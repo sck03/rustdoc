@@ -17,6 +17,7 @@ import { AttachmentDraftFields } from "../../ui/AttachmentDraftFields.tsx";
 import { HandlingServicePicker } from "./HandlingServicePicker.tsx";
 import { PersonnelChangeFields } from "./PersonnelChangeFields.tsx";
 import { personnelChangeLabels } from "./oaModel.ts";
+import { OaDepartmentPicker } from "./OaDepartmentPicker.tsx";
 
 export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind; record?: OaRequest; onClose: () => void; onSaved: (record: OaRequest) => void }) {
   const operation = useOfficeOperation();
@@ -60,6 +61,7 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
     <form onSubmit={submit} onChangeCapture={() => setDirty(true)}><fieldset disabled={operation.busy} className="office-form-grid">
       {kind !== "personnel" && user.capabilities.usesOfficeRegister && !record && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={(value) => { setEmployee(value); setDirty(true); }} disabled={operation.busy} />}
       {kind !== "personnel" && !record && <OfficeApplicantIdentity user={user} />}
+      {kind !== "personnel" && !record && <OaDepartmentPicker client={client} user={user} employeeId={employee?.id} value={draft.departmentId} onChange={departmentId => setDraft(current => ({ ...current, departmentId }))} />}
       {kind !== "personnel" && record && <p className="office-field-wide">申请人：{requestPersonLabel(record.employeeName, record)}</p>}
       {kind === "personnel" && <PersonnelChangeFields client={client} user={user} draft={draft} setDraft={setDraft} />}
       <OfficeField label="申请标题" wide><input required maxLength={150} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></OfficeField>

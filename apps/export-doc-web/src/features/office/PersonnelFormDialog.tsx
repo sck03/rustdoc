@@ -5,6 +5,9 @@ import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
 import { usePersonnelOperation } from "./usePersonnelData.ts";
 import { employmentTypeLabels, readPersonnelCreate, readPersonnelUpdate } from "./personnelModel.ts";
 import { PersonnelIdentityFields } from "./PersonnelIdentityFields.tsx";
+import { JobTitleInput } from "./PersonnelJobTitleInput.tsx";
+import { usePersonnelPositions } from "./usePersonnelPositions.ts";
+import { PersonnelOrganizationEditor, emptyOrganization } from "./PersonnelOrganizationEditor.tsx";
 import { departmentOptions } from "../organization/organizationModel.ts";
 import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
 import { AttachmentDraftFields } from "../../ui/AttachmentDraftFields.tsx";
@@ -14,16 +17,19 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
   onClose: () => void; onSaved: (record: PersonnelRecord) => void;
 }) {
   const operation = usePersonnelOperation();
+  const positions = usePersonnelPositions(client, user, record?.employee.id);
   const attachments = useAttachmentDraft(record);
   const [requestKey] = useState(createRequestKey);
   const [hireDate, setHireDate] = useState(record?.hireDate ?? user.businessDate);
+  const [departmentId, setDepartmentId] = useState(record?.employee.departmentId ?? user.departmentId ?? "");
+  const [organization, setOrganization] = useState(emptyOrganization);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     void operation.run(signal => attachments.save(JSON.stringify(readPersonnelUpdate(form, 0)), signal,
       (current, signal) => current
         ? client.updatePersonnel({ id: current.employee.id, body: readPersonnelUpdate(form, current.versionNumber) }, { signal })
-        : client.createPersonnel({ body: readPersonnelCreate(form, requestKey) }, { signal }),
+        : client.createPersonnel({ body: { ...readPersonnelCreate(form, requestKey), organization } }, { signal }),
       (current, entry, signal) => {
         const body = new FormData(); body.set("file", entry.file); body.set("expectedVersion", String(current.versionNumber));
         return entry.kind === "document" ? client.uploadPersonnelAttachment({ id: current.employee.id, body }, { signal })
@@ -41,10 +47,10 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
         {canCorrectRegistration && <OfficeField label="工号（系统内唯一）"><input name="employeeNumber" required maxLength={40} defaultValue={record?.employee.employeeNumber} autoFocus={!record} /></OfficeField>}
         <OfficeField label="姓名"><input name="fullName" required maxLength={100} defaultValue={record?.profile.fullName ?? ""} autoFocus={Boolean(record)} /></OfficeField>
         {canCorrectRegistration && <>
-          <OfficeField label="所属部门"><select name="departmentId" required defaultValue={record?.employee.departmentId ?? user.departmentId ?? ""}>
+          <OfficeField label="所属部门"><select name="departmentId" required value={departmentId} onChange={event => setDepartmentId(event.target.value)}>
             <option value="">请选择部门</option>{departmentOptions(departments).filter((item) => item.isActive).map((item) => <option value={item.code} key={item.code}>{item.label}</option>)}
           </select></OfficeField>
-          <OfficeField label="岗位"><input name="jobTitle" required maxLength={120} defaultValue={record?.employee.jobTitle} /></OfficeField>
+          <OfficeField label="职位"><JobTitleInput defaultValue={record?.employee.jobTitle} positions={positions.data?.positions} /></OfficeField>
           <OfficeField label="入职日期"><input type="date" name="hireDate" required min="1900-01-01" max={user.businessDate} value={hireDate} onChange={(event) => setHireDate(event.target.value)} /></OfficeField>
           <label className="checkbox-field"><input name="onProbation" type="checkbox" defaultChecked={!record || record.employee.status === "Probation"} />入职时处于试用期</label>
         </>}
@@ -54,6 +60,7 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
         </select></OfficeField>
         <OfficeField label="试用截止日期（选填）"><input type="date" name="probationEndsOn" min={hireDate} defaultValue={record?.probationEndsOn ?? ""} /></OfficeField>
         <OfficeField label="合同截止日期（选填）"><input type="date" name="contractEndsOn" min={hireDate} defaultValue={record?.contractEndsOn ?? ""} /></OfficeField>
+        {!record && <PersonnelOrganizationEditor client={client} company={user.companyScope} departments={departments} primaryDepartment={departmentId} value={organization} onChange={setOrganization} positions={positions.data?.positions} />}
       </fieldset>
       <fieldset className="office-form-grid" disabled={operation.busy}><legend>工作联系方式 · 公司通讯录可见</legend>
         <OfficeField label="工作邮箱"><input type="email" name="workEmail" maxLength={254} defaultValue={record?.profile.workEmail ?? ""} /></OfficeField>

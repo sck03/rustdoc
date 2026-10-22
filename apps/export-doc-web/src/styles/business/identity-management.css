@@ -192,6 +192,8 @@
   font-size: var(--edm-font-size-xs);
 }
 .permission-template-status strong { color: var(--edm-primary-700); }
+.permission-scheme-sources { display: flex; flex-wrap: wrap; gap: 12px; min-width: 0; margin-bottom: 12px; }
+.permission-scheme-sources p { flex-basis: 100%; margin: 0; }
 .permission-module-toolbar {
   display: flex;
   align-items: center;

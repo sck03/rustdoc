@@ -22,9 +22,10 @@ pub(crate) fn build(q: &PersonnelQuery<'_>, pg: bool) -> Result<(QuerySql, Strin
         clauses.push(scope.filter(&mut values, pg));
     }
     if !q.department.is_empty() {
-        clauses.push(format!(
-            "r.department={}",
-            sql::bind(&mut values, q.department, pg)
+        clauses.push(crate::generic_query::department_filter(
+            &sql::bind(&mut values, q.department, pg),
+            true,
+            pg,
         ));
     }
     let status = sql::field("status", pg);

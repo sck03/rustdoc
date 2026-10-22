@@ -138,6 +138,38 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
         .unwrap();
     policy["rules"][expense_rule]["mode"] = json!("Named");
     policy["rules"][expense_rule]["approverUserIds"] = json!([users[2]["id"], users[3]["id"]]);
+    // A named reviewer can never act on a colleague's request with own-only
+    // view or approval scope. Reject the unusable setup before any submission.
+    let mut scope_user = json!({"id":0,"versionNumber":0});
+    for (view, approve) in [("own", "company"), ("company", "own"), ("", "company")] {
+        let mut grants =
+            vec![json!({"resourceKey":"office.expenses","action":"approve","dataScope":approve})];
+        if !view.is_empty() {
+            grants.push(json!({"resourceKey":"office.expenses","action":"view","dataScope":view}));
+        }
+        scope_user = call(service, admin, if scope_user["id"] == 0 {CREATE_USER_ACCOUNT} else {UPDATE_USER_ACCOUNT}, scope_user["id"].as_i64().unwrap(),
+            Some(json!({"username":format!("scope-{suffix}"),"fullName":"审批范围校验","role":"OfficeEmployee","companyScope":company,"departmentId":leaf,"isActive":true,
+                "resetPassword":if scope_user["id"] == 0 {"Approval-Review-2026"} else {""},"expectedVersion":scope_user["versionNumber"],"permissionGrants":grants}))).unwrap()["user"].clone();
+        let mut invalid_policy = policy.clone();
+        invalid_policy["expectedVersion"] = json!(0);
+        invalid_policy["rules"][expense_rule]["approverUserIds"] = json!([scope_user["id"]]);
+        assert_eq!(
+            call(
+                service,
+                admin,
+                SAVE_OA_APPROVAL_SETTINGS,
+                0,
+                Some(invalid_policy)
+            )
+            .unwrap_err()
+            .status,
+            Some(400)
+        );
+        assert_eq!(
+            call(service, admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap()["versionNumber"],
+            0
+        );
+    }
     let now = chrono::Utc::now();
     policy["delegations"] = json!([{"key":"first-delegation","principalUserId":users[2]["id"],"delegateUserId":users[4]["id"],"startsAt":(now-chrono::Duration::hours(1)).to_rfc3339(),"endsAt":(now+chrono::Duration::days(1)).to_rfc3339(),"isActive":true}]);
     policy = settings(service, admin, policy);
@@ -201,7 +233,7 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
     assert_eq!(list(service, outsider, false)["totalCount"], 0);
     assert_eq!(list(service, delegate, false)["totalCount"], 1);
     assert_eq!(list(service, finance, true)["totalCount"], 0);
-    // Proxy queues must use the principal's current account and data scope too.
+    // In-flight signatures prevent disabling or narrowing the principal's authority.
     let own_scope = call(
         service,
         admin,
@@ -231,44 +263,33 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
         for (key, value) in change.as_object().unwrap() {
             update[key] = value.clone();
         }
-        let saved = call(
+        let rejected = call(
             service,
             admin,
             UPDATE_USER_ACCOUNT,
             users[2]["id"].as_i64().unwrap(),
             Some(update),
         )
-        .unwrap();
-        assert_eq!(list(service, delegate, false)["totalCount"], 0);
+        .unwrap_err();
+        assert_eq!(rejected.status, Some(409));
+        assert_eq!(list(service, delegate, false)["totalCount"], 1);
         assert_eq!(
             call(service, delegate, operation("expense", "get"), id, None).unwrap()["canReview"],
-            false
+            true
         );
+        let unchanged = call(service, admin, LIST_USERS, 0, None).unwrap();
         assert_eq!(
-            call(
-                service,
-                delegate,
-                operation("expense", "approve"),
-                id,
-                Some(json!({"expectedVersion":row["versionNumber"],"note":"原审批人权限已失效"}))
-            )
-            .unwrap_err()
-            .status,
-            Some(403)
+            unchanged["users"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|u| u["id"] == account["id"])
+                .unwrap()["versionNumber"],
+            account["versionNumber"]
         );
-        let mut restore = account;
-        restore["expectedVersion"] = saved["user"]["versionNumber"].clone();
-        call(
-            service,
-            admin,
-            UPDATE_USER_ACCOUNT,
-            users[2]["id"].as_i64().unwrap(),
-            Some(restore),
-        )
-        .unwrap();
         assert_eq!(list(service, delegate, false)["totalCount"], 1);
     }
-    // Account mutations revoke old sessions, including after restoring permissions.
+    // A fresh login sees the unchanged, still-valid principal permissions.
     let refreshed_first = call(
         service,
         "",

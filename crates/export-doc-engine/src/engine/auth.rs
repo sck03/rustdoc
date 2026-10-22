@@ -72,6 +72,8 @@ fn seed_admin(store: &Store, password: &str) -> Result<()> {
         department: "GENERAL".into(),
         admin: true,
         grants: vec![],
+        departments: vec![],
+        oa_assigned_only: false,
     };
     let (salt, hash) = password_hash(password)?;
     store.transaction(|transaction| {
@@ -192,35 +194,27 @@ impl Sessions {
             session_version_in(tx, &current)
         })?;
         let token = nonce().map_err(unavailable)? + &nonce().map_err(unavailable)?;
-        self.values
+        let now = Utc::now();
+        let expires = now + Duration::hours(12);
+        let mut values = self
+            .values
             .lock()
-            .map_err(|_| unavailable("会话状态异常。"))?
-            .insert(
-                token.clone(),
-                (
-                    record["id"].as_i64().unwrap_or(0),
-                    Utc::now() + Duration::hours(12),
-                    version,
-                ),
-            );
+            .map_err(|_| unavailable("会话状态异常。"))?;
+        values.retain(|_, (_, deadline, _)| *deadline > now);
+        values.insert(
+            token.clone(),
+            (record["id"].as_i64().unwrap_or(0), expires, version),
+        );
+        drop(values);
         Ok(
-            json!({"accessToken":token,"tokenType":"Bearer","expiresAt":(Utc::now()+Duration::hours(12)).to_rfc3339(),"expiresAtUtc":(Utc::now()+Duration::hours(12)).to_rfc3339(),"user":user_dto(store,&record,clock)?}),
+            json!({"accessToken":token,"tokenType":"Bearer","expiresAt":expires.to_rfc3339(),"expiresAtUtc":expires.to_rfc3339(),"user":user_dto(store,&record,clock)?}),
         )
     }
     pub fn actor(&self, store: &Store, token: &str) -> Result<Actor> {
-        let (id, version) = {
-            let mut values = self
-                .values
-                .lock()
-                .map_err(|_| unavailable("会话状态异常。"))?;
-            values.retain(|_, (_, expires, _)| *expires > Utc::now());
-            values
-                .get(token)
-                .map(|(id, _, version)| (*id, *version))
-                .ok_or_else(|| error(401, "会话已过期，请重新登录。"))?
-        };
+        let (id, version) = self.identity(token)?;
         let user = store.get("users", id)?;
         if user["isActive"] != true {
+            self.logout(token)?;
             return Err(error(401, "账号已停用。"));
         }
         if session_version(store, &user)? != version {
@@ -228,6 +222,22 @@ impl Sessions {
             return Err(error(401, "账号或权限已更新，请重新登录。"));
         }
         actor_from(store, &user)
+    }
+    fn identity(&self, token: &str) -> Result<(i64, (i64, i64))> {
+        let mut values = self
+            .values
+            .lock()
+            .map_err(|_| unavailable("会话状态异常。"))?;
+        if values
+            .get(token)
+            .is_some_and(|(_, expires, _)| *expires <= Utc::now())
+        {
+            values.remove(token);
+        }
+        values
+            .get(token)
+            .map(|(id, _, version)| (*id, *version))
+            .ok_or_else(|| error(401, "会话已过期，请重新登录。"))
     }
     pub fn logout(&self, token: &str) -> Result<()> {
         self.values
@@ -261,6 +271,22 @@ impl Sessions {
     }
 }
 
+#[test]
+fn expired_sessions_never_resolve_and_do_not_disturb_other_logins() {
+    let sessions = Sessions::default();
+    let now = Utc::now();
+    sessions.values.lock().unwrap().extend([
+        ("expired".into(), (1, now - Duration::seconds(1), (2, 3))),
+        ("active".into(), (4, now + Duration::hours(1), (5, 6))),
+    ]);
+    assert_eq!(sessions.identity("expired").unwrap_err().status, Some(401));
+    assert_eq!(sessions.identity("missing").unwrap_err().status, Some(401));
+    assert_eq!(sessions.identity("active").unwrap(), (4, (5, 6)));
+    assert!(!sessions.values.lock().unwrap().contains_key("expired"));
+    sessions.logout("active").unwrap();
+    assert_eq!(sessions.identity("active").unwrap_err().status, Some(401));
+}
+
 fn session_version(store: &Store, user: &Value) -> Result<(i64, i64)> {
     session_version_in(&*store.connection()?, user)
 }
@@ -290,6 +316,12 @@ fn actor_from_connection(
         name: user["fullName"].as_str().unwrap_or("").into(),
         company: user["companyScope"].as_str().unwrap_or("").into(),
         department: user["departmentId"].as_str().unwrap_or("").into(),
+        departments: match user.get("organizationDepartments") {
+            Some(value) => serde_json::from_value(value.clone())
+                .map_err(|_| unavailable("账号任职部门损坏。"))?,
+            None => vec![text(user, "departmentId")],
+        },
+        oa_assigned_only: super::account_permissions::assigned_only(connection, user)?,
         admin: user["role"] == "Admin",
         grants: grants
             .into_iter()
@@ -348,7 +380,30 @@ pub fn user_dto(
         })
     };
     user["capabilities"] = json!({"canManageSettings":actor.admin,"canManageUsers":actor.admin && actor.edition.allows("system.users"),"canViewAllBusinessData":actor.admin,"canUseDocumentWorkspace":workspace("document"),"canUseSalesWorkspace":workspace("sales"),"productEdition":actor.edition.name(),"enabledModules":enabled,"moduleAccess":access,"permissions":actor.grants,"usesOfficeRegister":store.provider()? == "SQLite","availableFeatures":["worklist","business-attachments"]});
+    user["capabilities"]["oaAssignedOnly"] = json!(actor.oa_assigned_only);
     Ok(user)
+}
+
+/// Company executives cover every office resource that exposes approval in the catalog.
+pub fn is_company_approver(actor: &Actor) -> bool {
+    !actor.oa_assigned_only
+        && permissions::catalog()
+            .resources
+            .iter()
+            .filter(|resource| {
+                resource.workspace == "office"
+                    && resource
+                        .actions
+                        .iter()
+                        .any(|action| action.key == "approve")
+            })
+            .all(|resource| {
+                scope_rank(actor, &resource.key, "view").min(scope_rank(
+                    actor,
+                    &resource.key,
+                    "approve",
+                )) >= 3
+            })
 }
 
 pub fn authorize(actor: &Actor, resource: &str, action: &str) -> Result<()> {
@@ -392,6 +447,8 @@ pub(super) fn data_scope<'a>(
     let mut scope = export_doc_storage::DataScope {
         company: &actor.company,
         department: &actor.department,
+        departments: &actor.departments,
+        personnel_memberships: resource == "office.people",
         user_id: actor.id,
         ..Default::default()
     };
@@ -434,7 +491,22 @@ pub fn visible(actor: &Actor, resource: &str, action: &str, record: &Value) -> b
                 "company" => record["companyScope"] == actor.company,
                 "department" => {
                     record["companyScope"] == actor.company
-                        && record["departmentId"] == actor.department
+                        && (record["departmentId"] == actor.department
+                            || actor
+                                .departments
+                                .iter()
+                                .any(|department| record["departmentId"] == *department)
+                            || (resource == "office.people"
+                                && record["organization"]["additionalAssignments"]
+                                    .as_array()
+                                    .is_some_and(|assignments| {
+                                        assignments.iter().any(|assignment| {
+                                            assignment["departmentId"] == actor.department
+                                                || actor.departments.iter().any(|department| {
+                                                    assignment["departmentId"] == *department
+                                                })
+                                        })
+                                    })))
                 }
                 "own" => {
                     record["companyScope"] == actor.company && record["ownerUserId"] == actor.id
@@ -511,7 +583,11 @@ pub fn template_visible(actor: &Actor, permission: &str, template: &Value) -> bo
             !actor.company.is_empty()
                 && !actor.department.is_empty()
                 && template["companyScope"] == actor.company
-                && template["departmentId"] == actor.department
+                && (template["departmentId"] == actor.department
+                    || actor
+                        .departments
+                        .iter()
+                        .any(|department| template["departmentId"] == *department))
         }
         _ => false,
     }

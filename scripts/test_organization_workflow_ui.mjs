@@ -1,0 +1,140 @@
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { withOfficeUi } from './lib/native-office-ui.mjs';
+
+await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, openPage, require }) => {
+  const login = await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' });
+  const token = login.accessToken;
+  const admin = await openPage('oa-review', 'Review-2026-Test');
+  for (const code of ['ORGOPS', 'ORGFIN', 'ORGEXEC']) await invoke('CreateOrganizationDepartment', { code, name: code, companyCode: 'DEFAULT', isActive: true }, {}, token);
+  const catalog = await invoke('ListPermissionTemplates', undefined, {}, token);
+  const approvalGrants = catalog.resources.filter(resource => resource.workspace === 'office' && resource.actions.some(action => action.key === 'approve'))
+    .flatMap(resource => ['view', 'approve'].map(action => ({ resourceKey: resource.key, action, dataScope: 'company' })));
+  const people = [], users = [];
+  for (const [index, name] of ['兼职员工', '会签甲', '会签乙', '执行总经理', '接任审批人'].entries()) {
+    const departmentId = index === 0 ? 'ORGOPS' : 'ORGEXEC';
+    const person = await invoke('CreatePersonnel', { requestKey: `org-ui-person-${index}`, employeeNumber: `ORG-UI-${index}`, departmentId,
+      jobTitle: index === 3 ? '总经理' : '普通员工', employmentType: 'FullTime', hireDate: '2026-09-01', profile: { fullName: name } }, {}, token);
+    const user = (await invoke('createUserAccount', { username: `org-ui-${index}`, fullName: name, role: 'OfficeEmployee', companyScope: 'DEFAULT', departmentId,
+      isActive: true, resetPassword: 'Org-Workflow-2026', ...(index > 0 ? { permissionGrants: approvalGrants, oaAssignedOnly: index !== 3 } : {}) }, {}, token)).user;
+    people.push(await invoke('LinkPersonnelAccount', { expectedVersion: person.versionNumber, userId: user.id, expectedAccountVersion: user.versionNumber }, { id: person.employee.id }, token));
+    users.push(user);
+  }
+  await admin.goto(`${url}/#/office/people/${people[0].employee.id}`);
+  await admin.getByRole('button', { name: '办理调岗', exact: true }).click();
+  const transfer = admin.getByRole('dialog', { name: /办理调岗/u });
+  await transfer.locator('summary').filter({ hasText: '兼职与汇报关系' }).click();
+  await transfer.getByRole('button', { name: '添加兼职部门', exact: true }).click();
+  await transfer.getByRole('combobox', { name: '兼职部门', exact: true }).selectOption('ORGFIN');
+  await transfer.getByRole('combobox', { name: '兼职职位', exact: true }).fill('财务协调专员');
+  const primary = transfer.getByRole('region', { name: '主职汇报', exact: true });
+  async function pick(region, button, name) {
+    await region.getByRole('button', { name: button, exact: true }).click();
+    const picker = admin.getByRole('dialog', { name: '选择部门负责人', exact: true });
+    await picker.getByRole('textbox', { name: '按姓名或工号搜索负责人' }).fill(name);
+    await picker.getByRole('button', { name: '搜索', exact: true }).click();
+    await picker.getByRole('button', { name: new RegExp(name, 'u') }).click();
+    await picker.waitFor({ state: 'hidden' });
+  }
+  await pick(primary, '选择直属负责人', '会签甲');
+  await pick(primary, '添加职能负责人', '会签乙');
+  await transfer.getByRole('textbox', { name: '办理说明（必填）', exact: true }).fill('建立兼职与双线汇报');
+  await transfer.getByRole('button', { name: '办理调岗', exact: true }).click();
+  await transfer.waitFor({ state: 'hidden' });
+  const updated = await invoke('GetPersonnel', undefined, { id: people[0].employee.id }, token);
+  assert.equal(updated.organization.additionalAssignments[0].departmentId, 'ORGFIN');
+  assert.equal(updated.organization.managerEmployeeId, people[1].employee.id);
+  assert.deepEqual(updated.organization.functionalManagerEmployeeIds, [people[2].employee.id]);
+  await admin.screenshot({ path: path.join(output, 'personnel-matrix.png'), fullPage: true });
+  await admin.goto(`${url}/#/system/organization`);
+  await admin.getByRole('button', { name: '编辑公司', exact: true }).click();
+  const company = admin.getByRole('dialog', { name: '编辑公司', exact: true });
+  await pick(company, '选择公司执行负责人', '执行总经理');
+  await company.locator('summary').filter({ hasText: '公司职位目录' }).click();
+  await company.getByRole('button', { name: '添加公司职位' }).click();
+  await company.getByRole('textbox', { name: '职位 1', exact: true }).fill('财务协调专员');
+  await company.getByRole('button', { name: '保存公司', exact: true }).click();
+  await company.waitFor({ state: 'hidden' });
+  const directory = await invoke('GetOrganizationDirectory', undefined, {}, token);
+  assert.equal(directory.companies.find(c => c.code === 'DEFAULT').executiveEmployeeId, people[3].employee.id);
+  await admin.locator('[aria-label="公司信息"]').getByRole('link', { name: /执行总经理/u }).waitFor();
+  await admin.screenshot({ path: path.join(output, 'company-executive.png'), fullPage: true });
+  await admin.goto(`${url}/#/office/people`);
+  await admin.getByRole('button', { name: '入职登记', exact: true }).click();
+  const hire = admin.getByRole('dialog', { name: '入职登记', exact: true });
+  await hire.getByRole('textbox', { name: '工号（系统内唯一）', exact: true }).fill('ORG-UI-HIRE');
+  await hire.getByRole('textbox', { name: '姓名', exact: true }).fill('直接入职兼职人员');
+  await hire.getByRole('combobox', { name: '所属部门', exact: true }).selectOption('ORGOPS');
+  await hire.getByRole('combobox', { name: '职位', exact: true }).fill('财务协调专员');
+  await hire.locator('summary').filter({ hasText: '兼职与汇报关系' }).click();
+  await hire.getByRole('button', { name: '添加兼职部门', exact: true }).click();
+  await hire.getByRole('combobox', { name: '兼职部门', exact: true }).selectOption('ORGFIN');
+  await pick(hire.getByRole('region', { name: '主职汇报', exact: true }), '选择直属负责人', '执行总经理');
+  await hire.getByRole('button', { name: '登记入职', exact: true }).click();
+  await hire.waitFor({ state: 'hidden' });
+  const hired = (await invoke('ListPersonnel', undefined, { keyword: 'ORG-UI-HIRE' }, token)).items.find(person => person.employeeNumber === 'ORG-UI-HIRE');
+  assert(hired, 'Direct hire must be saved once through the actual form');
+  const hireDetails = await invoke('GetPersonnel', undefined, { id: hired.id }, token);
+  assert.equal(hireDetails.organization.managerEmployeeId, people[3].employee.id);
+  assert.equal(hireDetails.organization.additionalAssignments[0].departmentId, 'ORGFIN');
+  await admin.goto(`${url}/#/office/approval-settings`);
+  const general = admin.getByRole('region', { name: '通用申请审批规则', exact: true });
+  await general.getByRole('combobox', { name: '审批方式', exact: true }).selectOption('Configured');
+  const stage1 = general.getByRole('group', { name: '第 1 阶段', exact: true });
+  await stage1.getByRole('combobox', { name: '审批人来源', exact: true }).selectOption('Named');
+  for (const index of [1, 2]) {
+    await stage1.getByRole('button', { name: '添加会签人' }).click();
+    await stage1.getByRole('combobox', { name: `会签人 ${index}`, exact: true }).selectOption(String(users[index].id));
+  }
+  await general.getByRole('button', { name: '添加审批阶段' }).click();
+  await general.getByRole('group', { name: '第 2 阶段', exact: true }).getByRole('combobox', { name: '审批人来源', exact: true }).selectOption('CompanyExecutive');
+  const purchase = admin.getByRole('region', { name: '采购申请审批规则', exact: true });
+  await purchase.locator('summary').filter({ hasText: '金额条件审批' }).click();
+  await purchase.getByRole('button', { name: '添加金额条件' }).click();
+  await purchase.getByRole('textbox', { name: '金额下限（含）', exact: true }).fill('1000');
+  await purchase.getByRole('combobox', { name: '审批人来源', exact: true }).selectOption('CompanyExecutive');
+  const savedPolicy = admin.waitForResponse(response => response.request().method() === 'PUT' && response.url().endsWith('/api/office/approval-settings'));
+  await admin.getByRole('button', { name: '保存审批设置', exact: true }).click();
+  assert.equal((await savedPolicy).status(), 200);
+  const policy = await invoke('GetOaApprovalSettings', undefined, {}, token);
+  assert.deepEqual(policy.rules.find(r => r.kind === 'general').stages[0].approverUserIds, [users[1].id, users[2].id]);
+  assert.equal(policy.rules.find(r => r.kind === 'purchase').amountBranches[0].minimum, '1000');
+  await admin.screenshot({ path: path.join(output, 'workflow-conditions.png'), fullPage: true });
+  const workerLogin = await invoke('Login', { username: 'org-ui-0', password: 'Org-Workflow-2026' });
+  assert.equal(workerLogin.user.employee.organization.additionalAssignments[0].departmentId, 'ORGFIN');
+  const draft = await invoke('CreateGeneralRequest', { requestKey: 'org-ui-approval', employeeId: people[0].employee.id, departmentId: 'ORGFIN', title: '兼职部门会签申请', reason: '真实界面闭环测试', category: 'Other' }, {}, token);
+  let row = await invoke('SubmitGeneralRequest', { expectedVersion: draft.versionNumber, note: '发起会签' }, { id: draft.id }, token);
+  const first = await openPage('org-ui-1', 'Org-Workflow-2026');
+  await first.goto(`${url}/#/office/requests/general?requestId=${row.id}`);
+  await first.getByRole('button', { name: '登记批准结果', exact: true }).click();
+  await first.getByRole('textbox', { name: '处理说明', exact: true }).fill('会签甲通过');
+  await first.getByRole('dialog').getByRole('button', { name: '登记批准结果', exact: true }).click();
+  await first.getByRole('dialog').waitFor({ state: 'hidden' });
+  row = await invoke('GetGeneralRequest', undefined, { id: row.id }, token);
+  assert.equal(row.status, 'Pending');
+  assert.equal(row.approvalPlan.steps[1].status, 'Waiting');
+  await admin.goto(`${url}/#/office/requests/general?requestId=${row.id}`);
+  await admin.getByRole('button', { name: '移交未完成审批', exact: true }).click();
+  const handover = admin.getByRole('dialog', { name: '移交未完成审批', exact: true });
+  await handover.getByRole('combobox', { name: '原审批人', exact: true }).selectOption(String(users[2].id));
+  await handover.getByRole('combobox', { name: '接任审批人', exact: true }).selectOption(String(users[4].id));
+  await handover.getByRole('textbox', { name: '移交原因', exact: true }).fill('调岗前移交未完成会签');
+  await handover.getByRole('button', { name: '确认移交审批', exact: true }).click();
+  await handover.waitFor({ state: 'hidden' });
+  row = await invoke('GetGeneralRequest', undefined, { id: row.id }, token);
+  assert.equal(row.approvalPlan.steps[1].approverUserId, users[4].id);
+  const old = (await invoke('Login', { username: 'org-ui-2', password: 'Org-Workflow-2026' })).accessToken;
+  await assert.rejects(() => invoke('GetGeneralRequest', undefined, { id: row.id }, old), /403/u);
+  for (const index of [4, 3]) {
+    const approver = (await invoke('Login', { username: `org-ui-${index}`, password: 'Org-Workflow-2026' })).accessToken;
+    row = await invoke('ApproveGeneralRequest', { expectedVersion: row.versionNumber, note: '完成剩余签署' }, { id: row.id }, approver);
+  }
+  assert.equal(row.status, 'Approved');
+  await first.reload();
+  await first.getByRole('heading', { name: row.title, exact: true }).waitFor();
+  await first.setViewportSize({ width: 390, height: 844 });
+  assert(await first.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+  const axe = require('axe-core'); await first.addScriptTag({ content: axe.source });
+  assert.deepEqual((await first.evaluate(() => window.axe.run(document.querySelector('main'), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } }))).violations, []);
+  await first.screenshot({ path: path.join(output, 'countersign-completed-mobile.png'), fullPage: true });
+});

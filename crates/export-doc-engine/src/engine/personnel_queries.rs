@@ -36,6 +36,7 @@ fn directory_entry(
 }
 
 pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value> {
+    record["organization"] = super::personnel_organization::project(tx, &record)?;
     record["account"] = super::personnel_accounts::current_account(tx, &record)?;
     if record.get("attachments").is_none() {
         record["attachments"] = json!([]);
@@ -96,12 +97,13 @@ pub fn options(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result
         .collect();
     let actions = super::oa::personnel_changes::required_actions(tx, actor)?;
     Ok(
-        json!({"departments":departments,"canCreate":auth::authorize(actor,"office.people","create").is_ok(),"approvalRequiredActions":actions}),
+        json!({"departments":departments,"positions":tx.find_identity("companies", &store::normalize(&company))?.and_then(|c| c.get("positions").cloned()).unwrap_or(json!([])),"canCreate":auth::authorize(actor,"office.people","create").is_ok(),"approvalRequiredActions":actions}),
     )
     })
 }
 
 const DIRECTORY_FIELDS: &[(&str, &str)] = &[
+    ("organization", "organization"),
     ("employee", "employee"),
     ("companyScope", "companyScope"),
     ("departmentId", "departmentId"),

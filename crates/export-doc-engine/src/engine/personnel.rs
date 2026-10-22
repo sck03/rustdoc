@@ -74,12 +74,20 @@ pub fn save(
             return Err(unavailable("人员关联账号不符合公司或角色约束。"));
         }
         let departed = value["status"] == "Departed";
+        let organization_departments = json!(if departed {
+            vec![]
+        } else {
+            super::personnel_organization::departments(&value)?
+        });
         if user["fullName"] != value["profile"]["fullName"]
             || user["departmentId"] != value["departmentId"]
             || (departed && user["isActive"] == true)
+            || user["organizationDepartments"] != organization_departments
+            || matches!(event_action, "Transfer" | "Rehire")
         {
             user["fullName"] = value["profile"]["fullName"].clone();
             user["departmentId"] = value["departmentId"].clone();
+            user["organizationDepartments"] = organization_departments;
             if departed {
                 user["isActive"] = json!(false);
             }
@@ -93,6 +101,7 @@ pub fn save(
                 actor,
                 "personnel-sync",
             )?;
+            super::oa::approval_references::validate_account(tx, actor, &user)?;
         }
         value["account"] = contracts::dto(contracts::schema("PersonnelAccountRecord"), user);
     }

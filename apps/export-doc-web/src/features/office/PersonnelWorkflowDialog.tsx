@@ -6,14 +6,19 @@ import { type PersonnelWorkflow } from "./personnelModel.ts";
 import { applyPersonnelWorkflow, usePersonnelClearance, usePersonnelOperation } from "./usePersonnelData.ts";
 import { personnelChangeLabels } from "../oa/oaModel.ts";
 import { departmentOptions } from "../organization/organizationModel.ts";
+import { JobTitleInput } from "./PersonnelJobTitleInput.tsx";
+import { usePersonnelPositions } from "./usePersonnelPositions.ts";
+import { PersonnelOrganizationEditor, emptyOrganization } from "./PersonnelOrganizationEditor.tsx";
 
 export function PersonnelWorkflowDialog({ client, user, record, action, departments, onClose }: {
   client: ExportDocManagerApiClient; user: ApiUserDto; record: PersonnelRecord; action: PersonnelWorkflow;
   departments: PersonnelDepartmentRecord[]; onClose: () => void;
 }) {
   const operation = usePersonnelOperation();
+  const positions = usePersonnelPositions(client, user, record.employee.id);
   const clearance = usePersonnelClearance(client, user, record.employee.id);
   const [departmentId, setDepartmentId] = useState(record.employee.departmentId);
+  const [organization, setOrganization] = useState(action === "Rehire" ? emptyOrganization() : record.organization ?? emptyOrganization());
   const changesJob = action === "Transfer" || action === "Rehire";
   const needsClearance = action === "Depart" || action === "Transfer";
   const blocked = needsClearance && (clearance.isFetching || clearance.isError ||
@@ -25,6 +30,7 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
     void operation.run((signal) => applyPersonnelWorkflow(client, record.employee.id, action, {
       expectedVersion: record.versionNumber, effectiveDate: String(form.get("effectiveDate") ?? ""), note: String(form.get("note") ?? ""),
       departmentId: changesJob ? departmentId : null, jobTitle: changesJob ? String(form.get("jobTitle") ?? "") : null, onProbation: form.has("onProbation"),
+      ...(changesJob ? { organization } : {}),
     }, signal), onClose);
   }
   return <OfficeDialog title={`办理${personnelChangeLabels[action]} · ${record.employee.fullName}`} onClose={onClose} {...operation} protectChanges>
@@ -44,7 +50,8 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
       {changesJob && <>
         <OfficeField label="新部门"><select required value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}><option value="">请选择部门</option>
           {departmentOptions(departments).filter((item) => item.isActive).map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}</select></OfficeField>
-        <OfficeField label="新岗位"><input name="jobTitle" required maxLength={120} defaultValue={record.employee.jobTitle} /></OfficeField>
+        <OfficeField label="新职位"><JobTitleInput defaultValue={record.employee.jobTitle} positions={positions.data?.positions} /></OfficeField>
+        <PersonnelOrganizationEditor client={client} company={record.companyScope ?? user.companyScope} departments={departments} primaryDepartment={departmentId} value={organization} onChange={setOrganization} />
       </>}
       {action === "Rehire" && <label className="checkbox-field"><input type="checkbox" name="onProbation" defaultChecked />返聘后先进入试用期</label>}
       <OfficeField label="办理说明（必填）" wide><textarea name="note" required maxLength={500} rows={3} /></OfficeField>

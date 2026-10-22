@@ -338,10 +338,25 @@ pub fn exercise(service: &NativeService, admin: &str) {
         .unwrap();
     assert_eq!(linked["employee"]["id"], id);
     assert_eq!(linked["employee"]["jobTitle"], "业务员");
+    let mut summary_keys = linked["employee"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    summary_keys.sort_unstable();
     assert_eq!(
-        linked["employee"].as_object().unwrap().len(),
-        5,
-        "Account summary excludes private HR data"
+        summary_keys,
+        [
+            "departmentId",
+            "employeeNumber",
+            "fullName",
+            "id",
+            "jobTitle",
+            "organization",
+            "status"
+        ],
+        "Account summary exposes only the approved employment fields"
     );
     for active in [false, true] {
         let saved = call(service, admin, UPDATE_USER_ACCOUNT, account["id"].as_i64().unwrap(), Some(json!({

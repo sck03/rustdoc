@@ -102,7 +102,7 @@ fn roundtrip(connection: &Connection) {
             .len(),
         1
     );
-    let body = json!({"versionNumber":1,"ownerUserId":7,"companyScope":"公司é","departmentId":"销售部","currentApproverId":7,"amount":123456.789,"items":["零件",null]});
+    let body = json!({"versionNumber":1,"ownerUserId":7,"companyScope":"公司é","departmentId":"销售部","currentApproverId":7,"approvalPlan":{"steps":[{"approverUserId":7,"status":"Waiting"}]},"amount":123456.789,"items":["零件",null]});
     connection.begin().unwrap();
     let id = connection
         .insert(&RecordWrite {
@@ -115,7 +115,7 @@ fn roundtrip(connection: &Connection) {
     for (department, count) in [("其他部门", 0), ("销售部", 1)] {
         let approvers = [export_doc_storage::RecordApprover {
             user_id: 7,
-            department: Some(department.into()),
+            departments: Some(vec![department.into()]),
         }];
         let query = export_doc_storage::RecordQuery {
             kind: "contract",

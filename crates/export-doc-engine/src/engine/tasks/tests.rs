@@ -31,6 +31,8 @@ impl Fixture {
                 department: "GENERAL".into(),
                 admin: false,
                 grants: vec![],
+                departments: vec![],
+                oa_assigned_only: false,
             },
         }
     }
@@ -378,6 +380,8 @@ fn retry_survives_restart_reauthorizes_and_keeps_private_requests_off_the_wire()
             &Actor {
                 admin: false,
                 grants: vec![],
+                departments: vec![],
+                oa_assigned_only: false,
                 ..actor.clone()
             },
             &id

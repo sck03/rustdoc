@@ -89,7 +89,7 @@ pub struct RecordWrite<'a> {
 /// One eligible approval principal and its optional department restriction.
 pub struct RecordApprover {
     pub user_id: i64,
-    pub department: Option<String>,
+    pub departments: Option<Vec<String>>,
 }
 /// Indexed, bounded reads with authorization scope applied before pagination.
 #[derive(Default)]
@@ -97,12 +97,15 @@ pub struct RecordQuery<'a> {
     pub kind: &'a str,
     pub company: &'a str,
     pub department: Option<&'a str>,
+    pub departments: Option<&'a [String]>,
     pub owner: Option<i64>,
     pub employee: Option<i64>,
     pub parent: Option<i64>,
     pub status: Option<&'a str>,
     pub approvers: Option<&'a [RecordApprover]>,
     pub approval_actor: Option<i64>,
+    pub visible_user: Option<i64>,
+    pub visible_principals: &'a [RecordApprover],
     pub exclude_owner: Option<i64>,
     pub exclude_applicant: Option<i64>,
     pub handling_key: Option<&'a str>,

@@ -8,6 +8,31 @@ use export_doc_storage::{Connection, DataScope, GenericQuery, PersonnelQuery};
 use serde_json::{Value, json};
 use std::collections::{HashMap, hash_map::Entry};
 
+pub fn check_references(connection: &Connection, kind: &str, record: &Value) -> Result<()> {
+    let code = &record["code"];
+    if kind == "companies" && !record["executiveEmployeeId"].is_null() {
+        return Err(conflict("公司仍有执行负责人，不能删除。"));
+    }
+    for resource in super::catalog::RESOURCES {
+        for item in store::all(connection, resource.key)? {
+            let referenced = if kind == "companies" {
+                item["companyScope"] == *code || item["companyCode"] == *code
+            } else {
+                item["departmentId"] == *code
+                    || item["parentCode"] == *code
+                    || (resource.key == "people"
+                        && super::personnel_organization::departments(&item)?
+                            .iter()
+                            .any(|department| *code == *department))
+            };
+            if item["id"] != record["id"] && referenced {
+                return Err(conflict("目录存在下级、账号或业务引用，不能删除。"));
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn validate_assignment(connection: &Connection, company: &str, department: &str) -> Result<()> {
     if company.is_empty() && department.is_empty() {
         return Ok(());
@@ -39,6 +64,20 @@ pub fn departments(store: &Store) -> Result<Vec<Value>> {
     let mut rows = store.catalog("departments")?;
     enrich_departments(store, &mut rows)?;
     Ok(rows)
+}
+pub fn companies(store: &Store) -> Result<Vec<Value>> {
+    store.read(|tx| {
+        store::all(tx, "companies")?
+            .into_iter()
+            .map(|mut company| {
+                company["executiveName"] = match company["executiveEmployeeId"].as_i64() {
+                    Some(id) => json!(text(&store::get(tx, "people", id)?, "profile.fullName")),
+                    None => json!(""),
+                };
+                Ok(company)
+            })
+            .collect()
+    })
 }
 pub(super) fn project(tx: &Connection, row: Value) -> Result<Value> {
     let mut department = crate::contracts::overlay(
@@ -189,7 +228,36 @@ pub fn validate(
         return Err(invalid("已有目录代码不能修改。"));
     }
     if kind == "companies" {
+        if let Some(positions) = value.get("positions") {
+            let positions = positions
+                .as_array()
+                .filter(|p| p.len() <= 200)
+                .ok_or_else(|| invalid("公司职位目录最多二百项。"))?;
+            let mut seen = std::collections::HashSet::new();
+            for position in positions {
+                required(position, "name", "职位名称", 120)?;
+                if !position["isActive"].is_boolean()
+                    || !seen.insert(search_key(&text(position, "name")))
+                {
+                    return Err(invalid("职位名称不能重复，启用状态须有效。"));
+                }
+            }
+        }
+        if let Some(id) = value["executiveEmployeeId"].as_i64() {
+            let person = super::personnel_organization::active_person(connection, &code, id)?;
+            let user =
+                super::records::positive(&person["account"], "id", "公司执行负责人关联账号")?;
+            let reviewer = super::auth::current_actor_in(connection, user, actor.edition)?;
+            if !super::auth::is_company_approver(&reviewer) {
+                return Err(invalid(
+                    "公司执行负责人须具有本公司全部人事、行政及资源申请的查看/审批权限，且不能限制为仅分派可见；请先分配公司审批方案。",
+                ));
+            }
+        }
         if value["isActive"] == false {
+            if !value["executiveEmployeeId"].is_null() {
+                return Err(conflict("停用公司前须移交或清除公司执行负责人。"));
+            }
             if exists(
                 connection,
                 "departments",

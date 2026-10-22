@@ -51306,6 +51306,1035 @@
         }
       }
     },
+    "/api/office/personnel-requests/{id}/approval-reassign": {
+      "post": {
+        "tags": [
+          "Office approvals"
+        ],
+        "operationId": "ReassignPersonnelChangeRequestApproval",
+        "x-exportdoc-office": {
+          "kind": "personnel",
+          "action": "approval-reassign",
+          "resource": "office.personnel-changes",
+          "permission": "view"
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OaRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.users",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OaApprovalReassign"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/office/leave-requests/{id}/approval-reassign": {
+      "post": {
+        "tags": [
+          "Office approvals"
+        ],
+        "operationId": "ReassignLeaveRequestApproval",
+        "x-exportdoc-office": {
+          "kind": "leave",
+          "action": "approval-reassign",
+          "resource": "office.leave",
+          "permission": "view"
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OaRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.users",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OaApprovalReassign"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/office/overtime-requests/{id}/approval-reassign": {
+      "post": {
+        "tags": [
+          "Office approvals"
+        ],
+        "operationId": "ReassignOvertimeRequestApproval",
+        "x-exportdoc-office": {
+          "kind": "overtime",
+          "action": "approval-reassign",
+          "resource": "office.overtime",
+          "permission": "view"
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OaRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.users",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OaApprovalReassign"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/office/expense-requests/{id}/approval-reassign": {
+      "post": {
+        "tags": [
+          "Office approvals"
+        ],
+        "operationId": "ReassignExpenseRequestApproval",
+        "x-exportdoc-office": {
+          "kind": "expense",
+          "action": "approval-reassign",
+          "resource": "office.expenses",
+          "permission": "view"
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OaRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.users",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OaApprovalReassign"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/office/travel-requests/{id}/approval-reassign": {
+      "post": {
+        "tags": [
+          "Office approvals"
+        ],
+        "operationId": "ReassignTravelRequestApproval",
+        "x-exportdoc-office": {
+          "kind": "travel",
+          "action": "approval-reassign",
+          "resource": "office.travel",
+          "permission": "view"
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OaRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.users",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OaApprovalReassign"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/office/purchase-requests/{id}/approval-reassign": {
+      "post": {
+        "tags": [
+          "Office approvals"
+        ],
+        "operationId": "ReassignPurchaseRequestApproval",
+        "x-exportdoc-office": {
+          "kind": "purchase",
+          "action": "approval-reassign",
+          "resource": "office.purchase",
+          "permission": "view"
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OaRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.users",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OaApprovalReassign"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/office/general-requests/{id}/approval-reassign": {
+      "post": {
+        "tags": [
+          "Office approvals"
+        ],
+        "operationId": "ReassignGeneralRequestApproval",
+        "x-exportdoc-office": {
+          "kind": "general",
+          "action": "approval-reassign",
+          "resource": "office.general",
+          "permission": "view"
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OaRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.users",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OaApprovalReassign"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
     "/api/office/announcements": {
       "get": {
         "tags": [
@@ -54026,6 +55055,265 @@
         ]
       }
     },
+    "/api/invoices/seals/image": {
+      "post": {
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "SaveInvoiceSealImage",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiInvoiceSealImageSaveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiInvoiceSealImageSaveResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": {
+            "readModule": "document.invoices",
+            "writeModule": null,
+            "readAccessLevel": null,
+            "writeAccessLevel": null,
+            "selector": 0,
+            "disabled": false,
+            "overridesParent": false
+          },
+          "requirements": [],
+          "permissionBypass": false
+        }
+      }
+    },
+    "/api/diagnostics/metrics": {
+      "get": {
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "GetRuntimeMetrics",
+        "responses": {
+          "200": {
+            "description": "Process counters and retained task counts; no business data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiRuntimeMetricsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Administrator required"
+          },
+          "503": {
+            "description": "Dependency unavailable"
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": false,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.settings",
+              "action": "view"
+            }
+          ],
+          "permissionBypass": false
+        }
+      }
+    },
+    "/api/office/people/reporting-options": {
+      "get": {
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "ListPersonnelReportingOptions",
+        "parameters": [
+          {
+            "name": "companyCode",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageNumber",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagedResultOfOrganizationManagerRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "office.people",
+              "action": "view"
+            }
+          ],
+          "permissionBypass": false
+        }
+      }
+    },
     "/api/office/people/{id}/account/unlink": {
       "post": {
         "tags": [
@@ -54587,115 +55875,6 @@
               }
             }
           }
-        }
-      }
-    },
-    "/api/invoices/seals/image": {
-      "post": {
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "SaveInvoiceSealImage",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiInvoiceSealImageSaveRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiInvoiceSealImageSaveResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "503": {
-            "description": "Service Unavailable"
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "permissions": {
-            "readModule": "document.invoices",
-            "writeModule": null,
-            "readAccessLevel": null,
-            "writeAccessLevel": null,
-            "selector": 0,
-            "disabled": false,
-            "overridesParent": false
-          },
-          "requirements": [],
-          "permissionBypass": false
-        }
-      }
-    },
-    "/api/diagnostics/metrics": {
-      "get": {
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "GetRuntimeMetrics",
-        "responses": {
-          "200": {
-            "description": "Process counters and retained task counts; no business data.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiRuntimeMetricsResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication required"
-          },
-          "403": {
-            "description": "Administrator required"
-          },
-          "503": {
-            "description": "Dependency unavailable"
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": false,
-          "permissions": null,
-          "requirements": [
-            {
-              "resourceKey": "system.settings",
-              "action": "view"
-            }
-          ],
-          "permissionBypass": false
         }
       }
     },
@@ -63657,6 +64836,25 @@
               "string"
             ],
             "format": "int32"
+          },
+          "executiveEmployeeId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 1
+          },
+          "positions": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "$ref": "#/components/schemas/OrganizationPosition"
+            }
+          },
+          "executiveName": {
+            "type": "string",
+            "readOnly": true
           }
         }
       },
@@ -63685,6 +64883,21 @@
             ],
             "format": "int32",
             "default": 0
+          },
+          "executiveEmployeeId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 1
+          },
+          "positions": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "$ref": "#/components/schemas/OrganizationPosition"
+            }
           }
         }
       },
@@ -65989,6 +67202,11 @@
             "maxItems": 100,
             "default": [],
             "description": "Disabled modules are removed from both effective permissions and navigation."
+          },
+          "oaAssignedOnly": {
+            "type": "boolean",
+            "default": false,
+            "description": "Restrict office requests to the user's own requests and explicitly assigned approval/handling work, within the ordinary data scopes."
           }
         }
       },
@@ -66021,6 +67239,11 @@
           },
           "isActive": {
             "type": "boolean"
+          },
+          "oaAssignedOnly": {
+            "type": "boolean",
+            "default": false,
+            "description": "Restrict office requests to the user's own requests and explicitly assigned approval/handling work, within the ordinary data scopes."
           }
         }
       },
@@ -66078,6 +67301,11 @@
             "maxItems": 100,
             "default": [],
             "description": "Disabled modules are removed from both effective permissions and navigation."
+          },
+          "oaAssignedOnly": {
+            "type": "boolean",
+            "default": false,
+            "description": "Restrict office requests to the user's own requests and explicitly assigned approval/handling work, within the ordinary data scopes."
           }
         }
       },
@@ -70550,6 +71778,11 @@
             "default": null,
             "readOnly": true,
             "description": "Current personnel link; maintained through personnel workflows, never account save input."
+          },
+          "oaAssignedOnly": {
+            "type": "boolean",
+            "default": false,
+            "description": "Restrict office requests to the user's own requests and explicitly assigned approval/handling work, within the ordinary data scopes."
           }
         }
       },
@@ -70613,6 +71846,11 @@
             "items": {
               "type": "string"
             }
+          },
+          "oaAssignedOnly": {
+            "type": "boolean",
+            "default": false,
+            "description": "Restrict office requests to the user's own requests and explicitly assigned approval/handling work, within the ordinary data scopes."
           }
         }
       },
@@ -71038,6 +72276,11 @@
             "maxItems": 100,
             "default": [],
             "description": "Disabled modules are removed from both effective permissions and navigation."
+          },
+          "oaAssignedOnly": {
+            "type": "boolean",
+            "default": false,
+            "description": "Restrict office requests to the user's own requests and explicitly assigned approval/handling work, within the ordinary data scopes."
           }
         }
       },
@@ -74925,6 +76168,13 @@
             "items": {
               "type": "string"
             }
+          },
+          "reportingCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "isCompanyExecutive": {
+            "type": "boolean"
           }
         }
       },
@@ -75019,6 +76269,9 @@
           },
           "profile": {
             "$ref": "#/components/schemas/PersonnelProfile"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/PersonnelOrganization"
           }
         }
       },
@@ -75216,6 +76469,12 @@
           },
           "canCreate": {
             "type": "boolean"
+          },
+          "positions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationPosition"
+            }
           },
           "approvalRequiredActions": {
             "type": "array",
@@ -75421,6 +76680,13 @@
             "type": "string",
             "default": ""
           },
+          "organization": {
+            "$ref": "#/components/schemas/PersonnelOrganization"
+          },
+          "companyScope": {
+            "type": "string",
+            "readOnly": true
+          },
           "approvalRequiredActions": {
             "type": "array",
             "readOnly": true,
@@ -75512,6 +76778,9 @@
           "onProbation": {
             "type": "boolean",
             "default": true
+          },
+          "organization": {
+            "$ref": "#/components/schemas/PersonnelOrganization"
           }
         }
       },
@@ -77288,6 +78557,9 @@
           },
           "registration": {
             "$ref": "#/components/schemas/PersonnelCreateRequest"
+          },
+          "organization": {
+            "$ref": "#/components/schemas/PersonnelOrganization"
           }
         },
         "required": [
@@ -77508,6 +78780,11 @@
           },
           "handlingKey": {
             "type": "string"
+          },
+          "departmentId": {
+            "type": "string",
+            "maxLength": 50,
+            "description": "Choose an active primary or additional assignment when creating a request; defaults to the primary department."
           }
         },
         "required": [
@@ -77744,6 +79021,10 @@
           "canHandle": {
             "type": "boolean"
           },
+          "companyScope": {
+            "type": "string",
+            "readOnly": true
+          },
           "employeeNumber": {
             "type": "string",
             "readOnly": true,
@@ -77864,6 +79145,15 @@
           },
           "delegationKey": {
             "type": "string"
+          },
+          "stage": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 9,
+            "description": "Zero-based countersign stage; omitted in serial plans, where each array position is its own stage."
           }
         },
         "required": [
@@ -77884,25 +79174,97 @@
             "enum": [
               "Single",
               "DepartmentChain",
-              "Named"
+              "Named",
+              "Configured"
             ]
           },
           "policyVersion": {
             "type": "integer",
             "format": "int64"
           },
+          "matchedBranch": {
+            "type": "string"
+          },
           "steps": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/OaApprovalStep"
             },
-            "maxItems": 10
+            "maxItems": 50
           }
         },
         "required": [
           "mode",
           "policyVersion",
           "steps"
+        ]
+      },
+      "OaApprovalStage": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "Named",
+              "DepartmentManager",
+              "LineManager",
+              "FunctionalManagers",
+              "CompanyExecutive"
+            ]
+          },
+          "approverUserIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "maxItems": 10,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "source",
+          "approverUserIds"
+        ]
+      },
+      "OaApprovalAmountBranch": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "minimum": {
+            "type": "string"
+          },
+          "maximum": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OaApprovalStage"
+            },
+            "maxItems": 10
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "currency",
+          "minimum",
+          "stages"
         ]
       },
       "OaApprovalRule": {
@@ -77925,7 +79287,8 @@
             "enum": [
               "Single",
               "DepartmentChain",
-              "Named"
+              "Named",
+              "Configured"
             ]
           },
           "approverUserIds": {
@@ -77933,6 +79296,20 @@
             "items": {
               "type": "integer",
               "format": "int64"
+            },
+            "maxItems": 10
+          },
+          "stages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OaApprovalStage"
+            },
+            "maxItems": 10
+          },
+          "amountBranches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OaApprovalAmountBranch"
             },
             "maxItems": 10
           }
@@ -78142,6 +79519,36 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "OaApprovalReassign": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fromUserId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "toUserId": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "fromUserId",
+          "toUserId",
+          "note"
         ]
       },
       "AnnouncementSave": {
@@ -78497,70 +79904,6 @@
           "totalCount",
           "pageNumber",
           "pageSize"
-        ]
-      },
-      "PersonnelUnlinkAccountRequest": {
-        "required": [
-          "expectedVersion",
-          "userId",
-          "expectedAccountVersion",
-          "reason"
-        ],
-        "type": "object",
-        "properties": {
-          "expectedVersion": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "userId": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "expectedAccountVersion": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 500
-          }
-        }
-      },
-      "PersonnelAttachment": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "fileName": {
-            "type": "string"
-          },
-          "mediaType": {
-            "type": "string"
-          },
-          "sizeBytes": {
-            "type": "integer",
-            "format": "int64"
-          }
-        },
-        "required": [
-          "id",
-          "fileName",
-          "mediaType",
-          "sizeBytes"
         ]
       },
       "ApiInvoicePrintRow": {
@@ -78984,8 +80327,187 @@
               "Active",
               "Departed"
             ]
+          },
+          "organization": {
+            "$ref": "#/components/schemas/PersonnelOrganization"
+          },
+          "departmentId": {
+            "type": "string"
           }
         }
+      },
+      "PersonnelAssignment": {
+        "type": "object",
+        "properties": {
+          "departmentId": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "jobTitle": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "managerEmployeeId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 1
+          },
+          "functionalManagerEmployeeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "maxItems": 10,
+            "uniqueItems": true
+          },
+          "managerName": {
+            "type": "string",
+            "readOnly": true
+          },
+          "functionalManagerNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "readOnly": true
+          }
+        },
+        "required": [
+          "departmentId",
+          "jobTitle",
+          "functionalManagerEmployeeIds"
+        ]
+      },
+      "PersonnelOrganization": {
+        "type": "object",
+        "properties": {
+          "managerEmployeeId": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 1
+          },
+          "functionalManagerEmployeeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "maxItems": 10,
+            "uniqueItems": true
+          },
+          "additionalAssignments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PersonnelAssignment"
+            },
+            "maxItems": 20
+          },
+          "managerName": {
+            "type": "string",
+            "readOnly": true
+          },
+          "functionalManagerNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "readOnly": true
+          }
+        },
+        "required": [
+          "functionalManagerEmployeeIds",
+          "additionalAssignments"
+        ]
+      },
+      "OrganizationPosition": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "isActive"
+        ]
+      },
+      "PersonnelUnlinkAccountRequest": {
+        "required": [
+          "expectedVersion",
+          "userId",
+          "expectedAccountVersion",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "userId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "expectedAccountVersion": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      },
+      "PersonnelAttachment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "id",
+          "fileName",
+          "mediaType",
+          "sizeBytes"
+        ]
       },
       "ApiBackupPlan": {
         "type": "object",

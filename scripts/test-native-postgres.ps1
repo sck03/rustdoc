@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$PostgresBin,
     [ValidateRange(60, 7200)][int]$TimeoutSeconds = 1800,
-    [ValidateSet('All', 'Storage', 'Engine', 'Capacity', 'Maintenance')][string]$Scope = 'All'
+    [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance')][string]$Scope = 'All'
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
@@ -37,9 +37,11 @@ $environment = @{
 $clusterStarted = $false
 $environment['EXPORTDOC_TEST_PG_BIN'] = $PostgresBin
 $databaseTargets = @()
-if ($Scope -in @('All', 'Storage')) { $databaseTargets += ,@('POSTGRES', 'native_storage') }
-if ($Scope -in @('All', 'Engine')) {
+if ($Scope -in @('All', 'Storage', 'Workflows')) { $databaseTargets += ,@('POSTGRES', 'native_storage') }
+if ($Scope -in @('All', 'Engine', 'Workflows')) {
     $databaseTargets += ,@('ENGINE', 'native_engine')
+}
+if ($Scope -in @('All', 'Engine')) {
     $databaseTargets += ,@('RECOVERY', 'native_recovery')
 }
 if ($Scope -eq 'Capacity') {
@@ -84,11 +86,14 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SEL
             $environment["EXPORTDOC_TEST_$($target[0])_$($role[0])"] = "host=127.0.0.1 port=$port user=$($role[1]) password=$password dbname=$($target[1]) sslmode=disable"
         }
     }
-    if ($Scope -in @('All', 'Storage')) {
+    if ($Scope -in @('All', 'Storage', 'Workflows')) {
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'contract', '--', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL storage contract'
     }
     if ($Scope -in @('All', 'Engine')) {
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--lib', '--test', 'team_service', '--', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL recovery and team workflows'
+    }
+    if ($Scope -eq 'Workflows') {
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--test', 'team_service', '--', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL team and organization workflows'
     }
     if ($Scope -eq 'Capacity') {
         $environment['EXPORTDOC_CAPACITY_ISOLATED'] = '1'

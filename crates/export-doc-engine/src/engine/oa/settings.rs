@@ -1,6 +1,6 @@
 //! Company-owned approval rules; settings changes never rewrite submitted plans.
 use super::*;
-use export_doc_domain::approval::{ApprovalMode, delegation_window};
+use export_doc_domain::{approval::delegation_window, approval_policy::ApprovalRule};
 use std::collections::HashSet;
 
 const STORAGE_KIND: &str = "oa-approval-settings";
@@ -72,28 +72,21 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         if !KINDS.contains(&format!("oa-{kind}").as_str()) || !kinds.insert(kind.clone()) {
             return Err(invalid("申请类型缺失或重复。"));
         }
-        let mode: ApprovalMode =
-            serde_json::from_value(rule["mode"].clone()).map_err(|_| invalid("审批模式无效。"))?;
-        let ids = rule["approverUserIds"]
-            .as_array()
-            .ok_or_else(|| invalid("审批人列表无效。"))?;
-        if (mode == ApprovalMode::Named && (ids.is_empty() || ids.len() > 10))
-            || (mode != ApprovalMode::Named && !ids.is_empty())
-        {
-            return Err(invalid("指定审批须为 1–10 人，其它模式不填写指定人。"));
-        }
-        let mut seen = HashSet::new();
-        for id in ids {
-            let id = id
-                .as_i64()
-                .filter(|id| *id > 0 && seen.insert(*id))
-                .ok_or_else(|| invalid("审批人无效或重复。"))?;
+        let typed: ApprovalRule =
+            serde_json::from_value(rule.clone()).map_err(|_| invalid("审批规则格式无效。"))?;
+        typed.validate().map_err(invalid)?;
+        for id in typed.account_ids() {
             let reviewer = account(tx, actor, id)?;
             let resource =
                 super::approval::resource(&kind).ok_or_else(|| invalid("申请类型无效。"))?;
-            auth::authorize(&reviewer, resource, "approve")
-                .map_err(|_| invalid("指定账号尚未获得该类申请的审批权限。"))?;
-            auth::authorize(&reviewer, resource, "view")?;
+            if auth::scope_rank(&reviewer, resource, "approve")
+                .min(auth::scope_rank(&reviewer, resource, "view"))
+                < 2
+            {
+                return Err(invalid(
+                    "指定审批人须有该类申请的部门或公司查看及审批权限；本人范围不能审批同事申请。",
+                ));
+            }
         }
     }
     let delegations = body["delegations"]

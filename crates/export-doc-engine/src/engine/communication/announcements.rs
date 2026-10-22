@@ -9,7 +9,10 @@ fn readable(actor: &Actor, row: &Value) -> Result<()> {
         || text(row, "startsAt") > now
         || text(row, "expiresAt") <= now
         || (!text(row, "audienceDepartment").is_empty()
-            && row["audienceDepartment"] != actor.department)
+            && !actor
+                .departments
+                .iter()
+                .any(|department| row["audienceDepartment"] == *department))
     {
         return Err(error(403, "此公告当前不在您的可见范围或有效期内。"));
     }
@@ -133,6 +136,8 @@ pub(super) fn handle(
         let (count, rows) = tx.query_communications(&CommunicationQuery {
             company: &actor.company,
             department: &actor.department,
+            departments: &actor.departments,
+            assigned_only: actor.oa_assigned_only,
             reader: actor.id,
             unread_only: unread(query)?,
             view: CommunicationView::Announcements {

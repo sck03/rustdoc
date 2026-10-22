@@ -3,6 +3,7 @@ import { hasPermission } from "../../app/PermissionAccessContext.tsx";
 import { officeBookingDefaults } from "../office/officeModel.ts";
 import { readPersonnelProfile } from "../office/personnelModel.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
+import { hasDepartment } from "../../app/permissionScope.ts";
 
 export type OaKind = OaRequest["kind"];
 export const personnelChangeLabels: Record<OaPersonnelChange["action"], string> = { Hire: "入职", Confirm: "转正", Transfer: "调岗", Depart: "离职", Rehire: "返聘" };
@@ -24,7 +25,7 @@ export function oaAccess(user: ApiUserDto, kind: OaKind, action: string, row?: O
   if (!hasPermission(user.capabilities.permissions, resource, action)) return false;
   if (row && kind === "general" && action === "complete" && row.canHandle !== undefined) return row.canHandle;
   return !row || user.capabilities.permissions.some((grant) => grant.resourceKey === resource && grant.action === action &&
-    (grant.dataScope === "all" || grant.dataScope === "company" || grant.dataScope === "department" && row.departmentId === user.departmentId || grant.dataScope === "own" && row.ownerUserId === user.id))
+    (grant.dataScope === "all" || grant.dataScope === "company" || grant.dataScope === "department" && hasDepartment(user, row.departmentId) || grant.dataScope === "own" && row.ownerUserId === user.id))
     || action === "view" && ((kind === "expense" && ["Approved", "HandedOff"].includes(row.status) && oaAccess(user, kind, "complete", row)) || kind === "general" && ["Approved", "Completed"].includes(row.status) && row.canHandle === true);
 }
 export function oaActions(row: OaRequest, user: ApiUserDto): OaActionName[] {

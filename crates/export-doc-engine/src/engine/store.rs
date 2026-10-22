@@ -35,6 +35,8 @@ pub struct Actor {
     pub name: String,
     pub company: String,
     pub department: String,
+    pub departments: Vec<String>,
+    pub oa_assigned_only: bool,
     pub admin: bool,
     pub grants: Vec<Value>,
 }

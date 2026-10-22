@@ -511,6 +511,15 @@ pub(super) fn save_in_transaction(
     if resource.key == "departments" {
         return super::organization::project(transaction, saved);
     }
+    if resource.key == "permission-templates" {
+        for user in store::all(transaction, "users")? {
+            if super::account_permissions::template(transaction, &user)?
+                .is_some_and(|template| template["id"] == saved["id"])
+            {
+                super::oa::approval_references::validate_account(transaction, actor, &user)?;
+            }
+        }
+    }
     Ok(saved)
 }
 
@@ -878,20 +887,7 @@ pub fn check_references(connection: &Connection, kind: &str, record: &Value) -> 
         }
     }
     if ["companies", "departments"].contains(&kind) {
-        let code = &record["code"];
-        for resource in RESOURCES {
-            for item in store::all(connection, resource.key)? {
-                if item["id"] != record["id"]
-                    && (if kind == "companies" {
-                        item["companyScope"] == *code || item["companyCode"] == *code
-                    } else {
-                        item["departmentId"] == *code || item["parentCode"] == *code
-                    })
-                {
-                    return Err(conflict("目录存在下级、账号或业务引用，不能删除。"));
-                }
-            }
-        }
+        super::organization::check_references(connection, kind, record)?;
     }
     Ok(())
 }

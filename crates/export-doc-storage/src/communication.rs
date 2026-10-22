@@ -6,6 +6,7 @@ pub struct NotificationScope {
     /// Empty accepts every parent state; otherwise filter before pagination.
     pub statuses: Vec<String>,
     pub handling_keys: Option<Vec<String>>,
+    pub approval_principals: Vec<crate::RecordApprover>,
 }
 pub enum CommunicationView<'a> {
     Announcements { manage: bool, now: &'a str },
@@ -14,6 +15,8 @@ pub enum CommunicationView<'a> {
 pub struct CommunicationQuery<'a> {
     pub company: &'a str,
     pub department: &'a str,
+    pub departments: &'a [String],
+    pub assigned_only: bool,
     pub reader: i64,
     pub unread_only: bool,
     pub view: CommunicationView<'a>,
@@ -36,10 +39,14 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
         CommunicationView::Announcements { manage, now } => {
             filter += " AND r.kind='announcement'";
             if !manage {
-                let department = bind(q.department.into());
+                let department = std::iter::once(q.department)
+                    .chain(q.departments.iter().map(String::as_str))
+                    .map(|department| bind(department.into()))
+                    .collect::<Vec<_>>()
+                    .join(",");
                 let now = bind((*now).into());
                 filter += &format!(
-                    " AND r.body->>'status'='Published' AND r.body->>'startsAt'<={now} AND r.body->>'expiresAt'>{now} AND (r.body->>'audienceDepartment'='' OR r.body->>'audienceDepartment'={department})"
+                    " AND r.body->>'status'='Published' AND r.body->>'startsAt'<={now} AND r.body->>'expiresAt'>{now} AND (r.body->>'audienceDepartment'='' OR r.body->>'audienceDepartment' IN ({department}))"
                 );
             }
             if q.unread_only {
@@ -63,7 +70,14 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                 }
                 let mut condition = match scope.rank {
                     1 => format!(" AND parent.owner_id={reader}"),
-                    2 => format!(" AND parent.department={}", bind(q.department.into())),
+                    2 => format!(
+                        " AND parent.department IN ({})",
+                        std::iter::once(q.department)
+                            .chain(q.departments.iter().map(String::as_str))
+                            .map(|department| bind(department.into()))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    ),
                     3..=4 => String::new(),
                     _ => continue,
                 };
@@ -82,6 +96,33 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                     let keys = keys.iter().map(|key| bind(key.clone())).collect::<Vec<_>>();
                     condition +=
                         &format!(" AND parent.body->>'handlingKey' IN ({})", keys.join(","));
+                }
+                if q.assigned_only && scope.kind.starts_with("oa-") && scope.handling_keys.is_none()
+                {
+                    let principals = scope
+                        .approval_principals
+                        .iter()
+                        .map(|principal| {
+                            (
+                                format!("CAST({} AS BIGINT)", bind(principal.user_id.to_string())),
+                                principal.departments.as_ref().map(|departments| {
+                                    departments
+                                        .iter()
+                                        .map(|department| bind(department.clone()))
+                                        .collect()
+                                }),
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    condition += &format!(
+                        " AND {}",
+                        crate::record_query::participant_condition(
+                            postgres,
+                            "parent",
+                            &reader,
+                            &principals
+                        )
+                    );
                 }
                 let kind = bind(scope.kind.clone());
                 allowed.push(format!("(parent.kind={kind}{condition})"));

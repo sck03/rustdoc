@@ -110,7 +110,9 @@ pub(super) fn prepare(
                 ));
             }
             if action == "Depart" && check["canDepart"] != true {
-                return Err(conflict("请先移交部门负责人职责。"));
+                return Err(conflict(
+                    "请先移交部门、公司执行负责人及直属/职能汇报职责。",
+                ));
             }
         }
         let state = text(&value, "status");
@@ -151,6 +153,26 @@ pub(super) fn prepare(
         value
     };
     records::required(&value, "jobTitle", "职位", 120)?;
+    if matches!(action.as_str(), "Transfer" | "Rehire") {
+        let organization = change
+            .get("organization")
+            .filter(|value| !value.is_null())
+            .cloned()
+            .unwrap_or_else(|| {
+                if action == "Rehire" {
+                    json!({})
+                } else {
+                    value.get("organization").cloned().unwrap_or(json!({}))
+                }
+            });
+        super::super::personnel_organization::validate(
+            tx,
+            actor,
+            &mut value,
+            &organization,
+            "transition",
+        )?;
+    }
     let department = text(&value, "departmentId");
     if !store::all(tx, "departments")?.iter().any(|d| {
         d["code"] == department

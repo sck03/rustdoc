@@ -50,7 +50,8 @@ export function PermissionModuleGrid({
               <h4>{resource.name}</h4>
               <select aria-label={`${resource.name}快捷设置`} disabled={disabled || readOnlyActions || disabledModules.includes(resource.moduleKey)} value={detectPreset(grants, resource)} onChange={(event) => onChange(setResourcePreset(grants, resource, event.target.value))}>
                 <option value="custom" disabled>自定义</option>
-                {Object.entries(presetLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                {Object.entries(presetLabels).filter(([value]) => value !== "approve" || resource.actions.some(action => action.key === "approve"))
+                  .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
               </select>
             </div>
             <div className="permission-action-list">
@@ -81,6 +82,8 @@ export function PermissionModuleGrid({
             {!disabledModules.includes(resource.moduleKey) && resource.actions.some(action => action.key === "view") &&
               !grants[grantKey(resource.key, "view")] && resource.actions.some(action => grants[grantKey(resource.key, action.key)]) &&
               <p className="field-help">已配置操作但未配置查看，页面或记录可能无法打开。请核对查看权限及其数据范围。</p>}
+            {!disabledModules.includes(resource.moduleKey) && grants[grantKey(resource.key, "approve")] === "own" &&
+              <p className="field-help">本人范围不能审批同事申请。负责人通常使用部门或公司范围，并单独配置审批步骤。</p>}
           </section>
         ))}
       </div>

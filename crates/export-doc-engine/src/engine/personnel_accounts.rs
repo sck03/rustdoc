@@ -18,6 +18,7 @@ const FIELDS: &[(&str, &str)] = &[
     ("status", "status"),
     ("companyScope", "companyScope"),
     ("departmentId", "departmentId"),
+    ("organization", "organization"),
 ];
 
 fn query(
@@ -128,14 +129,15 @@ pub fn unlink(store: &Store, actor: &Actor, id: i64, body: &Value) -> Result<Val
             .as_i64()
             .filter(|id| body["userId"].as_i64() == Some(*id))
             .ok_or_else(|| conflict("关联账号已变化，请刷新人员档案。"))?;
-        let user = store::get(tx, "users", user_id)?;
+        let mut user = store::get(tx, "users", user_id)?;
         store::check_version(&user, body["expectedAccountVersion"].as_i64().unwrap_or(0))?;
-        if super::office_queries::clearance(tx, &person)?["isClear"] != true {
+        if super::office_queries::clearance(tx, &person)?["canDepart"] != true {
             return Err(conflict(
                 "人员或账号仍有未结申请、审批或办理职责，请先完成交接再解除绑定。",
             ));
         }
         let username = records::text(&user, "username");
+        user["organizationDepartments"] = serde_json::json!([records::text(&user, "departmentId")]);
         // A version change invalidates existing sessions while preserving the account.
         store::save(
             tx,

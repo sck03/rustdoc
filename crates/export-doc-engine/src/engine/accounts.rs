@@ -43,7 +43,7 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
         } else {
             None
         };
-        for key in ["permissionGrants", "disabledModules"] {
+        for key in ["permissionGrants", "disabledModules", "oaAssignedOnly"] {
             if !body
                 .as_object()
                 .is_some_and(|value| value.contains_key(key))
@@ -112,7 +112,27 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
             if person["status"] == "Departed" && body["isActive"] == true {
                 return Err(conflict("离职人员须先办理返聘，才能重新启用账号。"));
             }
+            if body["isActive"] != true
+                && previous
+                    .as_ref()
+                    .is_some_and(|user| user["isActive"] == true)
+                && super::office_queries::clearance(
+                    tx,
+                    &super::personnel_accounts::person_for_account(tx, id)?
+                        .ok_or_else(|| invalid("人员关联失效。"))?,
+                )?["canDepart"]
+                    != true
+            {
+                return Err(conflict(
+                    "账号仍承担申请、审批、办理或组织负责人职责，请先交接再停用。",
+                ));
+            }
         }
+        body["organizationDepartments"] = json!(match &person {
+            Some(person) if person["status"] != "Departed" =>
+                super::personnel_organization::departments(person)?,
+            _ => vec![text(&body, "departmentId")],
+        });
         let mut saved = store::save(
             tx,
             "users",
@@ -125,6 +145,7 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
             actor,
             if id == 0 { "create" } else { "edit" },
         )?;
+        super::oa::approval_references::validate_account(tx, actor, &saved)?;
         if let Some((salt, hash)) = &credential {
             tx.set_credential(
                 saved["id"].as_i64().unwrap_or(0),

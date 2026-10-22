@@ -10,6 +10,7 @@ import { minimumPasswordLength } from "./userAccountModel.ts";
 import { getRolePresentation } from "../../app/userRoles.ts";
 import { UserPermissionEditor } from "./UserPermissionEditor.tsx";
 import { employmentStatusLabels } from "../office/personnelModel.ts";
+import { PersonnelOrganizationFacts } from "../office/PersonnelOrganizationEditor.tsx";
 
 export function UserManagementPanel({ client, canManageUsers }: { client: ExportDocManagerApiClient; canManageUsers: boolean }) {
   const { draft, setDraft, selectedUserId, users, search, setSearch, roles, permissionTemplates, availableCompanies, availableDepartments,
@@ -21,7 +22,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
       <div className="section-header">
         <div>
           <h2>账号管理</h2>
-          <p className="section-description">账号管理登录与操作权限；员工档案管理任职，公司与部门统一在组织架构维护。权限角色与实际岗位分别设置。</p>
+          <p className="section-description">账号管理登录与操作权限；职位在人事档案维护。一份共享方案可组合人事、行政、财务等多种职责，在“权限方案”中选择“组合多个职责方案”创建。</p>
         </div>
         <div className="toolbar-actions">
           <button className="icon-button" type="button" title="刷新用户" aria-label="刷新用户" disabled={isBusy} onClick={() => void refreshUsers()}>
@@ -95,7 +96,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
           <div className="user-personnel-summary" aria-label="关联员工档案">
             {employee ? <><strong>已关联：{employee.employeeNumber} · {employee.fullName}（{employmentStatusLabels[employee.status]}）</strong>
               <p className="field-help">实际职位：{employee.jobTitle}。姓名、部门及任职变动请在员工档案维护。离职会停用登录，返聘后需重新审核启用。</p>
-              <Link to={`/office/people/${employee.id}`}>打开员工档案</Link></>
+              <PersonnelOrganizationFacts value={employee.organization} /><Link to={`/office/people/${employee.id}`}>打开员工档案</Link></>
               : <><p className="field-help">{draft.role === "Admin" ? "管理员账号用于系统管理，不关联员工档案。" : "尚未关联员工。先保存本公司普通账号，再打开员工档案，点击“关联账号”。每个账号和员工档案一一对应。"}</p>
                 {draft.role !== "Admin" && <Link to="/office/people">选择或登记员工档案</Link>}</>}
           </div>
@@ -116,14 +117,14 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
                 </option>
               ))}
             </select>
-            <small className="field-help">{selectedRole.description} 权限角色提供默认授权，修改员工职位不会自动改变权限。</small>
+            <small className="field-help">{selectedRole.description}。角色仅提供默认权限，职位单独维护；选定共享方案后以方案为准。总经理可选普通员工，再指定公司审批负责人方案。</small>
           </label>
           <label>
             <span>权限方案</span>
             <select
               value={draft.permissionTemplateId ?? ""}
               disabled={isBusy || draft.role === "Admin" || draft.permissionGrants !== null}
-              onChange={(event) => patchDraft("permissionTemplateId", Number(event.target.value) || null)}
+              onChange={(event) => { const permissionTemplateId = Number(event.target.value) || null; setDraft(current => ({ ...current, permissionTemplateId, oaAssignedOnly: current.oaAssignedOnly || selectedTemplate?.oaAssignedOnly === true })); }}
             >
               <option value="">按角色默认方案</option>
               {permissionTemplates.map((template) => (
@@ -192,8 +193,8 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
       </div>
 
       {draft.role !== "Admin" ? <UserPermissionEditor client={client} template={selectedTemplate}
-        grants={draft.permissionGrants} disabledModules={draft.disabledModules} busy={isBusy}
-        onChange={(permissionGrants, disabledModules) => setDraft(current => ({ ...current, permissionGrants, disabledModules }))} /> : null}
+        grants={draft.permissionGrants} disabledModules={draft.disabledModules} oaAssignedOnly={draft.oaAssignedOnly} busy={isBusy}
+        onChange={(permissionGrants, disabledModules, oaAssignedOnly) => setDraft(current => ({ ...current, permissionGrants, disabledModules, oaAssignedOnly }))} /> : null}
 
       <p className="section-description">公司和部门在 <Link to="/system/organization">组织架构</Link> 中统一维护。</p>
 

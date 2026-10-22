@@ -114,6 +114,8 @@ mod tests {
                 company: "DEFAULT".into(),
                 department: "GENERAL".into(),
                 admin: false,
+                departments: vec![],
+                oa_assigned_only: false,
                 grants: vec![
                     json!({"resourceKey":"document.master-data","action":"view","dataScope":"all"}),
                 ],

@@ -324,4 +324,38 @@ assert(!routeAllowed("/office/approval-settings", employeeCapabilities), "employ
 assert(routeAllowed("/office/approval-settings", fullTeamCapabilities), "Full administrators can configure approvals");
 assert(!routeAllowed("/worklist", { ...moduleGrants([]), availableFeatures: ["worklist"] }), "empty grants also deny the direct worklist route");
 assert(model.searchWorkspaceNavGroups("审批规则", model.filterWorkspaceNavGroups(employeeCapabilities)).length === 0, "settings search respects administrator rights");
+const schemeResources = new Map(editionPermissions.resources.map(resource => [resource.key, { ...resource,
+  actions: resource.actions.map(action => ({ ...action, presetLevel: action.navigationAccessLevel })) }]));
+const employeeScheme = { id: 1, code: 'OfficeEmployee', isSystem: true, grants: employeeGrants, disabledModules: ['office.purchase'] };
+for (const scope of ['department', 'company']) {
+  const starting = scheme.createSchemeFromEmployee(employeeScheme, schemeResources, scope);
+  const grants = scheme.toPermissionGrants(starting.grants);
+  assert(starting.disabledModules.includes('office.purchase'), 'Starting from an employee scheme preserves its disabled modules');
+  for (const resource of schemeResources.values()) {
+    if (resource.workspace !== 'office' || resource.isTechnical || !resource.actions.some(action => action.key === 'approve')) continue;
+    assert(grants.some(grant => grant.resourceKey === resource.key && grant.action === 'view' && grant.dataScope === scope), 'Approvers can open records in their scope');
+    assert(grants.some(grant => grant.resourceKey === resource.key && grant.action === 'approve' && grant.dataScope === scope), 'Each office approval is granted explicitly');
+  }
+  assert(!grants.some(grant => grant.resourceKey === 'office.people' && grant.action !== 'view'), 'Approving does not grant private HR maintenance');
+  assert(!grants.some(grant => grant.resourceKey === 'system.users' || grant.action === 'complete'), 'Approving does not grant account management or financial handoff');
+  assert(grants.some(grant => grant.resourceKey === 'office.leave' && grant.action === 'edit' && grant.dataScope === 'own'), 'Employee self-service keeps its own scope');
+  const capabilities = { ...employeeCapabilities, permissions: grants, ...moduleGrants([...new Set(grants.map(grant => schemeResources.get(grant.resourceKey).moduleKey))]) };
+  assert(routeAllowed('/office/requests/personnel', capabilities), 'Personnel approval is visible without private personnel records');
+  assert(!routeAllowed('/office/people', capabilities), 'Personnel approval does not expose private dossiers');
+}
+const expenseResource = schemeResources.get('office.expenses');
+const approvePreset = scheme.setResourcePreset({}, expenseResource, 'approve');
+assert(Object.keys(approvePreset).length === 2 && Object.values(approvePreset).every(scope => scope === 'department'), 'Approval preset includes only view/approve and defaults to colleague scope');
+assert(scheme.detectPreset(approvePreset, expenseResource) === 'approve', 'Approval preset is recognized');
+assert(Object.keys(scheme.setResourcePreset({}, { ...expenseResource, actions: [{ key: 'unexpected' }] }, 'view')).length === 0, 'Unknown preset metadata cannot grant an action');
+const counts = scheme.countTemplateMembers([employeeScheme], [{ role: 'OfficeEmployee' }, { role: 'OfficeEmployee', permissionGrants: [] }, { role: 'Admin' }, { role: 'Sales', permissionTemplateId: 1 }]);
+assert(counts.get(1) === 2, 'Shared and default membership exclude independent accounts and administrators');
+const combined = scheme.combinePermissionSchemes(editionPermissions.roles.filter(role => ['PersonnelManager', 'OfficeManager', 'Finance'].includes(role.code)), schemeResources);
+for (const [resource, action] of [['office.people', 'view-details'], ['office.general', 'approve'], ['office.expenses', 'complete']]) {
+  assert(combined.grants[scheme.grantKey(resource, action)] === 'company', 'One scheme can contain HR, administration and finance duties');
+}
+assert(!scheme.toPermissionGrants(combined.grants).some(grant => ['system.users', 'system.settings'].includes(grant.resourceKey) || schemeResources.get(grant.resourceKey)?.isTechnical), 'Combining duties excludes administrator and technical permissions');
+const narrowed = scheme.combinePermissionSchemes([{ grants: [{ resourceKey: 'office.leave', action: 'view', dataScope: 'department' }], disabledModules: ['office.leave'] },
+  { grants: [{ resourceKey: 'office.leave', action: 'view', dataScope: 'company' }], disabledModules: [] }], schemeResources);
+assert(narrowed.grants[scheme.grantKey('office.leave', 'view')] === 'company' && narrowed.disabledModules.includes('office.leave'), 'Scope union retains explicit module restrictions');
 process.stdout.write("workspace-navigation-model tests passed\n");

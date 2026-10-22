@@ -8,6 +8,7 @@ import { OfficeField, OfficeSubmit } from "../office/OfficeUi.tsx";
 import { useApprovalSettings, useApprovalSettingsDraft, type ApprovalAccount } from "./useApprovalSettings.ts";
 import { oaModules, personnelChangeLabels } from "./oaModel.ts";
 import { HandlingServicesEditor } from "./HandlingServicesEditor.tsx";
+import { ApprovalStagesEditor, ApprovalAmountEditor, initialStage } from "./ApprovalStagesEditor.tsx";
 import "../../styles/routes/office.css";
 import "../../styles/routes/oa.css";
 
@@ -35,8 +36,9 @@ function ApprovalSettingsEditor({ client, user, initial, accounts }: { client: E
               personnelApprovalActions: event.target.checked ? [...(current.personnelApprovalActions ?? []), action] : current.personnelApprovalActions?.filter(value => value !== action) ?? [] }))} />{personnelChangeLabels[action]}须审批</label>)}
         </section>
         {draft.rules.map((rule, index) => <section className="office-resource-card office-field-wide" key={rule.kind} aria-label={`${oaModules[rule.kind].name}审批规则`}>
-          <h3>{oaModules[rule.kind].name}</h3><OfficeField label="审批方式"><select value={rule.mode} onChange={event => changeRule(index, { mode: event.target.value as typeof rule.mode, approverUserIds: [] })}>
+          <h3>{oaModules[rule.kind].name}</h3><OfficeField label="审批方式"><select value={rule.mode} onChange={event => changeRule(index, { mode: event.target.value as typeof rule.mode, approverUserIds: [], stages: event.target.value === "Configured" ? [initialStage()] : [] })}>
             <option value="Single">单步审批（按岗位权限）</option><option value="DepartmentChain">部门负责人逐级审批</option><option value="Named">指定审批人（按顺序，可单人）</option>
+            <option value="Configured">配置阶段与会签</option>
           </select></OfficeField>
           {rule.mode === "DepartmentChain" && <p className="office-muted">从申请人所在部门逐级到顶层部门，负责人须关联启用账号；跳过申请人本人和重复负责人，缺少负责人时阻止提交。</p>}
           {rule.mode === "Named" && <><ol>{rule.approverUserIds.map((id, step) => <li key={step} className="office-card-actions">
@@ -44,6 +46,8 @@ function ApprovalSettingsEditor({ client, user, initial, accounts }: { client: E
             <button className="command-button secondary" type="button" disabled={step === 0} onClick={() => { const ids = [...rule.approverUserIds]; [ids[step - 1], ids[step]] = [ids[step], ids[step - 1]]; changeRule(index, { approverUserIds: ids }); }}>上移</button>
             <button className="command-button secondary" type="button" onClick={() => changeRule(index, { approverUserIds: rule.approverUserIds.filter((_, i) => i !== step) })}>移除步骤</button>
           </li>)}</ol><button className="command-button secondary" type="button" disabled={rule.approverUserIds.length >= 10} onClick={() => changeRule(index, { approverUserIds: [...rule.approverUserIds, 0] })}>添加审批步骤</button></>}
+          {rule.mode === "Configured" && <ApprovalStagesEditor stages={rule.stages ?? []} accounts={accounts} onChange={stages => changeRule(index, { stages })} />}
+          {["expense", "purchase"].includes(rule.kind) && <ApprovalAmountEditor rule={rule} accounts={accounts} onChange={patch => changeRule(index, patch)} />}
         </section>)}
       </fieldset>
       <HandlingServicesEditor services={draft.handlingServices ?? []} accounts={accounts} disabled={operation.busy} onChange={handlingServices => setDraft(value => ({ ...value, handlingServices }))} />

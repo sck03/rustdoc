@@ -9,6 +9,7 @@ export type UserDraft = {
   permissionTemplateId: number | null;
   permissionGrants: ApiPermissionGrantDto[] | null;
   disabledModules: string[];
+  oaAssignedOnly: boolean;
   departmentId: string;
   companyScope: string;
   isActive: boolean;
@@ -27,6 +28,7 @@ export function createDraftFromUser(user: ApiUserAccountDto): UserDraft {
     permissionTemplateId: user.permissionTemplateId ?? null,
     permissionGrants: user.permissionGrants ?? null,
     disabledModules: user.disabledModules ?? [],
+    oaAssignedOnly: user.oaAssignedOnly ?? false,
     departmentId: user.departmentId ?? "",
     companyScope: user.companyScope ?? "",
     isActive: user.isActive,
@@ -44,6 +46,7 @@ export function createEmptyDraft(role: string): UserDraft {
     permissionTemplateId: null,
     permissionGrants: null,
     disabledModules: [],
+    oaAssignedOnly: false,
     departmentId: "",
     companyScope: "",
     isActive: true,
@@ -60,6 +63,7 @@ export function buildUserDraftSnapshot(draft: UserDraft) {
     permissionTemplateId: draft.permissionTemplateId,
     permissionGrants: draft.permissionGrants,
     disabledModules: draft.disabledModules,
+    oaAssignedOnly: draft.oaAssignedOnly,
     departmentId: draft.departmentId,
     companyScope: draft.companyScope,
     isActive: draft.isActive,

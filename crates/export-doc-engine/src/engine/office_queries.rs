@@ -302,9 +302,25 @@ fn clearance_for(
         && supply_count == 0
         && approval_count == 0
         && handling_services.is_empty();
+    let reporting_count = if let Some(employee) = employee {
+        super::personnel_organization::references(
+            tx,
+            company.as_str().unwrap_or(""),
+            employee,
+            true,
+        )?
+    } else {
+        0
+    };
+    let companies = store::all(tx, "companies")?;
+    let executive = employee.is_some_and(|id| {
+        companies
+            .iter()
+            .any(|company| company["executiveEmployeeId"] == id)
+    });
     meetings.sort_by_key(|r| r["requestId"].as_i64());
     supplies.sort_by_key(|r| r["requestId"].as_i64());
     Ok(
-        json!({"meetingCount":meeting_count,"supplyCount":supply_count,"approvalCount":approval_count,"handlingCount":handling_services.len(),"handlingServices":handling_services,"items":meetings.into_iter().take(20).chain(supplies.into_iter().take(20)).collect::<Vec<_>>(),"canDepart":clear&&departments.is_empty(),"isClear":clear,"managedDepartments":departments}),
+        json!({"meetingCount":meeting_count,"supplyCount":supply_count,"approvalCount":approval_count,"handlingCount":handling_services.len(),"handlingServices":handling_services,"items":meetings.into_iter().take(20).chain(supplies.into_iter().take(20)).collect::<Vec<_>>(),"canDepart":clear&&departments.is_empty()&&reporting_count==0&&!executive,"isClear":clear,"managedDepartments":departments,"reportingCount":reporting_count,"isCompanyExecutive":executive}),
     )
 }

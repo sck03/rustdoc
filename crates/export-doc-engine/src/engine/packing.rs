@@ -180,6 +180,8 @@ pub fn seed(store: &Store) -> Result<()> {
             department: String::new(),
             admin: true,
             grants: vec![],
+            departments: vec![],
+            oa_assigned_only: false,
         };
         for row in builtins() {
             let name = text(&row, "name");

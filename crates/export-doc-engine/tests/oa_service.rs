@@ -7,6 +7,8 @@ mod handling_contract;
 mod native_fixture;
 #[path = "support/oa_contract.rs"]
 mod oa_contract;
+#[path = "support/organization_workflow_contract.rs"]
+mod organization_workflow_contract;
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 
@@ -82,6 +84,23 @@ fn configured_approval_chain_delegation_reminders_and_finance() {
     .unwrap();
     approval_contract::exercise(&service, login["accessToken"].as_str().unwrap());
     handling_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    service.close().unwrap();
+}
+
+#[test]
+fn appointments_countersign_conditions_and_visibility_form_a_closed_workflow() {
+    let mut fixture = native_fixture::Fixture::new();
+    fixture.client.take();
+    let service = NativeService::open(fixture.paths.clone()).unwrap();
+    let login = oa_contract::call(
+        &service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":"admin","password":""})),
+    )
+    .unwrap();
+    organization_workflow_contract::exercise(&service, login["accessToken"].as_str().unwrap());
     service.close().unwrap();
 }
 

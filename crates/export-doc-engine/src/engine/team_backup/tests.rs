@@ -52,6 +52,8 @@ pub(super) fn admin() -> Actor {
         department: "GENERAL".into(),
         admin: true,
         grants: vec![],
+        departments: vec![],
+        oa_assigned_only: false,
     }
 }
 

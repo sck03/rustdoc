@@ -1,6 +1,7 @@
 pub use export_doc_contracts::{contracts, generated_api, report_batches};
 pub mod announcement;
 pub mod approval;
+pub mod approval_policy;
 pub mod backup_plan;
 pub mod crm;
 pub mod designer;
@@ -20,6 +21,7 @@ pub mod packing;
 pub mod party;
 pub mod payment;
 pub mod permissions;
+pub mod personnel_organization;
 pub mod product;
 pub mod report_template_format;
 pub mod sales;

@@ -68,6 +68,7 @@ mod permission_templates;
 mod personnel;
 mod personnel_accounts;
 mod personnel_files;
+mod personnel_organization;
 mod personnel_queries;
 mod product_options;
 mod record_documents;
@@ -716,7 +717,7 @@ impl NativeService {
             GET_ORGANIZATION_DIRECTORY => {
                 auth::authorize(actor, "system.users", "manage")?;
                 Ok(
-                    json!({"companies":self.store.all("companies")?,"departments":organization::departments(&self.store)?}),
+                    json!({"companies":organization::companies(&self.store)?,"departments":organization::departments(&self.store)?}),
                 )
             }
             LIST_ORGANIZATION_MANAGERS => {
@@ -724,6 +725,9 @@ impl NativeService {
                 organization::managers(&self.store, query)
             }
             GET_PERSONNEL_OPTIONS => personnel_queries::options(&self.store, actor, query),
+            LIST_PERSONNEL_REPORTING_OPTIONS => {
+                personnel_organization::reporting_options(&self.store, actor, query)
+            }
             LIST_PERSONNEL => personnel_queries::directory(&self.store, actor, &self.clock, query),
             GET_PERSONNEL => personnel_queries::read(&self.store, actor, records::id(parameters)?),
             GET_PERSONNEL_HISTORY => {

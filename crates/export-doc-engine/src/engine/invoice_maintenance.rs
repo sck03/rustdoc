@@ -213,6 +213,8 @@ mod tests {
                 department: "GENERAL".into(),
                 admin: true,
                 grants: vec![],
+                departments: vec![],
+                oa_assigned_only: false,
             };
             let mut user = contracts::initial(contracts::schema("ApiUserDto"));
             user["username"] = json!("admin");

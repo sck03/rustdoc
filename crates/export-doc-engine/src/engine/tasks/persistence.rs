@@ -79,6 +79,8 @@ pub(super) fn owner(job: &Value) -> Result<Actor> {
         department: text(job, "departmentId"),
         admin: false,
         grants: vec![],
+        departments: vec![],
+        oa_assigned_only: false,
     })
 }
 fn save(connection: &Connection, actor: &Actor, job: Value, action: &str) -> Result<Value> {

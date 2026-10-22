@@ -533,6 +533,8 @@ pub fn recover(store: &Store) -> Result<()> {
                 department: String::new(),
                 admin: true,
                 grants: vec![],
+                departments: vec![],
+                oa_assigned_only: false,
             };
             let identity = format!("{}:{}", row["ownerUserId"], text(&row, "deliveryId"));
             store::save(

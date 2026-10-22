@@ -63,7 +63,21 @@ fn modules(value: &Value) -> Result<Vec<String>> {
     )?)
 }
 
+pub fn assigned_only(connection: &Connection, user: &Value) -> Result<bool> {
+    if user["role"] == "Admin" {
+        return Ok(false);
+    }
+    Ok(user["oaAssignedOnly"] == true
+        || template(connection, user)?.is_some_and(|template| template["oaAssignedOnly"] == true))
+}
+
 pub fn validate(value: &mut Value) -> Result<()> {
+    if value
+        .get("oaAssignedOnly")
+        .is_some_and(|flag| !flag.is_boolean())
+    {
+        return Err(invalid("申请可见性限制须为布尔值。"));
+    }
     let modules = modules(value).map_err(|_| invalid("关闭模块须为有效模块列表。"))?;
     value["disabledModules"] =
         json!(permissions::profile::disabled_modules(&modules).map_err(invalid)?);
@@ -74,6 +88,7 @@ pub fn validate(value: &mut Value) -> Result<()> {
             json!(permissions::profile::assignable(&direct).map_err(invalid)?);
     }
     if value["role"] == "Admin" {
+        value["oaAssignedOnly"] = json!(false);
         value["permissionTemplateId"] = Value::Null;
         value["permissionGrants"] = Value::Null;
         value["disabledModules"] = json!([]);

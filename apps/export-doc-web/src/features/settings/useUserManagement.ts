@@ -161,7 +161,7 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
   }
 
   function changeRole(role: string) {
-    setDraft((current) => ({ ...current, role, permissionTemplateId: null, permissionGrants: null, disabledModules: [] }));
+    setDraft((current) => ({ ...current, role, permissionTemplateId: null, permissionGrants: null, disabledModules: role === "Admin" ? [] : current.disabledModules, oaAssignedOnly: role === "Admin" ? false : current.oaAssignedOnly || selectedTemplate?.oaAssignedOnly === true }));
     setSuccessMessage(null);
   }
 
@@ -204,6 +204,7 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
       permissionTemplateId: draft.permissionTemplateId,
       permissionGrants: draft.permissionGrants,
       disabledModules: draft.disabledModules,
+      oaAssignedOnly: draft.oaAssignedOnly,
       departmentId: draft.departmentId.trim(),
       companyScope: draft.companyScope.trim(),
       isActive: draft.isActive,

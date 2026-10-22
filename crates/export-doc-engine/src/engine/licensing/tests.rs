@@ -52,6 +52,8 @@ fn admin() -> Actor {
         department: "GENERAL".into(),
         admin: true,
         grants: vec![],
+        departments: vec![],
+        oa_assigned_only: false,
     }
 }
 struct TestVerifier;
@@ -237,6 +239,8 @@ fn license_registration_requires_an_administrator() {
         department: "GENERAL".into(),
         admin: false,
         grants: vec![],
+        departments: vec![],
+        oa_assigned_only: false,
     };
     assert_eq!(
         handle(

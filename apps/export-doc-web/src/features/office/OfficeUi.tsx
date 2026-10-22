@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useModalDialog } from "../../ui/useModalDialog.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
@@ -21,7 +22,7 @@ export function OfficeDialog({ title, children, onClose, busy = false, error = "
   }
   const ref = useModalDialog(close, { canClose: !busy });
   useEffect(() => { if (error) ref.current?.querySelectorAll("details").forEach(section => { section.open = true; }); }, [error, ref]);
-  return <div className="office-dialog-backdrop">
+  return createPortal(<div className="office-dialog-backdrop" onSubmit={event => event.stopPropagation()}>
     <div className="office-dialog" ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <header className="office-dialog-header"><h2 id={titleId}>{title}</h2>
         <button type="button" className="icon-button" aria-label="关闭窗口" disabled={busy} onClick={close}><X size={18} aria-hidden="true" /></button>
@@ -34,7 +35,7 @@ export function OfficeDialog({ title, children, onClose, busy = false, error = "
         {children}
       </div>
     </div>
-  </div>;
+  </div>, document.body);
 }
 
 export function OfficeField({ label, children, wide = false }: { label: string; children: ReactNode; wide?: boolean }) {

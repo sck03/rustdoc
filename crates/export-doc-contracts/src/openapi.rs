@@ -17,10 +17,10 @@ pub fn document() -> Value {
         .expect("reviewed reference OpenAPI");
     office::extend(&mut document);
     communication::extend(&mut document);
-    personnel::extend(&mut document);
     reports::extend(&mut document);
     observability::extend(&mut document);
     accounts::extend(&mut document);
+    personnel::extend(&mut document);
     payment_printing::extend(&mut document);
     backup_plan::extend(&mut document);
     exchange::extend(&mut document);

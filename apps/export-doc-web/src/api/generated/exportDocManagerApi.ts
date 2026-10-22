@@ -11,10 +11,12 @@ export interface AISettings {
 }
 
 export interface AccountPersonnelRecord {
+  departmentId?: string;
   employeeNumber: string;
   fullName: string;
   id: number;
   jobTitle: string;
+  organization?: PersonnelOrganization;
   status: "Probation" | "Active" | "Departed";
 }
 
@@ -2024,16 +2026,21 @@ export interface ApiOcrRecognizeImageResponse {
 
 export interface ApiOrganizationCompanyDto {
   code: string;
+  executiveEmployeeId?: number | null;
+  executiveName?: string;
   isActive: boolean;
   name: string;
+  positions?: OrganizationPosition[];
   versionNumber: number;
 }
 
 export interface ApiOrganizationCompanySaveRequest {
   code: string;
+  executiveEmployeeId?: number | null;
   expectedVersion?: number;
   isActive: boolean;
   name: string;
+  positions?: OrganizationPosition[];
 }
 
 export interface ApiOrganizationDepartmentDto {
@@ -2464,6 +2471,7 @@ export interface ApiPermissionTemplateDto {
   isActive: boolean;
   isSystem: boolean;
   name: string;
+  oaAssignedOnly?: boolean;
   updatedAt: string;
   versionNumber: number;
 }
@@ -2474,6 +2482,7 @@ export interface ApiPermissionTemplateOptionDto {
   isActive: boolean;
   isSystem: boolean;
   name: string;
+  oaAssignedOnly?: boolean;
 }
 
 export interface ApiPermissionTemplateSaveRequest {
@@ -2485,6 +2494,7 @@ export interface ApiPermissionTemplateSaveRequest {
   id: number;
   isActive: boolean;
   name: string;
+  oaAssignedOnly?: boolean;
 }
 
 export interface ApiPersonnelImageForm {
@@ -3577,6 +3587,7 @@ export interface ApiUserAccountDto {
   fullName: string;
   id: number;
   isActive: boolean;
+  oaAssignedOnly?: boolean;
   permissionGrants?: ApiPermissionGrantDto[] | null;
   permissionTemplateCode: string;
   permissionTemplateId?: number | null;
@@ -3595,6 +3606,7 @@ export interface ApiUserCapabilitiesDto {
   canViewAllBusinessData: boolean;
   enabledModules: string[];
   moduleAccess: ApiModuleAccessDto[];
+  oaAssignedOnly?: boolean;
   permissions: ApiPermissionGrantDto[];
   productEdition: string;
   usesOfficeRegister: boolean;
@@ -3688,6 +3700,7 @@ export interface ApiUserSaveRequest {
   expectedVersion?: number;
   fullName: string;
   isActive: boolean;
+  oaAssignedOnly?: boolean;
   permissionGrants?: ApiPermissionGrantDto[] | null;
   permissionTemplateId: number | null;
   resetPassword: string;
@@ -4221,6 +4234,15 @@ export interface OaAction {
   note: string;
 }
 
+export interface OaApprovalAmountBranch {
+  currency: string;
+  key: string;
+  maximum?: string | null;
+  minimum: string;
+  name: string;
+  stages: OaApprovalStage[];
+}
+
 export interface OaApprovalDelegation {
   delegateUserId: number;
   endsAt: string;
@@ -4231,15 +4253,25 @@ export interface OaApprovalDelegation {
 }
 
 export interface OaApprovalPlan {
-  mode: "Single" | "DepartmentChain" | "Named";
+  matchedBranch?: string;
+  mode: "Single" | "DepartmentChain" | "Named" | "Configured";
   policyVersion: number;
   steps: OaApprovalStep[];
 }
 
+export interface OaApprovalReassign {
+  expectedVersion: number;
+  fromUserId: number;
+  note: string;
+  toUserId: number;
+}
+
 export interface OaApprovalRule {
+  amountBranches?: OaApprovalAmountBranch[];
   approverUserIds: number[];
   kind: "leave" | "overtime" | "expense" | "travel" | "purchase" | "general" | "personnel";
-  mode: "Single" | "DepartmentChain" | "Named";
+  mode: "Single" | "DepartmentChain" | "Named" | "Configured";
+  stages?: OaApprovalStage[];
 }
 
 export interface OaApprovalSettings {
@@ -4259,6 +4291,11 @@ export interface OaApprovalSettingsSave {
   rules: OaApprovalRule[];
 }
 
+export interface OaApprovalStage {
+  approverUserIds: number[];
+  source: "Named" | "DepartmentManager" | "LineManager" | "FunctionalManagers" | "CompanyExecutive";
+}
+
 export interface OaApprovalStep {
   actedAt: string;
   actedByName: string;
@@ -4267,6 +4304,7 @@ export interface OaApprovalStep {
   approverUserId: number;
   delegationKey: string;
   note: string;
+  stage?: number | null;
   status: "Waiting" | "Approved" | "Rejected";
 }
 
@@ -4322,6 +4360,7 @@ export interface OaPersonnelChange {
   expectedPersonnelVersion?: number;
   jobTitle?: string;
   onProbation?: boolean;
+  organization?: PersonnelOrganization;
   registration?: PersonnelCreateRequest;
 }
 
@@ -4339,6 +4378,7 @@ export interface OaRequest {
   canHandle?: boolean;
   canReview?: boolean;
   category?: "Seal" | "Certificate" | "IT" | "Repair" | "Other";
+  companyScope?: string;
   createdAt: string;
   currency?: "CNY" | "USD" | "EUR" | "HKD" | "JPY" | "GBP";
   departmentId: string;
@@ -4380,6 +4420,7 @@ export interface OaRequestPage {
 export interface OaRequestSave {
   category?: "Seal" | "Certificate" | "IT" | "Repair" | "Other";
   currency?: "CNY" | "USD" | "EUR" | "HKD" | "JPY" | "GBP";
+  departmentId?: string;
   employeeId?: number;
   expectedVersion?: number;
   handlingKey?: string;
@@ -4511,6 +4552,11 @@ export interface OrganizationManagerRecord {
   employeeNumber: string;
   fullName: string;
   id: number;
+}
+
+export interface OrganizationPosition {
+  isActive: boolean;
+  name: string;
 }
 
 export interface PagedResultOfBusinessAttachmentRecord {
@@ -4655,6 +4701,15 @@ export interface PersonnelAccountRequest {
   userId: number;
 }
 
+export interface PersonnelAssignment {
+  departmentId: string;
+  functionalManagerEmployeeIds: number[];
+  functionalManagerNames?: string[];
+  jobTitle: string;
+  managerEmployeeId?: number | null;
+  managerName?: string;
+}
+
 export interface PersonnelAttachment {
   fileName: string;
   id: string;
@@ -4668,9 +4723,11 @@ export interface PersonnelClearance {
   handlingCount?: number;
   handlingServices?: string[];
   isClear: boolean;
+  isCompanyExecutive?: boolean;
   items: PersonnelClearanceItem[];
   managedDepartments: PersonnelManagedDepartment[];
   meetingCount: number;
+  reportingCount?: number;
   supplyCount: number;
 }
 
@@ -4690,6 +4747,7 @@ export interface PersonnelCreateRequest {
   hireDate: string;
   jobTitle: string;
   onProbation: boolean;
+  organization?: PersonnelOrganization;
   probationEndsOn: string | null;
   profile: PersonnelProfile;
   requestKey: string;
@@ -4745,6 +4803,15 @@ export interface PersonnelOptions {
   approvalRequiredActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
   canCreate: boolean;
   departments: PersonnelDepartmentRecord[];
+  positions?: OrganizationPosition[];
+}
+
+export interface PersonnelOrganization {
+  additionalAssignments: PersonnelAssignment[];
+  functionalManagerEmployeeIds: number[];
+  functionalManagerNames?: string[];
+  managerEmployeeId?: number | null;
+  managerName?: string;
 }
 
 export interface PersonnelProfile {
@@ -4773,6 +4840,7 @@ export interface PersonnelRecord {
   canEdit: boolean;
   canLinkAccount: boolean;
   canTransition: boolean;
+  companyScope?: string;
   confirmedOn?: string | null;
   contractEndsOn?: string | null;
   deleteRestriction: string;
@@ -4782,6 +4850,7 @@ export interface PersonnelRecord {
   hireDate: string;
   images: PersonnelImageRecord[];
   lastEffectiveDate: string;
+  organization?: PersonnelOrganization;
   probationEndsOn?: string | null;
   profile: PersonnelProfile;
   versionNumber: number;
@@ -4802,6 +4871,7 @@ export interface PersonnelTransitionRequest {
   jobTitle?: string | null;
   note: string;
   onProbation?: boolean;
+  organization?: PersonnelOrganization;
 }
 
 export interface PersonnelUnlinkAccountRequest {
@@ -5308,12 +5378,18 @@ export const ApiPaymentReportHtmlPreviewResponseDefaults = {
 
 export const ApiPermissionTemplateDtoDefaults = {
   disabledModules: [],
+  oaAssignedOnly: false,
   versionNumber: 1,
 } as const satisfies Partial<ApiPermissionTemplateDto>;
+
+export const ApiPermissionTemplateOptionDtoDefaults = {
+  oaAssignedOnly: false,
+} as const satisfies Partial<ApiPermissionTemplateOptionDto>;
 
 export const ApiPermissionTemplateSaveRequestDefaults = {
   disabledModules: [],
   expectedVersion: 0,
+  oaAssignedOnly: false,
 } as const satisfies Partial<ApiPermissionTemplateSaveRequest>;
 
 export const ApiPortDtoDefaults = {
@@ -5391,9 +5467,14 @@ export const ApiUnitDtoDefaults = {
 export const ApiUserAccountDtoDefaults = {
   disabledModules: [],
   employee: null,
+  oaAssignedOnly: false,
   permissionGrants: null,
   versionNumber: 1,
 } as const satisfies Partial<ApiUserAccountDto>;
+
+export const ApiUserCapabilitiesDtoDefaults = {
+  oaAssignedOnly: false,
+} as const satisfies Partial<ApiUserCapabilitiesDto>;
 
 export const ApiUserDtoDefaults = {
   employee: null,
@@ -5421,6 +5502,7 @@ export const ApiUserReportTemplateDraftRequestDefaults = {
 export const ApiUserSaveRequestDefaults = {
   disabledModules: [],
   expectedVersion: 0,
+  oaAssignedOnly: false,
   permissionGrants: null,
 } as const satisfies Partial<ApiUserSaveRequest>;
 
@@ -6863,6 +6945,13 @@ export interface ListPersonnelChangeRequestRequest {
   approvalsOnly?: boolean;
 }
 
+export interface ListPersonnelReportingOptionsRequest {
+  companyCode: string;
+  keyword?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface ListPortsRequest {
   keyword?: string;
 }
@@ -7137,6 +7226,41 @@ export interface QuerySuppliersRequest {
 
 export interface ReadNotificationRequest {
   id: number;
+}
+
+export interface ReassignExpenseRequestApprovalRequest {
+  id: number;
+  body: OaApprovalReassign;
+}
+
+export interface ReassignGeneralRequestApprovalRequest {
+  id: number;
+  body: OaApprovalReassign;
+}
+
+export interface ReassignLeaveRequestApprovalRequest {
+  id: number;
+  body: OaApprovalReassign;
+}
+
+export interface ReassignOvertimeRequestApprovalRequest {
+  id: number;
+  body: OaApprovalReassign;
+}
+
+export interface ReassignPersonnelChangeRequestApprovalRequest {
+  id: number;
+  body: OaApprovalReassign;
+}
+
+export interface ReassignPurchaseRequestApprovalRequest {
+  id: number;
+  body: OaApprovalReassign;
+}
+
+export interface ReassignTravelRequestApprovalRequest {
+  id: number;
+  body: OaApprovalReassign;
 }
 
 export interface RecognizeOcrImageRequest {
@@ -10651,6 +10775,19 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listPersonnelReportingOptions(request: ListPersonnelReportingOptionsRequest, init?: ApiRequestInit): Promise<PagedResultOfOrganizationManagerRecord> {
+    const path = "/api/office/people/reporting-options";
+    return this.request<PagedResultOfOrganizationManagerRecord>("GET", path, {
+      query: {
+        "companyCode": request.companyCode,
+        "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
   public listPorts(request: ListPortsRequest = {}, init?: ApiRequestInit): Promise<ApiPortDto[]> {
     const path = "/api/master-data/ports";
     return this.request<ApiPortDto[]>("GET", path, {
@@ -11188,6 +11325,62 @@ export class ExportDocManagerApiClient {
   public readNotification(request: ReadNotificationRequest, init?: ApiRequestInit): Promise<SiteNotification> {
     const path = `/api/office/notifications/${encodePath(request.id)}/read`;
     return this.request<SiteNotification>("POST", path, { init });
+  }
+
+  public reassignExpenseRequestApproval(request: ReassignExpenseRequestApprovalRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/approval-reassign`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public reassignGeneralRequestApproval(request: ReassignGeneralRequestApprovalRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/approval-reassign`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public reassignLeaveRequestApproval(request: ReassignLeaveRequestApprovalRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/approval-reassign`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public reassignOvertimeRequestApproval(request: ReassignOvertimeRequestApprovalRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/approval-reassign`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public reassignPersonnelChangeRequestApproval(request: ReassignPersonnelChangeRequestApprovalRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/approval-reassign`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public reassignPurchaseRequestApproval(request: ReassignPurchaseRequestApprovalRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/approval-reassign`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public reassignTravelRequestApproval(request: ReassignTravelRequestApprovalRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/approval-reassign`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public recognizeOcrImage(request: RecognizeOcrImageRequest, init?: ApiRequestInit): Promise<ApiOcrRecognizeImageResponse> {

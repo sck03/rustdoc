@@ -1,12 +1,42 @@
 use serde_json::{Value, json};
+#[path = "personnel_organization.rs"]
+mod organization;
 
 #[cfg(test)]
 pub(super) const FIELDS: &[(&str, &[&str])] = &[
     (
         "PersonnelRecord",
-        &["attachments", "approvalRequiredActions"],
+        &[
+            "attachments",
+            "approvalRequiredActions",
+            "organization",
+            "companyScope",
+        ],
     ),
-    ("PersonnelOptions", &["approvalRequiredActions"]),
+    (
+        "PersonnelOptions",
+        &["approvalRequiredActions", "positions"],
+    ),
+    ("PersonnelTransitionRequest", &["organization"]),
+    ("PersonnelCreateRequest", &["organization"]),
+    (
+        "PersonnelClearance",
+        &["reportingCount", "isCompanyExecutive"],
+    ),
+    (
+        "ApiOrganizationCompanyDto",
+        &["executiveEmployeeId", "executiveName", "positions"],
+    ),
+    (
+        "ApiOrganizationCompanySaveRequest",
+        &["executiveEmployeeId", "positions"],
+    ),
+    ("ApiUserAccountDto", &["oaAssignedOnly"]),
+    ("ApiUserSaveRequest", &["oaAssignedOnly"]),
+    ("ApiPermissionTemplateDto", &["oaAssignedOnly"]),
+    ("ApiPermissionTemplateOptionDto", &["oaAssignedOnly"]),
+    ("ApiPermissionTemplateSaveRequest", &["oaAssignedOnly"]),
+    ("ApiUserCapabilitiesDto", &["oaAssignedOnly"]),
     ("PersonnelUpdateRequest", &["correctionNote"]),
     ("ApiOrganizationDepartmentDto", &["managerEmployeeNumber"]),
     (
@@ -17,6 +47,7 @@ pub(super) const FIELDS: &[(&str, &[&str])] = &[
 ];
 
 pub(super) fn extend(doc: &mut Value) {
+    organization::extend(doc);
     let mut unlink = doc["paths"]["/api/office/people/{id}/account"]["post"].clone();
     unlink["operationId"] = json!("UnlinkPersonnelAccount");
     unlink["requestBody"]["content"]["application/json"]["schema"] =

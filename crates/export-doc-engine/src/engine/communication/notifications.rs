@@ -32,11 +32,13 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
                 rank: auth::scope_rank(actor, resource, "view"),
                 statuses: vec![],
                 handling_keys: None,
+                approval_principals: vec![],
             }];
             if kind == "oa-expense" {
                 scopes.push(NotificationScope {
                     kind: kind.into(),
                     handling_keys: None,
+                    approval_principals: vec![],
                     rank: auth::scope_rank(actor, resource, "complete"),
                     statuses: super::super::oa::FINANCE_STATUSES
                         .iter()
@@ -61,7 +63,16 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
             rank: 3,
             statuses: states.iter().map(|s| (*s).into()).collect(),
             handling_keys: Some(handling::keys(tx, actor, resource)?),
+            approval_principals: vec![],
         });
+    }
+    if actor.oa_assigned_only {
+        for scope in &mut result {
+            if let Some(resource) = super::super::oa::approval::resource(&scope.kind) {
+                scope.approval_principals =
+                    super::super::oa::approval::queue_approvers(tx, actor, resource)?;
+            }
+        }
     }
     Ok(result)
 }
@@ -117,6 +128,8 @@ pub(super) fn handle(
     let mut q = CommunicationQuery {
         company: &actor.company,
         department: &actor.department,
+        departments: &actor.departments,
+        assigned_only: actor.oa_assigned_only,
         reader: actor.id,
         unread_only: action != "inbox" || unread(query)?,
         view: CommunicationView::Notifications { scopes: &scopes },
@@ -164,6 +177,7 @@ pub(in crate::engine) fn on_event(
         "submit"
             | "approve"
             | "approve-step"
+            | "approval-reassign"
             | "remind"
             | "reject"
             | "complete"
@@ -182,7 +196,10 @@ pub(in crate::engine) fn on_event(
     let handling = matches!(action.as_str(), "approve" | "reassign")
         && handling::outstanding(row)
         && assigned_request;
-    let review = matches!(action.as_str(), "submit" | "approve-step" | "remind");
+    let review = matches!(
+        action.as_str(),
+        "submit" | "approve-step" | "remind" | "approval-reassign"
+    );
     let distribution = review || completion || handling;
     let resource = text(meta, "resource");
     loop {

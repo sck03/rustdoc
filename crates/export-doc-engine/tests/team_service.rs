@@ -19,6 +19,8 @@ mod invoice_clone_contract;
 mod oa_contract;
 #[path = "support/office_contract.rs"]
 mod office_contract;
+#[path = "support/organization_workflow_contract.rs"]
+mod organization_workflow_contract;
 #[path = "support/personnel_contract.rs"]
 mod personnel_contract;
 #[path = "support/personnel_policy_contract.rs"]
@@ -266,6 +268,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     );
     oa_contract::exercise(&service, admin_token, staff_token, None);
     approval_contract::exercise(&service, admin_token);
+    organization_workflow_contract::exercise(&service, admin_token);
     handling_contract::exercise(&service, admin_token);
     communication_contract::exercise(&service, admin_token);
     account_scope::exercise(&service, admin_token);

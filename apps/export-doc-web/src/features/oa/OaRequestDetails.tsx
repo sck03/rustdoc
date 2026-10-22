@@ -16,9 +16,12 @@ import { expenseCategories } from "./OaLineEditor.tsx";
 import { generalCategories, leaveCategories } from "./OaTemporalFields.tsx";
 import { documentDescription } from "../../ui/documentAttachments.ts";
 import { AttachmentUploadPanel } from "../../ui/AttachmentUploadPanel.tsx";
+import { ApprovalReassignDialog } from "./ApprovalReassignDialog.tsx";
+import { PersonnelOrganizationFacts } from "../office/PersonnelOrganizationEditor.tsx";
 
 export function OaRequestDetails({ client, user, row, onEdit }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: OaRequest; onEdit: () => void }) {
   const operation = useOfficeOperation();
+  const [reassigning, setReassigning] = useState(false);
   const [action, setAction] = useState<OaActionName | number | null>(null);
   const editable = ["Draft", "Rejected"].includes(row.status) && oaAccess(user, row.kind, "edit", row);
   const api = oaApi(client, row.kind);
@@ -34,7 +37,9 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     </div>}
     {row.status === "HandedOff" && <InlineNotice tone="success" title="财务交接已登记">此状态仅记录资料交接，不代表已记账或已付款；办理人、时间和说明见审批与办理记录。</InlineNotice>}
     </header>
-    {row.approvalPlan && row.approvalPlan.steps.length > 0 && <section className="oa-detail-content" aria-label="审批步骤"><h3>审批步骤</h3><ol className="oa-history">{row.approvalPlan.steps.map((step, index) => <li key={step.approverUserId}><strong>第 {index + 1} 步 · {step.approverName}（账号 #{step.approverUserId}）</strong> · {{ Waiting: "待审批", Approved: "已批准", Rejected: "已驳回" }[step.status]}{step.actedByUserId && <p>{step.delegationKey ? "代理办理：" : "办理人："}{step.actedByName}（账号 #{step.actedByUserId}） · {formatBusinessDateTime(step.actedAt, user.businessTimeZone)} · {step.note}</p>}</li>)}</ol></section>}
+    {user.capabilities.canManageUsers && row.status === "Pending" && Boolean(row.approvalPlan?.steps.some(step => step.status === "Waiting")) && <button type="button" className="command-button secondary" onClick={() => setReassigning(true)}>移交未完成审批</button>}
+    {row.approvalPlan?.matchedBranch && <p>命中金额条件：{row.approvalPlan.matchedBranch}</p>}
+    {row.approvalPlan && row.approvalPlan.steps.length > 0 && <section className="oa-detail-content" aria-label="审批步骤"><h3>审批步骤</h3><ol className="oa-history">{row.approvalPlan.steps.map((step, index) => <li key={step.approverUserId}><strong>第 {(step.stage ?? index) + 1} 阶段 · {step.approverName}（账号 #{step.approverUserId}）</strong> · {{ Waiting: "待审批", Approved: "已批准", Rejected: "已驳回" }[step.status]}{step.actedByUserId && <p>{step.delegationKey ? "代理办理：" : "办理人："}{step.actedByName}（账号 #{step.actedByUserId}） · {formatBusinessDateTime(step.actedAt, user.businessTimeZone)} · {step.note}</p>}</li>)}</ol></section>}
     <section className="oa-detail-content" aria-label="申请内容"><h3>申请内容</h3>
     <div className="oa-reason"><h4>申请说明</h4><p>{row.reason}</p></div>
     {row.personnelChange && <dl className="oa-facts">
@@ -47,6 +52,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
       <div><dt>提交账号</dt><dd>#{row.ownerUserId}（见审批与办理记录）</dd></div>
     </dl>}
     {row.leave && <p>{leaveCategories[row.leave.category]} · {row.leave.startsOn} {row.leave.startPeriod === "AM" ? "上午" : "下午"} 至 {row.leave.endsOn} {row.leave.endPeriod === "AM" ? "上午" : "下午"} · {row.durationDays} 个自然日</p>}
+    <PersonnelOrganizationFacts value={row.personnelChange?.organization} />
     {row.travel && <p>{row.travel.destination} · {row.travel.startsOn} 至 {row.travel.endsOn} · {row.durationDays} 天</p>}
     {row.overtime && <p>{row.overtime.location} · {formatBusinessDateTime(row.overtime.startsAt, user.businessTimeZone)} 至 {formatBusinessDateTime(row.overtime.endsAt, user.businessTimeZone)} · {row.durationHours} 小时</p>}
     {row.category && <p>申请类别：{generalCategories[row.category]}</p>}
@@ -67,6 +73,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     </section>
     <details className="oa-detail-history"><summary>审批与办理记录</summary><OaHistory client={client} user={user} row={row} /></details>
     {action !== null && <OaActionDialog client={client} user={user} row={row} action={action} onClose={() => setAction(null)} />}
+    {reassigning && <ApprovalReassignDialog client={client} row={row} onClose={() => setReassigning(false)} />}
   </article>;
 }
 
@@ -87,7 +94,7 @@ function OaHistory({ client, user, row }: { client: ExportDocManagerApiClient; u
   const [page, setPage] = useState(1);
   const query = useQuery({ queryKey: ["office", "oa", row.kind, user.id, user.companyScope, row.id, "history", page, row.versionNumber],
     queryFn: ({ signal }) => oaApi(client, row.kind).history(row.id, page, { signal }) });
-  const labels: Record<string, string> = { create: "创建草稿", update: "修改草稿", upload: "上传附件", "delete-attachment": "移除附件", submit: "提交审批", withdraw: "撤回修改", approve: "批准", "approve-step": "步骤批准", remind: "申请人催办", reject: "驳回", cancel: "取消", void: "作废批准", complete: "完成登记", reassign: "办理分工交接" };
+  const labels: Record<string, string> = { create: "创建草稿", update: "修改草稿", upload: "上传附件", "delete-attachment": "移除附件", submit: "提交审批", withdraw: "撤回修改", approve: "批准", "approve-step": "步骤批准", remind: "申请人催办", reject: "驳回", cancel: "取消", void: "作废批准", complete: "完成登记", reassign: "办理分工交接", "approval-reassign": "审批职责移交" };
   if (query.isError) return <InlineNotice tone="error">{readApiError(query.error)}</InlineNotice>;
   return <><ol className="oa-history">{query.data?.items.map((item) => <li key={item.id}><strong>{labels[item.action] ?? item.action}</strong> · {item.actorName} · {formatBusinessDateTime(item.occurredAt, user.businessTimeZone)}<p>{item.note || "无附加说明"}</p></li>)}</ol>
     <div className="office-card-actions"><button type="button" className="command-button secondary" disabled={page === 1 || query.isFetching} onClick={() => setPage(page - 1)}>上一页记录</button><span>第 {page} 页 · {query.data?.totalCount ?? 0} 条</span><button type="button" className="command-button secondary" disabled={query.isFetching || page * 20 >= (query.data?.totalCount ?? 0)} onClick={() => setPage(page + 1)}>下一页记录</button></div></>;

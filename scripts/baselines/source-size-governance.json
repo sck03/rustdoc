@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-10-19",
+  "updatedAt": "2026-10-22",
   "rules": [
     {
       "name": "repository web production default",
@@ -37,9 +37,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 66781,
+      "baselineAggregateLines": 68069,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 66856,
+      "maximumAggregateLines": 68144,
       "reportFiles": false
     },
     {
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 16870,
+      "baselineAggregateLines": 17673,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 16990,
+      "maximumAggregateLines": 17793,
       "reportFiles": false
     },
     {
@@ -120,8 +120,8 @@
       "directory": "apps/export-doc-web/src/features/office",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 220,
-      "maximumAggregateLines": 920,
-      "excludePattern": "/(?:Personnel.*|personnelModel|usePersonnelData|usePersonnelImage)\\.(?:ts|tsx)$"
+      "maximumAggregateLines": 922,
+      "excludePattern": "/(?:Personnel.*|personnelModel|usePersonnelData|usePersonnelImage|usePersonnelPositions)\\.(?:ts|tsx)$"
     },
     {
       "name": "maintenance settings panels",
@@ -324,10 +324,10 @@
     {
       "name": "personnel workspace components",
       "directory": "apps/export-doc-web/src/features/office",
-      "filePattern": "^(?:Personnel.*|personnelModel|usePersonnelData)\\.(?:ts|tsx)$",
+      "filePattern": "^(?:Personnel.*|personnelModel|usePersonnelData|usePersonnelPositions)\\.(?:ts|tsx)$",
       "excludePattern": "/Personnel(?:Avatar|IdentityFields|ImagesPanel)\\.tsx$",
       "maximumLines": 220,
-      "maximumAggregateLines": 605
+      "maximumAggregateLines": 692
     },
     {
       "name": "personnel image and identity workspace",

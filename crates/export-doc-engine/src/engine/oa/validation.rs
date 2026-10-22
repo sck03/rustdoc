@@ -8,7 +8,7 @@ pub(super) fn employee(
     body: &Value,
     existing: bool,
 ) -> Result<Value> {
-    let person = if tx.provider() == "SQLite" || existing {
+    let mut person = if tx.provider() == "SQLite" || existing {
         store::get(tx, "people", records::positive(body, "employeeId", "人员")?)?
     } else {
         if body["employeeId"].as_i64().is_some_and(|id| id > 0) {
@@ -27,8 +27,15 @@ pub(super) fn employee(
     if tx.provider() != "SQLite" && existing && person["account"]["id"] != body["ownerUserId"] {
         return Err(conflict("申请人与人员账号关联已变化。"));
     }
-    if existing && person["departmentId"] != body["departmentId"] {
-        return Err(conflict("员工部门已变化，请取消旧申请后重新申请。"));
+    let requested = text(body, "departmentId");
+    if existing || !requested.is_empty() {
+        if !super::super::personnel_organization::departments(&person)?.contains(&requested) {
+            return Err(conflict(
+                "申请部门已不在员工的有效主职或兼职范围内，请重新选择。",
+            ));
+        }
+        super::super::organization::validate_assignment(tx, &actor.company, &requested)?;
+        person["departmentId"] = json!(requested);
     }
     Ok(person)
 }

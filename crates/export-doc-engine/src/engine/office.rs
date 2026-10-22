@@ -75,6 +75,7 @@ pub fn validate(
                     return Err(conflict("离职档案不能直接修改，请办理重新入职。"));
                 }
                 value["status"] = previous["status"].clone();
+                value["organization"] = previous.get("organization").cloned().unwrap_or(json!({}));
                 for field in ["employeeNumber", "departmentId", "jobTitle", "hireDate"] {
                     value[field] = previous[field].clone();
                 }
@@ -144,6 +145,24 @@ pub fn validate(
                 &text(value, "companyScope"),
                 &text(value, "departmentId"),
             )?;
+            if id == 0 {
+                let organization = value
+                    .get("organization")
+                    .filter(|v| !v.is_null())
+                    .cloned()
+                    .unwrap_or(json!({}));
+                super::personnel_organization::validate(
+                    connection,
+                    actor,
+                    value,
+                    &organization,
+                    "create",
+                )?;
+            } else {
+                super::personnel_organization::organization(value)?
+                    .validate(id, &text(value, "departmentId"))
+                    .map_err(invalid)?;
+            }
             if !["FullTime", "PartTime", "Intern", "Contractor"]
                 .contains(&text(value, "employmentType").as_str())
             {
@@ -438,6 +457,21 @@ pub fn deletion_restriction(connection: &Connection, id: i64) -> Result<Option<&
     {
         return Ok(Some(
             "此人员仍被设为部门负责人，请先在组织架构中更换或清除负责人，再删除误录档案。",
+        ));
+    }
+    let person = store::get(connection, "people", id)?;
+    if super::personnel_organization::references(
+        connection,
+        &text(&person, "companyScope"),
+        id,
+        false,
+    )? > 0
+        || store::all(connection, "companies")?
+            .iter()
+            .any(|company| company["executiveEmployeeId"] == id)
+    {
+        return Ok(Some(
+            "此人员仍有公司执行负责人或任职汇报关系引用，请先办理负责人交接；历史引用须保留。",
         ));
     }
     Ok(None)

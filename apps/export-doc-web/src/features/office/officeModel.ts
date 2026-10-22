@@ -1,5 +1,6 @@
 import type { ApiUserDto, MeetingBookingRecord, MeetingBookingUpdateRequest, MeetingRoomSaveRequest, OfficeSupplyRequestRecord, OfficeSupplySaveRequest, SupplyRequestUpdateRequest } from "../../api/index.ts";
 import { businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
+import { hasDepartment } from "../../app/permissionScope.ts";
 
 export type OfficeKind = "rooms" | "supplies";
 export type OfficeRequestRow = MeetingBookingRecord | OfficeSupplyRequestRecord;
@@ -36,7 +37,7 @@ export function officeAccess(user: ApiUserDto, kind: OfficeKind) {
       if (!row) return true;
       if (row.handlingKey && ["issue", "return"].includes(action)) return row.canHandle === true;
       if (value === "own") return row.ownerUserId === user.id;
-      if (value === "department") return Boolean(user.departmentId) && row.departmentId === user.departmentId;
+      if (value === "department") return Boolean(user.departmentId) && hasDepartment(user, row.departmentId);
       return true;
     },
   };

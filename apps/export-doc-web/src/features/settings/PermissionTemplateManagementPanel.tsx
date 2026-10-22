@@ -13,7 +13,7 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { PermissionModuleGrid } from "./PermissionModuleGrid.tsx";
-import { getEditableSchemeGrants, grantKey, scopeLabels, toPermissionGrants } from "./permissionSchemeModel.ts";
+import { combinePermissionSchemes, countTemplateMembers, createSchemeFromEmployee, getEditableSchemeGrants, grantKey, schemeStartingPoints, scopeLabels, toPermissionGrants, type SchemeStartingPoint } from "./permissionSchemeModel.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 
@@ -27,6 +27,7 @@ type TemplateDraft = {
   isActive: boolean;
   grants: Record<string, string>;
   disabledModules: string[];
+  oaAssignedOnly: boolean;
 };
 
 export function PermissionTemplateManagementPanel({
@@ -43,6 +44,8 @@ export function PermissionTemplateManagementPanel({
   const [persistedDraftSnapshot, setPersistedDraftSnapshot] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [startingPoint, setStartingPoint] = useState<SchemeStartingPoint>("blank");
+  const [sourceIds, setSourceIds] = useState<number[]>([]);
 
   const catalogQuery = useQuery({
     queryKey: queryKeys.permissionTemplates(),
@@ -56,6 +59,7 @@ export function PermissionTemplateManagementPanel({
   const technicalResources = useMemo(() => resources.filter((resource) => resource.isTechnical), [resources]);
   const resourceByKey = useMemo(() => new Map(resources.map((resource) => [resource.key, resource])), [resources]);
   const selectedTemplate = templates.find((template) => template.id === selectedId);
+  const memberCounts = useMemo(() => countTemplateMembers(templates, membersQuery.data?.users ?? []), [templates, membersQuery.data?.users]);
 
   useEffect(() => {
     if (selectedId == null && templates.length > 0) applyTemplate(templates[0]);
@@ -141,9 +145,30 @@ export function PermissionTemplateManagementPanel({
   async function beginNew() {
     if (!await confirmDiscardChanges("新建权限方案")) return;
     const emptyDraft = createEmptyDraft();
+    if (startingPoint === "combined") {
+      const sources = templates.filter(template => sourceIds.includes(template.id) && template.isActive && template.code !== "Admin");
+      if (!sources.length || sources.length !== sourceIds.length) {
+        setMessage("请选择至少一个已启用的职责方案；系统管理员身份不能组合授予。");
+        return;
+      }
+      Object.assign(emptyDraft, combinePermissionSchemes(sources, resourceByKey), {
+        name: sources.map(source => source.name).join(" + ").slice(0, 120),
+        description: "组合选定方案的当前配置；同一操作取较大范围，任一来源关闭的模块继续关闭。保存后独立维护。",
+      });
+    } else if (startingPoint !== "blank") {
+      const source = templates.find(template => template.isSystem && template.code === "OfficeEmployee");
+      if (!source?.isActive) {
+        setMessage("请先确认普通员工方案存在且已启用，再从该方案创建。");
+        return;
+      }
+      Object.assign(emptyDraft, createSchemeFromEmployee(source, resourceByKey, startingPoint), {
+        name: schemeStartingPoints[startingPoint],
+        description: "以普通员工方案为起点；按实际职责核对模块、查看与审批范围，审批步骤另行配置。",
+      });
+    }
     setSelectedId(0);
     setDraft(emptyDraft);
-    setPersistedDraftSnapshot(buildTemplateDraftSnapshot(emptyDraft));
+    setPersistedDraftSnapshot(null);
     setMessage(null);
     setSuccessMessage(null);
   }
@@ -178,6 +203,7 @@ export function PermissionTemplateManagementPanel({
       isActive: draft.isActive,
       grants: toPermissionGrants(draft.grants),
       disabledModules: draft.disabledModules,
+      oaAssignedOnly: draft.oaAssignedOnly,
       expectedVersion: draft.id > 0 ? draft.versionNumber : 0,
     });
   }
@@ -215,6 +241,9 @@ export function PermissionTemplateManagementPanel({
         <div><h2>权限方案</h2><p className="section-description">共享权限分组：多个账号使用同一方案，统一维护模块与操作范围。未指定方案的账号跟随同名内置岗位分组；单独配置的账号使用自己的权限。</p></div>
         <div className="toolbar-actions">
           <button className="icon-button" type="button" title="刷新方案" aria-label="刷新方案" disabled={isBusy} onClick={() => void refreshTemplates()}><RefreshCw size={18} /></button>
+          <select aria-label="新建方案起点" value={startingPoint} disabled={isBusy} onChange={event => setStartingPoint(event.target.value as SchemeStartingPoint)}>
+            {Object.entries(schemeStartingPoints).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
           <button className="icon-button" type="button" title="新建方案" aria-label="新建方案" disabled={isBusy} onClick={() => void beginNew()}><Plus size={18} /></button>
           <button className="icon-button" type="button" title="复制当前方案" aria-label="复制当前方案" disabled={isBusy || draft.id <= 0} onClick={copySelected}><Copy size={18} /></button>
           <button className="command-button" type="button" disabled={isBusy || isAdminTemplate} onClick={saveTemplate}><Save size={17} /><span>保存方案</span></button>
@@ -225,13 +254,20 @@ export function PermissionTemplateManagementPanel({
       {message ? <InlineNotice tone="error" title="权限方案操作失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
 
+      {startingPoint === "combined" && <fieldset className="permission-scheme-sources" disabled={isBusy}>
+        <legend>选择需要兼任的职责</legend>
+        {templates.filter(template => template.isActive && template.code !== "Admin").map(template => <label key={template.id} className="checkbox-field">
+          <input type="checkbox" checked={sourceIds.includes(template.id)} onChange={event => setSourceIds(current => event.target.checked ? [...current, template.id] : current.filter(id => id !== template.id))} />{template.name}
+        </label>)}
+        <p>点击“新建方案”组合当前选择。同一操作取较大的数据范围，任一来源关闭的模块继续关闭，请核对后保存。新方案独立维护，来源以后修改不会自动叠加。</p>
+      </fieldset>}
+
       <div className="permission-template-layout">
         <div className="permission-template-list" role="group" aria-label="权限方案目录">
           {templates.map((template) => (
             <button key={template.id} type="button" title={template.description || template.name} aria-pressed={template.id === selectedId} className={template.id === selectedId ? "permission-template-card selected" : "permission-template-card"} onClick={() => void selectTemplate(template)}>
               <span><strong>{template.name}</strong>{template.isSystem ? <small>内置</small> : null}{!template.isActive ? <small>停用</small> : null}
-                {membersQuery.data ? <small>{membersQuery.data.users.filter(user => user.permissionGrants == null && user.role !== "Admin" &&
-                  (user.permissionTemplateId != null ? user.permissionTemplateId === template.id : template.isSystem && user.role === template.code)).length} 个继承账号</small> : null}</span>
+                {membersQuery.data ? <small>{memberCounts.get(template.id) ?? 0} 个继承账号</small> : null}</span>
             </button>
           ))}
         </div>
@@ -245,6 +281,7 @@ export function PermissionTemplateManagementPanel({
           <div className="permission-template-status">
             <label className="checkbox-field"><input type="checkbox" checked={draft.isActive} disabled={isBusy || draft.isSystem} onChange={(event) => setDraft((current) => ({ ...current, isActive: event.target.checked }))} /><span>启用方案</span></label>
             <span>已开通 <strong>{enabledActionCount}</strong> 项操作</span>
+            <label className="checkbox-field"><input type="checkbox" checked={draft.oaAssignedOnly} disabled={isBusy || isAdminTemplate} onChange={event => setDraft(current => ({ ...current, oaAssignedOnly: event.target.checked }))} />仅查看本人及分派给自己的申请</label>
           </div>
           <PermissionModuleGrid
             resources={assignableResources}
@@ -257,7 +294,7 @@ export function PermissionTemplateManagementPanel({
           />
           <details className="permission-effective-details">
             <summary>权限设置说明</summary>
-            <p>权限方案是一组岗位授权；功能模块是发票、客户等业务功能。勾选操作后可设置本人、部门、公司或全部数据范围，也可用快捷设置批量勾选。拥有模块所需的查看权限后，导航菜单自动显示。</p>
+            <p>总经理等跨部门负责人可从“公司审批负责人”新建方案，部门主管可从“部门审批负责人”开始，再按职责增减。方案复制普通员工的操作和关闭模块，只增加人事、行政的查看与审批；查看范围内的草稿与历史也可见。审批步骤、财务接收、档案维护及系统管理分别配置。部门范围包含主职及兼职部门；可另启用仅本人和分派申请可见。</p>
           </details>
           <EffectivePermissionSummary effectiveGrants={selectedTemplate?.effectiveGrants ?? []} resourceByKey={resourceByKey} />
           <TechnicalPermissionCatalog
@@ -343,11 +380,12 @@ function createDraftFromTemplate(template: ApiPermissionTemplateDto, resources: 
     isActive: template.isActive,
     grants: getEditableSchemeGrants(template.grants, resources),
     disabledModules: template.disabledModules ?? [],
+    oaAssignedOnly: template.oaAssignedOnly ?? false,
   };
 }
 
 function createEmptyDraft(): TemplateDraft {
-  return { id: 0, versionNumber: 0, code: createCustomTemplateCode(), name: "新权限方案", description: "", isSystem: false, isActive: true, grants: {}, disabledModules: [] };
+  return { id: 0, versionNumber: 0, code: createCustomTemplateCode(), name: "新权限方案", description: "", isSystem: false, isActive: true, grants: {}, disabledModules: [], oaAssignedOnly: false };
 }
 
 function buildTemplateDraftSnapshot(draft: TemplateDraft) {

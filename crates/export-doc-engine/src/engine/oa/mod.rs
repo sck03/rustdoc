@@ -1,7 +1,9 @@
 //! Independent office requests. Shared transitions, scoped persistence and files;
 //! no dependency on invoice/payment models, reports or financial software.
 pub(in crate::engine) mod approval;
+mod approval_handover;
 pub(in crate::engine) mod approval_references;
+mod approval_routing;
 mod handling_handover;
 pub(in crate::engine) mod personnel_changes;
 mod queries;
@@ -36,6 +38,45 @@ pub(super) fn viewable(
     resource: &str,
     row: &Value,
 ) -> Result<bool> {
+    Ok(scope_viewable(tx, actor, resource, row)?
+        && (!actor.oa_assigned_only || assigned_to(tx, actor, resource, row)?))
+}
+pub(super) fn assigned_to(
+    tx: &Connection,
+    actor: &Actor,
+    resource: &str,
+    row: &Value,
+) -> Result<bool> {
+    if row["ownerUserId"] == actor.id {
+        return Ok(true);
+    }
+    let principals = approval::queue_approvers(tx, actor, resource)?;
+    if approval::plan(row)?.is_some_and(|plan| {
+        plan.steps.iter().any(|step| {
+            step.acted_by_user_id == Some(actor.id)
+                || principals.iter().any(|principal| {
+                    principal.user_id == step.approver_user_id
+                        && principal.departments.as_ref().is_none_or(|departments| {
+                            departments
+                                .iter()
+                                .any(|department| row["departmentId"] == *department)
+                        })
+                })
+        })
+    }) {
+        return Ok(true);
+    }
+    Ok(resource == "office.general"
+        && !text(row, "handlingKey").is_empty()
+        && handling::GENERAL_STATES.contains(&text(row, "status").as_str())
+        && handling::can_handle(tx, actor, row, resource)?)
+}
+pub(super) fn scope_viewable(
+    tx: &Connection,
+    actor: &Actor,
+    resource: &str,
+    row: &Value,
+) -> Result<bool> {
     Ok(row["companyScope"] == actor.company
         && auth::authorize(actor, resource, "view").is_ok()
         && (auth::visible(actor, resource, "view", row)
@@ -57,7 +98,7 @@ fn access(tx: &Connection, actor: &Actor, meta: &Value, row: &Value) -> Result<(
     } else {
         row["companyScope"] == actor.company && auth::visible(actor, &resource, &permission, row)
     };
-    if !visible {
+    if !visible || (actor.oa_assigned_only && !assigned_to(tx, actor, &resource, row)?) {
         return Err(error(403, "没有访问此申请的权限。"));
     }
     Ok(())
@@ -218,12 +259,25 @@ pub(super) fn handle(
             ));
         }
         store::check_version(&row, store::expected(body))?;
+        if action == "approval-reassign" {
+            approval_handover::reassign(tx, &actor, &mut row, body)?;
+            return save(
+                tx,
+                &actor,
+                meta,
+                row,
+                "approval-reassign",
+                &text(body, "note"),
+            );
+        }
         if action == "delete-attachment" {
             return super::record_documents::remove(tx, &actor, meta, row, parameters, body);
         }
         if action == "update" {
             mutable(&row)?;
             if row["requestKey"] != body["requestKey"]
+                || (!text(body, "departmentId").is_empty()
+                    && body["departmentId"] != row["departmentId"])
                 || (body["employeeId"].is_number() && row["employeeId"] != body["employeeId"])
                 || (meta["kind"] == "personnel"
                     && row["personnelChange"]["action"] != body["personnelChange"]["action"])
@@ -369,6 +423,9 @@ fn create(
             }
         });
     let mut submitted_fields = row.clone();
+    if !text(body, "departmentId").is_empty() {
+        submitted_fields["departmentId"] = body["departmentId"].clone();
+    }
     submitted_fields.sort_all_objects();
     let submitted = super::media::digest(&serde_json::to_vec(&submitted_fields)?);
     if let Some(existing) = tx.find_identity(&kind(meta), &identity)? {
