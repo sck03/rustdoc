@@ -41,17 +41,17 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
   const recentInvoices = dashboard?.recentInvoices ?? [];
   const todoItems = dashboard?.todoItems ?? [];
   const metrics = [
-    {
-      label: "本月出口额",
-      value: dashboard ? formatAmount(dashboard.monthlyExportAmount) : "—",
-      detail: dashboard ? buildMonthTrend(dashboard.monthlyExportAmount, dashboard.previousMonthlyExportAmount) : null,
+    ...(dashboard?.exportAmountsByCurrency?.length ? dashboard.exportAmountsByCurrency : [{currency:"",monthlyAmount:0,previousMonthlyAmount:0}]).map((amount) => ({
+      label: amount.currency ? `本月出口额（${amount.currency}）` : "本月出口额",
+      value: dashboard && amount.currency ? formatAmount(amount.monthlyAmount) : "—",
+      detail: dashboard && amount.currency ? buildMonthTrend(amount.monthlyAmount, amount.previousMonthlyAmount) : null,
       icon: CalendarDays,
       tone: "teal",
       route: "/query/invoices",
       enabled: queryPermission.canView,
-    },
+    })),
     {
-      label: "本月预估利润",
+      label: "本月预估利润（CNY）",
       value: dashboard ? formatAmount(dashboard.monthlyProfit) : "—",
       detail: dashboard ? buildMonthTrend(dashboard.monthlyProfit, dashboard.previousMonthlyProfit) : null,
       icon: TrendingUp,
@@ -60,7 +60,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
       enabled: queryPermission.canView,
     },
     {
-      label: "本月退税额",
+      label: "本月退税额（CNY）",
       value: dashboard ? formatAmount(dashboard.monthlyTaxRefund) : "—",
       detail: dashboard ? buildMonthTrend(dashboard.monthlyTaxRefund, dashboard.previousMonthlyTaxRefund) : null,
       icon: WalletCards,
@@ -253,7 +253,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
                       <td data-label="状态"><span className="status-pill">{invoice.statusText || invoice.status}</span></td>
                       <td data-label="客户">{invoice.customerNameEN || "-"}</td>
                       <td data-label="日期" data-table-priority="secondary">{formatDate(invoice.invoiceDate)}</td>
-                      <td className="amount-cell" data-label="金额">{formatAmount(invoice.totalAmount)}</td>
+                      <td className="amount-cell" data-label="金额">{invoice.currency} {formatAmount(invoice.totalAmount)}</td>
                     </tr>
                   ))
                 ) : !dashboardQuery.isLoading && !errorMessage ? (

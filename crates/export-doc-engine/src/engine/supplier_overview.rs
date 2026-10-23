@@ -9,7 +9,7 @@ use rust_decimal::{Decimal, RoundingStrategy};
 use serde_json::{Value, json};
 
 pub fn query(store: &Store, actor: &Actor) -> Result<Value> {
-    store.transaction(|tx| {
+    store.read(|tx| {
         let suppliers: Vec<_> = store::all(tx, "suppliers")?
             .into_iter()
             .filter(|row| auth::visible(actor, "sales.supplier-assessments", "view", row))
@@ -24,12 +24,19 @@ pub fn query(store: &Store, actor: &Actor) -> Result<Value> {
                 .cmp(&a["assessmentDate"].as_str())
                 .then_with(|| b["id"].as_i64().cmp(&a["id"].as_i64()))
         });
+        let mut by_supplier = std::collections::BTreeMap::<i64, Vec<&Value>>::new();
+        for assessment in &assessments {
+            let id = assessment["supplierCompanyId"]
+                .as_i64()
+                .ok_or_else(|| super::error::unavailable("供应商评价缺少所属编号。"))?;
+            by_supplier.entry(id).or_default().push(assessment);
+        }
         let mut items = vec![];
         for supplier in &suppliers {
-            let rows: Vec<_> = assessments
-                .iter()
-                .filter(|row| row["supplierCompanyId"] == supplier["id"])
-                .collect();
+            let rows = by_supplier
+                .get(&supplier["id"].as_i64().unwrap_or(0))
+                .map(Vec::as_slice)
+                .unwrap_or_default();
             if let Some(latest) = rows.first() {
                 let mut value =
                     contracts::initial(contracts::schema("ApiSupplierAssessmentOverviewItemDto"));

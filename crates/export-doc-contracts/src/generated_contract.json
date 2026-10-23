@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "36c232154cbeee7e29dda1b627352f95bd28dc9bd5d9336aed54a8142786a08c",
+  "digest": "b7571a0af8e354d219c584d375f76950bc6cde728f314005df25fbaebab03a22",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -65000,6 +65000,35 @@
         }
       }
     },
+    "ApiDashboardCurrencyAmount": {
+      "type": "object",
+      "required": [
+        "currency",
+        "monthlyAmount",
+        "previousMonthlyAmount"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string"
+        },
+        "monthlyAmount": {
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "type": [
+            "number",
+            "string"
+          ],
+          "format": "double"
+        },
+        "previousMonthlyAmount": {
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "type": [
+            "number",
+            "string"
+          ],
+          "format": "double"
+        }
+      }
+    },
     "ApiDashboardRecentInvoiceDto": {
       "required": [
         "id",
@@ -65046,6 +65075,9 @@
           "format": "double"
         },
         "customerNameEN": {
+          "type": "string"
+        },
+        "currency": {
           "type": "string"
         }
       }
@@ -65197,6 +65229,17 @@
         },
         "storagePolicy": {
           "type": "string"
+        },
+        "exportAmountCurrency": {
+          "type": "string",
+          "description": "Currency of the scalar export amounts. Empty for no invoices or mixed currencies; scalar amounts are then zero. Use exportAmountsByCurrency."
+        },
+        "exportAmountsByCurrency": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ApiDashboardCurrencyAmount"
+          },
+          "description": "Original-currency totals for the union of both months. Compare only amounts from the same entry; no exchange-rate conversion."
         }
       }
     },
@@ -73891,6 +73934,29 @@
           "type": "integer",
           "format": "int64",
           "minimum": 0
+        },
+        "downloads": {
+          "$ref": "#/components/schemas/ApiRuntimeLatencyMetrics"
+        },
+        "downloadCapacity": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
+        "downloadTimeouts": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
+        "downloadDisconnects": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
+        "downloadReadErrors": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
         }
       },
       "required": [
@@ -73906,7 +73972,12 @@
         "availableBulkSlots",
         "uptimeSeconds",
         "logsDropped",
-        "logWriteErrors"
+        "logWriteErrors",
+        "downloads",
+        "downloadCapacity",
+        "downloadTimeouts",
+        "downloadDisconnects",
+        "downloadReadErrors"
       ],
       "additionalProperties": false
     },

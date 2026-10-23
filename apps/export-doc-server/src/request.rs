@@ -11,10 +11,11 @@ use export_doc_engine::{api::ApiError, operation::OperationScope};
 use serde_json::Value;
 use std::{collections::HashMap, time::Duration};
 
-fn error(status: u16, message: &str) -> ApiError {
+pub(super) fn error(status: u16, message: &str) -> ApiError {
     ApiError {
         status: Some(status),
         message: message.into(),
+        diagnostic: (status >= 500).then_some("http-processing"),
     }
 }
 
@@ -26,7 +27,7 @@ impl Drop for Cancellation {
 }
 
 pub async fn handle(state: ServerState, operation: Operation, request: Request) -> Response<Body> {
-    let span = state.telemetry.start(operation.id);
+    let mut span = state.telemetry.start(operation.id);
     let request_id = span.id().to_owned();
     let mut response = match tokio::time::timeout(
         Duration::from_secs(request_seconds(operation) + 5),
@@ -45,15 +46,18 @@ pub async fn handle(state: ServerState, operation: Operation, request: Request) 
                             state.requests.queued(),
                         );
                         reply.bytes = value.to_string().into_bytes();
-                        response::success(operation, reply)
+                        response::success(operation, reply, &state, &request_id)
                     }
                     Err(_) => response::error(error(503, "运行指标响应无效。")),
                 }
             } else {
-                response::success(operation, reply)
+                response::success(operation, reply, &state, &request_id)
             }
         }
-        Err(error) => response::error(error),
+        Err(error) => {
+            span.failure(&error);
+            response::error(error)
+        }
     };
     response.headers_mut().insert(
         "x-request-id",
@@ -89,7 +93,29 @@ async fn execute(
         }
     }
     let permit = state.requests.acquire(&state.telemetry).await?;
+    let download_permit = if response::is_download(operation) {
+        Some(
+            state
+                .downloads
+                .clone()
+                .try_acquire_owned()
+                .map_err(|_| error(429, "下载正在处理，请稍后重试。"))?,
+        )
+    } else {
+        None
+    };
     let scope = OperationScope::new(Duration::from_secs(request_seconds(operation)));
+    let processing = if body::needs_processing_slot(operation) && !body::backup_upload(operation) {
+        Some(
+            state
+                .processing
+                .clone()
+                .try_acquire_owned()
+                .map_err(|_| error(429, "文件或图片正在处理，请稍后重试。"))?,
+        )
+    } else {
+        None
+    };
     let bulk_permit = if [
         UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB,
         STAGE_SERVER_MIGRATION_RESTORE,
@@ -243,229 +269,236 @@ async fn execute(
     } = parsed;
     let worker = tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        scope.run(|| {
-            let parameters: Vec<_> = parameters
-                .iter()
-                .map(|(k, v)| (k.as_str(), v.clone()))
-                .collect();
-            let query: Vec<_> = query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
-            if operation == PREVIEW_OCR_IMAGE {
-                return state
-                    .service
-                    .preview_ocr_image(&query, &token)
-                    .map(response::Reply::file);
-            }
-            if operation == DOWNLOAD_JOB_RESULT_WITH_TICKET {
-                let ticket = parameters
+        let _processing = processing;
+        scope
+            .run(|| {
+                let parameters: Vec<_> = parameters
                     .iter()
-                    .find(|(name, _)| *name == "token")
-                    .map(|(_, value)| value.as_str())
-                    .unwrap_or("");
-                let (id, session) = state.tickets.resolve(ticket, &cookie_binding)?;
-                return state
-                    .service
-                    .prepare_job_download(&id, &session)
-                    .map(response::Reply::download);
-            }
-            if [
-                DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
-                DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET,
-            ]
-            .contains(&operation)
-            {
-                let ticket = parameters
-                    .iter()
-                    .find(|(name, _)| *name == "token")
-                    .map(|(_, value)| value.as_str())
-                    .unwrap_or("");
-                let (token, session) =
-                    state
-                        .tickets
-                        .resolve_for(operation, ticket, &cookie_binding)?;
-                return state
-                    .service
-                    .prepare_backup_download(operation, &[("token", token)], &session)
-                    .map(response::Reply::download);
-            }
-            if [DOWNLOAD_JOB_RESULT, CREATE_JOB_DOWNLOAD_TICKET].contains(&operation) {
-                let id = parameters
-                    .iter()
-                    .find(|(name, _)| *name == "jobId")
-                    .map(|(_, value)| value.as_str())
-                    .unwrap_or("");
-                if operation == DOWNLOAD_JOB_RESULT {
+                    .map(|(k, v)| (k.as_str(), v.clone()))
+                    .collect();
+                let query: Vec<_> = query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
+                if operation == PREVIEW_OCR_IMAGE {
                     return state
                         .service
-                        .prepare_job_download(id, &token)
+                        .preview_ocr_image(&query, &token)
+                        .map(response::Reply::file);
+                }
+                if operation == DOWNLOAD_JOB_RESULT_WITH_TICKET {
+                    let ticket = parameters
+                        .iter()
+                        .find(|(name, _)| *name == "token")
+                        .map(|(_, value)| value.as_str())
+                        .unwrap_or("");
+                    let (id, session) = state.tickets.resolve(ticket, &cookie_binding)?;
+                    return state
+                        .service
+                        .prepare_job_download(&id, &session)
                         .map(response::Reply::download);
                 }
-                state.service.authorize_job_download(id, &token)?;
-                let (ticket, cookie) =
-                    state
-                        .tickets
-                        .issue(id, &token, &cookie_binding, secure_cookie)?;
-                return Ok(response::Reply {
-                    bytes: serde_json::to_vec(&ticket)
-                        .map_err(|_| error(503, "下载票据编码失败。"))?,
-                    file: None,
-                    cookie: Some(cookie),
-                    stream: None,
-                });
-            }
-            let _bulk_permit = bulk_permit;
-            if let Some((authorization, file)) = backup_upload {
-                return serde_json::to_vec(&state.service.finish_backup_upload(
-                    authorization,
-                    file,
-                    &token,
-                )?)
-                .map(response::Reply::bytes)
-                .map_err(|_| error(503, "上传结果编码失败。"));
-            }
-            if operation == UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
-                return serde_json::to_vec(&state.service.upload_pdf_merge(merge_uploads, &token)?)
-                    .map(response::Reply::bytes)
-                    .map_err(|_| error(503, "文件任务响应编码失败。"));
-            }
-            if let Some((name, bytes)) = upload {
-                let value = state.service.upload(
-                    operation,
-                    &parameters,
-                    body.unwrap_or(Value::Null),
-                    &name,
-                    &bytes,
-                    &token,
-                )?;
-                serde_json::to_vec(&value)
-                    .map(response::Reply::bytes)
-                    .map_err(|_| error(503, "上传结果编码失败。"))
-            } else {
-                if operation == DOWNLOAD_REPORT_TEMPLATE_FILE {
-                    let request: DownloadReportTemplateFileBody = serde_json::from_value(
-                        body.ok_or_else(|| error(400, "缺少模板下载请求。"))?,
-                    )
-                    .map_err(|_| error(400, "模板下载请求格式无效。"))?;
-                    return state
-                        .service
-                        .download_file(
-                            operation,
-                            &[
-                                ("reportType", request.report_type.unwrap_or_default()),
-                                ("templatePath", request.template_path.unwrap_or_default()),
-                            ],
-                            &token,
-                        )
-                        .map(response::Reply::file);
-                }
-                if operation == DOWNLOAD_PERSONNEL_ATTACHMENT
-                    || export_doc_engine::engine::oa::is_download(operation)
-                    || export_doc_engine::engine::communication::is_download(operation)
-                    || [DOWNLOAD_REPORT_TEMPLATE_PACKAGE, DOWNLOAD_SUPPORT_PACKAGE]
-                        .contains(&operation)
-                {
-                    return state
-                        .service
-                        .download_file(operation, &parameters, &token)
-                        .map(response::Reply::file);
-                }
-                if operation == DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE {
-                    return state
-                        .service
-                        .download_report_resource(&parameters, &token)
-                        .map(response::Reply::file);
-                }
-                let result = state.service.dispatch_with_bootstrap(
-                    operation,
-                    &parameters,
-                    &query,
-                    body,
-                    &token,
-                    &bootstrap,
-                )?;
                 if [
-                    CREATE_POSTGRE_SQL_PHYSICAL_BACKUP_DOWNLOAD_TICKET,
-                    CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET,
+                    DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
+                    DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET,
                 ]
                 .contains(&operation)
                 {
-                    let original: Value = serde_json::from_slice(&result)
-                        .map_err(|_| error(503, "备份下载票据无效。"))?;
-                    let id = original["token"]
-                        .as_str()
-                        .ok_or_else(|| error(503, "备份下载票据缺失。"))?;
-                    let (ticket, cookie) = state.tickets.issue_for(
-                        if operation == CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET {
-                            DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET
-                        } else {
-                            DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET
-                        },
-                        id,
-                        &token,
-                        &cookie_binding,
-                        secure_cookie,
-                    )?;
+                    let ticket = parameters
+                        .iter()
+                        .find(|(name, _)| *name == "token")
+                        .map(|(_, value)| value.as_str())
+                        .unwrap_or("");
+                    let (token, session) =
+                        state
+                            .tickets
+                            .resolve_for(operation, ticket, &cookie_binding)?;
+                    return state
+                        .service
+                        .prepare_backup_download(operation, &[("token", token)], &session)
+                        .map(response::Reply::download);
+                }
+                if [DOWNLOAD_JOB_RESULT, CREATE_JOB_DOWNLOAD_TICKET].contains(&operation) {
+                    let id = parameters
+                        .iter()
+                        .find(|(name, _)| *name == "jobId")
+                        .map(|(_, value)| value.as_str())
+                        .unwrap_or("");
+                    if operation == DOWNLOAD_JOB_RESULT {
+                        return state
+                            .service
+                            .prepare_job_download(id, &token)
+                            .map(response::Reply::download);
+                    }
+                    state.service.authorize_job_download(id, &token)?;
+                    let (ticket, cookie) =
+                        state
+                            .tickets
+                            .issue(id, &token, &cookie_binding, secure_cookie)?;
                     return Ok(response::Reply {
                         bytes: serde_json::to_vec(&ticket)
-                            .map_err(|_| error(503, "票据编码失败。"))?,
+                            .map_err(|_| error(503, "下载票据编码失败。"))?,
                         file: None,
                         cookie: Some(cookie),
                         stream: None,
+                        download_permit: None,
                     });
                 }
-                if operation == LOGOUT {
-                    state.tickets.revoke(&token)?;
+                let _bulk_permit = bulk_permit;
+                if let Some((authorization, file)) = backup_upload {
+                    return serde_json::to_vec(&state.service.finish_backup_upload(
+                        authorization,
+                        file,
+                        &token,
+                    )?)
+                    .map(response::Reply::bytes)
+                    .map_err(|_| error(503, "上传结果编码失败。"));
                 }
-                if operation == DOWNLOAD_CONTAINER_PACKING_PDF {
-                    return Ok(response::Reply::file(
-                        export_doc_engine::engine::tasks::FileOutput {
-                            file_name: "装柜现场作业单.pdf".into(),
-                            media_type: "application/pdf".into(),
-                            content: result,
-                        },
-                    ));
+                if operation == UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
+                    return serde_json::to_vec(
+                        &state.service.upload_pdf_merge(merge_uploads, &token)?,
+                    )
+                    .map(response::Reply::bytes)
+                    .map_err(|_| error(503, "文件任务响应编码失败。"));
                 }
-                if operation == EXPORT_HS_CODE_KNOWLEDGE {
-                    return Ok(response::Reply::file(
-                        export_doc_engine::engine::tasks::FileOutput {
-                            file_name: "HS知识库.zip".into(),
-                            media_type: "application/vnd.exportdocmanager.hs-knowledge+zip".into(),
-                            content: result,
-                        },
-                    ));
-                }
-                if operation == DOWNLOAD_INVOICE_TRANSFER_PACKAGE {
-                    return Ok(response::Reply::file(
-                        export_doc_engine::engine::tasks::FileOutput {
-                            file_name: "单据.edpkg".into(),
-                            media_type: "application/zip".into(),
-                            content: result,
-                        },
-                    ));
-                }
-                if [
-                    DOWNLOAD_CUSTOMS_COO_SUBMIT_PACKAGE,
-                    DOWNLOAD_AGENT_CONSIGNMENT_SUBMIT_PACKAGE,
-                    DOWNLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
-                ]
-                .contains(&operation)
-                {
-                    return Ok(response::Reply::file(
-                        export_doc_engine::engine::tasks::FileOutput {
-                            file_name: if operation == DOWNLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE {
-                                "单一窗口回执包.zip"
-                            } else {
-                                "单一窗口提交包.zip"
-                            }
-                            .into(),
-                            media_type: "application/zip".into(),
-                            content: result,
-                        },
-                    ));
-                }
-                if [DOWNLOAD_AUDIT_LOGS, EXPORT_CRM_CUSTOMERS, EXPORT_SUPPLIERS]
+                if let Some((name, bytes)) = upload {
+                    let value = state.service.upload(
+                        operation,
+                        &parameters,
+                        body.unwrap_or(Value::Null),
+                        &name,
+                        &bytes,
+                        &token,
+                    )?;
+                    serde_json::to_vec(&value)
+                        .map(response::Reply::bytes)
+                        .map_err(|_| error(503, "上传结果编码失败。"))
+                } else {
+                    if operation == DOWNLOAD_REPORT_TEMPLATE_FILE {
+                        let request: DownloadReportTemplateFileBody = serde_json::from_value(
+                            body.ok_or_else(|| error(400, "缺少模板下载请求。"))?,
+                        )
+                        .map_err(|_| error(400, "模板下载请求格式无效。"))?;
+                        return state
+                            .service
+                            .download_file(
+                                operation,
+                                &[
+                                    ("reportType", request.report_type.unwrap_or_default()),
+                                    ("templatePath", request.template_path.unwrap_or_default()),
+                                ],
+                                &token,
+                            )
+                            .map(response::Reply::file);
+                    }
+                    if operation == DOWNLOAD_PERSONNEL_ATTACHMENT
+                        || export_doc_engine::engine::oa::is_download(operation)
+                        || export_doc_engine::engine::communication::is_download(operation)
+                        || [DOWNLOAD_REPORT_TEMPLATE_PACKAGE, DOWNLOAD_SUPPORT_PACKAGE]
+                            .contains(&operation)
+                    {
+                        return state
+                            .service
+                            .download_file(operation, &parameters, &token)
+                            .map(response::Reply::file);
+                    }
+                    if operation == DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE {
+                        return state
+                            .service
+                            .download_report_resource(&parameters, &token)
+                            .map(response::Reply::file);
+                    }
+                    let result = state.service.dispatch_with_bootstrap(
+                        operation,
+                        &parameters,
+                        &query,
+                        body,
+                        &token,
+                        &bootstrap,
+                    )?;
+                    if [
+                        CREATE_POSTGRE_SQL_PHYSICAL_BACKUP_DOWNLOAD_TICKET,
+                        CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET,
+                    ]
                     .contains(&operation)
-                {
-                    return Ok(response::Reply::file(
+                    {
+                        let original: Value = serde_json::from_slice(&result)
+                            .map_err(|_| error(503, "备份下载票据无效。"))?;
+                        let id = original["token"]
+                            .as_str()
+                            .ok_or_else(|| error(503, "备份下载票据缺失。"))?;
+                        let (ticket, cookie) = state.tickets.issue_for(
+                            if operation == CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET {
+                                DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET
+                            } else {
+                                DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET
+                            },
+                            id,
+                            &token,
+                            &cookie_binding,
+                            secure_cookie,
+                        )?;
+                        return Ok(response::Reply {
+                            bytes: serde_json::to_vec(&ticket)
+                                .map_err(|_| error(503, "票据编码失败。"))?,
+                            file: None,
+                            cookie: Some(cookie),
+                            stream: None,
+                            download_permit: None,
+                        });
+                    }
+                    if operation == LOGOUT {
+                        state.tickets.revoke(&token)?;
+                    }
+                    if operation == DOWNLOAD_CONTAINER_PACKING_PDF {
+                        return Ok(response::Reply::file(
+                            export_doc_engine::engine::tasks::FileOutput {
+                                file_name: "装柜现场作业单.pdf".into(),
+                                media_type: "application/pdf".into(),
+                                content: result,
+                            },
+                        ));
+                    }
+                    if operation == EXPORT_HS_CODE_KNOWLEDGE {
+                        return Ok(response::Reply::file(
+                            export_doc_engine::engine::tasks::FileOutput {
+                                file_name: "HS知识库.zip".into(),
+                                media_type: "application/vnd.exportdocmanager.hs-knowledge+zip"
+                                    .into(),
+                                content: result,
+                            },
+                        ));
+                    }
+                    if operation == DOWNLOAD_INVOICE_TRANSFER_PACKAGE {
+                        return Ok(response::Reply::file(
+                            export_doc_engine::engine::tasks::FileOutput {
+                                file_name: "单据.edpkg".into(),
+                                media_type: "application/zip".into(),
+                                content: result,
+                            },
+                        ));
+                    }
+                    if [
+                        DOWNLOAD_CUSTOMS_COO_SUBMIT_PACKAGE,
+                        DOWNLOAD_AGENT_CONSIGNMENT_SUBMIT_PACKAGE,
+                        DOWNLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
+                    ]
+                    .contains(&operation)
+                    {
+                        return Ok(response::Reply::file(
+                            export_doc_engine::engine::tasks::FileOutput {
+                                file_name: if operation == DOWNLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE {
+                                    "单一窗口回执包.zip"
+                                } else {
+                                    "单一窗口提交包.zip"
+                                }
+                                .into(),
+                                media_type: "application/zip".into(),
+                                content: result,
+                            },
+                        ));
+                    }
+                    if [DOWNLOAD_AUDIT_LOGS, EXPORT_CRM_CUSTOMERS, EXPORT_SUPPLIERS]
+                        .contains(&operation)
+                    {
+                        return Ok(response::Reply::file(
                         export_doc_engine::engine::tasks::FileOutput {
                             file_name: match operation {
                                 EXPORT_CRM_CUSTOMERS => "CRM客户.xlsx",
@@ -479,10 +512,14 @@ async fn execute(
                             content: result,
                         },
                     ));
+                    }
+                    Ok(response::Reply::bytes(result))
                 }
-                Ok(response::Reply::bytes(result))
-            }
-        })
+            })
+            .map(|mut reply| {
+                reply.download_permit = download_permit;
+                reply
+            })
     });
     tokio::time::timeout(Duration::from_secs(request_seconds(operation) + 2), worker)
         .await

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ApiCrmCustomerDto, ApiEmailTemplateDto, ApiEmailTemplatePreviewDto, ApiEmailTemplateVariableDto, ApiEmailTemplateVersionDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -19,9 +19,9 @@ import { FormGuidance, PermissionNotice } from "../../ui/PageState.tsx";
 import {
   areEmailTemplateDraftsEqual,
   createEmailTemplateCopyName,
-  createEmptyEmailTemplateDraft,
   type EmailTemplateDraft,
 } from "./emailTemplateModel.ts";
+import { useEmailTemplateWorkspace } from "./useEmailTemplateWorkspace.ts";
 import { usePermission } from "../../app/PermissionAccessContext.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { EmailHtmlPreview, EmailRichTextEditor } from "../../ui/EmailRichTextEditor.tsx";
@@ -38,20 +38,20 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
   const emailSendPermission = usePermission("common.email-delivery", "send");
   const requestConfirmation = useConfirmation();
   const navigate = useNavigate();
-  const runAbortableOperation = useAbortableOperation();
-  const [templates, setTemplates] = useState<ApiEmailTemplateDto[]>([]);
-  const [versions, setVersions] = useState<ApiEmailTemplateVersionDto[]>([]);
-  const [selectedVersionNumber, setSelectedVersionNumber] = useState(0);
+  const workspace = useEmailTemplateWorkspace(client);
+  const { templates, selected, draft: currentDraft, setDraft, savedDraft, versions, selectedVersionNumber, setSelectedVersionNumber, busy, loadVersions } = workspace;
+  const runAbortableOperation = useAbortableOperation(selected?.id);
+  const runCatalogOperation = useAbortableOperation(client);
   const [variables, setVariables] = useState<ApiEmailTemplateVariableDto[]>([]);
-  const [selectedId, setSelectedId] = useState(0);
-  const selectedIdRef = useRef(0);
   const [keyword, setKeyword] = useState("");
   const [includeArchived, setIncludeArchived] = useState(false);
   const [scope, setScope] = useState<EmailTemplateScope>("all");
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState("通用");
-  const [subject, setSubject] = useState("");
-  const [bodyHtml, setBodyHtml] = useState("");
+  const { name, category, subject, bodyHtml } = currentDraft;
+  const field = <K extends keyof EmailTemplateDraft>(key: K) => (value: EmailTemplateDraft[K] | ((previous: EmailTemplateDraft[K]) => EmailTemplateDraft[K])) => {
+    setDraft((previous) => ({ ...previous, [key]: typeof value === "function" ? value(previous[key]) : value }));
+    setPreview(null);
+  };
+  const setName = field("name"), setCategory = field("category"), setSubject = field("subject"), setBodyHtml = field("bodyHtml");
   const [shareScope, setShareScope] = useState("Private");
   const [sampleValues, setSampleValues] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<ApiEmailTemplatePreviewDto | null>(null);
@@ -61,15 +61,12 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
   const [crmCustomerId, setCrmCustomerId] = useState(0);
   const [recipientAddress, setRecipientAddress] = useState("");
   const [view, setView] = useState<EmailTemplateTaskView>("directory");
-  const [savedDraft, setSavedDraft] = useState<EmailTemplateDraft>(() => createEmptyEmailTemplateDraft());
-  const selected = templates.find((item) => item.id === selectedId);
   const selectedVersion = versions.find((item) => item.versionNumber === selectedVersionNumber) ?? versions[0];
   const visibleTemplates = useMemo(() => templates.filter((item) => {
     if (scope === "editable") return item.canEdit;
     if (scope === "shared") return item.shareScope !== "Private";
     return true;
   }), [scope, templates]);
-  const currentDraft = useMemo<EmailTemplateDraft>(() => ({ name, category, subject, bodyHtml }), [bodyHtml, category, name, subject]);
   const canEdit = templateEditPermission.allowed && (!selected || selected.canEdit);
   const canDelete = selected?.canArchive === true;
   const isDirty = canEdit && !areEmailTemplateDraftsEqual(currentDraft, savedDraft);
@@ -78,37 +75,20 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     message: "当前邮件模板有未保存的修改。",
   });
 
-  async function loadTemplates(preferredId?: number, query = { keyword: keyword.trim(), includeArchived }) {
-    await runAbortableOperation(async (signal) => {
-      const rows = await client.listEmailTemplates(query, { signal });
-      if (signal.aborted) return;
-      setTemplates(rows);
-      const candidateId = preferredId ?? selectedIdRef.current;
-      const nextId = candidateId && rows.some((item) => item.id === candidateId) ? candidateId : 0;
-      selectTemplateId(nextId);
-      if (!nextId) clearEditor();
-    });
+  async function loadTemplates(query = { keyword: keyword.trim(), includeArchived }) {
+    await workspace.loadTemplates(query);
   }
 
-  async function loadVersions(templateId = selectedIdRef.current, preferredVersion?: number) {
-    if (!templateId) { setVersions([]); setSelectedVersionNumber(0); return; }
-    await runAbortableOperation(async (signal) => {
-      const rows = await client.listEmailTemplateVersions({ id: templateId }, { signal });
-      if (signal.aborted) return;
-      setVersions(rows);
-      const nextVersion = preferredVersion && rows.some((item) => item.versionNumber === preferredVersion)
-        ? preferredVersion : rows[0]?.versionNumber ?? 0;
-      setSelectedVersionNumber(nextVersion);
-    });
-  }
-
-  function selectTemplateId(id: number) {
-    selectedIdRef.current = id;
-    setSelectedId(id);
+  async function refreshAfterWrite(message: string) {
+    setFeedback(successFeedback(message));
+    try { await loadTemplates({ keyword: "", includeArchived }); }
+    catch (error) {
+      if (!isAbortError(error)) setFeedback(warningFeedback(`${message} 目录刷新失败，可重试刷新：${readApiError(error)}`));
+    }
   }
 
   useEffect(() => {
-    const requests: Promise<unknown>[] = [loadTemplates(), runAbortableOperation(async (signal) => {
+    const requests: Promise<unknown>[] = [loadTemplates(), runCatalogOperation(async (signal) => {
       const rows = await client.listEmailTemplateVariables({ signal });
       if (signal.aborted) return;
       setVariables(rows);
@@ -120,50 +100,39 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     });
   }, [client, crmViewPermission.allowed, includeArchived]);
 
-  useEffect(() => {
-    if (!selected) return;
-    setName(selected.name); setCategory(selected.category); setSubject(selected.subject);
-    setBodyHtml(selected.bodyHtml); setShareScope(selected.shareScope); setPreview(null);
-    setSavedDraft(toDraft(selected));
-  }, [selected]);
-
-  function clearEditor() {
-    const empty = createEmptyEmailTemplateDraft();
-    applyDraft(empty); setSavedDraft(empty); setPreview(null);
-  }
-
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!canEdit) return;
+    if (!canEdit || busy) return;
     const id = selected?.id ?? 0;
     const body = { name: name.trim(), category: category.trim() || "通用", subject, bodyHtml,
       expectedVersion: id > 0 ? selected?.versionNumber ?? 0 : 0 };
     try {
-      const saved = await runAbortableOperation((signal) => id
+      const saved = await workspace.write(id, (signal) => id
         ? client.saveEmailTemplateDraft({ id, body }, { signal })
         : client.createEmailTemplate({ body }, { signal }));
-      selectTemplateId(saved.id); setKeyword(""); setSavedDraft(toDraft(saved));
-      await loadTemplates(saved.id, { keyword: "", includeArchived });
-      setFeedback(successFeedback(id ? "邮件模板草稿已保存。" : "邮件模板草稿已建立。"));
+      if (!saved) return;
+      setKeyword("");
+      await refreshAfterWrite(id ? "邮件模板草稿已保存。" : "邮件模板草稿已建立。");
     } catch (error) {
       if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
     }
   }
 
   async function remove() {
+    if (busy || !await confirmDiscardChanges("归档模板")) return;
     if (!canDelete || !selected || !await requestConfirmation({ title: "归档邮件模板", description: `确定归档邮件模板“${selected.name}”吗？`, details: ["归档保留版本历史，可由具备恢复权限的人员重新恢复为私有草稿。"], confirmLabel: "确认归档", tone: "danger" })) return;
     try {
-      await runAbortableOperation((signal) => client.archiveEmailTemplate({ id: selected.id, expectedVersion: selected.versionNumber }, { signal }));
-      await loadTemplates();
+      const saved = await workspace.write(selected.id, (signal) => client.archiveEmailTemplate({ id: selected.id, expectedVersion: selected.versionNumber }, { signal }));
+      if (!saved) return;
       setView("directory");
-      setFeedback(successFeedback("邮件模板已归档。"));
+      await refreshAfterWrite("邮件模板已归档。");
     } catch (error) {
       if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
     }
   }
 
   async function updateLifecycle(action: "publish" | "share" | "disable" | "restore") {
-    if (!selected) return;
+    if (!selected || busy) return;
     if (isDirty && !await confirmDiscardChanges("执行模板生命周期操作")) return;
     const labels = { publish: "发布", share: "调整共享范围", disable: "停用", restore: "恢复" } as const;
     if (!await requestConfirmation({
@@ -174,7 +143,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     })) return;
 
     try {
-      const saved = await runAbortableOperation((signal) => {
+      const saved = await workspace.write(selected.id, (signal) => {
         const body = { expectedVersion: selected.versionNumber };
         switch (action) {
           case "publish": return client.publishEmailTemplate({ id: selected.id, body }, { signal });
@@ -183,32 +152,28 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
           case "restore": return client.restoreEmailTemplate({ id: selected.id, body }, { signal });
         }
       });
-      selectTemplateId(saved.id);
-      applyDraft(toDraft(saved));
-      setSavedDraft(toDraft(saved));
+      if (!saved) return;
       setShareScope(saved.shareScope);
-      await loadTemplates(saved.id, { keyword: "", includeArchived });
-      await loadVersions(saved.id);
-      setFeedback(successFeedback(`邮件模板已${labels[action]}。`));
+      await refreshAfterWrite(`邮件模板已${labels[action]}。`);
     } catch (error) {
       if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
     }
   }
 
   async function restoreVersion(version: ApiEmailTemplateVersionDto) {
-    if (!selected || !version.canRestore || version.versionNumber === selected.versionNumber) return;
+    if (busy || !selected || version.emailTemplateId !== selected.id || !version.canRestore || version.versionNumber === selected.versionNumber) return;
     if (!await confirmDiscardChanges(`恢复 V${version.versionNumber}`)) return;
     if (!await requestConfirmation({ title: `恢复到 V${version.versionNumber}`, description: `将模板“${selected.name}”恢复到历史版本。`, details: ["系统会保留现有历史，并生成一个新的当前版本。"], confirmLabel: "确认恢复" })) return;
     try {
-      const restored = await runAbortableOperation((signal) => client.restoreEmailTemplateVersion(
+      const restored = await workspace.write(selected.id, (signal) => client.restoreEmailTemplateVersion(
         { id: selected.id, versionNumber: version.versionNumber, body: { expectedVersion: selected.versionNumber } },
         { signal },
       ));
-      selectTemplateId(restored.id); applyDraft(toDraft(restored)); setSavedDraft(toDraft(restored)); setPreview(null);
+      if (!restored) return;
+      setPreview(null);
       setKeyword("");
-      await loadTemplates(restored.id, { keyword: "", includeArchived });
+      await refreshAfterWrite(`已从 V${version.versionNumber} 恢复，并生成 V${restored.versionNumber}。`);
       await loadVersions(restored.id);
-      setFeedback(successFeedback(`已从 V${version.versionNumber} 恢复，并生成 V${restored.versionNumber}。`));
     } catch (error) {
       if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
     }
@@ -241,20 +206,16 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     if (rendered) setView("preview");
   }
 
-  function applyDraft(draft: EmailTemplateDraft) {
-    setName(draft.name); setCategory(draft.category); setSubject(draft.subject);
-    setBodyHtml(draft.bodyHtml);
-  }
-
   async function startNewTemplate() {
     if (!templateEditPermission.allowed) return;
     if (!await confirmDiscardChanges("新建模板")) return;
-    selectTemplateId(0); clearEditor(); setView("editor"); setFeedback(null);
+    workspace.open(); setPreview(null); setView("editor"); setFeedback(null);
   }
 
   async function openTemplate(template: ApiEmailTemplateDto) {
-    if (template.id !== selectedId && !await confirmDiscardChanges(`打开模板“${template.name}”`)) return;
-    selectTemplateId(template.id); setView("editor"); setFeedback(null);
+    if (template.id !== selected?.id && !await confirmDiscardChanges(`打开模板“${template.name}”`)) return;
+    if (template.id !== selected?.id) workspace.open(template);
+    setShareScope(template.shareScope); setPreview(null); setView("editor"); setFeedback(null);
   }
 
   function copyAsNewTemplate() {
@@ -263,7 +224,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
       ...currentDraft,
       name: createEmailTemplateCopyName(currentDraft.name, templates.map((item) => item.name)),
     };
-    selectTemplateId(0); applyDraft(copiedDraft); setSavedDraft(createEmptyEmailTemplateDraft());
+    workspace.open(undefined, copiedDraft);
     setPreview(null); setView("editor"); setFeedback(infoFeedback("已复制为新模板草稿，确认名称后点击保存。原模板保持不变。"));
   }
 
@@ -358,7 +319,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
         {selected ? <div className="context-strip form-field-wide"><strong>{emailTemplateStatusLabel(selected.status)}</strong><span>{emailTemplateShareScopeLabel(selected.shareScope)} · V{selected.versionNumber}</span></div> : null}
         {selected?.canShare ? <label>共享范围<select value={shareScope} onChange={(event) => setShareScope(event.target.value)}><option value="Private">仅自己可见</option><option value="Department">同部门可见</option><option value="Company">同公司可见</option><option value="All">全部成员可见</option></select></label> : null}
         <div className="form-actions">
-          {canEdit ? <button className="primary-button" type="submit">保存草稿</button> : null}
+          {canEdit ? <button className="primary-button" type="submit" disabled={busy}>保存草稿</button> : null}
           {selected?.canPublish ? <button className="secondary-button" type="button" onClick={() => void updateLifecycle("publish")}>发布</button> : null}
           {selected?.canShare ? <button className="secondary-button" type="button" onClick={() => void updateLifecycle("share")}>应用共享范围</button> : null}
           {selected?.canDisable ? <button className="secondary-button" type="button" onClick={() => void updateLifecycle("disable")}>停用</button> : null}
@@ -399,15 +360,6 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
         {selectedVersion ? <div className="form-grid"><div className="context-strip form-field-wide"><strong>V{selectedVersion.versionNumber} · {selectedVersion.changeType}</strong><span>{selectedVersion.category} · {emailTemplateStatusLabel(selectedVersion.status)} · {emailTemplateShareScopeLabel(selectedVersion.shareScope)}</span></div><label className="form-field-wide">历史主题<input readOnly value={selectedVersion.subject} /></label><div className="form-field-wide email-rich-text-field"><span className="email-rich-text-field-label">历史正文</span><EmailHtmlPreview html={selectedVersion.bodyHtml} title={`邮件模板 V${selectedVersion.versionNumber} 正文`} /><details className="email-html-advanced"><summary>查看高级 HTML</summary><textarea aria-label="历史邮件正文高级 HTML" rows={8} readOnly value={selectedVersion.bodyHtml} /></details></div><div className="form-actions form-field-wide"><button className="secondary-button" type="button" onClick={() => setView("editor")}>返回模板详情</button>{selectedVersion.canRestore && selectedVersion.versionNumber !== selected?.versionNumber ? <button className="primary-button" type="button" onClick={() => void restoreVersion(selectedVersion)}>恢复此版本</button> : null}</div></div> : null}
       </section> : null}
   </section>;
-}
-
-function toDraft(template: ApiEmailTemplateDto): EmailTemplateDraft {
-  return {
-    name: template.name,
-    category: template.category,
-    subject: template.subject,
-    bodyHtml: template.bodyHtml,
-  };
 }
 
 function emailTemplateStatusLabel(status?: string) {

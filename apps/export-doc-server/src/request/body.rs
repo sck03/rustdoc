@@ -33,6 +33,12 @@ pub(super) fn backup_upload(operation: Operation) -> bool {
     ]
     .contains(&operation)
 }
+pub(super) fn needs_processing_slot(operation: Operation) -> bool {
+    operation == RECOGNIZE_OCR_IMAGE
+        || contracts::contract()["operations"][operation.id]["requestBody"]["content"]
+            .as_object()
+            .is_some_and(|content| content.keys().any(|mime| !mime.contains("json")))
+}
 
 pub(crate) fn envelope_limit(operation: Operation) -> usize {
     if backup_upload(operation) {

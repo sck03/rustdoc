@@ -965,7 +965,14 @@ export interface ApiCustomsCooUnlockFieldsResponse {
   success: boolean;
 }
 
+export interface ApiDashboardCurrencyAmount {
+  currency: string;
+  monthlyAmount: number;
+  previousMonthlyAmount: number;
+}
+
 export interface ApiDashboardRecentInvoiceDto {
+  currency?: string;
   customerNameEN: string;
   id: number;
   invoiceDate: string;
@@ -979,6 +986,8 @@ export interface ApiDashboardRecentInvoiceDto {
 export interface ApiDashboardResponse {
   completedCount: number;
   draftCount: number;
+  exportAmountCurrency?: string;
+  exportAmountsByCurrency?: ApiDashboardCurrencyAmount[];
   monthlyExportAmount: number;
   monthlyInvoiceCount: number;
   monthlyProfit: number;
@@ -2895,6 +2904,11 @@ export interface ApiRuntimeHttpMetrics {
   availableRequestSlots: number;
   bulkCapacity: number;
   bulkRejected: number;
+  downloadCapacity: number;
+  downloadDisconnects: number;
+  downloadReadErrors: number;
+  downloadTimeouts: number;
+  downloads: ApiRuntimeLatencyMetrics;
   logWriteErrors: number;
   logsDropped: number;
   queueCapacity: number;

@@ -14,6 +14,7 @@ pub struct Reply {
     pub file: Option<(String, String)>,
     pub cookie: Option<String>,
     pub stream: Option<(std::fs::File, u64)>,
+    pub download_permit: Option<tokio::sync::OwnedSemaphorePermit>,
 }
 impl Reply {
     pub fn bytes(bytes: Vec<u8>) -> Self {
@@ -22,6 +23,7 @@ impl Reply {
             file: None,
             cookie: None,
             stream: None,
+            download_permit: None,
         }
     }
     pub fn file(file: FileOutput) -> Self {
@@ -30,6 +32,7 @@ impl Reply {
             file: Some((file.file_name, file.media_type)),
             cookie: None,
             stream: None,
+            download_permit: None,
         }
     }
     pub fn download(download: export_doc_engine::engine::backup_io::Download) -> Self {
@@ -45,6 +48,7 @@ impl Reply {
                 file: Some((file_name, media_type)),
                 cookie: None,
                 stream: Some((file, size)),
+                download_permit: None,
             },
         }
     }
@@ -73,7 +77,25 @@ pub fn error(error: ApiError) -> Response<Body> {
     response
 }
 
-pub fn success(operation: Operation, reply: Reply) -> Response<Body> {
+pub fn is_download(operation: Operation) -> bool {
+    contracts::contract()["operations"][operation.id]["responses"]
+        .as_object()
+        .into_iter()
+        .flat_map(|m| m.iter())
+        .filter(|(code, _)| code.starts_with('2'))
+        .any(|(_, response)| {
+            response["content"]
+                .as_object()
+                .is_some_and(|m| m.keys().any(|mime| !mime.contains("json")))
+        })
+}
+
+pub fn success(
+    operation: Operation,
+    mut reply: Reply,
+    state: &crate::ServerState,
+    request_id: &str,
+) -> Response<Body> {
     let responses = &contracts::contract()["operations"][operation.id]["responses"];
     let success = responses
         .as_object()
@@ -83,13 +105,30 @@ pub fn success(operation: Operation, reply: Reply) -> Response<Body> {
         .and_then(|m| m.keys().next())
         .map(String::as_str)
         .unwrap_or("application/json");
-    let mut response = if let Some((file, size)) = reply.stream {
+    let mut response = if reply.stream.is_some() || reply.file.is_some() {
         use tokio::io::AsyncReadExt;
-        let stream = tokio_util::io::ReaderStream::with_capacity(
-            tokio::fs::File::from_std(file).take(size),
-            64 * 1024,
-        );
-        let mut response = Response::new(Body::from_stream(stream));
+        let permit = match reply
+            .download_permit
+            .take()
+            .or_else(|| state.downloads.clone().try_acquire_owned().ok())
+        {
+            Some(permit) => permit,
+            None => return error(crate::request::error(429, "下载正在处理，请稍后重试。")),
+        };
+        let (source, size): (Box<dyn tokio::io::AsyncRead + Unpin + Send>, u64) =
+            if let Some((file, size)) = reply.stream {
+                (Box::new(tokio::fs::File::from_std(file).take(size)), size)
+            } else {
+                let size = reply.bytes.len() as u64;
+                (Box::new(std::io::Cursor::new(reply.bytes)), size)
+            };
+        let mut response = Response::new(crate::download_body::body(
+            source,
+            size,
+            permit,
+            state.telemetry.clone(),
+            request_id.to_owned(),
+        ));
         response
             .headers_mut()
             .insert(header::CONTENT_LENGTH, size.into());

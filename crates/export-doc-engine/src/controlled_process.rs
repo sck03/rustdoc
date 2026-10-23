@@ -48,6 +48,7 @@ fn failure(message: impl Into<String>) -> ApiError {
     ApiError {
         status: Some(503),
         message: message.into(),
+        diagnostic: Some("controlled-process"),
     }
 }
 fn read(mut pipe: impl Read, limit: usize, strict: bool) -> std::io::Result<Vec<u8>> {
@@ -146,6 +147,7 @@ pub fn run(
             break Err(ApiError {
                 status: Some(504),
                 message: "受控工具超过运行时限，已终止进程树。".into(),
+                diagnostic: Some("controlled-process-timeout"),
             });
         }
         thread::sleep(Duration::from_millis(20));

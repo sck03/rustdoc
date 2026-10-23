@@ -5,6 +5,7 @@ pub fn error(status: u16, message: impl Into<String>) -> ApiError {
     ApiError {
         status: Some(status),
         message: message.into(),
+        diagnostic: (status >= 500).then_some("dependency"),
     }
 }
 pub fn invalid(message: impl Into<String>) -> ApiError {
@@ -23,7 +24,7 @@ pub fn unsupported(message: impl Into<String>) -> ApiError {
 impl From<export_doc_report::Error> for ApiError {
     fn from(value: export_doc_report::Error) -> Self {
         use export_doc_report::ErrorKind;
-        error(
+        let mut cause = error(
             match value.kind {
                 ErrorKind::Invalid => 400,
                 ErrorKind::Unavailable => 503,
@@ -31,7 +32,9 @@ impl From<export_doc_report::Error> for ApiError {
                 ErrorKind::Timeout => 504,
             },
             value.message,
-        )
+        );
+        cause.diagnostic = Some("report");
+        cause
     }
 }
 
@@ -45,16 +48,22 @@ impl From<export_doc_storage::Error> for ApiError {
             ErrorKind::Timeout => 504,
             ErrorKind::Unsupported => 501,
         };
-        error(status, value.message)
+        let mut cause = error(status, value.message);
+        cause.diagnostic = Some("storage");
+        cause
     }
 }
 impl From<std::io::Error> for ApiError {
     fn from(value: std::io::Error) -> Self {
-        unavailable(format!("文件操作失败：{value}"))
+        let mut cause = unavailable(format!("文件操作失败：{value}"));
+        cause.diagnostic = Some("filesystem");
+        cause
     }
 }
 impl From<serde_json::Error> for ApiError {
     fn from(value: serde_json::Error) -> Self {
-        unavailable(format!("数据不符合保存契约：{value}"))
+        let mut cause = unavailable(format!("数据不符合保存契约：{value}"));
+        cause.diagnostic = Some("serialization");
+        cause
     }
 }

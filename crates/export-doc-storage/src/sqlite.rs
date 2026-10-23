@@ -113,6 +113,23 @@ impl Sqlite {
             },
         )?;
         connection.create_scalar_function(
+            "record_date",
+            1,
+            rusqlite::functions::FunctionFlags::SQLITE_UTF8
+                | rusqlite::functions::FunctionFlags::SQLITE_DETERMINISTIC,
+            |context| {
+                let value = context.get::<Option<String>>(0)?.unwrap_or_default();
+                let date = chrono::NaiveDate::parse_from_str(&value, "%Y-%m-%d")
+                    .map_err(|e| rusqlite::Error::UserFunctionError(Box::new(e)))?;
+                if date.format("%Y-%m-%d").to_string() != value {
+                    return Err(rusqlite::Error::UserFunctionError(
+                        "Invalid business date".into(),
+                    ));
+                }
+                Ok(value)
+            },
+        )?;
+        connection.create_scalar_function(
             "job_time",
             1,
             rusqlite::functions::FunctionFlags::SQLITE_UTF8

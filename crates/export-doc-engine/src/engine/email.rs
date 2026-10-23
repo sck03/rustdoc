@@ -84,18 +84,24 @@ pub fn handle(
             return Err(invalid("邮件投递页码或每页数量无效。"));
         }
         let keyword = store::normalize(keyword);
-        let mut rows = service.store.all(KIND)?;
-        rows.retain(|row| {
-            auth::visible(actor, PERMISSION, "view-delivery", row)
-                && (status.is_empty() || row["status"] == status)
-                && ["recipient", "subject"]
-                    .iter()
-                    .any(|k| store::normalize(&text(row, k)).contains(&keyword))
-        });
-        rows.sort_by(|a, b| b["createdAt"].as_str().cmp(&a["createdAt"].as_str()));
+        let (page, size, offset) = store::page_parameters(query);
+        let (total, rows) =
+            service
+                .store
+                .connection()?
+                .query_business(&export_doc_storage::BusinessQuery {
+                    list: export_doc_storage::BusinessList::Deliveries {
+                        keyword: &keyword,
+                        status,
+                    },
+                    scope: auth::data_scope(actor, PERMISSION, "view-delivery"),
+                    fields: &[],
+                    offset,
+                    limit: size as i64,
+                })?;
         return Ok(contracts::project(
             contracts::response(operation.id),
-            store::page_only(rows, query),
+            contracts::page(rows, total as usize, page, size),
         ));
     }
     if operation == SUGGEST_EMAIL_SERVER_CONFIG {
@@ -216,6 +222,7 @@ fn send(
         if test { "ConnectionTest" } else { "EmailTool" },
         &config,
         parameters,
+        None,
     )
 }
 #[allow(clippy::too_many_arguments)]
@@ -229,6 +236,7 @@ fn deliver(
     kind: &str,
     config: &transport::Config,
     parameters: &[(&str, String)],
+    invoice_id: Option<i64>,
 ) -> Result<Value> {
     let count = files.len();
     let digests: Vec<_> = files
@@ -254,7 +262,17 @@ fn deliver(
         ));
     }
     let identity = format!("{}:{delivery_id}", actor.id);
-    let attempt=store.transaction(|tx|{
+    let attempt=store.transaction_as(actor, |tx, actor|{
+        if kind == "ConnectionTest" {
+            auth::authorize_operation(actor, TEST_EMAIL_CONNECTION, &[])?;
+        } else {
+            auth::authorize_operation(actor, SEND_EMAIL, &[])?;
+        }
+        if let Some(id) = invoice_id {
+            auth::authorize_operation(actor, START_INVOICE_DOCUMENT_EMAIL_JOB, &[])?;
+            let invoice = store::get(tx,"invoices",id)?;
+            if !auth::visible(actor,"document.invoice-output","send-email",&invoice) { return Err(error(403,"发送前单据权限已变化。")); }
+        }
         if let Some(row)=tx.find_identity(KIND,&store::normalize(&identity))?{
             if row["requestFingerprint"]!=fingerprint{return Err(conflict("此幂等标识已用于其他邮件内容。"));}
             if row["status"]=="Sent"{return Ok(None);}
@@ -464,6 +482,7 @@ fn document_email(
                 "ReportDocumentEmail",
                 &config,
                 &[("Idempotency-Key", idempotency)],
+                Some(invoice_id),
             )?;
             let count = delivered["attachmentCount"].as_u64().unwrap_or_default();
             Ok(TaskOutput {
@@ -516,6 +535,61 @@ fn apply_template(
     }
     output.push_str(&template[cursor..]);
     output
+}
+
+#[cfg(test)]
+mod authorization_tests {
+    use super::*;
+    #[test]
+    fn revoked_actor_cannot_start_a_smtp_attempt() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join(".codex-runtime/mail-authorization-tests")
+            .join(paths::nonce().unwrap());
+        std::fs::create_dir_all(&root).unwrap();
+        let service = NativeService::open(
+            crate::paths::RuntimePaths::server(&root, &root.join("Data")).unwrap(),
+        )
+        .unwrap();
+        let mut user = service.store.all("users").unwrap().remove(0);
+        let id = user["id"].as_i64().unwrap();
+        let stale = auth::current_actor(&service.store, id).unwrap();
+        user["isActive"] = json!(false);
+        user["expectedVersion"] = user["versionNumber"].clone();
+        service
+            .store
+            .transaction(|tx| store::save(tx, "users", id, user, None, &stale, "disable"))
+            .unwrap();
+        let config = transport::Config {
+            host: "127.0.0.1".into(),
+            port: 9,
+            tls: false,
+            user: "".into(),
+            password: String::new().into(),
+            from: "sender@example.invalid".into(),
+            display_name: "".into(),
+        };
+        let result = deliver(
+            &service.store,
+            &stale,
+            "recipient@example.invalid",
+            "subject",
+            "<p>body</p>",
+            vec![],
+            "EmailTool",
+            &config,
+            &[],
+            None,
+        );
+        assert_eq!(result.unwrap_err().status, Some(403));
+        assert!(service.store.all(KIND).unwrap().is_empty());
+        service.close().unwrap();
+        drop(service);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }
 pub fn recover(store: &Store) -> Result<()> {
     store.transaction(|tx| {

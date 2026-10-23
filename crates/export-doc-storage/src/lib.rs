@@ -5,8 +5,10 @@ pub use postgres::tools::{
     ClientParameters as PostgresClientParameters, MaintenanceLease as PostgresMaintenanceLease,
     client_parameters as postgres_client_parameters,
 };
+mod business_query;
 mod communication;
 mod generic_query;
+pub use business_query::{BusinessList, BusinessQuery};
 mod job_query;
 mod personnel_query;
 pub use job_query::{JobQuery, JobRetention};
@@ -174,6 +176,10 @@ trait Adapter: Send {
         let (sql, projection) = generic_query::build(query, self.provider() == "PostgreSQL")?;
         self.query_page(&sql, &projection, query.offset, query.limit)
     }
+    fn query_business(&self, query: &BusinessQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let (sql, projection) = business_query::build(query, self.provider() == "PostgreSQL")?;
+        self.query_page(&sql, &projection, query.offset, query.limit)
+    }
     fn query_personnel(&self, query: &PersonnelQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, projection) = personnel_query::build(query, self.provider() == "PostgreSQL")?;
         self.query_page(&sql, &projection, query.offset, query.limit)
@@ -225,6 +231,18 @@ trait Adapter: Send {
         self.query_page(
             &template_query::versions(query, pg),
             &template_query::metadata(pg, true),
+            query.offset,
+            query.limit,
+        )
+    }
+    fn query_email_template_versions(
+        &self,
+        query: &TemplateVersionQuery<'_>,
+    ) -> Result<(i64, Vec<Value>)> {
+        let pg = self.provider() == "PostgreSQL";
+        self.query_page(
+            &template_query::versions(query, pg),
+            if pg { "r.body::text" } else { "r.body" },
             query.offset,
             query.limit,
         )
@@ -405,10 +423,12 @@ delegate! {
     query_jobs(query:&JobQuery<'_>)->(i64,Vec<Value>);
     job_counts()->Value;
     query_generic(query:&GenericQuery<'_>)->(i64, Vec<Value>);
+    query_business(query:&BusinessQuery<'_>)->(i64, Vec<Value>);
     query_personnel(query:&PersonnelQuery<'_>)->(i64, Vec<Value>);
     query_report_templates(query: &ReportTemplateQuery<'_>)->(i64, Vec<Value>);
     report_template_metadata(id:i64)->Option<Value>;
     query_template_versions(query: &TemplateVersionQuery<'_>)->(i64, Vec<Value>);
+    query_email_template_versions(query: &TemplateVersionQuery<'_>)->(i64, Vec<Value>);
     template_version(kind:&str,id:i64,version:i64)->Option<Value>;
     query_communications(query: &CommunicationQuery<'_>)->(i64, Vec<Value>);
     checkpoint()->();

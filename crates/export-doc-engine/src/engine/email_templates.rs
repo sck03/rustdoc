@@ -116,7 +116,7 @@ pub fn handle(
             json!({"subject":preview.subject,"bodyHtml":preview.html,"unresolvedTokens":preview.unresolved}),
         );
     }
-    service.store.transaction(|tx| {
+    let handle = |tx: &Connection, actor: &Actor| {
         if operation == LIST_EMAIL_TEMPLATES {
             let archived = super::hs::read(query, "includeArchived") == "true";
             if archived {
@@ -156,23 +156,38 @@ pub fn handle(
                 return Err(error(403, "没有查看此邮件模板的权限。"));
             }
             let mut versions = vec![];
-            for version in store::all(tx, "template-versions")?
-                .into_iter()
-                .filter(|r| r["templateKind"] == KIND && r["templateId"] == record_id)
-            {
-                let mut value = version["content"].clone();
-                if !value.is_object() {
-                    return Err(unavailable("邮件模板历史损坏。"));
+            let mut offset = 0;
+            loop {
+                crate::operation::check()?;
+                let (total, batch) =
+                    tx.query_email_template_versions(&export_doc_storage::TemplateVersionQuery {
+                        kind: KIND,
+                        template_id: record_id,
+                        offset,
+                        limit: 200,
+                    })?;
+                if batch.is_empty() {
+                    break;
                 }
-                for key in ["id", "changeType", "changedBy", "createdAt"] {
-                    value[key] = version[key].clone();
+                offset += batch.len() as i64;
+                for version in batch {
+                    let mut value = version["content"].clone();
+                    if !value.is_object() {
+                        return Err(unavailable("邮件模板历史损坏。"));
+                    }
+                    for key in ["id", "changeType", "changedBy", "createdAt"] {
+                        value[key] = version[key].clone();
+                    }
+                    value["emailTemplateId"] = json!(record_id);
+                    value["canRestore"] = json!(auth::visible(actor, PERMISSION, "restore", &row));
+                    versions.push(contracts::project(
+                        contracts::schema("ApiEmailTemplateVersionDto"),
+                        value,
+                    ));
                 }
-                value["emailTemplateId"] = json!(record_id);
-                value["canRestore"] = json!(auth::visible(actor, PERMISSION, "restore", &row));
-                versions.push(contracts::project(
-                    contracts::schema("ApiEmailTemplateVersionDto"),
-                    value,
-                ));
+                if offset >= total {
+                    break;
+                }
             }
             versions.sort_by_key(|r| std::cmp::Reverse(r["versionNumber"].as_i64().unwrap_or(0)));
             return Ok(json!(versions));
@@ -264,7 +279,15 @@ pub fn handle(
         }
         row["expectedVersion"] = json!(store::expected(body));
         persist(tx, actor, record_id, row, action).map(|saved| dto(actor, &saved))
-    })
+    };
+    if matches!(
+        operation,
+        LIST_EMAIL_TEMPLATES | LIST_EMAIL_TEMPLATE_VERSIONS
+    ) {
+        service.store.read(|tx| handle(tx, actor))
+    } else {
+        service.store.transaction_as(actor, handle)
+    }
 }
 fn crm_draft(
     service: &NativeService,
@@ -276,7 +299,7 @@ fn crm_draft(
         .ok()
         .filter(|id| *id > 0)
         .ok_or_else(|| invalid("客户编号无效。"))?;
-    service.store.transaction(|tx|{
+    service.store.read(|tx|{
         let customer=store::get(tx,"crm-customers",customer_id)?;if !auth::visible(actor,"sales.customers","view",&customer){return Err(error(403,"没有读取此客户的权限。"));}
         let mut contacts:Vec<_>=store::all(tx,"crm-contacts")?.into_iter().filter(|r|r["crmCustomerId"]==customer_id&&auth::visible(actor,"sales.contacts","view",r)).collect();
         contacts.sort_by_key(|r|(r["isPrimary"]!=true,r["id"].as_i64().unwrap_or(0)));let contact=contacts.first();

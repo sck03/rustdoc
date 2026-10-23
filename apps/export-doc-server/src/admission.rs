@@ -35,6 +35,7 @@ impl Admission {
             ApiError {
                 status: Some(429),
                 message: "请求队列繁忙，请稍后重试。".into(),
+                diagnostic: None,
             }
         };
         let reservation = self

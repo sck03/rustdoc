@@ -23,6 +23,8 @@ fn queued_writes_refresh_permissions_before_the_transaction() {
     account["expectedVersion"] = account["versionNumber"].clone();
     account["role"] = json!("OfficeEmployee");
     account = accounts::save(&service.store, &admin, id, account).unwrap()["user"].clone();
+    #[cfg(feature = "mail")]
+    assert_eq!(email_templates::handle(&service,&stale,CREATE_EMAIL_TEMPLATE,&[],&[],&json!({"name":"撤权模板","subject":"不应保存","bodyHtml":"<p>正文</p>","expectedVersion":0})).unwrap_err().status,Some(403));
     let attempted = json!({"username":"unauthorized","fullName":"不应创建","role":"Admin","companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Revocation-Test-2026"});
     assert_eq!(
         accounts::save(&service.store, &stale, 0, attempted)

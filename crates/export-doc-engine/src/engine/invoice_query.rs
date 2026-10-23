@@ -1,45 +1,78 @@
 //! One authorized query feeds the page, export count and every exported row.
-#[allow(unused_imports)]
-use super::{NativeService, error::error};
+#[cfg(feature = "excel")]
+use super::{
+    NativeService,
+    error::{error, unavailable},
+};
 use super::{
     auth,
-    error::{Result, invalid, unavailable},
+    error::{Result, invalid},
     store::{self, Actor, Store},
 };
-use crate::{contracts, generated_api::*};
+use crate::contracts;
+#[cfg(feature = "excel")]
+use crate::generated_api::*;
 use export_doc_domain::invoice_query::Criteria;
 use serde_json::{Value, json};
 
-pub fn select(store: &Store, actor: &Actor, body: &Value, action: &str) -> Result<Vec<Value>> {
+#[cfg(feature = "excel")]
+fn select(store: &Store, actor: &Actor, body: &Value, action: &str) -> Result<Vec<Value>> {
     auth::authorize(actor, "document.query", action)?;
     let filter =
         serde_json::from_value(body.clone()).map_err(|e| invalid(format!("查询条件无效：{e}")))?;
     let criteria = Criteria::new(filter).map_err(invalid)?;
-    let mut rows = vec![];
-    for mut row in store.all("invoices")? {
-        crate::operation::check()?;
-        if !auth::visible(actor, "document.query", action, &row) {
-            continue;
+    store.read(|tx| {
+        let mut rows = vec![];
+        loop {
+            crate::operation::check()?;
+            let (total, batch) = query(tx, actor, &criteria, action, rows.len() as i64, 200)?;
+            if total > 50_000 {
+                return Err(invalid("查询结果超过 50,000 条，请缩小筛选范围。"));
+            }
+            let empty = batch.is_empty();
+            rows.extend(batch);
+            if empty || rows.len() as i64 >= total {
+                return Ok(rows);
+            }
         }
-        let invoice: ApiInvoiceDetailDto = serde_json::from_value(row.clone())
-            .map_err(|_| unavailable("已保存的单据字段无效。"))?;
-        if !criteria.matches(&invoice).map_err(unavailable)? {
-            continue;
-        }
-        row["customerName"] = row["customerNameEN"].clone();
-        row["exporterName"] = row["exporterNameEN"].clone();
-        rows.push(contracts::dto(
-            contracts::schema("ApiQueryInvoiceRowDto"),
-            row,
-        ));
+    })
+}
+fn query(
+    tx: &export_doc_storage::Connection,
+    actor: &Actor,
+    criteria: &Criteria,
+    action: &str,
+    offset: i64,
+    limit: i64,
+) -> Result<(i64, Vec<Value>)> {
+    let schema = contracts::schema("ApiQueryInvoiceRowDto");
+    let mut fields: Vec<_> = schema["properties"]
+        .as_object()
+        .into_iter()
+        .flat_map(|p| p.keys())
+        .map(|key| {
+            let source = match key.as_str() {
+                "customerName" => "customerNameEN",
+                "exporterName" => "exporterNameEN",
+                key => key,
+            };
+            (key.as_str(), source)
+        })
+        .collect();
+    for key in ["ownerUserId", "companyScope", "departmentId"] {
+        fields.push((key, key));
     }
-    rows.sort_by(|a, b| {
-        b["invoiceDate"]
-            .as_str()
-            .cmp(&a["invoiceDate"].as_str())
-            .then_with(|| b["id"].as_i64().cmp(&a["id"].as_i64()))
-    });
-    Ok(rows)
+    let filter = serde_json::to_value(criteria.filter())?;
+    Ok(tx.query_business(&export_doc_storage::BusinessQuery {
+        list: export_doc_storage::BusinessList::Invoices {
+            filter: &filter,
+            tokens: criteria.tokens(),
+        },
+        scope: auth::data_scope(actor, "document.query", action),
+        fields: &fields,
+        offset,
+        limit,
+    })?)
 }
 pub fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
     let mut body = json!({});
@@ -61,9 +94,27 @@ pub fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Va
             json!(value)
         };
     }
-    Ok(store::page_only(
-        select(store, actor, &body, "view")?,
-        query,
+    auth::authorize(actor, "document.query", "view")?;
+    let criteria = Criteria::new(
+        serde_json::from_value(body).map_err(|e| invalid(format!("查询条件无效：{e}")))?,
+    )
+    .map_err(invalid)?;
+    let (page, size, offset) = store::page_parameters(query);
+    let (total, rows) = self::query(
+        &*store.connection()?,
+        actor,
+        &criteria,
+        "view",
+        offset,
+        size as i64,
+    )?;
+    Ok(contracts::page(
+        rows.into_iter()
+            .map(|row| contracts::dto(contracts::schema("ApiQueryInvoiceRowDto"), row))
+            .collect(),
+        total as usize,
+        page,
+        size,
     ))
 }
 #[cfg(feature = "excel")]
@@ -99,27 +150,40 @@ pub fn export(
             let actor = auth::current_actor(&store, actor_id)?;
             auth::authorize_operation(&actor, operation, &[])?;
             let rows = select(&store, &actor, &request, "operate")?;
-            if rows.len() > 50_000 {
-                return Err(invalid("查询结果超过 50,000 条，请缩小筛选范围。"));
-            }
             let bytes =
                 export_doc_excel::table(export_doc_domain::invoice_query::COLUMNS, &rows, &|| {
                     crate::operation::check().map_err(|e| e.to_string())
                 })
                 .map_err(invalid)?;
-            let current = auth::current_actor(&store, actor_id)?;
-            auth::authorize_operation(&current, operation, &[])?;
-            for row in &rows {
-                let source = store.get(
-                    "invoices",
+            let ids = rows
+                .iter()
+                .map(|row| {
                     row["id"]
                         .as_i64()
-                        .ok_or_else(|| unavailable("查询记录缺少编号。"))?,
-                )?;
-                if !auth::visible(&current, "document.query", "operate", &source) {
+                        .ok_or_else(|| unavailable("查询记录缺少编号。"))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            store.read(|tx| {
+                let current = auth::current_actor_in(tx, actor_id, store.edition)?;
+                auth::authorize_operation(&current, operation, &[])?;
+                let mut visible = 0;
+                for ids in ids.chunks(500) {
+                    crate::operation::check()?;
+                    visible += tx
+                        .query_business(&export_doc_storage::BusinessQuery {
+                            list: export_doc_storage::BusinessList::InvoiceIds(ids),
+                            scope: auth::data_scope(&current, "document.query", "operate"),
+                            fields: &[("id", "id")],
+                            offset: 0,
+                            limit: 1,
+                        })?
+                        .0;
+                }
+                if visible as usize != rows.len() {
                     return Err(error(403, "导出期间数据权限发生变化，请重新查询。"));
                 }
-            }
+                Ok(())
+            })?;
             let mut output = TaskOutput::file(
                 "查询结果.xlsx".into(),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

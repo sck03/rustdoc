@@ -25,6 +25,7 @@ fn error(status: u16, message: &str) -> ApiError {
     ApiError {
         status: Some(status),
         message: message.into(),
+        diagnostic: None,
     }
 }
 pub fn binding(headers: &HeaderMap) -> String {

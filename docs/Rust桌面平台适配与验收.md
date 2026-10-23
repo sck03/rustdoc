@@ -28,7 +28,7 @@ OCR 同样按目标 OS/架构组装 Rust worker、ONNX 和模型。2026-10-15 �
 
 2026-10-15 在[原生交付工作流](https://github.com/sck03/rustdoc/actions/runs/38694473894)完成上表全部五种 target 的独立桌面构建、运行依赖检查、Document 包组装及七份真实 OCR 模型夹具。Windows ARM64 实际加载 ARM64 ONNX 和三个 ARM64 CRT；x64 MSVC 与本机 GNU 分别记录。Linux/macOS runner 未在本批执行完整窗口、系统输入法及打印操作。本机最新 Full SQLite / 含 OCR 测试包另通过 Tauri 页面、空白设计、保存回读、十份 PDF、员工权限及退出清理，构建与路径见本日进度。
 
-2026-10-23 升级后的 Windows x64 GNU / Debug / Full SQLite / 含 OCR 测试包位于 `artifacts/personnel-stability-desktop/ExportDocManager.Tauri.Full`，完整 Tauri 回归覆盖人员组织编辑、确认框真实鼠标交互、中文字段、表格编辑、报表、OCR 与正常退出。16 份 PDF 共 16 页经 Poppler 渲染检查；自定义小纸张样例只验证尺寸保存和输出，内容裁切不计为重新排版通过。ONNX Runtime `1.31.0` 的七组真实样例及异常边界通过。实际构建标识和证据目录见[当日进度](./程序改进重构进度文档.md)。
+2026-10-23 升级及审查优化后的 Windows x64 GNU / Debug / Full SQLite / 含 OCR 测试包位于 `artifacts/review-hardening-desktop/ExportDocManager.Tauri.Full`，完整 Tauri 回归覆盖人员组织编辑、确认框真实鼠标交互、中文字段、表格编辑、报表、OCR 与正常退出。16 份 PDF 共 16 页经 Poppler 渲染检查；自定义小纸张样例只验证尺寸保存和输出，内容裁切不计为重新排版通过。独立 React／Rust HTTP 回归另核对 CNY／USD 出口额、窄屏及邮件模板保存／历史恢复。ONNX Runtime `1.31.0` 的七组真实样例及异常边界为本日升级批次证据；审查批次未升级原生库。旧 `personnel-stability-desktop` 程序及资源副本已清理，App_Data 保留。实际构建标识和证据目录见[当日进度](./程序改进重构进度文档.md)。
 
 报表维持 krilla 生成 PDF、PDFium worker 处理已有 PDF。当前已采用 `pdfium-render 0.9.4`（`pdfium_7881 + image_025`），原生包为 `158.0.8111`；2026-10-23 包内 Windows x64 GNU worker 的真实加载、文字、预览、OCR 页图、合并重开及异常边界通过。其它目标和 MSVC 发布须分别验收，不能将迁移前手写绑定的静态符号检查当成新封装运行通过。
 

@@ -96,6 +96,7 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
         && allowed(actor, "sales.customers", &["view"])
     {
         let mut items = vec![];
+        let mut customers = std::collections::BTreeMap::new();
         for record in rows(
             tx,
             actor,
@@ -107,20 +108,20 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
         .iter()
         .filter(|record| record["isCompleted"] != true && mine(record))
         {
-            let customer = store::get(
-                tx,
-                "crm-customers",
-                record["crmCustomerId"]
-                    .as_i64()
-                    .ok_or_else(|| unavailable("跟进记录缺少客户编号。"))?,
-            )?;
-            if !auth::visible(actor, "sales.customers", "view", &customer) {
+            let customer_id = record["crmCustomerId"]
+                .as_i64()
+                .ok_or_else(|| unavailable("跟进记录缺少客户编号。"))?;
+            if !customers.contains_key(&customer_id) {
+                customers.insert(customer_id, store::get(tx, "crm-customers", customer_id)?);
+            }
+            let customer = &customers[&customer_id];
+            if !auth::visible(actor, "sales.customers", "view", customer) {
                 continue;
             }
             let next = text(record, "nextAction");
             items.push(item(
                 record,
-                text(&customer, "name"),
+                text(customer, "name"),
                 if next.is_empty() {
                     text(record, "summary")
                 } else {
@@ -411,7 +412,7 @@ pub fn query(
     }
     let selected = parameter("source");
     let now = clock.now().map_err(unavailable)?;
-    store.transaction(|tx|{
+    store.read(|tx|{
         let groups=groups(tx,actor)?;
         if !selected.is_empty()&&!groups.iter().any(|g|g.key==selected){return Err(invalid("该待办来源不存在或当前账号无权查看。"));}
         let mut sources=vec![];let mut all=vec![];

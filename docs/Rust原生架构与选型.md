@@ -39,6 +39,8 @@ Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分
 
 2026-09-30 清除退役客户端残留的 `reference-backend` 回环传输 feature 和未使用的 Runtime 包装；`api::ApiClient` 仅持有进程内 Rust 服务，继续供集成工作流验证。Windows 子进程 Job 对象归入 `controlled_process` 私有平台模块，实际进程树清理机制保留。
 
+2026-10-23 审查后移除仅有自身测试和导出的 Rust `invoice_grid`／`history` 旧客户端模型；现行编辑与撤销继续由 React 管理，Domain 发票草稿、计算及打印行仍保留。Storage 专用业务查询复用受控 SQL、字段投影、数据范围和同快照分页；HTTP 下载资源生命周期独立于用例线程，前端邮件 workspace 独立于页面展示。未增加数据库、运行依赖或 OCR 常驻服务，Release 优化等级保持现有配置，后续调整须以实际负载测量为依据。
+
 ## 通信与运行目录
 
 桌面令牌由 Rust 宿主生成，仅由主窗口受限 IPC 获取，不写 URL 或日志。随机回环端口、精确 Host／Origin 校验、官方 endpoint policy、登录会话与对象权限共同控制桌面访问。网络服务不安装本机文件／进程能力。

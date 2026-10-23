@@ -15,9 +15,10 @@ use std::collections::BTreeMap;
 
 pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Value> {
     let now = clock.now().map_err(unavailable)?.utc_now;
-    store.transaction(|tx| {
+    store.read(|tx| {
         let customers: Vec<_> = store::all(tx, "crm-customers")?.into_iter().filter(|row| auth::visible(actor,"sales.customers","view",row)).collect();
-        let contacts = store::all(tx, "crm-contacts")?.into_iter().filter(|row| customers.iter().any(|customer| customer["id"] == row["crmCustomerId"])).count();
+        let customer_ids: std::collections::BTreeSet<_> = customers.iter().filter_map(|row|row["id"].as_i64()).collect();
+        let contacts = store::all(tx, "crm-contacts")?.into_iter().filter(|row| row["crmCustomerId"].as_i64().is_some_and(|id|customer_ids.contains(&id))).count();
         let follow_ups: Vec<_> = crm::sorted(crm::visible(tx, actor)?)?.into_iter().filter(|row| row["isCompleted"] != true).collect();
         let mut overdue = 0;
         let mut upcoming = 0;

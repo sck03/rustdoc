@@ -25,7 +25,7 @@ pub(super) fn extend(document: &mut Value) {
         json!({"active":counter(),"workerHandles":counter(),"stopping":{"type":"boolean"},"failed":{"type":"boolean"},"persistedCounts":{"type":"object","additionalProperties":counter()}}),
     );
     schemas["ApiRuntimeHttpMetrics"] = object(
-        json!({"requests":latency,"queueWait":latency,"queueCapacity":counter(),"queuedRequests":counter(),"admissionRejected":counter(),"bulkRejected":counter(),"requestCapacity":counter(),"availableRequestSlots":counter(),"bulkCapacity":counter(),"availableBulkSlots":counter(),"uptimeSeconds":counter(),"logsDropped":counter(),"logWriteErrors":counter()}),
+        json!({"requests":latency,"queueWait":latency,"queueCapacity":counter(),"queuedRequests":counter(),"admissionRejected":counter(),"bulkRejected":counter(),"requestCapacity":counter(),"availableRequestSlots":counter(),"bulkCapacity":counter(),"availableBulkSlots":counter(),"uptimeSeconds":counter(),"logsDropped":counter(),"logWriteErrors":counter(),"downloads":latency,"downloadCapacity":counter(),"downloadTimeouts":counter(),"downloadDisconnects":counter(),"downloadReadErrors":counter()}),
     );
     schemas["ApiRuntimeMetricsResponse"] = object(
         json!({"checkedAt":{"type":"string","format":"date-time"},"storage":reference("ApiRuntimeDatabaseMetrics"),"jobs":reference("ApiRuntimeJobMetrics"),"http":{"anyOf":[reference("ApiRuntimeHttpMetrics"),{"type":"null"}]}}),

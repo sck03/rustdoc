@@ -1,7 +1,6 @@
 use super::{
     auth,
     error::Result,
-    records::text,
     store::{self, Actor, Store},
 };
 use crate::generated_api::*;
@@ -31,43 +30,24 @@ pub fn search(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<
     );
     let page = number(query, "pageNumber", 1);
     let size = number(query, "pageSize", 20).min(MAX_PAGE);
-    let mut rows = vec![];
-    for record in store.all("products")? {
-        if !auth::visible(actor, PERMISSION, "view", &record) {
-            continue;
-        }
-        if !keyword.is_empty()
-            && ![
-                text(&record, "productCode"),
-                text(&record, "nameCN"),
-                text(&record, "nameEN"),
-            ]
-            .iter()
-            .any(|value| store::normalize(value).contains(&keyword))
-        {
-            continue;
-        }
-        rows.push(json!({
-            "id": record["id"],
-            "productCode": text(&record, "productCode"),
-            "nameCN": text(&record, "nameCN"),
-            "nameEN": text(&record, "nameEN"),
-        }));
-    }
-    rows.sort_by(|left, right| {
-        text(left, "productCode")
-            .cmp(&text(right, "productCode"))
-            .then_with(|| text(left, "nameCN").cmp(&text(right, "nameCN")))
-            .then_with(|| left["id"].as_i64().cmp(&right["id"].as_i64()))
-    });
-    let total = rows.len();
+    let start = i64::try_from(page.saturating_sub(1).saturating_mul(size)).unwrap_or(i64::MAX);
+    let (total, items) =
+        store
+            .connection()?
+            .query_business(&export_doc_storage::BusinessQuery {
+                list: export_doc_storage::BusinessList::Products { keyword: &keyword },
+                scope: auth::data_scope(actor, PERMISSION, "view"),
+                fields: &[
+                    ("id", "id"),
+                    ("productCode", "productCode"),
+                    ("nameCN", "nameCN"),
+                    ("nameEN", "nameEN"),
+                ],
+                offset: start,
+                limit: size as i64,
+            })?;
+    let total = total as usize;
     let pages = ((total + size - 1) / size).max(1);
-    let start = (page - 1) * size;
-    let items = rows
-        .into_iter()
-        .skip(start)
-        .take(size)
-        .collect::<Vec<Value>>();
     Ok(json!({
         "items": items,
         "totalCount": total,
@@ -195,5 +175,16 @@ mod tests {
         assert_eq!(page["totalPages"], 2);
         assert_eq!(page["hasNextPage"], true);
         assert!(page["items"].as_array().unwrap().len() <= 2);
+        let extreme = search(
+            &fixture.store,
+            &fixture.actor,
+            &[
+                ("pageNumber", usize::MAX.to_string()),
+                ("pageSize", "100".into()),
+            ],
+        )
+        .unwrap();
+        assert_eq!(extreme["totalCount"], 3);
+        assert!(extreme["items"].as_array().unwrap().is_empty());
     }
 }

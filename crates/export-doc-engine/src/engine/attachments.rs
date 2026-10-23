@@ -128,47 +128,33 @@ pub fn handle(
         let archived = query
             .iter()
             .any(|(key, value)| *key == "includeArchived" && value == "true");
-        let invoices = store.all("invoices")?;
-        let categories = store.all("attachment-categories")?;
         let category_id = query
             .iter()
             .find(|(key, _)| *key == "categoryId")
             .and_then(|(_, value)| value.parse::<i64>().ok());
-        let items: Vec<_> = store
-            .all("attachments")?
-            .into_iter()
-            .filter(|item| {
-                (invoice_id.is_none_or(|id| item["invoiceId"] == id))
-                    && category_id.is_none_or(|id| item["categoryId"] == id)
-                    && (archived || item["isArchived"] != true)
-                    && invoices.iter().any(|invoice| {
-                        invoice["id"] == item["invoiceId"]
-                            && auth::visible(actor, "document.invoices", "view", invoice)
-                    })
-            })
-            .map(|mut item| {
-                if let Some(invoice) = invoices
-                    .iter()
-                    .find(|invoice| invoice["id"] == item["invoiceId"])
-                {
-                    set_permissions(&mut item, actor, invoice);
+        store.read(|tx| {
+            let (page, size, offset) = store::page_parameters(query);
+            let keyword = store::normalize(super::hs::read(query,"keyword"));
+            let (total, mut items) = tx.query_business(&export_doc_storage::BusinessQuery {
+                list: export_doc_storage::BusinessList::Attachments { invoice_id, category_id, archived, keyword: &keyword, status: super::hs::read(query,"status") },
+                scope: auth::data_scope(actor,"document.invoices","view"),
+                fields: &[], offset, limit: size as i64,
+            })?;
+            let mut invoices = std::collections::BTreeMap::new();
+            let mut categories = std::collections::BTreeMap::new();
+            for item in &mut items {
+                crate::operation::check()?;
+                let id = item["invoiceId"].as_i64().ok_or_else(|| unavailable("资料所属发票编号损坏。"))?;
+                if !invoices.contains_key(&id) { invoices.insert(id, store::get(tx,"invoices",id)?); }
+                set_permissions(item,actor,&invoices[&id]);
+                if let Some(id) = item["categoryId"].as_i64() {
+                    if !categories.contains_key(&id) { categories.insert(id,tx.get("attachment-categories",id)?); }
+                    if let Some(category) = &categories[&id] { item["categoryName"] = category["name"].clone(); }
                 }
-                if let Some(category) = categories
-                    .iter()
-                    .find(|category| category["id"] == item["categoryId"])
-                {
-                    item["categoryName"] = category["name"].clone();
-                }
-                item
-            })
-            .collect();
-        let used = if let Some(id) = invoice_id {
-            invoice(store, actor, id, "view")?;
-            Some(store.connection()?.attachment_bytes(id)?)
-        } else {
-            None
-        };
-        json!({"page":store::paged(items,query),"canUpload":auth::authorize(actor,"document.invoices","operate").is_ok(),"usedBytes":used,"fileBytesLimit":FILE_LIMIT,"invoiceBytesLimit":INVOICE_LIMIT})
+            }
+            let used = if let Some(id) = invoice_id { invoice_in(tx,actor,id,"view")?; Some(tx.attachment_bytes(id)?) } else { None };
+            Ok(json!({"page":contracts::page(items,total as usize,page,size),"canUpload":auth::authorize(actor,"document.invoices","operate").is_ok(),"usedBytes":used,"fileBytesLimit":FILE_LIMIT,"invoiceBytesLimit":INVOICE_LIMIT}))
+        })?
     } else {
         let id = super::records::id(parameters)?;
         let mut record = store.get("attachments", id)?;

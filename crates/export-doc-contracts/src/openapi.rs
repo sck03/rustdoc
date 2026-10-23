@@ -3,6 +3,7 @@
 mod accounts;
 mod backup_plan;
 mod communication;
+mod dashboard;
 mod exchange;
 mod hs_lifecycle;
 mod observability;
@@ -25,6 +26,7 @@ pub fn document() -> Value {
     backup_plan::extend(&mut document);
     exchange::extend(&mut document);
     hs_lifecycle::extend(&mut document);
+    dashboard::extend(&mut document);
     document
 }
 
@@ -73,6 +75,7 @@ mod tests {
             .chain(personnel::FIELDS)
             .chain(exchange::FIELDS)
             .chain(hs_lifecycle::FIELDS)
+            .chain(dashboard::FIELDS)
         {
             for field in *fields {
                 current["components"]["schemas"][schema]["properties"]

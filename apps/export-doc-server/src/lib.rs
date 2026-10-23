@@ -2,6 +2,7 @@ mod admission;
 #[cfg(feature = "postgres")]
 pub mod configuration;
 pub mod desktop;
+mod download_body;
 mod downloads;
 mod request;
 mod response;
@@ -9,6 +10,8 @@ mod telemetry;
 const MAX_REQUESTS: usize = 16;
 const MAX_QUEUED_REQUESTS: usize = 16;
 const MAX_BULK_UPLOADS: usize = 2;
+const MAX_DOWNLOADS: usize = 8;
+const MAX_PROCESSING: usize = 2;
 
 use axum::{
     Router,
@@ -27,6 +30,8 @@ pub struct ServerState {
     pub service: Arc<NativeService>,
     requests: Arc<admission::Admission>,
     bulk_uploads: Arc<Semaphore>,
+    downloads: Arc<Semaphore>,
+    processing: Arc<Semaphore>,
     tickets: Arc<downloads::Tickets>,
     desktop_token: Option<Arc<str>>,
 }
@@ -50,6 +55,8 @@ fn compose_router(
             std::time::Duration::from_secs(5),
         )),
         bulk_uploads: Arc::new(Semaphore::new(MAX_BULK_UPLOADS)),
+        downloads: Arc::new(Semaphore::new(MAX_DOWNLOADS)),
+        processing: Arc::new(Semaphore::new(MAX_PROCESSING)),
         tickets: Arc::default(),
         desktop_token,
     };

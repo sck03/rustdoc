@@ -7,6 +7,8 @@ use std::{fmt, sync::Arc};
 pub struct ApiError {
     pub status: Option<u16>,
     pub message: String,
+    /// Reviewed, value-free category for internal logs; never copy raw causes.
+    pub diagnostic: Option<&'static str>,
 }
 
 impl ApiError {
@@ -14,6 +16,7 @@ impl ApiError {
         Self {
             status: None,
             message: message.into(),
+            diagnostic: Some("local"),
         }
     }
 }

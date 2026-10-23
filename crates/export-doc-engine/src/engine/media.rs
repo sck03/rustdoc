@@ -64,6 +64,17 @@ pub fn image_type(bytes: &[u8], max_bytes: usize) -> Result<&'static str> {
         ImageFormat::Jpeg => "image/jpeg",
         _ => return Err(invalid("只支持 PNG 或 JPEG 图片。")),
     };
+    let (width, height) = ImageReader::with_format(Cursor::new(bytes), format)
+        .into_dimensions()
+        .map_err(|_| invalid("图片尺寸无效。"))?;
+    if width == 0
+        || height == 0
+        || width > 8192
+        || height > 8192
+        || u64::from(width) * u64::from(height) > 32_000_000
+    {
+        return Err(invalid("图片尺寸或总像素超过限制。"));
+    }
     let mut reader = ImageReader::with_format(Cursor::new(bytes), format);
     let mut limits = Limits::default();
     limits.max_image_width = Some(8192);

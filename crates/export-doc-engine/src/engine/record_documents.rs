@@ -145,7 +145,7 @@ pub(in crate::engine) fn download(
     parameters: &[(&str, String)],
 ) -> Result<FileOutput> {
     let meta = metadata(operation).ok_or_else(|| invalid("未知附件下载。"))?;
-    service.store.transaction(|tx| {
+    service.store.read(|tx| {
         let (_, row) = current(tx, actor, meta, records::id(parameters)?)?;
         let attachment = attachment(tx, meta, &row, parameters)?;
         let blob = tx

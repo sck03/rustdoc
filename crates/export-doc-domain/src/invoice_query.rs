@@ -45,6 +45,12 @@ pub struct Criteria {
     tokens: Vec<String>,
 }
 impl Criteria {
+    pub fn filter(&self) -> &ApiQueryInvoiceFilterRequest {
+        &self.filter
+    }
+    pub fn tokens(&self) -> &[String] {
+        &self.tokens
+    }
     pub fn new(mut filter: ApiQueryInvoiceFilterRequest) -> Result<Self, String> {
         let start = date(filter.start_date.as_deref())?;
         let end = date(filter.end_date_exclusive.as_deref())?;
