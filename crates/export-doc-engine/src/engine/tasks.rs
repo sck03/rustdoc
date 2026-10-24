@@ -82,6 +82,7 @@ pub struct Jobs {
     store: Arc<Store>,
     runtime: Arc<Mutex<Runtime>>,
     retention: retention::Retention,
+    download_budget: Arc<super::backup_io::Budget>,
 }
 
 impl Jobs {
@@ -100,7 +101,7 @@ impl Jobs {
         };
         Ok(
             json!({"active":active,"workerHandles":workers,"stopping":stopping,"failed":failed,
-            "persistedCounts":self.store.connection()?.job_counts()?}),
+            "persistedCounts":self.store.connection()?.job_counts()?,"retainedOutputBytes":self.store.connection()?.job_output_bytes()?,"downloadMemory":self.download_budget.snapshot()}),
         )
     }
     pub fn open(store: Arc<Store>) -> Result<Self> {
@@ -114,6 +115,7 @@ impl Jobs {
             store,
             runtime: Arc::default(),
             retention,
+            download_budget: Arc::default(),
         })
     }
 
@@ -283,7 +285,7 @@ impl Jobs {
     }
     pub fn prepare_download(&self, actor: &Actor, id: &str) -> Result<super::backup_io::Download> {
         self.health()?;
-        persistence::download(&self.store, actor, id)
+        persistence::download(&self.store, actor, id, &self.download_budget)
     }
 
     pub fn operation(&self, operation: Operation, actor: &Actor, id: &str) -> Result<Vec<u8>> {

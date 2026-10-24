@@ -61,9 +61,30 @@ pub fn codes(tx: &Connection) -> Result<BTreeMap<String, ApiHsCodeDto>> {
         })
         .collect()
 }
-pub fn codes_for_year(tx: &Connection, year: i32) -> Result<BTreeMap<String, ApiHsCodeDto>> {
-    let mut values = codes(tx)?;
-    values.retain(|_, row| hs::current(row, year));
+pub fn codes_for_year(tx: &Connection, year: i32) -> Result<BTreeMap<String, hs::Standard>> {
+    let fields = [
+        "code",
+        "name",
+        "status",
+        "sourceName",
+        "effectiveYear",
+        "lastVerifiedAt",
+        "elements",
+        "description",
+    ]
+    .map(|key| (key, key));
+    let mut query = super::hs_queries::query(CODES, &fields);
+    query.current_year = Some(year);
+    let mut values = BTreeMap::new();
+    super::hs_queries::visit(tx, &mut query, |row| {
+        let mut dto: hs::Standard = serde_json::from_value(row)?;
+        dto.code =
+            hs::code(&dto.code).map_err(|_| super::error::unavailable("HS 标准编码损坏。"))?;
+        if dto.current(year) {
+            values.insert(dto.code.clone(), dto);
+        }
+        Ok(())
+    })?;
     Ok(values)
 }
 pub fn is_current(tx: &Connection, code: &str, year: i32) -> Result<bool> {
@@ -89,59 +110,108 @@ pub fn handle(
         .map_err(super::error::unavailable)?
         .today;
     let year = today.year();
-    let value=service.store.transaction(|tx|match operation {
-        PREVIEW_HS_CODE_CLEANUP|COMMIT_HS_CODE_CLEANUP=>lifecycle::handle(service,tx,actor,operation,body),
-        LIST_HS_CODES=>{
-            let filter=hs::text(read(query,"keyword"));
-            if filter.chars().count()>500{return Err(invalid("检索条件不能超过 500 字。"));}
-            let mut rows=store::all(tx,CODES)?;rows.retain(|r|filter.is_empty()||["code","name","elements","description"].iter().any(|key|hs::text(&text(r,key)).contains(&filter)));
-            rows.sort_by_key(|r|text(r,"code"));for row in &mut rows {annotate_year(row,year);}Ok(store::page_only(rows,query))
+    let execute = |tx: &Connection, actor: &Actor| match operation {
+        PREVIEW_HS_CODE_CLEANUP | COMMIT_HS_CODE_CLEANUP => {
+            lifecycle::handle(service, tx, actor, operation, body)
         }
-        GET_HS_CODE|GET_INVOICE_HS_CODE=>{
-            let code=hs::code(read(parameters,"code")).map_err(invalid)?;
-            tx.find_identity(CODES,&code)?.ok_or_else(||error(404,"HS 编码不存在。"))
-        }
-        CREATE_HS_CODE|UPDATE_HS_CODE=>{
-            let mut body=body.clone();
-            if operation==UPDATE_HS_CODE {
-                let code=hs::code(read(parameters,"code")).map_err(invalid)?;
-                if hs::code(&text(&body,"code")).map_err(invalid)?!=code{return Err(invalid("不能通过编辑更改 HS 编码。"));}
-                let previous=tx.find_identity(CODES,&code)?.ok_or_else(||error(404,"HS 编码不存在。"))?;
-                if body["id"].as_i64().is_some_and(|id|id>0&&Some(id)!=previous["id"].as_i64()){return Err(invalid("记录编号与编码不一致。"));}
-                body["id"]=previous["id"].clone();
+        LIST_HS_CODES => {
+            let filter = hs::text(read(query, "keyword"));
+            if filter.chars().count() > 500 {
+                return Err(invalid("检索条件不能超过 500 字。"));
             }
-            save_code(tx,actor,&body,false)
+            super::hs_queries::page(tx, CODES, query, year)
         }
-        DELETE_HS_CODE|DELETE_HS_CODES_BATCH|CLEAR_ALL_HS_CODES=>{
-            let ids=if operation==DELETE_HS_CODE{BTreeSet::from([id(parameters)?])}else if operation==CLEAR_ALL_HS_CODES {
-                if text(body,"confirmation")!="CLEAR"{return Err(invalid("请输入 CLEAR 确认清空税则主档。"));}
-                store::all(tx,CODES)?.iter().filter_map(|r|r["id"].as_i64()).collect()
-            }else{ids(body)?};
-            let count=delete(tx,actor,CODES,&ids)?;Ok(json!({"success":true,"message":format!("已删除 {count} 个编码。"),"deletedCount":count}))
+        GET_HS_CODE | GET_INVOICE_HS_CODE => {
+            let code = hs::code(read(parameters, "code")).map_err(invalid)?;
+            tx.find_identity(CODES, &code)?
+                .ok_or_else(|| error(404, "HS 编码不存在。"))
         }
-        SEARCH_HS_CODE_KNOWLEDGE|SEARCH_INVOICE_HS_CODE_KNOWLEDGE=>hs_search::search(tx,query,year),
-        LIST_HS_CODE_KNOWLEDGE_EXAMPLES=>{
-            let filter=hs::text(read(query,"keyword"));let mut rows=store::all(tx,EXAMPLES)?;
-            rows.retain(|r|filter.is_empty()||["rawReportedHsCode","resolvedCurrentHsCode","productName","specification"].iter().any(|key|hs::text(&text(r,key)).contains(&filter)));
-            rows.sort_by(|a,b|(a["isManuallyVerified"]!=true).cmp(&(b["isManuallyVerified"]!=true)).then_with(||b["updatedAt"].as_str().cmp(&a["updatedAt"].as_str())));
-            Ok(store::page_only(rows,query))
+        CREATE_HS_CODE | UPDATE_HS_CODE => {
+            let mut body = body.clone();
+            if operation == UPDATE_HS_CODE {
+                let code = hs::code(read(parameters, "code")).map_err(invalid)?;
+                if hs::code(&text(&body, "code")).map_err(invalid)? != code {
+                    return Err(invalid("不能通过编辑更改 HS 编码。"));
+                }
+                let previous = tx
+                    .find_identity(CODES, &code)?
+                    .ok_or_else(|| error(404, "HS 编码不存在。"))?;
+                if body["id"]
+                    .as_i64()
+                    .is_some_and(|id| id > 0 && Some(id) != previous["id"].as_i64())
+                {
+                    return Err(invalid("记录编号与编码不一致。"));
+                }
+                body["id"] = previous["id"].clone();
+            }
+            save_code(tx, actor, &body, false)
         }
-        SAVE_HS_CODE_KNOWLEDGE_EXAMPLE=>{
-            let current=text(body,"resolvedCurrentHsCode");
-            if !current.is_empty() && !is_current(tx,&hs::code(&current).map_err(invalid)?,year)? {return Err(invalid("请选择本年度已验证的有效编码。"));}
-            hs_learning::save_example(tx,actor,body)
-        },
-        DELETE_HS_CODE_KNOWLEDGE_EXAMPLE|DELETE_HS_CODE_KNOWLEDGE_EXAMPLES_BATCH=>{
-            let ids=if operation==DELETE_HS_CODE_KNOWLEDGE_EXAMPLE{BTreeSet::from([id(parameters)?])}else{ids(body)?};
-            let count=delete(tx,actor,EXAMPLES,&ids)?;Ok(json!({"success":true,"message":format!("已删除 {count} 条案例。"),"deletedCount":count}))
+        DELETE_HS_CODE | DELETE_HS_CODES_BATCH | CLEAR_ALL_HS_CODES => {
+            let ids = if operation == DELETE_HS_CODE {
+                BTreeSet::from([id(parameters)?])
+            } else if operation == CLEAR_ALL_HS_CODES {
+                if text(body, "confirmation") != "CLEAR" {
+                    return Err(invalid("请输入 CLEAR 确认清空税则主档。"));
+                }
+                store::all(tx, CODES)?
+                    .iter()
+                    .filter_map(|r| r["id"].as_i64())
+                    .collect()
+            } else {
+                ids(body)?
+            };
+            let count = delete(tx, actor, CODES, &ids)?;
+            Ok(
+                json!({"success":true,"message":format!("已删除 {count} 个编码。"),"deletedCount":count}),
+            )
         }
-        RECORD_HS_CODE_KNOWLEDGE_FEEDBACK|RECORD_INVOICE_HS_CODE_KNOWLEDGE_FEEDBACK=>{
-            hs_learning::feedback(tx,actor,body,year)?;
+        SEARCH_HS_CODE_KNOWLEDGE | SEARCH_INVOICE_HS_CODE_KNOWLEDGE => {
+            hs_search::search(tx, query, year)
+        }
+        LIST_HS_CODE_KNOWLEDGE_EXAMPLES => super::hs_queries::page(tx, EXAMPLES, query, year),
+        SAVE_HS_CODE_KNOWLEDGE_EXAMPLE => {
+            let current = text(body, "resolvedCurrentHsCode");
+            if !current.is_empty() && !is_current(tx, &hs::code(&current).map_err(invalid)?, year)?
+            {
+                return Err(invalid("请选择本年度已验证的有效编码。"));
+            }
+            hs_learning::save_example(tx, actor, body)
+        }
+        DELETE_HS_CODE_KNOWLEDGE_EXAMPLE | DELETE_HS_CODE_KNOWLEDGE_EXAMPLES_BATCH => {
+            let ids = if operation == DELETE_HS_CODE_KNOWLEDGE_EXAMPLE {
+                BTreeSet::from([id(parameters)?])
+            } else {
+                ids(body)?
+            };
+            let count = delete(tx, actor, EXAMPLES, &ids)?;
+            Ok(
+                json!({"success":true,"message":format!("已删除 {count} 条案例。"),"deletedCount":count}),
+            )
+        }
+        RECORD_HS_CODE_KNOWLEDGE_FEEDBACK | RECORD_INVOICE_HS_CODE_KNOWLEDGE_FEEDBACK => {
+            hs_learning::feedback(tx, actor, body, year)?;
             Ok(json!({"success":true,"message":"反馈已记录。"}))
         }
-        DISCOVER_HS_CODE_HISTORY_CANDIDATES=>hs_learning::history(tx,actor,query,year),
-        _=>hs_learning::remote_review(tx,actor,operation,query,body,year),
-    })?;
+        DISCOVER_HS_CODE_HISTORY_CANDIDATES => hs_learning::history(tx, actor, query, year),
+        _ => hs_learning::remote_review(tx, actor, operation, query, body, year),
+    };
+    let value = if [
+        LIST_HS_CODES,
+        GET_HS_CODE,
+        GET_INVOICE_HS_CODE,
+        SEARCH_HS_CODE_KNOWLEDGE,
+        SEARCH_INVOICE_HS_CODE_KNOWLEDGE,
+        LIST_HS_CODE_KNOWLEDGE_EXAMPLES,
+        LIST_HS_CODE_REMOTE_CANDIDATES,
+    ]
+    .contains(&operation)
+    {
+        service.store.read_for(actor, operation, query, execute)?
+    } else {
+        service
+            .store
+            .transaction_for(actor, operation, query, execute)?
+    };
     let mut value = value;
     if [
         GET_HS_CODE,
@@ -155,7 +225,7 @@ pub fn handle(
     }
     Ok(contracts::project(contracts::response(operation.id), value))
 }
-fn annotate_year(row: &mut Value, year: i32) {
+pub(super) fn annotate_year(row: &mut Value, year: i32) {
     row["requiresAnnualReview"] =
         json!(row["status"] == "Active" && row["effectiveYear"].as_i64() != Some(i64::from(year)));
 }
@@ -211,9 +281,7 @@ pub fn save_code(tx: &Connection, actor: &Actor, body: &Value, managed: bool) ->
     if !managed && dto.id > 0 && dto.id != record_id {
         return Err(error(404, "HS 编码记录不存在。"));
     }
-    let expected = if managed {
-        store::expected(body)
-    } else if dto.id > 0 {
+    let expected = if managed || dto.id > 0 {
         store::expected(body)
     } else {
         previous

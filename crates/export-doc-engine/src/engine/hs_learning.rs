@@ -377,7 +377,7 @@ pub fn remote_review(
         let accepted = input["confirmed"] == true;
         if accepted {
             let current = rules::code(&text(&input, "currentCode")).map_err(invalid)?;
-            if !codes.get(&current).is_some_and(rules::trusted) {
+            if !codes.get(&current).is_some_and(rules::Standard::trusted) {
                 return Err(invalid("请选择经过验证的当前有效编码。"));
             }
             let raw = text(&row, "rawReportedHsCode");

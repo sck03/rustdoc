@@ -1,7 +1,7 @@
 //! Authorized backup requests stream to an anonymous file in the managed cache.
 use super::error;
 use axum::body::{Body, HttpBody};
-use export_doc_engine::{api::ApiError, engine::backup_io::MAX_FILE_BYTES};
+use export_doc_engine::api::ApiError;
 use std::{fs, future::poll_fn, path::Path, pin::Pin};
 use tokio::io::{AsyncSeekExt, AsyncWriteExt};
 
@@ -47,7 +47,6 @@ pub(super) async fn receive(mut body: Body, root: &Path) -> Result<fs::File, Api
         if let Ok(bytes) = frame.into_data() {
             size = size
                 .checked_add(bytes.len() as u64)
-                .filter(|size| *size <= MAX_FILE_BYTES)
                 .ok_or_else(|| error(413, "备份文件大小无效或超出可表示范围。"))?;
             file.write_all(&bytes)
                 .await

@@ -138,7 +138,7 @@ impl Document {
     pub fn count(&self) -> Result<u32, String> {
         let document = self.document()?;
         let count = document.pages().len() as u32;
-        if count <= 0 {
+        if count == 0 {
             return Err("PDF 没有可读取页面。".into());
         }
         Ok(count)

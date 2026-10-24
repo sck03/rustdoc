@@ -172,6 +172,33 @@ impl Store {
             operation(connection, &current)
         })
     }
+    /// Revalidate generated operation permissions after the write coordinator is acquired.
+    pub fn transaction_for<T>(
+        &self,
+        actor: &Actor,
+        operation: crate::generated_api::Operation,
+        query: &[(&str, String)],
+        work: impl FnOnce(&Connection, &Actor) -> Result<T>,
+    ) -> Result<T> {
+        self.transaction_as(actor, |tx, current| {
+            super::auth::authorize_operation(current, operation, query)?;
+            work(tx, current)
+        })
+    }
+    /// Queries use a read snapshot and the same current-account authorization boundary.
+    pub fn read_for<T>(
+        &self,
+        actor: &Actor,
+        operation: crate::generated_api::Operation,
+        query: &[(&str, String)],
+        work: impl FnOnce(&Connection, &Actor) -> Result<T>,
+    ) -> Result<T> {
+        self.read(|tx| {
+            let current = super::auth::current_actor_in(tx, actor.id, self.edition)?;
+            super::auth::authorize_operation(&current, operation, query)?;
+            work(tx, &current)
+        })
+    }
     #[cfg(feature = "postgres")]
     pub fn postgres_connection(&self) -> Result<&str> {
         self.postgres_connection

@@ -3,7 +3,7 @@ pub use crate::invoice_columns::{COLUMN_COUNT, COLUMNS, ItemRow};
 use rust_decimal::{Decimal, RoundingStrategy};
 use std::str::FromStr;
 use unicode_normalization::UnicodeNormalization;
-pub const MAX_ROWS: usize = 5_000;
+pub const MAX_ROWS: usize = export_doc_contracts::invoice_editing::MAX_ITEMS;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct InvoiceDraft {

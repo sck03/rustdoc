@@ -18,7 +18,6 @@ const TRANSFER_TIMEOUT: Duration = Duration::from_secs(super::super::backup_io::
 const PROP_FIND_LIMIT: usize = 2 * 1024 * 1024;
 const ERROR_LIMIT: usize = 64 * 1024;
 const TRANSFER_BUFFER: usize = 128 * 1024;
-const MAX_TRANSFER_BYTES: u64 = super::super::backup_io::MAX_FILE_BYTES;
 mod download;
 mod recovery;
 use download::download_backup;
@@ -417,9 +416,6 @@ fn upload_file(config: &Config, path: &Path, file_name: &str) -> Result<()> {
     let metadata = fs::metadata(path)?;
     if !metadata.is_file() || metadata.len() == 0 {
         return Err(invalid("要上传的本地备份文件为空或不存在。"));
-    }
-    if metadata.len() > MAX_TRANSFER_BYTES {
-        return Err(invalid("本地备份大小超出可表示范围。"));
     }
     let remote = remote_path(&endpoint, file_name)?;
     let mut reader = std::io::BufReader::new(fs::File::open(path)?);

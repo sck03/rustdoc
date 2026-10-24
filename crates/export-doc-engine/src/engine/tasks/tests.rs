@@ -266,7 +266,8 @@ fn retention_keeps_running_work_and_removes_terminal_inputs_and_outputs_atomical
             retention::Retention {
                 days: 2,
                 global_limit: 3,
-                per_user_limit: 1
+                per_user_limit: 1,
+                ..Default::default()
             },
             chrono::Utc::now()
         )
@@ -291,7 +292,8 @@ fn retention_keeps_running_work_and_removes_terminal_inputs_and_outputs_atomical
             retention::Retention {
                 days: 2,
                 global_limit: 3,
-                per_user_limit: 1
+                per_user_limit: 1,
+                ..Default::default()
             },
             chrono::Utc::now()
         )
@@ -299,6 +301,58 @@ fn retention_keeps_running_work_and_removes_terminal_inputs_and_outputs_atomical
         0
     );
     assert!(retention::Retention::from_lookup(|_| Some("0".into())).is_err());
+}
+
+#[test]
+fn output_byte_retention_preserves_history_and_is_idempotent() {
+    let fixture = Fixture::new();
+    let (store, jobs) = fixture.open();
+    let mut ids = vec![];
+    for _ in 0..3 {
+        let job = persistence::create(&store, &fixture.actor, "Capacity", "容量结果").unwrap();
+        let id = job["jobId"].as_str().unwrap();
+        persistence::finish(
+            &store,
+            &fixture.actor,
+            id,
+            Ok(TaskOutput::file(
+                "result.txt".into(),
+                "text/plain",
+                b"123456".to_vec(),
+            )),
+        )
+        .unwrap();
+        ids.push(id.to_owned());
+    }
+    let policy = retention::Retention {
+        global_output_bytes: 10,
+        per_user_output_bytes: 10,
+        ..Default::default()
+    };
+    assert_eq!(
+        retention::prune(&store, policy, chrono::Utc::now()).unwrap(),
+        0
+    );
+    for id in &ids[..2] {
+        let snapshot = jobs.get(&fixture.actor, id).unwrap();
+        assert_eq!(snapshot["status"], "Succeeded");
+        assert_eq!(snapshot["outputPath"], "");
+        assert!(snapshot["detailText"].as_str().unwrap().contains("回收"));
+        assert_eq!(
+            jobs.download(&fixture.actor, id).err().unwrap().status,
+            Some(409)
+        );
+    }
+    assert_eq!(
+        jobs.download(&fixture.actor, &ids[2]).unwrap().content,
+        b"123456"
+    );
+    assert_eq!(jobs.metrics().unwrap()["retainedOutputBytes"], 6);
+    assert_eq!(
+        retention::prune(&store, policy, chrono::Utc::now()).unwrap(),
+        0
+    );
+    jobs.close().unwrap();
 }
 
 #[cfg(feature = "excel")]

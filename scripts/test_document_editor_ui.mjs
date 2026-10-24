@@ -8,9 +8,10 @@ import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { documentEditorUiFixture } from "./lib/document-editor-ui-fixture.mjs";
 import { runSettingsWorkspaceCases } from "./lib/settings-workspace-ui-cases.mjs";
+import { runInvoiceSaveCases } from "./lib/invoice-save-ui-cases.mjs";
 
 const repo = path.resolve(import.meta.dirname, ".."), web = path.join(repo, "apps/export-doc-web");
-const output = path.join(repo, "artifacts/document-editor-ui");
+const output = path.join(repo, "artifacts/document-editor-ui", String(Date.now()));
 const require = createRequire(path.join(web, "package.json"));
 fs.mkdirSync(output, { recursive: true });
 const source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\", "/"));
@@ -79,6 +80,7 @@ try {
     await waitFor(page, mode === "settings" ? "document.querySelector('.settings-center-form') && !document.querySelector('[aria-busy=true]')" : "(document.querySelector('form') || document.querySelector('[aria-label=发票单据包默认设置]')) && window.__calls.some(call=>call.name==='getSettings')");
     await delay(200);
   };
+  await runInvoiceSaveCases({open,currentPage:()=>page,read,field,clickText,waitFor,results});
   for (const width of [1440, 1024, 390, 320]) {
     await open("new", width);
     assert.equal(await read(page, "document.querySelectorAll('[role=tabpanel]:not([hidden])').length"), 1);
@@ -139,6 +141,8 @@ try {
   assert.deepEqual(await spareHeaders(), [], "tab changes preserve the chosen columns");
   results.push("column-default-populated-data-and-tab-persistence");
   await open("edit", 1440, "&rows=1000");
+  // Start above the existing minimum table height so the resize checks actual flex growth.
+  await page.send("Emulation.setDeviceMetricsOverride", { width:1440, height:1200, deviceScaleFactor:1, mobile:false });
   await click(page, "#invoice-tab-items");
   const viewport = () => read(page, "(()=>{const frame=document.querySelector('.item-editor-frame'),summary=document.querySelector('.item-summary-bar');return {height:frame.getBoundingClientRect().height,scrollHeight:frame.scrollHeight,rows:document.querySelectorAll('.item-editor-table tr:not(.item-virtual-spacer-row) input[data-invoice-item-field=styleNo]').length,summaryBelow:summary.getBoundingClientRect().top>=frame.getBoundingClientRect().bottom}})()");
   await waitFor(page, "document.querySelector('.item-editor-frame').clientHeight>0");
@@ -157,6 +161,10 @@ try {
   await page.send("Emulation.setDeviceMetricsOverride", { width: 1280, height: 600, deviceScaleFactor: 1, mobile: false });
   await delay(150);
   const resizedViewport = await viewport();
+  if (!(resizedViewport.height < initialViewport.height)) {
+    await captureScreenshot(page, path.join(output, "invoice-viewport-failed.png"));
+    fs.writeFileSync(path.join(output, "invoice-viewport-failed.json"), JSON.stringify({initialViewport,resizedViewport,layout:await read(page,"[...document.querySelectorAll('.document-editor-sections,.invoice-items-panel,.invoice-items-source,.item-editor-layout')].map(node=>({class:node.className,height:node.getBoundingClientRect().height,display:getComputedStyle(node).display,flex:getComputedStyle(node).flex}))")},null,2));
+  }
   assert(resizedViewport.height < initialViewport.height && resizedViewport.rows < 60 && resizedViewport.summaryBelow, JSON.stringify(resizedViewport));
   await clickText(page, "保存发票"); await waitFor(page, "window.__calls.some(call=>call.name==='updateInvoice')");
   assert.equal(await read(page, "window.__calls.find(call=>call.name==='updateInvoice').input.body.items[999].styleNo"), "LAST-ROW-DRAFT");
@@ -292,7 +300,7 @@ try {
   await audit(page, "invoice-reader-tabs");
   await runSettingsWorkspaceCases({ open, currentPage: () => page, read, click, clickText, input, field, waitFor, audit, captureScreenshot, output, results });
   fs.writeFileSync(path.join(output, "summary.json"), JSON.stringify({ passed: results.length, results }, null, 2));
-  process.stdout.write(`Document editor UI passed (${results.length} cases).\n`);
+  process.stdout.write(`Document editor UI passed (${results.length} cases); ${output}\n`);
 } finally {
   cdp?.close(); if (chrome) await closeChrome(chrome.browserWebSocketUrl, chrome.process);
   await new Promise(resolve => server.close(resolve));

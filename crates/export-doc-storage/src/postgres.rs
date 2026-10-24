@@ -205,6 +205,10 @@ impl Adapter for Postgres {
         }
         Ok(Value::Object(counts))
     }
+    fn job_output_bytes(&self) -> Result<u64> {
+        let size = self.client.borrow_mut().query_one("SELECT COALESCE(SUM(octet_length(content)),0)::bigint FROM files WHERE kind='job-output'", &[])?.try_get::<_, i64>(0)?;
+        u64::try_from(size).map_err(|_| Error::unavailable("任务容量无效。"))
+    }
     fn query_communications(&self, q: &CommunicationQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = communication::sql(q, true);
         self.query_page(&sql, "r.body::text", q.offset, q.limit.clamp(1, 100))
@@ -212,6 +216,29 @@ impl Adapter for Postgres {
     fn query_records(&self, q: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = super::record_query::sql(q, true);
         self.query_page(&sql, "r.body::text", q.offset, q.limit.clamp(1, 100))
+    }
+    fn query_slice(
+        &self,
+        sql: &QuerySql,
+        projection: &str,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Vec<Value>> {
+        let parameters: Vec<&(dyn ::postgres::types::ToSql + Sync)> =
+            sql.values.iter().map(|value| value as _).collect();
+        let query = format!(
+            "SELECT {projection} FROM records r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
+            sql.filter,
+            sql.order,
+            limit.clamp(1, 2000),
+            offset.max(0)
+        );
+        self.client
+            .borrow_mut()
+            .query(&query, &parameters)?
+            .into_iter()
+            .map(|row| Ok(serde_json::from_str(&row.try_get::<_, String>(0)?)?))
+            .collect()
     }
     fn query_page(
         &self,
@@ -407,6 +434,9 @@ impl Adapter for Postgres {
     }
     fn blob(&self, record_id: i64, kind: &str) -> Result<Option<Blob>> {
         self.client.borrow_mut().query_opt("SELECT file_name,media_type,digest,content FROM files WHERE record_id=$1 AND kind=$2 ORDER BY id DESC LIMIT 1",&[&record_id,&kind])?.map(|r|Ok(Blob{file_name:r.try_get(0)?,media_type:r.try_get(1)?,digest:r.try_get(2)?,content:r.try_get(3)?})).transpose()
+    }
+    fn blob_info(&self, record_id: i64, kind: &str) -> Result<Option<BlobInfo>> {
+        self.client.borrow_mut().query_opt("SELECT file_name,media_type,digest,octet_length(content)::bigint FROM files WHERE record_id=$1 AND kind=$2 ORDER BY id DESC LIMIT 1",&[&record_id,&kind])?.map(|row|Ok(BlobInfo { file_name:row.try_get(0)?,media_type:row.try_get(1)?,digest:row.try_get(2)?,size:u64::try_from(row.try_get::<_,i64>(3)?).map_err(|_|Error::unavailable("文件大小无效。"))? })).transpose()
     }
     fn delete_blobs(&self, record_id: i64) -> Result<()> {
         self.client

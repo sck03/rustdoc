@@ -2,10 +2,9 @@ use super::{
     error::{Result, invalid},
     hs::{self, codes_for_year, read},
     records::text,
-    store,
 };
 use crate::operation;
-use export_doc_domain::{generated_api::ApiHsCodeDto, hs as rules};
+use export_doc_domain::hs::{self as rules, Standard};
 use export_doc_storage::Connection;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -20,10 +19,10 @@ pub fn resolve(
     raw: &str,
     current: &str,
     verified: bool,
-    codes: &BTreeMap<String, ApiHsCodeDto>,
+    codes: &BTreeMap<String, Standard>,
     relations: &[Value],
 ) -> Resolution {
-    let trusted = |code: &str| codes.get(code).is_some_and(rules::trusted);
+    let trusted = |code: &str| codes.get(code).is_some_and(Standard::trusted);
     let make = |code: String, status, replacements, usable| Resolution {
         code,
         status,
@@ -99,23 +98,45 @@ pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Va
         .unwrap_or(20)
         .clamp(1, 50);
     let codes = codes_for_year(tx, year)?;
-    let relations = store::all(tx, hs::REPLACEMENTS)?;
-    let feedback = store::all(tx, hs::FEEDBACK)?;
-    let mut examples = store::all(tx, hs::EXAMPLES)?;
-    examples.sort_by(|a, b| {
-        (a["isManuallyVerified"] != true)
-            .cmp(&(b["isManuallyVerified"] != true))
-            .then_with(|| b["useCount"].as_i64().cmp(&a["useCount"].as_i64()))
-            .then_with(|| b["updatedAt"].as_str().cmp(&a["updatedAt"].as_str()))
-    });
     let prefix = rules::code(raw).ok().filter(|c| c.len() >= 4);
-    if let Some(prefix) = &prefix {
-        examples.retain(|r| {
-            text(r, "rawReportedHsCode").starts_with(prefix)
-                || text(r, "resolvedCurrentHsCode").starts_with(prefix)
-        });
+    let fields = [
+        "rawReportedHsCode",
+        "resolvedCurrentHsCode",
+        "productName",
+        "specification",
+        "isManuallyVerified",
+        "useCount",
+        "updatedAt",
+    ]
+    .map(|key| (key, key));
+    let mut example_query = super::hs_queries::query(hs::EXAMPLES, &fields);
+    example_query.prefix = prefix.as_deref().unwrap_or("");
+    example_query.ranked_examples = true;
+    example_query.limit = 2000;
+    let examples = tx.query_hs(&example_query)?;
+    let feedback = super::hs_queries::feedback(tx, &normalized)?;
+    let mut relations = BTreeMap::<String, Vec<Value>>::new();
+    let relation_fields = ["oldCode", "newCode", "isManuallyVerified"].map(|key| (key, key));
+    super::hs_queries::visit(
+        tx,
+        &mut super::hs_queries::query(hs::REPLACEMENTS, &relation_fields),
+        |row| {
+            relations
+                .entry(text(&row, "oldCode"))
+                .or_default()
+                .push(row);
+            Ok(())
+        },
+    )?;
+    let mut related_examples = BTreeMap::<String, Vec<&Value>>::new();
+    for row in &examples {
+        let raw = text(row, "rawReportedHsCode");
+        let current = text(row, "resolvedCurrentHsCode");
+        related_examples.entry(raw.clone()).or_default().push(row);
+        if current != raw {
+            related_examples.entry(current).or_default().push(row);
+        }
     }
-    examples.truncate(2000);
     let mut results: BTreeMap<String, Value> = BTreeMap::new();
     if prefix.is_none() {
         for example in &examples {
@@ -140,24 +161,17 @@ pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Va
                 &text(example, "resolvedCurrentHsCode"),
                 example["isManuallyVerified"] == true,
                 &codes,
-                &relations,
+                relations
+                    .get(&raw_code)
+                    .map(Vec::as_slice)
+                    .unwrap_or_default(),
             );
             let candidate = if resolved.code.is_empty() {
                 raw_code.clone()
             } else {
                 resolved.code.clone()
             };
-            let boost: i64 = feedback
-                .iter()
-                .filter(|r| {
-                    rules::text(&text(r, "queryText")) == normalized
-                        && r["candidateCode"] == candidate
-                })
-                .map(|r| {
-                    r["acceptedCount"].as_i64().unwrap_or(0).saturating_mul(5)
-                        - r["rejectedCount"].as_i64().unwrap_or(0).saturating_mul(4)
-                })
-                .fold(0, i64::saturating_add);
+            let boost = feedback.get(&candidate).copied().unwrap_or(0);
             let used = example["useCount"].as_i64().unwrap_or(0);
             let score = (score
                 + used.saturating_mul(2).min(15)
@@ -204,7 +218,7 @@ pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Va
     }
     for (code, standard) in &codes {
         operation::check()?;
-        if !rules::trusted(standard) || results.contains_key(code) {
+        if !standard.trusted() || results.contains_key(code) {
             continue;
         }
         let combined = rules::text(&format!(
@@ -227,10 +241,10 @@ pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Va
         if score < 22 {
             continue;
         }
-        let related: Vec<_> = examples
-            .iter()
-            .filter(|r| r["rawReportedHsCode"] == *code || r["resolvedCurrentHsCode"] == *code)
-            .collect();
+        let related = related_examples
+            .get(code)
+            .map(Vec::as_slice)
+            .unwrap_or_default();
         let name = related
             .first()
             .map(|r| text(r, "productName"))
@@ -272,7 +286,7 @@ pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Va
             related
                 .iter()
                 .filter_map(|r| r["useCount"].as_i64())
-                .sum::<i64>()
+                .fold(0, i64::saturating_add)
         );
         results.insert(code.clone(), row);
     }
@@ -296,10 +310,10 @@ fn result(
     name: &str,
     spec: &str,
     resolution: &Resolution,
-    standard: Option<&ApiHsCodeDto>,
+    standard: Option<&Standard>,
     score: i64,
     reasons: Vec<String>,
     warnings: Vec<String>,
 ) -> Value {
-    json!({"currentCode":resolution.code,"rawCode":raw,"name":name,"specification":spec,"standardName":standard.map(|s|s.name.as_str()).unwrap_or(""),"resolutionStatus":resolution.status,"score":score,"exampleCount":0,"confirmedCount":0,"replacementCandidates":resolution.replacements,"matchReasons":reasons,"conflictWarnings":warnings,"standardSource":standard.map(|s|s.source_name.as_str()).unwrap_or(""),"effectiveYear":standard.and_then(|s|s.effective_year),"lastVerifiedAt":standard.and_then(|s|s.last_verified_at.as_deref()),"canUse":resolution.usable&&standard.is_some_and(rules::trusted)})
+    json!({"currentCode":resolution.code,"rawCode":raw,"name":name,"specification":spec,"standardName":standard.map(|s|s.name.as_str()).unwrap_or(""),"resolutionStatus":resolution.status,"score":score,"exampleCount":0,"confirmedCount":0,"replacementCandidates":resolution.replacements,"matchReasons":reasons,"conflictWarnings":warnings,"standardSource":standard.map(|s|s.source_name.as_str()).unwrap_or(""),"effectiveYear":standard.and_then(|s|s.effective_year),"lastVerifiedAt":standard.and_then(|s|s.last_verified_at.as_deref()),"canUse":resolution.usable&&standard.is_some_and(Standard::trusted)})
 }

@@ -7,6 +7,16 @@ use std::{
 
 struct Database(PathBuf);
 impl Database {
+    fn v7() -> Self {
+        let database = Self::v6();
+        let raw = database.raw();
+        raw.execute_batch("BEGIN;").unwrap();
+        raw.execute_batch(include_str!("../src/migrations/007-sqlite.sql"))
+            .unwrap();
+        raw.execute_batch("UPDATE schema_version SET version=7; COMMIT;")
+            .unwrap();
+        database
+    }
     fn v6() -> Self {
         let database = Self::v5();
         // Apply the released v5 -> v6 schema change, not just a version label.
@@ -48,6 +58,40 @@ impl Database {
 impl Drop for Database {
     fn drop(&mut self) {
         fs::remove_dir_all(self.0.parent().unwrap()).unwrap();
+    }
+}
+
+#[test]
+fn version_seven_hs_indexes_roll_back_and_retry_without_rewriting_records() {
+    let database = Database::v7();
+    database
+        .raw()
+        .execute_batch("CREATE INDEX records_hs_current_code ON records(kind);")
+        .unwrap();
+    assert!(Connection::sqlite(&database.0).is_err());
+    assert_eq!(database.version(), 7);
+    assert_eq!(
+        database
+            .raw()
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_schema WHERE name='records_hs_code_order'",
+                [],
+                |row| row.get::<_, i64>(0)
+            )
+            .unwrap(),
+        0
+    );
+    database
+        .raw()
+        .execute_batch("DROP INDEX records_hs_current_code;")
+        .unwrap();
+    for _ in 0..2 {
+        let connection = Connection::sqlite(&database.0).unwrap();
+        assert_eq!(
+            connection.settings("preserved").unwrap().unwrap()["text"],
+            "中文业务数据"
+        );
+        assert_eq!(database.version(), SCHEMA_VERSION);
     }
 }
 

@@ -38,6 +38,7 @@ mod hs_files;
 mod hs_learning;
 #[cfg(feature = "excel")]
 mod hs_package;
+mod hs_queries;
 #[cfg(feature = "hs-remote")]
 mod hs_remote;
 mod hs_search;
@@ -285,7 +286,7 @@ impl NativeService {
                 operation.id
             )));
         }
-        let body_value = body.clone().unwrap_or_else(|| json!({}));
+        let body_value = body.unwrap_or_else(|| json!({}));
         let value = match operation {
             LOGIN => self.sessions.login(
                 &self.store,
@@ -685,7 +686,7 @@ impl NativeService {
                         self.clock.now().map_err(unavailable)?.today,
                     )?
                 } else {
-                    self.authenticated(operation, parameters, query, body, &actor, token)?
+                    self.authenticated(operation, parameters, query, body_value, &actor, token)?
                 }
             }
         };
@@ -700,11 +701,10 @@ impl NativeService {
         operation: Operation,
         parameters: &[(&str, String)],
         query: &[(&str, String)],
-        body: Option<Value>,
+        body_value: Value,
         actor: &Actor,
         token: &str,
     ) -> Result<Value> {
-        let body_value = body.clone().unwrap_or_else(|| json!({}));
         match operation {
             LOGOUT => {
                 self.sessions.logout(token)?;
@@ -892,7 +892,7 @@ impl NativeService {
                     operation,
                     parameters,
                     query,
-                    body,
+                    Some(body_value),
                 )
             }
         }

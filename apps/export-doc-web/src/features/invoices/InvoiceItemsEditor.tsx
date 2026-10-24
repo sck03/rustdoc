@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { ApiInvoiceItemDto, ApiProductDto } from "../../api/index.ts";
-import { normalizeText } from "../../ui/formUtils.ts";
+import { normalizeText, readApiError } from "../../ui/formUtils.ts";
 import { getClipboardPasteInstruction, readClipboardText, writeClipboardText } from "../../ui/clipboard.ts";
 import { InvoiceItemHistoryOptionCache } from "./invoiceItemHistory.ts";
 import { InvoiceItemShortcutGuide } from "./InvoiceItemShortcutGuide.tsx";
@@ -391,7 +391,9 @@ export function InvoiceItemsEditor({
       return;
     }
 
-    const rows = parseInvoiceItemClipboardRows(text);
+    let rows: string[][];
+    try { rows = parseInvoiceItemClipboardRows(text); }
+    catch (error) { setEditorMessage(readApiError(error)); return; }
     if (rows.length === 0) {
       setEditorMessage(null);
       return;
@@ -400,12 +402,12 @@ export function InvoiceItemsEditor({
     const startRowIndex = activeFocusedCell?.rowIndex ?? items.length;
     const startField = activeFocusedCell?.field ?? visibleColumns[0]?.field ?? firstEditableInvoiceItemField;
     markInvoiceItemMutationFrom(startRowIndex);
-    onPasteItemTable(
+    try { onPasteItemTable(
       startRowIndex,
       startField,
       rows,
       visibleColumns.map((column) => column.field),
-    );
+    ); } catch (error) { setEditorMessage(readApiError(error)); return; }
     focusItemCell({ rowIndex: startRowIndex, field: startField });
     setEditorMessage(`${rows.length} 行剪贴板内容已应用。`);
   }

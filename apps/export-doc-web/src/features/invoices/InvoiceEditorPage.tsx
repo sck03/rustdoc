@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useIsMutating } from "@tanstack/react-query";
 import { DocumentFieldLabelsProvider } from "../../ui/DocumentFieldLabelsContext.tsx";
 import { ArrowLeft, Edit3, Trash2 } from "lucide-react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -48,6 +48,8 @@ import { calculateInvoiceTotals } from "./invoiceItemsEditorModel.ts";
 import { useInvoiceEditorReferenceData } from "./useInvoiceEditorReferenceData.ts";
 import { useInvoiceItemsWorkspace } from "./useInvoiceItemsWorkspace.ts";
 import { useInvoicePersistenceOperations } from "./useInvoicePersistenceOperations.ts";
+import { readInvoiceSaveContinuation } from "./invoiceSaveModel.ts";
+import { invoiceControlMutationKey } from "./invoiceCache.ts";
 import { InvoiceReviewPanel } from "./InvoiceReviewPanel.tsx";
 import { readInvoiceEditorSection, type InvoiceEditorSectionId } from "./invoiceEditorSections.ts";
 
@@ -112,7 +114,8 @@ export function InvoiceEditorPage({
           routeInvoiceDraft.items?.length ?? 0
         }`
       : null;
-  const isInvoiceEditable = invoicePermission.canOperate
+  const invoiceControlBusy = useIsMutating({ mutationKey: invoiceControlMutationKey(parsedInvoiceId) }) > 0;
+  const isInvoiceEditable = invoicePermission.canOperate && !invoiceControlBusy
     && (isNew || isInvoiceEditableStatus(persistedInvoiceStatus || invoice?.status));
   const itemsWorkspace = useInvoiceItemsWorkspace({
     client,
@@ -121,6 +124,7 @@ export function InvoiceEditorPage({
     setSuccessMessage,
     isEditable: isInvoiceEditable && workspaceDeviceCapabilities.canUseDenseWorkbench,
     canSaveToProductLibrary: masterDataPermission.canOperate,
+    setMessage,
   });
 
   const invoiceQuery = useQuery({
@@ -165,6 +169,7 @@ export function InvoiceEditorPage({
     setInvoice,
     setMessage,
     setPendingHsFeedback,
+    pendingHsFeedback,
     setPersistedInvoiceDraft,
     setPersistedInvoiceStatus,
     setSuccessMessage,
@@ -247,10 +252,12 @@ export function InvoiceEditorPage({
   const serverDraftSync = useServerDraftSync({
     resourceKey: isNew ? "new" : parsedInvoiceId,
     incomingValue: isNew ? null : invoiceQuery.data,
+    persistedValue: persistedInvoiceDraft,
     isDirty: hasUnsavedInvoiceChanges,
     fingerprint: (serverInvoice) => buildInvoiceSnapshot(serverInvoice, parsedInvoiceId),
     applyIncoming: (serverInvoice) => {
       let nextInvoice = serverInvoice;
+      const continuation = readInvoiceSaveContinuation(location.state, serverInvoice);
       let appliedImportAction: RouteInvoiceImportAction | null = null;
       if (routeInvoiceDraft && routeInvoiceImportAction && routeInvoiceImportKey
         && appliedRouteInvoiceImportKey !== routeInvoiceImportKey) {
@@ -263,11 +270,12 @@ export function InvoiceEditorPage({
         appliedImportAction = routeInvoiceImportAction;
       }
 
-      setInvoice(nextInvoice);
+      setInvoice(continuation?.invoice ?? nextInvoice);
       setPersistedInvoiceDraft(normalizeInvoiceForSave(serverInvoice, parsedInvoiceId));
       setPersistedInvoiceStatus(normalizeInvoiceStatus(serverInvoice.status));
-      setPendingHsFeedback([]);
-      itemsWorkspace.reset();
+      setPendingHsFeedback(continuation?.feedback ?? []);
+      if (!continuation) itemsWorkspace.reset();
+      if (continuation) navigate(location.pathname + location.search, { replace: true, state: { successMessage: routeSuccessMessage } });
       setMessage(null);
       if (appliedImportAction && routeInvoiceImportKey) {
         setAppliedRouteInvoiceImportKey(routeInvoiceImportKey);

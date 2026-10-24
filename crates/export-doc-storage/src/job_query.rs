@@ -7,6 +7,35 @@ pub struct JobRetention<'a> {
     pub per_user: usize,
     pub global: usize,
 }
+pub struct JobOutputRetention {
+    pub global_bytes: u64,
+    pub per_user_bytes: u64,
+}
+
+pub(crate) fn expired_outputs(policy: &JobOutputRetention, pg: bool) -> Result<QuerySql> {
+    if policy.global_bytes == 0
+        || policy.per_user_bytes == 0
+        || policy.global_bytes > i64::MAX as u64
+        || policy.per_user_bytes > policy.global_bytes
+    {
+        return Err(Error::unavailable("文件任务容量保留边界无效。"));
+    }
+    let length = if pg {
+        "octet_length(f.content)"
+    } else {
+        "length(f.content)"
+    };
+    let timestamp = time(pg);
+    Ok(QuerySql { filter: format!("r.kind='background-jobs' AND r.id IN (
+        WITH outputs AS (SELECT r.id, r.owner_id, {timestamp} AS completed, SUM({length}) AS bytes
+            FROM records r JOIN files f ON f.record_id=r.id AND f.kind='job-output'
+            WHERE r.kind='background-jobs' AND NOT ({active}) GROUP BY r.id, r.owner_id, r.body),
+        users AS (SELECT *, SUM(bytes) OVER(PARTITION BY owner_id ORDER BY completed DESC,id DESC ROWS UNBOUNDED PRECEDING) AS user_bytes FROM outputs),
+        totals AS (SELECT *, SUM(CASE WHEN user_bytes<={user_limit} THEN bytes ELSE 0 END)
+            OVER(ORDER BY completed DESC,id DESC ROWS UNBOUNDED PRECEDING) AS total_bytes FROM users)
+        SELECT id FROM totals WHERE user_bytes>{user_limit} OR total_bytes>{global_limit})",
+        active=active(pg),user_limit=policy.per_user_bytes,global_limit=policy.global_bytes), order: "r.id", values: vec![] })
+}
 pub struct JobQuery<'a> {
     pub owner: Option<i64>,
     pub active: Option<bool>,

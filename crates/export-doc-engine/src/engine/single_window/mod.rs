@@ -135,7 +135,7 @@ pub fn handle(
         )?)
         .map_err(Into::into);
     }
-    let value=service.store.transaction(|tx|{
+    let value=service.store.transaction_for(actor, operation, &[], |tx, actor|{
         if operation==LIST_SINGLE_WINDOW_OPERATION_CENTER{
             return tracking::list(tx,actor,query);
         }

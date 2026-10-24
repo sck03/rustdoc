@@ -4,6 +4,8 @@ use super::{
     tasks::FileOutput,
 };
 use sha2::{Digest, Sha256};
+mod buffered;
+pub use buffered::{Budget, Reservation};
 use std::{
     fs,
     io::{Read, Seek, SeekFrom, Write},
@@ -15,7 +17,10 @@ pub const MAX_FILE_BYTES: u64 = u64::MAX;
 pub const TIMEOUT_SECONDS: u64 = 24 * 60 * 60;
 
 pub enum Download {
-    Memory(FileOutput),
+    Memory {
+        output: FileOutput,
+        reservation: Reservation,
+    },
     File {
         file_name: String,
         media_type: String,
@@ -34,7 +39,7 @@ impl Download {
             }
         })?;
         let metadata = file.metadata()?;
-        if !metadata.is_file() || metadata.len() == 0 || metadata.len() > MAX_FILE_BYTES {
+        if !metadata.is_file() || metadata.len() == 0 {
             return Err(invalid("备份文件为空、类型无效或超过可表示的文件大小。"));
         }
         if let Some((size, hash)) = expected {
@@ -60,7 +65,7 @@ impl Download {
     /// In-process callers have a bounded byte API; HTTP uses the file variant directly.
     pub fn into_memory(self) -> Result<FileOutput> {
         match self {
-            Self::Memory(file) => Ok(file),
+            Self::Memory { output, .. } => Ok(output),
             Self::File {
                 file_name,
                 media_type,

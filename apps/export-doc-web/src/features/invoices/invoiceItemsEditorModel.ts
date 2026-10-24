@@ -1,23 +1,20 @@
-import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiUnitDto } from "../../api/index.ts";
+import type { ApiInvoiceItemDto, ApiUnitDto } from "../../api/index.ts";
+import { ApiInvoiceEditingLimitsContractDefaults } from "../../api/index.ts";
 import { normalizeText, numberValue } from "../../ui/formUtils.ts";
 import { documentSpareKeys, mapDocumentSpareFields } from "../../ui/documentSpareFields.ts";
 import type { EditableInvoiceItemField, InvoiceItemColumnDefinition } from "./invoiceItemTableModel.ts";
 import { invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
+import { parseTabularClipboard } from "../../ui/tabularClipboard.ts";
+import { invoiceItemPriceCalculationModes, invoiceItemUnitPriceMaximumScale, invoiceItemUnitPriceStandardScale, invoiceItemWeightScale, invoiceItemVolumeScale, roundTo, roundUnitPrice, roundWeight, roundVolume, normalizePriceCalculationMode, normalizeInvoiceItemPrices, copyInvoiceItemWithTotals } from "./invoiceItemCalculation.ts";
+export { invoiceItemPriceCalculationModes, invoiceItemUnitPriceStandardScale, invoiceItemUnitPriceMaximumScale, invoiceItemWeightScale, invoiceItemVolumeScale, recalculateInvoiceItem, calculateInvoiceTotals, normalizePriceCalculationMode, hasChanged, roundMoney, roundTo, roundUnitPrice, roundWeight, roundVolume } from "./invoiceItemCalculation.ts";
+export type { InvoiceItemPriceCalculationMode } from "./invoiceItemCalculation.ts";
+export const maxInvoiceItemRows = ApiInvoiceEditingLimitsContractDefaults.maxItems;
 export type InvoiceItemCellSelection = { rowIndex: number; field: EditableInvoiceItemField };
 type UnitLookupSourceField = "unitEN" | "ctnUnitEN";
 const invoiceItemHeaderHeightPx = 42;
 const invoiceItemVirtualOverscanRows = 8;
 const invoiceItemRowHeightPx = 42;
 const blankWhenZeroInvoiceItemNumberFields = new Set<EditableInvoiceItemField>(["pcsPerCtn","cartons","length","width","height","volume","gwPerCtn","gwTotal","nwPerCtn","nwTotal","purchasePrice","purchaseTotal","taxRebateRate"]);
-export const invoiceItemPriceCalculationModes = {
-  unitPriceDriven: "UnitPriceDriven",
-  lineAmountDriven: "LineAmountDriven",
-} as const;
-export type InvoiceItemPriceCalculationMode = typeof invoiceItemPriceCalculationModes[keyof typeof invoiceItemPriceCalculationModes];
-export const invoiceItemUnitPriceStandardScale = 2;
-export const invoiceItemUnitPriceMaximumScale = 5;
-export const invoiceItemWeightScale = 2;
-export const invoiceItemVolumeScale = 3;
 const invoiceItemWeightFields = new Set<EditableInvoiceItemField>(["gwPerCtn", "gwTotal", "nwPerCtn", "nwTotal"]);
 
 export function isUnitLookupSourceField(field: EditableInvoiceItemField): field is UnitLookupSourceField {
@@ -228,12 +225,10 @@ export function sanitizeClipboardCell(value: string) {
 }
 
 export function parseInvoiceItemClipboardRows(text: string): string[][] {
-  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n+$/, "");
-  if (!normalized) {
-    return [];
-  }
-
-  return normalized.split("\n").map((line) => line.split("\t").map((cell) => cell.trim()));
+  return parseTabularClipboard(text.replace(/(?:\r?\n)+$/, ""), {
+    characters: 4 * 1024 * 1024, rows: maxInvoiceItemRows, columns: invoiceItemEditableColumns.length,
+    cells: maxInvoiceItemRows * invoiceItemEditableColumns.length,
+  }).map(row => row.map(cell => cell.trim()));
 }
 
 export function readItemTextValue(item: ApiInvoiceItemDto, field: EditableInvoiceItemField) {
@@ -347,143 +342,12 @@ export function createEmptyInvoiceItem(invoiceId = 0): ApiInvoiceItemDto {
   };
 }
 
-export function recalculateInvoiceItem(item: ApiInvoiceItemDto, changedFields: string[]): ApiInvoiceItemDto {
-  const next = { ...item };
-  const quantity = numberValue(next.quantity);
-  const cartons = numberValue(next.cartons);
-  const totalPriceChanged = hasChanged(changedFields, ["totalPrice"]);
-  const unitPriceChanged = hasChanged(changedFields, ["unitPrice"]);
-  const quantityChanged = hasChanged(changedFields, ["quantity"]);
-  const volumeChanged = hasChanged(changedFields, ["volume"]);
 
-  if (hasChanged(changedFields, ["gwPerCtn"])) {
-    next.gwPerCtn = roundWeight(numberValue(next.gwPerCtn));
-  }
-  if (hasChanged(changedFields, ["nwPerCtn"])) {
-    next.nwPerCtn = roundWeight(numberValue(next.nwPerCtn));
-  }
-  if (hasChanged(changedFields, ["gwTotal"])) {
-    next.gwTotal = roundWeight(numberValue(next.gwTotal));
-  }
-  if (hasChanged(changedFields, ["nwTotal"])) {
-    next.nwTotal = roundWeight(numberValue(next.nwTotal));
-  }
-  if (volumeChanged) {
-    next.volume = roundVolume(numberValue(next.volume));
-  }
-
-  if (totalPriceChanged) {
-    next.priceCalculationMode = invoiceItemPriceCalculationModes.lineAmountDriven;
-  } else if (unitPriceChanged) {
-    next.priceCalculationMode = invoiceItemPriceCalculationModes.unitPriceDriven;
-  } else {
-    next.priceCalculationMode = normalizePriceCalculationMode(next.priceCalculationMode);
-  }
-
-  if (hasChanged(changedFields, ["quantity", "pcsPerCtn"])) {
-    const pcsPerCtn = numberValue(next.pcsPerCtn);
-    if (pcsPerCtn > 0) {
-      next.cartons = Math.ceil(quantity / pcsPerCtn);
-    }
-  }
-
-  const effectiveCartons = numberValue(next.cartons ?? cartons);
-  if (quantityChanged || totalPriceChanged || unitPriceChanged) {
-    normalizeInvoiceItemPrices(next);
-  }
-
-  if (hasChanged(changedFields, ["quantity", "purchasePrice"])) {
-    next.purchaseTotal = roundMoney(quantity * numberValue(next.purchasePrice));
-  }
-
-  if (!volumeChanged && hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons", "length", "width", "height"])) {
-    next.volume =
-      numberValue(next.length) > 0 && numberValue(next.width) > 0 && numberValue(next.height) > 0 && effectiveCartons > 0
-        ? roundVolume((numberValue(next.length) * numberValue(next.width) * numberValue(next.height) * effectiveCartons) / 1000000)
-        : 0;
-  }
-
-  if (!hasChanged(changedFields, ["gwTotal"]) && hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons", "gwPerCtn"])) {
-    next.gwTotal =
-      numberValue(next.gwPerCtn) > 0 && effectiveCartons > 0
-        ? roundWeight(numberValue(next.gwPerCtn) * effectiveCartons)
-        : 0;
-  }
-
-  if (!hasChanged(changedFields, ["nwTotal"]) && hasChanged(changedFields, ["quantity", "pcsPerCtn", "cartons", "nwPerCtn"])) {
-    next.nwTotal =
-      numberValue(next.nwPerCtn) > 0 && effectiveCartons > 0
-        ? roundWeight(numberValue(next.nwPerCtn) * effectiveCartons)
-        : 0;
-  }
-
-  return next;
-}
-
-function normalizeInvoiceItemPrices(item: ApiInvoiceItemDto) {
-  const quantity = numberValue(item.quantity);
-  if (item.priceCalculationMode === invoiceItemPriceCalculationModes.lineAmountDriven) {
-    item.totalPrice = roundMoney(numberValue(item.totalPrice));
-    item.unitPrice = quantity > 0 ? roundUnitPrice(item.totalPrice / quantity) : 0;
-  } else {
-    item.unitPrice = roundUnitPrice(numberValue(item.unitPrice));
-    item.totalPrice = roundMoney(quantity * item.unitPrice);
-  }
-}
-
-export function calculateInvoiceTotals(
-  items: ApiInvoiceItemDto[],
-  exchangeRate?: number | null,
-  currency?: string,
-): Partial<ApiInvoiceDetailDto> {
-  const totals = items.reduce(
-    (current, item) => ({
-      amount: current.amount + numberValue(item.totalPrice),
-      cartons: current.cartons + numberValue(item.cartons),
-      grossWeight: current.grossWeight + numberValue(item.gwTotal),
-      netWeight: current.netWeight + numberValue(item.nwTotal),
-      purchaseAmount: current.purchaseAmount + numberValue(item.purchaseTotal),
-      quantity: current.quantity + numberValue(item.quantity),
-      taxRefundAmount:
-        current.taxRefundAmount + (numberValue(item.purchaseTotal) / 1.13) * (numberValue(item.taxRebateRate) / 100),
-      volume: current.volume + numberValue(item.volume),
-    }),
-    {
-      amount: 0,
-      cartons: 0,
-      grossWeight: 0,
-      netWeight: 0,
-      purchaseAmount: 0,
-      quantity: 0,
-      taxRefundAmount: 0,
-      volume: 0,
-    },
-  );
-
-  const configuredRate = numberValue(exchangeRate);
-  const finalAmount = roundMoney(totals.amount);
-  const effectiveRate = configuredRate > 0
-    ? configuredRate
-    : normalizeText(currency).toUpperCase() === "CNY"
-      ? 1
-      : 0;
-
-  return {
-    totalAmount: finalAmount,
-    totalCartons: roundMoney(totals.cartons),
-    totalGrossWeight: roundWeight(totals.grossWeight),
-    totalNetWeight: roundWeight(totals.netWeight),
-    totalProfit: effectiveRate > 0
-      ? roundMoney(finalAmount * effectiveRate - totals.purchaseAmount + totals.taxRefundAmount)
-      : 0,
-    totalPurchaseAmount: roundMoney(totals.purchaseAmount),
-    totalQuantity: roundMoney(totals.quantity),
-    totalTaxRefundAmount: roundMoney(totals.taxRefundAmount),
-    totalVolume: roundVolume(totals.volume),
-  };
-}
-
+const normalizedRows = new WeakMap<ApiInvoiceItemDto, { signature: string; value: ApiInvoiceItemDto }>();
 export function normalizeInvoiceItemForSave(item: ApiInvoiceItemDto): ApiInvoiceItemDto {
+  const signature = JSON.stringify(item);
+  const cached = normalizedRows.get(item);
+  if (cached?.signature === signature) return copyInvoiceItemWithTotals(cached.value);
   const normalized = {
     ...createEmptyInvoiceItem(numberValue(item.invoiceId)),
     ...item,
@@ -523,14 +387,10 @@ export function normalizeInvoiceItemForSave(item: ApiInvoiceItemDto): ApiInvoice
   };
 
   normalizeInvoiceItemPrices(normalized);
-  return normalized;
+  normalizedRows.set(item, { signature, value: normalized });
+  return copyInvoiceItemWithTotals(normalized);
 }
 
-export function normalizePriceCalculationMode(value?: string): InvoiceItemPriceCalculationMode {
-  return value?.trim().toLowerCase() === invoiceItemPriceCalculationModes.lineAmountDriven.toLowerCase()
-    ? invoiceItemPriceCalculationModes.lineAmountDriven
-    : invoiceItemPriceCalculationModes.unitPriceDriven;
-}
 
 export function isMeaningfulInvoiceItem(item: ApiInvoiceItemDto) {
   const textValues = [
@@ -569,28 +429,4 @@ export function isMeaningfulInvoiceItem(item: ApiInvoiceItemDto) {
   ];
 
   return item.id > 0 || textValues.some((value) => Boolean(value?.trim())) || numberValues.some((value) => numberValue(value) !== 0);
-}
-
-export function hasChanged(changedFields: string[], fields: string[]) {
-  return changedFields.some((field) => fields.includes(field));
-}
-
-export function roundMoney(value: number) {
-  return roundTo(value, 2);
-}
-
-export function roundUnitPrice(value: number) {
-  return roundTo(value, invoiceItemUnitPriceMaximumScale);
-}
-
-export function roundWeight(value: number) {
-  return roundTo(value, invoiceItemWeightScale);
-}
-
-export function roundVolume(value: number) {
-  return roundTo(value, invoiceItemVolumeScale);
-}
-
-export function roundTo(value: number, digits: number) {
-  return Number.isFinite(value) ? Number(value.toFixed(digits)) : 0;
 }

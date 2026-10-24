@@ -13,10 +13,11 @@ import { verifyReportPdfPreview } from "./lib/report-pdf-preview-http.mjs";
 
 // Real React + Rust HTTP regression. Uses the existing isolated review host.
 const repo = path.resolve(import.meta.dirname, "..");
+const appRoot = process.env.EXPORTDOCMANAGER_REVIEW_APP_ROOT ? path.resolve(process.env.EXPORTDOCMANAGER_REVIEW_APP_ROOT) : repo;
 const withNativePdf = process.argv.includes('--with-native-pdf');
 if (withNativePdf) {
   const library = process.platform === 'win32' ? 'pdfium.dll' : process.platform === 'darwin' ? 'libpdfium.dylib' : 'libpdfium.so';
-  assert(fs.existsSync(path.join(repo, 'Resources/Pdf', library)), 'PDF preview regression requires the governed native PDFium library in Resources/Pdf; see scripts/README.md.');
+  assert(fs.existsSync(path.join(appRoot, 'Resources/Pdf', library)), 'PDF preview regression requires governed PDFium resources in the selected application root; see scripts/README.md.');
 }
 const output = path.join(repo, "artifacts/invoice-report-ui", String(Date.now()));
 fs.mkdirSync(output, { recursive: true });
@@ -26,7 +27,7 @@ const model = path.join(output, "models.mjs");
 await require("esbuild").build({ stdin: { loader: "ts", resolveDir: web, contents: `export {createEmptyInvoice} from ${JSON.stringify(path.join(web,"src/features/invoices/invoiceModel.ts"))}; export {createEmptyInvoiceItem} from ${JSON.stringify(path.join(web,"src/features/invoices/invoiceItemsEditorModel.ts"))};` }, bundle: true, platform: "node", format: "esm", outfile: model });
 const { createEmptyInvoice, createEmptyInvoiceItem } = await import(pathToFileURL(model).href);
 const executable = cargoExampleExecutable(repo, 'office_review');
-const server = spawnProcessTree(executable, [path.join(output, "Data")], { cwd: repo, windowsHide: true, stdio: ["ignore","pipe","pipe"] });
+const server = spawnProcessTree(executable, [path.join(output, "Data"), appRoot], { cwd: repo, windowsHide: true, stdio: ["ignore","pipe","pipe"] });
 let chrome, cdp, page;
 const run = async expression => (await evaluate(page, expression, true)).value;
 async function wait(expression, message) {

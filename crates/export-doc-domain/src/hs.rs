@@ -51,16 +51,45 @@ mod lifecycle_tests {
         assert!(!cleanup_eligible(&row, anniversary));
     }
 }
+/// Read model for matching; it cannot be mistaken for a complete writable API DTO.
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Standard {
+    pub code: String,
+    pub name: String,
+    pub description: String,
+    pub elements: String,
+    pub status: String,
+    pub source_name: String,
+    pub effective_year: Option<i64>,
+    pub last_verified_at: Option<String>,
+}
+impl Standard {
+    pub fn trusted(&self) -> bool {
+        trusted_evidence(
+            &self.status,
+            &self.source_name,
+            self.effective_year,
+            self.last_verified_at.as_deref(),
+        )
+    }
+    pub fn current(&self, year: i32) -> bool {
+        self.trusted() && self.effective_year == Some(i64::from(year))
+    }
+}
+fn trusted_evidence(status: &str, source: &str, year: Option<i64>, verified: Option<&str>) -> bool {
+    status.eq_ignore_ascii_case("Active")
+        && !source.trim().is_empty()
+        && year.is_some_and(|year| (2000..=2100).contains(&year))
+        && verified.is_some_and(|date| !date.is_empty())
+}
 pub fn trusted(row: &ApiHsCodeDto) -> bool {
-    row.status.eq_ignore_ascii_case("Active")
-        && !row.source_name.trim().is_empty()
-        && row
-            .effective_year
-            .is_some_and(|year| (2000..=2100).contains(&year))
-        && row
-            .last_verified_at
-            .as_deref()
-            .is_some_and(|date| !date.is_empty())
+    trusted_evidence(
+        &row.status,
+        &row.source_name,
+        row.effective_year,
+        row.last_verified_at.as_deref(),
+    )
 }
 pub fn current(row: &ApiHsCodeDto, year: i32) -> bool {
     trusted(row) && row.effective_year == Some(i64::from(year))

@@ -166,7 +166,7 @@ fn original_v3_flow_blocks_validate_and_round_trip() {
         &mut design,
         "conditional-1",
         "Conditional",
-        ReportBlock::Conditional(crate::designer::ReportConditionalBlock {
+        ReportBlock::Conditional(Box::new(crate::designer::ReportConditionalBlock {
             id: "conditional-1".into(),
             output: None,
             condition: ConditionalRule {
@@ -187,7 +187,7 @@ fn original_v3_flow_blocks_validate_and_round_trip() {
             },
             style: ReportTextStyle::default(),
             border: None,
-        }),
+        })),
         10000,
     );
     append_flow(

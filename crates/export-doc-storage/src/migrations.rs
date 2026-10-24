@@ -28,6 +28,11 @@ const MIGRATIONS: &[Migration] = &[
         #[cfg(feature = "postgres")]
         postgres: include_str!("migrations/007-postgres.sql"),
     },
+    Migration {
+        sqlite: include_str!("migrations/008-sqlite.sql"),
+        #[cfg(feature = "postgres")]
+        postgres: include_str!("migrations/008-postgres.sql"),
+    },
 ];
 
 pub(crate) fn pending(version: i64) -> Result<&'static [Migration]> {

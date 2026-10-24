@@ -89,8 +89,7 @@ fn receive_file(config: &Config, file_name: &str, mut writer: fs::File) -> Resul
         }
         total = total
             .checked_add(length as u64)
-            .filter(|total| *total <= MAX_TRANSFER_BYTES)
-            .ok_or_else(|| invalid("WebDAV 备份超过 4 GiB 下载上限。"))?;
+            .ok_or_else(|| invalid("WebDAV 备份大小超出可表示范围。"))?;
         writer.write_all(&buffer[..length])?;
     }
     if total == 0 {

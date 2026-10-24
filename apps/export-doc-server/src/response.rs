@@ -15,6 +15,7 @@ pub struct Reply {
     pub cookie: Option<String>,
     pub stream: Option<(std::fs::File, u64)>,
     pub download_permit: Option<tokio::sync::OwnedSemaphorePermit>,
+    pub memory_reservation: Option<export_doc_engine::engine::backup_io::Reservation>,
 }
 impl Reply {
     pub fn bytes(bytes: Vec<u8>) -> Self {
@@ -24,6 +25,7 @@ impl Reply {
             cookie: None,
             stream: None,
             download_permit: None,
+            memory_reservation: None,
         }
     }
     pub fn file(file: FileOutput) -> Self {
@@ -33,11 +35,19 @@ impl Reply {
             cookie: None,
             stream: None,
             download_permit: None,
+            memory_reservation: None,
         }
     }
     pub fn download(download: export_doc_engine::engine::backup_io::Download) -> Self {
         match download {
-            export_doc_engine::engine::backup_io::Download::Memory(file) => Self::file(file),
+            export_doc_engine::engine::backup_io::Download::Memory {
+                output,
+                reservation,
+            } => {
+                let mut reply = Self::file(output);
+                reply.memory_reservation = Some(reservation);
+                reply
+            }
             export_doc_engine::engine::backup_io::Download::File {
                 file_name,
                 media_type,
@@ -49,6 +59,7 @@ impl Reply {
                 cookie: None,
                 stream: Some((file, size)),
                 download_permit: None,
+                memory_reservation: None,
             },
         }
     }
@@ -120,7 +131,10 @@ pub fn success(
                 (Box::new(tokio::fs::File::from_std(file).take(size)), size)
             } else {
                 let size = reply.bytes.len() as u64;
-                (Box::new(std::io::Cursor::new(reply.bytes)), size)
+                (
+                    crate::download_body::memory_source(reply.bytes, reply.memory_reservation),
+                    size,
+                )
             };
         let mut response = Response::new(crate::download_body::body(
             source,

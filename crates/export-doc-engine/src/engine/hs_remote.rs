@@ -54,7 +54,7 @@ pub fn handle(
         let bundle = search_bundle(&keyword, &observed)?;
         operation::check()?;
         if operation == CAPTURE_REMOTE_HS_CODES {
-            capture(service, actor, &keyword, &bundle)?;
+            capture(service, actor, operation, &keyword, &bundle)?;
         }
         return Ok(search_response(
             &bundle,
@@ -212,7 +212,13 @@ fn resolve(
     for keyword in &detail.recommended_keywords {
         operation::check()?;
         let bundle = search_bundle(keyword, observed)?;
-        capture(service, actor, &seed.name, &bundle)?;
+        capture(
+            service,
+            actor,
+            RESOLVE_REMOTE_HS_CODE_DETAIL,
+            &seed.name,
+            &bundle,
+        )?;
         let items = standard_items(&bundle);
         for item in items {
             let replacement = export_doc_hs::detail(&item, observed, &check);
@@ -245,65 +251,71 @@ fn resolve(
 fn capture(
     service: &NativeService,
     actor: &Actor,
+    operation: Operation,
     query: &str,
     bundle: &SearchBundle,
 ) -> Result<()> {
-    service.store.transaction(|tx| {
-        let codes = hs::codes_for_year(tx, service.clock.now().map_err(unavailable)?.today.year())?;
-        let relations = store::all(tx, hs::REPLACEMENTS)?;
-        for record in bundle
-            .records
-            .iter()
-            .filter(|record| record.kind == RemoteRecordKind::DeclarationExample)
-        {
-            operation::check()?;
-            let raw = rules::code(&record.item.code).map_err(invalid)?;
-            let name = export_doc_domain::crm::text(&record.item.name, "参考商品名称", 300, true)
-                .map_err(invalid)?;
-            let spec =
-                export_doc_domain::crm::text(&record.item.description, "参考规格", 1500, false)
-                    .map_err(invalid)?;
-            let fingerprint = rules::fingerprint(&[&raw, &name, &spec]);
-            let previous = tx.find_identity(hs::CANDIDATES, &fingerprint.to_ascii_lowercase())?;
-            let id = previous
-                .as_ref()
-                .and_then(|row| row["id"].as_i64())
-                .unwrap_or(0);
-            let resolved = hs_search::resolve(&raw, "", false, &codes, &relations);
-            let now = store::timestamp();
-            let mut row = previous.unwrap_or_else(|| {
-                json!({
-                    "fingerprint": fingerprint,
-                    "rawReportedHsCode": raw,
-                    "productName": name,
-                    "specification": spec,
-                    "source": export_doc_hs::SOURCE,
-                    "sourceUrl": record.evidence_url,
-                    "reviewStatus": "Pending",
-                    "firstSeenAt": now,
-                    "reviewedAt": null,
-                    "seenCount": 0
-                })
-            });
-            row["queryText"] = json!(query);
-            row["lastSeenAt"] = json!(now);
-            row["seenCount"] = json!(row["seenCount"].as_i64().unwrap_or(0).saturating_add(1));
-            if row["reviewStatus"] == "Pending" {
-                row["suggestedCurrentHsCode"] = json!(resolved.code);
-                row["resolutionStatus"] = json!(resolved.status);
+    service
+        .store
+        .transaction_for(actor, operation, &[], |tx, actor| {
+            let codes =
+                hs::codes_for_year(tx, service.clock.now().map_err(unavailable)?.today.year())?;
+            let relations = store::all(tx, hs::REPLACEMENTS)?;
+            for record in bundle
+                .records
+                .iter()
+                .filter(|record| record.kind == RemoteRecordKind::DeclarationExample)
+            {
+                operation::check()?;
+                let raw = rules::code(&record.item.code).map_err(invalid)?;
+                let name =
+                    export_doc_domain::crm::text(&record.item.name, "参考商品名称", 300, true)
+                        .map_err(invalid)?;
+                let spec =
+                    export_doc_domain::crm::text(&record.item.description, "参考规格", 1500, false)
+                        .map_err(invalid)?;
+                let fingerprint = rules::fingerprint(&[&raw, &name, &spec]);
+                let previous =
+                    tx.find_identity(hs::CANDIDATES, &fingerprint.to_ascii_lowercase())?;
+                let id = previous
+                    .as_ref()
+                    .and_then(|row| row["id"].as_i64())
+                    .unwrap_or(0);
+                let resolved = hs_search::resolve(&raw, "", false, &codes, &relations);
+                let now = store::timestamp();
+                let mut row = previous.unwrap_or_else(|| {
+                    json!({
+                        "fingerprint": fingerprint,
+                        "rawReportedHsCode": raw,
+                        "productName": name,
+                        "specification": spec,
+                        "source": export_doc_hs::SOURCE,
+                        "sourceUrl": record.evidence_url,
+                        "reviewStatus": "Pending",
+                        "firstSeenAt": now,
+                        "reviewedAt": null,
+                        "seenCount": 0
+                    })
+                });
+                row["queryText"] = json!(query);
+                row["lastSeenAt"] = json!(now);
+                row["seenCount"] = json!(row["seenCount"].as_i64().unwrap_or(0).saturating_add(1));
+                if row["reviewStatus"] == "Pending" {
+                    row["suggestedCurrentHsCode"] = json!(resolved.code);
+                    row["resolutionStatus"] = json!(resolved.status);
+                }
+                store::save(
+                    tx,
+                    hs::CANDIDATES,
+                    id,
+                    row,
+                    Some(fingerprint),
+                    actor,
+                    if id == 0 { "create" } else { "edit" },
+                )?;
             }
-            store::save(
-                tx,
-                hs::CANDIDATES,
-                id,
-                row,
-                Some(fingerprint),
-                actor,
-                if id == 0 { "create" } else { "edit" },
-            )?;
-        }
-        Ok(())
-    })
+            Ok(())
+        })
 }
 
 fn capture_detail(
@@ -327,7 +339,13 @@ fn capture_detail(
             }]
         },
     };
-    capture(service, actor, &seed.name, &bundle)
+    capture(
+        service,
+        actor,
+        RESOLVE_REMOTE_HS_CODE_DETAIL,
+        &seed.name,
+        &bundle,
+    )
 }
 
 #[cfg(test)]

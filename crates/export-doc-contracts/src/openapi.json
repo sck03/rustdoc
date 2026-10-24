@@ -25382,6 +25382,17 @@
               ],
               "format": "int32"
             }
+          },
+          {
+            "name": "productCode",
+            "in": "query",
+            "required": false,
+            "description": "Exact normalized product code; authorization applies before returning the match.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
           }
         ],
         "responses": {
@@ -80313,6 +80324,37 @@
               "format": "int64",
               "minimum": 0
             }
+          },
+          "retainedOutputBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "downloadMemory": {
+            "type": "object",
+            "properties": {
+              "capacityBytes": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "reservedBytes": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "rejections": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "capacityBytes",
+              "reservedBytes",
+              "rejections"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -80320,7 +80362,9 @@
           "workerHandles",
           "stopping",
           "failed",
-          "persistedCounts"
+          "persistedCounts",
+          "retainedOutputBytes",
+          "downloadMemory"
         ],
         "additionalProperties": false
       },
@@ -81077,6 +81121,20 @@
               "string"
             ],
             "format": "double"
+          }
+        }
+      },
+      "ApiInvoiceEditingLimitsContract": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "maxItems"
+        ],
+        "properties": {
+          "maxItems": {
+            "type": "integer",
+            "const": 5000,
+            "default": 5000
           }
         }
       }

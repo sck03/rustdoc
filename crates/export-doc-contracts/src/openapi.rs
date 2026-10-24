@@ -6,10 +6,12 @@ mod communication;
 mod dashboard;
 mod exchange;
 mod hs_lifecycle;
+mod invoice_editing;
 mod observability;
 mod office;
 mod payment_printing;
 mod personnel;
+mod product_queries;
 mod report_preview;
 mod reports;
 use serde_json::Value;
@@ -29,6 +31,8 @@ pub fn document() -> Value {
     exchange::extend(&mut document);
     hs_lifecycle::extend(&mut document);
     dashboard::extend(&mut document);
+    product_queries::extend(&mut document);
+    invoice_editing::extend(&mut document);
     // The frozen baseline remains read-only; retired products leave the live catalog.
     document["x-exportdoc-permissions"]["editions"]
         .as_object_mut()
@@ -54,6 +58,10 @@ mod tests {
     fn preserves_every_reference_schema_endpoint_and_security_contract() {
         let baseline: Value = serde_json::from_str(include_str!("reference_openapi.json")).unwrap();
         let mut current = document();
+        let parameters = current["paths"]["/api/master-data/products"]["get"]["parameters"]
+            .as_array_mut()
+            .unwrap();
+        assert_eq!(parameters.pop().unwrap()["name"], "productCode");
         // The catalog now serves output users as well as template designers;
         // the use case additionally checks the requested document data domain.
         assert_eq!(

@@ -85,7 +85,7 @@ pwsh -NoProfile -File scripts/package-native-web-server.ps1 -Version 1.2.3 -NoPa
 
 桌面业务库统一位于 `App_Data/Database/exportdoc-native.db`，实例锁位于 `App_Data/Locks`。旧位置 `App_Data/exportdoc-native.db` 中受支持的数据库会通过 SQLite 快照自动搬入 Database，原文件保留在 `Backups/DatabaseLayout`；新旧两处同时有库则停止并提示核对。不要手工只移动正在使用的主文件：它可能还有未合并的 WAL。WebView 内部数据库保留在 `WebView` profile 中。
 
-便携包重复构建会保留已有 `App_Data`。Rust 数据库从版本 5 起逐版升级，当前为 7；只有数据库不存在才新建，已有库失败不覆盖。版本 4 及以前不做兼容：确认无需使用后，先退出程序并将原 `App_Data` 整体另存，再启动初始化。不要直接修改版本标记。初始化错误及启动期 panic 会显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；运行目录不可写时提示备用日志位置或日志写入失败。
+便携包重复构建会保留已有 `App_Data`。Rust 数据库从版本 5 起逐版升级，当前为 8；只有数据库不存在才新建，已有库失败不覆盖。版本 4 及以前不做兼容：确认无需使用后，先退出程序并将原 `App_Data` 整体另存，再启动初始化。不要直接修改版本标记。初始化错误及启动期 panic 会显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；运行目录不可写时提示备用日志位置或日志写入失败。
 
 Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便携包携带原版固定清单验证的微软离线安装器；缺少 WebView2 时显示安装／退出选择，保留取消、繁忙、超时和需重启处理。构建时核对微软签名、版本、大小和 SHA-256。Windows GNU 构建同时携带 `WebView2Loader.dll`。
 
@@ -113,9 +113,9 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 源码脚本的启动／更新经过：准备镜像 → 停 API → 等数据库就绪 → 独立维护容器初始化/逐版升级 → 启 API 并检查就绪。构建及缺失镜像取得在停 API 前完成，失败不打断原应用；已有/离线镜像按 missing 策略复用。原 `compose.yml` 的维护服务仍由脚本显式运行，`-SkipBuild` 复用已有镜像。新版 `compose.image.yml` 则声明初始化完成依赖，支持直接 Compose 启动；升级时先 pull，再 down（不删卷）及 up。两种入口的恢复失败均保留 API 停止状态。
 
-应用 schema 升级与 PostgreSQL 软件主版本升级是两件事：当前 Rust schema 为 7，从 5 开始按顺序事务升级；模板权限调整不改变 schema 或备份格式。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。升级前在界面导出备份/完整迁移包并保存在本机故障之外的位置。
+应用 schema 升级与 PostgreSQL 软件主版本升级是两件事：当前 Rust schema 为 8，从 5 开始按顺序事务升级；模板权限调整不改变 schema 或备份格式。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。升级前在界面导出备份/完整迁移包并保存在本机故障之外的位置。
 
-首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／升级／恢复使用。桌面 SQLite 空库仍为 admin 空密码；当前数据库版本 7，支持从 Rust 版本 5 升级，不兼容 C# v19 或版本 4 及更早试验库。
+首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／升级／恢复使用。桌面 SQLite 空库仍为 admin 空密码；当前数据库版本 8，支持从 Rust 版本 5 升级，不兼容 C# v19 或版本 4 及更早试验库。
 
 ## 远端入口
 
@@ -130,6 +130,12 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 `test-native-postgres.ps1 -PostgresBin <PostgreSQL-18-bin>` 默认执行存储、团队业务及恢复实库契约，可用 `-Scope Storage` 或 `-Scope Engine` 定向验证。`-Scope Capacity` 是独立的 20 会话负载：使用新建的隔离数据库比较 1/4 连接，包含查询、发票保存、人员关联后的报销提交/审批及 PDF 导出。运行前需准备前端 npm 依赖和随包字体；脚本构建实际 Debug HTTP 服务，原数据库和便携数据不参与测试。输出吞吐、P95/P99、HTTP 状态、内存及指标快照到 `.codex-runtime/native-capacity`，不把 Debug 场景当成生产 SLA。
 
 存储故障演练分别终止隔离库的实例锁连接和业务连接，验证已提交数据保留、未提交写入回滚及重建连接池耗时；测试维护账号的 `pg_signal_backend` 仅在临时测试集群授予，生产部署不授予。升级失败和损坏备份保持失败与回滚边界。连接重建的恢复点与从备份恢复的时间点分别记录，生产备份频率和设备故障演练由部署环境制定。
+
+### 文件任务结果容量
+
+任务记录与生成文件分别保留。普通数据库文件结果默认全局 512 MiB、每用户 128 MiB；先保留较新的结果，超限回收旧 BLOB，保留成功状态和历史并提示重新生成。既有 30 天／全局 2000 条／每用户 200 条的任务历史策略继续执行。受管完整备份、服务器迁移包及业务附件不由此策略删除。
+
+`EXPORTDOCMANAGER_JOB_OUTPUT_MIB` 和 `EXPORTDOCMANAGER_JOB_USER_OUTPUT_MIB` 分别设置两项容量（64–1048576 MiB，个人不能大于全局），无效配置拒绝启动；Docker 对应 `NATIVE_JOB_OUTPUT_MIB`／`NATIVE_JOB_USER_OUTPUT_MIB`。数据库任务下载在加载内容前共用 128 MiB 内存预算，繁忙返回 429，传输结束或失败归还。管理员指标的 `jobs.retainedOutputBytes` 和 `jobs.downloadMemory` 用于观察实际容量及预留。
 
 ### 备份、迁移与恢复
 
@@ -169,6 +175,10 @@ Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公
 
 ## 验证和证据
 
+`npm --prefix apps/export-doc-web run test:invoice-editing` 读取与 Rust 共用的金额夹具，验证精确运算、TSV 和保存基线，再运行真实 React hook 的延迟、切换、卸载、刷新失败、重复提交与精确商品查询。`test:document-editor-ui` 另检查实际发票页面的新建跳转和二次保存。普通 Rust/Chromium CI 已加入这些回归及 Clippy；Firefox/WebKit 继续保留手动入口。
+
+实际 PDF 页图回归可设置 `EXPORTDOCMANAGER_REVIEW_APP_ROOT` 为本批组装的应用包根，直接复用包内受管 PDFium、字体和模板；`office_review` 的第二个可选参数对应此 AppRoot，第一个参数仍是独立测试 DataRoot，React 静态文件继续来自仓库构建。缺少原生库时专项明确失败。
+
 开发时通过 `generate-api-client.ps1` 调用 `cargo run --locked -p export-doc-contracts --example generate_clients`，由 Rust 从同一 OpenAPI 文档生成 Rust 与 React 客户端；`-Check` 只校验生成文件。`crates/export-doc-contracts/src/reference_openapi.json` 是保留的官方 .NET 基线，新增能力只修改 Rust 组合器，不能覆盖生成文件或另建前端 URL/schema。`-OpenApiPath` 可指定已审阅的输入，并同时更新两端；不需要 .NET SDK。Rust 生成器回归随 workspace tests 执行，校验完整生成结果、端点策略、上传下载、请求头、默认值和类型投影；请求运行行为由现有 React/API 测试校验。
 
 OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --example office_review`，再执行 `npm --prefix apps/export-doc-web run test:oa-ui`。回环测试宿主使用独立 DataRoot，覆盖六类申请、附件、办理记录、窄屏，以及管理员规则设置、多级审批、有效代理、手动催办和财务接收；不代替 PostgreSQL 18 或 Tauri 验收。公告通知与审批界面共用测试宿主/浏览器生命周期，正式业务仍使用同一 Rust 服务。
@@ -177,7 +187,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 
 发票印章与模板预览回归复用该隔离宿主：先构建 React 和 `office_review`，再运行 `node scripts/test_invoice_report_ui.mjs`，验证无出口商关联的上传按钮、图片保存回读及样例/真实单据的原生排版。
 
-实际 PDF 页图专项使用 `node scripts/test_invoice_report_ui.mjs --with-native-pdf`，验证多页翻页、修订变化、越界及未登录拒绝和真实 React 翻页。运行前将当前平台/架构的受管 PDFium 库放入仓库 `Resources/Pdf`（Windows 为 `pdfium.dll`，Linux 为 `libpdfium.so`，macOS 为 `libpdfium.dylib`）；来源须为本项目锁定摘要的原生包，或由 `build-native.ps1` 组装的对应测试包，不能使用未审核下载。缺库时该专项明确失败；普通 SVG/krilla 回归不要求 PDFium。专项结束后可移除这份测试库副本，受管下载缓存继续保留。
+实际 PDF 页图专项使用 `node scripts/test_invoice_report_ui.mjs --with-native-pdf`，验证多页翻页、修订变化、越界及未登录拒绝和真实 React 翻页。优先将 `EXPORTDOCMANAGER_REVIEW_APP_ROOT` 指向 `build-native.ps1` 组装的当前平台/架构测试包，直接读取包内 `Resources/Pdf`（Windows 为 `pdfium.dll`，Linux 为 `libpdfium.so`，macOS 为 `libpdfium.dylib`）。未设置时使用仓库 AppRoot，其资源也必须来自本项目锁定摘要的原生包；不要求复制或清理包内原生库。缺库时该专项明确失败；普通 SVG/krilla 回归不要求 PDFium。
 
 付款模板和真实 PDF 使用 `npm --prefix apps/export-doc-web run test:payment-printing-ui`，发票使用 `test:invoice-report-ui`，多模板 ZIP 和多附件使用 `test:batch-file-ui`；均要求先完成 React build 和 `cargo build --locked -p export-doc-server --example office_review`。批量回归包含六份模板的空白组件重建、原生样例/长明细输出对照、同一发票选择超过三种模板、逐模板权限与附件字节回读。付款回归覆盖个人模板、权限、预览失效、保存/取消和下载，生成的 PDF 仍须检查真实票面。
 

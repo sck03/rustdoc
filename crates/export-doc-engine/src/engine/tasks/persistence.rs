@@ -245,6 +245,7 @@ pub fn download(
     store: &Store,
     actor: &Actor,
     id: &str,
+    budget: &std::sync::Arc<super::super::backup_io::Budget>,
 ) -> Result<super::super::backup_io::Download> {
     let connection = store.connection()?;
     let job = checked(&connection, actor, id)?;
@@ -258,17 +259,28 @@ pub fn download(
     let record_id = job["id"]
         .as_i64()
         .ok_or_else(|| unavailable("任务记录编号缺失。"))?;
+    let info = connection
+        .blob_info(record_id, OUTPUT)?
+        .ok_or_else(|| unavailable("任务输出缺失。"))?;
+    let reservation = budget
+        .reserve(usize::try_from(info.size).map_err(|_| unavailable("任务输出大小无效。"))?)?;
     let blob = connection
         .blob(record_id, OUTPUT)?
         .ok_or_else(|| unavailable("任务输出缺失，不能提供不完整结果。"))?;
-    if digest(&blob.content) != blob.digest {
+    if blob.content.len() as u64 != info.size
+        || blob.digest != info.digest
+        || digest(&blob.content) != blob.digest
+    {
         return Err(unavailable("任务输出完整性校验失败。"));
     }
-    Ok(super::super::backup_io::Download::Memory(FileOutput {
-        file_name: blob.file_name,
-        media_type: blob.media_type,
-        content: blob.content,
-    }))
+    Ok(super::super::backup_io::Download::Memory {
+        output: FileOutput {
+            file_name: blob.file_name,
+            media_type: blob.media_type,
+            content: blob.content,
+        },
+        reservation,
+    })
 }
 pub fn cancel(store: &Store, actor: &Actor, id: &str) -> Result<()> {
     store.transaction(|connection| {
@@ -301,6 +313,21 @@ pub(super) fn remove(connection: &Connection, actor: &Actor, job: Value) -> Resu
     if !connection.delete(KIND, id, store::expected(&job))? {
         return Err(conflict("任务已变化，请重试。"));
     }
+    Ok(())
+}
+pub(super) fn expire_output(connection: &Connection, id: i64) -> Result<()> {
+    let mut job = store::get(connection, KIND, id)?;
+    if active(&job) {
+        return Err(conflict("活动任务的输出不能回收。"));
+    }
+    let actor = owner(&job)?;
+    connection.delete_blob(id, OUTPUT)?;
+    job["outputPath"] = json!("");
+    let detail = text(&job, "detailText");
+    job["detailText"] = json!(format!(
+        "{detail} 文件结果已按容量保留策略回收，请重新生成。"
+    ));
+    save(connection, &actor, job, "expire-output")?;
     Ok(())
 }
 pub fn delete(store: &Store, actor: &Actor, id: &str) -> Result<()> {

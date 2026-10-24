@@ -34,7 +34,7 @@ fn detail_table(template: Builtin) -> export_doc_domain::designer::DetailTable {
             Kind::Flow {
                 block: ReportBlock::DetailTable(table),
                 ..
-            } => Some(table),
+            } => Some(*table),
             _ => None,
         })
         .unwrap()

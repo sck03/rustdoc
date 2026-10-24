@@ -57,10 +57,9 @@ pub(in crate::engine::team_backup) fn seal(
         buffer.clear();
         input.by_ref().take(CHUNK as u64).read_to_end(&mut buffer)?;
         let size = buffer.len();
-        written += (4 + size + TAG) as u64;
-        if written > MAX_PACKAGE_BYTES {
-            return Err(invalid("迁移包文件超过可表示的文件大小。"));
-        }
+        written = written
+            .checked_add((4 + size + TAG) as u64)
+            .ok_or_else(|| invalid("迁移包大小计数溢出。"))?;
         let length = (size as u32).to_le_bytes();
         aad[header.len()..].copy_from_slice(&length);
         let tag = cipher
@@ -110,8 +109,10 @@ pub(in crate::engine::team_backup) fn open(
         let mut length = [0; 4];
         exact(&mut input, &mut length)?;
         let size = u32::from_le_bytes(length) as usize;
-        consumed += (4 + size + TAG) as u64;
-        if size > CHUNK || consumed > MAX_PACKAGE_BYTES || (partial && size != 0) {
+        consumed = consumed
+            .checked_add((4 + size + TAG) as u64)
+            .ok_or_else(|| invalid("迁移包大小计数溢出。"))?;
+        if size > CHUNK || (partial && size != 0) {
             return Err(invalid("迁移包块长度或容量无效。"));
         }
         buffer.resize(size, 0);

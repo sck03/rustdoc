@@ -97,35 +97,38 @@ pub fn handle(
     if operation == COLLECT_SINGLE_WINDOW_CLIENT_RECEIPTS {
         return collect(service, actor, id);
     }
-    let (row, profile, outbox, package) = service.store.transaction(|tx| {
-        let mut row = tracking::get(tx, actor, id, "operate")?;
-        let (profile, business) = binding(service, tx, actor, &row)?;
-        let outbox = directory(service, &profile, business)?.join("OutBox");
-        let package = tracking::archived(tx, &row)?;
-        tracking::verify(service, &row, &package.manifest, false)?;
-        if row["status"] == "QueuedToClient" {
-            return Ok((row, profile, outbox, package));
-        }
-        if row["clientDispatchAttemptCount"].as_i64().unwrap_or(0) > 0 {
-            return Err(error(
-                409,
-                "此批次已经尝试派发；请核对客户端收件状态后新建提交版本，避免重复申报。",
-            ));
-        }
-        if row["status"] != "SubmitPackageImported" {
-            return Err(error(
-                409,
-                "请先导入提交包并确认当前持卡机，再送入官方客户端。",
-            ));
-        }
-        row["status"] = json!("ClientDispatching");
-        row["clientDispatchOperationId"] = json!(nonce().map_err(unavailable)?);
-        row["clientDispatchAttemptCount"] = json!(1);
-        row["clientDispatchLeaseUntil"] =
-            json!((chrono::Utc::now() + chrono::Duration::seconds(60)).to_rfc3339());
-        let row = tracking::save(tx, actor, row, None)?;
-        Ok((row, profile, outbox, package))
-    })?;
+    let (row, profile, outbox, package) =
+        service
+            .store
+            .transaction_for(actor, operation, &[], |tx, actor| {
+                let mut row = tracking::get(tx, actor, id, "operate")?;
+                let (profile, business) = binding(service, tx, actor, &row)?;
+                let outbox = directory(service, &profile, business)?.join("OutBox");
+                let package = tracking::archived(tx, &row)?;
+                tracking::verify(service, &row, &package.manifest, false)?;
+                if row["status"] == "QueuedToClient" {
+                    return Ok((row, profile, outbox, package));
+                }
+                if row["clientDispatchAttemptCount"].as_i64().unwrap_or(0) > 0 {
+                    return Err(error(
+                        409,
+                        "此批次已经尝试派发；请核对客户端收件状态后新建提交版本，避免重复申报。",
+                    ));
+                }
+                if row["status"] != "SubmitPackageImported" {
+                    return Err(error(
+                        409,
+                        "请先导入提交包并确认当前持卡机，再送入官方客户端。",
+                    ));
+                }
+                row["status"] = json!("ClientDispatching");
+                row["clientDispatchOperationId"] = json!(nonce().map_err(unavailable)?);
+                row["clientDispatchAttemptCount"] = json!(1);
+                row["clientDispatchLeaseUntil"] =
+                    json!((chrono::Utc::now() + chrono::Duration::seconds(60)).to_rfc3339());
+                let row = tracking::save(tx, actor, row, None)?;
+                Ok((row, profile, outbox, package))
+            })?;
     if row["status"] != "QueuedToClient" {
         let result = (|| -> Result<()> {
             ensure_safe_absolute(&outbox).map_err(invalid)?;
@@ -177,12 +180,17 @@ pub fn handle(
 }
 
 fn collect(service: &NativeService, actor: &Actor, id: i64) -> Result<Value> {
-    let (row, root, business) = service.store.transaction(|tx| {
-        let row = tracking::get(tx, actor, id, "operate")?;
-        let (profile, business) = binding(service, tx, actor, &row)?;
-        let root = directory(service, &profile, business)?;
-        Ok((row, root, business))
-    })?;
+    let (row, root, business) = service.store.read_for(
+        actor,
+        COLLECT_SINGLE_WINDOW_CLIENT_RECEIPTS,
+        &[],
+        |tx, actor| {
+            let row = tracking::get(tx, actor, id, "operate")?;
+            let (profile, business) = binding(service, tx, actor, &row)?;
+            let root = directory(service, &profile, business)?;
+            Ok((row, root, business))
+        },
+    )?;
     let mut selected = BTreeSet::new();
     let mut inspected = 0;
     for name in ["InBox", "FailBox"] {

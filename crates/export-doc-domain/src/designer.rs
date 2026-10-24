@@ -631,7 +631,7 @@ impl Design {
             "details",
             Kind::Flow {
                 flow_kind: "DetailTable".into(),
-                block: ReportBlock::DetailTable(DetailTable {
+                block: ReportBlock::DetailTable(Box::new(DetailTable {
                     id: "detail-block".into(),
                     row_separators: None,
                     r#type: "DetailTable".into(),
@@ -660,7 +660,7 @@ impl Design {
                         width_px: 0.2,
                         ..Default::default()
                     },
-                }),
+                })),
             },
             [1000, 7000, 19000, 13500],
             9.,

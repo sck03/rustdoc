@@ -5,7 +5,7 @@ import ${source("styles/workspaces.css")}; import ${source("styles/responsive.cs
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { mockIPC } from '@tauri-apps/api/mocks';
 import { PermissionAccessProvider } from ${source("app/PermissionAccessContext.tsx")};
 import { permissionResources, permissionActions } from ${source("app/permissionCatalog.ts")};
@@ -40,7 +40,14 @@ let payment={...createEmptyPayment(date),id:9,invoiceNo:'PAY-2026-091',paymentMe
 const custom={PaymentMethod:['支票','电汇','预付'],PaymentPayerName:[],Currency:['USD','CNY'],SupervisionMode:['一般贸易'],PaymentTerms:['T/T']};
 const record=(name,input,result)=>{window.__calls.push({name,input});return Promise.resolve(structuredClone(result))};
 const page=items=>({items,pageNumber:1,pageSize:50,totalCount:items.length,totalPages:1,hasNextPage:false,hasPreviousPage:false});
-const saveInvoice=(name,input)=>{invoice={...input.body,id:7,rowVersion:(invoice.rowVersion||0)+1};return record(name,input,{id:7,invoice,isUpdate:name==='updateInvoice'})};
+window.__invoiceSaves=[];
+const saveInvoice=(name,input,init)=>{
+  invoice={...input.body,id:7,rowVersion:(invoice.rowVersion||0)+1};
+  const response=record(name,input,{id:7,invoice,isUpdate:name==='updateInvoice'});
+  if(!window.__delayInvoiceSave)return response;
+  return new Promise((resolve,reject)=>window.__invoiceSaves.push({signal:init?.signal,resolve:()=>resolve(response),reject}));
+};
+window.__finishInvoiceSave=(index=0)=>window.__invoiceSaves[index].resolve();
 const conflict=()=>new ApiError(409,'Conflict',JSON.stringify({message:'数据已被其他用户更新，请重新加载最新设置后再保存。'}));
 let backupPlan={revision:0,plan:{enabled:false,frequency:'Daily',time:'02:00',weekday:1,retentionCount:14,retentionDays:0,replicaMode:'None',verifyReplica:true,s3:{endpoint:'',region:'us-east-1',bucket:'',prefix:'ExportDocManager',accessKeyId:'',pathStyle:true}},encryptionPasswordSet:false,webDavPasswordSet:false,s3SecretAccessKeySet:false,s3SessionTokenSet:false,s3Available:true,timeZone:'Asia/Shanghai',nextRunAt:null,runningJobId:null,lastRunAt:null,lastResult:'NotRun',lastError:'',archives:[]};
 const backupStatus=()=>({...backupPlan,settingsRevision:settings.revision,webDav:{enabled:settings.webDav.enabled,url:settings.webDav.url,userName:settings.webDav.userName||''}});
@@ -68,7 +75,7 @@ const client={
   testEmailConnection:()=>record('testEmailConnection',{}, {message:'邮件连接正常。'}),
   testCloudBackupConnection:()=>record('testCloudBackupConnection',{}, {message:'WebDAV 连接正常。'}),
   getInvoice:input=>record('getInvoice',input,invoice),listInvoiceStatusHistory:()=>Promise.resolve([]),
-  createInvoice:input=>saveInvoice('createInvoice',input),updateInvoice:input=>saveInvoice('updateInvoice',input),
+  createInvoice:(input,init)=>saveInvoice('createInvoice',input,init),updateInvoice:(input,init)=>saveInvoice('updateInvoice',input,init),
   getPayment:input=>{if(window.__failPaymentReload){window.__failPaymentReload=false;return Promise.reject(new Error('付款读取失败'));}return record('getPayment',input,payment);},
   createPayment:input=>savePayment('createPayment',input),updatePayment:input=>savePayment('updatePayment',input),
   getSettings:()=>{if(window.__failSettingsReload){window.__failSettingsReload=false;return Promise.reject(new Error('设置读取失败'));}return record('getSettings',{}, {settings,canManageSettings:!readonly});},
@@ -98,7 +105,7 @@ window.__renameField=async(group,key,name)=>{settings.system.documentFieldLabels
 window.__changeSettingOnServer=(path,value)=>{settings=structuredClone(settings);setNestedValue(settings,path,value);settings.revision++;};
 window.__changeBackupPlanOnServer=()=>{backupPlan={...backupPlan,revision:backupPlan.revision+1};};
 window.__changePaymentOnServer=patch=>{payment={...payment,...patch,rowVersion:payment.rowVersion+1};};
-function LocationProbe(){const current=useLocation();window.__route=current.pathname+current.search;return null;}
+function LocationProbe(){const current=useLocation();window.__navigate=useNavigate();window.__route=current.pathname+current.search;return null;}
 function ExportDefaultsFixture(){
   const query=useQuery({queryKey:['settings'],queryFn:()=>client.getSettings()});
   const defaults=useReportExportDefaults({client,response:query.data,refetch:query.refetch,onFeedback:message=>{window.__feedback=message;}});

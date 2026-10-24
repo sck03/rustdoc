@@ -1,0 +1,11 @@
+[
+  {"quantity":"1","unitPrice":"1.005","expectedUnitPrice":"1.005","expectedAmount":"1.01"},
+  {"quantity":"1","unitPrice":"2.675","expectedUnitPrice":"2.675","expectedAmount":"2.68"},
+  {"quantity":"1","unitPrice":"0.105","expectedUnitPrice":"0.105","expectedAmount":"0.11"},
+  {"quantity":"1","unitPrice":"10.075","expectedUnitPrice":"10.075","expectedAmount":"10.08"},
+  {"quantity":"3","unitPrice":"0.335","expectedUnitPrice":"0.335","expectedAmount":"1.01"},
+  {"quantity":"7","unitPrice":"0.335","expectedUnitPrice":"0.335","expectedAmount":"2.35"},
+  {"quantity":"0.14","unitPrice":"0.1","expectedUnitPrice":"0.1","expectedAmount":"0.01"},
+  {"quantity":"3","unitPrice":"1.234565","expectedUnitPrice":"1.23457","expectedAmount":"3.70"},
+  {"quantity":"1000","unitPrice":"0.000015","expectedUnitPrice":"0.00002","expectedAmount":"0.02"}
+]

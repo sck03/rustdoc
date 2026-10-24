@@ -148,8 +148,8 @@ pub struct ReportPageBreakBlock {
 pub enum ReportBlock {
     Row(ReportRowBlock),
     Grid(ReportGridBlock),
-    Conditional(ReportConditionalBlock),
-    DetailTable(DetailTable),
+    Conditional(Box<ReportConditionalBlock>),
+    DetailTable(Box<DetailTable>),
     PageBreak(ReportPageBreakBlock),
 }
 impl ReportBlock {

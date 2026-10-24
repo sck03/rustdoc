@@ -1,7 +1,6 @@
 use super::*;
 
-#[test]
-fn queued_writes_refresh_permissions_before_the_transaction() {
+fn fixture() -> (std::path::PathBuf, Arc<NativeService>, store::Actor) {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -16,6 +15,73 @@ fn queued_writes_refresh_permissions_before_the_transaction() {
         .as_i64()
         .unwrap();
     let admin = auth::current_actor(&service.store, admin_id).unwrap();
+    (root, service, admin)
+}
+
+#[test]
+fn exact_product_lookup_is_independent_of_fuzzy_pages_and_keeps_visibility() {
+    let (root, service, admin) = fixture();
+    service
+        .store
+        .transaction(|tx| {
+            for code in
+                std::iter::once("ÉX-1".to_owned()).chain((0..51).map(|n| format!("A{n:02}-ÉX-1")))
+            {
+                let mut row = contracts::initial(contracts::schema("ApiProductDto"));
+                row["productCode"] = json!(code);
+                row["nameCN"] = json!("商品");
+                store::save(
+                    tx,
+                    "products",
+                    0,
+                    row,
+                    Some(store::normalize(&code)),
+                    &admin,
+                    "create",
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    let resource = catalog::RESOURCES
+        .iter()
+        .find(|resource| resource.key == "products")
+        .unwrap();
+    let query = [
+        ("productCode", " e\u{301}x-1 ".into()),
+        ("pageSize", "1".into()),
+    ];
+    let exact =
+        records::list(&service.store, &admin, resource, LIST_PRODUCTS, &query, &[]).unwrap();
+    assert_eq!(exact["totalCount"], 1);
+    assert_eq!(exact["items"][0]["productCode"], "ÉX-1");
+    let other_company = store::Actor {
+        admin: false,
+        company: "OTHER".into(),
+        grants: vec![
+            json!({"resourceKey":"common.product-reference","action":"view","dataScope":"company"}),
+        ],
+        ..admin.clone()
+    };
+    let hidden = records::list(
+        &service.store,
+        &other_company,
+        resource,
+        LIST_PRODUCTS,
+        &query,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(hidden["totalCount"], 0);
+    assert_eq!(hidden["items"], json!([]));
+    service.close().unwrap();
+    drop(service);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn queued_writes_refresh_permissions_before_the_transaction() {
+    let (root, service, admin) = fixture();
     let saved = accounts::save(&service.store, &admin, 0, json!({"username":"revoked","fullName":"待停用账号","role":"Admin","companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Revocation-Test-2026"})).unwrap();
     let mut account = saved["user"].clone();
     let id = account["id"].as_i64().unwrap();
@@ -23,6 +89,41 @@ fn queued_writes_refresh_permissions_before_the_transaction() {
     account["expectedVersion"] = account["versionNumber"].clone();
     account["role"] = json!("OfficeEmployee");
     account = accounts::save(&service.store, &admin, id, account).unwrap()["user"].clone();
+    for operation in [CREATE_HS_CODE, COMMIT_HS_CODE_CLEANUP] {
+        assert_eq!(
+            hs::handle(&service, &stale, operation, &[], &[], &json!({}))
+                .unwrap_err()
+                .status,
+            Some(403)
+        );
+    }
+    assert_eq!(
+        packing::handle(
+            &service,
+            &stale,
+            SAVE_CONTAINER_PACKING_CONTAINER_TYPE,
+            &[],
+            &[],
+            &json!({})
+        )
+        .unwrap_err()
+        .status,
+        Some(403)
+    );
+    #[cfg(feature = "single-window")]
+    assert_eq!(
+        single_window::handle(
+            &service,
+            &stale,
+            SAVE_CUSTOMS_COO_DOCUMENT,
+            &[("invoiceId", "1".into())],
+            &[],
+            &json!({})
+        )
+        .unwrap_err()
+        .status,
+        Some(403)
+    );
     #[cfg(feature = "mail")]
     assert_eq!(email_templates::handle(&service,&stale,CREATE_EMAIL_TEMPLATE,&[],&[],&json!({"name":"撤权模板","subject":"不应保存","bodyHtml":"<p>正文</p>","expectedVersion":0})).unwrap_err().status,Some(403));
     let attempted = json!({"username":"unauthorized","fullName":"不应创建","role":"Admin","companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Revocation-Test-2026"});

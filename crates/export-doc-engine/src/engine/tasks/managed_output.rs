@@ -2,7 +2,7 @@
 use super::ManagedOutput;
 use crate::engine::{
     auth,
-    backup_io::{Download, MAX_FILE_BYTES},
+    backup_io::Download,
     error::{Result, invalid, unavailable},
     store::{Actor, Store},
 };
@@ -53,8 +53,7 @@ pub(super) fn describe(store: &Store, actor: &Actor, output: &ManagedOutput) -> 
         .join("/");
     let path = resolve(store, &relative)?;
     auth::authorize(actor, permission(&path), "manage")?;
-    if output.size == 0 || output.size > MAX_FILE_BYTES || fs::metadata(&path)?.len() != output.size
-    {
+    if output.size == 0 || fs::metadata(&path)?.len() != output.size {
         return Err(unavailable("备份输出大小无效或已变化。"));
     }
     Ok(

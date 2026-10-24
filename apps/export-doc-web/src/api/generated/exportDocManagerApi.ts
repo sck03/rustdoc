@@ -1735,6 +1735,10 @@ export interface ApiInvoiceDraftReportHtmlPreviewRequest {
   withSeal?: boolean;
 }
 
+export interface ApiInvoiceEditingLimitsContract {
+  maxItems: number;
+}
+
 export interface ApiInvoiceItemDto {
   brand: string;
   cartons: number;
@@ -2939,8 +2943,10 @@ export interface ApiRuntimeHttpMetrics {
 
 export interface ApiRuntimeJobMetrics {
   active: number;
+  downloadMemory: { capacityBytes: number; rejections: number; reservedBytes: number };
   failed: boolean;
   persistedCounts: Record<string, unknown>;
+  retainedOutputBytes: number;
   stopping: boolean;
   workerHandles: number;
 }
@@ -5376,6 +5382,10 @@ export const ApiInvoiceDetailDtoDefaults = {
   useEntryPrintRows: false,
 } as const satisfies Partial<ApiInvoiceDetailDto>;
 
+export const ApiInvoiceEditingLimitsContractDefaults = {
+  maxItems: 5000,
+} as const satisfies Partial<ApiInvoiceEditingLimitsContract>;
+
 export const ApiInvoiceItemDtoDefaults = {
   printRows: [],
 } as const satisfies Partial<ApiInvoiceItemDto>;
@@ -7016,6 +7026,7 @@ export interface ListProductsRequest {
   keyword?: string;
   pageNumber?: number;
   pageSize?: number;
+  productCode?: string;
 }
 
 export interface ListPurchaseRequestRequest {
@@ -10872,6 +10883,7 @@ export class ExportDocManagerApiClient {
         "keyword": request.keyword,
         "pageNumber": request.pageNumber,
         "pageSize": request.pageSize,
+        "productCode": request.productCode,
       },
       init,
     });

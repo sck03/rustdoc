@@ -84,7 +84,3 @@ export function createProductDraftFromInvoiceItem(item: ApiInvoiceItemDto, exist
     rowVersion: existing?.rowVersion ?? "",
   };
 }
-
-export function hasSameProductCode(product: ApiProductDto, productCode: string) {
-  return normalizeText(product.productCode).toUpperCase() === normalizeText(productCode).toUpperCase();
-}

@@ -201,15 +201,6 @@ async fn execute(
         {
             return Err(error(400, "备份上传须使用二进制文件请求。"));
         }
-        if parts
-            .headers
-            .get("content-length")
-            .and_then(|value| value.to_str().ok())
-            .and_then(|value| value.parse::<u64>().ok())
-            .is_some_and(|size| size > export_doc_engine::engine::backup_io::MAX_FILE_BYTES)
-        {
-            return Err(error(413, "备份文件大小无效或超出可表示范围。"));
-        }
         let name = parameters
             .get(if operation == STAGE_SERVER_MIGRATION_RESTORE {
                 "X-ExportDocManager-Migration-File-Name"
@@ -339,6 +330,7 @@ async fn execute(
                         cookie: Some(cookie),
                         stream: None,
                         download_permit: None,
+                        memory_reservation: None,
                     });
                 }
                 let _bulk_permit = bulk_permit;
@@ -442,6 +434,7 @@ async fn execute(
                             cookie: Some(cookie),
                             stream: None,
                             download_permit: None,
+                            memory_reservation: None,
                         });
                     }
                     if operation == LOGOUT {

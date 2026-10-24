@@ -85,15 +85,30 @@ pub fn handle(
         })?;
         json!({"analysis":analysis,"storagePolicy":POLICY})
     } else {
-        service.store.transaction(|tx| match operation {
+        let execute = |tx: &Connection, actor: &Actor| match operation {
             LIST_CONTAINER_PACKING_PROJECTS => {
-                let limit = query.iter().find(|(key, _)| *key == "limit").and_then(|(_, value)| value.parse::<usize>().ok()).unwrap_or(30).clamp(1, 200);
-                let mut rows: Vec<_> = store::all(tx, PROJECTS)?.into_iter().filter(|r| auth::visible(actor, PERMISSION, "view", r)).collect();
-                rows.sort_by(|a, b| b["updatedAt"].as_str().cmp(&a["updatedAt"].as_str()).then_with(|| b["id"].as_i64().cmp(&a["id"].as_i64())));
+                let limit = query
+                    .iter()
+                    .find(|(key, _)| *key == "limit")
+                    .and_then(|(_, value)| value.parse::<usize>().ok())
+                    .unwrap_or(30)
+                    .clamp(1, 200);
+                let mut rows: Vec<_> = store::all(tx, PROJECTS)?
+                    .into_iter()
+                    .filter(|r| auth::visible(actor, PERMISSION, "view", r))
+                    .collect();
+                rows.sort_by(|a, b| {
+                    b["updatedAt"]
+                        .as_str()
+                        .cmp(&a["updatedAt"].as_str())
+                        .then_with(|| b["id"].as_i64().cmp(&a["id"].as_i64()))
+                });
                 rows.truncate(limit);
                 Ok(json!({"projects":rows,"storagePolicy":POLICY}))
             }
-            GET_CONTAINER_PACKING_PROJECT => Ok(json!({"project":project(tx, actor, id(parameters)?, "view")?,"storagePolicy":POLICY})),
+            GET_CONTAINER_PACKING_PROJECT => Ok(
+                json!({"project":project(tx, actor, id(parameters)?, "view")?,"storagePolicy":POLICY}),
+            ),
             SAVE_CONTAINER_PACKING_PROJECT => save_project(tx, actor, body),
             DELETE_CONTAINER_PACKING_PROJECT => {
                 let row = project(tx, actor, id(parameters)?, "delete")?;
@@ -102,19 +117,33 @@ pub fn handle(
             }
             LIST_CONTAINER_PACKING_CONTAINER_TYPES => {
                 let mut rows = store::all(tx, TYPES)?;
-                rows.sort_by_key(|row| (row["isSystemDefault"] != true, store::normalize(&text(row, "name"))));
+                rows.sort_by_key(|row| {
+                    (
+                        row["isSystemDefault"] != true,
+                        store::normalize(&text(row, "name")),
+                    )
+                });
                 Ok(json!({"containerTypes":rows,"storagePolicy":POLICY}))
             }
             SAVE_CONTAINER_PACKING_CONTAINER_TYPE => save_type(tx, actor, body),
             DELETE_CONTAINER_PACKING_CONTAINER_TYPE => {
                 let type_id = id(parameters)?;
                 let row = store::get(tx, TYPES, type_id)?;
-                if row["isSystemDefault"] == true { return Err(conflict("系统默认柜型不能删除。")); }
+                if row["isSystemDefault"] == true {
+                    return Err(conflict("系统默认柜型不能删除。"));
+                }
                 remove(tx, actor, TYPES, &row)?;
                 Ok(json!({"success":true,"message":"自定义柜型已删除。"}))
             }
             _ => Err(invalid("装柜操作无效。")),
-        })?
+        };
+        if operation.method == "GET" {
+            service.store.read_for(actor, operation, query, execute)?
+        } else {
+            service
+                .store
+                .transaction_for(actor, operation, query, execute)?
+        }
     };
     Ok(serde_json::to_vec(&contracts::project(
         contracts::response(operation.id),

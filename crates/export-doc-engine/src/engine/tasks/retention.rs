@@ -11,6 +11,8 @@ pub struct Retention {
     pub days: u32,
     pub global_limit: usize,
     pub per_user_limit: usize,
+    pub global_output_bytes: u64,
+    pub per_user_output_bytes: u64,
 }
 impl Default for Retention {
     fn default() -> Self {
@@ -18,6 +20,8 @@ impl Default for Retention {
             days: 30,
             global_limit: 2000,
             per_user_limit: 200,
+            global_output_bytes: 512 * 1024 * 1024,
+            per_user_output_bytes: 128 * 1024 * 1024,
         }
     }
 }
@@ -34,11 +38,20 @@ impl Retention {
                 .filter(|value| (min..=max).contains(value))
                 .ok_or_else(|| invalid(format!("{key} 必须为 {min}–{max} 之间的整数。"))),
         };
-        Ok(Self {
+        Self {
             days: read("EXPORTDOCMANAGER_JOB_HISTORY_DAYS", 30, 1, 3650)? as u32,
             global_limit: read("EXPORTDOCMANAGER_JOB_HISTORY_LIMIT", 2000, 100, 100_000)?,
             per_user_limit: read("EXPORTDOCMANAGER_JOB_USER_HISTORY_LIMIT", 200, 20, 10_000)?,
-        })
+            global_output_bytes: read("EXPORTDOCMANAGER_JOB_OUTPUT_MIB", 512, 64, 1_048_576)?
+                as u64
+                * 1024
+                * 1024,
+            per_user_output_bytes: read("EXPORTDOCMANAGER_JOB_USER_OUTPUT_MIB", 128, 64, 1_048_576)?
+                as u64
+                * 1024
+                * 1024,
+        }
+        .validate()
     }
     pub(super) fn validate(self) -> Result<Self> {
         if self.days == 0
@@ -47,6 +60,10 @@ impl Retention {
             || self.global_limit > 100_000
             || self.per_user_limit == 0
             || self.per_user_limit > 10_000
+            || self.global_output_bytes == 0
+            || self.global_output_bytes > 1024 * 1024 * 1024 * 1024
+            || self.per_user_output_bytes == 0
+            || self.per_user_output_bytes > self.global_output_bytes
         {
             return Err(invalid("文件任务保留策略超出有效范围。"));
         }
@@ -74,6 +91,25 @@ pub(super) fn prune(store: &Store, policy: Retention, now: DateTime<Utc>) -> Res
             for job in jobs {
                 remove(tx, &owner(&job)?, job)?;
                 removed += 1;
+            }
+        }
+        let outputs = export_doc_storage::JobOutputRetention {
+            global_bytes: policy.global_output_bytes,
+            per_user_bytes: policy.per_user_output_bytes,
+        };
+        loop {
+            crate::operation::check()?;
+            let rows = tx.expired_job_outputs(&outputs)?;
+            if rows.is_empty() {
+                break;
+            }
+            for row in rows {
+                super::persistence::expire_output(
+                    tx,
+                    row["id"]
+                        .as_i64()
+                        .ok_or_else(|| super::super::error::unavailable("任务编号无效。"))?,
+                )?;
             }
         }
         Ok(removed)

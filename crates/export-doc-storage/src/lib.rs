@@ -9,10 +9,12 @@ mod business_query;
 mod communication;
 mod generic_query;
 pub use business_query::{BusinessList, BusinessQuery};
+mod hs_query;
 mod job_query;
+pub use hs_query::HsQuery;
 mod office_query;
 mod personnel_query;
-pub use job_query::{JobQuery, JobRetention};
+pub use job_query::{JobOutputRetention, JobQuery, JobRetention};
 pub use office_query::OfficeQuery;
 pub use personnel_query::PersonnelQuery;
 mod record_query;
@@ -146,6 +148,12 @@ pub struct Blob {
     pub digest: String,
     pub content: Vec<u8>,
 }
+pub struct BlobInfo {
+    pub file_name: String,
+    pub media_type: String,
+    pub digest: String,
+    pub size: u64,
+}
 pub struct Credential {
     pub salt: Vec<u8>,
     pub hash: Vec<u8>,
@@ -154,6 +162,22 @@ pub struct Credential {
 
 /// All business operations use this semantic storage boundary, never provider SQL.
 trait Adapter: Send {
+    fn query_hs(&self, query: &HsQuery<'_>) -> Result<Vec<Value>> {
+        let (sql, projection) = hs_query::build(query, self.provider() == "PostgreSQL")?;
+        self.query_slice(&sql, &projection, query.offset, query.limit)
+    }
+    fn query_slice(
+        &self,
+        _sql: &QuerySql,
+        _projection: &str,
+        _offset: i64,
+        _limit: i64,
+    ) -> Result<Vec<Value>> {
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "存储适配器不支持有界扫描。",
+        ))
+    }
     fn is_closed(&self) -> bool {
         false
     }
@@ -176,6 +200,21 @@ trait Adapter: Send {
         self.query_page(&sql, &projection, query.offset, query.limit)
     }
     fn job_counts(&self) -> Result<Value>;
+    fn expired_job_outputs(&self, policy: &JobOutputRetention) -> Result<Vec<Value>> {
+        let pg = self.provider() == "PostgreSQL";
+        self.query_slice(
+            &job_query::expired_outputs(policy, pg)?,
+            &sql::projection(&[("id", "id")], pg)?,
+            0,
+            200,
+        )
+    }
+    fn job_output_bytes(&self) -> Result<u64> {
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "存储适配器不支持任务容量查询。",
+        ))
+    }
     fn query_generic(&self, query: &GenericQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, projection) = generic_query::build(query, self.provider() == "PostgreSQL")?;
         self.query_page(&sql, &projection, query.offset, query.limit)
@@ -309,6 +348,12 @@ trait Adapter: Send {
     fn attachment_bytes(&self, invoice_id: i64) -> Result<i64>;
     fn insert_blob(&self, blob: &BlobWrite<'_>) -> Result<()>;
     fn blob(&self, record_id: i64, kind: &str) -> Result<Option<Blob>>;
+    fn blob_info(&self, _record_id: i64, _kind: &str) -> Result<Option<BlobInfo>> {
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "存储适配器不支持文件元数据查询。",
+        ))
+    }
     fn delete_blobs(&self, record_id: i64) -> Result<()>;
     fn delete_blob(&self, record_id: i64, kind: &str) -> Result<()>;
     fn backup(&self, _path: &Path) -> Result<()> {
@@ -446,8 +491,11 @@ impl Connection {
     }
 }
 delegate! {
+    query_hs(query:&HsQuery<'_>)->Vec<Value>;
     query_jobs(query:&JobQuery<'_>)->(i64,Vec<Value>);
     job_counts()->Value;
+    job_output_bytes()->u64;
+    expired_job_outputs(policy:&JobOutputRetention)->Vec<Value>;
     query_generic(query:&GenericQuery<'_>)->(i64, Vec<Value>);
     resource_references(kind:&str,offset:i64,limit:i64)->(i64,Vec<Value>);
     query_scoped(query:&ScopedQuery<'_>)->(i64,Vec<Value>);
@@ -479,6 +527,7 @@ delegate! {
     attachment_bytes(invoice_id:i64)->i64;
     insert_blob(blob:&BlobWrite<'_>)->();
     blob(record_id:i64,kind:&str)->Option<Blob>;
+    blob_info(record_id:i64,kind:&str)->Option<BlobInfo>;
     delete_blobs(record_id:i64)->();
     delete_blob(record_id:i64,kind:&str)->();
     backup(path:&Path)->();

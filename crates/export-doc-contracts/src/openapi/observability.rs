@@ -22,7 +22,7 @@ pub(super) fn extend(document: &mut Value) {
         json!({"capacity":counter(),"leased":counter(),"failed":{"type":"boolean"},"acquireTimeouts":counter(),"acquireTimeoutMilliseconds":counter(),"wait":latency,"operations":latency,"writeWait":latency,"writeTransactions":latency,"writeCoordinatorFailed":{"type":"boolean"}}),
     );
     schemas["ApiRuntimeJobMetrics"] = object(
-        json!({"active":counter(),"workerHandles":counter(),"stopping":{"type":"boolean"},"failed":{"type":"boolean"},"persistedCounts":{"type":"object","additionalProperties":counter()}}),
+        json!({"active":counter(),"workerHandles":counter(),"stopping":{"type":"boolean"},"failed":{"type":"boolean"},"persistedCounts":{"type":"object","additionalProperties":counter()},"retainedOutputBytes":counter(),"downloadMemory":object(json!({"capacityBytes":counter(),"reservedBytes":counter(),"rejections":counter()}))}),
     );
     schemas["ApiRuntimeHttpMetrics"] = object(
         json!({"requests":latency,"queueWait":latency,"queueCapacity":counter(),"queuedRequests":counter(),"admissionRejected":counter(),"bulkRejected":counter(),"requestCapacity":counter(),"availableRequestSlots":counter(),"bulkCapacity":counter(),"availableBulkSlots":counter(),"uptimeSeconds":counter(),"logsDropped":counter(),"logWriteErrors":counter(),"downloads":latency,"downloadCapacity":counter(),"downloadTimeouts":counter(),"downloadDisconnects":counter(),"downloadReadErrors":counter()}),

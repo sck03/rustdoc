@@ -5,6 +5,7 @@ import { InlineNotice } from "./PageState.tsx";
 type ServerDraftSyncOptions<T> = {
   resourceKey: string | number;
   incomingValue: T | null | undefined;
+  persistedValue?: T | null;
   isDirty: boolean;
   fingerprint: (value: T) => string;
   applyIncoming: (value: T) => void;
@@ -22,6 +23,7 @@ type PendingServerDraft<T> = AppliedServerDraft & {
 export function useServerDraftSync<T>({
   resourceKey,
   incomingValue,
+  persistedValue,
   isDirty,
   fingerprint,
   applyIncoming,
@@ -50,6 +52,10 @@ export function useServerDraftSync<T>({
     const incomingFingerprint = fingerprintRef.current(incomingValue);
     const applied = appliedRef.current;
     const isFirstValueForResource = !applied || applied.resourceKey !== normalizedResourceKey;
+    if (!isFirstValueForResource && persistedValue != null && fingerprintRef.current(persistedValue) === incomingFingerprint) {
+      appliedRef.current = { resourceKey: normalizedResourceKey, fingerprint: incomingFingerprint };
+      acknowledgedRef.current = null; setPending(null); return;
+    }
     if (isFirstValueForResource || (!isDirty && applied.fingerprint !== incomingFingerprint)) {
       applyIncomingRef.current(incomingValue);
       appliedRef.current = {
@@ -82,7 +88,7 @@ export function useServerDraftSync<T>({
           fingerprint: incomingFingerprint,
           value: incomingValue,
         });
-  }, [incomingValue, isDirty, normalizedResourceKey]);
+  }, [incomingValue, persistedValue, isDirty, normalizedResourceKey]);
 
   function loadServerVersion() {
     if (!pending) {

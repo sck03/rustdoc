@@ -3,16 +3,17 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
-import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { normalizeText, readApiError } from "../../ui/formUtils.ts";
 import {
   type InvoiceItemCellSelection,
   calculateInvoiceTotals,
   createEmptyInvoiceItem,
   recalculateInvoiceItem,
-} from "./InvoiceItemsEditor.tsx";
+  maxInvoiceItemRows,
+} from "./invoiceItemsEditorModel.ts";
 import { type EditableInvoiceItemField, invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
-import { createInvoiceItemFromProduct, createProductDraftFromInvoiceItem, hasSameProductCode } from "./invoiceProductLibrary.ts";
+import { createInvoiceItemFromProduct, createProductDraftFromInvoiceItem } from "./invoiceProductLibrary.ts";
 import {
   areInvoiceItemsEqual,
   areInvoiceItemValuesEqual,
@@ -34,6 +35,7 @@ type Options = {
   setSuccessMessage: Dispatch<SetStateAction<string | null>>;
   isEditable: boolean;
   canSaveToProductLibrary: boolean;
+  setMessage: Dispatch<SetStateAction<string | null>>;
 };
 
 export function useInvoiceItemsWorkspace({
@@ -43,9 +45,10 @@ export function useInvoiceItemsWorkspace({
   setSuccessMessage,
   isEditable,
   canSaveToProductLibrary,
+  setMessage,
 }: Options) {
   const requestConfirmation = useConfirmation();
-  const runAbortable = useAbortableOperation();
+  const runAbortable = useAbortableOperation(invoice?.id);
   const queryClient = useQueryClient();
   const [editHistory, setEditHistoryState] = useState<InvoiceItemEditHistory>(emptyInvoiceItemEditHistory);
   const [productLibraryKeyword, setProductLibraryKeyword] = useState("");
@@ -86,10 +89,10 @@ export function useInvoiceItemsWorkspace({
       if (!productCode) throw new Error("商品编码(款号)不能为空。");
 
       const candidates = (await client.listProducts(
-        { keyword: productCode, pageNumber: 1, pageSize: 50 },
+        { productCode, pageNumber: 1, pageSize: 1 },
         { signal },
       )).items;
-      const existing = candidates.find((product) => hasSameProductCode(product, productCode)) ?? null;
+      const existing = candidates[0] ?? null;
       if (existing && !await requestConfirmation({
         title: "更新商品库",
         description: `商品库中已存在编码为 ${productCode} 的商品，是否用当前发票明细更新？`,
@@ -100,6 +103,7 @@ export function useInvoiceItemsWorkspace({
       }
 
       const body = createProductDraftFromInvoiceItem(item, existing);
+      signal.throwIfAborted();
       if (existing) {
         await client.updateProduct({ id: existing.id, body }, { signal });
         return { cancelled: false, isUpdate: true, productCode };
@@ -115,7 +119,7 @@ export function useInvoiceItemsWorkspace({
       setProductLibraryMessage(result.isUpdate ? `商品库已更新：${result.productCode}` : `商品已保存到商品库：${result.productCode}`);
       await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("products") });
     },
-    onError: (error) => setProductLibraryMessage(readApiError(error)),
+    onError: (error) => { if (!isAbortError(error)) setProductLibraryMessage(readApiError(error)); },
   });
 
   function resetEditHistory() {
@@ -162,6 +166,7 @@ export function useInvoiceItemsWorkspace({
     const invoiceId = invoice.id;
     const currentItems = latestInvoiceItemsRef.current;
     const nextItems = buildItems(currentItems, invoice.id);
+    if (nextItems.length > maxInvoiceItemRows) { setMessage(`商品明细最多 ${maxInvoiceItemRows} 行，未应用本次修改。`); return; }
     if (areInvoiceItemsEqual(currentItems, nextItems)) return;
     latestInvoiceItemsRef.current = nextItems;
 
@@ -300,6 +305,7 @@ export function useInvoiceItemsWorkspace({
     rows: string[][],
     targetFields = invoiceItemEditableColumns.map((column) => column.field),
   ) {
+    if (Math.max(0, startRowIndex) + rows.length > maxInvoiceItemRows) throw new Error(`从当前行粘贴会超过 ${maxInvoiceItemRows} 行，草稿未修改。`);
     const targetColumns = targetFields
       .map((field) => invoiceItemEditableColumns.find((column) => column.field === field))
       .filter((column): column is (typeof invoiceItemEditableColumns)[number] => Boolean(column));

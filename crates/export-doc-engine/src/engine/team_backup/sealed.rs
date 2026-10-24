@@ -19,7 +19,6 @@ const PBKDF2_ITERATIONS: u32 = 200_000;
 const SALT_LENGTH: usize = 32;
 const NONCE_LENGTH: usize = 12;
 pub(super) const MAX_EXPANDED_BYTES: u64 = crate::engine::backup_io::MAX_FILE_BYTES;
-pub(super) const MAX_PACKAGE_BYTES: u64 = MAX_EXPANDED_BYTES;
 const LEGACY_MAX_BYTES: usize = 256 * 1024 * 1024;
 #[cfg(test)]
 const MAX_ARCHIVE_BYTES: usize = LEGACY_MAX_BYTES - 128;
@@ -58,9 +57,7 @@ pub(super) fn zip_payload(entries: &[Entry<'_>], output: impl Write + Seek) -> R
     let mut output = writer
         .finish()
         .map_err(|cause| unavailable(cause.to_string()))?;
-    if output.seek(SeekFrom::End(0))? > MAX_PACKAGE_BYTES {
-        return Err(invalid("压缩后的迁移/灾备包超过可表示的文件大小。"));
-    }
+    output.seek(SeekFrom::End(0))?;
     output.flush()?;
     Ok(())
 }

@@ -1,6 +1,8 @@
 use export_doc_storage::{BlobWrite, Connection, ErrorKind, RecordWrite};
 #[path = "support/business_query.rs"]
 mod business_query;
+#[path = "support/capacity_query.rs"]
+mod capacity_query;
 #[path = "support/communication_query.rs"]
 mod communication_query;
 #[path = "support/office_query.rs"]
@@ -70,6 +72,7 @@ fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
 }
 
 fn roundtrip(connection: &Connection) {
+    capacity_query::exercise(connection);
     office_query::exercise(connection);
     resource_query::exercise(connection);
     business_query::exercise(connection);
@@ -285,6 +288,31 @@ fn postgres_matches_the_sqlite_contract_and_holds_the_instance_lock() {
         );
         assert_eq!(raw.query_one("SELECT COUNT(*) FROM pg_indexes WHERE schemaname='public' AND indexname='records_status_page'",&[]).unwrap().get::<_,i64>(0),0);
         raw.batch_execute("DROP INDEX records_template_catalog;")
+            .unwrap();
+    }
+    {
+        let mut raw = postgres::Client::connect(&maintenance, postgres::NoTls).unwrap();
+        raw.batch_execute("SET ROLE native_owner;").unwrap();
+        raw.batch_execute(include_str!("../src/migrations/007-postgres.sql"))
+            .unwrap();
+        raw.batch_execute("UPDATE schema_version SET version=7; CREATE INDEX records_hs_current_code ON records(kind);").unwrap();
+        assert!(Connection::initialize_postgres(&maintenance, "native_owner").is_err());
+        assert_eq!(
+            raw.query_one("SELECT version FROM schema_version", &[])
+                .unwrap()
+                .get::<_, i64>(0),
+            7
+        );
+        assert_eq!(
+            raw.query_one(
+                "SELECT COUNT(*) FROM pg_indexes WHERE indexname='records_hs_code_order'",
+                &[]
+            )
+            .unwrap()
+            .get::<_, i64>(0),
+            0
+        );
+        raw.batch_execute("DROP INDEX records_hs_current_code;")
             .unwrap();
     }
     Connection::initialize_postgres(&maintenance, "native_owner").unwrap();

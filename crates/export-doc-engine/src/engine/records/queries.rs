@@ -103,6 +103,26 @@ pub(super) fn rows(
         String::new()
     };
     let load = |tx: &Connection| -> Result<(Vec<Value>, usize)> {
+        if resource.key == "products" {
+            if let Some((_, code)) = query.iter().find(|(name, _)| *name == "productCode") {
+                let code = store::normalize(code);
+                if code.is_empty() || code.encode_utf16().count() > 100 {
+                    return Err(invalid("商品编码须为 1–100 个字符。"));
+                }
+                let row = tx
+                    .find_identity("products", &code)?
+                    .filter(|row| auth::visible(actor, read_permission(resource), "view", row));
+                let total = usize::from(row.is_some());
+                return Ok((
+                    if offset == 0 {
+                        row.into_iter().collect()
+                    } else {
+                        vec![]
+                    },
+                    total,
+                ));
+            }
+        }
         let mut items = Vec::new();
         loop {
             crate::operation::check()?;

@@ -50,7 +50,7 @@ pub fn export(service: &NativeService, query: &[(&str, String)]) -> Result<Vec<u
                 .map_err(|_| invalid("增量导出起始时间无效。"))?,
         )
     };
-    let snapshots = service.store.transaction(|tx| {
+    let snapshots = service.store.read(|tx| {
         CONTENTS
             .iter()
             .map(|(_, kind)| {
@@ -194,7 +194,7 @@ pub fn import(service: &NativeService, actor: &Actor, name: &str, bytes: &[u8]) 
         return Err(invalid("知识包文件名无效。"));
     }
     let content = read(bytes)?;
-    service.store.transaction(|tx|{
+    service.store.transaction_for(actor, crate::generated_api::IMPORT_HS_CODE_KNOWLEDGE, &[], |tx, actor|{
         let mut counters=BTreeMap::<&str,usize>::new();let mut unique=BTreeSet::new();
         for mut row in content[hs::CODES].clone(){
             operation::check()?;let code=rules::code(&text(&row,"code")).map_err(invalid)?;

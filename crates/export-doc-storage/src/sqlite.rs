@@ -184,6 +184,14 @@ impl Adapter for Sqlite {
         }
         Ok(Value::Object(counts))
     }
+    fn job_output_bytes(&self) -> Result<u64> {
+        let size: i64 = self.connection.borrow().query_row(
+            "SELECT COALESCE(SUM(length(content)),0) FROM files WHERE kind='job-output'",
+            [],
+            |row| row.get(0),
+        )?;
+        u64::try_from(size).map_err(|_| Error::unavailable("任务容量无效。"))
+    }
     fn query_communications(&self, q: &CommunicationQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = communication::sql(q, false);
         self.query_page(&sql, "r.body", q.offset, q.limit.clamp(1, 100))
@@ -252,6 +260,29 @@ impl Adapter for Sqlite {
     fn query_records(&self, q: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = super::record_query::sql(q, false);
         self.query_page(&sql, "r.body", q.offset, q.limit.clamp(1, 100))
+    }
+    fn query_slice(
+        &self,
+        sql: &QuerySql,
+        projection: &str,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Vec<Value>> {
+        let connection = self.connection.borrow();
+        let query = format!(
+            "SELECT {projection} FROM records r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
+            sql.filter,
+            sql.order,
+            limit.clamp(1, 2000),
+            offset.max(0)
+        );
+        let mut statement = connection.prepare(&query)?;
+        statement
+            .query_map(rusqlite::params_from_iter(sql.values.iter()), |row| {
+                row.get::<_, String>(0)
+            })?
+            .map(|row| Ok(serde_json::from_str(&row?)?))
+            .collect()
     }
     fn query_page(
         &self,
@@ -383,6 +414,18 @@ impl Adapter for Sqlite {
     }
     fn blob(&self, record_id: i64, kind: &str) -> Result<Option<Blob>> {
         Ok(self.connection.borrow().query_row("SELECT file_name,media_type,digest,content FROM files WHERE record_id=?1 AND kind=?2 ORDER BY id DESC LIMIT 1",params![record_id,kind],|r|Ok(Blob{file_name:r.get(0)?,media_type:r.get(1)?,digest:r.get(2)?,content:r.get(3)?})).optional()?)
+    }
+    fn blob_info(&self, record_id: i64, kind: &str) -> Result<Option<BlobInfo>> {
+        let info: Option<(String, String, String, i64)> = self.connection.borrow().query_row("SELECT file_name,media_type,digest,length(content) FROM files WHERE record_id=?1 AND kind=?2 ORDER BY id DESC LIMIT 1",params![record_id,kind],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))).optional()?;
+        info.map(|(file_name, media_type, digest, size)| {
+            Ok(BlobInfo {
+                file_name,
+                media_type,
+                digest,
+                size: u64::try_from(size).map_err(|_| Error::unavailable("文件大小无效。"))?,
+            })
+        })
+        .transpose()
     }
     fn delete_blobs(&self, record_id: i64) -> Result<()> {
         self.connection

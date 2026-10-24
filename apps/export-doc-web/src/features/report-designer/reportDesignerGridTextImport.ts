@@ -2,6 +2,7 @@ import type { ReportGridBlock } from "./reportDesignerSchema.ts";
 import { getGridCellLocations, resizeGridStructure } from "./reportDesignerGridStructure.ts";
 import { REPORT_GRID_MAX_COLUMNS, REPORT_GRID_MAX_ROWS } from "./reportDesignerGridPlacement.ts";
 import { updateGridCells } from "./reportDesignerGridMutations.ts";
+import { parseTabularClipboard } from "../../ui/tabularClipboard.ts";
 
 export const MAX_GRID_PASTE_CHARACTERS = 256 * 1024;
 const MAX_PASTE_CELLS = 10_000;
@@ -9,30 +10,7 @@ const MAX_PASTE_CELLS = 10_000;
 /** Excel-style TSV: quoted cells may contain tabs, newlines and doubled quotes. */
 export function parseGridText(text: string): string[][] {
   if (!text || text.length > MAX_GRID_PASTE_CHARACTERS) throw new Error("粘贴内容为空或文字过长，请分批填入。");
-  const rows: string[][] = [];
-  let row: string[] = [], cell = "", quoted = false, closed = false;
-  const field = () => { row.push(cell); cell = ""; closed = false;
-    if (row.length > REPORT_GRID_MAX_COLUMNS) throw new Error("粘贴内容的列数超过表格上限。"); };
-  const line = () => { field(); rows.push(row); row = [];
-    if (rows.length > REPORT_GRID_MAX_ROWS) throw new Error("粘贴内容的行数超过表格上限。"); };
-  const value = text.replace(/\r\n?/g, "\n");
-  for (let index = 0; index < value.length; index++) {
-    const character = value[index];
-    if (quoted) {
-      if (character !== '"') cell += character;
-      else if (value[index + 1] === '"') { cell += '"'; index++; }
-      else { quoted = false; closed = true; }
-    } else if (character === "\t") field();
-    else if (character === "\n") line();
-    else if (character === '"' && !cell && !closed) quoted = true;
-    else { if (closed) throw new Error("带引号的单元格格式不完整，请重新复制表格文字。"); cell += character; }
-  }
-  if (quoted) throw new Error("带引号的单元格尚未结束，请重新复制完整内容。");
-  if (cell || row.length || closed || !value.endsWith("\n")) line();
-  const columns = Math.max(...rows.map(row => row.length));
-  if (columns * rows.length > MAX_PASTE_CELLS) throw new Error("一次最多填入 10000 个单元格，请分批粘贴。");
-  if (rows.some(row => row.length !== columns)) throw new Error("每行列数必须一致，空单元格请保留制表符。");
-  return rows;
+  return parseTabularClipboard(text, { characters: MAX_GRID_PASTE_CHARACTERS, rows: REPORT_GRID_MAX_ROWS, columns: REPORT_GRID_MAX_COLUMNS, cells: MAX_PASTE_CELLS, rectangular: true });
 }
 
 export function importGridText(block: ReportGridBlock, cellId: string, text: string): { block: ReportGridBlock; notice: string | null } {

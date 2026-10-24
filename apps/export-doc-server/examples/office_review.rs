@@ -19,10 +19,18 @@ async fn serve() -> Result<(), Box<dyn std::error::Error>> {
         .parent()
         .unwrap()
         .to_path_buf();
-    let data = std::env::args()
-        .nth(1)
+    let mut arguments = std::env::args().skip(1);
+    let data = arguments
+        .next()
         .ok_or("provide isolated review data directory")?;
-    let service = NativeService::open(RuntimePaths::server(&root, &PathBuf::from(data))?)?;
+    let app_root = arguments
+        .next()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| root.clone());
+    if arguments.next().is_some() {
+        return Err("provide data directory and optional governed application root".into());
+    }
+    let service = NativeService::open(RuntimePaths::server(&app_root, &PathBuf::from(data))?)?;
     let login: Value = serde_json::from_slice(&service.dispatch(
         LOGIN,
         &[],

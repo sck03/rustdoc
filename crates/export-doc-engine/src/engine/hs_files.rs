@@ -65,7 +65,7 @@ pub fn upload(
     } else {
         source
     };
-    let response=service.store.transaction(|tx|{
+    let response=service.store.transaction_for(actor, operation, &[], |tx, actor|{
         let existing=hs::codes(tx)?;let mut items=vec![];let mut seen=BTreeMap::<String,Value>::new();let mut conflicts=BTreeSet::new();
         for (index,row) in table.rows.iter().enumerate().skip(header+1){
             operation::check()?;if row.iter().all(|v|v.trim().is_empty()){continue;}
@@ -108,7 +108,7 @@ pub fn upload(
             "warnings":if mode=="CompleteSnapshot"{vec!["完整年度库会标记缺失编码为疑似作废，请核对全部预检结果。"]}else{vec![]},"items":items,"storagePolicy":"预检尚未写入税则；30 分钟内确认有效，只能提交一次。"}))
     })?;
     if operation == UPLOAD_HS_CODES_IMPORT_FILE {
-        let committed = commit(service, actor, &response)?;
+        let committed = commit(service, actor, operation, &response)?;
         return Ok(
             json!({"success":true,"fileName":name,"totalCount":committed["addedCount"].as_i64().unwrap_or(0)+committed["updatedCount"].as_i64().unwrap_or(0),"message":committed["message"],"storagePolicy":"税则保存在当前业务数据库。"}),
         );
@@ -133,7 +133,7 @@ pub fn handle(
     body: &Value,
 ) -> Result<Value> {
     if operation == COMMIT_HS_CODES_IMPORT {
-        return commit(service, actor, body);
+        return commit(service, actor, operation, body);
     }
     if !LOCAL.contains(&operation) {
         return Err(invalid("此操作需要上传税则文件。"));
@@ -157,8 +157,13 @@ pub fn handle(
         &bytes,
     )
 }
-fn commit(service: &NativeService, actor: &Actor, body: &Value) -> Result<Value> {
-    service.store.transaction(|tx|{
+fn commit(
+    service: &NativeService,
+    actor: &Actor,
+    operation: Operation,
+    body: &Value,
+) -> Result<Value> {
+    service.store.transaction_for(actor, operation, &[], |tx, actor|{
         let items=import_previews::consume(tx,actor,&service.clock,"hs-tariffs",&text(body,"token"))?;
         let (mut added,mut updated,mut unchanged,mut obsolete,mut skipped)=(0,0,0,0,0);let mut written=BTreeSet::new();
         for row in items{

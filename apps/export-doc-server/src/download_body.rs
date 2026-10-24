@@ -11,6 +11,28 @@ use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWriteExt},
     sync::{OwnedSemaphorePermit, oneshot},
 };
+struct MemorySource {
+    inner: std::io::Cursor<Vec<u8>>,
+    _reservation: Option<export_doc_engine::engine::backup_io::Reservation>,
+}
+impl AsyncRead for MemorySource {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buffer: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut self.inner).poll_read(cx, buffer)
+    }
+}
+pub(crate) fn memory_source(
+    bytes: Vec<u8>,
+    reservation: Option<export_doc_engine::engine::backup_io::Reservation>,
+) -> Box<dyn AsyncRead + Unpin + Send> {
+    Box::new(MemorySource {
+        inner: std::io::Cursor::new(bytes),
+        _reservation: reservation,
+    })
+}
 struct Reader {
     inner: tokio::io::DuplexStream,
     remaining: u64,
@@ -127,6 +149,31 @@ fn transfer(
 mod tests {
     use super::*;
     use tokio::sync::Semaphore;
+    #[tokio::test]
+    async fn an_unread_or_dropped_transfer_releases_its_materialized_result_budget() {
+        let budget = Arc::new(export_doc_engine::engine::backup_io::Budget::default());
+        let slots = Arc::new(Semaphore::new(1));
+        let telemetry = Arc::new(crate::telemetry::Telemetry::new(
+            std::env::current_dir()
+                .unwrap()
+                .join(".codex-runtime/download-budget-tests"),
+        ));
+        let reservation = budget.reserve(128 * 1024).unwrap();
+        let body = transfer(
+            memory_source(vec![1; 128 * 1024], Some(reservation)),
+            128 * 1024,
+            slots.clone().try_acquire_owned().unwrap(),
+            telemetry,
+            Duration::from_millis(20),
+            Duration::from_secs(1),
+            "budget-test".into(),
+        );
+        assert_eq!(budget.snapshot()["reservedBytes"], 128 * 1024);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert_eq!(budget.snapshot()["reservedBytes"], 0);
+        assert_eq!(slots.available_permits(), 1);
+        drop(body);
+    }
     #[tokio::test]
     async fn slow_or_dropped_bodies_release_the_download_slot_and_count_failures() {
         let telemetry = Arc::new(crate::telemetry::Telemetry::new(

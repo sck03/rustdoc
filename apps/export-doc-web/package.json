@@ -23,6 +23,7 @@
     "test:batch-file-ui": "node ../../scripts/test_batch_file_workflows_ui.mjs",
     "test:print-preview-document": "node ../../scripts/test_print_report_preview_document.mjs",
     "test:invoice-list-models": "node ../../scripts/test_invoice_list_models.mjs",
+    "test:invoice-editing": "node ../../scripts/test_invoice_editing_contracts.mjs && node ../../scripts/test_invoice_save_workspace_ui.mjs",
     "test:list-pagination-ui": "node ../../scripts/test_list_pagination_ui.mjs",
     "test:invoice-text-normalization": "node ../../scripts/test_invoice_text_normalization_model.mjs",
     "test:settings-models": "node ../../scripts/test_settings_models.mjs",

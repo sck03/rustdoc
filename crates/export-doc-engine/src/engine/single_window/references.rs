@@ -31,7 +31,7 @@ pub fn handle(
     query: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
-    let result=service.store.transaction(|tx|match operation{
+    let result=service.store.transaction_for(actor, operation, &[], |tx, actor|match operation{
         GET_CUSTOMS_COO_ISSUING_AUTHORITIES=>Ok(rules::catalog::authorities()),
         GET_CUSTOMS_COO_EDITOR_OPTIONS=>Ok(rules::catalog::editor_options()),
         GET_SINGLE_WINDOW_REFERENCE_CATALOG=>Ok(json!({"catalog":catalog(tx)?,"storagePolicy":POLICY})),

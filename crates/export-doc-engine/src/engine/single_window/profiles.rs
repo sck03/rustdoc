@@ -130,7 +130,7 @@ pub fn handle(
     body: &Value,
 ) -> Result<Value> {
     local(service)?;
-    service.store.transaction(|tx| {
+    service.store.transaction_for(actor, operation, &[], |tx, actor| {
         if operation == GET_SINGLE_WINDOW_CLIENT_PROFILES { return response(tx,service,actor); }
         auth::authorize(actor, PERMISSION, "edit")?;
         let rows = store::all(tx, PROFILES)?;

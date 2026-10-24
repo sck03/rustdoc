@@ -82,7 +82,7 @@ jobs:
         with:
           toolchain: 1.99.1
           targets: ${{ matrix.target }}
-          components: rustfmt
+          components: rustfmt, clippy
       - name: Set up Node.js
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
@@ -114,6 +114,8 @@ jobs:
           exit $LASTEXITCODE
       - name: Domain, storage and application tests
         run: cargo test --locked -p export-doc-contracts -p export-doc-domain -p export-doc-storage -p export-doc-excel -p export-doc-exchange -p export-doc-report -p export-doc-engine -p export-doc-server --target ${{ matrix.target }}
+      - name: Rust correctness lints
+        run: cargo clippy --locked --workspace --all-features --all-targets --target ${{ matrix.target }} --message-format=short
       - name: Feature-gated engine suites
         run: cargo test --locked -p export-doc-engine --features mail,excel,invoice-transfer,single-window --target ${{ matrix.target }}
       - name: OCR worker tests
@@ -135,6 +137,37 @@ jobs:
           name: exportdoc-native-desktop-Document-${{ matrix.target }}
           path: artifacts/native-desktop/ExportDocManager.Tauri.Document
           if-no-files-found: error
+
+  frontend-regressions:
+    name: Chromium editing and async regressions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/artifacts/playwright-browsers
+      TEMP: ${{ github.workspace }}/.codex-runtime/temp
+      TMP: ${{ github.workspace }}/.codex-runtime/temp
+      TMPDIR: ${{ github.workspace }}/.codex-runtime/temp
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 26
+          cache: npm
+          cache-dependency-path: apps/export-doc-web/package-lock.json
+      - name: Prepare runtime and npm dependencies
+        run: |
+          mkdir -p "$TEMP"
+          npm --prefix apps/export-doc-web ci
+          node apps/export-doc-web/node_modules/playwright/cli.js install --with-deps --only-shell chromium
+      - name: Validate editing, cancellation and request contracts
+        run: |
+          npm --prefix apps/export-doc-web run test:invoice-editing
+          npm --prefix apps/export-doc-web run test:document-editor-ui
+          npm --prefix apps/export-doc-web run test:report-designer-v3
+          npm --prefix apps/export-doc-web run test:abortable-operations-ui
+          npm --prefix apps/export-doc-web run test:email-template-workspace-ui
+          npm --prefix apps/export-doc-web run test:browser-session-contracts
 
   browser-server:
     name: Browser server package (${{ matrix.runner }})
