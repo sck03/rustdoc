@@ -2409,12 +2409,18 @@ export interface ApiPaymentDto {
 
 export interface ApiPaymentReportHtmlPreviewRequest {
   content?: string;
+  pageIndex?: number;
+  previewFormat?: "Svg" | "PdfPage";
+  previewRevision?: string | null;
   templatePath?: string;
 }
 
 export interface ApiPaymentReportHtmlPreviewResponse {
   html: string;
+  pageCount?: number | null;
+  pageIndex?: number | null;
   paymentId: number;
+  previewRevision?: string | null;
   reportType: string;
   storagePolicy: string;
   templatePath: string;
@@ -2656,6 +2662,9 @@ export interface ApiRecoveryArchiveRestoreRequest {
 
 export interface ApiReportHtmlPreviewRequest {
   content?: string;
+  pageIndex?: number;
+  previewFormat?: "Svg" | "PdfPage";
+  previewRevision?: string | null;
   reportType?: string;
   templatePath?: string;
   withSeal?: boolean;
@@ -2664,6 +2673,9 @@ export interface ApiReportHtmlPreviewRequest {
 export interface ApiReportHtmlPreviewResponse {
   html: string;
   invoiceId: number;
+  pageCount?: number | null;
+  pageIndex?: number | null;
+  previewRevision?: string | null;
   reportType: string;
   storagePolicy: string;
   templatePath: string;
@@ -2776,6 +2788,9 @@ export interface ApiReportTemplatePackageImportResponse {
 
 export interface ApiReportTemplatePreviewRequest {
   content?: string;
+  pageIndex?: number;
+  previewFormat?: "Svg" | "PdfPage";
+  previewRevision?: string | null;
   reportType?: string;
   sampleProfile?: string;
   withSeal?: boolean | null;
@@ -2783,6 +2798,9 @@ export interface ApiReportTemplatePreviewRequest {
 
 export interface ApiReportTemplatePreviewResponse {
   html: string;
+  pageCount?: number | null;
+  pageIndex?: number | null;
+  previewRevision?: string | null;
   reportType: string;
   withSeal?: boolean | null;
 }
@@ -5389,6 +5407,11 @@ export const ApiPayeeDtoDefaults = {
   rowVersion: "",
 } as const satisfies Partial<ApiPayeeDto>;
 
+export const ApiPaymentReportHtmlPreviewRequestDefaults = {
+  pageIndex: 0,
+  previewFormat: "Svg",
+} as const satisfies Partial<ApiPaymentReportHtmlPreviewRequest>;
+
 export const ApiPaymentReportHtmlPreviewResponseDefaults = {
   storagePolicy: "",
 } as const satisfies Partial<ApiPaymentReportHtmlPreviewResponse>;
@@ -5417,9 +5440,19 @@ export const ApiProductDtoDefaults = {
   rowVersion: "",
 } as const satisfies Partial<ApiProductDto>;
 
+export const ApiReportHtmlPreviewRequestDefaults = {
+  pageIndex: 0,
+  previewFormat: "Svg",
+} as const satisfies Partial<ApiReportHtmlPreviewRequest>;
+
 export const ApiReportHtmlPreviewResponseDefaults = {
   storagePolicy: "",
 } as const satisfies Partial<ApiReportHtmlPreviewResponse>;
+
+export const ApiReportTemplatePreviewRequestDefaults = {
+  pageIndex: 0,
+  previewFormat: "Svg",
+} as const satisfies Partial<ApiReportTemplatePreviewRequest>;
 
 export const ApiReportTemplateV3LimitsContractDefaults = {
   maxElementsPerLayer: 1000,

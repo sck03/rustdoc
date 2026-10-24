@@ -10,6 +10,9 @@ use export_doc_storage::Connection;
 use serde_json::{Value, json};
 #[path = "worklist_oa.rs"]
 mod oa;
+#[path = "worklist_reads.rs"]
+mod reads;
+use reads::rows;
 
 struct Group {
     key: &'static str,
@@ -31,30 +34,6 @@ fn allowed(actor: &Actor, resource: &str, actions: &[&str]) -> bool {
     actions
         .iter()
         .all(|action| auth::authorize(actor, resource, action).is_ok())
-}
-fn rows(
-    tx: &Connection,
-    actor: &Actor,
-    kind: &str,
-    resource: &str,
-    actions: &[&str],
-    office: bool,
-) -> Result<Vec<Value>> {
-    let mut result = vec![];
-    for record in store::all(tx, kind)? {
-        let mut visible = !office || record["companyScope"] == actor.company;
-        for action in actions {
-            visible &= if matches!(resource, "office.supplies" | "office.rooms") {
-                super::handling::resource_access(tx, actor, resource, action, &record, false)?
-            } else {
-                auth::visible(actor, resource, action, &record)
-            };
-        }
-        if visible {
-            result.push(record);
-        }
-    }
-    Ok(result)
 }
 fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
     let local = tx.provider() == "SQLite";
@@ -341,7 +320,7 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
                 .map(|r| {
                     item(
                         r,
-                        text(&r["profile"], "fullName"),
+                        text(r, "fullName"),
                         format!("{} · {name}", text(r, "employeeNumber")),
                         Value::Null,
                         r[field].clone(),

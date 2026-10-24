@@ -7,6 +7,7 @@ fn audience(actor: &Actor, output: bool) -> TemplateAudience<'_> {
         user_id: actor.id,
         company: &actor.company,
         department: &actor.department,
+        departments: &actor.departments,
         administrator: actor.admin,
         can_view: auth::authorize(actor, permission, "view").is_ok(),
         shared: output || auth::scope_rank(actor, permission, "view") >= 2,

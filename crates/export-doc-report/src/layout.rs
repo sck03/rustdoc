@@ -421,9 +421,7 @@ fn pages_data(
 ) -> Result<Vec<String>> {
     let width = design.page.width_hundredth_mm as f32 / 100.;
     let height = design.page.height_hundredth_mm as f32 / 100.;
-    if width <= 0. || height <= 0. || width > 500. || height > 1000. {
-        return Err(invalid("报表纸张尺寸无效。"));
-    }
+    export_doc_domain::designer::page::validate(&design.page).map_err(invalid)?;
     let elements: Vec<_> = design
         .layers
         .iter()

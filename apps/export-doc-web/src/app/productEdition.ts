@@ -1,6 +1,6 @@
 import { filterWorkspaceNavGroups, getWorkspaceRouteItems, type WorkspaceCapabilities } from "./workspaceNavigation.ts";
 
-export type ProductEdition = "Document" | "Sales" | "Full" | "Administration";
+export type ProductEdition = "Document" | "Sales" | "Full";
 
 export type ProductEditionPresentation = {
   edition: ProductEdition;
@@ -13,15 +13,6 @@ export type ProductEditionPresentation = {
 };
 
 const presentations: Record<ProductEdition, ProductEditionPresentation> = {
-  Administration: {
-    edition: "Administration",
-    productName: "外贸业务综合管理系统",
-    displayName: "外贸业务综合管理系统（行政人事版）",
-    editionName: "行政人事版",
-    loginTagline: "人事、行政与申请审批工作台",
-    englishName: "Foreign Trade Business Management System",
-    defaultRoute: "/office/people",
-  },
   Document: {
     edition: "Document",
     productName: "外贸业务综合管理系统",
@@ -52,7 +43,7 @@ const presentations: Record<ProductEdition, ProductEditionPresentation> = {
 };
 
 export function normalizeProductEdition(value: unknown): ProductEdition {
-  if (value === "Document" || value === "Sales" || value === "Administration") return value;
+  if (value === "Document" || value === "Sales") return value;
   return "Full";
 }
 

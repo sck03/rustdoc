@@ -7,7 +7,6 @@ pub enum ProductEdition {
     Full,
     Document,
     Sales,
-    Administration,
 }
 
 impl ProductEdition {
@@ -16,7 +15,6 @@ impl ProductEdition {
             "Full" => Ok(Self::Full),
             "Document" => Ok(Self::Document),
             "Sales" => Ok(Self::Sales),
-            "Administration" => Ok(Self::Administration),
             _ => Err("未知产品版本。".into()),
         }
     }
@@ -26,7 +24,6 @@ impl ProductEdition {
             Self::Full => "Full",
             Self::Document => "Document",
             Self::Sales => "Sales",
-            Self::Administration => "Administration",
         }
     }
 

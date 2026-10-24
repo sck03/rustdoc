@@ -259,7 +259,7 @@ export function ReportDesignerV3Workspace({
     if (!located || located.element.type !== "Image" || located.element.locked || located.layer.locked) return;
     const normalizedResource = {
       id: resource.id,
-      mediaType: resource.mediaType as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+      mediaType: resource.mediaType as "image/png" | "image/jpeg",
       byteLength: resource.byteLength,
       sha256: resource.sha256,
       altText: resource.altText || undefined,

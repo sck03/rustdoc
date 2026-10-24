@@ -65,9 +65,6 @@ pub(super) fn template_visible(actor: &Actor, template: &Value) -> bool {
     super::report_templates::demand_type(actor, &text(template, "reportType")).is_ok()
         && auth::template_visible(actor, "document.report-templates", template)
 }
-fn schema(content: &str) -> Result<Value> {
-    schema_bytes(content.as_bytes())
-}
 fn schema_bytes(content: &[u8]) -> Result<Value> {
     if let Ok(design) = export_doc_domain::report_template_format::decode(content) {
         return serde_json::to_value(design).map_err(|_| invalid("报表模板结构无效。"));
@@ -132,8 +129,7 @@ pub(super) fn register(
         "jpg"
     };
     let id = format!("img-{hash}.{extension}");
-    let existing = tx.all(KIND)?;
-    let previous = existing.iter().find(|v| v["resourceId"] == id).cloned();
+    let previous = tx.find_identity(KIND, &id)?;
     if let Some(mut previous) = previous {
         read_entry(tx, &previous)?;
         if !owns(actor, &previous) {
@@ -146,7 +142,23 @@ pub(super) fn register(
         }
         return Ok(previous);
     }
-    if existing.len() >= 1000 {
+    if tx
+        .query_generic(&export_doc_storage::GenericQuery {
+            kind: KIND,
+            scope: export_doc_storage::DataScope {
+                all: true,
+                ..Default::default()
+            },
+            filters: &[],
+            keyword: "",
+            search_root: None,
+            fields: &[("id", "id")],
+            offset: 0,
+            limit: 1,
+        })?
+        .0
+        >= 1000
+    {
         return Err(conflict("图片资源已达到 1000 个，请回收未使用图片后重试。"));
     }
     let record = store::save(
@@ -185,7 +197,8 @@ pub fn upload(
         return Err(invalid("图片文件名无效。"));
     }
     if operation == UPLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE {
-        return store.transaction(|tx| {
+        return store.transaction_as(actor, |tx, actor| {
+            auth::authorize(actor, "document.report-resources", "upload")?;
             register(tx, actor, bytes, name, MAX_RESOURCE).map(|v| response(&v))
         });
     }
@@ -200,7 +213,7 @@ pub fn upload(
         "customs" | "Customs" => "customsSealPath",
         _ => return Err(invalid("印章类别只能是 document 或 customs。")),
     };
-    store.transaction(|tx| {
+    store.transaction_as(actor, |tx, actor| {
         let mut exporter = store::get(tx, "exporters", id)?;
         if !auth::visible(actor, "document.master-data", "edit", &exporter) {
             return Err(error(403, "没有修改此出口商印章的权限。"));
@@ -250,8 +263,12 @@ pub fn handle(
             if kind != format!("data:{decoded}") {
                 return Err(invalid("图片内容与声明类型不一致。"));
             }
-            let saved =
-                store.transaction(|tx| register(tx, actor, &bytes, "单据图片", 5 * 1024 * 1024))?;
+            let saved = store.transaction_as(actor, |tx, actor| {
+                if auth::authorize(actor, "document.invoices", "edit").is_err() {
+                    auth::authorize(actor, "document.invoices", "create")?;
+                }
+                register(tx, actor, &bytes, "单据图片", 5 * 1024 * 1024)
+            })?;
             let folder = if operation == SAVE_INVOICE_SEAL_IMAGE {
                 "Seals"
             } else {
@@ -289,7 +306,8 @@ pub fn handle(
         RECYCLE_REPORT_TEMPLATE_V3_IMAGE_RESOURCE => {
             let id = parameter_id(parameters)?;
             let _access = report_template_files::storage_lock(&service.paths)?;
-            store.transaction(|tx| {
+            store.transaction_as(actor, |tx, actor| {
+                auth::authorize(actor, "document.report-resources", "recycle")?;
                 let mut entry = find(tx, id)?;
                 if !actor.admin && !owns(actor, &entry) {
                     return Err(error(403, "只能回收自己上传的图片。"));

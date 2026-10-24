@@ -8,9 +8,11 @@ import {
 
 export function getV3ProductLayoutIssue(elements: Iterable<ReportDesignerV3Element>) {
   let productFields = false, detailTable = false;
+  let activeTables = 0;
   for (const element of elements) {
     productFields ||= isProductElement(element);
     detailTable ||= element.type === "Flow" && element.flowKind === "DetailTable";
+    if (element.type === "Flow" && element.flowKind === "DetailTable" && element.visible && element.outputEnabled && element.block.output?.enabled !== false && ++activeTables > 1) return "同一模板只能输出一张商品明细表，请先隐藏或移除已有明细表。";
     if (productFields && detailTable) return "自由商品字段与高级明细表不能混用，请选择一种商品排版方式。";
   }
   return null;

@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 use std::{path::PathBuf, sync::atomic::AtomicBool};
 mod jobs;
 pub(super) use jobs::invoice_document;
+pub(in crate::engine) mod page_preview;
 mod samples;
 
 pub const OPERATIONS: &[Operation] = &[
@@ -247,6 +248,23 @@ pub fn preview_document(
     parameters: &[(&str, String)],
     body: &Value,
 ) -> Result<(Document, Value)> {
+    let (data, template, metadata) = prepare_preview(service, actor, operation, parameters, body)?;
+    Ok((
+        template.render(
+            &data,
+            &service.report_fonts,
+            &crate::operation::cancellation_flag(),
+        )?,
+        metadata,
+    ))
+}
+fn prepare_preview(
+    service: &NativeService,
+    actor: &Actor,
+    operation: Operation,
+    parameters: &[(&str, String)],
+    body: &Value,
+) -> Result<(ReportData, Template, Value)> {
     let payment = [
         PREVIEW_PAYMENT_VOUCHER_HTML,
         PREVIEW_PAYMENT_VOUCHER_DRAFT_HTML,
@@ -337,17 +355,12 @@ pub fn preview_document(
         &mut data,
         Some(template.content()),
     )?;
-    let document = template.render(
-        &data,
-        &service.report_fonts,
-        &crate::operation::cancellation_flag(),
-    )?;
     let mut metadata = json!({"reportType":kind,"templatePath":template.path(),"storagePolicy":"预览只使用当前草稿，不写入正式单据。"});
     metadata[id_field] = json!(id);
     if !payment {
         metadata["withSeal"] = json!(body["withSeal"] == true);
     }
-    Ok((document, metadata))
+    Ok((data, template, metadata))
 }
 fn prepare(
     store: &Store,
@@ -426,10 +439,9 @@ pub fn handle(
         | PREVIEW_INVOICE_REPORT_DRAFT_HTML
         | PREVIEW_PAYMENT_VOUCHER_HTML
         | PREVIEW_PAYMENT_VOUCHER_DRAFT_HTML => {
-            let (document, mut response) =
-                preview_document(service, actor, operation, parameters, body)?;
-            response["html"] = json!(document.html(&service.report_fonts)?);
-            Ok(response)
+            let (data, template, metadata) =
+                prepare_preview(service, actor, operation, parameters, body)?;
+            page_preview::response(service, actor, data, template, body, metadata)
         }
         PREVIEW_REPORT_TEMPLATE_CONTENT => {
             auth::authorize(
@@ -470,14 +482,14 @@ pub fn handle(
                 &mut data,
                 Some(template.content()),
             )?;
-            let html = template
-                .render(
-                    &data,
-                    &service.report_fonts,
-                    &crate::operation::cancellation_flag(),
-                )?
-                .html(&service.report_fonts)?;
-            Ok(json!({"reportType":kind,"withSeal":body["withSeal"],"html":html}))
+            page_preview::response(
+                service,
+                actor,
+                data,
+                template,
+                body,
+                json!({"reportType":kind,"withSeal":body["withSeal"]}),
+            )
         }
         _ => jobs::start(service, actor, operation, parameters, body),
     }

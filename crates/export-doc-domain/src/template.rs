@@ -2,6 +2,7 @@ use crate::designer::{
     ConditionalContent, Design, DetailColumn, DetailTable, Field, GridRow, Kind, ReportBlock,
     ReportBorderStyle, ReportTextStyle, RowColumn,
 };
+mod structure;
 
 pub fn escape(text: &str) -> String {
     text.replace('&', "&amp;")
@@ -40,8 +41,8 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
         return Err("模板只能使用随包 Noto Sans CJK SC 或 Noto Serif CJK SC 字体。".into());
     }
     crate::designer::page::validate(page)?;
+    structure::validate(design)?;
     let mut detail_count = 0;
-    let mut ids = std::collections::BTreeSet::new();
     let mut block_ids = std::collections::BTreeSet::new();
     for layer in &design.layers {
         if layer.print.follow_body && (layer.role != "Footer" || layer.print.pin_to_page_bottom) {
@@ -54,15 +55,14 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
             return Err("此图层不受验证版支持。".into());
         }
         for element in &layer.elements {
-            if !ids.insert(element.id.clone()) {
-                return Err("组件 ID 重复。".into());
-            }
             if element.x_hundredth_mm < 0
                 || element.y_hundredth_mm < 0
                 || element.width_hundredth_mm < 400
                 || element.height_hundredth_mm < 400
-                || element.x_hundredth_mm + element.width_hundredth_mm > page.width_hundredth_mm
-                || element.y_hundredth_mm + element.height_hundredth_mm > page.height_hundredth_mm
+                || i64::from(element.x_hundredth_mm) + i64::from(element.width_hundredth_mm)
+                    > i64::from(page.width_hundredth_mm)
+                || i64::from(element.y_hundredth_mm) + i64::from(element.height_hundredth_mm)
+                    > i64::from(page.height_hundredth_mm)
             {
                 return Err(format!("{} 超出纸张范围。", element.label));
             }
@@ -110,15 +110,15 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
                     return Err("文字组件超出长度上限。".into());
                 }
                 Kind::Flow { flow_kind, block } => {
-                    validate_flow(
-                        design,
-                        layer,
-                        flow_kind,
-                        block,
-                        fields,
-                        &mut block_ids,
-                        &mut detail_count,
-                    )?;
+                    if layer.visible
+                        && element.visible
+                        && element.output_enabled
+                        && let ReportBlock::DetailTable(table) = block
+                        && table.output.as_ref().is_none_or(|output| output.enabled)
+                    {
+                        detail_count += 1;
+                    }
+                    validate_flow(design, layer, flow_kind, block, fields, &mut block_ids)?;
                 }
                 Kind::Image {
                     source_kind,
@@ -131,7 +131,9 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
                         return Err("图片用途无效。".into());
                     }
                     match source_kind.as_str() {
-                        "Resource" if design.resources.iter().any(|r| r.id == *resource_id) => {}
+                        "Resource"
+                            if purpose == "Image"
+                                && design.resources.iter().any(|r| r.id == *resource_id) => {}
                         "Field"
                             if [
                                 "doc_seal_path",
@@ -139,7 +141,10 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
                                 "Invoice.ShippingMarks",
                             ]
                             .contains(&field_path.as_str())
-                                && design.report_type == "ExportDocument" => {}
+                                && design.report_type == "ExportDocument"
+                                && (purpose != "Stamp"
+                                    || ["doc_seal_path", "customs_seal_path"]
+                                        .contains(&field_path.as_str())) => {}
                         _ => return Err("图片必须绑定已登记资源或出口商印章。".into()),
                     }
                 }
@@ -176,14 +181,18 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
     let detail = design
         .layers
         .iter()
+        .filter(|layer| layer.visible)
         .flat_map(|layer| &layer.elements)
         .find(|element| {
+            if !element.visible || !element.output_enabled {
+                return false;
+            }
             matches!(
-                element.kind,
+                &element.kind,
                 Kind::Flow {
-                    block: ReportBlock::DetailTable(_),
+                    block: ReportBlock::DetailTable(table),
                     ..
-                }
+                } if table.output.as_ref().is_none_or(|output| output.enabled)
             )
         })
         .unwrap();
@@ -218,7 +227,6 @@ fn validate_flow(
     block: &ReportBlock,
     fields: &[Field],
     ids: &mut std::collections::BTreeSet<String>,
-    detail_count: &mut usize,
 ) -> Result<(), String> {
     const FLOW_KINDS: &[&str] = &["Row", "Grid", "Conditional", "DetailTable", "PageBreak"];
     if !FLOW_KINDS.contains(&flow_kind) || flow_kind != block.kind() {
@@ -284,9 +292,6 @@ fn validate_flow(
             }
         }
         ReportBlock::DetailTable(table) => {
-            if layer.visible && table.output.as_ref().is_none_or(|output| output.enabled) {
-                *detail_count += 1;
-            }
             validate_detail_table(design, table, fields)?;
             for column in &table.columns {
                 if !ids.insert(column.id.clone()) {

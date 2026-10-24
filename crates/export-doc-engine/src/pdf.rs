@@ -1,6 +1,6 @@
 mod merge;
 mod native;
-use crate::paths::ensure_safe_absolute;
+use crate::{api::ApiError, engine::error::unavailable, paths::ensure_safe_absolute};
 pub use merge::{MAX_MERGE_INPUT, merge};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -127,9 +127,10 @@ pub fn render_page(
     bytes: &[u8],
     page_index: u32,
     pdfium_path: &Path,
-) -> Result<PdfPageImage, String> {
-    ensure_safe_absolute(pdfium_path)?;
-    let mut command = Command::new(std::env::current_exe().map_err(|error| error.to_string())?);
+) -> Result<PdfPageImage, ApiError> {
+    ensure_safe_absolute(pdfium_path).map_err(unavailable)?;
+    let mut command =
+        Command::new(std::env::current_exe().map_err(|error| unavailable(error.to_string()))?);
     command
         .arg("--pdf-preview-worker")
         .arg("--pdfium")
@@ -141,17 +142,16 @@ pub fn render_page(
         bytes.to_vec(),
         PREVIEW_LIMIT as usize + 16,
         Duration::from_secs(30),
-    )
-    .map_err(|e| e.to_string())?;
+    )?;
     if !output.status.success() {
-        return Err(format!(
+        return Err(unavailable(format!(
             "PDF 预览进程失败（{}）：{}。仍可另存原 PDF。",
             output.status, output.stderr
-        ));
+        )));
     }
     let bytes = output.stdout;
     if bytes.len() < 16 || bytes.len() as u64 > PREVIEW_LIMIT + 16 {
-        return Err("PDF 预览响应超出容量范围。".into());
+        return Err(unavailable("PDF 预览响应超出容量范围。"));
     }
     let read = |start| u32::from_le_bytes(bytes[start..start + 4].try_into().unwrap());
     Ok(PdfPageImage {
@@ -161,6 +161,31 @@ pub fn render_page(
         page_index: read(12),
         png: bytes[16..].to_vec(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn preview_preserves_request_deadlines_and_cancellation() {
+        let library = std::env::current_exe().unwrap();
+        for cancelled in [false, true] {
+            let scope = crate::operation::OperationScope::new(if cancelled {
+                Duration::from_secs(60)
+            } else {
+                Duration::ZERO
+            });
+            if cancelled {
+                scope.cancel();
+            }
+            let error = scope
+                .run(|| render_page(b"%PDF-test", 0, &library))
+                .err()
+                .unwrap();
+            assert_eq!(error.status, Some(504));
+            assert_eq!(error.diagnostic, Some("cancelled-or-timeout"));
+        }
+    }
 }
 
 /// No API or file writes: the parent owns the decoder process deadline.

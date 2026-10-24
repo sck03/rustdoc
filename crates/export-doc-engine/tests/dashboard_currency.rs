@@ -1,6 +1,7 @@
 use export_doc_engine::{generated_api::*, invoice::InvoiceDraft};
 use serde_json::{Value, json};
 #[path = "support/native_fixture.rs"]
+#[allow(dead_code)]
 mod native_fixture;
 #[test]
 fn stored_invoice_query_matches_the_domain_search_rules() {

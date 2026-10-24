@@ -97,96 +97,78 @@ pub fn list(store: &Store, actor: &Actor, kind: &str, query: &[(&str, String)]) 
     } else {
         "office.supplies"
     };
-    store.transaction(|tx| {
+    store.read(|tx| {
         let directory = matches!(kind, "rooms" | "supplies");
-        let mut rows = vec![];
-        for row in store::all(tx, kind)? {
-            let allowed = if directory {
-                row["companyScope"] == actor.company
-            } else {
-                super::handling::resource_access(tx, actor, resource, "view", &row, directory)?
-            };
-            if allowed
-                && (!handling
-                    || (super::handling::outstanding(&row)
-                        && super::handling::resource_access(
-                            tx,
-                            actor,
-                            resource,
-                            if row["status"] == "Approved" {
-                                "issue"
-                            } else {
-                                "return"
-                            },
-                            &row,
-                            false,
-                        )?))
+        let keys = super::handling::keys(tx, actor, resource)?;
+        let mut keyword_keys = vec![];
+        if directory && !keyword.is_empty() {
+            for service in super::handling::directory(tx, actor, resource)?["items"]
+                .as_array()
+                .into_iter()
+                .flatten()
             {
-                rows.push(super::handling::project_resource(tx, actor, resource, row)?);
+                if store::normalize(&text(service, "handlerNames")).contains(&keyword) {
+                    keyword_keys.push(text(service, "key"));
+                }
             }
         }
-        if directory {
-            rows.retain(|row| {
-                (include_inactive || row["isActive"] == true)
-                    && (!low_stock || row["lowStock"] == true)
-                    && (keyword.is_empty()
-                        || ["name", "location", "handlingName", "handlerNames"]
-                            .iter()
-                            .any(|field| store::normalize(&text(row, field)).contains(&keyword)))
-            });
+        let (page, size, offset) = store::page_parameters(query);
+        let from = (!directory)
+            .then(|| from.map(|date| date.to_rfc3339()))
+            .flatten();
+        let to = (!directory)
+            .then(|| to.map(|date| date.to_rfc3339()))
+            .flatten();
+        let (total, rows) = tx.query_office(&export_doc_storage::OfficeQuery {
+            kind,
+            company: &actor.company,
+            view: auth::data_scope(actor, resource, "view"),
+            issue: auth::data_scope(actor, resource, "issue"),
+            return_scope: auth::data_scope(actor, resource, "return"),
+            handling_keys: &keys,
+            keyword_handling_keys: &keyword_keys,
+            keyword: if directory { &keyword } else { "" },
+            status: if directory { "" } else { status },
+            identifiers: if directory { &[] } else { &identifiers },
+            owner: (!directory && mine).then_some(actor.id),
+            include_inactive,
+            low_stock,
+            handling_only: handling,
+            can_issue: auth::authorize(actor, resource, "issue").is_ok(),
+            can_return: auth::authorize(actor, resource, "return").is_ok(),
+            from: from.as_deref(),
+            to: to.as_deref(),
+            offset,
+            limit: size as i64,
+        })?;
+        let mut items = Vec::with_capacity(rows.len());
+        for row in rows {
+            let mut row = super::handling::project_resource(tx, actor, resource, row)?;
             if kind == "rooms" {
-                let bookings = store::all(tx, "bookings")?;
-                for row in &mut rows {
-                    row["inUse"] = json!(
-                        bookings
-                            .iter()
-                            .any(|booking| booking["meetingRoomId"] == row["id"]
-                                && booking["status"] == "InUse")
-                    );
-                }
+                row["inUse"] = json!(
+                    tx.query_generic(&export_doc_storage::GenericQuery {
+                        kind: "bookings",
+                        scope: export_doc_storage::DataScope {
+                            company: &actor.company,
+                            company_wide: true,
+                            ..Default::default()
+                        },
+                        filters: &[
+                            ("meetingRoomId", row["id"].to_string()),
+                            ("status", "InUse".into())
+                        ],
+                        keyword: "",
+                        search_root: None,
+                        fields: &[("id", "id")],
+                        offset: 0,
+                        limit: 1,
+                    })?
+                    .0 > 0
+                );
             }
-            rows.sort_by_key(|row| {
-                (
-                    row["isActive"] != true,
-                    text(row, "name"),
-                    row["id"].as_i64(),
-                )
-            });
-        } else {
-            rows.retain(|row| {
-                (!mine || row["ownerUserId"] == actor.id)
-                    && (status.is_empty() || row["status"] == status)
-                    && identifiers.iter().all(|(field, id)| row[*field] == *id)
-            });
-            let mut filtered = vec![];
-            for row in rows {
-                let (start, end) = if kind == "bookings" {
-                    ("startsAt", "endsAt")
-                } else {
-                    ("createdAt", "createdAt")
-                };
-                let read_time = |key: &str| {
-                    DateTime::parse_from_rfc3339(&text(&row, key))
-                        .map_err(|_| super::error::unavailable("行政记录时间损坏。"))
-                };
-                let end = from.map(|_| read_time(end)).transpose()?;
-                let start = to.map(|_| read_time(start)).transpose()?;
-                if from.zip(end).is_some_and(|(from, end)| end <= from)
-                    || to.zip(start).is_some_and(|(to, start)| start >= to)
-                {
-                    continue;
-                }
-                filtered.push(row);
-            }
-            rows = filtered;
-            rows.sort_by_key(|row| std::cmp::Reverse((text(row, "createdAt"), row["id"].as_i64())));
+            items.push(row);
         }
-        let paging: Vec<_> = query
-            .iter()
-            .filter(|(key, _)| matches!(*key, "pageNumber" | "pageSize"))
-            .cloned()
-            .collect();
-        Ok(store::paged(rows, &paging))
+        Ok(crate::contracts::page(items, total as usize, page, size))
     })
 }
 
@@ -209,11 +191,11 @@ pub fn availability(
     if to <= from || to - from > Duration::days(7) + Duration::hours(1) {
         return Err(invalid("可用时段查询须在一周以内。"));
     }
-    store.transaction(|tx|{
+    store.read(|tx|{
         let room=records::parent(tx,actor,"rooms",id)?;
         if room["companyScope"]!=actor.company{return Err(error(403,"不能查看其他公司的会议室。"));}
         let now=Utc::now();let mut slots=vec![];
-        for booking in store::all(tx,"bookings")?.iter().filter(|booking|booking["meetingRoomId"]==id&&booking["companyScope"]==actor.company&&["Pending","Approved","InUse"].contains(&text(booking,"status").as_str())) {
+        for booking in store::matching(tx,"bookings", &[("meetingRoomId",id.to_string()),("companyScope",actor.company.clone())], &[("startsAt","startsAt"),("endsAt","endsAt"),("status","status")])?.iter().filter(|booking|["Pending","Approved","InUse"].contains(&text(booking,"status").as_str())) {
             let start=DateTime::parse_from_rfc3339(&text(booking,"startsAt")).map_err(|_|super::error::unavailable("预约开始时间损坏。"))?;
             let end=DateTime::parse_from_rfc3339(&text(booking,"endsAt")).map_err(|_|super::error::unavailable("预约结束时间损坏。"))?;
             if start<to&&(end>from||booking["status"]=="InUse") {
@@ -245,21 +227,34 @@ fn clearance_for(
     account: Option<i64>,
     company: &Value,
 ) -> Result<Value> {
-    let belongs = |record: &&Value| {
-        record["companyScope"] == *company
-            && (employee.is_some_and(|id| record["employeeId"] == id)
-                || account.is_some_and(|user| record["ownerUserId"] == user))
+    let related = |kind| -> Result<Vec<Value>> {
+        let mut rows = std::collections::BTreeMap::new();
+        for (field, id) in [("employeeId", employee), ("ownerUserId", account)] {
+            if let Some(id) = id {
+                for row in store::matching(
+                    tx,
+                    kind,
+                    &[
+                        ("companyScope", company.as_str().unwrap_or("").into()),
+                        (field, id.to_string()),
+                    ],
+                    &[],
+                )? {
+                    rows.insert(records::positive(&row, "id", "行政记录")?, row);
+                }
+            }
+        }
+        Ok(rows.into_values().collect())
     };
     let mut meetings = vec![];
     let mut supplies = vec![];
-    for booking in store::all(tx, "bookings")?
+    for booking in related("bookings")?
         .iter()
-        .filter(belongs)
         .filter(|r| ["Pending", "Approved", "InUse"].contains(&text(r, "status").as_str()))
     {
         meetings.push(json!({"kind":"rooms","requestId":booking["id"],"resourceName":booking["roomName"],"status":booking["status"],"outstandingQuantity":if booking["status"]=="InUse"{1}else{0}}));
     }
-    for request in store::all(tx, "supply-requests")?.iter().filter(belongs) {
+    for request in related("supply-requests")?.iter() {
         let remaining = request["quantity"].as_i64().unwrap_or(0)
             - request["returnedQuantity"].as_i64().unwrap_or(0);
         let pending = ["Pending", "Approved"].contains(&text(request, "status").as_str());
@@ -269,13 +264,21 @@ fn clearance_for(
             supplies.push(json!({"kind":"supplies","requestId":request["id"],"resourceName":request["supplyName"],"status":request["status"],"outstandingQuantity":if pending{0}else{remaining}}));
         }
     }
-    let departments = store::all(tx, "departments")?
-        .iter()
-        .filter(|r| {
-            r["companyCode"] == *company && employee.is_some_and(|id| r["managerEmployeeId"] == id)
-        })
-        .map(|r| json!({"code":r["code"],"name":r["name"]}))
-        .collect::<Vec<_>>();
+    let departments = match employee {
+        Some(employee) => store::matching(
+            tx,
+            "departments",
+            &[
+                ("companyCode", company.as_str().unwrap_or("").into()),
+                ("managerEmployeeId", employee.to_string()),
+            ],
+            &[("code", "code"), ("name", "name")],
+        )?,
+        None => vec![],
+    }
+    .iter()
+    .map(|r| json!({"code":r["code"],"name":r["name"]}))
+    .collect::<Vec<_>>();
     let meeting_count = meetings.len();
     let supply_count = supplies.len();
     let mut approval_count =
@@ -312,12 +315,16 @@ fn clearance_for(
     } else {
         0
     };
-    let companies = store::all(tx, "companies")?;
-    let executive = employee.is_some_and(|id| {
-        companies
-            .iter()
-            .any(|company| company["executiveEmployeeId"] == id)
-    });
+    let executive = match employee {
+        Some(id) => !store::matching(
+            tx,
+            "companies",
+            &[("executiveEmployeeId", id.to_string())],
+            &[("id", "id")],
+        )?
+        .is_empty(),
+        None => false,
+    };
     meetings.sort_by_key(|r| r["requestId"].as_i64());
     supplies.sort_by_key(|r| r["requestId"].as_i64());
     Ok(

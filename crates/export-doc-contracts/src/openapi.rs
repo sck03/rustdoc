@@ -10,6 +10,7 @@ mod observability;
 mod office;
 mod payment_printing;
 mod personnel;
+mod report_preview;
 mod reports;
 use serde_json::Value;
 
@@ -19,6 +20,7 @@ pub fn document() -> Value {
     office::extend(&mut document);
     communication::extend(&mut document);
     reports::extend(&mut document);
+    report_preview::extend(&mut document);
     observability::extend(&mut document);
     accounts::extend(&mut document);
     personnel::extend(&mut document);
@@ -27,6 +29,11 @@ pub fn document() -> Value {
     exchange::extend(&mut document);
     hs_lifecycle::extend(&mut document);
     dashboard::extend(&mut document);
+    // The frozen baseline remains read-only; retired products leave the live catalog.
+    document["x-exportdoc-permissions"]["editions"]
+        .as_object_mut()
+        .unwrap()
+        .remove("Administration");
     document
 }
 
@@ -143,7 +150,32 @@ mod tests {
             serde_json::json!({"type":"integer","format":"int64","minimum":1})
         );
         for (path, methods) in baseline["paths"].as_object().unwrap() {
+            if path == "/api/master-data/exporters/{id}/seals/{sealType}/upload" {
+                let content = current["paths"][path]["post"]["requestBody"]["content"]
+                    .as_object_mut()
+                    .unwrap();
+                for media in ["image/gif", "image/webp"] {
+                    assert!(!content.contains_key(media));
+                    content.insert(
+                        media.into(),
+                        methods["post"]["requestBody"]["content"][media].clone(),
+                    );
+                }
+            }
             assert_eq!(&current["paths"][path], methods, "endpoint drift: {path}");
+        }
+        for (schemas, fields) in [
+            (report_preview::REQUESTS, report_preview::REQUEST_FIELDS),
+            (report_preview::RESPONSES, report_preview::RESPONSE_FIELDS),
+        ] {
+            for schema in schemas {
+                for field in fields {
+                    current["components"]["schemas"][schema]["properties"]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove(*field);
+                }
+            }
         }
         for (name, schema) in baseline["components"]["schemas"].as_object().unwrap() {
             assert_eq!(

@@ -8,6 +8,7 @@ pub struct TemplateAudience<'a> {
     pub user_id: i64,
     pub company: &'a str,
     pub department: &'a str,
+    pub departments: &'a [String],
     pub administrator: bool,
     pub can_view: bool,
     pub shared: bool,
@@ -82,9 +83,13 @@ pub(super) fn catalog(q: &ReportTemplateQuery<'_>, postgres: bool) -> QuerySql {
                 f("shareScope")
             ));
             if !a.department.is_empty() {
-                let department = bind(&mut values, a.department, postgres);
+                let department = std::iter::once(a.department)
+                    .chain(a.departments.iter().map(String::as_str))
+                    .map(|department| bind(&mut values, department, postgres))
+                    .collect::<Vec<_>>()
+                    .join(",");
                 shared.push(format!(
-                    "({}='Department' AND r.company={company} AND r.department={department})",
+                    "({}='Department' AND r.company={company} AND r.department IN ({department}))",
                     f("shareScope")
                 ));
             }

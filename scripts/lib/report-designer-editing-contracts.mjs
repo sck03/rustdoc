@@ -43,6 +43,8 @@ export function verifyDesignerEditingMutations(api) {
   assert.equal(pinned.schema.layers.find(layer => layer.id === footer.id).print.followBody, false, "pin and follow are mutually exclusive");
   const table = api.createV3FlowElement(api.createDetailTableBlock());
   const tableState = api.insertV3Element(empty, header.id, table);
+  assert.equal(api.insertV3Element(tableState, header.id, api.createV3FlowElement(api.createDetailTableBlock())), tableState, "a second active detail table cannot create a server-invalid draft");
+  assert.equal(api.duplicateSelectedV3Elements(tableState), tableState, "copying an active detail table must respect the native output limit");
   const textTarget = { elementId: table.id, kind: "DetailHeader", columnId: table.block.columns[0].id };
   const titled = api.updateDesignerCanvasText(tableState, textTarget, "产品名称\nDescription");
   const updated = api.findV3Element(titled.schema, table.id).element;

@@ -17,6 +17,7 @@ export function ReportTemplatePreviewWorkspace({
   onSampleProfileChange,
   onSourceChange,
   onPreview,
+  pdf,
 }: {
   mode: TemplatePreviewMode;
   sampleProfile: ReportDesignerPreviewSampleProfile;
@@ -31,10 +32,12 @@ export function ReportTemplatePreviewWorkspace({
   onSampleProfileChange: (value: string) => void;
   onSourceChange: (value: string) => void;
   onPreview: () => void;
+  pdf: { format: "Svg" | "PdfPage"; pageIndex: number; pageCount: number; onFormatChange: (format: "Svg" | "PdfPage") => void; onPageChange: (index: number) => void };
 }) {
   return (
     <div className="report-template-preview-workspace">
       <div className="report-template-preview-toolbar">
+        <SelectField label="预览方式" value={pdf.format} disabled={isBusy} options={[{ value: "Svg", label: "矢量排版" }, { value: "PdfPage", label: "实际 PDF 页图" }]} onChange={value => pdf.onFormatChange(value === "PdfPage" ? "PdfPage" : "Svg")} />
         <div className="new-report-preview-mode-tabs report-template-preview-mode-tabs" role="tablist" aria-label="模板预览数据">
           <button
             className={mode === "sample" ? "segmented-active" : ""}
@@ -85,6 +88,11 @@ export function ReportTemplatePreviewWorkspace({
         </div>
       </div>
       <div className="report-template-preview report-template-preview-full">
+        {pdf.format === "PdfPage" && pdf.pageCount > 0 ? <div className="report-template-preview-pagination" role="group" aria-label="PDF 预览翻页">
+          <button type="button" className="command-button secondary" disabled={isBusy || pdf.pageIndex <= 0} onClick={() => pdf.onPageChange(pdf.pageIndex - 1)}>上一页</button>
+          <span aria-live="polite">{pdf.pageIndex + 1} / {pdf.pageCount}</span>
+          <button type="button" className="command-button secondary" disabled={isBusy || pdf.pageIndex + 1 >= pdf.pageCount} onClick={() => pdf.onPageChange(pdf.pageIndex + 1)}>下一页</button>
+        </div> : null}
         <iframe title="模板预览" sandbox="" srcDoc={renderedHtml} />
       </div>
     </div>

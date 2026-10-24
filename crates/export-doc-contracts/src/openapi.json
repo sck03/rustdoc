@@ -24409,16 +24409,6 @@
               "schema": {
                 "$ref": "#/components/schemas/IFormFile"
               }
-            },
-            "image/gif": {
-              "schema": {
-                "$ref": "#/components/schemas/IFormFile"
-              }
-            },
-            "image/webp": {
-              "schema": {
-                "$ref": "#/components/schemas/IFormFile"
-              }
             }
           },
           "required": true
@@ -66917,6 +66907,28 @@
           },
           "content": {
             "type": "string"
+          },
+          "previewFormat": {
+            "type": "string",
+            "enum": [
+              "Svg",
+              "PdfPage"
+            ],
+            "default": "Svg"
+          },
+          "pageIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 499,
+            "default": 0
+          },
+          "previewRevision": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "description": "翻页时提交上一页修订号；单据或模板变化返回 409。"
           }
         },
         "additionalProperties": false
@@ -66951,6 +66963,26 @@
           "storagePolicy": {
             "type": "string",
             "default": ""
+          },
+          "pageIndex": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "pageCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "previewRevision": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -67922,6 +67954,28 @@
           },
           "content": {
             "type": "string"
+          },
+          "previewFormat": {
+            "type": "string",
+            "enum": [
+              "Svg",
+              "PdfPage"
+            ],
+            "default": "Svg"
+          },
+          "pageIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 499,
+            "default": 0
+          },
+          "previewRevision": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "description": "翻页时提交上一页修订号；单据或模板变化返回 409。"
           }
         }
       },
@@ -67959,6 +68013,26 @@
           "storagePolicy": {
             "type": "string",
             "default": ""
+          },
+          "pageIndex": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "pageCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "previewRevision": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -68309,6 +68383,28 @@
           },
           "sampleProfile": {
             "type": "string"
+          },
+          "previewFormat": {
+            "type": "string",
+            "enum": [
+              "Svg",
+              "PdfPage"
+            ],
+            "default": "Svg"
+          },
+          "pageIndex": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 499,
+            "default": 0
+          },
+          "previewRevision": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64,
+            "description": "翻页时提交上一页修订号；单据或模板变化返回 409。"
           }
         },
         "additionalProperties": false
@@ -68331,6 +68427,26 @@
           },
           "html": {
             "type": "string"
+          },
+          "pageIndex": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "pageCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "previewRevision": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -87938,25 +88054,6 @@
         "office.announcements",
         "office.notifications",
         "common.report-catalog"
-      ],
-      "Administration": [
-        "system.about",
-        "office.rooms",
-        "office.supplies",
-        "office.people",
-        "system.users",
-        "system.permissions",
-        "system.settings",
-        "system.audit",
-        "system.backup",
-        "system.disaster-recovery",
-        "office.personnel-changes",
-        "office.leave",
-        "office.overtime",
-        "office.expenses",
-        "office.travel",
-        "office.purchase",
-        "office.general"
       ]
     }
   },

@@ -351,6 +351,14 @@
   background: var(--edm-neutral-50);
 }
 
+.report-template-preview-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
+}
+
 .report-template-preview iframe {
   width: 100%;
   height: 100%;

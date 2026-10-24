@@ -196,7 +196,7 @@ fn permissions(doc: &mut Value, kind: &str, resource: &str, label: &str, group: 
     let actions: Vec<_> = [("view","查看","view"),("create","新建申请","operate"),("edit","编辑与提交","operate"),("cancel","取消草稿","operate"),("approve",if kind=="personnel" {"审批人员变动"} else {"审批与作废"},"manage"),("complete",if kind=="expense" {"财务查看与接收"} else {"完成登记"},"manage")].into_iter().filter(|(key,_,_)| kind != "personnel" || *key != "complete").enumerate().map(|(order,(key,name,level))| json!({"key":key,"name":name,"description":name,"sortOrder":order*10,"navigationAccessLevel":level})).collect();
     catalog["resources"].as_array_mut().unwrap().push(json!({"key":resource,"name":label,"group":group,"workspace":"office","moduleKey":resource,"sortOrder":order,"isTechnical":false,"supportsDataScope":true,"actions":actions}));
     catalog["modules"].as_array_mut().unwrap().push(json!({"key":resource,"name":label,"group":group,"workspace":"office","sortOrder":order,"isTechnical":false}));
-    for edition in ["Full", "Administration"] {
+    for edition in ["Full"] {
         catalog["editions"][edition]
             .as_array_mut()
             .unwrap()

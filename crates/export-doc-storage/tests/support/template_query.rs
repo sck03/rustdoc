@@ -88,6 +88,7 @@ pub fn exercise(c: &Connection) {
             user_id: 7,
             company: "A",
             department: "D",
+            departments: &[],
             can_view: true,
             shared: true,
             administrator: false,
@@ -103,6 +104,18 @@ pub fn exercise(c: &Connection) {
     };
     let (total, first) = c.query_report_templates(&q).unwrap();
     assert_eq!(total, 5);
+    let additional = vec!["E".into()];
+    let extra = insert(
+        c,
+        "report-templates",
+        json!({"name":"兼职共享","ownerUserId":99,"companyScope":"A","departmentId":"E","status":"Published","shareScope":"Department","reportType":"ExportDocument","versionNumber":1,"contentHtml":payload}),
+    );
+    assert_eq!(c.query_report_templates(&q).unwrap().0, total);
+    q.audience.departments = &additional;
+    let (expanded, _) = c.query_report_templates(&q).unwrap();
+    assert_eq!(expanded, total + 1);
+    q.audience.departments = &[];
+    assert!(c.delete("report-templates", extra, 1).unwrap());
     assert_eq!(
         first
             .iter()

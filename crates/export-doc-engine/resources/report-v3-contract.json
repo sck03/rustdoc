@@ -64,9 +64,7 @@
     "policy": "managed-resource-or-controlled-field",
     "mediaTypes": [
       "image/png",
-      "image/jpeg",
-      "image/gif",
-      "image/webp"
+      "image/jpeg"
     ],
     "controlledFieldPaths": [
       "doc_seal_path",

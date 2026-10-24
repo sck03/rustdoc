@@ -49,7 +49,7 @@ import {
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
 
 const identifierPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,119}$/;
-const resourceIdPattern = /^img-([0-9a-f]{64})\.(png|jpg|gif|webp)$/;
+const resourceIdPattern = /^img-([0-9a-f]{64})\.(png|jpg)$/;
 const sha256Pattern = /^[0-9a-fA-F]{64}$/;
 export type ReportDesignerV3ValidationResult = {
   schema: ReportDesignerV3Schema | null;
@@ -88,7 +88,7 @@ export function normalizeReportDesignerV3Schema(
     return { schema: null, issues };
   }
   validateBodyFlowOverlaps(layers, issues);
-  const productLayoutIssue = getV3ProductLayoutIssue(layers.flatMap(layer => layer.elements));
+  const productLayoutIssue = getV3ProductLayoutIssue(layers.filter(layer => layer.visible).flatMap(layer => layer.elements));
   if (productLayoutIssue) issues.push({ severity: "error", path: "$.layers", message: productLayoutIssue });
 
   const resources = normalizeResources(input.resources, issues);
@@ -342,7 +342,7 @@ function normalizeElement(
           ? rawResourceId.trim()
           : undefined;
         if (sourceKind === "Resource" && rawResourceId && !resourceId) {
-          issues.push({ severity: "warning", path: `${path}.resourceId`, message: "图片资源 ID 格式无效，已清除。" });
+          issues.push({ severity: "error", path: `${path}.resourceId`, message: "图片资源 ID 格式无效，请重新选择已上传的 PNG/JPEG 图片。" });
         }
         if (sourceKind === "Field" && !fieldPath) {
           issues.push({ severity: "error", path: `${path}.fieldPath`, message: "字段图片必须绑定字段。" });
@@ -351,7 +351,7 @@ function normalizeElement(
           validateControlledReportImageFieldPath(reportType, fieldPath, `${path}.fieldPath`, issues);
         }
         if (sourceKind === "Resource" && !resourceId) {
-          issues.push({ severity: "warning", path: `${path}.resourceId`, message: "图片资源尚未上传，导出时会显示占位提示。" });
+          issues.push({ severity: "error", path: `${path}.resourceId`, message: "图片资源尚未上传，请先上传或选择资源库中的图片。" });
         }
         if (purpose === "Stamp" && sourceKind !== "Field") {
           issues.push({ severity: "error", path: `${path}.purpose`, message: "印章必须绑定受控图片字段，不能直接读取资源或外部地址。" });
@@ -547,9 +547,9 @@ function normalizeResources(value: unknown, issues: ReportDesignerSchemaIssue[])
     const id = typeof item.id === "string" && resourceIdPattern.test(item.id.trim()) ? item.id.trim() : "";
     if (!id || ids.has(id)) return invalid(`${path}.id`, "图片资源 ID 缺失或重复。");
     ids.add(id);
-    const mediaType = ["image/png", "image/jpeg", "image/gif", "image/webp"].includes(String(item.mediaType))
+    const mediaType = ["image/png", "image/jpeg"].includes(String(item.mediaType))
       ? item.mediaType as ReportDesignerV3ImageResource["mediaType"] : undefined;
-    if (!mediaType) return invalid(`${path}.mediaType`, "图片资源只支持 PNG、JPEG、GIF 或 WebP。");
+    if (!mediaType) return invalid(`${path}.mediaType`, "图片资源只支持 PNG 或 JPEG。");
     const byteLength = typeof item.byteLength === "number" && Number.isInteger(item.byteLength) &&
       item.byteLength > 0 && item.byteLength <= REPORT_DESIGNER_V3_MAX_RESOURCE_BYTES
       ? item.byteLength

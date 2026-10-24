@@ -12,7 +12,7 @@ pub const REPORT_TEMPLATE_EXTENSION: &str = ".dtpl";
 const MAGIC: &[u8; 11] = b"EXPORTDOCDT";
 const FORMAT_VERSION: u16 = 1;
 const DOCUMENT_NAME: &str = "document.v3.json";
-const MAX_DOCUMENT_BYTES: usize = 4 * 1024 * 1024;
+pub const MAX_DOCUMENT_BYTES: usize = 4 * 1024 * 1024;
 const MAX_CONTAINER_BYTES: usize = 10 * 1024 * 1024;
 
 pub fn encode(design: &Design) -> Result<Vec<u8>, String> {

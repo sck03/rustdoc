@@ -106,6 +106,11 @@ fn validate_design(kind: &str, design: Design) -> Result<Design> {
         return Err(invalid("模板与单据的数据域不一致。"));
     }
     template::validate(&design, &field_catalog(&fields(kind)?)).map_err(invalid)?;
+    if serde_json::to_vec(&design)?.len()
+        > export_doc_domain::report_template_format::MAX_DOCUMENT_BYTES
+    {
+        return Err(invalid("报表模板结构不能超过 4 MiB。"));
+    }
     Ok(design)
 }
 

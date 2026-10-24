@@ -224,7 +224,7 @@ assert(product.getDefaultWorkspaceRoute({ ...moduleGrants([]), availableFeatures
 assert(product.getProductEditionPresentation("Document").displayName === "外贸业务综合管理系统（单证版）", "document edition brand name");
 assert(product.getProductEditionPresentation("Sales").displayName === "外贸业务综合管理系统（业务员版）", "sales edition brand name");
 assert(product.getProductEditionPresentation("Full").displayName === "外贸业务综合管理系统（全功能版）", "full edition brand name");
-assert(product.getProductEditionPresentation("Administration").editionName === "行政人事版", "administration includes human resources");
+assert(product.getProductEditionPresentation("Administration").edition === "Full", "retired editions have no active presentation");
 const editionPermissions = JSON.parse(fs.readFileSync(path.join(repoRoot, "crates/export-doc-contracts/src/generated_contract.json"), "utf8")).permissions;
 const employeeGrants = editionPermissions.roles.find(role => role.code === "OfficeEmployee").grants;
 const employeeCapabilities = { productEdition: "Full", availableFeatures: ["worklist"], permissions: employeeGrants,

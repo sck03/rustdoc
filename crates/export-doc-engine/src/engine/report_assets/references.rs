@@ -22,34 +22,44 @@ impl References {
             ("report-templates", "document.report-templates"),
             ("template-versions", ""),
         ] {
-            for record in tx.all(kind)? {
-                crate::operation::check()?;
-                if kind == "template-versions" && record["templateKind"] != "report-templates" {
-                    continue;
+            let mut offset = 0;
+            loop {
+                let (total, rows) = tx.resource_references(kind, offset, 200)?;
+                if rows.is_empty() {
+                    break;
                 }
-                let visible = if kind == "report-templates" {
-                    template_visible(actor, &record)
-                } else if kind == "template-versions" {
-                    record["templateId"]
-                        .as_i64()
-                        .is_some_and(|id| visible_templates.contains(&id))
-                } else {
-                    !permission.is_empty() && auth::visible(actor, permission, "view", &record)
-                };
-                if kind == "report-templates" && visible {
-                    if let Some(id) = record["id"].as_i64() {
-                        visible_templates.insert(id);
+                offset += rows.len() as i64;
+                for record in rows {
+                    crate::operation::check()?;
+                    let visible = if kind == "report-templates" {
+                        template_visible(actor, &record)
+                    } else if kind == "template-versions" {
+                        record["templateId"]
+                            .as_i64()
+                            .is_some_and(|id| visible_templates.contains(&id))
+                    } else {
+                        !permission.is_empty() && auth::visible(actor, permission, "view", &record)
+                    };
+                    if kind == "report-templates" && visible {
+                        if let Some(id) = record["id"].as_i64() {
+                            visible_templates.insert(id);
+                        }
                     }
+                    let mut ids = HashSet::new();
+                    collect(kind, &record, &mut ids)?;
+                    if visible
+                        || (kind == "report-templates"
+                            && super::super::report_templates::policy::output_visible(
+                                actor, &record,
+                            ))
+                    {
+                        index.readable.extend(ids.iter().cloned());
+                    }
+                    index.all.extend(ids);
                 }
-                let mut ids = HashSet::new();
-                collect(kind, &record, &mut ids)?;
-                if visible
-                    || (kind == "report-templates"
-                        && super::super::report_templates::policy::output_visible(actor, &record))
-                {
-                    index.readable.extend(ids.iter().cloned());
+                if offset >= total {
+                    break;
                 }
-                index.all.extend(ids);
             }
         }
         if let Some(paths) = paths {
@@ -89,17 +99,13 @@ fn collect(kind: &str, value: &Value, ids: &mut HashSet<String>) -> Result<()> {
             add_path("customsSealPath", "Files/Seals/")?;
         }
         "report-templates" | "template-versions" => {
-            let template = if kind == "template-versions" {
-                &value["content"]
-            } else {
-                value
-            };
-            let source = template["contentHtml"]
-                .as_str()
-                .ok_or_else(|| unavailable("模板资源索引损坏。"))?;
-            let root =
-                schema(source).map_err(|_| unavailable("模板资源索引损坏，已停止图片操作。"))?;
-            for resource in root["resources"].as_array().into_iter().flatten() {
+            if value["validDocument"] != true {
+                return Err(unavailable("模板资源索引损坏，已停止图片操作。"));
+            }
+            if !value["resources"].is_null() && !value["resources"].is_array() {
+                return Err(unavailable("模板资源索引损坏。"));
+            }
+            for resource in value["resources"].as_array().into_iter().flatten() {
                 let id = text(resource, "id");
                 resource_id(&id).map_err(|_| unavailable("模板资源编号损坏。"))?;
                 ids.insert(id);

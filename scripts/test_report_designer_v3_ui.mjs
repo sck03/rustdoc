@@ -263,9 +263,11 @@ try {
   await click(page,'.report-designer-v3-layer-name');
   await click(page,'button[aria-label="明细表"]');
   assert(await read(page,'window.__designerSchema.layers.filter(layer=>layer.role!=="Body").every(layer=>layer.elements.every(element=>element.flowKind!=="DetailTable"))'));
-  assert.equal(await read(page,'window.__designerSchema.layers.find(layer=>layer.role==="Body").elements.filter(element=>element.flowKind==="DetailTable").length'),2);
+  assert.equal(await read(page,'window.__designerSchema.layers.find(layer=>layer.role==="Body").elements.filter(element=>element.flowKind==="DetailTable").length'),1);
+  assert(await read(page,'document.body.innerText.includes("只能输出一张商品明细表")'));
   assert(!await read(page,'document.body.innerText.includes("当前草稿不能保存")'));
-  results.push({test:'detail insertion from header goes to body',passed:true});
+  results.push({test:'second detail insertion is rejected without changing the draft',passed:true});
+  await read(page,'document.querySelector("[data-v3-element-id=review-detail]").focus()'); await key(page,'Enter');
 	  await read(page, "[...document.querySelectorAll('.report-designer-v3-inspector summary')].find(node=>node.textContent.startsWith('位置与大小')).click()");
   await read(page, `(() => {const input=Array.from(document.querySelectorAll('.report-designer-v3-inspector label')).find(label=>label.textContent.trim()==='Y (mm)').querySelector('input');input.focus();input.select()})()`);
   await page.send('Input.insertText',{text:'0'}); await key(page,'Enter');

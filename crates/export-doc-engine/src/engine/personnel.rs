@@ -220,7 +220,7 @@ pub fn handle(
     let result = match operation {
         UNLINK_PERSONNEL_ACCOUNT => super::personnel_accounts::unlink(store, actor, id, body)?,
         GET_PERSONNEL_CLEARANCE => {
-            store.transaction(|tx| super::office_queries::clearance(tx, &current))?
+            store.read(|tx| super::office_queries::clearance(tx, &current))?
         }
         GET_PERSONNEL_AVATAR | GET_PERSONNEL_IMAGE => {
             let kind = if operation == GET_PERSONNEL_AVATAR {

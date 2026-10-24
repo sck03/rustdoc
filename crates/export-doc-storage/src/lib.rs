@@ -10,10 +10,14 @@ mod communication;
 mod generic_query;
 pub use business_query::{BusinessList, BusinessQuery};
 mod job_query;
+mod office_query;
 mod personnel_query;
 pub use job_query::{JobQuery, JobRetention};
+pub use office_query::OfficeQuery;
 pub use personnel_query::PersonnelQuery;
 mod record_query;
+mod resource_query;
+pub use generic_query::ScopedQuery;
 mod sql;
 mod template_query;
 pub use generic_query::{DataScope, GenericQuery};
@@ -176,6 +180,19 @@ trait Adapter: Send {
         let (sql, projection) = generic_query::build(query, self.provider() == "PostgreSQL")?;
         self.query_page(&sql, &projection, query.offset, query.limit)
     }
+    fn resource_references(
+        &self,
+        kind: &str,
+        offset: i64,
+        limit: i64,
+    ) -> Result<(i64, Vec<Value>)> {
+        let (sql, projection) = resource_query::build(kind, self.provider() == "PostgreSQL")?;
+        self.query_page(&sql, &projection, offset, limit)
+    }
+    fn query_scoped(&self, query: &ScopedQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let (sql, projection) = generic_query::scoped(query, self.provider() == "PostgreSQL")?;
+        self.query_page(&sql, &projection, query.offset, query.limit)
+    }
     fn query_business(&self, query: &BusinessQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, projection) = business_query::build(query, self.provider() == "PostgreSQL")?;
         self.query_page(&sql, &projection, query.offset, query.limit)
@@ -183,6 +200,15 @@ trait Adapter: Send {
     fn query_personnel(&self, query: &PersonnelQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, projection) = personnel_query::build(query, self.provider() == "PostgreSQL")?;
         self.query_page(&sql, &projection, query.offset, query.limit)
+    }
+    fn query_office(&self, query: &OfficeQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let pg = self.provider() == "PostgreSQL";
+        self.query_page(
+            &office_query::build(query, pg)?,
+            if pg { "r.body::text" } else { "r.body" },
+            query.offset,
+            query.limit,
+        )
     }
     fn provider(&self) -> &'static str;
     fn health(&self) -> Result<()>;
@@ -423,8 +449,11 @@ delegate! {
     query_jobs(query:&JobQuery<'_>)->(i64,Vec<Value>);
     job_counts()->Value;
     query_generic(query:&GenericQuery<'_>)->(i64, Vec<Value>);
+    resource_references(kind:&str,offset:i64,limit:i64)->(i64,Vec<Value>);
+    query_scoped(query:&ScopedQuery<'_>)->(i64,Vec<Value>);
     query_business(query:&BusinessQuery<'_>)->(i64, Vec<Value>);
     query_personnel(query:&PersonnelQuery<'_>)->(i64, Vec<Value>);
+    query_office(query:&OfficeQuery<'_>)->(i64, Vec<Value>);
     query_report_templates(query: &ReportTemplateQuery<'_>)->(i64, Vec<Value>);
     report_template_metadata(id:i64)->Option<Value>;
     query_template_versions(query: &TemplateVersionQuery<'_>)->(i64, Vec<Value>);

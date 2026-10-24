@@ -3,6 +3,8 @@ use export_doc_storage::{BlobWrite, Connection, ErrorKind, RecordWrite};
 mod business_query;
 #[path = "support/communication_query.rs"]
 mod communication_query;
+#[path = "support/office_query.rs"]
+mod office_query;
 #[path = "support/personnel_query.rs"]
 mod personnel_query;
 #[cfg(feature = "postgres")]
@@ -11,6 +13,8 @@ mod pool_recovery;
 #[cfg(feature = "postgres")]
 #[path = "support/query_plans.rs"]
 mod query_plans;
+#[path = "support/resource_query.rs"]
+mod resource_query;
 #[path = "support/scaling_query.rs"]
 mod scaling_query;
 #[path = "support/template_query.rs"]
@@ -66,6 +70,8 @@ fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
 }
 
 fn roundtrip(connection: &Connection) {
+    office_query::exercise(connection);
+    resource_query::exercise(connection);
     business_query::exercise(connection);
     personnel_query::exercise(connection);
     scaling_query::exercise(connection);

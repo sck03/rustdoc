@@ -177,6 +177,8 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 
 发票印章与模板预览回归复用该隔离宿主：先构建 React 和 `office_review`，再运行 `node scripts/test_invoice_report_ui.mjs`，验证无出口商关联的上传按钮、图片保存回读及样例/真实单据的原生排版。
 
+实际 PDF 页图专项使用 `node scripts/test_invoice_report_ui.mjs --with-native-pdf`，验证多页翻页、修订变化、越界及未登录拒绝和真实 React 翻页。运行前将当前平台/架构的受管 PDFium 库放入仓库 `Resources/Pdf`（Windows 为 `pdfium.dll`，Linux 为 `libpdfium.so`，macOS 为 `libpdfium.dylib`）；来源须为本项目锁定摘要的原生包，或由 `build-native.ps1` 组装的对应测试包，不能使用未审核下载。缺库时该专项明确失败；普通 SVG/krilla 回归不要求 PDFium。专项结束后可移除这份测试库副本，受管下载缓存继续保留。
+
 付款模板和真实 PDF 使用 `npm --prefix apps/export-doc-web run test:payment-printing-ui`，发票使用 `test:invoice-report-ui`，多模板 ZIP 和多附件使用 `test:batch-file-ui`；均要求先完成 React build 和 `cargo build --locked -p export-doc-server --example office_review`。批量回归包含六份模板的空白组件重建、原生样例/长明细输出对照、同一发票选择超过三种模板、逐模板权限与附件字节回读。付款回归覆盖个人模板、权限、预览失效、保存/取消和下载，生成的 PDF 仍须检查真实票面。
 
 文档整理后运行 `node scripts/verify-documentation-links.mjs`，检查 docs 及各说明入口的本地文件链接；当前入口不应引用已退役的文档或工作流。
@@ -208,6 +210,8 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 浏览器仅用于开发验收，正式 Rust PDF 和 Tauri 系统 WebView 不依赖根 `Browsers` 目录。旧副本清理后，前端回归统一从既有 `artifacts/playwright-browsers` 缓存定位 Chromium，不再搜索旧 .NET 输出或调用已删除的浏览器准备脚本。需要重建测试缓存时，在仓库根设置 `$env:PLAYWRIGHT_BROWSERS_PATH = Join-Path $PWD 'artifacts/playwright-browsers'`，再执行 `node apps/export-doc-web/node_modules/playwright/cli.js install chromium`；普通界面回归可加 `--only-shell` 只下载无界面浏览器，PDF 查看器回归需要完整 Chromium。这不影响用户正常运行程序，默认清理继续保留该可复用缓存。
 
 报表原版 React 设计器可复用，但 Rust 渲染仍有明确未完成项；当前事实见 `docs/Rust原生功能迁移核对表.md`。旧 Slint 的 `--validation --ui-smoke` 入口已退役。
+
+模板预览新增“实际 PDF 页图”，复用已有预览 API 的可选 `previewFormat=PdfPage`、零起始 `pageIndex` 与翻页修订号；未提供参数仍使用矢量预览。`test_invoice_report_ui.mjs` 同时验证多页 PDFium 真正渲染、翻页、修订变化 409、非法页码 400、匿名拒绝与真实 React 页图。运行前准备受管 PDFium 及本批 `office_review`，完整桌面包另行验收。
 
 ## 工作区清理
 

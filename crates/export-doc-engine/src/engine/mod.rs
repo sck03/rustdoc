@@ -106,6 +106,7 @@ pub struct NativeService {
     maintenance: RwLock<()>,
     pub paths: RuntimePaths,
     report_fonts: Arc<export_doc_report::Fonts>,
+    report_previews: reports::page_preview::Cache,
     protector: crate::secrets::Protector,
     store: Arc<Store>,
     sessions: auth::Sessions,

@@ -9,9 +9,15 @@ import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
 import { startChrome, createPageSession, evaluate, captureScreenshot } from "./lib/web-runtime-browser-session.mjs";
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
 import { verifyReportConditionsHttp } from "./lib/report-conditions-http.mjs";
+import { verifyReportPdfPreview } from "./lib/report-pdf-preview-http.mjs";
 
 // Real React + Rust HTTP regression. Uses the existing isolated review host.
 const repo = path.resolve(import.meta.dirname, "..");
+const withNativePdf = process.argv.includes('--with-native-pdf');
+if (withNativePdf) {
+  const library = process.platform === 'win32' ? 'pdfium.dll' : process.platform === 'darwin' ? 'libpdfium.dylib' : 'libpdfium.so';
+  assert(fs.existsSync(path.join(repo, 'Resources/Pdf', library)), 'PDF preview regression requires the governed native PDFium library in Resources/Pdf; see scripts/README.md.');
+}
 const output = path.join(repo, "artifacts/invoice-report-ui", String(Date.now()));
 fs.mkdirSync(output, { recursive: true });
 const web = path.join(repo, "apps/export-doc-web");
@@ -147,6 +153,7 @@ try {
   fs.writeFileSync(path.join(output,"saved.html"),real);
   await captureScreenshot(page,path.join(output,"saved.png"));
   await verifyReportConditionsHttp({ api, url, headers, invoiceId });
+  if (withNativePdf) await verifyReportPdfPreview({ repo, output, api, url, headers, page, run, wait, click, captureScreenshot });
   console.log(`Invoice seals and native sample/saved preview passed: ${output}`);
 } catch(error) {
   if(page){await captureScreenshot(page,path.join(output,"failure.png"));fs.writeFileSync(path.join(output,"failure.txt"),await run("document.body.innerText"));}

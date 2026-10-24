@@ -230,6 +230,36 @@ pub fn get(connection: &Connection, kind: &str, id: i64) -> Result<Value> {
 pub fn all(connection: &Connection, kind: &str) -> Result<Vec<Value>> {
     Ok(connection.all(kind)?)
 }
+/// Small related sets are filtered and read in bounded pages inside the caller's snapshot.
+pub fn matching(
+    connection: &Connection,
+    kind: &str,
+    filters: &[(&str, String)],
+    fields: &[(&str, &str)],
+) -> Result<Vec<Value>> {
+    let mut result = vec![];
+    loop {
+        crate::operation::check()?;
+        let (total, rows) = connection.query_generic(&export_doc_storage::GenericQuery {
+            kind,
+            scope: export_doc_storage::DataScope {
+                all: true,
+                ..Default::default()
+            },
+            filters,
+            fields,
+            keyword: "",
+            search_root: None,
+            offset: result.len() as i64,
+            limit: 200,
+        })?;
+        let empty = rows.is_empty();
+        result.extend(rows);
+        if empty || result.len() as i64 >= total {
+            return Ok(result);
+        }
+    }
+}
 pub fn normalize(text: &str) -> String {
     text.nfc().collect::<String>().trim().to_lowercase()
 }

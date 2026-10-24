@@ -6,15 +6,12 @@ use serde_json::{Value, json};
 
 #[test]
 fn editions_limit_admin_capabilities_and_requests_after_login_and_renewal() {
-    for edition in ["Full", "Document", "Sales", "Administration"] {
+    for edition in ["Full", "Document", "Sales"] {
         let fixture = native_fixture::Fixture::edition(edition);
         let user = fixture.request(GET_CURRENT_USER, None, None);
         assert_eq!(user["capabilities"]["productEdition"], edition);
         let grants = user["capabilities"]["permissions"].as_array().unwrap();
-        assert_eq!(
-            user["capabilities"]["canManageUsers"],
-            matches!(edition, "Full" | "Administration")
-        );
+        assert_eq!(user["capabilities"]["canManageUsers"], edition == "Full");
         let policy = export_doc_domain::permissions::ProductEdition::parse(edition).unwrap();
         assert!(
             grants
@@ -45,7 +42,7 @@ fn editions_limit_admin_capabilities_and_requests_after_login_and_renewal() {
         let worklist = fixture.request(GET_WORKLIST, None, None);
         assert!(worklist.is_object());
         fixture.request(GET_LICENSE_STATUS, None, None);
-        if matches!(edition, "Full" | "Administration") {
+        if edition == "Full" {
             fixture.employee();
             fixture.request(GET_ORGANIZATION_DIRECTORY, None, None);
             for kind in [
@@ -83,7 +80,7 @@ fn opening_the_same_database_in_another_edition_preserves_data_and_denies_other_
     assert_eq!(denied.unwrap_err().status, Some(403));
     drop(client);
     fixture.client = Some(
-        ApiClient::native_edition(fixture.paths.clone(), Default::default(), "Administration")
+        ApiClient::native_edition(fixture.paths.clone(), Default::default(), "Full")
             .unwrap()
             .login("admin".into(), String::new())
             .unwrap()
@@ -98,5 +95,9 @@ fn unknown_edition_is_rejected_before_opening_a_database() {
     let fixture = native_fixture::Fixture::new();
     assert!(
         ApiClient::native_edition(fixture.paths.clone(), Default::default(), "Unknown").is_err()
+    );
+    assert!(
+        ApiClient::native_edition(fixture.paths.clone(), Default::default(), "Administration")
+            .is_err()
     );
 }

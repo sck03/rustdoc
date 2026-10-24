@@ -3,8 +3,16 @@ use export_doc_engine::{engine::NativeService, generated_api::*, paths::RuntimeP
 use serde_json::{Value, json};
 use std::path::PathBuf;
 
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    if let Some(result) = export_doc_engine::pdf::worker_args(&std::env::args().collect::<Vec<_>>())
+    {
+        return result.map_err(Into::into);
+    }
+    serve()
+}
+
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()

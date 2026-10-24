@@ -1,5 +1,5 @@
 import { useReportTemplateDocument } from "./useReportTemplateDocument.ts";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import "../../styles/routes/reports.css";
 import { useLocation } from "react-router-dom";
 import { ApiReportTemplatePreviewResponse, ApiUserReportTemplateDto, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -21,7 +21,6 @@ import { ReportTemplatePreviewWorkspace } from "./ReportTemplatePreviewWorkspace
 import { ReportTemplateWorkspaceHeader } from "./ReportTemplateWorkspaceHeader.tsx";
 import { useReportTemplateSelectionSync } from "./useReportTemplateSelectionSync.ts";
 import { deriveReportTemplateFeedback, deriveReportTemplateWorkspaceState } from "./reportTemplateWorkspaceState.ts";
-import { ReportTemplateDesignWorkspace } from "./ReportTemplateDesignWorkspace.tsx";
 import { useReportTemplateSelectionActions } from "./useReportTemplateSelectionActions.ts";
 import { ReportTemplateFeedback } from "./ReportTemplateFeedback.tsx";
 import { reportTemplateShareScopeLabel } from "./ReportTemplateUserPanel.tsx";
@@ -56,6 +55,7 @@ import { readDefaultReportTemplatePath } from "./reportTemplateSelectionModel.ts
 import { readReportTemplateReturnTarget } from "./reportTemplateReturnNavigation.ts";
 import { useReportExportDefaults } from "./useReportExportDefaults.ts";
 import { createReportTemplatePageActions } from "./reportTemplatePageActions.ts";
+const ReportTemplateDesignWorkspace = lazy(() => import("./ReportTemplateDesignWorkspace.tsx").then(module => ({ default: module.ReportTemplateDesignWorkspace })));
 export function ReportTemplateWorkspacePage({
   client,
   templateAccess,
@@ -111,6 +111,7 @@ export function ReportTemplateWorkspacePage({
   const [previewPaymentId, setPreviewPaymentId] = useState(() =>
     initialReportType === "PaymentVoucher" ? requestedPreviewSourceId : 0,
   );
+  useEffect(() => setPreview(null), [reportType, selectedTemplatePath, content, designerDraftContent, previewInvoiceId, previewPaymentId]);
   const [newTemplateFileName, setNewTemplateFileName] = useState(() => buildNewTemplateFileName(initialReportType));
   const [newTemplateDisplayName, setNewTemplateDisplayName] = useState("");
   const [newUserTemplateName, setNewUserTemplateName] = useState("");
@@ -391,12 +392,13 @@ export function ReportTemplateWorkspacePage({
       onError: (error) => showFeedback(readApiError(error), "error"),
     });
 
-  const { samplePreviewMutation, invoicePreviewMutation, paymentPreviewMutation } = useReportTemplatePreviewMutations({
+  const { samplePreviewMutation, invoicePreviewMutation, paymentPreviewMutation, previewFormat, setPreviewFormat, page: previewPage } = useReportTemplatePreviewMutations({
     client,
     reportType,
     selectedTemplatePath,
     content: designerDraftContent.trim() ? designerDraftContent : content,
     sampleProfile: templatePreviewSampleProfile,
+    mode: templatePreviewMode,
     canDesignTemplates,
     withSeal: reportType === "ExportDocument" && (currentTemplate?.withSealDefault ?? true),
     previewInvoiceId,
@@ -801,7 +803,7 @@ export function ReportTemplateWorkspacePage({
 
         <div hidden={workspaceMode !== "design"}>
           <div className="report-template-grid report-template-grid-design">
-            {selectedTemplateContentActive && <ReportTemplateDesignWorkspace
+            <Suspense fallback={<p role="status">正在加载设计器…</p>}>{selectedTemplateContentActive && <ReportTemplateDesignWorkspace
               key={contentTemplatePath}
               client={client}
               editable={!isBusy && (
@@ -814,7 +816,7 @@ export function ReportTemplateWorkspacePage({
               content={content}
               fieldCatalog={fieldCatalogQuery.data}
               onDesignerDraftChange={setDesignerDraft}
-            />}
+            />}</Suspense>
           </div>
         </div>
         <div hidden={workspaceMode === "design"}>
@@ -832,6 +834,15 @@ export function ReportTemplateWorkspacePage({
             onSampleProfileChange={handleTemplatePreviewSampleProfileChange}
             onSourceChange={handlePreviewSourceChange}
             onPreview={handleRenderTemplatePreview}
+            pdf={{ format: previewFormat, ...previewPage,
+              onFormatChange: format => { setPreviewFormat(format); setPreview(null); },
+              onPageChange: pageIndex => {
+                const target = { pageIndex, previewRevision: previewPage.previewRevision };
+                if (templatePreviewMode === "sample") samplePreviewMutation.mutate(target);
+                else if (reportType === "PaymentVoucher") paymentPreviewMutation.mutate(target);
+                else invoicePreviewMutation.mutate(target);
+              },
+            }}
           />
         </div>
       </form>

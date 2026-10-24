@@ -179,7 +179,7 @@ export type ReportDesignerV3Element =
 
 export type ReportDesignerV3ImageResource = {
   id: string;
-  mediaType: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+  mediaType: "image/png" | "image/jpeg";
   byteLength: number;
   sha256: string;
   altText?: string;

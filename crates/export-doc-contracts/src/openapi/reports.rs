@@ -115,4 +115,8 @@ pub(super) fn extend(document: &mut Value) {
     document["components"]["schemas"]["ApiInvoiceSealImageSaveResponse"] =
         document["components"]["schemas"]["ApiShippingMarkImageSaveResponse"].clone();
     document["paths"]["/api/invoices/seals/image"] = endpoint;
+    let upload = document["paths"]["/api/master-data/exporters/{id}/seals/{sealType}/upload"]["post"]["requestBody"]["content"].as_object_mut().unwrap();
+    for media in ["image/gif", "image/webp"] {
+        upload.remove(media);
+    }
 }

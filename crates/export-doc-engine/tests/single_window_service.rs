@@ -1,5 +1,6 @@
 #![cfg(feature = "single-window")]
 #[path = "support/native_fixture.rs"]
+#[allow(dead_code)]
 mod native_fixture;
 use export_doc_engine::{contracts, generated_api::*, invoice::InvoiceDraft};
 use native_fixture::Fixture;
