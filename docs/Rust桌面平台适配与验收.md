@@ -36,6 +36,8 @@ OCR 同样按目标 OS/架构组装 Rust worker、ONNX 和模型。2026-10-15 �
 
 2026-10-25 发票与资源优化后的同类 GNU / Debug / Full SQLite / 含 OCR 包为 `artifacts/correctness-performance-desktop/ExportDocManager.Tauri.Full`。完整 Tauri 回归 `artifacts/correctness-performance-desktop-evidence/desktop-1792866424633`、七组包内 OCR 样例和 PDFium worker 边界均通过；16 页 PDF 全部渲染检查，15 份与上批逐字节相同，另一份仅业务日期变化。HTTP 7 页实际 PDF 的翻页、修订和授权专项另行通过；不增加其它平台、系统 IME、实体打印或 MSVC 发布验收声明，完整证据见当日进度。
 
+同日后续完整修复包为 `artifacts/complete-hardening-desktop/ExportDocManager.Tauri.Full`，来源 `ee89fa4433c6`，仍为 GNU/Debug/Full SQLite/含 OCR。完整窗口、中文字段、表格、设计器、权限、附件、OCR 与退出回归通过；同目录 WithoutOcr 资源退出和恢复完整包均有实际验证。16 页 PDF 全部与上一同日输出逐字节一致并完成渲染查看；新 worker 的 PDFium 调用与七页实际 HTTP 页图通过。上述范围不扩大为 MSVC、其它 OS、系统输入法候选窗或实体打印支持，详细回执见进度。
+
 2026-09-20 本地 Windows x64 DLL 与 Linux x64 ELF 静态导出检查均包含当前 19/19 个所需符号；本轮没有执行 Linux/macOS/ARM64 加载或功能调用，不据此宣称跨平台运行通过。详细平台矩阵、符号/加载/回调/资源限制检查见[《PDFium 跨平台绑定与验收方案》](./PDFium跨平台绑定与验收方案.md)。
 
 本批实际验证统一记入进度文档。平台完整验收包括原版导航和页签、表格滚动／编辑、中文 IME、撤销与粘贴、缩放、保存取消、路径与链接拒绝、登录授权、后台任务、真实 PDF／打印、备份恢复和退出清理。未经实跑不声明通过，不执行 Windows Authenticode、Developer ID 或 Apple 公证。
