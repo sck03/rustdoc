@@ -52,6 +52,8 @@ OCR 同样按目标 OS/架构组装 Rust worker、ONNX 和模型。2026-10-15 �
 
 2026-09-30 本地 `-Edition Full` 支持 SQLite 单机测试便携包。Windows GNU Debug `-WithoutOcr` 实際包已启动 Tauri/WebView2，核对完整导航、默认首页、人员/OA/账号/公告/通知及单证/销售 API、公告页面截图和正常退出/端口关闭；实际记录见进度文档。Full 测试包不加入正式 All、安装器和更新发布矩阵；其它平台和 OCR/打印等能力不由这次布局验证代替。
 
+2026-10-25 后续修复的 GNU/Debug/Full SQLite/含 OCR 包为 `artifacts/project-completion-desktop/ExportDocManager.Tauri.Full`，来源 `117e2873e543`。完整窗口回归、33 张截图、16 页渲染 PDF、七组 OCR 与 PDFium worker 通过；新退出专项覆盖正常/重复/宿主异常退出及独立窗口。原始截图和测试数据按用户追加授权可在总结后清理，实施数字和清理回执见当日进度，不扩大其它平台验收声明。
+
 ## 2026-09-28 Windows 退出清理
 
 `desktop_runtime` 区分运行、正在清理和清理完成；并发退出只启动一个清理线程，其余请求继续等待。后端关闭在工作线程执行，保持现有 45 秒等待上限和错误日志；退出前显式销毁 WebView 窗口，让 wry 关闭平台控制器，不依赖 `App::run` 直接退出进程后的 Rust 析构。
