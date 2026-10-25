@@ -253,7 +253,7 @@ Runtime image boundary: PostgreSQL client tools and their native library closure
 | cssparser-macros | 0.7.1 | MPL-2.0 | native-desktop |
 | ctor | 1.0.13 | Apache-2.0 OR MIT | native-desktop |
 | ctr | 0.10.1 | MIT OR Apache-2.0 | native-desktop |
-| ctutils | 0.4.3 | Apache-2.0 OR MIT | native-desktop |
+| ctutils | 0.4.4 | Apache-2.0 OR MIT | native-desktop |
 | darling | 0.24.1 | MIT | native-desktop |
 | darling_core | 0.24.1 | MIT | native-desktop |
 | darling_macro | 0.24.1 | MIT | native-desktop |

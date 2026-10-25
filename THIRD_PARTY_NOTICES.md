@@ -115,7 +115,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | cssparser-macros | 0.7.1 | MPL-2.0 | native-desktop |
 | cargo | ctor | 1.0.13 | Apache-2.0 OR MIT | native-desktop |
 | cargo | ctr | 0.10.1 | MIT OR Apache-2.0 | native-desktop |
-| cargo | ctutils | 0.4.3 | Apache-2.0 OR MIT | native-desktop |
+| cargo | ctutils | 0.4.4 | Apache-2.0 OR MIT | native-desktop |
 | cargo | darling | 0.24.1 | MIT | native-desktop |
 | cargo | darling_core | 0.24.1 | MIT | native-desktop |
 | cargo | darling_macro | 0.24.1 | MIT | native-desktop |
