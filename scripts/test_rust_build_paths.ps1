@@ -142,10 +142,11 @@ try {
     $nestedGit = Join-Path $output 'Web/repository/.git'
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $nestedGit) | Out-Null
     [IO.File]::WriteAllText($nestedGit, 'gitdir: protected')
+    if ($IsWindows) { (Get-Item -LiteralPath $nestedGit -Force).Attributes = [IO.FileAttributes]::Hidden }
     $rejected = $false
     try { Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Web/assets/current.js' }) -OutputRoot $output } catch { $rejected = $true }
     if (-not $rejected -or -not (Test-Path -LiteralPath $legacyOcr)) { throw 'Nested Git boundary was traversed or package partially changed' }
-    Remove-Item -LiteralPath $nestedGit
+    Remove-Item -LiteralPath $nestedGit -Force
     $outside = Join-Path $fixture 'preserved-assets'
     New-Item -ItemType Directory -Path $outside | Out-Null
     $outsideFile = Join-Path $outside 'private-patch.txt'
