@@ -70,8 +70,15 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
   await read(page,"document.querySelector('[aria-label=编辑业务部]').click()");
   await clickText(page,"选择负责人");await waitFor(page,"document.querySelector('.organization-managers button')");
   await read(page,"document.querySelector('.organization-managers button').click()");
+  const managerDraft=await read(page,"document.querySelector('.office-dialog-body').innerText");
   await read(page,"document.querySelector('.office-dialog [aria-label=关闭窗口]').click()");
-  await waitFor(page,"document.body.innerText.includes('放弃未提交的内容')");
+  await waitFor(page,"document.querySelector('.confirmation-dialog')?.getAttribute('aria-modal')==='true'");
+  await clickText(page,"取消",".confirmation-dialog button");
+  assert.equal(await read(page,"document.querySelector('.office-dialog-body').innerText"),managerDraft,"cancelling close preserves the selected manager");
+  await read(page,"document.querySelector('.office-dialog [aria-label=关闭窗口]').click()");
+  await clickText(page,"关闭窗口",".confirmation-dialog button");
+  await waitFor(page,"!document.querySelector('.office-dialog, .confirmation-dialog')");
+  assert.equal(await read(page,"window.__officeCalls.some(call=>call.name==='updateDepartment')"),false,"discarding the manager draft must not save it");
   results.push("organization-manager-selection-unsaved-guard");
   await open("people",390);
   assert(await read(page,"Boolean(document.querySelector('a[href*=organization]'))"));

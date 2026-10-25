@@ -48,7 +48,7 @@ export async function verifyDesktopPersonnelDeletion({ run, request, token, cdp,
   await wait(`!${confirmation}`);
   assert(await run(`Boolean(${close})`), 'Cancel keeps the personnel draft open');
   await click(close);
-  await click("[...document.querySelectorAll('.confirmation-dialog button')].find(e=>e.textContent.trim()==='放弃并关闭')");
+  await click("[...document.querySelectorAll('.confirmation-dialog button')].find(e=>e.textContent.trim()==='关闭窗口')");
   await wait("!document.querySelector('[role=dialog]')");
   assert.equal((await request('GetPersonnel', token, undefined, { id: unlinked.employee.id })).body.versionNumber, unlinked.versionNumber, 'Discard does not save personnel changes');
   await run(`${button}.click(); true`);

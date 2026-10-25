@@ -126,5 +126,60 @@ pub fn exercise(c: &Connection) {
         ids.iter()
             .all(|id| c.get("background-jobs", *id).unwrap().is_some())
     );
+    let mut inputs = vec![];
+    for (n, owner) in [1, 1, 1, 2, 2].into_iter().enumerate() {
+        let time = format!("2026-10-25T00:00:{n:02}Z");
+        let id = insert(
+            c,
+            "background-jobs",
+            json!({"requestedByUserId":owner,"status":if n%2==0 {"Failed"} else {"Canceled"},"createdAt":time,"completedAt":time}),
+            owner,
+        );
+        c.insert_blob(&BlobWrite {
+            kind: "job-input",
+            record_id: id,
+            file_name: "input.xlsx",
+            media_type: "application/octet-stream",
+            digest: "test",
+            content: b"123456",
+            created_at: &time,
+        })
+        .unwrap();
+        inputs.push(id);
+    }
+    for status in ["Succeeded", "Running"] {
+        let id = insert(
+            c,
+            "background-jobs",
+            json!({"requestedByUserId":1,"status":status,"createdAt":"2026-10-25T00:01:00Z","completedAt":"2026-10-25T00:01:00Z"}),
+            1,
+        );
+        c.insert_blob(&BlobWrite {
+            kind: "job-input",
+            record_id: id,
+            file_name: "input.xlsx",
+            media_type: "application/octet-stream",
+            digest: "test",
+            content: b"123456",
+            created_at: "2026-10-25T00:01:00Z",
+        })
+        .unwrap();
+        inputs.push(id);
+    }
+    assert_eq!(c.job_input_bytes().unwrap(), 42);
+    let expired = c.expired_job_inputs(&policy).unwrap();
+    assert_eq!(
+        expired
+            .iter()
+            .map(|row| row["id"].as_i64().unwrap())
+            .collect::<Vec<_>>(),
+        vec![inputs[0], inputs[1], inputs[5]]
+    );
+    for row in expired {
+        c.delete_blob(row["id"].as_i64().unwrap(), "job-input")
+            .unwrap();
+    }
+    assert_eq!(c.job_input_bytes().unwrap(), 24);
+    assert!(c.expired_job_inputs(&policy).unwrap().is_empty());
     c.rollback().unwrap();
 }

@@ -283,7 +283,7 @@ impl<RS: Read + Seek> Xlsb<RS> {
                 ],
                 &mut buf,
             )?; // BrtSSTItem
-            self.strings.push(wide_str(&buf[1..], &mut 0)?.into_owned());
+            crate::read_limits::push(&mut self.strings, wide_str(&buf[1..], &mut 0)?.into_owned())?;
         }
         Ok(())
     }
@@ -360,12 +360,15 @@ impl<RS: Read + Seek> Xlsb<RS> {
                 0x016A => {
                     // BrtExternSheet
                     let _len = iter.fill_buffer(&mut buf)?;
-                    let cxti = read_u32(&buf[..4]) as usize;
-                    if cxti < 1_000_000 {
-                        self.extern_sheets.reserve(cxti);
+                    let count_bytes = buf.get(..4).ok_or_else(crate::read_limits::invalid)?;
+                    let cxti = read_u32(count_bytes) as usize;
+                    crate::read_limits::bytes::<String>(cxti)?;
+                    if buf.len() < 4 || (buf.len() - 4) / 12 < cxti {
+                        return Err(crate::read_limits::invalid().into());
                     }
                     let sheets = &self.sheets;
-                    let extern_sheets = buf[4..]
+                    let mut extern_sheets = Vec::new();
+                    for name in buf[4..]
                         .chunks(12)
                         .map(|xti| {
                             match read_i32(&xti[4..8]) {
@@ -377,7 +380,9 @@ impl<RS: Read + Seek> Xlsb<RS> {
                             .to_string()
                         })
                         .take(cxti)
-                        .collect();
+                    {
+                        crate::read_limits::push(&mut extern_sheets, name)?;
+                    }
                     self.extern_sheets = extern_sheets;
                 }
                 0x0027 => {
@@ -560,13 +565,13 @@ impl<RS: Read + Seek> Reader<RS> for Xlsb<RS> {
     /// MS-XLSB 2.1.7.62
     fn worksheet_formula(&mut self, name: &str) -> Result<Range<String>, XlsbError> {
         let mut cells_reader = self.worksheet_cells_reader(name)?;
-        let mut cells = Vec::with_capacity(cells_reader.dimensions().len().min(1_000_000) as _);
+        let mut cells = Vec::with_capacity(cells_reader.dimensions().len().min(100_000) as _);
         while let Some(cell) = cells_reader.next_formula()? {
             if !cell.val.is_empty() {
-                cells.push(cell);
+                crate::read_limits::push(&mut cells, cell)?;
             }
         }
-        Ok(Range::from_sparse(cells))
+        Ok(Range::from_sparse_bounded(cells)?)
     }
 
     /// MS-XLSB 2.1.7.62
@@ -610,7 +615,7 @@ impl<RS: Read + Seek> ReaderRef<RS> for Xlsb<RS> {
                             val: DataRef::Empty,
                             ..
                         })) => (),
-                        Ok(Some(cell)) => cells.push(cell),
+                        Ok(Some(cell)) => crate::read_limits::push(&mut cells, cell)?,
                         Ok(None) => break,
                         Err(e) => return Err(e),
                     }
@@ -626,7 +631,7 @@ impl<RS: Read + Seek> ReaderRef<RS> for Xlsb<RS> {
                         })) => (),
                         Ok(Some(cell)) => {
                             if cell.pos.0 >= header_row_idx {
-                                cells.push(cell);
+                                crate::read_limits::push(&mut cells, cell)?;
                             }
                         }
                         Ok(None) => break,
@@ -637,21 +642,19 @@ impl<RS: Read + Seek> ReaderRef<RS> for Xlsb<RS> {
                 // If `header_row` is set and the first non-empty cell is not at the `header_row`, we add
                 // an empty cell at the beginning with row `header_row` and same column as the first non-empty cell.
                 if cells.first().is_some_and(|c| c.pos.0 != header_row_idx) {
-                    cells.insert(
-                        0,
+                    let first_column = cells.first().expect("cells should not be empty").pos.1;
+                    crate::read_limits::insert_first(
+                        &mut cells,
                         Cell {
-                            pos: (
-                                header_row_idx,
-                                cells.first().expect("cells should not be empty").pos.1,
-                            ),
+                            pos: (header_row_idx, first_column),
                             val: DataRef::Empty,
                         },
-                    );
+                    )?;
                 }
             }
         }
 
-        Ok(Range::from_sparse(cells))
+        Ok(Range::from_sparse_bounded(cells)?)
     }
 }
 
@@ -710,7 +713,10 @@ where
             b = self.read_u8()?;
             len += ((b & 0x7F) as usize) << (7 * i);
         }
+        crate::read_limits::bytes::<u8>(len)?;
         if buf.len() < len {
+            buf.try_reserve_exact(len - buf.len())
+                .map_err(|_| crate::read_limits::invalid())?;
             buf.resize(len, 0);
         }
 

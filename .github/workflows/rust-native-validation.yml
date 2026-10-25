@@ -20,6 +20,9 @@ on:
       - VisualCppRuntime/**
       - eng/native-runtime-packages.json
       - tests/OcrFixtures/**
+      - tests/ReportTemplateFixtures/**
+      - third_party/**
+      - scripts/test_editor_state_regressions_ui.mjs
       - scripts/test_native_*.mjs
       - scripts/lib/native-*.ps1
       - scripts/lib/*support*.ps1
@@ -181,6 +184,7 @@ jobs:
           npm --prefix apps/export-doc-web run test:report-designer-v3
           npm --prefix apps/export-doc-web run test:abortable-operations-ui
           npm --prefix apps/export-doc-web run test:email-template-workspace-ui
+          npm --prefix apps/export-doc-web run test:concurrency-feedback
           npm --prefix apps/export-doc-web run test:browser-session-contracts
 
   browser-server:

@@ -1,9 +1,12 @@
-use export_doc_domain::designer::Design;
+#[cfg(test)]
+#[path = "../../../tests/ReportTemplateFixtures/designer_fixture.rs"]
+mod fixture;
+
 use export_doc_report::{ReportData, render_design};
 use std::sync::atomic::AtomicBool;
 #[test]
 fn full_custom_paper_contract_is_accepted_by_layout() {
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     for layer in &mut design.layers {
         layer.elements.clear();
     }

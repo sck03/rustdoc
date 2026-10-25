@@ -1,12 +1,13 @@
-use export_doc_domain::{
-    designer::Design,
-    report_template_format::{decode, encode},
-};
+#[cfg(test)]
+#[path = "../../../tests/ReportTemplateFixtures/designer_fixture.rs"]
+mod fixture;
+
+use export_doc_domain::report_template_format::{decode, encode};
 use sha2::{Digest, Sha256};
 
 #[test]
 fn template_container_rejects_forged_expanded_lengths() {
-    let design = Design::invoice();
+    let design = fixture::invoice();
     let original = encode(&design).unwrap();
     assert_eq!(decode(&original).unwrap(), design);
     // The SHA-256 is public integrity metadata, not an excuse to trust ZIP sizes.

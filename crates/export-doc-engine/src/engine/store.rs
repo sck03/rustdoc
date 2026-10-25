@@ -401,6 +401,9 @@ pub fn save_in_scope(
             .filter(|key| !key.is_empty())
             .map(|key| normalize(&key))
     };
+    if id > 0 {
+        identify_record(&mut body, kind, id);
+    }
     let record = RecordWrite {
         kind,
         identity: identity.as_deref(),
@@ -414,16 +417,10 @@ pub fn save_in_scope(
         }
         id
     };
-    body["id"] = json!(record_id);
-    if kind == "invoices" {
-        for item in body["items"].as_array_mut().into_iter().flatten() {
-            item["invoiceId"] = json!(record_id);
-        }
+    if id == 0 {
+        identify_record(&mut body, kind, record_id);
+        connection.set_body(record_id, &body)?;
     }
-    if kind == "people" {
-        body["employee"]["id"] = json!(record_id);
-    }
-    connection.set_body(record_id, &body)?;
     connection.append_audit_details(
         &AuditWrite {
             kind,
@@ -437,6 +434,18 @@ pub fn save_in_scope(
         &super::audit_values::changes(previous.as_ref(), Some(&body)),
     )?;
     Ok(body)
+}
+
+fn identify_record(body: &mut Value, kind: &str, id: i64) {
+    body["id"] = json!(id);
+    if kind == "invoices" {
+        for item in body["items"].as_array_mut().into_iter().flatten() {
+            item["invoiceId"] = json!(id);
+        }
+    }
+    if kind == "people" {
+        body["employee"]["id"] = json!(id);
+    }
 }
 
 pub fn history(connection: &Connection, kind: &str, id: i64) -> Result<Vec<Value>> {

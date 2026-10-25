@@ -9,6 +9,9 @@ mod error;
 mod fonts;
 mod layout;
 pub mod packing;
+#[cfg(test)]
+#[path = "../../../tests/ReportTemplateFixtures/designer_fixture.rs"]
+pub(crate) mod test_design_fixture;
 
 pub use archive::{DocumentArchive, zip_documents};
 pub use builtin::{BUILTINS, Builtin, render_builtin};

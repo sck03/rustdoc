@@ -44,6 +44,20 @@ impl OperationScope {
         drop(restore);
         result
     }
+
+    /// Preserve the execution boundary even when an optional capability erases
+    /// the structured cancellation error while converting its own result.
+    pub fn run_result<T>(
+        &self,
+        operation: impl FnOnce() -> Result<T, ApiError>,
+    ) -> Result<T, ApiError> {
+        self.run(|| {
+            check()?;
+            let result = operation();
+            check()?;
+            result
+        })
+    }
 }
 
 pub fn check() -> Result<(), ApiError> {
@@ -69,4 +83,44 @@ pub fn cancellation_flag() -> Arc<AtomicBool> {
             .map(OperationScope::cancellation_flag)
             .unwrap_or_else(|| Arc::new(AtomicBool::new(false)))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn result_boundary_preserves_cancellation_after_an_adapter_erases_the_error() {
+        let scope = OperationScope::new(Duration::from_secs(30));
+        let result: Result<(), ApiError> = scope.run_result(|| {
+            scope.cancel();
+            Err(ApiError {
+                status: Some(400),
+                message: "stringified cancellation".into(),
+                diagnostic: None,
+            })
+        });
+        assert_eq!(result.unwrap_err().status, Some(504));
+        check().unwrap(); // The caller's scope is restored on error too.
+    }
+
+    #[test]
+    fn expired_work_does_not_start_and_genuine_validation_errors_keep_their_category() {
+        let mut started = false;
+        let result = OperationScope::new(Duration::ZERO).run_result(|| {
+            started = true;
+            Ok(())
+        });
+        assert!(!started);
+        assert_eq!(result.unwrap_err().status, Some(504));
+        let result: Result<(), ApiError> =
+            OperationScope::new(Duration::from_secs(30)).run_result(|| {
+                Err(ApiError {
+                    status: Some(400),
+                    message: "invalid format".into(),
+                    diagnostic: None,
+                })
+            });
+        assert_eq!(result.unwrap_err().status, Some(400));
+    }
 }

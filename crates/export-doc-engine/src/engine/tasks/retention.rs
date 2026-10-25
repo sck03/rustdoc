@@ -112,6 +112,23 @@ pub(super) fn prune(store: &Store, policy: Retention, now: DateTime<Utc>) -> Res
                 )?;
             }
         }
+        // Reuse the same bounded per-user/global policy for retry workbooks.
+        // Successful jobs never need their input; failed/canceled jobs retain only the newest budget.
+        loop {
+            crate::operation::check()?;
+            let rows = tx.expired_job_inputs(&outputs)?;
+            if rows.is_empty() {
+                break;
+            }
+            for row in rows {
+                super::persistence::expire_input(
+                    tx,
+                    row["id"]
+                        .as_i64()
+                        .ok_or_else(|| super::super::error::unavailable("任务编号无效。"))?,
+                )?;
+            }
+        }
         Ok(removed)
     })
 }

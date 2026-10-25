@@ -1,3 +1,7 @@
+#[cfg(test)]
+#[path = "../../../tests/ReportTemplateFixtures/designer_fixture.rs"]
+mod fixture;
+
 use export_doc_domain::{
     designer::{Design, Kind},
     invoice::InvoiceDraft,
@@ -7,7 +11,7 @@ use serde_json::json;
 use std::sync::atomic::AtomicBool;
 
 fn design() -> Design {
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     let seed = design.layers[0].elements[0].clone();
     for layer in &mut design.layers {
         layer.elements.clear();

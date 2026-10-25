@@ -10,6 +10,8 @@ import { isConcurrencyConflict, normalizeText, readApiError, readRouteSuccessMes
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useScopedSave } from "../../ui/useScopedSave.ts";
+import { isAbortError } from "../../ui/useAbortableOperation.ts";
 import { ConcurrencyConflictNotice, InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import {
   hasCustomOptionValue,
@@ -50,6 +52,7 @@ export function PaymentEditorPage({
   const parsedPaymentId = Number(paymentId);
   const isNew = mode === "new";
   const isPaymentIdValid = Number.isInteger(parsedPaymentId) && parsedPaymentId > 0;
+  const saveBoundary = useScopedSave(isNew ? "payment:new" : `payment:${parsedPaymentId}`, client);
   const queryClient = useQueryClient();
   const formRef = useRef<HTMLFormElement>(null);
   const settingsQuery = useQuery({
@@ -104,11 +107,11 @@ export function PaymentEditorPage({
   }, [paymentQuery.error, paymentQuery.isError, isNew]);
 
   const savePaymentMutation = useMutation({
-    mutationFn: (body: ApiPaymentDto) =>
-      isNew
-        ? client.createPayment({ body })
-        : client.updatePayment({ id: parsedPaymentId, body }),
-    onSuccess: async (response) => {
+    mutationFn: (body: ApiPaymentDto) => saveBoundary.run(async ({ signal, checkCurrent, continueInScope }) => {
+      const response = await (isNew
+        ? client.createPayment({ body }, { signal })
+        : client.updatePayment({ id: parsedPaymentId, body }, { signal }));
+      checkCurrent();
       const nextMessage = isNew ? "付款报销已创建。" : "付款报销已保存。";
       setPayment(response.payment);
       setPersistedPaymentSnapshot(buildPaymentSnapshot(response.payment, response.id));
@@ -116,15 +119,18 @@ export function PaymentEditorPage({
       setConcurrencyMessage(null);
       setSuccessMessage(nextMessage);
       queryClient.setQueryData(queryKeys.payment(response.id), response.payment);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.paymentsRoot() });
       if (isNew) {
+        continueInScope(`payment:${response.id}`);
         navigate(`/payments/${response.id}${location.search}`, {
           replace: true,
           state: { successMessage: "付款报销已创建。" },
         });
       }
-    },
+      try { await queryClient.invalidateQueries({ queryKey: queryKeys.paymentsRoot() }); }
+      catch (error) { checkCurrent(); setMessage(`付款报销已保存，但列表刷新失败：${readApiError(error)}`); }
+    }),
     onError: (error) => {
+      if (isAbortError(error)) return;
       const nextMessage = readApiError(error);
       setMessage(isConcurrencyConflict(error) ? null : nextMessage);
       setConcurrencyMessage(isConcurrencyConflict(error) ? nextMessage : null);
@@ -133,21 +139,23 @@ export function PaymentEditorPage({
   });
 
   const deletePaymentMutation = useMutation({
-    mutationFn: () => client.deletePayment({ id: parsedPaymentId, rowVersion: payment?.rowVersion ?? "" }),
-    onSuccess: async (response) => {
+    mutationFn: () => saveBoundary.run(async ({ signal, checkCurrent }) => {
+      const response = await client.deletePayment({ id: parsedPaymentId, rowVersion: payment?.rowVersion ?? "" }, { signal });
+      checkCurrent();
       setMessage(null);
       setSuccessMessage(null);
       queryClient.removeQueries({ queryKey: queryKeys.payment(parsedPaymentId) });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.paymentsRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() }),
-      ]);
       navigate("/payments", {
         replace: true,
         state: { successMessage: response.message || "付款报销已删除。" },
       });
-    },
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.paymentsRoot() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() }),
+      ]);
+    }),
     onError: (error) => {
+      if (isAbortError(error)) return;
       setMessage(readApiError(error));
       setSuccessMessage(null);
     },
@@ -164,7 +172,7 @@ export function PaymentEditorPage({
     },
   });
 
-  const isBusy = paymentQuery.isFetching || savePaymentMutation.isPending || deletePaymentMutation.isPending;
+  const isBusy = paymentQuery.isFetching || saveBoundary.isSaving;
   const paymentCustomOptions = customOptionsQuery.data ?? {};
   const payerNameOptions = useMemo(
     () => paymentCustomOptions.PaymentPayerName ?? [],

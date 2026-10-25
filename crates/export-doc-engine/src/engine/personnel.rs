@@ -22,13 +22,25 @@ pub(super) fn registration(
     let mut submitted = request.clone();
     submitted.sort_all_objects();
     let digest = media::digest(&serde_json::to_vec(&submitted)?);
-    if let Some(existing) = store::all(transaction, "people")?
+    if let Some(existing) = transaction
+        .query_generic(&export_doc_storage::GenericQuery {
+            kind: "people",
+            scope: export_doc_storage::DataScope {
+                own: true,
+                company: &actor.company,
+                user_id: actor.id,
+                ..Default::default()
+            },
+            filters: &[("requestKey", records::text(request, "requestKey"))],
+            keyword: "",
+            search_root: None,
+            fields: &[],
+            offset: 0,
+            limit: 1,
+        })?
+        .1
         .into_iter()
-        .find(|person| {
-            person["companyScope"] == actor.company
-                && person["ownerUserId"] == actor.id
-                && person["requestKey"] == request["requestKey"]
-        })
+        .next()
     {
         if existing["registrationDigest"] != digest {
             return Err(conflict("同一请求编号不能用于不同入职资料。"));

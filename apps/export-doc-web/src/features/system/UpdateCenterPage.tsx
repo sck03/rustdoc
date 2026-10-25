@@ -76,7 +76,7 @@ export function UpdateCenterPage({ client, sessionToken }: { client: ExportDocMa
     setIsBusy(true);
     setMessage(null);
     setInstallResult(null);
-    setUpdateProgress(null);
+    setUpdateProgress({ phase: "preparing", downloadedBytes: 0, statusText: "正在检查新版本。" });
     try {
       const result = await checkTauriUpdate(sessionToken, updaterEndpoint || undefined);
       if (!result) {
@@ -85,15 +85,19 @@ export function UpdateCenterPage({ client, sessionToken }: { client: ExportDocMa
 
       setCheckedEndpoint(updaterEndpoint);
       setCheckResult(result);
+      setUpdateProgress(result.errorMessage ? { phase: "failed", downloadedBytes: 0, statusText: result.statusText } : null);
       setMessage(result.statusText || (result.updateAvailable ? "发现新版本。" : "当前已是最新版本。"));
       setMessageType(result.errorMessage ? "error" : "success");
     } catch (error) {
       setCheckedEndpoint(null);
       setCheckResult(null);
-      setMessage(readApiError(error));
-      setMessageType("error");
+      const errorMessage = readApiError(error);
+      setUpdateProgress(current => ({ ...current, phase: errorMessage.includes("已取消") ? "canceled" : "failed", downloadedBytes: current?.downloadedBytes ?? 0, statusText: errorMessage }));
+      setMessage(errorMessage);
+      setMessageType(errorMessage.includes("已取消") ? "success" : "error");
     } finally {
       setIsBusy(false);
+      setIsCanceling(false);
     }
   }
 
@@ -127,6 +131,7 @@ export function UpdateCenterPage({ client, sessionToken }: { client: ExportDocMa
     } catch (error) {
       const errorMessage = readApiError(error);
       const canceled = errorMessage.includes("已取消");
+      setUpdateProgress(current => ({ ...current, phase: canceled ? "canceled" : "failed", downloadedBytes: current?.downloadedBytes ?? 0, statusText: errorMessage }));
       setMessage(canceled ? "更新下载已取消，未修改当前安装。" : errorMessage);
       setMessageType(canceled ? "success" : "error");
     } finally {
@@ -172,7 +177,7 @@ export function UpdateCenterPage({ client, sessionToken }: { client: ExportDocMa
           {isBusy ? (
             <button className="command-button secondary" type="button" disabled={!canCancel} onClick={cancelUpdate}>
               <X size={17} aria-hidden="true" />
-              <span>{isCanceling ? "正在取消" : "取消下载"}</span>
+              <span>{isCanceling ? "正在取消" : "取消更新"}</span>
             </button>
           ) : null}
         </div>
@@ -192,7 +197,7 @@ export function UpdateCenterPage({ client, sessionToken }: { client: ExportDocMa
           <DetailItem
             label="检查结果"
             value={checkResult
-              ? (checkResult.updateAvailable
+              ? (checkResult.errorMessage ? "检查未完成" : checkResult.updateAvailable
                 ? (checkResult.installSupported ? "发现可安装的新版本" : "发现新版便携包")
                 : "已是最新版本")
               : "-"}
@@ -247,10 +252,11 @@ function formatDateTime(value?: string) {
 }
 
 function formatUpdateProgress(progress: TauriUpdaterProgress) {
+  if (progress.phase === "failed") return "更新失败，可重试";
+  if (progress.phase === "canceled") return "已取消";
   if (typeof progress.progressPercent === "number") return `${progress.progressPercent}%`;
   if (progress.phase === "verifying") return "校验中";
   if (progress.phase === "installing") return "安装中";
   if (progress.phase === "restarting") return "即将重启";
-  if (progress.phase === "canceled") return "已取消";
   return "准备中";
 }

@@ -351,7 +351,10 @@ impl<RS: Read + Seek> Xlsx<RS> {
                 Ok(Event::Start(e)) if e.local_name().as_ref() == "sst" => {
                     if let Some(count) = e.raw_attr("uniqueCount")? {
                         if let Ok(n) = atoi_simd::parse::<usize, true, false>(count.as_bytes()) {
-                            self.strings.reserve(n);
+                            crate::read_limits::bytes::<String>(n)?;
+                            self.strings
+                                .try_reserve_exact(n.min(100_000))
+                                .map_err(|_| crate::read_limits::invalid())?;
                         }
                     }
                     break;
@@ -371,7 +374,7 @@ impl<RS: Read + Seek> Xlsx<RS> {
                     if let Some(s) =
                         read_string_with_bufs(&mut xml, e.name(), &mut str_buf, &mut str_val_buf)?
                     {
-                        self.strings.push(s);
+                        crate::read_limits::push(&mut self.strings, s)?;
                     }
                 }
                 Ok(Event::End(e)) if e.local_name().as_ref() == "sst" => break,
@@ -2674,10 +2677,10 @@ impl<RS: Read + Seek> Reader<RS> for Xlsx<RS> {
         }
         while let Some(cell) = cell_reader.next_formula()? {
             if !cell.val.is_empty() {
-                cells.push(cell);
+                crate::read_limits::push(&mut cells, cell)?;
             }
         }
-        Ok(Range::from_sparse(cells))
+        Ok(Range::from_sparse_bounded(cells)?)
     }
 
     fn worksheets(&mut self) -> Vec<(String, Range<Data>)> {
@@ -2736,7 +2739,7 @@ impl<RS: Read + Seek> ReaderRef<RS> for Xlsx<RS> {
                             val: DataRef::Empty,
                             ..
                         })) => (),
-                        Ok(Some(cell)) => cells.push(cell),
+                        Ok(Some(cell)) => crate::read_limits::push(&mut cells, cell)?,
                         Ok(None) => break,
                         Err(e) => return Err(e),
                     }
@@ -2752,7 +2755,7 @@ impl<RS: Read + Seek> ReaderRef<RS> for Xlsx<RS> {
                         })) => (),
                         Ok(Some(cell)) => {
                             if cell.pos.0 >= header_row_idx {
-                                cells.push(cell);
+                                crate::read_limits::push(&mut cells, cell)?;
                             }
                         }
                         Ok(None) => break,
@@ -2763,21 +2766,19 @@ impl<RS: Read + Seek> ReaderRef<RS> for Xlsx<RS> {
                 // If `header_row` is set and the first non-empty cell is not at the `header_row`, we add
                 // an empty cell at the beginning with row `header_row` and same column as the first non-empty cell.
                 if cells.first().is_some_and(|c| c.pos.0 != header_row_idx) {
-                    cells.insert(
-                        0,
+                    let first_column = cells.first().expect("cells should not be empty").pos.1;
+                    crate::read_limits::insert_first(
+                        &mut cells,
                         Cell {
-                            pos: (
-                                header_row_idx,
-                                cells.first().expect("cells should not be empty").pos.1,
-                            ),
+                            pos: (header_row_idx, first_column),
                             val: DataRef::Empty,
                         },
-                    );
+                    )?;
                 }
             }
         }
 
-        Ok(Range::from_sparse(cells))
+        Ok(Range::from_sparse_bounded(cells)?)
     }
 }
 

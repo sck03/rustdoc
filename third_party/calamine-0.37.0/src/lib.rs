@@ -86,6 +86,7 @@ mod cfb;
 mod datatype;
 mod formats;
 mod ods;
+mod read_limits;
 mod xls;
 mod xlsb;
 mod xlsx;
@@ -1006,8 +1007,27 @@ impl<T: CellType> Range<T> {
     /// ```
     ///
     pub fn from_sparse(cells: Vec<Cell<T>>) -> Range<T> {
+        Self::from_sparse_inner(cells, false).expect("invalid sparse range allocation")
+    }
+
+    pub(crate) fn sparse_read_bytes(cells: &[Cell<T>]) -> std::io::Result<usize> {
+        let Some((start, end)) = Self::sparse_bounds(cells) else {
+            return Ok(0);
+        };
+        let count = (u64::from(end.0) - u64::from(start.0) + 1)
+            .checked_mul(u64::from(end.1) - u64::from(start.1) + 1)
+            .and_then(|count| usize::try_from(count).ok())
+            .ok_or_else(read_limits::invalid)?;
+        read_limits::bytes::<T>(count)
+    }
+
+    pub(crate) fn from_sparse_bounded(cells: Vec<Cell<T>>) -> std::io::Result<Range<T>> {
+        Self::from_sparse_inner(cells, true)
+    }
+
+    fn sparse_bounds(cells: &[Cell<T>]) -> Option<((u32, u32), (u32, u32))> {
         if cells.is_empty() {
-            return Range::empty();
+            return None;
         }
         // cells do not always appear in (row, col) order
         // search bounds
@@ -1021,11 +1041,25 @@ impl<T: CellType> Range<T> {
             col_start = min(c, col_start);
             col_end = max(c, col_end);
         }
-        let cols = (col_end - col_start + 1) as usize;
-        let rows = (row_end - row_start + 1) as usize;
-        let len = cols.saturating_mul(rows);
-        let mut v = vec![T::default(); len];
-        v.shrink_to_fit();
+        Some(((row_start, col_start), (row_end, col_end)))
+    }
+
+    fn from_sparse_inner(cells: Vec<Cell<T>>, bounded: bool) -> std::io::Result<Range<T>> {
+        let Some(((row_start, col_start), (row_end, col_end))) = Self::sparse_bounds(&cells) else {
+            return Ok(Range::empty());
+        };
+        let cols = usize::try_from(u64::from(col_end) - u64::from(col_start) + 1)
+            .map_err(|_| read_limits::invalid())?;
+        let rows = usize::try_from(u64::from(row_end) - u64::from(row_start) + 1)
+            .map_err(|_| read_limits::invalid())?;
+        let len = cols.checked_mul(rows).ok_or_else(read_limits::invalid)?;
+        if bounded {
+            read_limits::bytes::<T>(len)?;
+        }
+        let mut v = Vec::new();
+        v.try_reserve_exact(len)
+            .map_err(|_| read_limits::invalid())?;
+        v.resize(len, T::default());
         for c in cells {
             let row = (c.pos.0 - row_start) as usize;
             let col = (c.pos.1 - col_start) as usize;
@@ -1034,11 +1068,11 @@ impl<T: CellType> Range<T> {
                 *v = c.val;
             }
         }
-        Range {
+        Ok(Range {
             start: (row_start, col_start),
             end: (row_end, col_end),
             inner: v,
-        }
+        })
     }
 
     /// Set a value at an absolute position in a `Range`.

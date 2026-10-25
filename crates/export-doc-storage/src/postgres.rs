@@ -221,6 +221,10 @@ impl Adapter for Postgres {
         let size = self.client.borrow_mut().query_one("SELECT COALESCE(SUM(octet_length(content)),0)::bigint FROM files WHERE kind='job-output'", &[])?.try_get::<_, i64>(0)?;
         u64::try_from(size).map_err(|_| Error::unavailable("任务容量无效。"))
     }
+    fn job_input_bytes(&self) -> Result<u64> {
+        let size = self.client.borrow_mut().query_one("SELECT COALESCE(SUM(octet_length(content)),0)::bigint FROM files WHERE kind='job-input'", &[])?.try_get::<_, i64>(0)?;
+        u64::try_from(size).map_err(|_| Error::unavailable("任务输入容量无效。"))
+    }
     fn query_communications(&self, q: &CommunicationQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = communication::sql(q, true);
         self.query_page(&sql, "r.body::text", q.offset, q.limit.clamp(1, 100))
@@ -401,6 +405,12 @@ impl Adapter for Postgres {
     }
     fn history(&self, kind: Option<&str>, id: Option<i64>) -> Result<Vec<Value>> {
         self.client.borrow_mut().query("SELECT id,kind,record_id,version,action,actor_id,occurred_at,note FROM history WHERE ($1::text IS NULL OR kind=$1) AND ($2::bigint IS NULL OR record_id=$2) ORDER BY id DESC LIMIT 10000",&[&kind,&id])?.into_iter().map(|r|Ok(json!({"id":r.try_get::<_,i64>(0)?,"module":r.try_get::<_,String>(1)?,"recordId":r.try_get::<_,i64>(2)?,"versionNumber":r.try_get::<_,i64>(3)?,"action":r.try_get::<_,String>(4)?,"actorUserId":r.try_get::<_,i64>(5)?,"createdAt":r.try_get::<_,String>(6)?,"timestamp":r.try_get::<_,String>(6)?,"note":r.try_get::<_,String>(7)?,"description":r.try_get::<_,String>(7)?}))).collect()
+    }
+    fn has_history_except(&self, kind: &str, id: i64, allowed: &[&str]) -> Result<bool> {
+        Ok(self.client.borrow_mut().query_one(
+            "SELECT EXISTS(SELECT 1 FROM history WHERE kind=$1 AND record_id=$2 AND NOT(action=ANY($3)))",
+            &[&kind, &id, &allowed],
+        )?.try_get(0)?)
     }
     fn credential(&self, id: i64) -> Result<Option<Credential>> {
         self.client

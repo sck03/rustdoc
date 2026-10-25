@@ -9,6 +9,8 @@ use export_doc_storage::{AuditWrite, Connection};
 use serde_json::{Value, json};
 use unicode_normalization::UnicodeNormalization;
 mod queries;
+mod references;
+pub use references::check_references;
 
 pub fn find(operation: Operation) -> Option<&'static Resource> {
     RESOURCES.iter().find(|resource| {
@@ -763,9 +765,7 @@ pub fn delete(
             }
         }
         if ["rooms", "supplies"].contains(&resource.key)
-            && store::history(transaction, resource.key, record_id)?
-                .iter()
-                .any(|event| event["action"] != "create" && event["action"] != "edit")
+            && transaction.has_history_except(resource.key, record_id, &["create", "edit"])?
         {
             return Err(conflict("记录已有正式业务历史，请使用停用或离职流程。"));
         }
@@ -782,10 +782,13 @@ pub fn delete(
             &super::audit_values::changes(Some(&previous), None),
         )?;
         if resource.key == "people" {
-            for event in store::all(transaction, "personnel-events")?
-                .into_iter()
-                .filter(|event| event["employeeId"] == record_id)
-            {
+            transaction.delete_blobs(record_id)?;
+            for event in store::matching(
+                transaction,
+                "personnel-events",
+                &[("employeeId", record_id.to_string())],
+                &[],
+            )? {
                 if !transaction.delete(
                     "personnel-events",
                     event["id"]
@@ -808,87 +811,4 @@ pub fn delete(
         }
         Ok(json!({"success":true,"message":"已删除"}))
     })
-}
-
-pub fn check_references(connection: &Connection, kind: &str, record: &Value) -> Result<()> {
-    super::oa::approval_references::check(connection, kind, record)?;
-    super::communication::check_references(connection, kind, record)?;
-    if matches!(kind, "users" | "people")
-        && super::oa::references(
-            connection,
-            &text(record, "companyScope"),
-            if kind == "people" {
-                record["id"].as_i64()
-            } else {
-                None
-            },
-            if kind == "users" {
-                record["id"].as_i64()
-            } else {
-                None
-            },
-            false,
-        )? > 0
-    {
-        return Err(conflict("账号或人员已有行政审批历史，不能删除。"));
-    }
-    if matches!(kind, "companies" | "departments") {
-        let company = if kind == "companies" {
-            text(record, "code")
-        } else {
-            text(record, "companyCode")
-        };
-        let department = text(record, "code");
-        for request_kind in super::oa::KINDS {
-            if connection
-                .query_records(&export_doc_storage::RecordQuery {
-                    kind: request_kind,
-                    company: &company,
-                    department: (kind == "departments").then_some(department.as_str()),
-                    limit: 1,
-                    ..Default::default()
-                })?
-                .0
-                > 0
-            {
-                return Err(conflict("组织已有行政审批记录，不能删除。"));
-            }
-        }
-    }
-    const REFS: &[(&str, &str, &str)] = &[
-        ("users", "people", "account.id"),
-        ("users", "bookings", "ownerUserId"),
-        ("users", "supply-requests", "ownerUserId"),
-        ("customers", "invoices", "customerId"),
-        ("exporters", "invoices", "exporterId"),
-        ("payees", "payments", "payeeId"),
-        ("crm-customers", "crm-contacts", "crmCustomerId"),
-        ("crm-customers", "crm-follow-ups", "crmCustomerId"),
-        ("crm-customers", "opportunities", "crmCustomerId"),
-        ("suppliers", "supplier-contacts", "supplierCompanyId"),
-        ("suppliers", "supplier-products", "supplierCompanyId"),
-        ("suppliers", "supplier-assessments", "supplierCompanyId"),
-        ("products", "supplier-products", "productId"),
-        ("products", "opportunities", "productId"),
-        ("rooms", "bookings", "meetingRoomId"),
-        ("supplies", "supply-requests", "officeSupplyId"),
-        ("people", "bookings", "employeeId"),
-        ("people", "supply-requests", "employeeId"),
-        ("permission-templates", "users", "permissionTemplateId"),
-        ("invoices", "attachments", "invoiceId"),
-        ("attachment-categories", "attachments", "categoryId"),
-    ];
-    for (parent, child, property) in REFS.iter().filter(|(parent, _, _)| *parent == kind) {
-        let _ = parent;
-        if store::all(connection, child)?
-            .iter()
-            .any(|item| field(item, property) == &record["id"])
-        {
-            return Err(conflict("该记录已被业务引用，不能删除。"));
-        }
-    }
-    if ["companies", "departments"].contains(&kind) {
-        super::organization::check_references(connection, kind, record)?;
-    }
-    Ok(())
 }

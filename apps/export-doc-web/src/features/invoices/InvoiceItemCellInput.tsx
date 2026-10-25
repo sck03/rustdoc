@@ -101,16 +101,13 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
     const isForwardTyping = nextPrefix.length > previousPrefix.length;
     const matchingOptions = filterInvoiceItemHistoryOptionsByPrefix(options ?? [], rawValue);
 
-    if (!disabled && isForwardTyping && matchingOptions.length === 1) {
+    if (!disabled && column.kind !== "number" && isForwardTyping && matchingOptions.length === 1) {
       const option = matchingOptions[0];
-      if (column.kind !== "number") {
-        pendingAutocompleteSelectionRef.current = {
-          start: Math.min(rawValue.length, option.length),
-          end: option.length,
-        };
-      }
-
-      onChange(column.kind === "number" ? readInvoiceItemNumberInput(option) : option);
+      pendingAutocompleteSelectionRef.current = {
+        start: Math.min(rawValue.length, option.length),
+        end: option.length,
+      };
+      onChange(option);
       setIsHistoryOpen(false);
       return;
     }
@@ -173,7 +170,8 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
     }
 
     if (event.key === "Tab" && isHistoryOpen) {
-      applyActiveInlineOption();
+      if (column.kind !== "number") applyActiveInlineOption();
+      else setIsHistoryOpen(false);
     }
   }
 

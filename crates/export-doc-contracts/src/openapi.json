@@ -80330,6 +80330,11 @@
             "format": "int64",
             "minimum": 0
           },
+          "retainedInputBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
           "downloadMemory": {
             "type": "object",
             "properties": {
@@ -80364,6 +80369,7 @@
           "failed",
           "persistedCounts",
           "retainedOutputBytes",
+          "retainedInputBytes",
           "downloadMemory"
         ],
         "additionalProperties": false

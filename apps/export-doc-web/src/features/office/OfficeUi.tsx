@@ -2,23 +2,21 @@ import { useEffect, useId, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { useModalDialog } from "../../ui/useModalDialog.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import type { OfficePage } from "./officeModel.ts";
+import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 export function OfficeDialog({ title, children, onClose, busy = false, error = "", protectChanges = false, hasChanges = false }: {
   title: string; children: ReactNode; onClose: () => void; busy?: boolean; error?: string; protectChanges?: boolean; hasChanges?: boolean;
 }) {
   const titleId = useId();
   const [dirty, setDirty] = useState(false);
-  const requestConfirmation = useConfirmation();
+  const { confirmDiscardChanges } = useUnsavedChangesGuard({ isDirty: protectChanges && (dirty || hasChanges), message: `${title}有尚未保存的内容。` });
   function close() {
     if (busy) return;
-    if (!protectChanges || !dirty && !hasChanges) { onClose(); return; }
-    void requestConfirmation({ title: "放弃未提交的内容？", description: "当前填写内容尚未提交。", confirmLabel: "放弃并关闭" })
-      .then((accepted) => { if (accepted) onClose(); });
+    void confirmDiscardChanges("关闭窗口").then((accepted) => { if (accepted) onClose(); });
   }
   const ref = useModalDialog(close, { canClose: !busy });
   useEffect(() => { if (error) ref.current?.querySelectorAll("details").forEach(section => { section.open = true; }); }, [error, ref]);

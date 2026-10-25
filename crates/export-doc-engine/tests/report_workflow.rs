@@ -1,3 +1,7 @@
+#[cfg(test)]
+#[path = "../../../tests/ReportTemplateFixtures/designer_fixture.rs"]
+mod fixture;
+
 use base64::{Engine, engine::general_purpose::STANDARD};
 use export_doc_engine::{
     api::ApiClient,
@@ -377,7 +381,7 @@ fn builtins_images_pdf_jobs_and_backup_restore_share_the_business_store() {
 #[test]
 fn template_publication_sharing_history_and_concurrency_are_not_generic_record_updates() {
     let fixture = Fixture::new();
-    let content = serde_json::to_string(&Design::invoice()).unwrap();
+    let content = serde_json::to_string(&fixture::invoice()).unwrap();
     let template = fixture.create(
         CREATE_USER_REPORT_TEMPLATE,
         json!({"reportType":"ExportDocument","name":"共享模板","contentHtml":content}),
@@ -539,7 +543,7 @@ fn report_images_enforce_upload_ownership_and_references() {
             .status,
         Some(400)
     );
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     design.resources.push(serde_json::from_value(json!({"id":image["id"],"mediaType":image["mediaType"],"byteLength":image["byteLength"],"sha256":image["sha256"],"altText":"验证图片"})).unwrap());
     template::validate(&design, &field_catalog(&fixture.fields())).unwrap();
     let content = serde_json::to_string(&design).unwrap();

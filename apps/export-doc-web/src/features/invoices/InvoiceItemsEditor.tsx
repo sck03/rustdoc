@@ -18,7 +18,7 @@ import { InvoiceItemsTable } from "./InvoiceItemsTable.tsx";
 import { InvoiceItemsEditorDialogs } from "./InvoiceItemsEditorDialogs.tsx";
 import { useInvoiceItemsEditorInteraction } from "./useInvoiceItemsEditorInteraction.ts";
 import { invoiceItemUnitLookupTargets, isInvoiceItemArrowNavigationKey, isInvoiceItemCellInputTarget, isInvoiceItemVerticalNavigationKey, shouldMoveInvoiceItemCellByArrow } from "./invoiceItemsEditorInteraction.ts";
-import { isUnitLookupSourceField, buildUnitCandidateLookup, findChineseUnitCandidates, normalizeUnitEnglishKey, canFillDownSelectedCells, normalizeInvoiceItemBlankRowCount, buildSelectedCellsClipboardText, calculateInvoiceItemTableMinWidth, readItemTextValue, parseInvoiceItemClipboardRows, createEmptyInvoiceItem, calculateInvoiceTotals, isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
+import { isUnitLookupSourceField, buildUnitCandidateLookup, findChineseUnitCandidates, normalizeUnitEnglishKey, canFillDownSelectedCells, normalizeInvoiceItemBlankRowCount, buildSelectedCellsClipboardText, calculateInvoiceItemTableMinWidth, readItemTextValue, parseInvoiceItemClipboardRows, createEmptyInvoiceItem, isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
 import {
   EditableInvoiceItemField,
   firstEditableInvoiceItemField,
@@ -42,7 +42,7 @@ export function InvoiceItemsEditor({
   blankRowCount = 0,
   defaultSpareColumnCount = 0,
   currency,
-  exchangeRate,
+  totals,
   isProductLibraryBusy,
   readOnly = false,
   onAddItem,
@@ -190,10 +190,6 @@ export function InvoiceItemsEditor({
     visibleColumns,
   });
   const focusedRowIndex = activeFocusedCell?.rowIndex ?? null;
-  const totals = useMemo(
-    () => calculateInvoiceTotals(items, exchangeRate, currency),
-    [currency, exchangeRate, items],
-  );
   const meaningfulItemCount = useMemo(() => items.filter(isMeaningfulInvoiceItem).length, [items]);
   const hasFillDownSelection = canFillDownSelectedCells(selectedCells);
   const isFillDownAvailable =

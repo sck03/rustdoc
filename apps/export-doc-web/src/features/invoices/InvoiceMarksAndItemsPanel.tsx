@@ -306,7 +306,7 @@ export function InvoiceMarksAndItemsPanel({
         blankRowCount={invoiceItemBlankRowCount}
         defaultSpareColumnCount={defaultSpareColumnCount}
         currency={invoice.currency}
-        exchangeRate={invoice.exchangeRate}
+        totals={invoice}
         isProductLibraryBusy={isProductLibraryBusy}
         readOnly={!isEditable}
         onAddItem={onAddItem}

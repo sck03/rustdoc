@@ -278,8 +278,13 @@ fn collect_image(
     );
     Ok(())
 }
-fn export(service: &NativeService, actor: &Actor, id: i64) -> Result<Vec<u8>> {
-    let package = service.store.transaction(|tx| {
+fn export(
+    service: &NativeService,
+    actor: &Actor,
+    operation: Operation,
+    id: i64,
+) -> Result<Vec<u8>> {
+    let package = service.store.read_for(actor, operation, &[], |tx, actor| {
         let source = store::get(tx, "invoices", id)?;
         if !auth::visible(actor, "document.invoices", "view", &source)
             || !auth::visible(actor, "document.invoice-output", "export-zip", &source)
@@ -391,7 +396,7 @@ pub fn handle(
     .contains(&operation)
     {
         let id = records::id(parameters)?;
-        let bytes = export(service, actor, id)?;
+        let bytes = export(service, actor, operation, id)?;
         if operation == DOWNLOAD_INVOICE_TRANSFER_PACKAGE {
             return Ok(bytes);
         }

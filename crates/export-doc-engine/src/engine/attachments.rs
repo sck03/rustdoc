@@ -63,12 +63,12 @@ pub fn upload(
         let invoice = invoice_in(transaction, actor, invoice_id, "operate")?;
         let category = store::get(transaction,"attachment-categories",category_id)?;
         if category["companyScope"] != invoice["companyScope"] { return Err(error(403,"资料分类不属于发票所在公司。")); }
-        let attachments=store::all(transaction,"attachments")?;
-        if let Some(existing)=attachments.iter().find(|item|item["lastUploadKey"]==metadata["uploadKey"]){
+        let existing=transaction.query_generic(&export_doc_storage::GenericQuery {kind:"attachments",scope:export_doc_storage::DataScope {all:true,..Default::default()},filters:&[("lastUploadKey",text(&metadata,"uploadKey"))],keyword:"",search_root:None,fields:&[],offset:0,limit:1})?.1.into_iter().next();
+        if let Some(existing)=existing{
             if existing["invoiceId"]==invoice_id&&existing["lastDigest"]==hash{return Ok(existing.clone());}
             return Err(conflict("同一上传编号已用于不同内容。"));
         }
-        if attachment_id==0&&attachments.iter().filter(|item|item["invoiceId"]==invoice_id).count()>=100{return Err(conflict("每张发票最多归档 100 份资料。"));}
+        if attachment_id==0&&transaction.query_generic(&export_doc_storage::GenericQuery {kind:"attachments",scope:export_doc_storage::DataScope {all:true,..Default::default()},filters:&[("invoiceId",invoice_id.to_string())],keyword:"",search_root:None,fields:&[("id","id")],offset:0,limit:1})?.0>=100{return Err(conflict("每张发票最多归档 100 份资料。"));}
         let used=transaction.attachment_bytes(invoice_id)?;
         if used+bytes.len() as i64>INVOICE_LIMIT{return Err(conflict("这张发票的归档资料超过 256 MiB 容量。"));}
         let mut record=if attachment_id>0{

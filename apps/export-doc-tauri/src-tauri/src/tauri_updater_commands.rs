@@ -1,7 +1,4 @@
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicU8, Ordering},
-};
+use std::sync::Arc;
 
 use serde::Serialize;
 use tauri::{Emitter, Manager};
@@ -55,122 +52,10 @@ struct TauriUpdaterProgress {
     status_text: &'static str,
 }
 
-#[derive(Default)]
-pub(crate) struct TauriUpdaterState {
-    active: Mutex<Option<Arc<UpdaterCancellation>>>,
-}
-
-struct UpdaterCancellation {
-    phase: AtomicU8,
-    abort: Mutex<Option<Box<dyn Fn() + Send + Sync>>>,
-}
-
-impl UpdaterCancellation {
-    const DOWNLOADING: u8 = 0;
-    const CANCEL_REQUESTED: u8 = 1;
-    const INSTALLING: u8 = 2;
-
-    fn new() -> Self {
-        Self {
-            phase: AtomicU8::new(Self::DOWNLOADING),
-            abort: Mutex::new(None),
-        }
-    }
-
-    fn request_cancel(&self) -> bool {
-        if self
-            .phase
-            .compare_exchange(
-                Self::DOWNLOADING,
-                Self::CANCEL_REQUESTED,
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            )
-            .is_err()
-        {
-            return false;
-        }
-
-        if let Some(abort) = self
-            .abort
-            .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .take()
-        {
-            abort();
-        }
-        true
-    }
-
-    fn set_abort(&self, abort: impl Fn() + Send + Sync + 'static) {
-        let abort: Box<dyn Fn() + Send + Sync> = Box::new(abort);
-        if self.phase.load(Ordering::Acquire) == Self::CANCEL_REQUESTED {
-            abort();
-            return;
-        }
-
-        let mut slot = self.abort.lock().unwrap_or_else(|error| error.into_inner());
-        if self.phase.load(Ordering::Acquire) == Self::CANCEL_REQUESTED {
-            drop(slot);
-            abort();
-        } else {
-            *slot = Some(abort);
-        }
-    }
-
-    fn begin_install(&self) -> bool {
-        self.phase
-            .compare_exchange(
-                Self::DOWNLOADING,
-                Self::INSTALLING,
-                Ordering::AcqRel,
-                Ordering::Acquire,
-            )
-            .is_ok()
-    }
-
-    fn is_cancel_requested(&self) -> bool {
-        self.phase.load(Ordering::Acquire) == Self::CANCEL_REQUESTED
-    }
-}
-
-impl TauriUpdaterState {
-    fn begin(&self) -> Result<Arc<UpdaterCancellation>, String> {
-        let mut active = self
-            .active
-            .lock()
-            .unwrap_or_else(|error| error.into_inner());
-        if active.is_some() {
-            return Err("已有软件更新任务正在运行。".to_owned());
-        }
-
-        let cancellation = Arc::new(UpdaterCancellation::new());
-        *active = Some(cancellation.clone());
-        Ok(cancellation)
-    }
-
-    fn finish(&self, cancellation: &Arc<UpdaterCancellation>) {
-        let mut active = self
-            .active
-            .lock()
-            .unwrap_or_else(|error| error.into_inner());
-        if active
-            .as_ref()
-            .is_some_and(|current| Arc::ptr_eq(current, cancellation))
-        {
-            *active = None;
-        }
-    }
-
-    fn request_cancel(&self) -> bool {
-        let cancellation = self
-            .active
-            .lock()
-            .unwrap_or_else(|error| error.into_inner())
-            .clone();
-        cancellation.is_some_and(|value| value.request_cancel())
-    }
-}
+pub(crate) use crate::tauri_updater_task::TauriUpdaterState;
+use crate::tauri_updater_task::{
+    CHECK_TIMEOUT, CONNECT_TIMEOUT, DOWNLOAD_TIMEOUT, READ_TIMEOUT, UpdaterCancellation,
+};
 
 const TAURI_UPDATER_STORAGE_POLICY: &str =
     "软件更新只更新程序文件；业务数据库、授权文件和运行数据保持在运行数据目录。";
@@ -184,11 +69,20 @@ pub(crate) async fn check_tauri_update(
     app: tauri::AppHandle,
     session_token: String,
     endpoint: Option<String>,
+    state: tauri::State<'_, TauriUpdaterState>,
 ) -> Result<TauriUpdaterCheckResult, String> {
     desktop_runtime::authorize_update(&app, session_token).await?;
     let portable = app.state::<RuntimePaths>().portable;
     let updater = build_tauri_updater(&app, endpoint)?;
-    match updater.check().await.map_err(describe_updater_error)? {
+    let lease = state.begin()?;
+    let update = lease
+        .cancellation
+        .run(CHECK_TIMEOUT, async move {
+            updater.check().await.map_err(describe_updater_error)
+        })
+        .await
+        .inspect_err(|_| report_network_failure(&app, &lease.cancellation))?;
+    match update {
         Some(update) => Ok(TauriUpdaterCheckResult {
             supported: true,
             install_supported: !portable,
@@ -241,11 +135,8 @@ pub(crate) async fn install_tauri_update(
     state: tauri::State<'_, TauriUpdaterState>,
 ) -> Result<TauriUpdaterInstallResult, String> {
     desktop_runtime::authorize_update(&app, session_token.clone()).await?;
-    let cancellation = state.begin()?;
-    let result =
-        install_tauri_update_core(app, endpoint, session_token, cancellation.clone()).await;
-    state.finish(&cancellation);
-    result
+    let lease = state.begin()?;
+    install_tauri_update_core(app, endpoint, session_token, lease.cancellation.clone()).await
 }
 
 #[tauri::command]
@@ -259,9 +150,9 @@ pub(crate) async fn cancel_tauri_update(
     Ok(TauriUpdaterCancelResult {
         accepted,
         status_text: if accepted {
-            "已请求取消更新下载，正在停止网络传输。".to_owned()
+            "已请求取消更新检查或下载，正在停止网络传输。".to_owned()
         } else {
-            "当前没有可取消的更新下载；进入安装阶段后不能中断。".to_owned()
+            "当前没有可取消的更新操作；进入安装阶段后不能中断。".to_owned()
         },
     })
 }
@@ -274,53 +165,50 @@ async fn install_tauri_update_core(
 ) -> Result<TauriUpdaterInstallResult, String> {
     ensure_updater_install_supported(app.state::<RuntimePaths>().portable)?;
     let updater = build_tauri_updater(&app, endpoint)?;
-    let update = updater
-        .check()
+    let mut update = cancellation
+        .run(CHECK_TIMEOUT, async move {
+            updater.check().await.map_err(describe_updater_error)
+        })
         .await
-        .map_err(describe_updater_error)?
+        .inspect_err(|_| report_network_failure(&app, &cancellation))?
         .ok_or_else(|| "未发现可安装的新版本。".to_owned())?;
+    update.timeout = Some(DOWNLOAD_TIMEOUT);
     let version = update.version.clone();
 
     emit_updater_progress(&app, "preparing", 0, None, "正在准备更新下载。");
     let download_app = app.clone();
     let install_app = app.clone();
     let download_update = update.clone();
-    let download_handle = tauri::async_runtime::spawn(async move {
-        let mut downloaded_bytes = 0_u64;
-        download_update
-            .download(
-                move |chunk_bytes, total_bytes| {
-                    downloaded_bytes = downloaded_bytes.saturating_add(chunk_bytes as u64);
-                    emit_updater_progress(
-                        &download_app,
-                        "downloading",
-                        downloaded_bytes,
-                        total_bytes,
-                        "正在下载并校验更新包。",
-                    );
-                },
-                move || {
-                    emit_updater_progress(
-                        &install_app,
-                        "verifying",
-                        0,
-                        None,
-                        "下载完成，正在校验更新包签名。",
-                    );
-                },
-            )
-            .await
-    });
-    let abort_handle = download_handle.inner().abort_handle();
-    cancellation.set_abort(move || abort_handle.abort());
-    let bytes = match download_handle.await {
-        Ok(result) => result.map_err(describe_updater_error)?,
-        Err(_error) if cancellation.is_cancel_requested() => {
-            emit_updater_progress(&app, "canceled", 0, None, "更新下载已取消。");
-            return Err("软件更新下载已取消。".to_owned());
-        }
-        Err(error) => return Err(format!("软件更新下载任务失败：{error}")),
-    };
+    let bytes = cancellation
+        .run(DOWNLOAD_TIMEOUT, async move {
+            let mut downloaded_bytes = 0_u64;
+            download_update
+                .download(
+                    move |chunk_bytes, total_bytes| {
+                        downloaded_bytes = downloaded_bytes.saturating_add(chunk_bytes as u64);
+                        emit_updater_progress(
+                            &download_app,
+                            "downloading",
+                            downloaded_bytes,
+                            total_bytes,
+                            "正在下载并校验更新包。",
+                        );
+                    },
+                    move || {
+                        emit_updater_progress(
+                            &install_app,
+                            "verifying",
+                            0,
+                            None,
+                            "下载完成，正在校验更新包签名。",
+                        );
+                    },
+                )
+                .await
+                .map_err(describe_updater_error)
+        })
+        .await
+        .inspect_err(|_| report_network_failure(&app, &cancellation))?;
 
     desktop_runtime::authorize_update(&app, session_token).await?;
     if !cancellation.begin_install() {
@@ -344,6 +232,20 @@ async fn install_tauri_update_core(
         restart_policy: "安装完成后自动重启程序。".to_owned(),
         storage_policy: TAURI_UPDATER_STORAGE_POLICY.to_owned(),
     })
+}
+
+fn report_network_failure(app: &tauri::AppHandle, cancellation: &UpdaterCancellation) {
+    if cancellation.is_cancel_requested() {
+        emit_updater_progress(app, "canceled", 0, None, "软件更新操作已取消。");
+    } else {
+        emit_updater_progress(
+            app,
+            "failed",
+            0,
+            None,
+            "软件更新网络操作失败或超时，可重试。",
+        );
+    }
 }
 
 fn emit_updater_progress(
@@ -390,7 +292,14 @@ fn build_tauri_updater(
     app: &tauri::AppHandle,
     endpoint: Option<String>,
 ) -> Result<Updater, String> {
-    let mut builder = app.updater_builder();
+    let mut builder = app
+        .updater_builder()
+        .timeout(CHECK_TIMEOUT)
+        .configure_client(|client| {
+            client
+                .connect_timeout(CONNECT_TIMEOUT)
+                .read_timeout(READ_TIMEOUT)
+        });
     if let Some(endpoint) = parse_runtime_endpoint(endpoint)? {
         builder = builder
             .endpoints(vec![endpoint])
@@ -543,17 +452,5 @@ mod tests {
             updater_storage_policy(true),
             PORTABLE_UPDATER_STORAGE_POLICY
         );
-    }
-
-    #[test]
-    fn updater_cancellation_is_only_accepted_before_installation() {
-        let canceled = UpdaterCancellation::new();
-        assert!(canceled.request_cancel());
-        assert!(!canceled.request_cancel());
-        assert!(!canceled.begin_install());
-
-        let installing = UpdaterCancellation::new();
-        assert!(installing.begin_install());
-        assert!(!installing.request_cancel());
     }
 }

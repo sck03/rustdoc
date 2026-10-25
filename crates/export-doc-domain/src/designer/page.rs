@@ -1,6 +1,8 @@
 //! Page validation is independent of template contents and rendering.
 use super::Page;
 use crate::contracts;
+#[cfg(test)]
+use crate::test_design_fixture as fixture;
 use export_doc_contracts::report_pages;
 
 pub fn validate(page: &Page) -> Result<(), String> {
@@ -49,7 +51,6 @@ pub fn validate(page: &Page) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::designer::Design;
 
     #[test]
     fn page_contract_matches_frontend_fixtures() {
@@ -58,7 +59,7 @@ mod tests {
         ))
         .unwrap();
         for case in cases.as_array().unwrap() {
-            let mut value = serde_json::to_value(Design::invoice().page).unwrap();
+            let mut value = serde_json::to_value(fixture::invoice().page).unwrap();
             for (key, field) in case["page"].as_object().unwrap() {
                 value[key] = field.clone();
             }

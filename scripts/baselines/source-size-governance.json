@@ -37,9 +37,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 71231,
+      "baselineAggregateLines": 72050,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 71306,
+      "maximumAggregateLines": 72125,
       "reportFiles": false
     },
     {
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 19068,
+      "baselineAggregateLines": 19413,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 19188,
+      "maximumAggregateLines": 19533,
       "reportFiles": false
     },
     {

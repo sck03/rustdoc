@@ -16,6 +16,7 @@ pub(crate) fn ensure_runtime_data_root_is_usable(data_root: &Path) -> Result<(),
     validate_migration_root_shape(data_root, "dataRoot")?;
     reject_network_data_root(data_root)?;
     reject_link_like_path(data_root)?;
+    export_doc_engine::maintenance::ensure_data_root_available(data_root)?;
     ensure_runtime_data_directories(data_root)?;
     reject_network_data_root(data_root)?;
     reject_link_like_path(data_root)?;
@@ -210,47 +211,6 @@ pub(crate) fn reject_link_like_path(path: &Path) -> Result<(), Box<dyn Error>> {
             .into());
         }
     }
-    Ok(())
-}
-
-pub(crate) fn copy_directory_tree(source: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
-    fs::create_dir(target).map_err(|error| {
-        format!(
-            "Failed to create data-root migration staging directory '{}': {error}",
-            target.display()
-        )
-    })?;
-    for entry in fs::read_dir(source)? {
-        let entry = entry?;
-        let source_path = entry.path();
-        let target_path = target.join(entry.file_name());
-        let metadata = fs::symlink_metadata(&source_path)?;
-        if metadata.file_type().is_symlink() || is_windows_reparse_point(&metadata) {
-            return Err(format!(
-                "Data-root migration refuses link-like entry '{}'.",
-                source_path.display()
-            )
-            .into());
-        }
-        if metadata.is_dir() {
-            copy_directory_tree(&source_path, &target_path)?;
-        } else if metadata.is_file() {
-            let mut source_file = fs::File::open(&source_path)?;
-            let mut target_file = OpenOptions::new()
-                .create_new(true)
-                .write(true)
-                .open(&target_path)?;
-            std::io::copy(&mut source_file, &mut target_file)?;
-            target_file.sync_all()?;
-        } else {
-            return Err(format!(
-                "Data-root migration found unsupported filesystem entry '{}'.",
-                source_path.display()
-            )
-            .into());
-        }
-    }
-    sync_directory(target);
     Ok(())
 }
 

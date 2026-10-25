@@ -261,4 +261,33 @@ fn document_packages_preview_export_and_email_share_template_rendering() {
     assert_eq!(after["totalCount"], 2);
     assert_eq!(after["items"][0]["recipient"], "package@example.invalid");
     assert_eq!(after["items"][0]["subject"], "客户邮箱回退");
+
+    let uncertain_peer = smtp::Smtp::start(false);
+    configure(&fixture, uncertain_peer.port);
+    let uncertain = start_job(
+        &fixture,
+        START_INVOICE_DOCUMENT_EMAIL_JOB,
+        invoice_id,
+        json!({"items":items,"includeMergedPdf":false,"toAddress":"package@example.invalid","subject":"不确定投递不得重发","body":"核实 SMTP 确认"}),
+    );
+    let uncertain_id = uncertain.job_id.clone();
+    assert!(
+        jobs::wait_for_completion(fixture.client(), uncertain, &AtomicBool::new(false)).is_err()
+    );
+    uncertain_peer
+        .body
+        .recv_timeout(std::time::Duration::from_secs(6))
+        .unwrap();
+    let retried: BackgroundJobSnapshot = fixture
+        .client()
+        .json(RETRY_JOB, &[("jobId", uncertain_id)], &[], Some(json!({})))
+        .unwrap();
+    assert!(jobs::wait_for_completion(fixture.client(), retried, &AtomicBool::new(false)).is_err());
+    assert!(
+        uncertain_peer.body.try_recv().is_err(),
+        "retry must not open a second SMTP delivery after an uncertain acknowledgement"
+    );
+    let deliveries = fixture.request(LIST_EMAIL_DELIVERIES, None, None);
+    assert_eq!(deliveries["totalCount"], 3);
+    assert_eq!(deliveries["items"][0]["status"], "Uncertain");
 }

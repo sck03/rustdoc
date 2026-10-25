@@ -220,6 +220,14 @@ impl Adapter for Sqlite {
         )?;
         u64::try_from(size).map_err(|_| Error::unavailable("任务容量无效。"))
     }
+    fn job_input_bytes(&self) -> Result<u64> {
+        let size: i64 = self.connection.borrow().query_row(
+            "SELECT COALESCE(SUM(length(content)),0) FROM files WHERE kind='job-input'",
+            [],
+            |row| row.get(0),
+        )?;
+        u64::try_from(size).map_err(|_| Error::unavailable("任务输入容量无效。"))
+    }
     fn query_communications(&self, q: &CommunicationQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = communication::sql(q, false);
         self.query_page(&sql, "r.body", q.offset, q.limit.clamp(1, 100))
@@ -395,6 +403,25 @@ impl Adapter for Sqlite {
         let c = self.connection.borrow();
         let mut s=c.prepare("SELECT id,kind,record_id,version,action,actor_id,occurred_at,note FROM history WHERE (?1 IS NULL OR kind=?1) AND (?2 IS NULL OR record_id=?2) ORDER BY id DESC LIMIT 10000")?;
         s.query_map(params![kind,id],|r|Ok(json!({"id":r.get::<_,i64>(0)?,"module":r.get::<_,String>(1)?,"recordId":r.get::<_,i64>(2)?,"versionNumber":r.get::<_,i64>(3)?,"action":r.get::<_,String>(4)?,"actorUserId":r.get::<_,i64>(5)?,"createdAt":r.get::<_,String>(6)?,"timestamp":r.get::<_,String>(6)?,"note":r.get::<_,String>(7)?,"description":r.get::<_,String>(7)?})))?.map(|r|r.map_err(Into::into)).collect()
+    }
+    fn has_history_except(&self, kind: &str, id: i64, allowed: &[&str]) -> Result<bool> {
+        let placeholders = vec!["?"; allowed.len()].join(",");
+        let filter = if allowed.is_empty() {
+            String::new()
+        } else {
+            format!(" AND action NOT IN ({placeholders})")
+        };
+        let mut values = vec![rusqlite::types::Value::Text(kind.into()), id.into()];
+        values.extend(
+            allowed
+                .iter()
+                .map(|action| rusqlite::types::Value::Text((*action).into())),
+        );
+        Ok(self.connection.borrow().query_row(
+            &format!("SELECT EXISTS(SELECT 1 FROM history WHERE kind=? AND record_id=?{filter})"),
+            rusqlite::params_from_iter(values),
+            |row| row.get(0),
+        )?)
     }
     fn credential(&self, id: i64) -> Result<Option<Credential>> {
         Ok(self

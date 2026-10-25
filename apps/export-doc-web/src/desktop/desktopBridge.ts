@@ -54,7 +54,7 @@ export type TauriUpdaterCancelResult = {
 };
 
 export type TauriUpdaterProgress = {
-  phase: "preparing" | "downloading" | "verifying" | "installing" | "restarting" | "canceled";
+  phase: "preparing" | "downloading" | "verifying" | "installing" | "restarting" | "canceled" | "failed";
   downloadedBytes: number;
   totalBytes?: number | null;
   progressPercent?: number | null;

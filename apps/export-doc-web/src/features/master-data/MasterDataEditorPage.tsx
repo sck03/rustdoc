@@ -1,15 +1,14 @@
 import { useMutation,useQuery,useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft,Edit3,Eye,Save,Trash2 } from "lucide-react";
-import { FormEvent,useEffect,useMemo,useState } from "react";
+import { FormEvent,useEffect,useMemo,useRef,useState } from "react";
 import { useLocation,useNavigate,useParams } from "react-router-dom";
-import { ApiExporterDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import {
 normalizeText,
 numberValue,
-isConcurrencyConflict,
 readApiError,
 readRouteSuccessMessage
 } from "../../ui/formUtils.ts";
@@ -50,6 +49,7 @@ readString
 
 
 import { MasterDataField } from "./MasterDataField.tsx";
+import { useMasterDataPersistence } from "./useMasterDataPersistence.ts";
 
 const masterDataCustomOptionTypeSet = new Set<string>(masterDataCustomOptionTypes);
 
@@ -76,11 +76,10 @@ export function MasterDataEditorPage({
   const [productUnitMessage, setProductUnitMessage] = useState<string | null>(null);
   const [autoFilledProductUnits, setAutoFilledProductUnits] = useState<Partial<Record<ProductUnitTargetField, string>>>({});
   const [productHsCodeKeyword, setProductHsCodeKeyword] = useState("");
-  const [persistedRecordSnapshot, setPersistedRecordSnapshot] = useState<string | null>(null);
+  const [persistedRecord, setPersistedRecord] = useState<MasterDataRecord | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [hasConcurrencyConflict, setHasConcurrencyConflict] = useState(false);
   const queryClient = useQueryClient();
-  const runAbortableOperation = useAbortableOperation();
   const customOptionTypes = useMemo(
     () =>
       Array.from(
@@ -100,6 +99,12 @@ export function MasterDataEditorPage({
   const isNew = mode === "new";
   const effectiveRecordKey = recordKey ?? "";
   const isRecordKeyValid = isNew || effectiveRecordKey.trim().length > 0;
+  const resourceScope = `${config.key}:${isNew ? "new" : effectiveRecordKey}`;
+  const runAbortableOperation = useAbortableOperation(resourceScope);
+  const runHsLookup = useAbortableOperation(resourceScope, { cancelPrevious: true });
+  const latestRecord = useRef(record); latestRecord.current = record;
+  const persistedRecordSnapshot = useMemo(() => persistedRecord
+    ? buildMasterDataSnapshot(config, persistedRecord, numberValue(persistedRecord.id)) : null, [config, persistedRecord]);
 
   const detailQuery = useQuery({
     queryKey: queryKeys.masterDataRecord(config.key, effectiveRecordKey),
@@ -116,13 +121,13 @@ export function MasterDataEditorPage({
 
   const productUnitProductsQuery = useQuery({
     queryKey: queryKeys.masterDataList("products", 1, productHsCodeLookupPageSize, ""),
-    queryFn: ({ signal }) => client.listProducts({ pageNumber: 1, pageSize: productHsCodeLookupPageSize }, { signal }).then(result => result.items),
+    queryFn: ({ signal }) => client.listProducts({ pageNumber: 1, pageSize: productHsCodeLookupPageSize }, { signal }),
     enabled: config.key === "products",
     staleTime: 5 * 60 * 1000,
   });
 
   const productUnitUnitsQuery = useQuery({
-    queryKey: queryKeys.masterDataList("units", 1, productHsCodeLookupPageSize, ""),
+    queryKey: queryKeys.masterDataRoot("units"),
     queryFn: ({ signal }) => client.listUnits({}, { signal }),
     enabled: config.key === "products",
     staleTime: 5 * 60 * 1000,
@@ -146,7 +151,7 @@ export function MasterDataEditorPage({
     if (isNew) {
       const nextRecord = config.emptyRecord();
       setRecord(nextRecord);
-      setPersistedRecordSnapshot(buildMasterDataSnapshot(config, nextRecord, 0));
+      setPersistedRecord(nextRecord);
       setMessage(null);
       setProductUnitMessage(null);
       setAutoFilledProductUnits({});
@@ -156,7 +161,7 @@ export function MasterDataEditorPage({
 
     if (!isRecordKeyValid) {
       setRecord(null);
-      setPersistedRecordSnapshot(null);
+      setPersistedRecord(null);
       setMessage(`${config.label} ID 无效。`);
       setProductUnitMessage(null);
       setAutoFilledProductUnits({});
@@ -171,73 +176,11 @@ export function MasterDataEditorPage({
     }
   }, [detailQuery.error, detailQuery.isError, isNew]);
 
-  const saveMutation = useMutation({
-    mutationFn: (body: MasterDataRecord) =>
-      runAbortableOperation((signal) => isNew
-        ? config.create(client, body, signal)
-        : config.update(client, effectiveRecordKey, body, signal)),
-    onSuccess: async (saved) => {
-      const nextMessage = isNew ? `${config.label}已创建。` : `${config.label}已保存。`;
-      setRecord(saved);
-      setPersistedRecordSnapshot(buildMasterDataSnapshot(config, saved, numberValue(saved.id)));
-      setMessage(null);
-      setSuccessMessage(nextMessage);
-      setHasConcurrencyConflict(false);
-      queryClient.setQueryData(queryKeys.masterDataRecord(config.key, config.routeId(saved)), saved);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot(config.key) });
-      if (isNew) {
-        navigate(`/master-data/${config.key}/${config.routeId(saved)}`, {
-          replace: true,
-          state: { successMessage: nextMessage },
-        });
-      }
-    },
-    onError: (error) => {
-      if (isAbortError(error)) return;
-      const errorMessage = readApiError(error);
-      setMessage(errorMessage);
-      setSuccessMessage(null);
-      setHasConcurrencyConflict(
-        !isNew &&
-        isConcurrencyConflict(error),
-      );
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: () => {
-      if (!record) {
-        throw new Error(`${config.label}未加载，无法删除。`);
-      }
-
-      return runAbortableOperation((signal) => config.delete(client, record, effectiveRecordKey, signal));
-    },
-    onSuccess: async (response) => {
-      const nextMessage = response.message || `${config.label}已删除。`;
-      setMessage(null);
-      setSuccessMessage(null);
-      queryClient.removeQueries({ queryKey: queryKeys.masterDataRecord(config.key, effectiveRecordKey) });
-      if (record) {
-        queryClient.removeQueries({ queryKey: queryKeys.masterDataRecord(config.key, config.routeId(record)) });
-      }
-
-      const invalidations = [queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot(config.key) })];
-      if (config.key === "customers" || config.key === "exporters") {
-        invalidations.push(queryClient.invalidateQueries({ queryKey: queryKeys.invoiceParties() }));
-      }
-
-      await Promise.all(invalidations);
-      navigate(`/master-data/${config.key}`, {
-        replace: true,
-        state: { successMessage: nextMessage },
-      });
-    },
-    onError: (error) => {
-      if (isAbortError(error)) return;
-      setDeleteDialogOpen(false);
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
+  const { saveMutation, deleteMutation, sealUploadMutation, isSaving } = useMasterDataPersistence({
+    client, config, record, isNew, recordKey: effectiveRecordKey,
+    onSaved: (saved, draft) => { setRecord(draft); setPersistedRecord(saved); },
+    onDeleteError: () => setDeleteDialogOpen(false),
+    setMessage, setSuccessMessage, setHasConcurrencyConflict,
   });
 
   const saveCustomOptionMutation = useMutation({
@@ -251,39 +194,10 @@ export function MasterDataEditorPage({
     },
   });
 
-  const sealUploadMutation = useMutation({
-    mutationFn: ({ fieldName, file }: { fieldName: "docSealPath" | "customsSealPath"; file: File }) =>
-      runAbortableOperation((signal) => client.uploadExporterSeal({
-        id: numberValue(record?.id),
-        sealType: fieldName === "docSealPath" ? "document" : "customs",
-        fileName: file.name,
-        body: file,
-      }, { signal })),
-    onSuccess: async (saved: ApiExporterDto, variables) => {
-      const nextRecord = saved as unknown as MasterDataRecord;
-      const nextMessage = variables.fieldName === "docSealPath" ? "单证章已上传并保存。" : "报关章已上传并保存。";
-      setRecord(nextRecord);
-      setPersistedRecordSnapshot(buildMasterDataSnapshot(config, nextRecord, saved.id));
-      setMessage(null);
-      setSuccessMessage(nextMessage);
-      setHasConcurrencyConflict(false);
-      queryClient.setQueryData(queryKeys.masterDataRecord(config.key, config.routeId(nextRecord)), nextRecord);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot(config.key) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.invoiceParties() }),
-      ]);
-    },
-    onError: (error) => {
-      if (isAbortError(error)) return;
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const isBusy = detailQuery.isFetching || saveMutation.isPending || deleteMutation.isPending || sealUploadMutation.isPending;
+  const isBusy = detailQuery.isFetching || isSaving;
   const customOptions = customOptionsQuery.data ?? {};
   const productInputAssistance = useMemo(
-    () => buildProductInputAssistance(productUnitProductsQuery.data ?? [], productHsCodesQuery.data?.items ?? []),
+    () => buildProductInputAssistance(productUnitProductsQuery.data?.items ?? [], productHsCodesQuery.data?.items ?? []),
     [productHsCodesQuery.data?.items, productUnitProductsQuery.data],
   );
   const productHsCodeLookup = useMemo(
@@ -291,7 +205,7 @@ export function MasterDataEditorPage({
     [productHsCodesQuery.data?.items],
   );
   const productUnitAssistance = useMemo(
-    () => buildProductUnitAssistance(productUnitProductsQuery.data ?? [], productUnitUnitsQuery.data ?? []),
+    () => buildProductUnitAssistance(productUnitProductsQuery.data?.items ?? [], productUnitUnitsQuery.data ?? []),
     [productUnitProductsQuery.data, productUnitUnitsQuery.data],
   );
   const productUnitLookupMessage =
@@ -315,11 +229,16 @@ export function MasterDataEditorPage({
   const serverDraftSync = useServerDraftSync({
     resourceKey: isNew ? `${config.key}:new` : `${config.key}:${effectiveRecordKey}`,
     incomingValue: isNew ? null : detailQuery.data,
+    persistedValue: persistedRecord,
     isDirty: hasUnsavedRecordChanges,
     fingerprint: (serverRecord) => buildMasterDataSnapshot(config, serverRecord, numberValue(serverRecord.id)),
     applyIncoming: (serverRecord) => {
-      setRecord(serverRecord);
-      setPersistedRecordSnapshot(buildMasterDataSnapshot(config, serverRecord, numberValue(serverRecord.id)));
+      const continuation = location.state?.masterDataSaveContinuation;
+      const continued = continuation?.entityKey === config.key && continuation.record?.id === serverRecord.id
+        && continuation.record?.rowVersion === serverRecord.rowVersion ? continuation.record as MasterDataRecord : null;
+      setRecord(continued ?? serverRecord);
+      setPersistedRecord(serverRecord);
+      if (continued) navigate(location.pathname + location.search, { replace: true, state: { successMessage: routeSuccessMessage } });
       setMessage(null);
       setProductUnitMessage(null);
       setAutoFilledProductUnits({});
@@ -371,7 +290,7 @@ export function MasterDataEditorPage({
     const preparedRecord = config.key === "products"
       ? autoPopulateProductUnitFields(record, productUnitAssistance, autoFilledProductUnits).record
       : record;
-    saveMutation.mutate(config.normalizeRecord(preparedRecord, isNew ? 0 : numberValue(record.id)));
+    saveMutation.mutate({ submitted: record, body: config.normalizeRecord(preparedRecord, isNew ? 0 : numberValue(record.id)) });
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -426,23 +345,27 @@ export function MasterDataEditorPage({
     let hsCode = productHsCodeLookup.get(normalizedValue);
     if (!hsCode && normalizedValue.length >= 4) {
       try {
-        const result = await runAbortableOperation((signal) => client.listHsCodes(
+        const result = await runHsLookup((signal) => client.listHsCodes(
           { pageNumber: 1, pageSize: 20, keyword: normalizedValue },
           { signal },
         ));
         hsCode = result.items.find(item => normalizeHsCodeKey(item.code || item.normalizedCode) === normalizedValue && item.status === "Active" && !item.requiresAnnualReview);
       } catch (error) {
         if (isAbortError(error)) return;
+        if (normalizeHsCodeKey(readString(latestRecord.current ?? { id: 0 }, "hsCode")) !== normalizedValue) return;
         setProductUnitMessage(readApiError(error));
         return;
       }
     }
+    if (normalizeHsCodeKey(readString(latestRecord.current ?? { id: 0 }, "hsCode")) !== normalizedValue) return;
     if (!hsCode) {
       setProductUnitMessage("未在已验证的年度税则中找到完全一致的有效 HS 编码。");
       return;
     }
 
-    const result = applyHsCodeToProductRecord(record, hsCode);
+    const current = latestRecord.current;
+    if (!current || normalizeHsCodeKey(readString(current, "hsCode")) !== normalizedValue) return;
+    const result = applyHsCodeToProductRecord(current, hsCode);
     if (!result.changed) {
       return;
     }

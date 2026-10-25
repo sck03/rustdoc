@@ -214,20 +214,13 @@ pub(crate) fn select_save_package_path(
     default_file_name: Option<String>,
     default_directory: Option<String>,
 ) -> Result<Option<String>, String> {
-    let mut dialog = rfd::FileDialog::new()
-        .set_title("选择单一窗口交换包保存位置")
-        .add_filter("单一窗口交换包", &["swpkg"]);
-
-    if let Some(file_name) = default_file_name
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty())
-    {
-        dialog = dialog.set_file_name(file_name);
-    }
-
-    dialog = apply_default_directory(dialog, default_directory);
-
-    Ok(dialog.save_file().map(path_to_string))
+    Ok(save_file(
+        "选择单一窗口交换包保存位置",
+        "单一窗口交换包",
+        &["swpkg"],
+        default_file_name,
+        default_directory,
+    ))
 }
 
 #[tauri::command]
@@ -235,20 +228,13 @@ pub(crate) fn select_save_invoice_transfer_package_path(
     default_file_name: Option<String>,
     default_directory: Option<String>,
 ) -> Result<Option<String>, String> {
-    let mut dialog = rfd::FileDialog::new()
-        .set_title("选择发票单据包保存位置")
-        .add_filter("发票单据包", &["edpkg"]);
-
-    if let Some(file_name) = default_file_name
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty())
-    {
-        dialog = dialog.set_file_name(file_name);
-    }
-
-    dialog = apply_default_directory(dialog, default_directory);
-
-    Ok(dialog.save_file().map(path_to_string))
+    Ok(save_file(
+        "选择发票单据包保存位置",
+        "发票单据包",
+        &["edpkg"],
+        default_file_name,
+        default_directory,
+    ))
 }
 
 #[tauri::command]
@@ -256,20 +242,13 @@ pub(crate) fn select_save_report_template_package_path(
     default_file_name: Option<String>,
     default_directory: Option<String>,
 ) -> Result<Option<String>, String> {
-    let mut dialog = rfd::FileDialog::new()
-        .set_title("选择报表模板包保存位置")
-        .add_filter("报表模板包", &["edtpl", "zip"]);
-
-    if let Some(file_name) = default_file_name
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty())
-    {
-        dialog = dialog.set_file_name(file_name);
-    }
-
-    dialog = apply_default_directory(dialog, default_directory);
-
-    Ok(dialog.save_file().map(path_to_string))
+    Ok(save_file(
+        "选择报表模板包保存位置",
+        "报表模板包",
+        &["edtpl", "zip"],
+        default_file_name,
+        default_directory,
+    ))
 }
 
 #[tauri::command]
@@ -277,20 +256,13 @@ pub(crate) fn select_save_report_template_file_path(
     default_file_name: Option<String>,
     default_directory: Option<String>,
 ) -> Result<Option<String>, String> {
-    let mut dialog = rfd::FileDialog::new()
-        .set_title("选择报表模板文件保存位置")
-        .add_filter("V3 报表模板", &["dtpl"]);
-
-    if let Some(file_name) = default_file_name
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty())
-    {
-        dialog = dialog.set_file_name(file_name);
-    }
-
-    dialog = apply_default_directory(dialog, default_directory);
-
-    Ok(dialog.save_file().map(path_to_string))
+    Ok(save_file(
+        "选择报表模板文件保存位置",
+        "V3 报表模板",
+        &["dtpl"],
+        default_file_name,
+        default_directory,
+    ))
 }
 
 #[tauri::command]
@@ -298,20 +270,13 @@ pub(crate) fn select_save_pdf_path(
     default_file_name: Option<String>,
     default_directory: Option<String>,
 ) -> Result<Option<String>, String> {
-    let mut dialog = rfd::FileDialog::new()
-        .set_title("选择 PDF 保存位置")
-        .add_filter("PDF 文件", &["pdf"]);
-
-    if let Some(file_name) = default_file_name
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty())
-    {
-        dialog = dialog.set_file_name(file_name);
-    }
-
-    dialog = apply_default_directory(dialog, default_directory);
-
-    Ok(dialog.save_file().map(path_to_string))
+    Ok(save_file(
+        "选择 PDF 保存位置",
+        "PDF 文件",
+        &["pdf"],
+        default_file_name,
+        default_directory,
+    ))
 }
 
 #[tauri::command]
@@ -319,20 +284,13 @@ pub(crate) fn select_save_zip_path(
     default_file_name: Option<String>,
     default_directory: Option<String>,
 ) -> Result<Option<String>, String> {
-    let mut dialog = rfd::FileDialog::new()
-        .set_title("选择 ZIP 保存位置")
-        .add_filter("ZIP 文件", &["zip"]);
-
-    if let Some(file_name) = default_file_name
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty())
-    {
-        dialog = dialog.set_file_name(file_name);
-    }
-
-    dialog = apply_default_directory(dialog, default_directory);
-
-    Ok(dialog.save_file().map(path_to_string))
+    Ok(save_file(
+        "选择 ZIP 保存位置",
+        "ZIP 文件",
+        &["zip"],
+        default_file_name,
+        default_directory,
+    ))
 }
 
 #[tauri::command]
@@ -340,20 +298,13 @@ pub(crate) fn select_save_excel_path(
     default_file_name: Option<String>,
     default_directory: Option<String>,
 ) -> Result<Option<String>, String> {
-    let mut dialog = rfd::FileDialog::new()
-        .set_title("选择 Excel 保存位置")
-        .add_filter("Excel 文件", &["xlsx"]);
-
-    if let Some(file_name) = default_file_name
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty())
-    {
-        dialog = dialog.set_file_name(file_name);
-    }
-
-    dialog = apply_default_directory(dialog, default_directory);
-
-    Ok(dialog.save_file().map(path_to_string))
+    Ok(save_file(
+        "选择 Excel 保存位置",
+        "Excel 文件",
+        &["xlsx"],
+        default_file_name,
+        default_directory,
+    ))
 }
 
 #[tauri::command]
@@ -373,6 +324,27 @@ pub(crate) fn select_save_file_path(default_file_name: String) -> Result<Option<
         dialog = dialog.add_filter("原文件类型", &[extension]);
     }
     Ok(dialog.save_file().map(path_to_string))
+}
+
+fn save_file(
+    title: &str,
+    label: &str,
+    extensions: &[&str],
+    default_file_name: Option<String>,
+    default_directory: Option<String>,
+) -> Option<String> {
+    let mut dialog = rfd::FileDialog::new()
+        .set_title(title)
+        .add_filter(label, extensions);
+    if let Some(file_name) = default_file_name
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+    {
+        dialog = dialog.set_file_name(file_name);
+    }
+    apply_default_directory(dialog, default_directory)
+        .save_file()
+        .map(path_to_string)
 }
 
 fn pick_file(title: &str, filters: &[(&str, &[&str])]) -> Option<String> {

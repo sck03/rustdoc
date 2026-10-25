@@ -139,7 +139,9 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 
 任务记录与生成文件分别保留。普通数据库文件结果默认全局 512 MiB、每用户 128 MiB；先保留较新的结果，超限回收旧 BLOB，保留成功状态和历史并提示重新生成。既有 30 天／全局 2000 条／每用户 200 条的任务历史策略继续执行。受管完整备份、服务器迁移包及业务附件不由此策略删除。
 
-`EXPORTDOCMANAGER_JOB_OUTPUT_MIB` 和 `EXPORTDOCMANAGER_JOB_USER_OUTPUT_MIB` 分别设置两项容量（64–1048576 MiB，个人不能大于全局），无效配置拒绝启动；Docker 对应 `NATIVE_JOB_OUTPUT_MIB`／`NATIVE_JOB_USER_OUTPUT_MIB`。数据库任务下载在加载内容前共用 128 MiB 内存预算，繁忙返回 429，传输结束或失败归还。管理员指标的 `jobs.retainedOutputBytes` 和 `jobs.downloadMemory` 用于观察实际容量及预留。
+重试工作簿在成功终态事务内删除，启动时也清理旧成功任务遗留的输入。失败/取消任务输入独立使用相同的全局与用户容量上限，活动输入不回收；回收后保留历史但不再提供重试。单据组合与单据邮件的重试复用原用例，邮件继续按原幂等键及投递状态拒绝自动重复发送。
+
+`EXPORTDOCMANAGER_JOB_OUTPUT_MIB` 和 `EXPORTDOCMANAGER_JOB_USER_OUTPUT_MIB` 分别设置两项容量（64–1048576 MiB，个人不能大于全局），分别约束输出与待重试输入，无效配置拒绝启动；Docker 对应 `NATIVE_JOB_OUTPUT_MIB`／`NATIVE_JOB_USER_OUTPUT_MIB`。数据库任务下载在加载内容前共用 128 MiB 内存预算，繁忙返回 429，传输结束或失败归还。管理员指标的 `jobs.retainedInputBytes`、`jobs.retainedOutputBytes` 和 `jobs.downloadMemory` 用于观察实际容量及预留。
 
 ### 备份、迁移与恢复
 

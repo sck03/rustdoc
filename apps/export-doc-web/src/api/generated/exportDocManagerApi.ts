@@ -2946,6 +2946,7 @@ export interface ApiRuntimeJobMetrics {
   downloadMemory: { capacityBytes: number; rejections: number; reservedBytes: number };
   failed: boolean;
   persistedCounts: Record<string, unknown>;
+  retainedInputBytes: number;
   retainedOutputBytes: number;
   stopping: boolean;
   workerHandles: number;

@@ -1,3 +1,9 @@
+#[cfg(test)]
+extern crate self as export_doc_domain;
+#[cfg(test)]
+#[path = "../../../tests/ReportTemplateFixtures/designer_fixture.rs"]
+pub(crate) mod test_design_fixture;
+
 pub use export_doc_contracts::{contracts, generated_api, report_batches};
 pub mod announcement;
 pub mod approval;

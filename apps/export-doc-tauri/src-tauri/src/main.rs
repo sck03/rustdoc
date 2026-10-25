@@ -29,6 +29,7 @@ mod runtime_portable;
 mod runtime_prerequisites;
 mod runtime_tree_manifest;
 mod tauri_updater_commands;
+mod tauri_updater_task;
 mod window;
 #[cfg(windows)]
 mod windows_prerequisites;

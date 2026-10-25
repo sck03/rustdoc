@@ -18,7 +18,7 @@ export function AnnouncementDialog({ client, user, record, onClose, onSaved }: {
       {m.departments.isError && <InlineNotice tone="error">{readApiError(m.departments.error)}</InlineNotice>}
       <OfficeField label="生效时间"><input type="datetime-local" required value={m.draft.startsAt} onChange={e => m.change({ startsAt: e.target.value })} /></OfficeField>
       <OfficeField label="失效时间"><input type="datetime-local" required value={m.draft.expiresAt} onChange={e => m.change({ expiresAt: e.target.value })} /></OfficeField>
-      <AttachmentDraftFields draft={m.attachments} busy={m.operation.busy} onChange={() => m.setDirty(true)} />
+      <AttachmentDraftFields draft={m.attachments} busy={m.operation.busy} existingFiles={m.attachments.saved?.attachments} onChange={() => m.setDirty(true)} />
     </fieldset><OfficeSubmit busy={m.operation.busy} label="保存草稿" disabled={m.departments.isPending || m.departments.isError} /></form>
   </OfficeDialog>;
 }

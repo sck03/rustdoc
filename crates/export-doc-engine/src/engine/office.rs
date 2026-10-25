@@ -435,38 +435,30 @@ pub fn deletion_restriction(connection: &Connection, id: i64) -> Result<Option<&
             "此人员已有行政或人员变动申请记录，需要保留历史。请通过调岗、离职流程处理。",
         ));
     }
-    if store::history(connection, "people", id)?
-        .iter()
-        .any(|event| {
-            ![
-                "create",
-                "edit",
-                "image-upload",
-                "image-delete",
-                "attachment-upload",
-                "attachment-delete",
-            ]
-            .contains(&text(event, "action").as_str())
-        })
-    {
+    if connection.has_history_except(
+        "people",
+        id,
+        &[
+            "create",
+            "edit",
+            "image-upload",
+            "image-delete",
+            "attachment-upload",
+            "attachment-delete",
+        ],
+    )? {
         return Ok(Some(
             "此档案已有正式任职变动或账号关联历史，需要保留追溯。可在“任职与操作记录”中查看；请通过调岗、离职流程处理。",
         ));
     }
     for kind in ["bookings", "supply-requests"] {
-        if store::all(connection, kind)?
-            .iter()
-            .any(|item| item["employeeId"] == id)
-        {
+        if has_reference(connection, kind, "employeeId", id)? {
             return Ok(Some(
                 "此人员已有会议室预约或物品领用记录，需要保留业务历史。请通过离职流程处理。",
             ));
         }
     }
-    if store::all(connection, "departments")?
-        .iter()
-        .any(|department| department["managerEmployeeId"] == id)
-    {
+    if has_reference(connection, "departments", "managerEmployeeId", id)? {
         return Ok(Some(
             "此人员仍被设为部门负责人，请先在组织架构中更换或清除负责人，再删除误录档案。",
         ));
@@ -478,15 +470,32 @@ pub fn deletion_restriction(connection: &Connection, id: i64) -> Result<Option<&
         id,
         false,
     )? > 0
-        || store::all(connection, "companies")?
-            .iter()
-            .any(|company| company["executiveEmployeeId"] == id)
+        || has_reference(connection, "companies", "executiveEmployeeId", id)?
     {
         return Ok(Some(
             "此人员仍有公司执行负责人或任职汇报关系引用，请先办理负责人交接；历史引用须保留。",
         ));
     }
     Ok(None)
+}
+
+fn has_reference(connection: &Connection, kind: &str, field: &str, id: i64) -> Result<bool> {
+    Ok(connection
+        .query_generic(&export_doc_storage::GenericQuery {
+            kind,
+            scope: export_doc_storage::DataScope {
+                all: true,
+                ..Default::default()
+            },
+            filters: &[(field, id.to_string())],
+            keyword: "",
+            search_root: None,
+            fields: &[("id", "id")],
+            offset: 0,
+            limit: 1,
+        })?
+        .0
+        > 0)
 }
 
 fn validate_identity(profile: &Value) -> Result<()> {

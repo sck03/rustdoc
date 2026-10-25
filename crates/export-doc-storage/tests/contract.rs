@@ -9,6 +9,8 @@ mod communication_query;
 mod crm_query;
 #[path = "support/import_preview_query.rs"]
 mod import_preview_query;
+#[path = "support/integrity_query.rs"]
+mod integrity_query;
 #[path = "support/office_query.rs"]
 mod office_query;
 #[path = "support/personnel_query.rs"]
@@ -19,6 +21,8 @@ mod pool_recovery;
 #[cfg(feature = "postgres")]
 #[path = "support/query_plans.rs"]
 mod query_plans;
+#[path = "support/related_query.rs"]
+mod related_query;
 #[path = "support/resource_query.rs"]
 mod resource_query;
 #[path = "support/scaling_query.rs"]
@@ -76,6 +80,8 @@ fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
 }
 
 fn roundtrip(connection: &Connection) {
+    integrity_query::exercise(connection);
+    related_query::exercise(connection);
     import_preview_query::exercise(connection);
     capacity_query::exercise(connection);
     office_query::exercise(connection);

@@ -1,10 +1,14 @@
+#[cfg(test)]
+#[path = "../../../tests/ReportTemplateFixtures/designer_fixture.rs"]
+mod fixture;
+
 use export_doc_domain::{
     designer::{Design, ImageResource},
     template,
 };
 
 fn blank() -> Design {
-    let mut d = Design::invoice();
+    let mut d = fixture::invoice();
     for layer in &mut d.layers {
         layer.elements.clear();
     }
@@ -34,7 +38,7 @@ fn structural_limits_and_resource_identity_are_enforced_without_a_browser() {
         .collect();
     assert!(template::validate(&d, &[]).is_err());
     let mut d = base.clone();
-    let element = Design::invoice().layers[0].elements[0].clone();
+    let element = fixture::invoice().layers[0].elements[0].clone();
     d.layers[1].elements = (0..1001)
         .map(|n| {
             let mut e = element.clone();

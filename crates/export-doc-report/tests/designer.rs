@@ -1,3 +1,7 @@
+#[cfg(test)]
+#[path = "../../../tests/ReportTemplateFixtures/designer_fixture.rs"]
+mod fixture;
+
 use export_doc_domain::{
     designer::{Design, Kind, ReportBlock},
     invoice::InvoiceDraft,
@@ -19,7 +23,7 @@ fn data() -> ReportData {
 }
 
 fn grid() -> Design {
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     let mut element = design.layers[0].elements[0].clone();
     for layer in &mut design.layers {
         layer.elements.clear();
@@ -47,11 +51,11 @@ fn grid() -> Design {
 }
 
 fn body_flow_design(with_break: bool) -> Design {
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     for layer in &mut design.layers {
         layer.elements.clear();
     }
-    let mut element = Design::invoice().layers[0].elements[0].clone();
+    let mut element = fixture::invoice().layers[0].elements[0].clone();
     element.id = "flow-block".into();
     element.label = "Flow block".into();
     element.x_hundredth_mm = 1000;
@@ -73,7 +77,7 @@ fn body_flow_design(with_break: bool) -> Design {
     design.layers[0].elements.clear();
     design.layers[2].elements.clear();
     if with_break {
-        let mut page_break = Design::invoice().layers[0].elements[0].clone();
+        let mut page_break = fixture::invoice().layers[0].elements[0].clone();
         page_break.id = "page-break".into();
         page_break.label = "Page break".into();
         page_break.x_hundredth_mm = 1000;
@@ -197,7 +201,7 @@ fn invalid_merged_cells_fail_instead_of_drawing_over_other_columns() {
 
 #[test]
 fn detail_width_does_not_change_a4_page_viewbox() {
-    let result = render_design(&data(), &Design::invoice(), &AtomicBool::new(false)).unwrap();
+    let result = render_design(&data(), &fixture::invoice(), &AtomicBool::new(false)).unwrap();
     assert_eq!(result.pages[0].width_mm, 210.);
     assert!(result.pages[0].svg.contains("viewBox=\"0 0 210 297\""));
 }
@@ -280,7 +284,7 @@ fn body_flow_wraps_before_the_footer_when_the_next_block_does_not_fit() {
 
 #[test]
 fn detail_row_that_only_fits_a_continuation_page_never_overlaps_the_footer() {
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     design.layers[0].print.repeat_on_every_page = false;
     let element = &mut design.layers[1].elements[0];
     element.y_hundredth_mm = 22000;
@@ -304,7 +308,7 @@ fn detail_row_that_only_fits_a_continuation_page_never_overlaps_the_footer() {
 
 #[test]
 fn detail_header_and_body_styles_control_measurement_and_output() {
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     if let Kind::Flow {
         block: ReportBlock::DetailTable(table),
         ..
@@ -328,7 +332,7 @@ fn detail_header_and_body_styles_control_measurement_and_output() {
 }
 
 fn detail_with_surrounding_flows() -> Design {
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     let mut before = design.layers[0].elements[0].clone();
     before.id = "before-detail".into();
     before.label = "Before detail".into();
@@ -395,7 +399,7 @@ fn detail_table_rejects_overlapping_following_flow() {
 
 #[test]
 fn detail_row_limits_force_structured_page_breaks_without_losing_rows() {
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     if let Kind::Flow {
         block: ReportBlock::DetailTable(table),
         ..

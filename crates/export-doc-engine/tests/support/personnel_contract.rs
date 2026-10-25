@@ -175,6 +175,76 @@ pub fn exercise(service: &NativeService, admin: &str) {
     assert!(person["account"].is_null());
     let version = person["versionNumber"].clone();
     let pdf = b"%PDF-1.7\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n";
+    // Uploaded documents belong to an otherwise removable mistaken registration.
+    // A failed version check must preserve them; the successful deletion removes them atomically.
+    let mut removable = body.clone();
+    removable["requestKey"] = json!(nonce().unwrap());
+    removable["employeeNumber"] = json!(format!("REMOVE-{}", &nonce().unwrap()[..8]));
+    let mut removable = call(service, admin, CREATE_PERSONNEL, 0, Some(removable)).unwrap();
+    let removable_id = removable["employee"]["id"].as_i64().unwrap();
+    let removable_path = [("id", removable_id.to_string())];
+    let removable_image = [("id", removable_id.to_string()), ("kind", "Avatar".into())];
+    removable = service
+        .upload(
+            UPLOAD_PERSONNEL_IMAGE,
+            &removable_image,
+            json!({"expectedVersion":removable["versionNumber"]}),
+            "avatar.png",
+            image.get_ref(),
+            admin,
+        )
+        .unwrap();
+    removable = service
+        .upload(
+            UPLOAD_PERSONNEL_ATTACHMENT,
+            &removable_path,
+            json!({"expectedVersion":removable["versionNumber"]}),
+            "误录附件.pdf",
+            pdf,
+            admin,
+        )
+        .unwrap();
+    assert_eq!(removable["deleteRestriction"], "");
+    let removable_attachment = [
+        ("id", removable_id.to_string()),
+        (
+            "attachmentId",
+            removable["attachments"][0]["id"].as_str().unwrap().into(),
+        ),
+    ];
+    assert_eq!(
+        call(
+            service,
+            admin,
+            DELETE_PERSONNEL,
+            removable_id,
+            Some(json!({"expectedVersion":1}))
+        )
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
+    assert_eq!(
+        service
+            .download_file(DOWNLOAD_PERSONNEL_ATTACHMENT, &removable_attachment, admin)
+            .unwrap()
+            .content,
+        pdf
+    );
+    call(
+        service,
+        admin,
+        DELETE_PERSONNEL,
+        removable_id,
+        Some(json!({"expectedVersion":removable["versionNumber"]})),
+    )
+    .unwrap();
+    assert_eq!(
+        call(service, admin, GET_PERSONNEL, removable_id, None)
+            .unwrap_err()
+            .status,
+        Some(404)
+    );
     person = service
         .upload(
             UPLOAD_PERSONNEL_ATTACHMENT,

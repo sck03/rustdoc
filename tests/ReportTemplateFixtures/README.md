@@ -1,6 +1,7 @@
 # 报表对照与模型夹具
 
 - `designer-margin-cases.json`、`raster-images.json` 仍由当前 V3 模型和界面测试读取。
+- `synthetic-invoice-v3.json` 是从原领域样例构造器原样捕获的匿名测试文档，Domain、报表与工作流通过 `designer_fixture.rs` 共同读取；不参与内置模板或正式输出选择。样例构造已迁出生产领域模型。
 - 三份 `customer_custom_*_legacy.html` 保留为原版版式对照；不是当前可导入模板，也不能作为 Rust PDF 已通过的证据。
 - 旧 Chromium HTML 打印脚本及其 PDF/print 像素阈值已移除：它们把二进制 .dtpl 当成 HTML，无法验证当前报表。
 

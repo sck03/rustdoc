@@ -157,6 +157,17 @@ fn persists_runtime_data_root_as_valid_config() {
 }
 
 #[test]
+fn missing_persisted_data_root_never_recreates_an_empty_business_directory() {
+    let app_root = fresh_test_dir("missing-persisted-runtime-root");
+    let config_root = app_root.join("RuntimeConfig");
+    let missing_root = app_root.join("disconnected-business-data");
+    persist_runtime_data_root(&config_root, &missing_root).unwrap();
+    let error = resolve_data_root(&app_root, &config_root, None, false).unwrap_err();
+    assert!(error.to_string().contains("已停止新建空库"));
+    assert!(!missing_root.exists());
+}
+
+#[test]
 fn persist_keeps_previous_runtime_paths_config_as_backup() {
     let app_root = fresh_test_dir("backup-runtime-data-root");
     let config_root = app_root.join("platform-config");
@@ -289,9 +300,14 @@ fn schedules_and_applies_data_root_migration_before_runtime_start() {
     assert!(scheduled.restart_required);
     assert!(pending_data_root_migration_path(&config_root).exists());
 
-    apply_pending_data_root_migration(&config_root).unwrap();
+    apply_pending_data_root_migration(&config_root, &app_root).unwrap();
 
-    assert!(!source_root.exists());
+    assert!(
+        source_root
+            .join(export_doc_engine::maintenance::DATA_ROOT_MIGRATION_REDIRECT_FILE)
+            .is_file()
+    );
+    assert!(!source_root.join("Database/data.db").exists());
     assert_eq!(
         fs::read(target_root.join("Database").join("data.db")).unwrap(),
         b"database"

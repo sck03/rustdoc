@@ -3,6 +3,7 @@
 mod archive;
 mod import;
 mod mapping;
+mod reader;
 mod sheet;
 mod supplements;
 mod tabular;
@@ -18,5 +19,7 @@ pub const MAX_INPUT: usize = 25 * 1024 * 1024;
 pub type Result<T> = std::result::Result<T, String>;
 pub type Check<'a> = &'a dyn Fn() -> Result<()>;
 
+#[cfg(test)]
+mod limits_tests;
 #[cfg(test)]
 mod tests;

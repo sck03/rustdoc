@@ -22,11 +22,14 @@ pub use job_query::{JobOutputRetention, JobQuery, JobRetention};
 pub use office_query::OfficeQuery;
 pub use personnel_query::PersonnelQuery;
 mod record_query;
+mod related_query;
 mod resource_query;
 pub use generic_query::ScopedQuery;
+pub use related_query::RelatedQuery;
 mod sql;
 mod template_query;
 pub use generic_query::{DataScope, GenericQuery};
+pub mod maintenance;
 pub mod metrics;
 pub mod pool;
 pub use template_query::{ReportTemplateQuery, TemplateAudience, TemplateVersionQuery};
@@ -235,6 +238,16 @@ trait Adapter: Send {
             200,
         )
     }
+    fn expired_job_inputs(&self, policy: &JobOutputRetention) -> Result<Vec<Value>> {
+        let pg = self.provider() == "PostgreSQL";
+        self.query_slice(
+            &job_query::expired_inputs(policy, pg)?,
+            &sql::projection(&[("id", "id")], pg)?,
+            0,
+            200,
+        )
+    }
+    fn job_input_bytes(&self) -> Result<u64>;
     fn job_output_bytes(&self) -> Result<u64> {
         Err(Error::new(
             ErrorKind::Unsupported,
@@ -264,6 +277,10 @@ trait Adapter: Send {
     }
     fn query_crm(&self, query: &CrmQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, projection) = crm_query::build(query, self.provider() == "PostgreSQL")?;
+        self.query_page(&sql, &projection, query.offset, query.limit)
+    }
+    fn query_related(&self, query: &RelatedQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let (sql, projection) = related_query::build(query, self.provider() == "PostgreSQL")?;
         self.query_page(&sql, &projection, query.offset, query.limit)
     }
     fn scan_crm(&self, query: &CrmQuery<'_>, after_id: i64) -> Result<Vec<Value>> {
@@ -379,6 +396,7 @@ trait Adapter: Send {
     fn audit_events(&self, before_id: i64, limit: i64) -> Result<Vec<Value>>;
     fn delete_audits(&self, ids: &[i64]) -> Result<usize>;
     fn history(&self, kind: Option<&str>, id: Option<i64>) -> Result<Vec<Value>>;
+    fn has_history_except(&self, kind: &str, id: i64, allowed: &[&str]) -> Result<bool>;
     fn credential(&self, id: i64) -> Result<Option<Credential>>;
     fn set_credential(&self, id: i64, salt: &[u8], hash: &[u8], iterations: u32) -> Result<()>;
     fn settings(&self, name: &str) -> Result<Option<Value>>;
@@ -535,12 +553,15 @@ delegate! {
     query_jobs(query:&JobQuery<'_>)->(i64,Vec<Value>);
     job_counts()->Value;
     job_output_bytes()->u64;
+    job_input_bytes()->u64;
     expired_job_outputs(policy:&JobOutputRetention)->Vec<Value>;
+    expired_job_inputs(policy:&JobOutputRetention)->Vec<Value>;
     query_generic(query:&GenericQuery<'_>)->(i64, Vec<Value>);
     resource_references(kind:&str,offset:i64,limit:i64)->(i64,Vec<Value>);
     query_scoped(query:&ScopedQuery<'_>)->(i64,Vec<Value>);
     query_business(query:&BusinessQuery<'_>)->(i64, Vec<Value>);
     query_crm(query:&CrmQuery<'_>)->(i64, Vec<Value>);
+    query_related(query:&RelatedQuery<'_>)->(i64, Vec<Value>);
     scan_crm(query:&CrmQuery<'_>,after_id:i64)->Vec<Value>;
     query_personnel(query:&PersonnelQuery<'_>)->(i64, Vec<Value>);
     query_office(query:&OfficeQuery<'_>)->(i64, Vec<Value>);
@@ -562,6 +583,7 @@ delegate! {
     audit_events(before_id:i64,limit:i64)->Vec<Value>;
     delete_audits(ids:&[i64])->usize;
     history(kind:Option<&str>,id:Option<i64>)->Vec<Value>;
+    has_history_except(kind:&str,id:i64,allowed:&[&str])->bool;
     credential(id:i64)->Option<Credential>;
     set_credential(id:i64,salt:&[u8],hash:&[u8],iterations:u32)->();
     settings(name:&str)->Option<Value>;

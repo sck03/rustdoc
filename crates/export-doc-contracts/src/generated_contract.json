@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "d05b675af93619dc408076d63a5a5f9eb0aec54f8bec83db5c2a712b76a5ad32",
+  "digest": "27589cee6636014f08f1f40227d2cf1dddcfaccb94d950916ab193fcbeb99965",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -74121,6 +74121,11 @@
           "format": "int64",
           "minimum": 0
         },
+        "retainedInputBytes": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
         "downloadMemory": {
           "type": "object",
           "properties": {
@@ -74155,6 +74160,7 @@
         "failed",
         "persistedCounts",
         "retainedOutputBytes",
+        "retainedInputBytes",
         "downloadMemory"
       ],
       "additionalProperties": false

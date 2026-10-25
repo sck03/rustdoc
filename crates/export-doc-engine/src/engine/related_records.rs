@@ -121,11 +121,18 @@ fn validate(
             )
             .map_err(invalid)?
         );
-        if store::all(tx, resource.key)?.iter().any(|row| {
-            row["id"] != value["id"]
-                && row["supplierCompanyId"] == value["supplierCompanyId"]
-                && row["productId"] == product_id
-        }) {
+        if store::matching(
+            tx,
+            resource.key,
+            &[
+                ("supplierCompanyId", value["supplierCompanyId"].to_string()),
+                ("productId", product_id.to_string()),
+            ],
+            &[("id", "id")],
+        )?
+        .iter()
+        .any(|row| row["id"] != value["id"])
+        {
             return Err(conflict("该供应商已经关联此产品。"));
         }
         value["status"] = if previous["id"].as_i64().unwrap_or(0) > 0 {
@@ -177,40 +184,65 @@ pub fn handle(
         }
     };
     let permission_action = auth::operation_action(operation, resource.permission, action)?;
+    if operation == resource.list {
+        return store.read_for(actor, operation, query, |tx, actor| {
+            let parent = store::get(tx, parent_kind, parent_id)?;
+            if !auth::visible(actor, resource.permission, permission_action, &parent) {
+                return Err(error(403, "所属客户或供应商不在当前账号的操作范围内。"));
+            }
+            let array = operation == LIST_SUPPLIER_ASSESSMENTS;
+            let (page, size, offset) = store::page_parameters(query);
+            let mut fields: Vec<_> = contracts::schema(resource.schema)["properties"]
+                .as_object()
+                .expect("related schema")
+                .keys()
+                .map(|key| (key.as_str(), key.as_str()))
+                .collect();
+            if resource.key == "supplier-products" {
+                fields.push(("__linkedProductId", "__linkedProductId"));
+            }
+            let include_other_drafts =
+                auth::visible(actor, resource.permission, "approve", &parent);
+            let mut items = vec![];
+            loop {
+                crate::operation::check()?;
+                let (total, mut rows) = tx.query_related(&export_doc_storage::RelatedQuery {
+                    kind: resource.key,
+                    parent_id,
+                    include_other_drafts,
+                    user_id: actor.id,
+                    fields: &fields,
+                    offset: if array { items.len() as i64 } else { offset },
+                    limit: if array { 200 } else { size as i64 },
+                })?;
+                let empty = rows.is_empty();
+                if resource.key == "supplier-products" {
+                    for row in &mut rows {
+                        if row["__linkedProductId"].as_i64().is_none() {
+                            return Err(error(404, "关联商品不存在。"));
+                        }
+                        row.as_object_mut()
+                            .expect("related record")
+                            .remove("__linkedProductId");
+                    }
+                }
+                items.extend(
+                    rows.into_iter()
+                        .map(|row| contracts::project(contracts::schema(resource.schema), row)),
+                );
+                if !array {
+                    return Ok(contracts::page(items, total as usize, page, size));
+                }
+                if empty || items.len() as i64 >= total {
+                    return Ok(json!(items));
+                }
+            }
+        });
+    }
     store.transaction_as(actor, |tx, actor| {
         let parent = store::get(tx, parent_kind, parent_id)?;
         if !auth::visible(actor, resource.permission, permission_action, &parent) {
             return Err(error(403, "所属客户或供应商不在当前账号的操作范围内。"));
-        }
-        if operation == resource.list {
-            let mut rows: Vec<_> = store::all(tx, resource.key)?
-                .into_iter()
-                .filter(|row| row[field] == parent_id)
-                .collect();
-            if resource.key == "supplier-assessments"
-                && !auth::visible(actor, resource.permission, "approve", &parent)
-            {
-                rows.retain(|row| row["status"] == "Confirmed" || row["ownerUserId"] == actor.id);
-            }
-            rows.sort_by(|a, b| {
-                (b["isPrimary"] == true)
-                    .cmp(&(a["isPrimary"] == true))
-                    .then_with(|| {
-                        b["assessmentDate"]
-                            .as_str()
-                            .cmp(&a["assessmentDate"].as_str())
-                    })
-                    .then_with(|| b["id"].as_i64().cmp(&a["id"].as_i64()))
-            });
-            let rows = rows
-                .into_iter()
-                .map(|row| project(tx, resource, row))
-                .collect::<Result<Vec<_>>>()?;
-            return Ok(if operation == LIST_SUPPLIER_ASSESSMENTS {
-                json!(rows)
-            } else {
-                store::page_only(rows, query)
-            });
         }
         let id = if operation == resource.create {
             0
@@ -237,10 +269,12 @@ pub fn handle(
                 return Err(conflict("已确认评价不能删除。"));
             }
             if resource.key == "crm-contacts" {
-                for mut follow_up in store::all(tx, "crm-follow-ups")?
-                    .into_iter()
-                    .filter(|row| row["crmContactId"] == id)
-                {
+                for mut follow_up in store::matching(
+                    tx,
+                    "crm-follow-ups",
+                    &[("crmContactId", id.to_string())],
+                    &[],
+                )? {
                     follow_up["crmContactId"] = Value::Null;
                     store::save(
                         tx,
@@ -303,9 +337,15 @@ pub fn handle(
             if value["isPrimary"] == true {
                 return project(tx, resource, value);
             }
-            for mut sibling in store::all(tx, resource.key)?.into_iter().filter(|row| {
-                row[field] == parent_id && row["id"] != id && row["isPrimary"] == true
-            }) {
+            for mut sibling in store::matching(
+                tx,
+                resource.key,
+                &[(field, parent_id.to_string()), ("isPrimary", "true".into())],
+                &[],
+            )?
+            .into_iter()
+            .filter(|row| row["id"] != id)
+            {
                 sibling["isPrimary"] = json!(false);
                 store::save(
                     tx,

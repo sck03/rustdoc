@@ -1,3 +1,5 @@
+use crate::test_design_fixture as fixture;
+
 use super::*;
 use crate::designer::{
     ConditionOperator, ConditionalRule, Element, GridCell, GridColumn, GridRow, ReportBlock,
@@ -68,7 +70,7 @@ fn fixed_blocks_reject_fields_without_a_current_item() {
             "rows":[{"id":"row","cells":[{"id":"cell","contentKind":"CheckboxGroup","fieldPath":"item.Quantity"}]}]}),
     ];
     for value in cases {
-        let mut design = Design::invoice();
+        let mut design = fixture::invoice();
         design.layers[1].elements.clear();
         let kind = value["type"].as_str().unwrap();
         append_flow(
@@ -98,7 +100,7 @@ fn fixed_blocks_reject_fields_without_a_current_item() {
 
 #[test]
 fn original_v3_flow_blocks_validate_and_round_trip() {
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     design.layers[1].elements.clear();
     append_flow(
         &mut design,
@@ -224,7 +226,7 @@ fn original_v3_flow_blocks_validate_and_round_trip() {
 
 #[test]
 fn structured_detail_groups_subtotals_summary_and_side_band_round_trip() {
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     if let Kind::Flow {
         block: ReportBlock::DetailTable(table),
         ..
@@ -285,7 +287,7 @@ fn structured_detail_groups_subtotals_summary_and_side_band_round_trip() {
 
 #[test]
 fn grid_diagonal_header_round_trips_through_dtpl() {
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     design.layers[1].elements.clear();
     append_flow(
         &mut design,
@@ -368,7 +370,7 @@ fn foreign_templates_are_rejected_without_silent_conversion() {
 #[test]
 fn template_fonts_are_restricted_to_the_bundled_families() {
     for family in ["Noto Sans CJK SC", "Noto Serif CJK SC", "Arial", "SimSun"] {
-        let mut design = Design::invoice();
+        let mut design = fixture::invoice();
         design.page.font_family = family.into();
         let supported = matches!(family, "Noto Sans CJK SC" | "Noto Serif CJK SC");
         assert_eq!(validate(&design, &fields()).is_ok(), supported);

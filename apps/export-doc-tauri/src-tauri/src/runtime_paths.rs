@@ -92,7 +92,7 @@ pub(crate) fn prepare_runtime_paths(app: &tauri::App) -> Result<RuntimePaths, Bo
             .unwrap_or_else(|| app_root.join("RuntimeConfig"))
     };
     if !portable {
-        apply_pending_data_root_migration(&runtime_config_root)?;
+        apply_pending_data_root_migration(&runtime_config_root, &app_root)?;
     }
     let data_root = resolve_data_root(
         storage_root,
@@ -159,6 +159,13 @@ fn resolve_data_root(
         return Ok(data_root);
     }
     if let Some(data_root) = read_persisted_data_root(runtime_config_root, app_root)? {
+        if !data_root.try_exists()? {
+            return Err(format!(
+                "已配置的业务数据目录不存在，已停止新建空库：{}。请连接原磁盘或恢复数据目录配置。",
+                data_root.display()
+            )
+            .into());
+        }
         ensure_runtime_data_root_is_usable(&data_root)?;
         return Ok(data_root);
     }

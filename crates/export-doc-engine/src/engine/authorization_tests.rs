@@ -1,5 +1,34 @@
 use super::*;
 
+#[test]
+fn migration_fences_block_store_open_before_database_initialization() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join(".codex-runtime/authorization-tests")
+        .join(crate::paths::nonce().unwrap());
+    std::fs::create_dir_all(&root).unwrap();
+    for (index, marker) in [
+        export_doc_storage::maintenance::DATA_ROOT_MIGRATION_PENDING_FILE,
+        export_doc_storage::maintenance::DATA_ROOT_MIGRATION_REDIRECT_FILE,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let paths = RuntimePaths::server(&root, &root.join(format!("Data{index}"))).unwrap();
+        std::fs::write(
+            paths.data_root.join(marker),
+            b"damaged marker must also block opening",
+        )
+        .unwrap();
+        assert_eq!(store::Store::open(&paths).err().unwrap().status, Some(503));
+        assert!(!paths.sqlite_database_path().exists());
+    }
+    std::fs::remove_dir_all(root).unwrap();
+}
+
 fn fixture() -> (std::path::PathBuf, Arc<NativeService>, store::Actor) {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -121,6 +150,49 @@ fn queued_writes_refresh_permissions_before_the_transaction() {
     account["expectedVersion"] = account["versionNumber"].clone();
     account["role"] = json!("OfficeEmployee");
     account = accounts::save(&service.store, &admin, id, account).unwrap()["user"].clone();
+    #[cfg(feature = "invoice-transfer")]
+    for operation in [
+        DOWNLOAD_INVOICE_TRANSFER_PACKAGE,
+        SAVE_INVOICE_TRANSFER_PACKAGE_TO_PATH,
+    ] {
+        assert_eq!(
+            invoice_transfer::handle(
+                &service,
+                &stale,
+                operation,
+                &[("id", "9999999".into())],
+                &json!({})
+            )
+            .unwrap_err()
+            .status,
+            Some(403)
+        );
+    }
+    for operation in [
+        QUERY_CRM_CONTACTS,
+        QUERY_SUPPLIER_PRODUCT_LINKS,
+        LIST_SUPPLIER_ASSESSMENTS,
+    ] {
+        let parameters = if operation == QUERY_CRM_CONTACTS {
+            vec![("customerId", "9999999".into())]
+        } else {
+            vec![("supplierId", "9999999".into())]
+        };
+        assert_eq!(
+            related_records::handle(
+                &service.store,
+                &stale,
+                &service.clock,
+                operation,
+                &parameters,
+                &[],
+                &json!({})
+            )
+            .unwrap_err()
+            .status,
+            Some(403)
+        );
+    }
     for operation in [CREATE_HS_CODE, COMMIT_HS_CODE_CLEANUP] {
         assert_eq!(
             hs::handle(&service, &stale, operation, &[], &[], &json!({}))

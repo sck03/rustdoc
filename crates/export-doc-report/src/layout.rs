@@ -1,4 +1,6 @@
 //! Vector PDF output. Layout, pagination and embedded fonts run inside Rust.
+#[cfg(test)]
+use crate::test_design_fixture as fixture;
 use crate::{
     canvas::Canvas,
     error::{Result, invalid},
@@ -717,7 +719,7 @@ mod tests {
     use serde_json::json;
 
     fn structured_design() -> Design {
-        let mut design = Design::invoice();
+        let mut design = fixture::invoice();
         if let Kind::Flow {
             block: ReportBlock::DetailTable(table),
             ..
@@ -827,7 +829,7 @@ mod tests {
         let row = draft.rows[0].clone();
         draft.rows = vec![row; 75];
         draft.rows[74].cells[2] = "最后一行 END-75".into();
-        let output = pages(&draft.build().unwrap(), &Design::invoice()).unwrap();
+        let output = pages(&draft.build().unwrap(), &fixture::invoice()).unwrap();
         assert!(output.len() > 1);
         assert!(output.last().unwrap().contains("END-75"));
         assert!(output[0].contains("TEST-&lt;&gt;&amp;"));
@@ -835,7 +837,7 @@ mod tests {
 
     #[test]
     fn dashed_styles_and_explicit_page_numbers_are_not_silently_replaced_or_appended() {
-        let mut design = Design::invoice();
+        let mut design = fixture::invoice();
         let title = design.element_mut("title").unwrap();
         title.style.border_width_px = 1.;
         title.style.border_style = "Dashed".into();

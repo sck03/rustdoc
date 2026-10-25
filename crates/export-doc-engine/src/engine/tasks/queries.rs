@@ -28,6 +28,7 @@ pub(super) fn metadata_fields() -> Vec<(&'static str, &'static str)> {
         }
     }
     fields.push(("_retryOperation", "_retry.operation"));
+    fields.push(("_retryInput", "_retryInput"));
     fields
 }
 pub(super) fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {

@@ -343,7 +343,14 @@ where
                     let formula = formula.unwrap_or_default();
                     if expand_shared_derived {
                         if formulas.len() <= shared_index {
-                            formulas.resize(shared_index + 1, None);
+                            let count = shared_index
+                                .checked_add(1)
+                                .ok_or_else(crate::read_limits::invalid)?;
+                            crate::read_limits::bytes::<Option<SharedFormula>>(count)?;
+                            formulas
+                                .try_reserve_exact(count - formulas.len())
+                                .map_err(|_| crate::read_limits::invalid())?;
+                            formulas.resize(count, None);
                         }
                         formulas[shared_index] = Some(SharedFormula {
                             formula: formula.clone(),

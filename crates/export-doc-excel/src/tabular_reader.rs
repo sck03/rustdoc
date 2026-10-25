@@ -1,7 +1,7 @@
 //! Bounded CSV/OOXML reading for business directories. No paths or database writes.
-use crate::{Check, MAX_INPUT, Result, archive::Package};
-use calamine::{Data, Reader, open_workbook_auto_from_rs};
-use std::{io::Cursor, path::Path};
+use crate::{Check, MAX_INPUT, Result};
+use calamine::{Data, Reader};
+use std::path::Path;
 
 pub fn read_table(
     bytes: &[u8],
@@ -39,9 +39,7 @@ pub fn read_table_data(
             rows: csv(&decode(bytes)?, maximum_rows, check)?,
         }),
         "xlsx" | "xlsm" => {
-            Package::open(bytes, check)?;
-            let mut workbook = open_workbook_auto_from_rs(Cursor::new(bytes))
-                .map_err(|cause| format!("无法读取 Excel：{cause}"))?;
+            let mut workbook = crate::reader::open(bytes, check)?;
             let sheet = workbook
                 .sheet_names()
                 .first()
@@ -95,9 +93,7 @@ pub fn sheet_names(bytes: &[u8], name: &str, check: Check<'_>) -> Result<Vec<Str
     {
         "csv" => Ok(vec!["CSV".into()]),
         "xlsx" | "xlsm" => {
-            Package::open(bytes, check)?;
-            let workbook = open_workbook_auto_from_rs(Cursor::new(bytes))
-                .map_err(|cause| format!("无法读取 Excel：{cause}"))?;
+            let workbook = crate::reader::open(bytes, check)?;
             Ok(workbook.sheet_names().to_vec())
         }
         _ => Err("只支持 .csv、.xlsx 或 .xlsm 文件。".into()),
@@ -114,9 +110,7 @@ pub fn read_sheet_data(
     if bytes.is_empty() || bytes.len() > MAX_INPUT {
         return Err("导入文件为空或超过 25 MiB。".into());
     }
-    Package::open(bytes, check)?;
-    let mut workbook = open_workbook_auto_from_rs(Cursor::new(bytes))
-        .map_err(|cause| format!("无法读取 Excel：{cause}"))?;
+    let mut workbook = crate::reader::open(bytes, check)?;
     let names = workbook.sheet_names().to_vec();
     if names.is_empty() {
         return Err("Excel 没有可读取的工作表。".into());

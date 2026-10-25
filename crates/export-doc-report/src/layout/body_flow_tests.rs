@@ -1,8 +1,10 @@
+use crate::test_design_fixture as fixture;
+
 use super::*;
 use serde_json::json;
 
 fn blank_grid(top: i32, height: i32) -> Design {
-    let mut design = Design::invoice();
+    let mut design = fixture::invoice();
     let mut element = design.layers[0].elements[0].clone();
     for layer in &mut design.layers {
         layer.elements.clear();

@@ -223,7 +223,7 @@ async fn execute(
             .collect();
         let upload_scope = scope.clone();
         let authorization = tokio::task::spawn_blocking(move || {
-            upload_scope.run(|| {
+            upload_scope.run_result(|| {
                 service.begin_backup_upload(
                     operation,
                     &parameters
@@ -262,7 +262,7 @@ async fn execute(
         let _permit = permit;
         let _processing = processing;
         scope
-            .run(|| {
+            .run_result(|| {
                 let parameters: Vec<_> = parameters
                     .iter()
                     .map(|(k, v)| (k.as_str(), v.clone()))

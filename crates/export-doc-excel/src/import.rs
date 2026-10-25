@@ -1,8 +1,5 @@
-use crate::{Check, MAX_INPUT, Result, archive::Package, mapping};
-use calamine::{
-    Data, DataType, ExcelDateTime, ExcelDateTimeType, Range, Reader, Sheets,
-    open_workbook_auto_from_rs,
-};
+use crate::{Check, Result, mapping};
+use calamine::{Data, DataType, ExcelDateTime, ExcelDateTimeType, Range, Reader, Sheets};
 use export_doc_contracts::{contracts, generated_api::*};
 use export_doc_domain::{
     invoice::{InvoiceDraft, ItemRow, MAX_ROWS, money, parse_number},
@@ -11,7 +8,7 @@ use export_doc_domain::{
 use exportdoc_excel_analyzer::{SheetAnalysis, analyze_cells};
 use rust_decimal::Decimal;
 use serde_json::{Value, json};
-use std::{collections::BTreeMap, io::Cursor, str::FromStr};
+use std::{collections::BTreeMap, str::FromStr};
 use unicode_normalization::UnicodeNormalization;
 
 fn text(cell: Option<&Data>) -> String {
@@ -123,16 +120,7 @@ pub fn preview(
     check: Check<'_>,
 ) -> Result<ApiExcelImportPreviewResponse> {
     check()?;
-    if bytes.is_empty() || bytes.len() > MAX_INPUT {
-        return Err("Excel 文件为空或超过 25 MiB。".into());
-    }
-    if bytes.starts_with(b"PK") {
-        Package::open(bytes, check)?;
-    } else if !bytes.starts_with(&[0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]) {
-        return Err("文件内容不是受支持的 Excel 工作簿。".into());
-    }
-    let mut workbook = open_workbook_auto_from_rs(Cursor::new(bytes))
-        .map_err(|e| format!("无法读取 Excel 工作簿：{e}"))?;
+    let mut workbook = crate::reader::open(bytes, check)?;
     let epoch = match &workbook {
         Sheets::Xls(book) => Some(book.has_1904_epoch()),
         Sheets::Xlsx(book) => Some(book.has_1904_epoch()),
@@ -278,7 +266,8 @@ pub fn preview(
                 header[*key] = json!(lines.join("\n"));
             }
         }
-        let shipment = at(&range, 13, 15);
+        let shipment = numeric_date(&range, "shipmentDate", 13, 15, epoch)
+            .unwrap_or_else(|| at(&range, 13, 15));
         if !shipment.is_empty() {
             header["shipmentDate"] = json!(shipment);
         }

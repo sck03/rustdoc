@@ -1,10 +1,10 @@
-import type { ApiInvoiceItemDto, ApiProductDto, ApiUnitDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
+import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ApiUnitDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import type { EditableInvoiceItemField } from "./invoiceItemTableModel.ts";
 
 export type InvoiceItemCellSelection = { rowIndex: number; field: EditableInvoiceItemField };
 export type InvoiceItemsEditorProps = {
   client: ExportDocManagerApiClient; items: ApiInvoiceItemDto[]; canRedoItemEdit: boolean; canSaveToProductLibrary: boolean; canUseHsKnowledge: boolean; canUndoItemEdit: boolean;
-  blankRowCount?: number; defaultSpareColumnCount?: number; currency: string; exchangeRate?: number | null; isProductLibraryBusy: boolean; readOnly?: boolean;
+  blankRowCount?: number; defaultSpareColumnCount?: number; currency: string; totals: Partial<ApiInvoiceDetailDto>; isProductLibraryBusy: boolean; readOnly?: boolean;
   onAddItem(): void; onApplyProductLibraryItem(product: ApiProductDto, insertAfterIndex: number | null): void; onChangeItem(index: number, next: Partial<ApiInvoiceItemDto>): void;
   onClearItemCells(cells: InvoiceItemCellSelection[]): void; onDuplicateItem(index: number): void; onFillDownItemCells(cells: InvoiceItemCellSelection[]): void;
   onFillDownItemField(index: number, field: EditableInvoiceItemField): void; onMoveItem(index: number, direction: -1 | 1): void;

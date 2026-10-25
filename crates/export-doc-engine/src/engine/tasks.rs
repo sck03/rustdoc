@@ -1,5 +1,6 @@
 //! Durable file tasks. Only running workers live in memory; snapshots and output
 //! bytes commit together in the same application database as the business data.
+mod admission;
 mod output;
 mod persistence;
 mod queries;
@@ -74,6 +75,7 @@ impl TaskOutput {
 struct Runtime {
     workers: Vec<JoinHandle<()>>,
     active: HashMap<String, OperationScope>,
+    preparing_retries: usize,
     stopping: bool,
     failure: Option<String>,
 }
@@ -101,7 +103,7 @@ impl Jobs {
         };
         Ok(
             json!({"active":active,"workerHandles":workers,"stopping":stopping,"failed":failed,
-            "persistedCounts":self.store.connection()?.job_counts()?,"retainedOutputBytes":self.store.connection()?.job_output_bytes()?,"downloadMemory":self.download_budget.snapshot()}),
+            "persistedCounts":self.store.connection()?.job_counts()?,"retainedOutputBytes":self.store.connection()?.job_output_bytes()?,"retainedInputBytes":self.store.connection()?.job_input_bytes()?,"downloadMemory":self.download_budget.snapshot()}),
         )
     }
     pub fn open(store: Arc<Store>) -> Result<Self> {
@@ -211,12 +213,7 @@ impl Jobs {
             .spawn(move || {
                 let flag = scope.cancellation_flag();
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    scope.run(|| {
-                        crate::operation::check()?;
-                        let output = work(&flag)?;
-                        crate::operation::check()?;
-                        Ok(output)
-                    })
+                    scope.run_result(|| work(&flag))
                 }))
                 .unwrap_or_else(|_| Err(unavailable("文件处理异常终止，未发布输出。")));
                 // Persist terminal state outside the canceled execution scope.

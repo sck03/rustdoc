@@ -51,6 +51,7 @@ pub(super) fn prepare(paths: &RuntimePaths) -> Result<File> {
     let locks = paths.data_root.join("Locks");
     directory(&locks)?;
     let instance = lock(&locks.join("native-instance.lock"))?;
+    export_doc_storage::maintenance::ensure_data_root_available(&paths.data_root)?;
     let database = paths.sqlite_database_path();
     let database_root = database.parent().expect("managed database root");
     directory(database_root)?;

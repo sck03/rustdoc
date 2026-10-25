@@ -357,6 +357,188 @@ fn output_byte_retention_preserves_history_and_is_idempotent() {
 
 #[cfg(feature = "excel")]
 #[test]
+fn retry_inputs_are_released_on_success_and_bounded_after_failure_or_cancellation() {
+    let fixture = Fixture::new();
+    let (store, jobs) = fixture.open();
+    let mut ids = vec![];
+    for state in ["Succeeded", "Failed", "Canceled", "Failed"] {
+        let replay = retry::Replay::new(
+            UPLOAD_AND_START_BOOKING_SHEET_CONVERT_DOWNLOAD_JOB,
+            &[],
+            &json!({}),
+        )
+        .with_input("input.xlsx", b"123456");
+        let started = persistence::create_replayable(
+            &store,
+            &fixture.actor,
+            "BookingSheetConvert",
+            "输入保留",
+            Some(&replay),
+        )
+        .unwrap();
+        let id = started["jobId"].as_str().unwrap();
+        if state == "Canceled" {
+            persistence::cancel(&store, &fixture.actor, id).unwrap();
+        }
+        let result = if state == "Succeeded" {
+            Ok(TaskOutput::file(
+                "result.txt".into(),
+                "text/plain",
+                b"result".to_vec(),
+            ))
+        } else {
+            Err(unavailable("模拟失败"))
+        };
+        persistence::finish(&store, &fixture.actor, id, result).unwrap();
+        let row = persistence::checked(&*store.connection().unwrap(), &fixture.actor, id).unwrap();
+        let record_id = row["id"].as_i64().unwrap();
+        assert_eq!(
+            store
+                .connection()
+                .unwrap()
+                .blob(record_id, "job-input")
+                .unwrap()
+                .is_some(),
+            state != "Succeeded"
+        );
+        ids.push((id.to_owned(), record_id));
+    }
+    assert_eq!(store.connection().unwrap().job_input_bytes().unwrap(), 18);
+    let policy = retention::Retention {
+        global_output_bytes: 12,
+        per_user_output_bytes: 12,
+        ..Default::default()
+    };
+    retention::prune(&store, policy, chrono::Utc::now()).unwrap();
+    assert_eq!(store.connection().unwrap().job_input_bytes().unwrap(), 12);
+    let expired =
+        persistence::checked(&*store.connection().unwrap(), &fixture.actor, &ids[1].0).unwrap();
+    assert_eq!(expired["status"], "Failed");
+    assert_eq!(expired["_retryInput"], false);
+    assert_eq!(
+        jobs.get(&fixture.actor, &ids[1].0).unwrap()["canRetry"],
+        false
+    );
+    assert!(expired["detailText"].as_str().unwrap().contains("重试输入"));
+    assert!(
+        store
+            .connection()
+            .unwrap()
+            .blob(ids[2].1, "job-input")
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        store
+            .connection()
+            .unwrap()
+            .blob(ids[3].1, "job-input")
+            .unwrap()
+            .is_some()
+    );
+    retention::prune(&store, policy, chrono::Utc::now()).unwrap();
+    assert_eq!(store.connection().unwrap().job_input_bytes().unwrap(), 12);
+    jobs.close().unwrap();
+}
+
+#[test]
+fn registered_document_retries_reach_their_original_use_case() {
+    let fixture = Fixture::new();
+    let service = crate::engine::NativeService::open(fixture.paths.clone()).unwrap();
+    let admin_id = service.store.all("users").unwrap()[0]["id"]
+        .as_i64()
+        .unwrap();
+    let actor = crate::engine::auth::current_actor(&service.store, admin_id).unwrap();
+    let body = json!({"items":[{"reportType":"ExportDocument","templatePath":export_doc_report::Builtin::Invoice.path(),"name":"发票","withSeal":false}],"createZip":true});
+    let parameters = [("invoiceId", "999999999".into())];
+    for operation in [
+        START_INVOICE_DOCUMENT_PACKAGE_DOWNLOAD_JOB,
+        START_INVOICE_DOCUMENT_PACKAGE_SAVE_TO_PATH_JOB,
+        #[cfg(feature = "mail")]
+        START_INVOICE_DOCUMENT_EMAIL_JOB,
+    ] {
+        let replay = retry::Replay::new(operation, &parameters, &body);
+        let started = persistence::create_replayable(
+            &service.store,
+            &actor,
+            "DocumentRetry",
+            "重试分派",
+            Some(&replay),
+        )
+        .unwrap();
+        let id = started["jobId"].as_str().unwrap();
+        persistence::finish(
+            &service.store,
+            &actor,
+            id,
+            Err(unavailable("模拟输出前失败")),
+        )
+        .unwrap();
+        assert_eq!(service.jobs.get(&actor, id).unwrap()["canRetry"], true);
+        assert_eq!(
+            retry::execute(&service, &actor, id).unwrap_err().status,
+            Some(404),
+            "retry must reach the source invoice check for {}",
+            operation.id
+        );
+    }
+    service.close().unwrap();
+}
+
+#[cfg(feature = "excel")]
+#[test]
+fn reclaimed_retry_input_is_a_conflict_inside_the_read_snapshot() {
+    let fixture = Fixture::new();
+    let service = crate::engine::NativeService::open(fixture.paths.clone()).unwrap();
+    let admin_id = service.store.all("users").unwrap()[0]["id"]
+        .as_i64()
+        .unwrap();
+    let actor = crate::engine::auth::current_actor(&service.store, admin_id).unwrap();
+    let replay = retry::Replay::new(
+        UPLOAD_AND_START_BOOKING_SHEET_CONVERT_DOWNLOAD_JOB,
+        &[],
+        &json!({}),
+    )
+    .with_input("input.xlsx", b"workbook");
+    let started = persistence::create_replayable(
+        &service.store,
+        &actor,
+        "BookingSheetConvert",
+        "回收冲突",
+        Some(&replay),
+    )
+    .unwrap();
+    let id = started["jobId"].as_str().unwrap();
+    persistence::finish(&service.store, &actor, id, Err(unavailable("模拟失败"))).unwrap();
+    retention::prune(
+        &service.store,
+        retention::Retention {
+            global_output_bytes: 1,
+            per_user_output_bytes: 1,
+            ..Default::default()
+        },
+        chrono::Utc::now(),
+    )
+    .unwrap();
+    assert_eq!(service.jobs.get(&actor, id).unwrap()["canRetry"], false);
+    assert_eq!(
+        retry::execute(&service, &actor, id).unwrap_err().status,
+        Some(409)
+    );
+    assert_eq!(
+        service
+            .store
+            .connection()
+            .unwrap()
+            .job_input_bytes()
+            .unwrap(),
+        0
+    );
+    service.close().unwrap();
+}
+
+#[cfg(feature = "excel")]
+#[test]
 fn retry_survives_restart_reauthorizes_and_keeps_private_requests_off_the_wire() {
     use crate::engine::NativeService;
     let fixture = Fixture::new();
@@ -390,6 +572,11 @@ fn retry_survives_restart_reauthorizes_and_keeps_private_requests_off_the_wire()
         .sessions
         .actor(&service.store, login["accessToken"].as_str().unwrap())
         .unwrap();
+    let other_id = service.store.transaction(|tx| {
+        let account = crate::contracts::overlay(crate::contracts::initial(crate::contracts::schema("ApiUserAccountDto")), &json!({"username":"other-task-owner","fullName":"其他任务账号","role":"User","isActive":true,"companyScope":"DEFAULT","departmentId":"GENERAL"}));
+        let saved = crate::engine::store::save(tx, "users", 0, account, Some("other-task-owner".into()), &actor, "create")?;
+        Ok(saved["id"].as_i64().unwrap())
+    }).unwrap();
     let started = service
         .jobs
         .start_replayable(
@@ -418,7 +605,7 @@ fn retry_survives_restart_reauthorizes_and_keeps_private_requests_off_the_wire()
             &service,
             &Actor {
                 edition: Default::default(),
-                id: actor.id + 100,
+                id: other_id,
                 admin: false,
                 ..actor.clone()
             },

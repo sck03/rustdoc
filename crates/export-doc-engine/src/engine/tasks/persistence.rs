@@ -47,7 +47,10 @@ fn snapshot(record: &Value) -> Value {
     value["retryRequestJson"] = json!("");
     value["canRetry"] = json!(
         matches!(record["status"].as_str(), Some("Failed" | "Canceled"))
-            && retry_operation(record).is_some()
+            && retry_operation(record).is_some_and(|operation| super::retry::available(
+                operation,
+                record["_retryInput"] == true
+            ))
     );
     value
 }
@@ -198,6 +201,10 @@ pub fn finish(store: &Store, actor: &Actor, id: &str, result: Result<TaskOutput>
             }
         }
         job["canCancel"] = json!(false);
+        if job["status"] == "Succeeded" && job["_retryInput"] == true {
+            super::retry::remove_input(connection, record_id)?;
+            job["_retryInput"] = json!(false);
+        }
         job["completedAt"] = json!(store::timestamp());
         save(connection, actor, job, "finish")?;
         Ok(())
@@ -328,6 +335,23 @@ pub(super) fn expire_output(connection: &Connection, id: i64) -> Result<()> {
         "{detail} 文件结果已按容量保留策略回收，请重新生成。"
     ));
     save(connection, &actor, job, "expire-output")?;
+    Ok(())
+}
+pub(super) fn expire_input(connection: &Connection, id: i64) -> Result<()> {
+    let mut job = store::get(connection, KIND, id)?;
+    if active(&job) {
+        return Err(conflict("活动任务的输入不能回收。"));
+    }
+    super::retry::remove_input(connection, id)?;
+    job["_retryInput"] = json!(false);
+    if job["status"] != "Succeeded" {
+        job["detailText"] = json!(format!(
+            "{} 重试输入已按容量保留策略回收，请重新选择源文件。",
+            text(&job, "detailText")
+        ));
+    }
+    let actor = owner(&job)?;
+    save(connection, &actor, job, "expire-input")?;
     Ok(())
 }
 pub fn delete(store: &Store, actor: &Actor, id: &str) -> Result<()> {

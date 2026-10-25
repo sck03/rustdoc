@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useServerDraftSync } from "./serverDraftSync.tsx";
+import { mergeSavedDraftFields } from "./recordDraftMerge.ts";
 
 /** Keeps editable values, the saved baseline and its concurrency token together. */
 export function useVersionedRecordDraft<T extends { id: number; versionNumber: number }, K extends keyof T & string>(
@@ -34,9 +35,7 @@ export function useVersionedRecordDraft<T extends { id: number; versionNumber: n
   function acceptSaved(record: T, submitted: Values, nextResourceKey = resourceKey) {
     const latest = currentRef.current;
     const baseline = valuesFrom(record);
-    const values = { ...baseline };
-    // Only fields unchanged since submission take the server-normalized value.
-    fields.forEach(key => { if (latest.values[key] !== submitted[key]) values[key] = latest.values[key]; });
+    const values = mergeSavedDraftFields(latest.values, submitted, baseline, fields);
     update({ resourceKey: nextResourceKey, adoptedFrom: nextResourceKey === resourceKey ? undefined : resourceKey, record, persisted: record, baseline, values });
   }
   function field(key: K) {

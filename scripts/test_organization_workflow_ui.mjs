@@ -92,7 +92,7 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   assert.equal(await edit.getByRole('combobox', { name: '兼职部门', exact: true }).inputValue(), 'ORGFIN');
   await edit.getByRole('button', { name: '清除直属负责人', exact: true }).click();
   await edit.getByRole('button', { name: '关闭窗口', exact: true }).click();
-  const discard = admin.getByRole('dialog', { name: '放弃未提交的内容？', exact: true });
+  const discard = admin.getByRole('dialog', { name: '放弃未保存的修改？', exact: true });
   await discard.getByRole('button', { name: '取消', exact: true }).click();
   await discard.waitFor({ state: 'hidden' });
   assert(await edit.isVisible());
@@ -100,12 +100,12 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   await discard.waitFor();
   assert(await discard.getByRole('button', { name: '取消', exact: true }).evaluate(button => button === document.activeElement));
   await admin.keyboard.press('Tab');
-  assert(await discard.getByRole('button', { name: '放弃并关闭', exact: true }).evaluate(button => button === document.activeElement));
+  assert(await discard.getByRole('button', { name: '关闭窗口', exact: true }).evaluate(button => button === document.activeElement));
   await admin.keyboard.press('Escape');
   await discard.waitFor({ state: 'hidden' });
   assert(await edit.isVisible());
   await edit.getByRole('button', { name: '关闭窗口', exact: true }).click();
-  await discard.getByRole('button', { name: '放弃并关闭', exact: true }).click();
+  await discard.getByRole('button', { name: '关闭窗口', exact: true }).click();
   await edit.waitFor({ state: 'hidden' });
   assert.equal((await invoke('GetPersonnel', undefined, { id: hired.id }, token)).versionNumber, hireDetails.versionNumber);
   await admin.getByRole('button', { name: '编辑档案', exact: true }).click();
