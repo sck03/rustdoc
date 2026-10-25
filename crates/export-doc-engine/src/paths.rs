@@ -1,4 +1,3 @@
-use serde::Deserialize;
 use std::{
     fs,
     io::Write,
@@ -15,12 +14,6 @@ pub struct RuntimePaths {
     pub log_root: PathBuf,
     pub cache_root: PathBuf,
     pub font_path: PathBuf,
-}
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct PackageMarker {
-    schema_version: u32,
-    purpose: String,
 }
 
 impl RuntimePaths {
@@ -59,58 +52,6 @@ impl RuntimePaths {
         Ok(Self {
             app_root: app_root.to_path_buf(),
             data_root: data_root.to_path_buf(),
-            log_root,
-            cache_root,
-            font_path,
-        })
-    }
-    pub fn open(root: &Path, validation_run: bool) -> Result<Self, String> {
-        ensure_safe_absolute(root)?;
-        let app_root =
-            fs::canonicalize(root).map_err(|error| format!("程序目录不可读：{error}"))?;
-        let marker = app_root.join("exportdoc-native-package.json");
-        ensure_safe_absolute(&marker)?;
-        let marker: PackageMarker = serde_json::from_slice(
-            &fs::read(&marker)
-                .map_err(|_| "请选择独立的 Rust 原生程序目录。请先运行原生程序构建脚本。")?,
-        )
-        .map_err(|error| format!("原生程序包标记无效：{error}"))?;
-        if marker.schema_version != 1 || marker.purpose != "rust-native-application" {
-            return Err("这不是受支持的独立原生程序包。".into());
-        }
-        let data_name = if validation_run {
-            format!("ValidationData-{}", nonce()?)
-        } else {
-            "App_Data".into()
-        };
-        let data_root = app_root.join(data_name);
-        let log_root = data_root.join("Logs");
-        let cache_root = data_root.join("Cache").join("Native");
-        for directory in [&data_root, &log_root, &cache_root] {
-            ensure_safe_absolute(directory)?;
-            fs::create_dir_all(directory).map_err(|error| error.to_string())?;
-            ensure_safe_absolute(directory)?;
-        }
-        let probe = cache_root.join(format!("write-probe-{}", nonce()?));
-        let file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&probe)
-            .map_err(|error| format!("验证数据目录不可写：{error}"))?;
-        drop(file);
-        fs::remove_file(probe).map_err(|error| error.to_string())?;
-        let font_path = app_root
-            .join("Resources")
-            .join("Fonts")
-            .join("OpenSource")
-            .join("NotoSansCJKsc-Regular.otf");
-        ensure_safe_absolute(&font_path)?;
-        if !font_path.is_file() {
-            return Err("验证包缺少已审核的 Noto CJK 字体。请重新构建验证包。".into());
-        }
-        Ok(Self {
-            app_root,
-            data_root,
             log_root,
             cache_root,
             font_path,
@@ -175,6 +116,8 @@ pub fn ensure_safe_absolute(path: &Path) -> Result<(), String> {
 pub fn valid_file_name(name: &str) -> bool {
     if name.is_empty()
         || name.chars().count() > 180
+        || name.len() > 255
+        || name.encode_utf16().count() > 255
         || name.ends_with(['.', ' '])
         || name.nfc().collect::<String>() != name
         || name
@@ -195,7 +138,8 @@ pub fn valid_file_name(name: &str) -> bool {
 }
 
 pub fn suggested_pdf_name(invoice_no: &str) -> String {
-    let name: String = invoice_no
+    let mut name = String::new();
+    for ch in invoice_no
         .nfc()
         .map(|ch| {
             if ch.is_control() || "<>:\"/\\|?*".contains(ch) {
@@ -205,7 +149,13 @@ pub fn suggested_pdf_name(invoice_no: &str) -> String {
             }
         })
         .take(120)
-        .collect();
+    {
+        // UTF-8 also bounds UTF-16 here; reserve four bytes for the extension.
+        if name.len() + ch.len_utf8() > 251 {
+            break;
+        }
+        name.push(ch);
+    }
     let name = format!("{}.pdf", name.trim_end_matches(['.', ' ']));
     if valid_file_name(&name) {
         name
@@ -318,7 +268,15 @@ mod tests {
             assert!(!valid_file_name(name), "{name}");
         }
         assert!(valid_file_name("发票-é.pdf"));
+        assert!(valid_file_name(&format!("{}.dtpl", "汉".repeat(83))));
+        assert!(!valid_file_name(&format!("{}.dtpl", "汉".repeat(84))));
+        assert!(valid_file_name(&format!("{}.pdf", "😀".repeat(62))));
+        assert!(!valid_file_name(&format!("{}.pdf", "😀".repeat(63))));
         assert_eq!(suggested_pdf_name("客户/2026:001"), "客户_2026_001.pdf");
+        assert_eq!(
+            suggested_pdf_name(&"汉".repeat(120)),
+            format!("{}.pdf", "汉".repeat(83))
+        );
     }
     #[test]
     fn relative_and_parent_paths_are_rejected() {

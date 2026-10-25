@@ -48,6 +48,10 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 
 先查看第一个失败步骤及完整日志。依赖安全错误、下载故障、工具链和平台编译问题分别处理；取消、ignored、静态语法通过不计为运行验收。
 
+2026-10-25 复核 [run 40121278583](https://github.com/sck03/rustdoc/actions/runs/40121278583/job/120953136194)：主锁图的 `ctutils 0.4.3` 命中新公告 `RUSTSEC-2026-0385`，涉及非常量时间掩码/比较；OCR/Excel 图未命中。独立升级到 `0.4.4` 并重生成 notices，原 MIT/Apache-2.0 许可及既有 GLib 例外保持。审计步骤保留原 JSON 报告并输出依赖、公告和修复版本摘要，不用忽略公告消除失败。主工作区库存标为 `rust-workspace`，与桌面实际运行图分别检查。
+
+普通 Rust 验证使用 `cargo test --locked --workspace`，独立 OCR 工程和 feature 专项继续分别执行。原生库清单、字体、模板、工具链和相关准备脚本加入对应 paths 过滤，避免这些构建输入单独变化时遗漏门禁；Firefox/WebKit 仍仅手工执行。
+
 2026-10-08 复核 [run 37550212861](https://github.com/sck03/rustdoc/actions/runs/37550212861)：发布合同中的清理测试在 Ubuntu 删除测试用 .git 文件时报“隐藏/只读项”。Linux 将点文件标为 Hidden，测试释放自己创建的单个文件时需要 -Force；修正测试清理，并在 Windows 显式设置同一隐藏属性复现和回归。正式清理器的 Git/数据保护保持不变，不能为让测试通过而允许删除真实仓库。
 
 同日复核 [run 37512895890](https://github.com/sck03/rustdoc/actions/runs/37512895890) 的 rustsec-workspace.json：yoke-derive 0.8.3 被撤回，触发 --deny yanked；OCR/Excel 图没有该阻断。独立定向升级为未撤回的 0.8.4（Unicode-3.0）并同步锁文件/notices，三份锁图按原审计参数通过。GLib 既有单项例外及源码前置检查保留，不新增豁免。

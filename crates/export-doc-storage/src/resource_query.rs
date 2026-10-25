@@ -64,7 +64,7 @@ pub(crate) fn build(kind: &str, pg: bool) -> Result<(QuerySql, String)> {
     Ok((
         QuerySql {
             filter,
-            order: "r.id DESC",
+            order: "r.id DESC".into(),
             values,
         },
         projection,

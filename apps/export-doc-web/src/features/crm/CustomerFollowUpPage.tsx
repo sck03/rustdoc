@@ -183,20 +183,21 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
     setFollowUpRevision((value) => value + 1);
   }
 
-  async function reloadCustomers(preferred?: ApiCrmCustomerDto) {
+  async function reloadCustomers(preferred?: ApiCrmCustomerDto, signal?: AbortSignal) {
+    if (preferred) {
+      signal?.throwIfAborted();
+      setCustomers(current => [preferred, ...current.filter(item => item.id !== preferred.id)]);
+      setCustomerId(preferred.id);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: queryKeys.crmCustomersRoot() }), queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() })]);
+      return;
+    }
     await runAbortableOperation(async (signal) => {
       const page = await client.queryCrmCustomers(
         { keyword: customerKeyword.trim(), status: "", pageNumber: 1, pageSize: 100 },
         { signal },
       );
-      const nextCustomers = preferred && !page.items.some((item) => item.id === preferred.id)
-        ? [preferred, ...page.items]
-        : page.items;
-      setCustomers(nextCustomers);
-      const nextId = preferred && nextCustomers.some((item) => item.id === preferred.id)
-        ? preferred.id
-        : 0;
-      setCustomerId(nextId);
+      setCustomers(page.items);
+      setCustomerId(0);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.crmCustomersRoot() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() }),
@@ -219,18 +220,18 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
     }
   }
 
-  async function reloadContacts() {
+  async function reloadContacts(preferred?: ApiCrmContactDto, signal?: AbortSignal) {
     if (!customerId) {
       setContacts([]);
       return;
     }
-    await runAbortableOperation(async (signal) => {
-      const page = await client.queryCrmContacts(
-        { customerId, pageNumber: 1, pageSize: 100 },
-        { signal },
-      );
-      setContacts(page.items);
-    });
+    if (preferred) setContacts(current => [preferred, ...current.filter(item => item.id !== preferred.id)]);
+    const load = async (requestSignal: AbortSignal) => {
+      const page = await client.queryCrmContacts({ customerId, pageNumber: 1, pageSize: 100 }, { signal: requestSignal });
+      requestSignal.throwIfAborted();
+      setContacts(preferred && !page.items.some(item => item.id === preferred.id) ? [preferred, ...page.items] : page.items.map(item => item.id === preferred?.id ? preferred : item));
+    };
+    await (signal ? load(signal) : runAbortableOperation(load));
   }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {

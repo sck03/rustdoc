@@ -102,7 +102,7 @@ pub(super) fn rows(
     } else {
         String::new()
     };
-    let load = |tx: &Connection| -> Result<(Vec<Value>, usize)> {
+    let load = |tx: &Connection, actor: &Actor| -> Result<(Vec<Value>, usize)> {
         if resource.key == "products" {
             if let Some((_, code)) = query.iter().find(|(name, _)| *name == "productCode") {
                 let code = store::normalize(code);
@@ -147,10 +147,6 @@ pub(super) fn rows(
             }
         }
     };
-    let (rows, total) = if paginated {
-        load(&*store.connection()?)?
-    } else {
-        store.read(load)?
-    };
+    let (rows, total) = store.read_for(actor, operation, query, load)?;
     Ok((rows, total, page, size))
 }

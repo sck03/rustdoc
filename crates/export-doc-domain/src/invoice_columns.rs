@@ -91,9 +91,6 @@ columns![
     (spare9, "spare9", "备用 9", 100, text),
     (spare10, "spare10", "备用 10", 100, text),
 ];
-pub fn column_index(key: &str) -> Option<usize> {
-    ITEM_COLUMNS.iter().position(|column| column.key == key)
-}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ItemRow {
@@ -138,10 +135,6 @@ impl ItemRow {
         assign(&mut item, &self.cells)?;
         crate::invoice_calculation::normalize_item(&mut item)?;
         Ok(item)
-    }
-    /// Invalid intermediate typing remains in the editor; a commit reports it.
-    pub fn edit_finished(&mut self, column: usize) {
-        let _ = self.recalculate(&[column]);
     }
     pub fn recalculate(&mut self, changed: &[usize]) -> Result<(), String> {
         let mut item = self.original.clone();

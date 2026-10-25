@@ -174,7 +174,7 @@ pub(crate) fn build(q: &OfficeQuery<'_>, pg: bool) -> Result<QuerySql> {
     };
     Ok(QuerySql {
         filter: clauses.join(" AND "),
-        order,
+        order: order.into(),
         values,
     })
 }

@@ -1,6 +1,6 @@
 //! Follow-up workflows share canonical completion, relationship and scope rules.
 use super::{
-    auth,
+    auth, crm_queries,
     error::{Result, conflict, error, invalid, unavailable},
     records::{id, text},
     store::{self, Actor, Store},
@@ -8,7 +8,7 @@ use super::{
 use crate::{clock::BusinessClock, contracts, generated_api::*};
 use chrono::{DateTime, FixedOffset, Utc};
 use export_doc_domain::crm;
-use export_doc_storage::{AuditWrite, Connection, RecordWrite};
+use export_doc_storage::{AuditWrite, Connection, CrmList, RecordWrite};
 use serde_json::{Value, json};
 
 pub const OPERATIONS: &[Operation] = &[
@@ -78,48 +78,6 @@ fn instant(value: &str) -> Result<DateTime<FixedOffset>> {
     DateTime::parse_from_rfc3339(value)
         .map_err(|_| invalid("跟进时间必须包含有效日期、时间和时区。"))
 }
-fn order(value: &Value, key: &str) -> Result<Option<DateTime<FixedOffset>>> {
-    value[key]
-        .as_str()
-        .filter(|value| !value.is_empty())
-        .map(instant)
-        .transpose()
-}
-pub fn visible(tx: &Connection, actor: &Actor) -> Result<Vec<Value>> {
-    let customers = store::all(tx, "crm-customers")?;
-    store::all(tx, KIND)?
-        .into_iter()
-        .filter(|row| {
-            auth::visible(actor, PERMISSION, "view", row)
-                && customers.iter().any(|customer| {
-                    customer["id"] == row["crmCustomerId"]
-                        && auth::visible(actor, "sales.customers", "view", customer)
-                })
-        })
-        .map(|row| project(tx, row))
-        .collect()
-}
-pub fn sorted(rows: Vec<Value>) -> Result<Vec<Value>> {
-    let mut rows = rows
-        .into_iter()
-        .map(|row| {
-            Ok((
-                row["isCompleted"] == true,
-                order(&row, "nextFollowUpAt")?,
-                order(&row, "followedUpAt")?,
-                row,
-            ))
-        })
-        .collect::<Result<Vec<_>>>()?;
-    rows.sort_by(|a, b| {
-        a.0.cmp(&b.0)
-            .then_with(|| a.1.is_none().cmp(&b.1.is_none()))
-            .then_with(|| a.1.cmp(&b.1))
-            .then_with(|| b.2.cmp(&a.2))
-            .then_with(|| b.3["id"].as_i64().cmp(&a.3["id"].as_i64()))
-    });
-    Ok(rows.into_iter().map(|row| row.3).collect())
-}
 fn query(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
     let read = |key: &str| {
         query
@@ -141,30 +99,34 @@ fn query(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value
     };
     let customer_id = filter_id("crmCustomerId")?;
     let follow_up_id = filter_id("followUpId")?;
-    let tx = store.connection()?;
-    let rows = sorted(visible(&tx, actor)?)?
-        .into_iter()
-        .filter(|row| {
-            (read("includeCompleted") == "true" || row["isCompleted"] != true)
-                && customer_id.is_none_or(|id| row["crmCustomerId"] == id)
-                && follow_up_id.is_none_or(|id| row["id"] == id)
-        })
-        .collect::<Vec<_>>();
     let size = read("pageSize")
         .parse::<usize>()
         .unwrap_or(20)
         .clamp(1, 100);
     let page = read("pageNumber").parse::<usize>().unwrap_or(1).max(1);
-    let total = rows.len();
-    Ok(contracts::page(
-        rows.into_iter()
-            .skip(page.saturating_sub(1).saturating_mul(size))
-            .take(size)
-            .collect(),
-        total,
-        page,
-        size,
-    ))
+    let offset = i64::try_from(page.saturating_sub(1).saturating_mul(size)).unwrap_or(i64::MAX);
+    store.read_for(actor, QUERY_CRM_FOLLOW_UPS, query, |tx, actor| {
+        let (total, rows) = crm_queries::page(
+            tx,
+            actor,
+            CrmList::FollowUps {
+                include_completed: read("includeCompleted") == "true",
+                customer_id,
+                record_id: follow_up_id,
+            },
+            &crm_queries::fields("ApiCrmFollowUpDto"),
+            offset,
+            size as i64,
+        )?;
+        Ok(contracts::page(
+            rows.into_iter()
+                .map(|row| contracts::project(contracts::schema("ApiCrmFollowUpDto"), row))
+                .collect(),
+            total,
+            page,
+            size,
+        ))
+    })
 }
 fn save(
     store: &Store,

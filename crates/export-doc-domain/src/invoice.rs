@@ -200,45 +200,6 @@ impl InvoiceDraft {
         }
         draft
     }
-    /// Validate the complete paste before changing anything, including existing
-    /// hidden spare fields and server-owned identifiers on the target rows.
-    pub fn paste(
-        &mut self,
-        start_row: usize,
-        start_column: usize,
-        text: &str,
-    ) -> Result<usize, String> {
-        if text.len() > 4 * 1024 * 1024 {
-            return Err("粘贴内容超过 4 MiB。".into());
-        }
-        let grid = parse_tsv(text)?;
-        if grid.is_empty() {
-            return Ok(0);
-        }
-        if start_row > self.rows.len() || start_row + grid.len() > MAX_ROWS {
-            return Err(format!("表格最多 {MAX_ROWS} 行。"));
-        }
-        let mut candidate = self.rows.clone();
-        for (offset, cells) in grid.iter().enumerate() {
-            if start_column + cells.len() > COLUMN_COUNT {
-                return Err("粘贴列超出了商品表格范围。".into());
-            }
-            while candidate.len() <= start_row + offset {
-                candidate.push(ItemRow::blank());
-            }
-            let row = &mut candidate[start_row + offset];
-            for (column, text) in cells.iter().enumerate() {
-                row.cells[start_column + column] = normalize(text);
-            }
-            let changed: Vec<_> = (start_column..start_column + cells.len()).collect();
-            row.recalculate(&changed)
-                .map_err(|message| format!("粘贴第 {} 行：{message}", offset + 1))?;
-            row.to_dto()
-                .map_err(|message| format!("粘贴第 {} 行：{message}", offset + 1))?;
-        }
-        self.rows = candidate;
-        Ok(grid.len())
-    }
 }
 
 pub fn number(value: Decimal) -> String {
@@ -296,39 +257,6 @@ pub fn valid_date(value: &str) -> bool {
     day > 0 && day <= days[month as usize - 1]
 }
 
-pub fn parse_tsv(text: &str) -> Result<Vec<Vec<String>>, String> {
-    let mut rows = vec![];
-    let mut row = vec![];
-    let mut cell = String::new();
-    let mut quoted = false;
-    let mut chars = text.chars().peekable();
-    while let Some(character) = chars.next() {
-        match character {
-            '"' if quoted && chars.peek() == Some(&'"') => {
-                cell.push('"');
-                chars.next();
-            }
-            '"' if quoted => quoted = false,
-            '"' if cell.is_empty() => quoted = true,
-            '\t' if !quoted => row.push(std::mem::take(&mut cell)),
-            '\n' if !quoted => {
-                row.push(std::mem::take(&mut cell));
-                rows.push(std::mem::take(&mut row));
-            }
-            '\r' if !quoted && chars.peek() == Some(&'\n') => {}
-            other => cell.push(other),
-        }
-    }
-    if quoted {
-        return Err("粘贴内容包含未闭合的引号。".into());
-    }
-    if !cell.is_empty() || !row.is_empty() {
-        row.push(cell);
-        rows.push(row);
-    }
-    Ok(rows)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -340,30 +268,14 @@ mod tests {
         );
         let mut draft = InvoiceDraft::demo("2026-09-16", "TEST-001");
         draft.rows[0].cells[23] = "0.123456789012".into();
-        draft.rows[0].edit_finished(23);
+        draft.rows[0].recalculate(&[23]).unwrap();
         let invoice = draft.build().unwrap();
         let roundtrip: ApiInvoiceDetailDto =
             serde_json::from_str(&serde_json::to_string(&invoice).unwrap()).unwrap();
         assert_eq!(invoice.items[0].unit_price, roundtrip.items[0].unit_price);
     }
     #[test]
-    fn paste_is_atomic_and_preserves_hidden_fields() {
-        let mut draft = InvoiceDraft::demo("2026-09-16", "TEST");
-        draft.rows[0].cells[37] = "保留备用十".into();
-        let before = draft.clone();
-        assert!(draft.paste(0, 8, "NaN\tPCS").is_err());
-        assert_eq!(before, draft);
-        draft.paste(0, 8, "1200").unwrap();
-        draft.paste(0, 23, "4.55").unwrap();
-        assert_eq!(draft.rows[0].cells[37], "保留备用十");
-        assert_eq!(draft.rows[0].cells[24], "5460");
-    }
-    #[test]
-    fn quoted_tsv_and_calendar_dates() {
-        assert_eq!(
-            parse_tsv("\"a\nb\"\t\"x\"\"y\"\r\n").unwrap(),
-            vec![vec!["a\nb", "x\"y"]]
-        );
+    fn calendar_dates_are_strict() {
         assert!(valid_date("2024-02-29"));
         assert!(!valid_date("2026-02-29"));
         assert!(!valid_date("2026-09-31"));

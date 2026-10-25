@@ -9,7 +9,9 @@ use super::{
 use crate::{contracts, generated_api::*, operation, paths::valid_file_name};
 use export_doc_domain::party;
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
+#[cfg(test)]
+mod tests;
 
 pub const OPERATIONS: &[Operation] = &[
     PREVIEW_CRM_CUSTOMER_IMPORT,
@@ -62,7 +64,7 @@ pub fn upload(
     let table = export_doc_excel::read_table(bytes, name, 5000, &check).map_err(invalid)?;
     let mut rows = party::map_rows(&table, supplier).map_err(invalid)?;
     let resource = catalog::resource(kind(supplier)).unwrap();
-    service.store.transaction(|tx| {
+    service.store.transaction_for(actor, operation, &[], |tx, actor| {
         let mut names: BTreeSet<_> = store::all(tx,resource.key)?.iter().filter(|row| auth::visible(actor,resource.permission,"view",row))
             .map(|row| store::normalize(&text(row,"name"))).collect();
         for row in &mut rows {
@@ -84,7 +86,7 @@ fn import(
     let supplier = supplier(operation);
     let resource = catalog::resource(kind(supplier)).unwrap();
     let contacts = catalog::resource(contact_kind(supplier)).unwrap();
-    service.store.transaction(|tx| {
+    service.store.transaction_for(actor, operation, &[], |tx, actor| {
         let rows = import_previews::consume(tx,actor,&service.clock,resource.key,&text(body,"previewId"))?;
         let mut names: BTreeSet<_> = store::all(tx,resource.key)?.iter().filter(|row| auth::visible(actor,resource.permission,"view",row))
             .map(|row| store::normalize(&text(row,"name"))).collect();
@@ -129,51 +131,61 @@ fn export(
             .unwrap_or("")
     };
     let keyword = store::normalize(read("keyword"));
-    let rows = service.store.transaction(|tx| {
-        let mut rows: Vec<_> = store::all(tx, resource.key)?
-            .into_iter()
-            .filter(|row| {
-                auth::visible(actor, resource.permission, "export", row)
-                    && (read("status").is_empty() || row["status"] == read("status"))
-                    && (keyword.is_empty()
-                        || [
-                            "name",
-                            "countryRegion",
-                            "website",
-                            "source",
-                            "notes",
-                            "category",
-                            "mainProducts",
-                        ]
-                        .iter()
-                        .any(|key| store::normalize(&text(row, key)).contains(&keyword)))
-            })
-            .collect();
-        if rows.len() > 10_000 {
-            return Err(invalid("当前筛选超过 10000 条，请缩小范围后导出。"));
-        }
-        rows.sort_by_key(|row| text(row, "name"));
-        let mut contacts = store::all(tx, contact_kind(supplier))?;
-        contacts.sort_by_key(|row| (row["isPrimary"] != true, row["id"].as_i64()));
-        for row in &mut rows {
-            operation::check()?;
-            let contact = contacts
-                .iter()
-                .find(|contact| contact[relation(supplier)] == row["id"]);
-            for (from, to) in [
-                ("name", "contactName"),
-                ("title", "contactTitle"),
-                ("email", "contactEmail"),
-                ("phone", "contactPhone"),
-                ("instantMessaging", "instantMessaging"),
-            ] {
-                row[to] = contact
-                    .map(|row| json!(text(row, from)))
-                    .unwrap_or(json!(""));
+    let rows = service
+        .store
+        .read_for(actor, operation, query, |tx, actor| {
+            let mut rows: Vec<_> = store::all(tx, resource.key)?
+                .into_iter()
+                .filter(|row| {
+                    auth::visible(actor, resource.permission, "export", row)
+                        && (read("status").is_empty() || row["status"] == read("status"))
+                        && (keyword.is_empty()
+                            || [
+                                "name",
+                                "countryRegion",
+                                "website",
+                                "source",
+                                "notes",
+                                "category",
+                                "mainProducts",
+                            ]
+                            .iter()
+                            .any(|key| store::normalize(&text(row, key)).contains(&keyword)))
+                })
+                .collect();
+            if rows.len() > 10_000 {
+                return Err(invalid("当前筛选超过 10000 条，请缩小范围后导出。"));
             }
-        }
-        Ok(rows)
-    })?;
+            rows.sort_by_key(|row| text(row, "name"));
+            let contact_resource = catalog::resource(contact_kind(supplier)).unwrap();
+            let mut contacts: Vec<_> = store::all(tx, contact_resource.key)?
+                .into_iter()
+                .filter(|row| auth::visible(actor, contact_resource.permission, "view", row))
+                .collect();
+            contacts.sort_by_key(|row| (row["isPrimary"] != true, row["id"].as_i64()));
+            let mut primary_contacts = BTreeMap::new();
+            for contact in &contacts {
+                if let Some(id) = contact[relation(supplier)].as_i64() {
+                    primary_contacts.entry(id).or_insert(contact);
+                }
+            }
+            for row in &mut rows {
+                operation::check()?;
+                let contact = row["id"].as_i64().and_then(|id| primary_contacts.get(&id));
+                for (from, to) in [
+                    ("name", "contactName"),
+                    ("title", "contactTitle"),
+                    ("email", "contactEmail"),
+                    ("phone", "contactPhone"),
+                    ("instantMessaging", "instantMessaging"),
+                ] {
+                    row[to] = contact
+                        .map(|row| json!(text(row, from)))
+                        .unwrap_or(json!(""));
+                }
+            }
+            Ok(rows)
+        })?;
     let mut columns = if supplier {
         vec![
             ("name", "供应商名称"),

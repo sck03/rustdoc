@@ -194,6 +194,18 @@ pub fn initialize(connection_string: &str, owner: &str) -> Result<()> {
     validate_schema(&mut client)
 }
 impl Adapter for Postgres {
+    fn import_preview_usage(&self, owner: i64) -> Result<ImportPreviewUsage> {
+        let row = self
+            .client
+            .borrow_mut()
+            .query_one(&import_preview_query::usage_sql(true), &[&owner])?;
+        ImportPreviewUsage::from_counts([
+            row.try_get(0)?,
+            row.try_get(1)?,
+            row.try_get(2)?,
+            row.try_get(3)?,
+        ])
+    }
     fn is_closed(&self) -> bool {
         self.client.borrow().is_closed()
     }

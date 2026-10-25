@@ -34,7 +34,7 @@ pub(crate) fn expired_outputs(policy: &JobOutputRetention, pg: bool) -> Result<Q
         totals AS (SELECT *, SUM(CASE WHEN user_bytes<={user_limit} THEN bytes ELSE 0 END)
             OVER(ORDER BY completed DESC,id DESC ROWS UNBOUNDED PRECEDING) AS total_bytes FROM users)
         SELECT id FROM totals WHERE user_bytes>{user_limit} OR total_bytes>{global_limit})",
-        active=active(pg),user_limit=policy.per_user_bytes,global_limit=policy.global_bytes), order: "r.id", values: vec![] })
+        active=active(pg),user_limit=policy.per_user_bytes,global_limit=policy.global_bytes), order: "r.id".into(), values: vec![] })
 }
 pub struct JobQuery<'a> {
     pub owner: Option<i64>,
@@ -55,13 +55,7 @@ fn time(pg: bool) -> String {
         field("completedAt", pg),
         field("createdAt", pg)
     );
-    if pg {
-        format!(
-            "CASE WHEN {value} ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}[Tt][0-9]{{2}}:[0-9]{{2}}:[0-9]{{2}}(\\.[0-9]+)?([Zz]|[+-][0-9]{{2}}:[0-9]{{2}})$' THEN (EXTRACT(EPOCH FROM ({value})::timestamptz)*1000)::bigint ELSE ('invalid job timestamp: '||COALESCE({value},''))::bigint END"
-        )
-    } else {
-        format!("job_time({value})")
-    }
+    sql::timestamp(&value, pg)
 }
 pub(crate) fn invalid_times(pg: bool) -> QuerySql {
     QuerySql {
@@ -71,7 +65,7 @@ pub(crate) fn invalid_times(pg: bool) -> QuerySql {
             time(pg),
             field("requestedByUserId", pg)
         ),
-        order: "r.id",
+        order: "r.id".into(),
         values: vec![],
     }
 }
@@ -152,7 +146,8 @@ pub(crate) fn build(q: &JobQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
                 "r.body->>'createdAt' DESC, r.id DESC"
             } else {
                 "json_extract(r.body,'$.createdAt') DESC, r.id DESC"
-            },
+            }
+            .into(),
             values,
         },
         sql::projection(q.fields, pg)?,

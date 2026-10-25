@@ -71,6 +71,7 @@ foreach ($test in @('test_generated_artifact_protection.ps1', 'test_rust_build_p
         -WorkingDirectory $repoRoot
 }
 Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_cargo_paths.mjs') -WorkingDirectory $repoRoot
+Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_verified_download.mjs') -WorkingDirectory $repoRoot
 $bashPath = Get-Command bash -CommandType Application -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty Source
 if ([string]::IsNullOrWhiteSpace($bashPath)) {

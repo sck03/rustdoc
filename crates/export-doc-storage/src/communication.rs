@@ -140,7 +140,7 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
     };
     QuerySql {
         filter,
-        order,
+        order: order.into(),
         values,
     }
 }

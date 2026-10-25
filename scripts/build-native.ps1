@@ -57,6 +57,9 @@ $outputFullPath = [System.IO.Path]::GetFullPath($OutputRoot)
 Assert-NativePackagePath -Path $outputFullPath
 if (Test-ExportDocPathEqual -Left $outputFullPath -Right $repositoryRoot) { throw 'Output must be a dedicated package directory.' }
 $marker = Join-Path $outputFullPath 'exportdoc-native-package.json'
+foreach ($descriptor in @($marker, (Join-Path $outputFullPath 'portable-runtime.json'), (Join-Path $outputFullPath 'runtime-layout.json'))) {
+    Assert-NativePackagePath -Path $descriptor -File
+}
 if (Test-Path -LiteralPath $outputFullPath) {
     if (Test-Path -LiteralPath $marker -PathType Leaf) {
         $existingMarker = Get-Content -LiteralPath $marker -Raw | ConvertFrom-Json

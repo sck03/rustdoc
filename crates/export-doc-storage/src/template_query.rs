@@ -111,7 +111,7 @@ pub(super) fn catalog(q: &ReportTemplateQuery<'_>, postgres: bool) -> QuerySql {
             "(r.body->>'status'='Published') DESC, (r.body->>'name') COLLATE \"C\", r.id"
         } else {
             "(json_extract(r.body,'$.status')='Published') DESC, json_extract(r.body,'$.name') COLLATE BINARY, r.id"
-        },
+        }.into(),
     }
 }
 
@@ -134,7 +134,8 @@ pub(super) fn versions(q: &TemplateVersionQuery<'_>, postgres: bool) -> QuerySql
             "CAST(r.body #>> '{content,versionNumber}' AS BIGINT) DESC, r.id"
         } else {
             "json_extract(r.body,'$.content.versionNumber') DESC, r.id"
-        },
+        }
+        .into(),
     }
 }
 

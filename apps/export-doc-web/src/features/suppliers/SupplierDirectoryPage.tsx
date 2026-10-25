@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useVersionedRecordDraft } from "../../ui/useVersionedRecordDraft.ts";
+import { useScopedSave } from "../../ui/useScopedSave.ts";
+import { isAbortError } from "../../ui/useAbortableOperation.ts";
 import { ServerDraftUpdateNotice } from "../../ui/serverDraftSync.tsx";
 import type { ApiSupplierContactDto, ApiSupplierDto, ApiSupplierImportPreviewDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { currentLocalDateInputValue, readApiError } from "../../ui/formUtils.ts";
@@ -8,7 +10,7 @@ import { SupplierAssessmentsPanel } from "./SupplierAssessmentsPanel.tsx";
 import { SupplierAssessmentOverview } from "./SupplierAssessmentOverview.tsx";
 import { TaskViewTabs, getTaskViewPanelProps } from "../../ui/TaskViewTabs.tsx";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
-import { OperationFeedback, errorFeedback, requestErrorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { OperationFeedback, errorFeedback, requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { usePermission } from "../../app/PermissionAccessContext.tsx";
 import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
@@ -69,10 +71,11 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
   const view = readRouteChoice<SupplierTaskView>(params.get("view"), ["overview", "directory", "profile", "contacts", "products", "assessments", "import"], "directory");
   const setView = (value: SupplierTaskView) => updateRoute({ view: value }, false);
   const [contactView, setContactView] = useState<"directory" | "editor">("directory");
-  const [supplierDraftDirty, setSupplierDraftDirty] = useState(false);
-  const [contactDraftDirty, setContactDraftDirty] = useState(false);
-  const supplierDraft = useVersionedRecordDraft(`supplier:${supplierId}`, suppliers.find((item) => item.id === supplierId), supplierDraftDirty);
-  const contactDraft = useVersionedRecordDraft(`supplier:${supplierId}:contact:${contactId}`, contacts.find((item) => item.id === contactId), contactDraftDirty);
+  const supplierDraft = useVersionedRecordDraft(`supplier:${supplierId}`, suppliers.find((item) => item.id === supplierId), ["name", "countryRegion", "category", "website", "mainProducts", "notes"]);
+  const contactDraft = useVersionedRecordDraft(`supplier:${supplierId}:contact:${contactId}`, contacts.find((item) => item.id === contactId), ["name", "title", "email", "phone", "instantMessaging"]);
+  const supplierDraftDirty = supplierDraft.isDirty, contactDraftDirty = contactDraft.isDirty;
+  const supplierSave = useScopedSave(`supplier:${supplierId}:${view}`, client);
+  const contactSave = useScopedSave(`supplier:${supplierId}:contact:${contactId}:${view}:${contactView}`, client);
   const selectedSupplier = supplierDraft.record;
   const selectedContact = contactDraft.record;
   const confirmDiscardChanges = useConfirmUnsavedChanges();
@@ -80,16 +83,13 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
     isDirty: supplierDraftDirty || contactDraftDirty,
     message: "当前供应商或联系人资料有未保存的修改。",
   });
-  useEffect(() => {
-    setSupplierDraftDirty(false);
-    setContactDraftDirty(false);
-  }, [supplierId, view]);
+  useEffect(() => { supplierDraft.reset(); contactDraft.reset(); }, [view]);
 
   async function changeView(nextView: SupplierTaskView) {
     if (nextView === view) return true;
     if (!await confirmDiscardChanges("切换供应商工作区")) return false;
-    setSupplierDraftDirty(false);
-    setContactDraftDirty(false);
+    supplierDraft.reset();
+    contactDraft.reset();
     if (view === "profile" && newSupplier) setNewSupplier(false);
     setView(nextView);
     return true;
@@ -97,8 +97,8 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
 
   async function beginNewSupplier() {
     if (!await confirmDiscardChanges("新建供应商")) return;
-    setSupplierDraftDirty(false);
-    setContactDraftDirty(false);
+    supplierDraft.reset();
+    contactDraft.reset();
     setSupplierId(0);
     setNewSupplier(true);
     setView("profile");
@@ -107,7 +107,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
   async function changeContactView(nextView: "directory" | "editor") {
     if (nextView === contactView) return true;
     if (!await confirmDiscardChanges("切换联系人视图")) return false;
-    setContactDraftDirty(false);
+    contactDraft.reset();
     setContactView(nextView);
     return true;
   }
@@ -115,7 +115,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
   async function selectContact(nextContactId: number) {
     if (nextContactId === contactId && contactView === "editor") return;
     if (!await confirmDiscardChanges("切换联系人")) return;
-    setContactDraftDirty(false);
+    contactDraft.reset();
     setContactId(nextContactId);
     setContactView("editor");
   }
@@ -170,31 +170,33 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
     return () => controller.abort();
   }, [client, contactPageNumber, contactPageSize, supplierId, canViewContacts]);
 
-  async function reloadContacts(preferredId = 0) {
+  async function reloadContacts(preferred?: ApiSupplierContactDto, signal?: AbortSignal) {
     if (!supplierId) return;
-    const page = await client.querySupplierContacts({ supplierId, pageNumber: 1, pageSize: contactPageSize });
-    setContactPageNumber(1);
-    setContacts(page.items);
+    const page = await client.querySupplierContacts({ supplierId, pageNumber: contactPageNumber, pageSize: contactPageSize }, { signal });
+    signal?.throwIfAborted();
+    setContacts(preferred && !page.items.some(item => item.id === preferred.id) ? [preferred, ...page.items] : page.items.map(item => item.id === preferred?.id ? preferred : item));
     setContactTotalCount(page.totalCount);
     setContactTotalPages(page.totalPages);
-    setContactId(preferredId && page.items.some((item) => item.id === preferredId)
-      ? preferredId
-      : page.items[0]?.id ?? 0);
+    setContactId(preferred?.id ?? page.items[0]?.id ?? 0);
   }
 
   async function saveSupplier(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (newSupplier ? !canCreateSupplier : !canEditSupplier) return;
-    const form = new FormData(event.currentTarget);
+    const submitted = { ...supplierDraft.values };
     const id = newSupplier ? 0 : selectedSupplier?.id ?? 0;
-    const body = { id, name: text(form, "name"), countryRegion: text(form, "countryRegion"), category: text(form, "category"),
-      website: text(form, "website"),
-      mainProducts: text(form, "mainProducts"), notes: text(form, "notes"),
+    const body = { id, ...Object.fromEntries(Object.entries(submitted).map(([key, value]) => [key, value.trim()])) as typeof submitted,
       expectedVersion: id > 0 ? selectedSupplier?.versionNumber ?? 0 : 0 };
     try {
-      const saved = id ? await client.updateSupplier({ id, body }) : await client.createSupplier({ body });
-      await loadSupplierOptions(saved); setSupplierDraftDirty(false); setContactDraftDirty(false); setRevision((value) => value + 1); setNewSupplier(false); setFeedback(successFeedback(id ? "供应商已更新。" : "供应商已建立。"));
-    } catch (error) { setFeedback(requestErrorFeedback(error)); }
+      await supplierSave.run(async ({ signal, checkCurrent, continueInScope }) => {
+        const saved = id ? await client.updateSupplier({ id, body }, { signal }) : await client.createSupplier({ body }, { signal });
+        checkCurrent(); continueInScope(`supplier:${saved.id}:${view}`);
+        supplierDraft.acceptSaved(saved, submitted, `supplier:${saved.id}`);
+        setSuppliers(current => [saved, ...current.filter(item => item.id !== saved.id)]);
+        updateRoute({ supplierId: saved.id, new: false });
+        setRevision(value => value + 1); setFeedback(successFeedback(id ? "供应商已更新。" : "供应商已建立。"));
+      });
+    } catch (error) { if (!isAbortError(error)) setFeedback(requestErrorFeedback(error)); }
   }
 
   async function changeSupplierStatus(action: "admit" | "deactivate" | "restore") {
@@ -219,7 +221,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
           ? await client.restoreSupplier(request)
           : await client.deactivateSupplier(request);
       await loadSupplierOptions(saved);
-      setSupplierDraftDirty(false);
+      supplierDraft.reset();
       setRevision((value) => value + 1);
       setFeedback(successFeedback(successMessage));
     } catch (error) {
@@ -229,20 +231,26 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
 
   async function deleteSupplier() {
     if (!canDeleteSupplier || !selectedSupplier || !await requestConfirmation({ title: "删除供应商", description: `确定删除供应商“${selectedSupplier.name}”吗？`, details: ["只有没有供货关系和评价的供应商才能删除。", "联系人会随供应商一并删除；有业务历史时请使用“停用供应商”。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除供应商")) return;
-    try { const response = await client.deleteSupplier({ id: selectedSupplier.id, expectedVersion: selectedSupplier.versionNumber }); setSupplierDraftDirty(false); setContactDraftDirty(false); await loadSupplierOptions(); setRevision((value) => value + 1); setView("directory"); setFeedback(successFeedback(response.message)); }
+    try { const response = await client.deleteSupplier({ id: selectedSupplier.id, expectedVersion: selectedSupplier.versionNumber }); supplierDraft.reset(); contactDraft.reset(); await loadSupplierOptions(); setRevision((value) => value + 1); setView("directory"); setFeedback(successFeedback(response.message)); }
     catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
 
   async function saveContact(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); if ((selectedContact ? !canEditContact : !canCreateContact) || !supplierId) return;
-    const form = new FormData(event.currentTarget); const id = selectedContact?.id ?? 0;
-    const body = { id, supplierCompanyId: supplierId, name: text(form, "contactName"), title: text(form, "title"), email: text(form, "email"),
-      phone: text(form, "phone"), instantMessaging: text(form, "instantMessaging"),
+    const submitted = { ...contactDraft.values }; const id = selectedContact?.id ?? 0;
+    const body = { id, supplierCompanyId: supplierId, ...Object.fromEntries(Object.entries(submitted).map(([key, value]) => [key, value.trim()])) as typeof submitted,
       expectedVersion: id > 0 ? selectedContact?.versionNumber ?? 0 : 0 };
     try {
-      const saved = id ? await client.updateSupplierContact({ supplierId, id, body }) : await client.createSupplierContact({ supplierId, body });
-      await reloadContacts(saved.id); setContactDraftDirty(false); setContactView("editor"); setFeedback(successFeedback(id ? "联系人已更新。" : "联系人已添加。"));
-    } catch (error) { setFeedback(requestErrorFeedback(error)); }
+      await contactSave.run(async ({ signal, checkCurrent, continueInScope }) => {
+        const saved = id ? await client.updateSupplierContact({ supplierId, id, body }, { signal }) : await client.createSupplierContact({ supplierId, body }, { signal });
+        checkCurrent(); continueInScope(`supplier:${supplierId}:contact:${saved.id}:${view}:editor`);
+        contactDraft.acceptSaved(saved, submitted, `supplier:${supplierId}:contact:${saved.id}`);
+        setContacts(current => [saved, ...current.filter(item => item.id !== saved.id)]); setContactId(saved.id);
+        setContactView("editor"); setFeedback(successFeedback(id ? "联系人已更新。" : "联系人已添加。"));
+        try { await reloadContacts(saved, signal); }
+        catch (error) { checkCurrent(); setFeedback(warningFeedback(`联系人已保存，但目录刷新失败：${readApiError(error)}`)); }
+      });
+    } catch (error) { if (!isAbortError(error)) setFeedback(requestErrorFeedback(error)); }
   }
 
   async function setPrimaryContact() {
@@ -254,8 +262,8 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
         id: selectedContact.id,
         body: { expectedVersion: selectedContact.versionNumber },
       });
-      await reloadContacts(saved.id);
-      setContactDraftDirty(false);
+      await reloadContacts(saved);
+      contactDraft.reset();
       setFeedback(successFeedback("主要联系人已切换。"));
     } catch (error) {
       setFeedback(requestErrorFeedback(error));
@@ -266,7 +274,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
     if (!canDeleteContact || !selectedContact || !await requestConfirmation({ title: "删除供应商联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除联系人")) return;
     try {
       await client.deleteSupplierContact({ supplierId, id: selectedContact.id, expectedVersion: selectedContact.versionNumber });
-      await reloadContacts(); setContactDraftDirty(false); setContactView("directory"); setFeedback(successFeedback("联系人已删除。"));
+      await reloadContacts(); contactDraft.reset(); setContactView("directory"); setFeedback(successFeedback("联系人已删除。"));
     }
     catch (error) { setFeedback(requestErrorFeedback(error)); }
   }
@@ -305,8 +313,8 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
       onLoadServer={() => { void (async () => {
         if (!await confirmDiscardChanges("载入服务器版本")) return;
         (view === "profile" ? supplierDraft : contactDraft).loadServerVersion();
-        setSupplierDraftDirty(false);
-        setContactDraftDirty(false);
+        supplierDraft.reset();
+        contactDraft.reset();
       })(); }}
     /> : null}
     {!canCreateSupplier && !canEditSupplier && !canCreateContact && !canEditContact && !canEditProductLink && !canCreateAssessment && !canEditAssessment
@@ -353,15 +361,15 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
       </tbody></table></ResponsiveTableFrame>
       <ListPaginationControls pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />
     </section> : null}
-    {view === "profile" && (newSupplier || selectedSupplier) ? <form className="form-grid" key={newSupplier ? "new" : `${selectedSupplier?.id ?? "empty"}-${selectedSupplier?.versionNumber ?? 0}`} onSubmit={saveSupplier} {...(newSupplier ? { "aria-label": "新建供应商" } : getTaskViewPanelProps(supplierTabsId, "profile"))}>
+    {view === "profile" && (newSupplier || selectedSupplier) ? <form className="form-grid" onSubmit={saveSupplier} {...(newSupplier ? { "aria-label": "新建供应商" } : getTaskViewPanelProps(supplierTabsId, "profile"))}>
         <div className="section-heading-row"><h3>{newSupplier ? "新建供应商" : canEditSupplier ? "供应商资料" : "查看供应商"}</h3></div>
-        <fieldset className="permission-fieldset form-field-wide" disabled={newSupplier ? !canCreateSupplier : !canEditSupplier} onChangeCapture={() => setSupplierDraftDirty(true)}>
-        <label>名称<input name="name" required defaultValue={newSupplier ? "" : selectedSupplier?.name} /></label><label>国家/地区<input name="countryRegion" defaultValue={newSupplier ? "" : selectedSupplier?.countryRegion} /></label>
-        <label>分类<input name="category" defaultValue={newSupplier ? "" : selectedSupplier?.category} /></label><label>网站<input name="website" defaultValue={newSupplier ? "" : selectedSupplier?.website} /></label>
+        <fieldset className="permission-fieldset form-field-wide" disabled={newSupplier ? !canCreateSupplier : !canEditSupplier}>
+        <label>名称<input name="name" required {...supplierDraft.field("name")} /></label><label>国家/地区<input name="countryRegion" {...supplierDraft.field("countryRegion")} /></label>
+        <label>分类<input name="category" {...supplierDraft.field("category")} /></label><label>网站<input name="website" {...supplierDraft.field("website")} /></label>
         {!newSupplier ? <label>当前状态<input value={selectedSupplier?.status ?? ""} readOnly /></label> : null}
-        <label className="form-field-wide">主要产品<input name="mainProducts" defaultValue={newSupplier ? "" : selectedSupplier?.mainProducts} /></label><label className="form-field-wide">备注<textarea name="notes" defaultValue={newSupplier ? "" : selectedSupplier?.notes} /></label>
+        <label className="form-field-wide">主要产品<input name="mainProducts" {...supplierDraft.field("mainProducts")} /></label><label className="form-field-wide">备注<textarea name="notes" {...supplierDraft.field("notes")} /></label>
         </fieldset>
-        <div className="form-actions">{(newSupplier ? canCreateSupplier : canEditSupplier) ? <button className="primary-button" type="submit">保存供应商</button> : null}{!newSupplier && selectedSupplier?.status === "考察中" && canAdmitSupplier ? <button className="secondary-button" type="button" onClick={() => void changeSupplierStatus("admit")}>确认准入</button> : null}{!newSupplier && selectedSupplier && selectedSupplier.status !== "停用" && canDeactivateSupplier ? <button className="secondary-button" type="button" onClick={() => void changeSupplierStatus("deactivate")}>停用供应商</button> : null}{!newSupplier && selectedSupplier && (selectedSupplier.status === "停用" || selectedSupplier.status === "暂停") && canDeactivateSupplier ? <button className="secondary-button" type="button" onClick={() => void changeSupplierStatus("restore")}>恢复考察</button> : null}{!newSupplier && selectedSupplier && canViewContacts ? <button className="secondary-button" type="button" onClick={() => void changeView("contacts")}>{canCreateContact || canEditContact ? "管理联系人" : "查看联系人"}</button> : null}{!newSupplier && selectedSupplier && canDeleteSupplier ? <button className="secondary-button danger-button" type="button" onClick={() => void deleteSupplier()}>删除</button> : null}</div>
+        <div className="form-actions">{(newSupplier ? canCreateSupplier : canEditSupplier) ? <button className="primary-button" type="submit" disabled={supplierSave.isSaving}>保存供应商</button> : null}{!newSupplier && selectedSupplier?.status === "考察中" && canAdmitSupplier ? <button className="secondary-button" type="button" disabled={supplierSave.isSaving} onClick={() => void changeSupplierStatus("admit")}>确认准入</button> : null}{!newSupplier && selectedSupplier && selectedSupplier.status !== "停用" && canDeactivateSupplier ? <button className="secondary-button" type="button" disabled={supplierSave.isSaving} onClick={() => void changeSupplierStatus("deactivate")}>停用供应商</button> : null}{!newSupplier && selectedSupplier && (selectedSupplier.status === "停用" || selectedSupplier.status === "暂停") && canDeactivateSupplier ? <button className="secondary-button" type="button" disabled={supplierSave.isSaving} onClick={() => void changeSupplierStatus("restore")}>恢复考察</button> : null}{!newSupplier && selectedSupplier && canViewContacts ? <button className="secondary-button" type="button" onClick={() => void changeView("contacts")}>{canCreateContact || canEditContact ? "管理联系人" : "查看联系人"}</button> : null}{!newSupplier && selectedSupplier && canDeleteSupplier ? <button className="secondary-button danger-button" type="button" disabled={supplierSave.isSaving} onClick={() => void deleteSupplier()}>删除</button> : null}</div>
       </form> : null}
     {view === "contacts" && canViewContacts && selectedSupplier && !newSupplier ? <section className="form-section supplier-contact-workspace" {...getTaskViewPanelProps(supplierTabsId, "contacts")}>
       <div className="section-header"><div><h3>{contactView === "directory" ? "供应商联系人目录" : selectedContact ? "编辑供应商联系人" : "新增供应商联系人"}</h3><p className="section-description">联系人只归属 {selectedSupplier.name}，不写入客户 CRM。</p></div><span>{contactTotalCount} 位</span></div>
@@ -372,19 +380,17 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
           {!contacts.length ? <tr><td className="empty-cell" colSpan={6}><div className="empty-cell-content"><strong>尚未建立供应商联系人</strong><span>{canCreateContact ? "需要记录询价、交期或付款沟通对象时，再添加联系人。" : "当前供应商还没有联系人。"}</span>{canCreateContact ? <button className="primary-button" type="button" onClick={() => void selectContact(0)}>添加第一位联系人</button> : null}</div></td></tr> : null}
         </tbody></table></ResponsiveTableFrame>
         <ListPaginationControls pageNumber={contactPageNumber} totalPages={contactTotalPages} totalCount={contactTotalCount} pageSize={contactPageSize} pageSizeOptions={[20, 50, 100]} isBusy={false} onPageChange={setContactPageNumber} onPageSizeChange={(value) => { setContactPageSize(value); setContactPageNumber(1); }} />
-      </> : <form className="form-grid" key={`${selectedContact?.id ?? "new"}-${selectedContact?.versionNumber ?? 0}-${supplierId}`} onSubmit={saveContact}>
+      </> : <form className="form-grid" onSubmit={saveContact}>
         <div className="section-heading-row"><h4>{selectedContact ? "编辑联系人资料" : "新增联系人资料"}</h4><button className="secondary-button" type="button" onClick={() => void changeContactView("directory")}>返回联系人目录</button></div>
         <div className="form-field-wide context-strip"><strong>{selectedSupplier.name}</strong><span>联系人只归属当前供应商，不写入客户 CRM。</span></div>
-        <fieldset className="permission-fieldset form-field-wide" disabled={selectedContact ? !canEditContact : !canCreateContact} onChangeCapture={() => setContactDraftDirty(true)}>
-        <label>姓名<input name="contactName" required defaultValue={selectedContact?.name} /></label><label>职位<input name="title" defaultValue={selectedContact?.title} /></label><label>邮箱<input name="email" type="email" defaultValue={selectedContact?.email} /></label>
-        <label>电话<input name="phone" defaultValue={selectedContact?.phone} /></label><label>即时通讯<input name="instantMessaging" defaultValue={selectedContact?.instantMessaging} /></label>{selectedContact ? <label>联系人角色<input value={selectedContact.isPrimary ? "主要联系人" : "普通联系人"} readOnly /></label> : null}
+        <fieldset className="permission-fieldset form-field-wide" disabled={selectedContact ? !canEditContact : !canCreateContact}>
+        <label>姓名<input name="contactName" required {...contactDraft.field("name")} /></label><label>职位<input name="title" {...contactDraft.field("title")} /></label><label>邮箱<input name="email" type="email" {...contactDraft.field("email")} /></label>
+        <label>电话<input name="phone" {...contactDraft.field("phone")} /></label><label>即时通讯<input name="instantMessaging" {...contactDraft.field("instantMessaging")} /></label>{selectedContact ? <label>联系人角色<input value={selectedContact.isPrimary ? "主要联系人" : "普通联系人"} readOnly /></label> : null}
         </fieldset>
-        <div className="form-actions">{(selectedContact ? canEditContact : canCreateContact) ? <button className="primary-button" type="submit" disabled={!supplierId}>保存联系人</button> : null}{selectedContact && !selectedContact.isPrimary && canSetPrimaryContact ? <button className="secondary-button" type="button" onClick={() => void setPrimaryContact()}>设为主要联系人</button> : null}{selectedContact && canDeleteContact ? <button className="secondary-button danger-button" type="button" onClick={() => void deleteContact()}>删除</button> : null}</div>
+        <div className="form-actions">{(selectedContact ? canEditContact : canCreateContact) ? <button className="primary-button" type="submit" disabled={!supplierId || contactSave.isSaving}>保存联系人</button> : null}{selectedContact && !selectedContact.isPrimary && canSetPrimaryContact ? <button className="secondary-button" type="button" disabled={contactSave.isSaving} onClick={() => void setPrimaryContact()}>设为主要联系人</button> : null}{selectedContact && canDeleteContact ? <button className="secondary-button danger-button" type="button" disabled={contactSave.isSaving} onClick={() => void deleteContact()}>删除</button> : null}</div>
       </form>}
     </section> : null}
     {view === "products" && canViewProducts && selectedSupplier && !newSupplier ? <div {...getTaskViewPanelProps(supplierTabsId, "products")}><SupplierProductLinksPanel client={client} supplierId={selectedSupplier.id} supplierName={selectedSupplier.name} canEdit={canEditProductLink} canDeactivate={canDeactivateProductLink} canDelete={canDeleteProductLink} /></div> : null}
     {view === "assessments" && canViewAssessments && selectedSupplier && !newSupplier ? <div {...getTaskViewPanelProps(supplierTabsId, "assessments")}><SupplierAssessmentsPanel businessDate={businessDate} client={client} supplierId={selectedSupplier.id} supplierName={selectedSupplier.name} canCreate={canCreateAssessment} canEdit={canEditAssessment} canApprove={canApproveAssessment} canDelete={canDeleteAssessment} /></div> : null}
   </section>;
 }
-
-function text(form: FormData, name: string) { return String(form.get(name) ?? "").trim(); }

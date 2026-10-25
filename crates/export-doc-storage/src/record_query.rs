@@ -186,7 +186,7 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
     }
     QuerySql {
         filter,
-        order: "r.id DESC",
+        order: "r.id DESC".into(),
         values,
     }
 }

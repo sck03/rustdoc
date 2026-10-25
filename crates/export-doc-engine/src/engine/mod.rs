@@ -16,6 +16,7 @@ pub mod catalog;
 pub mod communication;
 mod crm;
 mod crm_dashboard;
+mod crm_queries;
 mod custom_options;
 mod dashboard;
 mod diagnostics;
@@ -782,41 +783,7 @@ impl NativeService {
             }
             ANALYZE_INVOICE_PROFIT => {
                 auth::authorize(actor, "document.invoices", "view")?;
-                let dto: ApiInvoiceDetailDto =
-                    serde_json::from_value(body_value["invoice"].clone())
-                        .map_err(|error| invalid(error.to_string()))?;
-                let invoice = crate::invoice::InvoiceDraft::from_dto(dto)
-                    .build()
-                    .map_err(invalid)?;
-                let rate = invoice
-                    .exchange_rate
-                    .filter(|rate| *rate > rust_decimal::Decimal::ZERO)
-                    .or_else(|| {
-                        if invoice.currency.eq_ignore_ascii_case("CNY")
-                            || invoice.currency.eq_ignore_ascii_case("RMB")
-                        {
-                            Some(rust_decimal::Decimal::ONE)
-                        } else {
-                            None
-                        }
-                    });
-                let sales_rmb = invoice
-                    .total_amount
-                    .checked_mul(rate.unwrap_or_default())
-                    .ok_or_else(|| invalid("利润计算超出范围。"))?;
-                let profit = if rate.is_some() {
-                    sales_rmb - invoice.total_purchase_amount + invoice.total_tax_refund_amount
-                } else {
-                    rust_decimal::Decimal::ZERO
-                };
-                let margin = if sales_rmb > rust_decimal::Decimal::ZERO {
-                    profit / sales_rmb
-                } else {
-                    rust_decimal::Decimal::ZERO
-                };
-                Ok(
-                    json!({"currency":invoice.currency,"salesTotal":invoice.total_amount,"exchangeRate":rate,"salesRmb":sales_rmb,"purchaseCost":invoice.total_purchase_amount,"taxRefund":invoice.total_tax_refund_amount,"grossProfit":profit,"margin":margin,"salesTotalText":format!("{} {:.2}",invoice.currency,invoice.total_amount),"exchangeRateText":rate.map(|rate|format!("{rate:.4}")).unwrap_or("未设置".into()),"salesRmbText":format!("¥ {sales_rmb:.2}"),"purchaseCostText":format!("- ¥ {:.2}",invoice.total_purchase_amount),"taxRefundText":format!("+ ¥ {:.2}",invoice.total_tax_refund_amount),"grossProfitText":format!("¥ {profit:.2}"),"marginText":format!("{:.2}%",margin*rust_decimal::Decimal::from(100)),"storagePolicy":"本机数据"}),
-                )
+                workflows::profit(&body_value)
             }
             GET_DASHBOARD => dashboard::query(&self.store, actor, &self.clock),
             GET_CRM_DASHBOARD => crm_dashboard::query(&self.store, actor, &self.clock),

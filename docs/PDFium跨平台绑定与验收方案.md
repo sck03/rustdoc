@@ -10,7 +10,7 @@
 | PDF 读取、页图、文字和合并 | [pdf/native.rs](../crates/export-doc-engine/src/pdf/native.rs)，使用 pdfium-render，保留有界 writer |
 | 进程隔离、取消和资源释放 | [PDF worker](../crates/export-doc-engine/src/pdf.rs)及[合并入口](../crates/export-doc-engine/src/pdf/merge.rs) |
 | 原生库来源、版本及哈希 | [中央原生资源清单](../eng/native-runtime-packages.json) |
-| React 编辑和样例/单据预览 | 同一 Rust 排版结果生成 SVG，由受控 HTML 包装显示；不是 PDFium 页图预览 |
+| React 编辑和样例/单据预览 | 同一 Rust 排版结果生成矢量 SVG，或编码正式 PDF 后通过隔离 PDFium worker 按页显示；页图绑定模板/单据/图片修订 |
 
 [Engine 清单](../crates/export-doc-engine/Cargo.toml)精确固定 `pdfium-render = 0.9.4`，关闭默认 feature，启用 `pdfium_7881` 与 `image_025`；当前原生载荷为 `158.0.8111`。这分别是绑定版本、API 集和原生构建，不是三个可以互换的版本号。2026-09-20 的“最新版本”查询只属于历史，后续升级重新核验，不按旧候选版本直接更新。
 
@@ -20,6 +20,7 @@
 
 - 由 RuntimePaths 提供受管绝对路径，先验证路径及文件，再调用 `Pdfium::bind_to_library`；不使用系统搜索回退、请求时下载或猜测符号名。
 - PDFium 初始化、文档、页面、文本及位图对象限于 worker 生命周期。调用方不接触绑定类型，Tauri 窗口与 HTTP 不复制 PDF 业务。
+- 一次 worker 操作只打开一份 PDF，输入切片和 PDFium 实例由闭包边界持有。多页文字提取复用文档，渲染直接读取已打开文档的页数；不为减少解析开销引入常驻 worker 或跨请求原生句柄缓存。
 - 合并读取原 PDF 页面并用受限 writer 保存；不把页图重新编码成正式 PDF，不以无限制缓冲替代输出容量控制。
 - 缺库、错架构、缺依赖、损坏/密码文件、超时、取消及 worker 异常分别验证；失败不发布半成品。
 - 绑定或原生库升级时核查所选 feature 加载的完整符号集。迁移前的 19 个静态符号检查不足以证明当前封装兼容。
@@ -45,7 +46,7 @@ Windows 本机的报表导出和界面预览记录见[进度](./程序改进重�
 2. 检查坏文件、页数/像素/面积/输入/输出上限、取消、超时、子进程退出和临时文件清理。
 3. 在每个目标 OS/架构分别记录 locked build、资源哈希、真实加载、功能和包内许可；不得借用上游 CI 结果。
 4. 依赖变更独立完成 Cargo/npm 锁图、notices/SBOM 和治理，要求 unresolved=0、disallowed=0。
-5. 如果后续实现“实际输出 PDF 的页图预览”，应增加正式契约、草稿修订绑定、按页加载及权限验证；当前 SVG 预览不能标记为该功能已实现。
+5. 已实现的实际 PDF 页图复用正式预览契约，并绑定草稿/单据/图片修订、按页加载和重新授权；继续验证复杂模板、翻页、修订过期和目标平台，SVG 显示本身不能证明 PDFium 页图通过。
 
 模板版式和逐页打印要求见[PDF 验收方案](./Rust统一V3模板与原版PDF验收方案.md)，平台状态见[支持矩阵](./多平台与多架构支持矩阵.md)。
 

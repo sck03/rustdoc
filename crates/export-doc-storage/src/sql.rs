@@ -24,6 +24,30 @@ pub(crate) fn bind(values: &mut Vec<String>, value: impl ToString, postgres: boo
         format!("?{}", values.len())
     }
 }
+/// Strict RFC 3339 instants used by sorting and retention, expressed as epoch milliseconds.
+pub(crate) fn timestamp(value: &str, postgres: bool) -> String {
+    if postgres {
+        format!(
+            "CASE WHEN {value} ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}[Tt][0-9]{{2}}:[0-9]{{2}}:[0-9]{{2}}(\\.[0-9]+)?([Zz]|[+-][0-9]{{2}}:[0-9]{{2}})$' THEN (EXTRACT(EPOCH FROM ({value})::timestamptz)*1000)::bigint ELSE ('invalid timestamp: '||COALESCE({value},''))::bigint END"
+        )
+    } else {
+        format!("job_time({value})")
+    }
+}
+/// Chronological ordering keeps RFC 3339 offsets and the original nanosecond precision.
+pub(crate) fn instant_order(value: &str, postgres: bool) -> (String, String) {
+    if postgres {
+        let seconds = format!("regexp_replace({value},'\\.[0-9]+','')");
+        let nanos =
+            format!("rpad(COALESCE(substring({value} from '\\.([0-9]+)'),'0'),9,'0')::bigint");
+        (format!("({})/1000", timestamp(&seconds, true)), nanos)
+    } else {
+        (
+            format!("record_time_seconds({value})"),
+            format!("record_time_nanos({value})"),
+        )
+    }
+}
 pub(crate) fn normalized(value: &str, postgres: bool) -> String {
     if postgres {
         format!(
@@ -55,12 +79,25 @@ pub(crate) fn projection(fields: &[(&str, &str)], postgres: bool) -> Result<Stri
     if fields.is_empty() {
         return Ok(if postgres { "r.body::text" } else { "r.body" }.into());
     }
-    let pairs = fields
-        .iter()
-        .map(|(name, source)| {
-            valid_path(name)?;
+    projected(
+        fields.iter().map(|(name, source)| {
             valid_path(source)?;
-            Ok(format!("('{name}',{})", json_field(source, postgres)))
+            Ok((*name, json_field(source, postgres)))
+        }),
+        postgres,
+    )
+}
+/// Expressions are produced only by reviewed query builders; names stay validated.
+pub(crate) fn projected<'a>(
+    fields: impl IntoIterator<Item = Result<(&'a str, String)>>,
+    postgres: bool,
+) -> Result<String> {
+    let pairs = fields
+        .into_iter()
+        .map(|item| {
+            let (name, expression) = item?;
+            valid_path(name)?;
+            Ok(format!("('{name}',{expression})"))
         })
         .collect::<Result<Vec<_>>>()?;
     Ok(if postgres {

@@ -35,7 +35,7 @@
     "test:email-template-model": "node ../../scripts/test_email_template_model.mjs",
     "test:email-template-workspace-ui": "node ../../scripts/test_email_template_workspace_ui.mjs",
     "test:business-status-model": "node ../../scripts/test_business_status_model.mjs",
-    "test:concurrency-feedback": "node ../../scripts/test_frontend_concurrency_feedback.mjs",
+    "test:concurrency-feedback": "node ../../scripts/test_frontend_concurrency_feedback.mjs && node ../../scripts/test_party_save_workspace_ui.mjs",
     "test:abortable-operations-ui": "node ../../scripts/test_abortable_operations_ui.mjs",
     "test:smart-ocr-ui": "node ../../scripts/test_smart_ocr_ui.mjs",
     "test:query-retry-policy": "node ../../scripts/test_query_retry_policy.mjs",

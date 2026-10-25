@@ -67,10 +67,12 @@ function App() {
   const hasUnsavedChanges = useHasUnsavedChanges();
   const sessionChannelRef = useRef<ReturnType<typeof openSessionChannel>>(null);
   const sessionRef = useRef<SessionState | null>(session);
+  const validatedUserTokenRef = useRef<string | undefined>(undefined);
   const sessionActionRef = useRef<symbol | null>(null);
   const apiBaseUrlRef = useRef(apiBaseUrl);
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   const setSession = useCallback((nextSession: SessionState | null) => {
+    validatedUserTokenRef.current = nextSession?.accessToken;
     sessionRef.current = nextSession;
     setSessionState(nextSession);
     if (nextSession) writeStoredSession(nextSession);
@@ -337,6 +339,7 @@ function App() {
     session,
     sessionRef,
     setSession,
+    validatedUserTokenRef,
   });
 
   const routeAccessAllowed = !session || isRouteAccessAllowed({
@@ -361,14 +364,16 @@ function App() {
     }
 
     let isStale = false;
-    void client
-      .getLicenseStatus()
+    void queryClient.fetchQuery({
+      queryKey: queryKeys.licenseStatus(),
+      queryFn: ({ signal }) => client.getLicenseStatus({ signal }),
+      staleTime: 60_000,
+    })
       .then((status) => {
         if (isStale) {
           return;
         }
 
-        queryClient.setQueryData(queryKeys.licenseStatus(), status);
         if (status.isTrialExpired) {
           setWorkspaceNotice({
             id: "license",

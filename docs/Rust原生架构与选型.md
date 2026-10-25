@@ -47,6 +47,8 @@ Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分
 
 2026-10-25 完成发票精确计算、保存作用域、TSV 与精确商品查询的收口。十进制和表格解析复用共用纯模块，保存基线、剩余草稿及缓存失效各有独立职责。Storage 新增有界 HS 投影及排序、文件元数据与结果容量查询，Engine 负责语义匹配、授权和保留用例；普通任务下载在 BLOB 分配前取得实例字节预算。数据库按 7→8 追加 HS 索引，既有迁移和业务记录保持；V3 大变体使用堆间接存储，序列化格式不变。本批没有新增运行依赖、业务数据库或默认文件目录。
 
+同日后续审查修复将客户/供应商草稿及保存生命周期收口到共用 hook，CRM 查询进入 Storage，预检内容增加事务化消费和累计容量边界；PDFium 文档句柄仅在一次隔离 worker 操作内复用。移除无生产调用的 `RuntimePaths::open` 和旧 Rust 编辑粘贴模型，实际运行根仍由组合根注入，React 继续承担编辑与 TSV。共享查询投影和时间排序属于 Storage；HTTP、Tauri 和用例层不复制 SQL。修复 GitHub 安全门禁仅独立升级 `ctutils 0.4.3` 至 `0.4.4`，其 Apache-2.0/MIT 许可不变；无新增运行依赖或 schema 迁移。
+
 桌面令牌由 Rust 宿主生成，仅由主窗口受限 IPC 获取，不写 URL 或日志。随机回环端口、精确 Host／Origin 校验、官方 endpoint policy、登录会话与对象权限共同控制桌面访问。网络服务不安装本机文件／进程能力。
 
 AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，业务 SQLite 在 DataRoot/Database，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。Rust 数据库保留版本 5 建库基线，从版本 5 起按存储层有序事务迁移升级；不打开原 C# v19 或版本 4 及更早试验库，不做猜测迁移。

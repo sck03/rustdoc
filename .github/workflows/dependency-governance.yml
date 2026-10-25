@@ -11,24 +11,42 @@ on:
       - "**/package-lock.json"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
+      - "rust-toolchain.toml"
+      - "eng/native-runtime-packages.json"
+      - "Resources/Fonts/OpenSource/**"
+      - "OcrModels/**"
+      - "VisualCppRuntime/**"
+      - "WebView2Runtime/**"
+      - "third_party/**"
+      - "THIRD_PARTY_*.md"
       - "scripts/generate-dependency-governance.mjs"
       - "scripts/verify-dependency-policy.mjs"
       - "scripts/test_dependency_policy.mjs"
       - "scripts/verify-github-workflow-actions.mjs"
       - ".github/workflows/dependency-governance.yml"
       - "scripts/verify-rustsec-glib-exception.mjs"
+      - "scripts/summarize-rustsec-reports.mjs"
   pull_request:
     paths:
       - "**/package.json"
       - "**/package-lock.json"
       - "**/Cargo.toml"
       - "**/Cargo.lock"
+      - "rust-toolchain.toml"
+      - "eng/native-runtime-packages.json"
+      - "Resources/Fonts/OpenSource/**"
+      - "OcrModels/**"
+      - "VisualCppRuntime/**"
+      - "WebView2Runtime/**"
+      - "third_party/**"
+      - "THIRD_PARTY_*.md"
       - "scripts/generate-dependency-governance.mjs"
       - "scripts/verify-dependency-policy.mjs"
       - "scripts/test_dependency_policy.mjs"
       - "scripts/verify-github-workflow-actions.mjs"
       - ".github/workflows/dependency-governance.yml"
       - "scripts/verify-rustsec-glib-exception.mjs"
+      - "scripts/summarize-rustsec-reports.mjs"
 
 concurrency:
   group: dependency-governance-${{ github.ref }}
@@ -39,10 +57,11 @@ permissions:
 
 jobs:
   audit-and-sbom:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
-      CARGO_HOME: ${{ github.workspace }}/artifacts/cargo-home
+      CARGO_HOME: ${{ github.workspace }}/.codex-runtime/cargo-home
+      npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
 
     steps:
       - name: Checkout
@@ -93,6 +112,7 @@ jobs:
           "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --ignore RUSTSEC-2024-0429 --file Cargo.lock --json > artifacts/dependency-governance/rustsec-workspace.json || status=1
           "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file apps/exportdoc-ocr-rs/Cargo.lock --json > artifacts/dependency-governance/rustsec-ocr.json || status=1
           "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file tools/excel-analyzer-rs/Cargo.lock --json > artifacts/dependency-governance/rustsec-excel.json || status=1
+          node scripts/summarize-rustsec-reports.mjs artifacts/dependency-governance/rustsec-{workspace,ocr,excel}.json
           exit "$status"
 
       - name: Generate SPDX, CycloneDX and third-party inventory

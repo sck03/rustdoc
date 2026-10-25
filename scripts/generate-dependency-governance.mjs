@@ -61,7 +61,7 @@ collectNpmLock("web", "apps/export-doc-web/package-lock.json");
 collectNpmLock("tauri-build", "apps/export-doc-tauri/package-lock.json");
 collectCargoMetadata("ocr", "apps/exportdoc-ocr-rs/Cargo.toml");
 collectCargoMetadata("excel-analyzer", "tools/excel-analyzer-rs/Cargo.toml");
-collectCargoMetadata("native-desktop", "Cargo.toml");
+collectCargoMetadata("rust-workspace", "Cargo.toml");
 collectNativeResources();
 
 const ordered = [...components.values()].sort((left, right) =>
@@ -295,7 +295,7 @@ function buildNotices(items) {
     "",
     "- Noto CJK report fonts are redistributed under the SIL Open Font License. The complete text is included below and is also shipped at `Resources/Fonts/OpenSource/OFL-Noto-CJK.txt`.",
     "- PaddleOCR/PP-OCRv6 model provenance and notices are shipped at `OcrModels/PaddleOCR/V6/THIRD_PARTY_NOTICES.md`.",
-    "- The Rust Excel analyzer notice is shipped at `Tools/EXCEL_ANALYZER_NOTICES.md`.",
+    "- The Rust Excel analyzer notice is included in the Excel analyzer notice section below; its source is `tools/excel-analyzer-rs/THIRD_PARTY_NOTICES.md`.",
     "- Web/server packages include PostgreSQL 18 pg_dump, pg_restore and psql under Tools/PostgreSQL. The PostgreSQL license and upstream native library notices are preserved in that directory; these tools are excluded from desktop SQLite packages. Windows uses the checksum-pinned EnterpriseDB archive, Linux uses the official PostgreSQL image, and macOS uses the version-checked Homebrew formula and its dylib closure.",
     "- Windows OCR packages carry the matching app-local CRT libraries (four for x64, three for ARM64) beside ONNX Runtime, with `sidecar/ocr/msvc-runtime.json` and `sidecar/ocr/MSVC_RUNTIME_NOTICES.md`. These Microsoft redistribution terms are separate from the open-source package licenses; the full installer is a build-time source and is not shipped.",
     "- The Rust desktop uses the system WebView (WebView2 on Windows, WebKitGTK on Linux, WKWebView on macOS). Windows x64 portable packages carry the pinned Microsoft WebView2 installer and its notice under `WebView2Runtime/`. Rust PDF generation does not ship Chromium. Retained C# browser/NuGet dependencies are excluded from this Rust delivery inventory.",
@@ -344,6 +344,7 @@ function buildInventory(items) {
       "The exact application build version is recorded in the accompanying machine-readable SBOM files.",
     "",
     "Runtime image boundary: PostgreSQL client tools and their native library closure ship in web/server packages under Tools/PostgreSQL with license texts. The database server remains a separate OS/container input. Rust containers do not include .NET or a browser rendering service.",
+    "The rust-workspace scope covers the complete locked desktop/server/build/test graph across supported platforms. It is not a desktop runtime inventory; the desktop feature closure is checked separately by verify-native-desktop.mjs.",
     "",
   ];
   for (const ecosystem of ["npm", "cargo", "native-resource"]) {

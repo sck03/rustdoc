@@ -177,3 +177,33 @@ fn opportunity_edit_permissions_do_not_grant_quote_writes() {
     );
     assert_eq!(created["stage"], "线索");
 }
+
+#[test]
+fn opportunity_product_references_prevent_deletion_and_keep_projection_metadata_private() {
+    let fixture = native_fixture::Fixture::new();
+    let customer = fixture.create(CREATE_CRM_CUSTOMER, json!({"name":"商品引用客户"}));
+    let product = fixture.create(
+        CREATE_PRODUCT,
+        json!({"productCode":"OPPORTUNITY-PRODUCT","nameCN":"关联商品"}),
+    );
+    let opportunity = fixture.create(CREATE_SALES_OPPORTUNITY, json!({"crmCustomerId":customer["id"],"productId":product["id"],"title":"商品引用商机","currency":"USD","expectedCloseDate":"2026-12-15"}));
+    let error = fixture
+        .client()
+        .json::<Value>(
+            DELETE_PRODUCT,
+            &[("id", product["id"].to_string())],
+            &[("expectedVersion", product["versionNumber"].to_string())],
+            None,
+        )
+        .unwrap_err();
+    assert_eq!(error.status, Some(409));
+    let page: Value = fixture
+        .client()
+        .json(QUERY_SALES_OPPORTUNITIES, &[], &[], None)
+        .unwrap();
+    let saved = &page["items"][0];
+    assert_eq!(saved["id"], opportunity["id"]);
+    assert_eq!(saved["productName"], "关联商品");
+    assert!(saved.get("__linkedProductId").is_none());
+    assert!(saved.get("linkedProductId").is_none());
+}

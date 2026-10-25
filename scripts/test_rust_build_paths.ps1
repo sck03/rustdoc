@@ -68,9 +68,9 @@ try {
     $good = Join-Path $fixture 'input.txt'
     [IO.File]::WriteAllText($good, 'new')
     New-Item -ItemType Directory -Path $output | Out-Null
-    $existing = Join-Path $output 'existing.txt'
+    $existing = Join-Path $output 'ExportDocManager.exe'
     [IO.File]::WriteAllText($existing, 'old')
-    $map = [ordered]@{ $good = 'existing.txt'; (Join-Path $fixture 'missing.txt') = 'missing.txt' }
+    $map = [ordered]@{ $good = 'ExportDocManager.exe'; (Join-Path $fixture 'missing.txt') = 'Web/missing.js' }
     $rejected = $false
     try { Copy-ExportDocNativePackageFiles -Copies $map -OutputRoot $output } catch { $rejected = $true }
     if (-not $rejected) { throw 'Incomplete package inputs were accepted' }
@@ -79,8 +79,106 @@ try {
     $rejected = $false
     try { Copy-ExportDocNativePackageFiles -Copies $map -OutputRoot $output } catch { $rejected = $true }
     if (-not $rejected -or (Test-Path -LiteralPath (Join-Path $fixture 'escape.txt'))) { throw 'Package output escaped its root' }
-    Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'existing.txt' }) -OutputRoot $output
+    Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'ExportDocManager.exe' }) -OutputRoot $output
     Assert-Equal ([IO.File]::ReadAllText($existing)) 'new'
+    # Rebuilding a package retires only files owned by the package manifest.
+    $data = Join-Path $output 'App_Data/Database/business.db'
+    $customTemplate = Join-Path $output 'Templates/custom.dtpl'
+    foreach ($file in @($data, $customTemplate)) {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $file) | Out-Null
+        [IO.File]::WriteAllText($file, 'keep')
+    }
+    $secondInput = Join-Path $fixture 'second.txt'
+    [IO.File]::WriteAllText($secondInput, 'runtime')
+    Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Web/assets/old.js'; $secondInput = 'sidecar/ocr/exportdoc-ocr.exe' }) -OutputRoot $output
+    Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Web/assets/new.js' }) -OutputRoot $output
+    foreach ($relative in @('ExportDocManager.exe', 'Web/assets/old.js', 'sidecar/ocr/exportdoc-ocr.exe')) {
+        if (Test-Path -LiteralPath (Join-Path $output $relative)) { throw "Retired package file survived: $relative" }
+    }
+    foreach ($file in @($data, $customTemplate)) { Assert-Equal ([IO.File]::ReadAllText($file)) 'keep' }
+    foreach ($relative in @('App_Data/Database/business.db', 'App_Data./Database/business.db', 'App_Data /Database/business.db', 'Web/assets/CON.js', '../escape.txt', '.git/config', 'private-patch.txt')) {
+        $rejected = $false
+        try { Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = $relative }) -OutputRoot $output } catch { $rejected = $true }
+        if (-not $rejected) { throw "Protected package path accepted: $relative" }
+    }
+    $fileManifest = Join-Path $output 'exportdoc-package-files.json'
+    $previousManifest = [IO.File]::ReadAllText($fileManifest)
+    $privatePatch = Join-Path $output 'private-patch.txt'
+    [IO.File]::WriteAllText($privatePatch, 'private patch')
+    foreach ($broken in @('{', '{"schemaVersion":1,"files":["Web/assets/new.js"]}', (@{schemaVersion=1;files=@(@{path='private-patch.txt';sha256=(Get-FileHash -LiteralPath $privatePatch -Algorithm SHA256).Hash})} | ConvertTo-Json -Depth 4))) {
+        [IO.File]::WriteAllText($fileManifest, $broken)
+        $rejected = $false
+        try { Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Web/assets/replacement.js' }) -OutputRoot $output } catch { $rejected = $true }
+        if (-not $rejected -or (Test-Path -LiteralPath (Join-Path $output 'Web/assets/replacement.js'))) { throw 'Unsafe old manifest was accepted or partially copied' }
+        Assert-Equal ([IO.File]::ReadAllText($data)) 'keep'
+        Assert-Equal ([IO.File]::ReadAllText($privatePatch)) 'private patch'
+    }
+    [IO.File]::WriteAllText($fileManifest, $previousManifest)
+    $savedManifest = "$fileManifest.saved"
+    Move-Item -LiteralPath $fileManifest -Destination $savedManifest
+    New-Item -ItemType Directory -Path $fileManifest | Out-Null
+    try {
+        $rejected = $false
+        try { Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Web/assets/replacement.js' }) -OutputRoot $output } catch { $rejected = $true }
+        if (-not $rejected -or (Test-Path -LiteralPath (Join-Path $output 'Web/assets/replacement.js'))) { throw 'Directory manifest was accepted or partially copied' }
+    } finally {
+        Remove-Item -LiteralPath $fileManifest
+        Move-Item -LiteralPath $savedManifest -Destination $fileManifest
+    }
+    # A user edit to a resource owned by an earlier package is a conflict, not deletion.
+    Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Templates/builtin.dtpl' }) -OutputRoot $output
+    $builtin = Join-Path $output 'Templates/builtin.dtpl'
+    [IO.File]::AppendAllText($builtin, ' user edit')
+    $rejected = $false
+    try { Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Web/assets/replacement.js' }) -OutputRoot $output } catch { $rejected = $true }
+    if (-not $rejected -or (Test-Path -LiteralPath (Join-Path $output 'Web/assets/replacement.js'))) { throw 'Modified owned template was silently retired' }
+    Assert-Equal ([IO.File]::ReadAllText($builtin)) 'new user edit'
+    [IO.File]::WriteAllText($builtin, 'new')
+    # An existing marked package gets an ownership list without sweeping custom files.
+    Remove-Item -LiteralPath $fileManifest
+    [IO.File]::WriteAllText((Join-Path $output 'exportdoc-native-package.json'), '{"schemaVersion":1,"purpose":"rust-native-application"}')
+    $legacyOcr = Join-Path $output 'sidecar/ocr/onnxruntime.dll'
+    [IO.File]::WriteAllText($legacyOcr, 'old OCR')
+    $nestedGit = Join-Path $output 'Web/repository/.git'
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $nestedGit) | Out-Null
+    [IO.File]::WriteAllText($nestedGit, 'gitdir: protected')
+    $rejected = $false
+    try { Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Web/assets/current.js' }) -OutputRoot $output } catch { $rejected = $true }
+    if (-not $rejected -or -not (Test-Path -LiteralPath $legacyOcr)) { throw 'Nested Git boundary was traversed or package partially changed' }
+    Remove-Item -LiteralPath $nestedGit
+    $outside = Join-Path $fixture 'preserved-assets'
+    New-Item -ItemType Directory -Path $outside | Out-Null
+    $outsideFile = Join-Path $outside 'private-patch.txt'
+    [IO.File]::WriteAllText($outsideFile, 'keep outside')
+    $linkedDirectory = Join-Path $output 'Web/linked'
+    New-Item -ItemType $(if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }) -Path $linkedDirectory -Target $outside | Out-Null
+    try {
+        $rejected = $false
+        try { Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Web/assets/current.js' }) -OutputRoot $output } catch { $rejected = $true }
+        if (-not $rejected -or -not (Test-Path -LiteralPath $legacyOcr)) { throw 'Linked runtime subtree was traversed or package partially changed' }
+        Assert-Equal ([IO.File]::ReadAllText($outsideFile)) 'keep outside'
+    } finally { Remove-Item -LiteralPath $linkedDirectory -Force }
+    foreach ($case in @(@('build-native.ps1', 'portable-runtime.json'), @('build-native.ps1', 'runtime-layout.json'), @('build-native.ps1', 'exportdoc-native-package.json'), @('package-native-web-server.ps1', 'exportdoc-native-web-server.json'))) {
+        $descriptor = Join-Path $output $case[1]
+        $savedDescriptor = "$descriptor.saved"
+        $hadDescriptor = Test-Path -LiteralPath $descriptor -PathType Leaf
+        if ($hadDescriptor) { Move-Item -LiteralPath $descriptor -Destination $savedDescriptor }
+        New-Item -ItemType $(if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }) -Path $descriptor -Target $outside | Out-Null
+        try {
+            $message = & pwsh -NoProfile -File (Join-Path $PSScriptRoot $case[0]) -SkipBuild -WithoutOcr -NoPause -OutputRoot $output 2>&1 | Out-String
+            if ($LASTEXITCODE -eq 0 -or $message -notmatch 'Linked paths are not allowed') { throw "Linked descriptor preflight failed: $($case[1]) $message" }
+        } finally {
+            Remove-Item -LiteralPath $descriptor -Force
+            if ($hadDescriptor) { Move-Item -LiteralPath $savedDescriptor -Destination $descriptor }
+        }
+        Assert-Equal ([IO.File]::ReadAllText($outsideFile)) 'keep outside'
+    }
+    $rejected = $false
+    try { Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Templates/custom.dtpl' }) -OutputRoot $output } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Unowned modified template was overwritten on first package adoption' }
+    Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Web/assets/current.js' }) -OutputRoot $output
+    if (Test-Path -LiteralPath $legacyOcr) { throw 'Unmanifested marked OCR resource survived lightweight rebuild' }
+    foreach ($file in @($data, $customTemplate)) { Assert-Equal ([IO.File]::ReadAllText($file)) 'keep' }
     Write-Host 'Rust build paths and package preflight passed.'
 } finally {
     $env:CARGO_TARGET_DIR = $previousTarget

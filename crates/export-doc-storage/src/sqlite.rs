@@ -141,6 +141,26 @@ impl Sqlite {
                     .map_err(|e| rusqlite::Error::UserFunctionError(Box::new(e)))
             },
         )?;
+        for (name, seconds) in [("record_time_seconds", true), ("record_time_nanos", false)] {
+            connection.create_scalar_function(
+                name,
+                1,
+                rusqlite::functions::FunctionFlags::SQLITE_UTF8
+                    | rusqlite::functions::FunctionFlags::SQLITE_DETERMINISTIC,
+                move |context| {
+                    let value = context.get::<String>(0)?;
+                    chrono::DateTime::parse_from_rfc3339(&value)
+                        .map(|time| {
+                            if seconds {
+                                time.timestamp()
+                            } else {
+                                i64::from(time.timestamp_subsec_nanos())
+                            }
+                        })
+                        .map_err(|cause| rusqlite::Error::UserFunctionError(Box::new(cause)))
+                },
+            )?;
+        }
         Ok(Self {
             connection: RefCell::new(connection),
         })
@@ -171,6 +191,14 @@ impl Sqlite {
     }
 }
 impl Adapter for Sqlite {
+    fn import_preview_usage(&self, owner: i64) -> Result<ImportPreviewUsage> {
+        let counts = self.connection.borrow().query_row(
+            &import_preview_query::usage_sql(false),
+            [owner],
+            |row| Ok([row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?]),
+        )?;
+        ImportPreviewUsage::from_counts(counts)
+    }
     fn job_counts(&self) -> Result<Value> {
         let connection = self.connection.borrow();
         let mut statement=connection.prepare("SELECT json_extract(body,'$.status'),COUNT(*) FROM records WHERE kind='background-jobs' GROUP BY json_extract(body,'$.status')")?;

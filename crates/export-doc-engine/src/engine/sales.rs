@@ -1,13 +1,13 @@
 //! Opportunity use cases own quotation permissions, versions and business history.
 use super::{
-    auth,
+    auth, crm_queries,
     error::{Result, conflict, error, invalid},
     records::{id, text},
     store::{self, Actor, Store},
 };
 use crate::{contracts, generated_api::*};
 use export_doc_domain::sales;
-use export_doc_storage::Connection;
+use export_doc_storage::{Connection, CrmList};
 use serde_json::{Value, json};
 
 pub const OPERATIONS: &[Operation] = &[
@@ -91,25 +91,12 @@ pub(super) fn details(
     ))
 }
 
-pub fn visible(tx: &Connection, actor: &Actor) -> Result<Vec<Value>> {
-    let customers = store::all(tx, "crm-customers")?;
-    store::all(tx, KIND)?
-        .into_iter()
-        .filter(|value| {
-            value["isArchived"] != true && auth::visible(actor, PERMISSION, "view", value)
-        })
-        .filter(|value| {
-            customers.iter().any(|party| {
-                party["id"] == value["crmCustomerId"]
-                    && auth::visible(actor, "sales.customers", "view", party)
-            })
-        })
-        .map(Ok)
-        .collect()
+pub(super) fn projected(mut value: Value) -> Value {
+    value["allowedNextStages"] = json!(sales::next_stages(value["stage"].as_str().unwrap_or("")));
+    contracts::project(contracts::schema("ApiSalesOpportunityDto"), value)
 }
 
 fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
-    auth::authorize(actor, "common.product-reference", "view")?;
     let read = |key: &str| {
         query
             .iter()
@@ -122,51 +109,45 @@ fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value>
         return Err(invalid("商机阶段无效。"));
     }
     let keyword = store::normalize(read("keyword"));
-    let tx = store.connection()?;
-    let mut rows = visible(&tx, actor)?;
-    rows.sort_by(|left, right| {
-        sales::closed(&text(left, "stage"))
-            .cmp(&sales::closed(&text(right, "stage")))
-            .then_with(|| right["updatedAt"].as_str().cmp(&left["updatedAt"].as_str()))
-            .then_with(|| right["id"].as_i64().cmp(&left["id"].as_i64()))
-    });
-    let mut rows: Vec<_> = rows
-        .into_iter()
-        .map(|row| details(&tx, actor, row, "view"))
-        .collect::<Result<_>>()?;
-    rows.retain(|value| {
-        (stage.is_empty() || value["stage"] == stage)
-            && (keyword.is_empty()
-                || [
-                    "title",
-                    "quotationNo",
-                    "nextAction",
-                    "customerName",
-                    "productCode",
-                    "productName",
-                ]
-                .iter()
-                .any(|field| store::normalize(&text(value, field)).contains(&keyword)))
-            && (read("crmCustomerId").is_empty()
-                || value["crmCustomerId"]
-                    .as_i64()
-                    .is_some_and(|id| id.to_string() == read("crmCustomerId")))
-    });
+    let customer_id = if read("crmCustomerId").is_empty() {
+        None
+    } else {
+        Some(
+            read("crmCustomerId")
+                .parse::<i64>()
+                .ok()
+                .filter(|id| *id > 0)
+                .ok_or_else(|| invalid("客户编号必须大于零。"))?,
+        )
+    };
     let size = read("pageSize")
         .parse::<usize>()
         .unwrap_or(20)
         .clamp(10, 100);
     let page = read("pageNumber").parse::<usize>().unwrap_or(1).max(1);
-    let count = rows.len();
-    Ok(contracts::page(
-        rows.into_iter()
-            .skip(page.saturating_sub(1).saturating_mul(size))
-            .take(size)
-            .collect(),
-        count,
-        page,
-        size,
-    ))
+    let offset = i64::try_from(page.saturating_sub(1).saturating_mul(size)).unwrap_or(i64::MAX);
+    store.read_for(actor, QUERY_SALES_OPPORTUNITIES, query, |tx, actor| {
+        auth::authorize(actor, "common.product-reference", "view")?;
+        let (count, rows) = crm_queries::page(
+            tx,
+            actor,
+            CrmList::Opportunities {
+                customer_id,
+                stage,
+                keyword: &keyword,
+                upcoming_closings: false,
+            },
+            &crm_queries::fields("ApiSalesOpportunityDto"),
+            offset,
+            size as i64,
+        )?;
+        Ok(contracts::page(
+            rows.into_iter().map(projected).collect(),
+            count,
+            page,
+            size,
+        ))
+    })
 }
 
 fn append(
@@ -198,19 +179,26 @@ fn append(
 }
 
 fn history(store: &Store, actor: &Actor, record_id: i64) -> Result<Value> {
-    let tx = store.connection()?;
-    checked(&tx, actor, record_id, "view", true)?;
-    let mut rows: Vec<_> = store::all(&tx, "opportunity-events")?
+    store.read_for(actor, LIST_SALES_OPPORTUNITY_HISTORY, &[], |tx, actor| {
+        checked(tx, actor, record_id, "view", true)?;
+        let mut rows: Vec<_> = store::matching(
+            tx,
+            "opportunity-events",
+            &[("opportunityId", record_id.to_string())],
+            &[("id", "id"), ("snapshot", "snapshot")],
+        )?
         .into_iter()
-        .filter(|row| row["opportunityId"] == record_id)
         .map(|row| {
             let mut snapshot = row["snapshot"].clone();
             snapshot["id"] = row["id"].clone();
             snapshot
         })
         .collect();
-    rows.sort_by_key(|row| std::cmp::Reverse((row["versionNumber"].as_i64(), row["id"].as_i64())));
-    Ok(json!(rows))
+        rows.sort_by_key(|row| {
+            std::cmp::Reverse((row["versionNumber"].as_i64(), row["id"].as_i64()))
+        });
+        Ok(json!(rows))
+    })
 }
 
 fn save(store: &Store, actor: &Actor, record_id: i64, body: &Value) -> Result<Value> {
@@ -356,16 +344,15 @@ pub fn handle(
 ) -> Result<Value> {
     match operation {
         QUERY_SALES_OPPORTUNITIES => list(store, actor, query),
-        GET_SALES_OPPORTUNITY => {
+        GET_SALES_OPPORTUNITY => store.read_for(actor, operation, query, |tx, actor| {
             auth::authorize(actor, "common.product-reference", "view")?;
-            let tx = store.connection()?;
             details(
-                &tx,
+                tx,
                 actor,
-                checked(&tx, actor, id(parameters)?, "view", false)?,
+                checked(tx, actor, id(parameters)?, "view", false)?,
                 "view",
             )
-        }
+        }),
         LIST_SALES_OPPORTUNITY_HISTORY => history(store, actor, id(parameters)?),
         CREATE_SALES_OPPORTUNITY => save(store, actor, 0, body),
         UPDATE_SALES_OPPORTUNITY => save(store, actor, id(parameters)?, body),

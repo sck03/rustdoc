@@ -5,6 +5,10 @@ mod business_query;
 mod capacity_query;
 #[path = "support/communication_query.rs"]
 mod communication_query;
+#[path = "support/crm_query.rs"]
+mod crm_query;
+#[path = "support/import_preview_query.rs"]
+mod import_preview_query;
 #[path = "support/office_query.rs"]
 mod office_query;
 #[path = "support/personnel_query.rs"]
@@ -72,6 +76,7 @@ fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
 }
 
 fn roundtrip(connection: &Connection) {
+    import_preview_query::exercise(connection);
     capacity_query::exercise(connection);
     office_query::exercise(connection);
     resource_query::exercise(connection);
@@ -80,6 +85,7 @@ fn roundtrip(connection: &Connection) {
     scaling_query::exercise(connection);
     template_query::exercise(connection);
     communication_query::exercise(connection);
+    crm_query::exercise(connection);
     connection.begin().unwrap();
     connection
         .append_audit_details(

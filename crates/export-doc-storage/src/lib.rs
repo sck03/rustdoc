@@ -6,10 +6,14 @@ pub use postgres::tools::{
     client_parameters as postgres_client_parameters,
 };
 mod business_query;
+mod crm_query;
+pub use crm_query::{CrmList, CrmQuery};
 mod communication;
 mod generic_query;
 pub use business_query::{BusinessList, BusinessQuery};
 mod hs_query;
+mod import_preview_query;
+pub use import_preview_query::ImportPreviewUsage;
 mod job_query;
 pub use hs_query::HsQuery;
 mod office_query;
@@ -28,7 +32,7 @@ pub mod pool;
 pub use template_query::{ReportTemplateQuery, TemplateAudience, TemplateVersionQuery};
 struct QuerySql {
     filter: String,
-    order: &'static str,
+    order: String,
     values: Vec<String>,
 }
 mod migrations;
@@ -162,6 +166,28 @@ pub struct Credential {
 
 /// All business operations use this semantic storage boundary, never provider SQL.
 trait Adapter: Send {
+    fn import_preview_usage(&self, _owner: i64) -> Result<ImportPreviewUsage> {
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "存储适配器不支持导入预检容量查询。",
+        ))
+    }
+    fn expired_import_previews(&self, before: &str) -> Result<Vec<Value>> {
+        let pg = self.provider() == "PostgreSQL";
+        self.query_slice(
+            &import_preview_query::expired(before, pg),
+            &sql::projection(
+                &[
+                    ("id", "id"),
+                    ("versionNumber", "versionNumber"),
+                    ("expiresAt", "expiresAt"),
+                ],
+                pg,
+            )?,
+            0,
+            200,
+        )
+    }
     fn query_hs(&self, query: &HsQuery<'_>) -> Result<Vec<Value>> {
         let (sql, projection) = hs_query::build(query, self.provider() == "PostgreSQL")?;
         self.query_slice(&sql, &projection, query.offset, query.limit)
@@ -236,6 +262,18 @@ trait Adapter: Send {
         let (sql, projection) = business_query::build(query, self.provider() == "PostgreSQL")?;
         self.query_page(&sql, &projection, query.offset, query.limit)
     }
+    fn query_crm(&self, query: &CrmQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let (sql, projection) = crm_query::build(query, self.provider() == "PostgreSQL")?;
+        self.query_page(&sql, &projection, query.offset, query.limit)
+    }
+    fn scan_crm(&self, query: &CrmQuery<'_>, after_id: i64) -> Result<Vec<Value>> {
+        let (mut sql, projection) = crm_query::build(query, self.provider() == "PostgreSQL")?;
+        let cursor = sql::bind(&mut sql.values, after_id, self.provider() == "PostgreSQL");
+        sql.filter
+            .push_str(&format!(" AND r.id>CAST({cursor} AS BIGINT)"));
+        sql.order = "r.id".into();
+        self.query_slice(&sql, &projection, 0, query.limit)
+    }
     fn query_personnel(&self, query: &PersonnelQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, projection) = personnel_query::build(query, self.provider() == "PostgreSQL")?;
         self.query_page(&sql, &projection, query.offset, query.limit)
@@ -280,7 +318,7 @@ trait Adapter: Send {
         let pg = self.provider() == "PostgreSQL";
         let sql = QuerySql {
             filter: format!("r.kind='report-templates' AND r.id={id}"),
-            order: "r.id",
+            order: "r.id".into(),
             values: vec![],
         };
         Ok(self
@@ -491,6 +529,8 @@ impl Connection {
     }
 }
 delegate! {
+    import_preview_usage(owner:i64)->ImportPreviewUsage;
+    expired_import_previews(before:&str)->Vec<Value>;
     query_hs(query:&HsQuery<'_>)->Vec<Value>;
     query_jobs(query:&JobQuery<'_>)->(i64,Vec<Value>);
     job_counts()->Value;
@@ -500,6 +540,8 @@ delegate! {
     resource_references(kind:&str,offset:i64,limit:i64)->(i64,Vec<Value>);
     query_scoped(query:&ScopedQuery<'_>)->(i64,Vec<Value>);
     query_business(query:&BusinessQuery<'_>)->(i64, Vec<Value>);
+    query_crm(query:&CrmQuery<'_>)->(i64, Vec<Value>);
+    scan_crm(query:&CrmQuery<'_>,after_id:i64)->Vec<Value>;
     query_personnel(query:&PersonnelQuery<'_>)->(i64, Vec<Value>);
     query_office(query:&OfficeQuery<'_>)->(i64, Vec<Value>);
     query_report_templates(query: &ReportTemplateQuery<'_>)->(i64, Vec<Value>);

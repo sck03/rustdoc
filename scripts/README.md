@@ -34,6 +34,8 @@
 
 `-SkipBuild` 只整理已经构建好的相同 profile／target 二进制与资源。Document 正式包默认包含 OCR；`-WithoutOcr` 仅生成明确不提供文字识别的轻量验收包，不能用它代替完整单证版验收。网页/Docker Full 继续包含 OCR。
 
+便携/Web 组包写入 `exportdoc-package-files.json`，登记受控程序路径和 SHA-256。同目录重打包只移除已退出新清单且归属/摘要仍匹配的程序资源，清除旧 OCR 与 Web hash 文件；`App_Data`、DataRoot 用户模板、备份及私有文件不进入此清单。已修改的程序资源或模板、损坏清单、链接、嵌套 Git 和 Windows 路径别名会在复制前报错，先另存冲突内容或选择新包目录。旧无清单包只识别明确的只读运行资源树；首次遇到不同内容的模板不猜测覆盖。
+
 直接 Cargo 命令、本地打包、实库/界面回归与 GitHub 工作流默认共用仓库 `target/`；不再分别写入 `.codex-runtime/cargo-target-native` 和 `artifacts/cargo-target-native`。`CARGO_TARGET_DIR` 可显式覆盖，相对路径按仓库根解析；公共入口同时把下载缓存和临时目录放入 `.codex-runtime`。手工运行 Cargo 时也应设置仓库内的 `CARGO_HOME`，以复用脚本的下载缓存。`-SkipBuild` 会先检查主程序及所需 OCR 程序，缺失时在创建/改动输出包之前报错；所有文件复制前统一验证来源和目标边界。
 
 Windows 批量入口默认 `-Edition All`，仅生成 Document、Sales，共用一次 React 构建及 Cargo 输出根。默认目录为 `artifacts/native-desktop/ExportDocManager.Tauri.Document` 和 `.Sales`；显式 `-Edition Full` 只生成 `.Full` 测试目录。`-OutputDir` 指定这些子目录的父目录，单版 `build-native.ps1 -OutputRoot <目录>` 直接指定包目录。每版保留自己的 `App_Data`，不能覆盖另一版本；Administration 参数仍拒绝。
@@ -96,6 +98,8 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 `eng/native-runtime-packages.json` 固定已校验来源及签名的原生资源归档版本和 SHA-512。NuGet 在此只是原生 DLL／so／dylib 的下载载体；不复制托管程序集，也不执行 dotnet restore。不要把 NuGet lock 的“内容哈希”直接当成签名后整个归档的哈希。PowerShell 打包器和容器资源准备都读取这份清单。
 
 共享字体、Excel 模板、原版报表模板、PDFium、notices 和 OCR 资源通过 `lib/native-package-resources.ps1` 组装，桌面与网页服务不维护重复清单。临时文件和下载缓存写仓库 `.codex-runtime/`。AppRoot 与 DataRoot 显式传入；桌面 WebView profile 写 DataRoot/WebView。
+
+字体准备复用 `lib/verified-download.mjs`：流式下载并核对 SHA-256，单文件最多 32 MiB、总时限 120 秒，支持取消和并行独立临时文件；坏摘要、超限、超时或取消均保留原字体并清理本次临时文件。`node scripts/test_verified_download.mjs` 验证这些边界，随脚本套件执行。
 
 六份默认报表统一为 `.dtpl`。开发维护源为 `lib/default-report-designs.mjs`，通过 `node scripts/generate_default_dtpl_templates.mjs` 重建容器，再运行 `node scripts/test_report_designer_v3_contract.mjs` 校验设计器读写与尺寸保留。生成源和六份资产同时提交；旧 HTML 仅可作只读版式参考，不进入目录或发布包。
 
@@ -178,6 +182,8 @@ Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公
 `npm --prefix apps/export-doc-web run test:invoice-editing` 读取与 Rust 共用的金额夹具，验证精确运算、TSV 和保存基线，再运行真实 React hook 的延迟、切换、卸载、刷新失败、重复提交与精确商品查询。`test:document-editor-ui` 另检查实际发票页面的新建跳转和二次保存。普通 Rust/Chromium CI 已加入这些回归及 Clippy；Firefox/WebKit 继续保留手动入口。
 
 实际 PDF 页图回归可设置 `EXPORTDOCMANAGER_REVIEW_APP_ROOT` 为本批组装的应用包根，直接复用包内受管 PDFium、字体和模板；`office_review` 的第二个可选参数对应此 AppRoot，第一个参数仍是独立测试 DataRoot，React 静态文件继续来自仓库构建。缺少原生库时专项明确失败。
+
+`test:concurrency-feedback` 另运行客户/供应商与联系人保存的真实 React 回归，覆盖保存期间继续输入、新建编号与并发版本、重复提交、切换/卸载、迟到响应和刷新失败；共用保存 hook 不通过清空草稿规避冲突。导入预检在同一业务库中保留 30 分钟，单次边界保持；待提交内容另限每账号 200 份/128 MiB、全局 2000 份/256 MiB，满额返回 429。提交成功即事务化释放正文，重复提交仍明确拒绝。
 
 开发时通过 `generate-api-client.ps1` 调用 `cargo run --locked -p export-doc-contracts --example generate_clients`，由 Rust 从同一 OpenAPI 文档生成 Rust 与 React 客户端；`-Check` 只校验生成文件。`crates/export-doc-contracts/src/reference_openapi.json` 是保留的官方 .NET 基线，新增能力只修改 Rust 组合器，不能覆盖生成文件或另建前端 URL/schema。`-OpenApiPath` 可指定已审阅的输入，并同时更新两端；不需要 .NET SDK。Rust 生成器回归随 workspace tests 执行，校验完整生成结果、端点策略、上传下载、请求头、默认值和类型投影；请求运行行为由现有 React/API 测试校验。
 

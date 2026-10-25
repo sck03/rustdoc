@@ -869,6 +869,7 @@ pub fn check_references(connection: &Connection, kind: &str, record: &Value) -> 
         ("suppliers", "supplier-products", "supplierCompanyId"),
         ("suppliers", "supplier-assessments", "supplierCompanyId"),
         ("products", "supplier-products", "productId"),
+        ("products", "opportunities", "productId"),
         ("rooms", "bookings", "meetingRoomId"),
         ("supplies", "supply-requests", "officeSupplyId"),
         ("people", "bookings", "employeeId"),

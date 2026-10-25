@@ -6,6 +6,7 @@ on:
     paths:
       - Cargo.toml
       - Cargo.lock
+      - rust-toolchain.toml
       - .cargo/**
       - crates/**
       - apps/export-doc-tauri/**
@@ -13,17 +14,30 @@ on:
       - apps/export-doc-web/**
       - apps/exportdoc-ocr-rs/**
       - OcrModels/**
+      - Resources/**
+      - Templates/**
+      - WebView2Runtime/**
       - VisualCppRuntime/**
+      - eng/native-runtime-packages.json
       - tests/OcrFixtures/**
-      - scripts/test_native_ocr.mjs
-      - scripts/lib/native-ocr-resources.ps1
-      - scripts/lib/visual-cpp-runtime-support.ps1
-      - scripts/provision-visual-cpp-runtime.ps1
+      - scripts/test_native_*.mjs
+      - scripts/lib/native-*.ps1
+      - scripts/lib/*support*.ps1
+      - scripts/lib/rust-*.ps1
+      - scripts/lib/platform-path-safety.ps1
+      - scripts/lib/product-editions.ps1
+      - scripts/lib/cargo-paths.mjs
+      - scripts/lib/verified-download.mjs
+      - scripts/provision-*.ps1
+      - scripts/provision-*.mjs
+      - scripts/package-native-web-server.ps1
+      - scripts/product-editions.json
+      - version.json
       - tools/excel-analyzer-rs/**
       - deploy/rust-native/**
       - scripts/build-native.*
+      - scripts/run-tauri-build.mjs
       - scripts/run-native-docker.*
-      - scripts/lib/native-docker-lifecycle.ps1
       - scripts/lib/native-docker-validation.mjs
       - .dockerignore
       - scripts/verify-native-desktop.mjs
@@ -112,8 +126,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo run --locked -p export-doc-contracts --example generate_clients -- --check
           exit $LASTEXITCODE
-      - name: Domain, storage and application tests
-        run: cargo test --locked -p export-doc-contracts -p export-doc-domain -p export-doc-storage -p export-doc-excel -p export-doc-exchange -p export-doc-report -p export-doc-engine -p export-doc-server --target ${{ matrix.target }}
+      - name: Workspace tests
+        run: cargo test --locked --workspace --target ${{ matrix.target }}
       - name: Rust correctness lints
         run: cargo clippy --locked --workspace --all-features --all-targets --target ${{ matrix.target }} --message-format=short
       - name: Feature-gated engine suites

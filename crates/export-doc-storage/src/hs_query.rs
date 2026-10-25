@@ -73,7 +73,7 @@ pub(crate) fn build(query: &HsQuery<'_>, pg: bool) -> Result<(QuerySql, String)>
     Ok((
         QuerySql {
             filter: clauses.join(" AND "),
-            order,
+            order: order.into(),
             values,
         },
         sql::projection(query.fields, pg)?,

@@ -84,8 +84,6 @@ export function normalizeDetailTableBlock(
   if (value.entryDescriptionColumnId !== undefined && !columns.some(column => column.id === value.entryDescriptionColumnId)) {
     issues.push(createIssue("error", `${path}.entryDescriptionColumnId`, "按录入行打印的说明列不存在。"));
   }
-  if (!block.sideBand) {
-  }
 
   return block;
 }

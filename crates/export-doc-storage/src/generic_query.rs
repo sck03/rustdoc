@@ -99,7 +99,7 @@ pub(crate) fn scoped(q: &ScopedQuery<'_>, pg: bool) -> Result<(QuerySql, String)
     Ok((
         QuerySql {
             filter: clauses.join(" AND "),
-            order: "r.id DESC",
+            order: "r.id DESC".into(),
             values,
         },
         sql::projection(q.fields, pg)?,
@@ -149,7 +149,7 @@ pub(crate) fn build(q: &GenericQuery<'_>, pg: bool) -> Result<(QuerySql, String)
     Ok((
         QuerySql {
             filter: clauses.join(" AND "),
-            order: "r.id DESC",
+            order: "r.id DESC".into(),
             values,
         },
         sql::projection(q.fields, pg)?,

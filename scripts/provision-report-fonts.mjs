@@ -1,8 +1,8 @@
-import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { downloadVerifiedFile, fileSha256 } from "./lib/verified-download.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const fontRoot = path.join(repositoryRoot, "Resources", "Fonts", "OpenSource");
@@ -13,38 +13,30 @@ if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.fonts) || manifest.f
   throw new Error(`Unsupported or empty report font manifest: ${manifestPath}`);
 }
 
-await mkdir(fontRoot, { recursive: true });
-for (const font of manifest.fonts) {
-  await provisionFont(font);
+const cancellation = new AbortController();
+const cancel = () => cancellation.abort(new Error("Report font provisioning cancelled."));
+process.once("SIGINT", cancel);
+process.once("SIGTERM", cancel);
+try {
+  await mkdir(fontRoot, { recursive: true });
+  for (const font of manifest.fonts) await provisionFont(font);
+  process.stdout.write(`Report fonts ready (${manifest.fonts.length} files): ${fontRoot}\n`);
+} finally {
+  process.removeListener("SIGINT", cancel);
+  process.removeListener("SIGTERM", cancel);
 }
-
-process.stdout.write(`Report fonts ready (${manifest.fonts.length} files): ${fontRoot}\n`);
 
 async function provisionFont(font) {
   const destinationPath = resolveFontPath(font.fileName);
-  if (existsSync(destinationPath) && await sha256(destinationPath) === normalizeHash(font.sha256)) {
+  cancellation.signal.throwIfAborted();
+  const expectedHash = normalizeHash(font.sha256);
+  if (existsSync(destinationPath) && await fileSha256(destinationPath, { signal: cancellation.signal }) === expectedHash) {
     process.stdout.write(`  verified ${font.fileName}\n`);
     return;
   }
 
-  const temporaryPath = `${destinationPath}.download`;
-  await rm(temporaryPath, { force: true });
   process.stdout.write(`  downloading ${font.fileName}\n`);
-  const response = await fetch(font.url, { redirect: "follow" });
-  if (!response.ok) {
-    throw new Error(`Unable to download ${font.fileName}: HTTP ${response.status} ${response.statusText}`);
-  }
-
-  const bytes = Buffer.from(await response.arrayBuffer());
-  const actualHash = createHash("sha256").update(bytes).digest("hex").toUpperCase();
-  const expectedHash = normalizeHash(font.sha256);
-  if (actualHash !== expectedHash) {
-    throw new Error(`${font.fileName} SHA-256 mismatch. Expected ${expectedHash}, received ${actualHash}.`);
-  }
-
-  await writeFile(temporaryPath, bytes);
-  await rm(destinationPath, { force: true });
-  await rename(temporaryPath, destinationPath);
+  await downloadVerifiedFile(font.url, destinationPath, { sha256: expectedHash, maxBytes: 32 * 1024 * 1024, signal: cancellation.signal });
 }
 
 function resolveFontPath(fileName) {
@@ -52,10 +44,6 @@ function resolveFontPath(fileName) {
     throw new Error(`Invalid font file name in manifest: ${fileName}`);
   }
   return path.join(fontRoot, fileName);
-}
-
-async function sha256(filePath) {
-  return createHash("sha256").update(await readFile(filePath)).digest("hex").toUpperCase();
 }
 
 function normalizeHash(value) {

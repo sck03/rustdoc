@@ -54,7 +54,8 @@ pub(crate) fn build(q: &PersonnelQuery<'_>, pg: bool) -> Result<(QuerySql, Strin
                 "r.identity COLLATE \"C\" ASC, r.id ASC"
             } else {
                 "r.identity ASC, r.id ASC"
-            },
+            }
+            .into(),
             values,
         },
         sql::projection(q.fields, pg)?,

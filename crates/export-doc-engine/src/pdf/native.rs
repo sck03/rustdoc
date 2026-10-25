@@ -4,36 +4,7 @@
 //! project-specific path validation, capacity limits and error wording so the
 //! HTTP/Tauri callers and worker protocol remain unchanged.
 use pdfium_render::prelude::*;
-use std::{
-    io::{Cursor, Write},
-    path::Path,
-};
-
-#[derive(Default)]
-struct LimitedWriter {
-    bytes: Vec<u8>,
-    limit: usize,
-}
-
-impl Write for LimitedWriter {
-    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
-        let size = buffer.len();
-        if self
-            .bytes
-            .len()
-            .checked_add(size)
-            .is_none_or(|total| total > self.limit)
-        {
-            return Err(std::io::Error::other("PDF 输出超过容量上限。"));
-        }
-        self.bytes.extend_from_slice(buffer);
-        Ok(size)
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
+use std::{io::Cursor, path::Path};
 
 struct BoundPdfium {
     bindings: Box<dyn PdfiumLibraryBindings>,
@@ -55,9 +26,21 @@ impl BoundPdfium {
     }
 }
 
-pub struct Document {
-    pdfium: Box<Pdfium>,
-    bytes: Vec<u8>,
+pub struct Document<'a> {
+    inner: PdfDocument<'a>,
+}
+
+/// Keep the library, input bytes and document alive for exactly one worker operation.
+pub(super) fn with_document<T>(
+    bytes: &[u8],
+    path: &Path,
+    work: impl FnOnce(Document<'_>) -> Result<T, String>,
+) -> Result<T, String> {
+    let pdfium = BoundPdfium::open(path)?.into_pdfium();
+    let inner = pdfium
+        .load_pdf_from_byte_slice(bytes, None)
+        .map_err(|_| "PDF 已损坏、受密码保护或格式不受支持。".to_string())?;
+    work(Document { inner })
 }
 
 pub(super) fn merge(files: &[Vec<u8>], path: &Path, limit: usize) -> Result<Vec<u8>, String> {
@@ -103,7 +86,7 @@ pub(super) fn merge(files: &[Vec<u8>], path: &Path, limit: usize) -> Result<Vec<
             .map_err(|_| "PDF 页面合并失败。".to_string())?;
         pages += count;
     }
-    let mut writer = LimitedWriter {
+    let mut writer = crate::bounded_bytes::BoundedBytes {
         bytes: Vec::new(),
         limit,
     };
@@ -117,27 +100,9 @@ pub(super) fn merge(files: &[Vec<u8>], path: &Path, limit: usize) -> Result<Vec<
     Ok(bytes)
 }
 
-impl Document {
-    pub fn open(bytes: &[u8], path: &Path) -> Result<Self, String> {
-        let pdfium = Box::new(BoundPdfium::open(path)?.into_pdfium());
-        pdfium
-            .load_pdf_from_byte_slice(bytes, None)
-            .map_err(|_| "PDF 已损坏、受密码保护或格式不受支持。".to_string())?;
-        Ok(Self {
-            pdfium,
-            bytes: bytes.to_vec(),
-        })
-    }
-
-    fn document(&self) -> Result<PdfDocument<'_>, String> {
-        self.pdfium
-            .load_pdf_from_byte_slice(&self.bytes, None)
-            .map_err(|_| "PDF 已损坏、受密码保护或格式不受支持。".into())
-    }
-
+impl Document<'_> {
     pub fn count(&self) -> Result<u32, String> {
-        let document = self.document()?;
-        let count = document.pages().len() as u32;
+        let count = self.inner.pages().len() as u32;
         if count == 0 {
             return Err("PDF 没有可读取页面。".into());
         }
@@ -163,12 +128,9 @@ impl Document {
             text: String::new(),
             raster_pixels: 0,
         };
+        let pages = self.inner.pages();
+        let mut text_length = 0;
         for index in 0..count {
-            let document = self.document()?;
-            let pages = document.pages();
-            if index >= pages.len() as u32 {
-                return Err("PDF 页码超出范围。".into());
-            }
             let page = pages
                 .get(index as PdfPageIndex)
                 .map_err(|_| "PDF 页面无法读取。".to_string())?;
@@ -188,10 +150,13 @@ impl Document {
             if !content.trim().is_empty() {
                 if !result.text.is_empty() {
                     result.text.push_str("\n\n");
+                    text_length += 2;
                 }
-                result.text.push_str(content.trim());
+                let content = content.trim();
+                text_length += content.chars().count();
+                result.text.push_str(content);
             }
-            if result.text.chars().count() > 500_000 {
+            if text_length > 500_000 {
                 return Err("信用证文本超过 50 万字。".into());
             }
         }
@@ -210,8 +175,7 @@ impl Document {
     }
 
     pub fn render(&self, index: u32, for_ocr: bool) -> Result<super::PdfPageImage, String> {
-        let document = self.document()?;
-        let pages = document.pages();
+        let pages = self.inner.pages();
         if index >= pages.len() as u32 {
             return Err("PDF 页码超出范围。".into());
         }

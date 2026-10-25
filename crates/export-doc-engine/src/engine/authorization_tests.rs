@@ -55,17 +55,32 @@ fn exact_product_lookup_is_independent_of_fuzzy_pages_and_keeps_visibility() {
         records::list(&service.store, &admin, resource, LIST_PRODUCTS, &query, &[]).unwrap();
     assert_eq!(exact["totalCount"], 1);
     assert_eq!(exact["items"][0]["productCode"], "ÉX-1");
-    let other_company = store::Actor {
-        admin: false,
-        company: "OTHER".into(),
-        grants: vec![
-            json!({"resourceKey":"common.product-reference","action":"view","dataScope":"company"}),
-        ],
-        ..admin.clone()
-    };
+    let account = accounts::save(
+        &service.store,
+        &admin,
+        0,
+        json!({
+            "username":"product-reader", "fullName":"商品阅览员", "role":"User",
+            "companyScope":"DEFAULT", "departmentId":"GENERAL", "isActive":true,
+            "resetPassword":"Product-Test-2026", "permissionGrants":[
+                {"resourceKey":"document.master-data","action":"view","dataScope":"own"}
+            ]
+        }),
+    )
+    .unwrap()["user"]
+        .clone();
+    let own_reader = auth::current_actor(&service.store, account["id"].as_i64().unwrap()).unwrap();
+    assert!(
+        own_reader
+            .grants
+            .iter()
+            .any(|grant| grant["resourceKey"] == "common.product-reference"
+                && grant["action"] == "view"
+                && grant["dataScope"] == "own")
+    );
     let hidden = records::list(
         &service.store,
-        &other_company,
+        &own_reader,
         resource,
         LIST_PRODUCTS,
         &query,
@@ -74,6 +89,23 @@ fn exact_product_lookup_is_independent_of_fuzzy_pages_and_keeps_visibility() {
     .unwrap();
     assert_eq!(hidden["totalCount"], 0);
     assert_eq!(hidden["items"], json!([]));
+    let mut revoked = account;
+    revoked["expectedVersion"] = revoked["versionNumber"].clone();
+    revoked["permissionGrants"] = json!([]);
+    accounts::save(&service.store, &admin, own_reader.id, revoked).unwrap();
+    assert_eq!(
+        records::list(
+            &service.store,
+            &own_reader,
+            resource,
+            LIST_PRODUCTS,
+            &query,
+            &[]
+        )
+        .unwrap_err()
+        .status,
+        Some(403)
+    );
     service.close().unwrap();
     drop(service);
     std::fs::remove_dir_all(root).unwrap();
@@ -96,6 +128,36 @@ fn queued_writes_refresh_permissions_before_the_transaction() {
                 .status,
             Some(403)
         );
+    }
+    #[cfg(feature = "excel")]
+    {
+        for operation in [
+            IMPORT_CRM_CUSTOMERS,
+            IMPORT_SUPPLIERS,
+            EXPORT_CRM_CUSTOMERS,
+            EXPORT_SUPPLIERS,
+        ] {
+            assert_eq!(
+                party_files::handle(&service, &stale, operation, &[], &json!({}))
+                    .unwrap_err()
+                    .status,
+                Some(403)
+            );
+        }
+        for operation in [PREVIEW_CRM_CUSTOMER_IMPORT, PREVIEW_SUPPLIER_IMPORT] {
+            assert_eq!(
+                party_files::upload(
+                    &service,
+                    &stale,
+                    operation,
+                    "party.csv",
+                    "客户名称,供应商名称\n客户,供应商".as_bytes()
+                )
+                .unwrap_err()
+                .status,
+                Some(403)
+            );
+        }
     }
     assert_eq!(
         packing::handle(
@@ -169,6 +231,54 @@ fn queued_writes_refresh_permissions_before_the_transaction() {
         .unwrap_err()
         .status,
         Some(403)
+    );
+    service.close().unwrap();
+    drop(service);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn existing_dangling_opportunity_product_links_fail_instead_of_returning_empty_product_data() {
+    let (root, service, admin) = fixture();
+    service
+        .store
+        .transaction(|tx| {
+            let customer = store::save(
+                tx,
+                "crm-customers",
+                0,
+                json!({"name":"遗留关联客户"}),
+                None,
+                &admin,
+                "create",
+            )?;
+            let mut row = contracts::initial(contracts::schema("ApiSalesOpportunityDto"));
+            row["crmCustomerId"] = customer["id"].clone();
+            row["productId"] = json!(i64::MAX);
+            row["stage"] = json!("线索");
+            row["expectedCloseDate"] = json!("2026-12-15");
+            store::save(tx, "opportunities", 0, row, None, &admin, "create")?;
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(
+        sales::handle(
+            &service.store,
+            &admin,
+            QUERY_SALES_OPPORTUNITIES,
+            &[],
+            &[],
+            &json!({})
+        )
+        .unwrap_err()
+        .status,
+        Some(404)
+    );
+    assert_eq!(
+        crm_dashboard::query(&service.store, &admin, &service.clock)
+            .unwrap_err()
+            .status,
+        Some(404)
     );
     service.close().unwrap();
     drop(service);

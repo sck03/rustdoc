@@ -52,7 +52,7 @@ export function useServerDraftSync<T>({
     const incomingFingerprint = fingerprintRef.current(incomingValue);
     const applied = appliedRef.current;
     const isFirstValueForResource = !applied || applied.resourceKey !== normalizedResourceKey;
-    if (!isFirstValueForResource && persistedValue != null && fingerprintRef.current(persistedValue) === incomingFingerprint) {
+    if (persistedValue != null && fingerprintRef.current(persistedValue) === incomingFingerprint) {
       appliedRef.current = { resourceKey: normalizedResourceKey, fingerprint: incomingFingerprint };
       acknowledgedRef.current = null; setPending(null); return;
     }

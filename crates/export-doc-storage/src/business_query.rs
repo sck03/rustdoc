@@ -300,7 +300,7 @@ pub(crate) fn build(q: &BusinessQuery<'_>, pg: bool) -> Result<(QuerySql, String
     Ok((
         QuerySql {
             filter: clauses.join(" AND "),
-            order,
+            order: order.into(),
             values,
         },
         sql::projection(q.fields, pg)?,

@@ -29,6 +29,7 @@ if ($outputFullPath -eq [System.IO.Path]::GetPathRoot($outputFullPath) -or (Test
 }
 Assert-NativePackagePath -Path $outputFullPath
 $packageMarkerPath = Join-Path $outputFullPath 'exportdoc-native-web-server.json'
+Assert-NativePackagePath -Path $packageMarkerPath -File
 if (Test-Path -LiteralPath $outputFullPath) {
     if (Test-Path -LiteralPath $packageMarkerPath -PathType Leaf) {
         $existing = Get-Content -LiteralPath $packageMarkerPath -Raw | ConvertFrom-Json

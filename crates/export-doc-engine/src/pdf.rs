@@ -108,12 +108,13 @@ pub fn worker_args(args: &[String]) -> Option<Result<(), String>> {
         if bytes.len() > 25 * 1024 * 1024 || !bytes.starts_with(b"%PDF-") {
             return Err("无效或超限的 PDF 输入。".into());
         }
-        let document = native::Document::open(&bytes, library)?;
-        let output = if mode == "--pdf-text-worker" {
-            serde_json::to_vec(&document.extract()?).map_err(|e| e.to_string())?
-        } else {
-            document.render(index, true)?.png
-        };
+        let output = native::with_document(&bytes, library, |document| {
+            if mode == "--pdf-text-worker" {
+                serde_json::to_vec(&document.extract()?).map_err(|e| e.to_string())
+            } else {
+                Ok(document.render(index, true)?.png)
+            }
+        })?;
         std::io::stdout()
             .write_all(&output)
             .and_then(|_| std::io::stdout().flush())
@@ -199,7 +200,9 @@ pub fn worker(pdfium_path: &Path, page_index: u32) -> Result<(), String> {
     if pdf.len() as u64 > crate::jobs::PDF_LIMIT || !pdf.starts_with(b"%PDF-") {
         return Err("无效或超限的 PDF 输入。".into());
     }
-    let page = native::Document::open(&pdf, pdfium_path)?.render(page_index, false)?;
+    let page = native::with_document(&pdf, pdfium_path, |document| {
+        document.render(page_index, false)
+    })?;
     let mut stdout = std::io::stdout().lock();
     for value in [page.width, page.height, page.page_count, page.page_index] {
         stdout

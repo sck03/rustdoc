@@ -12,6 +12,7 @@ type BusinessDateSessionRefreshOptions = {
   session: WebSessionState | null;
   sessionRef: { current: WebSessionState | null };
   setSession: (session: WebSessionState) => void;
+  validatedUserTokenRef: { current: string | undefined };
 };
 
 export function useBusinessDateSessionRefresh({
@@ -21,17 +22,17 @@ export function useBusinessDateSessionRefresh({
   session,
   sessionRef,
   setSession,
+  validatedUserTokenRef,
 }: BusinessDateSessionRefreshOptions) {
-  const activeRefreshRef = useRef<Promise<void> | null>(null);
-  const skipInitialRefreshRef = useRef(true);
+  const activeRefreshRef = useRef<{ accessToken: string; promise: Promise<void> } | null>(null);
   const accessToken = session?.accessToken;
 
   const refreshCurrentUser = useCallback(() => {
     if (!accessToken || desktopContextLoading) {
       return Promise.resolve();
     }
-    if (activeRefreshRef.current) {
-      return activeRefreshRef.current;
+    if (activeRefreshRef.current?.accessToken === accessToken) {
+      return activeRefreshRef.current.promise;
     }
 
     const refresh = client.getCurrentUser()
@@ -51,25 +52,20 @@ export function useBusinessDateSessionRefresh({
         if (sessionRef.current?.accessToken === accessToken) notifyAuthenticationFailure(error);
       })
       .finally(() => {
-        if (activeRefreshRef.current === refresh) {
+        if (activeRefreshRef.current?.promise === refresh) {
           activeRefreshRef.current = null;
         }
       });
-    activeRefreshRef.current = refresh;
+    activeRefreshRef.current = { accessToken, promise: refresh };
     return refresh;
   }, [accessToken, client, desktopContextLoading, queryClient, sessionRef, setSession]);
 
   useEffect(() => {
-    // The login response and desktop context already include the user object,
-    // so skip the immediate refresh on first mount to avoid a redundant
-    // /api/auth/me round-trip that delays the initial dashboard render.
-    // Subsequent mount changes (token rotation, reconnection) still refresh.
-    if (skipInitialRefreshRef.current) {
-      skipInitialRefreshRef.current = false;
-      return;
-    }
+    // Login/renewal responses contain a fresh user. Restored sessions still
+    // refresh once, and visibility/online/business-date events refresh below.
+    if (validatedUserTokenRef.current === accessToken) return;
     void refreshCurrentUser();
-  }, [refreshCurrentUser]);
+  }, [accessToken, refreshCurrentUser, validatedUserTokenRef]);
 
   useEffect(() => {
     if (!accessToken || desktopContextLoading) {
