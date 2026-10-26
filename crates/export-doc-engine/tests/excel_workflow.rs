@@ -4,10 +4,11 @@ use export_doc_engine::{
     contracts,
     generated_api::*,
     invoice::InvoiceDraft,
-    jobs,
     paths::{RuntimePaths, nonce},
 };
 use serde_json::{Value, json};
+#[path = "support/jobs.rs"]
+pub mod jobs;
 use std::{fs, path::PathBuf, sync::atomic::AtomicBool};
 
 #[test]

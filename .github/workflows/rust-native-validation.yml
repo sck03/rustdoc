@@ -23,6 +23,7 @@ on:
       - tests/ReportTemplateFixtures/**
       - third_party/**
       - scripts/test_editor_state_regressions_ui.mjs
+      - scripts/test_packing_credit_workspace_ui.mjs
       - scripts/test_native_*.mjs
       - scripts/lib/native-*.ps1
       - scripts/lib/*support*.ps1

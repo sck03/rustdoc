@@ -2,7 +2,9 @@
 #[path = "support/native_fixture.rs"]
 #[allow(dead_code)]
 mod native_fixture;
-use export_doc_engine::{generated_api::*, invoice::InvoiceDraft, jobs};
+use export_doc_engine::{generated_api::*, invoice::InvoiceDraft};
+#[path = "support/jobs.rs"]
+pub mod jobs;
 use serde_json::{Value, json};
 use std::{
     io::{Cursor, Read, Write},

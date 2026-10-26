@@ -95,6 +95,7 @@ export function MasterDataField({
   if (field.pathPicker) {
     return (
       <ExporterSealField
+        scopeKey={`${record.id}:${record.versionNumber}:${field.name}`}
         inputReadOnly
         actionDisabled={disabled || pathActionDisabled}
         actionTitle={pathActionTitle}

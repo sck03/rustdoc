@@ -69,9 +69,9 @@ mod tests {
     use std::fs;
 
     struct Fixture {
-        root: std::path::PathBuf,
         store: Store,
         actor: Actor,
+        _root: crate::test_support::ScratchDirectory,
     }
     impl Fixture {
         fn new() -> Self {
@@ -133,12 +133,11 @@ mod tests {
                 )
                 .unwrap();
             }
-            Self { root, store, actor }
-        }
-    }
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.root);
+            Self {
+                store,
+                actor,
+                _root: crate::test_support::ScratchDirectory(root),
+            }
         }
     }
 

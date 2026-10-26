@@ -213,13 +213,16 @@ fn sanitize_http_url(value: &str) -> String {
 mod tests {
     use super::*;
     use crate::desktop_file_dialog_commands::{
-        MAX_EXPORTER_SEAL_IMAGE_BYTES, is_existing_directory_candidate,
-        read_exporter_seal_image_file_as_data_url,
+        MAX_EXPORTER_SEAL_IMAGE_BYTES, is_existing_directory_candidate, read_seal_image_file,
     };
     use crate::desktop_open_commands::{build_open_command, open_path, resolve_open_path_target};
     use base64::{Engine as _, engine::general_purpose::STANDARD};
     use std::ffi::OsString;
     use std::path::PathBuf;
+
+    fn seal_png() -> Vec<u8> {
+        STANDARD.decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==").unwrap()
+    }
 
     #[test]
     fn frontend_log_fields_remove_credentials_and_personal_paths() {
@@ -262,23 +265,19 @@ mod tests {
     fn exporter_seal_reader_accepts_managed_upload_formats() {
         let data_root = fresh_desktop_command_test_dir("read-exporter-seal");
         let png_path = data_root.join("boen-baoguan.png");
-        let png_bytes = STANDARD
-            .decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAFgQIAQbT2ZQAAAABJRU5ErkJggg==")
-            .unwrap();
-        fs::write(&png_path, png_bytes).unwrap();
+        let png_bytes = seal_png();
+        fs::write(&png_path, &png_bytes).unwrap();
 
-        let data_url =
-            read_exporter_seal_image_file_as_data_url(png_path.to_string_lossy().into_owned())
-                .unwrap();
+        let bytes = read_seal_image_file(png_path.to_string_lossy().into_owned()).unwrap();
 
-        assert!(data_url.starts_with("data:image/png;base64,"));
+        assert_eq!(bytes, png_bytes);
         let _ = fs::remove_dir_all(data_root);
     }
 
     #[test]
     fn exporter_seal_reader_rejects_blank_oversized_and_mismatched_files() {
         assert!(
-            read_exporter_seal_image_file_as_data_url("   ".to_owned())
+            read_seal_image_file("   ".to_owned())
                 .unwrap_err()
                 .contains("路径不能为空")
         );
@@ -291,25 +290,17 @@ mod tests {
         )
         .unwrap();
         assert!(
-            read_exporter_seal_image_file_as_data_url(
-                oversized_path.to_string_lossy().into_owned(),
-            )
-            .unwrap_err()
-            .contains("不能超过 5 MB")
+            read_seal_image_file(oversized_path.to_string_lossy().into_owned(),)
+                .unwrap_err()
+                .contains("容量")
         );
 
         let mismatched_path = data_root.join("renamed.jpg");
-        fs::write(
-            &mismatched_path,
-            [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
-        )
-        .unwrap();
+        fs::write(&mismatched_path, seal_png()).unwrap();
         assert!(
-            read_exporter_seal_image_file_as_data_url(
-                mismatched_path.to_string_lossy().into_owned(),
-            )
-            .unwrap_err()
-            .contains("扩展名与实际图片格式不一致")
+            read_seal_image_file(mismatched_path.to_string_lossy().into_owned(),)
+                .unwrap_err()
+                .contains("扩展名与实际图片格式不一致")
         );
 
         let _ = fs::remove_dir_all(data_root);

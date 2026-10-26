@@ -66,6 +66,16 @@ for (const edition of selected) {
     assert(await run("!!document.querySelector('input[autocomplete=username]')"), `${edition}: login missing`);
     const context = await run("window.__TAURI_INTERNALS__.invoke('get_desktop_runtime_context')");
     assert.equal(context.productEdition, edition);
+    const sealBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64');
+    const sealPath = path.join(output, `${edition}-seal.png`);
+    fs.writeFileSync(sealPath, sealBytes);
+    const sealResponse = await run(`(async()=>{const bytes=await window.__TAURI_INTERNALS__.invoke('read_exporter_seal_image_file',{path:${JSON.stringify(sealPath)}});return {binary:bytes instanceof ArrayBuffer,bytes:Array.from(new Uint8Array(bytes))};})()`);
+    assert.equal(sealResponse.binary, true, 'seal IPC must return raw bytes');
+    assert.deepEqual(sealResponse.bytes, [...sealBytes]);
+    const mismatchedSeal = path.join(output, `${edition}-seal.jpg`);
+    fs.writeFileSync(mismatchedSeal, sealBytes);
+    const sealError = await run(`window.__TAURI_INTERNALS__.invoke('read_exporter_seal_image_file',{path:${JSON.stringify(mismatchedSeal)}}).then(()=>'',error=>String(error))`);
+    assert.match(sealError, /扩展名与实际图片格式不一致/);
     const request = async (id, token, body, parameters = {}) => {
       const operation = operations.get(id);
       assert(operation, `Unknown contract operation: ${id}`);

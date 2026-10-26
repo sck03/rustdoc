@@ -21,6 +21,8 @@ pub(super) fn username_key(username: &str) -> Result<String> {
 }
 
 pub(super) const ITERATIONS: u32 = 600_000;
+const MAX_USER_SESSIONS: usize = 32;
+const MAX_SESSIONS: usize = 4096;
 pub struct Sessions {
     values: Mutex<HashMap<String, (i64, chrono::DateTime<Utc>, (i64, i64))>>,
     attempts: Mutex<HashMap<String, (u32, Instant)>>,
@@ -193,22 +195,32 @@ impl Sessions {
             }
             session_version_in(tx, &current)
         })?;
+        let expires = Utc::now() + Duration::hours(12);
+        let user = user_dto(store, &record, clock)?;
+        let token = self.issue(record["id"].as_i64().unwrap_or(0), expires, version)?;
+        Ok(
+            json!({"accessToken":token,"tokenType":"Bearer","expiresAt":expires.to_rfc3339(),"expiresAtUtc":expires.to_rfc3339(),"user":user}),
+        )
+    }
+    fn issue(
+        &self,
+        user_id: i64,
+        expires: chrono::DateTime<Utc>,
+        version: (i64, i64),
+    ) -> Result<String> {
         let token = nonce().map_err(unavailable)? + &nonce().map_err(unavailable)?;
-        let now = Utc::now();
-        let expires = now + Duration::hours(12);
         let mut values = self
             .values
             .lock()
             .map_err(|_| unavailable("会话状态异常。"))?;
-        values.retain(|_, (_, deadline, _)| *deadline > now);
-        values.insert(
-            token.clone(),
-            (record["id"].as_i64().unwrap_or(0), expires, version),
-        );
-        drop(values);
-        Ok(
-            json!({"accessToken":token,"tokenType":"Bearer","expiresAt":expires.to_rfc3339(),"expiresAtUtc":expires.to_rfc3339(),"user":user_dto(store,&record,clock)?}),
-        )
+        values.retain(|_, (_, deadline, _)| *deadline > Utc::now());
+        if values.len() >= MAX_SESSIONS
+            || values.values().filter(|(id, _, _)| *id == user_id).count() >= MAX_USER_SESSIONS
+        {
+            return Err(error(429, "活跃会话数量已达上限，请退出已有会话后重试。"));
+        }
+        values.insert(token.clone(), (user_id, expires, version));
+        Ok(token)
     }
     pub fn actor(&self, store: &Store, token: &str) -> Result<Actor> {
         let (id, version) = self.identity(token)?;
@@ -285,6 +297,44 @@ fn expired_sessions_never_resolve_and_do_not_disturb_other_logins() {
     assert!(!sessions.values.lock().unwrap().contains_key("expired"));
     sessions.logout("active").unwrap();
     assert_eq!(sessions.identity("active").unwrap_err().status, Some(401));
+}
+
+#[test]
+fn session_capacity_preserves_existing_logins_and_recovers_after_logout_or_expiry() {
+    let sessions = Sessions::default();
+    let expires = Utc::now() + Duration::hours(12);
+    let tokens: Vec<_> = (0..MAX_USER_SESSIONS)
+        .map(|_| sessions.issue(7, expires, (1, 2)).unwrap())
+        .collect();
+    assert_eq!(
+        sessions.issue(7, expires, (1, 2)).unwrap_err().status,
+        Some(429)
+    );
+    assert_eq!(sessions.identity(&tokens[0]).unwrap(), (7, (1, 2)));
+    sessions.issue(8, expires, (1, 2)).unwrap();
+    sessions.logout(&tokens[0]).unwrap();
+    sessions.issue(7, expires, (1, 2)).unwrap();
+    sessions
+        .values
+        .lock()
+        .unwrap()
+        .get_mut(&tokens[1])
+        .unwrap()
+        .1 = Utc::now() - Duration::seconds(1);
+    sessions.issue(7, expires, (1, 2)).unwrap();
+    let mut values = sessions.values.lock().unwrap();
+    while values.len() < MAX_SESSIONS {
+        let index = values.len();
+        values.insert(
+            format!("capacity-{index}"),
+            (100 + index as i64, expires, (1, 2)),
+        );
+    }
+    drop(values);
+    assert_eq!(
+        sessions.issue(9, expires, (1, 2)).unwrap_err().status,
+        Some(429)
+    );
 }
 
 fn session_version(store: &Store, user: &Value) -> Result<(i64, i64)> {

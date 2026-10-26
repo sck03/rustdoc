@@ -5,7 +5,9 @@ pub use postgres::tools::{
     ClientParameters as PostgresClientParameters, MaintenanceLease as PostgresMaintenanceLease,
     client_parameters as postgres_client_parameters,
 };
+mod audit_query;
 mod business_query;
+pub use audit_query::AuditQuery;
 mod crm_query;
 pub use crm_query::{CrmList, CrmQuery};
 mod communication;
@@ -17,6 +19,8 @@ pub use import_preview_query::ImportPreviewUsage;
 mod job_query;
 pub use hs_query::HsQuery;
 mod office_query;
+mod ordered_query;
+pub use ordered_query::RecordOrder;
 mod personnel_query;
 pub use job_query::{JobOutputRetention, JobQuery, JobRetention};
 pub use office_query::OfficeQuery;
@@ -31,6 +35,7 @@ mod template_query;
 pub use generic_query::{DataScope, GenericQuery};
 pub mod maintenance;
 pub mod metrics;
+pub mod operation;
 pub mod pool;
 pub use template_query::{ReportTemplateQuery, TemplateAudience, TemplateVersionQuery};
 struct QuerySql {
@@ -169,6 +174,47 @@ pub struct Credential {
 
 /// All business operations use this semantic storage boundary, never provider SQL.
 trait Adapter: Send {
+    fn query_audits(&self, _query: &AuditQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "存储适配器不支持审计筛选分页。",
+        ))
+    }
+    fn query_ordered_records(
+        &self,
+        query: &GenericQuery<'_>,
+        order: RecordOrder,
+    ) -> Result<(i64, Vec<Value>)> {
+        let (sql, projection) =
+            ordered_query::build(query, order, self.provider() == "PostgreSQL")?;
+        self.query_page(&sql, &projection, query.offset, query.limit)
+    }
+    fn record_exists(&self, kind: &str, filters: &[(&str, String)]) -> Result<bool> {
+        let query = GenericQuery {
+            kind,
+            scope: DataScope {
+                all: true,
+                ..Default::default()
+            },
+            filters,
+            keyword: "",
+            search_root: None,
+            fields: &[("id", "id")],
+            offset: 0,
+            limit: 1,
+        };
+        let (sql, projection) = generic_query::build(&query, self.provider() == "PostgreSQL")?;
+        Ok(!self.query_slice(&sql, &projection, 0, 1)?.is_empty())
+    }
+    fn attachment_category_counts(
+        &self,
+        _company: &str,
+    ) -> Result<std::collections::BTreeMap<i64, i64>> {
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "存储适配器不支持附件分类统计。",
+        ))
+    }
     fn import_preview_usage(&self, _owner: i64) -> Result<ImportPreviewUsage> {
         Err(Error::new(
             ErrorKind::Unsupported,
@@ -448,7 +494,10 @@ impl Connection {
     }
     fn observed<T>(&self, operation: impl FnOnce(&dyn Adapter) -> Result<T>) -> Result<T> {
         let observation = self.metrics.start();
-        let result = self.health().and_then(|_| operation(&*self.adapter));
+        let result = operation::check()
+            .and_then(|_| self.health())
+            .and_then(|_| operation(&*self.adapter));
+        let result = operation::check().and(result);
         if self.adapter.is_closed() {
             self.failed.set(true);
         }
@@ -519,7 +568,7 @@ impl Connection {
         result
     }
     pub fn rollback(&self) -> Result<()> {
-        let result = self.adapter.rollback();
+        let result = operation::without_control(|| self.adapter.rollback());
         if result.is_err() {
             self.failed.set(true);
         } else {
@@ -547,6 +596,10 @@ impl Connection {
     }
 }
 delegate! {
+    query_audits(query:&AuditQuery<'_>)->(i64,Vec<Value>);
+    query_ordered_records(query:&GenericQuery<'_>,order:RecordOrder)->(i64,Vec<Value>);
+    record_exists(kind:&str,filters:&[(&str,String)])->bool;
+    attachment_category_counts(company:&str)->std::collections::BTreeMap<i64,i64>;
     import_preview_usage(owner:i64)->ImportPreviewUsage;
     expired_import_previews(before:&str)->Vec<Value>;
     query_hs(query:&HsQuery<'_>)->Vec<Value>;

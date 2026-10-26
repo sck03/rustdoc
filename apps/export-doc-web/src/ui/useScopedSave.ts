@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 /** Serializes a form's saves and rejects results after leaving its workspace. */
 export function useScopedSave(scope: string, owner: unknown) {
@@ -6,6 +6,9 @@ export function useScopedSave(scope: string, owner: unknown) {
   latest.current = { scope, owner };
   const active = useRef<{ controller: AbortController; scopes: Set<string>; owner: unknown } | null>(null);
   const [isSaving, setSaving] = useState(false);
+  const cancel = useCallback(() => {
+    active.current?.controller.abort(); active.current = null; setSaving(false);
+  }, []);
   useLayoutEffect(() => {
     if (active.current && (!active.current.scopes.has(scope) || active.current.owner !== owner)) {
       active.current.controller.abort(); active.current = null; setSaving(false);
@@ -29,5 +32,5 @@ export function useScopedSave(scope: string, owner: unknown) {
       if (active.current === pending) { active.current = null; setSaving(false); }
     }
   }
-  return { run, isSaving };
+  return { run, cancel, isSaving };
 }

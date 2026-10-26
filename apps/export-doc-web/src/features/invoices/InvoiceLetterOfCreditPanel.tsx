@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, FileText, ShieldCheck, Upload } from "lucide-react";
 import { ApiInvoiceDetailDto, ApiLetterOfCreditReviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -12,6 +12,7 @@ import { PathField, PathTextAreaField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { normalizeInvoiceForSave } from "./invoiceModel.ts";
+import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 type LetterOfCreditImportSource =
   | { kind: "desktop"; filePath: string }
@@ -44,12 +45,17 @@ export function InvoiceLetterOfCreditPanel({
   const [browserFile, setBrowserFile] = useState<File | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const desktopAvailable = isDesktopBridgeAvailable();
+  const scope = useMemo(() => ({ invoice, client }), [invoice, client]);
+  const latestScope = useRef(scope); latestScope.current = scope;
+  const run = useAbortableOperation(scope, { cancelPrevious: true });
+  const isCurrent = (submitted: typeof scope) => latestScope.current === submitted;
 
   const importMutation = useMutation({
-    mutationFn: (source: LetterOfCreditImportSource) => source.kind === "desktop"
-      ? client.importLetterOfCreditDocument({ body: { filePath: source.filePath } })
-      : client.uploadLetterOfCreditDocument({ fileName: source.file.name, body: source.file }),
-    onSuccess: (response) => {
+    mutationFn: ({ source }: { source: LetterOfCreditImportSource; scope: typeof scope }) => run(signal => source.kind === "desktop"
+      ? client.importLetterOfCreditDocument({ body: { filePath: source.filePath } }, { signal })
+      : client.uploadLetterOfCreditDocument({ fileName: source.file.name, body: source.file }, { signal })),
+    onSuccess: (response, submitted) => {
+      if (!isCurrent(submitted.scope)) return;
       onChange({
         letterOfCreditSourcePath: response.sourcePath,
         letterOfCreditContent: response.extractedText,
@@ -59,7 +65,8 @@ export function InvoiceLetterOfCreditPanel({
       setImportMessage(`信用证已导入：${response.sourceDescription}`);
       setImportMessageType("success");
     },
-    onError: (error) => {
+    onError: (error, submitted) => {
+      if (!isCurrent(submitted.scope) || isAbortError(error)) return;
       setImportMessage(readApiError(error));
       setImportMessageType("error");
       onClearPageMessages();
@@ -67,19 +74,21 @@ export function InvoiceLetterOfCreditPanel({
   });
 
   const reviewMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (submitted: typeof scope) => run(signal =>
       client.reviewLetterOfCreditCompliance({
         body: {
-          invoice: normalizeInvoiceForSave(invoice, invoice.id ?? 0),
+          invoice: normalizeInvoiceForSave(submitted.invoice, submitted.invoice.id ?? 0),
         },
-      }),
-    onSuccess: (response) => {
+      }, { signal })),
+    onSuccess: (response, submitted) => {
+      if (!isCurrent(submitted)) return;
       setReviewResult(response);
       setReviewMessage(null);
       onClearPageMessages();
       clearImportMessage();
     },
-    onError: (error) => {
+    onError: (error, submitted) => {
+      if (!isCurrent(submitted) || isAbortError(error)) return;
       setReviewResult(null);
       setReviewMessage(readApiError(error));
       onClearPageMessages();
@@ -112,7 +121,10 @@ export function InvoiceLetterOfCreditPanel({
     setBrowserFile(null);
     clearImportMessage();
     clearReviewState();
-  }, [invoice.id]);
+    importMutation.reset(); reviewMutation.reset();
+  }, [invoice.id, client]);
+
+  useEffect(() => { clearReviewState(); }, [scope]);
 
   function clearImportMessage() {
     setImportMessage(null);
@@ -145,7 +157,9 @@ export function InvoiceLetterOfCreditPanel({
     }
 
     try {
-      const selected = await selectLetterOfCreditFile();
+      const submitted = scope;
+      const selected = await run(() => selectLetterOfCreditFile());
+      if (!isCurrent(submitted)) return;
       if (selected) {
         setBrowserFile(null);
         onChange({ letterOfCreditSourcePath: selected });
@@ -153,12 +167,13 @@ export function InvoiceLetterOfCreditPanel({
         clearImportMessage();
       }
     } catch (error) {
+      if (isAbortError(error)) return;
       showImportError(readDesktopError(error));
     }
   }
 
   function importLetterOfCredit() {
-    if (disabled) {
+    if (disabled || isImporting || isReviewing) {
       return;
     }
 
@@ -171,7 +186,7 @@ export function InvoiceLetterOfCreditPanel({
         return;
       }
 
-      importMutation.mutate({ kind: "desktop", filePath });
+      importMutation.mutate({ source: { kind: "desktop", filePath }, scope });
       return;
     }
 
@@ -185,7 +200,7 @@ export function InvoiceLetterOfCreditPanel({
       return;
     }
 
-    importMutation.mutate({ kind: "browser", file: browserFile });
+    importMutation.mutate({ source: { kind: "browser", file: browserFile }, scope });
   }
 
   function selectBrowserFile(file: File | null) {
@@ -223,7 +238,7 @@ export function InvoiceLetterOfCreditPanel({
     onClearPageMessages();
     clearImportMessage();
     setReviewMessage(null);
-    reviewMutation.mutate();
+    reviewMutation.mutate(scope);
   }
 
   return (

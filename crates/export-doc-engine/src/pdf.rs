@@ -19,6 +19,7 @@ pub struct PdfPageImage {
     pub page_index: u32,
 }
 pub(super) const PREVIEW_LIMIT: u64 = 16 * 1024 * 1024;
+pub const PDF_LIMIT: u64 = 64 * 1024 * 1024;
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -194,10 +195,10 @@ pub fn worker(pdfium_path: &Path, page_index: u32) -> Result<(), String> {
     ensure_safe_absolute(pdfium_path)?;
     let mut pdf = vec![];
     std::io::stdin()
-        .take(crate::jobs::PDF_LIMIT + 1)
+        .take(PDF_LIMIT + 1)
         .read_to_end(&mut pdf)
         .map_err(|error| error.to_string())?;
-    if pdf.len() as u64 > crate::jobs::PDF_LIMIT || !pdf.starts_with(b"%PDF-") {
+    if pdf.len() as u64 > PDF_LIMIT || !pdf.starts_with(b"%PDF-") {
         return Err("无效或超限的 PDF 输入。".into());
     }
     let page = native::with_document(&pdf, pdfium_path, |document| {

@@ -8,6 +8,24 @@ use std::{
 use unicode_normalization::UnicodeNormalization;
 
 pub const DOCUMENT_LIMIT: usize = 10 * 1024 * 1024;
+pub const SEAL_LIMIT: usize = 5 * 1024 * 1024;
+
+pub fn read_seal_image(path: &Path) -> Result<Vec<u8>> {
+    let bytes = read_local(path, SEAL_LIMIT)?;
+    let media = image_type(&bytes, SEAL_LIMIT)?;
+    let extension = path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !match media {
+        "image/png" => extension == "png",
+        _ => matches!(extension.as_str(), "jpg" | "jpeg"),
+    } {
+        return Err(invalid("印章图片扩展名与实际图片格式不一致。"));
+    }
+    Ok(bytes)
+}
 
 /// Shared evidence-file validation for personnel and office requests.
 pub fn document_type(file_name: &str, bytes: &[u8]) -> Result<(String, &'static str)> {

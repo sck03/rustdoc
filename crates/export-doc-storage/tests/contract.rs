@@ -11,6 +11,8 @@ mod crm_query;
 mod import_preview_query;
 #[path = "support/integrity_query.rs"]
 mod integrity_query;
+#[path = "support/maintenance_query.rs"]
+mod maintenance_query;
 #[path = "support/office_query.rs"]
 mod office_query;
 #[path = "support/personnel_query.rs"]
@@ -80,6 +82,7 @@ fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
 }
 
 fn roundtrip(connection: &Connection) {
+    maintenance_query::exercise(connection);
     integrity_query::exercise(connection);
     related_query::exercise(connection);
     import_preview_query::exercise(connection);

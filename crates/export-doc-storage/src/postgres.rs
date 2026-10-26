@@ -194,6 +194,37 @@ pub fn initialize(connection_string: &str, owner: &str) -> Result<()> {
     validate_schema(&mut client)
 }
 impl Adapter for Postgres {
+    fn query_audits(&self, query: &AuditQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let (sql, projection) = audit_query::build(query, true);
+        let count = if query.count_all {
+            format!("(SELECT COUNT(*) FROM audit_logs r WHERE {})", sql.filter)
+        } else {
+            "0::bigint".into()
+        };
+        let statement = format!(
+            "SELECT {count},COALESCE((SELECT jsonb_agg(page.body) FROM (SELECT {projection} AS body FROM audit_logs r WHERE {filter} ORDER BY {order} LIMIT {limit} OFFSET {offset}) page),'[]'::jsonb)::text",
+            filter = sql.filter,
+            order = sql.order,
+            limit = query.limit.clamp(1, 200_000),
+            offset = query.offset.max(0)
+        );
+        let parameters: Vec<&(dyn ::postgres::types::ToSql + Sync)> =
+            sql.values.iter().map(|value| value as _).collect();
+        let row = self
+            .client
+            .borrow_mut()
+            .query_one(&statement, &parameters)?;
+        Ok((
+            row.try_get(0)?,
+            serde_json::from_str(&row.try_get::<_, String>(1)?)?,
+        ))
+    }
+    fn attachment_category_counts(
+        &self,
+        company: &str,
+    ) -> Result<std::collections::BTreeMap<i64, i64>> {
+        self.client.borrow_mut().query("SELECT c.id,COUNT(*) FROM records a JOIN records c ON c.id=CAST(a.body->>'categoryId' AS BIGINT) AND c.kind='attachment-categories' WHERE a.kind='attachments' AND c.company=$1 GROUP BY c.id", &[&company])?.into_iter().map(|row| Ok((row.try_get(0)?, row.try_get(1)?))).collect()
+    }
     fn import_preview_usage(&self, owner: i64) -> Result<ImportPreviewUsage> {
         let row = self
             .client

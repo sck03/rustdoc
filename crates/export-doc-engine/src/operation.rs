@@ -40,7 +40,8 @@ impl OperationScope {
             }
         }
         let restore = Restore(CURRENT.with(|current| current.replace(Some(self.clone()))));
-        let result = operation();
+        let result =
+            export_doc_storage::operation::run(self.cancelled.clone(), self.deadline, operation);
         drop(restore);
         result
     }

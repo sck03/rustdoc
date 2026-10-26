@@ -77,7 +77,7 @@ pub fn history(
         _ => ("supply-requests", "office.supplies", "view"),
     };
     auth::authorize(actor, permission, action)?;
-    store.transaction(|tx| {
+    store.read_for(actor, operation, query, |tx, actor| {
         let record = store::get(tx, kind, id)?;
         let allowed = super::handling::resource_access(
             tx,
@@ -91,27 +91,46 @@ pub fn history(
             return Err(error(403, "没有查看这项记录历史的权限。"));
         }
         let stock = operation == GET_OFFICE_STOCK_HISTORY;
-        let mut events: Vec<_> = store::all(
-            tx,
-            if stock {
-                "stock-movements"
-            } else {
-                "office-events"
-            },
-        )?
-        .into_iter()
-        .filter(|event| {
-            event["companyScope"] == actor.company
-                && if stock {
-                    event["officeSupplyId"] == id
+        let mut filters = vec![("companyScope", actor.company.clone())];
+        if stock {
+            filters.push(("officeSupplyId", id.to_string()));
+        } else {
+            filters.extend([("requestKind", kind.into()), ("requestId", id.to_string())]);
+        }
+        if let Some((_, status)) = query
+            .iter()
+            .find(|(key, value)| *key == "status" && !value.is_empty())
+        {
+            filters.push(("status", status.clone()));
+        }
+        let keyword = store::normalize(
+            query
+                .iter()
+                .find(|(key, _)| *key == "keyword")
+                .map(|(_, value)| value.as_str())
+                .unwrap_or(""),
+        );
+        let (page, size, offset) = store::page_parameters(query);
+        let (total, events) = tx.query_ordered_records(
+            &export_doc_storage::GenericQuery {
+                kind: if stock {
+                    "stock-movements"
                 } else {
-                    event["requestKind"] == kind && event["requestId"] == id
-                }
-        })
-        .collect();
-        events.sort_by_key(|event| {
-            std::cmp::Reverse((text(event, "createdAt"), event["id"].as_i64()))
-        });
-        Ok(store::paged(events, query))
+                    "office-events"
+                },
+                scope: export_doc_storage::DataScope {
+                    all: true,
+                    ..Default::default()
+                },
+                filters: &filters,
+                keyword: &keyword,
+                search_root: None,
+                fields: &[],
+                offset,
+                limit: size as i64,
+            },
+            export_doc_storage::RecordOrder::CreatedDescending,
+        )?;
+        Ok(crate::contracts::page(events, total as usize, page, size))
     })
 }

@@ -9,7 +9,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ApiContainerPackingAnalyzeRequest,
   ApiContainerPackingAnalyzeResponse,
-  ApiContainerPackingProjectDto,
 } from "../../../api/index.ts";
 import { ExportDocManagerApiClient } from "../../../api/index.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
@@ -23,20 +22,18 @@ import {
   type ContainerPackingRenderModeValue,
   type ContainerPackingRulesFormState,
   buildContainerPackingAnalyzeRequest,
-  buildContainerPackingProjectSaveRequest,
   buildContainerPackingStatusText,
   containerPackingAutoRefreshDebounceMs,
   createContainerPackingCargoRow,
   findContainerType,
   formatFormNumber,
   isValidContainerPackingCargoRow,
-  normalizeContainerPackingZone,
   readNonNegativeNumberInput,
   readPositiveIntegerInput,
   readPositiveNumberInput,
-  signedArgbToColorHex,
 } from "./containerPackingModel.ts";
 import { ContainerPackingWorkspace } from "./ContainerPackingWorkspace.tsx";
+import { useContainerPackingProjects } from "./useContainerPackingProjects.ts";
 
 export function ContainerPackingPanel({
   client,
@@ -49,41 +46,6 @@ export function ContainerPackingPanel({
 }) {
   const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
-  const [currentProjectId, setCurrentProjectId] = useState(0);
-  const [currentProjectVersion, setCurrentProjectVersion] = useState(0);
-  const [projectName, setProjectName] = useState("未命名方案");
-  const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [container, setContainer] = useState<ContainerPackingFormState>({
-    containerType: "20GP",
-    length: "589",
-    width: "235",
-    height: "239",
-    volume: "33.2",
-    maxWeight: "28000",
-  });
-  const [rules, setRules] = useState<ContainerPackingRulesFormState>({
-    allowRotation: true,
-    usePalletConstraints: false,
-    defaultPalletLength: "120",
-    defaultPalletWidth: "100",
-    defaultPalletHeight: "15",
-    defaultPalletWeight: "25",
-    enforceCenterOfGravity: false,
-    centerOfGravityTolerancePercent: "20",
-    minimumSupportAreaPercent: "100",
-    requireSameFootprintStacking: false,
-  });
-  const [cargoRows, setCargoRows] = useState<ContainerPackingCargoRow[]>(() => [
-    createContainerPackingCargoRow(0, {
-      name: "纸箱",
-      length: "60",
-      width: "40",
-      height: "40",
-      weight: "10",
-      quantity: "50",
-      preferredZone: "Auto",
-    }),
-  ]);
   const [response, setResponse] =
     useState<ApiContainerPackingAnalyzeResponse | null>(null);
   const [analysisDimensions, setAnalysisDimensions] = useState<{
@@ -103,10 +65,11 @@ export function ContainerPackingPanel({
   const latestAnalyzeSequenceRef = useRef(0);
   const activeAnalyzeControllerRef = useRef<AbortController | null>(null);
 
-  const projectsQuery = useQuery({
-    queryKey: queryKeys.containerPackingProjects(),
-    queryFn: ({ signal }) => client.listContainerPackingProjects({ limit: 100 }, { signal }),
-  });
+  const {
+    currentProjectId, projectName, selectedProjectId, container, rules, cargoRows,
+    setProjectName, setSelectedProjectId, setContainer, setRules, setCargoRows,
+    projectsQuery, saveProjectMutation, loadProjectMutation, deleteProjectMutation, isSaving,
+  } = useContainerPackingProjects(client, () => { setResponse(null); setAnalysisDimensions(null); }, setMessage);
   const containerTypesQuery = useQuery({
     queryKey: queryKeys.containerPackingContainerTypes(),
     queryFn: ({ signal }) => client.listContainerPackingContainerTypes({ signal }),
@@ -255,66 +218,6 @@ export function ContainerPackingPanel({
     canAnalyze,
     validCargoRows.length,
   ]);
-
-  const saveProjectMutation = useMutation({
-    mutationFn: () =>
-      client.saveContainerPackingProject({
-        body: buildContainerPackingProjectSaveRequest(
-          currentProjectId,
-          currentProjectVersion,
-          projectName,
-          container,
-          cargoRows,
-          rules,
-        ),
-      }),
-    onSuccess: (nextResponse) => {
-      setCurrentProjectId(nextResponse.id);
-      setCurrentProjectVersion(nextResponse.project.versionNumber);
-      setSelectedProjectId(String(nextResponse.id));
-      setProjectName(nextResponse.project.name || "未命名方案");
-      setMessage(nextResponse.message || "装柜方案已保存。");
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.containerPackingProjects(),
-      });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-    },
-  });
-
-  const loadProjectMutation = useMutation({
-    mutationFn: (projectId: number) =>
-      client.getContainerPackingProject({ id: projectId }),
-    onSuccess: (nextResponse) => {
-      applyProjectToForm(nextResponse.project);
-      setMessage("装柜方案已加载。");
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-    },
-  });
-
-  const deleteProjectMutation = useMutation({
-    mutationFn: (projectId: number) =>
-      client.deleteContainerPackingProject({ id: projectId }),
-    onSuccess: (_, deletedProjectId) => {
-      if (currentProjectId === deletedProjectId) {
-        setCurrentProjectId(0);
-        setCurrentProjectVersion(0);
-        setProjectName("未命名方案");
-      }
-
-      setSelectedProjectId("");
-      setMessage("装柜方案已删除。");
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.containerPackingProjects(),
-      });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-    },
-  });
 
   const saveContainerTypeMutation = useMutation({
     mutationFn: () =>
@@ -490,7 +393,7 @@ export function ContainerPackingPanel({
   }
 
   function handleSaveProject() {
-    if (!canSaveProject || saveProjectMutation.isPending) {
+    if (!canSaveProject || isSaving) {
       return;
     }
 
@@ -508,37 +411,9 @@ export function ContainerPackingPanel({
     loadProjectMutation.mutate(projectId);
   }
 
-  async function handleDeleteProject() {
-    if (!canManage) {
-      return;
-    }
-
-    const projectId = Number.parseInt(
-      selectedProjectId || String(currentProjectId),
-      10,
-    );
-    if (projectId <= 0 || deleteProjectMutation.isPending) {
-      return;
-    }
-
-    const selectedProject = savedProjects.find(
-      (project) => project.id === projectId,
-    );
-    const deleteProjectName =
-      selectedProject?.name ||
-      (projectId === currentProjectId ? projectName : "");
-    const confirmed = await requestConfirmation({
-      title: "删除装柜方案",
-      description: deleteProjectName.trim() ? `确定删除方案“${deleteProjectName.trim()}”吗？` : "确定删除当前装柜方案吗？",
-      confirmLabel: "确认删除",
-      tone: "danger",
-    });
-    if (!confirmed) {
-      return;
-    }
-
-    setMessage(null);
-    deleteProjectMutation.mutate(projectId);
+  function handleDeleteProject() {
+    const projectId = Number.parseInt(selectedProjectId || String(currentProjectId), 10);
+    if (canManage && projectId > 0 && !isSaving) deleteProjectMutation.mutate(projectId);
   }
 
   function handleSaveContainerType() {
@@ -561,60 +436,6 @@ export function ContainerPackingPanel({
 
     setMessage(null);
     deleteContainerTypeMutation.mutate(selectedContainerType.id);
-  }
-
-  function applyProjectToForm(project: ApiContainerPackingProjectDto) {
-    setCurrentProjectId(project.id);
-    setCurrentProjectVersion(project.versionNumber);
-    setProjectName(project.name || "未命名方案");
-    setSelectedProjectId(String(project.id));
-    setContainer({
-      containerType: project.containerType || "",
-      length: String(project.container.length || ""),
-      width: String(project.container.width || ""),
-      height: String(project.container.height || ""),
-      volume: formatFormNumber(project.container.volume),
-      maxWeight: formatFormNumber(project.container.maxWeight),
-    });
-    setRules({
-      allowRotation: project.rules.allowRotation ?? true,
-      usePalletConstraints: project.rules.usePalletConstraints ?? false,
-      defaultPalletLength: String(project.rules.defaultPalletLength || 120),
-      defaultPalletWidth: String(project.rules.defaultPalletWidth || 100),
-      defaultPalletHeight: String(project.rules.defaultPalletHeight ?? 15),
-      defaultPalletWeight: formatFormNumber(project.rules.defaultPalletWeight ?? 25),
-      enforceCenterOfGravity: project.rules.enforceCenterOfGravity ?? false,
-      centerOfGravityTolerancePercent: formatFormNumber(
-        project.rules.centerOfGravityTolerancePercent ?? 20,
-      ),
-      minimumSupportAreaPercent: formatFormNumber(
-        project.rules.minimumSupportAreaPercent ?? 100,
-      ),
-      requireSameFootprintStacking: project.rules.requireSameFootprintStacking ?? false,
-    });
-    setCargoRows(
-      project.cargoItems.length > 0
-        ? project.cargoItems.map((item, index) =>
-            createContainerPackingCargoRow(index, {
-              name: item.name || `货物 ${index + 1}`,
-              length: formatFormNumber(item.length),
-              width: formatFormNumber(item.width),
-              height: formatFormNumber(item.height),
-              weight: formatFormNumber(item.weight),
-              quantity: String(item.quantity || 1),
-              colorHex: signedArgbToColorHex(item.colorArgb ?? -12417035),
-              usePallet: item.usePallet,
-              unitsPerPallet: String(item.unitsPerPallet || 1),
-              maxTopLoadWeight: formatFormNumber(item.maxTopLoadWeight),
-              preferredZone: normalizeContainerPackingZone(item.preferredZone),
-              loadSequence: String(item.loadSequence || index + 1),
-              priorityGroup: item.priorityGroup || "",
-            }),
-          )
-        : [createContainerPackingCargoRow(0)],
-    );
-    setResponse(null);
-    setAnalysisDimensions(null);
   }
 
   const queryMessage = projectsQuery.isError
@@ -642,7 +463,7 @@ export function ContainerPackingPanel({
       hasVisibleError={hasVisibleError} isAnalyzing={analyzeMutation.isPending} isDeletingContainerType={deleteContainerTypeMutation.isPending}
       isDeletingProject={deleteProjectMutation.isPending} isLoadingProject={loadProjectMutation.isPending}
       isRefreshingProjects={projectsQuery.isFetching} isSavingContainerType={saveContainerTypeMutation.isPending}
-      isSavingProject={saveProjectMutation.isPending} onAddCargo={addCargoRow} onAnalyze={runContainerPackingAnalysis}
+      isSavingProject={isSaving} onAddCargo={addCargoRow} onAnalyze={runContainerPackingAnalysis}
       onApplyContainerType={applyContainerType} onAutoRefreshChange={setAutoRefreshEnabled} onClearCargo={clearCargoRows}
       onContainerFieldChange={updateContainerField} onDeleteContainerType={handleDeleteContainerType} onDeleteProject={handleDeleteProject}
       onLoadProject={handleLoadProject} onProjectNameChange={updateProjectName} onRefreshProjects={() => void queryClient.invalidateQueries({ queryKey: queryKeys.containerPackingProjects() })}

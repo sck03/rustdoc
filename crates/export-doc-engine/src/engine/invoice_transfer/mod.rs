@@ -70,11 +70,12 @@ fn equivalent(existing: &Value, incoming: &Value) -> bool {
     existing == incoming
 }
 fn find_invoice(tx: &Connection, actor: &Actor, invoice: &Value) -> Result<Option<Value>> {
-    Ok(store::all(tx, "invoices")?.into_iter().find(|v| {
-        v["companyScope"] == actor.company
-            && v["invoiceNo"] == invoice["invoiceNo"]
-            && v["type"] == invoice["type"]
-    }))
+    let identity = store::invoice_identity(
+        &json!(actor.company),
+        &invoice["invoiceNo"],
+        &invoice["type"],
+    )?;
+    Ok(tx.find_identity("invoices", &identity)?)
 }
 fn find_party(tx: &Connection, actor: &Actor, kind: &str, value: &Value) -> Result<Option<Value>> {
     let keys: &[&str] = if kind == "customers" {

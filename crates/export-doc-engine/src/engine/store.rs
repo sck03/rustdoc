@@ -40,6 +40,9 @@ pub struct Actor {
     pub admin: bool,
     pub grants: Vec<Value>,
 }
+pub fn invoice_identity(company: &Value, number: &Value, data_type: &Value) -> Result<String> {
+    Ok(serde_json::to_string(&[company, number, data_type])?)
+}
 
 impl Store {
     pub fn open(paths: &RuntimePaths) -> Result<Self> {
@@ -150,7 +153,10 @@ impl Store {
         connection.begin_read()?;
         match operation(&connection) {
             Ok(value) => {
-                crate::operation::check()?;
+                if let Err(cause) = crate::operation::check() {
+                    connection.rollback()?;
+                    return Err(cause);
+                }
                 connection.commit()?;
                 Ok(value)
             }
@@ -391,11 +397,11 @@ pub fn save_in_scope(
     // The original invoice key is company + invoice number + data type. A
     // length-delimited JSON tuple keeps both data versions and tenant keys distinct.
     let identity = if kind == "invoices" {
-        Some(serde_json::to_string(&[
+        Some(invoice_identity(
             &body["companyScope"],
             &body["invoiceNo"],
             &body["type"],
-        ])?)
+        )?)
     } else {
         identity
             .filter(|key| !key.is_empty())

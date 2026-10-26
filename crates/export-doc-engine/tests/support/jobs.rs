@@ -1,4 +1,4 @@
-use crate::{
+use export_doc_engine::{
     api::{ApiClient, ApiError},
     generated_api::*,
     operation::OperationScope,
@@ -10,12 +10,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub const PDF_LIMIT: u64 = 64 * 1024 * 1024;
+pub use export_doc_engine::pdf::PDF_LIMIT;
 fn terminal(status: &str) -> bool {
     matches!(status, "Succeeded" | "Failed" | "Canceled")
 }
 
-/// The UI's canceled scope must never prevent a cleanup request from reaching
+/// The test caller's canceled scope must never prevent a cleanup request from reaching
 /// the independently running file task.
 pub fn wait_for_completion(
     client: &ApiClient,
@@ -82,7 +82,7 @@ pub fn render_report_pdf(
     {
         return Err(ApiError::local("此操作不是单据 PDF 输出。"));
     }
-    crate::operation::check()?;
+    export_doc_engine::operation::check()?;
     if cancelled.load(Ordering::Relaxed) {
         return Err(ApiError::local("已取消 PDF 输出。"));
     }

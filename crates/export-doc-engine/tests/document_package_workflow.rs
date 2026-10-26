@@ -4,7 +4,9 @@
 mod native_fixture;
 #[path = "support/smtp.rs"]
 mod smtp;
-use export_doc_engine::{generated_api::*, invoice::InvoiceDraft, jobs};
+use export_doc_engine::{generated_api::*, invoice::InvoiceDraft};
+#[path = "support/jobs.rs"]
+pub mod jobs;
 use export_doc_report::Builtin;
 use serde_json::{Value, json};
 use std::{fs, path::PathBuf, sync::atomic::AtomicBool};

@@ -3,9 +3,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use base64::{Engine as _, engine::general_purpose::STANDARD};
-
-pub(crate) const MAX_EXPORTER_SEAL_IMAGE_BYTES: u64 = 5 * 1024 * 1024;
+#[cfg(test)]
+pub(crate) const MAX_EXPORTER_SEAL_IMAGE_BYTES: u64 = export_doc_engine::engine::SEAL_LIMIT as u64;
 
 #[tauri::command]
 pub(crate) fn select_single_window_package_file() -> Result<Option<String>, String> {
@@ -145,29 +144,22 @@ pub(crate) fn select_exporter_seal_image_file() -> Result<Option<String>, String
 }
 
 #[tauri::command]
-pub(crate) fn read_exporter_seal_image_file_as_data_url(path: String) -> Result<String, String> {
-    let trimmed = path.trim();
-    if trimmed.is_empty() {
-        return Err("印章图片路径不能为空。".to_owned());
-    }
+pub(crate) async fn read_exporter_seal_image_file(
+    path: String,
+) -> Result<tauri::ipc::Response, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        read_seal_image_file(path).map(tauri::ipc::Response::new)
+    })
+    .await
+    .map_err(|cause| format!("印章图片读取任务失败：{cause}"))?
+}
 
-    let input = PathBuf::from(trimmed);
-    let metadata = fs::metadata(&input)
-        .map_err(|error| format!("无法读取印章图片 '{}': {error}", input.display()))?;
-    if !metadata.is_file() {
-        return Err("印章图片必须是文件。".to_owned());
+pub(crate) fn read_seal_image_file(path: String) -> Result<Vec<u8>, String> {
+    if path.trim().is_empty() {
+        return Err("印章图片路径不能为空。".into());
     }
-    if metadata.len() == 0 || metadata.len() > MAX_EXPORTER_SEAL_IMAGE_BYTES {
-        return Err("印章图片不能为空且不能超过 5 MB。".to_owned());
-    }
-
-    let bytes = fs::read(&input)
-        .map_err(|error| format!("无法读取印章图片 '{}': {error}", input.display()))?;
-    let mime_type = exporter_seal_image_mime_type(&input, &bytes)?;
-    Ok(format!(
-        "data:{mime_type};base64,{}",
-        STANDARD.encode(bytes)
-    ))
+    export_doc_engine::engine::read_seal_image(Path::new(path.trim()))
+        .map_err(|cause| cause.to_string())
 }
 
 #[tauri::command]
@@ -385,40 +377,4 @@ pub(crate) fn is_existing_directory_candidate(default_directory: Option<String>)
 
 fn path_to_string(path: PathBuf) -> String {
     path.to_string_lossy().into_owned()
-}
-
-fn exporter_seal_image_mime_type(path: &Path, bytes: &[u8]) -> Result<&'static str, String> {
-    let detected =
-        if bytes.len() >= 8 && bytes[..8] == [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a] {
-            ("png", "image/png")
-        } else if bytes.len() >= 4
-            && bytes[..3] == [0xff, 0xd8, 0xff]
-            && bytes[bytes.len() - 2..] == [0xff, 0xd9]
-        {
-            ("jpeg", "image/jpeg")
-        } else if bytes.len() >= 6 && (&bytes[..6] == b"GIF87a" || &bytes[..6] == b"GIF89a") {
-            ("gif", "image/gif")
-        } else if bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
-            ("webp", "image/webp")
-        } else {
-            return Err("印章图片格式无效；仅支持 PNG、JPEG、GIF 或 WebP。".to_owned());
-        };
-
-    let extension = path
-        .extension()
-        .and_then(|value| value.to_str())
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    let extension_matches = match detected.0 {
-        "png" => extension == "png",
-        "jpeg" => extension == "jpg" || extension == "jpeg",
-        "gif" => extension == "gif",
-        "webp" => extension == "webp",
-        _ => false,
-    };
-    if !extension_matches {
-        return Err("印章图片扩展名与实际图片格式不一致。".to_owned());
-    }
-
-    Ok(detected.1)
 }

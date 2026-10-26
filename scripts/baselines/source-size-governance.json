@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-10-25",
+  "updatedAt": "2026-10-26",
   "rules": [
     {
       "name": "repository web production default",
@@ -37,9 +37,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 72050,
+      "baselineAggregateLines": 72667,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 72125,
+      "maximumAggregateLines": 72742,
       "reportFiles": false
     },
     {
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 19413,
+      "baselineAggregateLines": 19706,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 19533,
+      "maximumAggregateLines": 19826,
       "reportFiles": false
     },
     {

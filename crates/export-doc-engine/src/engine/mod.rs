@@ -53,6 +53,7 @@ mod licensing;
 mod lifecycle;
 mod maintenance;
 mod media;
+pub use media::{SEAL_LIMIT, read_seal_image};
 pub mod oa;
 #[cfg(feature = "ocr")]
 mod ocr;

@@ -49,9 +49,7 @@ pub fn handle(
 }
 
 fn retained_attachments(connection: &Connection, invoice_id: i64) -> Result<bool> {
-    Ok(store::all(connection, "attachments")?
-        .iter()
-        .any(|attachment| attachment["invoiceId"].as_i64() == Some(invoice_id)))
+    Ok(connection.record_exists("attachments", &[("invoiceId", invoice_id.to_string())])?)
 }
 
 fn guidance(status: &str, retained: bool) -> String {
@@ -100,7 +98,7 @@ fn purge(store: &Store, actor: &Actor, invoice_id: i64, body: &Value) -> Result<
     if reason.chars().count() > 500 {
         return Err(invalid("数据清理原因不能超过 500 个字符。"));
     }
-    store.transaction(|transaction| {
+    store.transaction_for(actor, PURGE_CANCELLED_INVOICE, &[], |transaction, actor| {
         let invoice = store::get(transaction, "invoices", invoice_id)?;
         let status = text(&invoice, "status");
         if status != "Cancelled" {
@@ -186,10 +184,10 @@ mod tests {
     use std::fs;
 
     struct Fixture {
-        root: std::path::PathBuf,
         store: Store,
         actor: Actor,
         invoice_id: i64,
+        _root: crate::test_support::ScratchDirectory,
     }
     impl Fixture {
         fn new() -> Self {
@@ -216,10 +214,10 @@ mod tests {
                 departments: vec![],
                 oa_assigned_only: false,
             };
-            let mut user = contracts::initial(contracts::schema("ApiUserDto"));
+            let mut user = contracts::initial(contracts::schema("ApiUserAccountDto"));
             user["username"] = json!("admin");
-            user["isAdmin"] = json!(true);
-            user["status"] = json!("Active");
+            user["role"] = json!("Admin");
+            user["isActive"] = json!(true);
             store::save(
                 &*store.connection().unwrap(),
                 "users",
@@ -246,16 +244,11 @@ mod tests {
             )
             .unwrap();
             Self {
-                root,
                 store,
                 actor,
                 invoice_id: saved["id"].as_i64().unwrap(),
+                _root: crate::test_support::ScratchDirectory(root),
             }
-        }
-    }
-    impl Drop for Fixture {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.root);
         }
     }
 
@@ -392,5 +385,39 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(denied.status, Some(403));
+    }
+
+    #[test]
+    fn queued_purge_rechecks_account_after_the_previous_writer_disables_it() {
+        let fixture = Fixture::new();
+        std::thread::scope(|scope| {
+            let (entered, waiting) = std::sync::mpsc::channel();
+            let (release, released) = std::sync::mpsc::channel();
+            let store = &fixture.store;
+            let actor = &fixture.actor;
+            let writer = scope.spawn(move || {
+                store.transaction(|tx| {
+                    entered.send(()).unwrap();
+                    released.recv().unwrap();
+                    let mut user = store::get(tx, "users", actor.id)?;
+                    user["isActive"] = json!(false);
+                    store::save(tx, "users", actor.id, user, None, actor, "edit")?;
+                    Ok(())
+                })
+            });
+            waiting.recv().unwrap();
+            let purge = scope.spawn(|| {
+                purge(
+                    &fixture.store,
+                    &fixture.actor,
+                    fixture.invoice_id,
+                    &json!({"invoiceNoConfirmation":"INV-100","reason":"授权回归"}),
+                )
+            });
+            release.send(()).unwrap();
+            writer.join().unwrap().unwrap();
+            assert_eq!(purge.join().unwrap().unwrap_err().status, Some(403));
+        });
+        assert!(fixture.store.get("invoices", fixture.invoice_id).is_ok());
     }
 }

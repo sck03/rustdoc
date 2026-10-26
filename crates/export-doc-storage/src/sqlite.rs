@@ -1,4 +1,6 @@
 use super::*;
+#[cfg(test)]
+mod tests;
 use rusqlite::{
     Connection as SqliteConnection, OptionalExtension,
     backup::{Backup, StepResult},
@@ -16,6 +18,9 @@ pub struct Sqlite {
 impl From<rusqlite::Error> for Error {
     fn from(error: rusqlite::Error) -> Self {
         if let rusqlite::Error::SqliteFailure(failure, _) = &error {
+            if failure.code == rusqlite::ErrorCode::OperationInterrupted {
+                return Self::new(ErrorKind::Timeout, "SQLite 操作已取消或超过时限。");
+            }
             if matches!(
                 failure.code,
                 rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked
@@ -57,6 +62,7 @@ impl Sqlite {
     pub fn open(path: &Path) -> Result<Self> {
         let fresh = !path.try_exists()?;
         let mut connection = SqliteConnection::open(path)?;
+        connection.progress_handler(1000, Some(operation::cancelled as fn() -> bool))?;
         connection.busy_timeout(Duration::from_secs(5))?;
         connection.pragma_update(None, "foreign_keys", true)?;
         // Reject invalid existing files before changing their journal mode. Configure WAL before
@@ -72,14 +78,19 @@ impl Sqlite {
             transaction.execute_batch(include_str!("sqlite.sql"))?;
         }
         let version = Self::version(&transaction)?;
-        for (index, migration) in migrations::pending(version)?.iter().enumerate() {
+        let pending = migrations::pending(version)?;
+        for (index, migration) in pending.iter().enumerate() {
             transaction.execute_batch(migration.sqlite)?;
             transaction.execute(
                 "UPDATE schema_version SET version=?1",
                 [version + index as i64 + 1],
             )?;
         }
-        Self::validate(&transaction)?;
+        if fresh || !pending.is_empty() {
+            Self::validate(&transaction)?;
+        } else {
+            Self::validate_structure(&transaction)?;
+        }
         transaction.commit()?;
         connection.create_scalar_function(
             "template_normalize",
@@ -181,16 +192,54 @@ impl Sqlite {
         Ok(version.expect("validated marker"))
     }
     fn validate(connection: &SqliteConnection) -> Result<()> {
-        migrations::pending(Self::version(connection)?)?;
+        operation::check()?;
+        connection.progress_handler(1000, Some(operation::cancelled as fn() -> bool))?;
+        Self::validate_structure(connection)?;
         let integrity: String = connection.query_row("PRAGMA quick_check", [], |r| r.get(0))?;
         if integrity != "ok" {
             return Err(Error::unavailable("数据库完整性检查失败。"));
         }
+        Ok(())
+    }
+    fn validate_structure(connection: &SqliteConnection) -> Result<()> {
+        migrations::pending(Self::version(connection)?)?;
         connection.prepare("SELECT id,kind,record_id,version,action,actor_id,occurred_at,body FROM audit_logs LIMIT 0")?;
         Ok(())
     }
 }
 impl Adapter for Sqlite {
+    fn query_audits(&self, query: &AuditQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let (sql, projection) = audit_query::build(query, false);
+        let count = if query.count_all {
+            format!("(SELECT COUNT(*) FROM audit_logs r WHERE {})", sql.filter)
+        } else {
+            "0".into()
+        };
+        let statement = format!(
+            "SELECT {count},(SELECT json_group_array(json(page.body)) FROM (SELECT {projection} AS body FROM audit_logs r WHERE {filter} ORDER BY {order} LIMIT {limit} OFFSET {offset}) page)",
+            filter = sql.filter,
+            order = sql.order,
+            limit = query.limit.clamp(1, 200_000),
+            offset = query.offset.max(0)
+        );
+        let (count, rows): (i64, String) = self.connection.borrow().query_row(
+            &statement,
+            rusqlite::params_from_iter(sql.values.iter()),
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        Ok((count, serde_json::from_str(&rows)?))
+    }
+    fn attachment_category_counts(
+        &self,
+        company: &str,
+    ) -> Result<std::collections::BTreeMap<i64, i64>> {
+        let connection = self.connection.borrow();
+        let mut statement = connection.prepare("SELECT c.id,COUNT(*) FROM records a JOIN records c ON c.id=json_extract(a.body,'$.categoryId') AND c.kind='attachment-categories' WHERE a.kind='attachments' AND c.company=?1 GROUP BY c.id")?;
+        statement
+            .query_map([company], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .map(|row| row.map_err(Into::into))
+            .collect()
+    }
     fn import_preview_usage(&self, owner: i64) -> Result<ImportPreviewUsage> {
         let counts = self.connection.borrow().query_row(
             &import_preview_query::usage_sql(false),
@@ -251,7 +300,11 @@ impl Adapter for Sqlite {
         Ok(())
     }
     fn rollback(&self) -> Result<()> {
-        self.connection.borrow().execute_batch("ROLLBACK;")?;
+        let connection = self.connection.borrow();
+        // An interrupted SQLite write may already have rolled back the whole transaction.
+        if !connection.is_autocommit() {
+            connection.execute_batch("ROLLBACK;")?;
+        }
         Ok(())
     }
     fn checkpoint(&self) -> Result<()> {
@@ -524,6 +577,7 @@ fn copy(source: &SqliteConnection, destination: &mut SqliteConnection) -> Result
     let backup = Backup::new(source, destination)?;
     let deadline = Instant::now() + Duration::from_secs(120);
     loop {
+        operation::check()?;
         if Instant::now() > deadline {
             return Err(Error::new(ErrorKind::Timeout, "数据库备份 / 恢复超时。"));
         }

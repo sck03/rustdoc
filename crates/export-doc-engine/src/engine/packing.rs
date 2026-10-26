@@ -93,17 +93,19 @@ pub fn handle(
                     .and_then(|(_, value)| value.parse::<usize>().ok())
                     .unwrap_or(30)
                     .clamp(1, 200);
-                let mut rows: Vec<_> = store::all(tx, PROJECTS)?
-                    .into_iter()
-                    .filter(|r| auth::visible(actor, PERMISSION, "view", r))
-                    .collect();
-                rows.sort_by(|a, b| {
-                    b["updatedAt"]
-                        .as_str()
-                        .cmp(&a["updatedAt"].as_str())
-                        .then_with(|| b["id"].as_i64().cmp(&a["id"].as_i64()))
-                });
-                rows.truncate(limit);
+                let (_, rows) = tx.query_ordered_records(
+                    &export_doc_storage::GenericQuery {
+                        kind: PROJECTS,
+                        scope: auth::data_scope(actor, PERMISSION, "view"),
+                        filters: &[],
+                        keyword: "",
+                        search_root: None,
+                        fields: &[],
+                        offset: 0,
+                        limit: limit as i64,
+                    },
+                    export_doc_storage::RecordOrder::UpdatedDescending,
+                )?;
                 Ok(json!({"projects":rows,"storagePolicy":POLICY}))
             }
             GET_CONTAINER_PACKING_PROJECT => Ok(

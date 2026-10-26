@@ -9,11 +9,12 @@ use export_doc_engine::{
     designer::{Design, field_catalog},
     generated_api::*,
     invoice::InvoiceDraft,
-    jobs,
     paths::{RuntimePaths, nonce},
     template,
 };
 use export_doc_report::Builtin;
+#[path = "support/jobs.rs"]
+pub mod jobs;
 use serde_json::{Value, json};
 use std::{
     fs,

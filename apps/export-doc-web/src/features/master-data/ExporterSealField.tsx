@@ -1,16 +1,18 @@
 import { FolderOpen, Trash2, Upload } from "lucide-react";
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import {
   isDesktopBridgeAvailable,
-  readExporterSealImageFileAsDataUrl,
+  readExporterSealImageFile,
   selectExporterSealImageFile,
 } from "../../desktop/desktopBridge.ts";
 import { PathField } from "../../ui/PathField.tsx";
+import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 export type ExporterSealType = "document" | "customs";
 
 export function ExporterSealField({
   label,
+  scopeKey,
   value,
   inputReadOnly,
   actionDisabled,
@@ -20,6 +22,7 @@ export function ExporterSealField({
   onError,
 }: {
   label: string;
+  scopeKey: string;
   value: string;
   inputReadOnly?: boolean;
   actionDisabled?: boolean;
@@ -29,6 +32,9 @@ export function ExporterSealField({
   onError: (error: unknown) => void;
 }) {
   const uploadInputRef = useRef<HTMLInputElement>(null);
+  const scope = useMemo(() => ({ scopeKey, value, actionDisabled }), [scopeKey, value, actionDisabled]);
+  const browserSelection = useRef(scope);
+  const readImage = useAbortableOperation(scope, { cancelPrevious: true });
   const desktopAvailable = isDesktopBridgeAvailable();
   const sealLabel = label.replace(/路径$/, "");
   const title = actionTitle || (desktopAvailable ? `选择并上传${sealLabel}图片` : `上传${sealLabel}图片`);
@@ -37,18 +43,23 @@ export function ExporterSealField({
     if (actionDisabled) return;
 
     if (!desktopAvailable) {
+      browserSelection.current = scope;
       uploadInputRef.current?.click();
       return;
     }
 
     try {
-      const selectedPath = await selectExporterSealImageFile();
-      if (!selectedPath) return;
-
-      const dataUrl = await readExporterSealImageFileAsDataUrl(selectedPath);
-      if (dataUrl) onUploadFile(dataUrlToFile(dataUrl, selectedPath));
+      const file = await readImage(async signal => {
+        const selectedPath = await selectExporterSealImageFile();
+        signal.throwIfAborted();
+        if (!selectedPath) return;
+        const bytes = await readExporterSealImageFile(selectedPath);
+        signal.throwIfAborted();
+        return bytes ? sealBytesToFile(bytes, selectedPath) : undefined;
+      });
+      if (file) onUploadFile(file);
     } catch (error) {
-      onError(error);
+      if (!isAbortError(error)) onError(error);
     }
   }
 
@@ -96,29 +107,18 @@ export function ExporterSealField({
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
           event.currentTarget.value = "";
-          if (file) onUploadFile(file);
+          if (file && !actionDisabled && browserSelection.current === scope) onUploadFile(file);
         }}
       />
     </>
   );
 }
 
-function dataUrlToFile(dataUrl: string, selectedPath: string) {
-  const match = /^data:(image\/(?:png|jpeg|gif|webp));base64,([a-zA-Z0-9+/=]+)$/.exec(dataUrl);
-  if (!match) {
-    throw new Error("印章图片内容无效，请重新选择。");
-  }
-
-  const binary = window.atob(match[2]);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
+function sealBytesToFile(bytes: ArrayBuffer, selectedPath: string) {
   const fileName = selectedPath.split(/[\\/]/).pop()?.trim();
   if (!fileName) {
     throw new Error("无法读取印章图片文件名，请重新选择。");
   }
 
-  return new File([bytes], fileName, { type: match[1] });
+  return new File([bytes], fileName, { type: /\.png$/i.test(fileName) ? "image/png" : "image/jpeg" });
 }

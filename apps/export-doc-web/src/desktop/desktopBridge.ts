@@ -129,13 +129,13 @@ export async function selectExporterSealImageFile() {
   return invokeOptionalPath("select_exporter_seal_image_file");
 }
 
-export async function readExporterSealImageFileAsDataUrl(path: string) {
+export async function readExporterSealImageFile(path: string) {
   const invoke = getInvoke();
   if (!invoke || !path.trim()) {
     return null;
   }
 
-  return invoke<string>("read_exporter_seal_image_file_as_data_url", { path });
+  return invoke<ArrayBuffer>("read_exporter_seal_image_file", { path });
 }
 
 export async function selectExcelFile() {

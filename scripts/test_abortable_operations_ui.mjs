@@ -20,6 +20,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { useAbortableOperation } from ${source('ui/useAbortableOperation.ts')};
   import { useOfficeOperation } from ${source('features/office/useOfficeData.ts')};
   import { AttachmentUploadPanel } from ${source('ui/AttachmentUploadPanel.tsx')};
+  import { ExporterSealField } from ${source('features/master-data/ExporterSealField.tsx')};
   import { MemoryRouter } from 'react-router-dom';
   import { ConfirmationProvider } from ${source('ui/ConfirmationProvider.tsx')};
   import { UnsavedChangesProvider } from ${source('ui/unsavedChangesGuard.tsx')};
@@ -31,6 +32,10 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   window.attachmentUploads = [];
   window.attachmentRecord = { versionNumber: 1, attachments: Array.from({ length: window.mode === 'attachments-partial' ? 18 : 20 }, () => ({ sizeBytes: 1 })) };
   const delayed = signal => new Promise((resolve, reject) => window.pending.push({ signal, resolve, reject }));
+  if (window.mode === 'seal') {
+    window.isTauri = true;
+    window.__TAURI_INTERNALS__ = { invoke: command => new Promise((resolve, reject) => window.pending.push({ command, resolve, reject })) };
+  }
   const lookup = (input, options, kind = 'primary') => new Promise((resolve, reject) => window.pending.push({ ...input, kind, signal: options.signal, resolve, reject }));
   const client = { searchSupplierProductOptions: lookup, queryCrmCustomers: lookup, listProducts: (input, options) => lookup(input, options, 'product'),
     listSupplierAssessments: (input, options) => lookup(input, options, 'assessment-list'),
@@ -61,7 +66,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
       }}/><output>{operation.error}</output></>;
   }
   function App() {
-    const [scope, setScope] = useState(0), [open, setOpen] = useState(true);
+    const [scope, setScope] = useState(0), [open, setOpen] = useState(true), [sealDisabled, setSealDisabled] = useState(false);
     const refresh = () => window.mode.startsWith('attachments') ? Promise.resolve('updated') : new Promise(resolve => window.refreshes.push(resolve));
     useQuery({ queryKey: ['office', 'test'], initialData: 'before', staleTime: Infinity,
       queryFn: refresh });
@@ -69,9 +74,13 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
       queryFn: refresh });
     return <><button onClick={() => setScope(value => value + 1)}>切换资料</button>
       <button onClick={() => setOpen(false)}>离开编辑页</button>
+      <button onClick={() => setSealDisabled(true)}>停用印章操作</button>
       {open ? window.mode === 'supplier' ? <SupplierProductLinksPanel client={client} supplierId={scope + 1} supplierName='供应商' canEdit/>
         : window.mode === 'assessment' ? <SupplierAssessmentsPanel client={client} businessDate='2026-10-12' supplierId={scope + 1} supplierName={'供应商'+(scope+1)} canCreate canEdit canApprove canDelete/>
         : window.mode.startsWith('sales') ? <SalesOpportunityPage client={client} businessTimeZone='Asia/Shanghai'/>
+        : window.mode === 'seal' ? <ExporterSealField label='单证章路径' scopeKey={String(scope)} value='' actionDisabled={sealDisabled}
+          onUploadFile={async file => window.completed.push({name:file.name,type:file.type,bytes:Array.from(new Uint8Array(await file.arrayBuffer()))})}
+          onError={error => window.results.push(error.message)}/>
         : window.mode === 'office' ? <Office/> : window.mode.startsWith('attachments') ? <Attachments/> : <Generic scope={scope}/> : <p>编辑页已关闭</p>}</>;
   }
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
@@ -106,6 +115,31 @@ try {
       results.push(name);
     } catch (error) { failures.push(`${name}: ${error.message}`); }
     finally { await page.close(); }
+  }
+  for (const phase of ['select', 'read']) for (const boundary of ['none', 'scope', 'unmount', 'disabled']) for (const reject of [false, true]) {
+    await scenario(`seal-${phase}-${boundary}-${reject ? 'failure' : 'success'}`, 'seal', async page => {
+      await page.getByRole('button', { name: '选择并上传单证章图片', exact: true }).click();
+      await page.waitForFunction(() => window.pending.length === 1);
+      if (phase === 'read') {
+        await page.evaluate(() => window.pending[0].resolve('E:/selected/中文印章.png'));
+        await page.waitForFunction(() => window.pending.length === 2);
+        assert.equal(await page.evaluate(() => window.pending[1].command), 'read_exporter_seal_image_file');
+      }
+      if (boundary !== 'none') await page.getByRole('button', { name: {scope:'切换资料',unmount:'离开编辑页',disabled:'停用印章操作'}[boundary], exact: true }).click();
+      await page.evaluate(({phase,reject}) => {
+        const request = window.pending.at(-1);
+        if (reject) request.reject(new Error('印章读取失败'));
+        else request.resolve(phase === 'select' ? 'E:/selected/中文印章.png' : new Uint8Array([137,80,78,71]).buffer);
+      }, {phase,reject});
+      if (boundary === 'none' && !reject && phase === 'select') {
+        await page.waitForFunction(() => window.pending.length === 2);
+        await page.evaluate(() => window.pending[1].resolve(new Uint8Array([137,80,78,71]).buffer));
+      }
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      assert.deepEqual(await page.evaluate(() => window.completed), boundary === 'none' && !reject ? [{name:'中文印章.png',type:'image/png',bytes:[137,80,78,71]}] : []);
+      assert.deepEqual(await page.evaluate(() => window.results), boundary === 'none' && reject ? ['印章读取失败'] : []);
+      if (phase === 'select' && boundary !== 'none') assert.equal(await page.evaluate(() => window.pending.length), 1);
+    });
   }
   for (const boundary of ['none', 'scope', 'unmount']) {
     for (const reject of [false, true]) {

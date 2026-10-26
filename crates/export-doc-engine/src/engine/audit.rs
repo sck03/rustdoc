@@ -1,4 +1,6 @@
 //! Audit queries and maintenance never delete or query business history.
+#[cfg(test)]
+mod tests;
 #[allow(unused_imports)]
 use super::error::error;
 use super::{
@@ -132,40 +134,6 @@ impl Criteria {
             || self.start.is_some()
             || self.end.is_some()
     }
-    fn matches(&self, row: &Value) -> Result<bool> {
-        let timestamp = DateTime::parse_from_rfc3339(&text(row, "timestamp"))
-            .map_err(|_| unavailable("审计记录时间损坏，已停止处理。"))?
-            .with_timezone(&Utc);
-        let searchable = format!(
-            "{} {} {} {} {}",
-            text(row, "entityName"),
-            text(row, "entityId"),
-            text(row, "userId"),
-            text(row, "oldValues"),
-            text(row, "newValues")
-        )
-        .to_lowercase();
-        let invoice_values = format!(
-            "{} {} {}",
-            if row["entityName"] == "Invoice" {
-                text(row, "entityId")
-            } else {
-                String::new()
-            },
-            text(row, "oldValues"),
-            text(row, "newValues")
-        )
-        .to_lowercase();
-        Ok(
-            (self.entity.is_empty() || self.entity == text(row, "entityName"))
-                && (self.action.is_empty() || self.action == text(row, "action"))
-                && text(row, "userId").to_lowercase().contains(&self.user)
-                && searchable.contains(&self.keyword)
-                && invoice_values.contains(&self.invoice)
-                && self.start.is_none_or(|start| timestamp >= start)
-                && self.end.is_none_or(|end| timestamp <= end),
-        )
-    }
 }
 fn project(event: Value) -> Value {
     let kind = text(&event, "kind");
@@ -201,33 +169,21 @@ fn select(
     limit: usize,
     count_all: bool,
 ) -> Result<(Vec<Value>, usize)> {
-    let mut before = i64::MAX;
-    let mut matched = 0usize;
-    let mut selected = vec![];
-    loop {
-        crate::operation::check()?;
-        let batch = tx.audit_events(before, 256)?;
-        if batch.is_empty() {
-            break;
-        }
-        for event in batch {
-            before = event["id"]
-                .as_i64()
-                .filter(|id| *id > 0 && *id < before)
-                .ok_or_else(|| unavailable("审计游标顺序异常。"))?;
-            let row = project(event);
-            if criteria.matches(&row)? {
-                if matched >= offset && selected.len() < limit {
-                    selected.push(row);
-                }
-                matched += 1;
-                if !count_all && selected.len() >= limit {
-                    return Ok((selected, matched));
-                }
-            }
-        }
-    }
-    Ok((selected, matched))
+    let (total, events) = tx.query_audits(&export_doc_storage::AuditQuery {
+        invoice: &criteria.invoice,
+        entity: &criteria.entity,
+        action: &criteria.action,
+        user: &criteria.user,
+        keyword: &criteria.keyword,
+        start: criteria.start,
+        end: criteria.end,
+        entities: ENTITIES,
+        offset: i64::try_from(offset).unwrap_or(i64::MAX),
+        limit: limit as i64,
+        count_all,
+    })?;
+    let rows = events.into_iter().map(project).collect::<Vec<_>>();
+    Ok((rows, total as usize))
 }
 fn command(count: usize, destination: &str, message: &str) -> Value {
     json!({"success":true,"message":format!("{message}（{count} 条）"),"affectedCount":count,"destinationPath":destination,"storagePolicy":POLICY})
@@ -262,15 +218,17 @@ pub fn handle(
         };
         let page = number("pageNumber", 1);
         let size = number("pageSize", 50).min(200);
-        let (rows, total) = service.store.transaction(|tx| {
-            select(
-                tx,
-                &criteria,
-                page.saturating_sub(1).saturating_mul(size),
-                size,
-                true,
-            )
-        })?;
+        let (rows, total) = service
+            .store
+            .read_for(actor, operation, query, |tx, _actor| {
+                select(
+                    tx,
+                    &criteria,
+                    page.saturating_sub(1).saturating_mul(size),
+                    size,
+                    true,
+                )
+            })?;
         return serde_json::to_vec(&contracts::page(rows, total, page, size)).map_err(Into::into);
     }
     #[cfg(feature = "excel")]
@@ -283,7 +241,9 @@ pub fn handle(
             .min(50_000) as usize;
         let (rows, _) = service
             .store
-            .transaction(|tx| select(tx, &criteria, 0, limit, false))?;
+            .read_for(actor, operation, query, |tx, _actor| {
+                select(tx, &criteria, 0, limit, false)
+            })?;
         let bytes = export_doc_excel::table(
             &[
                 ("id", "编号"),
@@ -346,26 +306,28 @@ pub fn handle(
         .filter(|value| *value > 0)
         .unwrap_or(hard_limit)
         .min(hard_limit) as usize;
-    let count = service.store.transaction(|tx| {
-        let (rows, _) = select(tx, &criteria, 0, limit, false)?;
-        let ids: Vec<_> = rows.iter().filter_map(|row| row["id"].as_i64()).collect();
-        crate::operation::check()?;
-        let count = tx.delete_audits(&ids)?;
-        if count > 0 {
-            tx.append_audit_details(
-                &AuditWrite {
-                    kind: "audit-maintenance",
-                    record_id: 0,
-                    version: 1,
-                    action: operation.id,
-                    actor_id: actor.id,
-                    occurred_at: &Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
-                    note: "",
-                },
-                &json!({"newValues":{"affectedCount":count}}),
-            )?;
-        }
-        Ok(count)
-    })?;
+    let count = service
+        .store
+        .transaction_for(actor, operation, query, |tx, actor| {
+            let (rows, _) = select(tx, &criteria, 0, limit, false)?;
+            let ids: Vec<_> = rows.iter().filter_map(|row| row["id"].as_i64()).collect();
+            crate::operation::check()?;
+            let count = tx.delete_audits(&ids)?;
+            if count > 0 {
+                tx.append_audit_details(
+                    &AuditWrite {
+                        kind: "audit-maintenance",
+                        record_id: 0,
+                        version: 1,
+                        action: operation.id,
+                        actor_id: actor.id,
+                        occurred_at: &Utc::now().to_rfc3339_opts(SecondsFormat::Millis, true),
+                        note: "",
+                    },
+                    &json!({"newValues":{"affectedCount":count}}),
+                )?;
+            }
+            Ok(count)
+        })?;
     serde_json::to_vec(&command(count, "", "审计记录已清理")).map_err(Into::into)
 }
