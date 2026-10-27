@@ -9,6 +9,8 @@ use crate::contracts;
 use export_doc_storage::{Connection, RecordQuery};
 use serde_json::{Value, json};
 use std::collections::HashSet;
+mod account_references;
+pub(in crate::engine) use account_references::validate_account;
 
 pub(in crate::engine) const GENERAL_STATES: &[&str] = &["Approved", "Completed"];
 pub(in crate::engine) const SUPPLY_STATES: &[&str] = &["Approved", "Issued", "Returned"];

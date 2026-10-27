@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import type { ApiUserReportTemplateDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
+import { ReportTemplateHistoryRetention } from "./ReportTemplateHistoryRetention.tsx";
 
 export function ReportTemplateVersionHistory({ client, template, enabled, isBusy, onRestore }: {
   client: ExportDocManagerApiClient; template: ApiUserReportTemplateDto; enabled: boolean; isBusy: boolean; onRestore: (version: number) => void;
@@ -15,9 +17,11 @@ export function ReportTemplateVersionHistory({ client, template, enabled, isBusy
     enabled: enabled && open,
     staleTime: 30_000,
   });
+  useServerPageNumber(query, pageNumber, setPageNumber);
   return <details className="template-inline-details" open={open} onToggle={event => setOpen(event.currentTarget.open)}>
     <summary>版本历史{query.data ? ` (${query.data.totalCount})` : ""}</summary>
     {open ? <div className="template-version-list">
+      {template.canManageHistory && <ReportTemplateHistoryRetention client={client} template={template} enabled={enabled && open} isBusy={isBusy} />}
       {query.isPending ? <small role="status">正在读取历史版本…</small> : null}
       {query.isError ? <div role="alert">{readApiError(query.error)}<button className="command-button secondary compact-button" type="button" onClick={() => void query.refetch()}>重新读取</button></div> : null}
       {query.data?.items.length === 0 ? <small>保存后会在这里保留可恢复快照。</small> : null}

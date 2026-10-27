@@ -113,7 +113,7 @@ pub fn save(
                 actor,
                 "personnel-sync",
             )?;
-            super::oa::approval_references::validate_account(tx, actor, &user)?;
+            super::account_permissions::validate_references(tx, actor, &user)?;
         }
         value["account"] = contracts::dto(contracts::schema("PersonnelAccountRecord"), user);
     }

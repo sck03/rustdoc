@@ -15,6 +15,8 @@ mod integrity_query;
 mod maintenance_query;
 #[path = "support/office_query.rs"]
 mod office_query;
+#[path = "support/organization_query.rs"]
+mod organization_query;
 #[path = "support/personnel_query.rs"]
 mod personnel_query;
 #[cfg(feature = "postgres")]
@@ -29,6 +31,8 @@ mod related_query;
 mod resource_query;
 #[path = "support/scaling_query.rs"]
 mod scaling_query;
+#[path = "support/template_history_query.rs"]
+mod template_history_query;
 #[path = "support/template_query.rs"]
 mod template_query;
 use serde_json::json;
@@ -83,6 +87,8 @@ fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
 
 fn roundtrip(connection: &Connection) {
     maintenance_query::exercise(connection);
+    organization_query::exercise(connection);
+    template_history_query::exercise(connection);
     integrity_query::exercise(connection);
     related_query::exercise(connection);
     import_preview_query::exercise(connection);

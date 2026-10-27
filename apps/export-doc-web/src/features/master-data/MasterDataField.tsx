@@ -50,7 +50,7 @@ export function MasterDataField({
   pathActionDisabled?: boolean;
   pathActionTitle?: string;
 }) {
-  const disabled = Boolean(field.readOnlyOnEdit && isEdit);
+  const disabled = Boolean(field.readOnly || field.readOnlyOnEdit && isEdit);
 
   if (field.options) {
     return (

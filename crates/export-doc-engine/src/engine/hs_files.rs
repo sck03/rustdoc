@@ -14,6 +14,7 @@ use std::{
     collections::{BTreeMap, BTreeSet},
     path::Path,
 };
+mod preview;
 
 pub const UPLOADS: &[Operation] = &[PREVIEW_HS_CODES_IMPORT_UPLOAD, UPLOAD_HS_CODES_IMPORT_FILE];
 pub const OPERATIONS: &[Operation] = &[
@@ -45,10 +46,11 @@ pub fn upload(
         "CompleteSnapshot" => "CompleteSnapshot",
         _ => return Err(invalid("税则导入模式无效。")),
     };
+    let now = service.clock.now().map_err(unavailable)?;
     let year = metadata["effectiveYear"]
         .as_i64()
-        .unwrap_or(service.clock.now().map_err(unavailable)?.today.year() as i64);
-    if !(2000..=i64::from(service.clock.now().map_err(unavailable)?.today.year())).contains(&year) {
+        .unwrap_or(i64::from(now.today.year()));
+    if !(2000..=i64::from(now.today.year())).contains(&year) {
         return Err(invalid(
             "税则年度须为 2000 至本年度；未来年度请在生效后导入。",
         ));
@@ -65,48 +67,35 @@ pub fn upload(
     } else {
         source
     };
-    let response=service.store.transaction_for(actor, operation, &[], |tx, actor|{
-        let existing=hs::codes(tx)?;let mut items=vec![];let mut seen=BTreeMap::<String,Value>::new();let mut conflicts=BTreeSet::new();
-        for (index,row) in table.rows.iter().enumerate().skip(header+1){
-            operation::check()?;if row.iter().all(|v|v.trim().is_empty()){continue;}
-            let mut item=contracts::initial(contracts::schema("ApiHsCodeDto"));
-            for (field,column) in &mapping{item[*field]=json!(row.get(*column).map(String::as_str).unwrap_or(""));}
-            let first=hs_import::unit(&text(&item,"unit"));let second=hs_import::unit(&text(&item,"unit2"));
-            item["unit"]=json!(if second.is_empty()||first==second{first}else{format!("{first}/{second}")});
-            item["status"]=json!("Active");item["sourceName"]=json!(source);item["effectiveYear"]=json!(year);item["lastVerifiedAt"]=json!(store::timestamp());
-            let parsed:Result<ApiHsCodeDto>=serde_json::from_value(item.clone()).map_err(|e|invalid(e.to_string())).and_then(|mut dto|{rules::normalize(&mut dto).map_err(invalid)?;Ok(dto)});
-            let mut change="Add";let mut message=String::new();let mut changed=vec![];
-            match parsed {
-                Err(cause)=>{change="Invalid";message=cause.message;},
-                Ok(dto)=>{
-                    item=serde_json::to_value(&dto)?;let code=dto.code.clone();
-                    if let Some(prior)=seen.get(&code){if comparable(prior)!=comparable(&item){conflicts.insert(code.clone());}else{change="Unchanged";}}
-                    seen.insert(code.clone(),item.clone());
-                    if let Some(old)=existing.get(&code){let old=serde_json::to_value(old)?;item["id"]=old["id"].clone();item["rowVersion"]=old["rowVersion"].clone();
-                        changed=comparable(&item).as_object().unwrap().iter().filter(|(key,value)|old[*key]!=**value).map(|(key,_)|key.clone()).collect();
-                        if old["effectiveYear"].as_i64().is_some_and(|previous|previous>year){change="Conflict";message="已有较新年度资料，不能用旧年度覆盖。".into();}
-                        else if change!="Unchanged"{change=if changed.is_empty(){"Unchanged"}else{"Update"};}
-                    }
-                }
-            }
-            items.push(json!({"changeType":change,"rowNumber":index+table.first_row,"item":item,"changedFields":changed,"replacementCandidates":[],"message":message}));
-        }
-        if items.is_empty(){return Err(invalid("税则文件没有可读取的明细。"));}
-        for item in &mut items{if conflicts.contains(&text(&item["item"],"code")){item["changeType"]=json!("Conflict");item["message"]=json!("同一编码在文件中存在不同内容，不会写入。" );}}
-        if mode=="CompleteSnapshot"{
-            if items.iter().any(|row|row["changeType"]=="Invalid"||row["changeType"]=="Conflict"){return Err(invalid("完整年度库包含无效或冲突行，请修正后重新预检，避免误判缺失编码。"));}
-            for (code,old) in &existing{if seen.contains_key(code)||old.status!="Active"||old.effective_year.is_none_or(|old_year|old_year>year){continue;}operation::check()?;
-                let replacements:Vec<_>=seen.iter().filter(|(_,item)|rules::text(&text(item,"name"))==rules::text(&old.name)).map(|(code,_)|code.clone()).take(20).collect();
-                items.push(json!({"changeType":"SuspectedObsolete","rowNumber":0,"item":old,"changedFields":["status"],"replacementCandidates":replacements,"message":"完整年度文件未出现，确认后标记为疑似作废，保留原编码。"}));
-            }
-        }
-        let counts=|kind:&str|items.iter().filter(|row|row["changeType"]==kind).count();
-        let token=import_previews::save(tx,actor,&service.clock,"hs-tariffs",&items)?;
-        Ok(json!({"token":token,"fileName":name,"mode":mode,"sourceName":source,"effectiveYear":year,"worksheetName":table.sheet_name,"headerRowNumber":header+table.first_row,"confidence":100,
+    let existing = service
+        .store
+        .read_for(actor, operation, &[], |tx, _| hs::codes(tx))?;
+    let items = preview::items(
+        &preview::Input {
+            table: &table,
+            header,
+            mapping: &mapping,
+            source: &source,
+            year,
+            verified_at: &now.utc_now.to_rfc3339(),
+            complete: mode == "CompleteSnapshot",
+        },
+        &existing,
+    )?;
+    drop(existing);
+    let prepared = import_previews::prepare("hs-tariffs", &items)?;
+    let token = service
+        .store
+        .transaction_for(actor, operation, &[], |tx, actor| {
+            import_previews::save_prepared(tx, actor, &service.clock, &prepared)
+        })?;
+    drop(prepared);
+    let counts = |kind: &str| items.iter().filter(|row| row["changeType"] == kind).count();
+    let mut response = json!({"token":token,"fileName":name,"mode":mode,"sourceName":source,"effectiveYear":year,"worksheetName":table.sheet_name,"headerRowNumber":header+table.first_row,"confidence":100,
             "columns":mapping.iter().map(|(field,column)|json!({"field":field,"header":table.rows[header][*column],"columnNumber":column+1,"confidence":100})).collect::<Vec<_>>(),
             "addCount":counts("Add"),"updateCount":counts("Update"),"unchangedCount":counts("Unchanged"),"suspectedObsoleteCount":counts("SuspectedObsolete"),"conflictCount":counts("Conflict"),"invalidCount":counts("Invalid"),
-            "warnings":if mode=="CompleteSnapshot"{vec!["完整年度库会标记缺失编码为疑似作废，请核对全部预检结果。"]}else{vec![]},"items":items,"storagePolicy":"预检尚未写入税则；30 分钟内确认有效，只能提交一次。"}))
-    })?;
+            "warnings":if mode=="CompleteSnapshot"{vec!["完整年度库会标记缺失编码为疑似作废，请核对全部预检结果。"]}else{vec![]},"storagePolicy":"预检尚未写入税则；30 分钟内确认有效，只能提交一次。"});
+    response["items"] = Value::Array(items);
     if operation == UPLOAD_HS_CODES_IMPORT_FILE {
         let committed = commit(service, actor, operation, &response)?;
         return Ok(
@@ -114,17 +103,6 @@ pub fn upload(
         );
     }
     Ok(response)
-}
-fn comparable(item: &Value) -> Value {
-    let keys = hs_import::COLUMNS
-        .iter()
-        .map(|(k, _)| *k)
-        .filter(|key| *key != "unit2")
-        .chain(["status", "sourceName", "effectiveYear"]);
-    Value::Object(
-        keys.map(|key| (key.to_string(), item[key].clone()))
-            .collect(),
-    )
 }
 pub fn handle(
     service: &NativeService,

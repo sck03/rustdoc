@@ -2,6 +2,8 @@
 use super::oa_contract::{call, operation};
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
+#[path = "handling_permissions.rs"]
+mod permissions;
 #[path = "handling_resources.rs"]
 mod resources;
 
@@ -375,4 +377,5 @@ pub fn exercise(service: &NativeService, root: &str) {
             .status,
         Some(409)
     );
+    permissions::exercise(service, root);
 }

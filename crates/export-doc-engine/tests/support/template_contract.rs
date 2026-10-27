@@ -2,6 +2,8 @@ use export_doc_engine::{
     api::ApiError, contracts, engine::NativeService, generated_api::*, paths::nonce,
 };
 use serde_json::{Value, json};
+#[path = "template_history_contract.rs"]
+mod history_retention;
 
 fn call(
     service: &NativeService,
@@ -241,4 +243,5 @@ pub fn exercise(service: &NativeService, admin: &str) {
         Some(json!({"expectedVersion":copy["versionNumber"]})),
     )
     .unwrap();
+    history_retention::exercise(service, &users[0].0, &users[1].0);
 }

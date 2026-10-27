@@ -3,7 +3,7 @@ import { useReportDesignerV3Clipboard } from "./useReportDesignerV3Clipboard.ts"
 import { ReportDesignerUploadState } from "./reportDesignerUploadState.ts";
 import { ReportDesignerPreviewProvider } from "./ReportDesignerPreviewContext.tsx";
 import { useReportDesignerV3Shortcuts } from "./useReportDesignerV3Shortcuts.ts";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignHorizontalJustifyStart,
   AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart,
@@ -40,7 +40,8 @@ import { setReportDesignerLayerRoleHeight } from "./reportDesignerLayerBands.ts"
 import type { ReportBlock, ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { createConditionalBlock, createDetailTableBlock, createGridBlock, createPageBreakBlock, createRowBlock } from "./reportDesignerBlockFactories.ts";
 import { applyGridPreset } from "./reportDesignerGridMutations.ts";
-import { updateDesignerCanvasText, type ReportDesignerTextTarget } from "./reportDesignerCanvasText.ts";
+import { readDesignerCanvasText, updateDesignerCanvasText, type ReportDesignerTextTarget, type ReportDesignerCanvasTextDraft } from "./reportDesignerCanvasText.ts";
+import { serializeReportDesignerV3 } from "./reportDesignerV3Serialization.ts";
 import { bindV3GridCellField, type ReportDesignerGridCellTarget } from "./reportDesignerGridFields.ts";
 import {
   countElements,
@@ -58,6 +59,7 @@ import { focusDesignerNode } from "./ReportDesignerV3InspectorControls.tsx";
 import { insertProductField } from "./reportDesignerProductFields.ts";
 import { getV3InsertionIssue } from "./reportDesignerV3Insertion.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { ReportDesignerPendingInputContext } from "./ReportDesignerPendingInputContext.tsx";
 
 type V3SidebarTab = "components" | "fields" | "layers";
 
@@ -101,8 +103,33 @@ export function ReportDesignerV3Workspace({
   const documentContentRef = useRef(content);
   documentContentRef.current = content;
   const sourceValid = !parsed.issues.some(issue => issue.severity === "error");
+  const editingEnabled = editable && sourceValid;
   const [draftEnabled, setDraftEnabled] = useState(false);
+  const [pendingInputs, setPendingInputs] = useState<Set<string>>(() => new Set());
+  const registerPendingInput = useCallback((id: string, pending: boolean) => {
+    setPendingInputs(current => {
+      if (current.has(id) === pending) return current;
+      const next = new Set(current); if (pending) next.add(id); else next.delete(id); return next;
+    });
+  }, []);
+  const [textDraft, setTextDraft] = useState<ReportDesignerCanvasTextDraft | null>(null);
+  const textTarget = textDraft ? findV3Element(history.state.schema, textDraft.elementId) : null;
+  const pendingTextChanged = Boolean(textDraft && (!textTarget || readDesignerCanvasText(textTarget.element, textDraft) !== textDraft.text));
+  const pendingTextBlocked = pendingTextChanged && (!textTarget || textTarget.element.locked || textTarget.layer.locked
+    || !textDraft || readDesignerCanvasText(textTarget.element, textDraft) === undefined);
   const historyRef = useRef(history);
+  const textDraftRef = useRef(textDraft); textDraftRef.current = textDraft;
+  const editingRef = useRef(editingEnabled); editingRef.current = editingEnabled;
+  const commitPendingText = useCallback(() => {
+    const draft = textDraftRef.current;
+    if (!draft || !editingRef.current) return;
+    const base = historyRef.current.state;
+    const next = updateDesignerCanvasText(base, draft, draft.text);
+    if (next.schema !== base.schema) {
+      setDraftEnabled(true); historyRef.current.commitFrom(base, next);
+    }
+    setTextDraft(null);
+  }, []);
   const selected = useMemo(
     () => history.state.selectedIds.length === 1 ? findV3Element(history.state.schema, history.state.selectedIds[0]) : null,
     [history.state],
@@ -114,25 +141,27 @@ export function ReportDesignerV3Workspace({
     () => validateReportDesignerV3Draft(history.state.schema, reportType),
     [history.state.schema, reportType],
   );
-  const serializedContent = useMemo(() => JSON.stringify(history.state.schema), [history.state.schema]);
-  const originalContent = useMemo(() => JSON.stringify(parsed.schema), [parsed.schema]);
-  const exportedContent = exportValidation.blocked ? "" : serializedContent;
+  const serializedContent = useMemo(() => serializeReportDesignerV3(history.state.schema), [history.state.schema]);
+  const originalContent = useMemo(() => serializeReportDesignerV3(parsed.schema), [parsed.schema]);
+  const exportedContent = exportValidation.blocked || pendingTextBlocked ? "" : serializedContent;
   const pageSize = reportDesignerV3PageSize(history.state.schema.page);
   const visibleFieldGroups = useMemo(() => filterFieldGroups(fieldGroups.map(group => ({ ...group, fields: group.fields.filter(field => field.value.startsWith("item.") === productFieldsOnly) })).filter(group => group.fields.length), fieldQuery), [fieldGroups, fieldQuery, productFieldsOnly]);
   useEffect(() => {
     setDraftEnabled(false);
+    setTextDraft(null);
     setGridCellSelection(null);
   }, [content, reportType]);
   const schemaChanged = serializedContent !== originalContent;
-  const draftDirty = sourceValid && draftEnabled && schemaChanged;
-  useEffect(() => {
+  const draftDirty = sourceValid && (draftEnabled && schemaChanged || pendingTextChanged);
+  useLayoutEffect(() => {
     onDesignerDraftChange?.({
-      content: draftDirty && !exportValidation.blocked ? exportedContent : "",
-      isDirty: draftDirty || imageUploading,
-      isValid: sourceValid && !exportValidation.blocked && !imageUploading,
+      content: draftDirty ? exportedContent : "",
+      isDirty: draftDirty || imageUploading || pendingInputs.size > 0,
+      isValid: sourceValid && !exportValidation.blocked && !pendingTextChanged && !pendingTextBlocked && !imageUploading && pendingInputs.size === 0,
+      hasPendingCommit: editingEnabled && pendingTextChanged && !pendingTextBlocked && !exportValidation.blocked && !imageUploading && pendingInputs.size === 0,
+      commitPending: commitPendingText,
     });
-  }, [sourceValid, draftDirty, exportValidation.blocked, exportedContent, imageUploading, onDesignerDraftChange]);
-  const editingEnabled = editable && sourceValid;
+  }, [sourceValid, draftDirty, exportValidation.blocked, exportedContent, pendingTextChanged, pendingTextBlocked, imageUploading, pendingInputs, editingEnabled, commitPendingText, onDesignerDraftChange]);
   const { hasClipboard, canCopyStyle, canPasteStyle, copySelection, pasteClipboard, copyStyle, pasteStyle } = useReportDesignerV3Clipboard({
     state: history.state, editable: editingEnabled, content, reportType, onCommit: commit, onNotice: setCapacityNotice,
   });
@@ -217,7 +246,7 @@ export function ReportDesignerV3Workspace({
   function setManualZoom(value: number) { setAutoFit(false); setZoom(clampReportDesignerV3Zoom(value)); }
   async function reloadDesign() {
     const current = historyRef.current.state.schema;
-    if (draftDirty && !await confirmation({ title: "重新载入模板", description: "将放弃本次未保存的修改，恢复到打开时的模板。", confirmLabel: "放弃修改并载入", tone: "warning" })) return;
+    if ((draftDirty || pendingInputs.size > 0) && !await confirmation({ title: "重新载入模板", description: "将放弃本次未保存的修改，恢复到打开时的模板。", confirmLabel: "放弃修改并载入", tone: "warning" })) return;
     if (historyRef.current.state.schema !== current || documentContentRef.current !== content) return;
     history.reset(parsed.schema);
     setDraftEnabled(false);
@@ -318,6 +347,7 @@ export function ReportDesignerV3Workspace({
   historyRef.current = history;
   useReportDesignerV3Shortcuts({ workspaceRef, history, editable: editingEnabled, commit, copySelection, pasteClipboard, duplicateSelection, clearSelection });
   return (
+    <ReportDesignerPendingInputContext.Provider value={registerPendingInput}>
     <ReportDesignerUploadState.Provider value={setImageUploading}>
     <ReportDesignerPreviewProvider fieldGroups={fieldGroups}>
     <section ref={workspaceRef} className="report-designer-v3-workspace" data-compact-panel={compactPanel} aria-label="报表模板可视化设计器">
@@ -335,7 +365,7 @@ export function ReportDesignerV3Workspace({
             <span>重新载入</span>
           </button>
           <span className="report-designer-v3-element-count">{countElements(history.state.schema)} 个元素</span>
-          <span className="report-designer-v3-element-count" role="status">{imageUploading ? "图片上传中" : draftDirty ? "有未保存的修改" : "与已载入模板一致"}</span>
+          <span className="report-designer-v3-element-count" role="status">{imageUploading ? "图片上传中" : pendingInputs.size ? "有尚未确认的字段输入" : draftDirty ? "有未保存的修改" : "与已载入模板一致"}</span>
         </div>
       </header>
       {editingEnabled ? <details className="report-designer-v3-quick-start"><summary>第一次使用？三步修改模板</summary>
@@ -359,6 +389,7 @@ export function ReportDesignerV3Workspace({
       ) : null}
       {capacityNotice ? <div className="report-designer-v3-notice warning" role="status"><strong>添加字段提示</strong><span>{capacityNotice}</span></div> : null}
       {imageUploading ? <div className="report-designer-v3-notice" role="status">图片正在上传，完成后可保存。</div> : null}
+      {pendingTextBlocked && <div className="report-designer-v3-notice warning" role="alert">文字编辑目标已锁定，解锁或取消此处输入后可继续保存。</div>}
       <div className="report-designer-v3-editing-surface">
       <div className="report-designer-v3-toolbar" role="toolbar" aria-label="设计器工具栏">
         {editingEnabled ? <>
@@ -459,11 +490,12 @@ export function ReportDesignerV3Workspace({
             onCommitLayerBand={(role, height) => commit(setReportDesignerLayerRoleHeight(history.state, role, height))}
             onClearSelection={clearSelection}
             onCommitText={commitCanvasText}
+            onTextDraftChange={setTextDraft}
             onDropField={dropField}
           />
         </main>
 
-        {editingEnabled ? <aside className="report-designer-v3-inspector">
+        {editingEnabled || pendingInputs.size > 0 ? <aside className="report-designer-v3-inspector">
           {history.state.selectedIds.length > 1 ? (
             <MultiElementInspector
               state={history.state}
@@ -501,6 +533,7 @@ export function ReportDesignerV3Workspace({
     </section>
     </ReportDesignerPreviewProvider>
     </ReportDesignerUploadState.Provider>
+    </ReportDesignerPendingInputContext.Provider>
   );
 }
 

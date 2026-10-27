@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReportDesignerV3Schema } from "./reportDesignerV3Schema.ts";
 import type { ReportDesignerV3DocumentState } from "./reportDesignerV3Mutations.ts";
 import { createReportDesignerV3DocumentState } from "./reportDesignerV3Mutations.ts";
+import { estimateReportDesignerV3Bytes } from "./reportDesignerV3Serialization.ts";
 
 type HistoryState = {
   past: ReportDesignerV3DocumentState[];
@@ -18,7 +19,6 @@ type CommitOptions = {
 // count alone can still reserve too much memory after repeated bulk edits.
 export const REPORT_DESIGNER_V3_HISTORY_MAX_ENTRIES = 40;
 export const REPORT_DESIGNER_V3_HISTORY_MAX_ESTIMATED_BYTES = 12 * 1024 * 1024;
-const stateSizeCache = new WeakMap<object, number>();
 
 export function useReportDesignerV3History(initialSchema: ReportDesignerV3Schema) {
   const initialState = useMemo(() => createReportDesignerV3DocumentState(initialSchema), [initialSchema]);
@@ -119,12 +119,8 @@ function estimateHistoryBytes(
 function estimateStateBytes(state: ReportDesignerV3DocumentState) {
   // This guard runs only at commit/undo boundaries, never while the pointer
   // moves, so an accurate-enough estimate cannot slow canvas dragging.
-  const cached = stateSizeCache.get(state.schema);
-  if (cached !== undefined) return cached;
   try {
-    const bytes = JSON.stringify(state.schema).length * 2;
-    stateSizeCache.set(state.schema, bytes);
-    return bytes;
+    return estimateReportDesignerV3Bytes(state.schema);
   } catch {
     return REPORT_DESIGNER_V3_HISTORY_MAX_ESTIMATED_BYTES;
   }

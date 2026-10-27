@@ -8,6 +8,8 @@ export type ReportDesignerTextTarget = { elementId: string } & (
   | { kind: "DetailHeader"; columnId: string }
 );
 
+export type ReportDesignerCanvasTextDraft = ReportDesignerTextTarget & { text: string };
+
 export function readDesignerCanvasText(element: ReportDesignerV3Element, target: ReportDesignerTextTarget) {
   if (target.kind === "Text" && element.type === "Text") return element.text;
   if (target.kind === "GridCell" && element.type === "Flow" && element.block.type === "Grid") {

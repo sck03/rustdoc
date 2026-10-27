@@ -1,5 +1,6 @@
 import { type ChangeEvent as ReactChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useReportDesignerPointerGesture } from "./useReportDesignerPointerGesture.ts";
+import { useReportDesignerPendingInput } from "./ReportDesignerPendingInputContext.tsx";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type { ReportBorderStyle, ReportTextStyle } from "./reportDesignerSchema.ts";
 import { normalizeDesignerFieldPath } from "./reportDesignerMutations.ts";
@@ -105,6 +106,7 @@ export function CommitTextField({
   multiline = false,
   placeholder,
   rows = 3,
+  affectsDocument = true,
 }: {
   value: string;
   onCommit: (value: string) => void;
@@ -112,9 +114,11 @@ export function CommitTextField({
   multiline?: boolean;
   placeholder?: string;
   rows?: number;
+  affectsDocument?: boolean;
 }) {
   const [draft, setDraft] = useState(value);
   const [focused, setFocused] = useState(false);
+  useReportDesignerPendingInput(affectsDocument && focused && draft !== value);
   const cancelOnBlur = useRef(false);
   useEffect(() => setDraft(value), [value]);
   function commit() {
@@ -137,8 +141,8 @@ export function CommitTextField({
   };
   const input = {
     disabled, placeholder, value: focused ? draft : value, onChange, onKeyDown,
-    onFocus: () => { setDraft(value); setFocused(true); },
-    onBlur: () => { setFocused(false); commit(); },
+    onFocus: () => { if (!focused) setDraft(value); setFocused(true); },
+    onBlur: () => { if (!disabled) { setFocused(false); commit(); } },
   };
   return multiline ? <textarea {...input} rows={rows} /> : <input {...input} type="text" />;
 }

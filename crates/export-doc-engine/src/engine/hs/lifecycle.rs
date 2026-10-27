@@ -1,29 +1,87 @@
 use super::*;
 use crate::engine::{error::unavailable, import_previews};
 
-pub(super) fn handle(
+pub(super) fn preview(service: &NativeService, actor: &Actor) -> Result<Value> {
+    use export_doc_storage::{DataScope, GenericQuery};
+    let now = service.clock.now().map_err(unavailable)?.utc_now;
+    let (total, items) = service
+        .store
+        .read_for(actor, PREVIEW_HS_CODE_CLEANUP, &[], |tx, _| {
+            let total = tx
+                .query_generic(&GenericQuery {
+                    kind: CODES,
+                    scope: DataScope {
+                        all: true,
+                        ..Default::default()
+                    },
+                    filters: &[],
+                    keyword: "",
+                    search_root: None,
+                    fields: &[("id", "id")],
+                    offset: 0,
+                    limit: 1,
+                })?
+                .0;
+            let fields = [
+                ("id", "id"),
+                ("status", "status"),
+                ("updateTime", "updateTime"),
+            ];
+            let mut query = crate::engine::hs_queries::query(CODES, &fields);
+            let mut items = vec![];
+            loop {
+                operation::check()?;
+                let rows = tx.query_hs(&query)?;
+                let count = rows.len() as i64;
+                for row in rows {
+                    operation::check()?;
+                    if !hs::cleanup_eligible_state(
+                        row["status"].as_str().unwrap_or(""),
+                        row["updateTime"].as_str(),
+                        now,
+                    ) {
+                        continue;
+                    }
+                    let id = row["id"]
+                        .as_i64()
+                        .filter(|id| *id > 0)
+                        .ok_or_else(|| unavailable("编码记录编号损坏。"))?;
+                    let dto: ApiHsCodeDto = serde_json::from_value(contracts::project(
+                        contracts::schema("ApiHsCodeDto"),
+                        store::get(tx, CODES, id)?,
+                    ))?;
+                    items.push(serde_json::to_value(dto)?);
+                    if items.len() == MAX_BATCH {
+                        break;
+                    }
+                }
+                query.offset += count;
+                if count < query.limit || items.len() == MAX_BATCH {
+                    break;
+                }
+            }
+            Ok((total as usize, items))
+        })?;
+    let prepared = import_previews::prepare("hs-cleanup", &items)?;
+    let token =
+        service
+            .store
+            .transaction_for(actor, PREVIEW_HS_CODE_CLEANUP, &[], |tx, actor| {
+                import_previews::save_prepared(tx, actor, &service.clock, &prepared)
+            })?;
+    let mut value = json!({"token":token,"eligibleCount":items.len(),"retainedCount":total-items.len(),
+        "policy":"仅清理已人工确认作废且最后更新满 12 个日历月的编码。未导入新年度资料不会导致编码清理；有效、参考、疑似作废及日期不明的编码保留。每批最多 5000 条，预检 30 分钟内有效，确认后才删除目录记录；历史单据、商品、申报实例和替代关系保留。"});
+    value["items"] = Value::Array(items);
+    Ok(value)
+}
+
+pub(super) fn commit(
     service: &NativeService,
     tx: &Connection,
     actor: &Actor,
-    operation: Operation,
     body: &Value,
 ) -> Result<Value> {
     let now = service.clock.now().map_err(unavailable)?.utc_now;
-    if operation == PREVIEW_HS_CODE_CLEANUP {
-        let rows = codes(tx)?;
-        let total = rows.len();
-        let items = rows
-            .values()
-            .filter(|row| hs::cleanup_eligible(row, now))
-            .take(5000)
-            .map(serde_json::to_value)
-            .collect::<std::result::Result<Vec<_>, _>>()?;
-        let token = import_previews::save(tx, actor, &service.clock, "hs-cleanup", &items)?;
-        return Ok(
-            json!({"token":token,"eligibleCount":items.len(),"retainedCount":total-items.len(),"items":items,
-            "policy":"仅清理已确认失效且最后更新已满一年的编码，每批最多 5000 条；疑似失效、年度待复核和日期不明的编码保留。历史单据、商品、申报实例及替代关系保持原记录。预检 30 分钟内有效。"}),
-        );
-    }
     let rows = import_previews::consume(
         tx,
         actor,

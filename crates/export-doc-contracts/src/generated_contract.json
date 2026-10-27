@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "27589cee6636014f08f1f40227d2cf1dddcfaccb94d950916ab193fcbeb99965",
+  "digest": "877af44ae5ae4daf9f56ab804943ab03832111cab4a1cb6614d9174033bc923e",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -11492,6 +11492,98 @@
         "$ref": "#/components/schemas/ApiHsCodeImportCommitResponse"
       }
     },
+    "CommitUserReportTemplateHistoryCleanup": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": {
+          "readModule": "document.reports",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": null,
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [
+          {
+            "resourceKey": "document.report-templates",
+            "action": "archive"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiTemplateHistoryCleanupCommitRequest"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiCommandResponse"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not Found"
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/ApiTemplateHistoryCleanupCommitRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/ApiCommandResponse"
+      }
+    },
     "CompleteCrmFollowUp": {
       "policy": {
         "requiresAuthentication": true,
@@ -12557,6 +12649,69 @@
         "action": "read",
         "resource": "office.announcements",
         "permission": "view"
+      }
+    },
+    "ConfirmHsCodesObsolete": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": {
+          "readModule": "document.hs-knowledge",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": "manage",
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiHsCodeObsoleteRequest"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiCommandResponse"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "409": {
+          "description": "Conflict"
+        },
+        "503": {
+          "description": "Service Unavailable"
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/ApiHsCodeObsoleteRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/ApiCommandResponse"
       }
     },
     "ConfirmPersonnel": {
@@ -19042,6 +19197,15 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": "integer",
             "format": "int32"
+          }
+        },
+        {
+          "name": "expectedRowVersion",
+          "in": "query",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "minLength": 1
           }
         }
       ],
@@ -29258,6 +29422,88 @@
         "$ref": "#/components/schemas/ApiUserReportTemplateDto"
       }
     },
+    "GetUserReportTemplateHistoryRetention": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": {
+          "readModule": "document.reports",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": null,
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [
+          {
+            "resourceKey": "document.report-templates",
+            "action": "view"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        {
+          "name": "retainLatest",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "format": "int32",
+            "default": 20,
+            "minimum": 5,
+            "maximum": 200
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiTemplateHistoryRetention"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not Found"
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/ApiTemplateHistoryRetention"
+      }
+    },
     "GetWorklist": {
       "policy": {
         "requiresAuthentication": true,
@@ -38308,6 +38554,58 @@
         "$ref": "#/components/schemas/ApiHsCodeImportPreviewResponse"
       }
     },
+    "PreviewHsCodesObsolete": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": {
+          "readModule": "document.hs-knowledge",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": "manage",
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiHsCodeObsoletePreview"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "409": {
+          "description": "Conflict"
+        },
+        "503": {
+          "description": "Service Unavailable"
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/ApiHsCodeObsoletePreview"
+      }
+    },
     "PreviewInvoiceDocumentPackageHtml": {
       "policy": {
         "requiresAuthentication": true,
@@ -39324,6 +39622,98 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceTransferPreviewResponse"
+      }
+    },
+    "PreviewUserReportTemplateHistoryCleanup": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": {
+          "readModule": "document.reports",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": null,
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [
+          {
+            "resourceKey": "document.report-templates",
+            "action": "archive"
+          }
+        ],
+        "permissionBypass": false
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiTemplateHistoryCleanupPreviewRequest"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiTemplateHistoryCleanupPreview"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "404": {
+          "description": "Not Found"
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/ApiTemplateHistoryCleanupPreviewRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/ApiTemplateHistoryCleanupPreview"
       }
     },
     "PublishAnnouncement": {
@@ -66817,7 +67207,8 @@
     },
     "ApiHsCodeBatchDeleteRequest": {
       "required": [
-        "ids"
+        "ids",
+        "expectedVersions"
       ],
       "type": "object",
       "properties": {
@@ -66830,6 +67221,14 @@
               "string"
             ],
             "format": "int32"
+          }
+        },
+        "expectedVersions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5000,
+          "items": {
+            "$ref": "#/components/schemas/ApiHsCodeVersionReference"
           }
         }
       }
@@ -67083,6 +67482,15 @@
           "default": false,
           "readOnly": true,
           "description": "Active evidence belongs to another business year; it cannot be used as a current tariff."
+        },
+        "obsoleteReason": {
+          "type": "string",
+          "readOnly": true
+        },
+        "obsoletedAt": {
+          "type": "string",
+          "format": "date-time",
+          "readOnly": true
         }
       }
     },
@@ -67535,6 +67943,95 @@
         }
       }
     },
+    "ApiHsCodeMaintenanceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "code",
+        "name",
+        "status",
+        "rowVersion"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "code": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "rowVersion": {
+          "type": "string"
+        },
+        "updateTime": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "ApiHsCodeObsoletePreview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "totalCount",
+        "maxBatchCount",
+        "policy"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 5000,
+          "items": {
+            "$ref": "#/components/schemas/ApiHsCodeMaintenanceItem"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "maxBatchCount": {
+          "type": "integer",
+          "default": 5000
+        },
+        "policy": {
+          "type": "string"
+        }
+      }
+    },
+    "ApiHsCodeObsoleteRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items",
+        "reason"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5000,
+          "items": {
+            "$ref": "#/components/schemas/ApiHsCodeVersionReference"
+          }
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      }
+    },
     "ApiHsCodeRemoteDetailResolutionResponse": {
       "required": [
         "items",
@@ -67680,6 +68177,25 @@
           ],
           "format": "int32",
           "default": 0
+        }
+      }
+    },
+    "ApiHsCodeVersionReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "rowVersion"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "rowVersion": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
@@ -77138,6 +77654,144 @@
         }
       }
     },
+    "ApiTemplateHistoryCleanupCommitRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "token",
+        "reason"
+      ],
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        }
+      }
+    },
+    "ApiTemplateHistoryCleanupItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "recordVersion",
+        "versionNumber",
+        "byteLength"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "recordVersion": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "versionNumber": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "byteLength": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "ApiTemplateHistoryCleanupPreview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "token",
+        "templateVersion",
+        "retention",
+        "items"
+      ],
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "templateVersion": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "retention": {
+          "$ref": "#/components/schemas/ApiTemplateHistoryRetention"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 5000,
+          "items": {
+            "$ref": "#/components/schemas/ApiTemplateHistoryCleanupItem"
+          }
+        }
+      }
+    },
+    "ApiTemplateHistoryCleanupPreviewRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "retainLatest": {
+          "type": "integer",
+          "format": "int32",
+          "default": 20,
+          "minimum": 5,
+          "maximum": 200
+        }
+      }
+    },
+    "ApiTemplateHistoryRetention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "totalCount",
+        "totalBytes",
+        "eligibleCount",
+        "eligibleBytes",
+        "retainLatest",
+        "maxCleanupCount",
+        "policy",
+        "canClean"
+      ],
+      "properties": {
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "totalBytes": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "eligibleCount": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "eligibleBytes": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "retainLatest": {
+          "type": "integer",
+          "format": "int32",
+          "default": 20,
+          "minimum": 5,
+          "maximum": 200
+        },
+        "maxCleanupCount": {
+          "type": "integer",
+          "format": "int32",
+          "default": 5000
+        },
+        "policy": {
+          "type": "string"
+        },
+        "canClean": {
+          "type": "boolean"
+        }
+      }
+    },
     "ApiUnitDto": {
       "required": [
         "id",
@@ -77601,6 +78255,10 @@
             "string"
           ],
           "format": "int32"
+        },
+        "canManageHistory": {
+          "type": "boolean",
+          "readOnly": true
         }
       }
     },

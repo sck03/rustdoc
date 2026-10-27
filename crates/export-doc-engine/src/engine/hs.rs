@@ -13,12 +13,14 @@ use export_doc_storage::{AuditWrite, Connection};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 mod lifecycle;
+mod mutations;
 
 pub const CODES: &str = "hs-codes";
 pub const EXAMPLES: &str = "hs-examples";
 pub const FEEDBACK: &str = "hs-feedback";
 pub const REPLACEMENTS: &str = "hs-replacements";
 pub const CANDIDATES: &str = "hs-candidates";
+pub(super) use export_doc_contracts::hs_maintenance::MAX_BATCH;
 pub const OPERATIONS: &[Operation] = &[
     LIST_HS_CODES,
     GET_HS_CODE,
@@ -30,6 +32,8 @@ pub const OPERATIONS: &[Operation] = &[
     CLEAR_ALL_HS_CODES,
     PREVIEW_HS_CODE_CLEANUP,
     COMMIT_HS_CODE_CLEANUP,
+    CONFIRM_HS_CODES_OBSOLETE,
+    PREVIEW_HS_CODES_OBSOLETE,
     SEARCH_HS_CODE_KNOWLEDGE,
     SEARCH_INVOICE_HS_CODE_KNOWLEDGE,
     LIST_HS_CODE_KNOWLEDGE_EXAMPLES,
@@ -104,6 +108,12 @@ pub fn handle(
     query: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
+    if operation == PREVIEW_HS_CODE_CLEANUP {
+        return Ok(contracts::project(
+            contracts::response(operation.id),
+            lifecycle::preview(service, actor)?,
+        ));
+    }
     let today = service
         .clock
         .now()
@@ -111,9 +121,9 @@ pub fn handle(
         .today;
     let year = today.year();
     let execute = |tx: &Connection, actor: &Actor| match operation {
-        PREVIEW_HS_CODE_CLEANUP | COMMIT_HS_CODE_CLEANUP => {
-            lifecycle::handle(service, tx, actor, operation, body)
-        }
+        COMMIT_HS_CODE_CLEANUP => lifecycle::commit(service, tx, actor, body),
+        CONFIRM_HS_CODES_OBSOLETE => mutations::confirm_obsolete(service, tx, actor, body),
+        PREVIEW_HS_CODES_OBSOLETE => mutations::preview_obsolete(tx),
         LIST_HS_CODES => {
             let filter = hs::text(read(query, "keyword"));
             if filter.chars().count() > 500 {
@@ -146,20 +156,17 @@ pub fn handle(
             }
             save_code(tx, actor, &body, false)
         }
-        DELETE_HS_CODE | DELETE_HS_CODES_BATCH | CLEAR_ALL_HS_CODES => {
-            let ids = if operation == DELETE_HS_CODE {
-                BTreeSet::from([id(parameters)?])
-            } else if operation == CLEAR_ALL_HS_CODES {
-                if text(body, "confirmation") != "CLEAR" {
-                    return Err(invalid("请输入 CLEAR 确认清空税则主档。"));
-                }
-                store::all(tx, CODES)?
-                    .iter()
-                    .filter_map(|r| r["id"].as_i64())
-                    .collect()
-            } else {
-                ids(body)?
-            };
+        DELETE_HS_CODE | DELETE_HS_CODES_BATCH => {
+            mutations::delete_codes(tx, actor, operation, parameters, query, body)
+        }
+        CLEAR_ALL_HS_CODES => {
+            if text(body, "confirmation") != "CLEAR" {
+                return Err(invalid("请输入 CLEAR 确认清空税则主档。"));
+            }
+            let ids = store::all(tx, CODES)?
+                .iter()
+                .filter_map(|r| r["id"].as_i64())
+                .collect();
             let count = delete(tx, actor, CODES, &ids)?;
             Ok(
                 json!({"success":true,"message":format!("已删除 {count} 个编码。"),"deletedCount":count}),
@@ -203,6 +210,7 @@ pub fn handle(
         SEARCH_INVOICE_HS_CODE_KNOWLEDGE,
         LIST_HS_CODE_KNOWLEDGE_EXAMPLES,
         LIST_HS_CODE_REMOTE_CANDIDATES,
+        PREVIEW_HS_CODES_OBSOLETE,
     ]
     .contains(&operation)
     {
@@ -274,6 +282,16 @@ pub fn save_code(tx: &Connection, actor: &Actor, body: &Value, managed: bool) ->
     {
         return Ok(previous.unwrap());
     }
+    if !managed
+        && previous
+            .as_ref()
+            .is_some_and(|row| row["status"] != dto.status)
+    {
+        return Err(invalid("编码状态须通过确认作废或年度税则导入变更。"));
+    }
+    if !managed && previous.is_none() && dto.status != "ReferenceOnly" {
+        return Err(invalid("手工新建编码只能作为参考资料。"));
+    }
     let record_id = previous
         .as_ref()
         .and_then(|r| r["id"].as_i64())
@@ -291,6 +309,15 @@ pub fn save_code(tx: &Connection, actor: &Actor, body: &Value, managed: bool) ->
     };
     dto.update_time = Some(store::timestamp());
     let mut value = serde_json::to_value(&dto)?;
+    for field in ["obsoleteReason", "obsoletedAt"] {
+        if managed && dto.status == "Active" {
+            value.as_object_mut().unwrap().remove(field);
+        } else if let Some(saved) = previous.as_ref().and_then(|row| row.get(field)) {
+            value[field] = saved.clone();
+        } else {
+            value.as_object_mut().unwrap().remove(field);
+        }
+    }
     value["expectedVersion"] = json!(expected);
     store::save(
         tx,
@@ -305,7 +332,7 @@ pub fn save_code(tx: &Connection, actor: &Actor, body: &Value, managed: bool) ->
 pub fn ids(body: &Value) -> Result<BTreeSet<i64>> {
     let ids: Vec<i64> = serde_json::from_value(body["ids"].clone())
         .map_err(|_| invalid("请选择有效的记录编号。"))?;
-    if ids.is_empty() || ids.len() > 5000 || ids.iter().any(|id| *id <= 0) {
+    if ids.is_empty() || ids.len() > MAX_BATCH || ids.iter().any(|id| *id <= 0) {
         return Err(invalid("一次最多选择 5000 条有效记录。"));
     }
     Ok(ids.into_iter().collect())

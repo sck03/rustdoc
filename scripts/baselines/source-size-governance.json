@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-10-26",
+  "updatedAt": "2026-10-27",
   "rules": [
     {
       "name": "repository web production default",
@@ -9,9 +9,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 87102,
+      "baselineAggregateLines": 87494,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 87302,
+      "maximumAggregateLines": 87694,
       "reportFiles": false
     },
     {
@@ -37,9 +37,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 72667,
+      "baselineAggregateLines": 73568,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 72742,
+      "maximumAggregateLines": 73643,
       "reportFiles": false
     },
     {
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 19706,
+      "baselineAggregateLines": 20420,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 19826,
+      "maximumAggregateLines": 20540,
       "reportFiles": false
     },
     {

@@ -1,4 +1,5 @@
 //! Template ownership, publication, sharing and version queries.
+mod history_retention;
 mod mutations;
 pub(crate) mod policy;
 pub(super) mod queries;
@@ -32,6 +33,9 @@ pub const OPERATIONS: &[Operation] = &[
     ARCHIVE_USER_REPORT_TEMPLATE,
     LIST_USER_REPORT_TEMPLATE_VERSIONS,
     RESTORE_USER_REPORT_TEMPLATE_VERSION,
+    GET_USER_REPORT_TEMPLATE_HISTORY_RETENTION,
+    PREVIEW_USER_REPORT_TEMPLATE_HISTORY_CLEANUP,
+    COMMIT_USER_REPORT_TEMPLATE_HISTORY_CLEANUP,
 ];
 
 pub fn report_type(value: &str) -> Result<&'static str> {
@@ -141,7 +145,8 @@ fn record(actor: &Actor, value: &Value, content: bool, settings: &Value) -> Valu
         "canShare":(["Published","Disabled"].contains(&state.as_str())&&allowed("share")),
         "canDisable":state=="Published"&&allowed("deactivate"),
         "canRestore":(["Disabled","Archived"].contains(&state.as_str())&&allowed("restore")),
-        "canArchive":state!="Archived"&&allowed("archive")
+        "canArchive":state!="Archived"&&allowed("archive"),
+        "canManageHistory":policy::can_manage(actor,value,"archive")
     });
     if content {
         output["contentHtml"] = value["contentHtml"].clone();
@@ -165,6 +170,22 @@ pub fn handle(
     body: &Value,
 ) -> Result<Value> {
     let store = &service.store;
+    if [
+        GET_USER_REPORT_TEMPLATE_HISTORY_RETENTION,
+        PREVIEW_USER_REPORT_TEMPLATE_HISTORY_CLEANUP,
+        COMMIT_USER_REPORT_TEMPLATE_HISTORY_CLEANUP,
+    ]
+    .contains(&operation)
+    {
+        return history_retention::handle(
+            service,
+            actor,
+            operation,
+            parameters,
+            query_values,
+            body,
+        );
+    }
     if operation == LIST_USER_REPORT_TEMPLATES {
         return queries::list(service, actor, query_values);
     }

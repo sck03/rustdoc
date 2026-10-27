@@ -1,5 +1,7 @@
 use export_doc_engine::{api::ApiError, contracts, generated_api::*};
 use serde_json::{Value, json};
+#[path = "hs_maintenance_contract.rs"]
+mod hs_maintenance;
 
 pub fn exercise(
     call: &impl Fn(
@@ -98,4 +100,5 @@ pub fn exercise(
     changed["notes"] = json!("仅供参考");
     update(changed).unwrap();
     reject(update(row), 409);
+    hs_maintenance::exercise(call);
 }

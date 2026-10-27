@@ -16,6 +16,7 @@ export function useReportTemplateEditingActions({
   canManageTemplates,
   canRenderTemplatePreview,
   content,
+  readContent,
   currentUserTemplateCanEdit,
   isUserTemplate,
   reportType,
@@ -38,15 +39,16 @@ export function useReportTemplateEditingActions({
   canManageTemplates: boolean;
   canRenderTemplatePreview: boolean;
   content: string;
+  readContent?: () => string | null;
   currentUserTemplateCanEdit: boolean;
   isUserTemplate: boolean;
   reportType: ReportTypeOption;
   selectedTemplateContentActive: boolean;
   selectedTemplatePath: string;
   templatePreviewMode: TemplatePreviewMode;
-  renderInvoicePreview: () => void;
-  renderPaymentPreview: () => void;
-  renderSamplePreview: () => void;
+  renderInvoicePreview: (content?: string) => void;
+  renderPaymentPreview: (content?: string) => void;
+  renderSamplePreview: (content?: string) => void;
   saveDefaultTemplateContent: (content: string) => void;
   saveUserTemplateContent: (content: string) => void;
   setMessage: Dispatch<SetStateAction<string | null>>;
@@ -107,17 +109,21 @@ export function useReportTemplateEditingActions({
     if (!canRenderTemplatePreview) {
       return;
     }
+    const nextContent = readContent ? readContent() : content;
+    if (nextContent === null) {
+      setMessage("当前草稿不能预览，请先确认输入并修正模板结构。"); setMessageType("error"); return;
+    }
 
     setWorkspaceMode("preview");
     if (templatePreviewMode === "sample") {
-      renderSamplePreview();
+      renderSamplePreview(nextContent);
       return;
     }
 
     if (reportType === "PaymentVoucher") {
-      renderPaymentPreview();
+      renderPaymentPreview(nextContent);
     } else {
-      renderInvoicePreview();
+      renderInvoicePreview(nextContent);
     }
   }
 

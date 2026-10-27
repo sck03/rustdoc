@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ensureCurrentSelectOption, type SelectOption } from "./ReportDesignerPropertyControls.tsx";
 import { formatNumber } from "./reportDesignerV3WorkspaceHelpers.tsx";
+import { useReportDesignerPendingInput } from "./ReportDesignerPendingInputContext.tsx";
 
 export function SelectField({ label, value, options, disabled = false, className, onChange }: { label: string; value: string; options: SelectOption[]; disabled?: boolean; className?: string; onChange: (value: string) => void }) {
   const safeOptions = ensureCurrentSelectOption(options, value);
@@ -22,6 +23,7 @@ export function NumberField(props: NumberFieldProps) {
   const formatted = value === undefined ? "" : formatNumber(value, precision);
   const [draft, setDraft] = useState(formatted);
   const [focused, setFocused] = useState(false);
+  useReportDesignerPendingInput(focused && draft !== formatted);
   const cancelOnBlur = useRef(false);
   useEffect(() => setDraft(formatted), [formatted]);
   function commit() {
@@ -45,7 +47,7 @@ export function NumberField(props: NumberFieldProps) {
   // Native validation sees the displayed precision; the model retains exact bounds.
   const displayMin = Number(formatNumber(min, precision));
   const displayMax = Number(formatNumber(max, precision));
-  return <label><span>{label}</span><input type="number" inputMode={step === 1 ? "numeric" : "decimal"} placeholder={props.optional ? "自动" : undefined} step={step === 1 ? 1 : "any"} min={displayMin} max={displayMax} disabled={disabled} value={focused ? draft : formatted} onFocus={() => { setFocused(true); setDraft(formatted); }} onChange={(event) => setDraft(event.target.value)} onBlur={() => { setFocused(false); commit(); }} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); cancelOnBlur.current = true; setDraft(formatted); event.currentTarget.blur(); } else if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} /></label>;
+  return <label><span>{label}</span><input type="number" inputMode={step === 1 ? "numeric" : "decimal"} placeholder={props.optional ? "自动" : undefined} step={step === 1 ? 1 : "any"} min={displayMin} max={displayMax} disabled={disabled} value={focused ? draft : formatted} onFocus={() => { if (!focused) setDraft(formatted); setFocused(true); }} onChange={(event) => setDraft(event.target.value)} onBlur={() => { if (!disabled) { setFocused(false); commit(); } }} onKeyDown={(event) => { if (event.nativeEvent.isComposing) return; if (event.key === "Escape") { event.preventDefault(); cancelOnBlur.current = true; setDraft(formatted); event.currentTarget.blur(); } else if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} /></label>;
 }
 
 export function focusDesignerNode(selector: string) {

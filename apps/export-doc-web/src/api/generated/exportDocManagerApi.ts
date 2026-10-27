@@ -1359,6 +1359,7 @@ export interface ApiHealthResponse {
 }
 
 export interface ApiHsCodeBatchDeleteRequest {
+  expectedVersions: ApiHsCodeVersionReference[];
   ids: number[];
 }
 
@@ -1395,6 +1396,8 @@ export interface ApiHsCodeDto {
   normalizedCode: string;
   notes: string;
   observedAt?: string | null;
+  obsoleteReason?: string;
+  obsoletedAt?: string;
   personalPostalTaxCode: string;
   preferentialTariffRate: string;
   rebateRate: string;
@@ -1499,6 +1502,27 @@ export interface ApiHsCodeKnowledgeImportResponse {
   warnings: string[];
 }
 
+export interface ApiHsCodeMaintenanceItem {
+  code: string;
+  id: number;
+  name: string;
+  rowVersion: string;
+  status: string;
+  updateTime?: string | null;
+}
+
+export interface ApiHsCodeObsoletePreview {
+  items: ApiHsCodeMaintenanceItem[];
+  maxBatchCount: number;
+  policy: string;
+  totalCount: number;
+}
+
+export interface ApiHsCodeObsoleteRequest {
+  items: ApiHsCodeVersionReference[];
+  reason: string;
+}
+
 export interface ApiHsCodeRemoteDetailResolutionResponse {
   items: ApiHsCodeDto[];
   message: string;
@@ -1531,6 +1555,11 @@ export interface ApiHsCodeSearchResponse {
   source: string;
   standardCodeCount: number;
   storagePolicy: string;
+}
+
+export interface ApiHsCodeVersionReference {
+  id: number;
+  rowVersion: string;
 }
 
 export interface ApiImportedCustomerDto {
@@ -3610,6 +3639,40 @@ export interface ApiSystemLogCleanupResponse {
   success: boolean;
 }
 
+export interface ApiTemplateHistoryCleanupCommitRequest {
+  reason: string;
+  token: string;
+}
+
+export interface ApiTemplateHistoryCleanupItem {
+  byteLength: number;
+  id: number;
+  recordVersion: number;
+  versionNumber: number;
+}
+
+export interface ApiTemplateHistoryCleanupPreview {
+  items: ApiTemplateHistoryCleanupItem[];
+  retention: ApiTemplateHistoryRetention;
+  templateVersion: number;
+  token: string;
+}
+
+export interface ApiTemplateHistoryCleanupPreviewRequest {
+  retainLatest?: number;
+}
+
+export interface ApiTemplateHistoryRetention {
+  canClean: boolean;
+  eligibleBytes: number;
+  eligibleCount: number;
+  maxCleanupCount: number;
+  policy: string;
+  retainLatest: number;
+  totalBytes: number;
+  totalCount: number;
+}
+
 export interface ApiUnitDto {
   code: string;
   id: number;
@@ -3698,6 +3761,7 @@ export interface ApiUserReportTemplateDto {
   canArchive: boolean;
   canDisable: boolean;
   canEdit: boolean;
+  canManageHistory?: boolean;
   canPublish: boolean;
   canRestore: boolean;
   canShare: boolean;
@@ -3713,6 +3777,10 @@ export interface ApiUserReportTemplateDto {
 
 export interface ApiUserReportTemplateLifecycleRequest {
   expectedVersion: number;
+}
+
+export interface ApiUserReportTemplateListItemDto {
+  canManageHistory?: boolean;
 }
 
 export interface ApiUserReportTemplateShareRequest {
@@ -5373,6 +5441,10 @@ export const ApiHsCodeDtoDefaults = {
   valueAddedTaxRate: "",
 } as const satisfies Partial<ApiHsCodeDto>;
 
+export const ApiHsCodeObsoletePreviewDefaults = {
+  maxBatchCount: 5000,
+} as const satisfies Partial<ApiHsCodeObsoletePreview>;
+
 export const ApiHsCodeSearchResponseDefaults = {
   declarationExampleCount: 0,
   standardCodeCount: 0,
@@ -5520,6 +5592,15 @@ export const ApiSupplierProductLinkSaveRequestDefaults = {
 export const ApiSupplierSaveRequestDefaults = {
   expectedVersion: 0,
 } as const satisfies Partial<ApiSupplierSaveRequest>;
+
+export const ApiTemplateHistoryCleanupPreviewRequestDefaults = {
+  retainLatest: 20,
+} as const satisfies Partial<ApiTemplateHistoryCleanupPreviewRequest>;
+
+export const ApiTemplateHistoryRetentionDefaults = {
+  maxCleanupCount: 5000,
+  retainLatest: 20,
+} as const satisfies Partial<ApiTemplateHistoryRetention>;
 
 export const ApiUnitDtoDefaults = {
   rowVersion: "",
@@ -5808,6 +5889,11 @@ export interface CommitHsCodesImportRequest {
   body: ApiHsCodeImportCommitRequest;
 }
 
+export interface CommitUserReportTemplateHistoryCleanupRequest {
+  id: number;
+  body: ApiTemplateHistoryCleanupCommitRequest;
+}
+
 export interface CompleteCrmFollowUpRequest {
   id: number;
   body: ApiCrmLifecycleRequest;
@@ -5846,6 +5932,10 @@ export interface CompleteTravelRequestRequest {
 export interface ConfirmAnnouncementReadRequest {
   id: number;
   body: AnnouncementRead;
+}
+
+export interface ConfirmHsCodesObsoleteRequest {
+  body: ApiHsCodeObsoleteRequest;
 }
 
 export interface ConfirmPersonnelRequest {
@@ -6160,6 +6250,7 @@ export interface DeleteExporterRequest {
 
 export interface DeleteHsCodeRequest {
   id: number;
+  expectedRowVersion: string;
 }
 
 export interface DeleteHsCodeKnowledgeExampleRequest {
@@ -6630,6 +6721,11 @@ export interface GetUnitRequest {
 
 export interface GetUserReportTemplateRequest {
   id: number;
+}
+
+export interface GetUserReportTemplateHistoryRetentionRequest {
+  id: number;
+  retainLatest?: number;
 }
 
 export interface GetWorklistRequest {
@@ -7212,6 +7308,11 @@ export interface PreviewUploadedExcelImportRequest {
 export interface PreviewUploadedInvoiceTransferPackageRequest {
   fileName?: string;
   body: Blob;
+}
+
+export interface PreviewUserReportTemplateHistoryCleanupRequest {
+  id: number;
+  body: ApiTemplateHistoryCleanupPreviewRequest;
 }
 
 export interface PublishAnnouncementRequest {
@@ -8674,6 +8775,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public commitUserReportTemplateHistoryCleanup(request: CommitUserReportTemplateHistoryCleanupRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
+    const path = `/api/reports/user-templates/${encodePath(request.id)}/versions/cleanup/commit`;
+    return this.request<ApiCommandResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public completeCrmFollowUp(request: CompleteCrmFollowUpRequest, init?: ApiRequestInit): Promise<ApiCrmFollowUpDto> {
     const path = `/api/crm/follow-ups/${encodePath(request.id)}/complete`;
     return this.request<ApiCrmFollowUpDto>("POST", path, {
@@ -8733,6 +8842,14 @@ export class ExportDocManagerApiClient {
   public confirmAnnouncementRead(request: ConfirmAnnouncementReadRequest, init?: ApiRequestInit): Promise<Announcement> {
     const path = `/api/office/announcements/${encodePath(request.id)}/read`;
     return this.request<Announcement>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public confirmHsCodesObsolete(request: ConfirmHsCodesObsoleteRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
+    const path = "/api/master-data/hs-codes/confirm-obsolete";
+    return this.request<ApiCommandResponse>("POST", path, {
       body: request.body,
       init,
     });
@@ -9293,7 +9410,12 @@ export class ExportDocManagerApiClient {
 
   public deleteHsCode(request: DeleteHsCodeRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/hs-codes/by-id/${encodePath(request.id)}`;
-    return this.request<ApiCommandResponse>("DELETE", path, { init });
+    return this.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedRowVersion": request.expectedRowVersion,
+      },
+      init,
+    });
   }
 
   public deleteHsCodeKnowledgeExample(request: DeleteHsCodeKnowledgeExampleRequest, init?: ApiRequestInit): Promise<void> {
@@ -10110,6 +10232,16 @@ export class ExportDocManagerApiClient {
   public getUserReportTemplate(request: GetUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}`;
     return this.request<ApiUserReportTemplateDto>("GET", path, { init });
+  }
+
+  public getUserReportTemplateHistoryRetention(request: GetUserReportTemplateHistoryRetentionRequest, init?: ApiRequestInit): Promise<ApiTemplateHistoryRetention> {
+    const path = `/api/reports/user-templates/${encodePath(request.id)}/versions/retention`;
+    return this.request<ApiTemplateHistoryRetention>("GET", path, {
+      query: {
+        "retainLatest": request.retainLatest,
+      },
+      init,
+    });
   }
 
   public getWorklist(request: GetWorklistRequest = {}, init?: ApiRequestInit): Promise<WorklistPage> {
@@ -11120,6 +11252,11 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public previewHsCodesObsolete(init?: ApiRequestInit): Promise<ApiHsCodeObsoletePreview> {
+    const path = "/api/master-data/hs-codes/obsolete/preview";
+    return this.request<ApiHsCodeObsoletePreview>("POST", path, { init });
+  }
+
   public previewInvoiceDocumentPackageHtml(request: PreviewInvoiceDocumentPackageHtmlRequest, init?: ApiRequestInit): Promise<ApiInvoiceDocumentPackagePreviewResponse> {
     const path = `/api/reports/invoices/${encodePath(request.invoiceId)}/document-package/html-preview`;
     return this.request<ApiInvoiceDocumentPackagePreviewResponse>("POST", path, {
@@ -11246,6 +11383,14 @@ export class ExportDocManagerApiClient {
       query: {
         "fileName": request.fileName,
       },
+      body: request.body,
+      init,
+    });
+  }
+
+  public previewUserReportTemplateHistoryCleanup(request: PreviewUserReportTemplateHistoryCleanupRequest, init?: ApiRequestInit): Promise<ApiTemplateHistoryCleanupPreview> {
+    const path = `/api/reports/user-templates/${encodePath(request.id)}/versions/cleanup/preview`;
+    return this.request<ApiTemplateHistoryCleanupPreview>("POST", path, {
       body: request.body,
       init,
     });

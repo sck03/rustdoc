@@ -9,7 +9,7 @@ import { startChrome, createPageSession, evaluate, captureScreenshot } from "./l
 import { navigationReorganizationUiFixture } from "./lib/navigation-reorganization-ui-fixture.mjs";
 
 const repo = path.resolve(import.meta.dirname, ".."), web = path.join(repo, "apps/export-doc-web");
-const output = path.join(repo, "artifacts/report-template-draft-ui");
+const output = path.join(repo, "artifacts/report-template-draft-ui", String(Date.now()));
 const require = createRequire(path.join(web, "package.json"));
 fs.mkdirSync(output, { recursive: true });
 const source = name => JSON.stringify(path.join(web, "src", name).split(path.sep).join("/"));
@@ -81,14 +81,14 @@ async function click(text, selector = "button") {
   await read(`(()=>{const node=[...document.querySelectorAll(${JSON.stringify(selector)})].find(node=>node.getClientRects().length&&!node.disabled&&node.textContent.trim()===${JSON.stringify(text)});if(!node)throw new Error('Missing button '+${JSON.stringify(text)});node.click()})()`);
 }
 async function input(selector, value) {
-  await read(`(()=>{const node=document.querySelector(${JSON.stringify(selector)});const proto=node instanceof HTMLSelectElement?HTMLSelectElement.prototype:HTMLTextAreaElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(node,${JSON.stringify(value)});node.dispatchEvent(new Event('input',{bubbles:true}));node.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await read(`(()=>{const node=document.querySelector(${JSON.stringify(selector)});const proto=node instanceof HTMLSelectElement?HTMLSelectElement.prototype:node instanceof HTMLInputElement?HTMLInputElement.prototype:HTMLTextAreaElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(node,${JSON.stringify(value)});node.dispatchEvent(new Event('input',{bubbles:true}));node.dispatchEvent(new Event('change',{bubbles:true}));})()`);
 }
-async function editText(value) {
+async function editText(value, confirm = true) {
  await read(`document.querySelector(${JSON.stringify(editor)}).dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`);
  const selector='textarea[aria-label="在画布编辑文字"]';
  await waitFor(`document.querySelector(${JSON.stringify(selector)})`);
  await input(selector,value);
- await read(`document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',ctrlKey:true,bubbles:true}))`);
+ if (confirm) await read(`document.querySelector(${JSON.stringify(selector)}).dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',ctrlKey:true,bubbles:true}))`);
  await settle();
 }
 async function open(scenario, file = false) {
@@ -119,6 +119,54 @@ try {
   await editText("NEW LOCAL DRAFT"); await waitFor(saveEnabled); await click("保存"); await settle();
   assert.equal(await read("window.__calls.filter(call=>call.name==='saveUser').at(-1).input.body.expectedVersion"), 2); assert.equal(await read(saveEnabled), false); await record("save-after-reload");
 
+  for (const fileTemplate of [false, true]) {
+    await open("classic", fileTemplate);
+    await editText("尚未确认的中文输入", false); await waitFor(saveEnabled);
+    await read("window.__remoteRefresh()"); await settle();
+    const inputSelector = 'textarea[aria-label="在画布编辑文字"]';
+    assert.equal(await read(`document.querySelector(${JSON.stringify(inputSelector)})?.value`), "尚未确认的中文输入");
+    await click("保存"); await waitFor("document.body.innerText.includes('版本冲突')");
+    const savedContent = await read(`window.__calls.filter(call=>call.name===${JSON.stringify(fileTemplate ? "saveFile" : "saveUser")}).at(-1).input.body.${fileTemplate ? "content" : "contentHtml"}`);
+    assert(savedContent.includes("尚未确认的中文输入"));
+    assert((await read(`document.querySelector(${JSON.stringify(inputSelector)})?.value ?? document.querySelector(${JSON.stringify(editor)})?.textContent`)).includes("尚未确认的中文输入"));
+    await click("返回模板管理"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("取消", ".confirmation-dialog button");
+    await settle();
+    assert((await read(`document.querySelector(${JSON.stringify(inputSelector)})?.value ?? document.querySelector(${JSON.stringify(editor)})?.textContent`)).includes("尚未确认的中文输入"));
+    await record(fileTemplate ? "pending-file-text-survives-refresh-save-conflict-and-leave" : "pending-user-text-survives-refresh-save-conflict-and-leave");
+    await open("classic", fileTemplate); await editText("不失焦直接保存的文字", false); await waitFor(saveEnabled);
+    await click("保存"); await settle();
+    assert((await read("document.body.innerText")).includes("不失焦直接保存的文字"));
+    assert.equal(await read(saveEnabled), false);
+    await record(fileTemplate ? "pending-file-text-saves-without-blur" : "pending-user-text-saves-without-blur");
+  }
+  await open("classic"); await editText("未确认输入可取消", false); await waitFor(saveEnabled);
+  await read('document.querySelector("textarea[aria-label=在画布编辑文字]").dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');
+  await settle(); assert.equal(await read(saveEnabled), false);
+  await record("cancel-pending-text-does-not-add-an-undo-snapshot");
+  await open("classic");
+  await read('document.querySelector("[data-v3-element-id=baseline-text]").dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true}))');
+  const propertyText = '.report-designer-v3-inspector textarea';
+  await waitFor(`document.querySelector(${JSON.stringify(propertyText)})`);
+  await read(`document.querySelector(${JSON.stringify(propertyText)}).focus()`);
+  await input(propertyText, "尚未确认的属性文字");
+  await waitFor("document.body.innerText.includes('有尚未确认的字段输入')");
+  await read("window.__remoteRefresh()"); await settle();
+  assert.equal(await read(`document.querySelector(${JSON.stringify(propertyText)})?.value`), "尚未确认的属性文字");
+  await read(`document.querySelector(${JSON.stringify(propertyText)}).dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',ctrlKey:true,bubbles:true}))`);
+  await settle(); await waitFor(saveEnabled);
+  await click("撤销", '.report-designer-v3-toolbar button'); await settle();
+  assert.equal(await read(saveEnabled), false);
+  await record("buffered-property-text-survives-refresh-and-commits-one-undo-step");
+  await open("classic");
+  await click("页面设置");
+  const propertyNumber = '.report-designer-v3-inspector input[type=number]';
+  await waitFor(`document.querySelector(${JSON.stringify(propertyNumber)})`);await read(`document.querySelector(${JSON.stringify(propertyNumber)}).focus()`);
+  await input(propertyNumber,"12.25");await waitFor("document.body.innerText.includes('有尚未确认的字段输入')");
+  await read("window.__remoteRefresh()");await settle();
+  assert.equal(await read(`document.querySelector(${JSON.stringify(propertyNumber)})?.value`),"12.25");
+  await read(`document.querySelector(${JSON.stringify(propertyNumber)}).blur()`);await settle();await waitFor(saveEnabled);
+  await click("撤销",'.report-designer-v3-toolbar button');await settle();assert.equal(await read(saveEnabled),false);
+  await record("buffered-property-number-survives-refresh-and-commits-one-undo-step");
   await open("v3"); await waitFor("document.querySelector('[data-v3-element-id]')");
   assert.equal(await read(saveEnabled), false); assert((await read("document.body.innerText")).includes("BASELINE CANVAS")); await record("canvas-first-load-keeps-content");
   await read('document.querySelector(".report-designer-v3-toolbar button[aria-label=文本]").click()'); await waitFor(saveEnabled);

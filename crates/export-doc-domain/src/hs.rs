@@ -98,10 +98,15 @@ pub fn current(row: &ApiHsCodeDto, year: i32) -> bool {
 /// Only confirmed obsolete records are eligible. A full calendar year after
 /// their last change is a conservative transition period; unknown dates stay.
 pub fn cleanup_eligible(row: &ApiHsCodeDto, now: chrono::DateTime<chrono::Utc>) -> bool {
-    row.status == "Obsolete"
-        && row
-            .update_time
-            .as_deref()
+    cleanup_eligible_state(&row.status, row.update_time.as_deref(), now)
+}
+pub fn cleanup_eligible_state(
+    status: &str,
+    update_time: Option<&str>,
+    now: chrono::DateTime<chrono::Utc>,
+) -> bool {
+    status == "Obsolete"
+        && update_time
             .and_then(|value| chrono::DateTime::parse_from_rfc3339(value).ok())
             .and_then(|date| date.checked_add_months(chrono::Months::new(12)))
             .is_some_and(|anniversary| anniversary <= now)

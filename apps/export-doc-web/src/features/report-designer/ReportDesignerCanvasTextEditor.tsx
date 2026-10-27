@@ -9,9 +9,11 @@ export type ReportDesignerTextEdit = ReportDesignerTextTarget & {
   height: number;
 };
 
-export function ReportDesignerCanvasTextEditor({ edit, zoom, onCommit, onCancel }: {
+export function ReportDesignerCanvasTextEditor({ edit, zoom, readOnly = false, onChange, onCommit, onCancel }: {
   edit: ReportDesignerTextEdit;
   zoom: number;
+  readOnly?: boolean;
+  onChange: (value: string) => void;
   onCommit: (value: string) => void;
   onCancel: () => void;
 }) {
@@ -19,13 +21,13 @@ export function ReportDesignerCanvasTextEditor({ edit, zoom, onCommit, onCancel 
   const settled = useRef(false);
   useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
   function finish(value: string, cancel = false) {
-    if (settled.current) return;
+    if (settled.current || readOnly && !cancel) return;
     settled.current = true;
     if (cancel) onCancel();
     else onCommit(value);
   }
   return <div className="report-designer-canvas-text-editor" style={{ left: edit.left, top: edit.top, width: edit.width, height: edit.height }} onPointerDown={(event) => event.stopPropagation()}>
-    <textarea ref={ref} aria-label={edit.kind === "GridCell" ? "在画布编辑单元格文字" : edit.kind === "DetailHeader" ? "在画布编辑表头文字" : "在画布编辑文字"} title="Ctrl+Enter 确认，Esc 取消；点击画布其他位置也可确认" defaultValue={edit.text} style={{ fontSize: `${12 / zoom}px` }} onBlur={(event) => finish(event.currentTarget.value)} onKeyDown={(event) => {
+    <textarea ref={ref} readOnly={readOnly} aria-label={edit.kind === "GridCell" ? "在画布编辑单元格文字" : edit.kind === "DetailHeader" ? "在画布编辑表头文字" : "在画布编辑文字"} title="Ctrl+Enter 确认，Esc 取消；点击画布其他位置也可确认" defaultValue={edit.text} onChange={event => onChange(event.currentTarget.value)} style={{ fontSize: `${12 / zoom}px` }} onBlur={(event) => finish(event.currentTarget.value)} onKeyDown={(event) => {
       if (event.nativeEvent.isComposing) return;
       event.stopPropagation();
       if (event.key === "Escape") { event.preventDefault(); finish(event.currentTarget.value, true); }

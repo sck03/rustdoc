@@ -28,6 +28,18 @@ pub fn save(
     kind: &str,
     rows: &[Value],
 ) -> Result<String> {
+    save_prepared(tx, actor, clock, &prepare(kind, rows)?)
+}
+
+pub struct PreparedPreview<'a> {
+    kind: &'a str,
+    row_count: usize,
+    bytes: Vec<u8>,
+    digest: String,
+}
+
+/// Expensive bounded serialization can finish before acquiring the write transaction.
+pub fn prepare<'a>(kind: &'a str, rows: &[Value]) -> Result<PreparedPreview<'a>> {
     let (max_rows, max_payload) = limits(kind);
     if rows.len() > max_rows {
         return Err(invalid(format!(
@@ -47,6 +59,26 @@ pub fn save(
         }
     })?;
     let bytes = output.bytes;
+    Ok(PreparedPreview {
+        kind,
+        row_count: rows.len(),
+        digest: digest(&bytes),
+        bytes,
+    })
+}
+
+pub fn save_prepared(
+    tx: &Connection,
+    actor: &Actor,
+    clock: &BusinessClock,
+    prepared: &PreparedPreview<'_>,
+) -> Result<String> {
+    let PreparedPreview {
+        kind,
+        row_count,
+        bytes,
+        digest,
+    } = prepared;
     let now = clock.now().map_err(unavailable)?.utc_now;
     loop {
         crate::operation::check()?;
@@ -78,7 +110,7 @@ pub fn save(
     let identity = nonce().map_err(unavailable)?;
     let mut value = json!({"previewId":identity,"kind":kind,"ownerUserId":actor.id,"companyScope":actor.company,"departmentId":actor.department,
         "versionNumber":1,"createdAt":now.to_rfc3339(),"expiresAt":(now+Duration::minutes(30)).to_rfc3339(),
-        "consumed":false,"rowCount":rows.len(),"payloadSha256":digest(&bytes)});
+        "consumed":false,"rowCount":row_count,"payloadSha256":digest});
     let id = tx.insert(&RecordWrite {
         kind: KIND,
         identity: Some(&identity),
@@ -92,7 +124,7 @@ pub fn save(
         file_name: "preview.json",
         media_type: "application/json",
         digest: value["payloadSha256"].as_str().unwrap(),
-        content: &bytes,
+        content: bytes,
         created_at: &now.to_rfc3339(),
     })?;
     Ok(identity)

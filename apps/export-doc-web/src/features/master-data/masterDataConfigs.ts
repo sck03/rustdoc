@@ -487,10 +487,15 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       {
         title: "数据来源与有效性",
         fields: [
-          { name: "status", label: "状态（手工新建仅供参考）", readOnlyOnEdit: true },
+          { name: "status", label: "状态（通过年度导入或确认作废维护）", readOnly: true, options: [
+            { value: "Active", label: "有效" }, { value: "ReferenceOnly", label: "仅供参考" },
+            { value: "SuspectedObsolete", label: "疑似作废" }, { value: "Obsolete", label: "已作废" },
+          ] },
           { name: "sourceName", label: "数据来源" },
           { name: "effectiveYear", label: "适用年份", type: "number" },
           { name: "replacedByCodes", label: "替代编码（多个用逗号分隔）" },
+          { name: "obsoleteReason", label: "确认作废原因", type: "textarea", readOnlyOnEdit: true, visibleWhen: record => record.status === "Obsolete" },
+          { name: "obsoletedAt", label: "确认作废时间", readOnlyOnEdit: true, visibleWhen: record => record.status === "Obsolete" && Boolean(record.obsoletedAt) },
         ],
       },
     ],
@@ -541,7 +546,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
     create: async (client, record, signal) => (await client.createHsCode({ body: record as unknown as ApiHsCodeDto }, { signal })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record, signal) =>
       (await client.updateHsCode({ code: decodeURIComponent(recordKey), body: record as unknown as ApiHsCodeDto }, { signal })) as unknown as MasterDataRecord,
-    delete: (client, record, _recordKey, signal) => client.deleteHsCode({ id: numberValue(record.id) }, { signal }),
+    delete: (client, record, _recordKey, signal) => client.deleteHsCode({ id: numberValue(record.id), expectedRowVersion: readString(record, "rowVersion") }, { signal }),
   },
 ];
 

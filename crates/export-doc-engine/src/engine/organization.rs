@@ -4,7 +4,7 @@ use super::{
     store::{self, Actor, Store},
 };
 pub use export_doc_domain::organization::search_key;
-use export_doc_storage::{Connection, DataScope, GenericQuery, PersonnelQuery};
+use export_doc_storage::{Connection, OrganizationReference, PersonnelQuery};
 use serde_json::{Value, json};
 use std::collections::{HashMap, hash_map::Entry};
 
@@ -13,22 +13,26 @@ pub fn check_references(connection: &Connection, kind: &str, record: &Value) -> 
     if kind == "companies" && !record["executiveEmployeeId"].is_null() {
         return Err(conflict("公司仍有执行负责人，不能删除。"));
     }
-    for resource in super::catalog::RESOURCES {
-        for item in store::all(connection, resource.key)? {
-            let referenced = if kind == "companies" {
-                item["companyScope"] == *code || item["companyCode"] == *code
-            } else {
-                item["departmentId"] == *code
-                    || item["parentCode"] == *code
-                    || (resource.key == "people"
-                        && super::personnel_organization::departments(&item)?
-                            .iter()
-                            .any(|department| *code == *department))
-            };
-            if item["id"] != record["id"] && referenced {
-                return Err(conflict("目录存在下级、账号或业务引用，不能删除。"));
-            }
-        }
+    let reference = if kind == "companies" {
+        OrganizationReference::Company
+    } else {
+        OrganizationReference::Department
+    };
+    let kinds: Vec<_> = super::catalog::RESOURCES
+        .iter()
+        .map(|resource| resource.key)
+        .collect();
+    let code = code
+        .as_str()
+        .filter(|code| !code.is_empty())
+        .ok_or_else(|| super::error::unavailable("组织目录代码损坏。"))?;
+    if connection.organization_referenced(
+        reference,
+        code,
+        record["id"].as_i64().unwrap_or(0),
+        &kinds,
+    )? {
+        return Err(conflict("目录存在下级、账号或业务引用，不能删除。"));
     }
     Ok(())
 }
@@ -166,22 +170,7 @@ impl DepartmentNames {
 }
 
 fn exists(tx: &Connection, kind: &str, filters: &[(&str, String)]) -> Result<bool> {
-    Ok(tx
-        .query_generic(&GenericQuery {
-            kind,
-            scope: DataScope {
-                all: true,
-                ..Default::default()
-            },
-            filters,
-            keyword: "",
-            search_root: None,
-            fields: &[("id", "id")],
-            offset: 0,
-            limit: 1,
-        })?
-        .0
-        > 0)
+    Ok(tx.record_exists(kind, filters)?)
 }
 fn has_active_members(tx: &Connection, company: &str, department: &str) -> Result<bool> {
     let mut filters = vec![
@@ -194,20 +183,17 @@ fn has_active_members(tx: &Connection, company: &str, department: &str) -> Resul
     if exists(tx, "users", &filters)? {
         return Ok(true);
     }
-    Ok(tx
-        .query_personnel(&PersonnelQuery {
-            company,
-            department,
-            status: "",
-            keyword: "",
-            search_fields: &[],
-            scopes: &[],
-            fields: &[("id", "id")],
-            offset: 0,
-            limit: 1,
-        })?
-        .0
-        > 0)
+    Ok(tx.personnel_exists(&PersonnelQuery {
+        company,
+        department,
+        status: "",
+        keyword: "",
+        search_fields: &[],
+        scopes: &[],
+        fields: &[("id", "id")],
+        offset: 0,
+        limit: 1,
+    })?)
 }
 
 pub fn validate(

@@ -7,6 +7,15 @@ use export_doc_domain::permissions::{self, Grant};
 use export_doc_storage::Connection;
 use serde_json::{Value, json};
 
+pub(super) fn validate_references(
+    connection: &Connection,
+    actor: &super::store::Actor,
+    user: &Value,
+) -> Result<()> {
+    super::oa::approval_references::validate_account(connection, actor, user)?;
+    super::handling::validate_account(connection, actor, user)
+}
+
 pub fn template(connection: &Connection, user: &Value) -> Result<Option<Value>> {
     if user["role"] == "Admin" || !user["permissionGrants"].is_null() {
         return Ok(None);

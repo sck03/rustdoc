@@ -30,6 +30,7 @@ export function createReportTemplatePageActions({
   canSave,
   workspaceHasUnappliedDesignerChanges,
   previewContent,
+  readPreviewContent,
   saveNewDesignerContent,
   saveUserTemplate,
   saveDefaultTemplate,
@@ -60,6 +61,7 @@ export function createReportTemplatePageActions({
   canSave: boolean;
   workspaceHasUnappliedDesignerChanges: boolean;
   previewContent: string;
+  readPreviewContent?: () => string | null;
   saveNewDesignerContent: (content: string) => Promise<void>;
   saveUserTemplate: () => void;
   saveDefaultTemplate: () => void;
@@ -166,8 +168,10 @@ export function createReportTemplatePageActions({
   function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSave) return;
+    const nextContent = readPreviewContent ? readPreviewContent() : previewContent;
+    if (nextContent === null) return;
     if (workspaceHasUnappliedDesignerChanges) {
-      void saveNewDesignerContent(previewContent);
+      void saveNewDesignerContent(nextContent);
     } else if (isUserTemplate) {
       saveUserTemplate();
     } else {

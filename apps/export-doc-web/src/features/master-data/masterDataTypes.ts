@@ -35,6 +35,7 @@ export type MasterDataFieldDefinition = {
   productAssistanceField?: ProductAssistanceField;
   required?: boolean;
   readOnlyOnEdit?: boolean;
+  readOnly?: boolean;
   visibleWhen?: (record: MasterDataRecord) => boolean;
 };
 

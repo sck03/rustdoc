@@ -1,4 +1,5 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { ApiReportTemplateContentDto, ApiUserReportTemplateDto } from "../../api/index.ts";
 import { EMPTY_REPORT_DESIGNER_DRAFT, type ReportDesignerDraft } from "../report-designer/reportDesignerDraft.ts";
 import { buildUserTemplateKey } from "./reportTemplateDesignerModel.ts";
@@ -25,6 +26,12 @@ function isDirty(document: TemplateDocument) {
 
 export function useReportTemplateDocument() {
   const [document, setDocument] = useState(emptyDocument);
+  const latest = useRef(document); latest.current = document;
+  const readContent = useCallback(() => {
+    if (latest.current.draft.hasPendingCommit) flushSync(() => latest.current.draft.commitPending?.());
+    const current = latest.current;
+    return current.draft.isValid ? current.draft.content || current.content : null;
+  }, []);
   const load = useCallback((next: TemplateDocument, force: boolean) => {
     setDocument(current => {
       if (!force && current.path === next.path && (isDirty(current) || next.userVersion < current.userVersion || (
@@ -47,12 +54,12 @@ export function useReportTemplateDocument() {
     }, force);
   }, [load]);
   const clear = useCallback(() => setDocument(emptyDocument), []);
-  const setContent = useCallback((content: string) => setDocument(current => ({ ...current, content, draft: EMPTY_REPORT_DESIGNER_DRAFT })), []);
   const setName = useCallback((name: string) => setDocument(current => ({ ...current, name })), []);
   const acceptName = useCallback((name: string, revision: string) => setDocument(current => ({ ...current, name, baselineName: name, revision })), []);
   const setDraft = useCallback((draft: ReportDesignerDraft) => setDocument(current =>
     current.draft.content === draft.content && current.draft.isDirty === draft.isDirty && current.draft.isValid === draft.isValid
+      && current.draft.hasPendingCommit === draft.hasPendingCommit && current.draft.commitPending === draft.commitPending
       ? current : { ...current, draft }), []);
 
-  return { document, hasUnsavedChanges: Boolean(document.path) && isDirty(document), loadFile, loadUser, clear, setContent, setName, acceptName, setDraft };
+  return { document, hasUnsavedChanges: Boolean(document.path) && isDirty(document), readContent, loadFile, loadUser, clear, setName, acceptName, setDraft };
 }

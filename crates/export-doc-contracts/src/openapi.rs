@@ -14,6 +14,7 @@ mod personnel;
 mod product_queries;
 mod report_preview;
 mod reports;
+mod template_history;
 use serde_json::Value;
 
 pub fn document() -> Value {
@@ -22,6 +23,7 @@ pub fn document() -> Value {
     office::extend(&mut document);
     communication::extend(&mut document);
     reports::extend(&mut document);
+    template_history::extend(&mut document);
     report_preview::extend(&mut document);
     observability::extend(&mut document);
     accounts::extend(&mut document);
@@ -62,6 +64,24 @@ mod tests {
             .as_array_mut()
             .unwrap();
         assert_eq!(parameters.pop().unwrap()["name"], "productCode");
+        let version =
+            current["paths"]["/api/master-data/hs-codes/by-id/{id}"]["delete"]["parameters"]
+                .as_array_mut()
+                .unwrap()
+                .pop()
+                .unwrap();
+        assert_eq!(
+            version,
+            serde_json::json!({"name":"expectedRowVersion","in":"query","required":true,"schema":{"type":"string","minLength":1}})
+        );
+        assert_eq!(
+            current["components"]["schemas"]["ApiHsCodeBatchDeleteRequest"]["required"]
+                .as_array_mut()
+                .unwrap()
+                .pop()
+                .unwrap(),
+            "expectedVersions"
+        );
         // The catalog now serves output users as well as template designers;
         // the use case additionally checks the requested document data domain.
         assert_eq!(
@@ -90,6 +110,7 @@ mod tests {
             .chain(personnel::FIELDS)
             .chain(exchange::FIELDS)
             .chain(hs_lifecycle::FIELDS)
+            .chain(template_history::FIELDS)
             .chain(dashboard::FIELDS)
         {
             for field in *fields {

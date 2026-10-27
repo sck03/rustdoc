@@ -93,7 +93,7 @@ export function ReportTemplateWorkspacePage({
   const [savedTemplatePath, setSavedTemplatePath] = useState<string | null>(null);
   const [selectedUserTemplateId, setSelectedUserTemplateId] = useState(() => requestedUserTemplateId);
   const { document, hasUnsavedChanges: hasUnsavedTemplateChanges, loadFile, loadUser, clear: clearDocument,
-    acceptName, setName: setCurrentTemplateDisplayName, setDraft: setDesignerDraft } = useReportTemplateDocument();
+    acceptName, readContent: readDesignerContent, setName: setCurrentTemplateDisplayName, setDraft: setDesignerDraft } = useReportTemplateDocument();
   const { content, path: contentTemplatePath, baseline: loadedContent, name: currentTemplateDisplayName,
     baselineName: persistedDisplayName, revision: expectedRevision, userVersion: expectedUserVersion } = document;
   const designerDraftContent = document.draft.content;
@@ -450,7 +450,7 @@ export function ReportTemplateWorkspacePage({
     reportType,
     designerDraftContent,
     designerDraftDirty: document.draft.isDirty,
-    designerDraftValid: document.draft.isValid,
+    designerDraftValid: document.draft.isValid || document.draft.hasPendingCommit === true,
     content,
     loadedContent,
     contentTemplatePath,
@@ -468,11 +468,11 @@ export function ReportTemplateWorkspacePage({
     previewInvoiceId,
     previewPaymentId,
     busyFlags: [
-      templatesQuery.isFetching,
-      userTemplatesQuery.isFetching,
-      userTemplateContentQuery.isFetching,
-      settingsQuery.isFetching,
-      templateContentQuery.isFetching,
+      templatesQuery.isLoading,
+      userTemplatesQuery.isLoading,
+      userTemplateContentQuery.isLoading,
+      settingsQuery.isLoading,
+      templateContentQuery.isLoading,
       createTemplateMutation.isPending,
       renameTemplateMutation.isPending,
       updateDisplayNameMutation.isPending,
@@ -534,15 +534,16 @@ export function ReportTemplateWorkspacePage({
     canManageTemplates,
     canRenderTemplatePreview,
     content,
+    readContent: readDesignerContent,
     currentUserTemplateCanEdit: currentUserTemplate?.canEdit === true,
     isUserTemplate,
     reportType,
     selectedTemplateContentActive,
     selectedTemplatePath,
     templatePreviewMode,
-    renderInvoicePreview: () => invoicePreviewMutation.mutate(),
-    renderPaymentPreview: () => paymentPreviewMutation.mutate(),
-    renderSamplePreview: () => samplePreviewMutation.mutate(previewContent),
+    renderInvoicePreview: nextContent => invoicePreviewMutation.mutate({ content: nextContent }),
+    renderPaymentPreview: nextContent => paymentPreviewMutation.mutate({ content: nextContent }),
+    renderSamplePreview: nextContent => samplePreviewMutation.mutate(nextContent ?? previewContent),
     saveDefaultTemplateContent: (nextContent) => saveMutation.mutate(nextContent),
     saveUserTemplateContent: (nextContent) => saveUserTemplateMutation.mutate(nextContent),
     setMessage,
@@ -593,6 +594,7 @@ export function ReportTemplateWorkspacePage({
     canSave,
     workspaceHasUnappliedDesignerChanges,
     previewContent,
+    readPreviewContent: readDesignerContent,
     saveNewDesignerContent: handleSaveNewReportDesignerContent,
     saveUserTemplate: () => saveUserTemplateMutation.mutate(undefined),
     saveDefaultTemplate: () => saveMutation.mutate(undefined),

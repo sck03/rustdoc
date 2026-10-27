@@ -518,7 +518,7 @@ pub(super) fn save_in_transaction(
             if super::account_permissions::template(transaction, &user)?
                 .is_some_and(|template| template["id"] == saved["id"])
             {
-                super::oa::approval_references::validate_account(transaction, actor, &user)?;
+                super::account_permissions::validate_references(transaction, actor, &user)?;
             }
         }
     }

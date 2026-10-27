@@ -1,7 +1,9 @@
 pub mod contracts;
 pub mod generated_api;
+pub mod hs_maintenance;
 pub mod invoice_editing;
 pub mod openapi;
 pub mod report_batches;
 pub mod report_pages;
+pub mod template_history;
 pub mod validation;

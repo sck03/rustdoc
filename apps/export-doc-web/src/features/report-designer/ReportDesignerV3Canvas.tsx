@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { readDesignerCanvasText, type ReportDesignerTextTarget } from "./reportDesignerCanvasText.ts";
+import { readDesignerCanvasText, type ReportDesignerTextTarget, type ReportDesignerCanvasTextDraft } from "./reportDesignerCanvasText.ts";
 import type { ReportDesignerGridCellTarget } from "./reportDesignerGridFields.ts";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { ReportDesignerCanvasTextEditor, type ReportDesignerTextEdit } from "./ReportDesignerCanvasTextEditor.tsx";
@@ -67,6 +67,7 @@ export function ReportDesignerV3Canvas({
   onCommitLayerBand,
   onClearSelection,
   onCommitText,
+  onTextDraftChange,
   onDropField,
   }: {
   state: ReportDesignerV3DocumentState;
@@ -87,12 +88,15 @@ export function ReportDesignerV3Canvas({
   onCommitLayerBand: (role: "Header" | "Footer", heightHundredthMm: number) => void;
   onClearSelection: () => void;
   onCommitText: (target: ReportDesignerTextTarget, text: string) => void;
+  onTextDraftChange?: (draft: ReportDesignerCanvasTextDraft | null) => void;
   onDropField?: (fieldPath: string, x: number, y: number, target?: ReportDesignerGridCellTarget) => void;
 }) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const pointer = useReportDesignerPointerGesture();
   const [textEdit, setTextEdit] = useState<ReportDesignerTextEdit | null>(null);
+  const textTarget = textEdit ? findV3Element(state.schema, textEdit.elementId) : null;
+  const textEditingDisabled = disabled || Boolean(textTarget?.element.locked || textTarget?.layer.locked);
   const callbacksRef = useRef({ onCommitTransform, schema: state.schema });
   callbacksRef.current = { onCommitTransform, schema: state.schema };
   const page = reportDesignerV3PageSize(state.schema.page);
@@ -231,9 +235,10 @@ export function ReportDesignerV3Canvas({
   }
 
   function finishTextEdit(text?: string) {
-    if (!textEdit) return;
+    if (!textEdit || textEditingDisabled && text !== undefined) return;
     const edit = textEdit;
     setTextEdit(null);
+    onTextDraftChange?.(null);
     if (text !== undefined && text !== edit.text) onCommitText(edit, text);
     requestAnimationFrame(() => {
       findReportDesignerElementNodes(canvasRef.current, [edit.elementId]).get(edit.elementId)?.focus({ preventScroll: true });
@@ -333,8 +338,16 @@ export function ReportDesignerV3Canvas({
 
   useLayoutEffect(() => {
     pointer.cancel();
-    setTextEdit(null);
   }, [state.schema, zoom, disabled, pointer]);
+
+  useLayoutEffect(() => {
+    if (!textEdit) return;
+    const target = findV3Element(state.schema, textEdit.elementId);
+    if (!target || readDesignerCanvasText(target.element, textEdit) !== textEdit.text) {
+      setTextEdit(null);
+      onTextDraftChange?.(null);
+    }
+  }, [state.schema, textEdit, onTextDraftChange]);
 
   return (
     <div className="report-designer-v3-canvas-shell">
@@ -402,7 +415,7 @@ export function ReportDesignerV3Canvas({
             </div>
           ))}
           {showGuides ? <><ReportDesignerProductRows schema={state.schema} /><ReportDesignerLayerResizers schema={state.schema} zoom={zoom} disabled={disabled} onCommit={onCommitLayerBand} /></> : null}
-          {textEdit ? <ReportDesignerCanvasTextEditor key={`${textEdit.elementId}:${textEdit.kind}:${textEdit.kind === "GridCell" ? textEdit.cellId : textEdit.kind === "DetailHeader" ? textEdit.columnId : ""}`} edit={textEdit} zoom={zoom} onCancel={() => finishTextEdit()} onCommit={finishTextEdit} /> : null}
+          {textEdit ? <ReportDesignerCanvasTextEditor key={`${textEdit.elementId}:${textEdit.kind}:${textEdit.kind === "GridCell" ? textEdit.cellId : textEdit.kind === "DetailHeader" ? textEdit.columnId : ""}`} edit={textEdit} zoom={zoom} readOnly={textEditingDisabled} onChange={text => onTextDraftChange?.({ ...textEdit, text })} onCancel={() => finishTextEdit()} onCommit={finishTextEdit} /> : null}
           </div>
         </div>
       </div>

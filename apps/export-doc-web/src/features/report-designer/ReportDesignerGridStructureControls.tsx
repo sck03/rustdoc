@@ -26,7 +26,7 @@ export function GridCellNavigator({ block, locations, selected, selection, onSel
     if (valid) onSelect(cells[0]!.cell.id, cells[1]?.cell.id);
   };
   return <section className="new-report-grid-structure" aria-label="定位表格单元格" onFocusCapture={() => setError("")}>
-    <label><span>单元格位置</span><CommitTextField value={value} placeholder="D4、4,4 或 A1:C3" onCommit={selectAt} /></label>
+    <label><span>单元格位置</span><CommitTextField affectsDocument={false} value={value} placeholder="D4、4,4 或 A1:C3" onCommit={selectAt} /></label>
     {error && <small role="alert">{error}</small>}
     <div className="new-report-grid-structure-actions" onKeyDown={event => {
       const direction = event.key === "ArrowLeft" ? "left" : event.key === "ArrowRight" ? "right" : event.key === "ArrowUp" ? "up" : event.key === "ArrowDown" ? "down" : null;

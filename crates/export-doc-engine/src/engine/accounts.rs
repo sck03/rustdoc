@@ -145,7 +145,7 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
             actor,
             if id == 0 { "create" } else { "edit" },
         )?;
-        super::oa::approval_references::validate_account(tx, actor, &saved)?;
+        super::account_permissions::validate_references(tx, actor, &saved)?;
         if let Some((salt, hash)) = &credential {
             tx.set_credential(
                 saved["id"].as_i64().unwrap_or(0),

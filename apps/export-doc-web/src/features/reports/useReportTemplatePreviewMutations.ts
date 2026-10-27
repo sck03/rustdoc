@@ -39,7 +39,7 @@ export function useReportTemplatePreviewMutations({
   const scope = useMemo(() => ({ mode, reportType, selectedTemplatePath, content, sampleProfile, withSeal, previewInvoiceId, previewPaymentId, previewFormat }),
     [mode, reportType, selectedTemplatePath, content, sampleProfile, withSeal, previewInvoiceId, previewPaymentId, previewFormat]);
   useEffect(() => setPage({ pageIndex: 0, pageCount: 0, previewRevision: "" }), [scope]);
-  type PageRequest = { pageIndex: number; previewRevision: string };
+  type PageRequest = { pageIndex?: number; previewRevision?: string; content?: string };
   const request = (target?: PageRequest) => ({ previewFormat, pageIndex: target?.pageIndex ?? 0, previewRevision: target?.previewRevision || undefined });
   const accept = (response: ApiReportTemplatePreviewResponse) => {
     setPage({ pageIndex: response.pageIndex ?? 0, pageCount: response.pageCount ?? 0, previewRevision: response.previewRevision ?? "" });
@@ -64,7 +64,7 @@ export function useReportTemplatePreviewMutations({
     mutationFn: (target?: PageRequest) =>
       run(signal => client.previewInvoiceReportHtml({
         invoiceId: previewInvoiceId,
-        body: { reportType, templatePath: selectedTemplatePath, withSeal, content: canDesignTemplates ? content : undefined, ...request(target) },
+        body: { reportType, templatePath: selectedTemplatePath, withSeal, content: canDesignTemplates ? target?.content ?? content : undefined, ...request(target) },
       }, { signal })),
     onSuccess: (response) => accept({ ...response, withSeal: response.withSeal ?? withSeal }),
     onError: failed,
@@ -75,7 +75,7 @@ export function useReportTemplatePreviewMutations({
     mutationFn: (target?: PageRequest) =>
       run(signal => client.previewPaymentVoucherHtml({
         paymentId: previewPaymentId,
-        body: { templatePath: selectedTemplatePath, content: canDesignTemplates ? content : undefined, ...request(target) },
+        body: { templatePath: selectedTemplatePath, content: canDesignTemplates ? target?.content ?? content : undefined, ...request(target) },
       }, { signal })),
     onSuccess: (response) => accept({ ...response, withSeal: null }),
     onError: failed,

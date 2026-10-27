@@ -1,4 +1,4 @@
-import { useId, useRef } from "react";
+import { useId, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, X } from "lucide-react";
 import { Button, IconButton } from "./Button.tsx";
@@ -13,6 +13,8 @@ export function ConfirmationDialog({
   tone = "danger",
   onCancel,
   onConfirm,
+  children,
+  confirmDisabled = false,
 }: {
   title: string;
   description: string;
@@ -22,6 +24,8 @@ export function ConfirmationDialog({
   tone?: "danger" | "warning";
   onCancel: () => void;
   onConfirm: () => void;
+  children?: ReactNode;
+  confirmDisabled?: boolean;
 }) {
   const titleId = useId();
   const descriptionId = useId();
@@ -70,12 +74,13 @@ export function ConfirmationDialog({
           </div>
         ) : null}
 
+        {children}
         <footer className="confirmation-dialog-footer">
           <Button ref={cancelButtonRef} variant="secondary" disabled={isBusy} onClick={onCancel}>取消</Button>
           <Button
             variant="primary"
             className="confirmation-dialog-confirm"
-            disabled={isBusy}
+            disabled={isBusy || confirmDisabled}
             onClick={onConfirm}
           >
             {isBusy ? "处理中…" : confirmLabel}

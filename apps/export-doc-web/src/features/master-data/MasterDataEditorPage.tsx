@@ -50,6 +50,7 @@ readString
 
 import { MasterDataField } from "./MasterDataField.tsx";
 import { useMasterDataPersistence } from "./useMasterDataPersistence.ts";
+import { HsCodeObsoleteAction } from "./HsCodeObsoleteAction.tsx";
 
 const masterDataCustomOptionTypeSet = new Set<string>(masterDataCustomOptionTypes);
 
@@ -449,6 +450,10 @@ export function MasterDataEditorPage({
             <span>删除</span>
           </button>
         ) : null}
+        {config.key === "hs-codes" && !isNew && canManage && record && <HsCodeObsoleteAction client={client} records={[record]}
+          disabled={isBusy || hasUnsavedRecordChanges} onChanged={async () => {
+            await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("hs-codes") });
+          }} />}
       </div>
 
       {message && hasConcurrencyConflict ? <ConcurrencyConflictNotice message={message} isBusy={detailQuery.isFetching} onReload={() => void loadLatestRecord()} /> : null}
@@ -518,7 +523,7 @@ export function MasterDataEditorPage({
         <ConfirmationDialog
           title={`删除${config.label}`}
           description={`确定删除“${buildMasterDataDisplayName(config, record) || `#${effectiveRecordKey}`}”吗？`}
-          details={["删除后无法在列表中继续查看。", "如该资料已被业务单据引用，系统会拒绝删除并说明原因。"]}
+          details={config.key === "hs-codes" ? ["只删除目录记录，历史单据、商品、申报实例及替代关系保留。", "使用读取时版本，记录变化后拒绝删除；年度淘汰可先确认作废再按保留期清理。"] : ["删除后无法在列表中继续查看。", "如该资料已被业务单据引用，系统会拒绝删除并说明原因。"]}
           confirmLabel="确认删除"
           isBusy={deleteMutation.isPending}
           onCancel={() => setDeleteDialogOpen(false)}

@@ -20,7 +20,9 @@ mod job_query;
 pub use hs_query::HsQuery;
 mod office_query;
 mod ordered_query;
+mod organization_query;
 pub use ordered_query::RecordOrder;
+pub use organization_query::OrganizationReference;
 mod personnel_query;
 pub use job_query::{JobOutputRetention, JobQuery, JobRetention};
 pub use office_query::OfficeQuery;
@@ -31,8 +33,10 @@ mod resource_query;
 pub use generic_query::ScopedQuery;
 pub use related_query::RelatedQuery;
 mod sql;
+mod template_history_query;
 mod template_query;
 pub use generic_query::{DataScope, GenericQuery};
+pub use template_history_query::TemplateHistoryUsage;
 pub mod maintenance;
 pub mod metrics;
 pub mod operation;
@@ -205,6 +209,26 @@ trait Adapter: Send {
         };
         let (sql, projection) = generic_query::build(&query, self.provider() == "PostgreSQL")?;
         Ok(!self.query_slice(&sql, &projection, 0, 1)?.is_empty())
+    }
+    fn organization_referenced(
+        &self,
+        reference: OrganizationReference,
+        code: &str,
+        exclude: i64,
+        kinds: &[&str],
+    ) -> Result<bool> {
+        let pg = self.provider() == "PostgreSQL";
+        let sql = organization_query::build(reference, code, exclude, kinds, pg);
+        Ok(!self
+            .query_slice(&sql, &sql::projection(&[("id", "id")], pg)?, 0, 1)?
+            .is_empty())
+    }
+    fn personnel_exists(&self, query: &PersonnelQuery<'_>) -> Result<bool> {
+        let pg = self.provider() == "PostgreSQL";
+        let (sql, _) = personnel_query::build(query, pg)?;
+        Ok(!self
+            .query_slice(&sql, &sql::projection(&[("id", "id")], pg)?, 0, 1)?
+            .is_empty())
     }
     fn attachment_category_counts(
         &self,
@@ -400,6 +424,24 @@ trait Adapter: Send {
             query.offset,
             query.limit,
         )
+    }
+    fn template_history_usage(
+        &self,
+        query: &TemplateVersionQuery<'_>,
+        keep: i64,
+    ) -> Result<TemplateHistoryUsage> {
+        let (sql, projection) =
+            template_history_query::usage(query, keep, self.provider() == "PostgreSQL");
+        let value = self
+            .query_slice(&sql, &projection, 0, 1)?
+            .pop()
+            .ok_or_else(|| Error::unavailable("模板历史容量统计缺失。"))?;
+        TemplateHistoryUsage::from_value(&value)
+    }
+    fn template_history_candidates(&self, query: &TemplateVersionQuery<'_>) -> Result<Vec<Value>> {
+        let (sql, projection) =
+            template_history_query::candidates(query, self.provider() == "PostgreSQL");
+        self.query_slice(&sql, &projection, query.offset, query.limit)
     }
     fn query_email_template_versions(
         &self,
@@ -599,6 +641,8 @@ delegate! {
     query_audits(query:&AuditQuery<'_>)->(i64,Vec<Value>);
     query_ordered_records(query:&GenericQuery<'_>,order:RecordOrder)->(i64,Vec<Value>);
     record_exists(kind:&str,filters:&[(&str,String)])->bool;
+    organization_referenced(reference:OrganizationReference,code:&str,exclude:i64,kinds:&[&str])->bool;
+    personnel_exists(query:&PersonnelQuery<'_>)->bool;
     attachment_category_counts(company:&str)->std::collections::BTreeMap<i64,i64>;
     import_preview_usage(owner:i64)->ImportPreviewUsage;
     expired_import_previews(before:&str)->Vec<Value>;
@@ -621,6 +665,8 @@ delegate! {
     query_report_templates(query: &ReportTemplateQuery<'_>)->(i64, Vec<Value>);
     report_template_metadata(id:i64)->Option<Value>;
     query_template_versions(query: &TemplateVersionQuery<'_>)->(i64, Vec<Value>);
+    template_history_usage(query:&TemplateVersionQuery<'_>,keep:i64)->TemplateHistoryUsage;
+    template_history_candidates(query:&TemplateVersionQuery<'_>)->Vec<Value>;
     query_email_template_versions(query: &TemplateVersionQuery<'_>)->(i64, Vec<Value>);
     template_version(kind:&str,id:i64,version:i64)->Option<Value>;
     query_communications(query: &CommunicationQuery<'_>)->(i64, Vec<Value>);
