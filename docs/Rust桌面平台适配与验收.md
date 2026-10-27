@@ -56,6 +56,8 @@ OCR 同样按目标 OS/架构组装 Rust worker、ONNX 和模型。2026-10-15 �
 
 ## 2026-09-28 Windows 退出清理
 
+2026-10-27 的新 GNU/Debug/Full SQLite/含 OCR 包为 `artifacts/review-completion-desktop/ExportDocManager.Tauri.Full`，来源 `a1814e57e871`。完整 Tauri、HS／历史维护和未确认文字保存、37 张截图、16 页渲染 PDF、七组 OCR、PDFium worker 及正常／重复／异常／独立窗口退出通过；各实例 WebView2 归零、HTTP 关闭。`@oai/sky` 包缺失，系统 IME 候选窗未由 computer-use 检查，仍不扩大 MSVC／其它 OS/架构／实体打印验收。详细范围、小纸张裁切限制和清理回执见本日进度。
+
 `desktop_runtime` 区分运行、正在清理和清理完成；并发退出只启动一个清理线程，其余请求继续等待。后端关闭在工作线程执行，保持现有 45 秒等待上限和错误日志；退出前显式销毁 WebView 窗口，让 wry 关闭平台控制器，不依赖 `App::run` 直接退出进程后的 Rust 析构。
 
 `scripts/test_native_desktop_shutdown.mjs` 在隔离 DataRoot 启动实际 GNU Release EXE，通过 WebView2 CDP 检查 React 登录页和退出事件，记录对应进程及 HTTP 端口。两次正常退出、一次连续 12 次退出 IPC、一次只终止宿主的异常退出均观察到本实例 6 个 WebView2 进程归零、HTTP 监听关闭；期间独立测试窗口持续响应，最后也正常清空。该结果证明本机测试场景，不能推导为所有崩溃条件或 Linux/macOS/ARM64 已验收。
