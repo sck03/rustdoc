@@ -118,18 +118,23 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
     } else if mode == ApprovalMode::DepartmentChain {
         let mut department = text(row, "departmentId");
         let mut visited = HashSet::new();
-        let mut ids = HashSet::new();
         while !department.is_empty() {
             if visited.len() >= 10 || !visited.insert(department.clone()) {
                 return Err(conflict("部门审批链循环或超过十级。"));
             }
             let (id, parent) = department_manager(tx, &actor.company, &department)?;
-            if row["ownerUserId"] != id && Some(id) != employee_user && ids.insert(id) {
-                groups.push(vec![id]);
-            }
+            groups.push(vec![id]);
             department = parent;
         }
     }
+    row["approvalRoutingNotes"] = json!(
+        rule.route_groups(
+            &mut groups,
+            row["ownerUserId"].as_i64().unwrap_or(0),
+            employee_user,
+        )
+        .map_err(invalid)?
+    );
     let mut plan = ApprovalPlan {
         mode,
         policy_version: settings["versionNumber"].as_i64().unwrap_or(0),
@@ -137,16 +142,16 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
         matched_branch: branch.map(|branch| branch.key.clone()).unwrap_or_default(),
     };
     for (stage, ids) in groups.into_iter().enumerate() {
-        if ids.is_empty() {
-            return Err(conflict("审批阶段没有有效负责人。"));
-        }
         for id in ids {
-            if Some(id) == employee_user {
-                return Err(invalid("审批人不能是申请人员本人。"));
-            }
             let reviewer = approval::reviewer(tx, actor, id, row)?;
             plan.steps.push(ApprovalStep {
                 stage: Some(stage),
+                decision: branch
+                    .map(|branch| &branch.stages)
+                    .unwrap_or(&rule.stages)
+                    .get(stage)
+                    .map(|stage| stage.decision)
+                    .unwrap_or_default(),
                 approver_user_id: id,
                 approver_name: reviewer.name,
                 status: "Waiting".into(),

@@ -7,11 +7,6 @@ pub const DETAIL_FIELDS: &[(&str, &str)] = &[
     ("EmployeeNumber", "申请人工号"),
     ("JobTitle", "申请人职位"),
     ("SubmittedAt", "提交时间"),
-    ("FirstStageTitle", "首阶段审批标题"),
-    ("FollowingStageTitle", "后续阶段审批标题"),
-    ("FirstStageApprovals", "首阶段审批记录"),
-    ("FollowingStageApprovals", "后续阶段审批记录"),
-    ("ApprovalResult", "审批结果说明"),
 ];
 pub const SHEET_FIELDS: &[(&str, &str)] = &[
     ("CompanyName", "公司名称"),
@@ -23,6 +18,7 @@ pub const SHEET_FIELDS: &[(&str, &str)] = &[
     ("Reason", "申请说明"),
     ("Attachments", "本次提交的附件清单"),
     ("Approvals", "实际审批记录"),
+    ("ApprovalResult", "审批结果与流程说明"),
     ("GeneratedAt", "PDF 生成时间"),
 ];
 
@@ -82,7 +78,46 @@ pub(super) fn extend(doc: &mut Value) {
     }
     s["OaApprovalSettings"]["properties"]["sheetFieldCatalog"] =
         reference("ApiReportTemplateFieldCatalogResponse");
+    s["OaApprovalSettings"]["properties"]["sheetDefaultContent"] = text.clone();
     s["OaSheetPreview"] = object(json!({"html":text}), &["html"]);
+    s["OaApprovalPreview"] = object(
+        json!({"approvalPlan":reference("OaApprovalPlan"),"approvalRoutingNotes":{"type":"array","items":text}}),
+        &["approvalPlan", "approvalRoutingNotes"],
+    );
+    s["OaApprovalVerification"] = object(
+        json!({
+            "requestId":int,"submissionNumber":int,"currentSubmissionNumber":int,
+            "submissionStatus":text,"requestStatus":text,"documentStatus":text,
+            "isCurrent":{"type":"boolean"},"isValid":{"type":"boolean"},"canOpenRequest":{"type":"boolean"},
+            "checkedAt":text,"approvedAt":text,"companyName":text,"departmentName":text,
+            "employeeName":text,"employeeNumber":text,"title":text,"currency":text,"totalAmount":text
+        }),
+        &[
+            "requestId",
+            "submissionNumber",
+            "currentSubmissionNumber",
+            "submissionStatus",
+            "requestStatus",
+            "documentStatus",
+            "isCurrent",
+            "isValid",
+            "canOpenRequest",
+            "checkedAt",
+        ],
+    );
+    endpoint(
+        doc,
+        "/api/office/expense-requests/{id}/verification",
+        "get",
+        "VerifyExpenseApproval",
+        "office.expenses",
+        "complete",
+        None,
+        "OaApprovalVerification",
+        "expense",
+        "verification",
+    );
+    doc["paths"]["/api/office/expense-requests/{id}/verification"]["get"]["parameters"].as_array_mut().unwrap().push(json!({"name":"submissionNumber","in":"query","required":true,"schema":{"type":"integer","format":"int64","minimum":1}}));
     endpoint(
         doc,
         "/api/office/approval-settings/sheet-preview",
@@ -106,6 +141,13 @@ pub(super) fn extend(doc: &mut Value) {
     ] {
         let root = format!("/api/office/{kind}-requests");
         for (suffix, method, verb, action, response) in [
+            (
+                "/{id}/approval-preview",
+                "get",
+                "PreviewApprovalOf",
+                "approval-preview",
+                "OaApprovalPreview",
+            ),
             (
                 "/{id}/submissions",
                 "get",
@@ -149,7 +191,11 @@ pub(super) fn extend(doc: &mut Value) {
                 method,
                 &format!("{verb}{name}Request"),
                 resource,
-                "view",
+                if action == "approval-preview" {
+                    "edit"
+                } else {
+                    "view"
+                },
                 None,
                 response,
                 kind,

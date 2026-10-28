@@ -60,6 +60,7 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
     }
     if action == "settings-get" {
         previous["sheetFieldCatalog"] = sheet_templates::catalog();
+        previous["sheetDefaultContent"] = json!(sheet_templates::default_content()?);
         return Ok(contracts::dto(
             contracts::schema("OaApprovalSettings"),
             previous,
@@ -178,6 +179,7 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
     Ok(contracts::dto(contracts::schema("OaApprovalSettings"), {
         let mut saved = saved;
         saved["sheetFieldCatalog"] = sheet_templates::catalog();
+        saved["sheetDefaultContent"] = json!(sheet_templates::default_content()?);
         saved
     }))
 }

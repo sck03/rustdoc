@@ -8,6 +8,7 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { OfficeQueryState } from "../office/OfficeUi.tsx";
 import { OaRequestDialog } from "./OaRequestDialog.tsx";
 import { OaRequestDetails } from "./OaRequestDetails.tsx";
+import { OaApprovalVerification } from "./OaApprovalVerification.tsx";
 import { oaAccess, oaModules, oaStatus, type OaKind } from "./oaModel.ts";
 import { useOaRequests } from "./useOaRequests.ts";
 import "../../styles/routes/office.css";
@@ -33,6 +34,7 @@ export function OaRequestsPage({ client, user, kind }: { client: ExportDocManage
     </> : <>
       {(model.canReceive || model.canApprove || model.canHandle) && <nav className="office-tabs" aria-label="申请工作区"><button type="button" aria-pressed={!model.financeOnly && !model.approvalsOnly && !model.handlingOnly} onClick={() => model.changeView("requests")}>申请记录</button>{model.canApprove && <button type="button" aria-pressed={model.approvalsOnly} onClick={() => model.changeView("approvals")}>待我审批</button>}{model.canReceive && <button type="button" aria-pressed={model.financeOnly} onClick={() => model.changeView("finance")}>财务接收</button>}</nav>}
       {model.financeOnly && <p className="office-muted">核对已批准报销单的明细、凭证和审批记录，确认后登记接收；付款由独立财务软件办理。</p>}
+      {model.financeOnly && <OaApprovalVerification client={client} user={user} onOpen={model.select} />}
       {model.canHandle && <button className="command-button secondary" type="button" aria-pressed={model.handlingOnly} onClick={() => model.changeView("handling")}>待我办理</button>}
       {model.handlingOnly && <p className="office-muted">审批全部通过后，按职责完成交付、验收或归档；用印、证明及其他已分工事项由指定人员办理。</p>}
       <div className="office-toolbar oa-toolbar">

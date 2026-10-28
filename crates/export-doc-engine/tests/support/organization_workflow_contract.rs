@@ -49,6 +49,14 @@ fn policy(service: &NativeService, token: &str, kind: &str, rule: Value) -> Valu
 }
 
 pub fn exercise(service: &NativeService, root: &str) {
+    exercise_inner(service, root, false);
+}
+
+pub fn exercise_nodes(service: &NativeService, root: &str) {
+    exercise_inner(service, root, true);
+}
+
+fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
     let suffix = &nonce().unwrap()[..8];
     let company = format!("ORG-{suffix}");
     let a = format!("A-{suffix}");
@@ -189,6 +197,129 @@ pub fn exercise(service: &NativeService, root: &str) {
         }
         call(service, tokens[1], operation(kind, "create"), 0, Some(body)).unwrap()
     };
+    if nodes {
+        // Dynamic dual roles keep only the last node, with all remaining leaders signing.
+        let department = get(service, admin, GET_ORGANIZATION_DIRECTORY, 0)["departments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["code"] == b)
+            .unwrap()
+            .clone();
+        let mut managed = department.clone();
+        managed["managerEmployeeId"] = people[4]["employee"]["id"].clone();
+        managed["expectedVersion"] = managed["versionNumber"].clone();
+        service
+            .dispatch(
+                UPDATE_ORGANIZATION_DEPARTMENT,
+                &[("code", b.clone())],
+                &[],
+                Some(managed),
+                admin,
+            )
+            .unwrap();
+        policy(
+            service,
+            admin,
+            "general",
+            json!({"kind":"general","mode":"Configured","approverUserIds":[],"stages":[{"source":"DepartmentManager","approverUserIds":[]},{"source":"Named","approverUserIds":[users[3]["id"],users[4]["id"]]}]}),
+        );
+        let dual_draft = create("general", json!({}));
+        let preview = get(
+            service,
+            tokens[1],
+            operation("general", "approval-preview"),
+            dual_draft["id"].as_i64().unwrap(),
+        );
+        assert_eq!(
+            preview["approvalPlan"]["steps"].as_array().unwrap().len(),
+            2
+        );
+        assert_eq!(preview["approvalPlan"]["steps"][0]["stage"], 1);
+        assert_eq!(preview["approvalRoutingNotes"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            get(
+                service,
+                tokens[1],
+                GET_GENERAL_REQUEST,
+                dual_draft["id"].as_i64().unwrap()
+            )["versionNumber"],
+            dual_draft["versionNumber"]
+        );
+        let dual = act(service, tokens[1], "general", "submit", &dual_draft);
+        assert_eq!(dual["approvalPlan"], preview["approvalPlan"]);
+        let dual = act(service, tokens[3], "general", "approve", &dual);
+        assert_eq!(dual["status"], "Pending");
+        assert_eq!(
+            act(service, tokens[4], "general", "approve", &dual)["status"],
+            "Approved"
+        );
+        let mut restored = department;
+        restored["expectedVersion"] = json!(restored["versionNumber"].as_i64().unwrap() + 1);
+        service
+            .dispatch(
+                UPDATE_ORGANIZATION_DEPARTMENT,
+                &[("code", b.clone())],
+                &[],
+                Some(restored),
+                admin,
+            )
+            .unwrap();
+
+        // The submitter and applicant coincide; the leader's own signature is omitted.
+        policy(
+            service,
+            admin,
+            "general",
+            json!({"kind":"general","mode":"Configured","approverUserIds":[],"stages":[{"source":"Named","approverUserIds":[users[2]["id"],users[3]["id"]]}]}),
+        );
+        let self_draft = call(service,tokens[2],CREATE_GENERAL_REQUEST,0,Some(json!({"requestKey":nonce().unwrap(),"employeeId":if sqlite {people[2]["employee"]["id"].clone()}else{Value::Null},"departmentId":b,"title":"负责人本人申请","reason":"回避验证","category":"Other"}))).unwrap();
+        let own = act(service, tokens[2], "general", "submit", &self_draft);
+        assert_eq!(own["approvalPlan"]["steps"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            own["approvalPlan"]["steps"][0]["approverUserId"],
+            users[3]["id"]
+        );
+        assert_eq!(
+            get(
+                service,
+                tokens[2],
+                GET_GENERAL_REQUEST,
+                own["id"].as_i64().unwrap()
+            )["canReview"],
+            false
+        );
+        act(service, tokens[3], "general", "approve", &own);
+
+        policy(
+            service,
+            admin,
+            "general",
+            json!({"kind":"general","mode":"Configured","approverUserIds":[],"stages":[{"source":"Named","decision":"Any","approverUserIds":[users[2]["id"],users[3]["id"]]},{"source":"CompanyExecutive","approverUserIds":[]}]}),
+        );
+        let either = act(
+            service,
+            tokens[1],
+            "general",
+            "submit",
+            &create("general", json!({})),
+        );
+        let either = act(service, tokens[3], "general", "approve", &either);
+        assert_eq!(either["status"], "Pending");
+        assert_eq!(either["approvalPlan"]["steps"][0]["status"], "Skipped");
+        assert!(either["approvalPlan"]["steps"][0]["actedByUserId"].is_null());
+        assert_eq!(
+            get(
+                service,
+                tokens[2],
+                GET_GENERAL_REQUEST,
+                either["id"].as_i64().unwrap()
+            )["canReview"],
+            false
+        );
+        act(service, tokens[4], "general", "approve", &either);
+        return;
+    }
     let parallel = json!({"kind":"general","mode":"Configured","approverUserIds":[],"stages":[{"source":"Named","approverUserIds":[users[2]["id"],users[3]["id"]]},{"source":"CompanyExecutive","approverUserIds":[]}]});
     policy(service, admin, "general", parallel);
     let draft = create("general", json!({}));

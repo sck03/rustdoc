@@ -9,7 +9,7 @@ pub(super) fn extend(doc: &mut Value) {
     let int = json!({"type":"integer","format":"int64"});
     let mode = json!({"type":"string","enum":["Single","DepartmentChain","Named","Configured"]});
     s["OaApprovalStep"] = object(
-        json!({"approverUserId":int,"approverName":text,"status":{"type":"string","enum":["Waiting","Approved","Rejected"]},"actedByUserId":{"type":["integer","null"],"format":"int64"},"actedByName":text,"actedAt":text,"note":text,"delegationKey":text}),
+        json!({"approverUserId":int,"approverName":text,"status":{"type":"string","enum":["Waiting","Approved","Rejected","Skipped"]},"actedByUserId":{"type":["integer","null"],"format":"int64"},"actedByName":text,"actedAt":text,"note":text,"delegationKey":text}),
         &[
             "approverUserId",
             "approverName",
@@ -32,6 +32,9 @@ pub(super) fn extend(doc: &mut Value) {
         }),
         &["source", "approverUserIds"],
     );
+    for name in ["OaApprovalStage", "OaApprovalStep"] {
+        s[name]["properties"]["decision"] = json!({"type":"string","enum":["All","Any"],"default":"All","description":"All requires every effective reviewer; Any closes the node after one approval. Rejection ends the request."});
+    }
     let stages = json!({"type":"array","items":reference("OaApprovalStage"),"maxItems":10});
     s["OaApprovalAmountBranch"] = object(
         json!({
@@ -43,12 +46,16 @@ pub(super) fn extend(doc: &mut Value) {
     );
     s["OaRequest"]["properties"]["approvalPlan"] = reference("OaApprovalPlan");
     s["OaRequest"]["properties"]["canReview"] = json!({"type":"boolean"});
+    s["OaRequest"]["properties"]["approvalRoutingNotes"] =
+        json!({"type":"array","items":text,"maxItems":100});
     s["OaRequest"]["properties"]["lastRemindedAt"] = text.clone();
     s["OaEvent"]["properties"]["approvalPlan"] = reference("OaApprovalPlan");
     s["OaApprovalRule"] = object(
         json!({"kind":{"type":"string","enum":["leave","overtime","expense","travel","purchase","general","personnel"]},"mode":mode,"approverUserIds":{"type":"array","items":int,"maxItems":10},"stages":stages,"amountBranches":{"type":"array","items":reference("OaApprovalAmountBranch"),"maxItems":10}}),
         &["kind", "mode", "approverUserIds"],
     );
+    s["OaApprovalRule"]["properties"]["selfApproval"] = json!({"type":"string","enum":["Skip","Reject"],"default":"Skip","description":"Skip the submitter and applicant, or require another configured approver. Never auto-approve an empty route."});
+    s["OaApprovalRule"]["properties"]["repeatedApprover"] = json!({"type":"string","enum":["LastStage","Reject"],"default":"LastStage","description":"Keep a repeated approver only in the last stage, or reject the route. Existing submissions are unchanged."});
     s["OaApprovalDelegation"] = object(
         json!({"key":text,"principalUserId":int,"delegateUserId":int,"startsAt":{"type":"string","format":"date-time"},"endsAt":{"type":"string","format":"date-time"},"isActive":{"type":"boolean"}}),
         &[

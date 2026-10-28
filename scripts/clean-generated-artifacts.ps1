@@ -187,13 +187,18 @@ function New-CleanupTarget {
         [string]$Reason
     )
 
-    if (-not (Test-Path -LiteralPath $Path)) {
-        return $null
-    }
-
     $fullPath = Assert-WorkspaceChildPath -Path $Path -Purpose $Reason
-    if (Test-ExportDocProtectedArtifact -Path $fullPath -IncludeReleaseOutputs:$IncludeReleaseOutputs) {
-        Write-Verbose "Preserving data or linked content: $fullPath"
+    try {
+        if (-not (Test-Path -LiteralPath $fullPath -ErrorAction Stop)) { return $null }
+        if (Test-ExportDocProtectedArtifact -Path $fullPath -IncludeReleaseOutputs:$IncludeReleaseOutputs) {
+            Write-Verbose "Preserving data or linked content: $fullPath"
+            return $null
+        }
+    }
+    catch {
+        # An unreadable candidate is not proven disposable. Preserve it while
+        # allowing the inventory of independent, readable candidates to finish.
+        Write-Warning "Preserving uninspectable path '$fullPath': $($_.Exception.Message)"
         return $null
     }
     [PSCustomObject]@{

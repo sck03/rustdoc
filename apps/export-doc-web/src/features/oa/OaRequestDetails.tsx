@@ -19,10 +19,13 @@ import { documentDescription } from "../../ui/documentAttachments.ts";
 import { AttachmentUploadPanel } from "../../ui/AttachmentUploadPanel.tsx";
 import { ApprovalReassignDialog } from "./ApprovalReassignDialog.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
+import { OaApprovalSteps } from "./OaApprovalSteps.tsx";
+import { OaApprovalPreview } from "./OaApprovalPreview.tsx";
 
 export function OaRequestDetails({ client, user, row, onEdit }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: OaRequest; onEdit: () => void }) {
   const operation = useOaOperation(row.kind);
   const [reassigning, setReassigning] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [historyOpened, setHistoryOpened] = useState(false);
   const [purpose, setPurpose] = useState("Voucher");
   const [action, setAction] = useState<OaActionName | number | null>(null);
@@ -36,14 +39,14 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
       {canViewPersonnelDetails(user) && <Link to={`/office/people/${row.employeeId}`}>查看人员档案</Link>}</InlineNotice>}
     {(editable || oaActions(row, user).length > 0) && <div className="office-card-actions">
       {editable && <button type="button" className="command-button secondary" disabled={operation.busy} onClick={onEdit}>编辑草稿</button>}
+      {editable && <button type="button" className="command-button secondary" disabled={operation.busy} onClick={() => setPreviewing(true)}>预览审批流程</button>}
       {oaActions(row, user).map((action) => <button type="button" className={`command-button${["cancel", "withdraw", "reject", "void"].includes(action) ? " secondary" : ""}`} key={action} disabled={operation.busy} onClick={() => setAction(action)}>{oaActionLabel(action, row.kind, user.capabilities.usesOfficeRegister)}</button>)}
     </div>}
     {row.status === "HandedOff" && <InlineNotice tone="success" title="财务交接已登记">此状态仅记录资料交接，不代表已记账或已付款；办理人、时间和说明见审批与办理记录。</InlineNotice>}
     </header>
     <OaApprovalDocument key={row.submissionId} client={client} user={user} row={row} />
     {user.capabilities.canManageUsers && row.status === "Pending" && Boolean(row.approvalPlan?.steps.some(step => step.status === "Waiting")) && <button type="button" className="command-button secondary" onClick={() => setReassigning(true)}>移交未完成审批</button>}
-    {row.approvalPlan?.matchedBranch && <p>命中金额条件：{row.approvalPlan.matchedBranch}</p>}
-    {row.approvalPlan && row.approvalPlan.steps.length > 0 && <section className="oa-detail-content" aria-label="审批步骤"><h3>审批步骤</h3><ol className="oa-history">{row.approvalPlan.steps.map((step, index) => <li key={step.approverUserId}><strong>第 {(step.stage ?? index) + 1} 阶段 · {step.approverName}（账号 #{step.approverUserId}）</strong> · {{ Waiting: "待审批", Approved: "已批准", Rejected: "已驳回" }[step.status]}{step.actedByUserId && <p>{step.delegationKey ? "代理办理：" : "办理人："}{step.actedByName}（账号 #{step.actedByUserId}） · {formatBusinessDateTime(step.actedAt, user.businessTimeZone)} · {step.note}</p>}</li>)}</ol></section>}
+    <OaApprovalSteps plan={row.approvalPlan} notes={row.approvalRoutingNotes} user={user} />
     <OaRequestContent row={row} user={user} />
     <section className="oa-attachments" aria-label="申请附件"><h3>{row.kind === "expense" ? "报销凭证" : "申请附件"}</h3>
       <p className="office-muted">{documentDescription}{row.kind === "expense" && "提交报销前至少上传一份凭证。"}</p>
@@ -58,6 +61,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     <details className="oa-detail-history" onToggle={event => setHistoryOpened(event.currentTarget.open)}><summary>审批与办理记录、提交版本</summary>{historyOpened && <><OaHistory client={client} user={user} row={row} /><OaSubmissionHistory client={client} user={user} row={row} /></>}</details>
     {action !== null && <OaActionDialog client={client} user={user} row={row} action={action} onClose={() => setAction(null)} />}
     {reassigning && <ApprovalReassignDialog client={client} row={row} onClose={() => setReassigning(false)} />}
+    {previewing && <OaApprovalPreview client={client} user={user} row={row} onClose={() => setPreviewing(false)} />}
   </article>;
 }
 

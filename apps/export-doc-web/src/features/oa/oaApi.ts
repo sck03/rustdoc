@@ -8,6 +8,7 @@ export function oaApi(client: ExportDocManagerApiClient, kind: OaKind) {
   return {
     list: (request: { pageNumber: number; pageSize: number; mineOnly: boolean; status?: string; financeOnly?: boolean; approvalsOnly?: boolean; handlingOnly?: boolean }, init?: ApiRequestInit) => client[`list${name}Request`](request, init),
     get: (id: number, init?: ApiRequestInit) => client[`get${name}Request`]({ id }, init),
+    previewApproval: (id: number, init?: ApiRequestInit) => client[`previewApprovalOf${name}Request`]({ id }, init),
     reassign: (id: number, body: OaApprovalReassign, init?: ApiRequestInit) => client[`reassign${name}RequestApproval`]({ id, body }, init),
     create: (body: OaRequestSave, init?: ApiRequestInit) => client[`create${name}Request`]({ body }, init),
     update: (id: number, body: OaRequestSave, init?: ApiRequestInit) => client[`update${name}Request`]({ id, body }, init),

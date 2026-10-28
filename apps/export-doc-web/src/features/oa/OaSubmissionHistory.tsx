@@ -9,6 +9,7 @@ import { oaApi } from "./oaApi.ts";
 import { useOaOperation } from "./useOaOperation.ts";
 import { OaApprovalDocument } from "./OaApprovalDocument.tsx";
 import { OaRequestContent } from "./OaRequestContent.tsx";
+import { OaApprovalSteps } from "./OaApprovalSteps.tsx";
 
 export function OaSubmissionHistory({client,user,row}:{client:ExportDocManagerApiClient;user:ApiUserDto;row:OaRequest}) {
   const [page,setPage] = useState(1);
@@ -26,6 +27,7 @@ export function OaSubmissionHistory({client,user,row}:{client:ExportDocManagerAp
     <div className="office-card-actions"><button type="button" disabled={page<=1||query.isFetching} onClick={()=>setPage(page-1)}>上一页版本</button><span>第 {page} 页</span><button type="button" disabled={query.isFetching||page*20>=(query.data?.totalCount??0)} onClick={()=>setPage(page+1)}>下一页版本</button></div>
     {snapshot && <article><h4>{detail.data?.formName} · {snapshot.title}</h4><p>{snapshot.employeeName} · {detail.data?.departmentName}</p>
       <OaRequestContent row={snapshot} user={user} />
+      <OaApprovalSteps plan={snapshot.approvalPlan} notes={snapshot.approvalRoutingNotes} user={user} />
       <ul>{snapshot.attachments.map(file=><li key={file.id}>{file.fileName} <button type="button" disabled={operation.busy} onClick={()=>void operation.run(signal=>api.download(row.id,file.id,{signal}),blob=>downloadBlob(blob,file.fileName),false)}>下载该版本原文件</button></li>)}</ul>
       <OaApprovalDocument key={selected} client={client} user={user} row={row} submissionId={selected} />
     </article>}

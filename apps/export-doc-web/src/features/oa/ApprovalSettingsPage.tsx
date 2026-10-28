@@ -26,7 +26,7 @@ function ApprovalSettingsEditor({ client, user, initial, accounts }: { client: E
   return <section className="work-surface office-workspace oa-workspace" aria-label="审批规则与代理">
     <header className="oa-heading"><h2>审批规则与代理</h2><Link to="/office/approvals">返回申请与审批</Link></header>
     <p className="office-muted">设置仅用于本公司后续提交的申请。在途申请保留提交时的步骤；代理按当前有效期校验，审批人与代理人仍须具有对应查看和审批权限。</p>
-    <p className="office-muted">新公司默认由部门负责人、公司领导两级审批。请在公司资料中指定领导审批负责人，职位可按本公司实际情况确定；需要多名领导参与时，可设置指定审批人阶段或会签。</p>
+    <p className="office-muted">默认由部门负责人、公司领导两级审批，可配置 1–10 个阶段。公司资料指定默认领导；多名领导共同审批时，选择“指定人员”、添加全部领导并选“会签”。允许任一领导办理时选“或签”。也可按申请类型和报销／采购金额分别配置流程。</p>
     {changedElsewhere && <InlineNotice tone="warning">审批设置已被其他管理员修改。当前草稿已保留，请记录需要保留的内容后重新载入最新设置。</InlineNotice>}
     <form ref={formRef} onInvalidCapture={event => { const section = (event.target as HTMLElement).closest("details"); if (section) section.open = true; }} onSubmit={event => { event.preventDefault(); void save(); }}>
       <fieldset disabled={operation.busy} className="office-form-grid">
@@ -44,7 +44,12 @@ function ApprovalSettingsEditor({ client, user, initial, accounts }: { client: E
             <option value="Single">单步审批（按岗位权限）</option><option value="DepartmentChain">部门负责人逐级审批</option><option value="Named">指定审批人（按顺序，可单人）</option>
             <option value="Configured">配置阶段与会签</option>
           </select></OfficeField>
-          {rule.mode === "DepartmentChain" && <p className="office-muted">从申请人所在部门逐级到顶层部门，负责人须关联启用账号；跳过申请人本人和重复负责人，缺少负责人时阻止提交。</p>}
+          {rule.mode !== "Single" && <div className="office-form-grid">
+            <OfficeField label="审批人是提交人或申请人员本人"><select value={rule.selfApproval ?? "Skip"} onChange={event => changeRule(index, { selfApproval: event.target.value as typeof rule.selfApproval })}><option value="Skip">本人回避，继续其他审批</option><option value="Reject">阻止提交，要求配置其他审批人</option></select></OfficeField>
+            <OfficeField label="同一人兼任多个审批阶段"><select value={rule.repeatedApprover ?? "LastStage"} onChange={event => changeRule(index, { repeatedApprover: event.target.value as typeof rule.repeatedApprover })}><option value="LastStage">只保留最后阶段审批</option><option value="Reject">阻止提交，要求不同审批人</option></select></OfficeField>
+            <p className="office-muted office-field-wide">系统记录回避和兼任处理原因；处理后无其他审批人时停止提交，不自动批准。已提交申请保留原流程。</p>
+          </div>}
+          {rule.mode === "DepartmentChain" && <p className="office-muted">从申请人所在部门逐级到顶层部门，负责人须关联启用账号；本人和兼任按上方规则处理，缺少负责人时阻止提交。</p>}
           {rule.mode === "Named" && <><ol>{rule.approverUserIds.map((id, step) => <li key={step} className="office-card-actions">
             <OfficeField label={`第 ${step + 1} 步审批人`}><select value={id} onChange={event => changeRule(index, { approverUserIds: rule.approverUserIds.map((value, i) => i === step ? Number(event.target.value) : value) })}>{accountOptions}</select></OfficeField>
             <button className="command-button secondary" type="button" disabled={step === 0} onClick={() => { const ids = [...rule.approverUserIds]; [ids[step - 1], ids[step]] = [ids[step], ids[step - 1]]; changeRule(index, { approverUserIds: ids }); }}>上移</button>

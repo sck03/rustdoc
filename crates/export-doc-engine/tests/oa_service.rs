@@ -137,6 +137,10 @@ fn appointments_countersign_conditions_and_visibility_form_a_closed_workflow() {
     )
     .unwrap();
     organization_workflow_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    organization_workflow_contract::exercise_nodes(
+        &service,
+        login["accessToken"].as_str().unwrap(),
+    );
     personnel_scope_contract::exercise(&service, login["accessToken"].as_str().unwrap());
     service.close().unwrap();
 }

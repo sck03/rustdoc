@@ -4367,6 +4367,11 @@ export interface OaApprovalPlan {
   steps: OaApprovalStep[];
 }
 
+export interface OaApprovalPreview {
+  approvalPlan: OaApprovalPlan;
+  approvalRoutingNotes: string[];
+}
+
 export interface OaApprovalReassign {
   expectedVersion: number;
   fromUserId: number;
@@ -4379,6 +4384,8 @@ export interface OaApprovalRule {
   approverUserIds: number[];
   kind: "leave" | "overtime" | "expense" | "travel" | "purchase" | "general" | "personnel";
   mode: "Single" | "DepartmentChain" | "Named" | "Configured";
+  repeatedApprover?: "LastStage" | "Reject";
+  selfApproval?: "Skip" | "Reject";
   stages?: OaApprovalStage[];
 }
 
@@ -4388,6 +4395,7 @@ export interface OaApprovalSettings {
   handlingServices?: OfficeHandlingService[];
   personnelApprovalActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
   rules: OaApprovalRule[];
+  sheetDefaultContent?: string;
   sheetFieldCatalog?: ApiReportTemplateFieldCatalogResponse;
   sheetTemplates?: OaSheetTemplate[];
   versionNumber: number;
@@ -4404,6 +4412,7 @@ export interface OaApprovalSettingsSave {
 
 export interface OaApprovalStage {
   approverUserIds: number[];
+  decision?: "All" | "Any";
   source: "Named" | "DepartmentManager" | "LineManager" | "FunctionalManagers" | "CompanyExecutive";
 }
 
@@ -4413,10 +4422,32 @@ export interface OaApprovalStep {
   actedByUserId?: number | null;
   approverName: string;
   approverUserId: number;
+  decision?: "All" | "Any";
   delegationKey: string;
   note: string;
   stage?: number | null;
-  status: "Waiting" | "Approved" | "Rejected";
+  status: "Waiting" | "Approved" | "Rejected" | "Skipped";
+}
+
+export interface OaApprovalVerification {
+  approvedAt?: string;
+  canOpenRequest: boolean;
+  checkedAt: string;
+  companyName?: string;
+  currency?: string;
+  currentSubmissionNumber: number;
+  departmentName?: string;
+  documentStatus: string;
+  employeeName?: string;
+  employeeNumber?: string;
+  isCurrent: boolean;
+  isValid: boolean;
+  requestId: number;
+  requestStatus: string;
+  submissionNumber: number;
+  submissionStatus: string;
+  title?: string;
+  totalAmount?: string;
 }
 
 export interface OaAttachment {
@@ -4489,6 +4520,7 @@ export interface OaPurchaseLine {
 export interface OaRequest {
   approvalDocument?: OaSubmission;
   approvalPlan?: OaApprovalPlan;
+  approvalRoutingNotes?: string[];
   attachments: OaAttachment[];
   canHandle?: boolean;
   canReview?: boolean;
@@ -4561,10 +4593,6 @@ export interface OaSheetFields {
   CompanyName?: string;
   DepartmentName?: string;
   EmployeeNumber?: string;
-  FirstStageApprovals?: string;
-  FirstStageTitle?: string;
-  FollowingStageApprovals?: string;
-  FollowingStageTitle?: string;
   FormName?: string;
   GeneratedAt?: string;
   JobTitle?: string;
@@ -4611,6 +4639,7 @@ export interface OaSubmissionPage {
 
 export interface OaSubmittedRequest {
   approvalPlan?: OaApprovalPlan;
+  approvalRoutingNotes?: string[];
   attachments: OaAttachment[];
   canHandle?: boolean;
   canReview?: boolean;
@@ -5767,6 +5796,19 @@ export const HsCodeHistoryCandidatePageDefaults = {
   notice: "",
   scannedSourceCount: 0,
 } as const satisfies Partial<HsCodeHistoryCandidatePage>;
+
+export const OaApprovalRuleDefaults = {
+  repeatedApprover: "LastStage",
+  selfApproval: "Skip",
+} as const satisfies Partial<OaApprovalRule>;
+
+export const OaApprovalStageDefaults = {
+  decision: "All",
+} as const satisfies Partial<OaApprovalStage>;
+
+export const OaApprovalStepDefaults = {
+  decision: "All",
+} as const satisfies Partial<OaApprovalStep>;
 
 export const OfficeDecisionRequestDefaults = {
   note: "",
@@ -7499,6 +7541,34 @@ export interface ManageAnnouncementsRequest {
   pageSize?: number;
 }
 
+export interface PreviewApprovalOfExpenseRequestRequest {
+  id: number;
+}
+
+export interface PreviewApprovalOfGeneralRequestRequest {
+  id: number;
+}
+
+export interface PreviewApprovalOfLeaveRequestRequest {
+  id: number;
+}
+
+export interface PreviewApprovalOfOvertimeRequestRequest {
+  id: number;
+}
+
+export interface PreviewApprovalOfPersonnelChangeRequestRequest {
+  id: number;
+}
+
+export interface PreviewApprovalOfPurchaseRequestRequest {
+  id: number;
+}
+
+export interface PreviewApprovalOfTravelRequestRequest {
+  id: number;
+}
+
 export interface PreviewCrmCustomerImportRequest {
   fileName?: string;
   body: Blob;
@@ -8589,6 +8659,11 @@ export interface UploadSingleWindowSubmitPackageRequest {
 
 export interface ValidateSettingsRequest {
   body: ApiSettingsValidationRequest;
+}
+
+export interface VerifyExpenseApprovalRequest {
+  id: number;
+  submissionNumber: number;
 }
 
 export interface VoidExpenseRequestRequest {
@@ -11705,6 +11780,41 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public previewApprovalOfExpenseRequest(request: PreviewApprovalOfExpenseRequestRequest, init?: ApiRequestInit): Promise<OaApprovalPreview> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/approval-preview`;
+    return this.request<OaApprovalPreview>("GET", path, { init });
+  }
+
+  public previewApprovalOfGeneralRequest(request: PreviewApprovalOfGeneralRequestRequest, init?: ApiRequestInit): Promise<OaApprovalPreview> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/approval-preview`;
+    return this.request<OaApprovalPreview>("GET", path, { init });
+  }
+
+  public previewApprovalOfLeaveRequest(request: PreviewApprovalOfLeaveRequestRequest, init?: ApiRequestInit): Promise<OaApprovalPreview> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/approval-preview`;
+    return this.request<OaApprovalPreview>("GET", path, { init });
+  }
+
+  public previewApprovalOfOvertimeRequest(request: PreviewApprovalOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaApprovalPreview> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/approval-preview`;
+    return this.request<OaApprovalPreview>("GET", path, { init });
+  }
+
+  public previewApprovalOfPersonnelChangeRequest(request: PreviewApprovalOfPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaApprovalPreview> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/approval-preview`;
+    return this.request<OaApprovalPreview>("GET", path, { init });
+  }
+
+  public previewApprovalOfPurchaseRequest(request: PreviewApprovalOfPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaApprovalPreview> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/approval-preview`;
+    return this.request<OaApprovalPreview>("GET", path, { init });
+  }
+
+  public previewApprovalOfTravelRequest(request: PreviewApprovalOfTravelRequestRequest, init?: ApiRequestInit): Promise<OaApprovalPreview> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/approval-preview`;
+    return this.request<OaApprovalPreview>("GET", path, { init });
+  }
+
   public previewCrmCustomerImport(request: PreviewCrmCustomerImportRequest, init?: ApiRequestInit): Promise<ApiCrmCustomerImportPreviewDto> {
     const path = "/api/crm/import/preview";
     return this.request<ApiCrmCustomerImportPreviewDto>("POST", path, {
@@ -13647,6 +13757,16 @@ export class ExportDocManagerApiClient {
     const path = "/api/settings/validate";
     return this.request<ApiSettingsValidationResponse>("POST", path, {
       body: request.body,
+      init,
+    });
+  }
+
+  public verifyExpenseApproval(request: VerifyExpenseApprovalRequest, init?: ApiRequestInit): Promise<OaApprovalVerification> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/verification`;
+    return this.request<OaApprovalVerification>("GET", path, {
+      query: {
+        "submissionNumber": request.submissionNumber,
+      },
       init,
     });
   }

@@ -11,6 +11,13 @@ pub enum ApprovalMode {
     Configured,
 }
 
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ApprovalDecision {
+    #[default]
+    All,
+    Any,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -47,6 +54,24 @@ mod tests {
         assert!(parallel.current_indices().is_empty());
         assert!(parallel.validate(1).is_err());
     }
+    #[test]
+    fn any_sign_closes_only_its_node_without_fabricating_other_signatures() {
+        let mut plan = snapshot(true);
+        plan.steps[0].decision = ApprovalDecision::Any;
+        plan.steps[1].decision = ApprovalDecision::Any;
+        plan.validate(4).unwrap();
+        plan.steps[1].status = "Approved".into();
+        plan.steps[1].acted_by_user_id = Some(2);
+        assert!(plan.validate(4).is_err());
+        plan.close_any_stage(1);
+        plan.validate(4).unwrap();
+        assert_eq!(plan.steps[0].status, "Skipped");
+        assert_eq!(plan.steps[0].acted_by_user_id, None);
+        assert_eq!(plan.current_indices(), vec![2]);
+        plan.steps[1].status = "Waiting".into();
+        plan.steps[1].acted_by_user_id = None;
+        assert!(plan.validate(4).is_err());
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,6 +79,8 @@ pub struct ApprovalStep {
     /// Omitted in previously issued serial plans; their array order remains authoritative.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stage: Option<usize>,
+    #[serde(default)]
+    pub decision: ApprovalDecision,
     pub approver_user_id: i64,
     pub approver_name: String,
     pub status: String,
@@ -73,6 +100,20 @@ pub struct ApprovalPlan {
     pub matched_branch: String,
 }
 impl ApprovalPlan {
+    /// Any-sign closes only the other waiting steps of this node, without
+    /// inventing signatures for people who did not approve it.
+    pub fn close_any_stage(&mut self, approved: usize) {
+        let step = &self.steps[approved];
+        if step.status != "Approved" || step.decision != ApprovalDecision::Any {
+            return;
+        }
+        let stage = step.stage.unwrap_or(approved);
+        for (index, other) in self.steps.iter_mut().enumerate() {
+            if other.stage.unwrap_or(index) == stage && other.status == "Waiting" {
+                other.status = "Skipped".into();
+            }
+        }
+    }
     pub fn current(&self) -> Option<usize> {
         self.current_indices().first().copied()
     }
@@ -106,6 +147,29 @@ impl ApprovalPlan {
         let mut seen = HashSet::new();
         let mut open_stage = None;
         let mut previous_stage = 0;
+        let mut stages = std::collections::BTreeMap::new();
+        for (index, step) in self.steps.iter().enumerate() {
+            let entry =
+                stages
+                    .entry(step.stage.unwrap_or(index))
+                    .or_insert((step.decision, 0, 0, 0));
+            if entry.0 != step.decision {
+                return Err("同一审批阶段的通过方式必须一致。".into());
+            }
+            entry.1 += usize::from(step.status == "Approved");
+            entry.2 += usize::from(step.status == "Waiting");
+            entry.3 += usize::from(step.status == "Skipped");
+        }
+        for (decision, approved, waiting, skipped) in stages.values() {
+            if (*decision == ApprovalDecision::All && *skipped > 0)
+                || (*decision == ApprovalDecision::Any
+                    && (*approved > 1
+                        || (*approved == 1 && *waiting > 0)
+                        || (*skipped > 0 && *approved != 1)))
+            {
+                return Err("或签阶段只能有一位批准人，其余步骤须正确关闭。".into());
+            }
+        }
         for (index, step) in self.steps.iter().enumerate() {
             let stage = step.stage.unwrap_or(index);
             if stage >= 10 || (index > 0 && stage < previous_stage) {
@@ -131,6 +195,9 @@ impl ApprovalPlan {
                 "Waiting" if step.acted_by_user_id.is_none() => {
                     open_stage.get_or_insert(stage);
                 }
+                "Skipped"
+                    if step.acted_by_user_id.is_none()
+                        && step.decision == ApprovalDecision::Any => {}
                 _ => return Err("审批步骤顺序或办理记录无效。".into()),
             }
         }

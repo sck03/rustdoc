@@ -62,6 +62,18 @@ try {
     foreach ($name in @('platform-path-safety.ps1', 'generated-artifact-protection.ps1', 'rust-test-artifacts.ps1')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "lib/$name") -Destination (Join-Path $planScripts 'lib')
     }
+    # Simulate an unreadable candidate without creating persistent denied ACLs.
+    Add-Content -LiteralPath (Join-Path $planScripts 'lib/generated-artifact-protection.ps1') -Value @'
+$script:originalProtection = ${function:Test-ExportDocProtectedArtifact}
+function Test-ExportDocProtectedArtifact {
+    param([string]$Path, [switch]$IncludeReleaseOutputs)
+    if ((Split-Path $Path -Leaf) -eq 'uninspectable') { throw [UnauthorizedAccessException]::new('fixture access denied') }
+    & $script:originalProtection -Path $Path -IncludeReleaseOutputs:$IncludeReleaseOutputs
+}
+'@
+    $uninspectable = Join-Path $planRoot 'artifacts/uninspectable'
+    New-Item -ItemType Directory -Path $uninspectable -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $uninspectable 'keep.txt'), 'unverified content')
     [IO.File]::WriteAllText((Join-Path $planRoot 'target/CACHEDIR.TAG'), "Signature: 8a477f597d28d172789f06886806bc55`n")
     $testTarget = Join-Path $planRoot 'target'
     $testOutputs = @('debug/deps/sample_test-0123456789abcdef.exe', 'debug/deps/sample_test-0123456789abcdef.d', 'debug/deps/sample_test-0123456789abcdef.pdb')
@@ -119,6 +131,7 @@ try {
     }
     & pwsh -NoProfile -File (Join-Path $planScripts 'clean-generated-artifacts.ps1') -IncludeCodexRuntimeWorkspaces | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Isolated cleanup failed' }
+    if (-not (Test-Path -LiteralPath (Join-Path $uninspectable 'keep.txt'))) { throw 'Uninspectable output must be preserved' }
     foreach ($path in $generatedPaths) {
         if (Test-Path -LiteralPath (Join-Path $planRoot $path)) { throw "Verified compiler output was not removed: $path" }
     }

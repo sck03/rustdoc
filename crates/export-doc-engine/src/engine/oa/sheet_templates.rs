@@ -21,14 +21,17 @@ const TYPES: &[(&str, &str)] = &[
     ("personnel:Rehire", "返聘审批单"),
 ];
 pub(super) fn defaults() -> Result<Value> {
-    let design = export_doc_domain::report_template_format::decode(DEFAULT).map_err(invalid)?;
-    let content = serde_json::to_string(&design)?;
+    let content = default_content()?;
     Ok(json!(
         TYPES
             .iter()
             .map(|(key, name)| json!({"key":key,"name":name,"content":content}))
             .collect::<Vec<_>>()
     ))
+}
+pub(super) fn default_content() -> Result<String> {
+    let design = export_doc_domain::report_template_format::decode(DEFAULT).map_err(invalid)?;
+    Ok(serde_json::to_string(&design)?)
 }
 pub(super) fn fields() -> Vec<Field> {
     export_doc_contracts::openapi::OA_SHEET_FIELDS
@@ -110,13 +113,6 @@ pub(super) fn validate_design(content: &str) -> Result<Design> {
         {
             continue;
         }
-        if field.path == "Oa.Approvals"
-            && ["Oa.FirstStageApprovals", "Oa.FollowingStageApprovals"]
-                .iter()
-                .all(|key| growing.contains(*key))
-        {
-            continue;
-        }
         if !printed.contains(&field.path) {
             return Err(invalid(format!(
                 "审批单须保留可打印字段：{}。",
@@ -130,6 +126,7 @@ pub(super) fn validate_design(content: &str) -> Result<Design> {
             "Oa.Reason",
             "Oa.Attachments",
             "Oa.Approvals",
+            "Oa.ApprovalResult",
         ]
         .contains(&field.path.as_str())
             && !growing.contains(&field.path)
@@ -158,15 +155,12 @@ pub(super) fn preview(service: &NativeService, actor: &Actor, body: &Value) -> R
         root: json!({"Oa":{
             "CompanyName":"示例公司","FormName":body["name"],"Reference":"排版样例 · 未审批",
             "ApplicantName":"张三","DepartmentName":"业务部","EmployeeNumber":"A001","JobTitle":"业务专员","SubmittedAt":"2026-01-01 09:00:00 +08:00",
-            "FirstStageTitle":"部门负责人审批","FollowingStageTitle":"公司领导审批",
-            "FirstStageApprovals":"审批人：李四\n审批意见：同意，按公司制度办理。\n审批时间：2026-01-01 10:00:00 +08:00",
-            "FollowingStageApprovals":"审批人：王五\n审批意见：同意，请办理后续手续。\n审批时间：2026-01-01 11:00:00 +08:00",
             "ApprovalResult":"排版样例 · 未审批，不作为已批准凭据",
             "Applicant":"示例申请人 · 工号 001 · 示例部门\n提交时间：2026-01-01T09:00:00+08:00",
             "Title":"审批单版式预览","Summary":"示例事项\nCNY 1,000.00 · 人民币壹仟元整",
             "Reason":"此处显示申请说明。正式审批单使用提交时冻结的内容；长说明、附件清单及审批意见自动续页。",
             "Attachments":"1. 报销明细.pdf · 报销单\n2. 电子凭证.pdf · 发票/凭证",
-            "Approvals":"部门负责人审批：示例负责人\n意见：同意\n\n公司领导审批：示例领导\n意见：同意",
+            "Approvals":"节点 1 · 部门负责人审批 · 会签：全部同意\n审批人：李四 · 结果：同意\n审批意见：同意，按公司制度办理。\n审批时间：2026-01-01 10:00:00 +08:00\n\n节点 2 · 职能负责人审批 · 或签：任一人同意\n审批人：王五 · 结果：同意\n审批意见：资料齐全。\n审批时间：2026-01-01 11:00:00 +08:00\n候选审批人：赵六；节点已通过，本人未签署。\n\n节点 3 · 公司领导审批 · 会签：全部同意\n审批人：钱七 · 结果：同意\n审批意见：同意，请办理后续手续。\n审批时间：2026-01-01 12:00:00 +08:00",
             "GeneratedAt":"排版样例，不作为已批准凭据"
         }}),
         images: Default::default(),
@@ -205,9 +199,11 @@ pub(super) fn select(settings: &Value, row: &Value) -> Result<Value> {
         defaults = self::defaults()?;
         &defaults
     };
-    templates
+    let template = templates
         .as_array()
         .and_then(|values| values.iter().find(|v| v["key"] == key))
         .cloned()
-        .ok_or_else(|| super::super::error::unavailable("审批单模板缺失。"))
+        .ok_or_else(|| super::super::error::unavailable("审批单模板缺失。"))?;
+    validate_design(&text(&template, "content"))?;
+    Ok(template)
 }

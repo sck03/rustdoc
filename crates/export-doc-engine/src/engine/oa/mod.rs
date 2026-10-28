@@ -12,6 +12,7 @@ pub(in crate::engine) mod settings;
 mod sheet_templates;
 mod submissions;
 mod validation;
+mod verification;
 use super::{
     NativeService, auth,
     error::{Result, conflict, error, invalid},
@@ -270,6 +271,16 @@ pub(super) fn handle(
         }
         let id = records::id(parameters)?;
         let (_, mut row) = current(tx, &actor, meta, id)?;
+        if action == "verification" {
+            return verification::verify(tx, &actor, &row, query);
+        }
+        if action == "approval-preview" {
+            mutable(&row)?;
+            approval::submit(tx, &actor, &mut row)?;
+            return Ok(
+                json!({"approvalPlan":row["approvalPlan"],"approvalRoutingNotes":row["approvalRoutingNotes"]}),
+            );
+        }
         if action == "get" {
             return project(tx, &actor, row, true);
         }

@@ -278,6 +278,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     oa_archive_contract::exercise(&service, admin_token, staff_token, None);
     approval_contract::exercise(&service, admin_token);
     organization_workflow_contract::exercise(&service, admin_token);
+    organization_workflow_contract::exercise_nodes(&service, admin_token);
     personnel_scope_contract::exercise(&service, admin_token);
     handling_contract::exercise(&service, admin_token);
     communication_contract::exercise(&service, admin_token);

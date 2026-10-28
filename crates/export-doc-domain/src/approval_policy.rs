@@ -1,5 +1,5 @@
 //! Configurable approval sources and exact, currency-specific amount conditions.
-use crate::approval::ApprovalMode;
+use crate::approval::{ApprovalDecision, ApprovalMode};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, str::FromStr};
@@ -18,12 +18,39 @@ pub enum ApproverSource {
 pub struct ApprovalStage {
     pub source: ApproverSource,
     pub approver_user_ids: Vec<i64>,
+    #[serde(default)]
+    pub decision: ApprovalDecision,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+    #[test]
+    fn routing_handles_self_dual_roles_and_keeps_other_countersigners() {
+        let mut rule: ApprovalRule = serde_json::from_value(json!({"kind":"expense","mode":"Configured","approverUserIds":[],"stages":[{"source":"Named","approverUserIds":[1,2]},{"source":"Named","approverUserIds":[2,3,4]}]})).unwrap();
+        rule.validate().unwrap();
+        let mut groups = vec![vec![1, 2], vec![2, 3, 4]];
+        let notes = rule.route_groups(&mut groups, 1, Some(4)).unwrap();
+        assert_eq!(groups, vec![vec![], vec![2, 3]]);
+        assert_eq!(notes.len(), 3);
+        assert!(
+            rule.route_groups(&mut [vec![1], vec![4]], 1, Some(4))
+                .is_err()
+        );
+        assert!(rule.route_groups(&mut [vec![]], 1, None).is_err());
+        rule.self_approval = SelfApproval::Reject;
+        assert!(rule.route_groups(&mut [vec![1, 2]], 1, None).is_err());
+        rule.self_approval = SelfApproval::Skip;
+        rule.repeated_approver = RepeatedApprover::Reject;
+        assert!(
+            rule.route_groups(&mut [vec![2], vec![2, 3]], 1, None)
+                .is_err()
+        );
+        rule.mode = ApprovalMode::Single;
+        assert!(rule.route_groups(&mut [vec![1]], 1, None).is_err());
+        assert!(rule.route_groups(&mut [], 1, None).is_ok());
+    }
     #[test]
     fn exact_currency_ranges_have_no_rounding_overlap_or_boundary_gaps() {
         let stages = json!([{"source":"CompanyExecutive","approverUserIds":[]}]);
@@ -81,21 +108,39 @@ pub struct ApprovalRule {
     pub stages: Vec<ApprovalStage>,
     #[serde(default)]
     pub amount_branches: Vec<AmountBranch>,
+    #[serde(default)]
+    pub self_approval: SelfApproval,
+    #[serde(default)]
+    pub repeated_approver: RepeatedApprover,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub enum SelfApproval {
+    #[default]
+    Skip,
+    Reject,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RepeatedApprover {
+    #[default]
+    LastStage,
+    Reject,
 }
 
 pub fn validate_stages(stages: &[ApprovalStage]) -> Result<(), String> {
     if stages.is_empty() || stages.len() > 10 {
         return Err("配置审批须有 1–10 个阶段。".into());
     }
-    let mut named = HashSet::new();
     for stage in stages {
+        let mut named = HashSet::new();
         if stage.source == ApproverSource::Named {
             if stage.approver_user_ids.is_empty() || stage.approver_user_ids.len() > 10 {
                 return Err("每个指定会签阶段须有 1–10 位审批人。".into());
             }
             for id in &stage.approver_user_ids {
                 if *id <= 0 || !named.insert(*id) {
-                    return Err("指定审批人无效或在多个阶段重复。".into());
+                    return Err("指定审批人无效或在同一阶段重复。".into());
                 }
             }
         } else if !stage.approver_user_ids.is_empty() {
@@ -123,6 +168,59 @@ impl AmountBranch {
 }
 
 impl ApprovalRule {
+    /// Keep stage positions stable so skipped nodes retain their original labels.
+    /// This only resolves new submissions; signed snapshots are never rewritten.
+    pub fn route_groups(
+        &self,
+        groups: &mut [Vec<i64>],
+        owner: i64,
+        applicant: Option<i64>,
+    ) -> Result<Vec<String>, String> {
+        if groups.iter().any(Vec::is_empty) {
+            return Err("审批阶段没有有效负责人，请完善流程配置。".into());
+        }
+        let mut seen = HashSet::new();
+        let mut notes = vec![];
+        for (stage, ids) in groups.iter_mut().enumerate().rev() {
+            let mut retained = vec![];
+            for id in ids.iter().copied() {
+                if id == owner || Some(id) == applicant {
+                    if self.self_approval == SelfApproval::Reject {
+                        return Err("流程包含提交人或申请人员本人，请配置其他审批人。".into());
+                    }
+                    notes.push((
+                        stage,
+                        format!(
+                            "第 {} 阶段：账号 #{id} 为提交人或申请人员本人，已回避。",
+                            stage + 1
+                        ),
+                    ));
+                } else if !seen.insert(id) {
+                    if self.repeated_approver == RepeatedApprover::Reject {
+                        return Err("同一审批人出现在多个阶段，请配置不同审批人。".into());
+                    }
+                    notes.push((
+                        stage,
+                        format!(
+                            "第 {} 阶段：账号 #{id} 兼任后续审批职责，仅保留最后阶段审批。",
+                            stage + 1
+                        ),
+                    ));
+                } else {
+                    retained.push(id);
+                }
+            }
+            *ids = retained;
+        }
+        if (self.mode != ApprovalMode::Single || !groups.is_empty())
+            && groups.iter().all(Vec::is_empty)
+        {
+            return Err("回避后没有其他审批人，不能自动批准；请配置另一位负责人。".into());
+        }
+        notes.sort_by_key(|(stage, _)| *stage);
+        Ok(notes.into_iter().map(|(_, note)| note).collect())
+    }
+
     pub fn account_ids(&self) -> Vec<i64> {
         self.approver_user_ids
             .iter()

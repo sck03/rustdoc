@@ -384,6 +384,27 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
     assert_eq!(list(service, second, false)["totalCount"], 1);
     row = act(service, second, "approve", &row);
     assert_eq!(row["status"], "Approved");
+    let verify = |token: &str,
+                  row: &Value,
+                  number: i64|
+     -> Result<Value, export_doc_engine::api::ApiError> {
+        let value: Value = serde_json::from_slice(&service.dispatch(
+            VERIFY_EXPENSE_APPROVAL,
+            &[("id", row["id"].to_string())],
+            &[("submissionNumber", number.to_string())],
+            None,
+            token,
+        )?)
+        .unwrap();
+        export_doc_contracts::validation::response(VERIFY_EXPENSE_APPROVAL.id, &value).unwrap();
+        Ok(value)
+    };
+    let checked = verify(finance, &row, row["submissionNumber"].as_i64().unwrap()).unwrap();
+    assert_eq!(checked["isValid"], true);
+    assert_eq!(checked["totalAmount"], "12.35");
+    assert_eq!(verify(applicant, &row, 1).unwrap_err().status, Some(403));
+    assert_eq!(verify(root_admin, &row, 1).unwrap_err().status, Some(403));
+    assert_eq!(verify(finance, &row, 999).unwrap_err().status, Some(404));
     assert_eq!(list(service, finance, true)["totalCount"], 1);
     assert_eq!(
         call(service, finance, GET_NOTIFICATION_UNREAD_COUNT, 0, None).unwrap()["unreadCount"],
@@ -391,6 +412,10 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
     );
     row = act(service, finance, "complete", &row);
     assert_eq!(row["status"], "HandedOff");
+    assert_eq!(
+        verify(finance, &row, 1).unwrap()["requestStatus"],
+        "HandedOff"
+    );
     let history = call(
         service,
         applicant,
@@ -441,12 +466,25 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
     let rejected = act(service, first, "reject", &chain);
     assert_eq!(rejected["status"], "Rejected");
     let resubmitted = act(service, applicant, "submit", &rejected);
+    let old_version = verify(finance, &resubmitted, 1).unwrap();
+    assert_eq!(old_version["isValid"], false);
+    assert_eq!(old_version["isCurrent"], false);
+    assert!(old_version.get("title").is_none());
     let first_done = act(service, first, "approve", &resubmitted);
     let approved = act(service, second, "approve", &first_done);
     let notice = call(service, finance, LIST_NOTIFICATIONS, 0, None).unwrap()["items"][0]["id"]
         .as_i64()
         .unwrap();
     act(service, first, "void", &approved);
+    let voided = verify(
+        finance,
+        &approved,
+        approved["submissionNumber"].as_i64().unwrap(),
+    )
+    .unwrap();
+    assert_eq!(voided["isValid"], false);
+    assert_eq!(voided["submissionStatus"], "Voided");
+    assert_eq!(voided["canOpenRequest"], false);
     assert_eq!(
         call(service, finance, READ_NOTIFICATION, notice, None)
             .unwrap_err()

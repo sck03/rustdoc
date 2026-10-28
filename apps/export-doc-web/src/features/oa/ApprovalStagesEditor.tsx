@@ -3,15 +3,16 @@ import type { ApprovalAccount } from "./useApprovalSettings.ts";
 import { OfficeField } from "../office/OfficeUi.tsx";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 
-const sources: Record<OaApprovalStage["source"], string> = { Named: "指定人员会签", DepartmentManager: "任职部门负责人", LineManager: "直属负责人", FunctionalManagers: "职能负责人会签", CompanyExecutive: "公司领导审批负责人" };
+const sources: Record<OaApprovalStage["source"], string> = { Named: "指定人员", DepartmentManager: "任职部门负责人", LineManager: "直属负责人", FunctionalManagers: "职能负责人", CompanyExecutive: "公司领导审批负责人" };
 export const initialStage = (): OaApprovalStage => ({ source: "DepartmentManager", approverUserIds: [] });
 
 export function ApprovalStagesEditor({ stages, accounts, onChange }: { stages: OaApprovalStage[]; accounts: ApprovalAccount[]; onChange: (stages: OaApprovalStage[]) => void }) {
   const patch = (index: number, stage: OaApprovalStage) => onChange(stages.map((old, i) => i === index ? stage : old));
   return <div className="oa-stages-editor">
-    <p className="office-muted">阶段按顺序推进。同一阶段须全部批准，任一驳回即结束；申请人不能自批，同一人不能重复签署。组织来源在提交时解析并保留快照。</p>
+    <p className="office-muted">阶段按顺序推进。会签须全部同意，或签任一人同意即可；当前节点任一人先驳回即结束。本人和兼任按流程规则处理，提交时保留快照。</p>
     {stages.map((stage, index) => <fieldset className="office-resource-card" key={index}><legend>第 {index + 1} 阶段</legend>
-      <OfficeField label="审批人来源"><select value={stage.source} onChange={event => patch(index, { source: event.target.value as OaApprovalStage["source"], approverUserIds: [] })}>{Object.entries(sources).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></OfficeField>
+      <OfficeField label="审批人来源"><select value={stage.source} onChange={event => patch(index, { ...stage, source: event.target.value as OaApprovalStage["source"], approverUserIds: [] })}>{Object.entries(sources).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></OfficeField>
+      <OfficeField label="节点通过方式"><select value={stage.decision ?? "All"} onChange={event => patch(index, { ...stage, decision: event.target.value as OaApprovalStage["decision"] })}><option value="All">会签：全部同意</option><option value="Any">或签：任一人同意</option></select></OfficeField>
       {stage.source === "Named" && <>
         {stage.approverUserIds.map((id, signer) => <div className="office-card-actions" key={signer}><OfficeField label={`会签人 ${signer + 1}`}><select required value={id || ""} onChange={event => patch(index, { ...stage, approverUserIds: stage.approverUserIds.map((old, i) => i === signer ? Number(event.target.value) : old) })}><option value="">选择会签账号</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.fullName} · {account.username}</option>)}</select></OfficeField>
           <button type="button" className="command-button secondary" onClick={() => patch(index, { ...stage, approverUserIds: stage.approverUserIds.filter((_, i) => i !== signer) })}>移除会签人</button></div>)}

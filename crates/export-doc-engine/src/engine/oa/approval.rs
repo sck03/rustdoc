@@ -160,6 +160,7 @@ pub(super) fn review(
             step.acted_at = store::timestamp();
             step.note = note.into();
             step.delegation_key = delegation;
+            plan.close_any_stage(index);
             let current = if action == "reject" {
                 None
             } else {

@@ -214,16 +214,16 @@ function payment(expense) {
 }
 export function approvalSheetDesign() {
   const d = document("OaApproval");
-  const navy = "#29496b", ink = "#243447", line = "#cbd6e2", pale = "#eef3f8";
+  const ink = "#000000";
   d.page.fontSizePt = 10;
   d.page.marginLeftHundredthMm = d.page.marginRightHundredthMm = 1500;
-  const color = (e, fg, bg = "#ffffff") => ({ ...e, style: { ...e.style, color: fg, backgroundColor: bg } });
+  const color = e => ({ ...e, style: { ...e.style, color: ink } });
   d.layers[0].elements = [
-    color(field("oa-company","Oa.CompanyName",15,10,120,7,10),navy),
-    color(text("oa-system","OA / 审批记录",140,10,55,7,9,"Right"),navy),
-    {...rule("oa-heading-rule",15,21,180),style:{borderColor:navy,borderWidthPx:1,borderStyle:"Solid"}},
-    color(field("oa-title","Oa.FormName",30,26,150,11,19,"Center",true),navy),
-    color(text("oa-subtitle","流程审批通过后的系统记录",45,38,120,6,8,"Center"),"#63758a"),
+    color(field("oa-company","Oa.CompanyName",15,10,120,7,10)),
+    color(text("oa-system","OA / 审批记录",140,10,55,7,9,"Right")),
+    {...rule("oa-heading-rule",15,21,180),style:{borderColor:ink,borderWidthPx:0.6,borderStyle:"Solid"}},
+    color(field("oa-title","Oa.FormName",30,26,150,11,19,"Center",true)),
+    color(text("oa-subtitle","流程审批通过后的系统记录",45,38,120,6,8,"Center")),
   ];
   d.layers[0].designHeightHundredthMm = 4600;
   let y = 46;
@@ -232,14 +232,14 @@ export function approvalSheetDesign() {
     y += gap;
     const e = grid(id,15,y,180,widths,rows,size,sans);
     e.block.growToContent = true;
-    e.block.border = {...border,color:line,widthPx:0.6};
+    e.block.border = {...border,color:ink,widthPx:0.6};
     e.block.defaultCellStyle = {fontSizePt:size,color:ink,align:"Left",verticalAlign:"Top",marginTopMm:2,marginBottomMm:2,marginLeftMm:2.5,marginRightMm:2.5};
     blocks.push(e); y += rows.reduce((n,row)=>n+row[0],0);
     return e;
   };
-  const label = (id,name) => cell(id,name,1,{style:{color:navy,backgroundColor:pale,bold:true}});
-  const section = (id,title) => add(id,[100],[[8,[cell(id+"-text",title,1,{style:{color:navy,backgroundColor:pale,bold:true}})]]],10,4);
-  add("oa-reference",[100],[[9,[binding("reference","Oa.Reference",1,{style:{color:navy,backgroundColor:pale}})]]],9);
+  const label = (id,name) => cell(id,name,1,{style:{bold:true}});
+  const section = (id,title) => add(id,[100],[[8,[cell(id+"-text",title,1,{style:{bold:true}})]]],10,4);
+  add("oa-reference",[100],[[9,[binding("reference","Oa.Reference")]]],9);
   section("oa-applicant-heading","一、申请人信息");
   add("oa-applicant",[13,20,13,21,10,23],[
     [9,[label("name-label","申请人"),binding("name","Oa.ApplicantName"),label("department-label","所属部门"),binding("department","Oa.DepartmentName"),label("number-label","工号"),binding("number","Oa.EmployeeNumber")]],
@@ -252,20 +252,20 @@ export function approvalSheetDesign() {
     [24,[label("reason-label","申请内容"),binding("reason","Oa.Reason")]],
     [13,[label("attachments-label","附件索引"),binding("attachments","Oa.Attachments")]],
   ],9.5);
-  section("oa-approval-heading","三、审批意见");
-  add("oa-approvals",[50,50],[
-    [9,[binding("first-heading","Oa.FirstStageTitle",1,{style:{color:"#ffffff",backgroundColor:"#34775d",bold:true,align:"Center"}}),binding("following-heading","Oa.FollowingStageTitle",1,{style:{color:"#ffffff",backgroundColor:"#335f8c",bold:true,align:"Center"}})]],
-    [38,[binding("first-approval","Oa.FirstStageApprovals",1,{style:{backgroundColor:"#f1f8f4"}}),binding("following-approval","Oa.FollowingStageApprovals",1,{style:{backgroundColor:"#f1f5fa"}})]],
-  ],9);
-  add("oa-result",[100],[[12,[binding("approval-result","Oa.ApprovalResult",1,{style:{color:"#256447",backgroundColor:"#eaf5ed",align:"Center",bold:true}})]]],9,4);
+  section("oa-approval-heading","三、流程节点与审批记录");
+  add("oa-approvals",[100],[[36,[binding("approvals","Oa.Approvals")]]],9);
+  add("oa-result",[100],[[12,[binding("approval-result","Oa.ApprovalResult",1,{style:{align:"Center",bold:true}})]]],9,4);
   d.layers[1].elements = blocks;
   d.layers[2].elements = [
-    {...rule("oa-footer-rule",15,277,180),style:{borderColor:line,borderWidthPx:0.6,borderStyle:"Solid"}},
-    color(field("oa-page-reference","Oa.Reference",15,279,145,5,7),"#63758a"),
-    color(field("oa-generated","Oa.GeneratedAt",15,286,145,5,7),"#63758a"),
-    color(pageNumber(170,283),"#63758a"),
+    {...rule("oa-footer-rule",15,277,180),style:{borderColor:ink,borderWidthPx:0.6,borderStyle:"Solid"}},
+    color(field("oa-page-reference","Oa.Reference",15,279,145,5,7)),
+    color(field("oa-generated","Oa.GeneratedAt",15,286,145,5,7)),
+    color(pageNumber(170,283)),
   ];
   d.layers[2].designHeightHundredthMm = 2200;
+  for (const layer of d.layers) for (const element of layer.elements) {
+    element.style = { ...element.style, color: ink, backgroundColor: "#ffffff", borderColor: ink };
+  }
   return d;
 }
 export function defaultReportDesigns() {

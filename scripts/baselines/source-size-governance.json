@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-10-28",
+  "updatedAt": "2026-10-29",
   "rules": [
     {
       "name": "repository web production default",
@@ -9,9 +9,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 87541,
+      "baselineAggregateLines": 87821,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 87741,
+      "maximumAggregateLines": 88021,
       "reportFiles": false
     },
     {
@@ -37,9 +37,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 76503,
+      "baselineAggregateLines": 76811,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 76578,
+      "maximumAggregateLines": 76886,
       "reportFiles": false
     },
     {
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 21979,
+      "baselineAggregateLines": 22219,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 22099,
+      "maximumAggregateLines": 22339,
       "reportFiles": false
     },
     {
@@ -66,9 +66,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 38198,
+      "baselineAggregateLines": 38393,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 38348,
+      "maximumAggregateLines": 38543,
       "reportFiles": false
     },
     {

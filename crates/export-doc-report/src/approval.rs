@@ -110,45 +110,60 @@ pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
         })
         .unwrap_or_default();
     let mut decisions = vec![];
-    let mut first = vec![];
-    let mut following = vec![];
-    let mut titles = vec![];
+    let mut previous_stage = None;
     if let Some(steps) = snapshot["approvalPlan"]["steps"].as_array() {
         for (index, step) in steps.iter().enumerate() {
             let stage = step["stage"].as_u64().unwrap_or(index as u64) as usize;
             let label = request["approvalStageLabels"][stage]
                 .as_str()
                 .map(str::to_owned)
-                .unwrap_or_else(|| format!("第 {} 阶段审批", stage + 1));
-            let record = format!(
-                "审批人：{}（账号 #{}）\n{}审批意见：{}\n审批时间：{}\n结果：同意",
-                text(step, "approverName"),
-                step["approverUserId"],
-                if text(step, "delegationKey").is_empty() {
-                    String::new()
+                .unwrap_or_else(|| "审批".into());
+            if previous_stage != Some(stage) {
+                let rule = if step["decision"] == "Any" {
+                    "或签：任一人同意"
                 } else {
-                    format!(
-                        "代理审批：{}（账号 #{}）\n",
-                        text(step, "actedByName"),
-                        step["actedByUserId"]
-                    )
-                },
-                text(step, "note"),
-                time(&text(step, "actedAt"))
-            );
-            decisions.push(format!("{label}\n{record}"));
-            if titles.last() != Some(&label) {
-                titles.push(label.clone());
+                    "会签：全部同意"
+                };
+                decisions.push(format!("节点 {} · {label} · {rule}", stage + 1));
+                previous_stage = Some(stage);
             }
-            if stage == steps[0]["stage"].as_u64().unwrap_or(0) as usize {
-                first.push(record);
+            let record = if step["status"] == "Skipped" {
+                format!(
+                    "候选审批人：{}（账号 #{}）\n或签节点已由其他审批人通过，本人未签署。",
+                    text(step, "approverName"),
+                    step["approverUserId"]
+                )
+            } else if step["status"] == "Approved" {
+                format!(
+                    "审批人：{}（账号 #{}） · 结果：同意\n{}审批意见：{}\n审批时间：{}",
+                    text(step, "approverName"),
+                    step["approverUserId"],
+                    if text(step, "delegationKey").is_empty() {
+                        String::new()
+                    } else {
+                        format!(
+                            "代理审批：{}（账号 #{}）\n",
+                            text(step, "actedByName"),
+                            step["actedByUserId"]
+                        )
+                    },
+                    text(step, "note"),
+                    time(&text(step, "actedAt"))
+                )
             } else {
-                following.push((label, record));
-            }
+                return Err(crate::error::invalid("审批单包含未批准的审批记录。"));
+            };
+            decisions.push(record);
         }
     }
     if decisions.is_empty() {
-        for decision in snapshot["decisions"].as_array().into_iter().flatten() {
+        decisions.push("节点 1 · 单步审批".into());
+        for decision in snapshot["decisions"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|decision| decision["action"] == "approve")
+        {
             decisions.push(format!(
                 "{}（账号 #{}） · {}\n{}",
                 text(decision, "actorName"),
@@ -157,16 +172,20 @@ pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
                 text(decision, "note")
             ));
         }
-        first = decisions.clone();
+        if decisions.len() == 1 {
+            return Err(crate::error::invalid("审批单缺少实际批准记录。"));
+        }
     }
     Ok(ReportData {
         report_type: "OaApproval",
         root: json!({"Oa":{
             "CompanyName":text(snapshot,"companyName"),"FormName":text(snapshot,"formName"),
             "ApplicantName":text(request,"employeeName"),"DepartmentName":text(snapshot,"departmentName"),"EmployeeNumber":text(request,"employeeNumber"),"JobTitle":text(snapshot,"applicantJobTitle"),"SubmittedAt":time(&text(snapshot,"submittedAt")),
-            "FirstStageTitle":titles.first().cloned().unwrap_or_else(||"审批意见".into()),"FollowingStageTitle":if titles.len()==2 {titles[1].clone()} else {"后续阶段审批".into()},
-            "FirstStageApprovals":first.join("\n\n"),"FollowingStageApprovals":if following.is_empty(){"本次流程无后续审批阶段".into()}else{following.iter().map(|(label,record)|if titles.len()>2 {format!("{label}\n{record}")}else{record.clone()}).collect::<Vec<_>>().join("\n\n")},
-            "ApprovalResult":"本次提交版本已审批通过，请按公司制度办理后续事项。",
+            "ApprovalResult":std::iter::once(if request["kind"] == "expense" {
+                "本次提交已批准。财务请在费用报销的财务接收中，按申请编号及提交版本核对；纸单不代表当前仍有效或已付款。"
+            } else { "本次提交版本已审批通过，请按公司制度办理后续事项。" }.to_owned())
+                .chain(request["approvalRoutingNotes"].as_array().into_iter().flatten().filter_map(|v| v.as_str().map(str::to_owned)))
+                .collect::<Vec<_>>().join("\n"),
             "Reference":format!("申请 #{} · 提交版本 {} · 已批准",snapshot["requestId"],snapshot["submissionNumber"]),
             "Applicant":format!("{} · 工号 {} · {}\n提交时间：{}",text(request,"employeeName"),text(request,"employeeNumber"),text(snapshot,"departmentName"),text(snapshot,"submittedAt")),
             "Title":text(request,"title"),"Summary":summary.join("\n"),"Reason":text(request,"reason"),
