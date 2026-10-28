@@ -66,7 +66,7 @@ export function normalizeReportDesignerV3Schema(
     return { schema: null, issues };
   }
 
-  const suppliedReportType = input.reportType === "PaymentVoucher" ? "PaymentVoucher" : input.reportType === "ExportDocument" ? "ExportDocument" : null;
+  const suppliedReportType = input.reportType === "OaApproval" ? "OaApproval" : input.reportType === "PaymentVoucher" ? "PaymentVoucher" : input.reportType === "ExportDocument" ? "ExportDocument" : null;
   if (!suppliedReportType) {
     issues.push({ severity: "error", path: "$.reportType", message: "报表类型无效。" });
   }

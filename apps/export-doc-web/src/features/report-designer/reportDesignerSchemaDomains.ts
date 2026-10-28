@@ -152,6 +152,10 @@ export function validateReportTypeFieldPath(
     return;
   }
 
+  if (reportType === "OaApproval") {
+    if (!fieldPath.startsWith("Oa.")) issues.push(createIssue("error", path, "审批单只能使用 OA 审批字段。"));
+    return;
+  }
   if (reportType === "PaymentVoucher") {
     if (fieldPath === "cny_amount_upper" || fieldPath.startsWith("Payment.")) {
       return;

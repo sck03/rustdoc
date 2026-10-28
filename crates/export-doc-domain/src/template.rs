@@ -32,7 +32,8 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
         || design.ast_kind != "ReportDocument"
         || design.coordinate_unit != "hundredth-mm"
         || design.contract_version != "3.0"
-        || !["ExportDocument", "PaymentVoucher"].contains(&design.report_type.as_str())
+        || !["ExportDocument", "PaymentVoucher", "OaApproval"]
+            .contains(&design.report_type.as_str())
     {
         return Err("不受支持的 V3 合同。".into());
     }
@@ -43,6 +44,7 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
     crate::designer::page::validate(page)?;
     structure::validate(design)?;
     let mut detail_count = 0;
+    let mut growing_count = 0;
     let mut block_ids = std::collections::BTreeSet::new();
     for layer in &design.layers {
         if layer.print.follow_body && (layer.role != "Footer" || layer.print.pin_to_page_bottom) {
@@ -110,6 +112,24 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
                     return Err("文字组件超出长度上限。".into());
                 }
                 Kind::Flow { flow_kind, block } => {
+                    if let ReportBlock::Grid(grid) = block
+                        && grid.grow_to_content
+                    {
+                        growing_count += 1;
+                        if layer.role != "Body"
+                            || layer.print.first_page_only
+                            || element.rotation_deg != 0
+                            || !grid.title.is_empty()
+                            || grid.rows.iter().flat_map(|row| &row.cells).any(|cell| {
+                                cell.row_span != 1
+                                    || cell.vertical_text
+                                    || cell.diagonal_header.is_some()
+                                    || !matches!(cell.content_kind.as_str(), "Text" | "Field")
+                            })
+                        {
+                            return Err("自动增高表格须为正文横排文字或字段，不支持跨行合并、斜线、旋转或仅打印首页。".into());
+                        }
+                    }
                     if layer.visible
                         && element.visible
                         && element.output_enabled
@@ -171,6 +191,9 @@ pub fn validate(design: &Design, fields: &[Field]) -> Result<(), String> {
             .any(|element| element.is_product())
     {
         return Err("自由商品字段和高级明细表不能混用，请先选择一种排版方式。".into());
+    }
+    if detail_count > 0 && growing_count > 0 {
+        return Err("自动增高普通表格不能与商品明细表混排，请分别设计票面。".into());
     }
     if detail_count > 1 {
         return Err("当前模板只能包含一个可见的商品明细表。".into());
@@ -590,6 +613,13 @@ fn validate_detail_column(column: &DetailColumn, fields: &[Field]) -> Result<(),
 }
 
 fn validate_text_style(style: &ReportTextStyle) -> Result<(), String> {
+    if [&style.color, &style.background_color]
+        .into_iter()
+        .flatten()
+        .any(|color| !safe_color(color))
+    {
+        return Err("文本及底色须为有效的六位十六进制颜色。".into());
+    }
     for value in [
         style.font_size_pt,
         style.margin_top_mm,

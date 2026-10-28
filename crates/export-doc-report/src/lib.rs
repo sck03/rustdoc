@@ -1,5 +1,6 @@
 //! Report data, physical layout and PDF encoding. This crate has no database,
 //! authentication, HTTP, GUI or browser dependency.
+pub mod approval;
 mod archive;
 mod builtin;
 mod canvas;

@@ -36,7 +36,7 @@ export function UserPermissionEditor({ client, template, grants, disabledModules
     <p>日常建议共享权限分组。单独配置会复制当前分组的可授权操作，此后不随分组更新；没有可复制的分组时从空权限开始。空权限表示不开放业务，恢复继承后重新使用岗位或所选分组。</p>
     {catalog.isError ? <InlineNotice tone="error">{readApiError(catalog.error)}</InlineNotice> : null}
     <label className="checkbox-field"><input type="checkbox" checked={oaAssignedOnly || inheritedRestriction} disabled={busy || inheritedRestriction} onChange={event => update(grants, disabledModules, event.target.checked)} />仅查看本人及分派给自己的申请{inheritedRestriction ? "（继承自方案）" : ""}</label>
-    <p>此限制同时用于申请列表、详情、附件、通知和待办，仍受普通数据范围约束。需要查看本公司全部申请的 CEO 不应启用。</p>
+    <p>此限制同时用于申请列表、详情、附件、通知和待办，仍受普通数据范围约束。需要查看本公司全部申请的公司领导审批负责人 不应启用。</p>
     <label><span>权限来源</span><select aria-label="账号权限来源" value={grants === null ? "inherit" : "custom"} disabled={busy || !catalog.data}
       onChange={event => event.target.value === "inherit" ? onChange(null, disabledModules) : onChange(
         source?.isActive === false ? [] : toPermissionGrants(getEditableSchemeGrants(source?.grants ?? [], resourceByKey)), [...new Set([...disabledModules, ...(source?.disabledModules ?? [])])])}>

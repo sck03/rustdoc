@@ -232,17 +232,17 @@ pub fn validate(
         if let Some(id) = value["executiveEmployeeId"].as_i64() {
             let person = super::personnel_organization::active_person(connection, &code, id)?;
             let user =
-                super::records::positive(&person["account"], "id", "公司执行负责人关联账号")?;
+                super::records::positive(&person["account"], "id", "公司领导审批负责人关联账号")?;
             let reviewer = super::auth::current_actor_in(connection, user, actor.edition)?;
             if !super::auth::is_company_approver(&reviewer) {
                 return Err(invalid(
-                    "公司执行负责人须具有本公司全部人事、行政及资源申请的查看/审批权限，且不能限制为仅分派可见；请先分配公司审批方案。",
+                    "公司领导审批负责人须具有本公司全部人事、行政及资源申请的查看/审批权限，且不能限制为仅分派可见；请先分配公司审批方案。",
                 ));
             }
         }
         if value["isActive"] == false {
             if !value["executiveEmployeeId"].is_null() {
-                return Err(conflict("停用公司前须移交或清除公司执行负责人。"));
+                return Err(conflict("停用公司前须移交或清除公司领导审批负责人。"));
             }
             if exists(
                 connection,

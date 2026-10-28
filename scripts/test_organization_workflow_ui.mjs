@@ -49,7 +49,7 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   await admin.goto(`${url}/#/system/organization`);
   await admin.getByRole('button', { name: '编辑公司', exact: true }).click();
   const company = admin.getByRole('dialog', { name: '编辑公司', exact: true });
-  await pick(company, '选择公司执行负责人', '执行总经理');
+  await pick(company, '选择公司领导审批负责人', '执行总经理');
   await company.locator('summary').filter({ hasText: '公司职位目录' }).click();
   await company.getByRole('button', { name: '添加公司职位' }).click();
   await company.getByRole('textbox', { name: '职位 1', exact: true }).fill('财务协调专员');
@@ -124,20 +124,19 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   await admin.screenshot({ path: path.join(output, 'personnel-correction.png'), fullPage: true });
   await admin.goto(`${url}/#/office/approval-settings`);
   const general = admin.getByRole('region', { name: '通用申请审批规则', exact: true });
-  await general.getByRole('combobox', { name: '审批方式', exact: true }).selectOption('Configured');
+  await general.getByRole('button', { name: '恢复默认两级审批', exact: true }).click();
   const stage1 = general.getByRole('group', { name: '第 1 阶段', exact: true });
   await stage1.getByRole('combobox', { name: '审批人来源', exact: true }).selectOption('Named');
   for (const index of [1, 2]) {
     await stage1.getByRole('button', { name: '添加会签人' }).click();
     await stage1.getByRole('combobox', { name: `会签人 ${index}`, exact: true }).selectOption(String(users[index].id));
   }
-  await general.getByRole('button', { name: '添加审批阶段' }).click();
   await general.getByRole('group', { name: '第 2 阶段', exact: true }).getByRole('combobox', { name: '审批人来源', exact: true }).selectOption('CompanyExecutive');
   const purchase = admin.getByRole('region', { name: '采购申请审批规则', exact: true });
   await purchase.locator('summary').filter({ hasText: '金额条件审批' }).click();
   await purchase.getByRole('button', { name: '添加金额条件' }).click();
   await purchase.getByRole('textbox', { name: '金额下限（含）', exact: true }).fill('1000');
-  await purchase.getByRole('combobox', { name: '审批人来源', exact: true }).selectOption('CompanyExecutive');
+  await purchase.getByRole('group', { name: '金额条件 1', exact: true }).getByRole('combobox', { name: '审批人来源', exact: true }).selectOption('CompanyExecutive');
   const savedPolicy = admin.waitForResponse(response => response.request().method() === 'PUT' && response.url().endsWith('/api/office/approval-settings'));
   await admin.getByRole('button', { name: '保存审批设置', exact: true }).click();
   assert.equal((await savedPolicy).status(), 200);

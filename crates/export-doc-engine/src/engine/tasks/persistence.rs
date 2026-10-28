@@ -173,7 +173,7 @@ pub(super) fn finish_controlled(
             .ok_or_else(|| unavailable("任务记录编号缺失。"))?;
         connection.delete_blob(record_id, OUTPUT)?;
         let result = result.and_then(|output| {
-            if let Some(file) = &output.file {
+            if let Some(file) = output.file.as_ref().or_else(||output.archive.as_ref().map(|archive| &archive.file)) {
                 if !valid_file_name(&file.file_name)
                     || file.content.len() > MAX_OUTPUT
                     || file.content.is_empty()
@@ -184,7 +184,7 @@ pub(super) fn finish_controlled(
                 }
             }
             if usize::from(output.file.is_some()) + usize::from(output.directory.is_some())
-                + usize::from(output.managed_file.is_some()) > 1
+                + usize::from(output.managed_file.is_some()) + usize::from(output.archive.is_some()) > 1
                 || output.destination.is_some() && output.file.is_none()
             {
                 return Err(invalid("任务输出来源重复或保存位置缺少对应文件。"));
@@ -200,7 +200,7 @@ pub(super) fn finish_controlled(
             // Serialize cancellation against final publication. A cancel after
             // this transaction sees a completed task and cannot relabel it.
             let result = result.and_then(|output| {
-                if output.file.is_some() || output.directory.is_some() || output.managed_file.is_some() {
+                if output.file.is_some() || output.directory.is_some() || output.managed_file.is_some() || output.archive.is_some() {
                     let current = crate::engine::auth::current_actor_in(connection, actor.id, store.edition)?;
                     let operation = crate::generated_api::ALL_OPERATIONS.iter().find(|operation| job["_operation"].as_str() == Some(operation.id))
                         .ok_or_else(|| unavailable("任务缺少生成的发布授权元数据。"))?;
@@ -215,6 +215,11 @@ pub(super) fn finish_controlled(
             });
             match result {
                 Ok(output) => {
+                    if let Some(archive) = output.archive {
+                        if connection.blob_info(archive.record_id,archive.kind)?.is_some() { return Err(conflict("归档文件已经存在，不能覆盖。")); }
+                        let file = archive.file;
+                        connection.insert_blob(&BlobWrite { kind:archive.kind,record_id:archive.record_id,file_name:&file.file_name,media_type:&file.media_type,digest:&digest(&file.content),content:&file.content,created_at:&store::timestamp() })?;
+                    }
                     if output.managed_file.is_some() {
                         job["outputPath"] = job["_managedOutput"]["fileName"].clone();
                         if connection.provider() == "SQLite" {

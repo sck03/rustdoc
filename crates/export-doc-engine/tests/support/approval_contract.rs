@@ -137,6 +137,7 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
         .position(|r| r["kind"] == "expense")
         .unwrap();
     policy["rules"][expense_rule]["mode"] = json!("Named");
+    policy["rules"][expense_rule]["stages"] = json!([]);
     policy["rules"][expense_rule]["approverUserIds"] = json!([users[2]["id"], users[3]["id"]]);
     // A named reviewer can never act on a colleague's request with own-only
     // view or approval scope. Reject the unusable setup before any submission.

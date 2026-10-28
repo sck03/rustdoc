@@ -22,6 +22,7 @@ mod detail_content;
 mod detail_mix;
 mod flow;
 mod free_detail;
+mod growing_grid;
 
 const PT_MM: f32 = 25.4 / 72.0;
 fn stroke_dash(style: &str) -> &'static str {
@@ -548,8 +549,10 @@ fn render_body_flow(
         return Err(invalid("页眉与页脚之间没有足够的 Flow 空间。"));
     }
 
-    let mut ordered = flows.to_vec();
-    ordered.sort_by_key(|element| (element.y_hundredth_mm, element.z_index));
+    let mut originals = flows.to_vec();
+    originals.sort_by_key(|element| (element.y_hundredth_mm, element.z_index));
+    let expanded = growing_grid::expand(&originals, data, capacity, header_bottom, cancelled)?;
+    let ordered: Vec<_> = expanded.iter().collect();
     let mut steps = Vec::with_capacity(ordered.len());
     let mut previous_bottom = 0.;
     for element in ordered {

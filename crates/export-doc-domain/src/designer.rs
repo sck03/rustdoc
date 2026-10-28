@@ -457,7 +457,8 @@ impl Design {
         let design: Self = serde_json::from_str(source.trim())
             .map_err(|error| format!("模板含验证版不支持的结构,已保留原内容:{error}"))?;
         if design.version != 3
-            || !["ExportDocument", "PaymentVoucher"].contains(&design.report_type.as_str())
+            || !["ExportDocument", "PaymentVoucher", "OaApproval"]
+                .contains(&design.report_type.as_str())
             || design.contract_version != "3.0"
         {
             return Err("模板版本或数据域不受支持。".into());

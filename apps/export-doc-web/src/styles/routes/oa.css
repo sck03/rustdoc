@@ -30,3 +30,5 @@
 .oa-attachments ul { padding: 0; list-style: none; }
 .oa-attachments li { margin-block: calc(2 * 0.25rem); overflow-wrap: anywhere; }
 }
+
+.office-dialog.office-dialog-wide { width: min(1500px, calc(100vw - 32px)); max-width: none; }

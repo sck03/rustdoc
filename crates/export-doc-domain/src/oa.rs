@@ -7,12 +7,7 @@ use std::str::FromStr;
 fn string<'a>(value: &'a Value, key: &str) -> &'a str {
     value[key].as_str().unwrap_or("")
 }
-pub fn date(value: &str) -> Result<NaiveDate, String> {
-    if value.len() != 10 || value.as_bytes()[4] != b'-' || value.as_bytes()[7] != b'-' {
-        return Err("日期须为 YYYY-MM-DD。".into());
-    }
-    NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| "日期无效。".into())
-}
+pub use crate::business_date::parse as date;
 pub fn leave_span(value: &Value) -> Result<(i64, i64), String> {
     if !["Annual", "Sick", "Personal", "Other"].contains(&string(value, "category")) {
         return Err("请选择有效的请假类型。".into());

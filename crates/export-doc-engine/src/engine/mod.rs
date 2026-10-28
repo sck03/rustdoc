@@ -23,6 +23,7 @@ mod diagnostics;
 mod document_formats;
 mod document_packages;
 mod downloads;
+mod electronic_evidence;
 #[cfg(feature = "mail")]
 mod email;
 #[cfg(feature = "mail")]
@@ -119,6 +120,7 @@ pub struct NativeService {
     clock: crate::clock::BusinessClock,
     license_gate: std::sync::Mutex<()>,
     packing_gate: std::sync::Mutex<()>,
+    oa_document_gate: std::sync::Mutex<()>,
     #[cfg(feature = "ocr")]
     ocr_gate: std::sync::Mutex<()>,
     #[cfg(feature = "exchange-rates")]
@@ -211,6 +213,14 @@ impl NativeService {
             .map_err(|_| unavailable("数据库维护状态异常。"))?;
         let actor = self.sessions.actor(&self.store, token)?;
         self.authorize_operation(&actor, operation, &[])?;
+        if oa::metadata(operation).is_some_and(|meta| {
+            matches!(
+                meta["action"].as_str(),
+                Some("document-download" | "bundle-download")
+            )
+        }) {
+            return oa::download(self, &actor, operation, parameters);
+        }
         if oa::is_download(operation) || communication::is_download(operation) {
             return record_documents::download(self, &actor, operation, parameters);
         }

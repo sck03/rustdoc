@@ -15,6 +15,8 @@ mod handling_contract;
 mod identity_contract;
 #[path = "support/invoice_clone_contract.rs"]
 mod invoice_clone_contract;
+#[path = "support/oa_archive_contract.rs"]
+mod oa_archive_contract;
 #[path = "support/oa_contract.rs"]
 mod oa_contract;
 #[path = "support/office_contract.rs"]
@@ -73,7 +75,11 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
         .join("team-tests")
         .join(nonce().unwrap());
     std::fs::create_dir_all(&root).unwrap();
-    let paths = RuntimePaths::server(&root, &root.join("Data")).unwrap();
+    let mut paths = RuntimePaths::server(&root, &root.join("Data")).unwrap();
+    paths.font_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../Resources/Fonts/OpenSource/NotoSansCJKsc-Regular.otf")
+        .canonicalize()
+        .unwrap();
     let bootstrap = nonce().unwrap();
     let service =
         NativeService::open_postgres(paths.clone(), &app, bootstrap.clone(), Default::default())
@@ -269,6 +275,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
         None,
     );
     oa_contract::exercise(&service, admin_token, staff_token, None);
+    oa_archive_contract::exercise(&service, admin_token, staff_token, None);
     approval_contract::exercise(&service, admin_token);
     organization_workflow_contract::exercise(&service, admin_token);
     personnel_scope_contract::exercise(&service, admin_token);

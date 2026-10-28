@@ -11,7 +11,7 @@ import { OaLineEditor } from "./OaLineEditor.tsx";
 import { OaTemporalFields } from "./OaTemporalFields.tsx";
 import { oaApi } from "./oaApi.ts";
 import { oaDraft, oaModules, type OaKind } from "./oaModel.ts";
-import { useOfficeOperation } from "../office/useOfficeData.ts";
+import { useOaOperation } from "./useOaOperation.ts";
 import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
 import { AttachmentDraftFields } from "../../ui/AttachmentDraftFields.tsx";
 import { HandlingServicePicker } from "./HandlingServicePicker.tsx";
@@ -20,7 +20,8 @@ import { personnelChangeLabels } from "./oaModel.ts";
 import { OaDepartmentPicker } from "./OaDepartmentPicker.tsx";
 
 export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind; record?: OaRequest; onClose: () => void; onSaved: (record: OaRequest) => void }) {
-  const operation = useOfficeOperation();
+  const operation = useOaOperation(kind);
+  const [purpose,setPurpose] = useState("Voucher");
   const [params] = useSearchParams();
   const attachments = useAttachmentDraft(record);
   const [draft, storeDraft] = useState<OaRequestSave>(() => record ? { ...record, expectedVersion: record.versionNumber,
@@ -52,7 +53,7 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
       const api = oaApi(client, kind);
       return attachments.save(JSON.stringify(body), signal,
         (current, signal) => current ? api.update(current.id, { ...body, expectedVersion: current.versionNumber }, { signal }) : api.create(body, { signal }),
-        (current, entry, signal) => { const form = new FormData(); form.set("file", entry.file); form.set("expectedVersion", String(current.versionNumber)); return api.upload(current.id, form, { signal }); });
+        (current, entry, signal) => { const form = new FormData(); form.set("file", entry.file); form.set("purpose",purpose); form.set("expectedVersion", String(current.versionNumber)); return api.upload(current.id, form, { signal }); });
     }, (result) => { setDirty(false); onSaved(result); });
   }
   return <OfficeDialog title={`${record ? "编辑" : "新建"}${oaModules[kind].name}`} onClose={onClose} {...operation} protectChanges hasChanges={dirty}>
@@ -72,6 +73,7 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
         <OfficeField label="币种"><select value={draft.currency} onChange={(event) => setDraft({ ...draft, currency: event.target.value as OaRequestSave["currency"] })}>{["CNY", "USD", "EUR", "HKD", "JPY", "GBP"].map((currency) => <option key={currency}>{currency}</option>)}</select></OfficeField>
         <OaLineEditor draft={draft} setDraft={setDraft} purchase={kind === "purchase"} businessDate={user.businessDate} />
       </>}
+      <OfficeField label="本批附件用途"><select value={purpose} onChange={event=>setPurpose(event.target.value)}><option value="ReimbursementForm">报销单</option><option value="Voucher">发票／其他凭证</option><option value="Supporting">补充资料</option></select></OfficeField>
       <AttachmentDraftFields draft={attachments} busy={operation.busy} existingFiles={attachments.saved?.attachments} onChange={() => setDirty(true)} />
     </fieldset><OfficeSubmit busy={operation.busy} label="保存草稿" disabled={kind === "personnel" ? draft.personnelChange?.action !== "Hire" && !draft.personnelChange?.expectedPersonnelVersion : !record && (!canIdentifyOfficeApplicant(user) || user.capabilities.usesOfficeRegister && !employee)} /></form>
   </OfficeDialog>;

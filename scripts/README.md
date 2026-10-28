@@ -230,7 +230,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 - Windows 退出：`node scripts/test_native_desktop_shutdown.mjs [便携包目录] [EXE路径]` 使用隔离 DataRoot 验证真实 React/WebView2、重复退出、宿主异常终止、独立窗口不受影响及 HTTP 端口释放。调试端口仅注入测试子进程，不修改正式配置；其它 OS 需独立验收。
 - 脚本：`verify-script-suite.ps1`、`verify-github-workflow-actions.mjs`、`test_tauri_updater_release_contract.mjs`、`github/verify-public-source.ps1`、`git diff --check`。
 - 人员与审批职责：`node scripts/test_approval_permissions_ui.mjs` 在隔离 Rust `office_review` 宿主上验证常用/自定义职位、从普通员工建立公司审批方案、跨部门行政和人事审批，以及私密档案、财务办理、模块限制和会话撤销边界。
-- 任职与流程闭环：`node scripts/test_organization_workflow_ui.mjs` 复用上述隔离宿主，验证真实兼职/矩阵负责人选择、公司 CEO/职位目录、会签和金额条件设置、未完成审批移交、仅分派可见及窄屏无障碍；先生成客户端、构建 React 和 `cargo build --locked -p export-doc-server --example office_review`。
+- 任职与流程闭环：`node scripts/test_organization_workflow_ui.mjs` 复用上述隔离宿主，验证真实兼职/矩阵负责人选择、公司领导审批负责人/职位目录、会签和金额条件设置、未完成审批移交、仅分派可见及窄屏无障碍；先生成客户端、构建 React 和 `cargo build --locked -p export-doc-server --example office_review`。
 - PostgreSQL 权限/组织定向回归：`pwsh -NoProfile -File scripts/test-native-postgres.ps1 -PostgresBin <PostgreSQL18/bin> -Scope Workflows` 复用隔离集群与独立账号，串行运行存储合同和完整团队业务合同；`All` 仍额外运行恢复/大容量备份测试。
 
 本分支已删除旧 C# 源码/测试/工程与 `deploy/container`；`verify-dependency-policy.mjs` 拒绝重新引入托管工程或将其依赖列入 Rust notices。原生 NuGet 归档仍按中央资源清单校验。手动跨浏览器验收使用锁定的 npm Playwright 和隔离 Rust `office_review` 宿主，不读取旧 .NET DLL；Firefox/WebKit 仍只在手动工作流执行。
@@ -240,6 +240,8 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 报表原版 React 设计器可复用，但 Rust 渲染仍有明确未完成项；当前事实见 `docs/Rust原生功能迁移核对表.md`。旧 Slint 的 `--validation --ui-smoke` 入口已退役。
 
 模板预览新增“实际 PDF 页图”，复用已有预览 API 的可选 `previewFormat=PdfPage`、零起始 `pageIndex` 与翻页修订号；未提供参数仍使用矢量预览。`test_invoice_report_ui.mjs` 同时验证多页 PDFium 真正渲染、翻页、修订变化 409、非法页码 400、匿名拒绝与真实 React 页图。运行前准备受管 PDFium 及本批 `office_review`，完整桌面包另行验收。
+
+- OA 审批单：`node scripts/test_oa_approval_documents_ui.mjs`（也纳入 `test:oa-ui`）复用 `office_review`，验证两级默认、共用设计器、名称/颜色保存及 Rust 样例预览。`export-doc-report --test approval` 验证单页、长内容、会签和多阶段完整续页；`oa_service` 与真实 PostgreSQL `team_service` 共用提交版本/原件/PDF/材料包/作废权限合同。
 
 ## 工作区清理
 

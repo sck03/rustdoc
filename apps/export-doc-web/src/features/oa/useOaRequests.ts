@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { oaApi } from "./oaApi.ts";
 import { oaAccess, type OaKind } from "./oaModel.ts";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export function useOaRequests(client: ExportDocManagerApiClient, user: ApiUserDto, kind: OaKind) {
   const [params, setParams] = useSearchParams();
@@ -22,11 +23,12 @@ export function useOaRequests(client: ExportDocManagerApiClient, user: ApiUserDt
   const status = filter.view === view ? filter.status : completing ? "Approved" : approvalsOnly ? "Pending" : "";
   const api = oaApi(client, kind);
   const key = ["office", "oa", kind, user.id, user.companyScope];
-  const query = useQuery({ queryKey: [...key, "list", page, mineOnly, status, financeOnly, approvalsOnly, handlingOnly], enabled: oaAccess(user, kind, "view"),
+  const query = useQuery({ queryKey: [...key, "list", page, mineOnly, status, financeOnly, approvalsOnly, handlingOnly], enabled: selected === 0 && oaAccess(user, kind, "view"),
     queryFn: ({ signal }) => api.list({ pageNumber: page, pageSize: 20, mineOnly: completing || approvalsOnly ? false : mineOnly, status: status || undefined, financeOnly: kind === "expense" ? financeOnly : undefined, approvalsOnly, handlingOnly: kind !== "expense" ? handlingOnly : undefined }, { signal }),
     refetchInterval: 30000, refetchIntervalInBackground: false });
+  useServerPageNumber(query, page, setPage);
   const detail = useQuery({ queryKey: [...key, "detail", selected], enabled: selected > 0 && oaAccess(user, kind, "view"),
-    queryFn: ({ signal }) => api.get(selected, { signal }) });
+    queryFn: ({ signal }) => api.get(selected, { signal }), refetchInterval: 30000, refetchIntervalInBackground: false });
   return { query, detail, selected, page, setPage, mineOnly, status, canReceive, financeOnly, canApprove, approvalsOnly,canHandle,handlingOnly,
     changeView: (value: string) => { setParams({ view: value }); setPage(1); },
     select: (id: number) => setParams((current) => { const next = new URLSearchParams(current); next.delete("change"); next.delete("employeeId"); if (id) next.set("requestId", String(id)); else next.delete("requestId"); return next; }),

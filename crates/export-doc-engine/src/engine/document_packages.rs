@@ -270,6 +270,7 @@ pub fn handle(
                             .collect(),
                     }),
                     publication: None,
+                    archive: None,
                 }
                 .check_on_publish(reports::publication_check(
                     &paths,

@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import crypto from "node:crypto";
-import { defaultReportDesigns } from "./lib/default-report-designs.mjs";
+import { defaultReportDesigns, approvalSheetDesign } from "./lib/default-report-designs.mjs";
 
 const root = path.resolve(process.argv[2] ?? ".");
 const MAGIC = Buffer.from("EXPORTDOCDT", "ascii");
@@ -62,7 +62,7 @@ function encode(design) {
   return Buffer.concat([header, payload]);
 }
 
-const templates = defaultReportDesigns();
+const templates = [...defaultReportDesigns(), ["Templates/Office/approval_sheet_template.dtpl", approvalSheetDesign()]];
 for (const [relative, design] of templates) {
   const target = path.join(root, relative);
   fs.mkdirSync(path.dirname(target), { recursive: true });

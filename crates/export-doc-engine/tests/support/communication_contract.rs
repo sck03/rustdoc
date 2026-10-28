@@ -42,6 +42,23 @@ fn count(service: &NativeService, token: &str) -> i64 {
 
 /// Runs against both SQLite and PostgreSQL using only the public service boundary.
 pub fn exercise(service: &NativeService, admin: &str) -> i64 {
+    let mut settings = call(service, admin, GET_OA_APPROVAL_SETTINGS, 0, &[], None).unwrap();
+    settings["expectedVersion"] = settings["versionNumber"].clone();
+    for rule in settings["rules"].as_array_mut().unwrap() {
+        rule["mode"] = json!("Single");
+        rule["stages"] = json!([]);
+        rule["approverUserIds"] = json!([]);
+        rule["amountBranches"] = json!([]);
+    }
+    call(
+        service,
+        admin,
+        SAVE_OA_APPROVAL_SETTINGS,
+        0,
+        &[],
+        Some(settings),
+    )
+    .unwrap();
     let suffix = nonce().unwrap()[..8].to_owned();
     let create = |op, body| call(service, admin, op, 0, &[], Some(body)).unwrap();
     let company = format!("COMMS-{suffix}");

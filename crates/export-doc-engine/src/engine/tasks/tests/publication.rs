@@ -7,6 +7,86 @@ fn file_output(path: &std::path::Path, bytes: &[u8]) -> TaskOutput {
 }
 
 #[test]
+fn business_archive_is_atomic_cancelable_and_survives_task_cleanup() {
+    for scenario in ["cancel", "denied", "rollback", "ready"] {
+        let fixture = Fixture::new();
+        let store = fixture.store();
+        let record = store
+            .transaction(|tx| {
+                crate::engine::store::save(
+                    tx,
+                    "oa-submission",
+                    0,
+                    json!({"status":"Approved"}),
+                    None,
+                    &fixture.actor,
+                    "submit",
+                )
+            })
+            .unwrap();
+        let record_id = record["id"].as_i64().unwrap();
+        let job = persistence::create(&store, &fixture.actor, "Export", "归档事务").unwrap();
+        let id = job["jobId"].as_str().unwrap();
+        let mut result = TaskOutput::file(
+            "approval.pdf".into(),
+            "application/pdf",
+            b"%PDF-archive".to_vec(),
+        );
+        result.archive = Some(ArchiveOutput {
+            record_id,
+            kind: "oa-approval-pdf",
+            file: result.file.take().unwrap(),
+        });
+        if scenario == "cancel" {
+            persistence::cancel(&store, &fixture.actor, id).unwrap();
+        }
+        if scenario == "denied" {
+            result.publication = Some(PublicationCheck::new(|_, _| {
+                Err(error(403, "申请访问权限已撤销。"))
+            }));
+        }
+        if scenario == "rollback" {
+            store
+                .transaction(|tx| {
+                    let mut job = persistence::checked(tx, &fixture.actor, id)?;
+                    job["versionNumber"] = json!(100000);
+                    tx.set_body(job["id"].as_i64().unwrap(), &job)?;
+                    Ok(())
+                })
+                .unwrap();
+        }
+        let finished = persistence::finish(&store, &fixture.actor, id, Ok(result));
+        if scenario == "rollback" {
+            assert!(finished.is_err());
+        } else {
+            finished.unwrap();
+        }
+        let blob = store
+            .connection()
+            .unwrap()
+            .blob(record_id, "oa-approval-pdf")
+            .unwrap();
+        if scenario == "ready" {
+            assert_eq!(blob.unwrap().content, b"%PDF-archive");
+            persistence::delete(&store, &fixture.actor, id).unwrap();
+            persistence::recover(&store).unwrap();
+            assert_eq!(
+                store
+                    .connection()
+                    .unwrap()
+                    .blob(record_id, "oa-approval-pdf")
+                    .unwrap()
+                    .unwrap()
+                    .content,
+                b"%PDF-archive"
+            );
+        } else {
+            assert!(blob.is_none());
+        }
+    }
+}
+
+#[test]
 fn saved_location_keeps_the_selected_name_and_survives_download_copy_expiry() {
     let fixture = Fixture::new();
     let (store, jobs) = fixture.open();
@@ -140,6 +220,7 @@ fn directory_publication_records_its_location_and_keeps_unexpected_changes() {
         managed_file: None,
         destination: None,
         publication: None,
+        archive: None,
         detail: "saved folder".into(),
         directory: Some(DirectoryOutput {
             path: target.clone(),
@@ -243,6 +324,7 @@ fn recovery_finishes_partial_cleanup_and_compensation_ignores_request_cancellati
         managed_file: None,
         destination: None,
         publication: None,
+        archive: None,
         detail: String::new(),
         directory: Some(DirectoryOutput {
             path: folder.clone(),

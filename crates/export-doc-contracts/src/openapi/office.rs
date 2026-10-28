@@ -1,4 +1,5 @@
 mod approval;
+pub(super) mod documents;
 mod schemas;
 use serde_json::{Value, json};
 
@@ -189,6 +190,7 @@ pub(super) fn extend(doc: &mut Value) {
         permissions(doc, kind, resource, label, group, order);
     }
     approval::extend(doc);
+    documents::extend(doc);
 }
 
 fn permissions(doc: &mut Value, kind: &str, resource: &str, label: &str, group: &str, order: i32) {

@@ -9,6 +9,7 @@ import { useApprovalSettings, useApprovalSettingsDraft, type ApprovalAccount } f
 import { oaModules, personnelChangeLabels } from "./oaModel.ts";
 import { HandlingServicesEditor } from "./HandlingServicesEditor.tsx";
 import { ApprovalStagesEditor, ApprovalAmountEditor, initialStage } from "./ApprovalStagesEditor.tsx";
+import { ApprovalSheetTemplates } from "./ApprovalSheetTemplates.tsx";
 import "../../styles/routes/office.css";
 import "../../styles/routes/oa.css";
 
@@ -25,6 +26,7 @@ function ApprovalSettingsEditor({ client, user, initial, accounts }: { client: E
   return <section className="work-surface office-workspace oa-workspace" aria-label="审批规则与代理">
     <header className="oa-heading"><h2>审批规则与代理</h2><Link to="/office/approvals">返回申请与审批</Link></header>
     <p className="office-muted">设置仅用于本公司后续提交的申请。在途申请保留提交时的步骤；代理按当前有效期校验，审批人与代理人仍须具有对应查看和审批权限。</p>
+    <p className="office-muted">新公司默认由部门负责人、公司领导两级审批。请在公司资料中指定领导审批负责人，职位可按本公司实际情况确定；需要多名领导参与时，可设置指定审批人阶段或会签。</p>
     {changedElsewhere && <InlineNotice tone="warning">审批设置已被其他管理员修改。当前草稿已保留，请记录需要保留的内容后重新载入最新设置。</InlineNotice>}
     <form ref={formRef} onInvalidCapture={event => { const section = (event.target as HTMLElement).closest("details"); if (section) section.open = true; }} onSubmit={event => { event.preventDefault(); void save(); }}>
       <fieldset disabled={operation.busy} className="office-form-grid">
@@ -36,7 +38,9 @@ function ApprovalSettingsEditor({ client, user, initial, accounts }: { client: E
               personnelApprovalActions: event.target.checked ? [...(current.personnelApprovalActions ?? []), action] : current.personnelApprovalActions?.filter(value => value !== action) ?? [] }))} />{personnelChangeLabels[action]}须审批</label>)}
         </section>
         {draft.rules.map((rule, index) => <section className="office-resource-card office-field-wide" key={rule.kind} aria-label={`${oaModules[rule.kind].name}审批规则`}>
-          <h3>{oaModules[rule.kind].name}</h3><OfficeField label="审批方式"><select value={rule.mode} onChange={event => changeRule(index, { mode: event.target.value as typeof rule.mode, approverUserIds: [], stages: event.target.value === "Configured" ? [initialStage()] : [] })}>
+          <h3>{oaModules[rule.kind].name}</h3>
+          <button type="button" className="command-button secondary" onClick={() => changeRule(index, { mode: "Configured", approverUserIds: [], stages: [{ source: "DepartmentManager", approverUserIds: [] }, { source: "CompanyExecutive", approverUserIds: [] }], amountBranches: [] })}>恢复默认两级审批</button>
+          <OfficeField label="审批方式"><select value={rule.mode} onChange={event => changeRule(index, { mode: event.target.value as typeof rule.mode, approverUserIds: [], stages: event.target.value === "Configured" ? [initialStage()] : [] })}>
             <option value="Single">单步审批（按岗位权限）</option><option value="DepartmentChain">部门负责人逐级审批</option><option value="Named">指定审批人（按顺序，可单人）</option>
             <option value="Configured">配置阶段与会签</option>
           </select></OfficeField>
@@ -51,6 +55,7 @@ function ApprovalSettingsEditor({ client, user, initial, accounts }: { client: E
         </section>)}
       </fieldset>
       <HandlingServicesEditor services={draft.handlingServices ?? []} accounts={accounts} disabled={operation.busy} onChange={handlingServices => setDraft(value => ({ ...value, handlingServices }))} />
+      <ApprovalSheetTemplates client={client} settings={draft} disabled={operation.busy} onChange={sheetTemplates => setDraft(value => ({ ...value, sheetTemplates }))} />
       <details><summary>审批代理</summary>
         <p className="office-muted">代理用于有指定审批人的步骤；只接受直接代理，同一人不能代批同一申请的多个步骤。停用或到期立即失效。</p>
         {draft.delegations.map((item, index) => <fieldset disabled={operation.busy} className="office-form-grid office-resource-card" key={item.key}><legend>代理 {index + 1}</legend>

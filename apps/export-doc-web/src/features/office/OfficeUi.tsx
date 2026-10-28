@@ -8,8 +8,8 @@ import { readApiError } from "../../ui/formUtils.ts";
 import type { OfficePage } from "./officeModel.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
-export function OfficeDialog({ title, children, onClose, busy = false, error = "", protectChanges = false, hasChanges = false }: {
-  title: string; children: ReactNode; onClose: () => void; busy?: boolean; error?: string; protectChanges?: boolean; hasChanges?: boolean;
+export function OfficeDialog({ title, children, onClose, busy = false, error = "", protectChanges = false, hasChanges = false, wide = false }: {
+  title: string; children: ReactNode; onClose: () => void; busy?: boolean; error?: string; protectChanges?: boolean; hasChanges?: boolean; wide?: boolean;
 }) {
   const titleId = useId();
   const [dirty, setDirty] = useState(false);
@@ -21,7 +21,7 @@ export function OfficeDialog({ title, children, onClose, busy = false, error = "
   const ref = useModalDialog(close, { canClose: !busy });
   useEffect(() => { if (error) ref.current?.querySelectorAll("details").forEach(section => { section.open = true; }); }, [error, ref]);
   return createPortal(<div className="office-dialog-backdrop" onSubmit={event => event.stopPropagation()}>
-    <div className="office-dialog" ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+    <div className={`office-dialog${wide ? " office-dialog-wide" : ""}`} ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId}>
       <header className="office-dialog-header"><h2 id={titleId}>{title}</h2>
         <button type="button" className="icon-button" aria-label="关闭窗口" disabled={busy} onClick={close}><X size={18} aria-hidden="true" /></button>
       </header>

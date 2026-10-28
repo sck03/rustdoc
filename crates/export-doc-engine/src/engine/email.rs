@@ -497,6 +497,7 @@ fn document_email(
                 directory: None,
                 managed_file: None,
                 publication: None,
+                archive: None,
             })
         },
     )

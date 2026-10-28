@@ -44,6 +44,14 @@ pub fn document_type(file_name: &str, bytes: &[u8]) -> Result<(String, &'static 
             super::document_formats::office_type(&extension, bytes)?,
         ));
     }
+    if extension == "xml" {
+        super::electronic_evidence::xml(bytes)?;
+        return Ok((name, "application/xml"));
+    }
+    if extension == "ofd" {
+        super::electronic_evidence::ofd(bytes)?;
+        return Ok((name, "application/ofd"));
+    }
     let pdf = bytes.starts_with(b"%PDF-")
         && bytes[bytes.len().saturating_sub(1024)..]
             .windows(5)
@@ -59,7 +67,7 @@ pub fn document_type(file_name: &str, bytes: &[u8]) -> Result<(String, &'static 
         _ => matches!(extension.as_str(), "jpg" | "jpeg"),
     } {
         return Err(invalid(
-            "附件扩展名与实际类型不一致，只支持 PDF、PNG、JPEG、Word 和 Excel。",
+            "附件扩展名与实际类型不一致，只支持 PDF、PNG、JPEG、Word、Excel、OFD 和 XML。",
         ));
     }
     Ok((name, media_type))

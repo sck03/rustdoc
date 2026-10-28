@@ -8,13 +8,13 @@ import { OfficeEmployeePicker } from "./OfficeEmployeePicker.tsx";
 import { OfficeApplicantIdentity, canIdentifyOfficeApplicant } from "./OfficeApplicantIdentity.tsx";
 import { HandlingServicePicker } from "../oa/HandlingServicePicker.tsx";
 
-export function OfficeSupplyEditor({ client, user, supply, onClose }: { client: ExportDocManagerApiClient; user: ApiUserDto; supply?: OfficeSupplyRecord; onClose: () => void }) {
+export function OfficeSupplyEditor({ client, user, supply, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; supply?: OfficeSupplyRecord; onClose: () => void; onSaved: (saved: OfficeSupplyRecord) => void }) {
   const operation = useOfficeOperation();
   const [handlingKey, setHandlingKey] = useState(supply?.handlingKey ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const body = { ...readOfficeSupplyForm(new FormData(event.currentTarget), supply?.versionNumber ?? 0), handlingKey };
-    void operation.run((signal) => supply ? client.updateOfficeSupply({ id: supply.id, body }, { signal }) : client.createOfficeSupply({ body }, { signal }), onClose);
+    void operation.run((signal) => supply ? client.updateOfficeSupply({ id: supply.id, body }, { signal }) : client.createOfficeSupply({ body }, { signal }), onSaved);
   }
   return <OfficeDialog title={supply ? "编辑物品" : "添加物品"} onClose={onClose} {...operation} protectChanges>
     <form onSubmit={submit}><fieldset disabled={operation.busy} className="office-form-grid">

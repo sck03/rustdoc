@@ -41,7 +41,7 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   await admin.getByRole('button', { name: '重新载入审批设置', exact: true }).click();
   await admin.getByRole('dialog').getByRole('button', { name: '重新载入审批设置', exact: true }).click();
   await admin.getByText('审批设置已被其他管理员修改。当前草稿已保留，请记录需要保留的内容后重新载入最新设置。', { exact: true }).waitFor({ state: 'hidden' });
-  assert.equal(await generalRule.getByLabel('审批方式').inputValue(), 'Single');
+  assert.equal(await generalRule.getByLabel('审批方式').inputValue(), 'Configured');
   await admin.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
   assert.deepEqual(await admin.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => v.id)), []);
   await admin.screenshot({ path: path.join(output, 'approval-settings.png'), fullPage: true });
@@ -76,6 +76,20 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   await second.getByRole('button', { name: '逐级审批真实界面验收', exact: true }).click();
   await act(second, '登记批准结果');
   await second.locator('.oa-detail-summary .office-badge').getByText('已批准', { exact: true }).waitFor();
+  // The applicant's existing detail view must discover another user's approval
+  // and its archived PDF without a reload or a separate finance permission.
+  await admin.getByRole('button', { name: '下载审批单 PDF', exact: true }).waitFor({ timeout: 65000 });
+  const pdfDownload = admin.waitForEvent('download');
+  await admin.getByRole('button', { name: '下载审批单 PDF', exact: true }).click();
+  const pdf = await pdfDownload;
+  const pdfPath = path.join(output, 'approved-request.pdf');
+  await pdf.saveAs(pdfPath);
+  assert(fs.readFileSync(pdfPath).subarray(0,5).equals(Buffer.from('%PDF-')));
+  await admin.getByRole('button', { name: '预览／打印审批单', exact: true }).click();
+  const preview = admin.getByRole('dialog', { name: '审批单预览与打印', exact: true });
+  await preview.locator('iframe').waitFor();
+  assert((await preview.locator('iframe').getAttribute('src')).startsWith('blob:'));
+  await preview.getByRole('button', { name: '关闭窗口', exact: true }).click();
   const finance = await openPage('approval-finance', 'Approval-UI-2026');
   await finance.goto(`${url}/#/office/approvals`);
   await finance.getByText('待财务接收：1', { exact: true }).waitFor();

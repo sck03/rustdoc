@@ -77,6 +77,7 @@ pub(in crate::engine) fn stage_restore(
             Ok(tasks::TaskOutput {
                 managed_file: None,
                 publication: None,
+                archive: None,
                 file: None,
                 destination: None,
                 directory: None,

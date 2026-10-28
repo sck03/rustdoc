@@ -322,6 +322,7 @@ function normalizeGridBlock(
   }
 
   const grid: ReportGridBlock = {
+    ...(value.growToContent === true ? { growToContent: true } : {}),
     id: normalizeId(value.id, "block-grid", blockIds, `${path}.id`, issues),
     type: "Grid",
     output: normalizeBlockOutputSettings(value.output, `${path}.output`, issues),

@@ -135,6 +135,7 @@ pub(in crate::engine) fn test_replica(service: &NativeService, actor: &Actor) ->
                     destination: None,
                     directory: None,
                     publication: None,
+                    archive: None,
                 })
             })();
             let cleanup = fs::remove_dir_all(&directory);

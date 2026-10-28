@@ -124,6 +124,9 @@ pub struct RecordQuery<'a> {
     pub departments: Option<&'a [String]>,
     pub owner: Option<i64>,
     pub employee: Option<i64>,
+    /// Candidate OA periods: inclusive business dates for leave/travel, exact
+    /// RFC 3339 instants for overtime. Values are parameter-bound by adapters.
+    pub period: Option<(&'a str, &'a str)>,
     pub parent: Option<i64>,
     pub status: Option<&'a str>,
     pub approvers: Option<&'a [RecordApprover]>,

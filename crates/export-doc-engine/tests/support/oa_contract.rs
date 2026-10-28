@@ -281,6 +281,15 @@ fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Va
 }
 
 pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, employee: Option<i64>) {
+    // This contract explicitly exercises the legacy single-step configuration.
+    // New-company two-stage routing is covered by the organization contract.
+    let mut settings = call(service, admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
+    settings["expectedVersion"] = settings["versionNumber"].clone();
+    for rule in settings["rules"].as_array_mut().unwrap() {
+        rule["mode"] = json!("Single");
+        rule["stages"] = json!([]);
+    }
+    call(service, admin, SAVE_OA_APPROVAL_SETTINGS, 0, Some(settings)).unwrap();
     let finance = finance_user(service, admin, "Finance", "DEFAULT", "GENERAL");
     let date = (chrono::Utc::now() - chrono::Duration::days(1))
         .date_naive()

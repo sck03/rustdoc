@@ -52,7 +52,7 @@ fn resolve(
             vec![records::positive(
                 &company,
                 "executiveEmployeeId",
-                "公司执行负责人",
+                "公司领导审批负责人",
             )?]
         }
     };
@@ -95,6 +95,7 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
         .matching_branch(&text(row, "currency"), &text(row, "totalAmount"))
         .map_err(super::super::error::unavailable)?;
     let mut groups = vec![];
+    let mut stage_labels = vec![];
     let mode = if branch.is_some() {
         ApprovalMode::Configured
     } else {
@@ -104,6 +105,13 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
         let stages = branch.map(|branch| &branch.stages).unwrap_or(&rule.stages);
         for stage in stages {
             groups.push(resolve(tx, actor, row, &employee, stage)?);
+            stage_labels.push(match stage.source {
+                ApproverSource::DepartmentManager => "部门负责人审批",
+                ApproverSource::CompanyExecutive => "公司领导审批",
+                ApproverSource::LineManager => "直属负责人审批",
+                ApproverSource::FunctionalManagers => "职能负责人审批",
+                ApproverSource::Named => "指定负责人审批",
+            });
         }
     } else if mode == ApprovalMode::Named {
         groups = rule.approver_user_ids.iter().map(|id| vec![*id]).collect();
@@ -159,6 +167,7 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
             .unwrap_or(0)
     );
     row["approvalPlan"] = serde_json::to_value(plan)?;
+    row["approvalStageLabels"] = json!(stage_labels);
     row["lastRemindedAt"] = json!("");
     Ok(())
 }

@@ -30,6 +30,7 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
   const { paging, query, keyword, search, lowStockOnly, includeInactive } = model;
   const [dialog, setDialog] = useState<SupplyDialog | null>(null);
   const close = () => setDialog(null);
+  const saved = (supply: OfficeSupplyRecord) => { model.acceptSaved(supply); close(); };
   const deletion = useOfficeOperation();
   return <>
     <div className="office-toolbar"><form className="office-search" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
@@ -37,7 +38,7 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
       <label className="checkbox-field"><input type="checkbox" checked={lowStockOnly} onChange={(event) => model.changeLowStock(event.target.checked)} />仅低库存</label>
       {access.allows("manage") && <label className="checkbox-field"><input type="checkbox" checked={includeInactive} onChange={(event) => model.changeInactive(event.target.checked)} />含停用</label>}
       <button className="icon-button" type="button" aria-label="刷新办公物品" disabled={query.isFetching} onClick={model.refresh}><RefreshCw size={17} aria-hidden="true" /></button>
-      {access.allows("manage") && <button className="command-button" type="button" onClick={() => setDialog({ kind: "edit" })}><Plus size={17} aria-hidden="true" />添加物品</button>}
+      {access.allows("manage") && <button className="command-button" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "edit" })}><Plus size={17} aria-hidden="true" />添加物品</button>}
     </div>
     <OfficeQueryState query={query} emptyTitle={search || lowStockOnly ? "没有符合条件的物品" : "尚未添加物品，请联系行政管理员"} />
     {!query.isError && <div className="office-resource-grid">{query.data?.items.map((supply) => <article key={supply.id} className="office-resource-card">
@@ -48,20 +49,20 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
       <p className="office-card-detail"><MapPin size={16} aria-hidden="true" />{supply.location || "领取位置未填写"}</p>
       <p className="office-muted office-card-description">{supply.description || (supply.isReturnable ? "借用后需要按期归还" : "按需领用，交接时确认发放")}</p>
       <footer className="office-card-actions">
-        {supply.isActive && access.allows("create") && <button className="command-button" type="button" onClick={() => setDialog({ kind: "apply", supply })}>{user.capabilities.usesOfficeRegister ? "登记" : "申请"}{supply.isReturnable ? "借用" : "领用"}</button>}
-        {allowsSupply("restock", supply) && <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "restock", supply })}>补充库存</button>}
+        {supply.isActive && access.allows("create") && <button className="command-button" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "apply", supply })}>{user.capabilities.usesOfficeRegister ? "登记" : "申请"}{supply.isReturnable ? "借用" : "领用"}</button>}
+        {allowsSupply("restock", supply) && <button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "restock", supply })}>补充库存</button>}
         {(allowsSupply("restock", supply) || allowsSupply("manage", supply)) && <details className="office-secondary-actions">
           <summary>更多操作</summary><div>
-            {allowsSupply("restock", supply) && <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "history", supply })}>库存流水</button>}
-            {allowsSupply("manage", supply) && <><button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "stocktake", supply })}>盘点</button>
-              <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "edit", supply })}>编辑</button>
-              <button className="command-button secondary" type="button" onClick={() => setDialog({ kind: "delete", supply })}>删除</button></>}
+            {allowsSupply("restock", supply) && <button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "history", supply })}>库存流水</button>}
+            {allowsSupply("manage", supply) && <><button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "stocktake", supply })}>盘点</button>
+              <button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "edit", supply })}>编辑</button>
+              <button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "delete", supply })}>删除</button></>}
           </div>
         </details>}
       </footer>
     </article>)}</div>}
     <OfficePager page={query.data} paging={paging} busy={query.isFetching} />
-    {dialog?.kind === "edit" && <OfficeSupplyEditor client={client} user={user} supply={dialog.supply} onClose={close} />}
+    {dialog?.kind === "edit" && <OfficeSupplyEditor client={client} user={user} supply={dialog.supply} onClose={close} onSaved={saved} />}
     {dialog?.kind === "apply" && <OfficeSupplyApplication client={client} supply={dialog.supply} user={user} onClose={close} />}
     {(dialog?.kind === "restock" || dialog?.kind === "stocktake") && <OfficeStockDialog client={client} supply={dialog.supply} stocktake={dialog.kind === "stocktake"} onClose={close} />}
     {dialog?.kind === "history" && <OfficeHistoryDialog client={client} user={user} kind="stock" id={dialog.supply.id} title={`${dialog.supply.name} · 库存流水`} onClose={close} />}

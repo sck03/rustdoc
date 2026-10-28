@@ -5,6 +5,8 @@ mod handling_contract;
 #[path = "support/native_fixture.rs"]
 #[allow(dead_code)]
 mod native_fixture;
+#[path = "support/oa_archive_contract.rs"]
+mod oa_archive_contract;
 #[path = "support/oa_contract.rs"]
 mod oa_contract;
 #[path = "support/organization_workflow_contract.rs"]
@@ -13,6 +15,38 @@ mod organization_workflow_contract;
 mod personnel_scope_contract;
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
+
+#[test]
+fn submitted_versions_originals_and_stored_pdf_survive_draft_changes() {
+    let mut fixture = native_fixture::Fixture::new();
+    let employee = fixture.employee();
+    fixture.client.take();
+    fixture.paths.font_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../Resources/Fonts/OpenSource/NotoSansCJKsc-Regular.otf")
+        .canonicalize()
+        .unwrap();
+    let service = NativeService::open(fixture.paths.clone()).unwrap();
+    let login = oa_contract::call(
+        &service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":"admin","password":""})),
+    )
+    .unwrap();
+    let token = login["accessToken"].as_str().unwrap();
+    let defaults = oa_contract::call(&service, token, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
+    assert!(
+        defaults["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|rule| rule["mode"] == "Configured"
+                && rule["stages"][1]["source"] == "CompanyExecutive")
+    );
+    oa_archive_contract::exercise(&service, token, token, employee["employee"]["id"].as_i64());
+    service.close().unwrap();
+}
 
 #[test]
 fn sqlite_office_approvals_attachments_and_concurrency() {

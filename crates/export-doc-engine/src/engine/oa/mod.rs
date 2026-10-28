@@ -4,10 +4,13 @@ pub(in crate::engine) mod approval;
 mod approval_handover;
 pub(in crate::engine) mod approval_references;
 mod approval_routing;
+mod documents;
 mod handling_handover;
 pub(in crate::engine) mod personnel_changes;
 mod queries;
 pub(in crate::engine) mod settings;
+mod sheet_templates;
+mod submissions;
 mod validation;
 use super::{
     NativeService, auth,
@@ -26,8 +29,14 @@ pub fn metadata(operation: Operation) -> Option<&'static Value> {
         .filter(|v| v.is_object())
 }
 pub fn is_download(operation: Operation) -> bool {
-    metadata(operation).is_some_and(|m| m["action"] == "download")
+    metadata(operation).is_some_and(|m| {
+        matches!(
+            m["action"].as_str(),
+            Some("download" | "document-download" | "bundle-download")
+        )
+    })
 }
+pub(super) use documents::download;
 fn kind(meta: &Value) -> String {
     format!("oa-{}", text(meta, "kind"))
 }
@@ -151,6 +160,10 @@ pub(super) fn project(
     };
     if detail {
         row["canReview"] = json!(approval::authority(tx, actor, &row)?.is_some());
+        if let Some(id) = row["submissionId"].as_i64().filter(|id| *id > 0) {
+            row["approvalDocument"] =
+                submissions::project(tx, submissions::checked(tx, &row, id)?, false)?;
+        }
     }
     if row["kind"] == "general" {
         row["canHandle"] = json!(handling::can_handle(tx, actor, &row, "office.general")?);
@@ -168,6 +181,9 @@ fn append_event(
     let mut body = json!({"requestId":row["id"],"requestVersion":row["versionNumber"],"action":action,"actorName":actor.name,"occurredAt":store::timestamp(),"note":note});
     if let Some(plan) = row.get("approvalPlan") {
         body["approvalPlan"] = plan.clone();
+    }
+    if let Some(id) = row["submissionId"].as_i64() {
+        body["submissionId"] = json!(id);
     }
     store::save_in_scope(tx, "oa-event", 0, body, None, actor, "oa-event", Some(row))
 }
@@ -192,6 +208,7 @@ pub(super) fn save(
         action,
         Some(&scope),
     )?;
+    submissions::after_save(tx, actor, &saved, action, note)?;
     let event = append_event(tx, actor, &saved, action, note)?;
     super::communication::on_event(tx, actor, &saved, &event, meta)?;
     project(tx, actor, saved, true)
@@ -225,12 +242,18 @@ pub(super) fn handle(
 ) -> Result<Value> {
     let meta = metadata(operation).ok_or_else(|| invalid("未知审批功能。"))?;
     let action = text(meta, "action");
+    if action == "document-generate" {
+        return documents::start(service, actor, operation, parameters);
+    }
+    if action == "sheet-preview" {
+        return sheet_templates::preview(service, actor, body);
+    }
     let today = service
         .clock
         .now()
         .map_err(super::error::unavailable)?
         .today;
-    service.store.transaction(|tx| {
+    let execute = |tx: &Connection| {
         let actor = auth::current_actor_in(tx, actor.id, actor.edition)?;
         auth::authorize(&actor, &text(meta, "resource"), &text(meta, "permission"))?;
         if meta["kind"] == "approval-settings" {
@@ -249,6 +272,16 @@ pub(super) fn handle(
         let (_, mut row) = current(tx, &actor, meta, id)?;
         if action == "get" {
             return project(tx, &actor, row, true);
+        }
+        if action == "submissions" {
+            return submissions::list(tx, &row, query);
+        }
+        if action == "submission" {
+            return submissions::project(
+                tx,
+                submissions::checked(tx, &row, submissions::id(parameters)?)?,
+                true,
+            );
         }
         if action == "history" {
             let (page, size) = paging(query)?;
@@ -359,6 +392,7 @@ pub(super) fn handle(
                 )?;
             }
             approval::submit(tx, &actor, &mut row)?;
+            submissions::begin(tx, &actor, &mut row)?;
         }
         if matches!(action.as_str(), "approve" | "reject") {
             next = approval::review(tx, &actor, &mut row, &action, &note)?;
@@ -390,7 +424,30 @@ pub(super) fn handle(
             &action
         };
         save(tx, &actor, meta, row, event, &note)
-    })
+    };
+    if operation.method == "GET" {
+        service.store.read(execute)
+    } else {
+        let mut result = service.store.transaction(execute)?;
+        if action == "approve"
+            && matches!(result["status"].as_str(), Some("Approved" | "Completed"))
+            && result["submissionId"].as_i64().is_some()
+        {
+            // PDF work starts after approval commits; a rendering failure never
+            // reverses the actual approval or personnel action.
+            // Approval has committed. Return that fact even when a subsequent
+            // document/status write fails; its missing output is retryable.
+            match documents::start_approved(service, actor, meta, &result) {
+                Ok(document) => result["approvalDocument"] = document,
+                Err(cause) => eprintln!(
+                    "Approval {} committed; document scheduling failed: {cause}",
+                    result["id"]
+                ),
+            }
+            return Ok(result);
+        }
+        Ok(result)
+    }
 }
 
 fn create(

@@ -93,6 +93,11 @@ pub fn exercise(service: &NativeService, token: &str) {
     settings["expectedVersion"] = settings["versionNumber"].clone();
     settings["personnelApprovalActions"] =
         json!(["Hire", "Confirm", "Transfer", "Depart", "Rehire"]);
+    // This contract tests the opt-in personnel policy with one explicit reviewer.
+    for rule in settings["rules"].as_array_mut().unwrap() {
+        rule["mode"] = json!("Single");
+        rule["stages"] = json!([]);
+    }
     admin
         .request(SAVE_OA_APPROVAL_SETTINGS, 0, Some(settings))
         .unwrap();

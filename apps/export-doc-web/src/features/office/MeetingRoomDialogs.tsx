@@ -11,13 +11,13 @@ import { OfficeEmployeePicker } from "./OfficeEmployeePicker.tsx";
 import { OfficeApplicantIdentity, canIdentifyOfficeApplicant } from "./OfficeApplicantIdentity.tsx";
 import { HandlingServicePicker } from "../oa/HandlingServicePicker.tsx";
 
-export function MeetingRoomEditor({ client, user, room, onClose }: { client: ExportDocManagerApiClient; user: ApiUserDto; room?: MeetingRoomRecord; onClose: () => void }) {
+export function MeetingRoomEditor({ client, user, room, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; room?: MeetingRoomRecord; onClose: () => void; onSaved: (saved: MeetingRoomRecord) => void }) {
   const operation = useOfficeOperation();
   const [handlingKey, setHandlingKey] = useState(room?.handlingKey ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const body = { ...readMeetingRoomForm(new FormData(event.currentTarget), room?.versionNumber ?? 0), handlingKey };
-    void operation.run((signal) => room ? client.updateMeetingRoom({ id: room.id, body }, { signal }) : client.createMeetingRoom({ body }, { signal }), onClose);
+    void operation.run((signal) => room ? client.updateMeetingRoom({ id: room.id, body }, { signal }) : client.createMeetingRoom({ body }, { signal }), onSaved);
   }
   return <OfficeDialog title={room ? "编辑会议室" : "添加会议室"} onClose={onClose} {...operation} protectChanges>
     <form onSubmit={submit}><fieldset disabled={operation.busy} className="office-form-grid">

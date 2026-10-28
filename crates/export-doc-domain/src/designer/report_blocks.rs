@@ -21,6 +21,10 @@ pub struct BlockOutput {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReportTextStyle {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_color: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub font_size_pt: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bold: Option<bool>,
@@ -40,6 +44,8 @@ pub struct ReportTextStyle {
 impl Default for ReportTextStyle {
     fn default() -> Self {
         Self {
+            color: None,
+            background_color: None,
             font_size_pt: None,
             bold: None,
             align: None,
@@ -105,6 +111,8 @@ pub struct ReportRowBlock {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ReportGridBlock {
     pub id: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub grow_to_content: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<ReportBlockOutput>,
     #[serde(default, skip_serializing_if = "String::is_empty")]
@@ -341,6 +349,9 @@ pub struct ConditionalContent {
 
 fn yes() -> bool {
     true
+}
+fn is_false(value: &bool) -> bool {
+    !value
 }
 fn one() -> i32 {
     1

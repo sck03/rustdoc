@@ -33,7 +33,7 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
       <div className="organization-actions"><Link className="command-button secondary" to="/office/people">人员档案</Link>
         <Link className="command-button secondary" to="/system/access-control">账号与权限</Link>
         <button type="button" className="command-button secondary" onClick={() => setCompanyEditor({})}><Plus size={16} aria-hidden="true" />新增公司</button></div></div>
-    <details><summary>公司、职位与审批如何设置</summary><p className="office-muted">公司下建立财务部、外贸部、单证综合部等实际部门，在公司信息中指定总经理为公司执行负责人（CEO），并维护常用职位目录。人员档案维护主职、兼职和直属/职能汇报，审批规则可组合部门负责人、职能会签和 CEO。负责人须关联启用账号并取得对应查看、审批范围；组织层级和职位名称不自动授予权限。</p></details>
+    <details><summary>公司、职位与审批如何设置</summary><p className="office-muted">公司下建立实际部门，并在公司信息中指定公司领导审批负责人，可以是董事长、总经理、分管副总等。人员档案维护主职、兼职和直属/职能汇报，审批规则可组合部门负责人、公司领导及指定人员会签。负责人须关联启用账号并取得对应查看、审批范围；组织层级和职位名称不自动授予权限。</p></details>
     {query.isPending ? <PageState tone="loading" title="正在加载组织架构" /> : query.isError ? <PageState tone="error" title="组织架构加载失败" description={readApiError(query.error)}
       action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新加载</button>} /> : !company ? <PageState title="尚未设置公司" description="先新增公司，再在公司下建立部门。" /> : <>
       <div className="organization-directory-layout">
@@ -46,7 +46,7 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
           <div className="organization-actions"><button type="button" className="text-button" onClick={() => setCompanyEditor({ record: company })}>编辑公司</button>
             <button type="button" className="text-button" onClick={() => setDeleting({ kind: "company", record: company })}>删除公司</button></div>
           <p className="office-muted">{company.code}{company.code === user.companyScope ? " · 当前账号所属公司" : ""} · {departments.length} 个部门 · {departments.filter((item) => item.isActive).length} 个启用 · {departments.filter((item) => item.managerEmployeeId).length} 个已设负责人</p>
-          <p>公司执行负责人（CEO）：{company.executiveEmployeeId ? <Link to={`/office/people/${company.executiveEmployeeId}`}>{company.executiveName || `人员 #${company.executiveEmployeeId}`}</Link> : "未设置"}</p>
+          <p>公司领导审批负责人：{company.executiveEmployeeId ? <Link to={`/office/people/${company.executiveEmployeeId}`}>{company.executiveName || `人员 #${company.executiveEmployeeId}`}</Link> : "未设置"}</p>
         </div>
         <div className="organization-heading"><div><h3>部门层级</h3></div>
           <button type="button" className="command-button" disabled={!company.isActive} onClick={() => setDepartmentEditor({})}><Plus size={17} aria-hidden="true" />新增部门</button></div>

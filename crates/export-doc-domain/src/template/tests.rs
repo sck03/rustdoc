@@ -131,6 +131,7 @@ fn original_v3_flow_blocks_validate_and_round_trip() {
         "Grid",
         ReportBlock::Grid(crate::designer::ReportGridBlock {
             id: "grid-1".into(),
+            grow_to_content: false,
             output: None,
             title: "固定字段".into(),
             columns: vec![GridColumn {
@@ -295,6 +296,7 @@ fn grid_diagonal_header_round_trips_through_dtpl() {
         "Grid",
         ReportBlock::Grid(crate::designer::ReportGridBlock {
             id: "grid-diagonal".into(),
+            grow_to_content: false,
             output: None,
             title: String::new(),
             columns: vec![GridColumn {

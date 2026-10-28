@@ -224,7 +224,7 @@ fn track_offsets(sizes: &[f32]) -> Vec<f32> {
         .collect()
 }
 
-fn value(
+pub(super) fn value(
     data: &ReportData,
     kind: &str,
     text: &str,
@@ -245,8 +245,13 @@ fn value(
     value
 }
 
-fn inherit(style: &ReportTextStyle, base: &ReportTextStyle) -> ReportTextStyle {
+pub(super) fn inherit(style: &ReportTextStyle, base: &ReportTextStyle) -> ReportTextStyle {
     ReportTextStyle {
+        color: style.color.clone().or_else(|| base.color.clone()),
+        background_color: style
+            .background_color
+            .clone()
+            .or_else(|| base.background_color.clone()),
         font_size_pt: style.font_size_pt.or(base.font_size_pt),
         bold: style.bold.or(base.bold),
         align: style.align.clone().or_else(|| base.align.clone()),
@@ -274,6 +279,7 @@ fn box_content(
     path: &str,
 ) -> Result<()> {
     let [x, y, width, height] = rect;
+    background(svg, rect, style);
     if let Some(border) = border {
         draw_border(svg, rect, border);
     }
@@ -328,7 +334,7 @@ fn box_content(
         w,
         size,
         style.bold.unwrap_or(element.style.bold),
-        &element.style.color,
+        style.color.as_deref().unwrap_or(&element.style.color),
         style.align.as_deref().unwrap_or(&element.style.align),
     );
     Ok(())
@@ -344,6 +350,7 @@ fn checkbox_group(
     element: &Element,
 ) -> Result<()> {
     let [x, y, width, height] = rect;
+    background(svg, rect, style);
     if let Some(border) = border {
         draw_border(svg, rect, border);
     }
@@ -378,7 +385,7 @@ fn checkbox_group(
             slot - size - 1.,
             size,
             bold,
-            &element.style.color,
+            style.color.as_deref().unwrap_or(&element.style.color),
             "Left",
         );
         cursor += slot;
@@ -395,6 +402,7 @@ fn diagonal_header(
     element: &Element,
 ) -> Result<()> {
     let [x, y, width, height] = rect;
+    background(svg, rect, style);
     if let Some(border) = border {
         draw_border(svg, rect, border);
     }
@@ -448,7 +456,7 @@ fn diagonal_header(
         text_width,
         size,
         bold,
-        &element.style.color,
+        style.color.as_deref().unwrap_or(&element.style.color),
         if descending { "Right" } else { "Left" },
     );
     text_svg(
@@ -459,7 +467,7 @@ fn diagonal_header(
         text_width,
         size,
         bold,
-        &element.style.color,
+        style.color.as_deref().unwrap_or(&element.style.color),
         if descending { "Left" } else { "Right" },
     );
     Ok(())
@@ -479,5 +487,14 @@ pub(super) fn draw_border(svg: &mut String, [x, y, w, h]: [f32; 4], border: &Rep
         if enabled {
             svg.push_str(&format!("<line x1=\"{x1}\" y1=\"{y1}\" x2=\"{x2}\" y2=\"{y2}\" stroke=\"{}\" stroke-width=\"{}\"{dash}/>",escape(&border.color),border.width_px*25.4/96.));
         }
+    }
+}
+
+fn background(svg: &mut String, [x, y, width, height]: [f32; 4], style: &ReportTextStyle) {
+    if let Some(color) = &style.background_color {
+        svg.push_str(&format!(
+            "<rect x=\"{x}\" y=\"{y}\" width=\"{width}\" height=\"{height}\" fill=\"{}\"/>",
+            escape(color)
+        ));
     }
 }

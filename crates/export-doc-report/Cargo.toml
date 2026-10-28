@@ -12,6 +12,7 @@ export-doc-contracts = { path = "../export-doc-contracts" }
 serde.workspace = true
 serde_json.workspace = true
 rust_decimal.workspace = true
+chrono.workspace = true
 base64.workspace = true
 zip.workspace = true
 krilla = "=0.8.2"

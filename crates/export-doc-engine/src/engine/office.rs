@@ -474,7 +474,7 @@ pub fn deletion_restriction(connection: &Connection, id: i64) -> Result<Option<&
         || has_reference(connection, "companies", "executiveEmployeeId", id)?
     {
         return Ok(Some(
-            "此人员仍有公司执行负责人或任职汇报关系引用，请先办理负责人交接；历史引用须保留。",
+            "此人员仍有公司领导审批负责人或任职汇报关系引用，请先办理负责人交接；历史引用须保留。",
         ));
     }
     Ok(None)

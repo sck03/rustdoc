@@ -50,6 +50,14 @@ try {
     server.stderr.on("data", chunk => { log += chunk; });
     server.stdout.on("data", chunk => { log += chunk; const match = log.match(/\{"url":"([^"]+)"\}/u); if (match) { clearTimeout(timer); resolve(match[1]); } });
   });
+  // This broad form/attachment contract explicitly uses single-stage registration;
+  // the default two-stage route is covered by the approval/document UI contracts.
+  const token = (await fetch(`${url}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'oa-review', password: 'Review-2026-Test' }) }).then(r => r.json())).accessToken;
+  const settingsHeaders = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+  const settingsUrl = `${url}/api/office/approval-settings`;
+  const settings = await fetch(settingsUrl, { headers: settingsHeaders }).then(r => r.json());
+  settings.rules = settings.rules.map(rule => ({ ...rule, mode: 'Single', stages: [], approverUserIds: [], amountBranches: [] }));
+  assert.equal((await fetch(settingsUrl, { method: 'PUT', headers: settingsHeaders, body: JSON.stringify({ ...settings, expectedVersion: settings.versionNumber }) })).status, 200);
   const browser = locateChromeForTesting(repo);
   chrome = await startChrome({ browserExecutable: browser, userDataDir: path.join(output, "Chrome"), timeoutMs: 30000 });
   cdp = await CdpClient.connect(chrome.browserWebSocketUrl); page = await createPageSession(cdp);
@@ -72,7 +80,7 @@ try {
   await navigate(`${url}/#/office/people`);
   await wait("document.querySelector('.personnel-directory')", "Personnel page missing");
   await click("入职登记");
-  await fill("工号（系统内唯一）", "UI-ATTACH-001"); await fill("姓名", "一次保存人员"); await fill("岗位", "业务专员");
+  await fill("工号（系统内唯一）", "UI-ATTACH-001"); await fill("姓名", "一次保存人员"); await fill("职位", "业务专员");
   await chooseFiles('[aria-label="选择档案图片或文档"] input', [receipt, supporting]);
   await run(`new Promise(resolve => {const canvas=document.createElement('canvas'); canvas.width=40;canvas.height=40;const c=canvas.getContext('2d');c.fillStyle='#147d92';c.fillRect(0,0,40,40);canvas.toBlob(blob=>{const transfer=new DataTransfer();transfer.items.add(new File([blob],'avatar.png',{type:'image/png'}));const input=document.querySelector('[aria-label="选择人员头像"] input');input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));resolve(true);},'image/png');})`);
   await wait("document.querySelector('[role=dialog] img')?.naturalWidth>0", "Draft image preview missing");

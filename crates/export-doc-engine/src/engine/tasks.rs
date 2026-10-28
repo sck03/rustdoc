@@ -1,6 +1,7 @@
 //! Durable file tasks. Only running workers live in memory; snapshots and output
 //! bytes commit together in the same application database as the business data.
 mod admission;
+mod completion;
 mod output;
 mod persistence;
 mod queries;
@@ -30,12 +31,19 @@ pub struct FileOutput {
 
 mod managed_output;
 pub struct TaskOutput {
+    pub(crate) archive: Option<ArchiveOutput>,
     pub managed_file: Option<ManagedOutput>,
     pub file: Option<FileOutput>,
     pub detail: String,
     pub destination: Option<std::path::PathBuf>,
     pub directory: Option<DirectoryOutput>,
     pub publication: Option<PublicationCheck>,
+}
+/// Durable business file, excluded from disposable task-download retention.
+pub(crate) struct ArchiveOutput {
+    pub record_id: i64,
+    pub kind: &'static str,
+    pub file: FileOutput,
 }
 pub struct PublicationCheck {
     check: Box<dyn Fn(&Connection, &Actor) -> Result<()> + Send>,
@@ -75,6 +83,7 @@ impl TaskOutput {
             directory: None,
             managed_file: Some(ManagedOutput { path, size, digest }),
             publication: None,
+            archive: None,
         })
     }
     pub fn file(file_name: String, media_type: &str, content: Vec<u8>) -> Self {
@@ -89,6 +98,7 @@ impl TaskOutput {
             directory: None,
             managed_file: None,
             publication: None,
+            archive: None,
         }
     }
     pub(crate) fn check_on_publish(mut self, check: PublicationCheck) -> Self {
@@ -116,6 +126,7 @@ struct TaskSpec<'a> {
 pub struct Jobs {
     store: Arc<Store>,
     runtime: Arc<Mutex<Runtime>>,
+    completion: Arc<completion::Completion>,
     retention: retention::Retention,
     download_budget: Arc<super::backup_io::Budget>,
 }
@@ -150,6 +161,7 @@ impl Jobs {
         Ok(Self {
             store,
             runtime: Arc::default(),
+            completion: Arc::default(),
             retention,
             download_budget: Arc::default(),
         })
@@ -265,6 +277,7 @@ impl Jobs {
         runtime.active.insert(job_id.clone(), scope.clone());
         let store = self.store.clone();
         let state = self.runtime.clone();
+        let completion = self.completion.clone();
         let owner = actor.clone();
         let retention = self.retention;
         let worker_id = job_id.clone();
@@ -277,11 +290,12 @@ impl Jobs {
                 }))
                 .unwrap_or_else(|_| Err(unavailable("文件处理异常终止，未发布输出。")));
                 // Persist terminal state outside the canceled execution scope.
-                let finished =
+                let finished = completion.finish(|| {
                     persistence::finish_controlled(&store, &owner, &worker_id, result, Some(&flag))
                         .and_then(|_| {
                             retention::prune(&store, retention, chrono::Utc::now()).map(|_| ())
-                        });
+                        })
+                });
                 if let Ok(mut runtime) = state.lock() {
                     runtime.active.remove(&worker_id);
                     if let Err(cause) = finished {
@@ -323,6 +337,7 @@ impl Jobs {
                 directory: None,
                 managed_file: None,
                 publication: None,
+                archive: None,
             }),
         )?;
         retention::prune(&self.store, self.retention, chrono::Utc::now())?;
@@ -331,11 +346,13 @@ impl Jobs {
 
     pub fn get(&self, actor: &Actor, id: &str) -> Result<Value> {
         self.health()?;
+        let _completion = self.completion.read()?;
         persistence::get(&self.store, actor, id)
     }
 
     pub fn list(&self, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
         self.health()?;
+        let _completion = self.completion.read()?;
         persistence::list(&self.store, actor, query)
     }
 
@@ -344,10 +361,12 @@ impl Jobs {
     }
     pub(crate) fn authorize_download(&self, actor: &Actor, id: &str) -> Result<()> {
         self.health()?;
+        let _completion = self.completion.read()?;
         persistence::authorize_download(&self.store, actor, id)
     }
     pub fn prepare_download(&self, actor: &Actor, id: &str) -> Result<super::backup_io::Download> {
         self.health()?;
+        let _completion = self.completion.read()?;
         persistence::download(&self.store, actor, id, &self.download_budget)
     }
 
@@ -371,6 +390,7 @@ impl Jobs {
                 json!({"success":true,"message":"已请求取消"})
             }
             DELETE_JOB => {
+                let _completion = self.completion.read()?;
                 persistence::delete(&self.store, actor, id)?;
                 json!({"success":true,"message":"任务输出已清理"})
             }
@@ -381,6 +401,7 @@ impl Jobs {
 
     pub fn clear_finished(&self, actor: &Actor) -> Result<Value> {
         self.health()?;
+        let _completion = self.completion.read()?;
         let count = persistence::clear_finished(&self.store, actor)?;
         Ok(
             json!({"success":true,"message":format!("已清理 {count} 个已结束任务。"),"affectedCount":count}),

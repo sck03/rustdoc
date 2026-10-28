@@ -111,7 +111,7 @@ pub(super) fn prepare(
             }
             if action == "Depart" && check["canDepart"] != true {
                 return Err(conflict(
-                    "请先移交部门、公司执行负责人及直属/职能汇报职责。",
+                    "请先移交部门、公司领导审批负责人及直属/职能汇报职责。",
                 ));
             }
         }

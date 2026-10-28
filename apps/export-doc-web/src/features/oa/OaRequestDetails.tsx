@@ -1,3 +1,4 @@
+import { OaRequestContent } from "./OaRequestContent.tsx";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { requestPersonLabel } from "../office/requestIdentity.ts";
@@ -8,20 +9,22 @@ import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "../office/OfficeUi.tsx";
-import { useOfficeOperation } from "../office/useOfficeData.ts";
+import { useOaOperation } from "./useOaOperation.ts";
+import { OaApprovalDocument } from "./OaApprovalDocument.tsx";
+import { OaSubmissionHistory } from "./OaSubmissionHistory.tsx";
 import { oaApi } from "./oaApi.ts";
-import { oaAccess, oaActions, oaActionLabel, oaStatus, personnelChangeLabels, type OaActionName } from "./oaModel.ts";
+import { oaAccess, oaActions, oaActionLabel, oaStatus, type OaActionName } from "./oaModel.ts";
 import { canViewPersonnelDetails } from "../office/personnelModel.ts";
-import { expenseCategories } from "./OaLineEditor.tsx";
-import { generalCategories, leaveCategories } from "./OaTemporalFields.tsx";
 import { documentDescription } from "../../ui/documentAttachments.ts";
 import { AttachmentUploadPanel } from "../../ui/AttachmentUploadPanel.tsx";
 import { ApprovalReassignDialog } from "./ApprovalReassignDialog.tsx";
-import { PersonnelOrganizationFacts } from "../office/PersonnelOrganizationEditor.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export function OaRequestDetails({ client, user, row, onEdit }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: OaRequest; onEdit: () => void }) {
-  const operation = useOfficeOperation();
+  const operation = useOaOperation(row.kind);
   const [reassigning, setReassigning] = useState(false);
+  const [historyOpened, setHistoryOpened] = useState(false);
+  const [purpose, setPurpose] = useState("Voucher");
   const [action, setAction] = useState<OaActionName | number | null>(null);
   const editable = ["Draft", "Rejected"].includes(row.status) && oaAccess(user, row.kind, "edit", row);
   const api = oaApi(client, row.kind);
@@ -37,48 +40,29 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     </div>}
     {row.status === "HandedOff" && <InlineNotice tone="success" title="财务交接已登记">此状态仅记录资料交接，不代表已记账或已付款；办理人、时间和说明见审批与办理记录。</InlineNotice>}
     </header>
+    <OaApprovalDocument client={client} user={user} row={row} />
     {user.capabilities.canManageUsers && row.status === "Pending" && Boolean(row.approvalPlan?.steps.some(step => step.status === "Waiting")) && <button type="button" className="command-button secondary" onClick={() => setReassigning(true)}>移交未完成审批</button>}
     {row.approvalPlan?.matchedBranch && <p>命中金额条件：{row.approvalPlan.matchedBranch}</p>}
     {row.approvalPlan && row.approvalPlan.steps.length > 0 && <section className="oa-detail-content" aria-label="审批步骤"><h3>审批步骤</h3><ol className="oa-history">{row.approvalPlan.steps.map((step, index) => <li key={step.approverUserId}><strong>第 {(step.stage ?? index) + 1} 阶段 · {step.approverName}（账号 #{step.approverUserId}）</strong> · {{ Waiting: "待审批", Approved: "已批准", Rejected: "已驳回" }[step.status]}{step.actedByUserId && <p>{step.delegationKey ? "代理办理：" : "办理人："}{step.actedByName}（账号 #{step.actedByUserId}） · {formatBusinessDateTime(step.actedAt, user.businessTimeZone)} · {step.note}</p>}</li>)}</ol></section>}
-    <section className="oa-detail-content" aria-label="申请内容"><h3>申请内容</h3>
-    <div className="oa-reason"><h4>申请说明</h4><p>{row.reason}</p></div>
-    {row.personnelChange && <dl className="oa-facts">
-      <div><dt>变动类型</dt><dd>{personnelChangeLabels[row.personnelChange.action]}</dd></div>
-      <div><dt>生效日期</dt><dd>{row.personnelChange.registration?.hireDate ?? row.personnelChange.effectiveDate}</dd></div>
-      {(row.personnelChange.registration || ["Transfer", "Rehire"].includes(row.personnelChange.action)) && <>
-        <div><dt>任职部门</dt><dd>{row.personnelChange.registration?.departmentId ?? row.personnelChange.departmentId}</dd></div>
-        <div><dt>职位</dt><dd>{row.personnelChange.registration?.jobTitle ?? row.personnelChange.jobTitle}</dd></div>
-      </>}
-      <div><dt>提交账号</dt><dd>#{row.ownerUserId}（见审批与办理记录）</dd></div>
-    </dl>}
-    {row.leave && <p>{leaveCategories[row.leave.category]} · {row.leave.startsOn} {row.leave.startPeriod === "AM" ? "上午" : "下午"} 至 {row.leave.endsOn} {row.leave.endPeriod === "AM" ? "上午" : "下午"} · {row.durationDays} 个自然日</p>}
-    <PersonnelOrganizationFacts value={row.personnelChange?.organization} />
-    {row.travel && <p>{row.travel.destination} · {row.travel.startsOn} 至 {row.travel.endsOn} · {row.durationDays} 天</p>}
-    {row.overtime && <p>{row.overtime.location} · {formatBusinessDateTime(row.overtime.startsAt, user.businessTimeZone)} 至 {formatBusinessDateTime(row.overtime.endsAt, user.businessTimeZone)} · {row.durationHours} 小时</p>}
-    {row.category && <p>申请类别：{generalCategories[row.category]}</p>}
-    {row.handlingName && <p>办理事项：{row.handlingName} · 当前办理人员：{row.handlerNames || "请联系管理员核对分工"}</p>}
-    {row.totalAmount && <p><strong>{row.kind === "purchase" ? "预算合计" : "报销合计"}：{row.currency} {row.totalAmount}</strong></p>}
-    {row.lines && <ol className="oa-lines">{row.lines.map((line, index) => <li key={`${row.id}-${index}`} className="oa-line">{expenseCategories[line.category]} · {line.spentOn} · {line.description} · {line.amount} {row.currency}</li>)}</ol>}
-    {row.purchaseLines && <ol className="oa-lines">{row.purchaseLines.map((line, index) => <li key={`${row.id}-${index}`} className="oa-line">{line.name} {line.specification} · {line.quantity} {line.unit} × {line.unitPrice} {row.currency}</li>)}</ol>}
-    </section>
+    <OaRequestContent row={row} user={user} />
     <section className="oa-attachments" aria-label="申请附件"><h3>{row.kind === "expense" ? "报销凭证" : "申请附件"}</h3>
       <p className="office-muted">{documentDescription}{row.kind === "expense" && "提交报销前至少上传一份凭证。"}</p>
-      {editable && <AttachmentUploadPanel key={`${row.kind}-${row.id}`} record={row} operation={operation} upload={(current, body, signal) => api.upload(current.id, body, { signal })} />}
+      {editable && <><label>本批附件用途<select value={purpose} onChange={event=>setPurpose(event.target.value)}><option value="ReimbursementForm">报销单</option><option value="Voucher">发票／其他凭证</option><option value="Supporting">补充资料</option></select></label><AttachmentUploadPanel key={`${row.kind}-${row.id}`} record={row} operation={operation} upload={(current, body, signal) => { body.set("purpose",purpose); return api.upload(current.id, body, { signal }); }} /></>}
       {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
       {!row.attachments.length && <p className="office-muted">尚未上传附件。</p>}
       <ul>{row.attachments.map((file) => <li key={file.id} className="office-card-actions"><span>{file.fileName} · {Math.ceil(file.sizeBytes / 1024)} KiB</span>
-        <button className="command-button secondary" type="button" disabled={operation.busy} onClick={() => void operation.run((signal) => api.download(row.id, file.id, { signal }), (blob) => downloadBlob(blob, file.fileName))}>下载</button>
+        <span>{{ReimbursementForm:"报销单",Voucher:"发票／凭证",Supporting:"补充资料"}[file.purpose??"Voucher"]}</span><button className="command-button secondary" type="button" disabled={operation.busy} onClick={() => void operation.run((signal) => api.download(row.id, file.id, { signal }), (blob) => downloadBlob(blob, file.fileName), false)}>下载</button>
         {editable && <button className="command-button secondary" type="button" disabled={operation.busy} onClick={() => setAction(file.id)}>移除</button>}
       </li>)}</ul>
     </section>
-    <details className="oa-detail-history"><summary>审批与办理记录</summary><OaHistory client={client} user={user} row={row} /></details>
+    <details className="oa-detail-history" onToggle={event => setHistoryOpened(event.currentTarget.open)}><summary>审批与办理记录、提交版本</summary>{historyOpened && <><OaHistory client={client} user={user} row={row} /><OaSubmissionHistory client={client} user={user} row={row} /></>}</details>
     {action !== null && <OaActionDialog client={client} user={user} row={row} action={action} onClose={() => setAction(null)} />}
     {reassigning && <ApprovalReassignDialog client={client} row={row} onClose={() => setReassigning(false)} />}
   </article>;
 }
 
 function OaActionDialog({ client, user, row, action, onClose }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: OaRequest; action: OaActionName | number; onClose: () => void }) {
-  const operation = useOfficeOperation();
+  const operation = useOaOperation(row.kind);
   const [note, setNote] = useState("");
   const label = typeof action === "number" ? "移除附件" : oaActionLabel(action, row.kind, user.capabilities.usesOfficeRegister);
   return <OfficeDialog title={label} onClose={onClose} {...operation} protectChanges>
@@ -94,6 +78,7 @@ function OaHistory({ client, user, row }: { client: ExportDocManagerApiClient; u
   const [page, setPage] = useState(1);
   const query = useQuery({ queryKey: ["office", "oa", row.kind, user.id, user.companyScope, row.id, "history", page, row.versionNumber],
     queryFn: ({ signal }) => oaApi(client, row.kind).history(row.id, page, { signal }) });
+  useServerPageNumber(query, page, setPage);
   const labels: Record<string, string> = { create: "创建草稿", update: "修改草稿", upload: "上传附件", "delete-attachment": "移除附件", submit: "提交审批", withdraw: "撤回修改", approve: "批准", "approve-step": "步骤批准", remind: "申请人催办", reject: "驳回", cancel: "取消", void: "作废批准", complete: "完成登记", reassign: "办理分工交接", "approval-reassign": "审批职责移交" };
   if (query.isError) return <InlineNotice tone="error">{readApiError(query.error)}</InlineNotice>;
   return <><ol className="oa-history">{query.data?.items.map((item) => <li key={item.id}><strong>{labels[item.action] ?? item.action}</strong> · {item.actorName} · {formatBusinessDateTime(item.occurredAt, user.businessTimeZone)}<p>{item.note || "无附加说明"}</p></li>)}</ol>

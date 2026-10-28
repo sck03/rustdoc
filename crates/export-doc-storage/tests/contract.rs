@@ -13,6 +13,8 @@ mod import_preview_query;
 mod integrity_query;
 #[path = "support/maintenance_query.rs"]
 mod maintenance_query;
+#[path = "support/oa_period_query.rs"]
+mod oa_period_query;
 #[path = "support/office_query.rs"]
 mod office_query;
 #[path = "support/organization_query.rs"]
@@ -94,6 +96,7 @@ fn roundtrip(connection: &Connection) {
     import_preview_query::exercise(connection);
     capacity_query::exercise(connection);
     office_query::exercise(connection);
+    oa_period_query::exercise(connection);
     resource_query::exercise(connection);
     business_query::exercise(connection);
     personnel_query::exercise(connection);

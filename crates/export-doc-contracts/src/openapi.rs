@@ -15,6 +15,8 @@ mod product_queries;
 mod report_preview;
 mod reports;
 mod template_history;
+pub use office::documents::DETAIL_FIELDS as OA_SHEET_DETAIL_FIELDS;
+pub use office::documents::SHEET_FIELDS as OA_SHEET_FIELDS;
 use serde_json::Value;
 
 pub fn document() -> Value {

@@ -3,6 +3,7 @@ import { useReportDesignerPointerGesture } from "./useReportDesignerPointerGestu
 import { useReportDesignerPendingInput } from "./ReportDesignerPendingInputContext.tsx";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type { ReportBorderStyle, ReportTextStyle } from "./reportDesignerSchema.ts";
+import { ReportDesignerV3ColorField } from "./ReportDesignerV3ColorField.tsx";
 import { normalizeDesignerFieldPath } from "./reportDesignerMutations.ts";
 import { resizeAdjacentWidths } from "./reportDesignerTableMutations.ts";
 import {
@@ -325,6 +326,9 @@ export function TextStyleEditor({
   const update = (patch: Partial<ReportTextStyle>) => onChange({ ...style, ...patch }, patch);
   return (
     <div className="new-report-property-grid new-report-style-grid">
+      <ReportDesignerV3ColorField label="文字颜色" value={style.color ?? "#000000"} disabled={false} onCommit={color => update({color})} />
+      <ReportDesignerV3ColorField label="单元格底色" value={style.backgroundColor ?? "#ffffff"} disabled={false} onCommit={backgroundColor => update({backgroundColor})} />
+      <button type="button" className="command-button secondary" onClick={() => update({color:undefined,backgroundColor:undefined})}>沿用上层颜色</button>
       <label>
         <span>字号</span>
         <input

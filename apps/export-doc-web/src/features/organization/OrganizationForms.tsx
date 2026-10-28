@@ -26,10 +26,10 @@ export function OrganizationCompanyForm({ client, record, onClose, onSaved }: {
       <OfficeField label="公司代码"><input name="code" required maxLength={50} defaultValue={record?.code ?? ""} readOnly={Boolean(record)} autoFocus={!record} /></OfficeField>
       <OfficeField label="公司名称"><input name="name" required maxLength={120} defaultValue={record?.name ?? ""} autoFocus={Boolean(record)} /></OfficeField>
       <label className="checkbox-field"><input type="checkbox" name="isActive" defaultChecked={record?.isActive ?? true} />启用公司</label>
-      <div className="office-field-wide"><h3>公司执行负责人（CEO）</h3><p>{executive?.name || "未设置"}</p>
+      <div className="office-field-wide"><h3>公司领导审批负责人</h3><p>{executive?.name || "未设置"}</p>
         <p className="office-muted">须先建立人员档案、关联启用账号，分配公司级全部申请查看与审批权限。审批规则可直接引用此负责人；在途步骤通过申请详情单独移交。</p>
-        <button type="button" className="command-button secondary" disabled={!record?.isActive} onClick={() => setChoosingExecutive(true)}>选择公司执行负责人</button>
-        {executive && <button type="button" className="command-button secondary" onClick={() => setExecutive(null)}>清除公司执行负责人</button>}
+        <button type="button" className="command-button secondary" disabled={!record?.isActive} onClick={() => setChoosingExecutive(true)}>选择公司领导审批负责人</button>
+        {executive && <button type="button" className="command-button secondary" onClick={() => setExecutive(null)}>清除公司领导审批负责人</button>}
       </div>
       <OrganizationPositionsEditor value={positions} onChange={setPositions} />
       <p className="office-field-wide office-muted">代码创建后固定，名称可随时调整。停用前须处理启用部门、账号和在职人员。</p>

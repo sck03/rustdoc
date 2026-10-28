@@ -4,6 +4,12 @@ use export_doc_domain::{approval::delegation_window, approval_policy::ApprovalRu
 use std::collections::HashSet;
 
 const STORAGE_KIND: &str = "oa-approval-settings";
+fn default_rule(kind: &str) -> Value {
+    json!({"kind":kind,"mode":"Configured","approverUserIds":[],"stages":[
+        {"source":"DepartmentManager","approverUserIds":[]},
+        {"source":"CompanyExecutive","approverUserIds":[]}
+    ]})
+}
 fn personnel_actions(value: &Value) -> std::result::Result<(), &'static str> {
     let actions = value
         .as_array()
@@ -22,13 +28,13 @@ fn personnel_actions(value: &Value) -> std::result::Result<(), &'static str> {
 }
 pub(in crate::engine) fn load(tx: &Connection, company: &str) -> Result<Value> {
     let mut value = tx.find_identity(STORAGE_KIND, &store::normalize(company))?.unwrap_or_else(|| {
-        json!({"versionNumber":0,"rules":KINDS.iter().map(|kind| json!({"kind":kind.trim_start_matches("oa-"),"mode":"Single","approverUserIds":[]})).collect::<Vec<_>>(),"delegations":[]})
+        json!({"versionNumber":0,"rules":KINDS.iter().map(|kind| default_rule(kind.trim_start_matches("oa-"))).collect::<Vec<_>>(),"delegations":[]})
     });
     let rules = value["rules"]
         .as_array_mut()
         .ok_or_else(|| super::super::error::unavailable("审批规则损坏。"))?;
     if !rules.iter().any(|rule| rule["kind"] == "personnel") {
-        rules.push(json!({"kind":"personnel","mode":"Single","approverUserIds":[]}));
+        rules.push(default_rule("personnel"));
     }
     if value.get("personnelApprovalActions").is_none() {
         value["personnelApprovalActions"] = json!([]);
@@ -48,8 +54,12 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
     if !actor.admin {
         return Err(error(403, "只有管理员可以设置审批规则和代理。"));
     }
-    let previous = load(tx, &actor.company)?;
+    let mut previous = load(tx, &actor.company)?;
+    if previous.get("sheetTemplates").is_none() {
+        previous["sheetTemplates"] = sheet_templates::defaults()?;
+    }
     if action == "settings-get" {
+        previous["sheetFieldCatalog"] = sheet_templates::catalog();
         return Ok(contracts::dto(
             contracts::schema("OaApprovalSettings"),
             previous,
@@ -122,6 +132,11 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         }
     }
     let mut value = contracts::dto(contracts::schema("OaApprovalSettingsSave"), body.clone());
+    value["sheetTemplates"] = body
+        .get("sheetTemplates")
+        .cloned()
+        .unwrap_or_else(|| previous["sheetTemplates"].clone());
+    sheet_templates::validate(&value["sheetTemplates"])?;
     let actions = body
         .get("personnelApprovalActions")
         .cloned()
@@ -160,10 +175,11 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         "approval-settings",
     )?;
     super::handling_handover::notify(tx, actor, &previous, &saved)?;
-    Ok(contracts::dto(
-        contracts::schema("OaApprovalSettings"),
-        saved,
-    ))
+    Ok(contracts::dto(contracts::schema("OaApprovalSettings"), {
+        let mut saved = saved;
+        saved["sheetFieldCatalog"] = sheet_templates::catalog();
+        saved
+    }))
 }
 pub(super) fn principals(tx: &Connection, actor: &Actor) -> Result<Vec<(i64, String)>> {
     let settings = load(tx, &actor.company)?;

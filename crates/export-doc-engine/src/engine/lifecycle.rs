@@ -69,6 +69,7 @@ impl NativeService {
             clock: crate::clock::BusinessClock::default(),
             license_gate: Default::default(),
             packing_gate: Default::default(),
+            oa_document_gate: Default::default(),
             #[cfg(feature = "ocr")]
             ocr_gate: Default::default(),
             #[cfg(feature = "exchange-rates")]
@@ -145,6 +146,7 @@ impl NativeService {
             clock,
             license_gate: Default::default(),
             packing_gate: Default::default(),
+            oa_document_gate: Default::default(),
             #[cfg(feature = "ocr")]
             ocr_gate: Default::default(),
             #[cfg(feature = "exchange-rates")]

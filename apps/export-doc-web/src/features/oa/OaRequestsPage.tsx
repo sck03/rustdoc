@@ -24,7 +24,7 @@ export function OaRequestsPage({ client, user, kind }: { client: ExportDocManage
   return <section className="work-surface office-workspace oa-workspace" aria-label={module.name}>
     <header className="oa-heading"><h2>{model.selected ? "申请详情" : "申请列表"}</h2><Link to="/office/approvals">申请与审批中心</Link></header>
     {kind === "expense" && <InlineNotice tone="info" action={payments.canView ? <Link to="/payments">填写付款或报销打印单</Link> : undefined}>
-      此处办理报销申请、审批和财务接收；付款报销打印单在工作台单独填写，打印不改变申请状态。
+      报销单可在工作台或使用 Excel 独立制作，导出 PDF 后作为附件提交。全部审批通过后，系统自动提供正式审批单，供下载打印并与原始凭证一起交给财务。
     </InlineNotice>}
     {model.selected ? <>
       <button type="button" className="command-button secondary" onClick={() => model.select(0)}>返回申请列表</button>

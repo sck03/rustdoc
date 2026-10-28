@@ -507,6 +507,7 @@ pub(super) fn upload_latest(service: &NativeService, actor: &Actor) -> Result<Va
                 directory: None,
                 managed_file: None,
                 publication: None,
+                archive: None,
             })
         },
     )
@@ -566,6 +567,7 @@ pub(super) fn download(service: &NativeService, actor: &Actor, body: &Value) -> 
                 directory: None,
                 managed_file: None,
                 publication: None,
+                archive: None,
             })
         },
     )

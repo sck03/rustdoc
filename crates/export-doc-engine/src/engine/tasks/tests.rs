@@ -2,6 +2,7 @@ use super::*;
 use crate::contracts;
 use crate::paths::{RuntimePaths, nonce};
 use std::{fs, path::PathBuf, sync::mpsc, time::Instant};
+mod completion;
 mod publication;
 
 struct Fixture {

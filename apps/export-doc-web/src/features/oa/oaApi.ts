@@ -19,6 +19,11 @@ export function oaApi(client: ExportDocManagerApiClient, kind: OaKind) {
       return client[`${action}${name}Request`]({ id, body }, init);
     },
     history: (id: number, pageNumber: number, init?: ApiRequestInit) => client[`listHistoryOf${name}Request`]({ id, pageNumber, pageSize: 20 }, init),
+    submissions: (id: number, pageNumber: number, init?: ApiRequestInit) => client[`listSubmissionsOf${name}Request`]({ id, pageNumber, pageSize: 20 }, init),
+    submission: (id: number, submissionId: number, init?: ApiRequestInit) => client[`getSubmissionOf${name}Request`]({ id, submissionId }, init),
+    approvalPdf: (id: number, submissionId: number, init?: ApiRequestInit) => client[`downloadApprovalOf${name}Request`]({ id, submissionId }, init),
+    materials: (id: number, submissionId: number, init?: ApiRequestInit) => client[`downloadMaterialsOf${name}Request`]({ id, submissionId }, init),
+    generateApproval: (id: number, submissionId: number, init?: ApiRequestInit) => client[`generateApprovalOf${name}Request`]({ id, submissionId }, init),
     upload: (id: number, body: FormData, init?: ApiRequestInit) => client[`uploadAttachmentTo${name}Request`]({ id, body }, init),
     download: (id: number, attachmentId: number, init?: ApiRequestInit) => client[`downloadAttachmentOf${name}Request`]({ id, attachmentId }, init),
     remove: (id: number, attachmentId: number, body: OaAction, init?: ApiRequestInit) => client[`deleteAttachmentOf${name}Request`]({ id, attachmentId, body }, init),

@@ -51,6 +51,8 @@ export function normalizeTextStyle(value: unknown, path: string, issues: ReportD
   }
 
   return {
+    color: value.color === undefined ? undefined : readCssColor(value.color, `${path}.color`, issues),
+    backgroundColor: value.backgroundColor === undefined ? undefined : readCssColor(value.backgroundColor, `${path}.backgroundColor`, issues),
     fontSizePt: readOptionalNumber(value.fontSizePt, 10, 6, 48, `${path}.fontSizePt`, issues),
     bold: typeof value.bold === "boolean" ? value.bold : undefined,
     align: readOptionalEnum(value.align, ["Left", "Center", "Right"] as const, `${path}.align`, issues),

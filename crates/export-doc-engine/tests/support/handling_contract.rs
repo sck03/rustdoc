@@ -93,6 +93,11 @@ pub fn exercise(service: &NativeService, root: &str) {
     let local = call(service, &admin, GET_CURRENT_USER, 0, None).unwrap()["capabilities"]["usesOfficeRegister"]
         == true;
     let mut policy = call(service, &admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
+    // This contract exercises service custody after a deliberately single-stage approval.
+    for rule in policy["rules"].as_array_mut().unwrap() {
+        rule["mode"] = json!("Single");
+        rule["stages"] = json!([]);
+    }
     policy["handlingServices"] = json!([
         {"key":"seal","name":"公章","category":"Seal","handlerUserIds":[users[2]["id"]],"isActive":true},
         {"key":"certificate","name":"在职证明","category":"Certificate","handlerUserIds":[users[3]["id"]],"isActive":true},

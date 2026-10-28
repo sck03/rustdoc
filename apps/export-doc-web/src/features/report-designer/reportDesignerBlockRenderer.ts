@@ -602,6 +602,8 @@ function renderTextStyle(style: ReportTextStyle) {
 
 function renderTextPresentation(style: ReportTextStyle) {
   return [
+    style.color ? `color: ${style.color}` : "",
+    style.backgroundColor ? `background-color: ${style.backgroundColor}` : "",
     style.fontSizePt ? `font-size: ${style.fontSizePt}pt` : "",
     style.bold ? `font-weight: 700; font-family: ${portableReportSansFontFamily}` : "",
     style.align ? `text-align: ${alignToCss(style.align)}` : "",

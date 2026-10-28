@@ -20,8 +20,9 @@ export function useOfficePaging() {
     changePageSize: (size: number) => { setPageSize(size); setPageNumber(1); } };
 }
 
-export function useOfficeDirectory<T>(user: ApiUserDto, kind: OfficeKind,
+export function useOfficeDirectory<T extends { id: number }>(user: ApiUserDto, kind: OfficeKind,
   load: (input: ListOfficeSuppliesRequest, signal: AbortSignal) => Promise<OfficePage<T>>) {
+  const queries = useQueryClient();
   const paging = useOfficePaging();
   const [keyword, setKeyword] = useState("");
   const [search, setSearch] = useState("");
@@ -34,7 +35,10 @@ export function useOfficeDirectory<T>(user: ApiUserDto, kind: OfficeKind,
     refetchInterval: 30000, refetchIntervalInBackground: false,
   });
   const commitSearch = () => { setSearch(keyword.trim()); paging.resetPage(); };
-  return { paging, query, keyword, search, includeInactive, lowStockOnly, commitSearch,
+  const acceptSaved = (saved: T) => queries.setQueriesData<OfficePage<T>>(
+    { queryKey: ["office", kind, "resources", user.id, user.companyScope] },
+    page => page ? { ...page, items: page.items.map(item => item.id === saved.id ? saved : item) } : page);
+  return { paging, query, keyword, search, includeInactive, lowStockOnly, commitSearch, acceptSaved,
     changeKeyword: (value: string) => { setKeyword(value); if (!value) { setSearch(""); paging.resetPage(); } },
     changeInactive: (value: boolean) => { setIncludeInactive(value); paging.resetPage(); },
     changeLowStock: (value: boolean) => { setLowStockOnly(value); paging.resetPage(); },
@@ -67,14 +71,14 @@ export function useOfficeHistory(client: ExportDocManagerApiClient, user: ApiUse
   return { paging, query };
 }
 
-export function useOfficeOperation(relatedKeys: readonly QueryKey[] = []) {
+export function useOfficeOperation(relatedKeys: readonly QueryKey[] = [], includeOffice = true) {
   const queries = useQueryClient();
   const abortable = useAbortableOperation();
   const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const refresh = () => Promise.all([["office"], ["worklist"], ...relatedKeys].map(queryKey => queries.invalidateQueries({ queryKey })));
-  async function run<T>(operation: (signal: AbortSignal) => Promise<T>, done: (result: T) => void) {
+  const refresh = () => Promise.all([...(includeOffice ? [["office"]] : []), ["worklist"], ...relatedKeys].map(queryKey => queries.invalidateQueries({ queryKey })));
+  async function run<T>(operation: (signal: AbortSignal) => Promise<T>, done: (result: T) => void, refreshAfter = true) {
     if (inFlight.current) return;
     inFlight.current = true;
     setBusy(true);
@@ -83,11 +87,11 @@ export function useOfficeOperation(relatedKeys: readonly QueryKey[] = []) {
       const result = await abortable(operation);
       // Apply the result before refreshes can unmount a deleted or filtered record.
       done(result);
-      await refresh();
+      if (refreshAfter) await refresh();
     } catch (failure) {
       if (!isAbortError(failure)) {
         setError(readApiError(failure));
-        void refresh();
+        if (refreshAfter) void refresh();
       }
     } finally { inFlight.current = false; setBusy(false); }
   }

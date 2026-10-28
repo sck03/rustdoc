@@ -140,7 +140,7 @@ export function PersonnelClearancePanel({ client, user, record }: { client: Expo
   if (query.isError) return <PageState tone="error" title="交接核对失败" description={readApiError(query.error)} action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新核对</button>} />;
   const data = query.data;
   return <div className="personnel-clearance">
-    {(data.isCompanyExecutive || (data.reportingCount ?? 0) > 0) && <InlineNotice tone="warning">{data.isCompanyExecutive && "该人员仍是公司执行负责人。"}仍有 {data.reportingCount ?? 0} 位人员向其直属或职能汇报；离职、停用或解除账号绑定前须先交接。</InlineNotice>}
+    {(data.isCompanyExecutive || (data.reportingCount ?? 0) > 0) && <InlineNotice tone="warning">{data.isCompanyExecutive && "该人员仍是公司领导审批负责人。"}仍有 {data.reportingCount ?? 0} 位人员向其直属或职能汇报；离职、停用或解除账号绑定前须先交接。</InlineNotice>}
     {[
       { names: data.managedDepartments.map(department => department.name), title: "离职前需调整部门负责人", href: "/system/organization", label: "前往组织架构" },
       { names: data.handlingServices ?? [], title: "需移交印章、证明或物品保管职责", href: "/office/approval-settings", label: "前往办理分工设置" },

@@ -74,6 +74,12 @@ pub(in crate::engine) fn upload(
         return Err(invalid("该操作不能上传附件。"));
     }
     let (name, media_type) = media::document_type(file_name, bytes)?;
+    let purpose = match text(body, "purpose").as_str() {
+        "" | "Voucher" => "Voucher",
+        "ReimbursementForm" => "ReimbursementForm",
+        "Supporting" => "Supporting",
+        _ => return Err(invalid("附件用途无效。")),
+    };
     let digest = media::digest(bytes);
     service.store.transaction(|tx| {
         let (actor,row)=current(tx,actor,meta,records::id(parameters)?)?;
@@ -87,7 +93,16 @@ pub(in crate::engine) fn upload(
         store::check_version(&row,store::expected(body))?;
         let size: u64=existing.iter().map(|v| v["sizeBytes"].as_u64().unwrap_or(0)).sum();
         if count>=20 || size+bytes.len() as u64>50*1024*1024 { return Err(invalid("每份记录最多 20 个附件、合计 50 MiB。")); }
-        let record=store::save_in_scope(tx,kind,0,json!({"requestId":row["id"],"fileName":name,"mediaType":media_type,"sizeBytes":bytes.len(),"digest":digest}),Some(format!("{}:{digest}",row["id"])),&actor,"upload",Some(&row))?;
+        let identity = format!("{}:{digest}",row["id"]);
+        if !announcement(meta) && let Some(mut retained) = tx.find_identity(kind,&identity)? {
+            if retained["requestId"] != 0 || retained["sourceRequestId"] != row["id"] || retained["fileName"] != name { return Err(conflict("同一原始文件已有历史引用，请保留原文件名。")); }
+            retained["requestId"] = row["id"].clone();
+            retained["purpose"] = json!(purpose);
+            let id = records::positive(&retained,"id","附件")?;
+            store::save_in_scope(tx,kind,id,retained,Some(identity),&actor,"reattach",Some(&row))?;
+            return save(tx,&actor,meta,row,"upload",&name);
+        }
+        let record=store::save_in_scope(tx,kind,0,json!({"requestId":row["id"],"sourceRequestId":row["id"],"fileName":name,"mediaType":media_type,"sizeBytes":bytes.len(),"digest":digest,"purpose":purpose}),Some(identity),&actor,"upload",Some(&row))?;
         tx.insert_blob(&BlobWrite {kind,record_id:records::positive(&record,"id","附件")?,file_name:&name,media_type,digest:&digest,content:bytes,created_at:&store::timestamp()})?;
         save(tx,&actor,meta,row,"upload",&name)
     })
@@ -106,7 +121,9 @@ fn attachment(
         .filter(|id| *id > 0)
         .ok_or_else(|| invalid("附件编号无效。"))?;
     let value = store::get(tx, attachment_kind(meta), id)?;
-    if value["requestId"] != row["id"] || value["companyScope"] != row["companyScope"] {
+    if (value["requestId"] != row["id"] && value["sourceRequestId"] != row["id"])
+        || value["companyScope"] != row["companyScope"]
+    {
         return Err(error(404, "文档附件不存在。"));
     }
     Ok(value)
@@ -124,9 +141,27 @@ pub(super) fn remove(
     let value = attachment(tx, meta, &row, parameters)?;
     required(body, "note", "删除原因", 500)?;
     let id = records::positive(&value, "id", "附件")?;
-    tx.delete_blobs(id)?;
-    if !tx.delete(attachment_kind(meta), id, store::expected(&value))? {
-        return Err(conflict("附件已被其他人修改。"));
+    if value["requestId"] != row["id"] {
+        return Err(conflict("附件已从当前草稿移除。"));
+    }
+    if !announcement(meta) && value["retained"] == true {
+        let mut retained = value.clone();
+        retained["requestId"] = json!(0);
+        store::save_in_scope(
+            tx,
+            attachment_kind(meta),
+            id,
+            retained,
+            Some(format!("{}:{}", row["id"], text(&value, "digest"))),
+            actor,
+            "detach-retained",
+            Some(&row),
+        )?;
+    } else {
+        tx.delete_blobs(id)?;
+        if !tx.delete(attachment_kind(meta), id, store::expected(&value))? {
+            return Err(conflict("附件已被其他人修改。"));
+        }
     }
     save(
         tx,

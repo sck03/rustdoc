@@ -20,7 +20,7 @@ pub(in crate::engine) fn validate_account(
     let current = || {
         auth::current_actor_in(tx, id, actor.edition).map_err(|e| {
             if matches!(e.status, Some(403 | 404)) {
-                conflict("账号仍承担审批或公司执行负责人职责，请先移交、更新规则后再调整权限。")
+                conflict("账号仍承担审批或公司领导审批负责人职责，请先移交、更新规则后再调整权限。")
             } else {
                 e
             }
@@ -28,7 +28,7 @@ pub(in crate::engine) fn validate_account(
     };
     if executive && !auth::is_company_approver(&current()?) {
         return Err(conflict(
-            "权限调整会使公司执行负责人失去公司审批职责，请先交接。",
+            "权限调整会使公司领导审批负责人失去公司审批职责，请先交接。",
         ));
     }
     if rules.iter().any(|r| r.account_ids().contains(&id)) {
@@ -45,7 +45,7 @@ pub(in crate::engine) fn validate_account(
                 .min(auth::scope_rank(&reviewer, resource, "approve"));
             if rank < 2 {
                 return Err(conflict(
-                    "权限调整会使公司执行负责人或指定审批规则失效，请先交接职责或更新规则。",
+                    "权限调整会使公司领导审批负责人或指定审批规则失效，请先交接职责或更新规则。",
                 ));
             }
         }

@@ -3,7 +3,7 @@ import type { ApprovalAccount } from "./useApprovalSettings.ts";
 import { OfficeField } from "../office/OfficeUi.tsx";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 
-const sources: Record<OaApprovalStage["source"], string> = { Named: "指定人员会签", DepartmentManager: "任职部门负责人", LineManager: "直属负责人", FunctionalManagers: "职能负责人会签", CompanyExecutive: "公司执行负责人（CEO）" };
+const sources: Record<OaApprovalStage["source"], string> = { Named: "指定人员会签", DepartmentManager: "任职部门负责人", LineManager: "直属负责人", FunctionalManagers: "职能负责人会签", CompanyExecutive: "公司领导审批负责人" };
 export const initialStage = (): OaApprovalStage => ({ source: "DepartmentManager", approverUserIds: [] });
 
 export function ApprovalStagesEditor({ stages, accounts, onChange }: { stages: OaApprovalStage[]; accounts: ApprovalAccount[]; onChange: (stages: OaApprovalStage[]) => void }) {

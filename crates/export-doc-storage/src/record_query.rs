@@ -97,6 +97,43 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
             bind(status.into(), "TEXT")
         );
     }
+    if let Some((start, end)) = q.period {
+        let nested = |kind: &str, field: &str| {
+            if postgres {
+                format!("r.body->'{kind}'->>'{field}'")
+            } else {
+                format!("json_extract(r.body,'$.{kind}.{field}')")
+            }
+        };
+        let (first, last) = (bind(start.into(), "TEXT"), bind(end.into(), "TEXT"));
+        match q.kind {
+            "oa-leave" | "oa-travel" => {
+                let kind = q.kind.trim_start_matches("oa-");
+                filter += &format!(
+                    " AND {}<={last} AND {}>={first}",
+                    nested(kind, "startsOn"),
+                    nested(kind, "endsOn")
+                );
+            }
+            "oa-overtime" => {
+                let instant = |value: String| {
+                    if postgres {
+                        format!("CAST({value} AS TIMESTAMPTZ)")
+                    } else {
+                        format!("julianday({value})")
+                    }
+                };
+                filter += &format!(
+                    " AND {}<{} AND {}>{}",
+                    instant(nested("overtime", "startsAt")),
+                    instant(last),
+                    instant(nested("overtime", "endsAt")),
+                    instant(first)
+                );
+            }
+            _ => filter += " AND FALSE",
+        }
+    }
     if let Some(key) = q.handling_key {
         filter += &format!(
             " AND {}={}",

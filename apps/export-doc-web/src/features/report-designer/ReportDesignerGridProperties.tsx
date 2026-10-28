@@ -86,6 +86,7 @@ export function GridBlockProperties({ block, fieldGroups, selectedCellId, select
       {tab === "table" ? <>
       <div className="new-report-property-grid">
         <label><span>表格名称（可选）</span><CommitTextField value={block.title ?? ""} onCommit={(title) => onCommit({ ...block, title })} /></label>
+        <label><input type="checkbox" checked={block.growToContent ?? false} onChange={event => onCommit({ ...block, growToContent: event.target.checked })} />按内容自动增高并续页（横排文字或字段，无跨行合并）</label>
         <label><span>快速版式</span><select value="" onChange={(event) => {
           if (!event.target.value) return;
           const next = applyGridPreset(block, event.target.value as "Blank" | "Form" | "Approval");

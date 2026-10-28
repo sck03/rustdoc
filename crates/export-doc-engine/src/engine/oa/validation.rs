@@ -123,6 +123,11 @@ pub(super) fn submission(tx: &Connection, row: &Value) -> Result<()> {
     } else {
         vec!["oa-leave", "oa-travel"]
     };
+    let (start, end) = match text(row, "kind").as_str() {
+        "overtime" => (text(row, "overtime.startsAt"), text(row, "overtime.endsAt")),
+        "leave" => (text(row, "leave.startsOn"), text(row, "leave.endsOn")),
+        _ => (text(row, "travel.startsOn"), text(row, "travel.endsOn")),
+    };
     for kind in kinds {
         for status in ["Pending", "Approved", "Completed"] {
             let mut offset = 0;
@@ -132,6 +137,7 @@ pub(super) fn submission(tx: &Connection, row: &Value) -> Result<()> {
                     kind,
                     company: row["companyScope"].as_str().unwrap_or(""),
                     employee: row["employeeId"].as_i64(),
+                    period: Some((&start, &end)),
                     status: Some(status),
                     offset,
                     limit: 100,

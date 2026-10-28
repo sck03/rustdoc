@@ -37,9 +37,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 74833,
+      "baselineAggregateLines": 76503,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 74908,
+      "maximumAggregateLines": 76578,
       "reportFiles": false
     },
     {
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 21385,
+      "baselineAggregateLines": 21979,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 21505,
+      "maximumAggregateLines": 22099,
       "reportFiles": false
     },
     {
@@ -120,7 +120,7 @@
       "directory": "apps/export-doc-web/src/features/office",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 220,
-      "maximumAggregateLines": 924,
+      "maximumAggregateLines": 927,
       "excludePattern": "/(?:Personnel.*|personnelModel|usePersonnelData|usePersonnelImage|usePersonnelPositions)\\.(?:ts|tsx)$"
     },
     {

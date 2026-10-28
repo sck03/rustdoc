@@ -1,7 +1,7 @@
 import type { ReportConditionalRule, ReportConditionMatch } from "./reportDesignerConditions.ts";
 export type { ReportConditionalRule } from "./reportDesignerConditions.ts";
 
-export type ReportDesignerReportType = "ExportDocument" | "PaymentVoucher";
+export type ReportDesignerReportType = "ExportDocument" | "PaymentVoucher" | "OaApproval";
 
 export type ReportDesignerSchema = {
   version: 2;
@@ -93,6 +93,7 @@ export type ReportRowColumn = {
 };
 
 export type ReportGridBlock = ReportBlockBase & {
+  growToContent?: boolean;
   type: "Grid";
   title?: string;
   columns: ReportGridColumn[];
@@ -286,6 +287,8 @@ export type ReportPageBreakBlock = ReportBlockBase & {
 };
 
 export type ReportTextStyle = {
+  color?: string;
+  backgroundColor?: string;
   fontSizePt?: number;
   bold?: boolean;
   align?: "Left" | "Center" | "Right";

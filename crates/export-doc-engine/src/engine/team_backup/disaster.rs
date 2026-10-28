@@ -157,6 +157,7 @@ pub(super) fn restore_package(
                 file: None,
                 managed_file: None,
                 publication: None,
+                archive: None,
                 destination: None,
                 directory: None,
                 detail: "恢复已暂存。请立即退出并重新打开程序，恢复前原数据会保存在恢复目录。"
