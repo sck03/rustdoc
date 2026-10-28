@@ -42,6 +42,7 @@ fn settings(service: &NativeService, token: &str, mut value: Value) -> Value {
     call(service, token, SAVE_OA_APPROVAL_SETTINGS, 0, Some(value)).unwrap()
 }
 pub fn exercise(service: &NativeService, root_admin: &str) {
+    let root_policy = call(service, root_admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
     let suffix = &nonce().unwrap()[..8];
     let company = format!("FLOW-{suffix}");
     let root = format!("ROOT-{suffix}");
@@ -452,10 +453,10 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
             .status,
         Some(403)
     );
-    // Company admins cannot access another company's workflow configuration.
+    // This company's edits leave the other company's existing policy unchanged.
     assert_eq!(
-        call(service, root_admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap()["versionNumber"],
-        0
+        call(service, root_admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap(),
+        root_policy
     );
     assert_eq!(policy["rules"][expense_rule]["mode"], "DepartmentChain");
     let mut root_department = departments[0].clone();
