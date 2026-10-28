@@ -56,9 +56,14 @@ export function recalculateInvoiceItem(item: ApiInvoiceItemDto, changedFields: s
 }
 
 type RowTotals = { amount: ExactDecimal; cartons: ExactDecimal; grossWeight: ExactDecimal; netWeight: ExactDecimal; purchase: ExactDecimal; quantity: ExactDecimal; refund: ExactDecimal; volume: ExactDecimal };
+const totalInputFields = ["totalPrice", "cartons", "gwTotal", "nwTotal", "purchaseTotal", "quantity", "taxRebateRate", "volume"] as const;
+export function haveInvoiceTotalsInputsChanged(previous: readonly ApiInvoiceItemDto[], next: readonly ApiInvoiceItemDto[]): boolean {
+  return previous.length !== next.length || previous.some((item, index) => item !== next[index]
+    && totalInputFields.some(field => numberValue(item[field]) !== numberValue(next[index][field])));
+}
 const rowTotals = new WeakMap<ApiInvoiceItemDto, { fields: number[]; totals: RowTotals }>();
 function itemTotals(item: ApiInvoiceItemDto): RowTotals {
-  const fields = [item.totalPrice, item.cartons, item.gwTotal, item.nwTotal, item.purchaseTotal, item.quantity, item.taxRebateRate, item.volume].map(value => numberValue(value));
+  const fields = totalInputFields.map(field => numberValue(item[field]));
   const cached = rowTotals.get(item);
   if (cached && fields.every((value, index) => value === cached.fields[index])) return cached.totals;
   const [amount, cartons, grossWeight, netWeight, purchase, quantity, rate, volume] = fields.map(decimal);

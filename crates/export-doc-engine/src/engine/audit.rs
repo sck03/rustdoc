@@ -3,9 +3,11 @@
 mod tests;
 #[allow(unused_imports)]
 use super::error::error;
+#[cfg(feature = "excel")]
+use super::error::unavailable;
 use super::{
     NativeService, auth,
-    error::{Result, invalid, unavailable},
+    error::{Result, invalid},
     records::text,
     store::Actor,
 };

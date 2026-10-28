@@ -217,17 +217,7 @@ fn number(value: &str) -> Result<Decimal, String> {
 }
 
 fn date(value: &str) -> Result<NaiveDate, String> {
-    if !value.bytes().enumerate().all(|(index, byte)| {
-        if index == 4 || index == 7 {
-            byte == b'-'
-        } else {
-            byte.is_ascii_digit()
-        }
-    }) || !crate::invoice::valid_date(value)
-    {
-        return Err("日期须为有效的 YYYY-MM-DD。".into());
-    }
-    NaiveDate::parse_from_str(value, "%Y-%m-%d").map_err(|_| "日期须为有效的 YYYY-MM-DD。".into())
+    crate::business_date::parse(value)
 }
 fn is_false(value: &bool) -> bool {
     !value

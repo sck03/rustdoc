@@ -43,6 +43,7 @@ if ($Scope -in @('All', 'Engine', 'Workflows')) {
 }
 if ($Scope -in @('All', 'Engine')) {
     $databaseTargets += ,@('RECOVERY', 'native_recovery')
+    $databaseTargets += ,@('PUBLICATION', 'native_publication')
 }
 if ($Scope -eq 'Capacity') {
     $databaseTargets += ,@('CAPACITY_ONE', 'native_capacity_1')

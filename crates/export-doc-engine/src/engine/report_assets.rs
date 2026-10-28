@@ -19,6 +19,7 @@ use serde_json::{Value, json};
 
 const KIND: &str = "report-images";
 const MAX_RESOURCE: usize = 32 * 1024 * 1024;
+const MAX_SNAPSHOT_IMAGES: usize = 128 * 1024 * 1024;
 pub const OPERATIONS: &[Operation] = &[
     SAVE_SHIPPING_MARK_IMAGE,
     SAVE_INVOICE_SEAL_IMAGE,
@@ -94,6 +95,17 @@ fn read_entry(tx: &Connection, entry: &Value) -> Result<RasterImage> {
     let id = entry["id"]
         .as_i64()
         .ok_or_else(|| unavailable("图片资源记录损坏。"))?;
+    let info = tx
+        .blob_info(id, KIND)?
+        .ok_or_else(|| unavailable("图片资源内容缺失。"))?;
+    if info.size == 0
+        || info.size > MAX_RESOURCE as u64
+        || info.size != entry["byteLength"].as_u64().unwrap_or(0)
+        || info.digest != text(entry, "sha256")
+        || info.media_type != text(entry, "mediaType")
+    {
+        return Err(unavailable("图片资源元数据或容量无效。"));
+    }
     let blob = tx
         .blob(id, KIND)?
         .ok_or_else(|| unavailable("图片资源内容缺失。"))?;
@@ -415,11 +427,25 @@ pub fn hydrate(
 ) -> Result<()> {
     let _access = report_template_files::storage_lock(paths)?;
     let tx = store.connection()?;
+    hydrate_in(&tx, paths, actor, data, content)
+}
+pub(super) fn hydrate_in(
+    tx: &Connection,
+    paths: &crate::paths::RuntimePaths,
+    actor: &Actor,
+    data: &mut ReportData,
+    content: Option<&[u8]>,
+) -> Result<()> {
     if data.text("Invoice.ShippingMarksType") == "Image" {
         let reference = data.text("Invoice.ShippingMarksImage");
         let id = stored_id(&reference, "Files/ShippingMarks/")?;
-        data.images
-            .insert("Invoice.ShippingMarks".into(), read(&tx, actor, id, None)?);
+        if !data.images.contains_key("Invoice.ShippingMarks") {
+            insert_snapshot_image(
+                data,
+                "Invoice.ShippingMarks".into(),
+                read(tx, actor, id, None)?,
+            )?;
+        }
     }
     if data.root["ShowSeal"] == true {
         for (source, fallback, field) in [
@@ -441,16 +467,33 @@ pub fn hydrate(
             });
             if !path.is_empty() {
                 let id = stored_id(&path, "Files/Seals/")?;
-                data.images
-                    .insert(field.into(), read(&tx, actor, id, None)?);
+                if !data.images.contains_key(field) {
+                    insert_snapshot_image(data, field.into(), read(tx, actor, id, None)?)?;
+                }
             }
         }
     }
     if let Some(content) = content {
-        template_images(&tx, actor, content, Some(paths), |id, image| {
-            data.images.insert(id, image);
+        template_images(tx, actor, content, Some(paths), |id, entry| {
+            if !data.images.contains_key(&id) {
+                insert_snapshot_image(data, id, read_entry(tx, entry)?)?;
+            }
+            Ok(())
         })?;
     }
+    Ok(())
+}
+fn insert_snapshot_image(data: &mut ReportData, key: String, image: RasterImage) -> Result<()> {
+    let retained = data
+        .images
+        .values()
+        .map(|image| image.bytes.len())
+        .sum::<usize>();
+    let replaced = data.images.get(&key).map_or(0, |image| image.bytes.len());
+    if retained - replaced + image.bytes.len() > MAX_SNAPSHOT_IMAGES {
+        return Err(error(429, "报表图片快照超过 128 MiB，请减少模板或图片。"));
+    }
+    data.images.insert(key, image);
     Ok(())
 }
 pub fn validate_template(
@@ -459,7 +502,9 @@ pub fn validate_template(
     content: &str,
     paths: Option<&crate::paths::RuntimePaths>,
 ) -> Result<()> {
-    template_images(tx, actor, content.as_bytes(), paths, |_, _| {})
+    template_images(tx, actor, content.as_bytes(), paths, |_, entry| {
+        read_entry(tx, entry).map(|_| ())
+    })
 }
 
 fn template_images(
@@ -467,7 +512,7 @@ fn template_images(
     actor: &Actor,
     content: &[u8],
     paths: Option<&crate::paths::RuntimePaths>,
-    mut consume: impl FnMut(String, RasterImage),
+    mut consume: impl FnMut(String, &Value) -> Result<()>,
 ) -> Result<()> {
     let schema = schema_bytes(content)?;
     let mut references = None;
@@ -483,14 +528,13 @@ fn template_images(
                 return Err(error(403, "没有读取此图片的权限。"));
             }
         }
-        let image = read_entry(tx, &entry)?;
-        if resource["sha256"] != media::digest(&image.bytes)
-            || resource["byteLength"].as_u64() != Some(image.bytes.len() as u64)
-            || resource["mediaType"] != image.media_type
+        if resource["sha256"] != entry["sha256"]
+            || resource["byteLength"] != entry["byteLength"]
+            || resource["mediaType"] != entry["mediaType"]
         {
             return Err(invalid("模板图片清单与受控资源不一致。"));
         }
-        consume(id, image);
+        consume(id, &entry)?;
     }
     Ok(())
 }

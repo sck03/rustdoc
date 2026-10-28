@@ -2,9 +2,11 @@
 #[path = "../../../tests/ReportTemplateFixtures/designer_fixture.rs"]
 mod fixture;
 
+#[path = "support/native_fixture.rs"]
+#[allow(dead_code)]
+mod native_fixture;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use export_doc_engine::{
-    api::ApiClient,
     contracts,
     designer::{Design, field_catalog},
     generated_api::*,
@@ -13,6 +15,7 @@ use export_doc_engine::{
     template,
 };
 use export_doc_report::Builtin;
+use native_fixture::ApiClient;
 #[path = "support/jobs.rs"]
 pub mod jobs;
 use serde_json::{Value, json};

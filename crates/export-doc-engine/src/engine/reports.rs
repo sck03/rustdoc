@@ -6,16 +6,17 @@ use super::{
     error::{Result, conflict, error, invalid, unavailable, unsupported},
     records::text,
     report_assets,
-    store::{Actor, Store},
+    store::{Actor, Connection, Store},
 };
 use crate::{contracts, designer::Design, generated_api::*, invoice::InvoiceDraft, paths};
 use export_doc_report::{self as render, Builtin, Document, ReportData};
 use serde_json::{Value, json};
 use std::{path::PathBuf, sync::atomic::AtomicBool};
 mod jobs;
-pub(super) use jobs::invoice_document;
 pub(in crate::engine) mod page_preview;
+mod preparation;
 mod samples;
+pub(super) use preparation::{prepare_batch, publication_check};
 
 pub const OPERATIONS: &[Operation] = &[
     LIST_REPORT_TEMPLATES,
@@ -110,6 +111,23 @@ fn template(
     kind: &str,
     for_output: bool,
 ) -> Result<Template> {
+    template_in(
+        &*store.connection()?,
+        paths,
+        actor,
+        reference,
+        kind,
+        for_output,
+    )
+}
+fn template_in(
+    tx: &Connection,
+    paths: &crate::paths::RuntimePaths,
+    actor: &Actor,
+    reference: &str,
+    kind: &str,
+    for_output: bool,
+) -> Result<Template> {
     super::report_templates::demand_type(actor, kind)?;
     let reference = if reference.is_empty() {
         default_path(kind)
@@ -133,7 +151,7 @@ fn template(
             .ok()
             .filter(|id| *id > 0)
             .ok_or_else(|| invalid("模板编号无效。"))?;
-        let saved = store.get("report-templates", id)?;
+        let saved = super::store::get(tx, "report-templates", id)?;
         let visible = if for_output {
             auth::template_visible(actor, super::report_templates::policy::CATALOG, &saved)
         } else {
@@ -193,7 +211,10 @@ fn catalog(
     Ok(json!(rows))
 }
 fn subject(store: &Store, actor: &Actor, kind: &str, id: i64, action: &str) -> Result<Value> {
-    let record = store.get(kind, id)?;
+    subject_in(&*store.connection()?, actor, kind, id, action)
+}
+fn subject_in(tx: &Connection, actor: &Actor, kind: &str, id: i64, action: &str) -> Result<Value> {
+    let record = super::store::get(tx, kind, id)?;
     let (permission, output) = if kind == "payments" {
         ("document.payments", "document.payment-output")
     } else {
@@ -207,10 +228,13 @@ fn subject(store: &Store, actor: &Actor, kind: &str, id: i64, action: &str) -> R
     Ok(record)
 }
 fn party(store: &Store, actor: &Actor, kind: &str, id: Option<i64>) -> Result<Value> {
+    party_in(&*store.connection()?, actor, kind, id)
+}
+fn party_in(tx: &Connection, actor: &Actor, kind: &str, id: Option<i64>) -> Result<Value> {
     let Some(id) = id.filter(|v| *v > 0) else {
         return Ok(json!({}));
     };
-    let value = store.connection()?.get(kind, id)?;
+    let value = tx.get(kind, id)?;
     let Some(value) = value else {
         return Err(unavailable("单据关联的往来单位不存在。"));
     };
@@ -327,15 +351,18 @@ fn prepare_preview(
         )?;
         (data, template)
     } else {
-        prepare(
+        prepare_batch(
             &service.store,
             &service.paths,
             actor,
             id,
-            body,
+            std::slice::from_ref(body),
             payment,
             "preview",
         )?
+        .pop()
+        .ok_or_else(|| unavailable("没有可预览的报表。"))?
+        .into_parts()
     };
     // The source and selected template retain their usual access checks. Only
     // template designers may render an unsaved layout over that source.
@@ -362,40 +389,6 @@ fn prepare_preview(
     }
     Ok((data, template, metadata))
 }
-fn prepare(
-    store: &Store,
-    paths: &crate::paths::RuntimePaths,
-    actor: &Actor,
-    id: i64,
-    body: &Value,
-    payment: bool,
-    action: &str,
-) -> Result<(ReportData, Template)> {
-    let kind = if payment {
-        "PaymentVoucher"
-    } else {
-        report_type(&text(body, "reportType"))?
-    };
-    if !payment && kind != "ExportDocument" {
-        return Err(invalid("发票只能使用出口单据模板。"));
-    }
-    let source = subject(
-        store,
-        actor,
-        if payment { "payments" } else { "invoices" },
-        id,
-        action,
-    )?;
-    let mut data = if payment {
-        payment_data(store, actor, source)?
-    } else {
-        invoice_data(store, actor, source, body["withSeal"] == true)?
-    };
-    let template = template(store, paths, actor, &text(body, "templatePath"), kind, true)?;
-    report_assets::hydrate(store, paths, actor, &mut data, Some(template.content()))?;
-    Ok((data, template))
-}
-
 pub fn handle(
     service: &NativeService,
     actor: &Actor,

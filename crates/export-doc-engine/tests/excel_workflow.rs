@@ -1,11 +1,14 @@
 #![cfg(feature = "excel")]
+#[path = "support/native_fixture.rs"]
+#[allow(dead_code)]
+mod native_fixture;
 use export_doc_engine::{
-    api::ApiClient,
     contracts,
     generated_api::*,
     invoice::InvoiceDraft,
     paths::{RuntimePaths, nonce},
 };
+use native_fixture::ApiClient;
 use serde_json::{Value, json};
 #[path = "support/jobs.rs"]
 pub mod jobs;

@@ -19,4 +19,4 @@ pub use data::{RasterImage, ReportData, chinese_money, english_money};
 pub use document::{Document, Page, pdf_document};
 pub use error::{Error, ErrorKind, Result};
 pub use fonts::{FontScope, Fonts};
-pub use layout::{field_value, pages, pdf, render_design};
+pub use layout::{pages, render_design};

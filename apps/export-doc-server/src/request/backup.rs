@@ -42,14 +42,21 @@ pub(super) async fn receive(mut body: Body, root: &Path) -> Result<fs::File, Api
         .map_err(|_| error(503, "上传暂存任务中断。"))??;
     let mut file = tokio::fs::File::from_std(file);
     let mut size = 0_u64;
-    while let Some(frame) = poll_fn(|context| Pin::new(&mut body).poll_frame(context)).await {
+    while let Some(frame) = tokio::time::timeout(
+        std::time::Duration::from_secs(60),
+        poll_fn(|context| Pin::new(&mut body).poll_frame(context)),
+    )
+    .await
+    .map_err(|_| error(504, "备份上传读取空闲超过 60 秒。"))?
+    {
         let frame = frame.map_err(|_| error(400, "上传内容读取失败。"))?;
         if let Ok(bytes) = frame.into_data() {
             size = size
                 .checked_add(bytes.len() as u64)
                 .ok_or_else(|| error(413, "备份文件大小无效或超出可表示范围。"))?;
-            file.write_all(&bytes)
+            tokio::time::timeout(std::time::Duration::from_secs(60), file.write_all(&bytes))
                 .await
+                .map_err(|_| error(504, "备份上传写入空闲超过 60 秒。"))?
                 .map_err(|_| error(503, "上传暂存空间不可用。"))?;
         }
     }

@@ -19,23 +19,25 @@ pub(super) fn error(status: u16, message: &str) -> ApiError {
     }
 }
 
-struct Cancellation(OperationScope);
+struct Cancellation {
+    scope: OperationScope,
+    _registration: crate::shutdown::Registration,
+}
 impl Drop for Cancellation {
     fn drop(&mut self) {
-        self.0.cancel();
+        self.scope.cancel();
     }
 }
 
 pub async fn handle(state: ServerState, operation: Operation, request: Request) -> Response<Body> {
     let mut span = state.telemetry.start(operation.id);
     let request_id = span.id().to_owned();
-    let mut response = match tokio::time::timeout(
-        Duration::from_secs(request_seconds(operation) + 5),
-        execute(state.clone(), operation, request),
-    )
-    .await
-    .unwrap_or_else(|_| Err(error(504, "请求读取或处理超过时限。")))
-    {
+    let result = tokio::select! {
+        result = tokio::time::timeout(Duration::from_secs(request_seconds(operation) + 5), execute(state.clone(), operation, request)) =>
+            result.unwrap_or_else(|_| Err(error(504, "请求读取或处理超过时限。"))),
+        _ = state.shutdown.wait() => Err(error(503, "服务正在关闭，已取消请求。")),
+    };
+    let mut response = match result {
         Ok(mut reply) => {
             if operation == GET_RUNTIME_METRICS {
                 match serde_json::from_slice::<Value>(&reply.bytes) {
@@ -105,6 +107,7 @@ async fn execute(
         None
     };
     let scope = OperationScope::new(Duration::from_secs(request_seconds(operation)));
+    let registration = state.shutdown.register(scope.clone())?;
     let processing = if body::needs_processing_slot(operation) && !body::backup_upload(operation) {
         Some(
             state
@@ -136,7 +139,10 @@ async fn execute(
     } else {
         None
     };
-    let _cancel = Cancellation(scope.clone());
+    let _cancel = Cancellation {
+        scope: scope.clone(),
+        _registration: registration.clone(),
+    };
     let (mut parts, body) = request.into_parts();
     let cookie_binding = crate::downloads::binding(&parts.headers);
     let secure_cookie = parts.uri.scheme_str() == Some("https")
@@ -190,6 +196,22 @@ async fn execute(
             .collect();
     if query.len() > 64 {
         return Err(error(400, "查询参数过多。"));
+    }
+    if operation.requires_authentication
+        && !body::backup_upload(operation)
+        && contracts::contract()["operations"][operation.id]["requestBody"].is_object()
+    {
+        let service = state.service.clone();
+        let authentication_token = token.clone();
+        let authentication_scope = scope.clone();
+        let authentication_registration = registration.clone();
+        tokio::task::spawn_blocking(move || {
+            let _registration = authentication_registration;
+            authentication_scope
+                .run_result(|| service.session_actor(&authentication_token).map(|_| ()))
+        })
+        .await
+        .map_err(|_| error(503, "上传会话验证中断。"))??;
     }
     let mut backup_upload = None;
     let parsed = if body::backup_upload(operation) {
@@ -259,6 +281,7 @@ async fn execute(
         merge_uploads,
     } = parsed;
     let worker = tokio::task::spawn_blocking(move || {
+        let _registration = registration;
         let _permit = permit;
         let _processing = processing;
         scope

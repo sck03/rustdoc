@@ -63,7 +63,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             render_builtin(template, data, &cancelled)?
         };
         let name = format!("builtin-{}", index + 1);
-        std::fs::write(output.join(format!("{name}.html")), document.html(&fonts)?)?;
+        std::fs::write(
+            output.join(format!("{name}.html")),
+            document.html(&fonts, &std::sync::atomic::AtomicBool::new(false))?,
+        )?;
         std::fs::write(
             output.join(format!("{name}.pdf")),
             pdf_document(&document, &fonts, &cancelled)?,

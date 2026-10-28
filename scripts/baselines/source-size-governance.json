@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-10-27",
+  "updatedAt": "2026-10-28",
   "rules": [
     {
       "name": "repository web production default",
@@ -9,9 +9,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 87494,
+      "baselineAggregateLines": 87541,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 87694,
+      "maximumAggregateLines": 87741,
       "reportFiles": false
     },
     {
@@ -23,9 +23,9 @@
       ],
       "filePattern": "^.+\\.rs$",
       "maximumLines": 1000,
-      "baselineAggregateLines": 10013,
+      "baselineAggregateLines": 9942,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 10088,
+      "maximumAggregateLines": 10017,
       "reportFiles": false
     },
     {
@@ -37,9 +37,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 73568,
+      "baselineAggregateLines": 74833,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 73643,
+      "maximumAggregateLines": 74908,
       "reportFiles": false
     },
     {
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 20420,
+      "baselineAggregateLines": 21385,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 20540,
+      "maximumAggregateLines": 21505,
       "reportFiles": false
     },
     {
@@ -66,9 +66,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 43013,
+      "baselineAggregateLines": 38198,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 43163,
+      "maximumAggregateLines": 38348,
       "reportFiles": false
     },
     {
@@ -81,9 +81,9 @@
       "filePattern": "^(?:.+\\.(?:mjs|ps1|cmd|yml|yaml|sh)|Dockerfile)$",
       "relativePathPattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)|deploy/rust-native/[^/]+|\\.github/workflows/rust-native-validation\\.yml)$",
       "maximumLines": 350,
-      "baselineAggregateLines": 2252,
+      "baselineAggregateLines": 2288,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 2327,
+      "maximumAggregateLines": 2363,
       "reportFiles": false
     },
     {
@@ -92,9 +92,9 @@
       "filePattern": "^.+\\.(?:yml|yaml)$",
       "excludePattern": "^\\.github/workflows/rust-native-validation\\.yml$",
       "maximumLines": 800,
-      "baselineAggregateLines": 2776,
+      "baselineAggregateLines": 815,
       "maximumAggregateGrowthLines": 20,
-      "maximumAggregateLines": 2796,
+      "maximumAggregateLines": 835,
       "reportFiles": false
     },
     {
@@ -102,18 +102,18 @@
       "directory": "apps/export-doc-web/src/features/attachments",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 120,
-      "baselineAggregateLines": 465,
+      "baselineAggregateLines": 503,
       "maximumAggregateGrowthLines": 40,
-      "maximumAggregateLines": 505
+      "maximumAggregateLines": 543
     },
     {
       "name": "worklist workspace",
       "directory": "apps/export-doc-web/src/features/worklist",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 100,
-      "baselineAggregateLines": 94,
+      "baselineAggregateLines": 95,
       "maximumAggregateGrowthLines": 30,
-      "maximumAggregateLines": 124
+      "maximumAggregateLines": 125
     },
     {
       "name": "office workspace components",
@@ -141,9 +141,9 @@
       "directory": "apps/export-doc-web/src/features/jobs",
       "filePattern": "^(?:JobCenterPage|JobCreationPanels|InvoiceReportSelection|JobTable|jobPresentation|useJobCenterOperations|useJobPermissions)\\.(?:tsx|ts)$",
       "maximumLines": 320,
-      "maximumAggregateLines": 941,
+      "maximumAggregateLines": 919,
       "maximumAggregateGrowthLines": 50,
-      "baselineAggregateLines": 891
+      "baselineAggregateLines": 869
     },
     {
       "name": "Tauri desktop command modules",
@@ -287,9 +287,9 @@
       "directory": "apps/export-doc-web/src/features/report-designer",
       "filePattern": "^(?:ReportDesignerV3(?:Workspace|Canvas|FlowProperties)|ReportDesignerCanvas(?:Element|TextEditor)|reportDesignerBlockRenderer|reportDesignerV3(?:ElementFactories|History|HtmlExporter|Migration|Mutations|Regions|Resize|Schema|TemplateParser|Validation|WorkspaceHelpers))\\.(?:tsx|ts)$",
       "maximumLines": 720,
-      "baselineAggregateLines": 5086,
+      "baselineAggregateLines": 4197,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 5286
+      "maximumAggregateLines": 4397
     },
     {
       "name": "themed stylesheet modules",

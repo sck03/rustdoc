@@ -6,6 +6,8 @@ mod download_body;
 mod downloads;
 mod request;
 mod response;
+mod shutdown;
+pub use shutdown::{Shutdown, serve};
 mod telemetry;
 const MAX_REQUESTS: usize = 16;
 const MAX_QUEUED_REQUESTS: usize = 16;
@@ -34,9 +36,17 @@ pub struct ServerState {
     processing: Arc<Semaphore>,
     tickets: Arc<downloads::Tickets>,
     desktop_token: Option<Arc<str>>,
+    shutdown: Shutdown,
 }
 
 pub fn router(service: Arc<NativeService>, web_root: Option<&Path>) -> Router {
+    router_with_shutdown(service, web_root).0
+}
+
+pub fn router_with_shutdown(
+    service: Arc<NativeService>,
+    web_root: Option<&Path>,
+) -> (Router, Shutdown) {
     compose_router(service, web_root, None)
 }
 
@@ -44,8 +54,9 @@ fn compose_router(
     service: Arc<NativeService>,
     web_root: Option<&Path>,
     desktop_token: Option<Arc<str>>,
-) -> Router {
+) -> (Router, Shutdown) {
     let telemetry = Arc::new(telemetry::Telemetry::new(service.paths.log_root.clone()));
+    let shutdown = Shutdown::default();
     let state = ServerState {
         telemetry,
         service,
@@ -59,6 +70,7 @@ fn compose_router(
         processing: Arc::new(Semaphore::new(MAX_PROCESSING)),
         tickets: Arc::default(),
         desktop_token,
+        shutdown: shutdown.clone(),
     };
     let mut router = Router::new().route(
         "/openapi/v1.json",
@@ -100,5 +112,5 @@ fn compose_router(
             ServeDir::new(root).not_found_service(ServeFile::new(root.join("index.html"))),
         );
     }
-    router.with_state(state)
+    (router.with_state(state), shutdown)
 }

@@ -10,7 +10,114 @@ use std::{
     path::PathBuf,
     time::Duration,
 };
+use std::{
+    pin::Pin,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    task::{Context, Poll},
+};
 use tower::ServiceExt;
+struct PendingUpload {
+    polled: Arc<AtomicBool>,
+    dropped: Arc<AtomicBool>,
+}
+impl tokio::io::AsyncRead for PendingUpload {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _: &mut Context<'_>,
+        _: &mut tokio::io::ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        self.polled.store(true, Ordering::Release);
+        Poll::Pending
+    }
+}
+impl Drop for PendingUpload {
+    fn drop(&mut self) {
+        self.dropped.store(true, Ordering::Release);
+    }
+}
+
+#[tokio::test]
+async fn invalid_sessions_do_not_read_uploads_and_shutdown_cancels_an_open_body() {
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_owned();
+    let root = workspace
+        .join(".codex-runtime/http-upload-shutdown-tests")
+        .join(nonce().unwrap());
+    let service = NativeService::open(RuntimePaths::server(&workspace, &root).unwrap()).unwrap();
+    let (app, control) = export_doc_server::router_with_shutdown(service.clone(), None);
+    let make = |token: &str, polled: Arc<AtomicBool>, dropped: Arc<AtomicBool>| {
+        Request::builder()
+            .method("POST")
+            .uri(PREVIEW_CRM_CUSTOMER_IMPORT.path)
+            .header("authorization", format!("Bearer {token}"))
+            .header("content-type", "application/octet-stream")
+            .body(Body::from_stream(tokio_util::io::ReaderStream::new(
+                PendingUpload { polled, dropped },
+            )))
+            .unwrap()
+    };
+    let polled = Arc::new(AtomicBool::new(false));
+    let dropped = Arc::new(AtomicBool::new(false));
+    let response = tokio::time::timeout(
+        Duration::from_secs(2),
+        app.clone()
+            .oneshot(make("invalid-session", polled.clone(), dropped.clone())),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(response.status().as_u16(), 401);
+    assert!(!polled.load(Ordering::Acquire));
+    assert!(dropped.load(Ordering::Acquire));
+    let login: serde_json::Value = serde_json::from_slice(
+        &service
+            .dispatch(
+                LOGIN,
+                &[],
+                &[],
+                Some(serde_json::json!({"username":"admin","password":""})),
+                "",
+            )
+            .unwrap(),
+    )
+    .unwrap();
+    let polled = Arc::new(AtomicBool::new(false));
+    let dropped = Arc::new(AtomicBool::new(false));
+    let request = make(
+        login["accessToken"].as_str().unwrap(),
+        polled.clone(),
+        dropped.clone(),
+    );
+    let pending = tokio::spawn(async move { app.oneshot(request).await.unwrap() });
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while !polled.load(Ordering::Acquire) {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    control.stop();
+    assert_eq!(
+        tokio::time::timeout(Duration::from_secs(2), pending)
+            .await
+            .unwrap()
+            .unwrap()
+            .status()
+            .as_u16(),
+        503
+    );
+    assert!(dropped.load(Ordering::Acquire));
+    service.close().unwrap();
+    drop(service);
+    std::fs::remove_dir_all(root).unwrap();
+}
 
 // Leave the chunked body open: the server must reject the offending field
 // without waiting for a closing multipart boundary or the next body chunk.

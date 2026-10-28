@@ -22,16 +22,14 @@ fn normalized(value: &str) -> String {
     value.nfc().collect::<String>().trim().to_lowercase()
 }
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
-struct CalendarDate(String);
+struct CalendarDate(chrono::NaiveDate);
 fn date(value: Option<&str>) -> Result<Option<CalendarDate>, String> {
     value
         .filter(|v| !v.is_empty())
         .map(|v| {
-            if crate::invoice::valid_date(v) {
-                Ok(CalendarDate(v.into()))
-            } else {
-                Err("查询日期须为 YYYY-MM-DD。".into())
-            }
+            crate::business_date::parse(v)
+                .map(CalendarDate)
+                .map_err(|_| "查询日期须为 YYYY-MM-DD。".into())
         })
         .transpose()
 }

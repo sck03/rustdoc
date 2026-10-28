@@ -20,6 +20,7 @@ mod sqlite_layout;
 pub struct Store {
     pub(crate) edition: export_doc_domain::permissions::ProductEdition,
     pub(crate) data_root: std::path::PathBuf,
+    pub(crate) cache_root: std::path::PathBuf,
     connection: Pool,
     writes: Mutex<()>,
     write_waits: Metrics,
@@ -38,7 +39,7 @@ pub struct Actor {
     pub departments: Vec<String>,
     pub oa_assigned_only: bool,
     pub admin: bool,
-    pub grants: Vec<Value>,
+    pub grants: Vec<export_doc_domain::permissions::Grant>,
 }
 pub fn invoice_identity(company: &Value, number: &Value, data_type: &Value) -> Result<String> {
     Ok(serde_json::to_string(&[company, number, data_type])?)
@@ -53,6 +54,7 @@ impl Store {
         Ok(Self {
             edition: Default::default(),
             data_root: paths.data_root.clone(),
+            cache_root: paths.cache_root.clone(),
             connection: Pool::single(connection),
             writes: Mutex::new(()),
             write_waits: Default::default(),
@@ -118,6 +120,7 @@ impl Store {
         Ok(Self {
             edition: Default::default(),
             data_root: paths.data_root.clone(),
+            cache_root: paths.cache_root.clone(),
             connection: Pool::postgres(connection_string, options)?,
             writes: Mutex::new(()),
             write_waits: Default::default(),
@@ -219,30 +222,7 @@ impl Store {
         all(&*self.connection()?, kind)
     }
     pub fn catalog(&self, kind: &str) -> Result<Vec<Value>> {
-        self.read(|tx| {
-            let mut rows = Vec::new();
-            loop {
-                crate::operation::check()?;
-                let (total, page) = tx.query_generic(&export_doc_storage::GenericQuery {
-                    kind,
-                    scope: export_doc_storage::DataScope {
-                        all: true,
-                        ..Default::default()
-                    },
-                    filters: &[],
-                    keyword: "",
-                    search_root: None,
-                    fields: &[],
-                    offset: rows.len() as i64,
-                    limit: 200,
-                })?;
-                let empty = page.is_empty();
-                rows.extend(page);
-                if empty || rows.len() as i64 >= total {
-                    return Ok(rows);
-                }
-            }
-        })
+        self.read(|tx| matching(tx, kind, &[], &[]))
     }
     pub fn settings(&self, name: &str) -> Result<Option<Value>> {
         Ok(self.connection()?.settings(name)?)
@@ -263,7 +243,7 @@ pub fn get(connection: &Connection, kind: &str, id: i64) -> Result<Value> {
 pub fn all(connection: &Connection, kind: &str) -> Result<Vec<Value>> {
     Ok(connection.all(kind)?)
 }
-/// Small related sets are filtered and read in bounded pages inside the caller's snapshot.
+/// Related sets share one snapshot and use bounded keyset pages without repeated counts.
 pub fn matching(
     connection: &Connection,
     kind: &str,
@@ -271,26 +251,31 @@ pub fn matching(
     fields: &[(&str, &str)],
 ) -> Result<Vec<Value>> {
     let mut result = vec![];
+    let mut before_id = None;
     loop {
         crate::operation::check()?;
-        let (total, rows) = connection.query_generic(&export_doc_storage::GenericQuery {
-            kind,
-            scope: export_doc_storage::DataScope {
-                all: true,
-                ..Default::default()
+        let (cursor, rows) = connection.scan_generic(
+            &export_doc_storage::GenericQuery {
+                kind,
+                scope: export_doc_storage::DataScope {
+                    all: true,
+                    ..Default::default()
+                },
+                filters,
+                fields,
+                keyword: "",
+                search_root: None,
+                offset: 0,
+                limit: 200,
             },
-            filters,
-            fields,
-            keyword: "",
-            search_root: None,
-            offset: result.len() as i64,
-            limit: 200,
-        })?;
-        let empty = rows.is_empty();
+            before_id,
+        )?;
+        let complete = rows.len() < 200;
         result.extend(rows);
-        if empty || result.len() as i64 >= total {
+        if complete {
             return Ok(result);
         }
+        before_id = cursor;
     }
 }
 pub fn normalize(text: &str) -> String {

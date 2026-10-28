@@ -1,5 +1,5 @@
 use export_doc_engine::{engine::NativeService, paths::atomic_write};
-use export_doc_server::{configuration::Configuration, router};
+use export_doc_server::{configuration::Configuration, router_with_shutdown};
 use export_doc_storage::Connection;
 use std::{sync::Arc, time::Duration};
 mod deployment;
@@ -67,13 +67,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         retention,
         configuration.pool,
     )?;
-    let routes = router(service.clone(), configuration.web_root.as_deref());
+    let (routes, control) =
+        router_with_shutdown(service.clone(), configuration.web_root.as_deref());
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .max_blocking_threads(20)
         .enable_all()
         .build()?;
     let health = service.clone();
+    let closing = service.clone();
     let result = runtime.block_on(async move {
         let listener = tokio::net::TcpListener::bind(configuration.bind).await?;
         let address = listener.local_addr()?;
@@ -95,11 +97,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         });
-        let server = axum::serve(listener, routes).with_graceful_shutdown(async move {
+        let server = export_doc_server::serve(listener, routes, control, async move {
             tokio::select! {
                 _ = shutdown_signal() => {},
                 _ = stopping.changed() => eprintln!("数据库实例锁或连接失效，Rust API 正在停止。"),
             }
+            let _ = closing.request_shutdown();
         }).await;
         monitor.abort();
         let _ = monitor.await;

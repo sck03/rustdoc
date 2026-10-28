@@ -45,7 +45,7 @@ async fn desktop_http_preserves_original_login_and_rejects_untrusted_callers() {
     let authority = "127.0.0.1:51888";
     let secret = "isolated-test-desktop-capability";
     let origin = "http://tauri.localhost";
-    let app = desktop_router(fixture.service.clone(), secret, authority, false);
+    let (app, _) = desktop_router(fixture.service.clone(), secret, authority, false);
     for (host, origin, token, expected) in [
         (authority, origin, "", StatusCode::FORBIDDEN),
         (authority, origin, "wrong", StatusCode::FORBIDDEN),

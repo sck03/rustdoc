@@ -11,7 +11,7 @@ mod tests;
 
 use super::{
     error::{Result, error, unavailable},
-    store::{Actor, Store},
+    store::{Actor, Connection, Store},
 };
 use crate::{generated_api::*, operation::OperationScope};
 use serde_json::{Value, json};
@@ -35,6 +35,26 @@ pub struct TaskOutput {
     pub detail: String,
     pub destination: Option<std::path::PathBuf>,
     pub directory: Option<DirectoryOutput>,
+    pub publication: Option<PublicationCheck>,
+}
+pub struct PublicationCheck {
+    check: Box<dyn Fn(&Connection, &Actor) -> Result<()> + Send>,
+    _file_lock: Option<std::fs::File>,
+}
+impl PublicationCheck {
+    pub(crate) fn new(check: impl Fn(&Connection, &Actor) -> Result<()> + Send + 'static) -> Self {
+        Self {
+            check: Box::new(check),
+            _file_lock: None,
+        }
+    }
+    pub(crate) fn with_file_lock(mut self, file: std::fs::File) -> Self {
+        self._file_lock = Some(file);
+        self
+    }
+    pub(super) fn validate(&self, tx: &Connection, actor: &Actor) -> Result<()> {
+        (self.check)(tx, actor)
+    }
 }
 pub struct ManagedOutput {
     pub path: std::path::PathBuf,
@@ -54,6 +74,7 @@ impl TaskOutput {
             destination: None,
             directory: None,
             managed_file: Some(ManagedOutput { path, size, digest }),
+            publication: None,
         })
     }
     pub fn file(file_name: String, media_type: &str, content: Vec<u8>) -> Self {
@@ -67,7 +88,12 @@ impl TaskOutput {
             destination: None,
             directory: None,
             managed_file: None,
+            publication: None,
         }
+    }
+    pub(crate) fn check_on_publish(mut self, check: PublicationCheck) -> Self {
+        self.publication = Some(check);
+        self
     }
 }
 
@@ -78,6 +104,13 @@ struct Runtime {
     preparing_retries: usize,
     stopping: bool,
     failure: Option<String>,
+}
+struct TaskSpec<'a> {
+    operation: Operation,
+    kind: &'a str,
+    title: &'a str,
+    replay: Option<retry::Replay>,
+    timeout: Duration,
 }
 
 pub struct Jobs {
@@ -111,6 +144,7 @@ impl Jobs {
     }
     pub fn with_retention(store: Arc<Store>, retention: retention::Retention) -> Result<Self> {
         let retention = retention.validate()?;
+        output::recover(&store)?;
         persistence::recover(&store)?;
         retention::prune(&store, retention, chrono::Utc::now())?;
         Ok(Self {
@@ -135,47 +169,67 @@ impl Jobs {
     pub fn start(
         &self,
         actor: &Actor,
+        operation: Operation,
         kind: &str,
         title: &str,
         work: impl FnOnce(&AtomicBool) -> Result<TaskOutput> + Send + 'static,
     ) -> Result<Value> {
-        self.start_replayable(actor, kind, title, None, work)
+        self.start_replayable(actor, operation, kind, title, None, work)
     }
     pub(crate) fn start_replayable(
         &self,
         actor: &Actor,
+        operation: Operation,
         kind: &str,
         title: &str,
         replay: Option<retry::Replay>,
         work: impl FnOnce(&AtomicBool) -> Result<TaskOutput> + Send + 'static,
     ) -> Result<Value> {
-        self.start_task(actor, kind, title, replay, Duration::from_secs(180), work)
+        self.start_task(
+            actor,
+            TaskSpec {
+                operation,
+                kind,
+                title,
+                replay,
+                timeout: Duration::from_secs(180),
+            },
+            work,
+        )
     }
     pub(crate) fn start_backup(
         &self,
         actor: &Actor,
+        operation: Operation,
         kind: &str,
         title: &str,
         work: impl FnOnce(&AtomicBool) -> Result<TaskOutput> + Send + 'static,
     ) -> Result<Value> {
         self.start_task(
             actor,
-            kind,
-            title,
-            None,
-            Duration::from_secs(super::backup_io::TIMEOUT_SECONDS),
+            TaskSpec {
+                operation,
+                kind,
+                title,
+                replay: None,
+                timeout: Duration::from_secs(super::backup_io::TIMEOUT_SECONDS),
+            },
             work,
         )
     }
     fn start_task(
         &self,
         actor: &Actor,
-        kind: &str,
-        title: &str,
-        replay: Option<retry::Replay>,
-        timeout: Duration,
+        spec: TaskSpec<'_>,
         work: impl FnOnce(&AtomicBool) -> Result<TaskOutput> + Send + 'static,
     ) -> Result<Value> {
+        let TaskSpec {
+            operation,
+            kind,
+            title,
+            replay,
+            timeout,
+        } = spec;
         self.health()?;
         let mut runtime = self
             .runtime
@@ -195,8 +249,14 @@ impl Jobs {
                 .join()
                 .map_err(|_| unavailable("文件任务异常退出。"))?;
         }
-        let snapshot =
-            persistence::create_replayable(&self.store, actor, kind, title, replay.as_ref())?;
+        let snapshot = persistence::create_replayable(
+            &self.store,
+            actor,
+            operation,
+            kind,
+            title,
+            replay.as_ref(),
+        )?;
         let job_id = snapshot["jobId"]
             .as_str()
             .ok_or_else(|| unavailable("任务编号缺失。"))?
@@ -218,9 +278,10 @@ impl Jobs {
                 .unwrap_or_else(|_| Err(unavailable("文件处理异常终止，未发布输出。")));
                 // Persist terminal state outside the canceled execution scope.
                 let finished =
-                    persistence::finish(&store, &owner, &worker_id, result).and_then(|_| {
-                        retention::prune(&store, retention, chrono::Utc::now()).map(|_| ())
-                    });
+                    persistence::finish_controlled(&store, &owner, &worker_id, result, Some(&flag))
+                        .and_then(|_| {
+                            retention::prune(&store, retention, chrono::Utc::now()).map(|_| ())
+                        });
                 if let Ok(mut runtime) = state.lock() {
                     runtime.active.remove(&worker_id);
                     if let Err(cause) = finished {
@@ -247,7 +308,7 @@ impl Jobs {
 
     pub fn completed(&self, actor: &Actor, kind: &str, title: &str, detail: &str) -> Result<Value> {
         self.health()?;
-        let job = persistence::create(&self.store, actor, kind, title)?;
+        let job = persistence::create_completed(&self.store, actor, kind, title)?;
         let id = job["jobId"]
             .as_str()
             .ok_or_else(|| unavailable("任务编号缺失。"))?;
@@ -261,6 +322,7 @@ impl Jobs {
                 destination: None,
                 directory: None,
                 managed_file: None,
+                publication: None,
             }),
         )?;
         retention::prune(&self.store, self.retention, chrono::Utc::now())?;
@@ -279,6 +341,10 @@ impl Jobs {
 
     pub fn download(&self, actor: &Actor, id: &str) -> Result<FileOutput> {
         self.prepare_download(actor, id)?.into_memory()
+    }
+    pub(crate) fn authorize_download(&self, actor: &Actor, id: &str) -> Result<()> {
+        self.health()?;
+        persistence::authorize_download(&self.store, actor, id)
     }
     pub fn prepare_download(&self, actor: &Actor, id: &str) -> Result<super::backup_io::Download> {
         self.health()?;
@@ -369,6 +435,17 @@ impl Jobs {
         } else {
             self.health()
         }
+    }
+    pub(crate) fn request_stop(&self) -> Result<()> {
+        let mut runtime = self
+            .runtime
+            .lock()
+            .map_err(|_| unavailable("文件任务状态异常。"))?;
+        runtime.stopping = true;
+        for scope in runtime.active.values() {
+            scope.cancel();
+        }
+        Ok(())
     }
 }
 

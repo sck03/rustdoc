@@ -8,6 +8,7 @@ import { normalizeText, readApiError } from "../../ui/formUtils.ts";
 import {
   type InvoiceItemCellSelection,
   calculateInvoiceTotals,
+  haveInvoiceTotalsInputsChanged,
   createEmptyInvoiceItem,
   recalculateInvoiceItem,
   maxInvoiceItemRows,
@@ -168,6 +169,7 @@ export function useInvoiceItemsWorkspace({
     const nextItems = buildItems(currentItems, invoice.id);
     if (nextItems.length > maxInvoiceItemRows) { setMessage(`商品明细最多 ${maxInvoiceItemRows} 行，未应用本次修改。`); return; }
     if (areInvoiceItemsEqual(currentItems, nextItems)) return;
+    const updateTotals = haveInvoiceTotalsInputsChanged(currentItems, nextItems);
     latestInvoiceItemsRef.current = nextItems;
 
     if (options.trackHistory !== false) {
@@ -185,7 +187,7 @@ export function useInvoiceItemsWorkspace({
       ? {
           ...current,
           items: nextItems,
-          ...calculateInvoiceTotals(nextItems, current.exchangeRate, current.currency),
+          ...(updateTotals ? calculateInvoiceTotals(nextItems, current.exchangeRate, current.currency) : {}),
         }
       : current);
     setSuccessMessage(null);

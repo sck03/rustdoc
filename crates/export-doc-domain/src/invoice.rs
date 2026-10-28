@@ -1,3 +1,4 @@
+use crate::business_date::is_valid as valid_date;
 use crate::generated_api::ApiInvoiceDetailDto;
 pub use crate::invoice_columns::{COLUMN_COUNT, COLUMNS, ItemRow};
 use rust_decimal::{Decimal, RoundingStrategy};
@@ -222,39 +223,6 @@ pub fn parse_number(value: &str) -> Result<Decimal, String> {
         return Err("数字范围应为 0–10 亿，最多 12 位小数。".into());
     }
     Ok(parsed)
-}
-
-pub fn valid_date(value: &str) -> bool {
-    let parts: Vec<_> = value.split('-').collect();
-    if parts.len() != 3 || parts[0].len() != 4 || parts[1].len() != 2 || parts[2].len() != 2 {
-        return false;
-    }
-    let (Ok(year), Ok(month), Ok(day)) = (
-        parts[0].parse::<u32>(),
-        parts[1].parse::<u32>(),
-        parts[2].parse::<u32>(),
-    ) else {
-        return false;
-    };
-    if year == 0 || !(1..=12).contains(&month) {
-        return false;
-    }
-    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
-    let days = [
-        31,
-        if leap { 29 } else { 28 },
-        31,
-        30,
-        31,
-        30,
-        31,
-        31,
-        30,
-        31,
-        30,
-        31,
-    ];
-    day > 0 && day <= days[month as usize - 1]
 }
 
 #[cfg(test)]

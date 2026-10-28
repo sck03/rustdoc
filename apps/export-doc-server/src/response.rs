@@ -142,6 +142,7 @@ pub fn success(
             permit,
             state.telemetry.clone(),
             request_id.to_owned(),
+            state.shutdown.clone(),
         ));
         response
             .headers_mut()

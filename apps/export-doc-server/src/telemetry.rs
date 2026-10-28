@@ -118,6 +118,7 @@ impl Telemetry {
     }
     pub fn download_failure(&self, reason: &str) {
         match reason {
+            "server-shutdown" => return,
             "idle-timeout" | "transfer-timeout" => &self.download_timeouts,
             "client-disconnected" => &self.download_disconnects,
             _ => &self.download_read_errors,

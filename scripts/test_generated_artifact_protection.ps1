@@ -7,7 +7,7 @@ $fixture = Join-Path $fixtureRoot ("cleanup-policy-" + [Guid]::NewGuid().ToStrin
 New-Item -ItemType Directory -Path $fixture -Force | Out-Null
 try {
     if (Test-ExportDocProtectedArtifact $fixture) { throw "Empty generated directory should be cleanable" }
-    foreach ($name in @("App_Data", "Backups", "Templates", "Resources", "Database", "KEY")) {
+    foreach ($name in @("App_Data", "Backups", "Templates", "Resources", "Database", "KEY", "TaskPublications")) {
         $child = Join-Path $fixture $name
         New-Item -ItemType Directory -Path $child | Out-Null
         if (-not (Test-ExportDocProtectedArtifact $fixture)) { throw "Failed to protect $name" }

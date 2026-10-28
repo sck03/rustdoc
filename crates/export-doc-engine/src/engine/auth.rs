@@ -5,7 +5,7 @@ use super::{
 };
 use crate::{contracts, paths::nonce};
 use chrono::{Duration, Utc};
-use export_doc_domain::permissions::{self, Grant};
+use export_doc_domain::permissions;
 use serde_json::{Value, json};
 use sha2::Sha256;
 use std::{collections::HashMap, sync::Mutex, time::Instant};
@@ -376,7 +376,6 @@ fn actor_from_connection(
         grants: grants
             .into_iter()
             .filter(|grant| edition.allows(&grant.resource_key))
-            .map(|grant| serde_json::to_value(grant).expect("permission grant"))
             .collect(),
     })
 }
@@ -417,8 +416,8 @@ pub fn user_dto(
     user["effectiveDepartmentIds"] = json!(actor.departments);
     user["businessTimeZone"] = json!(now.time_zone);
     user["businessDateValidUntilUtc"] = json!(now.valid_until.to_rfc3339());
-    let grants: Vec<Grant> = serde_json::from_value(json!(actor.grants))?;
-    let modules = permissions::module_access(&grants);
+    let grants = &actor.grants;
+    let modules = permissions::module_access(grants);
     let enabled: Vec<_> = modules.keys().cloned().collect();
     let access: Vec<_> = modules
         .iter()
@@ -467,7 +466,7 @@ pub fn authorize(actor: &Actor, resource: &str, action: &str) -> Result<()> {
             && actor
                 .grants
                 .iter()
-                .any(|grant| grant["resourceKey"] == resource && grant["action"] == action))
+                .any(|grant| grant.resource_key == resource && grant.action == action))
     {
         Ok(())
     } else {
@@ -485,8 +484,8 @@ pub(super) fn scope_rank(actor: &Actor, resource: &str, action: &str) -> u8 {
     actor
         .grants
         .iter()
-        .filter(|grant| grant["resourceKey"] == resource && grant["action"] == action)
-        .map(|grant| permissions::scope_rank(grant["dataScope"].as_str().unwrap_or("")))
+        .filter(|grant| grant.resource_key == resource && grant.action == action)
+        .map(|grant| permissions::scope_rank(&grant.data_scope))
         .max()
         .unwrap_or(0)
 }
@@ -511,13 +510,13 @@ pub(super) fn data_scope<'a>(
     for grant in actor
         .grants
         .iter()
-        .filter(|grant| grant["resourceKey"] == resource && grant["action"] == action)
+        .filter(|grant| grant.resource_key == resource && grant.action == action)
     {
-        match grant["dataScope"].as_str() {
-            Some("all") => scope.all = true,
-            Some("company") => scope.company_wide = true,
-            Some("department") => scope.department_wide = true,
-            Some("own") => scope.own = true,
+        match grant.data_scope.as_str() {
+            "all" => scope.all = true,
+            "company" => scope.company_wide = true,
+            "department" => scope.department_wide = true,
+            "own" => scope.own = true,
             _ => {}
         }
     }
@@ -534,9 +533,9 @@ pub fn visible(actor: &Actor, resource: &str, action: &str, record: &Value) -> b
     actor
         .grants
         .iter()
-        .filter(|grant| grant["resourceKey"] == resource && grant["action"] == action)
+        .filter(|grant| grant.resource_key == resource && grant.action == action)
         .any(|grant| {
-            let scope = grant["dataScope"].as_str().unwrap_or("");
+            let scope = grant.data_scope.as_str();
             match scope {
                 "all" => true,
                 "company" => record["companyScope"] == actor.company,
@@ -576,9 +575,13 @@ pub fn authorize_operation(
     if policy.is_null() {
         return Err(unavailable("API 缺少授权元数据。"));
     }
-    let grants: Vec<Grant> = serde_json::from_value(json!(actor.grants))?;
-    if permissions::allows_edition_operation(&grants, actor.admin, actor.edition, operation, query)
-    {
+    if permissions::allows_edition_operation(
+        &actor.grants,
+        actor.admin,
+        actor.edition,
+        operation,
+        query,
+    ) {
         Ok(())
     } else {
         Err(error(403, "当前账号没有此功能权限。"))
@@ -617,12 +620,11 @@ pub fn template_visible(actor: &Actor, permission: &str, template: &Value) -> bo
     }
     if template["status"] != "Published"
         || !actor.grants.iter().any(|grant| {
-            grant["resourceKey"] == permission
-                && grant["action"] == "view"
+            grant.resource_key == permission
+                && grant.action == "view"
                 && (permissions::resource(permission)
                     .is_some_and(|resource| !resource.supports_data_scope)
-                    || ["department", "company", "all"]
-                        .contains(&text(grant, "dataScope").as_str()))
+                    || ["department", "company", "all"].contains(&grant.data_scope.as_str()))
         })
     {
         return false;

@@ -1,5 +1,5 @@
 //! Sales stages and quotation rules shared by the native and HTTP applications.
-use crate::{generated_api::ApiSalesOpportunitySaveRequest, invoice::valid_date};
+use crate::{business_date::is_valid as valid_date, generated_api::ApiSalesOpportunitySaveRequest};
 use rust_decimal::Decimal;
 use unicode_normalization::UnicodeNormalization;
 

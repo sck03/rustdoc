@@ -13,7 +13,7 @@ const MIB: usize = 1024 * 1024;
 const MAX_FIELD: usize = 65536;
 pub(super) struct Parsed {
     pub body: Option<Value>,
-    pub upload: Option<(String, Vec<u8>)>,
+    pub upload: Option<(String, Bytes)>,
     pub merge_uploads: Vec<FileOutput>,
 }
 
@@ -146,7 +146,8 @@ pub(super) async fn parse(
                         return Err(error(400, "每次只能上传一个文件。"));
                     }
                     let limit = if catalog_upload(operation) { 100 } else { 16 } * MIB;
-                    result.upload = Some((filename, field_bytes(field, limit, 413).await?));
+                    result.upload =
+                        Some((filename, Bytes::from(field_bytes(field, limit, 413).await?)));
                 }
             } else {
                 if metadata.len() >= 32 || metadata.contains_key(&name) {
@@ -186,7 +187,7 @@ pub(super) async fn parse(
         } else {
             25
         } * MIB;
-        result.upload = Some((filename, bytes(request.into_body(), limit).await?.to_vec()));
+        result.upload = Some((filename, bytes(request.into_body(), limit).await?));
         let mut metadata = Map::new();
         for property in contract["parameters"].as_array().into_iter().flatten() {
             let Some(name) = property["name"].as_str().filter(|name| *name != "fileName") else {

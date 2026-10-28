@@ -19,6 +19,7 @@ pub(crate) fn open_path(path: String) -> Result<(), String> {
 }
 
 pub(crate) fn resolve_open_path_target(input: &Path) -> Result<(PathBuf, bool), String> {
+    export_doc_engine::paths::ensure_safe_absolute(input)?;
     match fs::metadata(input) {
         Ok(metadata) => Ok((input.to_path_buf(), metadata.is_file())),
         Err(error) if error.kind() == io::ErrorKind::NotFound && input.extension().is_some() => {

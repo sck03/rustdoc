@@ -92,26 +92,25 @@ pub(super) fn render(
         *bottoms.last_mut().unwrap() = cursor as f32 / 100.;
     }
     let count = pages.len();
-    pages
-        .iter()
-        .enumerate()
-        .map(|(index, row)| {
-            let mut canvas = Canvas::new(width, height);
-            fixed_elements(
-                &mut canvas.svg,
-                design,
-                data,
-                index,
-                count,
-                true,
-                Some(bottoms[index]),
-            )?;
-            for field in row {
-                element(&mut canvas.svg, field, data, index, count)?;
-            }
-            Ok(canvas.finish().svg)
-        })
-        .collect()
+    let mut rendered = Vec::with_capacity(count);
+    for (index, row) in pages.iter().enumerate() {
+        let mut canvas = Canvas::new(width, height);
+        fixed_elements(
+            &mut canvas.svg,
+            design,
+            data,
+            index,
+            count,
+            true,
+            Some(bottoms[index]),
+        )?;
+        for field in row {
+            element(&mut canvas.svg, field, data, index, count)?;
+            crate::document::check_svg_size(&canvas.svg)?;
+        }
+        crate::document::push_svg(&mut rendered, canvas.finish().svg)?;
+    }
+    Ok(rendered)
 }
 
 fn overlaps(left: &Element, right: &Element) -> bool {

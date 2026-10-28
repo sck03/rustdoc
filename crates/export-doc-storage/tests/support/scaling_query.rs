@@ -97,7 +97,66 @@ pub fn exercise(c: &Connection) {
     q.fields = &invalid;
     assert!(c.query_generic(&q).is_err());
     c.rollback().unwrap();
+    keyset(c);
     jobs(c);
+}
+fn keyset(c: &Connection) {
+    c.begin().unwrap();
+    let mut expected = Vec::new();
+    for n in 0..463 {
+        let id = insert(
+            c,
+            "cursor-contract",
+            json!({
+            "versionNumber":1,"companyScope":"A","departmentId":"D","ownerUserId":n % 2 + 1,"label":format!("row-{n}"),
+                "amount":serde_json::from_str::<Value>("12345678901234.123456789").unwrap()
+            }),
+        );
+        if n % 2 == 0 {
+            expected.push(format!("row-{n}"));
+        }
+        // Cursor pagination must not depend on the projected/stored DTO id.
+        let mut record = c.get("cursor-contract", id).unwrap().unwrap();
+        record["id"] = json!(999999);
+        c.set_body(id, &record).unwrap();
+    }
+    expected.reverse();
+    let query = GenericQuery {
+        kind: "cursor-contract",
+        scope: DataScope {
+            company: "A",
+            user_id: 1,
+            own: true,
+            ..Default::default()
+        },
+        filters: &[],
+        keyword: "",
+        search_root: None,
+        fields: &[("label", "label"), ("amount", "amount")],
+        offset: 0,
+        limit: 73,
+    };
+    let mut before = None;
+    let mut labels = Vec::new();
+    loop {
+        let (cursor, rows) = c.scan_generic(&query, before).unwrap();
+        if rows.is_empty() {
+            break;
+        }
+        assert!(cursor.is_some());
+        assert!(before.is_none_or(|previous| cursor.unwrap() < previous));
+        for row in rows {
+            assert_eq!(row.as_object().unwrap().len(), 2);
+            assert_eq!(
+                row["amount"],
+                serde_json::from_str::<Value>("12345678901234.123456789").unwrap()
+            );
+            labels.push(row["label"].as_str().unwrap().to_owned());
+        }
+        before = cursor;
+    }
+    assert_eq!(labels, expected);
+    c.rollback().unwrap();
 }
 fn jobs(c: &Connection) {
     c.begin().unwrap();

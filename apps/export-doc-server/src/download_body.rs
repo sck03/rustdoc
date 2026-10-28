@@ -71,26 +71,41 @@ pub(crate) fn body(
     permit: OwnedSemaphorePermit,
     telemetry: Arc<crate::telemetry::Telemetry>,
     request_id: String,
+    shutdown: crate::Shutdown,
 ) -> Body {
     transfer(
         source,
         size,
         permit,
-        telemetry,
-        Duration::from_secs(60),
-        Duration::from_secs(3600),
-        request_id,
+        Transfer {
+            telemetry,
+            idle: Duration::from_secs(60),
+            total: Duration::from_secs(3600),
+            request_id,
+            shutdown,
+        },
     )
+}
+struct Transfer {
+    telemetry: Arc<crate::telemetry::Telemetry>,
+    idle: Duration,
+    total: Duration,
+    request_id: String,
+    shutdown: crate::Shutdown,
 }
 fn transfer(
     mut source: Box<dyn AsyncRead + Unpin + Send>,
     size: u64,
     permit: OwnedSemaphorePermit,
-    telemetry: Arc<crate::telemetry::Telemetry>,
-    idle: Duration,
-    total: Duration,
-    request_id: String,
+    context: Transfer,
 ) -> Body {
+    let Transfer {
+        telemetry,
+        idle,
+        total,
+        request_id,
+        shutdown,
+    } = context;
     let (inner, mut writer) = tokio::io::duplex(64 * 1024);
     let (finished, completion) = oneshot::channel();
     let reader = Reader {
@@ -130,9 +145,10 @@ fn transfer(
                 .map_err(|_| "idle-timeout")?
                 .map_err(|_| "client-disconnected")
         };
-        let result = tokio::time::timeout(total, copy)
-            .await
-            .unwrap_or(Err("transfer-timeout"));
+        let result = tokio::select! {
+            result = tokio::time::timeout(total, copy) => result.unwrap_or(Err("transfer-timeout")),
+            _ = shutdown.wait() => Err("server-shutdown"),
+        };
         if let Err(reason) = result {
             telemetry.download_failure(reason);
         }
@@ -149,6 +165,64 @@ fn transfer(
 mod tests {
     use super::*;
     use tokio::sync::Semaphore;
+    fn transfer(
+        source: Box<dyn AsyncRead + Unpin + Send>,
+        size: u64,
+        permit: OwnedSemaphorePermit,
+        telemetry: Arc<crate::telemetry::Telemetry>,
+        idle: Duration,
+        total: Duration,
+        request_id: String,
+    ) -> Body {
+        super::transfer(
+            source,
+            size,
+            permit,
+            Transfer {
+                telemetry,
+                idle,
+                total,
+                request_id,
+                shutdown: Default::default(),
+            },
+        )
+    }
+    #[tokio::test]
+    async fn shutdown_releases_an_unread_download_without_waiting_for_idle_timeout() {
+        let budget = Arc::new(export_doc_engine::engine::backup_io::Budget::default());
+        let slots = Arc::new(Semaphore::new(1));
+        let shutdown = crate::Shutdown::default();
+        let telemetry = Arc::new(crate::telemetry::Telemetry::new(
+            std::env::current_dir()
+                .unwrap()
+                .join(".codex-runtime/download-shutdown-tests"),
+        ));
+        let body = super::transfer(
+            memory_source(
+                vec![1; 128 * 1024],
+                Some(budget.reserve(128 * 1024).unwrap()),
+            ),
+            128 * 1024,
+            slots.clone().try_acquire_owned().unwrap(),
+            Transfer {
+                telemetry,
+                idle: Duration::from_secs(60),
+                total: Duration::from_secs(3600),
+                request_id: "shutdown-test".into(),
+                shutdown: shutdown.clone(),
+            },
+        );
+        shutdown.stop();
+        tokio::time::timeout(Duration::from_secs(1), async {
+            while slots.available_permits() == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(budget.snapshot()["reservedBytes"], 0);
+        drop(body);
+    }
     #[tokio::test]
     async fn an_unread_or_dropped_transfer_releases_its_materialized_result_budget() {
         let budget = Arc::new(export_doc_engine::engine::backup_io::Budget::default());

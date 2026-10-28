@@ -1,5 +1,8 @@
+#[path = "client.rs"]
+mod client;
+pub use client::ApiClient;
+
 use export_doc_engine::{
-    api::ApiClient,
     contracts,
     generated_api::*,
     paths::{RuntimePaths, nonce},

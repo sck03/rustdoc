@@ -45,11 +45,15 @@ pub(super) fn files(
     let mut files = vec![];
     let mut combined = export_doc_report::Document { pages: vec![] };
     let mut total = 0usize;
-    for (index, item) in items.iter().enumerate() {
+    for (index, prepared) in
+        reports::prepare_batch(store, paths, actor, invoice, items, false, action)?
+            .into_iter()
+            .enumerate()
+    {
         crate::operation::check()?;
-        let (document, fallback) = reports::invoice_document(
-            store, paths, fonts, actor, invoice, item, action, cancelled,
-        )?;
+        let item = &items[index];
+        let document = prepared.render(fonts, cancelled)?;
+        let fallback = prepared.file_name(invoice);
         let name = text(item, "name");
         let name = if name.is_empty() {
             fallback
@@ -133,18 +137,24 @@ pub fn handle(
     if operation == PREVIEW_INVOICE_DOCUMENT_PACKAGE_HTML {
         let mut output = vec![];
         let mut total = 0usize;
-        for item in items {
-            let (document, _) = reports::invoice_document(
-                &service.store,
-                &service.paths,
+        let prepared = reports::prepare_batch(
+            &service.store,
+            &service.paths,
+            actor,
+            invoice,
+            &items,
+            false,
+            "preview-html",
+        )?;
+        for (item, prepared) in items.into_iter().zip(prepared) {
+            let document = prepared.render(
                 &service.report_fonts,
-                actor,
-                invoice,
-                &item,
-                "preview-html",
                 &crate::operation::cancellation_flag(),
             )?;
-            let html = document.html(&service.report_fonts)?;
+            let html = document.html(
+                &service.report_fonts,
+                &crate::operation::cancellation_flag(),
+            )?;
             total = total
                 .checked_add(html.len())
                 .filter(|n| *n <= 32 * 1024 * 1024)
@@ -195,6 +205,7 @@ pub fn handle(
     let merged = body["includeMergedPdf"] == true;
     service.jobs.start_replayable(
         actor,
+        operation,
         "ReportDocumentPackage",
         if zip {
             "发票单据包 ZIP 导出"
@@ -233,7 +244,13 @@ pub fn handle(
                     export_doc_report::zip_documents(files)?,
                 );
                 output.destination = destination;
-                Ok(output)
+                Ok(output.check_on_publish(reports::publication_check(
+                    &paths,
+                    vec![invoice],
+                    items.clone(),
+                    false,
+                    "export-zip",
+                )?))
             } else {
                 let path = destination.ok_or_else(|| invalid("缺少输出文件夹。"))?;
                 Ok(TaskOutput {
@@ -252,7 +269,15 @@ pub fn handle(
                             })
                             .collect(),
                     }),
-                })
+                    publication: None,
+                }
+                .check_on_publish(reports::publication_check(
+                    &paths,
+                    vec![invoice],
+                    items.clone(),
+                    false,
+                    "export-zip",
+                )?))
             }
         },
     )

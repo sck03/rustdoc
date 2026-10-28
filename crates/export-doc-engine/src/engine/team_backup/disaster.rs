@@ -58,6 +58,7 @@ pub(super) fn create_package(
     );
     service.jobs.start_backup(
         actor,
+        CREATE_DISASTER_RECOVERY_PACKAGE,
         "DisasterRecoveryPackage",
         "创建加密灾备包",
         move |_| {
@@ -131,6 +132,7 @@ pub(super) fn restore_package(
     let (store, paths, id) = (service.store.clone(), service.paths.clone(), actor.id);
     service.jobs.start_backup(
         actor,
+        RESTORE_DISASTER_RECOVERY_PACKAGE,
         "DisasterRecoveryRestore",
         "校验并暂存灾备恢复",
         move |_| {
@@ -154,6 +156,7 @@ pub(super) fn restore_package(
             Ok(TaskOutput {
                 file: None,
                 managed_file: None,
+                publication: None,
                 destination: None,
                 directory: None,
                 detail: "恢复已暂存。请立即退出并重新打开程序，恢复前原数据会保存在恢复目录。"

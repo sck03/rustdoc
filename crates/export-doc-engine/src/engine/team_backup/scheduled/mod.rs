@@ -103,6 +103,7 @@ pub(in crate::engine) fn test_replica(service: &NativeService, actor: &Actor) ->
     );
     service.jobs.start(
         actor,
+        TEST_BACKUP_REPLICA,
         "BackupReplicaTest",
         "验证异机副本存储",
         move |_| {
@@ -133,6 +134,7 @@ pub(in crate::engine) fn test_replica(service: &NativeService, actor: &Actor) ->
                     detail: "存储写入、回读校验和删除均成功。".into(),
                     destination: None,
                     directory: None,
+                    publication: None,
                 })
             })();
             let cleanup = fs::remove_dir_all(&directory);

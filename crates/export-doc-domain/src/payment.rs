@@ -1,5 +1,5 @@
 //! Payment validation and exact expense calculations shared by every host.
-use crate::{generated_api::ApiPaymentDto, invoice::valid_date};
+use crate::{business_date::is_valid as valid_date, generated_api::ApiPaymentDto};
 use rust_decimal::Decimal;
 
 pub const EXPENSE_FIELDS: &[(&str, &str)] = &[

@@ -124,6 +124,7 @@ pub(super) fn create_package(
     );
     service.jobs.start_backup(
         actor,
+        CREATE_SERVER_MIGRATION_PACKAGE,
         "ServerMigrationPackage",
         "创建服务器迁移包",
         move |_| {

@@ -31,34 +31,6 @@ fn stroke_dash(style: &str) -> &'static str {
         ""
     }
 }
-pub fn field_value(invoice: &Value, item: Option<&Value>, path: &str) -> String {
-    let (group, key) = path.split_once('.').unwrap_or(("Invoice", path));
-    let target = if group.eq_ignore_ascii_case("item") {
-        item.unwrap_or(&Value::Null)
-    } else {
-        invoice
-    };
-    let alias = match (group, key) {
-        ("Exporter", "ExporterNameEN") => "exporterNameEN",
-        ("Exporter", "ExporterNameCN") => "exporterNameCN",
-        ("Exporter", "AddressEN") => "exporterAddressEN",
-        ("Customer", "CustomerNameEN") => "customerNameEN",
-        ("Customer", "AddressEN") => "customerAddressEN",
-        _ => key,
-    };
-    let value = target.as_object().and_then(|object| {
-        object
-            .iter()
-            .find(|(name, _)| name.eq_ignore_ascii_case(alias))
-            .map(|(_, value)| value)
-    });
-    match value {
-        Some(Value::String(value)) => value.clone(),
-        Some(Value::Number(value)) => value.to_string(),
-        Some(Value::Bool(value)) => if *value { "是" } else { "否" }.into(),
-        _ => String::new(),
-    }
-}
 pub(crate) fn escape(text: &str) -> String {
     text.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -380,6 +352,7 @@ fn fixed_elements(
             } else {
                 element(svg, item, data, index, count)?;
             }
+            crate::document::check_svg_size(svg)?;
         }
         if pinned_footer_offset.abs() > f32::EPSILON {
             svg.push_str("</g>");
@@ -685,30 +658,10 @@ fn render_body_flow(
             canvas.svg.push_str("</g>");
             cursor += element.height_hundredth_mm as f32 / 100.;
         }
-        rendered.push(canvas.finish().svg);
+        crate::document::push_svg(&mut rendered, canvas.finish().svg)?;
     }
     Ok(rendered)
 }
-pub fn pdf(
-    invoice: &ApiInvoiceDetailDto,
-    design: &Design,
-    fonts: &crate::Fonts,
-    cancelled: &AtomicBool,
-) -> Result<Vec<u8>> {
-    let _fonts = fonts.enter()?;
-    let document = crate::Document {
-        pages: pages(invoice, design)?
-            .into_iter()
-            .map(|svg| crate::Page {
-                width_mm: design.page.width_hundredth_mm as f32 / 100.,
-                height_mm: design.page.height_hundredth_mm as f32 / 100.,
-                svg,
-            })
-            .collect(),
-    };
-    crate::pdf_document(&document, fonts, cancelled)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

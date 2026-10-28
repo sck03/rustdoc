@@ -78,8 +78,12 @@ pub(super) fn response(
                     &service.report_fonts,
                     &crate::operation::cancellation_flag()
                 )?
-                .html(&service.report_fonts)?
+                .html(
+                    &service.report_fonts,
+                    &crate::operation::cancellation_flag()
+                )?
         );
+        validate_current_access(service, actor, &data, &template, &metadata)?;
         return Ok(metadata);
     }
     if format != "PdfPage" {
@@ -156,7 +160,18 @@ pub(super) fn response(
     metadata["pageIndex"] = json!(image.page_index);
     metadata["pageCount"] = json!(image.page_count);
     metadata["previewRevision"] = json!(revision);
-    let current = auth::current_actor(&service.store, actor.id)?;
+    validate_current_access(service, actor, &data, &template, &metadata)?;
+    Ok(metadata)
+}
+
+fn validate_current_access(
+    service: &NativeService,
+    actor: &Actor,
+    data: &ReportData,
+    template: &Template,
+    metadata: &Value,
+) -> Result<()> {
+    crate::operation::check()?;
     let (operation, resource, id) = if let Some(id) = metadata["invoiceId"].as_i64() {
         (PREVIEW_INVOICE_REPORT_HTML, "invoices", id)
     } else if let Some(id) = metadata["paymentId"].as_i64() {
@@ -164,21 +179,26 @@ pub(super) fn response(
     } else {
         (PREVIEW_REPORT_TEMPLATE_CONTENT, "", 0)
     };
-    service.authorize_operation(&current, operation, &[])?;
-    if id > 0 {
-        subject(&service.store, &current, resource, id, "preview")?;
-    }
-    if !template.path().is_empty() {
-        super::template(
-            &service.store,
-            &service.paths,
-            &current,
-            template.path(),
-            data.report_type,
-            true,
-        )?;
-    }
-    Ok(metadata)
+    super::super::licensing::check_operation(service, operation)?;
+    let _lock = super::super::report_template_files::storage_lock(&service.paths)?;
+    service.store.read(|tx| {
+        let current = auth::current_actor_in(tx, actor.id, service.store.edition)?;
+        auth::authorize_operation(&current, operation, &[])?;
+        if id > 0 {
+            subject_in(tx, &current, resource, id, "preview")?;
+        }
+        if !template.path().is_empty() {
+            template_in(
+                tx,
+                &service.paths,
+                &current,
+                template.path(),
+                data.report_type,
+                true,
+            )?;
+        }
+        Ok(())
+    })
 }
 
 #[cfg(test)]

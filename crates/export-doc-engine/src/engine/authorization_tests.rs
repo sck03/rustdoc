@@ -103,9 +103,9 @@ fn exact_product_lookup_is_independent_of_fuzzy_pages_and_keeps_visibility() {
         own_reader
             .grants
             .iter()
-            .any(|grant| grant["resourceKey"] == "common.product-reference"
-                && grant["action"] == "view"
-                && grant["dataScope"] == "own")
+            .any(|grant| grant.resource_key == "common.product-reference"
+                && grant.action == "view"
+                && grant.data_scope == "own")
     );
     let hidden = records::list(
         &service.store,

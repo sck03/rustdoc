@@ -23,6 +23,7 @@ pub(super) fn start(
     );
     service.jobs.start_backup(
         actor,
+        RUN_BACKUP_PLAN,
         "ScheduledRecoveryBackup",
         "日常完整灾备",
         move |_| {

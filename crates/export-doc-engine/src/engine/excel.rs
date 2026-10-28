@@ -105,6 +105,7 @@ pub fn upload(
     let actor_id = actor.id;
     service.jobs.start_replayable(
         actor,
+        operation,
         "BookingSheetConvert",
         "转换订舱托单",
         Some(replay),
@@ -154,6 +155,7 @@ pub fn handle(
         let actor_id = actor.id;
         return service.jobs.start_replayable(
             actor,
+            operation,
             "BookingSheetConvert",
             "转换订舱托单",
             Some(replay),
@@ -225,6 +227,7 @@ pub fn handle(
     let actor_id = actor.id;
     service.jobs.start_replayable(
         actor,
+        operation,
         if booking {
             "BookingSheetExport"
         } else {
@@ -257,18 +260,6 @@ pub fn handle(
                 export_doc_excel::blank_template(&bytes, &exporter_name, booking, &check)
             }
             .map_err(invalid)?;
-            let actor = auth::current_actor(&store, actor_id)?;
-            auth::authorize_operation(&actor, operation, &[])?;
-            if let Some(id) = invoice_id {
-                if !auth::visible(
-                    &actor,
-                    "document.invoices",
-                    "view",
-                    &store.get("invoices", id)?,
-                ) {
-                    return Err(error(403, "当前账号已没有读取发票的权限。"));
-                }
-            }
             let mut output = TaskOutput::file(
                 if booking {
                     "订舱托单.xlsx"
@@ -280,7 +271,24 @@ pub fn handle(
                 bytes,
             );
             output.destination = destination;
+            if let Some(id) = invoice_id {
+                output = output.check_on_publish(invoice_publication_check(id));
+            }
             Ok(output)
         },
     )
+}
+
+pub(in crate::engine) fn invoice_publication_check(id: i64) -> super::tasks::PublicationCheck {
+    super::tasks::PublicationCheck::new(move |tx, actor| {
+        if !auth::visible(
+            actor,
+            "document.invoices",
+            "view",
+            &super::store::get(tx, "invoices", id)?,
+        ) {
+            return Err(error(403, "当前账号已没有读取发票的权限。"));
+        }
+        Ok(())
+    })
 }

@@ -1,8 +1,5 @@
-use export_doc_engine::{
-    api::{ApiClient, ApiError},
-    generated_api::*,
-    operation::OperationScope,
-};
+use crate::native_fixture::ApiClient;
+use export_doc_engine::{api::ApiError, generated_api::*, operation::OperationScope};
 use serde_json::{Value, json};
 use std::{
     sync::atomic::{AtomicBool, Ordering},

@@ -143,6 +143,7 @@ pub fn export(
     let request = body.clone();
     service.jobs.start_replayable(
         actor,
+        operation,
         "QueryInvoiceExcelExport",
         "导出查询结果 Excel",
         Some(Replay::new(operation, &[], body)),
@@ -163,27 +164,6 @@ pub fn export(
                         .ok_or_else(|| unavailable("查询记录缺少编号。"))
                 })
                 .collect::<Result<Vec<_>>>()?;
-            store.read(|tx| {
-                let current = auth::current_actor_in(tx, actor_id, store.edition)?;
-                auth::authorize_operation(&current, operation, &[])?;
-                let mut visible = 0;
-                for ids in ids.chunks(500) {
-                    crate::operation::check()?;
-                    visible += tx
-                        .query_business(&export_doc_storage::BusinessQuery {
-                            list: export_doc_storage::BusinessList::InvoiceIds(ids),
-                            scope: auth::data_scope(&current, "document.query", "operate"),
-                            fields: &[("id", "id")],
-                            offset: 0,
-                            limit: 1,
-                        })?
-                        .0;
-                }
-                if visible as usize != rows.len() {
-                    return Err(error(403, "导出期间数据权限发生变化，请重新查询。"));
-                }
-                Ok(())
-            })?;
             let mut output = TaskOutput::file(
                 "查询结果.xlsx".into(),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -191,7 +171,30 @@ pub fn export(
             );
             output.destination = destination;
             output.detail = format!("已导出 {} 条记录。", rows.len());
-            Ok(output)
+            Ok(output.check_on_publish(publication_check(ids)))
         },
     )
+}
+
+#[cfg(feature = "excel")]
+pub(in crate::engine) fn publication_check(ids: Vec<i64>) -> super::tasks::PublicationCheck {
+    super::tasks::PublicationCheck::new(move |tx, current| {
+        let mut visible = 0;
+        for ids in ids.chunks(500) {
+            crate::operation::check()?;
+            visible += tx
+                .query_business(&export_doc_storage::BusinessQuery {
+                    list: export_doc_storage::BusinessList::InvoiceIds(ids),
+                    scope: auth::data_scope(current, "document.query", "operate"),
+                    fields: &[("id", "id")],
+                    offset: 0,
+                    limit: 1,
+                })?
+                .0;
+        }
+        if visible as usize != ids.len() {
+            return Err(error(403, "导出期间数据权限发生变化，请重新查询。"));
+        }
+        Ok(())
+    })
 }

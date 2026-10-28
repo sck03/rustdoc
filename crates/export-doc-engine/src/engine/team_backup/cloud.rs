@@ -491,6 +491,7 @@ pub(super) fn upload_latest(service: &NativeService, actor: &Actor) -> Result<Va
     let actor_id = actor.id;
     service.jobs.start(
         actor,
+        UPLOAD_LATEST_DATABASE_BACKUP_TO_CLOUD,
         "CloudBackupUpload",
         "上传最新数据库备份到 WebDAV",
         move |_| {
@@ -505,6 +506,7 @@ pub(super) fn upload_latest(service: &NativeService, actor: &Actor) -> Result<Va
                 destination: None,
                 directory: None,
                 managed_file: None,
+                publication: None,
             })
         },
     )
@@ -548,6 +550,7 @@ pub(super) fn download(service: &NativeService, actor: &Actor, body: &Value) -> 
     let remote_name = remote_name.to_string();
     service.jobs.start(
         actor,
+        DOWNLOAD_CLOUD_DATABASE_BACKUP,
         "CloudBackupDownload",
         "下载并验证 WebDAV 数据库备份",
         move |_| {
@@ -562,6 +565,7 @@ pub(super) fn download(service: &NativeService, actor: &Actor, body: &Value) -> 
                 destination: None,
                 directory: None,
                 managed_file: None,
+                publication: None,
             })
         },
     )

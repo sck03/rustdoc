@@ -1,7 +1,7 @@
 //! Authenticated task and backup downloads, including the maintenance read lock.
 use super::{
     NativeService, backup_io,
-    error::{Result, invalid, unavailable, unsupported},
+    error::{Result, unavailable, unsupported},
     tasks, team_backup,
 };
 use crate::generated_api::{
@@ -25,11 +25,7 @@ impl NativeService {
     pub fn authorize_job_download(&self, job_id: &str, token: &str) -> Result<()> {
         let actor = self.sessions.actor(&self.store, token)?;
         self.authorize_operation(&actor, DOWNLOAD_JOB_RESULT, &[])?;
-        let job = self.jobs.get(&actor, job_id)?;
-        if job["status"] != "Succeeded" || job["outputPath"].as_str().is_none_or(str::is_empty) {
-            return Err(invalid("任务没有可下载的结果。"));
-        }
-        Ok(())
+        self.jobs.authorize_download(&actor, job_id)
     }
     pub fn prepare_backup_download(
         &self,

@@ -49,15 +49,17 @@ fn start(
     let store = service.store.clone();
     let actor_id = actor.id;
     let library = service.paths.pdfium_path();
-    service.jobs.start(actor, "PdfMerge", "合并 PDF", move |_| {
-        auth::authorize_operation(&auth::current_actor(&store, actor_id)?, operation, &[])?;
-        let inputs = files.into_iter().map(|f| f.content).collect::<Vec<_>>();
-        let merged = crate::pdf::merge(&inputs, &library)?;
-        auth::authorize_operation(&auth::current_actor(&store, actor_id)?, operation, &[])?;
-        let mut result = TaskOutput::file("合并文件.pdf".into(), "application/pdf", merged);
-        result.destination = destination;
-        Ok(result)
-    })
+    service
+        .jobs
+        .start(actor, operation, "PdfMerge", "合并 PDF", move |_| {
+            auth::authorize_operation(&auth::current_actor(&store, actor_id)?, operation, &[])?;
+            let inputs = files.into_iter().map(|f| f.content).collect::<Vec<_>>();
+            let merged = crate::pdf::merge(&inputs, &library)?;
+            auth::authorize_operation(&auth::current_actor(&store, actor_id)?, operation, &[])?;
+            let mut result = TaskOutput::file("合并文件.pdf".into(), "application/pdf", merged);
+            result.destination = destination;
+            Ok(result)
+        })
 }
 pub fn local(service: &NativeService, actor: &Actor, body: &Value) -> Result<Value> {
     if service.provider()? != "SQLite" {

@@ -4,8 +4,9 @@ use super::{
     records::{parent, positive, required, text},
     store::{self, Actor, Store},
 };
-use crate::{contracts, invoice::valid_date};
+use crate::contracts;
 use chrono::{DateTime, FixedOffset};
+use export_doc_domain::business_date::is_valid as valid_date;
 use export_doc_storage::Connection;
 use serde_json::{Value, json};
 

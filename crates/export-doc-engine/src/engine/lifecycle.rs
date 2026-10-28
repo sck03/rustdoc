@@ -2,12 +2,22 @@
 use super::*;
 
 impl NativeService {
-    pub fn close(&self) -> Result<()> {
+    pub fn request_shutdown(&self) -> Result<()> {
+        let mut failure = None;
         #[cfg(feature = "exchange-rates")]
-        self.exchange_scheduler.stop()?;
-        self.backup_scheduler.stop()?;
-        self.jobs.close()?;
-        self.store.close()
+        remember(&mut failure, self.exchange_scheduler.request_stop());
+        remember(&mut failure, self.backup_scheduler.request_stop());
+        remember(&mut failure, self.jobs.request_stop());
+        failure.map_or(Ok(()), Err)
+    }
+    pub fn close(&self) -> Result<()> {
+        let mut failure = self.request_shutdown().err();
+        #[cfg(feature = "exchange-rates")]
+        remember(&mut failure, self.exchange_scheduler.stop());
+        remember(&mut failure, self.backup_scheduler.stop());
+        remember(&mut failure, self.jobs.close());
+        remember(&mut failure, self.store.close());
+        failure.map_or(Ok(()), Err)
     }
     fn activate(service: Self) -> Result<Arc<Self>> {
         let service = Arc::new(service);
@@ -148,5 +158,11 @@ impl NativeService {
         self.exchange_scheduler.health()?;
         self.jobs.health()?;
         self.store.health()
+    }
+}
+
+fn remember(failure: &mut Option<crate::api::ApiError>, result: Result<()>) {
+    if let Err(cause) = result {
+        failure.get_or_insert(cause);
     }
 }

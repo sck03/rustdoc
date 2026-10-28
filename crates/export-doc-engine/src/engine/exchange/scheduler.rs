@@ -92,6 +92,16 @@ impl Scheduler {
             .map_err(|_| unavailable("汇率调度状态异常。"))?;
         stop_worker(&mut worker)
     }
+    pub(in crate::engine) fn request_stop(&self) -> Result<()> {
+        let worker = self
+            .worker
+            .lock()
+            .map_err(|_| unavailable("汇率调度状态异常。"))?;
+        if let Some(worker) = worker.as_ref() {
+            signal(worker)?;
+        }
+        Ok(())
+    }
     pub(in crate::engine) fn health(&self) -> Result<()> {
         let worker = self
             .worker
@@ -107,13 +117,7 @@ impl Scheduler {
 }
 fn stop_worker(worker: &mut Option<Worker>) -> Result<()> {
     if let Some(worker) = worker.take() {
-        worker
-            .signal
-            .0
-            .lock()
-            .map_err(|_| unavailable("汇率调度状态异常。"))?
-            .stopped = true;
-        worker.signal.1.notify_all();
+        signal(&worker)?;
         if worker.handle.thread().id() != std::thread::current().id() {
             worker
                 .handle
@@ -121,6 +125,16 @@ fn stop_worker(worker: &mut Option<Worker>) -> Result<()> {
                 .map_err(|_| unavailable("汇率调度线程异常退出。"))?;
         }
     }
+    Ok(())
+}
+fn signal(worker: &Worker) -> Result<()> {
+    worker
+        .signal
+        .0
+        .lock()
+        .map_err(|_| unavailable("汇率调度状态异常。"))?
+        .stopped = true;
+    worker.signal.1.notify_all();
     Ok(())
 }
 fn run(service: &NativeService, signal: &(Mutex<Signal>, Condvar)) -> Result<Duration> {

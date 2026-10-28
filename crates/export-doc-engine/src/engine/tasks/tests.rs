@@ -1,6 +1,8 @@
 use super::*;
+use crate::contracts;
 use crate::paths::{RuntimePaths, nonce};
 use std::{fs, path::PathBuf, sync::mpsc, time::Instant};
+mod publication;
 
 struct Fixture {
     root: PathBuf,
@@ -37,9 +39,22 @@ impl Fixture {
         }
     }
     fn open(&self) -> (Arc<Store>, Jobs) {
-        let store = Arc::new(Store::open(&self.paths).unwrap());
+        let store = self.store();
         let jobs = Jobs::open(store.clone()).unwrap();
         (store, jobs)
+    }
+    fn store(&self) -> Arc<Store> {
+        let store = Arc::new(Store::open(&self.paths).unwrap());
+        crate::engine::auth::seed(&store).unwrap();
+        store.transaction(|tx| {
+            if tx.find_identity("users", "task-other")?.is_none() {
+                let value = contracts::overlay(contracts::initial(contracts::schema("ApiUserAccountDto")),
+                    &json!({"username":"task-other","fullName":"另一测试用户","role":"Admin","isActive":true,"companyScope":"DEFAULT","departmentId":"GENERAL"}));
+                crate::engine::store::save(tx, "users", 0, value, Some("task-other".into()), &self.actor, "create")?;
+            }
+            Ok(())
+        }).unwrap();
+        store
     }
 }
 impl Drop for Fixture {
@@ -66,13 +81,19 @@ fn output_and_snapshot_survive_restart_and_cleanup_is_idempotent() {
     let bytes = b"%PDF-1.7\nNative test output".to_vec();
     let output = bytes.clone();
     let started = jobs
-        .start(&fixture.actor, "TestFile", "文件输出", move |_| {
-            Ok(TaskOutput::file(
-                "测试.pdf".into(),
-                "application/pdf",
-                output,
-            ))
-        })
+        .start(
+            &fixture.actor,
+            GET_JOB,
+            "TestFile",
+            "文件输出",
+            move |_| {
+                Ok(TaskOutput::file(
+                    "测试.pdf".into(),
+                    "application/pdf",
+                    output,
+                ))
+            },
+        )
         .unwrap();
     let id = started["jobId"].as_str().unwrap();
     let finished = wait(&jobs, &fixture.actor, id);
@@ -127,7 +148,7 @@ fn cancellation_wins_over_in_flight_output_and_completed_tasks_are_unchanged() {
     let (entered_tx, entered_rx) = mpsc::channel();
     let (continue_tx, continue_rx) = mpsc::channel();
     let started = jobs
-        .start(&fixture.actor, "TestFile", "取消", move |_| {
+        .start(&fixture.actor, GET_JOB, "TestFile", "取消", move |_| {
             entered_tx.send(()).unwrap();
             continue_rx.recv_timeout(Duration::from_secs(3)).unwrap();
             Ok(TaskOutput::file(
@@ -162,13 +183,19 @@ fn malformed_output_fails_without_publishing_or_panicking() {
     let fixture = Fixture::new();
     let (_store, jobs) = fixture.open();
     let started = jobs
-        .start(&fixture.actor, "TestFile", "无效输出", move |_| {
-            Ok(TaskOutput::file(
-                "../escape.pdf".into(),
-                "application/pdf",
-                vec![1],
-            ))
-        })
+        .start(
+            &fixture.actor,
+            GET_JOB,
+            "TestFile",
+            "无效输出",
+            move |_| {
+                Ok(TaskOutput::file(
+                    "../escape.pdf".into(),
+                    "application/pdf",
+                    vec![1],
+                ))
+            },
+        )
         .unwrap();
     let id = started["jobId"].as_str().unwrap();
     assert_eq!(wait(&jobs, &fixture.actor, id)["status"], "Failed");
@@ -182,7 +209,7 @@ fn queries_filter_status_and_text_without_disclosing_another_users_jobs() {
     jobs.completed(&fixture.actor, "Export", "发票任务", "导出完成")
         .unwrap();
     let started = jobs
-        .start(&fixture.actor, "Export", "错误任务", |_| {
+        .start(&fixture.actor, GET_JOB, "Export", "错误任务", |_| {
             Err(unavailable("字体缺失"))
         })
         .unwrap();
@@ -216,6 +243,7 @@ fn queries_filter_status_and_text_without_disclosing_another_users_jobs() {
 }
 
 #[test]
+#[cfg(feature = "excel")]
 fn retention_keeps_running_work_and_removes_terminal_inputs_and_outputs_atomically() {
     let fixture = Fixture::new();
     let (store, jobs) = fixture.open();
@@ -231,6 +259,7 @@ fn retention_keeps_running_work_and_removes_terminal_inputs_and_outputs_atomical
         let job = persistence::create_replayable(
             &store,
             &fixture.actor,
+            GET_JOB,
             "Export",
             "文件输出",
             Some(&replay),
@@ -371,6 +400,7 @@ fn retry_inputs_are_released_on_success_and_bounded_after_failure_or_cancellatio
         let started = persistence::create_replayable(
             &store,
             &fixture.actor,
+            GET_JOB,
             "BookingSheetConvert",
             "输入保留",
             Some(&replay),
@@ -461,6 +491,7 @@ fn registered_document_retries_reach_their_original_use_case() {
         let started = persistence::create_replayable(
             &service.store,
             &actor,
+            GET_JOB,
             "DocumentRetry",
             "重试分派",
             Some(&replay),
@@ -503,6 +534,7 @@ fn reclaimed_retry_input_is_a_conflict_inside_the_read_snapshot() {
     let started = persistence::create_replayable(
         &service.store,
         &actor,
+        GET_JOB,
         "BookingSheetConvert",
         "回收冲突",
         Some(&replay),
@@ -581,6 +613,7 @@ fn retry_survives_restart_reauthorizes_and_keeps_private_requests_off_the_wire()
         .jobs
         .start_replayable(
             &actor,
+            START_EXCEL_TEMPLATE_DOWNLOAD_JOB,
             "ExcelTemplateExport",
             "Excel 模板",
             Some(retry::Replay::new(

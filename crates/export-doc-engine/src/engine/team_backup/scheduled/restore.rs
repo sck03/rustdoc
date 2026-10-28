@@ -33,6 +33,7 @@ pub(in crate::engine) fn stage_restore(
     let (store, paths, owner) = (service.store.clone(), service.paths.clone(), actor.id);
     service.jobs.start_backup(
         actor,
+        STAGE_RECOVERY_ARCHIVE_RESTORE,
         "RecoveryArchiveRestore",
         "验证并暂存完整恢复",
         move |_| {
@@ -75,6 +76,7 @@ pub(in crate::engine) fn stage_restore(
             )?;
             Ok(tasks::TaskOutput {
                 managed_file: None,
+                publication: None,
                 file: None,
                 destination: None,
                 directory: None,

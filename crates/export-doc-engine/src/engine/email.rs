@@ -368,6 +368,7 @@ fn document_email(
     }
     service.jobs.start_replayable(
         actor,
+        START_INVOICE_DOCUMENT_EMAIL_JOB,
         "ReportDocumentEmail",
         "发票单据邮件发送",
         Some(Replay::new(
@@ -495,6 +496,7 @@ fn document_email(
                 ),
                 directory: None,
                 managed_file: None,
+                publication: None,
             })
         },
     )

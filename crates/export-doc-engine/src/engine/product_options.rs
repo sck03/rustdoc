@@ -96,9 +96,10 @@ mod tests {
                 admin: false,
                 departments: vec![],
                 oa_assigned_only: false,
-                grants: vec![
-                    json!({"resourceKey":"document.master-data","action":"view","dataScope":"all"}),
-                ],
+                grants: serde_json::from_value(json!([
+                    {"resourceKey":"document.master-data","action":"view","dataScope":"all"}
+                ]))
+                .unwrap(),
             };
             let mut user = contracts::initial(contracts::schema("ApiUserDto"));
             user["username"] = json!("buyer");

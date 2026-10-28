@@ -143,18 +143,23 @@ impl Scheduler {
             .map_err(|_| unavailable("灾备调度器状态异常。"))?
             .take();
         if let Some(worker) = worker {
-            *worker
-                .stop
-                .0
-                .lock()
-                .map_err(|_| unavailable("灾备停止状态异常。"))? = true;
-            worker.stop.1.notify_all();
+            signal(&worker)?;
             if worker.handle.thread().id() != std::thread::current().id() {
                 worker
                     .handle
                     .join()
                     .map_err(|_| unavailable("灾备调度线程异常退出。"))?;
             }
+        }
+        Ok(())
+    }
+    pub(in crate::engine) fn request_stop(&self) -> Result<()> {
+        let worker = self
+            .worker
+            .lock()
+            .map_err(|_| unavailable("灾备调度器状态异常。"))?;
+        if let Some(worker) = worker.as_ref() {
+            signal(worker)?;
         }
         Ok(())
     }
@@ -248,6 +253,15 @@ impl Scheduler {
         }
         start
     }
+}
+fn signal(worker: &Worker) -> Result<()> {
+    *worker
+        .stop
+        .0
+        .lock()
+        .map_err(|_| unavailable("灾备停止状态异常。"))? = true;
+    worker.stop.1.notify_all();
+    Ok(())
 }
 impl Drop for Scheduler {
     fn drop(&mut self) {

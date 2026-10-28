@@ -18,7 +18,7 @@ import { InvoiceItemsTable } from "./InvoiceItemsTable.tsx";
 import { InvoiceItemsEditorDialogs } from "./InvoiceItemsEditorDialogs.tsx";
 import { useInvoiceItemsEditorInteraction } from "./useInvoiceItemsEditorInteraction.ts";
 import { invoiceItemUnitLookupTargets, isInvoiceItemArrowNavigationKey, isInvoiceItemCellInputTarget, isInvoiceItemVerticalNavigationKey, shouldMoveInvoiceItemCellByArrow } from "./invoiceItemsEditorInteraction.ts";
-import { isUnitLookupSourceField, buildUnitCandidateLookup, findChineseUnitCandidates, normalizeUnitEnglishKey, canFillDownSelectedCells, normalizeInvoiceItemBlankRowCount, buildSelectedCellsClipboardText, calculateInvoiceItemTableMinWidth, readItemTextValue, parseInvoiceItemClipboardRows, createEmptyInvoiceItem, isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
+import { isUnitLookupSourceField, buildUnitCandidateLookup, findChineseUnitCandidates, normalizeUnitEnglishKey, canFillDownSelectedCells, normalizeInvoiceItemBlankRowCount, buildSelectedCellsClipboardText, getInvoiceItemSelectionBounds, calculateInvoiceItemTableMinWidth, readItemTextValue, parseInvoiceItemClipboardRows, createEmptyInvoiceItem, isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
 import {
   EditableInvoiceItemField,
   firstEditableInvoiceItemField,
@@ -414,7 +414,7 @@ export function InvoiceItemsEditor({
     }
 
     if (hasFillDownSelection) {
-      markInvoiceItemMutationFrom(Math.min(...selectedCells.map((cell) => cell.rowIndex)));
+      markInvoiceItemMutationFrom(getInvoiceItemSelectionBounds(selectedCells, visibleColumns)?.rowStart ?? 0);
       onFillDownItemCells(selectedCells);
       setEditorMessage("已按选区向下填充。");
       return;
@@ -444,7 +444,7 @@ export function InvoiceItemsEditor({
       return;
     }
 
-    markInvoiceItemMutationFrom(Math.min(...selectedCells.map((cell) => cell.rowIndex)));
+    markInvoiceItemMutationFrom(getInvoiceItemSelectionBounds(selectedCells, visibleColumns)?.rowStart ?? 0);
     onClearItemCells(selectedCells);
     setEditorMessage(`已清空 ${selectedCells.length} 个单元格。`);
   }

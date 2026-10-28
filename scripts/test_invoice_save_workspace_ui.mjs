@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
+import { runInvoiceItemsGridCases } from "./lib/invoice-items-grid-ui-cases.mjs";
 
 const root = path.resolve(import.meta.dirname, ".."), web = path.join(root, "apps/export-doc-web");
 const require = createRequire(path.join(web, "package.json"));
@@ -19,6 +20,7 @@ import {useInvoicePersistenceOperations} from ${source("features/invoices/useInv
 import {useInvoiceItemsWorkspace} from ${source("features/invoices/useInvoiceItemsWorkspace.ts")};
 import {createEmptyInvoice} from ${source("features/invoices/invoiceModel.ts")};
 import {createEmptyInvoiceItem} from ${source("features/invoices/invoiceItemsEditorModel.ts")};
+import {InvoiceItemsEditor} from ${source("features/invoices/InvoiceItemsEditor.tsx")};
 import {ConfirmationProvider} from ${source("ui/ConfirmationProvider.tsx")};
 window.requests=[]; window.resets=0; window.productWrites=[];
 const queryClient=new QueryClient({defaultOptions:{queries:{staleTime:30000,retry:false},mutations:{retry:false}}});
@@ -35,7 +37,7 @@ window.switchSource=setId;window.hide=()=>setShown(false);
 return shown?<Editor key={id} id={id}/>:<div>unmounted</div>;
 }
 function Editor({id}){
-const [invoice,setInvoice]=useState(()=>({...createEmptyInvoice("2026-10-25"),id,invoiceNo:"before-save",rowVersion:"native:1",items:[{...createEmptyInvoiceItem(id),styleNo:"ZZ-1",styleName:"item",quantity:1,unitPrice:1}]}));
+const [invoice,setInvoice]=useState(()=>({...createEmptyInvoice("2026-10-25"),id,invoiceNo:"before-save",rowVersion:"native:1",items:Array.from({length:window.initialRows??1},(_,index)=>({...createEmptyInvoiceItem(id),poNumber:"PO-"+index,styleNo:"ZZ-1",styleName:"item",quantity:1,unitPrice:1}))}));
 const [message,setMessage]=useState(null),[success,setSuccessMessage]=useState(null),[baseline,setPersistedInvoiceDraft]=useState(null);
 const [feedback,setPendingHsFeedback]=useState([]);const location=useLocation();window.locationState=location.state;window.currentRoute=location.pathname;
 const mutations=useInvoicePersistenceOperations({client,invoice,invoiceId:id,isNew:id===0,pendingHsFeedback:feedback,resetItemEditHistory:()=>window.resets++,
@@ -44,22 +46,36 @@ const items=useInvoiceItemsWorkspace({client,invoice,setInvoice,setSuccessMessag
 window.actions={save:()=>mutations.saveInvoiceMutation.mutate({...invoice}),product:()=>items.saveItemToProductLibrary(0),
 paste:()=>{try{items.pasteItemTable(0,"styleNo",Array(5001).fill(["item"]));}catch(error){setMessage(error.message);}}};
 window.baseline=baseline;window.invoice=invoice;window.saveBusy=mutations.saveInvoiceMutation.isPending;
+const grid=window.gridMode?<InvoiceItemsEditor client={client} items={invoice.items} currency="USD" totals={invoice}
+defaultSpareColumnCount={10} canRedoItemEdit={items.canRedoItemEdit} canUndoItemEdit={items.canUndoItemEdit}
+canSaveToProductLibrary={false} canUseHsKnowledge={false} isProductLibraryBusy={false}
+onAddItem={items.addItem} onApplyProductLibraryItem={items.applyProductLibraryItem} onChangeItem={items.patchItem}
+onClearItemCells={cells=>{window.lastClearCount=cells.length;items.clearItemCells(cells)}}
+onDuplicateItem={items.duplicateItem} onFillDownItemCells={cells=>{window.lastFillCount=cells.length;items.fillDownItemCells(cells)}}
+onFillDownItemField={items.fillDownItemField} onMoveItem={items.moveItem} onPasteItemTable={items.pasteItemTable}
+onRedoItemEdit={items.redoItemEdit} onRefreshProductLibrary={items.refreshProductLibrary} onOpenProductLibrary={items.openProductLibrary}
+onRemoveItem={items.removeItem} onSaveItemToProductLibrary={items.saveItemToProductLibrary} onSearchProductLibrary={items.searchProductLibrary}
+onUndoItemEdit={items.undoItemEdit} productLibraryMessage={null} productLibraryProducts={[]}
+productLibraryPageNumber={1} productLibraryPageSize={30} productLibraryTotalCount={0} productLibraryTotalPages={1}
+onProductLibraryPageChange={items.setProductLibraryPageNumber} onProductLibraryPageSizeChange={items.changeProductLibraryPageSize}
+onHsKnowledgeFeedback={()=>{}} unitOptions={[]}/>:null;
 return <div><input aria-label="invoice-number" value={invoice.invoiceNo} onChange={e=>setInvoice(current=>({...current,invoiceNo:e.target.value}))}/>
 <button onClick={window.actions.save}>save</button><button onClick={window.actions.product}>product</button><button onClick={window.actions.paste}>paste</button>
-<output data-message>{message}</output><output data-success>{success}</output><output data-product>{items.productLibraryMessage}</output></div>;
+<output data-message>{message}</output><output data-success>{success}</output><output data-product>{items.productLibraryMessage}</output>{grid}</div>;
 }
 window.finish=(index=0)=>{const item=window.requests[index];item.resolve({id:7,isUpdate:!window.newInvoice,invoice:{...item.request.body,id:7,rowVersion:"native:2"}})};
 createRoot(document.getElementById("root")).render(<MemoryRouter><QueryClientProvider client={queryClient}><ConfirmationProvider><Harness/></ConfirmationProvider></QueryClientProvider></MemoryRouter>);
 ` }, outfile:bundle,bundle:true,platform:"browser",format:"iife",jsx:"automatic",logLevel:"silent" });
 const context=await require("playwright").chromium.launchPersistentContext(path.join(output,"Chrome"),{executablePath:locateChromeForTesting(root),headless:true});
 let passed=0;
-async function scenario(check,{isNew=false}={}){
-  const page=await context.newPage();page.setDefaultTimeout(7000);const errors=[];page.on("pageerror",error=>errors.push(error.message));
+async function scenario(check,{isNew=false,gridMode=false,initialRows=1}={}){
+  const page=await context.newPage();page.setDefaultTimeout(gridMode?20000:7000);const errors=[];page.on("pageerror",error=>errors.push(error.message));
   try{
     await page.setContent('<!doctype html><html lang="zh-CN"><title>Invoice save regression</title><div id="root"></div></html>');
-    await page.evaluate(value=>window.newInvoice=value,isNew);await page.addScriptTag({path:bundle});
+    if(gridMode)await page.addStyleTag({content:".item-editor-frame{height:600px;overflow:auto}.item-editor-table{border-collapse:collapse}.item-editor-table tbody tr:not(.item-virtual-spacer-row){height:42px}.item-virtual-spacer-cell{padding:0;border:0}"});
+    await page.evaluate(value=>Object.assign(window,value),{newInvoice:isNew,gridMode,initialRows});await page.addScriptTag({path:bundle});
     await page.getByRole("button",{name:"save",exact:true}).waitFor();await check(page);assert.deepEqual(errors,[]);passed++;
-  }catch(error){await page.screenshot({path:path.join(output,`failure-${passed}.png`),fullPage:true});throw error;}
+  }catch(error){if(errors.length)console.error("Browser errors:",errors);await page.screenshot({path:path.join(output,`failure-${passed}.png`),fullPage:false,timeout:5000}).catch(()=>{});throw error;}
   finally{await page.close();}
 }
 try{
@@ -116,5 +132,6 @@ try{
     await page.getByRole("button",{name:"paste",exact:true}).click();
     assert.match(await page.locator("[data-message]").textContent(),/5000/);assert.equal(await page.evaluate(()=>window.invoice.items.length),1);
   });
+  await runInvoiceItemsGridCases(scenario);
   console.log(`Invoice save workspace UI: ${passed} passed; ${output}`);
 }finally{await context.close();}

@@ -71,7 +71,7 @@ fn read(mut pipe: impl Read, limit: usize, strict: bool) -> std::io::Result<Vec<
 }
 pub fn run(
     command: &mut Command,
-    input: Vec<u8>,
+    input: impl AsRef<[u8]>,
     output_limit: usize,
     timeout: Duration,
 ) -> Result<Output, ApiError> {
@@ -118,61 +118,68 @@ pub fn run(
         .stderr
         .take()
         .ok_or_else(|| failure("工具缺少诊断管道。"))?;
-    let writer = thread::spawn(move || stdin.write_all(&input));
-    let (sender, receiver) = mpsc::channel();
-    let reader = thread::spawn(move || {
-        let _ = sender.send(read(stdout, output_limit, true));
-    });
-    let diagnostics = thread::spawn(move || read(stderr, 8192, false));
-    let deadline = Instant::now() + timeout;
-    let mut output = None;
-    let status = loop {
-        if let Err(cause) = operation::check() {
-            break Err(cause);
-        }
-        if output.is_none() {
-            match receiver.try_recv() {
-                Ok(Ok(bytes)) => output = Some(bytes),
-                Ok(Err(cause)) => break Err(failure(cause.to_string())),
-                Err(mpsc::TryRecvError::Disconnected) => break Err(failure("工具输出线程中断。")),
-                Err(mpsc::TryRecvError::Empty) => {}
+    let input = input.as_ref();
+    thread::scope(move |threads| {
+        // The process guard is dropped before scoped pipe threads are joined on unwind.
+        let mut process = process;
+        let writer = threads.spawn(move || stdin.write_all(input));
+        let (sender, receiver) = mpsc::channel();
+        let reader = threads.spawn(move || {
+            let _ = sender.send(read(stdout, output_limit, true));
+        });
+        let diagnostics = threads.spawn(move || read(stderr, 8192, false));
+        let deadline = Instant::now() + timeout;
+        let mut output = None;
+        let status = loop {
+            if let Err(cause) = operation::check() {
+                break Err(cause);
             }
+            if output.is_none() {
+                match receiver.try_recv() {
+                    Ok(Ok(bytes)) => output = Some(bytes),
+                    Ok(Err(cause)) => break Err(failure(cause.to_string())),
+                    Err(mpsc::TryRecvError::Disconnected) => {
+                        break Err(failure("工具输出线程中断。"));
+                    }
+                    Err(mpsc::TryRecvError::Empty) => {}
+                }
+            }
+            match process.child.try_wait() {
+                Ok(Some(status)) => break Ok(status),
+                Ok(None) => {}
+                Err(cause) => break Err(failure(cause.to_string())),
+            }
+            if Instant::now() >= deadline {
+                break Err(ApiError {
+                    status: Some(504),
+                    message: "受控工具超过运行时限，已终止进程树。".into(),
+                    diagnostic: Some("controlled-process-timeout"),
+                });
+            }
+            thread::sleep(Duration::from_millis(20));
+        };
+        process.stop();
+        let write_result = writer.join().map_err(|_| failure("工具输入线程异常。"))?;
+        reader.join().map_err(|_| failure("工具输出线程异常。"))?;
+        let diagnostic = diagnostics
+            .join()
+            .map_err(|_| failure("工具诊断线程异常。"))?
+            .map_err(|e| failure(e.to_string()))?;
+        let status = status?;
+        let bytes = match output {
+            Some(bytes) => bytes,
+            None => receiver
+                .recv()
+                .map_err(|_| failure("工具没有返回输出。"))?
+                .map_err(|e| failure(e.to_string()))?,
+        };
+        if status.success() {
+            write_result.map_err(|e| failure(e.to_string()))?;
         }
-        match process.child.try_wait() {
-            Ok(Some(status)) => break Ok(status),
-            Ok(None) => {}
-            Err(cause) => break Err(failure(cause.to_string())),
-        }
-        if Instant::now() >= deadline {
-            break Err(ApiError {
-                status: Some(504),
-                message: "受控工具超过运行时限，已终止进程树。".into(),
-                diagnostic: Some("controlled-process-timeout"),
-            });
-        }
-        thread::sleep(Duration::from_millis(20));
-    };
-    process.stop();
-    let write_result = writer.join().map_err(|_| failure("工具输入线程异常。"))?;
-    reader.join().map_err(|_| failure("工具输出线程异常。"))?;
-    let diagnostic = diagnostics
-        .join()
-        .map_err(|_| failure("工具诊断线程异常。"))?
-        .map_err(|e| failure(e.to_string()))?;
-    let status = status?;
-    let bytes = match output {
-        Some(bytes) => bytes,
-        None => receiver
-            .recv()
-            .map_err(|_| failure("工具没有返回输出。"))?
-            .map_err(|e| failure(e.to_string()))?,
-    };
-    if status.success() {
-        write_result.map_err(|e| failure(e.to_string()))?;
-    }
-    Ok(Output {
-        stdout: bytes,
-        stderr: String::from_utf8_lossy(&diagnostic).into_owned(),
-        status,
+        Ok(Output {
+            stdout: bytes,
+            stderr: String::from_utf8_lossy(&diagnostic).into_owned(),
+            status,
+        })
     })
 }

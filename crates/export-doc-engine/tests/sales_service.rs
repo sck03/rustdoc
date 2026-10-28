@@ -1,7 +1,8 @@
 #[path = "support/native_fixture.rs"]
 #[allow(dead_code)]
 mod native_fixture;
-use export_doc_engine::{api::ApiClient, contracts, generated_api::*};
+use export_doc_engine::{contracts, generated_api::*};
+use native_fixture::ApiClient;
 use serde_json::{Value, json};
 
 fn call(client: &ApiClient, operation: Operation, id: i64, body: Value) -> Value {

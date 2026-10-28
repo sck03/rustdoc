@@ -62,38 +62,6 @@ fn destination(body: &Value, local: bool, zip: bool) -> Result<Option<PathBuf>> 
     }
     Ok(Some(path))
 }
-fn output_name(data: &ReportData, template: &Template, id: i64) -> String {
-    let number = if data.report_type == "PaymentVoucher" {
-        data.text("Payment.VoucherNo")
-    } else {
-        data.text("Invoice.InvoiceNo")
-    };
-    paths::suggested_pdf_name(&format!(
-        "{}-{}-{id}",
-        if number.is_empty() {
-            "单据".into()
-        } else {
-            number
-        },
-        template.label()
-    ))
-}
-pub(crate) fn invoice_document(
-    store: &Store,
-    paths: &crate::paths::RuntimePaths,
-    fonts: &render::Fonts,
-    actor: &Actor,
-    id: i64,
-    item: &Value,
-    action: &str,
-    cancelled: &AtomicBool,
-) -> Result<(Document, String)> {
-    let (data, template) = prepare(store, paths, actor, id, item, false, action)?;
-    Ok((
-        template.render(&data, fonts, cancelled)?,
-        output_name(&data, &template, id),
-    ))
-}
 pub(super) fn start(
     service: &NativeService,
     actor: &Actor,
@@ -130,19 +98,15 @@ pub(super) fn start(
     if target.is_some() && service.provider()? != "SQLite" {
         return Err(error(403, "服务器不能保存到客户端本机路径。"));
     }
-    for id in &ids {
-        for request in &requests {
-            prepare(
-                &service.store,
-                &service.paths,
-                actor,
-                *id,
-                request,
-                payment,
-                "export-pdf",
-            )?;
-        }
-    }
+    super::preparation::validate_access(
+        &service.store,
+        &service.paths,
+        actor,
+        &ids,
+        &requests,
+        payment,
+        "export-pdf",
+    )?;
     let store = service.store.clone();
     let paths = service.paths.clone();
     let fonts = service.report_fonts.clone();
@@ -150,6 +114,7 @@ pub(super) fn start(
     let replay = Replay::new(operation, parameters, body);
     service.jobs.start_replayable(
         actor,
+        operation,
         if zip {
             "InvoiceReportPdfZip"
         } else if payment {
@@ -170,15 +135,21 @@ pub(super) fn start(
             let mut single_file = None;
             let mut output_index = 0;
             for id in &ids {
-                for request in &requests {
+                let actor = auth::current_actor(&store, actor_id)?;
+                auth::authorize_operation(&actor, operation, &[])?;
+                for prepared in prepare_batch(
+                    &store,
+                    &paths,
+                    &actor,
+                    *id,
+                    &requests,
+                    payment,
+                    "export-pdf",
+                )? {
                     crate::operation::check()?;
-                    let actor = auth::current_actor(&store, actor_id)?;
-                    auth::authorize_operation(&actor, operation, &[])?;
-                    let (data, template) =
-                        prepare(&store, &paths, &actor, *id, request, payment, "export-pdf")?;
-                    let document = template.render(&data, &fonts, cancelled)?;
+                    let document = prepared.render(&fonts, cancelled)?;
                     let pdf = render::pdf_document(&document, &fonts, cancelled)?;
-                    let name = output_name(&data, &template, *id);
+                    let name = prepared.file_name(*id);
                     output_index += 1;
                     if let Some(archive) = &mut archive {
                         let name = if requests.len() > 1 {
@@ -195,32 +166,6 @@ pub(super) fn start(
                     }
                 }
             }
-            let actor = auth::current_actor(&store, actor_id)?;
-            auth::authorize_operation(&actor, operation, &[])?;
-            for id in &ids {
-                subject(
-                    &store,
-                    &actor,
-                    if payment { "payments" } else { "invoices" },
-                    *id,
-                    "export-pdf",
-                )?;
-            }
-            for request in &requests {
-                let kind = if payment {
-                    "PaymentVoucher"
-                } else {
-                    report_type(&text(request, "reportType"))?
-                };
-                template(
-                    &store,
-                    &paths,
-                    &actor,
-                    &text(request, "templatePath"),
-                    kind,
-                    true,
-                )?;
-            }
             let (name, media, bytes) = if zip {
                 (
                     "单据报表.zip".into(),
@@ -235,7 +180,13 @@ pub(super) fn start(
             };
             let mut output = TaskOutput::file(name, media, bytes);
             output.destination = target;
-            Ok(output)
+            Ok(output.check_on_publish(publication_check(
+                &paths,
+                ids,
+                requests,
+                payment,
+                "export-pdf",
+            )?))
         },
     )
 }

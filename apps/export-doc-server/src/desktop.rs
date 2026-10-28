@@ -37,7 +37,8 @@ impl DesktopHost {
             .map_err(|e| e.to_string())?
             .to_string();
         let access_token = format!("{}{}", nonce()?, nonce()?);
-        let routes = desktop_router(service.clone(), &access_token, &authority, development);
+        let (routes, control) =
+            desktop_router(service.clone(), &access_token, &authority, development);
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .max_blocking_threads(20)
@@ -51,7 +52,8 @@ impl DesktopHost {
                 let listener = tokio::net::TcpListener::from_std(listener)
                     .map_err(|e| e.to_string())?;
                 let health = service.clone();
-                axum::serve(listener, routes).with_graceful_shutdown(async move {
+                let closing = service.clone();
+                crate::serve(listener, routes, control, async move {
                     tokio::pin!(stopping);
                     let mut interval = tokio::time::interval(Duration::from_secs(2));
                     loop {
@@ -66,6 +68,7 @@ impl DesktopHost {
                             }
                         }
                     }
+                    let _ = closing.request_shutdown();
                 }).await.map_err(|e| e.to_string())
             });
             let closed = service.close().map_err(|e| e.to_string());
@@ -115,7 +118,7 @@ fn desktop_router(
     token: &str,
     authority: &str,
     development: bool,
-) -> Router {
+) -> (Router, crate::Shutdown) {
     let mut origins = vec![
         "tauri://localhost",
         "http://tauri.localhost",
@@ -135,27 +138,30 @@ fn desktop_router(
         .allow_credentials(true)
         .expose_headers([header::CONTENT_DISPOSITION]);
     let authority = authority.to_owned();
-    crate::compose_router(service, None, Some(Arc::from(token)))
-        .layer(cors)
-        .layer(middleware::from_fn(move |request: Request, next: Next| {
-            let authority = authority.clone();
-            let allowed = allowed.clone();
-            async move {
-                let valid_host = request
-                    .headers()
-                    .get(header::HOST)
-                    .and_then(|v| v.to_str().ok())
-                    == Some(authority.as_str());
-                let valid_origin = request
-                    .headers()
-                    .get(header::ORIGIN)
-                    .is_none_or(|origin| allowed.contains(origin));
-                if !valid_host || !valid_origin {
-                    return denied();
+    let (router, control) = crate::compose_router(service, None, Some(Arc::from(token)));
+    let router =
+        router
+            .layer(cors)
+            .layer(middleware::from_fn(move |request: Request, next: Next| {
+                let authority = authority.clone();
+                let allowed = allowed.clone();
+                async move {
+                    let valid_host = request
+                        .headers()
+                        .get(header::HOST)
+                        .and_then(|v| v.to_str().ok())
+                        == Some(authority.as_str());
+                    let valid_origin = request
+                        .headers()
+                        .get(header::ORIGIN)
+                        .is_none_or(|origin| allowed.contains(origin));
+                    if !valid_host || !valid_origin {
+                        return denied();
+                    }
+                    next.run(request).await
                 }
-                next.run(request).await
-            }
-        }))
+            }));
+    (router, control)
 }
 
 fn denied() -> Response {

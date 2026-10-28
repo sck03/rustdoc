@@ -280,6 +280,7 @@ pub(super) fn create_backup(service: &NativeService, actor: &Actor) -> Result<Va
     let pg_dump = tools.pg_dump;
     service.jobs.start_backup(
         actor,
+        CREATE_POSTGRE_SQL_PHYSICAL_BACKUP,
         "PostgreSqlPhysicalBackup",
         "创建 PostgreSQL 物理备份",
         move |_| {
@@ -331,13 +332,10 @@ pub(super) fn create_backup(service: &NativeService, actor: &Actor) -> Result<Va
                 let _ = fs::remove_file(&temporary);
             }
             let target = result?;
-            Ok(tasks::TaskOutput {
-                file: None,
-                detail: format!("{name} 已写入运行目录，可通过下载票据安全获取。"),
-                destination: Some(target),
-                directory: None,
-                managed_file: None,
-            })
+            tasks::TaskOutput::managed_file(
+                target,
+                format!("{name} 已写入运行目录，可通过下载票据安全获取。"),
+            )
         },
     )
 }

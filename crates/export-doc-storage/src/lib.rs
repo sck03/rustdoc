@@ -328,6 +328,42 @@ trait Adapter: Send {
         let (sql, projection) = generic_query::build(query, self.provider() == "PostgreSQL")?;
         self.query_page(&sql, &projection, query.offset, query.limit)
     }
+    /// Descending keyset scan without a count. The cursor uses the physical
+    /// record id even when the caller projects fields that omit the DTO id.
+    fn scan_generic(
+        &self,
+        query: &GenericQuery<'_>,
+        before_id: Option<i64>,
+    ) -> Result<(Option<i64>, Vec<Value>)> {
+        let pg = self.provider() == "PostgreSQL";
+        let (mut sql, projection) = generic_query::build(query, pg)?;
+        if let Some(id) = before_id {
+            let cursor = sql::bind(&mut sql.values, id, pg);
+            sql.filter
+                .push_str(&format!(" AND r.id<CAST({cursor} AS BIGINT)"));
+        }
+        sql.order = "r.id DESC".into();
+        let projection = if pg {
+            format!("jsonb_build_array(r.id,({projection})::jsonb)::text")
+        } else {
+            format!("json_array(r.id,json({projection}))")
+        };
+        let mut cursor = before_id;
+        let mut rows = Vec::new();
+        for mut row in self.query_slice(&sql, &projection, 0, query.limit)? {
+            let parts = row
+                .as_array_mut()
+                .filter(|parts| parts.len() == 2)
+                .ok_or_else(|| Error::unavailable("记录扫描结果损坏。"))?;
+            let id = parts[0]
+                .as_i64()
+                .filter(|id| *id > 0 && cursor.is_none_or(|cursor| *id < cursor))
+                .ok_or_else(|| Error::unavailable("记录扫描游标无效。"))?;
+            cursor = Some(id);
+            rows.push(parts.pop().expect("validated row projection"));
+        }
+        Ok((cursor, rows))
+    }
     fn resource_references(
         &self,
         kind: &str,
@@ -654,6 +690,7 @@ delegate! {
     expired_job_outputs(policy:&JobOutputRetention)->Vec<Value>;
     expired_job_inputs(policy:&JobOutputRetention)->Vec<Value>;
     query_generic(query:&GenericQuery<'_>)->(i64, Vec<Value>);
+    scan_generic(query:&GenericQuery<'_>,before_id:Option<i64>)->(Option<i64>, Vec<Value>);
     resource_references(kind:&str,offset:i64,limit:i64)->(i64,Vec<Value>);
     query_scoped(query:&ScopedQuery<'_>)->(i64,Vec<Value>);
     query_business(query:&BusinessQuery<'_>)->(i64, Vec<Value>);

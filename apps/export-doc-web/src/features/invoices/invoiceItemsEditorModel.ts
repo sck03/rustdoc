@@ -6,7 +6,7 @@ import type { EditableInvoiceItemField, InvoiceItemColumnDefinition } from "./in
 import { invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
 import { parseTabularClipboard } from "../../ui/tabularClipboard.ts";
 import { invoiceItemPriceCalculationModes, invoiceItemUnitPriceMaximumScale, invoiceItemUnitPriceStandardScale, invoiceItemWeightScale, invoiceItemVolumeScale, roundTo, roundUnitPrice, roundWeight, roundVolume, normalizePriceCalculationMode, normalizeInvoiceItemPrices, copyInvoiceItemWithTotals } from "./invoiceItemCalculation.ts";
-export { invoiceItemPriceCalculationModes, invoiceItemUnitPriceStandardScale, invoiceItemUnitPriceMaximumScale, invoiceItemWeightScale, invoiceItemVolumeScale, recalculateInvoiceItem, calculateInvoiceTotals, normalizePriceCalculationMode, hasChanged, roundMoney, roundTo, roundUnitPrice, roundWeight, roundVolume } from "./invoiceItemCalculation.ts";
+export { invoiceItemPriceCalculationModes, invoiceItemUnitPriceStandardScale, invoiceItemUnitPriceMaximumScale, invoiceItemWeightScale, invoiceItemVolumeScale, recalculateInvoiceItem, calculateInvoiceTotals, haveInvoiceTotalsInputsChanged, normalizePriceCalculationMode, hasChanged, roundMoney, roundTo, roundUnitPrice, roundWeight, roundVolume } from "./invoiceItemCalculation.ts";
 export type { InvoiceItemPriceCalculationMode } from "./invoiceItemCalculation.ts";
 export const maxInvoiceItemRows = ApiInvoiceEditingLimitsContractDefaults.maxItems;
 export type InvoiceItemCellSelection = { rowIndex: number; field: EditableInvoiceItemField };
@@ -67,10 +67,11 @@ export function parseCellKey(key: string, columns = invoiceItemEditableColumns):
 }
 
 export function readSelectedCells(keys: Set<string>, itemCount: number, columns = invoiceItemEditableColumns) {
+  const columnIndices = new Map(columns.map((column, index) => [column.field, index]));
   return Array.from(keys)
     .map((key) => parseCellKey(key, columns))
     .filter((cell): cell is InvoiceItemCellSelection => Boolean(cell && cell.rowIndex >= 0 && cell.rowIndex < itemCount))
-    .sort((left, right) => compareInvoiceItemCells(left, right, columns));
+    .sort((left, right) => left.rowIndex - right.rowIndex || columnIndices.get(left.field)! - columnIndices.get(right.field)!);
 }
 
 export function canFillDownSelectedCells(cells: InvoiceItemCellSelection[]) {
@@ -145,8 +146,10 @@ export function calculateInvoiceItemVirtualRange(
     };
   }
 
-  const visibleBodyTop = Math.max(0, scrollTop - invoiceItemHeaderHeightPx);
   const effectiveViewportHeight = Math.max(viewportHeight || 0, invoiceItemRowHeightPx * 8);
+  const maximumScrollTop = Math.max(0, invoiceItemHeaderHeightPx + rowCount * invoiceItemRowHeightPx - effectiveViewportHeight);
+  const boundedScrollTop = Math.min(Math.max(0, scrollTop), maximumScrollTop);
+  const visibleBodyTop = Math.max(0, boundedScrollTop - invoiceItemHeaderHeightPx);
   const startIndex = Math.max(0, Math.floor(visibleBodyTop / invoiceItemRowHeightPx) - invoiceItemVirtualOverscanRows);
   const endIndex = Math.min(
     rowCount,
@@ -161,20 +164,33 @@ export function calculateInvoiceItemVirtualRange(
   };
 }
 
+/** Linear bounds avoid spreading large selections into JavaScript call arguments. */
+export function getInvoiceItemSelectionBounds(cells: readonly InvoiceItemCellSelection[], columns = invoiceItemEditableColumns) {
+  const columnIndices = new Map(columns.map((column, index) => [column.field, index]));
+  let rowStart = Infinity, rowEnd = -1, columnStart = Infinity, columnEnd = -1;
+  for (const cell of cells) {
+    const column = columnIndices.get(cell.field);
+    if (column === undefined || cell.rowIndex < 0) continue;
+    rowStart = Math.min(rowStart, cell.rowIndex);
+    rowEnd = Math.max(rowEnd, cell.rowIndex);
+    columnStart = Math.min(columnStart, column);
+    columnEnd = Math.max(columnEnd, column);
+  }
+  return rowEnd < 0 ? null : { rowStart, rowEnd, columnStart, columnEnd };
+}
+
 export function buildSelectedCellsClipboardText(
   cells: InvoiceItemCellSelection[],
   items: ApiInvoiceItemDto[],
   columns = invoiceItemEditableColumns,
 ) {
-  if (cells.length === 0) {
+  const bounds = getInvoiceItemSelectionBounds(cells, columns);
+  if (!bounds) {
     return "";
   }
 
   const selectedKeys = new Set(cells.map(createCellKey));
-  const rowStart = Math.min(...cells.map((cell) => cell.rowIndex));
-  const rowEnd = Math.max(...cells.map((cell) => cell.rowIndex));
-  const columnStart = Math.min(...cells.map((cell) => getInvoiceItemColumnIndex(cell.field, columns)));
-  const columnEnd = Math.max(...cells.map((cell) => getInvoiceItemColumnIndex(cell.field, columns)));
+  const { rowStart, rowEnd, columnStart, columnEnd } = bounds;
   const lines: string[] = [];
 
   for (let rowIndex = rowStart; rowIndex <= rowEnd; rowIndex += 1) {

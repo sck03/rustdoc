@@ -147,7 +147,7 @@ pub fn recognize(service: &NativeService, bytes: &[u8], source: &str) -> Result<
     command.arg("--recognize-stdin");
     let output = controlled_process::run(
         &mut command,
-        bytes.to_vec(),
+        bytes,
         4 * 1024 * 1024,
         Duration::from_secs(90),
     )?;

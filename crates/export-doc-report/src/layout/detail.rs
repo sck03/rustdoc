@@ -449,7 +449,7 @@ pub(super) fn render(
             }
         }
         svg.push_str("</svg>");
-        pages.push(svg);
+        crate::document::push_svg(&mut pages, svg)?;
     }
     Ok(pages)
 }

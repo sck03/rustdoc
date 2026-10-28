@@ -136,7 +136,7 @@ pub fn cert_no(
     let Some(code) = code.filter(|_| (1..=2).contains(&kind.len())) else {
         return current;
     };
-    let date = if crate::invoice::valid_date(date) {
+    let date = if crate::business_date::is_valid(date) {
         date
     } else {
         today

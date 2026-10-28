@@ -9,6 +9,7 @@ pub mod announcement;
 pub mod approval;
 pub mod approval_policy;
 pub mod backup_plan;
+pub mod business_date;
 pub mod crm;
 pub mod designer;
 pub mod hs;

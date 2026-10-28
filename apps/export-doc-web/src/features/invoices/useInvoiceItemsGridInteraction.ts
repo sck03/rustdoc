@@ -2,6 +2,7 @@ import {
   type MouseEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -65,7 +66,8 @@ export function useInvoiceItemsGridInteraction({
     () => new Set(visibleColumns.map((column) => column.field)),
     [visibleColumns],
   );
-  const activeFocusedCell = focusedCell && visibleColumnFields.has(focusedCell.field) ? focusedCell : null;
+  const activeFocusedCell = focusedCell && displayRowCount > 0 && visibleColumnFields.has(focusedCell.field)
+    ? focusedCell.rowIndex < displayRowCount ? focusedCell : { ...focusedCell, rowIndex: displayRowCount - 1 } : null;
   const selectedCells = useMemo(
     () => readSelectedCells(selectedCellKeys, itemsLength, visibleColumns),
     [itemsLength, selectedCellKeys, visibleColumns],
@@ -132,6 +134,28 @@ export function useInvoiceItemsGridInteraction({
         : nextViewport,
     );
   }, []);
+
+  useLayoutEffect(() => {
+    const clamp = (cell: InvoiceItemCellSelection | null) => !cell || cell.rowIndex < displayRowCount
+      ? cell : displayRowCount ? { ...cell, rowIndex: displayRowCount - 1 } : null;
+    setFocusedCell(clamp);
+    setSelectionAnchor(clamp);
+    setPendingFocusCell(clamp);
+    setSelectedCellKeys(current => {
+      const kept = new Set<string>();
+      for (const key of current) {
+        const cell = parseCellKey(key);
+        if (cell && cell.rowIndex < itemsLength) kept.add(key);
+      }
+      return kept.size === current.size ? current : kept;
+    });
+    const element = tableFrameRef.current;
+    if (element) {
+      if (shouldVirtualizeRows) element.scrollTop = Math.min(element.scrollTop,
+        Math.max(0, invoiceItemHeaderHeightPx + displayRowCount * invoiceItemRowHeightPx - element.clientHeight));
+      updateTableViewportFromElement(element);
+    }
+  }, [displayRowCount, itemsLength, shouldVirtualizeRows, updateTableViewportFromElement]);
 
   const handleTableScroll = useCallback(() => {
     const element = tableFrameRef.current;

@@ -138,7 +138,7 @@ fn rules(scope: &'static str, row: Option<usize>, value: &Value, issues: &mut Ve
                 } else {
                     raw.into()
                 };
-                (!crate::invoice::valid_date(&date))
+                (!crate::business_date::is_valid(&date))
                     .then(|| format!("日期格式须为 {}", text(rule, "format")))
             }
             "ValidateDecimal" => {

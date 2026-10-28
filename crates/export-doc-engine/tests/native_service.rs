@@ -1,10 +1,8 @@
-use export_doc_engine::{
-    api::ApiClient, contracts, generated_api::*, invoice::InvoiceDraft, paths::nonce,
-};
+use export_doc_engine::{contracts, generated_api::*, invoice::InvoiceDraft, paths::nonce};
 use serde_json::{Value, json};
 #[path = "support/native_fixture.rs"]
 mod native_fixture;
-use native_fixture::Fixture;
+use native_fixture::{ApiClient, Fixture};
 
 #[test]
 fn personnel_directory_images_and_employment_events_use_the_public_contract() {
