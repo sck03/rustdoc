@@ -40,7 +40,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     </div>}
     {row.status === "HandedOff" && <InlineNotice tone="success" title="财务交接已登记">此状态仅记录资料交接，不代表已记账或已付款；办理人、时间和说明见审批与办理记录。</InlineNotice>}
     </header>
-    <OaApprovalDocument client={client} user={user} row={row} />
+    <OaApprovalDocument key={row.submissionId} client={client} user={user} row={row} />
     {user.capabilities.canManageUsers && row.status === "Pending" && Boolean(row.approvalPlan?.steps.some(step => step.status === "Waiting")) && <button type="button" className="command-button secondary" onClick={() => setReassigning(true)}>移交未完成审批</button>}
     {row.approvalPlan?.matchedBranch && <p>命中金额条件：{row.approvalPlan.matchedBranch}</p>}
     {row.approvalPlan && row.approvalPlan.steps.length > 0 && <section className="oa-detail-content" aria-label="审批步骤"><h3>审批步骤</h3><ol className="oa-history">{row.approvalPlan.steps.map((step, index) => <li key={step.approverUserId}><strong>第 {(step.stage ?? index) + 1} 阶段 · {step.approverName}（账号 #{step.approverUserId}）</strong> · {{ Waiting: "待审批", Approved: "已批准", Rejected: "已驳回" }[step.status]}{step.actedByUserId && <p>{step.delegationKey ? "代理办理：" : "办理人："}{step.actedByName}（账号 #{step.actedByUserId}） · {formatBusinessDateTime(step.actedAt, user.businessTimeZone)} · {step.note}</p>}</li>)}</ol></section>}
