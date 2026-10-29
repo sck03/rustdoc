@@ -13,13 +13,13 @@ use super::{
     store::{self, Actor, Store},
     tasks::FileOutput,
 };
+use crate::engine::store::Connection;
 use crate::{
     contracts,
     generated_api::*,
     paths::{self, RuntimePaths},
 };
 use catalog::*;
-use export_doc_storage::Connection;
 use package::*;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};

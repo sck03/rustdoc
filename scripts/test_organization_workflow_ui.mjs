@@ -25,9 +25,9 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   await admin.getByRole('button', { name: '办理调岗', exact: true }).click();
   const transfer = admin.getByRole('dialog', { name: /办理调岗/u });
   await transfer.locator('summary').filter({ hasText: '兼职与汇报关系' }).click();
-  await transfer.getByRole('button', { name: '添加兼职部门', exact: true }).click();
-  await transfer.getByRole('combobox', { name: '兼职部门', exact: true }).selectOption('ORGFIN');
-  await transfer.getByRole('combobox', { name: '兼职职位', exact: true }).fill('财务协调专员');
+  await transfer.getByRole('button', { name: '添加任职', exact: true }).click();
+  await transfer.getByRole('combobox', { name: '任职部门', exact: true }).selectOption('ORGFIN');
+  await transfer.getByRole('combobox', { name: '任职职位', exact: true }).fill('财务协调专员');
   const primary = transfer.getByRole('region', { name: '主职汇报', exact: true });
   async function pick(region, button, name) {
     await region.getByRole('button', { name: button, exact: true }).click();
@@ -51,6 +51,8 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   await admin.getByRole('button', { name: '编辑公司', exact: true }).click();
   const company = admin.getByRole('dialog', { name: '编辑公司', exact: true });
   await pick(company, '选择公司领导审批负责人', '执行总经理');
+  await company.locator('summary').filter({ hasText: '分管负责人' }).click();
+  await pick(company, '添加分管负责人', '会签乙');
   await company.locator('summary').filter({ hasText: '公司职位目录' }).click();
   await company.getByRole('button', { name: '添加公司职位' }).click();
   await company.getByRole('textbox', { name: '职位 1', exact: true }).fill('财务协调专员');
@@ -58,7 +60,12 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   await company.waitFor({ state: 'hidden' });
   const directory = await invoke('GetOrganizationDirectory', undefined, {}, token);
   assert.equal(directory.companies.find(c => c.code === 'DEFAULT').executiveEmployeeId, people[3].employee.id);
-  await admin.locator('[aria-label="公司信息"]').getByRole('link', { name: /执行总经理/u }).waitFor();
+  assert.equal(directory.companies.find(c => c.code === 'DEFAULT').additionalLeaders[0].employeeId, people[2].employee.id);
+  await admin.getByRole('button', { name: '编辑公司', exact: true }).click();
+  await company.locator('summary').filter({ hasText: '分管负责人' }).click();
+  await company.getByRole('group', { name: /会签乙/u }).waitFor();
+  await company.getByRole('button', { name: '关闭窗口', exact: true }).click();
+  await admin.locator('[aria-label="公司信息"]').getByText(/执行总经理/u).waitFor();
   await admin.screenshot({ path: path.join(output, 'company-executive.png'), fullPage: true });
   await admin.goto(`${url}/#/office/people`);
   await admin.getByRole('button', { name: '入职登记', exact: true }).click();
@@ -68,8 +75,8 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   await hire.getByRole('combobox', { name: '所属部门', exact: true }).selectOption('ORGOPS');
   await hire.getByRole('combobox', { name: '职位', exact: true }).fill('财务协调专员');
   await hire.locator('summary').filter({ hasText: '兼职与汇报关系' }).click();
-  await hire.getByRole('button', { name: '添加兼职部门', exact: true }).click();
-  await hire.getByRole('combobox', { name: '兼职部门', exact: true }).selectOption('ORGFIN');
+  await hire.getByRole('button', { name: '添加任职', exact: true }).click();
+  await hire.getByRole('combobox', { name: '任职部门', exact: true }).selectOption('ORGFIN');
   await pick(hire.getByRole('region', { name: '主职汇报', exact: true }), '选择直属负责人', '执行总经理');
   await hire.getByRole('button', { name: '登记入职', exact: true }).click();
   await hire.waitFor({ state: 'hidden' });
@@ -80,7 +87,7 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   assert.equal(hireDetails.organization.additionalAssignments[0].departmentId, 'ORGFIN');
   await admin.goto(`${url}/#/office/people/${hired.id}`);
   const facts = admin.getByRole('region', { name: '任职与汇报关系', exact: true });
-  await facts.getByText(/兼职部门：测试财务部/u).waitFor();
+  await facts.getByText(/DEFAULT · 测试财务部/u).waitFor();
   await admin.getByRole('button', { name: '编辑档案', exact: true }).click();
   const edit = admin.getByRole('dialog', { name: /编辑档案/u });
   await edit.getByRole('checkbox', { name: '纠正登记信息（须说明原因）', exact: true }).check();
@@ -90,7 +97,7 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   await admin.getByRole('button', { name: '编辑档案', exact: true }).click();
   await edit.getByRole('checkbox', { name: '纠正登记信息（须说明原因）', exact: true }).check();
   await edit.locator('summary').filter({ hasText: '兼职与汇报关系' }).click();
-  assert.equal(await edit.getByRole('combobox', { name: '兼职部门', exact: true }).inputValue(), 'ORGFIN');
+  assert.equal(await edit.getByRole('combobox', { name: '任职部门', exact: true }).inputValue(), 'ORGFIN');
   await edit.getByRole('button', { name: '清除直属负责人', exact: true }).click();
   await edit.getByRole('button', { name: '关闭窗口', exact: true }).click();
   const discard = admin.getByRole('dialog', { name: '放弃未保存的修改？', exact: true });
@@ -112,7 +119,7 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   await admin.getByRole('button', { name: '编辑档案', exact: true }).click();
   await edit.getByRole('checkbox', { name: '纠正登记信息（须说明原因）', exact: true }).check();
   await edit.locator('summary').filter({ hasText: '兼职与汇报关系' }).click();
-  await edit.getByRole('combobox', { name: '兼职职位', exact: true }).fill('兼职档案协调员');
+  await edit.getByRole('combobox', { name: '任职职位', exact: true }).fill('兼职档案协调员');
   await edit.getByRole('button', { name: '清除直属负责人', exact: true }).click();
   await edit.getByRole('textbox', { name: '登记纠错原因', exact: true }).fill('核对后修正兼职与汇报关系');
   await edit.getByRole('button', { name: '保存档案', exact: true }).click();
@@ -162,6 +169,11 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   const draft = await invoke('CreateGeneralRequest', { requestKey: 'org-ui-approval', employeeId: people[0].employee.id, departmentId: 'ORGFIN', title: '兼职部门会签申请', reason: '真实界面闭环测试', category: 'Other' }, {}, token);
   let row = await invoke('SubmitGeneralRequest', { expectedVersion: draft.versionNumber, note: '发起会签' }, { id: draft.id }, token);
   const first = await openPage('org-ui-1', 'Org-Workflow-2026');
+  const hubReads = [];
+  first.on('request', request => { if (request.url().includes('/api/office/approval-hub')) hubReads.push(request.url()); });
+  await first.reload();
+  await first.getByRole('region', { name: '申请与审批中心', exact: true }).getByRole('link', { name: /兼职部门会签申请/u }).waitFor();
+  assert.equal(hubReads.length, 1, 'One aggregated approval read on initial hub load');
   await first.goto(`${url}/#/office/requests/general?requestId=${row.id}`);
   await first.getByRole('button', { name: '批准', exact: true }).click();
   await first.getByRole('textbox', { name: '处理说明', exact: true }).fill('会签甲通过');

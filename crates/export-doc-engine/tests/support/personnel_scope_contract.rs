@@ -51,7 +51,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
             &service
                 .dispatch(
                     UPDATE_ORGANIZATION_DEPARTMENT,
-                    &[("code", row["code"].as_str().unwrap().into())],
+                    &[("id", row["id"].to_string())],
                     &[],
                     Some(body),
                     admin,

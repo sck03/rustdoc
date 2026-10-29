@@ -9,8 +9,13 @@ fn previews_are_bounded_single_use_and_release_payloads_transactionally() {
         .canonicalize()
         .unwrap()
         .join(format!("{}.db", nonce().unwrap()));
-    let tx = Connection::sqlite(&path).unwrap();
+    let pool = export_doc_storage::pool::Pool::single(
+        export_doc_storage::Connection::sqlite(&path).unwrap(),
+    );
+    let clock = BusinessClock::default();
+    let tx = Connection::new(pool.acquire(|| false).unwrap(), &clock);
     let actor = Actor {
+        context: String::new(),
         edition: Default::default(),
         id: 1,
         name: "test".into(),
@@ -21,7 +26,6 @@ fn previews_are_bounded_single_use_and_release_payloads_transactionally() {
         admin: true,
         grants: vec![],
     };
-    let clock = BusinessClock::default();
     let rows = vec![json!({"name":"测试"})];
     tx.begin().unwrap();
     let token = save(&tx, &actor, &clock, "suppliers", &rows).unwrap();
@@ -68,5 +72,6 @@ fn previews_are_bounded_single_use_and_release_payloads_transactionally() {
     );
     tx.rollback().unwrap();
     drop(tx);
+    drop(pool);
     std::fs::remove_file(path).unwrap();
 }

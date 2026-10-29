@@ -24,10 +24,10 @@ pub const OPERATIONS: &[Operation] = &[
 ];
 
 fn invoice(store: &Store, actor: &Actor, id: i64, action: &str) -> Result<Value> {
-    invoice_in(&*store.connection()?, actor, id, action)
+    invoice_in(&store.connection()?, actor, id, action)
 }
 fn invoice_in(
-    tx: &export_doc_storage::Connection,
+    tx: &crate::engine::store::Connection,
     actor: &Actor,
     id: i64,
     action: &str,

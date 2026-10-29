@@ -88,6 +88,7 @@ mod tests {
             let paths = RuntimePaths::server(&root, &root.join("Data")).unwrap();
             let store = Store::open(&paths).unwrap();
             let actor = Actor {
+                context: String::new(),
                 edition: Default::default(),
                 id: 1,
                 name: "采购员".into(),
@@ -105,7 +106,7 @@ mod tests {
             user["username"] = json!("buyer");
             user["status"] = json!("Active");
             store::save(
-                &*store.connection().unwrap(),
+                &store.connection().unwrap(),
                 "users",
                 0,
                 user,
@@ -124,7 +125,7 @@ mod tests {
                 product["nameCN"] = json!(cn);
                 product["nameEN"] = json!(en);
                 store::save(
-                    &*store.connection().unwrap(),
+                    &store.connection().unwrap(),
                     "products",
                     0,
                     product,

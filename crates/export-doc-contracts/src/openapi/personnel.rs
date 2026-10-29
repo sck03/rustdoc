@@ -23,15 +23,34 @@ pub(super) const FIELDS: &[(&str, &[&str])] = &[
     ("ApiUserDto", &["effectiveDepartmentIds"]),
     (
         "PersonnelClearance",
-        &["reportingCount", "isCompanyExecutive"],
+        &[
+            "reportingCount",
+            "isCompanyExecutive",
+            "businessDataCount",
+            "invoiceCount",
+            "paymentCount",
+            "otherBusinessDataCount",
+        ],
     ),
     (
         "ApiOrganizationCompanyDto",
-        &["executiveEmployeeId", "executiveName", "positions"],
+        &[
+            "executiveEmployeeId",
+            "executiveAppointmentId",
+            "executiveName",
+            "positions",
+            "additionalLeaders",
+            "additionalLeaderNames",
+        ],
     ),
     (
         "ApiOrganizationCompanySaveRequest",
-        &["executiveEmployeeId", "positions"],
+        &[
+            "executiveEmployeeId",
+            "executiveAppointmentId",
+            "positions",
+            "additionalLeaders",
+        ],
     ),
     ("ApiUserAccountDto", &["oaAssignedOnly"]),
     ("ApiUserSaveRequest", &["oaAssignedOnly"]),
@@ -40,7 +59,19 @@ pub(super) const FIELDS: &[(&str, &[&str])] = &[
     ("ApiPermissionTemplateSaveRequest", &["oaAssignedOnly"]),
     ("ApiUserCapabilitiesDto", &["oaAssignedOnly"]),
     ("PersonnelUpdateRequest", &["correctionNote"]),
-    ("ApiOrganizationDepartmentDto", &["managerEmployeeNumber"]),
+    (
+        "ApiOrganizationDepartmentDto",
+        &[
+            "managerEmployeeNumber",
+            "managerAppointmentId",
+            "additionalLeaders",
+            "additionalLeaderNames",
+        ],
+    ),
+    (
+        "ApiOrganizationDepartmentSaveRequest",
+        &["additionalLeaders", "managerAppointmentId"],
+    ),
     (
         "OfficeSupplyRequestRecord",
         &["employeeNumber", "employeeId"],

@@ -32,7 +32,8 @@ pub(super) fn extend(doc: &mut Value) {
             "id":int,"requestId":int,"submissionNumber":int,"requestVersion":int,
             "submittedAt":text,"approvedAt":text,"companyName":text,"departmentName":text,"formName":text,
             "status":text,"documentStatus":{"type":"string","enum":["NotApproved","Pending","Running","Ready","Failed","Voided"]},
-            "documentError":text,"documentDigest":text,"request":reference("OaSubmittedRequest")
+            "documentError":text,"documentDigest":text,"request":reference("OaSubmittedRequest"),
+            "applicantJobTitle":text,"appointment":reference("PersonnelAssignment")
         }),
         &[
             "id",

@@ -3,7 +3,7 @@ import { OfficeDialog, OfficePager, OfficeQueryState } from "../office/OfficeUi.
 import { useOrganizationManagers } from "./useOrganizationDirectory.ts";
 
 export function OrganizationManagerPicker({ client, companyCode, onSelect, onClose, personnel = false }: {
-  client: ExportDocManagerApiClient; companyCode: string; onSelect: (person: OrganizationManagerRecord) => void; onClose: () => void; personnel?: boolean;
+  client: ExportDocManagerApiClient; companyCode: string; onSelect: (person: OrganizationManagerRecord & { appointmentId: string }) => void; onClose: () => void; personnel?: boolean;
 }) {
   const model = useOrganizationManagers(client, companyCode, personnel);
   return <OfficeDialog title="选择部门负责人" onClose={onClose}>
@@ -14,7 +14,7 @@ export function OrganizationManagerPicker({ client, companyCode, onSelect, onClo
     </form>
     <OfficeQueryState query={model.query} emptyTitle="没有符合条件的在职人员" />
     {!model.query.isError && <ul className="organization-managers">{model.query.data?.items.map((person) => <li key={person.id}>
-      <button type="button" className="command-button secondary" onClick={() => onSelect(person)}><strong>{person.fullName}</strong><span>{person.employeeNumber} · {person.departmentName}</span></button>
+      {(person.appointments ?? []).map(appointment => <button key={appointment.id} type="button" className="command-button secondary" onClick={() => onSelect({ ...person, appointmentId: appointment.id })}><strong>{person.fullName}</strong><span>{person.employeeNumber} · {appointment.departmentName} · {appointment.jobTitle}</span></button>)}
     </li>)}</ul>}
     <OfficePager page={model.query.data} paging={model.paging} busy={model.query.isFetching} />
   </OfficeDialog>;

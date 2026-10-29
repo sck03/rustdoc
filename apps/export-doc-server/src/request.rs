@@ -207,8 +207,11 @@ async fn execute(
         let authentication_registration = registration.clone();
         tokio::task::spawn_blocking(move || {
             let _registration = authentication_registration;
-            authentication_scope
-                .run_result(|| service.session_actor(&authentication_token).map(|_| ()))
+            authentication_scope.run_result(|| {
+                service
+                    .session_actor_for_operation(&authentication_token, operation)
+                    .map(|_| ())
+            })
         })
         .await
         .map_err(|_| error(503, "上传会话验证中断。"))??;

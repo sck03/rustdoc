@@ -17,6 +17,8 @@ mod maintenance_query;
 mod oa_period_query;
 #[path = "support/office_query.rs"]
 mod office_query;
+#[path = "support/organization_fixture.rs"]
+mod organization_fixture;
 #[path = "support/organization_query.rs"]
 mod organization_query;
 #[path = "support/personnel_query.rs"]
@@ -138,7 +140,7 @@ fn roundtrip(connection: &Connection) {
             .len(),
         1
     );
-    let body = json!({"versionNumber":1,"ownerUserId":7,"companyScope":"公司é","departmentId":"销售部","currentApproverId":7,"approvalPlan":{"steps":[{"approverUserId":7,"status":"Waiting"}]},"amount":123456.789,"items":["零件",null]});
+    let body = json!({"versionNumber":1,"ownerUserId":7,"companyScope":"公司é","departmentId":"销售部","status":"Pending","amount":123456.789,"items":["零件",null]});
     connection.begin().unwrap();
     let id = connection
         .insert(&RecordWrite {
@@ -156,10 +158,16 @@ fn roundtrip(connection: &Connection) {
                 key: "review".into(),
                 node: "review".into(),
                 assignee: id,
+                context: String::new(),
                 acted_by: None,
+                acted_by_context: String::new(),
                 status: "Waiting".into(),
                 active: true,
+                independent: false,
                 due_at: "2026-10-30T00:00:00+00:00".into(),
+                started_at: "2026-10-29T00:00:00Z".into(),
+                acted_at: String::new(),
+                elapsed_seconds: None,
             }],
         )
         .unwrap();
@@ -178,10 +186,10 @@ fn roundtrip(connection: &Connection) {
         assert_eq!(connection.query_records(&visibility).unwrap().0, expected);
     }
     connection.set_body(id, &body).unwrap();
-    for (department, count) in [("其他部门", 0), ("销售部", 1)] {
+    {
         let approvers = [export_doc_storage::RecordApprover {
             user_id: id,
-            departments: Some(vec![department.into()]),
+            context: String::new(),
         }];
         let query = export_doc_storage::RecordQuery {
             kind: "contract",
@@ -190,7 +198,7 @@ fn roundtrip(connection: &Connection) {
             limit: 1,
             ..Default::default()
         };
-        assert_eq!(connection.query_records(&query).unwrap().0, count);
+        assert_eq!(connection.query_records(&query).unwrap().0, 1);
     }
     connection
         .set_credential(id, &[1; 32], &[2; 32], 600000)

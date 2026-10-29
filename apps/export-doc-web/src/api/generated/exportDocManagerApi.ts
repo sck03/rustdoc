@@ -628,7 +628,7 @@ export interface ApiCrmEmailVariableDraftDto {
   crmContactId?: number | null;
   crmCustomerId: number;
   toAddress: string;
-  variables: Record<string, unknown>;
+  variables: Record<string, string>;
 }
 
 export interface ApiCrmFollowUpDto {
@@ -1139,7 +1139,7 @@ export interface ApiEmailTemplatePreviewDto {
 export interface ApiEmailTemplatePreviewRequest {
   bodyHtml: string;
   subject: string;
-  variables: Record<string, unknown>;
+  variables: Record<string, string>;
 }
 
 export interface ApiEmailTemplateShareRequest {
@@ -2067,28 +2067,42 @@ export interface ApiOcrRecognizeImageResponse {
 }
 
 export interface ApiOrganizationCompanyDto {
+  additionalLeaderNames?: Record<string, string>;
+  additionalLeaders?: OrganizationLeader[];
   code: string;
+  executiveAppointmentId?: string | null;
   executiveEmployeeId?: number | null;
   executiveName?: string;
+  id: number;
   isActive: boolean;
   name: string;
+  parentCompanyCode?: string | null;
   positions?: OrganizationPosition[];
+  unitKind?: "Company" | "Group";
   versionNumber: number;
 }
 
 export interface ApiOrganizationCompanySaveRequest {
+  additionalLeaders?: OrganizationLeader[];
   code: string;
+  executiveAppointmentId?: string | null;
   executiveEmployeeId?: number | null;
   expectedVersion?: number;
   isActive: boolean;
   name: string;
+  parentCompanyCode?: string | null;
   positions?: OrganizationPosition[];
+  unitKind?: "Company" | "Group";
 }
 
 export interface ApiOrganizationDepartmentDto {
+  additionalLeaderNames?: Record<string, string>;
+  additionalLeaders?: OrganizationLeader[];
   code: string;
   companyCode: string;
+  id: number;
   isActive: boolean;
+  managerAppointmentId?: string | null;
   managerEmployeeId?: number | null;
   managerEmployeeNumber?: string;
   managerName: string;
@@ -2098,10 +2112,12 @@ export interface ApiOrganizationDepartmentDto {
 }
 
 export interface ApiOrganizationDepartmentSaveRequest {
+  additionalLeaders?: OrganizationLeader[];
   code: string;
   companyCode: string;
   expectedVersion?: number;
   isActive: boolean;
+  managerAppointmentId?: string | null;
   managerEmployeeId?: number | null;
   name: string;
   parentCode?: string | null;
@@ -2510,6 +2526,7 @@ export interface ApiPermissionTemplateCatalogResponse {
 }
 
 export interface ApiPermissionTemplateDto {
+  accountReferenceCount?: number;
   code: string;
   description: string;
   disabledModules?: string[];
@@ -2520,6 +2537,8 @@ export interface ApiPermissionTemplateDto {
   isSystem: boolean;
   name: string;
   oaAssignedOnly?: boolean;
+  ownerUnitId?: number | null;
+  unitRoleReferenceCount?: number;
   updatedAt: string;
   versionNumber: number;
 }
@@ -2974,7 +2993,7 @@ export interface ApiRuntimeJobMetrics {
   active: number;
   downloadMemory: { capacityBytes: number; rejections: number; reservedBytes: number };
   failed: boolean;
-  persistedCounts: Record<string, unknown>;
+  persistedCounts: Record<string, number>;
   retainedInputBytes: number;
   retainedOutputBytes: number;
   stopping: boolean;
@@ -3711,6 +3730,7 @@ export interface ApiUserCapabilitiesDto {
   oaAssignedOnly?: boolean;
   permissions: ApiPermissionGrantDto[];
   productEdition: string;
+  unitManagement?: UnitManagement;
 }
 
 export interface ApiUserDto {
@@ -3719,13 +3739,17 @@ export interface ApiUserDto {
   businessTimeZone: string;
   capabilities: ApiUserCapabilitiesDto;
   companyScope: string;
+  contextId?: string;
   departmentId: string;
   effectiveDepartmentIds?: string[];
   employee?: AccountPersonnelRecord | null;
   fullName: string;
   id: number;
   isActive: boolean;
+  permissionSource?: PermissionSource;
+  primaryCompanyScope?: string;
   role: string;
+  unitContexts?: UnitContext[];
   username: string;
 }
 
@@ -3987,9 +4011,9 @@ export interface DeleteRecordRequest {
 }
 
 export interface DocumentFieldLabelSettings {
-  invoice: Record<string, unknown>;
-  item: Record<string, unknown>;
-  payment: Record<string, unknown>;
+  invoice: Record<string, string>;
+  item: Record<string, string>;
+  payment: Record<string, string>;
 }
 
 export interface EmailConfig {
@@ -4360,6 +4384,17 @@ export interface OaApprovalDelegation {
   startsAt: string;
 }
 
+export interface OaApprovalHub {
+  entries: OaApprovalHubEntry[];
+}
+
+export interface OaApprovalHubEntry {
+  finance: boolean;
+  handling: boolean;
+  kind: "personnel" | "leave" | "overtime" | "expense" | "travel" | "purchase" | "general";
+  page: OaRequestPage;
+}
+
 export interface OaApprovalNode {
   decision: "All" | "Any";
   dependsOn: string[];
@@ -4368,6 +4403,7 @@ export interface OaApprovalNode {
   independentReview: boolean;
   key: string;
   name: string;
+  reviewPoints?: string[];
   skipped: boolean;
   startedAt: string;
 }
@@ -4390,6 +4426,7 @@ export interface OaApprovalReassign {
   fromUserId: number;
   note: string;
   taskKey: string;
+  toContextId?: string;
   toUserId: number;
 }
 
@@ -4432,15 +4469,19 @@ export interface OaApprovalStage {
   dueHours: number;
   key: string;
   name: string;
+  organizationRoute?: OaOrganizationRoute;
   repeatedApprover: "Allow" | "Reject";
+  reviewPoints?: string[];
   selfApproval: "Skip" | "Reject";
-  source: "Named" | "DepartmentManager" | "LineManager" | "FunctionalManagers" | "CompanyExecutive";
+  source: "Named" | "DepartmentManager" | "DepartmentLeaders" | "LineManager" | "FunctionalManagers" | "CompanyExecutive" | "CompanyLeaders";
 }
 
 export interface OaApprovalStep {
   actedAt: string;
+  actedByContext: string;
   actedByName: string;
   actedByUserId?: number | null;
+  approverContext: string;
   approverName: string;
   approverUserId: number;
   decision: "All" | "Any";
@@ -4517,6 +4558,11 @@ export interface OaLeave {
   endsOn: string;
   startPeriod: "AM" | "PM";
   startsOn: string;
+}
+
+export interface OaOrganizationRoute {
+  mode: "Current" | "Specified" | "Ancestor";
+  unitId?: number | null;
 }
 
 export interface OaOvertime {
@@ -4618,6 +4664,16 @@ export interface OaRequestSave {
   travel?: OaTravel;
 }
 
+export interface OaRoutingUnit {
+  code: string;
+  id: number;
+  name: string;
+}
+
+export interface OaRoutingUnits {
+  items: OaRoutingUnit[];
+}
+
 export interface OaSheetFields {
   Applicant?: string;
   ApplicantName?: string;
@@ -4647,7 +4703,24 @@ export interface OaSheetTemplate {
   name: string;
 }
 
+export interface OaSimulationRequest {
+  amount: string;
+  appointmentId: string;
+  category: string;
+  currency: string;
+  definition: OaApprovalRule;
+  duration: string;
+  employeeId: number;
+}
+
+export interface OaSimulationResult {
+  approvalPlan: OaApprovalPlan;
+  notes: string[];
+}
+
 export interface OaSubmission {
+  applicantJobTitle?: string;
+  appointment?: PersonnelAssignment;
   approvedAt?: string;
   companyName: string;
   departmentName: string;
@@ -4826,7 +4899,43 @@ export interface OfficeSupplySaveRequest {
   unit: string;
 }
 
+export interface OrganizationChangeImpact {
+  impacts: OrganizationGrantImpact[];
+  requiresHandover: boolean;
+  unitId: number;
+  versionNumber: number;
+}
+
+export interface OrganizationGrantImpact {
+  addedUnits: OrganizationImpactUnit[];
+  removedUnits: OrganizationImpactUnit[];
+  roleId: number;
+  roleName: string;
+  userId: number;
+  userName: string;
+}
+
+export interface OrganizationImpactUnit {
+  code: string;
+  id: number;
+  name: string;
+}
+
+export interface OrganizationLeader {
+  appointmentId?: string;
+  employeeId: number;
+  workflowKinds: ("leave" | "overtime" | "expense" | "travel" | "purchase" | "general" | "personnel" | "room" | "supply")[];
+}
+
+export interface OrganizationManagerAppointment {
+  departmentId: string;
+  departmentName: string;
+  id: string;
+  jobTitle: string;
+}
+
 export interface OrganizationManagerRecord {
+  appointments?: OrganizationManagerAppointment[];
   departmentName: string;
   employeeNumber: string;
   fullName: string;
@@ -4965,6 +5074,20 @@ export interface PaymentTemplateItem {
   templatePath: string;
 }
 
+export interface PermissionSource {
+  accountDisabledModules: string[];
+  authorityDisabledModules: string[];
+  endsAt: string;
+  identityDisabledModules: string[];
+  name: string;
+  oaAssignedOnly: boolean;
+  operations: string[];
+  schemeDisabledModules: string[];
+  startsAt: string;
+  templateId: number | null;
+  templateVersion: number | null;
+}
+
 export interface PersonnelAccountRecord {
   departmentId: string;
   fullName: string;
@@ -4981,13 +5104,19 @@ export interface PersonnelAccountRequest {
 }
 
 export interface PersonnelAssignment {
+  companyCode?: string;
   departmentId: string;
   departmentName?: string;
+  endsOn?: string;
+  functionalManagerAssignmentIds?: string[];
   functionalManagerEmployeeIds: number[];
   functionalManagerNames?: string[];
+  id?: string;
   jobTitle: string;
+  managerAssignmentId?: string | null;
   managerEmployeeId?: number | null;
   managerName?: string;
+  startsOn?: string;
 }
 
 export interface PersonnelAttachment {
@@ -5001,14 +5130,18 @@ export interface PersonnelAttachment {
 
 export interface PersonnelClearance {
   approvalCount?: number;
+  businessDataCount?: number;
   canDepart: boolean;
   handlingCount?: number;
   handlingServices?: string[];
+  invoiceCount?: number;
   isClear: boolean;
   isCompanyExecutive?: boolean;
   items: PersonnelClearanceItem[];
   managedDepartments: PersonnelManagedDepartment[];
   meetingCount: number;
+  otherBusinessDataCount?: number;
+  paymentCount?: number;
   reportingCount?: number;
   supplyCount: number;
 }
@@ -5061,9 +5194,13 @@ export interface PersonnelEventRecord {
   action: string;
   actorName: string;
   createdAt: string;
+  currentAppointments?: PersonnelAssignment[];
   effectiveDate: string;
   id: number;
   note: string;
+  previousAppointments?: PersonnelAssignment[];
+  previousPrimaryAssignmentId?: string | null;
+  primaryAssignmentId?: string | null;
   summary: string;
 }
 
@@ -5084,16 +5221,27 @@ export interface PersonnelManagedDepartment {
 export interface PersonnelOptions {
   approvalRequiredActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
   canCreate: boolean;
+  companies?: ApiOrganizationCompanyDto[];
   departments: PersonnelDepartmentRecord[];
   positions?: OrganizationPosition[];
 }
 
 export interface PersonnelOrganization {
   additionalAssignments: PersonnelAssignment[];
+  functionalManagerAssignmentIds?: string[];
   functionalManagerEmployeeIds: number[];
   functionalManagerNames?: string[];
+  managerAssignmentId?: string | null;
   managerEmployeeId?: number | null;
   managerName?: string;
+  primaryAssignmentId?: string;
+  primaryStartsOn?: string;
+}
+
+export interface PersonnelPrimaryAppointmentChange {
+  appointmentId: string;
+  expectedVersion: number;
+  note: string;
 }
 
 export interface PersonnelProfile {
@@ -5117,6 +5265,7 @@ export interface PersonnelRecord {
   account?: null | PersonnelAccountRecord;
   approvalRequiredActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
   attachments?: PersonnelAttachment[];
+  canChangePrimaryAppointment?: boolean;
   canCorrectRegistration: boolean;
   canDelete: boolean;
   canEdit: boolean;
@@ -5490,6 +5639,231 @@ export interface SystemSettings {
   updaterEndpoint: string;
 }
 
+export interface UnitAccessDirectory {
+  companies: ApiOrganizationCompanyDto[];
+  grantCeiling?: ApiPermissionGrantDto[] | null;
+  items: UnitAccessRecord[];
+  permissionTemplates: ApiPermissionTemplateDto[];
+  resources: ApiPermissionResourceDefinitionDto[];
+  users: UnitUserOption[];
+}
+
+export interface UnitAccessRecord {
+  appointmentId: string;
+  companyCode: string;
+  departmentId: string;
+  disabledModules: string[];
+  endsAt: string;
+  expectedVersion?: number;
+  id: number;
+  includeDescendants: boolean;
+  isActive: boolean;
+  management: UnitManagement;
+  mode: "Business" | "Collaboration" | "Administration";
+  name: string;
+  oaAssignedOnly: boolean;
+  permissionGrants: ApiPermissionGrantDto[] | null;
+  permissionTemplateId?: number | null;
+  startsAt: string;
+  userId: number;
+  userName: string;
+  versionNumber: number;
+}
+
+export interface UnitAccessSave {
+  appointmentId: string;
+  companyCode: string;
+  disabledModules: string[];
+  endsAt: string;
+  expectedVersion: number;
+  id?: number;
+  includeDescendants: boolean;
+  isActive: boolean;
+  management: UnitManagement;
+  mode: "Business" | "Collaboration" | "Administration";
+  name: string;
+  oaAssignedOnly: boolean;
+  permissionGrants: ApiPermissionGrantDto[] | null;
+  permissionTemplateId?: number | null;
+  startsAt: string;
+  userId: number;
+}
+
+export interface UnitAppointmentOption {
+  departmentId: string;
+  departmentName: string;
+  id: string;
+  jobTitle: string;
+}
+
+export interface UnitApproverContext {
+  departmentId: string;
+  id: string;
+  name: string;
+}
+
+export interface UnitApproverOption {
+  contexts: UnitApproverContext[];
+  departmentId: string;
+  fullName: string;
+  id: number;
+  username: string;
+}
+
+export interface UnitApproverOptions {
+  users: UnitApproverOption[];
+}
+
+export interface UnitContext {
+  companyCode: string;
+  companyName: string;
+  departmentId: string;
+  id: string;
+  mode: "Primary" | "Business" | "Collaboration" | "Administration";
+  name: string;
+}
+
+export interface UnitContextSelection {
+  contextId: string;
+}
+
+export interface UnitManagement {
+  analytics?: boolean;
+  appointments: boolean;
+  organization: boolean;
+  roles: boolean;
+  workflows: boolean;
+}
+
+export interface UnitMember {
+  accountId: number | null;
+  appointments: UnitMemberAppointment[];
+  employeeNumber: string;
+  fullName: string;
+  personId: number;
+  primaryCompanyCode: string;
+  status: string;
+  versionNumber: number;
+}
+
+export interface UnitMemberAppointment {
+  companyCode: string;
+  departmentId: string;
+  departmentName?: string;
+  endsOn: string;
+  functionalManagerAssignmentIds?: string[];
+  functionalManagerEmployeeIds: number[];
+  functionalManagerNames?: string[];
+  id?: string;
+  isPrimary: boolean;
+  jobTitle: string;
+  managerAssignmentId?: string | null;
+  managerEmployeeId?: number | null;
+  managerName?: string;
+  startsOn: string;
+}
+
+export interface UnitMemberDirectory {
+  departments: PersonnelDepartmentRecord[];
+  items: UnitMember[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface UnitMemberSave {
+  appointments: UnitMemberAppointment[];
+  companyCode: string;
+  expectedVersion: number;
+  note: string;
+  personId: number;
+}
+
+export interface UnitPermissionTemplateSave {
+  code: string;
+  description: string;
+  disabledModules?: string[];
+  expectedVersion?: number;
+  grants: ApiPermissionGrantDto[];
+  id: number;
+  isActive: boolean;
+  name: string;
+  oaAssignedOnly?: boolean;
+  unitId: number;
+}
+
+export interface UnitPermissionTemplates {
+  items: ApiPermissionTemplateDto[];
+  unitId: number;
+}
+
+export interface UnitTaskChange {
+  requestId: number;
+  versionNumber: number;
+}
+
+export interface UnitTaskReassignment {
+  expectedVersion: number;
+  fromUserId: number;
+  note: string;
+  requestId: number;
+  requestKind: "oa-leave" | "oa-overtime" | "oa-expense" | "oa-travel" | "oa-purchase" | "oa-general" | "oa-personnel" | "bookings" | "supply-requests";
+  taskKey: string;
+  toContextId?: string;
+  toUserId: number;
+}
+
+export interface UnitUserOption {
+  appointments: UnitAppointmentOption[];
+  companyCode: string;
+  id: number;
+  name: string;
+}
+
+export interface UnitWorkflowSummary {
+  asOf: string;
+  completedSince: string;
+  items: UnitWorkflowSummaryRow[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface UnitWorkflowSummaryRow {
+  activeTaskCount: number;
+  averageProcessingSeconds: number | null;
+  companyCode: string;
+  companyName: string;
+  completedTaskCount: number;
+  overdueTaskCount: number;
+  queuedTaskCount: number;
+  requestCount: number;
+  unitId: number;
+}
+
+export interface UnitWorkflowTask {
+  active: boolean;
+  assigneeId: number;
+  assigneeName: string;
+  authorizationEndsAt?: string;
+  companyCode: string;
+  contextId: string;
+  dueAt: string;
+  identityAvailable?: boolean;
+  nodeKey: string;
+  requestId: number;
+  requestKind: string;
+  taskKey: string;
+  versionNumber: number;
+}
+
+export interface UnitWorkflowTasks {
+  items: UnitWorkflowTask[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
 export interface UserReportTemplateSummaryRecord {
   canArchive: boolean;
   canDisable: boolean;
@@ -5647,8 +6021,15 @@ export const ApiInvoiceReportZipRequestDefaults = {
   templatePaths: null,
 } as const satisfies Partial<ApiInvoiceReportZipRequest>;
 
+export const ApiOrganizationCompanyDtoDefaults = {
+  parentCompanyCode: null,
+  unitKind: "Company",
+} as const satisfies Partial<ApiOrganizationCompanyDto>;
+
 export const ApiOrganizationCompanySaveRequestDefaults = {
   expectedVersion: 0,
+  parentCompanyCode: null,
+  unitKind: "Company",
 } as const satisfies Partial<ApiOrganizationCompanySaveRequest>;
 
 export const ApiOrganizationDepartmentDtoDefaults = {
@@ -5673,8 +6054,11 @@ export const ApiPaymentReportHtmlPreviewResponseDefaults = {
 } as const satisfies Partial<ApiPaymentReportHtmlPreviewResponse>;
 
 export const ApiPermissionTemplateDtoDefaults = {
+  accountReferenceCount: 0,
   disabledModules: [],
   oaAssignedOnly: false,
+  ownerUnitId: null,
+  unitRoleReferenceCount: 0,
   versionNumber: 1,
 } as const satisfies Partial<ApiPermissionTemplateDto>;
 
@@ -5845,6 +6229,12 @@ export const OfficeReturnRequestDefaults = {
   note: "",
 } as const satisfies Partial<OfficeReturnRequest>;
 
+export const PersonnelAssignmentDefaults = {
+  companyCode: "",
+  endsOn: "",
+  startsOn: "",
+} as const satisfies Partial<PersonnelAssignment>;
+
 export const PersonnelProfileDefaults = {
   emergencyContact: "",
   emergencyPhone: "",
@@ -5868,6 +6258,17 @@ export const PersonnelRecordDefaults = {
 export const PersonnelTransitionRequestDefaults = {
   onProbation: true,
 } as const satisfies Partial<PersonnelTransitionRequest>;
+
+export const UnitManagementDefaults = {
+  analytics: false,
+  appointments: false,
+} as const satisfies Partial<UnitManagement>;
+
+export const UnitPermissionTemplateSaveDefaults = {
+  disabledModules: [],
+  expectedVersion: 0,
+  oaAssignedOnly: false,
+} as const satisfies Partial<UnitPermissionTemplateSave>;
 
 export interface ActivateSingleWindowClientProfileRequest {
   profileKey: string;
@@ -6458,12 +6859,12 @@ export interface DeleteOfficeSupplyRequest {
 }
 
 export interface DeleteOrganizationCompanyRequest {
-  code: string;
+  id: number;
   body: DeleteRecordRequest;
 }
 
 export interface DeleteOrganizationDepartmentRequest {
-  code: string;
+  id: number;
   body: DeleteRecordRequest;
 }
 
@@ -6900,6 +7301,14 @@ export interface GetMeetingRoomAvailabilityRequest {
   to: string;
 }
 
+export interface GetOaApprovalHubRequest {
+  pageNumber?: number;
+  pageSize?: number;
+  status?: string;
+  mineOnly?: boolean;
+  approvalsOnly?: boolean;
+}
+
 export interface GetOfficeStockHistoryRequest {
   id: number;
   pageNumber?: number;
@@ -6953,6 +7362,7 @@ export interface GetPersonnelImageRequest {
 
 export interface GetPersonnelOptionsRequest {
   employeeId?: number;
+  companyCode?: string;
 }
 
 export interface GetPortRequest {
@@ -7034,6 +7444,38 @@ export interface GetTravelRequestRequest {
 
 export interface GetUnitRequest {
   id: number;
+}
+
+export interface GetUnitAccessDirectoryRequest {
+  companyCode?: string;
+}
+
+export interface GetUnitApproverOptionsRequest {
+  companyCode?: string;
+}
+
+export interface GetUnitMembersRequest {
+  companyCode?: string;
+  keyword?: string;
+  includeAvailable?: boolean;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetUnitPermissionTemplatesRequest {
+  companyCode?: string;
+}
+
+export interface GetUnitWorkflowSummaryRequest {
+  unitId?: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface GetUnitWorkflowTasksRequest {
+  assigneeId?: number;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface GetUserReportTemplateRequest {
@@ -7651,6 +8093,11 @@ export interface PreviewOcrImageRequest {
   filePath?: string;
 }
 
+export interface PreviewOrganizationCompanyChangeRequest {
+  id: number;
+  body: ApiOrganizationCompanySaveRequest;
+}
+
 export interface PreviewPaymentVoucherDraftHtmlRequest {
   body: ApiPaymentDraftReportHtmlPreviewRequest;
 }
@@ -7704,6 +8151,11 @@ export interface PreviewUploadedInvoiceTransferPackageRequest {
 export interface PreviewUserReportTemplateHistoryCleanupRequest {
   id: number;
   body: ApiTemplateHistoryCleanupPreviewRequest;
+}
+
+export interface PromotePersonnelAppointmentRequest {
+  id: number;
+  body: PersonnelPrimaryAppointmentChange;
 }
 
 export interface PublishAnnouncementRequest {
@@ -7819,6 +8271,11 @@ export interface ReassignPurchaseRequestApprovalRequest {
 export interface ReassignTravelRequestApprovalRequest {
   id: number;
   body: OaApprovalReassign;
+}
+
+export interface ReassignUnitWorkflowTaskRequest {
+  companyCode?: string;
+  body: UnitTaskReassignment;
 }
 
 export interface RecognizeOcrImageRequest {
@@ -8174,6 +8631,21 @@ export interface SaveSupportPackageToRuntimeRequest {
   body: ApiSupportPackageRequest;
 }
 
+export interface SaveUnitAccessRequest {
+  companyCode?: string;
+  body: UnitAccessSave;
+}
+
+export interface SaveUnitMemberRequest {
+  companyCode?: string;
+  body: UnitMemberSave;
+}
+
+export interface SaveUnitPermissionTemplateRequest {
+  companyCode?: string;
+  body: UnitPermissionTemplateSave;
+}
+
 export interface SaveUserReportTemplateDraftRequest {
   id: number;
   body: ApiUserReportTemplateDraftRequest;
@@ -8228,6 +8700,10 @@ export interface ShareEmailTemplateRequest {
 export interface ShareUserReportTemplateRequest {
   id: number;
   body: ApiUserReportTemplateShareRequest;
+}
+
+export interface SimulateOaDefinitionRequest {
+  body: OaSimulationRequest;
 }
 
 export interface StageRecoveryArchiveRestoreRequest {
@@ -8352,6 +8828,10 @@ export interface SubmitTravelRequestRequest {
 
 export interface SuggestEmailServerConfigRequest {
   body: ApiEmailServerSuggestionRequest;
+}
+
+export interface SwitchUnitContextRequest {
+  body: UnitContextSelection;
 }
 
 export interface TransferCrmFollowUpRequest {
@@ -8494,12 +8974,12 @@ export interface UpdateOfficeSupplyRequestRequest {
 }
 
 export interface UpdateOrganizationCompanyRequest {
-  code: string;
+  id: number;
   body: ApiOrganizationCompanySaveRequest;
 }
 
 export interface UpdateOrganizationDepartmentRequest {
-  code: string;
+  id: number;
   body: ApiOrganizationDepartmentSaveRequest;
 }
 
@@ -9906,7 +10386,7 @@ export class ExportDocManagerApiClient {
   }
 
   public deleteOrganizationCompany(request: DeleteOrganizationCompanyRequest, init?: ApiRequestInit): Promise<void> {
-    const path = `/api/organization-directory/companies/${encodePath(request.code)}`;
+    const path = `/api/organization-directory/companies/${encodePath(request.id)}`;
     return this.request<void>("DELETE", path, {
       body: request.body,
       init,
@@ -9914,7 +10394,7 @@ export class ExportDocManagerApiClient {
   }
 
   public deleteOrganizationDepartment(request: DeleteOrganizationDepartmentRequest, init?: ApiRequestInit): Promise<void> {
-    const path = `/api/organization-directory/departments/${encodePath(request.code)}`;
+    const path = `/api/organization-directory/departments/${encodePath(request.id)}`;
     return this.request<void>("DELETE", path, {
       body: request.body,
       init,
@@ -10578,9 +11058,28 @@ export class ExportDocManagerApiClient {
     return this.request<NotificationCount>("GET", path, { init });
   }
 
+  public getOaApprovalHub(request: GetOaApprovalHubRequest = {}, init?: ApiRequestInit): Promise<OaApprovalHub> {
+    const path = "/api/office/approval-hub";
+    return this.request<OaApprovalHub>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "status": request.status,
+        "mineOnly": request.mineOnly,
+        "approvalsOnly": request.approvalsOnly,
+      },
+      init,
+    });
+  }
+
   public getOaApprovalSettings(init?: ApiRequestInit): Promise<OaApprovalSettings> {
     const path = "/api/office/approval-settings";
     return this.request<OaApprovalSettings>("GET", path, { init });
+  }
+
+  public getOaRoutingUnits(init?: ApiRequestInit): Promise<OaRoutingUnits> {
+    const path = "/api/organization/routing-units";
+    return this.request<OaRoutingUnits>("GET", path, { init });
   }
 
   public getOfficeStockHistory(request: GetOfficeStockHistoryRequest, init?: ApiRequestInit): Promise<PagedResultOfOfficeStockMovementRecord> {
@@ -10666,6 +11165,7 @@ export class ExportDocManagerApiClient {
     return this.request<PersonnelOptions>("GET", path, {
       query: {
         "employeeId": request.employeeId,
+        "companyCode": request.companyCode,
       },
       init,
     });
@@ -10810,6 +11310,74 @@ export class ExportDocManagerApiClient {
   public getUnit(request: GetUnitRequest, init?: ApiRequestInit): Promise<ApiUnitDto> {
     const path = `/api/master-data/units/${encodePath(request.id)}`;
     return this.request<ApiUnitDto>("GET", path, { init });
+  }
+
+  public getUnitAccessDirectory(request: GetUnitAccessDirectoryRequest = {}, init?: ApiRequestInit): Promise<UnitAccessDirectory> {
+    const path = "/api/organization/unit-access";
+    return this.request<UnitAccessDirectory>("GET", path, {
+      query: {
+        "companyCode": request.companyCode,
+      },
+      init,
+    });
+  }
+
+  public getUnitApproverOptions(request: GetUnitApproverOptionsRequest = {}, init?: ApiRequestInit): Promise<UnitApproverOptions> {
+    const path = "/api/organization/unit-approvers";
+    return this.request<UnitApproverOptions>("GET", path, {
+      query: {
+        "companyCode": request.companyCode,
+      },
+      init,
+    });
+  }
+
+  public getUnitMembers(request: GetUnitMembersRequest = {}, init?: ApiRequestInit): Promise<UnitMemberDirectory> {
+    const path = "/api/organization/unit-members";
+    return this.request<UnitMemberDirectory>("GET", path, {
+      query: {
+        "companyCode": request.companyCode,
+        "keyword": request.keyword,
+        "includeAvailable": request.includeAvailable,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public getUnitPermissionTemplates(request: GetUnitPermissionTemplatesRequest = {}, init?: ApiRequestInit): Promise<UnitPermissionTemplates> {
+    const path = "/api/organization/unit-schemes";
+    return this.request<UnitPermissionTemplates>("GET", path, {
+      query: {
+        "companyCode": request.companyCode,
+      },
+      init,
+    });
+  }
+
+  public getUnitWorkflowSummary(request: GetUnitWorkflowSummaryRequest = {}, init?: ApiRequestInit): Promise<UnitWorkflowSummary> {
+    const path = "/api/organization/workflow-summary";
+    return this.request<UnitWorkflowSummary>("GET", path, {
+      query: {
+        "unitId": request.unitId,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public getUnitWorkflowTasks(request: GetUnitWorkflowTasksRequest = {}, init?: ApiRequestInit): Promise<UnitWorkflowTasks> {
+    const path = "/api/organization/unit-tasks";
+    return this.request<UnitWorkflowTasks>("GET", path, {
+      query: {
+        "assigneeId": request.assigneeId,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
   }
 
   public getUserReportTemplate(request: GetUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
@@ -12002,6 +12570,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public previewOrganizationCompanyChange(request: PreviewOrganizationCompanyChangeRequest, init?: ApiRequestInit): Promise<OrganizationChangeImpact> {
+    const path = `/api/organization-directory/companies/${encodePath(request.id)}/impact`;
+    return this.request<OrganizationChangeImpact>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public previewPaymentVoucherDraftHtml(request: PreviewPaymentVoucherDraftHtmlRequest, init?: ApiRequestInit): Promise<ApiPaymentReportHtmlPreviewResponse> {
     const path = "/api/reports/payments/draft/html-preview";
     return this.request<ApiPaymentReportHtmlPreviewResponse>("POST", path, {
@@ -12094,6 +12670,14 @@ export class ExportDocManagerApiClient {
   public previewUserReportTemplateHistoryCleanup(request: PreviewUserReportTemplateHistoryCleanupRequest, init?: ApiRequestInit): Promise<ApiTemplateHistoryCleanupPreview> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}/versions/cleanup/preview`;
     return this.request<ApiTemplateHistoryCleanupPreview>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public promotePersonnelAppointment(request: PromotePersonnelAppointmentRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    const path = `/api/office/people/${encodePath(request.id)}/primary-appointment`;
+    return this.request<PersonnelRecord>("POST", path, {
       body: request.body,
       init,
     });
@@ -12297,6 +12881,17 @@ export class ExportDocManagerApiClient {
   public reassignTravelRequestApproval(request: ReassignTravelRequestApprovalRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/travel-requests/${encodePath(request.id)}/approval-reassign`;
     return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public reassignUnitWorkflowTask(request: ReassignUnitWorkflowTaskRequest, init?: ApiRequestInit): Promise<UnitTaskChange> {
+    const path = "/api/organization/unit-tasks/reassign";
+    return this.request<UnitTaskChange>("POST", path, {
+      query: {
+        "companyCode": request.companyCode,
+      },
       body: request.body,
       init,
     });
@@ -12924,6 +13519,39 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public saveUnitAccess(request: SaveUnitAccessRequest, init?: ApiRequestInit): Promise<UnitAccessRecord> {
+    const path = "/api/organization/unit-access";
+    return this.request<UnitAccessRecord>("POST", path, {
+      query: {
+        "companyCode": request.companyCode,
+      },
+      body: request.body,
+      init,
+    });
+  }
+
+  public saveUnitMember(request: SaveUnitMemberRequest, init?: ApiRequestInit): Promise<UnitMember> {
+    const path = "/api/organization/unit-members";
+    return this.request<UnitMember>("POST", path, {
+      query: {
+        "companyCode": request.companyCode,
+      },
+      body: request.body,
+      init,
+    });
+  }
+
+  public saveUnitPermissionTemplate(request: SaveUnitPermissionTemplateRequest, init?: ApiRequestInit): Promise<ApiPermissionTemplateDto> {
+    const path = "/api/organization/unit-schemes";
+    return this.request<ApiPermissionTemplateDto>("POST", path, {
+      query: {
+        "companyCode": request.companyCode,
+      },
+      body: request.body,
+      init,
+    });
+  }
+
   public saveUserReportTemplateDraft(request: SaveUserReportTemplateDraftRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}/draft`;
     return this.request<ApiUserReportTemplateDto>("PUT", path, {
@@ -13024,6 +13652,14 @@ export class ExportDocManagerApiClient {
   public shareUserReportTemplate(request: ShareUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}/share`;
     return this.request<ApiUserReportTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public simulateOaDefinition(request: SimulateOaDefinitionRequest, init?: ApiRequestInit): Promise<OaSimulationResult> {
+    const path = "/api/organization/approval-simulation";
+    return this.request<OaSimulationResult>("POST", path, {
       body: request.body,
       init,
     });
@@ -13247,6 +13883,14 @@ export class ExportDocManagerApiClient {
   public suggestEmailServerConfig(request: SuggestEmailServerConfigRequest, init?: ApiRequestInit): Promise<ApiEmailServerSuggestionResponse> {
     const path = "/api/tools/email/server-suggestion";
     return this.request<ApiEmailServerSuggestionResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public switchUnitContext(request: SwitchUnitContextRequest, init?: ApiRequestInit): Promise<ApiLoginResponse> {
+    const path = "/api/auth/unit-context";
+    return this.request<ApiLoginResponse>("POST", path, {
       body: request.body,
       init,
     });
@@ -13492,7 +14136,7 @@ export class ExportDocManagerApiClient {
   }
 
   public updateOrganizationCompany(request: UpdateOrganizationCompanyRequest, init?: ApiRequestInit): Promise<ApiOrganizationCompanyDto> {
-    const path = `/api/organization-directory/companies/${encodePath(request.code)}`;
+    const path = `/api/organization-directory/companies/${encodePath(request.id)}`;
     return this.request<ApiOrganizationCompanyDto>("PUT", path, {
       body: request.body,
       init,
@@ -13500,7 +14144,7 @@ export class ExportDocManagerApiClient {
   }
 
   public updateOrganizationDepartment(request: UpdateOrganizationDepartmentRequest, init?: ApiRequestInit): Promise<ApiOrganizationDepartmentDto> {
-    const path = `/api/organization-directory/departments/${encodePath(request.code)}`;
+    const path = `/api/organization-directory/departments/${encodePath(request.id)}`;
     return this.request<ApiOrganizationDepartmentDto>("PUT", path, {
       body: request.body,
       init,

@@ -130,6 +130,7 @@ pub(super) fn handle(
         department: &actor.department,
         departments: &actor.departments,
         assigned_only: actor.oa_assigned_only,
+        context: &actor.context,
         reader: actor.id,
         unread_only: action != "inbox" || unread(query)?,
         view: CommunicationView::Notifications { scopes: &scopes },
@@ -212,12 +213,18 @@ pub(in crate::engine) fn on_event(
     loop {
         crate::operation::check()?;
         let users = if distribution {
-            tx.query_records(&RecordQuery {
+            tx.query_generic(&export_doc_storage::GenericQuery {
                 kind: "users",
-                company: &actor.company,
+                scope: export_doc_storage::DataScope {
+                    all: true,
+                    ..Default::default()
+                },
+                filters: &[("isActive", "true".into())],
+                keyword: "",
+                search_root: None,
+                fields: &[("id", "id"), ("isActive", "isActive")],
                 offset,
                 limit: 100,
-                ..Default::default()
             })?
             .1
         } else {
@@ -239,47 +246,61 @@ pub(in crate::engine) fn on_event(
             if !distribution && row["ownerUserId"] != id {
                 continue;
             }
-            let recipient = auth::current_actor_in(tx, id, actor.edition)?;
-            if auth::authorize(&recipient, "office.notifications", "view").is_err()
-                || !viewable(tx, &recipient, &resource, row)?
-            {
-                continue;
-            }
-            if completion
-                && !cc.contains(&id)
-                && row["ownerUserId"] != id
-                && !auth::visible(&recipient, &resource, "complete", row)
-            {
-                continue;
-            }
-            if review {
-                let can_review = authority(tx, &recipient, row)?.is_some();
-                if !can_review {
+            let recipients = match super::super::units::actors_for_operation(
+                tx,
+                id,
+                actor.edition,
+                &actor.company,
+                &resource,
+                if review { "approve" } else { "view" },
+            ) {
+                Ok(recipients) => recipients,
+                Err(e) if matches!(e.status, Some(400 | 401 | 403 | 404)) => continue,
+                Err(e) => return Err(e),
+            };
+            for recipient in recipients {
+                if auth::authorize(&recipient, "office.notifications", "view").is_err()
+                    || !viewable(tx, &recipient, &resource, row)?
+                {
                     continue;
                 }
+                if completion
+                    && !cc.contains(&id)
+                    && row["ownerUserId"] != id
+                    && !auth::visible(&recipient, &resource, "complete", row)
+                {
+                    continue;
+                }
+                if review {
+                    let can_review = authority(tx, &recipient, row)?.is_some();
+                    if !can_review {
+                        continue;
+                    }
+                }
+                if handling
+                    && !cc.contains(&id)
+                    && row["ownerUserId"] != id
+                    && !handling::can_handle(tx, &recipient, row, &resource)?
+                {
+                    continue;
+                }
+                let identity = format!("{}:{id}", event["id"]);
+                if tx.find_identity("site-notification", &identity)?.is_some() {
+                    continue;
+                }
+                let scope = json!({"companyScope":recipient.company,"departmentId":recipient.department,"ownerUserId":id});
+                store::save_in_scope(
+                    tx,
+                    "site-notification",
+                    0,
+                    json!({"identity":identity,"eventId":event["id"],"requestId":row["id"],"requestKind":match row["kind"].as_str() { Some("supply") => "supply-requests".into(), Some("room") => "bookings".into(), _ => format!("oa-{}",text(row,"kind")) },"title":row["title"],"action":action,"status":"Unread","readAt":""}),
+                    Some(identity),
+                    actor,
+                    "notify",
+                    Some(&scope),
+                )?;
+                break;
             }
-            if handling
-                && !cc.contains(&id)
-                && row["ownerUserId"] != id
-                && !handling::can_handle(tx, &recipient, row, &resource)?
-            {
-                continue;
-            }
-            let identity = format!("{}:{id}", event["id"]);
-            if tx.find_identity("site-notification", &identity)?.is_some() {
-                continue;
-            }
-            let scope = json!({"companyScope":recipient.company,"departmentId":recipient.department,"ownerUserId":id});
-            store::save_in_scope(
-                tx,
-                "site-notification",
-                0,
-                json!({"identity":identity,"eventId":event["id"],"requestId":row["id"],"requestKind":match row["kind"].as_str() { Some("supply") => "supply-requests".into(), Some("room") => "bookings".into(), _ => format!("oa-{}",text(row,"kind")) },"title":row["title"],"action":action,"status":"Unread","readAt":""}),
-                Some(identity),
-                actor,
-                "notify",
-                Some(&scope),
-            )?;
         }
         if !distribution {
             break;

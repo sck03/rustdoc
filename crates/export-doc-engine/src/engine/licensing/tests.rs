@@ -45,6 +45,7 @@ fn open(workspace: &Workspace) -> Arc<NativeService> {
 }
 fn admin() -> Actor {
     Actor {
+        context: String::new(),
         edition: Default::default(),
         id: 1,
         name: "系统管理员".into(),
@@ -232,6 +233,7 @@ fn license_registration_requires_an_administrator() {
     let workspace = Workspace::new();
     let service = open(&workspace);
     let user = Actor {
+        context: String::new(),
         edition: Default::default(),
         id: 2,
         name: "用户".into(),

@@ -5,7 +5,7 @@ import { CdpClient, delay } from './lib/chromium-cdp.mjs';
 import { captureScreenshot, evaluate, getFreePort } from './lib/web-runtime-browser-session.mjs';
 import { spawnProcessTree, stopProcessTree } from './lib/child-process-tree.mjs';
 import { productEditionCatalog } from './lib/product-editions.mjs';
-import { verifyDesktopPayment } from './lib/native-payment-workflow.mjs';
+import { verifyDesktopOfficePermissions } from './lib/native-office-permissions.mjs';
 import { verifyDesktopDetailDesigner } from './lib/native-detail-designer.mjs';
 import { verifyDesktopListPagination } from './lib/native-list-pagination.mjs';
 import { verifyDesktopConditionalReports } from './lib/native-conditional-reports.mjs';
@@ -154,46 +154,7 @@ for (const edition of selected) {
       while (Date.now() < pageDeadline && !await run("!!document.querySelector('[aria-label=公司公告]')")) await delay(100);
       assert(await run("!!document.querySelector('[aria-label=公司公告]')"), 'Full SQLite announcement page missing');
       await captureScreenshot(cdp, path.join(output, `${edition}-announcements.png`));
-      const account = await request('createUserAccount', login.body.accessToken, {
-        username: 'desktop-employee', fullName: '普通员工桌面验收', role: 'OfficeEmployee', permissionTemplateId: null,
-        companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Desktop-Employee-2026',
-      });
-      assert.equal(account.status, 200);
-      await run("document.querySelector('.workspace-logout-button').click(); true");
-      const staffDeadline = Date.now() + 30000;
-      while (Date.now() < staffDeadline && !await run("!!document.querySelector('input[autocomplete=username]')")) await delay(100);
-      for (const [field, value] of [['username', 'desktop-employee'], ['current-password', 'Desktop-Employee-2026']]) {
-        await run(`document.querySelector('input[autocomplete="${field}"]').focus()`);
-        await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
-        await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
-        await cdp.send('Input.insertText', { text: value });
-      }
-      await run("document.querySelector('button[type=submit]').click(); true");
-      while (Date.now() < staffDeadline && await run("!!document.querySelector('input[autocomplete=username]')")) await delay(100);
-      assert.equal(await run('location.hash'), '#/office/approvals', 'Employee opens the office workspace');
-      await delay(500);
-      const staffText = await run('document.body.innerText');
-      assert(staffText.includes('人事管理') && staffText.includes('行政办公'));
-      const staffNavigation = await run("document.querySelector('#workspace-primary-navigation').textContent");
-      assert(staffNavigation.includes('工作台') && staffNavigation.includes('付款报销打印') && staffNavigation.includes('报表模板管理'));
-      assert(!staffText.includes('单证概览') && !staffText.includes('账号与权限') && !staffText.includes('人员档案'));
-      await captureScreenshot(cdp, path.join(output, `${edition}-employee.png`));
-      await run("location.hash='#/reports/templates/manage'; true");
-      const templateDeadline = Date.now() + 30000;
-      while (Date.now() < templateDeadline && !await run("!!document.querySelector('.template-select-field select')?.value")) await delay(100);
-      assert(!await run("!!document.querySelector('option[value=ExportDocument]')"), 'Employee designer excludes export documents');
-      const source = await run("document.querySelector('.template-select-field select').value");
-      assert(source, 'Employee payment template catalog loaded');
-      const staff = await request('Login', '', { username: 'desktop-employee', password: 'Desktop-Employee-2026' });
-      await verifyDesktopPayment({ run, request, staff: staff.body, cdp, output });
-      const cloned = await request('CloneUserReportTemplate', staff.body.accessToken,
-        { reportType: 'PaymentVoucher', name: '桌面私人付款模板', sourceTemplatePath: source });
-      assert.equal(cloned.status, 201); assert.equal(cloned.body.shareScope, 'Private');
-      await run(`location.hash='#/reports/templates?reportType=PaymentVoucher&userTemplateId=${cloned.body.id}'; true`);
-      const canvasDeadline = Date.now() + 30000;
-      while (Date.now() < canvasDeadline && !await run("!!document.querySelector('[data-v3-element-id]')")) await delay(100);
-      assert(await run("!!document.querySelector('[data-v3-element-id]')"), 'Employee payment designer renders inside WebView2');
-      await captureScreenshot(cdp, path.join(output, `${edition}-employee-designer.png`));
+      await verifyDesktopOfficePermissions({ run, request, token: login.body.accessToken, cdp, output, edition });
     } else { assert(!text.includes('人事管理') && !text.includes('行政办公') && !text.includes('账号与权限')); }
     results.push({ edition, home: expectedHome, version: health.body.productVersion, build: health.body.informationalVersion, ocr: marker.ocr, documentResources: marker.documentResources, statuses, screenshot: `${edition}.png` });
     await run("setTimeout(() => window.__TAURI_INTERNALS__.invoke('request_app_exit'), 100); true");

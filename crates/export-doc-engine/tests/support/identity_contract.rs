@@ -45,7 +45,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
             assert_eq!(
                 call(
                     UPDATE_ORGANIZATION_DEPARTMENT,
-                    &[("code", department.clone())],
+                    &[("id", organization["id"].to_string())],
                     &[],
                     Some(disabled)
                 )
@@ -178,7 +178,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
     assert_eq!(
         call(
             UPDATE_ORGANIZATION_DEPARTMENT,
-            &[("code", department.clone())],
+            &[("id", organization["id"].to_string())],
             &[],
             Some(department_body)
         )
@@ -194,7 +194,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         assert_eq!(
             call(
                 UPDATE_ORGANIZATION_DEPARTMENT,
-                &[("code", department.clone())],
+                &[("id", organization["id"].to_string())],
                 &[],
                 Some(body)
             )
@@ -207,7 +207,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
     organization["managerEmployeeId"] = people[1]["employee"]["id"].clone();
     let saved = call(
         UPDATE_ORGANIZATION_DEPARTMENT,
-        &[("code", department.clone())],
+        &[("id", organization["id"].to_string())],
         &[],
         Some(organization),
     )

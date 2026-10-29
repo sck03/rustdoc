@@ -10,9 +10,24 @@ use std::collections::{HashMap, HashSet};
 pub enum ApproverSource {
     Named,
     DepartmentManager,
+    DepartmentLeaders,
     LineManager,
     FunctionalManagers,
     CompanyExecutive,
+    CompanyLeaders,
+}
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub enum OrganizationRouteMode {
+    #[default]
+    Current,
+    Specified,
+    Ancestor,
+}
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OrganizationRoute {
+    pub mode: OrganizationRouteMode,
+    pub unit_id: Option<i64>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SelfApproval {
@@ -32,6 +47,10 @@ pub struct ApprovalStage {
     /// All predecessors must finish; independent roots run in parallel.
     pub depends_on: Vec<String>,
     pub source: ApproverSource,
+    #[serde(default)]
+    pub organization_route: OrganizationRoute,
+    #[serde(default)]
+    pub review_points: Vec<String>,
     pub approver_user_ids: Vec<i64>,
     pub decision: ApprovalDecision,
     pub self_approval: SelfApproval,
@@ -113,6 +132,29 @@ impl ApprovalRule {
             return Err("抄送账号无效、重复或超过 50 人。".into());
         }
         for node in &self.stages {
+            if node.review_points.len() > 12
+                || node
+                    .review_points
+                    .iter()
+                    .any(|p| p.trim().is_empty() || p.chars().count() > 200)
+            {
+                return Err("审批要点最多十二条，每条须为 1–200 字。".into());
+            }
+            let route = &node.organization_route;
+            if route.mode != OrganizationRouteMode::Current
+                && !matches!(
+                    node.source,
+                    ApproverSource::CompanyExecutive | ApproverSource::CompanyLeaders
+                )
+            {
+                return Err("指定管理单位或沿上级查找只适用于单位负责人来源。".into());
+            }
+            if (route.mode == OrganizationRouteMode::Specified
+                && route.unit_id.is_none_or(|id| id <= 0))
+                || (route.mode != OrganizationRouteMode::Specified && route.unit_id.is_some())
+            {
+                return Err("指定管理单位须选择有效单位，其他路由不得携带指定单位。".into());
+            }
             if !key(&node.key)
                 || node.name.trim().is_empty()
                 || node.name.chars().count() > 100

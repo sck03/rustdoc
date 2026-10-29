@@ -62,6 +62,8 @@ OCR 同样按目标 OS/架构组装 Rust worker、ONNX 和模型。2026-10-15 �
 
 2026-10-29 发布定义/节点图/schema 9 重构续办后的新包为 `artifacts/oa-rebuild-desktop/ExportDocManager.Tauri.Full`，来源 `6402f9ba`，仍为 GNU/Debug/Full SQLite/含 OCR。完整 Tauri、36 张界面截图、16 页实际 PDF、七组 OCR、PDFium 与各退出场景通过，运行依赖 433 项；六类申请、资源分工、窄屏提交历史另经真实 React/Rust HTTP 回归。旧 `oa-workflow-desktop` 测试包由新包替代，原程序和业务资料继续保留。小纸张裁切、其它平台、系统 IME 候选窗和实体打印的验收边界保持，见本日进度。
 
+2026-10-29 组织任职/schema 10/单位授权集成包位于 `artifacts/oa-integration-desktop/ExportDocManager.Tauri.Full`，使用本批工作树构建，版本标识为 `0.1.2+git.e3ca1e0d1a43`（提交前父版本，不是已提交的新代码标识）。Full/SQLite/Debug/含 OCR 的真实 WebView2 回归通过：中文字段、表格编辑、私有模板、付款与报销输出、人员删除限制、账号权限变更重新登录、OCR 和正常退出/HTTP 关闭。原始桌面结果在 `artifacts/edition-validation/desktop-1793278928317`，精选截图和 PDF 在 `artifacts/oa-integration-evidence`。付款、报销、金额调整 PDF 已抽查渲染。浏览器另验单位方案、跨单位流程、身份切换草稿保护与自然到期。computer-use 的 `@oai/sky` 运行组件缺失，系统 IME 候选窗未验收；本批不扩大 MSVC 发布、其他 OS/架构、实体打印或 Docker daemon 的验收声明。
+
 ## 2026-09-28 Windows 退出清理
 
 2026-10-27 的新 GNU/Debug/Full SQLite/含 OCR 包为 `artifacts/review-completion-desktop/ExportDocManager.Tauri.Full`，来源 `a1814e57e871`。完整 Tauri、HS／历史维护和未确认文字保存、37 张截图、16 页渲染 PDF、七组 OCR、PDFium worker 及正常／重复／异常／独立窗口退出通过；各实例 WebView2 归零、HTTP 关闭。`@oai/sky` 包缺失，系统 IME 候选窗未由 computer-use 检查，仍不扩大 MSVC／其它 OS/架构／实体打印验收。详细范围、小纸张裁切限制和清理回执见本日进度。

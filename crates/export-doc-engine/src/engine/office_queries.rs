@@ -4,8 +4,8 @@ use super::{
     records::{self, text},
     store::{self, Actor, Store},
 };
+use crate::engine::store::Connection;
 use chrono::{DateTime, Duration, Utc};
-use export_doc_storage::Connection;
 use serde_json::{Value, json};
 
 pub fn list(store: &Store, actor: &Actor, kind: &str, query: &[(&str, String)]) -> Result<Value> {
@@ -122,6 +122,7 @@ pub fn list(store: &Store, actor: &Actor, kind: &str, query: &[(&str, String)]) 
         let principals = super::oa::approval::queue_approvers(tx, actor, resource)?;
         let (total, rows) = tx.query_office(&export_doc_storage::OfficeQuery {
             viewer: actor.id,
+            context: &actor.context,
             assigned_only: actor.oa_assigned_only,
             principals: &principals,
             kind,
@@ -215,7 +216,7 @@ pub fn clearance(tx: &Connection, person: &Value) -> Result<Value> {
         .as_i64()
         .ok_or_else(|| invalid("人员编号无效。"))?;
     let account = person["account"]["id"].as_i64();
-    clearance_for(tx, Some(id), account, &person["companyScope"])
+    clearance_all(tx, Some(id), account, &person["companyScope"])
 }
 pub fn account_clearance(tx: &Connection, account: &Value) -> Result<Value> {
     let id = account["id"]
@@ -223,13 +224,50 @@ pub fn account_clearance(tx: &Connection, account: &Value) -> Result<Value> {
         .ok_or_else(|| invalid("账号编号无效。"))?;
     let employee =
         super::personnel_accounts::linked_person(tx, id)?.and_then(|person| person["id"].as_i64());
-    clearance_for(tx, employee, Some(id), &account["companyScope"])
+    clearance_all(tx, employee, Some(id), &account["companyScope"])
+}
+fn clearance_all(
+    tx: &Connection,
+    employee: Option<i64>,
+    account: Option<i64>,
+    primary: &Value,
+) -> Result<Value> {
+    // Ownership spans all units; calculate it once for the whole clearance review.
+    let business_counts = match account {
+        Some(user) => super::team_backup::ownership::owned_counts(tx, user)?,
+        None => [0; 3],
+    };
+    let mut result = clearance_for(tx, employee, account, primary, business_counts)?;
+    // Departure is global. Counts include every unit, while request titles and
+    // attachments from other units are never exposed through a personnel check.
+    for company in store::matching(tx, "companies", &[], &[("code", "code")])? {
+        if company["code"] == *primary {
+            continue;
+        }
+        let other = clearance_for(tx, employee, account, &company["code"], business_counts)?;
+        for field in [
+            "meetingCount",
+            "supplyCount",
+            "approvalCount",
+            "handlingCount",
+            "reportingCount",
+        ] {
+            result[field] =
+                json!(result[field].as_i64().unwrap_or(0) + other[field].as_i64().unwrap_or(0));
+        }
+        result["canDepart"] = json!(result["canDepart"] == true && other["canDepart"] == true);
+        result["isClear"] = json!(result["isClear"] == true && other["isClear"] == true);
+        result["isCompanyExecutive"] =
+            json!(result["isCompanyExecutive"] == true || other["isCompanyExecutive"] == true);
+    }
+    Ok(result)
 }
 fn clearance_for(
     tx: &Connection,
     employee: Option<i64>,
     account: Option<i64>,
     company: &Value,
+    business_counts: [i64; 3],
 ) -> Result<Value> {
     let related = |kind| -> Result<Vec<Value>> {
         let mut rows = std::collections::BTreeMap::new();
@@ -269,18 +307,30 @@ fn clearance_for(
         }
     }
     let departments = match employee {
-        Some(employee) => store::matching(
+        Some(_) => store::matching(
             tx,
             "departments",
+            &[("companyCode", company.as_str().unwrap_or("").into())],
             &[
-                ("companyCode", company.as_str().unwrap_or("").into()),
-                ("managerEmployeeId", employee.to_string()),
+                ("code", "code"),
+                ("name", "name"),
+                ("managerEmployeeId", "managerEmployeeId"),
+                ("additionalLeaders", "additionalLeaders"),
             ],
-            &[("code", "code"), ("name", "name")],
         )?,
         None => vec![],
     }
-    .iter()
+    .into_iter()
+    .map(|r| {
+        Ok((
+            super::organization::leads(&r, employee.unwrap_or(0), "managerEmployeeId")?,
+            r,
+        ))
+    })
+    .collect::<Result<Vec<_>>>()?
+    .into_iter()
+    .filter(|(managed, _)| *managed)
+    .map(|(_, r)| r)
     .map(|r| json!({"code":r["code"],"name":r["name"]}))
     .collect::<Vec<_>>();
     let meeting_count = meetings.len();
@@ -288,6 +338,7 @@ fn clearance_for(
     let mut approval_count =
         super::oa::references(tx, company.as_str().unwrap_or(""), employee, account, true)?;
     let mut handling_services = vec![];
+    let business_count = business_counts.iter().sum::<i64>();
     if let Some(user) = account {
         handling_services = super::handling::services(tx, company.as_str().unwrap_or(""))?
             .iter()
@@ -308,7 +359,8 @@ fn clearance_for(
     let clear = meeting_count == 0
         && supply_count == 0
         && approval_count == 0
-        && handling_services.is_empty();
+        && handling_services.is_empty()
+        && business_count == 0;
     let reporting_count = if let Some(employee) = employee {
         super::personnel_organization::references(
             tx,
@@ -320,18 +372,18 @@ fn clearance_for(
         0
     };
     let executive = match employee {
-        Some(id) => !store::matching(
-            tx,
+        Some(id) => match tx.find_identity(
             "companies",
-            &[("executiveEmployeeId", id.to_string())],
-            &[("id", "id")],
-        )?
-        .is_empty(),
+            &store::normalize(company.as_str().unwrap_or("")),
+        )? {
+            Some(c) => super::organization::leads(&c, id, "executiveEmployeeId")?,
+            None => false,
+        },
         None => false,
     };
     meetings.sort_by_key(|r| r["requestId"].as_i64());
     supplies.sort_by_key(|r| r["requestId"].as_i64());
     Ok(
-        json!({"meetingCount":meeting_count,"supplyCount":supply_count,"approvalCount":approval_count,"handlingCount":handling_services.len(),"handlingServices":handling_services,"items":meetings.into_iter().take(20).chain(supplies.into_iter().take(20)).collect::<Vec<_>>(),"canDepart":clear&&departments.is_empty()&&reporting_count==0&&!executive,"isClear":clear,"managedDepartments":departments,"reportingCount":reporting_count,"isCompanyExecutive":executive}),
+        json!({"meetingCount":meeting_count,"supplyCount":supply_count,"approvalCount":approval_count,"handlingCount":handling_services.len(),"handlingServices":handling_services,"businessDataCount":business_count,"invoiceCount":business_counts[0],"paymentCount":business_counts[1],"otherBusinessDataCount":business_counts[2],"items":meetings.into_iter().take(20).chain(supplies.into_iter().take(20)).collect::<Vec<_>>(),"canDepart":clear&&departments.is_empty()&&reporting_count==0&&!executive,"isClear":clear,"managedDepartments":departments,"reportingCount":reporting_count,"isCompanyExecutive":executive}),
     )
 }

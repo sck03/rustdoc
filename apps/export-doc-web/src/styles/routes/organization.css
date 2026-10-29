@@ -1,5 +1,7 @@
 @layer route {
   .organization-workspace { gap: 14px; }
+  .organization-section { display: grid; gap: 12px; min-width: 0; }
+  .organization-section .text-button { justify-self: start; }
   .organization-heading, .organization-company-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
   .organization-heading h2 { margin: 0 0 4px; font-size: var(--edm-font-size-lg); }
   .organization-heading h3, .organization-company-title h3 { margin: 0; font-size: var(--edm-font-size-md); }

@@ -20,6 +20,7 @@ import { PersonnelImagesPanel } from "./PersonnelImagesPanel.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
 import { PersonnelOrganizationFacts } from "./PersonnelOrganizationEditor.tsx";
+import { PersonnelPrimaryAppointmentDialog } from "./PersonnelPrimaryAppointmentDialog.tsx";
 
 type Props = { client: ExportDocManagerApiClient; user: ApiUserDto; id: number; departments: PersonnelDepartmentRecord[]; onClose: () => void };
 export function PersonnelDetailsPage({ client, user, id, departments, onClose }: Props) {
@@ -43,6 +44,7 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
   }
   const [editing, setEditing] = useState<PersonnelRecord | null>(null);
   const [linking, setLinking] = useState(false);
+  const [primaryChanging, setPrimaryChanging] = useState<PersonnelRecord | null>(null);
   const [unlinking, setUnlinking] = useState<PersonnelRecord | null>(null);
   const [workflow, setWorkflow] = useState<{ record: PersonnelRecord; action: PersonnelWorkflow } | null>(null);
   const record = query.data;
@@ -61,6 +63,7 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
             ? oaAccess(user, "personnel", "create") && <Link className="command-button secondary" key={action} to={`/office/requests/personnel?change=${action}&employeeId=${id}`}>申请{personnelChangeLabels[action]}</Link>
             : <button type="button" className="command-button secondary" disabled={imageOperation.busy} key={action} onClick={() => setWorkflow({ record, action })}>办理{personnelChangeLabels[action]}</button>)}
           {record.canLinkAccount && <button type="button" className="command-button secondary" disabled={imageOperation.busy} onClick={() => setLinking(true)}>关联账号</button>}
+          {record.canChangePrimaryAppointment && <button type="button" className="command-button secondary" disabled={imageOperation.busy} onClick={() => setPrimaryChanging(record)}>调整主任职</button>}
           {record.canLinkAccount && record.account && <button type="button" className="command-button secondary" disabled={imageOperation.busy} onClick={() => setUnlinking(record)}>解除账号绑定</button>}
           {record.canDelete && <button type="button" className="command-button secondary" disabled={imageOperation.busy || Boolean(record.deleteRestriction)}
             aria-describedby={record.deleteRestriction ? "personnel-delete-restriction" : undefined}
@@ -79,6 +82,7 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
     </section>
     {editing && <PersonnelFormDialog client={client} user={user} departments={departments} record={editing} onClose={() => setEditing(null)} onSaved={() => setEditing(null)} />}
     {workflow && <PersonnelWorkflowDialog client={client} user={user} departments={departments} {...workflow} onClose={() => setWorkflow(null)} />}
+    {primaryChanging && <PersonnelPrimaryAppointmentDialog client={client} user={user} record={primaryChanging} onClose={() => setPrimaryChanging(null)} />}
     {linking && record && <PersonnelAccountDialog client={client} user={user} record={record} onClose={() => setLinking(false)} onUnlink={() => { setLinking(false); setUnlinking(record); }} />}
     {unlinking && <PersonnelUnlinkAccountDialog client={client} record={unlinking} onClose={() => setUnlinking(null)} />}
     {deleting && <RecordDeleteDialog name={`${deleting.employee.fullName} · ${deleting.employee.employeeNumber}`} version={deleting.versionNumber} operation={deleteOperation}
@@ -128,6 +132,7 @@ function PersonnelHistory({ client, user, id }: { client: ExportDocManagerApiCli
   return <><OfficeQueryState query={model.query} emptyTitle="尚无操作记录" />
     {!model.query.isError && <ol className="office-history">{model.query.data?.items.map((item) => <li key={item.id}>
       <strong>{personnelHistoryLabels[item.action] ?? item.action} · 生效日期 {item.effectiveDate}</strong><p>{item.summary}</p>{item.note && <p>{item.note}</p>}
+      {Boolean(item.currentAppointments?.length) && <details><summary>任职变更明细</summary>{([["变更前", item.previousAppointments, item.previousPrimaryAssignmentId], ["变更后", item.currentAppointments, item.primaryAssignmentId]] as const).map(([label, appointments, primaryId]) => <div key={label}><strong>{label}</strong><ul>{appointments?.map(appointment => <li key={appointment.id}>{appointment.id === primaryId ? "主职" : "兼任"} · {appointment.companyCode} · {appointment.departmentId} · {appointment.jobTitle}{appointment.startsOn ? ` · 自 ${appointment.startsOn}` : ""}{appointment.endsOn ? ` 至 ${appointment.endsOn}` : ""}</li>)}</ul></div>)}</details>}
       <time dateTime={item.createdAt}>{formatBusinessDateTime(item.createdAt, user.businessTimeZone)} · {item.actorName}</time>
     </li>)}</ol>}
     <OfficePager page={model.query.data} paging={model.paging} busy={model.query.isFetching} />
@@ -149,6 +154,10 @@ export function PersonnelClearancePanel({ client, user, record }: { client: Expo
       {data.isClear ? "目前没有未结清的行政或人事事项。" : `预约 ${data.meetingCount} 笔，物品申请／借用 ${data.supplyCount} 笔，行政与人事申请 ${data.approvalCount ?? 0} 笔。请先完成办理或取消申请。`}
       {(data.approvalCount ?? 0) > 0 && <> <Link to="/office/approvals">前往申请与审批中心</Link></>}
     </InlineNotice>
+    {(data.businessDataCount ?? 0) > 0 && <InlineNotice tone="warning" title="业务资料待交接">
+      发票 {data.invoiceCount ?? 0} 条、付款报销 {data.paymentCount ?? 0} 条、其他业务资料 {data.otherBusinessDataCount ?? 0} 条。
+      {user.capabilities.canManageUsers && <> <Link to="/settings?section=ownership">前往维护设置改派业务归属</Link></>}
+    </InlineNotice>}
     {data.items.length > 0 && <ul>{data.items.map((item) => {
       const kind = item.kind === "rooms" ? "rooms" : "supplies";
       const path = kind === "rooms" ? "/office/meeting-rooms" : "/office/supplies";

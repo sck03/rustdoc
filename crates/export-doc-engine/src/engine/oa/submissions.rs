@@ -26,8 +26,11 @@ pub(super) fn begin(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<(
         )?;
     }
     request["attachments"] = json!(attachments);
-    let person = if row["personnelChange"]["action"] == "Hire" {
-        row["personnelChange"]["registration"].clone()
+    let person = if matches!(
+        row["personnelChange"]["action"].as_str(),
+        Some("Hire" | "Rehire")
+    ) {
+        super::personnel_changes::prepare(tx, actor, row, super::super::units::today(tx)?, false)?
     } else {
         store::get(
             tx,
@@ -39,13 +42,22 @@ pub(super) fn begin(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<(
         .find_identity("companies", &store::normalize(&actor.company))?
         .ok_or_else(|| super::super::error::unavailable("申请公司资料缺失。"))?;
     let department = tx
-        .find_identity("departments", &store::normalize(&text(row, "departmentId")))?
+        .find_identity(
+            "departments",
+            &store::department_identity(&actor.company, &text(row, "departmentId"))?,
+        )?
         .ok_or_else(|| super::super::error::unavailable("申请部门资料缺失。"))?;
     let settings = settings::load(tx, &actor.company)?;
+    let appointment = super::super::personnel_organization::appointment_in(
+        tx,
+        &person,
+        &actor.company,
+        &text(row, "departmentId"),
+    )?;
     let template = sheet_templates::select(&settings, row)?;
     let value = json!({"requestId":row["id"],"submissionNumber":number,"requestVersion":request["versionNumber"],
         "submittedAt":store::timestamp(),"status":"Pending","request":request,
-        "companyName":text(&company,"name"),"departmentName":text(&department,"name"),"applicantJobTitle":text(&person,"jobTitle"),
+        "companyName":text(&company,"name"),"departmentName":text(&department,"name"),"applicantJobTitle":appointment.job_title,"appointment":appointment,
         "formName":template["name"],"template":template,"templateVersion":settings["versionNumber"]});
     let saved = store::save_in_scope(
         tx,

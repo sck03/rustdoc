@@ -3,9 +3,9 @@ use super::{
     hs::{self, codes_for_year, read},
     records::text,
 };
+use crate::engine::store::Connection;
 use crate::operation;
 use export_doc_domain::hs::{self as rules, Standard};
-use export_doc_storage::Connection;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 

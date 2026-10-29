@@ -27,6 +27,7 @@ impl Fixture {
             root,
             paths,
             actor: Actor {
+                context: String::new(),
                 edition: Default::default(),
                 id: 1,
                 name: "任务用户".into(),
@@ -108,6 +109,7 @@ fn output_and_snapshot_survive_restart_and_cleanup_is_idempotent() {
     assert_eq!(file.file_name, "测试.pdf");
     assert_eq!(file.content, bytes);
     let other = Actor {
+        context: String::new(),
         edition: Default::default(),
         id: 2,
         ..fixture.actor.clone()
@@ -226,6 +228,7 @@ fn queries_filter_status_and_text_without_disclosing_another_users_jobs() {
     assert_eq!(
         jobs.list(
             &Actor {
+                context: String::new(),
                 edition: Default::default(),
                 id: 2,
                 ..fixture.actor.clone()
@@ -279,7 +282,7 @@ fn retention_keeps_running_work_and_removes_terminal_inputs_and_outputs_atomical
         )
         .unwrap();
         let mut record =
-            persistence::checked(&*store.connection().unwrap(), &fixture.actor, id).unwrap();
+            persistence::checked(&store.connection().unwrap(), &fixture.actor, id).unwrap();
         record["completedAt"] =
             json!((chrono::Utc::now() - chrono::Duration::days(day)).to_rfc3339());
         let record_id = record["id"].as_i64().unwrap();
@@ -421,7 +424,7 @@ fn retry_inputs_are_released_on_success_and_bounded_after_failure_or_cancellatio
             Err(unavailable("模拟失败"))
         };
         persistence::finish(&store, &fixture.actor, id, result).unwrap();
-        let row = persistence::checked(&*store.connection().unwrap(), &fixture.actor, id).unwrap();
+        let row = persistence::checked(&store.connection().unwrap(), &fixture.actor, id).unwrap();
         let record_id = row["id"].as_i64().unwrap();
         assert_eq!(
             store
@@ -443,7 +446,7 @@ fn retry_inputs_are_released_on_success_and_bounded_after_failure_or_cancellatio
     retention::prune(&store, policy, chrono::Utc::now()).unwrap();
     assert_eq!(store.connection().unwrap().job_input_bytes().unwrap(), 12);
     let expired =
-        persistence::checked(&*store.connection().unwrap(), &fixture.actor, &ids[1].0).unwrap();
+        persistence::checked(&store.connection().unwrap(), &fixture.actor, &ids[1].0).unwrap();
     assert_eq!(expired["status"], "Failed");
     assert_eq!(expired["_retryInput"], false);
     assert_eq!(
@@ -606,7 +609,7 @@ fn retry_survives_restart_reauthorizes_and_keeps_private_requests_off_the_wire()
         .actor(&service.store, login["accessToken"].as_str().unwrap())
         .unwrap();
     let other_id = service.store.transaction(|tx| {
-        let account = crate::contracts::overlay(crate::contracts::initial(crate::contracts::schema("ApiUserAccountDto")), &json!({"username":"other-task-owner","fullName":"其他任务账号","role":"User","isActive":true,"companyScope":"DEFAULT","departmentId":"GENERAL"}));
+        let account = crate::contracts::overlay(crate::contracts::initial(crate::contracts::schema("ApiUserAccountDto")), &json!({"username":"other-task-owner","fullName":"其他任务账号","role":"User","isActive":true,"companyScope":"DEFAULT","departmentId":"GENERAL","permissionGrants":[{"resourceKey":"document.jobs","action":"view","dataScope":"own"}]}));
         let saved = crate::engine::store::save(tx, "users", 0, account, Some("other-task-owner".into()), &actor, "create")?;
         Ok(saved["id"].as_i64().unwrap())
     }).unwrap();
@@ -638,6 +641,7 @@ fn retry_survives_restart_reauthorizes_and_keeps_private_requests_off_the_wire()
         retry::execute(
             &service,
             &Actor {
+                context: String::new(),
                 edition: Default::default(),
                 id: other_id,
                 admin: false,
@@ -653,6 +657,7 @@ fn retry_survives_restart_reauthorizes_and_keeps_private_requests_off_the_wire()
         retry::execute(
             &service,
             &Actor {
+                context: String::new(),
                 admin: false,
                 grants: vec![],
                 departments: vec![],

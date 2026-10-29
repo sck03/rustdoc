@@ -42,12 +42,14 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
 
   await admin.goto(`${url}/#/system/access-control?view=templates`);
   const schemes = admin.locator('.permission-template-section');
-  await schemes.getByLabel('新建方案起点').selectOption('company');
   await schemes.getByRole('button', { name: '新建方案', exact: true }).click();
+  const newSchemeDialog = admin.getByRole('dialog', { name: '新建权限方案', exact: true });
+  await newSchemeDialog.getByLabel('新建方案起点').selectOption('company');
+  await newSchemeDialog.getByRole('button', { name: '建立方案草稿', exact: true }).click();
   assert.equal(await schemes.getByLabel('方案名称', { exact: true }).inputValue(), '公司审批负责人');
   await schemes.getByLabel('模块分类').selectOption('人事管理');
   assert.equal(await schemes.getByLabel('员工请假查看数据范围', { exact: true }).inputValue(), 'company');
-  assert.equal(await schemes.getByLabel('员工请假审批与作废数据范围', { exact: true }).inputValue(), 'company');
+  assert.equal(await schemes.getByLabel('员工请假任务审批数据范围', { exact: true }).inputValue(), 'company');
   assert.equal(await schemes.getByLabel('人员变动审批快捷设置').inputValue(), 'approve');
   const savedScheme = admin.waitForResponse(response => response.url().endsWith('/api/permission-templates') && response.request().method() === 'POST');
   await schemes.getByRole('button', { name: '保存方案', exact: true }).click();
@@ -110,11 +112,12 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   await assert.rejects(() => invoke('ListLeaveRequest', undefined, {}, restricted.accessToken), /403/u);
 
   await admin.goto(`${url}/#/system/access-control?view=templates`);
-  await schemes.getByLabel('新建方案起点').selectOption('combined');
-  const sources = schemes.getByRole('group', { name: '选择需要兼任的职责' });
+  await schemes.getByRole('button', { name: '新建方案', exact: true }).click();
+  await newSchemeDialog.getByLabel('新建方案起点').selectOption('combined');
+  const sources = newSchemeDialog.getByRole('group', { name: '选择需要兼任的职责' });
   assert.equal(await sources.getByRole('checkbox', { name: '系统管理员', exact: true }).count(), 0);
   for (const name of ['人事管理员', '行政管理员', '财务人员']) await sources.getByRole('checkbox', { name, exact: true }).check();
-  await schemes.getByRole('button', { name: '新建方案', exact: true }).click();
+  await newSchemeDialog.getByRole('button', { name: '建立方案草稿', exact: true }).click();
   await schemes.getByLabel('方案名称', { exact: true }).fill('人事行政财务综合岗');
   const combinedResponse = admin.waitForResponse(response => response.url().endsWith('/api/permission-templates') && response.request().method() === 'POST');
   await schemes.getByRole('button', { name: '保存方案', exact: true }).click();

@@ -3,9 +3,10 @@ use super::{
     records::{id, text},
     store::{self, Actor, Store},
 };
+use crate::engine::store::Connection;
 #[allow(unused_imports)]
 use crate::{contracts, generated_api::*};
-use export_doc_storage::{AuditWrite, Connection};
+use export_doc_storage::AuditWrite;
 use serde_json::{Value, json};
 
 pub const OPERATIONS: &[Operation] = &[
@@ -68,9 +69,9 @@ fn guidance(status: &str, retained: bool) -> String {
 
 fn preview(store: &Store, invoice_id: i64) -> Result<Value> {
     let connection = store.connection()?;
-    let invoice = store::get(&*connection, "invoices", invoice_id)?;
+    let invoice = store::get(&connection, "invoices", invoice_id)?;
     let status = text(&invoice, "status");
-    let retained = retained_attachments(&*connection, invoice_id)?;
+    let retained = retained_attachments(&connection, invoice_id)?;
     let can_purge = status == "Cancelled" && !retained;
     Ok(json!({
         "id": invoice["id"],
@@ -204,6 +205,7 @@ mod tests {
             let paths = RuntimePaths::server(&root, &root.join("Data")).unwrap();
             let store = Store::open(&paths).unwrap();
             let actor = Actor {
+                context: String::new(),
                 edition: Default::default(),
                 id: 1,
                 name: "管理员".into(),
@@ -218,8 +220,10 @@ mod tests {
             user["username"] = json!("admin");
             user["role"] = json!("Admin");
             user["isActive"] = json!(true);
+            user["companyScope"] = json!(&actor.company);
+            user["departmentId"] = json!(&actor.department);
             store::save(
-                &*store.connection().unwrap(),
+                &store.connection().unwrap(),
                 "users",
                 0,
                 user,
@@ -234,7 +238,7 @@ mod tests {
             invoice["invoiceDate"] = json!("2026-09-01");
             invoice["customerNameEN"] = json!("BUYER LTD.");
             let saved = store::save(
-                &*store.connection().unwrap(),
+                &store.connection().unwrap(),
                 "invoices",
                 0,
                 invoice,
@@ -358,7 +362,7 @@ mod tests {
         assert_eq!(result["previousStatus"], "Cancelled");
         assert!(fixture.store.get("invoices", fixture.invoice_id).is_err());
         let logs = store::history(
-            &*fixture.store.connection().unwrap(),
+            &fixture.store.connection().unwrap(),
             "invoices",
             fixture.invoice_id,
         )
@@ -373,6 +377,7 @@ mod tests {
     fn non_admin_is_rejected() {
         let fixture = Fixture::new();
         let staff = Actor {
+            context: String::new(),
             admin: false,
             ..fixture.actor.clone()
         };

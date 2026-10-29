@@ -144,6 +144,11 @@ pub(super) fn remove_input(tx: &Connection, id: i64) -> Result<()> {
 fn read(store: &Store, actor: &Actor, id: &str) -> Result<Replay> {
     store.read_for(actor, RETRY_JOB, &[], |tx, current| {
         let job = persistence::checked(tx, current, id)?;
+        if job["companyScope"] != current.company
+            || crate::engine::records::text(&job, "_actorContext") != current.context
+        {
+            return Err(error(403, "请切换到任务创建时的单位身份后重试。"));
+        }
         if !matches!(job["status"].as_str(), Some("Failed" | "Canceled"))
             || !job["_retry"].is_object()
         {

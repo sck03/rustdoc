@@ -4,6 +4,8 @@
 
 ## 本地入口
 
+2026-10-29 视觉门禁保留 84 个场景及文本、几何、溢出、交互、无障碍断言。GitHub Windows runner 的 `query-mobile-390` 原生日期控件差异实测为 0.331%，默认截图像素比例阈值由 0.2% 调整为 0.5%；`FRONTEND_VISUAL_MAX_DIFF_RATIO` 可显式覆盖。没有批量更新参考图来掩盖差异，失败时仍上传截图/差异/摘要。Firefox/WebKit 重型兼容验收继续仅手动触发。
+
 | 入口 | 用途 |
 | --- | --- |
 | `build-windows-desktop-run.cmd`／`.ps1` | 默认生成 Document、Sales；可用 `-Edition Full` 单独生成 Full + SQLite 测试便携包 |
@@ -233,7 +235,8 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 - 脚本：`verify-script-suite.ps1`、`verify-github-workflow-actions.mjs`、`test_tauri_updater_release_contract.mjs`、`github/verify-public-source.ps1`、`git diff --check`。
 - 人员与审批职责：`node scripts/test_approval_permissions_ui.mjs` 在隔离 Rust `office_review` 宿主上验证常用/自定义职位、从普通员工建立公司审批方案、跨部门行政和人事审批，以及私密档案、财务办理、模块限制和会话撤销边界。
 - 任职与流程闭环：`node scripts/test_organization_workflow_ui.mjs` 复用上述隔离宿主，验证真实兼职/矩阵负责人选择、公司领导审批负责人/职位目录、会签和金额条件设置、未完成审批移交、仅分派可见及窄屏无障碍；先生成客户端、构建 React 和 `cargo build --locked -p export-doc-server --example office_review`。
-- PostgreSQL 权限/组织定向回归：`pwsh -NoProfile -File scripts/test-native-postgres.ps1 -PostgresBin <PostgreSQL18/bin> -Scope Workflows` 复用隔离集群与独立账号，串行运行存储合同和完整团队业务合同；`All` 仍额外运行恢复/大容量备份测试。
+- PostgreSQL 权限/组织定向回归：`pwsh -NoProfile -File scripts/test-native-postgres.ps1 -PostgresBin <PostgreSQL18/bin> -Scope Workflows` 复用隔离集群与独立账号，串行运行存储合同和完整团队业务合同；`All` 额外运行 PostgreSQL 恢复和输出发布合同；独立的大容量文件流测试不随数据库验收执行。
+- 单位身份与权限方案：`node scripts/test_unit_identity_ui.mjs` 使用同一隔离宿主，验证本单位方案维护、权限来源、跨单位身份切换及中文草稿保护；须先完成当前 React 与 `office_review` 构建。
 
 本分支已删除旧 C# 源码/测试/工程与 `deploy/container`；`verify-dependency-policy.mjs` 拒绝重新引入托管工程或将其依赖列入 Rust notices。原生 NuGet 归档仍按中央资源清单校验。手动跨浏览器验收使用锁定的 npm Playwright 和隔离 Rust `office_review` 宿主，不读取旧 .NET DLL；Firefox/WebKit 仍只在手动工作流执行。
 

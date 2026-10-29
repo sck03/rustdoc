@@ -17,9 +17,10 @@ fn insert(tx: &Connection, kind: &str, mut body: Value) -> i64 {
 }
 pub fn exercise(tx: &Connection) {
     tx.begin().unwrap();
+    super::organization_fixture::unit(tx, "ORG-A", &["ORG-D", "PRIMARY", "SECONDARY"]);
     let allowed = ["departments", "users", "people", "invoices"];
     let reference = |kind, code, exclude| {
-        tx.organization_referenced(kind, code, exclude, &allowed)
+        tx.organization_referenced(kind, code, "ORG-A", exclude, &allowed)
             .unwrap()
     };
     let department = insert(
@@ -39,7 +40,19 @@ pub fn exercise(tx: &Connection) {
         tx,
         "people",
         json!({"companyScope":"ORG-A","departmentId":"PRIMARY","status":"Departed",
-        "organization":{"additionalAssignments":[{"departmentId":"SECONDARY","jobTitle":"兼任"}]},"profile":{"private":"x".repeat(200_000)}}),
+        "organization":{"primaryAssignmentId":"org-primary","additionalAssignments":[{"id":"org-secondary","departmentId":"SECONDARY","jobTitle":"兼任"}]},"profile":{"fullName":"任职查询人员"}}),
+    );
+    let private = json!({"notes":"x".repeat(200_000),"personalPhone":"private-contact"});
+    tx.set_personnel_private_profile(person, &private).unwrap();
+    assert_eq!(
+        tx.personnel_private_profile(person).unwrap().unwrap(),
+        private
+    );
+    let public = tx.get("people", person).unwrap().unwrap();
+    assert!(public["profile"].get("personalPhone").is_none());
+    assert!(
+        public.to_string().len() < 2000,
+        "public appointment reads never load the private payload"
     );
     assert!(
         reference(OrganizationReference::Department, "SECONDARY", 0),
@@ -52,6 +65,7 @@ pub fn exercise(tx: &Connection) {
     ));
     assert!(
         !tx.personnel_exists(&PersonnelQuery {
+            as_of: "2026-10-29",
             company: "ORG-A",
             department: "SECONDARY",
             status: "",
@@ -79,5 +93,24 @@ pub fn exercise(tx: &Connection) {
     assert!(!reference(OrganizationReference::Company, "IGNORED", 0));
     assert!(tx.delete("departments", department, 1).unwrap());
     assert!(!reference(OrganizationReference::Department, "ORG-D", 0));
+    let mut leaked = public;
+    leaked["profile"]["personalPhone"] = json!("must-stay-private");
+    assert!(
+        tx.update(
+            person,
+            1,
+            &RecordWrite {
+                kind: "people",
+                identity: None,
+                body: &leaked
+            }
+        )
+        .is_err(),
+        "database rejects private fields in public personnel records"
+    );
     tx.rollback().unwrap();
+    assert!(
+        tx.personnel_private_profile(person).unwrap().is_none(),
+        "private and public writes roll back together"
+    );
 }

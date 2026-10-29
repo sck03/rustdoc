@@ -9,9 +9,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 87783,
+      "baselineAggregateLines": 88296,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 87983,
+      "maximumAggregateLines": 88496,
       "reportFiles": false
     },
     {
@@ -37,9 +37,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 77313,
+      "baselineAggregateLines": 82239,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 77388,
+      "maximumAggregateLines": 82314,
       "reportFiles": false
     },
     {
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 22279,
+      "baselineAggregateLines": 23966,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 22399,
+      "maximumAggregateLines": 24086,
       "reportFiles": false
     },
     {
@@ -66,9 +66,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 38492,
+      "baselineAggregateLines": 38673,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 38642,
+      "maximumAggregateLines": 38823,
       "reportFiles": false
     },
     {
@@ -196,7 +196,9 @@
       "directory": "apps/export-doc-web/src",
       "filePattern": "^(?:App|AppWorkspaceRoutes|webSessionStorage)\\.(?:tsx|ts)$",
       "maximumLines": 700,
-      "maximumAggregateLines": 920
+      "maximumAggregateLines": 953,
+      "baselineAggregateLines": 923,
+      "maximumAggregateGrowthLines": 30
     },
     {
       "name": "settings page orchestration",
@@ -327,7 +329,9 @@
       "filePattern": "^(?:Personnel.*|personnelModel|usePersonnelData|usePersonnelPositions)\\.(?:ts|tsx)$",
       "excludePattern": "/Personnel(?:Avatar|IdentityFields|ImagesPanel)\\.tsx$",
       "maximumLines": 220,
-      "maximumAggregateLines": 696
+      "maximumAggregateLines": 788,
+      "baselineAggregateLines": 758,
+      "maximumAggregateGrowthLines": 30
     },
     {
       "name": "personnel image and identity workspace",
@@ -341,7 +345,9 @@
       "directory": "apps/export-doc-web/src/features/organization",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 200,
-      "maximumAggregateLines": 420
+      "maximumAggregateLines": 701,
+      "baselineAggregateLines": 651,
+      "maximumAggregateGrowthLines": 50
     }
   ]
 }

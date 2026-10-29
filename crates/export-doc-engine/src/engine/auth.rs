@@ -23,8 +23,15 @@ pub(super) fn username_key(username: &str) -> Result<String> {
 pub(super) const ITERATIONS: u32 = 600_000;
 const MAX_USER_SESSIONS: usize = 32;
 const MAX_SESSIONS: usize = 4096;
+#[derive(Clone, Debug)]
+struct Session {
+    user_id: i64,
+    expires: chrono::DateTime<Utc>,
+    version: (i64, i64),
+    context: String,
+}
 pub struct Sessions {
-    values: Mutex<HashMap<String, (i64, chrono::DateTime<Utc>, (i64, i64))>>,
+    values: Mutex<HashMap<String, Session>>,
     attempts: Mutex<HashMap<String, (u32, Instant)>>,
 }
 impl Default for Sessions {
@@ -63,10 +70,11 @@ fn has_users(connection: &store::Connection) -> Result<bool> {
 }
 
 fn seed_admin(store: &Store, password: &str) -> Result<()> {
-    if has_users(&*store.connection()?)? {
+    if has_users(&store.connection()?)? {
         return Ok(());
     }
     let admin = Actor {
+        context: String::new(),
         edition: store.edition,
         id: 1,
         name: "系统管理员".into(),
@@ -89,6 +97,7 @@ fn seed_admin(store: &Store, password: &str) -> Result<()> {
         store::save(transaction,"departments",0,json!({"code":"GENERAL","name":"综合部","companyCode":"DEFAULT","parentCode":null,"managerEmployeeId":null,"isActive":true}),Some("GENERAL".into()),&admin,"create")?;
         for role in contracts::contract()["permissions"]["roles"].as_array().ok_or_else(|| unavailable("权限角色目录缺失。"))? {
             let mut template = contracts::overlay(contracts::initial(contracts::schema("ApiPermissionTemplateDto")), role);
+            template["grants"] = json!(permissions::catalog().roles.iter().find(|r| role["code"] == r.code).ok_or_else(|| unavailable("权限预置目录缺失。"))?.grants);
             template["isActive"] = json!(true);
             template["isSystem"] = json!(true);
             store::save(transaction, "permission-templates", 0, template, Some(role["code"].as_str().unwrap_or("").into()), &admin, "create")?;
@@ -104,7 +113,7 @@ pub fn bootstrap(
     expected: &str,
     submitted: &str,
 ) -> Result<()> {
-    if store.provider()? == "SQLite" || has_users(&*store.connection()?)? {
+    if store.provider()? == "SQLite" || has_users(&store.connection()?)? {
         return Ok(());
     }
     if expected.len() < 32 || expected.as_bytes().ct_eq(submitted.as_bytes()).unwrap_u8() != 1 {
@@ -213,42 +222,62 @@ impl Sessions {
             .values
             .lock()
             .map_err(|_| unavailable("会话状态异常。"))?;
-        values.retain(|_, (_, deadline, _)| *deadline > Utc::now());
+        values.retain(|_, session| session.expires > Utc::now());
         if values.len() >= MAX_SESSIONS
-            || values.values().filter(|(id, _, _)| *id == user_id).count() >= MAX_USER_SESSIONS
+            || values
+                .values()
+                .filter(|session| session.user_id == user_id)
+                .count()
+                >= MAX_USER_SESSIONS
         {
             return Err(error(429, "活跃会话数量已达上限，请退出已有会话后重试。"));
         }
-        values.insert(token.clone(), (user_id, expires, version));
+        values.insert(
+            token.clone(),
+            Session {
+                user_id,
+                expires,
+                version,
+                context: String::new(),
+            },
+        );
         Ok(token)
     }
     pub fn actor(&self, store: &Store, token: &str) -> Result<Actor> {
-        let (id, version) = self.identity(token)?;
-        let user = store.get("users", id)?;
+        let session = self.validated_session(store, token)?;
+        store.read(|tx| super::units::resolve(tx, session.user_id, store.edition, &session.context))
+    }
+    pub fn account_actor(&self, store: &Store, token: &str) -> Result<Actor> {
+        let session = self.validated_session(store, token)?;
+        current_actor(store, session.user_id)
+    }
+    fn validated_session(&self, store: &Store, token: &str) -> Result<Session> {
+        let session = self.identity(token)?;
+        let user = store.get("users", session.user_id)?;
         if user["isActive"] != true {
             self.logout(token)?;
             return Err(error(401, "账号已停用。"));
         }
-        if session_version(store, &user)? != version {
+        if session_version(store, &user)? != session.version {
             self.logout(token)?;
             return Err(error(401, "账号或权限已更新，请重新登录。"));
         }
-        actor_from(store, &user)
+        Ok(session)
     }
-    fn identity(&self, token: &str) -> Result<(i64, (i64, i64))> {
+    fn identity(&self, token: &str) -> Result<Session> {
         let mut values = self
             .values
             .lock()
             .map_err(|_| unavailable("会话状态异常。"))?;
         if values
             .get(token)
-            .is_some_and(|(_, expires, _)| *expires <= Utc::now())
+            .is_some_and(|session| session.expires <= Utc::now())
         {
             values.remove(token);
         }
         values
             .get(token)
-            .map(|(id, _, version)| (*id, *version))
+            .cloned()
             .ok_or_else(|| error(401, "会话已过期，请重新登录。"))
     }
     pub fn logout(&self, token: &str) -> Result<()> {
@@ -266,17 +295,42 @@ impl Sessions {
         clock: &crate::clock::BusinessClock,
     ) -> Result<Value> {
         let actor = self.actor(store, token)?;
+        self.replace_context(store, token, clock, &actor.context)
+    }
+
+    pub fn replace_context(
+        &self,
+        store: &Store,
+        token: &str,
+        clock: &crate::clock::BusinessClock,
+        context: &str,
+    ) -> Result<Value> {
+        let original = self.validated_session(store, token)?;
+        let actor =
+            store.read(|tx| super::units::resolve(tx, original.user_id, store.edition, context))?;
+        let record = store.get("users", actor.id)?;
+        if session_version(store, &record)? != original.version {
+            return Err(error(401, "账号或权限已变化，请重新登录。"));
+        }
         let replacement = nonce().map_err(unavailable)? + &nonce().map_err(unavailable)?;
         let expires = Utc::now() + Duration::hours(12);
-        let user = user_dto(store, &store.get("users", actor.id)?, clock)?;
+        let user = user_dto_for(store, &record, clock, &actor)?;
         let mut values = self
             .values
             .lock()
             .map_err(|_| unavailable("会话状态异常。"))?;
-        let (_, _, version) = values
+        let previous = values
             .remove(token)
             .ok_or_else(|| error(401, "会话已撤销，请重新登录。"))?;
-        values.insert(replacement.clone(), (actor.id, expires, version));
+        values.insert(
+            replacement.clone(),
+            Session {
+                user_id: actor.id,
+                expires,
+                version: previous.version,
+                context: actor.context,
+            },
+        );
         Ok(
             json!({"accessToken":replacement,"tokenType":"Bearer","expiresAt":expires.to_rfc3339(),"user":user}),
         )
@@ -288,12 +342,29 @@ fn expired_sessions_never_resolve_and_do_not_disturb_other_logins() {
     let sessions = Sessions::default();
     let now = Utc::now();
     sessions.values.lock().unwrap().extend([
-        ("expired".into(), (1, now - Duration::seconds(1), (2, 3))),
-        ("active".into(), (4, now + Duration::hours(1), (5, 6))),
+        (
+            "expired".into(),
+            Session {
+                user_id: 1,
+                expires: now - Duration::seconds(1),
+                version: (2, 3),
+                context: String::new(),
+            },
+        ),
+        (
+            "active".into(),
+            Session {
+                user_id: 4,
+                expires: now + Duration::hours(1),
+                version: (5, 6),
+                context: String::new(),
+            },
+        ),
     ]);
     assert_eq!(sessions.identity("expired").unwrap_err().status, Some(401));
     assert_eq!(sessions.identity("missing").unwrap_err().status, Some(401));
-    assert_eq!(sessions.identity("active").unwrap(), (4, (5, 6)));
+    let active = sessions.identity("active").unwrap();
+    assert_eq!((active.user_id, active.version), (4, (5, 6)));
     assert!(!sessions.values.lock().unwrap().contains_key("expired"));
     sessions.logout("active").unwrap();
     assert_eq!(sessions.identity("active").unwrap_err().status, Some(401));
@@ -310,7 +381,8 @@ fn session_capacity_preserves_existing_logins_and_recovers_after_logout_or_expir
         sessions.issue(7, expires, (1, 2)).unwrap_err().status,
         Some(429)
     );
-    assert_eq!(sessions.identity(&tokens[0]).unwrap(), (7, (1, 2)));
+    let active = sessions.identity(&tokens[0]).unwrap();
+    assert_eq!((active.user_id, active.version), (7, (1, 2)));
     sessions.issue(8, expires, (1, 2)).unwrap();
     sessions.logout(&tokens[0]).unwrap();
     sessions.issue(7, expires, (1, 2)).unwrap();
@@ -320,14 +392,19 @@ fn session_capacity_preserves_existing_logins_and_recovers_after_logout_or_expir
         .unwrap()
         .get_mut(&tokens[1])
         .unwrap()
-        .1 = Utc::now() - Duration::seconds(1);
+        .expires = Utc::now() - Duration::seconds(1);
     sessions.issue(7, expires, (1, 2)).unwrap();
     let mut values = sessions.values.lock().unwrap();
     while values.len() < MAX_SESSIONS {
         let index = values.len();
         values.insert(
             format!("capacity-{index}"),
-            (100 + index as i64, expires, (1, 2)),
+            Session {
+                user_id: 100 + index as i64,
+                expires,
+                version: (1, 2),
+                context: String::new(),
+            },
         );
     }
     drop(values);
@@ -338,10 +415,10 @@ fn session_capacity_preserves_existing_logins_and_recovers_after_logout_or_expir
 }
 
 fn session_version(store: &Store, user: &Value) -> Result<(i64, i64)> {
-    session_version_in(&*store.connection()?, user)
+    session_version_in(&store.connection()?, user)
 }
 fn session_version_in(
-    connection: &export_doc_storage::Connection,
+    connection: &crate::engine::store::Connection,
     user: &Value,
 ) -> Result<(i64, i64)> {
     let template = super::account_permissions::template(connection, user)?
@@ -351,16 +428,17 @@ fn session_version_in(
 }
 
 fn actor_from(store: &Store, user: &Value) -> Result<Actor> {
-    actor_from_connection(&*store.connection()?, user, store.edition)
+    actor_from_connection(&store.connection()?, user, store.edition)
 }
 
 fn actor_from_connection(
-    connection: &export_doc_storage::Connection,
+    connection: &crate::engine::store::Connection,
     user: &Value,
     edition: permissions::ProductEdition,
 ) -> Result<Actor> {
     let grants = super::account_permissions::grants(connection, user)?;
     Ok(Actor {
+        context: String::new(),
         edition,
         id: user["id"].as_i64().unwrap_or(0),
         name: user["fullName"].as_str().unwrap_or("").into(),
@@ -381,11 +459,25 @@ fn actor_from_connection(
 }
 
 pub fn current_actor(store: &Store, id: i64) -> Result<Actor> {
-    current_actor_in(&*store.connection()?, id, store.edition)
+    current_actor_in(&store.connection()?, id, store.edition)
+}
+
+pub(super) fn refresh_actor_in(
+    connection: &crate::engine::store::Connection,
+    actor: &Actor,
+) -> Result<Actor> {
+    let current = super::units::resolve(connection, actor.id, actor.edition, &actor.context)?;
+    if current.company != actor.company {
+        return Err(error(403, "单位身份已变化，请重新打开业务后操作。"));
+    }
+    Ok(current)
+}
+pub(super) fn refresh_actor(store: &Store, actor: &Actor) -> Result<Actor> {
+    store.read(|tx| refresh_actor_in(tx, actor))
 }
 
 pub fn current_actor_in(
-    connection: &export_doc_storage::Connection,
+    connection: &crate::engine::store::Connection,
     id: i64,
     edition: permissions::ProductEdition,
 ) -> Result<Actor> {
@@ -402,6 +494,14 @@ pub fn user_dto(
     clock: &crate::clock::BusinessClock,
 ) -> Result<Value> {
     let actor = actor_from(store, record)?;
+    user_dto_for(store, record, clock, &actor)
+}
+pub(super) fn user_dto_for(
+    store: &Store,
+    record: &Value,
+    clock: &crate::clock::BusinessClock,
+    actor: &Actor,
+) -> Result<Value> {
     let mut user = contracts::overlay(contracts::initial(contracts::schema("ApiUserDto")), record);
     user["employee"] = if !actor.admin && actor.edition.allows("office.people") {
         store
@@ -411,6 +511,34 @@ pub fn user_dto(
     } else {
         Value::Null
     };
+    if !actor.context.is_empty() {
+        user["employee"] = store.read(|tx| -> Result<Value> {
+            let Some(person) = super::personnel_accounts::person_for_account(tx, actor.id)? else {
+                return Ok(Value::Null);
+            };
+            if actor.department.is_empty() {
+                return Ok(Value::Null);
+            }
+            let appointment = super::personnel_organization::appointment_in(
+                tx,
+                &person,
+                &actor.company,
+                &actor.department,
+            )?;
+            let mut summary = super::personnel_accounts::summary(person);
+            summary["jobTitle"] = json!(appointment.job_title);
+            summary["departmentId"] = json!(actor.department);
+            summary["companyScope"] = json!(actor.company);
+            Ok(summary)
+        })?;
+    }
+    user["primaryCompanyScope"] = record["companyScope"].clone();
+    user["companyScope"] = json!(actor.company);
+    user["departmentId"] = json!(actor.department);
+    user["contextId"] = json!(actor.context);
+    user["permissionSource"] =
+        store.read(|tx| super::account_permissions::source(tx, actor, &record))?;
+    user["unitContexts"] = json!(store.read(|tx| super::units::contexts(tx, actor))?);
     let now = clock.now().map_err(unavailable)?;
     user["businessDate"] = json!(now.today.to_string());
     user["effectiveDepartmentIds"] = json!(actor.departments);
@@ -431,6 +559,7 @@ pub fn user_dto(
     };
     user["capabilities"] = json!({"canManageSettings":actor.admin,"canManageUsers":actor.admin && actor.edition.allows("system.users"),"canViewAllBusinessData":actor.admin,"canUseDocumentWorkspace":workspace("document"),"canUseSalesWorkspace":workspace("sales"),"productEdition":actor.edition.name(),"enabledModules":enabled,"moduleAccess":access,"permissions":actor.grants,"availableFeatures":["worklist","business-attachments"]});
     user["capabilities"]["oaAssignedOnly"] = json!(actor.oa_assigned_only);
+    user["capabilities"]["unitManagement"] = json!(super::units::management(actor));
     Ok(user)
 }
 
@@ -486,7 +615,7 @@ pub(super) fn data_scope<'a>(
         company: &actor.company,
         department: &actor.department,
         departments: &actor.departments,
-        personnel_memberships: resource == "office.people",
+        personnel_memberships: resource == "office.people" && action == "view",
         user_id: actor.id,
         ..Default::default()
     };
@@ -535,14 +664,16 @@ pub fn visible(actor: &Actor, resource: &str, action: &str, record: &Value) -> b
                                 .iter()
                                 .any(|department| record["departmentId"] == *department)
                             || (resource == "office.people"
+                                && action == "view"
                                 && record["organization"]["additionalAssignments"]
                                     .as_array()
                                     .is_some_and(|assignments| {
                                         assignments.iter().any(|assignment| {
-                                            assignment["departmentId"] == actor.department
-                                                || actor.departments.iter().any(|department| {
-                                                    assignment["departmentId"] == *department
-                                                })
+                                            assignment["companyCode"] == actor.company
+                                                && (assignment["departmentId"] == actor.department
+                                                    || actor.departments.iter().any(|department| {
+                                                        assignment["departmentId"] == *department
+                                                    }))
                                         })
                                     })))
                 }

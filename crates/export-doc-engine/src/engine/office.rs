@@ -5,9 +5,9 @@ use super::{
     store::{self, Actor, Store},
 };
 use crate::contracts;
+use crate::engine::store::Connection;
 use chrono::{DateTime, FixedOffset};
 use export_doc_domain::business_date::is_valid as valid_date;
-use export_doc_storage::Connection;
 use serde_json::{Value, json};
 
 pub(super) fn integer(body: &Value, key: &str, min: i64, max: i64, label: &str) -> Result<i64> {
@@ -183,7 +183,11 @@ pub fn validate(
                 )?;
             } else {
                 super::personnel_organization::organization(value)?
-                    .validate(id, &text(value, "departmentId"))
+                    .validate(
+                        id,
+                        &text(value, "departmentId"),
+                        &text(value, "companyScope"),
+                    )
                     .map_err(invalid)?;
             }
             if !["FullTime", "PartTime", "Intern", "Contractor"]
@@ -449,9 +453,9 @@ pub fn deletion_restriction(connection: &Connection, id: i64) -> Result<Option<&
             ));
         }
     }
-    if has_reference(connection, "departments", "managerEmployeeId", id)? {
+    if super::organization::leadership_referenced(connection, &text(&person, "companyScope"), id)? {
         return Ok(Some(
-            "此人员仍被设为部门负责人，请先在组织架构中更换或清除负责人，再删除误录档案。",
+            "此人员仍承担公司或部门主负责人、分管负责人职责，请先在组织架构中交接，再删除误录档案。",
         ));
     }
     let person = store::get(connection, "people", id)?;
@@ -461,7 +465,6 @@ pub fn deletion_restriction(connection: &Connection, id: i64) -> Result<Option<&
         id,
         false,
     )? > 0
-        || has_reference(connection, "companies", "executiveEmployeeId", id)?
     {
         return Ok(Some(
             "此人员仍有公司领导审批负责人或任职汇报关系引用，请先办理负责人交接；历史引用须保留。",

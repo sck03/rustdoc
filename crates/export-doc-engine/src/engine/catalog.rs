@@ -555,7 +555,7 @@ pub const RESOURCES: &[Resource] = &[
     resource!(
         "companies",
         "公司目录",
-        "system.users",
+        "organization.directory",
         GET_ORGANIZATION_DIRECTORY,
         CREATE_ORGANIZATION_COMPANY,
         UPDATE_ORGANIZATION_COMPANY,
@@ -573,7 +573,7 @@ pub const RESOURCES: &[Resource] = &[
     resource!(
         "departments",
         "部门目录",
-        "system.users",
+        "organization.directory",
         GET_ORGANIZATION_DIRECTORY,
         CREATE_ORGANIZATION_DEPARTMENT,
         UPDATE_ORGANIZATION_DEPARTMENT,

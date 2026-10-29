@@ -51,11 +51,31 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
     if let Some(owner) = q.owner {
         scope.push(format!("r.owner_id={}", bind(owner.to_string(), "BIGINT")));
     }
-    let ordinary = if scope.is_empty() {
+    let mut ordinary = if scope.is_empty() {
         "TRUE".into()
     } else {
         scope.join(" AND ")
     };
+    let participant = q.visible_user.map(|user| {
+        let user = bind(user.to_string(), "BIGINT");
+        let context = q.visible_context.map(|c| bind(c.into(), "TEXT"));
+        let principals = q
+            .visible_principals
+            .iter()
+            .map(|p| {
+                (
+                    bind(p.user_id.to_string(), "BIGINT"),
+                    bind(p.context.clone(), "TEXT"),
+                )
+            })
+            .collect::<Vec<_>>();
+        participant_condition(postgres, "r", &user, context.as_deref(), &principals)
+    });
+    if q.include_participants {
+        if let Some(participant) = &participant {
+            ordinary = format!("({ordinary}) OR ({participant})");
+        }
+    }
     let assigned = if let Some(keys) = q.handling_keys.filter(|keys| !keys.is_empty()) {
         let keys = keys
             .iter()
@@ -94,6 +114,18 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
             " AND {}={}",
             property("status", false),
             bind(status.into(), "TEXT")
+        );
+    }
+    if !q.statuses.is_empty() {
+        let states = q
+            .statuses
+            .iter()
+            .map(|s| bind((*s).into(), "TEXT"))
+            .collect::<Vec<_>>();
+        filter += &format!(
+            " AND {} IN ({})",
+            property("status", false),
+            states.join(",")
         );
     }
     if let Some((start, end)) = q.period {
@@ -152,58 +184,29 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
         let mut choices = vec!["FALSE".to_owned()];
         for approver in approvers {
             let user = bind(approver.user_id.to_string(), "BIGINT");
+            let context = bind(approver.context.clone(), "TEXT");
             let mut choice = format!(
-                "EXISTS (SELECT 1 FROM workflow_tasks task WHERE task.request_id=r.id AND task.active=1 AND task.status='Waiting' AND task.assignee_id={user})"
+                "EXISTS (SELECT 1 FROM workflow_tasks task WHERE task.request_id=r.id AND task.active=1 AND task.status='Waiting' AND task.assignee_id={user} AND task.context_id={context})"
             );
-            if let Some(departments) = &approver.departments {
-                let ids = departments
-                    .iter()
-                    .map(|d| bind(d.clone(), "TEXT"))
-                    .collect::<Vec<_>>();
-                choice += &if ids.is_empty() {
-                    " AND FALSE".into()
-                } else {
-                    format!(" AND r.department IN ({})", ids.join(","))
-                };
+            if let Some(actor) = q.approval_actor {
+                let actor = bind(actor.to_string(), "BIGINT");
+                // Match the actual decision rule for both direct and delegated signatures.
+                choice = format!(
+                    "EXISTS (SELECT 1 FROM workflow_tasks task WHERE task.request_id=r.id AND task.active=1 AND task.status='Waiting' AND task.assignee_id={user} AND task.context_id={context} AND NOT EXISTS (SELECT 1 FROM workflow_tasks signed WHERE signed.request_id=task.request_id AND signed.submission=task.submission AND signed.node_key<>task.node_key AND signed.acted_by_id={actor} AND (task.independent=1 OR signed.independent=1)))"
+                );
             }
             choices.push(choice);
         }
         filter += &format!(" AND ({})", choices.join(" OR "));
     }
-    if let Some(user) = q.visible_user {
-        let user = bind(user.to_string(), "BIGINT");
-        let principals = q
-            .visible_principals
-            .iter()
-            .map(|p| {
-                (
-                    bind(p.user_id.to_string(), "BIGINT"),
-                    p.departments
-                        .as_ref()
-                        .map(|ds| ds.iter().map(|d| bind(d.clone(), "TEXT")).collect()),
-                )
-            })
-            .collect::<Vec<_>>();
-        filter += &format!(
-            " AND ({} OR ({assigned}))",
-            participant_condition(postgres, "r", &user, &principals)
-        );
+    if let Some(participant) = participant.filter(|_| !q.include_participants) {
+        filter += &format!(" AND ({} OR ({assigned}))", participant);
     }
     if let Some(actor) = q.approval_actor {
         let actor = bind(actor.to_string(), "BIGINT");
         filter += &format!(
             " AND r.owner_id<>{actor} AND COALESCE({},0)<>{actor}",
             property("applicantAccountId", true)
-        );
-    }
-    if let Some(owner) = q.exclude_owner {
-        filter += &format!(" AND r.owner_id<>{}", bind(owner.to_string(), "BIGINT"));
-    }
-    if let Some(applicant) = q.exclude_applicant {
-        filter += &format!(
-            " AND COALESCE({},0)<>{}",
-            property("applicantAccountId", true),
-            bind(applicant.to_string(), "BIGINT")
         );
     }
     QuerySql {
@@ -216,19 +219,23 @@ pub(crate) fn participant_condition(
     postgres: bool,
     record: &str,
     user: &str,
-    principals: &[(String, Option<Vec<String>>)],
+    context: Option<&str>,
+    principals: &[(String, String)],
 ) -> String {
+    let signed_context = context
+        .map(|c| format!(" AND viewer.acted_by_context={c}"))
+        .unwrap_or_default();
+    let assigned_context = context
+        .map(|c| format!(" AND viewer.context_id={c}"))
+        .unwrap_or_default();
     let mut choices = vec![
-        format!("viewer.acted_by_id={user}"),
-        format!("viewer.assignee_id={user}"),
+        format!("(viewer.acted_by_id={user}{signed_context})"),
+        format!("(viewer.assignee_id={user}{assigned_context})"),
     ];
-    for (principal, departments) in principals {
-        let scope = match departments {
-            None => String::new(),
-            Some(ds) if ds.is_empty() => " AND FALSE".into(),
-            Some(ds) => format!(" AND {record}.department IN ({})", ds.join(",")),
-        };
-        choices.push(format!("(viewer.assignee_id={principal}{scope})"));
+    for (principal, context) in principals {
+        choices.push(format!(
+            "(viewer.assignee_id={principal} AND viewer.context_id={context})"
+        ));
     }
     let cc = if postgres {
         format!(

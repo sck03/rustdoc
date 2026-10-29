@@ -8,51 +8,82 @@ use rust_decimal::Decimal;
 use std::collections::HashSet;
 use std::str::FromStr;
 
-fn account(tx: &Connection, company: &str, employee: i64) -> Result<i64> {
-    let person = super::super::personnel_organization::active_person(tx, company, employee)?;
-    records::positive(&person["account"], "id", "负责人关联账号")
-}
-fn resolve(
+pub(super) fn resolve(
     tx: &Connection,
     actor: &Actor,
     row: &Value,
     employee: &Value,
     stage: &ApprovalStage,
 ) -> Result<Vec<i64>> {
-    let employee_ids = match stage.source {
+    let mut company_code = actor.company.clone();
+    let appointments = match stage.source {
         ApproverSource::Named => return Ok(stage.approver_user_ids.clone()),
-        ApproverSource::DepartmentManager => {
+        ApproverSource::DepartmentManager | ApproverSource::DepartmentLeaders => {
             let department = tx
-                .find_identity("departments", &store::normalize(&text(row, "departmentId")))?
+                .find_identity(
+                    "departments",
+                    &store::department_identity(&actor.company, &text(row, "departmentId"))?,
+                )?
                 .filter(|v| v["companyCode"] == actor.company && v["isActive"] == true)
                 .ok_or_else(|| conflict("申请部门缺失或已停用。"))?;
-            vec![records::positive(
-                &department,
-                "managerEmployeeId",
-                "部门负责人",
-            )?]
+            let mut ids = vec![(
+                records::positive(&department, "managerEmployeeId", "部门负责人")?,
+                text(&department, "managerAppointmentId"),
+            )];
+            if stage.source == ApproverSource::DepartmentLeaders {
+                ids.extend(
+                    super::super::organization::leaders(&department)?
+                        .into_iter()
+                        .filter(|l| l.workflow_kinds.contains(&text(row, "kind")))
+                        .map(|l| (l.employee_id, l.appointment_id)),
+                );
+            }
+            ids
         }
         ApproverSource::LineManager | ApproverSource::FunctionalManagers => {
-            super::super::personnel_organization::appointment_managers(
+            let appointment = super::super::personnel_organization::appointment_in(
+                tx,
                 employee,
+                &actor.company,
                 &text(row, "departmentId"),
-                stage.source == ApproverSource::FunctionalManagers,
-            )?
+            )?;
+            if stage.source == ApproverSource::FunctionalManagers {
+                appointment
+                    .functional_manager_employee_ids
+                    .into_iter()
+                    .zip(appointment.functional_manager_assignment_ids)
+                    .collect()
+            } else {
+                appointment
+                    .manager_employee_id
+                    .into_iter()
+                    .zip(appointment.manager_assignment_id)
+                    .collect()
+            }
         }
-        ApproverSource::CompanyExecutive => {
-            let company = tx
-                .find_identity("companies", &store::normalize(&actor.company))?
-                .ok_or_else(|| conflict("申请公司不存在。"))?;
-            vec![records::positive(
-                &company,
-                "executiveEmployeeId",
-                "公司领导审批负责人",
-            )?]
+        ApproverSource::CompanyExecutive | ApproverSource::CompanyLeaders => {
+            let company = super::organization_routing::unit(tx, actor, stage)?;
+            company_code = text(&company, "code");
+            let mut ids = vec![(
+                records::positive(&company, "executiveEmployeeId", "公司领导审批负责人")?,
+                text(&company, "executiveAppointmentId"),
+            )];
+            if stage.source == ApproverSource::CompanyLeaders {
+                ids.extend(
+                    super::super::organization::leaders(&company)?
+                        .into_iter()
+                        .filter(|l| l.workflow_kinds.contains(&text(row, "kind")))
+                        .map(|l| (l.employee_id, l.appointment_id)),
+                );
+            }
+            ids
         }
     };
-    employee_ids
+    appointments
         .into_iter()
-        .map(|id| account(tx, &actor.company, id))
+        .map(|(id, appointment)| {
+            super::organization_routing::account(tx, &company_code, id, &appointment)
+        })
         .collect()
 }
 pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<()> {
@@ -64,8 +95,8 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
     };
     let (rule, version) = super::definitions::published(tx, &actor.company, &kind, &variant)?;
     let hiring = kind == "personnel" && variant == "Hire";
-    let employee = if hiring {
-        row["personnelChange"]["registration"].clone()
+    let employee = if kind == "personnel" && matches!(variant.as_str(), "Hire" | "Rehire") {
+        super::personnel_changes::prepare(tx, actor, row, super::super::units::today(tx)?, false)?
     } else {
         store::get(
             tx,
@@ -116,6 +147,19 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
         },
         personnel_action: variant,
     };
+    build_plan(tx, actor, row, &employee, &rule, version, &context)
+}
+
+pub(super) fn build_plan(
+    tx: &Connection,
+    actor: &Actor,
+    row: &mut Value,
+    employee: &Value,
+    rule: &export_doc_domain::approval_policy::ApprovalRule,
+    version: i64,
+    context: &ConditionContext,
+) -> Result<()> {
+    let employee_user = row["applicantAccountId"].as_i64();
     let mut plan = ApprovalPlan {
         definition_key: rule.key.clone(),
         policy_version: version,
@@ -146,6 +190,7 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
         plan.nodes.push(ApprovalNode {
             key: node.key.clone(),
             name: node.name.clone(),
+            review_points: node.review_points.clone(),
             depends_on: node.depends_on.clone(),
             decision: node.decision,
             due_hours: node.due_hours,
@@ -163,9 +208,11 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
                 decision: node.decision,
                 approver_user_id: id,
                 approver_name: reviewer.name,
+                approver_context: reviewer.context,
                 status: "Waiting".into(),
                 acted_by_user_id: None,
                 acted_by_name: String::new(),
+                acted_by_context: String::new(),
                 acted_at: String::new(),
                 note: String::new(),
                 delegation_key: String::new(),

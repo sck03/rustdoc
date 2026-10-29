@@ -5,8 +5,8 @@ use super::{
     records::text,
     store::{self, Actor, Store},
 };
+use crate::engine::store::Connection;
 use crate::generated_api::*;
-use export_doc_storage::Connection;
 use serde_json::{Value, json};
 
 pub fn append(
@@ -35,6 +35,7 @@ pub fn append(
             "Approve" => "approve",
             "Submit" => "submit",
             "ApproveStep" => "approve-step",
+            "ApprovalReassign" => "approval-reassign",
             "Edit" if record["status"] == "Pending" => "submit",
             "Edit" => "approve",
             "Issue" => "issue",

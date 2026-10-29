@@ -1,5 +1,6 @@
 mod approval;
 pub(super) mod documents;
+mod hub;
 mod schemas;
 use serde_json::{Value, json};
 
@@ -139,7 +140,7 @@ pub(super) fn extend(doc: &mut Value) {
             ("reject", "Reject", "approve"),
             ("return", "ReturnForCorrection", "approve"),
             ("cancel", "Cancel", "cancel"),
-            ("void", "Void", "approve"),
+            ("void", "Void", "void"),
             ("complete", "Complete", "complete"),
             ("remind", "Remind", "edit"),
         ] {
@@ -192,11 +193,20 @@ pub(super) fn extend(doc: &mut Value) {
     }
     approval::extend(doc);
     documents::extend(doc);
+    hub::extend(doc);
 }
 
 fn permissions(doc: &mut Value, kind: &str, resource: &str, label: &str, group: &str, order: i32) {
     let catalog = &mut doc["x-exportdoc-permissions"];
-    let actions: Vec<_> = [("view","查看","view"),("create","新建申请","operate"),("edit","编辑与提交","operate"),("cancel","取消草稿","operate"),("approve",if kind=="personnel" {"审批人员变动"} else {"审批与作废"},"manage"),("complete",if kind=="expense" {"财务查看与接收"} else {"完成登记"},"manage")].into_iter().filter(|(key,_,_)| kind != "personnel" || *key != "complete").enumerate().map(|(order,(key,name,level))| json!({"key":key,"name":name,"description":name,"sortOrder":order*10,"navigationAccessLevel":level})).collect();
+    let completion = match kind {
+        "expense" => "财务查看与接收",
+        "leave" => "销假登记",
+        "overtime" => "加班完成确认",
+        "travel" => "返程归档",
+        "purchase" => "登记验收",
+        _ => "办结登记",
+    };
+    let actions: Vec<_> = [("view","查看","view"),("create","新建申请","operate"),("edit","编辑与提交","operate"),("cancel","取消草稿","operate"),("approve","任务审批","manage"),("void","审批后作废","manage"),("complete",completion,"manage")].into_iter().filter(|(key,_,_)| kind != "personnel" || !["complete","void"].contains(key)).enumerate().map(|(order,(key,name,level))| json!({"key":key,"name":name,"description":name,"sortOrder":order*10,"navigationAccessLevel":level})).collect();
     catalog["resources"].as_array_mut().unwrap().push(json!({"key":resource,"name":label,"group":group,"workspace":"office","moduleKey":resource,"sortOrder":order,"isTechnical":false,"supportsDataScope":true,"actions":actions}));
     catalog["modules"].as_array_mut().unwrap().push(json!({"key":resource,"name":label,"group":group,"workspace":"office","sortOrder":order,"isTechnical":false}));
     for edition in ["Full"] {
@@ -219,7 +229,7 @@ fn permissions(doc: &mut Value, kind: &str, resource: &str, label: &str, group: 
         for action in &actions {
             let key = action["key"].as_str().unwrap();
             let receiver = kind == "expense" && matches!(code.as_str(), "Admin" | "Finance");
-            if (key == "approve" && !manager)
+            if (["approve", "void"].contains(&key) && !manager)
                 || (key == "complete"
                     && if kind == "expense" {
                         !receiver

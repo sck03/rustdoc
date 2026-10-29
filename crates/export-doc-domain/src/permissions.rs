@@ -233,6 +233,9 @@ pub fn module_access(grants: &[Grant]) -> BTreeMap<String, String> {
 /// CRUD services express intent; standard resources use operate/manage, while
 /// resources with separate actions retain their exact create/edit/delete grant.
 pub fn service_action<'a>(key: &str, action: &'a str) -> &'a str {
+    if key == "organization.directory" {
+        return "manage";
+    }
     let Some(resource) = resource(key) else {
         return action;
     };
@@ -433,10 +436,17 @@ mod tests {
     }
 
     #[test]
-    fn voucher_output_is_shared_without_export_or_designer_permissions() {
+    fn voucher_output_follows_explicit_or_job_duties() {
         use crate::generated_api::*;
+        let employee = role_grants("OfficeEmployee").unwrap();
+        for operation in [
+            CREATE_PAYMENT,
+            START_PAYMENT_VOUCHER_PDF_DOWNLOAD_JOB,
+            LIST_INVOICES,
+        ] {
+            assert!(!allows_operation(&employee, false, operation, &[]));
+        }
         for role in [
-            "OfficeEmployee",
             "Sales",
             "SalesManager",
             "OfficeManager",

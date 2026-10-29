@@ -58,6 +58,7 @@ fn expired_files(policy: &JobOutputRetention, pg: bool, input: bool) -> Result<Q
 }
 pub struct JobQuery<'a> {
     pub owner: Option<i64>,
+    pub context: Option<(&'a str, &'a str)>,
     pub active: Option<bool>,
     pub status: &'a str,
     pub keyword: &'a str,
@@ -92,6 +93,14 @@ pub(crate) fn invalid_times(pg: bool) -> QuerySql {
 pub(crate) fn build(q: &JobQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
     let mut values = Vec::new();
     let mut clauses = vec!["r.kind='background-jobs'".to_owned()];
+    if let Some((company, context)) = q.context {
+        clauses.push(format!("r.company={}", bind(&mut values, company, pg)));
+        clauses.push(format!(
+            "COALESCE({},'')={}",
+            field("_actorContext", pg),
+            bind(&mut values, context, pg)
+        ));
+    }
     if let Some(owner) = q.owner {
         clauses.push(format!(
             "r.owner_id=CAST({} AS BIGINT)",

@@ -5,7 +5,8 @@ use super::{
     store::{self, Actor, Store},
 };
 use crate::contracts;
-use export_doc_storage::{Connection, DataScope, GenericQuery};
+use crate::engine::store::Connection;
+use export_doc_storage::{DataScope, GenericQuery};
 use serde_json::Value;
 use std::collections::HashMap;
 

@@ -43,8 +43,9 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   const booking={id:1,meetingRoomId:1,roomName:room.name,location:room.location,requiresKey:true,ownerUserId:1,applicantName:'示例员工',departmentId:'D1',title:'项目周会与交付沟通',attendeeCount:5,startsAt:new Date(now+7200000).toISOString(),endsAt:new Date(now+10800000).toISOString(),status:'Pending',canReview:admin,reviewTaskKeys:['review:99'],createdAt:new Date(now-600000).toISOString(),versionNumber:1};
   const request={id:1,officeSupplyId:1,supplyName:supply.name,unit:'台',isReturnable:true,ownerUserId:1,applicantName:'示例员工',departmentId:'D1',purpose:'客户交流会议',quantity:2,returnedQuantity:0,returnDueDate:date,status:'Pending',createdAt:booking.createdAt,versionNumber:1};
   const page=items=>({items,totalCount:items.length,pageNumber:1,pageSize:24,totalPages:1});
-  const departments=[{code:'D1',name:'业务部',isActive:true},{code:'D2',name:'运营部',isActive:true}].map(item=>({...item,companyCode:'DEMO',versionNumber:1,parentCode:null,managerEmployeeId:null,managerName:''}));
-  const companies=[{code:'DEMO',name:'示例公司',isActive:true,versionNumber:1}];
+  const departments=[{id:101,code:'D1',name:'业务部',isActive:true},{id:102,code:'D2',name:'运营部',isActive:true}].map(item=>({...item,companyCode:'DEMO',versionNumber:1,parentCode:null,managerEmployeeId:null,managerName:''}));
+  const companies=[{id:100,code:'DEMO',name:'示例公司',isActive:true,versionNumber:1}];
+  let organizationId=103;
   if(params.get('role')==='complex') {
     companies.push({code:'BRANCH',name:'华东分公司',isActive:true,versionNumber:1},{code:'OLD',name:'已停用公司',isActive:false,versionNumber:1});
     const addDepartment=(code,name,parentCode,managerName='')=>departments.push({code,name,parentCode,managerName,companyCode:'DEMO',isActive:true,versionNumber:1,managerEmployeeId:managerName?1:null});
@@ -74,13 +75,13 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   window.addEventListener('unhandledrejection',e=>window.__officeErrors.push(String(e.reason)));
   const record=(name,input,value)=>{window.__officeCalls.push({name,input}); return Promise.resolve(value)};
   const client={
-    deleteOrganizationCompany:input=>{companies.splice(companies.findIndex(item=>item.code===input.code),1);return record('deleteCompany',input,undefined)},
-    deleteOrganizationDepartment:input=>{departments.splice(departments.findIndex(item=>item.code===input.code),1);return record('deleteDepartment',input,undefined)},
+    deleteOrganizationCompany:input=>{companies.splice(companies.findIndex(item=>item.id===input.id),1);return record('deleteCompany',input,undefined)},
+    deleteOrganizationDepartment:input=>{departments.splice(departments.findIndex(item=>item.id===input.id),1);return record('deleteDepartment',input,undefined)},
     getOrganizationDirectory:async()=>structuredClone({companies,departments}),
-    createOrganizationCompany:input=>{const item={...input.body,versionNumber:1};companies.push(item);return record('createCompany',input,structuredClone(item))},
-    updateOrganizationCompany:input=>{const item=companies.find(item=>item.code===input.code);Object.assign(item,input.body,{versionNumber:item.versionNumber+1});return record('updateCompany',input,structuredClone(item))},
-    createOrganizationDepartment:input=>{const item={...input.body,versionNumber:1,managerName:input.body.managerEmployeeId?person.employee.fullName:''};departments.push(item);return record('createDepartment',input,structuredClone(item))},
-    updateOrganizationDepartment:input=>{const item=departments.find(item=>item.code===input.code);Object.assign(item,input.body,{versionNumber:item.versionNumber+1,managerName:input.body.managerEmployeeId?person.employee.fullName:''});return record('updateDepartment',input,structuredClone(item))},
+    createOrganizationCompany:input=>{const item={...input.body,id:organizationId++,versionNumber:1};companies.push(item);return record('createCompany',input,structuredClone(item))},
+    updateOrganizationCompany:input=>{const item=companies.find(item=>item.id===input.id);Object.assign(item,input.body,{versionNumber:item.versionNumber+1});return record('updateCompany',input,structuredClone(item))},
+    createOrganizationDepartment:input=>{const item={...input.body,id:organizationId++,versionNumber:1,managerName:input.body.managerEmployeeId?person.employee.fullName:''};departments.push(item);return record('createDepartment',input,structuredClone(item))},
+    updateOrganizationDepartment:input=>{const item=departments.find(item=>item.id===input.id);Object.assign(item,input.body,{versionNumber:item.versionNumber+1,managerName:input.body.managerEmployeeId?person.employee.fullName:''});return record('updateDepartment',input,structuredClone(item))},
     listOrganizationManagers:async()=>page([{id:person.employee.id,fullName:person.employee.fullName,employeeNumber:person.employee.employeeNumber,departmentName:person.employee.departmentName}]),
     getPersonnelAvatar:input=>record('readAvatar',input,imageFiles.get('Avatar')),
     getPersonnelImage:input=>record('readImage',input,imageFiles.get(input.kind)),

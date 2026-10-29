@@ -5,10 +5,10 @@ use super::{
     records::{id, text},
     store::{self, Actor},
 };
+use crate::engine::store::Connection;
 use crate::{contracts, generated_api::*};
 use export_doc_domain::template_lifecycle::{self, Action, ShareScope, Status};
 use export_doc_mail::content;
-use export_doc_storage::Connection;
 use serde_json::{Value, json};
 const KIND: &str = "email-templates";
 const PERMISSION: &str = "sales.email-templates";

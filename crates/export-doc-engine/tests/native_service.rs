@@ -641,7 +641,7 @@ fn organization_cycles_and_referenced_deletion_are_rejected() {
         .client()
         .json::<Value>(
             UPDATE_ORGANIZATION_DEPARTMENT,
-            &[("code", "SALES".into())],
+            &[("id", parent["id"].to_string())],
             &[],
             Some(update),
         )
@@ -651,7 +651,7 @@ fn organization_cycles_and_referenced_deletion_are_rejected() {
         .client()
         .json::<Value>(
             DELETE_ORGANIZATION_DEPARTMENT,
-            &[("code", "SALES".into())],
+            &[("id", parent["id"].to_string())],
             &[],
             Some(json!({"expectedVersion":parent["versionNumber"]})),
         )

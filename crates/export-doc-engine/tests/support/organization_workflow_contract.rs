@@ -13,10 +13,16 @@ fn login(service: &NativeService, username: &Value) -> Value {
     )
     .unwrap()
 }
-fn get(service: &NativeService, token: &str, operation: Operation, id: i64) -> Value {
+pub(super) fn get(service: &NativeService, token: &str, operation: Operation, id: i64) -> Value {
     call(service, token, operation, id, None).unwrap()
 }
-fn act(service: &NativeService, token: &str, kind: &str, action: &str, row: &Value) -> Value {
+pub(super) fn act(
+    service: &NativeService,
+    token: &str,
+    kind: &str,
+    action: &str,
+    row: &Value,
+) -> Value {
     call(
         service,
         token,
@@ -26,7 +32,12 @@ fn act(service: &NativeService, token: &str, kind: &str, action: &str, row: &Val
     )
     .unwrap()
 }
-fn list(service: &NativeService, token: &str, kind: &str, extra: &[(&str, String)]) -> Value {
+pub(super) fn list(
+    service: &NativeService,
+    token: &str,
+    kind: &str,
+    extra: &[(&str, String)],
+) -> Value {
     let mut query = vec![("mineOnly", "false".into())];
     query.extend_from_slice(extra);
     serde_json::from_slice(
@@ -75,7 +86,7 @@ fn rule_key(kind: &str) -> String {
         kind.into()
     }
 }
-fn policy(service: &NativeService, token: &str, kind: &str, rule: Value) -> Value {
+pub(super) fn policy(service: &NativeService, token: &str, kind: &str, rule: Value) -> Value {
     let mut settings = get(service, token, GET_OA_APPROVAL_SETTINGS, 0);
     settings["expectedVersion"] = settings["versionNumber"].clone();
     *settings["rules"]
@@ -179,7 +190,7 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
     service
         .dispatch(
             UPDATE_ORGANIZATION_COMPANY,
-            &[("code", company.clone())],
+            &[("id", company_row["id"].to_string())],
             &[],
             Some(company_save),
             admin,
@@ -243,25 +254,28 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
     };
     if nodes {
         // A manager who also owns a later responsibility signs each node explicitly.
-        let department = get(service, admin, GET_ORGANIZATION_DIRECTORY, 0)["departments"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|row| row["code"] == b)
-            .unwrap()
-            .clone();
-        let mut managed = department.clone();
-        managed["managerEmployeeId"] = people[4]["employee"]["id"].clone();
-        managed["expectedVersion"] = managed["versionNumber"].clone();
-        service
-            .dispatch(
-                UPDATE_ORGANIZATION_DEPARTMENT,
-                &[("code", b.clone())],
-                &[],
-                Some(managed),
-                admin,
-            )
-            .unwrap();
+        let directory = get(service, admin, GET_ORGANIZATION_DIRECTORY, 0);
+        for code in [&a, &b] {
+            let department = directory["departments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["code"] == *code)
+                .unwrap()
+                .clone();
+            let mut managed = department.clone();
+            managed["managerEmployeeId"] = people[4]["employee"]["id"].clone();
+            managed["expectedVersion"] = managed["versionNumber"].clone();
+            service
+                .dispatch(
+                    UPDATE_ORGANIZATION_DEPARTMENT,
+                    &[("id", department["id"].to_string())],
+                    &[],
+                    Some(managed),
+                    admin,
+                )
+                .unwrap();
+        }
         policy(
             service,
             admin,
@@ -305,12 +319,19 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
             act(service, tokens[4], "general", "approve", &dual)["status"],
             "Approved"
         );
-        let mut restored = department;
+        let mut restored = directory["departments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["code"] == b)
+            .unwrap()
+            .clone();
+        restored["managerEmployeeId"] = people[2]["employee"]["id"].clone();
         restored["expectedVersion"] = json!(restored["versionNumber"].as_i64().unwrap() + 1);
         service
             .dispatch(
                 UPDATE_ORGANIZATION_DEPARTMENT,
-                &[("code", b.clone())],
+                &[("id", restored["id"].to_string())],
                 &[],
                 Some(restored),
                 admin,
@@ -611,7 +632,7 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         }
     }
     // A template change must also preserve CEO obligations, transactionally.
-    let template = call(service,admin,CREATE_PERMISSION_TEMPLATE,0,Some(json!({"code":format!("ceo-{suffix}"),"name":"CEO方案","isActive":true,"grants":logins[4]["user"]["capabilities"]["permissions"].as_array().unwrap().iter().filter(|g| g["resourceKey"].as_str().unwrap().starts_with("office.")).cloned().collect::<Vec<_>>()}))).unwrap();
+    let template = call(service,admin,CREATE_PERMISSION_TEMPLATE,0,Some(json!({"code":format!("ceo-{suffix}"),"name":"CEO方案","isActive":true,"grants":logins[4]["user"]["capabilities"]["permissions"].as_array().unwrap().iter().filter(|g| g["resourceKey"].as_str().unwrap().starts_with("office.") && g["resourceKey"] != "office.approval-hub").cloned().collect::<Vec<_>>()}))).unwrap();
     directory = get(service, admin, LIST_USERS, 0);
     let mut executive = directory["users"]
         .as_array()
@@ -722,6 +743,16 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         &pending,
     );
     assert_eq!(hired["status"], "Completed");
+    // The directory-only role below does not retain a published reporting duty.
+    policy(
+        service,
+        admin,
+        "general",
+        serial(
+            "general",
+            json!([{"source":"Named","approverUserIds":[users[4]["id"]]}]),
+        ),
+    );
     membership_scope(service, admin, &users[6], &people[6], &users[1], &a, &b);
 }
 

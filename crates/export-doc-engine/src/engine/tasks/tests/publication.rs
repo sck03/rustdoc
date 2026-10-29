@@ -7,6 +7,77 @@ fn file_output(path: &std::path::Path, bytes: &[u8]) -> TaskOutput {
 }
 
 #[test]
+fn completed_download_rechecks_originating_module_after_revocation() {
+    let fixture = Fixture::new();
+    let (store, jobs) = fixture.open();
+    let admin = crate::engine::auth::current_actor(&store, 1).unwrap();
+    let account = crate::engine::accounts::save(
+        &store,
+        &admin,
+        0,
+        json!({
+            "username":"download-review", "fullName":"下载权限验收", "role":"OfficeEmployee",
+            "companyScope":"DEFAULT", "departmentId":"GENERAL", "isActive":true,
+            "resetPassword":"Download-Review-2026", "permissionGrants":[
+                {"resourceKey":"document.jobs","action":"view","dataScope":"own"},
+                {"resourceKey":"office.general","action":"view","dataScope":"own"}
+            ]
+        }),
+    )
+    .unwrap();
+    let actor = crate::engine::auth::current_actor(&store, account["user"]["id"].as_i64().unwrap())
+        .unwrap();
+    let job = persistence::create_replayable(
+        &store,
+        &actor,
+        GET_GENERAL_REQUEST,
+        "Export",
+        "原始业务授权",
+        None,
+    )
+    .unwrap();
+    let id = job["jobId"].as_str().unwrap();
+    persistence::finish(
+        &store,
+        &actor,
+        id,
+        Ok(TaskOutput::file(
+            "review.pdf".into(),
+            "application/pdf",
+            b"%PDF-review".to_vec(),
+        )),
+    )
+    .unwrap();
+    assert_eq!(jobs.download(&actor, id).unwrap().content, b"%PDF-review");
+    store
+        .transaction(|tx| {
+            let mut user = crate::engine::store::get(tx, "users", actor.id)?;
+            user["disabledModules"] = json!(["office.general"]);
+            crate::engine::store::save(
+                tx,
+                "users",
+                actor.id,
+                user,
+                Some("download-review".into()),
+                &admin,
+                "restrict-module",
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(jobs.download(&actor, id).err().unwrap().status, Some(403));
+    assert_eq!(
+        jobs.authorize_download(&actor, id).unwrap_err().status,
+        Some(403)
+    );
+    assert_eq!(
+        jobs.get(&actor, id).unwrap()["status"],
+        "Succeeded",
+        "revocation does not rewrite history"
+    );
+}
+
+#[test]
 fn business_archive_is_atomic_cancelable_and_survives_task_cleanup() {
     for scenario in ["cancel", "denied", "rollback", "ready"] {
         let fixture = Fixture::new();

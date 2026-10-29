@@ -348,7 +348,7 @@ fn document_email(
     let merged = body["includeMergedPdf"] == true;
     let invoice_no = invoice["invoiceNo"].as_str().unwrap_or("").to_owned();
     let customer_id = invoice["customerId"].as_i64().unwrap_or(0);
-    let actor_id = actor.id;
+    let task_actor = actor.clone();
     let idempotency = media::digest(&serde_json::to_vec(&json!([
         invoice_id, &to, &subject, &html, merged, items
     ]))?);
@@ -377,7 +377,7 @@ fn document_email(
             body,
         )),
         move |cancelled| {
-            let actor = auth::current_actor(&store, actor_id)?;
+            let actor = auth::refresh_actor(&store, &task_actor)?;
             auth::authorize_operation(&actor, START_INVOICE_DOCUMENT_EMAIL_JOB, &[])?;
             let invoice = store.get("invoices", invoice_id)?;
             if !auth::visible(&actor, "document.invoice-output", "send-email", &invoice) {
@@ -603,6 +603,7 @@ pub fn recover(store: &Store) -> Result<()> {
             row["status"] = json!("Uncertain");
             row["errorMessage"] = json!("程序在投递完成前退出，结果未知，未自动重发。");
             let actor = Actor {
+                context: String::new(),
                 edition: Default::default(),
                 id: 0,
                 name: "系统".into(),

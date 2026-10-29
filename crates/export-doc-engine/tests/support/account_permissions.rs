@@ -286,6 +286,20 @@ pub fn exercise(service: &NativeService, admin: &str) {
     );
 
     // Administrator identity cannot be partly restricted by a selected employee group.
+    let current = call(service, admin, LIST_USERS, 0, None).unwrap();
+    let refreshed = current["users"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|user| user["id"] == accounts[2]["id"])
+        .unwrap()
+        .clone();
+    assert!(
+        refreshed["versionNumber"].as_i64().unwrap()
+            > accounts[2]["versionNumber"].as_i64().unwrap(),
+        "scheme changes invalidate the account revision"
+    );
+    accounts[2] = refreshed;
     let promoted = update(
         service,
         admin,

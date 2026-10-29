@@ -1,6 +1,6 @@
 use super::*;
 
-const WORKFLOWS: &[&str] = &[
+pub(super) const WORKFLOWS: &[&str] = &[
     "oa-leave",
     "oa-overtime",
     "oa-expense",
@@ -33,23 +33,31 @@ fn referenced_rules(
 }
 
 /// Called after an account or scheme write inside its transaction, so rejection rolls back both.
-pub(in crate::engine) fn validate_account(
+pub(in crate::engine) fn validate_account_in(
     tx: &Connection,
     actor: &Actor,
     user: &Value,
+    company: &str,
 ) -> Result<()> {
     let id = records::positive(user, "id", "账号")?;
-    let company = text(user, "companyScope");
     let settings = settings::load(tx, &company)?;
     let rules = referenced_rules(tx, &company, &settings)?;
     let executive = match super::super::personnel_accounts::person_for_account(tx, id)? {
         Some(person) => tx
             .find_identity("companies", &store::normalize(&company))?
-            .is_some_and(|c| c["executiveEmployeeId"] == person["id"]),
+            .map(|c| {
+                super::super::organization::leads(
+                    &c,
+                    person["id"].as_i64().unwrap_or(0),
+                    "executiveEmployeeId",
+                )
+            })
+            .transpose()?
+            .unwrap_or(false),
         None => false,
     };
     let current = || {
-        auth::current_actor_in(tx, id, actor.edition).map_err(|e| {
+        super::super::units::approval_actor(tx, id, actor.edition, company).map_err(|e| {
             if matches!(e.status, Some(403 | 404)) {
                 conflict("账号仍承担审批或公司领导审批负责人职责，请先移交、更新规则后再调整权限。")
             } else {
@@ -62,13 +70,48 @@ pub(in crate::engine) fn validate_account(
             "权限调整会使公司领导审批负责人失去公司审批职责，请先交接。",
         ));
     }
+    if let Some(person) = super::super::personnel_accounts::person_for_account(tx, id)? {
+        if let Some(row) = tx.find_identity("companies", &store::normalize(company))? {
+            for leader in super::super::organization::leaders(&row)?
+                .iter()
+                .filter(|l| person["id"] == l.employee_id)
+            {
+                let mut scope = actor.clone();
+                scope.company = company.into();
+                for kind in &leader.workflow_kinds {
+                    approval::reviewer(tx, &scope, id, &json!({"kind":kind})).map_err(|e| {
+                        if matches!(e.status, Some(400 | 403 | 404)) {
+                            conflict("账号仍承担公司分管审批职责，请先交接对应业务再调整权限。")
+                        } else {
+                            e
+                        }
+                    })?;
+                }
+            }
+        }
+    }
     for rule in &rules {
         let responsible = rule.account_ids().contains(&id);
         if responsible || rule.notify_user_ids.contains(&id) {
-            let reviewer = current()?;
             let resource =
                 approval::resource(&rule.kind).ok_or_else(|| invalid("未知审批类型。"))?;
-            if auth::authorize(&reviewer, resource, "view").is_err()
+            let reviewer = super::super::units::for_operation(
+                tx,
+                id,
+                actor.edition,
+                company,
+                resource,
+                if responsible { "approve" } else { "view" },
+            )
+            .map_err(|e| {
+                if matches!(e.status, Some(400 | 403 | 404)) {
+                    conflict("账号仍被流程引用，请先交接职责或停用流程。")
+                } else {
+                    e
+                }
+            })?;
+            if reviewer.company != company
+                || auth::authorize(&reviewer, resource, "view").is_err()
                 || (responsible && auth::authorize(&reviewer, resource, "approve").is_err())
             {
                 return Err(conflict(
@@ -91,14 +134,25 @@ pub(in crate::engine) fn validate_account(
                 ..Default::default()
             })?;
             for row in rows {
-                if approval::plan(&row)?.is_some_and(|p| {
-                    p.steps
-                        .iter()
-                        .any(|s| s.approver_user_id == id && s.status == "Waiting")
-                }) {
-                    let reviewer = current()?;
+                let Some(plan) = approval::plan(&row)? else {
+                    continue;
+                };
+                for step in plan
+                    .steps
+                    .iter()
+                    .filter(|s| s.approver_user_id == id && s.status == "Waiting")
+                {
                     let resource =
                         approval::resource(kind).ok_or_else(|| invalid("未知审批类型。"))?;
+                    let reviewer =
+                        super::super::units::resolve(tx, id, actor.edition, &step.approver_context)
+                            .map_err(|e| {
+                                if matches!(e.status, Some(400 | 401 | 403 | 404)) {
+                                    conflict("此单位身份仍承担在途审批，请先交接任务。")
+                                } else {
+                                    e
+                                }
+                            })?;
                     if reviewer.company != company
                         || auth::authorize(&reviewer, resource, "view").is_err()
                         || auth::authorize(&reviewer, resource, "approve").is_err()
@@ -115,7 +169,7 @@ pub(in crate::engine) fn validate_account(
             }
         }
     }
-    Ok(())
+    super::approval_integrity::company(tx, actor, company)
 }
 
 pub(in crate::engine) fn assigned(

@@ -2,6 +2,7 @@
 use crate::{DataScope, QuerySql, Result, sql};
 
 pub struct PersonnelQuery<'a> {
+    pub as_of: &'a str,
     pub company: &'a str,
     pub department: &'a str,
     pub status: &'a str,
@@ -17,15 +18,20 @@ pub struct PersonnelQuery<'a> {
 pub(crate) fn build(q: &PersonnelQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
     let mut values = Vec::new();
     let company = sql::bind(&mut values, q.company, pg);
-    let mut clauses = vec![format!("r.kind='people' AND r.company={company}")];
+    let membership =
+        crate::personnel_memberships::filter(&mut values, pg, &company, None, Some(q.as_of));
+    let mut clauses = vec![format!("r.kind='people' AND ({membership})")];
     for scope in q.scopes {
         clauses.push(scope.filter(&mut values, pg));
     }
     if !q.department.is_empty() {
-        clauses.push(crate::generic_query::department_filter(
-            &sql::bind(&mut values, q.department, pg),
-            true,
+        let department = sql::bind(&mut values, q.department, pg);
+        clauses.push(crate::personnel_memberships::filter(
+            &mut values,
             pg,
+            &company,
+            Some(&department),
+            Some(q.as_of),
         ));
     }
     let status = sql::field("status", pg);
@@ -58,6 +64,22 @@ pub(crate) fn build(q: &PersonnelQuery<'_>, pg: bool) -> Result<(QuerySql, Strin
             .into(),
             values,
         },
-        sql::projection(q.fields, pg)?,
+        if q.fields.is_empty() {
+            sql::projection(q.fields, pg)?
+        } else {
+            sql::projected(q.fields.iter().map(|(name,source)| {
+                sql::valid_path(source)?;
+                let expression = match *source {
+                    "profile.identityLongTerm" | "profile.identityValidUntil" => {
+                        let key = source.strip_prefix("profile.").unwrap();
+                        if pg { format!("(SELECT p.body->'{key}' FROM personnel_private_profiles p WHERE p.person_id=r.id)") }
+                        else { format!("(SELECT json(p.body->'$.{key}') FROM personnel_private_profiles p WHERE p.person_id=r.id)") }
+                    },
+                    "privateProfileAvailable" => if pg { "to_jsonb(EXISTS(SELECT 1 FROM personnel_private_profiles p WHERE p.person_id=r.id))".into() } else { "json(CASE WHEN EXISTS(SELECT 1 FROM personnel_private_profiles p WHERE p.person_id=r.id) THEN 'true' ELSE 'false' END)".into() },
+                    _ => sql::json_field(source,pg),
+                };
+                Ok((*name,expression))
+            }),pg)?
+        },
     ))
 }

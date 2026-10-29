@@ -3,7 +3,8 @@ use super::{
     error::{Result, unavailable},
     records::text,
 };
-use export_doc_storage::{Connection, DataScope, GenericQuery};
+use crate::engine::store::Connection;
+use export_doc_storage::{DataScope, GenericQuery};
 use serde_json::Value;
 use std::collections::HashSet;
 
@@ -14,26 +15,14 @@ pub fn departments(tx: &Connection, user: &Value, include_managed: bool) -> Resu
         }
         None => vec![text(user, "departmentId")],
     };
-    if !include_managed {
-        return Ok(result);
-    }
     let Some(person) =
         super::personnel_accounts::linked_person(tx, user["id"].as_i64().unwrap_or(0))?
     else {
         return Ok(result);
     };
-    if person["companyScope"] != user["companyScope"]
-        || !matches!(person["status"].as_str(), Some("Active" | "Probation"))
-    {
-        return Ok(result);
-    }
     let company = text(user, "companyScope");
-    let filters = [
-        ("companyCode", company.clone()),
-        ("isActive", "true".into()),
-        ("managerEmployeeId", person["id"].to_string()),
-    ];
-    if query(tx, &filters, 0, 1)?.0 == 0 {
+    result = super::personnel_organization::departments_in(tx, &person, &company)?;
+    if !include_managed || result.is_empty() {
         return Ok(result);
     }
     let mut rows = vec![];
@@ -57,11 +46,18 @@ pub fn departments(tx: &Connection, user: &Value, include_managed: bool) -> Resu
         .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(|_| unavailable("部门层级数据损坏。"))?;
     let ancestors = export_doc_domain::organization::ancestry(&tree).map_err(unavailable)?;
-    let managed: HashSet<_> = rows
-        .iter()
-        .filter(|row| row["isActive"] == true && row["managerEmployeeId"] == person["id"])
-        .map(|row| text(row, "code"))
-        .collect();
+    let mut managed = HashSet::new();
+    for row in &rows {
+        if row["isActive"] == true
+            && super::organization::leads(
+                row,
+                person["id"].as_i64().unwrap_or(0),
+                "managerEmployeeId",
+            )?
+        {
+            managed.insert(text(row, "code"));
+        }
+    }
     result.extend(
         rows.iter()
             .filter(|row| row["isActive"] == true)
@@ -100,6 +96,7 @@ fn query(
             ("parentCode", "parentCode"),
             ("isActive", "isActive"),
             ("managerEmployeeId", "managerEmployeeId"),
+            ("additionalLeaders", "additionalLeaders"),
         ],
         offset,
         limit,

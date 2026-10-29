@@ -21,6 +21,7 @@ export type WorkspaceNavItem = {
   requiresAdmin?: boolean;
   desktopOnly?: boolean;
   requiresSystemAdministration?: boolean;
+  unitManagement?: ("organization" | "appointments" | "roles" | "workflows" | "analytics")[];
   workspace?: "document" | "sales" | "office";
   moduleKey?: string;
   requiredFeature?: string;
@@ -36,6 +37,7 @@ export type WorkspaceCapabilities = {
   moduleAccess?: ApiModuleAccessDto[];
   canManageSettings?: boolean;
   canManageUsers?: boolean;
+  unitManagement?: { organization: boolean; appointments?: boolean; roles: boolean; workflows: boolean; analytics?: boolean };
   canUseDocumentWorkspace?: boolean;
   canUseSalesWorkspace?: boolean;
   isDesktopRuntime?: boolean;
@@ -67,7 +69,7 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
         isActive: (path) => path === "/office/approvals" || path === "/office/approval-settings", workspace: "office", permissionMatch: "any",
         requiredPermissions: [...oaKinds.map((kind) => oaModules[kind].resource), "office.rooms", "office.supplies"].map(resourceKey => ({ resourceKey, action: "view" })),
         searchItems: [{ label: "审批规则与代理", description: "设置申请审批步骤和有期限的审批代理", to: "/office/approval-settings", icon: ShieldCheck,
-          isActive: path => path === "/office/approval-settings", workspace: "office", requiresAdmin: true, requiresSystemAdministration: true }] },
+          isActive: path => path === "/office/approval-settings", workspace: "office", unitManagement: ["workflows"] }] },
       { label: "工作概览", description: "按业务权限查看单证与销售概况", to: "/dashboard", icon: LayoutDashboard,
         isActive: (path) => isDashboardRoute(path) || path.startsWith("/crm/dashboard"), showSectionNav: true, children: [
       { label: "单证概览", description: "查看业务金额、近期单据与单证进度", keywords: "仪表盘", to: "/dashboard", icon: LayoutDashboard,
@@ -195,7 +197,7 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
           { label: "权限方案与模块权限", description: "系统管理 / 账号与权限 / 权限方案", keywords: "资源 动作 数据范围 授权", to: "/system/access-control?view=templates", search: "view=templates", icon: ShieldCheck, isActive: isAccessControlRoute },
         ] },
       { label: "组织架构", description: "定义公司、部门层级和负责人", keywords: "组织目录 公司部门 综合部", to: "/system/organization", icon: Network,
-        isActive: (path) => path.startsWith("/system/organization"), requiresAdmin: true, requiresSystemAdministration: true },
+        isActive: (path) => path.startsWith("/system/organization"), workspace: "office", unitManagement: ["organization", "appointments", "roles", "analytics"] },
       { label: "审计日志", description: "查阅和导出关键业务操作记录", to: "/audit-logs", icon: ShieldCheck,
         isActive: isAuditLogRoute, requiresAdmin: true, requiresSystemAdministration: true },
       { label: "关于与支持", description: "查看产品信息、授权注册和软件更新", to: "/system/about", icon: Info,

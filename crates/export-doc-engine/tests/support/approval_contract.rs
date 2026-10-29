@@ -126,7 +126,7 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
             &service
                 .dispatch(
                     UPDATE_ORGANIZATION_DEPARTMENT,
-                    &[("code", department["code"].as_str().unwrap().into())],
+                    &[("id", department["id"].to_string())],
                     &[],
                     Some(department.clone()),
                     admin,

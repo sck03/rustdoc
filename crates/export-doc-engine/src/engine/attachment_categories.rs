@@ -4,8 +4,9 @@ use super::{
     records::{id, text},
     store::{self, Actor, Store},
 };
+use crate::engine::store::Connection;
 use crate::{contracts, generated_api::*};
-use export_doc_storage::{AuditWrite, Connection, DataScope, GenericQuery, RecordOrder};
+use export_doc_storage::{AuditWrite, DataScope, GenericQuery, RecordOrder};
 use serde_json::{Value, json};
 pub const OPERATIONS: &[Operation] = &[
     LIST_BUSINESS_ATTACHMENT_CATEGORIES,

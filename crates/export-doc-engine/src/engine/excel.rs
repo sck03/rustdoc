@@ -102,7 +102,7 @@ pub fn upload(
     let replay = Replay::new(operation, &[], &serde_json::json!({})).with_input(name, bytes);
     let bytes = bytes.to_vec();
     let store = service.store.clone();
-    let actor_id = actor.id;
+    let task_actor = actor.clone();
     service.jobs.start_replayable(
         actor,
         operation,
@@ -110,9 +110,9 @@ pub fn upload(
         "转换订舱托单",
         Some(replay),
         move |_| {
-            auth::authorize_operation(&auth::current_actor(&store, actor_id)?, operation, &[])?;
+            auth::authorize_operation(&auth::refresh_actor(&store, &task_actor)?, operation, &[])?;
             let bytes = export_doc_excel::convert_booking(&bytes, &check).map_err(invalid)?;
-            auth::authorize_operation(&auth::current_actor(&store, actor_id)?, operation, &[])?;
+            auth::authorize_operation(&auth::refresh_actor(&store, &task_actor)?, operation, &[])?;
             Ok(TaskOutput::file(
                 "订舱托单.xlsx".into(),
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -152,7 +152,7 @@ pub fn handle(
         }
         let bytes = read(&source, export_doc_excel::MAX_INPUT)?;
         let store = service.store.clone();
-        let actor_id = actor.id;
+        let task_actor = actor.clone();
         return service.jobs.start_replayable(
             actor,
             operation,
@@ -160,9 +160,17 @@ pub fn handle(
             "转换订舱托单",
             Some(replay),
             move |_| {
-                auth::authorize_operation(&auth::current_actor(&store, actor_id)?, operation, &[])?;
+                auth::authorize_operation(
+                    &auth::refresh_actor(&store, &task_actor)?,
+                    operation,
+                    &[],
+                )?;
                 let bytes = export_doc_excel::convert_booking(&bytes, &check).map_err(invalid)?;
-                auth::authorize_operation(&auth::current_actor(&store, actor_id)?, operation, &[])?;
+                auth::authorize_operation(
+                    &auth::refresh_actor(&store, &task_actor)?,
+                    operation,
+                    &[],
+                )?;
                 let mut output = TaskOutput::file(
                     "订舱托单.xlsx".into(),
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -224,7 +232,7 @@ pub fn handle(
     ]
     .contains(&operation);
     let store = service.store.clone();
-    let actor_id = actor.id;
+    let task_actor = actor.clone();
     service.jobs.start_replayable(
         actor,
         operation,
@@ -240,7 +248,7 @@ pub fn handle(
         },
         Some(replay),
         move |_| {
-            let actor = auth::current_actor(&store, actor_id)?;
+            let actor = auth::refresh_actor(&store, &task_actor)?;
             auth::authorize_operation(&actor, operation, &[])?;
             if let Some(invoice) = &invoice {
                 let current = store.get("invoices", i64::from(invoice.id))?;

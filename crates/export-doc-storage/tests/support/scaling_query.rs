@@ -185,6 +185,7 @@ fn jobs(c: &Connection) {
         ("_retryOperation", "_retry.operation"),
     ];
     let mut q = JobQuery {
+        context: None,
         owner: Some(2),
         active: None,
         status: "Canceling",

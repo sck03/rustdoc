@@ -122,7 +122,10 @@ pub fn schema_type(schema: &Value) -> String {
                 .collect::<Vec<_>>()
                 .join("; ")
         ),
-        "object" => "Record<string, unknown>".into(),
+        "object" => format!(
+            "Record<string, {}>",
+            schema_type(&schema["additionalProperties"])
+        ),
         _ => "unknown".into(),
     };
     if types.contains(&"null") && result != "unknown" {

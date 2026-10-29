@@ -4,8 +4,9 @@ use super::{
     records::text,
     store::{self, Actor},
 };
-use export_doc_domain::personnel_organization::{PersonnelOrganization, validate_reporting_graph};
-use export_doc_storage::{Connection, DataScope, GenericQuery};
+use crate::engine::store::Connection;
+use export_doc_domain::personnel_organization::PersonnelOrganization;
+use export_doc_storage::{DataScope, GenericQuery};
 use serde_json::{Value, json};
 use std::collections::HashMap;
 
@@ -38,11 +39,94 @@ pub fn organization(person: &Value) -> Result<PersonnelOrganization> {
     }
 }
 pub fn departments(person: &Value) -> Result<Vec<String>> {
-    Ok(organization(person)?.departments(&text(person, "departmentId")))
+    Ok(assignments(person)?
+        .into_iter()
+        .filter(|a| a.company_code == text(person, "companyScope"))
+        .map(|a| a.department_id)
+        .collect())
+}
+pub fn assignments(
+    person: &Value,
+) -> Result<Vec<export_doc_domain::personnel_organization::Assignment>> {
+    let org = organization(person)?;
+    let mut result = vec![export_doc_domain::personnel_organization::Assignment {
+        id: org.primary_assignment_id,
+        manager_assignment_id: org.manager_assignment_id,
+        functional_manager_assignment_ids: org.functional_manager_assignment_ids,
+        company_code: text(person, "companyScope"),
+        department_id: text(person, "departmentId"),
+        job_title: text(person, "jobTitle"),
+        manager_employee_id: org.manager_employee_id,
+        functional_manager_employee_ids: org.functional_manager_employee_ids,
+        starts_on: if org.primary_starts_on.is_empty() {
+            text(person, "hireDate")
+        } else {
+            org.primary_starts_on
+        },
+        ends_on: String::new(),
+    }];
+    result.extend(org.additional_assignments);
+    Ok(result)
+}
+pub fn departments_in(tx: &Connection, person: &Value, company: &str) -> Result<Vec<String>> {
+    let today = super::units::today(tx)?;
+    if !matches!(person["status"].as_str(), Some("Active" | "Probation")) {
+        return Ok(vec![]);
+    }
+    assignments(person)?
+        .into_iter()
+        .filter(|a| a.company_code == company)
+        .filter_map(|a| match a.active_on(today) {
+            Ok(true) => Some(Ok(a.department_id)),
+            Ok(false) => None,
+            Err(e) => Some(Err(unavailable(e))),
+        })
+        .collect()
+}
+pub fn appointment_in(
+    tx: &Connection,
+    person: &Value,
+    company: &str,
+    department: &str,
+) -> Result<export_doc_domain::personnel_organization::Assignment> {
+    if !departments_in(tx, person, company)?
+        .iter()
+        .any(|d| d == department)
+    {
+        return Err(invalid("所选单位和部门不在人员的有效任职范围内。"));
+    }
+    assignments(person)?
+        .into_iter()
+        .find(|a| a.company_code == company && a.department_id == department)
+        .ok_or_else(|| invalid("任职不存在。"))
+}
+pub fn appointment_by_id(
+    tx: &Connection,
+    person: &Value,
+    company: &str,
+    id: &str,
+) -> Result<export_doc_domain::personnel_organization::Assignment> {
+    if !matches!(person["status"].as_str(), Some("Active" | "Probation")) {
+        return Err(invalid("任职人员已不在职。"));
+    }
+    let today = super::units::today(tx)?;
+    for assignment in assignments(person)? {
+        if assignment.id == id
+            && assignment.company_code == company
+            && assignment.active_on(today).map_err(unavailable)?
+        {
+            super::organization::validate_assignment(tx, company, &assignment.department_id)?;
+            return Ok(assignment);
+        }
+    }
+    Err(invalid("所选任职已失效、已结束或不属于目标单位。"))
 }
 pub fn active_person(tx: &Connection, company: &str, id: i64) -> Result<Value> {
+    if id <= 0 {
+        return Err(invalid("负责人编号必须大于零。"));
+    }
     let person = store::get(tx, "people", id)?;
-    if person["companyScope"] != company
+    if departments_in(tx, &person, company)?.is_empty()
         || !matches!(person["status"].as_str(), Some("Active" | "Probation"))
     {
         return Err(invalid("汇报负责人须为本公司的在职人员。"));
@@ -58,6 +142,8 @@ pub fn directory(tx: &Connection, company: &str) -> Result<Vec<Value>> {
             scope: DataScope {
                 company_wide: true,
                 company,
+                personnel_memberships: true,
+                personnel_date: Some(&super::units::today(tx)?.to_string()),
                 ..Default::default()
             },
             filters: &[],
@@ -68,6 +154,9 @@ pub fn directory(tx: &Connection, company: &str) -> Result<Vec<Value>> {
                 ("status", "status"),
                 ("departmentId", "departmentId"),
                 ("organization", "organization"),
+                ("companyScope", "companyScope"),
+                ("hireDate", "hireDate"),
+                ("jobTitle", "jobTitle"),
             ],
             offset: result.len() as i64,
             limit: 200,
@@ -86,42 +175,151 @@ pub fn validate(
     submitted: &Value,
     action: &str,
 ) -> Result<()> {
-    let organization: PersonnelOrganization = serde_json::from_value(submitted.clone())
+    validate_with_primary(tx, actor, person, submitted, action, None)
+}
+
+pub(super) fn validate_with_primary(
+    tx: &Connection,
+    actor: &Actor,
+    person: &mut Value,
+    submitted: &Value,
+    action: &str,
+    primary: Option<&str>,
+) -> Result<()> {
+    let mut organization: PersonnelOrganization = serde_json::from_value(submitted.clone())
         .map_err(|_| invalid("任职与汇报关系格式无效。"))?;
+    let company = text(person, "companyScope");
+    let previous = if person["id"].as_i64().unwrap_or(0) > 0 {
+        store::get(tx, "people", person["id"].as_i64().unwrap())?
+    } else {
+        Value::Null
+    };
+    let previous_assignments = assignments(&previous)?;
+    let previous_org = self::organization(&previous)?;
+    organization.primary_assignment_id = if let Some(primary) = primary {
+        let selected = previous_assignments
+            .iter()
+            .find(|a| a.id == primary && a.company_code == company)
+            .ok_or_else(|| invalid("新的主任职必须来自此人员的已有任职。"))?;
+        organization.primary_starts_on = selected.starts_on.clone();
+        selected.id.clone()
+    } else if previous_org.primary_assignment_id.is_empty() {
+        organization.primary_starts_on = text(person, "hireDate");
+        crate::paths::nonce().map_err(unavailable)?
+    } else {
+        organization.primary_starts_on =
+            if previous["status"] == "Departed" && person["status"] != "Departed" {
+                text(person, "hireDate")
+            } else {
+                previous_assignments[0].starts_on.clone()
+            };
+        previous_org.primary_assignment_id.clone()
+    };
+    for assignment in &mut organization.additional_assignments {
+        if assignment.company_code.is_empty() {
+            assignment.company_code = company.clone();
+        }
+        if assignment.id.is_empty() {
+            assignment.id = previous_org
+                .additional_assignments
+                .iter()
+                .find(|a| {
+                    a.company_code == assignment.company_code
+                        && a.department_id == assignment.department_id
+                })
+                .map(|a| a.id.clone())
+                .filter(|id| !id.is_empty())
+                .unwrap_or(crate::paths::nonce().map_err(unavailable)?);
+        } else if !previous_assignments
+            .iter()
+            .any(|a| a.id == assignment.id && a.company_code == assignment.company_code)
+        {
+            return Err(invalid("任职编号不属于此人员或任职单位已改变。"));
+        }
+    }
+    let mut identifiers =
+        std::collections::HashSet::from([organization.primary_assignment_id.as_str()]);
+    if organization
+        .additional_assignments
+        .iter()
+        .any(|a| !identifiers.insert(a.id.as_str()))
+    {
+        return Err(invalid("任职编号不能重复。"));
+    }
     let id = person["id"].as_i64().unwrap_or(0);
     organization
-        .validate(id, &text(person, "departmentId"))
+        .validate(id, &text(person, "departmentId"), &company)
         .map_err(invalid)?;
-    let company = text(person, "companyScope");
-    for department in organization.departments(&text(person, "departmentId")) {
-        super::organization::validate_assignment(tx, &company, &department)?;
-        let scope = json!({"companyScope":company,"departmentId":department,"ownerUserId":person["ownerUserId"]});
-        if !super::auth::visible(actor, "office.people", action, &scope) {
+    super::personnel_reporting::normalize(tx, &company, &mut organization)?;
+    for (unit, department) in std::iter::once((company.as_str(), text(person, "departmentId")))
+        .chain(
+            organization
+                .additional_assignments
+                .iter()
+                .map(|a| (a.company_code.as_str(), a.department_id.clone())),
+        )
+    {
+        super::organization::validate_assignment(tx, unit, &department)?;
+        let scope = json!({"companyScope":unit,"departmentId":department,"ownerUserId":person["ownerUserId"]});
+        let managed = super::units::demand(actor, unit, "organization.appointments").is_ok();
+        let unchanged = if unit == company && department == text(person, "departmentId") {
+            previous["companyScope"] == person["companyScope"]
+                && previous["departmentId"] == person["departmentId"]
+                && previous["jobTitle"] == person["jobTitle"]
+                && self::organization(&previous)?.manager_employee_id
+                    == organization.manager_employee_id
+                && self::organization(&previous)?.functional_manager_employee_ids
+                    == organization.functional_manager_employee_ids
+                && self::organization(&previous)?.manager_assignment_id
+                    == organization.manager_assignment_id
+                && self::organization(&previous)?.functional_manager_assignment_ids
+                    == organization.functional_manager_assignment_ids
+        } else {
+            organization
+                .additional_assignments
+                .iter()
+                .find(|a| a.company_code == unit && a.department_id == department)
+                .is_some_and(|a| previous_assignments.contains(a))
+        };
+        if !unchanged && !managed && !super::auth::visible(actor, "office.people", action, &scope) {
             return Err(super::error::error(403, "任职部门超出人事办理范围。"));
         }
     }
-    let managers = organization.manager_ids();
-    for manager in &managers {
-        active_person(tx, &company, *manager)?;
-    }
-    // A node without outgoing reporting edges cannot introduce a cycle.
-    if !managers.is_empty() {
-        let mut edges = HashMap::new();
-        for other in directory(tx, &company)? {
-            if other["id"] == id || other["status"] == "Departed" {
-                continue;
+    // A full-personnel form may preserve another unit's assignments but cannot remove them.
+    for old in self::organization(&previous)?.additional_assignments {
+        if !organization.additional_assignments.contains(&old) {
+            let scope = json!({"companyScope":old.company_code,"departmentId":old.department_id,"ownerUserId":person["ownerUserId"]});
+            if super::units::demand(actor, &old.company_code, "organization.appointments").is_err()
+                && !super::auth::visible(actor, "office.people", action, &scope)
+            {
+                return Err(super::error::error(403, "不能结束或改写其他单位的任职。"));
             }
-            edges.insert(
-                other["id"]
-                    .as_i64()
-                    .ok_or_else(|| unavailable("人员编号损坏。"))?,
-                self::organization(&other)?.manager_ids(),
-            );
         }
-        edges.insert(id, managers);
-        validate_reporting_graph(&edges).map_err(invalid)?;
+    }
+    for (unit, managers) in std::iter::once((
+        company.as_str(),
+        organization
+            .manager_employee_id
+            .into_iter()
+            .chain(organization.functional_manager_employee_ids.iter().copied())
+            .collect::<Vec<_>>(),
+    ))
+    .chain(organization.additional_assignments.iter().map(|a| {
+        (
+            a.company_code.as_str(),
+            a.manager_employee_id
+                .into_iter()
+                .chain(a.functional_manager_employee_ids.iter().copied())
+                .collect(),
+        )
+    })) {
+        for manager in managers {
+            active_person(tx, unit, manager)?;
+        }
     }
     person["organization"] = serde_json::to_value(organization)?;
+    super::personnel_reporting::validate(tx, person)?;
+    super::organization::validate_personnel_duties(tx, person)?;
     Ok(())
 }
 pub fn references(
@@ -131,33 +329,51 @@ pub fn references(
     active_only: bool,
 ) -> Result<usize> {
     let mut count = 0;
-    for person in directory(tx, company)? {
-        if (!active_only || person["status"] != "Departed")
-            && organization(&person)?.manager_ids().contains(&employee)
+    let today = super::units::today(tx)?;
+    for person in store::matching(
+        tx,
+        "people",
+        &[],
+        &[
+            ("id", "id"),
+            ("status", "status"),
+            ("companyScope", "companyScope"),
+            ("departmentId", "departmentId"),
+            ("jobTitle", "jobTitle"),
+            ("hireDate", "hireDate"),
+            ("organization", "organization"),
+        ],
+    )? {
+        if active_only && !matches!(person["status"].as_str(), Some("Active" | "Probation")) {
+            continue;
+        }
+        for assignment in assignments(&person)?
+            .into_iter()
+            .filter(|a| a.company_code == company)
         {
-            count += 1;
+            if active_only && !assignment.active_on(today).map_err(unavailable)? {
+                continue;
+            }
+            if assignment.manager_employee_id == Some(employee)
+                || assignment
+                    .functional_manager_employee_ids
+                    .contains(&employee)
+            {
+                count += 1;
+                break;
+            }
         }
     }
     Ok(count)
 }
 pub fn appointment_managers(
+    tx: &Connection,
     person: &Value,
+    company: &str,
     department: &str,
     functional: bool,
 ) -> Result<Vec<i64>> {
-    let organization = organization(person)?;
-    if person["departmentId"] == department {
-        return Ok(if functional {
-            organization.functional_manager_employee_ids
-        } else {
-            organization.manager_employee_id.into_iter().collect()
-        });
-    }
-    let assignment = organization
-        .additional_assignments
-        .iter()
-        .find(|a| a.department_id == department)
-        .ok_or_else(|| invalid("申请部门不在员工当前任职范围内。"))?;
+    let assignment = appointment_in(tx, person, company, department)?;
     Ok(if functional {
         assignment.functional_manager_employee_ids.clone()
     } else {
@@ -207,7 +423,7 @@ pub fn project(tx: &Connection, person: &Value) -> Result<Value> {
         enrich(assignment, &names);
         assignment["departmentName"] = json!(departments.get(
             tx,
-            &text(person, "companyScope"),
+            &text(assignment, "companyCode"),
             &text(assignment, "departmentId")
         )?);
     }

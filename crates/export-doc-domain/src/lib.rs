@@ -34,6 +34,7 @@ pub mod sales;
 pub mod supplier;
 pub mod template;
 pub mod template_lifecycle;
+pub mod units;
 
 pub mod letter_of_credit;
 

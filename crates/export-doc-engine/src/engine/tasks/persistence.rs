@@ -23,12 +23,24 @@ pub(super) fn active(job: &Value) -> bool {
     )
 }
 fn accessible(actor: &Actor, job: &Value) -> bool {
-    actor.admin || job["requestedByUserId"] == actor.id
+    actor.admin
+        || (job["requestedByUserId"] == actor.id
+            && job["companyScope"] == actor.company
+            && job["_actorContext"].as_str().unwrap_or("") == actor.context)
 }
 fn lookup(connection: &Connection, id: &str) -> Result<Value> {
     connection
         .find_identity(KIND, id)?
         .ok_or_else(|| error(404, "文件任务不存在。"))
+}
+fn authorize_output(connection: &Connection, actor: &Actor, job: &Value) -> Result<Actor> {
+    let current = crate::engine::auth::refresh_actor_in(connection, actor)?;
+    let operation = crate::generated_api::ALL_OPERATIONS
+        .iter()
+        .find(|operation| job["_operation"].as_str() == Some(operation.id))
+        .ok_or_else(|| unavailable("任务缺少生成的输出授权元数据。"))?;
+    crate::engine::auth::authorize_operation(&current, *operation, &[])?;
+    Ok(current)
 }
 pub(super) fn checked(connection: &Connection, actor: &Actor, id: &str) -> Result<Value> {
     let job = lookup(connection, id)?;
@@ -73,6 +85,7 @@ pub(super) fn actor_snapshot(actor: &Actor, record: &Value) -> Value {
 }
 pub(super) fn owner(job: &Value) -> Result<Actor> {
     Ok(Actor {
+        context: text(job, "_actorContext"),
         edition: Default::default(),
         id: job["requestedByUserId"]
             .as_i64()
@@ -143,6 +156,7 @@ fn create_in(
     );
     let mut value = value;
     value["_operation"] = json!(operation.map(|operation| operation.id));
+    value["_actorContext"] = json!(actor.context);
     let mut saved = save(connection, actor, value, "start")?;
     if let Some(replay) = replay {
         replay.persist(connection, &mut saved)?;
@@ -201,10 +215,7 @@ pub(super) fn finish_controlled(
             // this transaction sees a completed task and cannot relabel it.
             let result = result.and_then(|output| {
                 if output.file.is_some() || output.directory.is_some() || output.managed_file.is_some() || output.archive.is_some() {
-                    let current = crate::engine::auth::current_actor_in(connection, actor.id, store.edition)?;
-                    let operation = crate::generated_api::ALL_OPERATIONS.iter().find(|operation| job["_operation"].as_str() == Some(operation.id))
-                        .ok_or_else(|| unavailable("任务缺少生成的发布授权元数据。"))?;
-                    crate::engine::auth::authorize_operation(&current, *operation, &[])?;
+                    let current = authorize_output(connection, actor, &job)?;
                     if let Some(check) = &output.publication { check.validate(connection, &current)?; }
                     if let Some(path) = &output.managed_file {
                         job["_managedOutput"] = super::managed_output::describe(store, &current, path)?;
@@ -317,7 +328,7 @@ pub fn recover(store: &Store) -> Result<()> {
 pub fn get(store: &Store, actor: &Actor, id: &str) -> Result<Value> {
     Ok(actor_snapshot(
         actor,
-        &checked(&*store.connection()?, actor, id)?,
+        &checked(&store.connection()?, actor, id)?,
     ))
 }
 pub fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
@@ -374,10 +385,11 @@ fn downloadable(connection: &Connection, actor: &Actor, id: &str) -> Result<Valu
             "下载副本已按容量策略回收；已保存的外部文件继续保留，请从输出位置使用或重新生成。",
         ));
     }
+    authorize_output(connection, actor, &job)?;
     Ok(job)
 }
 pub(super) fn authorize_download(store: &Store, actor: &Actor, id: &str) -> Result<()> {
-    downloadable(&*store.connection()?, actor, id)?;
+    downloadable(&store.connection()?, actor, id)?;
     Ok(())
 }
 pub fn cancel(store: &Store, actor: &Actor, id: &str) -> Result<()> {
@@ -393,7 +405,7 @@ pub fn cancel(store: &Store, actor: &Actor, id: &str) -> Result<()> {
     })
 }
 pub fn cancel_system(store: &Store, id: &str) -> Result<()> {
-    let job = lookup(&*store.connection()?, id)?;
+    let job = lookup(&store.connection()?, id)?;
     cancel(store, &owner(&job)?, id)
 }
 pub(super) fn remove(connection: &Connection, actor: &Actor, job: Value) -> Result<()> {
@@ -463,11 +475,10 @@ pub fn clear_finished(store: &Store, actor: &Actor) -> Result<usize> {
         let mut count = 0;
         loop {
             crate::operation::check()?;
-            let (_, jobs) = connection.query_jobs(&super::queries::batch(
-                (!actor.admin).then_some(actor.id),
-                false,
-                &fields,
-            ))?;
+            let mut query =
+                super::queries::batch((!actor.admin).then_some(actor.id), false, &fields);
+            query.context = (!actor.admin).then_some((&actor.company, &actor.context));
+            let (_, jobs) = connection.query_jobs(&query)?;
             if jobs.is_empty() {
                 break;
             }

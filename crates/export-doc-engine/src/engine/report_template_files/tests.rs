@@ -40,6 +40,7 @@ fn open(workspace: &Workspace) -> Arc<NativeService> {
 }
 fn admin() -> Actor {
     Actor {
+        context: String::new(),
         edition: Default::default(),
         id: 1,
         name: "系统管理员".into(),

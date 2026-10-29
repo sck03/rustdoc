@@ -117,7 +117,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
                 </option>
               ))}
             </select>
-            <small className="field-help">{selectedRole.description}。角色仅提供默认权限，职位单独维护；选定共享方案后以方案为准。总经理可选普通员工，再指定公司审批负责人方案。</small>
+            <small className="field-help">{selectedRole.description}。选择角色会选入对应的初始方案，保存后以明确的权限方案或独立配置为准。组织职位另行维护。</small>
           </label>
           <label>
             <span>权限方案</span>
@@ -126,7 +126,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
               disabled={isBusy || draft.role === "Admin" || draft.permissionGrants !== null}
               onChange={(event) => { const permissionTemplateId = Number(event.target.value) || null; setDraft(current => ({ ...current, permissionTemplateId, oaAssignedOnly: current.oaAssignedOnly || selectedTemplate?.oaAssignedOnly === true })); }}
             >
-              <option value="">按角色默认方案</option>
+              <option value="">请选择权限方案</option>
               {permissionTemplates.map((template) => (
                 <option key={template.id} value={template.id} disabled={!template.isActive && template.id !== draft.permissionTemplateId}>
                   {template.name}{template.isSystem ? "（内置）" : ""}{!template.isActive ? "（已停用）" : ""}
@@ -140,7 +140,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
                   ? "账号使用独立权限；分组变更不再影响此账号"
                 : selectedTemplate?.name
                   ? `当前使用：${selectedTemplate.name}`
-                  : "未指定时自动使用该角色的内置方案"}
+                  : "需要选择权限方案或独立配置"}
             </small>
           </label>
           <label>
@@ -153,7 +153,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
                 </option>
               ))}
             </select>
-            <small className="field-help">公司代码是数据范围授权键，不能自由输入。</small>
+            <small className="field-help">主身份在所选单位内操作；其他单位的任职和协作须单独授权。</small>
           </label>
           <label>
             <span>所属部门</span>

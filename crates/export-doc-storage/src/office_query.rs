@@ -3,6 +3,7 @@ use crate::{DataScope, QuerySql, Result, sql};
 
 pub struct OfficeQuery<'a> {
     pub viewer: i64,
+    pub context: &'a str,
     pub assigned_only: bool,
     pub principals: &'a [crate::RecordApprover],
     pub kind: &'a str,
@@ -72,11 +73,18 @@ pub(crate) fn build(q: &OfficeQuery<'_>, pg: bool) -> Result<QuerySql> {
             .map(|p| {
                 (
                     format!("CAST({} AS BIGINT)", sql::bind(&mut values, p.user_id, pg)),
-                    None,
+                    sql::bind(&mut values, &p.context, pg),
                 )
             })
             .collect::<Vec<_>>();
-        let participant = crate::record_query::participant_condition(pg, "r", &viewer, &principals);
+        let context = sql::bind(&mut values, q.context, pg);
+        let participant = crate::record_query::participant_condition(
+            pg,
+            "r",
+            &viewer,
+            Some(&context),
+            &principals,
+        );
         let view = if q.assigned_only {
             participant.clone()
         } else {

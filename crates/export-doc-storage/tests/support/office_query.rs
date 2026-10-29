@@ -32,6 +32,7 @@ pub fn exercise(c: &Connection) {
     let mut q = OfficeQuery {
         viewer: 0,
         assigned_only: false,
+        context: "",
         principals: &[],
         kind: "supply-requests",
         company: "OFFICE-Q",

@@ -184,6 +184,26 @@ pub(super) fn prepare(
     for key in ["status", "departmentId", "jobTitle"] {
         value["employee"][key] = value[key].clone();
     }
+    // Persisted requests own the proposed identities. Repeated validation, routing,
+    // submission snapshots and final application must resolve the same appointment.
+    if action == "Hire"
+        && let Some(id) = row["id"].as_i64().filter(|id| *id > 0)
+    {
+        value["organization"]["primaryAssignmentId"] = json!(format!("hire-{id}-primary"));
+        for assignment in value["organization"]["additionalAssignments"]
+            .as_array_mut()
+            .into_iter()
+            .flatten()
+        {
+            let identity = super::super::media::digest(&serde_json::to_vec(&json!([
+                "hire",
+                id,
+                assignment["companyCode"],
+                assignment["departmentId"]
+            ]))?);
+            assignment["id"] = json!(identity);
+        }
+    }
     Ok(value)
 }
 
@@ -202,9 +222,12 @@ pub(super) fn identity(
     }
     // Changes are authorized against the employee's current department. A hire
     // uses the proposed department; neither is inferred from an approver's role.
-    if body["personnelChange"]["action"] == "Hire" {
+    if matches!(
+        body["personnelChange"]["action"].as_str(),
+        Some("Hire" | "Rehire")
+    ) {
         Ok(
-            json!({"id":0,"fullName":value["profile"]["fullName"],"employeeNumber":value["employeeNumber"],"departmentId":value["departmentId"]}),
+            json!({"id":if body["personnelChange"]["action"] == "Hire" {json!(0)} else {value["id"].clone()},"fullName":value["profile"]["fullName"],"employeeNumber":value["employeeNumber"],"departmentId":value["departmentId"]}),
         )
     } else {
         let previous = store::get(
@@ -224,10 +247,11 @@ pub(super) fn validate(
     row: &Value,
     today: chrono::NaiveDate,
 ) -> Result<()> {
-    let requester = auth::current_actor_in(
+    let requester = super::super::units::resolve(
         tx,
         records::positive(row, "ownerUserId", "申请人")?,
         actor.edition,
+        &text(row, "_requesterContext"),
     )?;
     if !auth::visible(&requester, "office.personnel-changes", "create", row) {
         return Err(error(403, "申请人已失去人员变动权限，请撤回后重新办理。"));
@@ -242,10 +266,11 @@ pub(super) fn apply(
     row: &Value,
     today: chrono::NaiveDate,
 ) -> Result<i64> {
-    let requester = auth::current_actor_in(
+    let requester = super::super::units::resolve(
         tx,
         records::positive(row, "ownerUserId", "申请人")?,
         actor.edition,
+        &text(row, "_requesterContext"),
     )?;
     let mut value = prepare(tx, &requester, row, today, true)?;
     let id = row["employeeId"].as_i64().unwrap_or(0);

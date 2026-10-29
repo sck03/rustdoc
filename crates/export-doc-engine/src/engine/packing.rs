@@ -5,9 +5,10 @@ use super::{
     records::{id, text},
     store::{self, Actor, Store},
 };
+use crate::engine::store::Connection;
 use crate::{contracts, generated_api::*, operation, paths};
 use export_doc_domain::packing;
-use export_doc_storage::{AuditWrite, Connection};
+use export_doc_storage::AuditWrite;
 use serde_json::{Value, json};
 use std::{
     path::Path,
@@ -204,6 +205,7 @@ pub fn seed(store: &Store) -> Result<()> {
     store.transaction(|tx| {
         let existing = store::all(tx, TYPES)?;
         let actor = Actor {
+            context: String::new(),
             edition: Default::default(),
             id: 0,
             name: "系统".into(),

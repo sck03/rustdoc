@@ -129,7 +129,7 @@ fn misplaced_database_blocks_new_database_creation_without_changing_original() {
 }
 
 #[test]
-fn supported_root_database_is_relocated_with_data_and_an_original_backup() {
+fn current_schema_in_an_old_layout_is_rejected_without_relocation() {
     let workspace = Workspace::new();
     let paths = workspace.paths();
     let original = paths.data_root.join("exportdoc-native.db");
@@ -139,45 +139,26 @@ fn supported_root_database_is_relocated_with_data_and_an_original_backup() {
         .unwrap();
     connection.checkpoint().unwrap();
     drop(connection);
-    let store = Store::open(&paths).unwrap();
+    assert!(matches!(Store::open(&paths), Err(cause) if cause.status == Some(503)));
+    assert!(!paths.sqlite_database_path().exists());
+    assert!(!paths.data_root.join("Backups/DatabaseLayout").exists());
+    let connection = export_doc_storage::Connection::sqlite(&original).unwrap();
     assert_eq!(
-        store.settings("layout-test").unwrap().unwrap()["value"],
-        "保留已有业务"
-    );
-    assert!(paths.sqlite_database_path().is_file());
-    assert!(!original.exists());
-    let backup = fs::read_dir(paths.data_root.join("Backups/DatabaseLayout"))
-        .unwrap()
-        .next()
-        .unwrap()
-        .unwrap()
-        .path();
-    export_doc_storage::verify_sqlite_backup(&backup.join("exportdoc-native.db")).unwrap();
-    drop(store);
-    assert_eq!(
-        Store::open(&paths)
-            .unwrap()
-            .settings("layout-test")
-            .unwrap()
-            .unwrap()["value"],
+        connection.settings("layout-test").unwrap().unwrap()["value"],
         "保留已有业务"
     );
 }
 
 #[test]
-fn layout_relocation_refuses_an_old_running_instance_or_ambiguous_copies() {
-    use fs2::FileExt;
+fn unsupported_root_layout_cannot_override_the_managed_database() {
     let workspace = Workspace::new();
     let paths = workspace.paths();
     drop(
         export_doc_storage::Connection::sqlite(&paths.data_root.join("exportdoc-native.db"))
             .unwrap(),
     );
-    let lock = fs::File::create(paths.data_root.join("native-instance.lock")).unwrap();
-    lock.lock_exclusive().unwrap();
-    assert!(matches!(Store::open(&paths), Err(cause) if cause.status == Some(429)));
+    assert!(matches!(Store::open(&paths), Err(cause) if cause.status == Some(503)));
     assert!(!paths.sqlite_database_path().exists());
-    drop(lock);
     fs::write(paths.sqlite_database_path(), b"another database").unwrap();
     assert!(matches!(Store::open(&paths), Err(cause) if cause.status == Some(503)));
     assert_eq!(

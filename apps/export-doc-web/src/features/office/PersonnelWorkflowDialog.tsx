@@ -44,7 +44,7 @@ export function PersonnelWorkflowDialog({ client, user, record, action, departme
       {clearance.isError ? "无法完成交接核对，请重新核对后提交。" : clearance.isFetching ? "正在核对…"
         : action === "Depart" && (clearance.data?.managedDepartments.length ?? 0) > 0 ? "该人员仍担任部门负责人，请先由管理员在组织架构中调整负责人。"
         : clearance.data?.isClear ? "未结清事项为 0，可以办理。"
-        : `还有预约 ${clearance.data?.meetingCount ?? 0} 笔、物品申请／借用 ${clearance.data?.supplyCount ?? 0} 笔、OA 申请／审批 ${clearance.data?.approvalCount ?? 0} 笔、办理分工 ${clearance.data?.handlingCount ?? 0} 项。请返回档案的“交接事项”处理。`}
+        : `还有预约 ${clearance.data?.meetingCount ?? 0} 笔、物品申请／借用 ${clearance.data?.supplyCount ?? 0} 笔、OA 申请／审批 ${clearance.data?.approvalCount ?? 0} 笔、办理分工 ${clearance.data?.handlingCount ?? 0} 项、业务资料 ${clearance.data?.businessDataCount ?? 0} 条。请返回档案的“交接事项”处理。`}
     </InlineNotice>}
     <form onSubmit={submit}><fieldset className="office-form-grid" disabled={operation.busy}>
       <OfficeField label="生效日期"><input type="date" name="effectiveDate" required min={record.lastEffectiveDate} max={user.businessDate} defaultValue={user.businessDate} /></OfficeField>

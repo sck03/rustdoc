@@ -132,7 +132,35 @@ fn schema_version(client: &mut impl ::postgres::GenericClient) -> Result<i64> {
 }
 fn validate_schema(client: &mut impl ::postgres::GenericClient) -> Result<()> {
     schema_version(client)?;
-    client.query("SELECT request_id,submission,task_key,node_key,assignee_id,acted_by_id,status,active,due_at FROM workflow_tasks LIMIT 0",&[])?;
+    client.query("SELECT request_id,submission,task_key,node_key,assignee_id,acted_by_id,context_id,acted_by_context,status,active,due_at,independent,started_at,acted_at,elapsed_seconds FROM workflow_tasks LIMIT 0",&[])?;
+    client.query("SELECT id,person_id,unit_id,department_id,company,department,job_title,starts_on,ends_on,is_primary FROM personnel_memberships LIMIT 0",&[])?;
+    client.query("SELECT appointment_id,manager_appointment_id,relation_type FROM reporting_relations LIMIT 0",&[])?;
+    client.query(
+        "SELECT id,code,parent_id,unit_kind FROM organization_units LIMIT 0",
+        &[],
+    )?;
+    client.query(
+        "SELECT id,unit_id,code,parent_id FROM organization_departments LIMIT 0",
+        &[],
+    )?;
+    client.query(
+        "SELECT person_id,user_id FROM personnel_accounts LIMIT 0",
+        &[],
+    )?;
+    client.query("SELECT organization_id,appointment_id,duty_kind,workflow_kinds FROM organization_duties LIMIT 0",&[])?;
+    client.query("SELECT id,user_id,unit_id,appointment_id,mode,is_active,template_id,authority_role_id FROM unit_access_roles LIMIT 0",&[])?;
+    client.query(
+        "SELECT role_id,resource_key,action,data_scope FROM unit_access_grants LIMIT 0",
+        &[],
+    )?;
+    client.query(
+        "SELECT id,owner_unit_id,code FROM permission_schemes LIMIT 0",
+        &[],
+    )?;
+    client.query(
+        "SELECT person_id,body FROM personnel_private_profiles LIMIT 0",
+        &[],
+    )?;
     let queries_available:bool=client.query_one("SELECT COALESCE(has_function_privilege(current_user, to_regprocedure('public.exportdoc_record_text(jsonb)'), 'EXECUTE'), false)",&[])?.try_get(0)?;
     if !queries_available {
         return Err(Error::unavailable(
@@ -192,7 +220,7 @@ impl Adapter for Postgres {
             "DELETE FROM workflow_tasks WHERE request_id=$1 AND submission=$2",
             &[&request, &submission],
         )?;
-        let insert=db.prepare("INSERT INTO workflow_tasks(request_id,submission,task_key,node_key,assignee_id,acted_by_id,status,active,due_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)")?;
+        let insert=db.prepare("INSERT INTO workflow_tasks(request_id,submission,task_key,node_key,assignee_id,acted_by_id,status,active,due_at,independent,context_id,acted_by_context,started_at,acted_at,elapsed_seconds) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)")?;
         for task in tasks {
             db.execute(
                 &insert,
@@ -206,6 +234,12 @@ impl Adapter for Postgres {
                     &task.status,
                     &i64::from(task.active),
                     &task.due_at,
+                    &i64::from(task.independent),
+                    &task.context,
+                    &task.acted_by_context,
+                    &task.started_at,
+                    &task.acted_at,
+                    &task.elapsed_seconds,
                 ],
             )?;
         }
@@ -281,6 +315,26 @@ impl Adapter for Postgres {
     fn query_records(&self, q: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = super::record_query::sql(q, true);
         self.query_page(&sql, "r.body::text", q.offset, q.limit.clamp(1, 100))
+    }
+    fn query_workflow_summary(&self, q: &WorkflowSummaryQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let (sql, values) = super::workflow::summary(q, true);
+        let params: Vec<&(dyn ::postgres::types::ToSql + Sync)> =
+            values.iter().map(|v| v as _).collect();
+        let row = self.client.borrow_mut().query_one(&sql, &params)?;
+        Ok((
+            row.try_get(0)?,
+            serde_json::from_str(&row.try_get::<_, String>(1)?)?,
+        ))
+    }
+    fn query_workflow_tasks(&self, q: &WorkflowTaskQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let (sql, values) = super::workflow::page(q, true);
+        let params: Vec<&(dyn ::postgres::types::ToSql + Sync)> =
+            values.iter().map(|v| v as _).collect();
+        let row = self.client.borrow_mut().query_one(&sql, &params)?;
+        Ok((
+            row.try_get(0)?,
+            serde_json::from_str(&row.try_get::<_, String>(1)?)?,
+        ))
     }
     fn query_slice(
         &self,
@@ -491,6 +545,23 @@ impl Adapter for Postgres {
                 serde_json::from_str(&body).map_err(Into::into)
             })
             .transpose()
+    }
+    fn personnel_private_profile(&self, id: i64) -> Result<Option<Value>> {
+        self.client
+            .borrow_mut()
+            .query_opt(
+                "SELECT body::text FROM personnel_private_profiles WHERE person_id=$1",
+                &[&id],
+            )?
+            .map(|r| {
+                let body: String = r.try_get(0)?;
+                serde_json::from_str(&body).map_err(Into::into)
+            })
+            .transpose()
+    }
+    fn set_personnel_private_profile(&self, id: i64, body: &Value) -> Result<()> {
+        self.client.borrow_mut().execute("INSERT INTO personnel_private_profiles(person_id,body) VALUES($1,$2::text::jsonb) ON CONFLICT(person_id) DO UPDATE SET body=excluded.body",&[&id,&serde_json::to_string(body)?])?;
+        Ok(())
     }
     fn set_settings(&self, name: &str, version: i64, body: &Value) -> Result<()> {
         self.client.borrow_mut().execute("INSERT INTO settings(name,version,body) VALUES($1,$2,$3::text::jsonb) ON CONFLICT(name) DO UPDATE SET version=excluded.version,body=excluded.body",&[&name,&version,&serde_json::to_string(body)?])?;

@@ -1,11 +1,11 @@
-//! Relocate a supported database using a verified SQLite snapshot, including committed WAL data.
+//! Accept only the current managed layout; reject experimental root databases untouched.
 use crate::{
     engine::error::{Result, error, unavailable},
-    paths::{RuntimePaths, ensure_safe_absolute, nonce},
+    paths::{RuntimePaths, ensure_safe_absolute},
 };
 use fs2::FileExt;
 use std::{
-    fs::{self, File, OpenOptions},
+    fs::{File, OpenOptions},
     path::Path,
 };
 
@@ -59,43 +59,15 @@ pub(super) fn prepare(paths: &RuntimePaths) -> Result<File> {
         ensure_safe_absolute(&paths.data_root.join(name)).map_err(unavailable)?;
         ensure_safe_absolute(&database_root.join(name)).map_err(unavailable)?;
     }
-    let original = paths.data_root.join(FILES[0]);
-    if !original.try_exists()? {
-        if has_database_files(&paths.data_root)?
-            || (!database.try_exists()? && has_database_files(database_root)?)
-        {
-            return Err(unavailable(
-                "存在数据库伴随文件但缺少主库，已停止新建数据库；请检查原数据目录。",
-            ));
-        }
-        return Ok(instance);
-    }
-    if has_database_files(database_root)? {
+    if has_database_files(&paths.data_root)? {
         return Err(unavailable(
-            "根目录和 Database 同时存在数据库文件，不能自动选择或覆盖；请核对数据及 Backups/DatabaseLayout 备份后重试。",
+            "不支持旧的根目录数据库布局；请显式选择新的数据目录，程序不会搬迁或覆盖原库。",
         ));
     }
-    let old_lock_path = paths.data_root.join("native-instance.lock");
-    let old_lock = lock(&old_lock_path)?;
-    export_doc_storage::verify_sqlite_backup(&original)?;
-    let backup = paths
-        .data_root
-        .join("Backups")
-        .join("DatabaseLayout")
-        .join(nonce().map_err(unavailable)?);
-    directory(&backup)?;
-    let staged = backup.join("relocated.db");
-    export_doc_storage::prepare_sqlite_restore(&original, &staged)?;
-    export_doc_storage::verify_sqlite_backup(&staged)?;
-    // Publish only a verified snapshot. Interrupted archiving leaves both copies and fails closed.
-    fs::rename(&staged, &database)?;
-    for name in FILES {
-        let path = paths.data_root.join(name);
-        if path.try_exists()? {
-            fs::rename(path, backup.join(name))?;
-        }
+    if !database.try_exists()? && has_database_files(database_root)? {
+        return Err(unavailable(
+            "存在数据库伴随文件但缺少主库，已停止新建数据库；请检查数据目录。",
+        ));
     }
-    drop(old_lock);
-    fs::rename(old_lock_path, backup.join("native-instance.lock"))?;
     Ok(instance)
 }

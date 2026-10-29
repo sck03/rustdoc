@@ -5,7 +5,7 @@ import { detectPreset, grantKey, presetLabels, scopeLabels, setResourcePreset } 
 import { filterPermissionResources, permissionResourceLocation } from "./permissionNavigationModel.ts";
 
 export function PermissionModuleGrid({
-  resources, grants, dataScopes, disabled, onChange, disabledModules, onModulesChange, inheritedModules = [], readOnlyActions = false,
+  resources, grants, dataScopes, disabled, onChange, disabledModules, onModulesChange, inheritedModules = [], readOnlyActions = false, actionDataScopes,
 }: {
   resources: ApiPermissionResourceDefinitionDto[];
   grants: Record<string, string>;
@@ -16,6 +16,7 @@ export function PermissionModuleGrid({
   onModulesChange: (modules: string[]) => void;
   inheritedModules?: string[];
   readOnlyActions?: boolean;
+  actionDataScopes?: Record<string, string[]>;
 }) {
   const [group, setGroup] = useState("");
   const [search, setSearch] = useState("");
@@ -25,7 +26,7 @@ export function PermissionModuleGrid({
   return (
     <div className="permission-modules">
       <div className="permission-module-toolbar">
-        <h3>功能模块 <span>{visible.length} / {resources.length}</span></h3>
+        <h3>功能模块 <span>显示 {visible.length} / 共 {resources.length}</span></h3>
         <div className="permission-module-tools">
           <select aria-label="模块分类" value={group} onChange={(event) => setGroup(event.target.value)}>
             <option value="">全部分类</option>
@@ -72,7 +73,7 @@ export function PermissionModuleGrid({
                     </label>
                     {resource.supportsDataScope ? (
                       <select aria-label={`${resource.name}${action.name}数据范围`} value={grants[key] ?? "own"} disabled={!enabled || disabled || readOnlyActions || disabledModules.includes(resource.moduleKey)} onChange={(event) => onChange({ ...grants, [key]: event.target.value })}>
-                        {dataScopes.map((scope) => <option key={scope} value={scope}>{scopeLabels[scope] ?? scope}</option>)}
+                        {(actionDataScopes?.[key] ?? dataScopes).map((scope) => <option key={scope} value={scope}>{scopeLabels[scope] ?? scope}</option>)}
                       </select>
                     ) : <span className="permission-global-scope">全局</span>}
                   </div>
@@ -83,7 +84,7 @@ export function PermissionModuleGrid({
               !grants[grantKey(resource.key, "view")] && resource.actions.some(action => grants[grantKey(resource.key, action.key)]) &&
               <p className="field-help">已配置操作但未配置查看，页面或记录可能无法打开。请核对查看权限及其数据范围。</p>}
             {!disabledModules.includes(resource.moduleKey) && grants[grantKey(resource.key, "approve")] === "own" &&
-              <p className="field-help">本人范围不能审批同事申请。负责人通常使用部门或公司范围，并单独配置审批步骤。</p>}
+              <p className="field-help">可审批明确分派给自己的同公司申请。普通资料范围独立配置，无须为了审批扩大查看范围。</p>}
           </section>
         ))}
       </div>

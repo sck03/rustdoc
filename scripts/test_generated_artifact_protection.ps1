@@ -82,8 +82,15 @@ function Test-ExportDocProtectedArtifact {
         New-Item -ItemType Directory -Path (Split-Path $file -Parent) -Force | Out-Null
         [IO.File]::WriteAllText($file, '{}')
     }
+    foreach ($relative in @('debug/incremental/sample_test-0123456789abc/session/work-products.bin', 'debug/incremental/sample-0123456789abc/session/work-products.bin')) {
+        $file = Join-Path $testTarget $relative
+        New-Item -ItemType Directory -Path (Split-Path $file -Parent) -Force | Out-Null
+        [IO.File]::WriteAllText($file, 'incremental fixture')
+    }
     $testPlan = @(Get-ExportDocRustTestArtifactPaths -TargetRoot $testTarget)
     if ($testPlan.Count -ne 3) { throw 'Only fingerprint-proven test outputs should be selected' }
+    if ((Join-Path $testTarget 'debug/incremental/sample_test-0123456789abc') -in $testPlan) { throw 'Reusable integration-test incremental workspace selected' }
+    if ((Join-Path $testTarget 'debug/incremental/sample-0123456789abc') -in $testPlan) { throw 'Production incremental workspace selected' }
     foreach ($relative in $testOutputs) {
         if ((Join-Path $testTarget $relative) -notin $testPlan) { throw "Missing test output: $relative" }
     }

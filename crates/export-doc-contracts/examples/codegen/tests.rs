@@ -73,6 +73,10 @@ fn multipart_binary_headers_defaults_and_nullable_items_are_preserved() {
         native::rust_type(&json!({"type":["number","null"]}), false),
         "Option<rust_decimal::Decimal>"
     );
+    assert_eq!(
+        typescript::schema_type(&json!({"type":"object","additionalProperties":{"type":"string"}})),
+        "Record<string, string>"
+    );
 }
 
 #[test]

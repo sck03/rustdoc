@@ -110,7 +110,7 @@ pub(super) fn start(
     let store = service.store.clone();
     let paths = service.paths.clone();
     let fonts = service.report_fonts.clone();
-    let actor_id = actor.id;
+    let task_actor = actor.clone();
     let replay = Replay::new(operation, parameters, body);
     service.jobs.start_replayable(
         actor,
@@ -135,7 +135,7 @@ pub(super) fn start(
             let mut single_file = None;
             let mut output_index = 0;
             for id in &ids {
-                let actor = auth::current_actor(&store, actor_id)?;
+                let actor = auth::refresh_actor(&store, &task_actor)?;
                 auth::authorize_operation(&actor, operation, &[])?;
                 for prepared in prepare_batch(
                     &store,

@@ -4,19 +4,50 @@ pub(super) fn extend(doc: &mut Value) {
     let schemas = &mut doc["components"]["schemas"];
     let manager = json!({"type":["integer","null"],"format":"int64","minimum":1});
     let managers = json!({"type":"array","items":{"type":"integer","format":"int64","minimum":1},"maxItems":10,"uniqueItems":true});
+    schemas["OrganizationLeader"] = json!({"type":"object","properties":{
+        "employeeId":{"type":"integer","format":"int64","minimum":1},
+        "appointmentId":{"type":"string","maxLength":64},
+        "workflowKinds":{"type":"array","minItems":1,"maxItems":9,"uniqueItems":true,"items":{"type":"string","enum":["leave","overtime","expense","travel","purchase","general","personnel","room","supply"]}}
+    },"required":["employeeId","workflowKinds"]});
+    for name in [
+        "ApiOrganizationCompanyDto",
+        "ApiOrganizationCompanySaveRequest",
+        "ApiOrganizationDepartmentDto",
+        "ApiOrganizationDepartmentSaveRequest",
+    ] {
+        schemas[name]["properties"]["additionalLeaders"] = json!({"type":"array","maxItems":10,"items":{"$ref":"#/components/schemas/OrganizationLeader"}});
+        let field = if name.contains("Company") {
+            "executiveAppointmentId"
+        } else {
+            "managerAppointmentId"
+        };
+        schemas[name]["properties"][field] = json!({"type":["string","null"],"maxLength":64});
+    }
+    for name in ["ApiOrganizationCompanyDto", "ApiOrganizationDepartmentDto"] {
+        schemas[name]["properties"]["additionalLeaderNames"] =
+            json!({"type":"object","additionalProperties":{"type":"string"},"readOnly":true});
+    }
     schemas["PersonnelAssignment"] = json!({"type":"object","properties":{
         "departmentId":{"type":"string","maxLength":50},"jobTitle":{"type":"string","maxLength":120},
         "managerEmployeeId":manager,"functionalManagerEmployeeIds":managers
     },"required":["departmentId","jobTitle","functionalManagerEmployeeIds"]});
     schemas["PersonnelOrganization"] = json!({"type":"object","properties":{
+        "primaryAssignmentId":{"type":"string","readOnly":true},
         "managerEmployeeId":manager,"functionalManagerEmployeeIds":managers,
         "additionalAssignments":{"type":"array","items":{"$ref":"#/components/schemas/PersonnelAssignment"},"maxItems":20}
     },"required":["functionalManagerEmployeeIds","additionalAssignments"]});
     for name in ["PersonnelOrganization", "PersonnelAssignment"] {
+        schemas[name]["properties"]["managerAssignmentId"] =
+            json!({"type":["string","null"],"maxLength":64});
+        schemas[name]["properties"]["functionalManagerAssignmentIds"] =
+            json!({"type":"array","items":{"type":"string","maxLength":64},"maxItems":10});
         schemas[name]["properties"]["managerName"] = json!({"type":"string","readOnly":true});
         schemas[name]["properties"]["functionalManagerNames"] =
             json!({"type":"array","items":{"type":"string"},"readOnly":true});
     }
+    schemas["PersonnelAssignment"]["properties"]["id"] = json!({"type":"string","maxLength":64,"description":"Stable appointment identifier; omitted only for a new appointment."});
+    schemas["OrganizationManagerAppointment"] = json!({"type":"object","properties":{"id":{"type":"string"},"departmentId":{"type":"string"},"departmentName":{"type":"string"},"jobTitle":{"type":"string"}},"required":["id","departmentId","departmentName","jobTitle"]});
+    schemas["OrganizationManagerRecord"]["properties"]["appointments"] = json!({"type":"array","items":{"$ref":"#/components/schemas/OrganizationManagerAppointment"}});
     for name in [
         "PersonnelRecord",
         "PersonnelCreateRequest",
@@ -72,6 +103,15 @@ pub(super) fn extend(doc: &mut Value) {
     schemas["PersonnelClearance"]["properties"]["reportingCount"] =
         json!({"type":"integer","minimum":0});
     schemas["PersonnelClearance"]["properties"]["isCompanyExecutive"] = json!({"type":"boolean"});
+    for name in [
+        "businessDataCount",
+        "invoiceCount",
+        "paymentCount",
+        "otherBusinessDataCount",
+    ] {
+        schemas["PersonnelClearance"]["properties"][name] =
+            json!({"type":"integer","format":"int64","minimum":0});
+    }
     let mut managers = doc["paths"]["/api/organization-directory/managers"]["get"].clone();
     assert!(
         managers.is_object(),

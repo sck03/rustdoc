@@ -4,8 +4,8 @@ use super::super::{
     records,
     store::Actor,
 };
+use crate::engine::store::Connection;
 use crate::{generated_api::*, invoice::InvoiceDraft};
-use export_doc_storage::Connection;
 use rust_decimal::Decimal;
 use serde_json::{Value, json};
 

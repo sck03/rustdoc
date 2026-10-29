@@ -63,21 +63,7 @@ pub(super) fn change(
     let typed: ApprovalRule =
         serde_json::from_value(rule.clone()).map_err(|_| invalid("流程定义格式无效。"))?;
     typed.validate().map_err(invalid)?;
-    for id in typed
-        .account_ids()
-        .into_iter()
-        .chain(typed.notify_user_ids.iter().copied())
-    {
-        let reviewer = auth::current_actor_in(tx, id, actor.edition)?;
-        if reviewer.company != actor.company {
-            return Err(invalid("流程责任人与抄送人须是本公司启用账号。"));
-        }
-        let resource = approval::resource(&typed.kind).ok_or_else(|| invalid("业务类型无效。"))?;
-        auth::authorize(&reviewer, resource, "view")?;
-        if typed.account_ids().contains(&id) {
-            auth::authorize(&reviewer, resource, "approve")?;
-        }
-    }
+    super::approval_integrity::rule(tx, actor, &actor.company, &typed)?;
     let version = existing
         .map(|i| publications[i]["version"].as_i64().unwrap_or(0))
         .unwrap_or(0)

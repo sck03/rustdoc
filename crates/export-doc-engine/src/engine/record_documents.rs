@@ -6,9 +6,9 @@ use super::{
     store::{self, Actor},
     tasks::FileOutput,
 };
+use crate::engine::store::Connection;
 use crate::generated_api::Operation;
 use export_doc_storage::BlobWrite;
-use export_doc_storage::Connection;
 use serde_json::{Value, json};
 
 fn metadata(op: Operation) -> Option<&'static Value> {

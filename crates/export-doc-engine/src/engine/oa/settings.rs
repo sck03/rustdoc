@@ -75,16 +75,14 @@ pub(in crate::engine) fn load(tx: &Connection, company: &str) -> Result<Value> {
     }))
 }
 fn account(tx: &Connection, actor: &Actor, id: i64) -> Result<Actor> {
-    let user = auth::current_actor_in(tx, id, actor.edition)?;
+    let user = super::super::units::approval_actor(tx, id, actor.edition, &actor.company)?;
     if user.company != actor.company {
         return Err(invalid("审批人和代理人必须是本公司的启用账号。"));
     }
     Ok(user)
 }
 pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value) -> Result<Value> {
-    if !actor.admin {
-        return Err(error(403, "只有管理员可以设置审批规则和代理。"));
-    }
+    super::super::units::demand(actor, &actor.company, "organization.workflows")?;
     let mut previous = load(tx, &actor.company)?;
     if previous.get("sheetTemplates").is_none() {
         previous["sheetTemplates"] = sheet_templates::defaults()?;
@@ -138,9 +136,16 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         }
         typed.validate_draft().map_err(invalid)?;
         for id in typed.account_ids() {
-            let reviewer = account(tx, actor, id)?;
             let resource =
                 super::approval::resource(&kind).ok_or_else(|| invalid("申请类型无效。"))?;
+            let reviewer = super::super::units::for_operation(
+                tx,
+                id,
+                actor.edition,
+                &actor.company,
+                resource,
+                "approve",
+            )?;
             auth::authorize(&reviewer, resource, "view")?;
             auth::authorize(&reviewer, resource, "approve")?;
         }

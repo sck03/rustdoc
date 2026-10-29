@@ -16,7 +16,7 @@ fn queued_audit_deletion_rechecks_the_current_grants_and_preserves_the_events() 
     let service =
         NativeService::open(RuntimePaths::server(&root, &root.join("Data")).unwrap()).unwrap();
     let actor = auth::current_actor_in(
-        &*service.store.connection().unwrap(),
+        &service.store.connection().unwrap(),
         1,
         service.store.edition,
     )

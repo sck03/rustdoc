@@ -123,7 +123,7 @@ pub(in crate::engine) fn prepare_batch(
 ) -> Result<Vec<PreparedReport>> {
     let _lock = report_template_files::storage_lock(paths)?;
     store.read(|tx| {
-        let actor = auth::current_actor_in(tx, actor.id, store.edition)?;
+        let actor = auth::refresh_actor_in(tx, actor)?;
         let source = subject_in(
             tx,
             &actor,
@@ -234,7 +234,7 @@ pub(super) fn validate_access(
 ) -> Result<()> {
     let _lock = report_template_files::storage_lock(paths)?;
     store.read(|tx| {
-        let current = auth::current_actor_in(tx, actor.id, store.edition)?;
+        let current = auth::refresh_actor_in(tx, actor)?;
         for id in ids {
             subject_in(
                 tx,

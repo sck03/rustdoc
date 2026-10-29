@@ -49,7 +49,7 @@
 - 所有持久化路径由启动组合根显式注入 `AppRoot`/`DataRoot`，使用 `RuntimePaths`／受管路径接口；服务不得自行构造全局路径提供器，也不得在静态字段中缓存宿主路径。
 - 数据库、配置、日志、备份、模板、缓存、浏览器 profile、PostgreSQL 客户端、OCR/浏览器资源和随包工具必须落在运行目录或明确职责的容器层；不要默认写入 `C:\Users\...\AppData`、系统 TEMP、ProgramData 或系统级工具缓存。
 - 配置中保存相对路径；写入、读取、迁移前后都必须验证仍在受管根目录内，并拒绝符号链接、联接点、路径穿越、磁盘根和不可写目录。
-- SQLite 仅用于桌面单机；团队/服务器/容器模式使用 PostgreSQL 18。按用户 2026-10-29 的明确授权，尚未生产部署，本轮以全新 schema 9 重建数据库基线，删除旧试验库兼容与迁移链。只接受 schema 9；旧库、空文件、损坏库、版本不明或超前版本报错，不自动删除或覆盖。只有确认数据库不存在才能初始化，重建使用显式新 DataRoot 或新 PostgreSQL 数据库；备份恢复同样拒绝旧 schema。SQLite 业务库统一在 DataRoot/Database；PostgreSQL 初始化与恢复使用独立维护账号，普通 API 不获得 DDL 权限。Full SQLite 与 PostgreSQL 共用人员身份、发布流程、审批任务和权限规则，不保留单机直接登记审批分支。
+- SQLite 仅用于桌面单机；团队/服务器/容器模式使用 PostgreSQL 18。按用户 2026-10-29 的明确授权，尚未生产部署，本轮以全新 schema 10 重建数据库基线，删除旧试验库兼容与迁移链。只接受 schema 10；旧库、空文件、损坏库、版本不明或超前版本报错，不自动删除或覆盖。只有确认数据库不存在才能初始化，重建使用显式新 DataRoot 或新 PostgreSQL 数据库；备份恢复同样拒绝旧 schema。SQLite 业务库统一在 DataRoot/Database；PostgreSQL 初始化与恢复使用独立维护账号，普通 API 不获得 DDL 权限。Full SQLite 与 PostgreSQL 共用人员身份、发布流程、审批任务和权限规则，不保留单机直接登记审批分支。
 - 单 API 实例锁、后台任务、恢复和迁移必须保持 fail-closed；不能把数据库/文件系统故障伪装成空列表或普通业务冲突。
 
 ### 3.2 跨平台路径、文件名和时间
@@ -61,7 +61,7 @@
 
 ### 3.3 API、错误和契约
 
-- `/openapi/v1.json` 是唯一 API 契约事实源。当前由 `export-doc-contracts::openapi` 组合冻结的官方 .NET 基线与新增 Rust 能力；基线端点、schema、认证、错误和权限须逐项保留验证。Rust DTO、路由和权限元数据通过 `crates/export-doc-contracts/examples/generate_clients.rs` 生成，React 客户端从相同文档生成；禁止手工修改生成文件或建立第二套 endpoint/schema。修改契约组合器或生成器时须验证 schema、错误、认证及权限元数据，不能静默变更契约。
+- `/openapi/v1.json` 是唯一 API 契约事实源。当前由 `export-doc-contracts::openapi` 组合冻结的官方 .NET 基线与 Rust 能力。按用户 2026-10-29 明确授权，OA/组织新模型不兼容旧接口；组织编辑/删除使用稳定 ID，旧代码路由退役，单位管理及流程权限随模型调整。回归须逐项证明明确变更，其余基线端点、schema、认证、错误和权限继续保留验证。Rust DTO、路由和权限元数据通过 `crates/export-doc-contracts/examples/generate_clients.rs` 生成，React 客户端从相同文档生成；禁止手工修改生成文件或建立第二套 endpoint/schema。修改契约组合器或生成器时须验证 schema、错误、认证及权限元数据，不能静默变更契约。
 - 端点认证、桌面令牌和许可证要求使用 endpoint metadata；不要按 `/api` 前缀、路径白名单或前端路由猜测授权。
 - 业务错误按现有分类映射：校验 400、权限 403、明确资源不存在 404、冲突 409、繁忙 429、依赖不可用 503、超时 504；不要把数据库、文件或外部工具故障包装成 404/409。
 - 所有异步公共操作都要有明确取消边界、超时和资源清理；后台任务完成、失败、取消和输出清理必须可观察且幂等。

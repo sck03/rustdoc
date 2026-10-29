@@ -90,7 +90,7 @@ pub(super) fn list(
     }
     let (page, size) = paging(query)?;
     let handling_keys = handling::keys(tx, actor, "office.general")?;
-    let approvers = if approvals || actor.oa_assigned_only {
+    let approvers = if approvals || actor.oa_assigned_only || !mine {
         approval::queue_approvers(tx, actor, &resource)?
     } else {
         vec![]
@@ -104,10 +104,15 @@ pub(super) fn list(
         status: (!status.is_empty()).then_some(status),
         approvers: approvals.then_some(approvers.as_slice()),
         approval_actor: approvals.then_some(actor.id),
-        visible_user: actor.oa_assigned_only.then_some(actor.id),
+        visible_user: (actor.oa_assigned_only || (!mine && !finance && !handling && !approvals))
+            .then_some(actor.id),
         visible_principals: &approvers,
-        exclude_owner: approvals.then_some(actor.id),
-        exclude_applicant: approvals.then_some(actor.id),
+        visible_context: Some(&actor.context),
+        include_participants: !actor.oa_assigned_only
+            && !mine
+            && !finance
+            && !handling
+            && !approvals,
         handling_keys: (meta["kind"] == "general" && !approvals && !mine)
             .then_some(handling_keys.as_slice()),
         handling_states: handling::GENERAL_STATES,

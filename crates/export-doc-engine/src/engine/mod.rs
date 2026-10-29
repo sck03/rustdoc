@@ -74,7 +74,10 @@ mod personnel;
 mod personnel_accounts;
 mod personnel_files;
 mod personnel_organization;
+mod personnel_primary;
+mod personnel_privacy;
 mod personnel_queries;
+mod personnel_reporting;
 mod product_options;
 mod record_documents;
 mod records;
@@ -91,6 +94,7 @@ mod store;
 mod supplier_overview;
 pub mod tasks;
 mod team_backup;
+mod units;
 mod workflow_tasks;
 pub use team_backup::UploadAuthorization;
 #[cfg(feature = "postgres")]
@@ -167,6 +171,15 @@ impl NativeService {
     }
     pub fn session_actor(&self, token: &str) -> Result<Actor> {
         self.sessions.actor(&self.store, token)
+    }
+    /// Session management remains available after a unit grant expires. Business
+    /// endpoints always resolve the selected context and never fall back to it.
+    pub fn session_actor_for_operation(&self, token: &str, operation: Operation) -> Result<Actor> {
+        if matches!(operation, SWITCH_UNIT_CONTEXT | LOGOUT) {
+            self.sessions.account_actor(&self.store, token)
+        } else {
+            self.session_actor(token)
+        }
     }
     pub fn authorize_administrator(&self, token: &str) -> Result<()> {
         auth::authorize(
@@ -291,7 +304,7 @@ impl NativeService {
         }
         crate::operation::check()?;
         if operation.requires_authentication {
-            self.sessions.actor(&self.store, token)?;
+            self.session_actor_for_operation(token, operation)?;
         }
         if !Self::supports(operation) {
             return Err(unsupported(format!(
@@ -316,7 +329,7 @@ impl NativeService {
                 json!({"success":true,"message":"关闭维护完成"})
             }
             _ => {
-                let actor = self.sessions.actor(&self.store, token)?;
+                let actor = self.session_actor_for_operation(token, operation)?;
                 self.authorize_operation(&actor, operation, query)?;
                 if operation == GET_RUNTIME_METRICS {
                     auth::authorize(&actor, "system.settings", "view")?;
@@ -718,27 +731,34 @@ impl NativeService {
         actor: &Actor,
         token: &str,
     ) -> Result<Value> {
+        if let Some(result) = units::dispatch(
+            &self.store,
+            actor,
+            operation,
+            parameters,
+            query,
+            &body_value,
+        ) {
+            return result;
+        }
         match operation {
             LOGOUT => {
                 self.sessions.logout(token)?;
                 Ok(json!({"success":true}))
             }
-            GET_CURRENT_USER => auth::user_dto(
+            GET_CURRENT_USER => auth::user_dto_for(
                 &self.store,
                 &self.store.get("users", actor.id)?,
                 &self.clock,
+                actor,
             ),
             RENEW_SESSION => self.sessions.renew(&self.store, token, &self.clock),
-            GET_ORGANIZATION_DIRECTORY => {
-                auth::authorize(actor, "system.users", "manage")?;
-                Ok(
-                    json!({"companies":organization::companies(&self.store)?,"departments":organization::departments(&self.store)?}),
-                )
-            }
-            LIST_ORGANIZATION_MANAGERS => {
-                auth::authorize(actor, "system.users", "manage")?;
-                organization::managers(&self.store, query)
-            }
+            SWITCH_UNIT_CONTEXT => self.sessions.replace_context(
+                &self.store,
+                token,
+                &self.clock,
+                &records::text(&body_value, "contextId"),
+            ),
             GET_PERSONNEL_OPTIONS => personnel_queries::options(&self.store, actor, query),
             LIST_PERSONNEL_REPORTING_OPTIONS => {
                 personnel_organization::reporting_options(&self.store, actor, query)
@@ -824,7 +844,7 @@ impl NativeService {
                 if !auth::visible(actor, resource.permission, "view", &record) {
                     return Err(error(403, "没有读取历史的权限。"));
                 }
-                Ok(json!(store::history(&*self.store.connection()?, kind, id)?))
+                Ok(json!(store::history(&self.store.connection()?, kind, id)?))
             }
             GET_SETTINGS => settings::read(&self.store, actor),
             UPDATE_SETTINGS | VALIDATE_SETTINGS => {

@@ -72,6 +72,20 @@ pub(super) fn extend(doc: &mut Value) {
         "grants":[{"resourceKey":CATALOG,"action":"view"}]}),
     );
     for role in permissions["roles"].as_array_mut().unwrap() {
+        if role["code"] == "OfficeEmployee" {
+            role["grants"].as_array_mut().unwrap().retain(|g| {
+                !matches!(
+                    g["resourceKey"].as_str(),
+                    Some(
+                        "document.payments"
+                            | "document.payment-output"
+                            | "document.report-templates"
+                            | "document.report-resources"
+                    )
+                )
+            });
+            continue;
+        }
         let finance = role["code"] == "Finance";
         let grants = role["grants"].as_array_mut().unwrap();
         if finance {

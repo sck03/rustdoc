@@ -1,7 +1,8 @@
 //! Bounded HS reads reuse provider ordering and keep the shared semantic matcher.
 use super::{error::Result, hs, records::text, store};
+use crate::engine::store::Connection;
 use export_doc_domain::hs as rules;
-use export_doc_storage::{Connection, HsQuery};
+use export_doc_storage::HsQuery;
 use serde_json::{Value, json};
 
 pub(super) fn visit(

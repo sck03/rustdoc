@@ -91,9 +91,9 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SEL
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'contract', '--', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL storage contract'
     }
     if ($Scope -in @('All', 'Engine')) {
-        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--lib', '--test', 'team_service', '--', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL recovery and team workflows'
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--lib', '--', 'postgres', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL recovery and output publication'
     }
-    if ($Scope -eq 'Workflows') {
+    if ($Scope -in @('All', 'Engine', 'Workflows')) {
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--test', 'team_service', '--', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL team and organization workflows'
     }
     if ($Scope -eq 'Capacity') {

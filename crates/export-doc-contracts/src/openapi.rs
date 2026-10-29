@@ -15,6 +15,7 @@ mod product_queries;
 mod report_preview;
 mod reports;
 mod template_history;
+mod units;
 pub use office::documents::DETAIL_FIELDS as OA_SHEET_DETAIL_FIELDS;
 pub use office::documents::SHEET_FIELDS as OA_SHEET_FIELDS;
 use serde_json::Value;
@@ -37,6 +38,7 @@ pub fn document() -> Value {
     dashboard::extend(&mut document);
     product_queries::extend(&mut document);
     invoice_editing::extend(&mut document);
+    units::extend(&mut document);
     // The frozen baseline remains read-only; retired products leave the live catalog.
     document["x-exportdoc-permissions"]["editions"]
         .as_object_mut()
@@ -62,6 +64,7 @@ mod tests {
     fn preserves_every_reference_schema_endpoint_and_security_contract() {
         let baseline: Value = serde_json::from_str(include_str!("reference_openapi.json")).unwrap();
         let mut current = document();
+        units::tests::compare_evolved_contract(&mut current, &baseline);
         // OA now has the same workflow semantics on SQLite and PostgreSQL.
         // Verify this intentional removal without weakening the other frozen contracts.
         let capabilities = &mut current["components"]["schemas"]["ApiUserCapabilitiesDto"];
@@ -149,6 +152,7 @@ mod tests {
         for (schema, fields) in reports::FIELDS
             .iter()
             .chain(accounts::FIELDS)
+            .chain(units::FIELDS)
             .chain(personnel::FIELDS)
             .chain(exchange::FIELDS)
             .chain(hs_lifecycle::FIELDS)

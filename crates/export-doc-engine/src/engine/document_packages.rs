@@ -201,7 +201,7 @@ pub fn handle(
     let store = service.store.clone();
     let paths = service.paths.clone();
     let fonts = service.report_fonts.clone();
-    let actor_id = actor.id;
+    let task_actor = actor.clone();
     let merged = body["includeMergedPdf"] == true;
     service.jobs.start_replayable(
         actor,
@@ -214,7 +214,7 @@ pub fn handle(
         },
         Some(Replay::new(operation, parameters, body)),
         move |cancelled| {
-            let actor = auth::current_actor(&store, actor_id)?;
+            let actor = auth::refresh_actor(&store, &task_actor)?;
             auth::authorize_operation(&actor, operation, &[])?;
             let files = files(
                 &store,
@@ -227,7 +227,7 @@ pub fn handle(
                 "export-zip",
                 cancelled,
             )?;
-            let actor = auth::current_actor(&store, actor_id)?;
+            let actor = auth::refresh_actor(&store, &task_actor)?;
             auth::authorize_operation(&actor, operation, &[])?;
             if !auth::visible(
                 &actor,

@@ -1,4 +1,4 @@
-import type { ApiPermissionGrantDto, ApiPermissionResourceDefinitionDto, ApiPermissionTemplateDto, ApiUserAccountDto } from "../../api/index.ts";
+import type { ApiPermissionGrantDto, ApiPermissionResourceDefinitionDto, ApiPermissionTemplateDto } from "../../api/index.ts";
 
 export function getEditableSchemeGrants(grants: ApiPermissionGrantDto[], resources: ReadonlyMap<string, ApiPermissionResourceDefinitionDto>) {
   return Object.fromEntries(grants
@@ -14,7 +14,7 @@ export const scopeLabels: Record<string, string> = {
 };
 
 export const presetLabels: Record<string, string> = {
-  "": "未开放",
+  "": "未授权",
   view: "仅查看",
   approve: "查看与审批",
   operate: "日常操作",
@@ -22,6 +22,11 @@ export const presetLabels: Record<string, string> = {
 };
 
 export const presetRanks: Record<string, number> = { view: 1, operate: 2, manage: 3 };
+
+/** OA schemes operate within one unit; group reporting has a separate authorization. */
+export function schemeActionDataScopes(resources: ApiPermissionResourceDefinitionDto[], scopes: string[]) {
+  return Object.fromEntries(resources.flatMap(resource => resource.actions.map(action => [grantKey(resource.key,action.key),resource.workspace === "office" && resource.supportsDataScope ? scopes.filter(scope => scope !== "all") : scopes])));
+}
 
 function presetActions(resource: ApiPermissionResourceDefinitionDto, level: string) {
   if (level === "approve") return resource.actions.some(action => action.key === "approve")
@@ -45,8 +50,7 @@ export function firstResourceScope(grants: Record<string, string>, resourceKey: 
 
 export function setResourcePreset(current: Record<string, string>, resource: ApiPermissionResourceDefinitionDto, level: string) {
   const grants = Object.fromEntries(Object.entries(current).filter(([key]) => splitGrantKey(key)[0] !== resource.key));
-  let scope = firstResourceScope(current, resource.key) || (resource.supportsDataScope ? "own" : "all");
-  if (level === "approve" && scope === "own") scope = "department";
+  const scope = firstResourceScope(current, resource.key) || (resource.supportsDataScope ? "own" : "all");
   for (const action of presetActions(resource, level)) {
     grants[grantKey(resource.key, action.key)] = scope;
   }
@@ -93,15 +97,4 @@ export function combinePermissionSchemes(sources: ApiPermissionTemplateDto[], re
     }
   }
   return { grants, disabledModules: [...new Set(sources.flatMap(source => source.disabledModules ?? []))], oaAssignedOnly: sources.some(source => source.oaAssignedOnly) };
-}
-
-export function countTemplateMembers(templates: ApiPermissionTemplateDto[], users: ApiUserAccountDto[]) {
-  const defaults = new Map(templates.filter(template => template.isSystem).map(template => [template.code, template.id]));
-  const counts = new Map<number, number>();
-  for (const user of users) {
-    if (user.role === "Admin" || user.permissionGrants != null) continue;
-    const id = user.permissionTemplateId ?? defaults.get(user.role);
-    if (id != null) counts.set(id, (counts.get(id) ?? 0) + 1);
-  }
-  return counts;
 }

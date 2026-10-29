@@ -9,12 +9,33 @@ mod native_fixture;
 mod oa_archive_contract;
 #[path = "support/oa_contract.rs"]
 mod oa_contract;
+#[path = "support/oa_integration_contract.rs"]
+mod oa_integration_contract;
 #[path = "support/organization_workflow_contract.rs"]
 mod organization_workflow_contract;
 #[path = "support/personnel_scope_contract.rs"]
 mod personnel_scope_contract;
+#[path = "support/unit_contract.rs"]
+mod unit_contract;
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
+
+#[test]
+fn unit_identity_scoped_administration_and_cross_company_approval() {
+    let mut fixture = native_fixture::Fixture::new();
+    fixture.client.take();
+    let service = NativeService::open(fixture.paths.clone()).unwrap();
+    let login = oa_contract::call(
+        &service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":"admin","password":""})),
+    )
+    .unwrap();
+    unit_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    service.close().unwrap();
+}
 
 #[test]
 fn submitted_versions_originals_and_stored_pdf_survive_draft_changes() {
@@ -143,6 +164,23 @@ fn appointments_countersign_conditions_and_visibility_form_a_closed_workflow() {
         login["accessToken"].as_str().unwrap(),
     );
     personnel_scope_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    service.close().unwrap();
+}
+
+#[test]
+fn assignment_leadership_and_ownership_share_one_consistent_contract() {
+    let mut fixture = native_fixture::Fixture::new();
+    fixture.client.take();
+    let service = NativeService::open(fixture.paths.clone()).unwrap();
+    let login = oa_contract::call(
+        &service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":"admin","password":""})),
+    )
+    .unwrap();
+    oa_integration_contract::exercise(&service, login["accessToken"].as_str().unwrap());
     service.close().unwrap();
 }
 

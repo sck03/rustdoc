@@ -18,9 +18,11 @@ await withOfficeUi('payment-printing-ui', async ({ repo, output, url, invoke, op
   const model = await import(pathToFileURL(bundle).href);
   const admin = (await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' })).accessToken;
   const password = 'Payment-Review-2026';
+  const paymentGrants = [['document.payments',['view','operate']],['document.payment-output',['preview','print','export-pdf']],['document.report-templates',['view','design','clone']],['document.report-resources',['upload']]]
+    .flatMap(([resourceKey, actions]) => actions.map(action => ({ resourceKey, action, dataScope: resourceKey === 'document.report-templates' && action === 'view' ? 'department' : 'own' })));
   for (const [username, role] of [['pay-owner', 'OfficeEmployee'], ['pay-peer', 'OfficeEmployee'], ['pay-finance', 'Finance']]) {
     await invoke('createUserAccount', { username, fullName: username, role, isActive: true,
-      companyScope: 'DEFAULT', departmentId: 'GENERAL', resetPassword: password, permissionGrants: null }, {}, admin);
+      companyScope: 'DEFAULT', departmentId: 'GENERAL', resetPassword: password, permissionGrants: role === 'OfficeEmployee' ? paymentGrants : null }, {}, admin);
   }
   const owner = await invoke('Login', { username: 'pay-owner', password });
   const peer = await invoke('Login', { username: 'pay-peer', password });
@@ -36,7 +38,7 @@ await withOfficeUi('payment-printing-ui', async ({ repo, output, url, invoke, op
     }
   }
   const page = await openPage('pay-owner', password);
-  await page.waitForURL('**/#/office/approvals');
+  await page.waitForURL('**/#/payments');
   await page.getByRole('link', { name: '付款报销打印', exact: true }).waitFor();
   const navigation = await page.locator('#workspace-primary-navigation').textContent();
   assert(navigation.includes('付款报销') && navigation.includes('报表模板管理'));

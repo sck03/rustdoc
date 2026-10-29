@@ -1,6 +1,6 @@
 //! Authorized, projected reads for cross-source worklists.
 use super::super::{auth, error::Result, store::Actor};
-use export_doc_storage::Connection;
+use crate::engine::store::Connection;
 use serde_json::Value;
 
 pub(super) fn rows(

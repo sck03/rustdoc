@@ -7,9 +7,10 @@ use super::{
     records::{id, text},
     store::{self, Actor},
 };
+use crate::engine::store::Connection;
 use crate::{contracts, generated_api::*, operation};
 use export_doc_domain::hs;
-use export_doc_storage::{AuditWrite, Connection};
+use export_doc_storage::AuditWrite;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 mod lifecycle;

@@ -4,10 +4,10 @@ import type { ApiUserDto, ExportDocManagerApiClient, OaApprovalSettings } from "
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useOfficeOperation } from "../office/useOfficeData.ts";
 
-export type ApprovalAccount = { id: number; fullName: string; username: string; departmentId: string };
+export type ApprovalAccount = { id: number; fullName: string; username: string; departmentId: string; contexts?: { id: string; name: string; departmentId: string }[] };
 export function useApprovalSettings(client: ExportDocManagerApiClient, user: ApiUserDto) {
-  return useQuery({ queryKey: ["office", "approval-settings", user.id, user.companyScope], enabled: user.capabilities.canManageUsers,
-    queryFn: async ({ signal }) => { const [settings, accounts] = await Promise.all([client.getOaApprovalSettings({ signal }), client.listUsers({ signal })]); return { settings, accounts: accounts.users.filter(account => account.companyScope === user.companyScope && account.isActive) }; }, refetchOnWindowFocus: false });
+  return useQuery({ queryKey: ["office", "approval-settings", user.id, user.companyScope, user.contextId], enabled: user.capabilities.canManageUsers || user.capabilities.unitManagement?.workflows,
+    queryFn: async ({ signal }) => { const [settings, accounts, routing] = await Promise.all([client.getOaApprovalSettings({ signal }), client.getUnitApproverOptions({}, { signal }), client.getOaRoutingUnits({ signal })]); return { settings, accounts: accounts.users, routingUnits: routing.items }; }, refetchOnWindowFocus: false });
 }
 export function useApprovalSettingsDraft(client: ExportDocManagerApiClient, initial: OaApprovalSettings) {
   const [draft, setDraft] = useState(initial);

@@ -45,6 +45,7 @@ pub fn exercise(db: &Connection) {
         department: "A",
         departments: &[],
         assigned_only: false,
+        context: "",
         reader: 200,
         unread_only: false,
         view: CommunicationView::Announcements {
@@ -104,6 +105,7 @@ pub fn exercise(db: &Connection) {
             department: "A",
             departments: &[],
             assigned_only: false,
+            context: "",
             reader: 200,
             unread_only: true,
             view: CommunicationView::Notifications { scopes: &scopes },
@@ -140,6 +142,7 @@ pub fn exercise(db: &Connection) {
         department: "A",
         departments: &[],
         assigned_only: false,
+        context: "",
         reader: 200,
         unread_only: true,
         view: CommunicationView::Notifications { scopes: &scopes },

@@ -15,6 +15,7 @@ pub struct DataScope<'a> {
     pub department: &'a str,
     pub departments: &'a [String],
     pub personnel_memberships: bool,
+    pub personnel_date: Option<&'a str>,
     pub user_id: i64,
 }
 impl DataScope<'_> {
@@ -22,10 +23,23 @@ impl DataScope<'_> {
         if self.all {
             return "1=1".into();
         }
+        if !self.company_wide && !self.department_wide && !self.own {
+            return "1=0".into();
+        }
         let company = bind(values, self.company, pg);
         let mut alternatives = Vec::new();
         if self.company_wide {
-            alternatives.push(format!("r.company={company}"));
+            alternatives.push(if self.personnel_memberships {
+                crate::personnel_memberships::filter(
+                    values,
+                    pg,
+                    &company,
+                    None,
+                    self.personnel_date,
+                )
+            } else {
+                format!("r.company={company}")
+            });
         }
         if self.department_wide {
             let departments = std::iter::once(self.department)
@@ -33,8 +47,18 @@ impl DataScope<'_> {
                 .map(|department| bind(values, department, pg))
                 .collect::<Vec<_>>()
                 .join(",");
-            let membership = department_filter(&departments, self.personnel_memberships, pg);
-            alternatives.push(format!("(r.company={company} AND ({membership}))"));
+            let membership = if self.personnel_memberships {
+                crate::personnel_memberships::filter(
+                    values,
+                    pg,
+                    &company,
+                    Some(&departments),
+                    self.personnel_date,
+                )
+            } else {
+                format!("r.company={company} AND r.department IN ({departments})")
+            };
+            alternatives.push(format!("({membership})"));
         }
         if self.own {
             let owner = bind(values, self.user_id, pg);
@@ -48,25 +72,6 @@ impl DataScope<'_> {
             format!("({})", alternatives.join(" OR "))
         }
     }
-}
-pub(crate) fn department_filter(parameters: &str, personnel: bool, pg: bool) -> String {
-    let direct = format!("r.department IN ({parameters})");
-    if !personnel {
-        return direct;
-    }
-    let assignments = if pg {
-        "jsonb_array_elements(COALESCE(r.body->'organization'->'additionalAssignments','[]'::jsonb)) assignment"
-    } else {
-        "json_each(r.body,'$.organization.additionalAssignments') assignment"
-    };
-    let department = if pg {
-        "assignment->>'departmentId'"
-    } else {
-        "assignment.value->>'departmentId'"
-    };
-    format!(
-        "({direct} OR EXISTS (SELECT 1 FROM {assignments} WHERE {department} IN ({parameters})))"
-    )
 }
 pub struct GenericQuery<'a> {
     pub kind: &'a str,

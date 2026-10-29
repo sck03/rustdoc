@@ -5,9 +5,10 @@ use super::{
     records::{id, text},
     store::{self, Actor, Store},
 };
+use crate::engine::store::Connection;
 use crate::{contracts, generated_api::*};
 use export_doc_domain::sales;
-use export_doc_storage::{Connection, CrmList};
+use export_doc_storage::CrmList;
 use serde_json::{Value, json};
 
 pub const OPERATIONS: &[Operation] = &[

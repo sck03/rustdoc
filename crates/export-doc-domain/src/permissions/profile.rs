@@ -9,6 +9,13 @@ pub fn assignable(grants: &[Grant]) -> Result<Vec<Grant>, String> {
     {
         return Err("系统身份与技术依赖能力由服务端派生，不能直接授予。".into());
     }
+    if grants.iter().any(|g| {
+        g.resource_key.starts_with("office.")
+            && g.data_scope == "all"
+            && resource(&g.resource_key).is_some_and(|r| r.supports_data_scope)
+    }) {
+        return Err("OA 业务权限最多覆盖当前单位；跨单位汇总须单独授权。".into());
+    }
     Ok(grants)
 }
 

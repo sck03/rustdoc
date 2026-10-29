@@ -294,7 +294,7 @@ pub fn handle(
             auth::authorize(actor, "document.invoices", "view")?;
             let path = text(body, "imagePath");
             let id = stored_id(&path, "Files/ShippingMarks/")?;
-            let image = read(&*store.connection()?, actor, id, None)?;
+            let image = read(&store.connection()?, actor, id, None)?;
             Ok(
                 json!({"imagePath":path,"fileName":id,"contentType":image.media_type,"sizeBytes":image.bytes.len(),"dataUrl":image.data_url()?,"storagePolicy":"受控唛头预览"}),
             )
@@ -380,7 +380,7 @@ pub fn download(
     let id = parameter_id(parameters)?;
     let _access = report_template_files::storage_lock(&service.paths)?;
     let image = read(
-        &*service.store.connection()?,
+        &service.store.connection()?,
         actor,
         id,
         Some(&service.paths),

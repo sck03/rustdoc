@@ -19,6 +19,8 @@ mod invoice_clone_contract;
 mod oa_archive_contract;
 #[path = "support/oa_contract.rs"]
 mod oa_contract;
+#[path = "support/oa_integration_contract.rs"]
+mod oa_integration_contract;
 #[path = "support/office_contract.rs"]
 mod office_contract;
 #[path = "support/organization_workflow_contract.rs"]
@@ -33,6 +35,8 @@ mod personnel_scope_contract;
 mod template_contract;
 #[path = "support/tools_contract.rs"]
 mod tools_contract;
+#[path = "support/unit_contract.rs"]
+mod unit_contract;
 #[path = "support/approval_fixture.rs"]
 mod workflow;
 use export_doc_engine::{
@@ -307,6 +311,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     oa_archive_contract::exercise(&service, admin_token, staff_token, None);
     approval_contract::exercise(&service, admin_token);
     organization_workflow_contract::exercise(&service, admin_token);
+    oa_integration_contract::exercise(&service, admin_token);
     organization_workflow_contract::exercise_nodes(&service, admin_token);
     personnel_scope_contract::exercise(&service, admin_token);
     handling_contract::exercise(&service, admin_token);
@@ -317,6 +322,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     personnel_contract::exercise(&service, admin_token);
     identity_contract::exercise(&service, admin_token);
     personnel_policy_contract::exercise(&service, admin_token);
+    unit_contract::exercise(&service, admin_token);
     service.close().unwrap();
     drop(Arc::clone(&service));
     drop(service);

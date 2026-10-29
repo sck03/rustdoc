@@ -6,11 +6,12 @@ use super::{
     store::{self, Actor},
 };
 use crate::contracts;
-use export_doc_storage::{Connection, RecordQuery};
+use crate::engine::store::Connection;
+use export_doc_storage::RecordQuery;
 use serde_json::{Value, json};
 use std::collections::HashSet;
 mod account_references;
-pub(in crate::engine) use account_references::validate_account;
+pub(in crate::engine) use account_references::validate_account_in;
 
 pub(in crate::engine) const GENERAL_STATES: &[&str] = &["Approved", "Completed"];
 pub(in crate::engine) const SUPPLY_STATES: &[&str] = &["Approved", "Issued", "Returned"];
@@ -236,7 +237,14 @@ fn validate_handlers(tx: &Connection, actor: &Actor, service: &Value) -> Result<
             .as_i64()
             .filter(|id| *id > 0 && seen.insert(*id))
             .ok_or_else(|| invalid("办理人员无效或重复。"))?;
-        let user = auth::current_actor_in(tx, id, actor.edition)?;
+        let user = super::units::for_operation(
+            tx,
+            id,
+            actor.edition,
+            &actor.company,
+            resource,
+            action(resource)?,
+        )?;
         if user.company != actor.company
             || auth::authorize(&user, resource, "view").is_err()
             || auth::authorize(&user, resource, action(resource)?).is_err()

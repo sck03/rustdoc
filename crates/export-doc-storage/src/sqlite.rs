@@ -194,7 +194,20 @@ impl Sqlite {
     }
     fn validate_structure(connection: &SqliteConnection) -> Result<()> {
         schema::validate(Self::version(connection)?)?;
-        connection.prepare("SELECT request_id,submission,task_key,node_key,assignee_id,acted_by_id,status,active,due_at FROM workflow_tasks LIMIT 0")?;
+        connection.prepare("SELECT request_id,submission,task_key,node_key,assignee_id,acted_by_id,context_id,acted_by_context,status,active,due_at,independent,started_at,acted_at,elapsed_seconds FROM workflow_tasks LIMIT 0")?;
+        connection.prepare("SELECT id,person_id,unit_id,department_id,company,department,job_title,starts_on,ends_on,is_primary FROM personnel_memberships LIMIT 0")?;
+        connection.prepare("SELECT appointment_id,manager_appointment_id,relation_type FROM reporting_relations LIMIT 0")?;
+        connection.prepare("SELECT id,code,parent_id,unit_kind FROM organization_units LIMIT 0")?;
+        connection
+            .prepare("SELECT id,unit_id,code,parent_id FROM organization_departments LIMIT 0")?;
+        connection.prepare("SELECT person_id,user_id FROM personnel_accounts LIMIT 0")?;
+        connection.prepare("SELECT organization_id,appointment_id,duty_kind,workflow_kinds FROM organization_duties LIMIT 0")?;
+        connection.prepare("SELECT id,user_id,unit_id,appointment_id,mode,is_active,template_id,authority_role_id FROM unit_access_roles LIMIT 0")?;
+        connection.prepare(
+            "SELECT role_id,resource_key,action,data_scope FROM unit_access_grants LIMIT 0",
+        )?;
+        connection.prepare("SELECT id,owner_unit_id,code FROM permission_schemes LIMIT 0")?;
+        connection.prepare("SELECT person_id,body FROM personnel_private_profiles LIMIT 0")?;
         connection.prepare("SELECT id,kind,record_id,version,action,actor_id,occurred_at,body FROM audit_logs LIMIT 0")?;
         Ok(())
     }
@@ -215,7 +228,7 @@ impl Adapter for Sqlite {
             "DELETE FROM workflow_tasks WHERE request_id=?1 AND submission=?2",
             params![request, submission],
         )?;
-        let mut insert=db.prepare("INSERT INTO workflow_tasks(request_id,submission,task_key,node_key,assignee_id,acted_by_id,status,active,due_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)")?;
+        let mut insert=db.prepare("INSERT INTO workflow_tasks(request_id,submission,task_key,node_key,assignee_id,acted_by_id,status,active,due_at,independent,context_id,acted_by_context,started_at,acted_at,elapsed_seconds) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)")?;
         for task in tasks {
             insert.execute(params![
                 request,
@@ -226,7 +239,13 @@ impl Adapter for Sqlite {
                 task.acted_by,
                 task.status,
                 i64::from(task.active),
-                task.due_at
+                task.due_at,
+                i64::from(task.independent),
+                task.context,
+                task.acted_by_context,
+                task.started_at,
+                task.acted_at,
+                task.elapsed_seconds,
             ])?;
         }
         Ok(())
@@ -373,6 +392,24 @@ impl Adapter for Sqlite {
     fn query_records(&self, q: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = super::record_query::sql(q, false);
         self.query_page(&sql, "r.body", q.offset, q.limit.clamp(1, 100))
+    }
+    fn query_workflow_summary(&self, q: &WorkflowSummaryQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let (sql, values) = super::workflow::summary(q, false);
+        let (count, rows): (i64, String) = self.connection.borrow().query_row(
+            &sql,
+            rusqlite::params_from_iter(values.iter()),
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        Ok((count, serde_json::from_str(&rows)?))
+    }
+    fn query_workflow_tasks(&self, q: &WorkflowTaskQuery<'_>) -> Result<(i64, Vec<Value>)> {
+        let (sql, values) = super::workflow::page(q, false);
+        let (count, rows): (i64, String) = self.connection.borrow().query_row(
+            &sql,
+            rusqlite::params_from_iter(values.iter()),
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )?;
+        Ok((count, serde_json::from_str(&rows)?))
     }
     fn query_slice(
         &self,
@@ -532,6 +569,24 @@ impl Adapter for Sqlite {
         value
             .map(|v| serde_json::from_str(&v).map_err(Into::into))
             .transpose()
+    }
+    fn personnel_private_profile(&self, id: i64) -> Result<Option<Value>> {
+        let value: Option<String> = self
+            .connection
+            .borrow()
+            .query_row(
+                "SELECT body FROM personnel_private_profiles WHERE person_id=?1",
+                [id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        value
+            .map(|body| serde_json::from_str(&body).map_err(Into::into))
+            .transpose()
+    }
+    fn set_personnel_private_profile(&self, id: i64, body: &Value) -> Result<()> {
+        self.connection.borrow().execute("INSERT INTO personnel_private_profiles(person_id,body) VALUES(?1,?2) ON CONFLICT(person_id) DO UPDATE SET body=excluded.body",params![id,serde_json::to_string(body)?])?;
+        Ok(())
     }
     fn set_settings(&self, name: &str, version: i64, body: &Value) -> Result<()> {
         self.connection.borrow().execute("INSERT INTO settings(name,version,body) VALUES(?1,?2,?3) ON CONFLICT(name) DO UPDATE SET version=excluded.version,body=excluded.body",params![name,version,serde_json::to_string(body)?])?;

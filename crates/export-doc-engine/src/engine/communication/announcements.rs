@@ -24,7 +24,7 @@ pub(in crate::engine) fn current(
     meta: &Value,
     id: i64,
 ) -> Result<(Actor, Value)> {
-    let actor = auth::current_actor_in(tx, actor.id, actor.edition)?;
+    let actor = auth::refresh_actor_in(tx, actor)?;
     auth::authorize(&actor, RESOURCE, &text(meta, "permission"))?;
     let row = store::get(tx, "announcement", id)?;
     if row["companyScope"] != actor.company {
@@ -138,6 +138,7 @@ pub(super) fn handle(
             department: &actor.department,
             departments: &actor.departments,
             assigned_only: actor.oa_assigned_only,
+            context: &actor.context,
             reader: actor.id,
             unread_only: unread(query)?,
             view: CommunicationView::Announcements {

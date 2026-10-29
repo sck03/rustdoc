@@ -142,10 +142,8 @@ pub(super) fn validate_design(content: &str) -> Result<Design> {
 
 pub(super) fn preview(service: &NativeService, actor: &Actor, body: &Value) -> Result<Value> {
     service.store.read(|tx| {
-        let current = auth::current_actor_in(tx, actor.id, actor.edition)?;
-        if !current.admin {
-            return Err(error(403, "只有管理员可以编辑审批单模板。"));
-        }
+        let current = auth::refresh_actor_in(tx, actor)?;
+        super::super::units::demand(&current, &current.company, "organization.workflows")?;
         Ok(())
     })?;
     required(body, "name", "审批单名称", 80)?;

@@ -21,7 +21,7 @@ Tauri 是桌面宿主；浏览器与 Docker 不运行 Tauri 窗口。Node 只用
 - `apps/export-doc-web`：唯一 React 界面；页面组合、hook 查询与变更、纯 model、平台 bridge 分层。
 - `apps/export-doc-tauri/src-tauri`：Tauri 窗口、文件对话框、WebView 预检、退出、更新、运行目录与迁移。`desktop_runtime` 仅管理共用 Rust 后端生命周期。
 - `apps/export-doc-server`：HTTP 请求、上传下载、认证适配、容量与超时。桌面关闭默认 `postgres` feature，在随机 `127.0.0.1` 端口启动相同 router；团队二进制启用 PostgreSQL。
-- `crates/export-doc-contracts`：Rust OpenAPI 组合器保留原官方导出并扩展新能力，统一生成契约、权限和配置元数据。逐项比较原 schema/端点/认证/错误的回归保护既有接口，生成文件不能手改。
+- `crates/export-doc-contracts`：Rust OpenAPI 组合器保留原官方导出并组合当前能力，统一生成契约、权限和配置元数据。2026-10-29 授权重构的组织稳定 ID 路由及单位权限声明单独验证，其余 schema/端点/认证/错误继续逐项比较；生成文件不能手改。
 - `export-doc-domain`：精确金额、数量、日期与纯业务规则，不依赖 UI、HTTP、数据库或宿主文件系统。
 - `export-doc-engine`：应用用例、权限、任务、报表及各可选能力编排；不放 SQL 或 Tauri command。
 - `export-doc-storage`：SQLite／PostgreSQL 18、事务、版本、单实例锁与持久化。
@@ -47,7 +47,9 @@ Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分
 
 2026-10-28 OA 读写分离并复用严格日期与分页；Storage 筛选时段，`oa/submissions`、`oa/sheet_templates`、`oa/documents` 分别管理提交档案、模板和文档任务。Report 只投影冻结事实，共用 V3 网格增加可选自动增高/续页及文字/底色，前端复用内容展示、OA hook 和设计器。详见[行政与人员](./公司行政协作设计与验收.md)。沿用 records/BLOB 和备份，无 schema 迁移；报表新增对锁图中已有 chrono 的直接依赖，未升级版本。
 
-2026-10-29 OA 重新建立发布定义、节点依赖图和任务模型。Domain 负责条件、会签/或签、并行汇合、本人回避及独立复核；Engine 负责组织解析、发布/停用、版本冻结、授权和业务生效；Storage 的 `workflow_tasks` 索引与业务同事务发布。React 页面、设置 hook 和编辑器分别维护展示、请求与规则草稿，会议室/物品共用审批内核。数据库采用 schema 9 全新基线，旧迁移链和单机直接登记逻辑删除；未新增运行依赖。实际能力和厂商参考见行政设计文档。
+2026-10-29 OA 重新建立发布定义、节点依赖图和任务模型。Domain 负责条件、会签/或签、并行汇合、本人回避及独立复核；Engine 负责组织解析、发布/停用、版本冻结、授权和业务生效；Storage 的 `workflow_tasks` 索引与业务同事务发布。React 页面、设置 hook 和编辑器分别维护展示、请求与规则草稿，会议室/物品共用审批内核。数据库采用 schema 10 全新基线，旧迁移链和单机直接登记逻辑删除；未新增运行依赖。实际能力和厂商参考见行政设计文档。
+
+后续集成修复将组织分管规则放在 Domain，职责完整性、任职快照及审批中心分别由 Engine 独立模块承担，查询条件和任务独立复核投影由 Storage 统一用于 SQLite/PostgreSQL。审批中心从多路前端轮询改为同一快照聚合，工作台只读取未结候选；人员交接复用业务归属统计。API 和两端客户端继续由唯一 OpenAPI 生成，未添加数据库迁移或旧流程兼容分支。
 
 2026-10-27 本次完整审查修复将报表批次快照归入 `reports/preparation`，任务的最终授权与数据库发布归入 `tasks/persistence`，文件补偿和启动恢复归入 `tasks/output`。HTTP 关闭登记由桌面及服务器组合根共用；页面展示、编辑模型和草稿 hook 继续分离。通用连续扫描仍由 Storage 构造 SQL，严格自然日仍由 Domain 校验，内部权限直接使用领域类型。
 
@@ -67,7 +69,7 @@ Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分
 
 桌面令牌由 Rust 宿主生成，仅由主窗口受限 IPC 获取，不写 URL 或日志。随机回环端口、精确 Host／Origin 校验、官方 endpoint policy、登录会话与对象权限共同控制桌面访问。网络服务不安装本机文件／进程能力。
 
-AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，业务 SQLite 在 DataRoot/Database，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。数据库仅接受全新 schema 9；旧测试库和旧 schema 备份拒绝打开或恢复，显式选择新目录/数据库建库，不自动删除原数据。
+AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，业务 SQLite 在 DataRoot/Database，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。数据库仅接受全新 schema 10；旧测试库和旧 schema 备份拒绝打开或恢复，显式选择新目录/数据库建库，不自动删除原数据。
 
 ## 版本与许可
 

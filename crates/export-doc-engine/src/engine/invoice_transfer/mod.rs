@@ -375,7 +375,7 @@ pub fn upload(
     {
         return import(service, actor, &package, body);
     }
-    let preview = preview(&*service.store.connection()?, actor, &package)?;
+    let preview = preview(&service.store.connection()?, actor, &package)?;
     Ok(
         json!({"checksumValid":package.checksum_valid,"checksumMessage":if package.checksum_valid{"校验通过"}else{"校验失败，不能导入"},"preview":preview,"storagePolicy":POLICY}),
     )

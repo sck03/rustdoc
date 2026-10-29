@@ -4,9 +4,10 @@ use super::{
     media::digest,
     store::{self, Actor},
 };
+use crate::engine::store::Connection;
 use crate::{clock::BusinessClock, paths::nonce};
 use chrono::{DateTime, Duration};
-use export_doc_storage::{BlobWrite, Connection, RecordWrite};
+use export_doc_storage::{BlobWrite, RecordWrite};
 use serde_json::{Value, json};
 const KIND: &str = "import-previews";
 const GLOBAL_BYTES: u64 = 256 * 1024 * 1024;

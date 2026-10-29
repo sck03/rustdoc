@@ -54,6 +54,18 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
             }
         }
         super::account_permissions::validate(&mut body)?;
+        if body["role"] != "Admin"
+            && body["permissionGrants"].is_null()
+            && body["permissionTemplateId"].is_null()
+        {
+            let template = tx
+                .find_identity(
+                    "permission-templates",
+                    &store::normalize(&text(&body, "role")),
+                )?
+                .ok_or_else(|| invalid("预置权限方案缺失，请明确选择权限方案。"))?;
+            body["permissionTemplateId"] = template["id"].clone();
+        }
         if let Some(previous) = &previous {
             store::check_version(previous, store::expected(&body))?;
             if previous["role"] == "Admin"
@@ -68,10 +80,13 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
                 return Err(invalid("必须保留至少一个启用的管理员。"));
             }
             if (previous["companyScope"] != body["companyScope"]
-                || previous["departmentId"] != body["departmentId"])
+                || previous["departmentId"] != body["departmentId"]
+                || previous["isActive"] == true && body["isActive"] != true)
                 && super::office_queries::account_clearance(tx, previous)?["isClear"] != true
             {
-                return Err(conflict("仍有未结申请、审批或办理职责，请先完成交接。"));
+                return Err(conflict(
+                    "仍有未结申请、审批、办理职责或业务资料，请先完成交接。",
+                ));
             }
         }
         super::organization::validate_assignment(
@@ -86,6 +101,9 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
             let template = tx
                 .get("permission-templates", template_id)?
                 .ok_or_else(|| invalid("权限方案不存在。"))?;
+            if template["ownerUnitId"].as_i64().is_some() {
+                return Err(invalid("单位方案请在单位身份中分配；主账号使用平台方案。"));
+            }
             if template["isActive"] != true
                 && previous
                     .as_ref()
@@ -146,6 +164,23 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
             if id == 0 { "create" } else { "edit" },
         )?;
         super::account_permissions::validate_references(tx, actor, &saved)?;
+        super::units::validate_issuer(
+            tx,
+            actor,
+            saved["id"]
+                .as_i64()
+                .ok_or_else(|| invalid("账号编号缺失。"))?,
+        )?;
+        if let Some(previous) = &previous {
+            if previous["companyScope"] != saved["companyScope"] {
+                super::oa::approval_references::validate_account_in(
+                    tx,
+                    actor,
+                    &saved,
+                    &text(previous, "companyScope"),
+                )?;
+            }
+        }
         if let Some((salt, hash)) = &credential {
             tx.set_credential(
                 saved["id"].as_i64().unwrap_or(0),

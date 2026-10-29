@@ -1,8 +1,9 @@
 //! Explicit, previewed snapshot cleanup; current content and business audit remain intact.
 use super::*;
+use crate::engine::store::Connection;
 use crate::engine::{error::conflict, import_previews, records::required};
 use export_doc_contracts::template_history as limits;
-use export_doc_storage::{AuditWrite, Connection, TemplateVersionQuery};
+use export_doc_storage::{AuditWrite, TemplateVersionQuery};
 
 fn keep(value: Option<i64>) -> Result<i64> {
     value

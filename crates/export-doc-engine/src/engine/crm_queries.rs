@@ -5,7 +5,8 @@ use super::{
     store::Actor,
 };
 use crate::contracts;
-use export_doc_storage::{Connection, CrmList, CrmQuery};
+use crate::engine::store::Connection;
+use export_doc_storage::{CrmList, CrmQuery};
 use serde_json::Value;
 
 pub(super) fn fields(schema: &str) -> Vec<(&'static str, &'static str)> {

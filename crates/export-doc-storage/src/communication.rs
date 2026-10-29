@@ -13,6 +13,7 @@ pub enum CommunicationView<'a> {
     Notifications { scopes: &'a [NotificationScope] },
 }
 pub struct CommunicationQuery<'a> {
+    pub context: &'a str,
     pub company: &'a str,
     pub department: &'a str,
     pub departments: &'a [String],
@@ -104,7 +105,7 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                         .map(|p| {
                             (
                                 format!("CAST({} AS BIGINT)", bind(p.user_id.to_string())),
-                                None,
+                                bind(p.context.clone()),
                             )
                         })
                         .collect::<Vec<_>>();
@@ -112,6 +113,7 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                         postgres,
                         "parent",
                         &reader,
+                        Some(&bind(q.context.into())),
                         &principals,
                     );
                     condition = if q.assigned_only {

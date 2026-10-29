@@ -6,9 +6,10 @@ use super::{
     records::{self, text},
     store::{self, Actor, Store},
 };
+use crate::engine::store::Connection;
 use crate::{clock::BusinessClock, contracts, generated_api::*};
 use export_doc_domain::{crm, sales, supplier};
-use export_doc_storage::{AuditWrite, Connection};
+use export_doc_storage::AuditWrite;
 use rust_decimal::Decimal;
 use serde_json::{Value, json};
 

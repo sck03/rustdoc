@@ -1,7 +1,6 @@
-import { useQueries } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
-import { oaApi } from "./oaApi.ts";
-import { oaAccess, oaKinds, oaModules, type OaKind } from "./oaModel.ts";
+import { oaAccess, oaKinds, oaModules, oaHandlingLabels, type OaKind } from "./oaModel.ts";
 
 export function useOaApprovalHub(client: ExportDocManagerApiClient, user: ApiUserDto) {
   const queues: { kind: OaKind; finance: boolean; handling: boolean; title: string; description: string; label: string; href: string }[] = oaKinds.filter((kind) => oaAccess(user, kind, "view")).map((kind) => ({
@@ -15,16 +14,13 @@ export function useOaApprovalHub(client: ExportDocManagerApiClient, user: ApiUse
       label: "待财务接收", href: "/office/requests/expense?view=finance" });
   }
   for (const kind of oaKinds.filter(kind => kind !== "expense" && kind !== "personnel" && oaAccess(user,kind,"view") && oaAccess(user,kind,"complete"))) {
-    queues.push({kind,finance:false,handling:true,title:`${oaModules[kind].name} · 待办理`,description:oaModules[kind].description,label:"待我办理",href:`/office/requests/${kind}?view=handling`});
+    queues.push({kind,finance:false,handling:true,title:`${oaModules[kind].name} · ${oaHandlingLabels[kind]}`,description:oaModules[kind].description,label:oaHandlingLabels[kind],href:`/office/requests/${kind}?view=handling`});
   }
-  const queries = useQueries({ queries: queues.map(({ kind, finance, handling }) => ({
-    queryKey: ["office", "oa", "hub", kind, finance, handling, user.id, user.companyScope],
-    queryFn: ({ signal }: { signal: AbortSignal }) => oaApi(client, kind).list({
-      mineOnly: finance || handling ? false : !oaAccess(user, kind, "approve"), status: finance || handling ? "Approved" : "Pending",
-      financeOnly: kind === "expense" ? finance : undefined, pageNumber: 1, pageSize: 5,
-      approvalsOnly: !finance && !handling && oaAccess(user, kind, "approve"), handlingOnly: kind !== "expense" ? handling : undefined,
-    }, { signal }),
+  const query = useQuery({
+    queryKey: ["office", "oa", "hub", user.id, user.companyScope],
+    queryFn: ({ signal }) => client.getOaApprovalHub({}, { signal }),
+    enabled: queues.length > 0, staleTime: 30000,
     refetchInterval: 30000, refetchIntervalInBackground: false,
-  })) });
-  return queues.map((queue, index) => ({ ...queue, query: queries[index] }));
+  });
+  return queues.map(queue => ({ ...queue, query: { ...query, data: query.data?.entries.find(entry => entry.kind === queue.kind && entry.finance === queue.finance && entry.handling === queue.handling)?.page } }));
 }

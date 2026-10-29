@@ -15,6 +15,21 @@ pub(in crate::engine) fn resource(kind: &str) -> Option<&'static str> {
         _ => None,
     }
 }
+pub(in crate::engine) fn resource_for_collaboration(resource: &str) -> bool {
+    [
+        "personnel",
+        "leave",
+        "overtime",
+        "expense",
+        "travel",
+        "purchase",
+        "general",
+        "room",
+        "supply",
+    ]
+    .iter()
+    .any(|kind| self::resource(kind) == Some(resource))
+}
 pub(in crate::engine) fn plan(row: &Value) -> Result<Option<ApprovalPlan>> {
     row.get("approvalPlan")
         .filter(|v| !v.is_null())
@@ -33,18 +48,8 @@ pub(in crate::engine) fn reviewer(
     id: i64,
     row: &Value,
 ) -> Result<Actor> {
-    let reviewer = auth::current_actor_in(tx, id, actor.edition)?;
     let resource = resource(&text(row, "kind")).ok_or_else(|| invalid("未知申请类型。"))?;
-    if reviewer.company != actor.company
-        || auth::authorize(&reviewer, resource, "view").is_err()
-        || auth::authorize(&reviewer, resource, "approve").is_err()
-    {
-        return Err(error(
-            403,
-            "审批人须为本公司启用账号，并具备此业务的查看和审批能力。",
-        ));
-    }
-    Ok(reviewer)
+    super::super::units::for_operation(tx, id, actor.edition, &actor.company, resource, "approve")
 }
 pub(in crate::engine) fn queue_approvers(
     tx: &Connection,
@@ -54,22 +59,22 @@ pub(in crate::engine) fn queue_approvers(
     use export_doc_storage::RecordApprover;
     let mut approvers = vec![RecordApprover {
         user_id: actor.id,
-        departments: None,
+        context: actor.context.clone(),
     }];
     for (id, _) in settings::principals(tx, actor)? {
-        match auth::current_actor_in(tx, id, actor.edition) {
-            Ok(p)
-                if p.company == actor.company
-                    && auth::authorize(&p, resource, "view").is_ok()
-                    && auth::authorize(&p, resource, "approve").is_ok() =>
-            {
-                approvers.push(RecordApprover {
-                    user_id: id,
-                    departments: None,
-                })
-            }
-            Ok(_) => {}
-            Err(e) if matches!(e.status, Some(403 | 404)) => {}
+        match super::super::units::actors_for_operation(
+            tx,
+            id,
+            actor.edition,
+            &actor.company,
+            resource,
+            "approve",
+        ) {
+            Ok(actors) => approvers.extend(actors.into_iter().map(|p| RecordApprover {
+                user_id: id,
+                context: p.context,
+            })),
+            Err(e) if matches!(e.status, Some(400 | 401 | 403 | 404)) => {}
             Err(e) => return Err(e),
         }
     }
@@ -134,10 +139,10 @@ fn authority_for(
                 })
         })
         .collect();
-    if indices
-        .iter()
-        .any(|i| plan.steps[*i].approver_user_id == actor.id)
-    {
+    if indices.iter().any(|i| {
+        plan.steps[*i].approver_user_id == actor.id
+            && plan.steps[*i].approver_context == actor.context
+    }) {
         return Ok(Some((actor.id, String::new())));
     }
     for (principal, key) in settings::principals(tx, actor)? {
@@ -147,10 +152,27 @@ fn authority_for(
         {
             continue;
         }
-        match reviewer(tx, actor, principal, row) {
-            Ok(_) => return Ok(Some((principal, key))),
-            Err(e) if matches!(e.status, Some(400 | 403 | 404)) => {}
-            Err(e) => return Err(e),
+        for i in indices
+            .iter()
+            .filter(|i| plan.steps[**i].approver_user_id == principal)
+        {
+            match super::super::units::resolve(
+                tx,
+                principal,
+                actor.edition,
+                &plan.steps[*i].approver_context,
+            ) {
+                Ok(p)
+                    if p.company == actor.company
+                        && auth::authorize(&p, resource, "view").is_ok()
+                        && auth::authorize(&p, resource, "approve").is_ok() =>
+                {
+                    return Ok(Some((principal, key)));
+                }
+                Ok(_) => {}
+                Err(e) if matches!(e.status, Some(400 | 401 | 403 | 404)) => {}
+                Err(e) => return Err(e),
+            }
         }
     }
     Ok(None)
@@ -184,6 +206,7 @@ pub(in crate::engine) fn review(
     step.status = next.into();
     step.acted_by_user_id = Some(actor.id);
     step.acted_by_name = actor.name.clone();
+    step.acted_by_context = actor.context.clone();
     step.acted_at = store::timestamp();
     step.note = note.into();
     step.delegation_key = delegation;

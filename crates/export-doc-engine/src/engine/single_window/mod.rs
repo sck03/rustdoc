@@ -16,9 +16,9 @@ use super::{
     records, settings,
     store::{self, Actor},
 };
+use crate::engine::store::Connection;
 use crate::{contracts, generated_api::*};
 use export_doc_domain::single_window::{self as rules, Business};
-use export_doc_storage::Connection;
 use serde_json::{Value, json};
 pub const PERMISSION: &str = "document.single-window";
 pub const OPERATIONS: &[Operation] = &[

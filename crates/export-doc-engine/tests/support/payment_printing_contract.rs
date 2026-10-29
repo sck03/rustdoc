@@ -1,6 +1,31 @@
 use super::*;
 
 pub(super) fn exercise(service: &NativeService, admin: &str, owner: &Value, other: &Value) {
+    assert_eq!(
+        call(service, token(owner), LIST_PAYMENTS, 0, None)
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
+    let username = format!("payment-specialist-{}", nonce().unwrap());
+    let grants: Vec<_> = [
+        ("document.payments", vec!["view", "operate"]),
+        (
+            "document.payment-output",
+            vec!["preview", "print", "export-pdf"],
+        ),
+        ("document.report-templates", vec!["view", "design", "clone"]),
+        ("document.report-resources", vec!["upload"]),
+    ]
+    .into_iter()
+    .flat_map(|(resource, actions)| {
+        actions
+            .into_iter()
+            .map(move |action| json!({"resourceKey":resource,"action":action,"dataScope":"own"}))
+    })
+    .collect();
+    call(service, admin, CREATE_USER_ACCOUNT, 0, Some(json!({"username":username,"fullName":"显式付款职责","role":"OfficeEmployee","companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Account-Review-2026","permissionGrants":grants}))).unwrap();
+    let owner = login(service, &username);
     let invoke = |token: &str,
                   op: Operation,
                   parameters: &[(&str, String)],
@@ -11,7 +36,7 @@ pub(super) fn exercise(service: &NativeService, admin: &str, owner: &Value, othe
             .dispatch(op, parameters, query, body, token)
             .map(|bytes| serde_json::from_slice::<Value>(&bytes).unwrap())
     };
-    let employee = token(owner);
+    let employee = token(&owner);
     for op in [
         GET_REPORT_TEMPLATE_CONTENT,
         LIST_USER_REPORT_TEMPLATES,

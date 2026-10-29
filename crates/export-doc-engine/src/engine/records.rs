@@ -4,8 +4,9 @@ use super::{
     error::{Result, conflict, error, invalid, unavailable},
     store::{self, Actor, Store},
 };
+use crate::engine::store::Connection;
 use crate::{contracts, generated_api::Operation, invoice};
-use export_doc_storage::{AuditWrite, Connection};
+use export_doc_storage::AuditWrite;
 use serde_json::{Value, json};
 use unicode_normalization::UnicodeNormalization;
 mod queries;
@@ -187,16 +188,17 @@ pub fn list(
         result["companies"] = json!(store.catalog("companies")?);
         result["departments"] = json!(super::organization::departments(store)?);
         let templates = store.catalog("permission-templates")?;
-        result["permissionTemplates"] = json!(templates);
+        result["permissionTemplates"] = json!(
+            templates
+                .iter()
+                .filter(|t| t["ownerUnitId"].is_null())
+                .collect::<Vec<_>>()
+        );
         for user in result["users"].as_array_mut().into_iter().flatten() {
             let template = user["permissionTemplateId"]
                 .as_i64()
                 .map(|id| templates.iter().find(|template| template["id"] == id))
-                .unwrap_or_else(|| {
-                    templates.iter().find(|template| {
-                        template["isSystem"] == true && template["code"] == user["role"]
-                    })
-                });
+                .flatten();
             user["permissionTemplateCode"] = template
                 .map(|value| value["code"].clone())
                 .unwrap_or(json!(""));
@@ -206,15 +208,15 @@ pub fn list(
         }
     }
     if resource.key == "permission-templates" {
-        result["templates"] = Value::Array(
-            result["templates"]
+        result["templates"] = Value::Array(store.read(|tx| {
+            Ok(result["templates"]
                 .as_array()
                 .into_iter()
                 .flatten()
                 .cloned()
-                .map(super::permission_templates::project)
-                .collect::<Result<Vec<_>>>()?,
-        );
+                .map(|value| super::permission_templates::project_with_usage(tx, value))
+                .collect::<Result<Vec<_>>>()?)
+        })?);
         result["resources"] = contracts::contract()["permissions"]["resources"].clone();
         for resource in result["resources"].as_array_mut().into_iter().flatten() {
             for action in resource["actions"].as_array_mut().into_iter().flatten() {
@@ -395,7 +397,7 @@ pub(super) fn save_in_transaction(
     business_date: chrono::NaiveDate,
     scope: Option<&Value>,
 ) -> Result<Value> {
-    let current = auth::current_actor_in(transaction, actor.id, actor.edition)?;
+    let current = auth::refresh_actor_in(transaction, actor)?;
     let actor = &current;
     let action = if record_id > 0 { "edit" } else { "create" };
     auth::authorize(actor, resource.permission, action)?;
@@ -473,6 +475,12 @@ pub(super) fn save_in_transaction(
     }
     let identity = if resource.identity.is_empty() {
         None
+    } else if resource.key == "permission-templates" && value["ownerUnitId"].as_i64().is_some() {
+        Some(format!(
+            "unit:{}:{}",
+            value["ownerUnitId"],
+            text(&value, resource.identity)
+        ))
     } else {
         Some(text(&value, resource.identity))
     };
@@ -499,16 +507,24 @@ pub(super) fn save_in_transaction(
         )?;
     }
     if resource.key == "departments" {
+        super::oa::approval_integrity::company(transaction, actor, &text(&saved, "companyCode"))?;
         return super::organization::project(transaction, saved);
     }
+    if resource.key == "companies" {
+        super::oa::approval_integrity::organization_changed(
+            transaction,
+            actor,
+            &text(&saved, "code"),
+        )?;
+    }
     if resource.key == "permission-templates" {
-        for user in store::all(transaction, "users")? {
-            if super::account_permissions::template(transaction, &user)?
-                .is_some_and(|template| template["id"] == saved["id"])
-            {
-                super::account_permissions::validate_references(transaction, actor, &user)?;
-            }
-        }
+        super::units::validate_scheme_users(
+            transaction,
+            actor,
+            saved["id"]
+                .as_i64()
+                .ok_or_else(|| super::error::unavailable("方案编号缺失。"))?,
+        )?;
     }
     Ok(saved)
 }
@@ -652,6 +668,12 @@ fn validate(
         }
         "permission-templates" => {
             super::permission_templates::validate(id, previous, value)?;
+            if previous["ownerUnitId"].as_i64().is_some() {
+                export_doc_domain::units::validate_grants(
+                    &super::permission_templates::direct_grants(value)?,
+                )
+                .map_err(invalid)?;
+            }
         }
         "email-templates" | "report-templates" => {
             required(value, "name", "模板名称", 160)?;
@@ -739,6 +761,16 @@ pub fn delete(
         }
         if resource.key == "permission-templates" && previous["isSystem"] == true {
             return Err(conflict("系统内置权限方案不可删除。"));
+        }
+        if resource.key == "permission-templates"
+            && transaction.record_exists(
+                super::units::KIND,
+                &[("permissionTemplateId", record_id.to_string())],
+            )?
+        {
+            return Err(conflict(
+                "权限方案仍被单位身份引用，请先调整这些身份的权限来源。",
+            ));
         }
         if resource.key == "invoices" && previous["status"] != "Draft" {
             return Err(conflict("只允许删除未核对的草稿发票。"));

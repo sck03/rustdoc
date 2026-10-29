@@ -37,8 +37,7 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
   const availableCompanies = companies.filter((item) => item.isActive || item.code === draft.companyScope);
   const availableDepartments = departments.filter((item) =>
     item.companyCode === draft.companyScope && (item.isActive || item.code === draft.departmentId));
-  const selectedTemplate = permissionTemplates.find((template) => draft.permissionTemplateId != null
-    ? template.id === draft.permissionTemplateId : template.isSystem && template.code === draft.role);
+  const selectedTemplate = permissionTemplates.find(template => template.id === draft.permissionTemplateId);
   const selectedRole = getRolePresentation(draft.role);
   const currentDraftSnapshot = useMemo(() => buildUserDraftSnapshot(draft), [draft]);
   const hasUnsavedUserChanges = Boolean(
@@ -117,6 +116,7 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
     }
 
     const emptyDraft = createEmptyDraft("OfficeEmployee");
+    emptyDraft.permissionTemplateId = permissionTemplates.find(t => t.isSystem && t.code === "OfficeEmployee")?.id ?? null;
     setSelectedUserId(0);
     setDraft(emptyDraft);
     setPersistedDraftSnapshot(buildUserDraftSnapshot(emptyDraft));
@@ -161,7 +161,8 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
   }
 
   function changeRole(role: string) {
-    setDraft((current) => ({ ...current, role, permissionTemplateId: null, permissionGrants: null, disabledModules: role === "Admin" ? [] : current.disabledModules, oaAssignedOnly: role === "Admin" ? false : current.oaAssignedOnly || selectedTemplate?.oaAssignedOnly === true }));
+    const templateId = role === "Admin" ? null : permissionTemplates.find(t => t.isSystem && t.code === role)?.id ?? null;
+    setDraft((current) => ({ ...current, role, permissionTemplateId: templateId, permissionGrants: null, disabledModules: role === "Admin" ? [] : current.disabledModules, oaAssignedOnly: role === "Admin" ? false : current.oaAssignedOnly || selectedTemplate?.oaAssignedOnly === true }));
     setSuccessMessage(null);
   }
 
@@ -181,6 +182,10 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
   function saveUser() {
     setMessage(null);
     setSuccessMessage(null);
+    if (draft.role !== "Admin" && draft.permissionGrants === null && draft.permissionTemplateId == null) {
+      setMessage("请选择明确的权限方案，或切换为独立权限配置。");
+      return;
+    }
 
     if (!draft.username.trim()) {
       setMessage("用户名不能为空。");

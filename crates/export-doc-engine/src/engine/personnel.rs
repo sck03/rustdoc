@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 
 /// Initialize a direct hire and resolve retries without duplicating personnel records.
 pub(super) fn registration(
-    transaction: &export_doc_storage::Connection,
+    transaction: &crate::engine::store::Connection,
     actor: &Actor,
     request: &Value,
     value: &mut Value,
@@ -55,7 +55,20 @@ pub(super) fn registration(
 }
 
 pub fn save(
-    tx: &export_doc_storage::Connection,
+    tx: &crate::engine::store::Connection,
+    actor: &Actor,
+    id: i64,
+    value: Value,
+    action: &str,
+    note: &str,
+) -> Result<Value> {
+    let saved = persist(tx, actor, id, value, action, note)?;
+    super::personnel_queries::detail(tx, actor, saved)
+}
+
+/// Shared transactional personnel write. Callers choose an authorized projection.
+pub(super) fn persist(
+    tx: &crate::engine::store::Connection,
     actor: &Actor,
     id: i64,
     mut value: Value,
@@ -70,19 +83,30 @@ pub fn save(
         "account-link" => "LinkAccount",
         "account-unlink" => "UnlinkAccount",
         "ConfirmPersonnel" => "Confirm",
-        "TransferPersonnel" => "Transfer",
+        "TransferPersonnel" | "PromotePersonnelAppointment" => "Transfer",
         "DepartPersonnel" => "Depart",
         "RehirePersonnel" => "Rehire",
         _ => return Err(invalid("人员变动类型无效。")),
     };
-    let audit_action = if matches!(event_action, "Confirm" | "Transfer" | "Depart" | "Rehire") {
+    let primary_transfer = action == "PromotePersonnelAppointment";
+    let audit_action = if primary_transfer {
+        "primary-transfer"
+    } else if matches!(event_action, "Confirm" | "Transfer" | "Depart" | "Rehire") {
         "transition"
     } else {
         action
     };
+    let previous = if id > 0 {
+        store::get(tx, "people", id)?
+    } else {
+        Value::Null
+    };
+    let mut updated_user = None;
     if let Some(user_id) = value["account"]["id"].as_i64() {
         let mut user = store::get(tx, "users", user_id)?;
-        if user["companyScope"] != value["companyScope"] || user["role"] == "Admin" {
+        if (!primary_transfer && user["companyScope"] != value["companyScope"])
+            || user["role"] == "Admin"
+        {
             return Err(unavailable("人员关联账号不符合公司或角色约束。"));
         }
         let departed = value["status"] == "Departed";
@@ -97,6 +121,9 @@ pub fn save(
             || user["organizationDepartments"] != organization_departments
             || matches!(event_action, "Transfer" | "Rehire")
         {
+            if primary_transfer {
+                user["companyScope"] = value["companyScope"].clone();
+            }
             user["fullName"] = value["profile"]["fullName"].clone();
             user["departmentId"] = value["departmentId"].clone();
             user["organizationDepartments"] = organization_departments;
@@ -113,7 +140,7 @@ pub fn save(
                 actor,
                 "personnel-sync",
             )?;
-            super::account_permissions::validate_references(tx, actor, &user)?;
+            updated_user = Some(user.clone());
         }
         value["account"] = contracts::dto(contracts::schema("PersonnelAccountRecord"), user);
     }
@@ -129,6 +156,33 @@ pub fn save(
         audit_action,
         scope.as_ref(),
     )?;
+    super::oa::approval_integrity::personnel_changed(tx, &previous, &saved)?;
+    if let Some(user) = updated_user.or_else(|| {
+        saved
+            .get("account")
+            .filter(|a| a["id"].is_number())
+            .cloned()
+    }) {
+        let user = store::get(
+            tx,
+            "users",
+            user["id"]
+                .as_i64()
+                .ok_or_else(|| unavailable("人员账号引用损坏。"))?,
+        )?;
+        super::account_permissions::validate_references(tx, actor, &user)?;
+    } else {
+        let units: std::collections::BTreeSet<_> =
+            super::personnel_organization::assignments(&previous)?
+                .into_iter()
+                .chain(super::personnel_organization::assignments(&saved)?)
+                .map(|a| a.company_code)
+                .filter(|u| !u.is_empty())
+                .collect();
+        for unit in units {
+            super::oa::approval_integrity::company(tx, actor, &unit)?;
+        }
+    }
     store::save_in_scope(
         tx,
         "personnel-events",
@@ -138,13 +192,16 @@ pub fn save(
             "effectiveDate":saved["lastEffectiveDate"],"actorName":actor.name,
             "summary":format!("{} · {}",records::text(&saved,"departmentId"),records::text(&saved,"jobTitle")),
             "note":note,"createdAt":store::timestamp()
+            ,"previousAppointments":if previous.is_null() { json!([]) } else { serde_json::to_value(super::personnel_organization::assignments(&previous)?)? },
+            "currentAppointments":serde_json::to_value(super::personnel_organization::assignments(&saved)?)?,
+            "previousPrimaryAssignmentId":previous["organization"]["primaryAssignmentId"],"primaryAssignmentId":saved["organization"]["primaryAssignmentId"]
         }),
         None,
         actor,
         event_action,
         Some(&saved),
     )?;
-    super::personnel_queries::detail(tx, actor, saved)
+    Ok(saved)
 }
 
 pub const OPERATIONS: &[Operation] = &[
@@ -159,15 +216,18 @@ pub const OPERATIONS: &[Operation] = &[
 ];
 
 pub(super) fn person(
-    tx: &export_doc_storage::Connection,
+    tx: &crate::engine::store::Connection,
     actor: &Actor,
     id: i64,
     action: &str,
 ) -> Result<Value> {
     auth::authorize(actor, "office.people", action)?;
-    let value = store::get(tx, "people", id)?;
+    let mut value = store::get(tx, "people", id)?;
     if !auth::visible(actor, "office.people", action, &value) {
         return Err(error(403, "没有访问此人员档案的权限。"));
+    }
+    if matches!(action, "view-details" | "edit") {
+        super::personnel_privacy::hydrate(tx, &mut value)?;
     }
     Ok(value)
 }
@@ -228,7 +288,7 @@ pub fn handle(
         DELETE_PERSONNEL_IMAGE => "edit",
         _ => "assign",
     };
-    let current = person(&*store.connection()?, actor, id, action)?;
+    let current = person(&store.connection()?, actor, id, action)?;
     let result = match operation {
         UNLINK_PERSONNEL_ACCOUNT => super::personnel_accounts::unlink(store, actor, id, body)?,
         GET_PERSONNEL_CLEARANCE => {

@@ -13,9 +13,10 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { PermissionModuleGrid } from "./PermissionModuleGrid.tsx";
-import { combinePermissionSchemes, countTemplateMembers, createSchemeFromEmployee, getEditableSchemeGrants, grantKey, schemeStartingPoints, scopeLabels, toPermissionGrants, type SchemeStartingPoint } from "./permissionSchemeModel.ts";
+import { combinePermissionSchemes, createSchemeFromEmployee, getEditableSchemeGrants, grantKey, schemeStartingPoints, schemeActionDataScopes, scopeLabels, toPermissionGrants, type SchemeStartingPoint } from "./permissionSchemeModel.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
+import { OfficeDialog } from "../office/OfficeUi.tsx";
 
 type TemplateDraft = {
   id: number;
@@ -46,20 +47,19 @@ export function PermissionTemplateManagementPanel({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [startingPoint, setStartingPoint] = useState<SchemeStartingPoint>("blank");
   const [sourceIds, setSourceIds] = useState<number[]>([]);
+  const [creating, setCreating] = useState(false);
 
   const catalogQuery = useQuery({
     queryKey: queryKeys.permissionTemplates(),
     queryFn: ({ signal }) => client.listPermissionTemplates({ signal }),
     enabled: canManageUsers,
   });
-  const membersQuery = useQuery({ queryKey: queryKeys.users(), queryFn: ({ signal }) => client.listUsers({ signal }), enabled: canManageUsers });
   const templates = catalogQuery.data?.templates ?? [];
   const resources = catalogQuery.data?.resources ?? [];
   const assignableResources = useMemo(() => resources.filter((resource) => !resource.isTechnical), [resources]);
   const technicalResources = useMemo(() => resources.filter((resource) => resource.isTechnical), [resources]);
   const resourceByKey = useMemo(() => new Map(resources.map((resource) => [resource.key, resource])), [resources]);
   const selectedTemplate = templates.find((template) => template.id === selectedId);
-  const memberCounts = useMemo(() => countTemplateMembers(templates, membersQuery.data?.users ?? []), [templates, membersQuery.data?.users]);
 
   useEffect(() => {
     if (selectedId == null && templates.length > 0) applyTemplate(templates[0]);
@@ -168,6 +168,7 @@ export function PermissionTemplateManagementPanel({
     }
     setSelectedId(0);
     setDraft(emptyDraft);
+    setCreating(false);
     setPersistedDraftSnapshot(null);
     setMessage(null);
     setSuccessMessage(null);
@@ -227,7 +228,7 @@ export function PermissionTemplateManagementPanel({
     if (!await requestConfirmation({
       title: "删除权限方案",
       description: `确定删除权限方案“${persistedTemplate.name}”吗？`,
-      details: ["正在被账号使用的方案不会被删除。"],
+      details: ["主账号或单位身份仍引用的方案不能删除。"],
       confirmLabel: "确认删除",
       tone: "danger",
     })) return;
@@ -238,13 +239,10 @@ export function PermissionTemplateManagementPanel({
   return (
     <section className="form-section permission-template-section" aria-label="权限方案">
       <div className="section-header">
-        <div><h2>权限方案</h2><p className="section-description">共享权限分组：多个账号使用同一方案，统一维护模块与操作范围。未指定方案的账号跟随同名内置岗位分组；单独配置的账号使用自己的权限。</p></div>
+        <div><h2>权限方案</h2><p className="section-description">主账号与单位身份明确选择共享方案，也可独立配置。方案关闭模块同时限制菜单和接口；已保存方案不会随岗位名称或程序升级自动增权。</p></div>
         <div className="toolbar-actions">
           <button className="icon-button" type="button" title="刷新方案" aria-label="刷新方案" disabled={isBusy} onClick={() => void refreshTemplates()}><RefreshCw size={18} /></button>
-          <select aria-label="新建方案起点" value={startingPoint} disabled={isBusy} onChange={event => setStartingPoint(event.target.value as SchemeStartingPoint)}>
-            {Object.entries(schemeStartingPoints).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-          </select>
-          <button className="icon-button" type="button" title="新建方案" aria-label="新建方案" disabled={isBusy} onClick={() => void beginNew()}><Plus size={18} /></button>
+          <button className="icon-button" type="button" title="新建方案" aria-label="新建方案" disabled={isBusy} onClick={() => setCreating(true)}><Plus size={18} /></button>
           <button className="icon-button" type="button" title="复制当前方案" aria-label="复制当前方案" disabled={isBusy || draft.id <= 0} onClick={copySelected}><Copy size={18} /></button>
           <button className="command-button" type="button" disabled={isBusy || isAdminTemplate} onClick={saveTemplate}><Save size={17} /><span>保存方案</span></button>
           <button className="icon-button" type="button" title="删除方案" aria-label="删除方案" disabled={isBusy || draft.id <= 0 || draft.isSystem} onClick={deleteSelected}><Trash2 size={18} /></button>
@@ -254,20 +252,26 @@ export function PermissionTemplateManagementPanel({
       {message ? <InlineNotice tone="error" title="权限方案操作失败">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}
 
-      {startingPoint === "combined" && <fieldset className="permission-scheme-sources" disabled={isBusy}>
-        <legend>选择需要兼任的职责</legend>
-        {templates.filter(template => template.isActive && template.code !== "Admin").map(template => <label key={template.id} className="checkbox-field">
-          <input type="checkbox" checked={sourceIds.includes(template.id)} onChange={event => setSourceIds(current => event.target.checked ? [...current, template.id] : current.filter(id => id !== template.id))} />{template.name}
-        </label>)}
-        <p>点击“新建方案”组合当前选择。同一操作取较大的数据范围，任一来源关闭的模块继续关闭，请核对后保存。新方案独立维护，来源以后修改不会自动叠加。</p>
-      </fieldset>}
+      {creating && <OfficeDialog title="新建权限方案" onClose={() => setCreating(false)}>
+        <label className="office-field"><span>新建方案起点</span><select aria-label="新建方案起点" value={startingPoint} disabled={isBusy} onChange={event => setStartingPoint(event.target.value as SchemeStartingPoint)}>
+          {Object.entries(schemeStartingPoints).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select></label>
+        {startingPoint === "combined" && <fieldset className="permission-scheme-sources" disabled={isBusy}><legend>选择需要兼任的职责</legend>
+          {templates.filter(template => template.isActive && template.code !== "Admin").map(template => <label key={template.id} className="checkbox-field">
+            <input type="checkbox" checked={sourceIds.includes(template.id)} onChange={event => setSourceIds(current => event.target.checked ? [...current, template.id] : current.filter(id => id !== template.id))} />{template.name}
+          </label>)}
+          <p>组合当前配置，同一操作取较大范围，关闭模块保留；新方案独立维护。</p>
+        </fieldset>}
+        {message && <InlineNotice tone="error">{message}</InlineNotice>}
+        <button className="command-button" type="button" disabled={isBusy} onClick={() => void beginNew()}>建立方案草稿</button>
+      </OfficeDialog>}
 
       <div className="permission-template-layout">
         <div className="permission-template-list" role="group" aria-label="权限方案目录">
           {templates.map((template) => (
             <button key={template.id} type="button" title={template.description || template.name} aria-pressed={template.id === selectedId} className={template.id === selectedId ? "permission-template-card selected" : "permission-template-card"} onClick={() => void selectTemplate(template)}>
               <span><strong>{template.name}</strong>{template.isSystem ? <small>内置</small> : null}{!template.isActive ? <small>停用</small> : null}
-                {membersQuery.data ? <small>{memberCounts.get(template.id) ?? 0} 个继承账号</small> : null}</span>
+                <small>{template.accountReferenceCount ?? 0} 个主账号 · {template.unitRoleReferenceCount ?? 0} 个单位身份</small>{template.ownerUnitId != null && <small>单位专用</small>}</span>
             </button>
           ))}
         </div>
@@ -287,6 +291,7 @@ export function PermissionTemplateManagementPanel({
             resources={assignableResources}
             grants={draft.grants}
             dataScopes={catalogQuery.data?.dataScopes ?? []}
+            actionDataScopes={schemeActionDataScopes(assignableResources,catalogQuery.data?.dataScopes ?? [])}
             disabled={isBusy || isAdminTemplate}
             onChange={grants => setDraft(current => ({ ...current, grants }))}
             disabledModules={draft.disabledModules}

@@ -112,7 +112,7 @@ fn template(
     for_output: bool,
 ) -> Result<Template> {
     template_in(
-        &*store.connection()?,
+        &store.connection()?,
         paths,
         actor,
         reference,
@@ -211,7 +211,7 @@ fn catalog(
     Ok(json!(rows))
 }
 fn subject(store: &Store, actor: &Actor, kind: &str, id: i64, action: &str) -> Result<Value> {
-    subject_in(&*store.connection()?, actor, kind, id, action)
+    subject_in(&store.connection()?, actor, kind, id, action)
 }
 fn subject_in(tx: &Connection, actor: &Actor, kind: &str, id: i64, action: &str) -> Result<Value> {
     let record = super::store::get(tx, kind, id)?;
@@ -228,7 +228,7 @@ fn subject_in(tx: &Connection, actor: &Actor, kind: &str, id: i64, action: &str)
     Ok(record)
 }
 fn party(store: &Store, actor: &Actor, kind: &str, id: Option<i64>) -> Result<Value> {
-    party_in(&*store.connection()?, actor, kind, id)
+    party_in(&store.connection()?, actor, kind, id)
 }
 fn party_in(tx: &Connection, actor: &Actor, kind: &str, id: Option<i64>) -> Result<Value> {
     let Some(id) = id.filter(|v| *v > 0) else {

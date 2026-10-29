@@ -2,11 +2,17 @@
 //! no dependency on invoice/payment models, reports or financial software.
 pub(in crate::engine) mod approval;
 mod approval_handover;
+pub(super) use approval_handover::{managed_reassign, managed_tasks};
+pub(in crate::engine) mod approval_integrity;
 pub(in crate::engine) mod approval_references;
 mod approval_routing;
+mod organization_routing;
+mod simulation;
+pub(super) use simulation::{simulate, units as routing_units};
 mod definitions;
 mod documents;
 mod handling_handover;
+mod hub;
 pub(in crate::engine) mod personnel_changes;
 mod queries;
 pub(in crate::engine) mod settings;
@@ -21,8 +27,9 @@ use super::{
     records::{self, required, text},
     store::{self, Actor},
 };
+use crate::engine::store::Connection;
 use crate::{contracts, generated_api::Operation};
-use export_doc_storage::{Connection, RecordQuery};
+use export_doc_storage::RecordQuery;
 use serde_json::{Value, json};
 
 pub fn metadata(operation: Operation) -> Option<&'static Value> {
@@ -65,14 +72,10 @@ pub(super) fn assigned_to(
     if approval::plan(row)?.is_some_and(|plan| {
         plan.notify_user_ids.contains(&actor.id)
             || plan.steps.iter().any(|step| {
-                step.acted_by_user_id == Some(actor.id)
+                (step.acted_by_user_id == Some(actor.id) && step.acted_by_context == actor.context)
                     || principals.iter().any(|principal| {
                         principal.user_id == step.approver_user_id
-                            && principal.departments.as_ref().is_none_or(|departments| {
-                                departments
-                                    .iter()
-                                    .any(|department| row["departmentId"] == *department)
-                            })
+                            && principal.context == step.approver_context
                     })
             })
     }) {
@@ -132,7 +135,7 @@ pub(super) fn current(
     meta: &Value,
     id: i64,
 ) -> Result<(Actor, Value)> {
-    let actor = auth::current_actor_in(tx, actor.id, actor.edition)?;
+    let actor = auth::refresh_actor_in(tx, actor)?;
     let row = store::get(tx, &kind(meta), id)?;
     access(tx, &actor, meta, &row)?;
     Ok((actor, row))
@@ -261,8 +264,11 @@ pub(super) fn handle(
         .map_err(super::error::unavailable)?
         .today;
     let execute = |tx: &Connection| {
-        let actor = auth::current_actor_in(tx, actor.id, actor.edition)?;
+        let actor = auth::refresh_actor_in(tx, actor)?;
         auth::authorize(&actor, &text(meta, "resource"), &text(meta, "permission"))?;
+        if meta["kind"] == "approval-hub" {
+            return hub::list(tx, &actor);
+        }
         if meta["kind"] == "approval-settings" {
             if action.starts_with("handling-") {
                 return handling::directory(tx, &actor, &text(meta, "resource"));
@@ -513,6 +519,7 @@ fn create(
     row["departmentId"] = employee["departmentId"].clone();
     row["companyScope"] = json!(actor.company);
     row["ownerUserId"] = json!(actor.id);
+    row["_requesterContext"] = json!(actor.context);
     if meta["kind"] == "general" {
         let category = text(&row, "category");
         handling::select(tx, actor, &mut row, &category, false)?;

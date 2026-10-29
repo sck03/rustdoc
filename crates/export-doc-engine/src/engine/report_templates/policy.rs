@@ -1,6 +1,6 @@
 //! Shared template authorization and global-default integrity.
 use super::*;
-use export_doc_storage::Connection;
+use crate::engine::store::Connection;
 
 pub(crate) const CATALOG: &str = "common.report-catalog";
 

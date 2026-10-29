@@ -23,6 +23,7 @@ mod ordered_query;
 mod organization_query;
 pub use ordered_query::RecordOrder;
 pub use organization_query::OrganizationReference;
+mod personnel_memberships;
 mod personnel_query;
 pub use job_query::{JobOutputRetention, JobQuery, JobRetention};
 pub use office_query::OfficeQuery;
@@ -50,7 +51,7 @@ struct QuerySql {
 mod schema;
 mod workflow;
 pub use communication::{CommunicationQuery, CommunicationView, NotificationScope};
-pub use workflow::WorkflowTask;
+pub use workflow::{WorkflowSummaryQuery, WorkflowTask, WorkflowTaskQuery};
 mod sqlite;
 pub use schema::{MIN_SUPPORTED_SCHEMA_VERSION, SCHEMA_VERSION};
 use serde_json::Value;
@@ -115,7 +116,7 @@ pub struct RecordWrite<'a> {
 /// One eligible approval principal and its optional department restriction.
 pub struct RecordApprover {
     pub user_id: i64,
-    pub departments: Option<Vec<String>>,
+    pub context: String,
 }
 /// Indexed, bounded reads with authorization scope applied before pagination.
 #[derive(Default)]
@@ -131,12 +132,15 @@ pub struct RecordQuery<'a> {
     pub period: Option<(&'a str, &'a str)>,
     pub parent: Option<i64>,
     pub status: Option<&'a str>,
+    pub statuses: &'a [&'a str],
     pub approvers: Option<&'a [RecordApprover]>,
     pub approval_actor: Option<i64>,
     pub visible_user: Option<i64>,
+    /// None is reserved for internal account-wide responsibility audits.
+    pub visible_context: Option<&'a str>,
     pub visible_principals: &'a [RecordApprover],
-    pub exclude_owner: Option<i64>,
-    pub exclude_applicant: Option<i64>,
+    /// Explicit participation extends ordinary visibility, without changing its scope.
+    pub include_participants: bool,
     pub handling_key: Option<&'a str>,
     /// Additional assigned-service access, combined with the ordinary owner/department scope.
     pub handling_keys: Option<&'a [String]>,
@@ -225,11 +229,12 @@ trait Adapter: Send {
         &self,
         reference: OrganizationReference,
         code: &str,
+        company: &str,
         exclude: i64,
         kinds: &[&str],
     ) -> Result<bool> {
         let pg = self.provider() == "PostgreSQL";
-        let sql = organization_query::build(reference, code, exclude, kinds, pg);
+        let sql = organization_query::build(reference, code, company, exclude, kinds, pg);
         Ok(!self
             .query_slice(&sql, &sql::projection(&[("id", "id")], pg)?, 0, 1)?
             .is_empty())
@@ -432,6 +437,9 @@ trait Adapter: Send {
     fn find_identity(&self, kind: &str, identity: &str) -> Result<Option<Value>>;
     fn all(&self, kind: &str) -> Result<Vec<Value>>;
     fn query_records(&self, query: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)>;
+    fn query_workflow_tasks(&self, query: &WorkflowTaskQuery<'_>) -> Result<(i64, Vec<Value>)>;
+    fn query_workflow_summary(&self, query: &WorkflowSummaryQuery<'_>)
+    -> Result<(i64, Vec<Value>)>;
     fn query_page(
         &self,
         sql: &QuerySql,
@@ -524,6 +532,8 @@ trait Adapter: Send {
     }
     fn query_communications(&self, query: &CommunicationQuery<'_>) -> Result<(i64, Vec<Value>)>;
     fn insert(&self, record: &RecordWrite<'_>) -> Result<i64>;
+    fn personnel_private_profile(&self, id: i64) -> Result<Option<Value>>;
+    fn set_personnel_private_profile(&self, id: i64, body: &Value) -> Result<()>;
     fn update(&self, id: i64, expected: i64, record: &RecordWrite<'_>) -> Result<bool>;
     fn set_body(&self, id: i64, body: &Value) -> Result<()>;
     fn delete(&self, kind: &str, id: i64, expected: i64) -> Result<bool>;
@@ -685,11 +695,13 @@ impl Connection {
     }
 }
 delegate! {
+    query_workflow_summary(query:&WorkflowSummaryQuery<'_>)->(i64,Vec<Value>);
+    query_workflow_tasks(query:&WorkflowTaskQuery<'_>)->(i64,Vec<Value>);
     replace_workflow_tasks(request:i64, submission:i64, tasks:&[WorkflowTask])->();
     query_audits(query:&AuditQuery<'_>)->(i64,Vec<Value>);
     query_ordered_records(query:&GenericQuery<'_>,order:RecordOrder)->(i64,Vec<Value>);
     record_exists(kind:&str,filters:&[(&str,String)])->bool;
-    organization_referenced(reference:OrganizationReference,code:&str,exclude:i64,kinds:&[&str])->bool;
+    organization_referenced(reference:OrganizationReference,code:&str,company:&str,exclude:i64,kinds:&[&str])->bool;
     personnel_exists(query:&PersonnelQuery<'_>)->bool;
     attachment_category_counts(company:&str)->std::collections::BTreeMap<i64,i64>;
     import_preview_usage(owner:i64)->ImportPreviewUsage;
@@ -724,6 +736,8 @@ delegate! {
     find_identity(kind:&str,identity:&str)->Option<Value>;
     all(kind:&str)->Vec<Value>;
     insert(record:&RecordWrite<'_>)->i64;
+    personnel_private_profile(id:i64)->Option<Value>;
+    set_personnel_private_profile(id:i64,body:&Value)->();
     update(id:i64,expected:i64,record:&RecordWrite<'_>)->bool;
     set_body(id:i64,body:&Value)->();
     delete(kind:&str,id:i64,expected:i64)->bool;

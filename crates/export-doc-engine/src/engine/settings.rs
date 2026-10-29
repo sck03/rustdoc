@@ -93,9 +93,9 @@ pub fn read(store: &Store, actor: &Actor) -> Result<Value> {
     )
 }
 pub fn current(store: &Store) -> Result<Value> {
-    current_in(&*store.connection()?)
+    current_in(&store.connection()?)
 }
-pub(super) fn current_in(tx: &export_doc_storage::Connection) -> Result<Value> {
+pub(super) fn current_in(tx: &crate::engine::store::Connection) -> Result<Value> {
     let mut settings = defaults(tx.provider())?;
     if let Some(saved) = tx.settings("settings")? {
         settings = contracts::overlay(settings, &saved);

@@ -1,10 +1,42 @@
 //! Permission template invariants and projections shared by both frontends.
+use super::store::{self, Connection};
 use super::{
     error::{Result, conflict, invalid},
     records::{required, text},
 };
 use export_doc_domain::permissions::{self, Grant};
 use serde_json::{Value, json};
+
+pub(super) fn project_with_usage(tx: &Connection, value: Value) -> Result<Value> {
+    let mut value = project(value)?;
+    let id = value["id"]
+        .as_i64()
+        .ok_or_else(|| invalid("方案编号缺失。"))?
+        .to_string();
+    let count = |kind| -> Result<usize> {
+        Ok(store::matching(
+            tx,
+            kind,
+            &[("permissionTemplateId", id.clone())],
+            &[("permissionGrants", "permissionGrants")],
+        )?
+        .iter()
+        .filter(|r| r["permissionGrants"].is_null())
+        .count())
+    };
+    value["accountReferenceCount"] = json!(count("users")?);
+    value["unitRoleReferenceCount"] = json!(count(super::units::KIND)?);
+    Ok(value)
+}
+
+pub(super) fn validate_owner(value: &Value, company: &Value) -> Result<()> {
+    if let Some(unit) = value["ownerUnitId"].as_i64() {
+        if company["id"] != unit {
+            return Err(super::error::error(403, "单位方案只能分配给本单位身份。"));
+        }
+    }
+    Ok(())
+}
 
 pub fn project(mut value: Value) -> Result<Value> {
     let grants = direct_grants(&value)?;
@@ -19,18 +51,8 @@ pub fn project(mut value: Value) -> Result<Value> {
     Ok(value)
 }
 
-/// Version one is the untouched system seed. Saving a scheme pins the explicit
-/// choices at version two or later; independent and custom schemes never inherit.
+/// Every saved scheme is explicit, including the initial system presets.
 pub(super) fn direct_grants(value: &Value) -> Result<Vec<Grant>> {
-    if value["isSystem"] == true && value["versionNumber"] == 1 {
-        if let Some(role) = permissions::catalog()
-            .roles
-            .iter()
-            .find(|r| value["code"] == r.code)
-        {
-            return Ok(role.grants.clone());
-        }
-    }
     serde_json::from_value(value["grants"].clone()).map_err(Into::into)
 }
 
@@ -39,15 +61,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_untouched_system_defaults_follow_the_current_role() {
+    fn saved_schemes_never_gain_permissions_from_their_name_or_version() {
         let mut seed =
             json!({"isSystem":true,"code":"OfficeEmployee","versionNumber":1,"grants":[]});
-        assert!(
-            direct_grants(&seed)
-                .unwrap()
-                .iter()
-                .any(|g| g.resource_key == "document.payment-output")
-        );
+        assert!(direct_grants(&seed).unwrap().is_empty());
         seed["versionNumber"] = json!(2);
         assert!(direct_grants(&seed).unwrap().is_empty());
         seed["versionNumber"] = json!(1);

@@ -30,6 +30,7 @@ import {
 } from "./app/webSessionStorage.ts";
 import { isCurrentSession, openSessionChannel, shouldAcceptSessionUpdate, type SessionChannelMessage } from "./app/sessionChannel.ts";
 import { useBusinessDateSessionRefresh } from "./app/useBusinessDateSessionRefresh.ts";
+import { useUnitContextSwitch } from "./app/useUnitContextSwitch.ts";
 import { prefetchLandingDashboard } from "./app/loginPrefetch.ts";
 import { isDashboardRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
 import {
@@ -185,10 +186,16 @@ function App() {
       if (event.type === "session-updated") {
         const previousSession = sessionRef.current;
         if (!shouldAcceptSessionUpdate(previousSession, event)) return;
+        if (previousSession && (previousSession.user.contextId ?? "") !== (event.session.user.contextId ?? "") && hasUnsavedChangesRef.current) {
+          clearStoredSession();
+          resetSessionAttention("expired");
+          return;
+        }
         sessionActionRef.current = null;
         setSession(event.session);
         resetSessionAttention();
-        if (!previousSession || JSON.stringify(previousSession.user.capabilities) !== JSON.stringify(event.session.user.capabilities)) {
+        if (!previousSession || previousSession.user.contextId !== event.session.user.contextId || JSON.stringify(previousSession.user.capabilities) !== JSON.stringify(event.session.user.capabilities)) {
+          void queryClient.cancelQueries();
           queryClient.clear();
         }
         if (!previousSession) navigate(getDefaultWorkspaceRoute(event.session.user.capabilities), { replace: true });
@@ -228,6 +235,12 @@ function App() {
       }),
     [apiBaseUrl, desktopAccessToken, sessionAccessToken, sessionApiBaseUrl],
   );
+  const unitContext = useUnitContextSwitch(client, session, (next, previous) => {
+    setSession(next);
+    resetSessionAttention();
+    setWorkspaceNotice(null);
+    sessionChannelRef.current?.post({ type: "session-expired", apiBaseUrl: previous.apiBaseUrl, accessToken: previous.accessToken, reason: "其他标签页已切换单位身份，请重新验证后继续当前单位的工作。" });
+  }, sessionActionBusy);
 
   useEffect(() => {
     if (!isDesktopBridgeAvailable()) {
@@ -346,7 +359,7 @@ function App() {
     pathname: location.pathname, user: session.user, canManageSystem, isDesktopRuntime,
   });
   useEffect(() => {
-    if (!session || desktopContextLoading) return;
+    if (!session || desktopContextLoading || unitContext.busy) return;
     if (!routeAccessAllowed) {
       setWorkspaceNotice({
         id: "permission",
@@ -356,7 +369,7 @@ function App() {
       });
       navigate(getDefaultWorkspaceRoute(session.user.capabilities), { replace: true });
     }
-  }, [desktopContextLoading, routeAccessAllowed, location.pathname, navigate, session]);
+  }, [desktopContextLoading, routeAccessAllowed, location.pathname, navigate, session, unitContext.busy]);
 
   useEffect(() => {
     if (!sessionAccessToken || desktopContextLoading || isLicenseRoute(location.pathname)) {
@@ -483,13 +496,13 @@ function App() {
 
   async function handleRefreshSession(reauthenticate = false) {
     const previousSession = sessionRef.current;
-    if (!previousSession || sessionActionRef.current || (reauthenticate && !reauthPassword)) return;
+    if (!previousSession || sessionActionRef.current || unitContext.busy || (reauthenticate && !reauthPassword)) return;
     const action = Symbol();
     sessionActionRef.current = action;
     setSessionActionBusy(true);
     setSessionActionError(null);
     try {
-      const response = reauthenticate
+      let response = reauthenticate
         ? await createExportDocManagerApiClient({
           baseUrl: previousSession.apiBaseUrl,
           desktopAccessToken: () => desktopAccessToken,
@@ -498,6 +511,16 @@ function App() {
       if (sessionActionRef.current !== action || !isCurrentSession(sessionRef.current, previousSession)) return;
       if (response.user.id !== previousSession.user.id) {
         throw new Error("账号身份已变化，请放弃当前草稿后重新登录。");
+      }
+      if (reauthenticate && previousSession.user.contextId) {
+        const renewedClient = createExportDocManagerApiClient({ baseUrl: previousSession.apiBaseUrl, accessToken: () => response.accessToken, desktopAccessToken: () => desktopAccessToken });
+        try {
+          response = await renewedClient.switchUnitContext({ body: { contextId: previousSession.user.contextId } });
+        } catch (error) {
+          void renewedClient.logout().catch(() => undefined);
+          throw error;
+        }
+        if (sessionActionRef.current !== action || !isCurrentSession(sessionRef.current, previousSession)) return;
       }
       const nextSession: SessionState = {
         accessToken: response.accessToken,
@@ -585,11 +608,13 @@ function App() {
       canManageSettings={session.user.capabilities.canManageSettings}
     >
       <WorkspaceShell
+        key={`${session.user.id}:${session.user.contextId ?? ""}`}
         pathname={workspacePathname}
         apiBaseUrl={session.apiBaseUrl ?? apiBaseUrl}
         isDesktopRuntime={isDesktopRuntime}
         user={session.user}
         onLogout={handleLogout}
+        unitContext={unitContext}
         notice={workspaceNotice}
         onDismissNotice={() => setWorkspaceNotice(null)}
         sessionAttention={sessionAttention}

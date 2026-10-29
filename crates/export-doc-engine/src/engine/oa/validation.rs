@@ -16,10 +16,11 @@ pub(super) fn employee(
                 return Err(invalid("团队申请由本人发起，不能代选其他员工。"));
             }
             super::super::personnel_accounts::person_for_account(tx, actor.id)?
-                .filter(|person| person["companyScope"] == actor.company)
                 .ok_or_else(|| invalid("请先由人事将账号关联到本公司在职人员。"))?
         };
-    if person["companyScope"] != actor.company {
+    let departments =
+        super::super::personnel_organization::departments_in(tx, &person, &actor.company)?;
+    if departments.is_empty() {
         return Err(error(403, "只能为本公司员工办理申请。"));
     }
     if !["Active", "Probation"].contains(&text(&person, "status").as_str()) {
@@ -32,16 +33,31 @@ pub(super) fn employee(
     {
         return Err(conflict("申请人与人员账号关联已变化。"));
     }
-    let requested = text(body, "departmentId");
+    let mut requested = text(body, "departmentId");
+    if !existing && requested.is_empty() {
+        requested = if departments.contains(&actor.department) {
+            actor.department.clone()
+        } else {
+            departments[0].clone()
+        };
+    }
     if existing || !requested.is_empty() {
-        if !super::super::personnel_organization::departments(&person)?.contains(&requested) {
+        if !departments.contains(&requested) {
             return Err(conflict(
                 "申请部门已不在员工的有效主职或兼职范围内，请重新选择。",
             ));
         }
         super::super::organization::validate_assignment(tx, &actor.company, &requested)?;
+        let appointment = super::super::personnel_organization::appointment_in(
+            tx,
+            &person,
+            &actor.company,
+            &requested,
+        )?;
+        person["jobTitle"] = json!(appointment.job_title);
         person["departmentId"] = json!(requested);
     }
+    person["companyScope"] = json!(actor.company);
     Ok(person)
 }
 

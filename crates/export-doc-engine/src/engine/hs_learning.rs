@@ -6,9 +6,9 @@ use super::{
     records::text,
     store::{self, Actor},
 };
+use crate::engine::store::Connection;
 use crate::{generated_api::*, operation};
 use export_doc_domain::hs as rules;
-use export_doc_storage::Connection;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 

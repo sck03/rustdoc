@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { PermissionSourceSummary } from "./PermissionSourceSummary.tsx";
 import {
   FileText,
   LogOut,
@@ -63,6 +64,7 @@ type WorkspaceShellProps = {
   isDesktopRuntime: boolean;
   user: ApiUserDto;
   onLogout: () => void;
+  unitContext?: { busy: boolean; error: string | null; switchContext: (id: string) => Promise<void> };
   children: ReactNode;
   connectivityOverride?: "online" | "offline";
   serviceAvailabilityOverride?: ServiceAvailability;
@@ -77,6 +79,7 @@ export function WorkspaceShell({
   isDesktopRuntime,
   user,
   onLogout,
+  unitContext,
   children,
   connectivityOverride,
   serviceAvailabilityOverride,
@@ -350,6 +353,11 @@ export function WorkspaceShell({
             </div>
           </div>
           <div className="session-strip">
+            <PermissionSourceSummary user={user} />
+            {(user.unitContexts?.length ?? 0) > 1 && <label className="office-field"><span>单位身份</span><select aria-label="当前单位身份" value={user.contextId ?? ""} disabled={unitContext?.busy} onChange={event => void unitContext?.switchContext(event.target.value)}>
+              {user.unitContexts?.map(context => <option key={context.id} value={context.id}>{context.companyName} · {context.name}</option>)}
+            </select></label>}
+            {unitContext?.error && <span role="alert">{unitContext.error}</span>}
             <button
               className="density-toggle-button"
               type="button"

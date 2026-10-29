@@ -42,8 +42,8 @@ pub fn exercise(service: &NativeService, admin: &str) {
         ),
     )
     .unwrap();
-    let renamed = call(service, admin, UPDATE_ORGANIZATION_DEPARTMENT, &[("code",department.clone())], Some(json!({"code":department,"companyCode":company,"name":"部门按代码更新","isActive":true,"expectedVersion":team["versionNumber"]}))).unwrap();
-    assert_eq!(renamed["name"], "部门按代码更新");
+    let renamed = call(service, admin, UPDATE_ORGANIZATION_DEPARTMENT, &[("id",team["id"].to_string())], Some(json!({"code":department,"companyCode":company,"name":"部门按稳定编号更新","isActive":true,"expectedVersion":team["versionNumber"]}))).unwrap();
+    assert_eq!(renamed["name"], "部门按稳定编号更新");
     let template = call(service, admin, CREATE_PERMISSION_TEMPLATE, &[], Some(json!({"code":format!("COMPANY-{suffix}"),"name":"按公司查看、本人编辑","isActive":true,"grants":[
         {"resourceKey":"document.invoices","action":"view","dataScope":"company"},
         {"resourceKey":"document.invoices","action":"operate","dataScope":"own"}
@@ -135,6 +135,39 @@ pub fn exercise(service: &NativeService, admin: &str) {
     changed["expectedVersion"] = changed["versionNumber"].clone();
     changed["companyScope"] = json!("DEFAULT");
     let account_parameters = [("id", accounts[0]["id"].to_string())];
+    let mut valid_destination = changed.clone();
+    valid_destination["departmentId"] = json!("GENERAL");
+    assert_eq!(
+        call(
+            service,
+            admin,
+            UPDATE_USER_ACCOUNT,
+            &account_parameters,
+            Some(valid_destination)
+        )
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
+    assert_eq!(
+        call(service, &tokens[0], GET_CURRENT_USER, &[], None).unwrap()["companyScope"],
+        company
+    );
+    let transfer = call(
+        service,
+        admin,
+        TRANSFER_SHARED_DATABASE_OWNERSHIP,
+        &[],
+        Some(json!({
+            "fromUserId":accounts[0]["id"], "toUserId":accounts[1]["id"],
+            "includeInvoices":true, "includePayments":false, "includeOtherBusinessData":false,
+            "onlyUnassigned":false, "confirmationText":"TRANSFER OWNERSHIP"
+        })),
+    )
+    .unwrap();
+    assert_eq!(transfer["updatedInvoices"], 1);
+    assert_eq!(transfer["updatedPayments"], 0);
+    assert_eq!(transfer["updatedOtherBusinessData"], 0);
     assert_eq!(
         call(
             service,
@@ -192,7 +225,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
             service,
             admin,
             DELETE_ORGANIZATION_COMPANY,
-            &[("code", company)],
+            &[("id", company_record["id"].to_string())],
             Some(json!({"expectedVersion":company_record["versionNumber"]}))
         )
         .unwrap_err()

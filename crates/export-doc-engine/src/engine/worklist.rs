@@ -5,8 +5,8 @@ use super::{
     store::{self, Actor, Store},
 };
 use crate::clock::{BusinessClock, BusinessTime};
+use crate::engine::store::Connection;
 use chrono::{DateTime, Duration, NaiveDate};
-use export_doc_storage::Connection;
 use serde_json::{Value, json};
 #[path = "worklist_oa.rs"]
 mod oa;

@@ -120,11 +120,9 @@ impl NativeService {
         pool: export_doc_storage::pool::PoolOptions,
     ) -> Result<Arc<Self>> {
         super::team_backup::postgres::ensure_no_pending(&paths)?;
-        let store = Arc::new(Store::open_postgres_with_pool(
-            &paths,
-            connection_string,
-            pool,
-        )?);
+        let mut store = Store::open_postgres_with_pool(&paths, connection_string, pool)?;
+        store.clock = clock.clone();
+        let store = Arc::new(store);
         packing::seed(&store)?;
         #[cfg(feature = "mail")]
         email::recover(&store)?;

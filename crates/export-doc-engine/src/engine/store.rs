@@ -1,7 +1,6 @@
 use super::error::{Result, conflict, error, unavailable};
 use crate::{contracts, paths::RuntimePaths};
 use chrono::Utc;
-pub use export_doc_storage::Connection;
 #[cfg(feature = "postgres")]
 use export_doc_storage::pool::PoolOptions;
 use export_doc_storage::{
@@ -18,6 +17,7 @@ use unicode_normalization::UnicodeNormalization;
 mod sqlite_layout;
 
 pub struct Store {
+    pub(crate) clock: crate::clock::BusinessClock,
     pub(crate) edition: export_doc_domain::permissions::ProductEdition,
     pub(crate) data_root: std::path::PathBuf,
     pub(crate) cache_root: std::path::PathBuf,
@@ -29,8 +29,26 @@ pub struct Store {
     postgres_connection: Option<zeroize::Zeroizing<String>>,
     _lock: Option<File>,
 }
+/// A leased application read/transaction carries the composition root's clock.
+/// Storage remains unaware of business calendars and application authorization.
+pub struct Connection<'a> {
+    inner: Lease<'a>,
+    pub(crate) clock: &'a crate::clock::BusinessClock,
+}
+impl<'a> std::ops::Deref for Connection<'a> {
+    type Target = export_doc_storage::Connection;
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+impl<'a> Connection<'a> {
+    pub(crate) fn new(inner: Lease<'a>, clock: &'a crate::clock::BusinessClock) -> Self {
+        Self { inner, clock }
+    }
+}
 #[derive(Clone, Debug)]
 pub struct Actor {
+    pub context: String,
     pub edition: export_doc_domain::permissions::ProductEdition,
     pub id: i64,
     pub name: String,
@@ -44,14 +62,21 @@ pub struct Actor {
 pub fn invoice_identity(company: &Value, number: &Value, data_type: &Value) -> Result<String> {
     Ok(serde_json::to_string(&[company, number, data_type])?)
 }
+pub fn department_identity(company: &str, code: &str) -> Result<String> {
+    Ok(serde_json::to_string(&[
+        normalize(company),
+        normalize(code),
+    ])?)
+}
 
 impl Store {
     pub fn open(paths: &RuntimePaths) -> Result<Self> {
         let lock = sqlite_layout::prepare(paths)?;
         let database_path = paths.sqlite_database_path();
         super::team_backup::disaster::apply_pending(paths)?;
-        let connection = Connection::sqlite(&database_path)?;
+        let connection = export_doc_storage::Connection::sqlite(&database_path)?;
         Ok(Self {
+            clock: Default::default(),
             edition: Default::default(),
             data_root: paths.data_root.clone(),
             cache_root: paths.cache_root.clone(),
@@ -65,7 +90,7 @@ impl Store {
         })
     }
 
-    pub fn connection(&self) -> Result<Lease<'_>> {
+    pub fn connection(&self) -> Result<Connection<'_>> {
         crate::operation::check()?;
         if self.writes.is_poisoned() {
             return Err(unavailable("数据库写入协调状态异常。"));
@@ -74,7 +99,7 @@ impl Store {
             .connection
             .acquire(|| crate::operation::check().is_err());
         crate::operation::check()?;
-        connection.map_err(Into::into)
+        Ok(Connection::new(connection?, &self.clock))
     }
     pub fn metrics(&self) -> Value {
         let mut value = self.connection.snapshot();
@@ -118,6 +143,7 @@ impl Store {
         options: PoolOptions,
     ) -> Result<Self> {
         Ok(Self {
+            clock: Default::default(),
             edition: Default::default(),
             data_root: paths.data_root.clone(),
             cache_root: paths.cache_root.clone(),
@@ -177,7 +203,7 @@ impl Store {
         operation: impl FnOnce(&Connection, &Actor) -> Result<T>,
     ) -> Result<T> {
         self.transaction(|connection| {
-            let current = super::auth::current_actor_in(connection, actor.id, self.edition)?;
+            let current = super::auth::refresh_actor_in(connection, actor)?;
             operation(connection, &current)
         })
     }
@@ -203,7 +229,7 @@ impl Store {
         work: impl FnOnce(&Connection, &Actor) -> Result<T>,
     ) -> Result<T> {
         self.read(|tx| {
-            let current = super::auth::current_actor_in(tx, actor.id, self.edition)?;
+            let current = super::auth::refresh_actor_in(tx, actor)?;
             super::auth::authorize_operation(&current, operation, query)?;
             work(tx, &current)
         })
@@ -216,10 +242,10 @@ impl Store {
             .ok_or_else(|| unavailable("当前不是 PostgreSQL 数据库。"))
     }
     pub fn get(&self, kind: &str, id: i64) -> Result<Value> {
-        get(&*self.connection()?, kind, id)
+        get(&self.connection()?, kind, id)
     }
     pub fn all(&self, kind: &str) -> Result<Vec<Value>> {
-        all(&*self.connection()?, kind)
+        all(&self.connection()?, kind)
     }
     pub fn catalog(&self, kind: &str) -> Result<Vec<Value>> {
         self.read(|tx| matching(tx, kind, &[], &[]))
@@ -330,7 +356,11 @@ pub fn save_in_scope(
 ) -> Result<Value> {
     let now = timestamp();
     let previous = if id > 0 {
-        Some(get(connection, kind, id)?)
+        let mut previous = get(connection, kind, id)?;
+        if kind == "people" {
+            super::personnel_privacy::hydrate(connection, &mut previous)?;
+        }
+        Some(previous)
     } else {
         None
     };
@@ -342,7 +372,8 @@ pub fn save_in_scope(
         1
     };
     body["ownerUserId"] = json!(actor.id);
-    if kind != "users" {
+    let primary_transfer = kind == "people" && action == "primary-transfer";
+    if kind != "users" && !primary_transfer {
         body["companyScope"] = json!(actor.company);
     }
     if !matches!(kind, "people" | "users" | "bookings" | "supply-requests") {
@@ -363,7 +394,7 @@ pub fn save_in_scope(
         let previous = previous.as_ref().expect("existing record");
         for key in ["ownerUserId", "companyScope", "departmentId", "createdAt"] {
             if (key == "departmentId" && matches!(kind, "people" | "users"))
-                || (key == "companyScope" && kind == "users")
+                || (key == "companyScope" && (kind == "users" || primary_transfer))
             {
                 continue;
             }
@@ -371,6 +402,12 @@ pub fn save_in_scope(
                 body[key] = previous[key].clone();
             }
         }
+    }
+    if kind == "departments" {
+        body["companyScope"] = body["companyCode"].clone();
+    }
+    if kind == "companies" {
+        body["companyScope"] = body["code"].clone();
     }
     body["updatedAt"] = json!(now);
     body["versionNumber"] = json!(version);
@@ -381,7 +418,12 @@ pub fn save_in_scope(
     }
     // The original invoice key is company + invoice number + data type. A
     // length-delimited JSON tuple keeps both data versions and tenant keys distinct.
-    let identity = if kind == "invoices" {
+    let identity = if kind == "departments" {
+        Some(department_identity(
+            &super::records::text(&body, "companyCode"),
+            &super::records::text(&body, "code"),
+        )?)
+    } else if kind == "invoices" {
         Some(invoice_identity(
             &body["companyScope"],
             &body["invoiceNo"],
@@ -395,6 +437,14 @@ pub fn save_in_scope(
     if id > 0 {
         identify_record(&mut body, kind, id);
     }
+    let private_profile = if kind == "people" {
+        Some(super::personnel_privacy::split(
+            &mut body,
+            previous.as_ref(),
+        )?)
+    } else {
+        None
+    };
     let record = RecordWrite {
         kind,
         identity: identity.as_deref(),
@@ -413,6 +463,10 @@ pub fn save_in_scope(
         connection.set_body(record_id, &body)?;
     }
     super::workflow_tasks::persist(connection, kind, &body)?;
+    if let Some(private_profile) = private_profile {
+        connection.set_personnel_private_profile(record_id, &private_profile)?;
+        super::personnel_privacy::restore(&mut body, private_profile)?;
+    }
     connection.append_audit_details(
         &AuditWrite {
             kind,

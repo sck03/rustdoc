@@ -3,5 +3,5 @@ import type { OaKind } from "./oaModel.ts";
 
 /** Only the changed OA kind, its hub queues, notifications and worklist refresh. */
 export function useOaOperation(kind: OaKind) {
-  return useOfficeOperation([["office", "oa", kind], ["office", "oa", "hub", kind], ["office", "communication"]], false);
+  return useOfficeOperation([["office", "oa", kind], ["office", "oa", "hub"], ["office", "communication"]], false);
 }

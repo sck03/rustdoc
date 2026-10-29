@@ -22,6 +22,7 @@ pub(super) fn metadata_fields() -> Vec<(&'static str, &'static str)> {
         "ownerUserId",
         "companyScope",
         "departmentId",
+        "_actorContext",
     ] {
         if !fields.iter().any(|(name, _)| *name == key) {
             fields.push((key, key));
@@ -61,6 +62,7 @@ pub(super) fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Re
     let fields = metadata_fields();
     let (total, rows) = store.connection()?.query_jobs(&JobQuery {
         owner: (!actor.admin).then_some(actor.id),
+        context: (!actor.admin).then_some((&actor.company, &actor.context)),
         active: None,
         status,
         keyword: &keyword,
@@ -86,6 +88,7 @@ pub(super) fn batch<'a>(
 ) -> JobQuery<'a> {
     JobQuery {
         owner,
+        context: None,
         active: Some(active),
         status: "",
         keyword: "",

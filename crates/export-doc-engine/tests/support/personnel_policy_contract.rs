@@ -97,12 +97,16 @@ pub fn exercise(service: &NativeService, token: &str) {
     settings["personnelApprovalActions"] =
         json!(["Hire", "Confirm", "Transfer", "Depart", "Rehire"]);
     // This contract tests the opt-in personnel policy with one explicit reviewer.
-    for rule in settings["rules"]
-        .as_array_mut()
-        .unwrap()
-        .iter_mut()
-        .filter(|r| r["kind"] == "personnel")
-    {
+    for rule in settings["rules"].as_array_mut().unwrap().iter_mut() {
+        if rule["kind"] != "personnel" {
+            rule["stages"] = json!([workflow::node(
+                "review",
+                &[],
+                "Named",
+                json!([accounts[0]["id"]])
+            )]);
+            continue;
+        }
         rule["stages"] = json!([workflow::node(
             "review",
             &[],
@@ -215,6 +219,11 @@ pub fn exercise(service: &NativeService, token: &str) {
     );
     let id = approved["employeeId"].as_i64().unwrap();
     let mut person = admin.request(GET_PERSONNEL, id, None).unwrap();
+    assert_eq!(
+        person["organization"]["primaryAssignmentId"],
+        format!("hire-{}-primary", approved["id"]),
+        "approved hire keeps the request's proposed appointment identity"
+    );
     person = admin.request(LINK_PERSONNEL_ACCOUNT, id, Some(json!({"expectedVersion":person["versionNumber"],"userId":accounts[2]["id"],"expectedAccountVersion":accounts[2]["versionNumber"]}))).unwrap();
     let employee = root
         .login(
@@ -365,5 +374,9 @@ pub fn exercise(service: &NativeService, token: &str) {
         assert_eq!(person["account"]["isActive"], false);
     }
     assert_eq!(person["employee"]["status"], "Probation");
+    assert_eq!(
+        person["organization"]["primaryStartsOn"], person["hireDate"],
+        "rehire starts a new effective period"
+    );
     assert!(person["probationEndsOn"].is_null() && person["contractEndsOn"].is_null());
 }

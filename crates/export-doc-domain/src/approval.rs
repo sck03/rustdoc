@@ -12,6 +12,8 @@ pub enum ApprovalDecision {
 pub struct ApprovalNode {
     pub key: String,
     pub name: String,
+    #[serde(default)]
+    pub review_points: Vec<String>,
     pub depends_on: Vec<String>,
     pub decision: ApprovalDecision,
     pub due_hours: u32,
@@ -28,9 +30,13 @@ pub struct ApprovalStep {
     pub decision: ApprovalDecision,
     pub approver_user_id: i64,
     pub approver_name: String,
+    #[serde(default)]
+    pub approver_context: String,
     pub status: String,
     pub acted_by_user_id: Option<i64>,
     pub acted_by_name: String,
+    #[serde(default)]
+    pub acted_by_context: String,
     pub acted_at: String,
     pub note: String,
     pub delegation_key: String,

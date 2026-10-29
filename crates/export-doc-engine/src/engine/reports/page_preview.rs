@@ -182,7 +182,7 @@ fn validate_current_access(
     super::super::licensing::check_operation(service, operation)?;
     let _lock = super::super::report_template_files::storage_lock(&service.paths)?;
     service.store.read(|tx| {
-        let current = auth::current_actor_in(tx, actor.id, service.store.edition)?;
+        let current = auth::refresh_actor_in(tx, actor)?;
         auth::authorize_operation(&current, operation, &[])?;
         if id > 0 {
             subject_in(tx, &current, resource, id, "preview")?;

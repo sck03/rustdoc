@@ -6,9 +6,10 @@ use super::{
     records::text,
     store::{self, Actor, Store},
 };
+use crate::engine::store::Connection;
 use crate::{clock::BusinessClock, contracts};
 use chrono::{Duration, NaiveDate};
-use export_doc_storage::{Connection, DataScope, GenericQuery, PersonnelQuery};
+use export_doc_storage::{DataScope, GenericQuery, PersonnelQuery};
 use serde_json::{Value, json};
 
 pub fn employee(tx: &Connection, actor: &Actor, record: &Value) -> Result<Value> {
@@ -36,6 +37,7 @@ fn directory_entry(
 }
 
 pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value> {
+    super::personnel_privacy::hydrate(tx, &mut record)?;
     record["organization"] = super::personnel_organization::project(tx, &record)?;
     record["account"] = super::personnel_accounts::current_account(tx, &record)?;
     if record.get("attachments").is_none() {
@@ -68,6 +70,11 @@ pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value
     }
     record["deleteRestriction"] = json!(restriction.unwrap_or_default());
     record["approvalRequiredActions"] = required_actions;
+    record["canChangePrimaryAppointment"] = json!(
+        actor.admin
+            && actor.edition.allows("office.people")
+            && matches!(record["status"].as_str(), Some("Active" | "Probation"))
+    );
     Ok(record)
 }
 
@@ -81,13 +88,19 @@ pub fn read(store: &Store, actor: &Actor, id: i64) -> Result<Value> {
 pub fn options(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
     auth::authorize(actor, "office.people", "view")?;
     store.read(|tx| {
-    let company = if let Some((_, id)) = query.iter().find(|(key, _)| *key == "employeeId") {
+    let mut company = if let Some((_, id)) = query.iter().find(|(key, _)| *key == "employeeId") {
         let id = id.parse::<i64>().ok().filter(|id| *id > 0)
             .ok_or_else(|| invalid("人员编号无效。"))?;
         text(&super::personnel::person(tx, actor, id, "view-details")?, "companyScope")
     } else {
         actor.company.clone()
     };
+    if let Some((_, target)) = query.iter().find(|(key, _)| *key == "companyCode") {
+        if !actor.admin && target != &actor.company { return Err(super::error::error(403,"请选择当前单位的人事选项。")); }
+        company = target.clone();
+    }
+    let companies = if actor.admin { store::all(tx, "companies")? } else { store::matching(tx,"companies",&[("code",company.clone())],&[])? };
+    let companies: Vec<_> = companies.into_iter().filter(|c| c["unitKind"] != "Group" && c["isActive"] == true).map(|c| contracts::dto(contracts::schema("ApiOrganizationCompanyDto"), c)).collect();
     let departments: Vec<_> = store::all(tx, "departments")?
         .into_iter()
         .filter(|department| department["companyCode"] == company)
@@ -97,12 +110,14 @@ pub fn options(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result
         .collect();
     let actions = super::oa::personnel_changes::required_actions(tx, actor)?;
     Ok(
-        json!({"departments":departments,"positions":tx.find_identity("companies", &store::normalize(&company))?.and_then(|c| c.get("positions").cloned()).unwrap_or(json!([])),"canCreate":auth::authorize(actor,"office.people","create").is_ok(),"approvalRequiredActions":actions}),
+        json!({"companies":companies,"departments":departments,"positions":tx.find_identity("companies", &store::normalize(&company))?.and_then(|c| c.get("positions").cloned()).unwrap_or(json!([])),"canCreate":auth::authorize(actor,"office.people","create").is_ok(),"approvalRequiredActions":actions}),
     )
     })
 }
 
 const DIRECTORY_FIELDS: &[(&str, &str)] = &[
+    ("jobTitle", "jobTitle"),
+    ("hireDate", "hireDate"),
     ("organization", "organization"),
     ("employee", "employee"),
     ("companyScope", "companyScope"),
@@ -111,6 +126,7 @@ const DIRECTORY_FIELDS: &[(&str, &str)] = &[
     ("status", "status"),
 ];
 const ATTENTION_FIELDS: &[(&str, &str)] = &[
+    ("privateProfileAvailable", "privateProfileAvailable"),
     ("probationEndsOn", "probationEndsOn"),
     ("contractEndsOn", "contractEndsOn"),
     ("identityLongTerm", "profile.identityLongTerm"),
@@ -140,7 +156,10 @@ pub fn directory(
         "true" => true,
         _ => return Err(invalid("到期筛选须为 true 或 false。")),
     };
-    let mut scopes = vec![auth::data_scope(actor, "office.people", "view")];
+    let date = clock.now().map_err(unavailable)?.today.to_string();
+    let mut public_scope = auth::data_scope(actor, "office.people", "view");
+    public_scope.personnel_date = Some(&date);
+    let mut scopes = vec![public_scope];
     if attention || status == "Departed" {
         auth::authorize(actor, "office.people", "view-details")?;
         scopes.push(auth::data_scope(actor, "office.people", "view-details"));
@@ -168,6 +187,7 @@ pub fn directory(
     }
     store.read(|tx| {
         let mut listing = PersonnelQuery {
+            as_of: &date,
             company: &actor.company,
             department: argument("departmentId"),
             status,
@@ -197,12 +217,41 @@ pub fn directory(
                 // Validate dates even outside the requested page; malformed private
                 // metadata must not become a successful, misleading attention count.
                 if let Some(through) = through {
+                    if record["privateProfileAvailable"] != true {
+                        return Err(unavailable("人员私密档案缺失，无法核对到期事项。"));
+                    }
                     if !needs_attention(&record, through)? {
                         continue;
                     }
                 }
                 if !attention || (count >= start && items.len() < size) {
-                    items.push(directory_entry(tx, actor, &record, &mut departments)?);
+                    let mut entry = directory_entry(tx, actor, &record, &mut departments)?;
+                    if record["status"] != "Departed" {
+                        let selected = super::personnel_organization::departments_in(
+                            tx,
+                            &record,
+                            &actor.company,
+                        )?;
+                        let department = if argument("departmentId").is_empty() {
+                            selected
+                                .first()
+                                .map(String::as_str)
+                                .ok_or_else(|| unavailable("人员目录任职投影失效。"))?
+                        } else {
+                            argument("departmentId")
+                        };
+                        let assignment = super::personnel_organization::appointment_in(
+                            tx,
+                            &record,
+                            &actor.company,
+                            department,
+                        )?;
+                        entry["departmentId"] = json!(department);
+                        entry["departmentName"] =
+                            json!(departments.get(tx, &actor.company, department)?);
+                        entry["jobTitle"] = json!(assignment.job_title);
+                    }
+                    items.push(entry);
                 }
                 count += 1;
             }

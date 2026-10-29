@@ -38,7 +38,7 @@ fn select(store: &Store, actor: &Actor, body: &Value, action: &str) -> Result<Ve
     })
 }
 fn query(
-    tx: &export_doc_storage::Connection,
+    tx: &crate::engine::store::Connection,
     actor: &Actor,
     criteria: &Criteria,
     action: &str,
@@ -101,7 +101,7 @@ pub fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Va
     .map_err(invalid)?;
     let (page, size, offset) = store::page_parameters(query);
     let (total, rows) = self::query(
-        &*store.connection()?,
+        &store.connection()?,
         actor,
         &criteria,
         "view",
@@ -139,7 +139,7 @@ pub fn export(
         None
     };
     let store = service.store.clone();
-    let actor_id = actor.id;
+    let task_actor = actor.clone();
     let request = body.clone();
     service.jobs.start_replayable(
         actor,
@@ -148,7 +148,7 @@ pub fn export(
         "导出查询结果 Excel",
         Some(Replay::new(operation, &[], body)),
         move |_| {
-            let actor = auth::current_actor(&store, actor_id)?;
+            let actor = auth::refresh_actor(&store, &task_actor)?;
             auth::authorize_operation(&actor, operation, &[])?;
             let rows = select(&store, &actor, &request, "operate")?;
             let bytes =

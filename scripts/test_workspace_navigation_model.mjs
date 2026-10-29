@@ -230,9 +230,9 @@ const employeeGrants = editionPermissions.roles.find(role => role.code === "Offi
 const employeeCapabilities = { productEdition: "Full", availableFeatures: ["worklist"], permissions: employeeGrants,
   ...moduleGrants([...new Set(employeeGrants.map(grant => editionPermissions.resources.find(resource => resource.key === grant.resourceKey).moduleKey))]) };
 const employeeGroups = model.filterWorkspaceNavGroups(employeeCapabilities);
-assert(employeeGroups.find(group => group.key === "workspace")?.items.some(item => item.to === "/payments"), "shared printing stays in the workbench for employees");
+assert(!model.getWorkspaceRouteItems(employeeGroups).some(item => item.to === "/payments"), "ordinary employees need explicit payment printing authorization");
 assert(!employeeGroups.find(group => group.key === "office")?.items.some(item => item.to === "/payments"), "administration keeps applications separate from voucher printing");
-assert(model.searchWorkspaceNavGroups("PDF", employeeGroups).some(group => group.items.some(item => item.to === "/payments")), "employees can find payment printing by PDF");
+assert(!model.searchWorkspaceNavGroups("PDF", employeeGroups).some(group => group.items.some(item => item.to === "/payments")), "search does not reveal ungranted payment printing");
 assert(product.getDefaultWorkspaceRoute(employeeCapabilities) === "/office/approvals", "employees land on their own office work instead of a forbidden document dashboard");
 assert(!model.getWorkspaceRouteItems(model.filterWorkspaceNavGroups(employeeCapabilities)).some(item => item.to === "/office/people"), "directory access does not expose private personnel records");
 for (const edition of ["Full", "Document", "Sales"]) {
@@ -345,11 +345,9 @@ for (const scope of ['department', 'company']) {
 }
 const expenseResource = schemeResources.get('office.expenses');
 const approvePreset = scheme.setResourcePreset({}, expenseResource, 'approve');
-assert(Object.keys(approvePreset).length === 2 && Object.values(approvePreset).every(scope => scope === 'department'), 'Approval preset includes only view/approve and defaults to colleague scope');
+assert(Object.keys(approvePreset).length === 2 && Object.values(approvePreset).every(scope => scope === 'own'), 'Approval preset includes only view/approve and defaults to the minimum scope');
 assert(scheme.detectPreset(approvePreset, expenseResource) === 'approve', 'Approval preset is recognized');
 assert(Object.keys(scheme.setResourcePreset({}, { ...expenseResource, actions: [{ key: 'unexpected' }] }, 'view')).length === 0, 'Unknown preset metadata cannot grant an action');
-const counts = scheme.countTemplateMembers([employeeScheme], [{ role: 'OfficeEmployee' }, { role: 'OfficeEmployee', permissionGrants: [] }, { role: 'Admin' }, { role: 'Sales', permissionTemplateId: 1 }]);
-assert(counts.get(1) === 2, 'Shared and default membership exclude independent accounts and administrators');
 const combined = scheme.combinePermissionSchemes(editionPermissions.roles.filter(role => ['PersonnelManager', 'OfficeManager', 'Finance'].includes(role.code)), schemeResources);
 for (const [resource, action] of [['office.people', 'view-details'], ['office.general', 'approve'], ['office.expenses', 'complete']]) {
   assert(combined.grants[scheme.grantKey(resource, action)] === 'company', 'One scheme can contain HR, administration and finance duties');

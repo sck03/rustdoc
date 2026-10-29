@@ -9,6 +9,10 @@ pub(super) fn extend(doc: &mut Value) {
     let ids = json!({"type":"array","items":int,"maxItems":50,"uniqueItems":true});
     let decision = json!({"type":"string","enum":["All","Any"]});
     let keys = json!({"type":"array","items":text,"maxItems":32,"uniqueItems":true});
+    s["OaOrganizationRoute"] = object(
+        json!({"mode":{"type":"string","enum":["Current","Specified","Ancestor"]},"unitId":{"type":["integer","null"],"format":"int64","minimum":1}}),
+        &["mode"],
+    );
     s["OaApprovalCondition"] = object(
         json!({
             "field":{"type":"string","enum":["Amount","Currency","Duration","Department","Category","PersonnelAction"]},
@@ -19,7 +23,8 @@ pub(super) fn extend(doc: &mut Value) {
     s["OaApprovalStage"] = object(
         json!({
             "key":text,"name":text,"dependsOn":keys,
-            "source":{"type":"string","enum":["Named","DepartmentManager","LineManager","FunctionalManagers","CompanyExecutive"]},
+            "organizationRoute":reference("OaOrganizationRoute"),"reviewPoints":{"type":"array","items":{"type":"string","minLength":1,"maxLength":200},"maxItems":12},
+            "source":{"type":"string","enum":["Named","DepartmentManager","DepartmentLeaders","LineManager","FunctionalManagers","CompanyExecutive","CompanyLeaders"]},
             "approverUserIds":ids,"decision":decision,"selfApproval":{"type":"string","enum":["Skip","Reject"]},
             "repeatedApprover":{"type":"string","enum":["Allow","Reject"]},
             "conditions":{"type":"array","items":reference("OaApprovalCondition"),"maxItems":16},"dueHours":{"type":"integer","minimum":1,"maximum":8760}
@@ -53,7 +58,7 @@ pub(super) fn extend(doc: &mut Value) {
     );
     s["OaApprovalStep"] = object(
         json!({"taskKey":text,"stage":{"type":"integer","minimum":0,"maximum":31},"decision":decision,
-            "approverUserId":int,"approverName":text,"status":{"type":"string","enum":["Waiting","Approved","Rejected","Returned","Skipped","Cancelled"]},
+            "approverUserId":int,"approverName":text,"approverContext":text,"actedByContext":text,"status":{"type":"string","enum":["Waiting","Approved","Rejected","Returned","Skipped","Cancelled"]},
             "actedByUserId":{"type":["integer","null"],"format":"int64"},"actedByName":text,"actedAt":text,"note":text,"delegationKey":text
         }),
         &[
@@ -62,6 +67,8 @@ pub(super) fn extend(doc: &mut Value) {
             "decision",
             "approverUserId",
             "approverName",
+            "approverContext",
+            "actedByContext",
             "status",
             "actedByName",
             "actedAt",
@@ -69,6 +76,8 @@ pub(super) fn extend(doc: &mut Value) {
             "delegationKey",
         ],
     );
+    s["OaApprovalNode"]["properties"]["reviewPoints"] =
+        json!({"type":"array","items":text,"maxItems":12});
     s["OaApprovalPlan"] = object(
         json!({"definitionKey":text,"policyVersion":int,"nodes":{"type":"array","items":reference("OaApprovalNode"),"maxItems":32},
         "steps":{"type":"array","items":reference("OaApprovalStep"),"maxItems":200},"notifyUserIds":ids}),

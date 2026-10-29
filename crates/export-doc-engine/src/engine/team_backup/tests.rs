@@ -45,6 +45,7 @@ pub(super) fn open_service(workspace: &Workspace) -> Arc<NativeService> {
 }
 pub(super) fn admin() -> Actor {
     Actor {
+        context: String::new(),
         edition: Default::default(),
         id: 1,
         name: "系统管理员".into(),

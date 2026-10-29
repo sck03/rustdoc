@@ -7,7 +7,8 @@ use super::{
     store::{Actor, Store},
 };
 use crate::contracts;
-use export_doc_storage::{Connection, RecordWrite};
+use crate::engine::store::Connection;
+use export_doc_storage::RecordWrite;
 use serde_json::{Value, json};
 
 const INVOICE_KIND: &str = "invoices";
@@ -186,37 +187,32 @@ pub(super) fn transfer(service: &NativeService, actor: &Actor, body: &Value) -> 
         )));
     }
     let request = Request::parse(body)?;
-    let target = {
-        let connection = service.store.connection()?;
-        let target = user_label(&connection, request.to_user_id)?;
+    service.store.transaction_as(actor, |connection, actor| {
+        auth::authorize(actor, "system.disaster-recovery", "manage")?;
+        let target = user_label(connection, request.to_user_id)?;
         if !target["isActive"].as_bool().unwrap_or(true) {
             return Err(invalid("目标用户已停用，不能改派归属。"));
         }
         if let Some(from) = request.from_user_id {
-            let source = user_label(&connection, from)?;
-            if !source["isActive"].as_bool().unwrap_or(true) {
-                return Err(invalid("来源用户已停用，不能改派归属。"));
-            }
+            user_label(connection, from)?;
         }
-        target
-    };
-    let department_id = if request.department_id.is_empty() {
-        super::records_text(&target, "departmentId")
-    } else {
-        request.department_id.clone()
-    };
-    let company_scope = if request.company_scope.is_empty() {
-        super::records_text(&target, "companyScope")
-    } else {
-        request.company_scope.clone()
-    };
-    let kinds = request.selected_kinds();
-    let to_user_id = request.to_user_id;
-    let from_user_id = request.from_user_id;
-    let only_unassigned = request.only_unassigned;
-    let mut updated = vec![0i64; kinds.len()];
-    service.store.transaction(|connection| {
-        for (index, kind) in kinds.iter().enumerate() {
+        let department_id = if request.department_id.is_empty() {
+            super::records_text(&target, "departmentId")
+        } else {
+            request.department_id.clone()
+        };
+        let company_scope = if request.company_scope.is_empty() {
+            super::records_text(&target, "companyScope")
+        } else {
+            request.company_scope.clone()
+        };
+        let kinds = request.selected_kinds();
+        super::super::organization::validate_assignment(connection, &company_scope, &department_id)?;
+        let to_user_id = request.to_user_id;
+        let from_user_id = request.from_user_id;
+        let only_unassigned = request.only_unassigned;
+        let mut updated = [0i64; 3];
+        for kind in &kinds {
             for record in connection.all(kind)? {
                 let owner = owner_of(&record);
                 let matches = if only_unassigned {
@@ -235,34 +231,67 @@ pub(super) fn transfer(service: &NativeService, actor: &Actor, body: &Value) -> 
                     &department_id,
                     &company_scope,
                 )?;
-                updated[index] += 1;
+                updated[match *kind {
+                    INVOICE_KIND => 0,
+                    PAYMENT_KIND => 1,
+                    _ => 2,
+                }] += 1;
             }
         }
-        Ok(())
-    })?;
-    let invoice_count = updated[0];
-    let payment_count = updated[1];
-    let other_count = updated[2..].iter().sum::<i64>();
-    super::audit(
-        &service.store,
-        actor,
-        "transfer-ownership",
-        &format!(
-            "已将业务资料归属改派给用户 {to_user_id}：发票 {invoice_count} 条，付款报销 {payment_count} 条，其它业务资料 {other_count} 条"
-        ),
-    )?;
-    let mut response = contracts::initial(contracts::schema(
-        "ApiSharedDatabaseOwnershipTransferResponse",
-    ));
-    response["success"] = json!(true);
-    response["message"] = json!(format!(
-        "归属改派完成：发票 {invoice_count} 条，付款报销 {payment_count} 条，其他业务资料 {other_count} 条。"
-    ));
-    response["updatedInvoices"] = json!(invoice_count);
-    response["updatedPayments"] = json!(payment_count);
-    response["updatedOtherBusinessData"] = json!(other_count);
-    response["storagePolicy"] = json!(OWNERSHIP_STORAGE_POLICY);
-    Ok(response)
+        let [invoice_count, payment_count, other_count] = updated;
+        let details = json!({
+            "fromUserId": from_user_id, "toUserId": to_user_id,
+            "updatedInvoices": invoice_count, "updatedPayments": payment_count,
+            "updatedOtherBusinessData": other_count,
+        });
+        connection.append_audit_details(&export_doc_storage::AuditWrite {
+            kind: "team-backup", record_id: 0, version: 1, action: "transfer-ownership",
+            actor_id: actor.id, occurred_at: &super::super::store::timestamp(),
+            note: &format!(
+                "已将业务资料归属改派给用户 {to_user_id}：发票 {invoice_count} 条，付款报销 {payment_count} 条，其它业务资料 {other_count} 条"
+            ),
+        }, &details)?;
+        let mut response = contracts::initial(contracts::schema(
+            "ApiSharedDatabaseOwnershipTransferResponse",
+        ));
+        response["success"] = json!(true);
+        response["message"] = json!(format!(
+            "归属改派完成：发票 {invoice_count} 条，付款报销 {payment_count} 条，其他业务资料 {other_count} 条。"
+        ));
+        response["updatedInvoices"] = json!(invoice_count);
+        response["updatedPayments"] = json!(payment_count);
+        response["updatedOtherBusinessData"] = json!(other_count);
+        response["storagePolicy"] = json!(OWNERSHIP_STORAGE_POLICY);
+        Ok(response)
+    })
+}
+
+pub(in crate::engine) fn owned_counts(tx: &Connection, user: i64) -> Result<[i64; 3]> {
+    let mut counts = [0; 3];
+    for kind in std::iter::once(INVOICE_KIND)
+        .chain(std::iter::once(PAYMENT_KIND))
+        .chain(OTHER_KINDS.iter().copied())
+    {
+        let (count, _) = tx.query_generic(&export_doc_storage::GenericQuery {
+            kind,
+            scope: export_doc_storage::DataScope {
+                all: true,
+                ..Default::default()
+            },
+            filters: &[("ownerUserId", user.to_string())],
+            fields: &[("id", "id")],
+            keyword: "",
+            search_root: None,
+            offset: 0,
+            limit: 1,
+        })?;
+        counts[match kind {
+            INVOICE_KIND => 0,
+            PAYMENT_KIND => 1,
+            _ => 2,
+        }] += count;
+    }
+    Ok(counts)
 }
 
 fn identity_for(kind: &str, body: &Value) -> Option<String> {

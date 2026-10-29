@@ -6,6 +6,50 @@ pub fn search_key(value: &str) -> String {
     value.trim().nfc().collect::<String>().to_lowercase()
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct OrganizationLeader {
+    pub employee_id: i64,
+    #[serde(default)]
+    pub appointment_id: String,
+    pub workflow_kinds: Vec<String>,
+}
+pub fn validate_leaders(
+    leaders: &[OrganizationLeader],
+    primary: Option<i64>,
+) -> Result<(), String> {
+    let mut people = BTreeSet::new();
+    people.extend(primary);
+    if leaders.len() > 10 {
+        return Err("分管负责人最多十位。".into());
+    }
+    for leader in leaders {
+        let mut kinds = BTreeSet::new();
+        if leader.employee_id <= 0
+            || !people.insert(leader.employee_id)
+            || leader.workflow_kinds.is_empty()
+            || leader.workflow_kinds.iter().any(|kind| {
+                ![
+                    "leave",
+                    "overtime",
+                    "expense",
+                    "travel",
+                    "purchase",
+                    "general",
+                    "personnel",
+                    "room",
+                    "supply",
+                ]
+                .contains(&kind.as_str())
+                    || !kinds.insert(kind)
+            })
+        {
+            return Err("分管负责人须互不重复，并明确选择负责的申请业务。".into());
+        }
+    }
+    Ok(())
+}
+
 #[derive(Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DepartmentLink {

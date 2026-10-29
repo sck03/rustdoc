@@ -10,10 +10,18 @@ pub enum OrganizationReference {
 pub(crate) fn build(
     reference: OrganizationReference,
     code: &str,
+    company: &str,
     exclude: i64,
     kinds: &[&str],
     pg: bool,
 ) -> QuerySql {
+    if kinds.is_empty() {
+        return QuerySql {
+            filter: "1=0".into(),
+            order: "r.id ASC".into(),
+            values: vec![],
+        };
+    }
     let mut values = vec![];
     let kinds = kinds
         .iter()
@@ -24,23 +32,23 @@ pub(crate) fn build(
     let excluded = sql::bind(&mut values, exclude, pg);
     let fields = match reference {
         OrganizationReference::Company => format!(
-            "({}={code} OR {}={code})",
+            "({}={code} OR {}={code} OR {}={code} OR (r.kind='people' AND EXISTS(SELECT 1 FROM personnel_memberships m WHERE m.person_id=r.id AND m.company={code})))",
             sql::field("companyScope", pg),
-            sql::field("companyCode", pg)
+            sql::field("companyCode", pg),
+            sql::field("parentCompanyCode", pg)
         ),
-        OrganizationReference::Department => format!(
-            "({}={code} OR {}={code} OR (r.kind='people' AND {}))",
-            sql::field("departmentId", pg),
-            sql::field("parentCode", pg),
-            crate::generic_query::department_filter(&code, true, pg)
-        ),
+        OrganizationReference::Department => {
+            let company = sql::bind(&mut values, company, pg);
+            format!(
+                "(((r.company={company} OR {}={company}) AND ({}={code} OR {}={code})) OR (r.kind='people' AND EXISTS(SELECT 1 FROM personnel_memberships m WHERE m.person_id=r.id AND m.company={company} AND m.department={code})))",
+                sql::field("companyCode", pg),
+                sql::field("departmentId", pg),
+                sql::field("parentCode", pg)
+            )
+        }
     };
     QuerySql {
-        filter: if kinds.is_empty() {
-            "1=0".into()
-        } else {
-            format!("r.kind IN ({kinds}) AND r.id<>CAST({excluded} AS BIGINT) AND {fields}")
-        },
+        filter: format!("r.kind IN ({kinds}) AND r.id<>CAST({excluded} AS BIGINT) AND {fields}"),
         order: "r.id ASC".into(),
         values,
     }

@@ -5,10 +5,11 @@ use super::{
     records::{id, text},
     store::{self, Actor, Store},
 };
+use crate::engine::store::Connection;
 use crate::{clock::BusinessClock, contracts, generated_api::*};
 use chrono::{DateTime, FixedOffset, Utc};
 use export_doc_domain::crm;
-use export_doc_storage::{AuditWrite, Connection, CrmList, RecordWrite};
+use export_doc_storage::{AuditWrite, CrmList, RecordWrite};
 use serde_json::{Value, json};
 
 pub const OPERATIONS: &[Operation] = &[
