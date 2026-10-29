@@ -24,8 +24,7 @@ async function wait(expression, message) {
 }
 async function click(text, scope = "document") {
   const target = `[...${scope}.querySelectorAll('button,a')].find(e=>e.textContent.trim()===${JSON.stringify(text)} && e.getClientRects().length && !e.disabled && e.getAttribute('aria-disabled')!=='true')`;
-  await wait(target, `Control not ready: ${text}`);
-  await run(`(${target}).click()`);
+  await wait(`(() => {const button=${target}; if(!button) return false; button.click(); return true;})()`, `Control not ready: ${text}`);
 }
 async function fill(label, value) {
   const field = `(() => {const label=[...document.querySelectorAll('label')].find(e=>(e.querySelector('span')?.textContent ?? [...e.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join('')).trim()===${JSON.stringify(label)}); return label?.control ?? label?.querySelector('input,textarea,select');})()`;
@@ -229,13 +228,15 @@ try {
     await wait("document.querySelector('.oa-detail .office-badge')?.textContent==='已批准'", "Approval state missing");
     const label = { leave: "销假归档", overtime: "确认加班完成", expense: "财务接收", travel: "返程归档", purchase: "登记验收", general: "办结登记" }[kind];
     await act(label, kind === "expense" ? "已移交独立财务软件，接收人王会计" : "已核对并完成办理");
-    await run("document.querySelector('.oa-detail details').open=true");
-    await wait("document.querySelector('.oa-history')?.innerText.includes('完成登记')", "Completion history missing");
+    await run("document.querySelector('.oa-detail-history > summary').click()");
+    await wait("document.querySelector('.oa-detail-history .oa-history')?.innerText.includes('完成登记')", "Completion history missing");
+    await wait("document.querySelector('.oa-submission-list button')", "Submission history missing");
     assert.deepEqual(await run("window.__oaErrors"), []);
     await captureScreenshot(page, path.join(output, `${kind}-desktop.png`));
     await page.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-    assert(await run("document.documentElement.scrollWidth<=window.innerWidth+1"), `${kind}: no page overflow on phone`);
+    await run("new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
     await captureScreenshot(page, path.join(output, `${kind}-mobile.png`));
+    assert(await run("document.documentElement.scrollWidth<=document.documentElement.clientWidth+1"), `${kind}: no page overflow on phone`);
     await page.send("Emulation.clearDeviceMetricsOverride");
     console.log(`${name}: real React/Rust HTTP save, approval, completion, history and mobile layout passed.`);
   }

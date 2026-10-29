@@ -122,7 +122,7 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
     await admin.getByRole('dialog').getByRole('button',{name:'确认入库',exact:true}).click(); await form.waitFor({state:'hidden'});
     await card.getByRole('button',{name:'申请领用',exact:true}).click();
     await form.getByLabel('登记人员',{exact:true}).fill('OA-001'); await form.getByRole('option',{name:/OA-001/u}).click();
-    await form.getByLabel('领用用途').fill('分工发放验收'); await form.getByRole('button',{name:'登记领用',exact:true}).click(); await form.waitFor({state:'hidden'});
+    await form.getByLabel('领用用途').fill('分工发放验收'); await form.getByRole('button',{name:'提交申请',exact:true}).click(); await form.waitFor({state:'hidden'});
     await approveResourceTask(invoke, reviewerToken, 'supply', name);
     await handler.goto(`${url}/#/office/supplies?view=requests&handlingOnly=true&status=Approved`);
     const request=handler.locator('.office-request-card').filter({has:handler.getByRole('heading',{name,exact:true})});

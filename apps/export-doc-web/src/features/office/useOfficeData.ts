@@ -106,7 +106,7 @@ export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUs
   const handlingOnly = search.get("handlingOnly") === "true" && !focused;
   const paging = useOfficePaging();
   const [mineOnlyFilter, setMineOnly] = useState(!access.canSeeOthers && !access.allows("approve"));
-  const [statusFilter, setStatus] = useState(search.get("status") ?? (access.allows("approve") ? "Pending" : ""));
+  const statusFilter = search.get("status") ?? (access.allows("approve") ? "Pending" : "");
   const mineOnly = focused || handlingOnly ? false : mineOnlyFilter;
   const status = focused ? "" : statusFilter;
   const query = useQuery({
@@ -118,10 +118,15 @@ export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUs
     refetchInterval: 30000,
     refetchIntervalInBackground: false,
   });
-  const clearFocus = () => { setSearch({ view: "requests" }); paging.resetPage(); };
-  return { access, paging, query, mineOnly, status, focus, focused, handlingOnly, changeHandling: (value: boolean) => { setSearch(value ? {view:"requests",handlingOnly:"true"} : {view:"requests"}); setStatus(""); paging.resetPage(); }, clearFocus: () => { setStatus(""); setMineOnly(!access.canSeeOthers); clearFocus(); },
-    changeMineOnly: (value: boolean) => { setMineOnly(value); clearFocus(); },
-    changeStatus: (value: string) => { setStatus(value); if (!handlingOnly) clearFocus(); else paging.resetPage(); } };
+  const showRequests = (nextStatus: string, handling = false) => {
+    setSearch({ view: "requests", status: nextStatus, ...(handling ? { handlingOnly: "true" } : {}) });
+    paging.resetPage();
+  };
+  return { access, paging, query, mineOnly, status, focus, focused, handlingOnly,
+    changeHandling: (value: boolean) => showRequests("", value),
+    clearFocus: () => { setMineOnly(!access.canSeeOthers); showRequests(""); },
+    changeMineOnly: (value: boolean) => { setMineOnly(value); showRequests(status); },
+    changeStatus: (value: string) => showRequests(value, handlingOnly) };
 }
 
 export function applyOfficeAction(client: ExportDocManagerApiClient, kind: OfficeKind, row: OfficeRequestRow,

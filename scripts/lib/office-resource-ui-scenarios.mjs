@@ -42,6 +42,7 @@ export async function exerciseOfficeResources({ url, page, output, run, wait, cl
   await wait("document.querySelector('.office-request-card')?.textContent.includes('资源流程验收设备')", 'Hub did not open exact request');
   await approveResource('supplies');
   await navigate(`${url}/#/office/supplies?view=requests&status=Approved`);
+  await wait("document.querySelector('.office-filter select')?.value==='Approved'", 'Same-route status navigation did not update the filter');
   await wait("document.querySelector('.office-request-card')", 'Approved supply request missing');
   await fill('申请状态', '');
   await action('确认发放'); await click('登记归还');
