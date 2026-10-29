@@ -753,8 +753,8 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | @rolldown/binding-win32-arm64-msvc | 1.2.15 | MIT | web |
 | npm | @rolldown/binding-win32-x64-msvc | 1.2.15 | MIT | web |
 | npm | @rolldown/pluginutils | 1.0.1 | MIT | web |
-| npm | @tanstack/query-core | 5.104.5 | MIT | web |
-| npm | @tanstack/react-query | 5.104.5 | MIT | web |
+| npm | @tanstack/query-core | 5.105.0 | MIT | web |
+| npm | @tanstack/react-query | 5.105.0 | MIT | web |
 | npm | @tauri-apps/api | 2.12.4 | Apache-2.0 OR MIT | web |
 | npm | @tauri-apps/cli | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
 | npm | @tauri-apps/cli-darwin-arm64 | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
@@ -769,7 +769,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | @tauri-apps/cli-win32-ia32-msvc | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
 | npm | @tauri-apps/cli-win32-x64-msvc | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
 | npm | @tweenjs/tween.js | 23.1.3 | MIT | web |
-| npm | @types/node | 26.6.5 | MIT | web |
+| npm | @types/node | 26.6.6 | MIT | web |
 | npm | @types/pngjs | 6.0.5 | MIT | web |
 | npm | @types/react | 19.3.0 | MIT | web |
 | npm | @types/react-dom | 19.3.0 | MIT | web |
@@ -817,7 +817,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | lightningcss-linux-x64-musl | 1.33.0 | MPL-2.0 | web |
 | npm | lightningcss-win32-arm64-msvc | 1.33.0 | MPL-2.0 | web |
 | npm | lightningcss-win32-x64-msvc | 1.33.0 | MPL-2.0 | web |
-| npm | lucide-react | 1.61.0 | ISC | web |
+| npm | lucide-react | 1.64.0 | ISC | web |
 | npm | meshoptimizer | 1.1.1 | MIT | web |
 | npm | nanoid | 3.3.20 | MIT | web |
 | npm | picocolors | 1.1.1 | ISC | web |
@@ -829,11 +829,11 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | postcss | 8.5.31 | MIT | web |
 | npm | react | 19.3.1 | MIT | web |
 | npm | react-dom | 19.3.1 | MIT | web |
-| npm | react-router | 7.18.4 | MIT | web |
-| npm | react-router-dom | 7.18.4 | MIT | web |
+| npm | react-router | 7.18.5 | MIT | web |
+| npm | react-router-dom | 7.18.5 | MIT | web |
 | npm | rolldown | 1.2.15 | MIT | web |
 | npm | scheduler | 0.28.0 | MIT | web |
-| npm | set-cookie-parser | 2.7.2 | MIT | web |
+| npm | set-cookie-parser | 2.7.3 | MIT | web |
 | npm | source-map-js | 1.2.2 | BSD-3-Clause | web |
 | npm | three | 0.186.1 | MIT | web |
 | npm | tinyglobby | 0.2.17 | MIT | web |

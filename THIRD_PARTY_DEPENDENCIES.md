@@ -53,8 +53,8 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | @rolldown/binding-win32-arm64-msvc | 1.2.15 | MIT | web |
 | @rolldown/binding-win32-x64-msvc | 1.2.15 | MIT | web |
 | @rolldown/pluginutils | 1.0.1 | MIT | web |
-| @tanstack/query-core | 5.104.5 | MIT | web |
-| @tanstack/react-query | 5.104.5 | MIT | web |
+| @tanstack/query-core | 5.105.0 | MIT | web |
+| @tanstack/react-query | 5.105.0 | MIT | web |
 | @tauri-apps/api | 2.12.4 | Apache-2.0 OR MIT | web |
 | @tauri-apps/cli | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
 | @tauri-apps/cli-darwin-arm64 | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
@@ -69,7 +69,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | @tauri-apps/cli-win32-ia32-msvc | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
 | @tauri-apps/cli-win32-x64-msvc | 2.12.4 | Apache-2.0 OR MIT | tauri-build |
 | @tweenjs/tween.js | 23.1.3 | MIT | web |
-| @types/node | 26.6.5 | MIT | web |
+| @types/node | 26.6.6 | MIT | web |
 | @types/pngjs | 6.0.5 | MIT | web |
 | @types/react | 19.3.0 | MIT | web |
 | @types/react-dom | 19.3.0 | MIT | web |
@@ -117,7 +117,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | lightningcss-linux-x64-musl | 1.33.0 | MPL-2.0 | web |
 | lightningcss-win32-arm64-msvc | 1.33.0 | MPL-2.0 | web |
 | lightningcss-win32-x64-msvc | 1.33.0 | MPL-2.0 | web |
-| lucide-react | 1.61.0 | ISC | web |
+| lucide-react | 1.64.0 | ISC | web |
 | meshoptimizer | 1.1.1 | MIT | web |
 | nanoid | 3.3.20 | MIT | web |
 | picocolors | 1.1.1 | ISC | web |
@@ -129,11 +129,11 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | postcss | 8.5.31 | MIT | web |
 | react | 19.3.1 | MIT | web |
 | react-dom | 19.3.1 | MIT | web |
-| react-router | 7.18.4 | MIT | web |
-| react-router-dom | 7.18.4 | MIT | web |
+| react-router | 7.18.5 | MIT | web |
+| react-router-dom | 7.18.5 | MIT | web |
 | rolldown | 1.2.15 | MIT | web |
 | scheduler | 0.28.0 | MIT | web |
-| set-cookie-parser | 2.7.2 | MIT | web |
+| set-cookie-parser | 2.7.3 | MIT | web |
 | source-map-js | 1.2.2 | BSD-3-Clause | web |
 | three | 0.186.1 | MIT | web |
 | tinyglobby | 0.2.17 | MIT | web |
