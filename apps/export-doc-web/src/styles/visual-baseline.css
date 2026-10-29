@@ -24,3 +24,25 @@
 @import "../ui/commercialComponents.css" layer(workspace);
 @import "../features/master-data/hsKnowledge.css" layer(workspace);
 @import "../responsiveOverrides.css" layer(responsive);
+
+/* Keep screenshot glyphs independent of fonts installed on the test host.
+   These OFL faces come from the existing, checksum-verified resource manifest. */
+@font-face {
+  font-family: "ExportDoc Visual Sans";
+  src: url("../../../../Resources/Fonts/OpenSource/NotoSansCJKsc-Regular.otf") format("opentype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "ExportDoc Visual Sans";
+  src: url("../../../../Resources/Fonts/OpenSource/NotoSansCJKsc-Bold.otf") format("opentype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+}
+
+:root {
+  --edm-font-sans: "ExportDoc Visual Sans", sans-serif;
+}

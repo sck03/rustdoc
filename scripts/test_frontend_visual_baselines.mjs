@@ -68,6 +68,8 @@ try {
     for (const pageName of pages) {
       // Isolate device metrics, focus and compositor state between visual scenes.
       const page = await createPageSession(cdp);
+      await page.send("Emulation.setLocaleOverride", { locale: "zh-CN" });
+      await page.send("Emulation.setTimezoneOverride", { timezoneId: "Asia/Shanghai" });
       await page.send("Emulation.setDeviceMetricsOverride", {
         width: viewport.width,
         height: viewport.height,
@@ -81,6 +83,12 @@ try {
       const url = `http://127.0.0.1:${port}/visual-baseline.html?page=${pageName}`;
       await page.send("Page.navigate", { url });
       await waitForReady(page);
+      const fonts = await evaluate(page, `(async () => {
+        const faces = await Promise.all([400, 700].map(weight =>
+          document.fonts.load(weight + ' 14px "ExportDoc Visual Sans"', '中文 Aa0123')));
+        return faces.every(matches => matches.length === 1 && matches[0].status === "loaded");
+      })()`, true);
+      if (!fonts.value) throw new Error("The verified visual baseline fonts did not load.");
       await evaluate(page, "document.fonts?.ready ?? Promise.resolve()", false);
       await evaluate(page, `(() => {
         const style = document.createElement("style");

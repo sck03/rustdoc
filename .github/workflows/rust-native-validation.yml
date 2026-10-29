@@ -103,6 +103,14 @@ jobs:
         run: npm --prefix apps/export-doc-web run test:scale-contracts
       - name: Check visual contracts
         run: npm --prefix apps/export-doc-web run test:visual-baselines
+      - name: Upload failed visual evidence
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: frontend-visual-failure
+          path: artifacts/frontend-visual-baseline
+          if-no-files-found: ignore
+          retention-days: 7
   desktop:
     if: github.event_name != 'push'
     name: Desktop ${{ matrix.target }}

@@ -105,6 +105,8 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 字体准备复用 `lib/verified-download.mjs`：流式下载并核对 SHA-256，单文件最多 32 MiB、总时限 120 秒，支持取消和并行独立临时文件；坏摘要、超限、超时或取消均保留原字体并清理本次临时文件。`node scripts/test_verified_download.mjs` 验证这些边界，随脚本套件执行。
 
+前端视觉与缩放夹具同样使用上述已核验的 Noto Sans 常规/粗体文件。首次运行 `test:visual-baselines`、`test:visual-baselines:update` 或 `test:scale-contracts` 前，先执行 `node scripts/provision-report-fonts.mjs`；视觉检查固定 `zh-CN` 与 `Asia/Shanghai`，字体加载失败直接报错。生产页面继续采用正式系统字体策略，测试字体不进入前端发布构建。更新参考图必须检查所有场景的布局和文字，不能通过放宽像素阈值消除失败。
+
 六份默认报表统一为 `.dtpl`。开发维护源为 `lib/default-report-designs.mjs`，通过 `node scripts/generate_default_dtpl_templates.mjs` 重建容器，再运行 `node scripts/test_report_designer_v3_contract.mjs` 校验设计器读写与尺寸保留。生成源和六份资产同时提交；旧 HTML 仅可作只读版式参考，不进入目录或发布包。
 
 ## 网页与 Docker

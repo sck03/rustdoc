@@ -1,4 +1,5 @@
-import { defineConfig } from "vite";
+import { fileURLToPath } from "node:url";
+import { defineConfig, searchForWorkspaceRoot } from "vite";
 import react from "@vitejs/plugin-react";
 
 const apiTarget =
@@ -26,6 +27,12 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     port: 5173,
+    fs: {
+      allow: [
+        searchForWorkspaceRoot(fileURLToPath(new URL(".", import.meta.url))),
+        fileURLToPath(new URL("../../Resources/Fonts/OpenSource", import.meta.url)),
+      ],
+    },
     proxy: {
       "/api": apiTarget,
       "/healthz": apiTarget,
