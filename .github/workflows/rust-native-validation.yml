@@ -84,16 +84,17 @@ jobs:
         run: node scripts/provision-report-fonts.mjs
       - name: Check Rust formatting
         run: cargo fmt --all --check
+      # Tauri's all-features check embeds frontendDist via custom-protocol.
+      - name: Install frontend dependencies
+        run: npm --prefix apps/export-doc-web ci
+      - name: Build frontend
+        run: npm --prefix apps/export-doc-web run build
       - name: Test Rust workspace
         run: cargo test --locked --workspace
       - name: Check all Rust features
         run: cargo check --locked --workspace --all-features
       - name: Verify generated API contract
         run: cargo run --locked -p export-doc-contracts --example generate_clients -- --check
-      - name: Install frontend dependencies
-        run: npm --prefix apps/export-doc-web ci
-      - name: Build frontend
-        run: npm --prefix apps/export-doc-web run build
       - name: Provision Chromium for layout contracts
         run: node apps/export-doc-web/node_modules/playwright/cli.js install --only-shell chromium
       - name: Check accessibility contracts
@@ -126,6 +127,7 @@ jobs:
       RUSTUP_HOME: ${{ github.workspace }}/.codex-runtime/rustup-home
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CARGO_BUILD_JOBS: 2
+      npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
       TMPDIR: ${{ github.workspace }}/.codex-runtime/temp
       TEMP: ${{ github.workspace }}/.codex-runtime/temp
       TMP: ${{ github.workspace }}/.codex-runtime/temp
@@ -177,6 +179,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo run --locked -p export-doc-contracts --example generate_clients -- --check
           exit $LASTEXITCODE
+      # Clippy's all-features check also embeds the Tauri frontend assets.
+      - name: Install frontend dependencies
+        run: npm --prefix apps/export-doc-web ci
+      - name: Build frontend
+        run: npm --prefix apps/export-doc-web run build
       - name: Workspace tests
         run: cargo test --locked --workspace --target ${{ matrix.target }}
       - name: Rust correctness lints
