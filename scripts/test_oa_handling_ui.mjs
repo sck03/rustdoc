@@ -1,3 +1,4 @@
+import { approvalStage, publishDefinitions, approveResourceTask } from './lib/approval-fixtures.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,11 +20,11 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
   }
   const admin = await openPage('oa-review', 'Review-2026-Test');
   await admin.goto(`${url}/#/office/approval-settings`);
-  const section = admin.getByRole('region', { name: '通用申请审批规则', exact: true });
-  await section.getByLabel('审批方式').selectOption('Named');
-  for (const [i,user] of users.slice(0,2).entries()) {
-    await section.getByRole('button', { name: '添加审批步骤', exact: true }).click();
-    await section.getByLabel(`第 ${i+1} 步审批人`).selectOption(String(user.id));
+  const section = admin.locator('details[data-definition-key="general"]');
+  await section.locator(':scope > summary').click();
+  for (const [i, user] of users.slice(0,2).entries()) {
+    await section.getByLabel('审批人来源').nth(i).selectOption('Named');
+    await section.getByLabel('审批账号（可多选）').nth(i).selectOption([String(user.id)]);
   }
   for (const [i,[category,name,handler]] of [['Seal','公章',2],['Seal','合同章',3],['Certificate','在职证明',3],['Supply','日常用品',2],['Supply','服装辅料',3],['Room','会议接待',2]].entries()) {
     await admin.getByRole('button', { name: '添加办理分工', exact: true }).click();
@@ -44,6 +45,9 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
   assert.equal((await save).status(),200);
   await admin.screenshot({ path: path.join(output,'handling-settings.png'),fullPage:true });
   const policy = await invoke('GetOaApprovalSettings',undefined,{},token);
+  for (const rule of policy.rules.filter(r => ['room', 'supply'].includes(r.key))) rule.stages = [approvalStage('review', [users[0].id])];
+  await publishDefinitions(invoke, token, policy, ['general', 'room', 'supply']);
+  const reviewerToken = (await invoke('Login', { username: 'handling-leader', password })).accessToken;
   const keys = Object.fromEntries(policy.handlingServices.map(row => [row.name,row.key]));
   const saveDuringDirectoryLoad = async (routeName, directory, name, label, key) => {
     let release;
@@ -91,9 +95,9 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
     await act(admin,'提交审批');
     await handler.goto(`${url}/#/office/requests/general?view=handling`);
     await handler.getByText('当前筛选下没有申请',{exact:true}).waitFor();
-    await leader.goto(requestUrl); await act(leader,'登记批准结果');
+    await leader.goto(requestUrl); await act(leader,'批准');
     await handler.reload(); await handler.getByText('当前筛选下没有申请',{exact:true}).waitFor();
-    await director.goto(requestUrl); await act(director,'登记批准结果');
+    await director.goto(requestUrl); await act(director,'批准');
     await handler.goto(`${url}/#/office/notifications`);
     await handler.getByRole('heading',{name:`审批通过 · ${name}闭环验收`,exact:true}).waitFor();
     await handler.getByRole('link',{name:'查看关联申请',exact:true}).first().click();
@@ -116,15 +120,16 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
     await admin.getByRole('dialog').getByLabel(/^本次补充数量/u).fill('10');
     await admin.getByRole('dialog').getByLabel('入库说明／采购单号').fill('采购验收后入库');
     await admin.getByRole('dialog').getByRole('button',{name:'确认入库',exact:true}).click(); await form.waitFor({state:'hidden'});
-    await card.getByRole('button',{name:'登记领用',exact:true}).click();
+    await card.getByRole('button',{name:'申请领用',exact:true}).click();
     await form.getByLabel('登记人员',{exact:true}).fill('OA-001'); await form.getByRole('option',{name:/OA-001/u}).click();
     await form.getByLabel('领用用途').fill('分工发放验收'); await form.getByRole('button',{name:'登记领用',exact:true}).click(); await form.waitFor({state:'hidden'});
+    await approveResourceTask(invoke, reviewerToken, 'supply', name);
     await handler.goto(`${url}/#/office/supplies?view=requests&handlingOnly=true&status=Approved`);
     const request=handler.locator('.office-request-card').filter({has:handler.getByRole('heading',{name,exact:true})});
     await request.waitFor(); await request.getByRole('button',{name:'确认发放',exact:true}).click();
     await handler.getByRole('dialog').getByRole('button',{name:'确认发放',exact:true}).click(); await handler.getByRole('dialog').waitFor({state:'hidden'});
     await other.goto(`${url}/#/office/supplies?view=requests&handlingOnly=true&status=Approved`);
-    await other.getByText('当前条件下没有登记记录',{exact:true}).waitFor();
+    await other.getByText('当前条件下没有申请记录',{exact:true}).waitFor();
     await handler.screenshot({path:path.join(output,`${group}-issued.png`),fullPage:true});
   }
   await admin.goto(`${url}/#/office/meeting-rooms`);
@@ -139,7 +144,8 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
   form = admin.getByRole('dialog');
   await form.getByLabel('登记人员', { exact: true }).fill('OA-001'); await form.getByRole('option', { name: /OA-001/u }).click();
   await form.getByLabel('会议主题').fill('部门联席中文会议');
-  await form.getByRole('button', { name: '登记预约', exact: true }).click(); await form.waitFor({ state: 'hidden' });
+  await form.getByRole('button', { name: '提交预约', exact: true }).click(); await form.waitFor({ state: 'hidden' });
+  await approveResourceTask(invoke, reviewerToken, 'room', '部门联席中文会议');
   const meetingQueue = `${url}/#/office/meeting-rooms?view=requests&handlingOnly=true`;
   for (const handler of [seal, special]) {
     await handler.goto(meetingQueue);
@@ -158,7 +164,7 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
   await special.getByRole('dialog').getByLabel('交接／处理备注').fill('第二位办理人核收钥匙');
   await special.getByRole('dialog').getByRole('button', { name: '归还钥匙', exact: true }).click();
   await special.getByRole('dialog').waitFor({ state: 'hidden' });
-  await special.getByText('当前条件下没有登记记录', { exact: true }).waitFor();
+  await special.getByText('当前条件下没有申请记录', { exact: true }).waitFor();
   await admin.goto(`${url}/#/office/notifications`);
   const returned = admin.locator('article').filter({ has: admin.getByRole('heading', { name: '已登记归还 · 多位办理会议室 · 部门联席中文会议', exact: true }) });
   await returned.getByRole('link', { name: '查看关联申请', exact: true }).click();

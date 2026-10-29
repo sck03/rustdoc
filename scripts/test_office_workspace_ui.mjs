@@ -31,16 +31,16 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   import { AccessControlPage } from ${source("features/access-control/AccessControlPage.tsx")};
   import { OrganizationDirectoryPage } from ${source("features/organization/OrganizationDirectoryPage.tsx")};
   const params = new URLSearchParams(location.search), mode=params.get('mode') || 'rooms', admin=params.get('role') !== 'employee';
-  const register=params.get('role')==='register';
+  const unlinked=params.get('role')==='unlinked';
   const now=Date.now(), date=new Date(now).toISOString().slice(0,10);
   const actions=['view','create','cancel','edit','approve','issue','return','restock','manage'];
   const permissions=['office.rooms','office.supplies'].flatMap(resourceKey=>(admin?actions:actions.slice(0,4)).map(action=>({resourceKey,action,dataScope:admin?'company':'own'})));
   const personnelActions=['view','view-details','create','edit','delete','transition','assign'];
   permissions.push(...(admin?personnelActions:['view']).map(action=>({resourceKey:'office.people',action,dataScope:'company'})));
-  const user={id:admin?99:1,username:admin?'admin':'employee',fullName:admin?'行政管理员':'示例员工',companyScope:'DEMO',departmentId:'D1',businessDate:date,businessTimeZone:'Asia/Shanghai',capabilities:{permissions:permissions.filter(p=>!register||p.action!=='assign'),usesOfficeRegister:register,canManageUsers:admin}};
+  const user={id:admin?99:1,username:admin?'admin':'employee',fullName:admin?'行政管理员':'示例员工',companyScope:'DEMO',departmentId:'D1',businessDate:date,businessTimeZone:'Asia/Shanghai',capabilities:{permissions:permissions.filter(p=>!unlinked||p.action!=='assign'),canManageUsers:admin}};
   const room={id:1,name:'三层第一会议室',location:'办公楼三层东侧',equipment:'投影设备、白板、视频会议终端',capacity:12,maximumBookingHours:8,advanceBookingDays:90,requiresKey:true,isActive:true,inUse:false,versionNumber:1};
   const supply={id:1,name:'会议投影设备',unit:'台',location:'行政办公室',description:'会议及培训临时借用，请按期归还。',isReturnable:true,isActive:true,stockQuantity:12,reservedQuantity:2,availableQuantity:10,minimumStock:3,lowStock:false,versionNumber:2};
-  const booking={id:1,meetingRoomId:1,roomName:room.name,location:room.location,requiresKey:true,ownerUserId:1,applicantName:'示例员工',departmentId:'D1',title:'项目周会与交付沟通',attendeeCount:5,startsAt:new Date(now+7200000).toISOString(),endsAt:new Date(now+10800000).toISOString(),status:'Pending',createdAt:new Date(now-600000).toISOString(),versionNumber:1};
+  const booking={id:1,meetingRoomId:1,roomName:room.name,location:room.location,requiresKey:true,ownerUserId:1,applicantName:'示例员工',departmentId:'D1',title:'项目周会与交付沟通',attendeeCount:5,startsAt:new Date(now+7200000).toISOString(),endsAt:new Date(now+10800000).toISOString(),status:'Pending',canReview:admin,reviewTaskKeys:['review:99'],createdAt:new Date(now-600000).toISOString(),versionNumber:1};
   const request={id:1,officeSupplyId:1,supplyName:supply.name,unit:'台',isReturnable:true,ownerUserId:1,applicantName:'示例员工',departmentId:'D1',purpose:'客户交流会议',quantity:2,returnedQuantity:0,returnDueDate:date,status:'Pending',createdAt:booking.createdAt,versionNumber:1};
   const page=items=>({items,totalCount:items.length,pageNumber:1,pageSize:24,totalPages:1});
   const departments=[{code:'D1',name:'业务部',isActive:true},{code:'D2',name:'运营部',isActive:true}].map(item=>({...item,companyCode:'DEMO',versionNumber:1,parentCode:null,managerEmployeeId:null,managerName:''}));
@@ -61,13 +61,13 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   const profile={fullName:'张宁',workEmail:'zhang.ning@example.test',workPhone:'010-5555 1001',workLocation:'总部三楼',personalPhone:'13800000000',emergencyContact:'家属',emergencyPhone:'13900000000',notes:'人事档案示例备注',identityNumber:'11010519491231002X',identityAuthority:'示例签发机关',registeredAddress:'测试地址',identityValidFrom:'2020-01-01',identityValidUntil:null,identityLongTerm:true};
   let person={employee:{id:1,employeeNumber:'EMP-001',fullName:profile.fullName,departmentId:'D1',departmentName:'业务部',jobTitle:'业务专员',workEmail:profile.workEmail,workPhone:profile.workPhone,workLocation:profile.workLocation,status:'Probation',canViewDetails:admin},profile,employmentType:'FullTime',hireDate:date,lastEffectiveDate:date,probationEndsOn:date,contractEndsOn:null,confirmedOn:null,departedOn:null,account:{id:1,username:'employee',fullName:profile.fullName,departmentId:'D1',isActive:true,versionNumber:1},versionNumber:1,canEdit:admin,canTransition:admin,canLinkAccount:admin};
   user.employee = admin ? null : { id: 1, employeeNumber: 'EMP-001', fullName: profile.fullName, jobTitle: '业务专员', status: 'Probation' };
-  if(register){person.account=null;person.canLinkAccount=false;booking.status='Approved';request.status='Approved';}
+  if(unlinked){person.account=null;person.canLinkAccount=false;}
   window.__personnelClear=false; window.__personnelConflict=false;
   const resources=['office.rooms','office.supplies'].map((key,index)=>({key,name:index?'物品领用':'会议室预约',group:'公司行政',workspace:'office',moduleKey:key,sortOrder:index,isTechnical:false,supportsDataScope:true,actions:actions.filter(action=>index||action!=='restock').map((key,index)=>({key,name:({view:'查看',create:'申请',cancel:'取消',approve:'审批',issue:'交接',return:'归还登记',restock:'库存补充',manage:'资源管理'})[key],description:'操作公司行政资源',sortOrder:index,presetLevel:index<1?'view':index<3?'operate':'manage'}))}));
   const template={id:7,code:'OfficeEmployee',name:'公司员工',description:'会议室与物品申请',isSystem:true,isActive:true,versionNumber:1,grants:permissions.filter(p=>p.resourceKey==='office.people'?p.action==='view':['view','create','cancel'].includes(p.action)).map(p=>({...p,dataScope:p.resourceKey==='office.people'?'company':'own'})),effectiveGrants:[]};
   resources.push({key:'office.people',name:'人员信息管理',group:'公司行政',workspace:'office',moduleKey:'office.people',sortOrder:350,isTechnical:false,supportsDataScope:true,actions:personnelActions.map((key,index)=>({key,name:({view:'公司通讯录','view-details':'人事档案与记录',create:'入职登记',edit:'编辑档案',transition:'转正、调岗与离职',assign:'关联账号'})[key],description:'人员管理动作',sortOrder:index,presetLevel:index===0?'view':index<4?'operate':'manage'}))});
   person.images=[];
-  person.canDelete=admin;person.canCorrectRegistration=register;person.deleteRestriction='';
+  person.canDelete=admin;person.canCorrectRegistration=unlinked;person.deleteRestriction='';
   let personDeleted=false;
   window.__officeCalls=[]; window.__officeErrors=[];
   window.addEventListener('error',e=>window.__officeErrors.push(e.message));
@@ -89,12 +89,12 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
     listMeetingRooms:async()=>page([room]), getMeetingRoomAvailability:async()=>[{startsAt:booking.startsAt,endsAt:booking.endsAt,status:'Approved'}],
     listMeetingBookings:async(input)=>record('listBookings',input,page(!input.status||input.status===booking.status?[booking]:[])),
     createMeetingBooking:input=>record('createBooking',input,{...booking,id:2,...input.body}),
-    updateMeetingBooking:input=>{Object.assign(booking,input.body,{versionNumber:booking.versionNumber+1});return record('updateBooking',input,structuredClone(booking))},
+    cancelMeetingBooking:input=>{booking.status='Cancelled';booking.versionNumber++;return record('cancelBooking',input,structuredClone(booking))},
     deleteMeetingRoom:input=>record('deleteRoom',input,undefined),
     createMeetingRoom:input=>record('createRoom',input,room), updateMeetingRoom:input=>record('updateRoom',input,room),
     listOfficeSupplies:async()=>page([supply]), listOfficeSupplyRequests:async(input)=>page(!input.status||input.status===request.status?[request]:[]),
     createOfficeSupplyRequest:input=>record('createSupplyRequest',input,request),
-    updateOfficeSupplyRequest:input=>{Object.assign(request,input.body,{versionNumber:request.versionNumber+1});return record('updateRequest',input,structuredClone(request))},
+    cancelOfficeSupplyRequest:input=>{request.status='Cancelled';request.versionNumber++;return record('cancelRequest',input,structuredClone(request))},
     deleteOfficeSupply:input=>record('deleteSupply',input,undefined),
     createOfficeSupply:input=>record('createSupply',input,supply), updateOfficeSupply:input=>record('updateSupply',input,supply),
     restockOfficeSupply:input=>record('restock',input,{}), stocktakeOfficeSupply:input=>record('stocktake',input,{}),
@@ -239,34 +239,34 @@ try {
   await read(page,"document.querySelector('input[aria-label=\"人员信息管理：人事档案与记录\"]').click()");await clickText(page,"保存方案");await waitFor(page,"window.__officeCalls.some(c=>c.name==='savePermissions')");
   assert(await read(page,"window.__officeCalls.find(c=>c.name==='savePermissions').input.body.grants.some(g=>g.resourceKey==='office.people' && g.action==='view-details')"));await audit(page,"personnel-permission-module-save");
   for(const width of [1024,390]){
-    await open("rooms",width,"register");await clickText(page,"查看日程与预约");
-    assert(await read(page,"[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='登记预约').disabled"));
+    await open("rooms",width,"unlinked");await clickText(page,"查看日程与预约");
+    assert(await read(page,"[...document.querySelectorAll('button')].find(n=>n.textContent.trim()==='提交预约').disabled"));
     await selectEmployee(page);await input(page,'input[name="title"]',"行政登记例会");
     await audit(page,`local-booking-${width}`);await captureScreenshot(page,path.join(output,`local-booking-${width}.png`));
-    await clickText(page,"登记预约");await waitFor(page,"window.__officeCalls.some(c=>c.name==='createBooking')");
+    await clickText(page,"提交预约");await waitFor(page,"window.__officeCalls.some(c=>c.name==='createBooking')");
     assert.equal((await read(page,"window.__officeCalls.find(c=>c.name==='createBooking').input.body")).employeeId,1);
-    await clickText(page,"预约与钥匙交接记录");await waitFor(page,"document.querySelector('.office-request-card')");
-    assert.equal(await read(page,"[...document.querySelectorAll('button')].some(n=>n.textContent.trim()==='批准')"),false);results.push(`local-booking-submit-${width}`);
-    await open("supplies",width,"register");await clickText(page,"登记借用");
+    await clickText(page,"预约记录与审批");await waitFor(page,"document.querySelector('.office-request-card')");
+    assert.equal(await read(page,"[...document.querySelectorAll('button')].some(n=>n.textContent.trim()==='批准')"),true);results.push(`local-booking-submit-${width}`);
+    await open("supplies",width,"unlinked");await clickText(page,"申请借用");
     await selectEmployee(page);await input(page,'textarea[name="purpose"]',"培训使用");
-    await audit(page,`local-supply-${width}`);await clickText(page,"登记领用");await waitFor(page,"window.__officeCalls.some(c=>c.name==='createSupplyRequest')");
+    await audit(page,`local-supply-${width}`);await clickText(page,"提交申请");await waitFor(page,"window.__officeCalls.some(c=>c.name==='createSupplyRequest')");
     assert.equal((await read(page,"window.__officeCalls.find(c=>c.name==='createSupplyRequest').input.body")).employeeId,1);results.push(`local-supply-submit-${width}`);
-    await clickText(page,"领用与归还记录");await waitFor(page,"document.querySelector('.office-request-card')");
-    assert.equal(await read(page,"document.querySelector('.office-filter select').value"),"");results.push(`local-admin-records-${width}`);
+    await clickText(page,"领用记录与审批");await waitFor(page,"document.querySelector('.office-request-card')");
+    assert.equal(await read(page,"document.querySelector('.office-filter select').value"),"Pending");results.push(`local-admin-records-${width}`);
   }
-  for(const role of ['register','employee']) {
+  for(const role of ['unlinked','employee']) {
     await open('hub',390,role);await waitFor(page,"[...document.querySelectorAll('.office-resource-card')].filter(card=>['会议室预约','物品领用'].includes(card.querySelector('h2')?.textContent.trim())).every(card=>card.querySelectorAll('li').length===1)");
     assert.equal(await read(page,"[...document.querySelectorAll('.office-resource-card h2')].filter(title=>['会议室预约','物品领用'].includes(title.textContent.trim())).length"),2);
     await audit(page,`resource-hub-${role}`);await captureScreenshot(page,path.join(output,`resource-hub-${role}.png`));
     await read(page,"document.querySelector('.office-resource-card li a').click()");await waitFor(page,"document.querySelector('.office-request-card')");
     assert(await read(page,"window.__officeCalls.some(c=>c.name==='listBookings'&&c.input.requestId===1)"));results.push(`resource-hub-navigation-${role}`);
   }
-  await open("people",1024,"register");await clickText(page,"人员档案");await waitFor(page,"document.querySelector('.personnel-facts')");
+  await open("people",1024,"unlinked");await clickText(page,"人员档案");await waitFor(page,"document.querySelector('.personnel-facts')");
   assert.equal(await read(page,"[...document.querySelectorAll('button')].some(n=>n.textContent.trim()==='关联账号')"),false);
   await clickText(page,"办理离职");await waitFor(page,"document.body.innerText.includes('还有预约 1 笔')");
   assert(await read(page,"[...document.querySelectorAll('.office-dialog-backdrop:last-of-type button')].find(n=>n.textContent.trim()==='办理离职').disabled"));
   await audit(page,"local-departure-blocked-without-account");
-  await open("people",1024,"register");await clickText(page,"人员档案");await waitFor(page,"document.querySelector('.personnel-facts')");await clickText(page,"交接事项");
+  await open("people",1024,"unlinked");await clickText(page,"人员档案");await waitFor(page,"document.querySelector('.personnel-facts')");await clickText(page,"交接事项");
   await waitFor(page,"document.querySelector('.personnel-clearance')");await read(page,"[...document.querySelectorAll('.personnel-clearance a')].find(n=>n.textContent==='全部预约记录').click()");
   await waitFor(page,"window.__officeCalls.some(c=>c.name==='listBookings'&&c.input.employeeId===1)");results.push("local-employee-clearance-navigation");
   await runPersonnelOrganizationUi({page,open,read,waitFor,clickText,input,audit,results,output,captureScreenshot});

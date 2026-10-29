@@ -169,6 +169,12 @@ pub(in crate::engine) fn resource_access(
     }
     let assigned = can_handle(tx, actor, row, resource)?;
     if action == "view" {
+        if !directory && super::oa::assigned_to(tx, actor, resource, row)? {
+            return Ok(true);
+        }
+        if !directory && actor.oa_assigned_only && !assigned {
+            return Ok(false);
+        }
         return Ok(auth::visible(actor, resource, action, row)
             || ((directory || states(resource)?.contains(&text(row, "status").as_str()))
                 && assigned));
@@ -191,6 +197,8 @@ pub(in crate::engine) fn project_resource(
     }
     row["canHandle"] = json!(can_handle(tx, actor, &row, resource)?);
     row["handlerNames"] = json!(names(tx, actor, &row)?);
+    row["reviewTaskKeys"] = json!(super::oa::approval::review_tasks(tx, actor, &row)?);
+    row["canReview"] = json!(super::oa::approval::authority(tx, actor, &row)?.is_some());
     Ok(row)
 }
 pub(in crate::engine) fn select(

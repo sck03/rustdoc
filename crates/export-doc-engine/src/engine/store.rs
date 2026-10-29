@@ -412,6 +412,7 @@ pub fn save_in_scope(
         identify_record(&mut body, kind, record_id);
         connection.set_body(record_id, &body)?;
     }
+    super::workflow_tasks::persist(connection, kind, &body)?;
     connection.append_audit_details(
         &AuditWrite {
             kind,

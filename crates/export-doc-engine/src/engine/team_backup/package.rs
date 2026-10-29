@@ -282,7 +282,8 @@ mod tests {
         for database in [SQLITE, POSTGRES] {
             for (version, supported) in [
                 (4, false),
-                (5, true),
+                (5, false),
+                (export_doc_storage::SCHEMA_VERSION - 1, false),
                 (export_doc_storage::SCHEMA_VERSION, true),
                 (export_doc_storage::SCHEMA_VERSION + 1, false),
             ] {

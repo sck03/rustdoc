@@ -1,8 +1,7 @@
 //! Shared record filters; values are bound by both database adapters.
 use super::{QuerySql, RecordQuery};
 pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
-    // Preserve each adapter's indexed JSON expression, including SQLite's
-    // json_extract expression indexes from the version-5 schema.
+    // Preserve each adapter's indexed JSON expression.
     let property = |name: &str, number: bool| {
         if postgres {
             let expression = format!("r.body->>'{name}'");
@@ -150,29 +149,24 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
         }
     }
     if let Some(approvers) = q.approvers {
-        let assigned = format!("COALESCE({},0)", property("currentApproverId", true));
-        let mut choices = vec![format!("{assigned}=0")];
+        let mut choices = vec!["FALSE".to_owned()];
         for approver in approvers {
+            let user = bind(approver.user_id.to_string(), "BIGINT");
             let mut choice = format!(
-                "EXISTS (SELECT 1 FROM {} WHERE step.value->>'status'='Waiting' AND {}=(SELECT MIN({}) FROM {} WHERE next.value->>'status'='Waiting') AND CAST(step.value->>'approverUserId' AS BIGINT)={})",
-                steps(postgres, "step"),
-                stage(postgres, "step"),
-                stage(postgres, "next"),
-                steps(postgres, "next"),
-                bind(approver.user_id.to_string(), "BIGINT")
+                "EXISTS (SELECT 1 FROM workflow_tasks task WHERE task.request_id=r.id AND task.active=1 AND task.status='Waiting' AND task.assignee_id={user})"
             );
             if let Some(departments) = &approver.departments {
-                let parameters = departments
+                let ids = departments
                     .iter()
-                    .map(|department| bind(department.clone(), "TEXT"))
+                    .map(|d| bind(d.clone(), "TEXT"))
                     .collect::<Vec<_>>();
-                choice += &if parameters.is_empty() {
+                choice += &if ids.is_empty() {
                     " AND FALSE".into()
                 } else {
-                    format!(" AND r.department IN ({})", parameters.join(","))
+                    format!(" AND r.department IN ({})", ids.join(","))
                 };
             }
-            choices.push(format!("({choice})"));
+            choices.push(choice);
         }
         filter += &format!(" AND ({})", choices.join(" OR "));
     }
@@ -181,15 +175,12 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
         let principals = q
             .visible_principals
             .iter()
-            .map(|principal| {
+            .map(|p| {
                 (
-                    bind(principal.user_id.to_string(), "BIGINT"),
-                    principal.departments.as_ref().map(|departments| {
-                        departments
-                            .iter()
-                            .map(|department| bind(department.clone(), "TEXT"))
-                            .collect()
-                    }),
+                    bind(p.user_id.to_string(), "BIGINT"),
+                    p.departments
+                        .as_ref()
+                        .map(|ds| ds.iter().map(|d| bind(d.clone(), "TEXT")).collect()),
                 )
             })
             .collect::<Vec<_>>();
@@ -200,14 +191,8 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
     }
     if let Some(actor) = q.approval_actor {
         let actor = bind(actor.to_string(), "BIGINT");
-        let used = if postgres {
-            "SELECT 1 FROM jsonb_array_elements(COALESCE(r.body->'approvalPlan'->'steps','[]'::jsonb)) step WHERE CAST(step->>'actedByUserId' AS BIGINT)"
-        } else {
-            "SELECT 1 FROM json_each(r.body,'$.approvalPlan.steps') step WHERE CAST(step.value->>'actedByUserId' AS BIGINT)"
-        };
         filter += &format!(
-            " AND (COALESCE({},0)=0 OR (r.owner_id<>{actor} AND COALESCE({},0)<>{actor} AND NOT EXISTS ({used}={actor})))",
-            property("currentApproverId", true),
+            " AND r.owner_id<>{actor} AND COALESCE({},0)<>{actor}",
             property("applicantAccountId", true)
         );
     }
@@ -227,25 +212,6 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
         values,
     }
 }
-
-fn steps(postgres: bool, alias: &str) -> String {
-    if postgres {
-        format!(
-            "jsonb_array_elements(COALESCE(r.body->'approvalPlan'->'steps','[]'::jsonb)) WITH ORDINALITY AS {alias}(value,ordinality)"
-        )
-    } else {
-        format!("json_each(r.body,'$.approvalPlan.steps') AS {alias}")
-    }
-}
-fn stage(postgres: bool, alias: &str) -> String {
-    let ordinal = if postgres {
-        format!("{alias}.ordinality-1")
-    } else {
-        format!("CAST({alias}.key AS BIGINT)")
-    };
-    format!("COALESCE(CAST({alias}.value->>'stage' AS BIGINT),{ordinal})")
-}
-
 pub(crate) fn participant_condition(
     postgres: bool,
     record: &str,
@@ -253,28 +219,26 @@ pub(crate) fn participant_condition(
     principals: &[(String, Option<Vec<String>>)],
 ) -> String {
     let mut choices = vec![
-        format!("CAST(viewer.value->>'actedByUserId' AS BIGINT)={user}"),
-        format!("CAST(viewer.value->>'approverUserId' AS BIGINT)={user}"),
+        format!("viewer.acted_by_id={user}"),
+        format!("viewer.assignee_id={user}"),
     ];
     for (principal, departments) in principals {
         let scope = match departments {
             None => String::new(),
-            Some(departments) if departments.is_empty() => " AND FALSE".into(),
-            Some(departments) => format!(" AND {record}.department IN ({})", departments.join(",")),
+            Some(ds) if ds.is_empty() => " AND FALSE".into(),
+            Some(ds) => format!(" AND {record}.department IN ({})", ds.join(",")),
         };
-        choices.push(format!(
-            "(CAST(viewer.value->>'approverUserId' AS BIGINT)={principal}{scope})"
-        ));
+        choices.push(format!("(viewer.assignee_id={principal}{scope})"));
     }
-    let source = if postgres {
+    let cc = if postgres {
         format!(
-            "jsonb_array_elements(COALESCE({record}.body->'approvalPlan'->'steps','[]'::jsonb)) AS viewer(value)"
+            "jsonb_array_elements_text(COALESCE({record}.body->'approvalPlan'->'notifyUserIds','[]'::jsonb)) AS cc(value)"
         )
     } else {
-        format!("json_each({record}.body,'$.approvalPlan.steps') AS viewer")
+        format!("json_each({record}.body,'$.approvalPlan.notifyUserIds') AS cc")
     };
     format!(
-        "({record}.owner_id={user} OR EXISTS (SELECT 1 FROM {source} WHERE {}))",
+        "({record}.owner_id={user} OR EXISTS (SELECT 1 FROM workflow_tasks viewer WHERE viewer.request_id={record}.id AND viewer.submission=CAST({record}.body->>'submissionNumber' AS BIGINT) AND ({})) OR EXISTS (SELECT 1 FROM {cc} WHERE CAST(cc.value AS BIGINT)={user}))",
         choices.join(" OR ")
     )
 }

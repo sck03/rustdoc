@@ -8,6 +8,24 @@ mod office_contract;
 fn sqlite_office_directory_schedule_handover_and_stock_follow_the_original_contract() {
     let fixture = native_fixture::Fixture::new();
     let person = fixture.employee();
+    use export_doc_engine::generated_api::*;
+    use serde_json::json;
+    let account=fixture.create(CREATE_USER_ACCOUNT,json!({"username":"resource-applicant","fullName":"资源申请人","role":"OfficeEmployee","companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Resource-2026-Test"}));
+    fixture.request(LINK_PERSONNEL_ACCOUNT,person["employee"]["id"].as_i64(),Some(json!({"expectedVersion":person["versionNumber"],"userId":account["user"]["id"],"expectedAccountVersion":account["user"]["versionNumber"]})));
+    let applicant = fixture
+        .client()
+        .login("resource-applicant".into(), "Resource-2026-Test".into())
+        .unwrap()
+        .0;
+    let applicant_call = |op, id: Option<i64>, query: &[(&str, String)], body| {
+        applicant.json(
+            op,
+            &id.map(|id| vec![("id", id.to_string())])
+                .unwrap_or_default(),
+            query,
+            body,
+        )
+    };
     let call = |operation, id: Option<i64>, query: &[(&str, String)], body| {
         fixture.client().json(
             operation,
@@ -17,7 +35,7 @@ fn sqlite_office_directory_schedule_handover_and_stock_follow_the_original_contr
             body,
         )
     };
-    office_contract::exercise(&call, &call, person["employee"]["id"].as_i64());
+    office_contract::exercise(&call, &applicant_call);
 }
 
 #[test]

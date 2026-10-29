@@ -20,9 +20,18 @@ export function useApprovalSettingsDraft(client: ExportDocManagerApiClient, init
   const changeDelegate = (index: number, change: Partial<OaApprovalSettings["delegations"][number]>) => setDraft(value => ({ ...value, delegations: value.delegations.map((item, i) => i === index ? { ...item, ...change } : item) }));
   const accept = (saved: OaApprovalSettings) => { setBaseline(saved); setDraft(saved); };
   const save = () => operation.run(signal => client.saveOaApprovalSettings({ body: { expectedVersion: baseline.versionNumber, rules: draft.rules, delegations: draft.delegations, handlingServices: draft.handlingServices ?? [], personnelApprovalActions: draft.personnelApprovalActions ?? [], sheetTemplates: draft.sheetTemplates } }, { signal }), accept);
+  const publish = (definitionKey:string) => operation.run(async signal => {
+    const saved=await client.saveOaApprovalSettings({body:{expectedVersion:baseline.versionNumber,rules:draft.rules,delegations:draft.delegations,handlingServices:draft.handlingServices??[],personnelApprovalActions:draft.personnelApprovalActions??[],sheetTemplates:draft.sheetTemplates}},{signal});
+    accept(saved);
+    return client.publishOaDefinition({body:{expectedVersion:saved.versionNumber,definitionKey}},{signal});
+  },accept);
+  const disable = (definitionKey:string) => operation.run(signal=>client.disableOaDefinition({body:{expectedVersion:baseline.versionNumber,definitionKey}},{signal}), saved => {
+    setBaseline(saved);
+    setDraft(value => ({ ...value, publications: saved.publications, versionNumber: saved.versionNumber }));
+  });
   const reload = async () => {
     if (operation.busy || !await confirmDiscardChanges("重新载入审批设置")) return;
     await operation.run(signal => client.getOaApprovalSettings({ signal }), accept);
   };
-  return { draft, setDraft, operation, formRef, changeRule, changeDelegate, save, reload, changedElsewhere: initial.versionNumber !== baseline.versionNumber };
+  return { draft, setDraft, operation, formRef, changeRule, changeDelegate, save, publish, disable, reload, changedElsewhere: initial.versionNumber > baseline.versionNumber };
 }

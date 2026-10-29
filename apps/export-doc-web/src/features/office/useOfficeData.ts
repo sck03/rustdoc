@@ -105,8 +105,8 @@ export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUs
   const focused = Boolean(focus.requestId || focus.applicantUserId || focus.employeeId);
   const handlingOnly = search.get("handlingOnly") === "true" && !focused;
   const paging = useOfficePaging();
-  const [mineOnlyFilter, setMineOnly] = useState(!access.canSeeOthers);
-  const [statusFilter, setStatus] = useState(search.get("status") ?? (user.capabilities.usesOfficeRegister ? "" : access.allows("approve") ? "Pending" : ""));
+  const [mineOnlyFilter, setMineOnly] = useState(!access.canSeeOthers && !access.allows("approve"));
+  const [statusFilter, setStatus] = useState(search.get("status") ?? (access.allows("approve") ? "Pending" : ""));
   const mineOnly = focused || handlingOnly ? false : mineOnlyFilter;
   const status = focused ? "" : statusFilter;
   const query = useQuery({
@@ -125,10 +125,10 @@ export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUs
 }
 
 export function applyOfficeAction(client: ExportDocManagerApiClient, kind: OfficeKind, row: OfficeRequestRow,
-  action: OfficeAction, note: string, quantity: number, signal: AbortSignal): Promise<OfficeRequestRow> {
+  action: OfficeAction, note: string, quantity: number, signal: AbortSignal, taskKey?: string): Promise<OfficeRequestRow> {
   const init = { signal };
   if (kind === "rooms") {
-    const request = { id: row.id, body: { expectedVersion: row.versionNumber, note } };
+    const request = { id: row.id, body: { expectedVersion: row.versionNumber, note, taskKey } };
     switch (action) {
       case "approve": return client.approveMeetingBooking(request, init);
       case "reject": return client.rejectMeetingBooking(request, init);
@@ -137,7 +137,7 @@ export function applyOfficeAction(client: ExportDocManagerApiClient, kind: Offic
       case "return": return client.returnMeetingRoomKey(request, init);
     }
   }
-  const request = { id: row.id, body: { expectedVersion: row.versionNumber, note, quantity } };
+  const request = { id: row.id, body: { expectedVersion: row.versionNumber, note, quantity, taskKey } };
   switch (action) {
     case "approve": return client.approveOfficeSupplyRequest(request, init);
     case "reject": return client.rejectOfficeSupplyRequest(request, init);

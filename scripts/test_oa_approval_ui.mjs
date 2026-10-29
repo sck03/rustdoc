@@ -12,11 +12,11 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   const admin = await openPage('oa-review', 'Review-2026-Test');
   await admin.goto(`${url}/#/office/approvals`);
   await admin.getByRole('link', { name: '审批规则与代理', exact: true }).click();
-  const rule = admin.getByRole('region', { name: '费用报销审批规则', exact: true });
-  await rule.getByLabel('审批方式').selectOption('Named');
+  const rule = admin.locator('details[data-definition-key="expense"]');
+  await rule.locator(':scope > summary').click();
   for (const [index, user] of users.slice(0, 2).entries()) {
-    await rule.getByRole('button', { name: '添加审批步骤', exact: true }).click();
-    await rule.getByLabel(`第 ${index + 1} 步审批人`).selectOption(String(user.id));
+    await rule.getByLabel('审批人来源').nth(index).selectOption('Named');
+    await rule.getByLabel('审批账号（可多选）').nth(index).selectOption([String(user.id)]);
   }
   await admin.getByText('审批代理', { exact: true }).click();
   await admin.getByRole('button', { name: '添加代理', exact: true }).click();
@@ -26,22 +26,25 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   await admin.getByRole('button', { name: '保存审批设置', exact: true }).click();
   assert.equal((await saved).status(), 200);
   // Another administrator saves while this form has unsaved changes.
-  const generalRule = admin.getByRole('region', { name: '通用申请审批规则', exact: true });
-  await generalRule.getByLabel('审批方式').selectOption('DepartmentChain');
+  await rule.getByRole('button', { name: '保存并发布此流程', exact: true }).click();
+  await rule.locator(':scope > summary').getByText(/已启用/u).waitFor();
+  const generalRule = admin.locator('details[data-definition-key="general"]');
+  await generalRule.locator(':scope > summary').click();
+  await generalRule.getByLabel('流程名称', { exact: true }).fill('未保存的通用流程');
   const concurrent = await invoke('GetOaApprovalSettings', undefined, {}, token);
   await invoke('SaveOaApprovalSettings', { ...concurrent, expectedVersion: concurrent.versionNumber }, {}, token);
   const conflict = admin.waitForResponse(response => response.url().endsWith('/api/office/approval-settings') && response.request().method() === 'PUT');
   await admin.getByRole('button', { name: '保存审批设置', exact: true }).click();
   assert.equal((await conflict).status(), 409);
   await admin.getByText('审批设置已被其他管理员修改。当前草稿已保留，请记录需要保留的内容后重新载入最新设置。', { exact: true }).waitFor();
-  assert.equal(await generalRule.getByLabel('审批方式').inputValue(), 'DepartmentChain');
+  assert.equal(await generalRule.getByLabel('流程名称', { exact: true }).inputValue(), '未保存的通用流程');
   await admin.getByRole('button', { name: '重新载入审批设置', exact: true }).click();
   await admin.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
-  assert.equal(await generalRule.getByLabel('审批方式').inputValue(), 'DepartmentChain');
+  assert.equal(await generalRule.getByLabel('流程名称', { exact: true }).inputValue(), '未保存的通用流程');
   await admin.getByRole('button', { name: '重新载入审批设置', exact: true }).click();
   await admin.getByRole('dialog').getByRole('button', { name: '重新载入审批设置', exact: true }).click();
   await admin.getByText('审批设置已被其他管理员修改。当前草稿已保留，请记录需要保留的内容后重新载入最新设置。', { exact: true }).waitFor({ state: 'hidden' });
-  assert.equal(await generalRule.getByLabel('审批方式').inputValue(), 'Configured');
+  assert.equal(await generalRule.getByLabel('流程名称', { exact: true }).inputValue(), concurrent.rules.find(r => r.key === 'general').name);
   await admin.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
   assert.deepEqual(await admin.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => v.id)), []);
   await admin.screenshot({ path: path.join(output, 'approval-settings.png'), fullPage: true });
@@ -68,6 +71,7 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   const requestId = new URLSearchParams(admin.url().split('?')[1]).get('requestId');
   assert(requestId);
   await admin.getByRole('region', { name: '审批步骤', exact: true }).waitFor();
+  assert(!/会签|或签/u.test(await admin.getByRole('region', { name: '审批步骤', exact: true }).innerText()), 'Business progress shows people and outcomes without configuration terminology');
   await act(admin, '催办');
   const second = await openPage('approval-second', 'Approval-UI-2026');
   await second.goto(`${url}/#/office/requests/expense?view=approvals`);
@@ -76,12 +80,12 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   await proxy.getByRole('link', { name: '站内通知', exact: true }).click();
   await proxy.getByRole('heading', { name: '申请人催办 · 逐级审批真实界面验收', exact: true }).waitFor();
   await proxy.getByRole('link', { name: '查看关联申请', exact: true }).first().click();
-  await act(proxy, '登记批准结果');
+  await act(proxy, '批准');
   await proxy.locator('.oa-detail-summary .office-badge').getByText('待审批', { exact: true }).waitFor();
   await proxy.screenshot({ path: path.join(output, 'delegated-step.png'), fullPage: true });
   await second.reload();
   await second.getByRole('button', { name: '逐级审批真实界面验收', exact: true }).click();
-  await act(second, '登记批准结果');
+  await act(second, '批准');
   await second.locator('.oa-detail-summary .office-badge').getByText('已批准', { exact: true }).waitFor();
   // The applicant's existing detail view must discover another user's approval
   // and its archived PDF without a reload or a separate finance permission.

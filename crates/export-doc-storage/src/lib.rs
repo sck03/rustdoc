@@ -47,16 +47,18 @@ struct QuerySql {
     order: String,
     values: Vec<String>,
 }
-mod migrations;
+mod schema;
+mod workflow;
 pub use communication::{CommunicationQuery, CommunicationView, NotificationScope};
+pub use workflow::WorkflowTask;
 mod sqlite;
-pub use migrations::{MIN_SUPPORTED_SCHEMA_VERSION, SCHEMA_VERSION};
+pub use schema::{MIN_SUPPORTED_SCHEMA_VERSION, SCHEMA_VERSION};
 use serde_json::Value;
 use std::{cell::Cell, path::Path};
 
 pub type Result<T> = std::result::Result<T, Error>;
 pub fn validate_schema_version(version: i64) -> Result<()> {
-    migrations::pending(version).map(|_| ())
+    schema::validate(version)
 }
 pub fn verify_sqlite_backup(path: &Path) -> Result<()> {
     sqlite::Sqlite::verify_file(path)
@@ -181,6 +183,12 @@ pub struct Credential {
 
 /// All business operations use this semantic storage boundary, never provider SQL.
 trait Adapter: Send {
+    fn replace_workflow_tasks(
+        &self,
+        request: i64,
+        submission: i64,
+        tasks: &[WorkflowTask],
+    ) -> Result<()>;
     fn query_audits(&self, _query: &AuditQuery<'_>) -> Result<(i64, Vec<Value>)> {
         Err(Error::new(
             ErrorKind::Unsupported,
@@ -677,6 +685,7 @@ impl Connection {
     }
 }
 delegate! {
+    replace_workflow_tasks(request:i64, submission:i64, tasks:&[WorkflowTask])->();
     query_audits(query:&AuditQuery<'_>)->(i64,Vec<Value>);
     query_ordered_records(query:&GenericQuery<'_>,order:RecordOrder)->(i64,Vec<Value>);
     record_exists(kind:&str,filters:&[(&str,String)])->bool;

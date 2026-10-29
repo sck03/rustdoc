@@ -1,3 +1,4 @@
+import { approvalStage, publishDefinitions } from './lib/approval-fixtures.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
@@ -68,10 +69,10 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   const employee = await invoke('CreatePersonnel', { requestKey: 'approval-worker', employeeNumber: 'APPROVAL-WORKER', departmentId: 'TRADE',
     jobTitle: '普通员工', employmentType: 'FullTime', hireDate: '2026-09-01', onProbation: true, profile: { fullName: '跨部门审批员工' } }, {}, adminToken);
   const policy = await invoke('GetOaApprovalSettings', undefined, {}, adminToken);
-  await invoke('SaveOaApprovalSettings', { ...policy, expectedVersion: policy.versionNumber, personnelApprovalActions: ['Confirm'],
-    rules: policy.rules.map(rule => ({ ...rule, mode: 'Named', approverUserIds: [account.id] })) }, {}, adminToken);
+  await publishDefinitions(invoke, adminToken, { ...policy, personnelApprovalActions: ['Confirm'],
+    rules: policy.rules.map(rule => ['general', 'personnel:Confirm'].includes(rule.key) ? { ...rule, stages: [approvalStage('review', [account.id])] } : rule) }, ['general', 'personnel:Confirm']);
   for (const [kind, op, extra, button] of [
-    ['general', 'General', { category: 'Other' }, '登记批准结果'],
+    ['general', 'General', { category: 'Other' }, '批准'],
     ['personnel', 'PersonnelChange', { personnelChange: { action: 'Confirm', expectedPersonnelVersion: employee.versionNumber, effectiveDate: login.user.businessDate } }, '批准人员变动'],
   ]) {
     const draft = await invoke(`Create${op}Request`, { requestKey: `approval-${kind}`, employeeId: employee.employee.id,
@@ -95,9 +96,6 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   const axe = require('axe-core'); await gm.addScriptTag({ content: axe.source });
   assert.deepEqual((await gm.evaluate(async () => window.axe.run(document.querySelector('main'), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } }))).violations, []);
   // Account restrictions survive changing the fallback role, and close both UI/API access.
-  const finishedPolicy = await invoke('GetOaApprovalSettings', undefined, {}, adminToken);
-  await invoke('SaveOaApprovalSettings', { ...finishedPolicy, expectedVersion: finishedPolicy.versionNumber,
-    rules: finishedPolicy.rules.map(rule => ({ ...rule, mode: 'Single', approverUserIds: [], stages: [], amountBranches: [] })) }, {}, adminToken);
   await accounts.locator('summary').filter({ hasText: '账号单独配置与模块权限' }).click();
   await accounts.getByLabel('员工请假模块开放', { exact: true }).uncheck();
   await accounts.getByRole('combobox', { name: /^角色/u }).selectOption('Sales');

@@ -137,6 +137,7 @@ pub(super) fn extend(doc: &mut Value) {
             ("withdraw", "Withdraw", "edit"),
             ("approve", "Approve", "approve"),
             ("reject", "Reject", "approve"),
+            ("return", "ReturnForCorrection", "approve"),
             ("cancel", "Cancel", "cancel"),
             ("void", "Void", "approve"),
             ("complete", "Complete", "complete"),

@@ -2,6 +2,9 @@
 use crate::{DataScope, QuerySql, Result, sql};
 
 pub struct OfficeQuery<'a> {
+    pub viewer: i64,
+    pub assigned_only: bool,
+    pub principals: &'a [crate::RecordApprover],
     pub kind: &'a str,
     pub company: &'a str,
     pub view: DataScope<'a>,
@@ -62,6 +65,23 @@ pub(crate) fn build(q: &OfficeQuery<'_>, pg: bool) -> Result<QuerySql> {
     let can_issue = format!("((COALESCE({handling},'')='' AND {issue}) OR {assigned})");
     if !directory {
         let view = q.view.filter(&mut values, pg);
+        let viewer = format!("CAST({} AS BIGINT)", sql::bind(&mut values, q.viewer, pg));
+        let principals = q
+            .principals
+            .iter()
+            .map(|p| {
+                (
+                    format!("CAST({} AS BIGINT)", sql::bind(&mut values, p.user_id, pg)),
+                    None,
+                )
+            })
+            .collect::<Vec<_>>();
+        let participant = crate::record_query::participant_condition(pg, "r", &viewer, &principals);
+        let view = if q.assigned_only {
+            participant.clone()
+        } else {
+            format!("({view} OR {participant})")
+        };
         let states = if q.kind == "bookings" {
             "'Approved','InUse','Completed'"
         } else {

@@ -33,6 +33,8 @@ mod personnel_scope_contract;
 mod template_contract;
 #[path = "support/tools_contract.rs"]
 mod tools_contract;
+#[path = "support/approval_fixture.rs"]
+mod workflow;
 use export_doc_engine::{
     contracts,
     engine::NativeService,
@@ -98,7 +100,11 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
             .unwrap(),
     )
     .unwrap();
-    assert_eq!(admin["user"]["capabilities"]["usesOfficeRegister"], false);
+    assert!(
+        admin["user"]["capabilities"]
+            .get("usesOfficeRegister")
+            .is_none()
+    );
     let token = admin["accessToken"].as_str().unwrap();
     invoice_clone_contract::exercise(&|operation, parameters, query, body| {
         let bytes = service.dispatch(operation, parameters, query, body, token)?;
@@ -148,9 +154,22 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     let room_id = room["id"].as_i64().unwrap();
     let start = chrono::Utc::now() + chrono::Duration::days(1);
     let end = start + chrono::Duration::hours(1);
-    let body = json!({"requestKey":nonce().unwrap(),"meetingRoomId":room_id,"title":"原生团队验收","attendeeCount":3,"startsAt":start.to_rfc3339(),"endsAt":end.to_rfc3339()});
+    let body = json!({"requestKey":nonce().unwrap(),"employeeId":employee["employee"]["id"],"meetingRoomId":room_id,"title":"原生团队验收","attendeeCount":3,"startsAt":start.to_rfc3339(),"endsAt":end.to_rfc3339()});
+    assert_eq!(
+        call(
+            &service,
+            staff_token,
+            CREATE_MEETING_BOOKING,
+            0,
+            Some(body.clone())
+        )
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
+    workflow::configure(&service, token, admin["user"]["id"].as_i64().unwrap());
     let mut delegated = body.clone();
-    delegated["employeeId"] = employee["employee"]["id"].clone();
+    delegated["employeeId"] = json!(i64::MAX);
     assert_eq!(
         call(
             &service,
@@ -161,12 +180,12 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
         )
         .unwrap_err()
         .status,
-        Some(400)
+        Some(403)
     );
     let booking = call(&service, staff_token, CREATE_MEETING_BOOKING, 0, Some(body)).unwrap();
     assert_eq!(booking["status"], "Pending");
     let booking_id = booking["id"].as_i64().unwrap();
-    let decision = json!({"expectedVersion":booking["versionNumber"],"note":"同意"});
+    let decision = json!({"expectedVersion":booking["versionNumber"],"taskKey":booking["approvalPlan"]["steps"][0]["taskKey"],"note":"同意"});
     assert_eq!(
         call(
             &service,
@@ -188,8 +207,19 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     )
     .unwrap();
     assert_eq!(approved["status"], "Approved");
-    let edited = call(&service, staff_token, UPDATE_MEETING_BOOKING, booking_id, Some(json!({"expectedVersion":approved["versionNumber"],"meetingRoomId":room_id,"title":"修改后重新审批","attendeeCount":4,"startsAt":start.to_rfc3339(),"endsAt":end.to_rfc3339()}))).unwrap();
-    assert_eq!(edited["status"], "Pending");
+    assert_eq!(call(&service, staff_token, UPDATE_MEETING_BOOKING, booking_id, Some(json!({"expectedVersion":approved["versionNumber"],"meetingRoomId":room_id,"title":"修改后重新审批","attendeeCount":4,"startsAt":start.to_rfc3339(),"endsAt":end.to_rfc3339()}))).unwrap_err().status, Some(409));
+    let cancelled = call(
+        &service,
+        staff_token,
+        CANCEL_MEETING_BOOKING,
+        booking_id,
+        Some(json!({"expectedVersion":approved["versionNumber"],"note":"修改内容，重新申请"})),
+    )
+    .unwrap();
+    assert_eq!(cancelled["status"], "Cancelled");
+    let resubmitted = call(&service, staff_token, CREATE_MEETING_BOOKING, 0, Some(json!({"requestKey":nonce().unwrap(),"meetingRoomId":room_id,"title":"修改后重新审批","attendeeCount":4,"startsAt":start.to_rfc3339(),"endsAt":end.to_rfc3339()}))).unwrap();
+    assert_eq!(resubmitted["status"], "Pending");
+    assert_ne!(resubmitted["id"], booking["id"]);
 
     let invoice = InvoiceDraft::demo("2026-09-16", &format!("PG-{}", &suffix[..8]))
         .build()
@@ -272,7 +302,6 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     office_contract::exercise(
         &|op, id, query, body| request(admin_token, op, id, query, body),
         &|op, id, query, body| request(staff_token, op, id, query, body),
-        None,
     );
     oa_contract::exercise(&service, admin_token, staff_token, None);
     oa_archive_contract::exercise(&service, admin_token, staff_token, None);

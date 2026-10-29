@@ -62,6 +62,46 @@ mod tests {
     fn preserves_every_reference_schema_endpoint_and_security_contract() {
         let baseline: Value = serde_json::from_str(include_str!("reference_openapi.json")).unwrap();
         let mut current = document();
+        // OA now has the same workflow semantics on SQLite and PostgreSQL.
+        // Verify this intentional removal without weakening the other frozen contracts.
+        let capabilities = &mut current["components"]["schemas"]["ApiUserCapabilitiesDto"];
+        assert!(
+            capabilities["properties"]
+                .get("usesOfficeRegister")
+                .is_none()
+        );
+        assert!(
+            !capabilities["required"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|f| f == "usesOfficeRegister")
+        );
+        capabilities["properties"]["usesOfficeRegister"] = baseline["components"]["schemas"]["ApiUserCapabilitiesDto"]["properties"]["usesOfficeRegister"].clone();
+        capabilities["required"] =
+            baseline["components"]["schemas"]["ApiUserCapabilitiesDto"]["required"].clone();
+        for (schema, fields) in [
+            ("OfficeDecisionRequest", &["taskKey"][..]),
+            (
+                "MeetingBookingRecord",
+                &["approvalPlan", "canReview", "reviewTaskKeys"][..],
+            ),
+            (
+                "OfficeSupplyRequestRecord",
+                &["approvalPlan", "canReview", "reviewTaskKeys"][..],
+            ),
+            ("OfficeRequestEventRecord", &["approvalPlan"][..]),
+        ] {
+            for field in fields {
+                assert!(
+                    current["components"]["schemas"][schema]["properties"]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove(*field)
+                        .is_some()
+                );
+            }
+        }
         let parameters = current["paths"]["/api/master-data/products"]["get"]["parameters"]
             .as_array_mut()
             .unwrap();

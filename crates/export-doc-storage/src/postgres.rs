@@ -127,15 +127,12 @@ fn schema_version(client: &mut impl ::postgres::GenericClient) -> Result<i64> {
         ));
     }
     let version = rows[0].try_get::<_, i64>(0)?;
-    migrations::pending(version)?;
+    schema::validate(version)?;
     Ok(version)
 }
 fn validate_schema(client: &mut impl ::postgres::GenericClient) -> Result<()> {
-    if schema_version(client)? != SCHEMA_VERSION {
-        return Err(Error::unavailable(
-            "PostgreSQL 数据库需要升级，请停机后通过维护账号运行初始化/升级命令；原库已保留。",
-        ));
-    }
+    schema_version(client)?;
+    client.query("SELECT request_id,submission,task_key,node_key,assignee_id,acted_by_id,status,active,due_at FROM workflow_tasks LIMIT 0",&[])?;
     let queries_available:bool=client.query_one("SELECT COALESCE(has_function_privilege(current_user, to_regprocedure('public.exportdoc_record_text(jsonb)'), 'EXECUTE'), false)",&[])?.try_get(0)?;
     if !queries_available {
         return Err(Error::unavailable(
@@ -143,18 +140,6 @@ fn validate_schema(client: &mut impl ::postgres::GenericClient) -> Result<()> {
         ));
     }
     Ok(())
-}
-
-fn migrate_schema(client: &mut impl ::postgres::GenericClient) -> Result<()> {
-    let version = schema_version(client)?;
-    for (index, migration) in migrations::pending(version)?.iter().enumerate() {
-        client.batch_execute(migration.postgres)?;
-        client.execute(
-            "UPDATE schema_version SET version=$1",
-            &[&(version + index as i64 + 1)],
-        )?;
-    }
-    validate_schema(client)
 }
 
 pub fn initialize(connection_string: &str, owner: &str) -> Result<()> {
@@ -174,8 +159,8 @@ pub fn initialize(connection_string: &str, owner: &str) -> Result<()> {
             &[],
         )?
         .try_get(0)?;
-    if count != 0 && schema_version(&mut client)? == SCHEMA_VERSION {
-        return Ok(());
+    if count != 0 {
+        return validate_schema(&mut client);
     }
     let role = client.query_opt("SELECT rolcanlogin, rolsuper, rolcreatedb, rolcreaterole FROM pg_roles WHERE rolname=$1", &[&owner])?
         .ok_or_else(|| Error::unavailable("请先创建独立的 NOLOGIN 数据库所有者角色。"))?;
@@ -186,14 +171,47 @@ pub fn initialize(connection_string: &str, owner: &str) -> Result<()> {
     }
     let mut transaction = client.transaction()?;
     transaction.batch_execute(&format!("SET LOCAL ROLE \"{owner}\""))?;
-    if count == 0 {
-        transaction.batch_execute(include_str!("postgres.sql"))?;
-    }
-    migrate_schema(&mut transaction)?;
+    transaction.batch_execute(include_str!("postgres.sql"))?;
+    validate_schema(&mut transaction)?;
     transaction.commit()?;
     validate_schema(&mut client)
 }
 impl Adapter for Postgres {
+    fn replace_workflow_tasks(
+        &self,
+        request: i64,
+        submission: i64,
+        tasks: &[WorkflowTask],
+    ) -> Result<()> {
+        let mut db = self.client.borrow_mut();
+        db.execute(
+            "UPDATE workflow_tasks SET active=0 WHERE request_id=$1",
+            &[&request],
+        )?;
+        db.execute(
+            "DELETE FROM workflow_tasks WHERE request_id=$1 AND submission=$2",
+            &[&request, &submission],
+        )?;
+        let insert=db.prepare("INSERT INTO workflow_tasks(request_id,submission,task_key,node_key,assignee_id,acted_by_id,status,active,due_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)")?;
+        for task in tasks {
+            db.execute(
+                &insert,
+                &[
+                    &request,
+                    &submission,
+                    &task.key,
+                    &task.node,
+                    &task.assignee,
+                    &task.acted_by,
+                    &task.status,
+                    &i64::from(task.active),
+                    &task.due_at,
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
     fn query_audits(&self, query: &AuditQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, projection) = audit_query::build(query, true);
         let count = if query.count_all {

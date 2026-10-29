@@ -1,16 +1,12 @@
 //! The same immutable-version and stored-PDF contract runs on both databases.
 use super::oa_contract::{call, operation};
-use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
+use export_doc_engine::{engine::NativeService, paths::nonce};
 use serde_json::{Value, json};
 use std::time::{Duration, Instant};
 
 pub fn exercise(service: &NativeService, admin: &str, applicant: &str, employee: Option<i64>) {
-    let mut settings = call(service, admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
-    settings["expectedVersion"] = settings["versionNumber"].clone();
-    for rule in settings["rules"].as_array_mut().unwrap() {
-        *rule = json!({"kind":rule["kind"],"mode":"Single","approverUserIds":[]});
-    }
-    call(service, admin, SAVE_OA_APPROVAL_SETTINGS, 0, Some(settings)).unwrap();
+    let (reviewer_id, reviewer_token) = super::oa_contract::workflow::reviewer(service, admin);
+    super::oa_contract::workflow::configure(service, admin, reviewer_id);
     let mut body = json!({"requestKey":nonce().unwrap(),"title":"冻结版本验证","reason":"第一版正文","category":"IT","employeeId":employee});
     let mut row = call(
         service,
@@ -108,7 +104,7 @@ pub fn exercise(service: &NativeService, admin: &str, applicant: &str, employee:
         original
     );
     row = act(applicant, "submit", &row);
-    row = act(admin, "approve", &row);
+    row = act(&reviewer_token, "approve", &row);
     assert_eq!(row["status"], "Approved");
     let second = row["submissionId"].as_i64().unwrap();
     let output_path = [("id", id.to_string()), ("submissionId", second.to_string())];
@@ -163,7 +159,7 @@ pub fn exercise(service: &NativeService, admin: &str, applicant: &str, employee:
             .content
             .starts_with(b"PK")
     );
-    row = act(admin, "void", &row);
+    row = act(&reviewer_token, "void", &row);
     assert_eq!(row["status"], "Cancelled");
     assert!(
         service

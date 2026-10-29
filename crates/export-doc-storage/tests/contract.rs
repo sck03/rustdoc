@@ -148,9 +148,39 @@ fn roundtrip(connection: &Connection) {
         })
         .unwrap();
     connection.set_body(id, &body).unwrap();
+    connection
+        .replace_workflow_tasks(
+            id,
+            1,
+            &[export_doc_storage::WorkflowTask {
+                key: "review".into(),
+                node: "review".into(),
+                assignee: id,
+                acted_by: None,
+                status: "Waiting".into(),
+                active: true,
+                due_at: "2026-10-30T00:00:00+00:00".into(),
+            }],
+        )
+        .unwrap();
+    // A previous submission's task must not expose a revised submission.
+    let visibility = export_doc_storage::RecordQuery {
+        kind: "contract",
+        company: "公司é",
+        visible_user: Some(id),
+        limit: 1,
+        ..Default::default()
+    };
+    for (submission, expected) in [(1, 1), (2, 0)] {
+        let mut revision = body.clone();
+        revision["submissionNumber"] = json!(submission);
+        connection.set_body(id, &revision).unwrap();
+        assert_eq!(connection.query_records(&visibility).unwrap().0, expected);
+    }
+    connection.set_body(id, &body).unwrap();
     for (department, count) in [("其他部门", 0), ("销售部", 1)] {
         let approvers = [export_doc_storage::RecordApprover {
-            user_id: 7,
+            user_id: id,
             departments: Some(vec![department.into()]),
         }];
         let query = export_doc_storage::RecordQuery {
@@ -231,6 +261,13 @@ fn roundtrip(connection: &Connection) {
     connection.rollback().unwrap();
     assert_eq!(connection.get("contract", id).unwrap(), Some(body));
     connection.begin().unwrap();
+    assert!(
+        connection.delete("contract", id, 1).is_err(),
+        "workflow history protects its parent"
+    );
+    connection.rollback().unwrap();
+    connection.begin().unwrap();
+    connection.replace_workflow_tasks(id, 1, &[]).unwrap();
     connection.delete_blobs(id).unwrap();
     assert!(connection.delete("contract", id, 1).unwrap());
     connection.commit().unwrap();
@@ -269,75 +306,10 @@ fn postgres_matches_the_sqlite_contract_and_holds_the_instance_lock() {
     let maintenance = std::env::var("EXPORTDOC_TEST_POSTGRES_MAINTENANCE")
         .expect("isolated maintenance connection");
     let app = std::env::var("EXPORTDOC_TEST_POSTGRES_APP").expect("isolated app connection");
-    {
-        let mut baseline = postgres::Client::connect(&maintenance, postgres::NoTls).unwrap();
-        baseline.batch_execute("SET ROLE native_owner;").unwrap();
-        baseline
-            .batch_execute(include_str!("../src/postgres.sql"))
-            .unwrap();
-        baseline
-            .execute(
-                "INSERT INTO settings VALUES ('v5-preserved', 1, $1::text::jsonb)",
-                &[&json!({"value":"原有业务数据"}).to_string()],
-            )
-            .unwrap();
-    }
-    assert!(
-        Connection::postgres(&app).is_err(),
-        "business account cannot perform DDL migrations"
-    );
+    Connection::initialize_postgres(&maintenance, "native_owner").unwrap();
     {
         let mut raw = postgres::Client::connect(&maintenance, postgres::NoTls).unwrap();
-        raw.batch_execute("SET ROLE native_owner; ALTER TABLE schema_version ADD CONSTRAINT migration_failure CHECK(version = 5);").unwrap();
-        assert!(Connection::initialize_postgres(&maintenance, "native_owner").is_err());
-        assert_eq!(
-            raw.query_one("SELECT version FROM schema_version", &[])
-                .unwrap()
-                .get::<_, i64>(0),
-            5
-        );
-        assert!(raw.query_one("SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='schema_version_version_check'", &[]).unwrap().get::<_, String>(0).contains("= 5"), "failed version update must roll back the earlier DDL too");
-        raw.batch_execute("ALTER TABLE schema_version DROP CONSTRAINT migration_failure;")
-            .unwrap();
-    }
-    {
-        let mut raw = postgres::Client::connect(&maintenance, postgres::NoTls).unwrap();
-        raw.batch_execute("SET ROLE native_owner; ALTER TABLE schema_version DROP CONSTRAINT schema_version_version_check; ALTER TABLE schema_version ADD CONSTRAINT schema_version_version_check CHECK(version >= 5); UPDATE schema_version SET version=6; CREATE INDEX records_template_catalog ON records(kind);").unwrap();
-        assert!(Connection::initialize_postgres(&maintenance, "native_owner").is_err());
-        assert_eq!(
-            raw.query_one("SELECT version FROM schema_version", &[])
-                .unwrap()
-                .get::<_, i64>(0),
-            6
-        );
-        assert_eq!(raw.query_one("SELECT COUNT(*) FROM pg_indexes WHERE schemaname='public' AND indexname='records_status_page'",&[]).unwrap().get::<_,i64>(0),0);
-        raw.batch_execute("DROP INDEX records_template_catalog;")
-            .unwrap();
-    }
-    {
-        let mut raw = postgres::Client::connect(&maintenance, postgres::NoTls).unwrap();
-        raw.batch_execute("SET ROLE native_owner;").unwrap();
-        raw.batch_execute(include_str!("../src/migrations/007-postgres.sql"))
-            .unwrap();
-        raw.batch_execute("UPDATE schema_version SET version=7; CREATE INDEX records_hs_current_code ON records(kind);").unwrap();
-        assert!(Connection::initialize_postgres(&maintenance, "native_owner").is_err());
-        assert_eq!(
-            raw.query_one("SELECT version FROM schema_version", &[])
-                .unwrap()
-                .get::<_, i64>(0),
-            7
-        );
-        assert_eq!(
-            raw.query_one(
-                "SELECT COUNT(*) FROM pg_indexes WHERE indexname='records_hs_code_order'",
-                &[]
-            )
-            .unwrap()
-            .get::<_, i64>(0),
-            0
-        );
-        raw.batch_execute("DROP INDEX records_hs_current_code;")
-            .unwrap();
+        raw.batch_execute(r#"SET ROLE native_owner; INSERT INTO settings VALUES ('v5-preserved',1,'{"value":"原有业务数据"}'::jsonb);"#).unwrap();
     }
     Connection::initialize_postgres(&maintenance, "native_owner").unwrap();
     Connection::initialize_postgres(&maintenance, "native_owner").unwrap();

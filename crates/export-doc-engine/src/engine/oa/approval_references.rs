@@ -1,5 +1,37 @@
 use super::*;
 
+const WORKFLOWS: &[&str] = &[
+    "oa-leave",
+    "oa-overtime",
+    "oa-expense",
+    "oa-travel",
+    "oa-purchase",
+    "oa-general",
+    "oa-personnel",
+    "bookings",
+    "supply-requests",
+];
+
+fn referenced_rules(
+    tx: &Connection,
+    company: &str,
+    settings: &Value,
+) -> Result<Vec<export_doc_domain::approval_policy::ApprovalRule>> {
+    let mut rules: Vec<export_doc_domain::approval_policy::ApprovalRule> =
+        serde_json::from_value(settings["rules"].clone())?;
+    for publication in settings["publications"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|p| p["enabled"] == true)
+    {
+        let key = text(publication, "key");
+        let (kind, variant) = key.split_once(':').unwrap_or((&key, ""));
+        rules.push(super::definitions::published(tx, company, kind, variant)?.0);
+    }
+    Ok(rules)
+}
+
 /// Called after an account or scheme write inside its transaction, so rejection rolls back both.
 pub(in crate::engine) fn validate_account(
     tx: &Connection,
@@ -9,8 +41,7 @@ pub(in crate::engine) fn validate_account(
     let id = records::positive(user, "id", "账号")?;
     let company = text(user, "companyScope");
     let settings = settings::load(tx, &company)?;
-    let rules: Vec<export_doc_domain::approval_policy::ApprovalRule> =
-        serde_json::from_value(settings["rules"].clone())?;
+    let rules = referenced_rules(tx, &company, &settings)?;
     let executive = match super::super::personnel_accounts::person_for_account(tx, id)? {
         Some(person) => tx
             .find_identity("companies", &store::normalize(&company))?
@@ -31,26 +62,22 @@ pub(in crate::engine) fn validate_account(
             "权限调整会使公司领导审批负责人失去公司审批职责，请先交接。",
         ));
     }
-    if rules.iter().any(|r| r.account_ids().contains(&id)) {
-        let reviewer = current()?;
-        for kind in KINDS {
-            if !rules
-                .iter()
-                .any(|r| r.kind == kind.trim_start_matches("oa-") && r.account_ids().contains(&id))
+    for rule in &rules {
+        let responsible = rule.account_ids().contains(&id);
+        if responsible || rule.notify_user_ids.contains(&id) {
+            let reviewer = current()?;
+            let resource =
+                approval::resource(&rule.kind).ok_or_else(|| invalid("未知审批类型。"))?;
+            if auth::authorize(&reviewer, resource, "view").is_err()
+                || (responsible && auth::authorize(&reviewer, resource, "approve").is_err())
             {
-                continue;
-            }
-            let resource = approval::resource(kind).ok_or_else(|| invalid("未知审批类型。"))?;
-            let rank = auth::scope_rank(&reviewer, resource, "view")
-                .min(auth::scope_rank(&reviewer, resource, "approve"));
-            if rank < 2 {
                 return Err(conflict(
-                    "权限调整会使公司领导审批负责人或指定审批规则失效，请先交接职责或更新规则。",
+                    "账号仍被流程草稿或启用版本引用，请先更新并发布流程或停用版本。",
                 ));
             }
         }
     }
-    for kind in KINDS {
+    for kind in WORKFLOWS {
         let mut offset = 0;
         loop {
             crate::operation::check()?;
@@ -72,8 +99,9 @@ pub(in crate::engine) fn validate_account(
                     let reviewer = current()?;
                     let resource =
                         approval::resource(kind).ok_or_else(|| invalid("未知审批类型。"))?;
-                    if !viewable(tx, &reviewer, resource, &row)?
-                        || !auth::visible(&reviewer, resource, "approve", &row)
+                    if reviewer.company != company
+                        || auth::authorize(&reviewer, resource, "view").is_err()
+                        || auth::authorize(&reviewer, resource, "approve").is_err()
                     {
                         return Err(conflict(
                             "权限调整会使在途审批失去审批人，请先从申请详情移交未完成步骤。",
@@ -97,7 +125,7 @@ pub(in crate::engine) fn assigned(
     pending: bool,
 ) -> Result<i64> {
     let mut total = 0;
-    for kind in KINDS {
+    for kind in WORKFLOWS {
         let mut offset = 0;
         loop {
             crate::operation::check()?;
@@ -142,25 +170,24 @@ pub(in crate::engine) fn check(tx: &Connection, kind: &str, row: &Value) -> Resu
         },
     );
     let settings = settings::load(tx, &company)?;
-    let referenced = if kind == "companies" {
-        settings["id"].as_i64().is_some()
-    } else {
-        let user = records::positive(row, "id", "账号")?;
-        let rules: Vec<export_doc_domain::approval_policy::ApprovalRule> =
-            serde_json::from_value(settings["rules"].clone())?;
-        rules.iter().any(|rule| rule.account_ids().contains(&user))
-            || settings["delegations"].as_array().is_some_and(|items| {
+    let referenced =
+        if kind == "companies" {
+            settings["id"].as_i64().is_some()
+        } else {
+            let user = records::positive(row, "id", "账号")?;
+            let rules = referenced_rules(tx, &company, &settings)?;
+            rules.iter().any(|rule| {
+                rule.account_ids().contains(&user) || rule.notify_user_ids.contains(&user)
+            }) || settings["delegations"].as_array().is_some_and(|items| {
                 items
                     .iter()
                     .any(|d| d["principalUserId"] == user || d["delegateUserId"] == user)
-            })
-            || handling::services(tx, &company)?.iter().any(|s| {
+            }) || handling::services(tx, &company)?.iter().any(|s| {
                 s["handlerUserIds"]
                     .as_array()
                     .is_some_and(|ids| ids.contains(&json!(user)))
-            })
-            || assigned(tx, &company, user, false)? > 0
-    };
+            }) || assigned(tx, &company, user, false)? > 0
+        };
     if referenced {
         return Err(conflict(
             "账号或公司仍有审批规则、代理或审批历史引用，不能删除。",

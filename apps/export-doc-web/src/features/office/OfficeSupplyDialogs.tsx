@@ -37,7 +37,7 @@ export function OfficeSupplyApplication({ client, supply, user, onClose }: {
 }) {
   const [requestKey] = useState(createRequestKey);
   const [employee, setEmployee] = useState<PersonnelDirectoryRecord | null>(null);
-  const register = user.capabilities.usesOfficeRegister;
+  const canSelectEmployee = user.capabilities.canManageUsers;
   const operation = useOfficeOperation();
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,17 +49,17 @@ export function OfficeSupplyApplication({ client, supply, user, onClose }: {
       employeeId: employee?.id ?? null,
     } }, { signal }), onClose);
   }
-  return <OfficeDialog title={`${register ? "登记" : "申请"}${supply.isReturnable ? "借用" : "领用"} · ${supply.name}`} onClose={onClose} {...operation} protectChanges>
+  return <OfficeDialog title={`申请${supply.isReturnable ? "借用" : "领用"} · ${supply.name}`} onClose={onClose} {...operation} protectChanges>
     <p>当前可用 {supply.availableQuantity} {supply.unit} · {supply.location || "请向行政管理员确认领取位置"}</p>
     {supply.handlingName && <p>物品组：{supply.handlingName} · 保管人员：{supply.handlerNames}</p>}
-    <p className="office-muted">{register ? "登记后预留库存，实际交接时再确认发放；库存不足请先补充。" : "申请由管理员审批后发放。库存不足时，可先提交申请，待补充后审批。"}</p>
+    <p className="office-muted">全部节点审批通过后预留库存，由指定办理人发放；库存不足时须先补充再批准。</p>
     <form onSubmit={submit}><fieldset disabled={operation.busy} className="office-form-grid">
-      {register && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={setEmployee} disabled={operation.busy} />}
+      {canSelectEmployee && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={setEmployee} disabled={operation.busy} />}
       <OfficeApplicantIdentity user={user} />
       <OfficeField label={`申请数量（${supply.unit}）`}><input name="quantity" type="number" required min={1} max={1000000} defaultValue={1} /></OfficeField>
       {supply.isReturnable && <OfficeField label="预计归还日期"><input name="returnDueDate" type="date" required min={user.businessDate} defaultValue={user.businessDate} /></OfficeField>}
       <OfficeField label="领用用途" wide><textarea name="purpose" rows={3} required maxLength={500} placeholder="请说明使用用途" /></OfficeField>
-    </fieldset><OfficeSubmit busy={operation.busy} disabled={!canIdentifyOfficeApplicant(user) || register && (!employee || supply.availableQuantity < 1)} label={register ? "登记领用" : "提交申请"} /></form>
+    </fieldset><OfficeSubmit busy={operation.busy} disabled={!canIdentifyOfficeApplicant(user) || canSelectEmployee && !employee} label="提交申请" /></form>
   </OfficeDialog>;
 }
 

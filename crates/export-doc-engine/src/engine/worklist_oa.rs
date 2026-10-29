@@ -21,49 +21,74 @@ pub(super) fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
             continue;
         }
         let mut items = vec![];
-        for row in store::all(tx, kind)? {
-            if !oa::viewable(tx, actor, resource, &row)? {
-                continue;
+        let mut offset = 0;
+        loop {
+            crate::operation::check()?;
+            let (total, rows) = tx.query_records(&export_doc_storage::RecordQuery {
+                kind,
+                company: &actor.company,
+                offset,
+                limit: 100,
+                ..Default::default()
+            })?;
+            let count = rows.len() as i64;
+            for row in rows {
+                if !oa::viewable(tx, actor, resource, &row)? {
+                    continue;
+                }
+                let own = row["ownerUserId"] == actor.id;
+                let status = text(&row, "status");
+                let complete = if kind == "oa-general" {
+                    handling::can_handle(tx, actor, &row, "office.general")?
+                } else {
+                    auth::visible(actor, resource, "complete", &row)
+                };
+                let label = match status.as_str() {
+                    "Draft" | "Returned" if own && auth::visible(actor, resource, "edit", &row) => {
+                        "待修改／提交"
+                    }
+                    "Pending" if approval::authority(tx, actor, &row)?.is_some() => "待我审批",
+                    "Pending" if own => "等待审批，可催办或撤回",
+                    "Approved" if complete => "待办理／验收／归档",
+                    "Approved" if own => "已批准，等待办理／验收／归档",
+                    _ => continue,
+                };
+                let date = if status == "Approved" {
+                    match kind {
+                        "oa-leave" => row["leave"]["endsOn"].clone(),
+                        "oa-travel" => row["travel"]["endsOn"].clone(),
+                        _ => Value::Null,
+                    }
+                } else {
+                    Value::Null
+                };
+                let instant = if status == "Pending" {
+                    let plan = approval::plan(&row)?;
+                    json!(plan.as_ref().and_then(|p| {
+                        p.current_indices()
+                            .iter()
+                            .map(|i| p.nodes[p.steps[*i].stage].due_at.clone())
+                            .filter(|d| !d.is_empty())
+                            .min()
+                    }))
+                } else if status == "Approved" && kind == "oa-overtime" {
+                    row["overtime"]["endsAt"].clone()
+                } else {
+                    Value::Null
+                };
+                items.push(item(
+                    &row,
+                    text(&row, "title"),
+                    format!("{} · {label}", text(&row, "employeeName")),
+                    Value::Null,
+                    date,
+                    instant,
+                ));
             }
-            let own = row["ownerUserId"] == actor.id;
-            let status = text(&row, "status");
-            let complete = if kind == "oa-general" {
-                handling::can_handle(tx, actor, &row, "office.general")?
-            } else {
-                auth::visible(actor, resource, "complete", &row)
-            };
-            let label = match status.as_str() {
-                "Draft" | "Rejected" if own && auth::visible(actor, resource, "edit", &row) => {
-                    "待修改／提交"
-                }
-                "Pending" if approval::authority(tx, actor, &row)?.is_some() => "待我审批",
-                "Pending" if own => "等待审批，可催办或撤回",
-                "Approved" if complete => "待办理／验收／归档",
-                "Approved" if own => "已批准，等待办理／验收／归档",
-                _ => continue,
-            };
-            let date = if status == "Approved" {
-                match kind {
-                    "oa-leave" => row["leave"]["endsOn"].clone(),
-                    "oa-travel" => row["travel"]["endsOn"].clone(),
-                    _ => Value::Null,
-                }
-            } else {
-                Value::Null
-            };
-            let instant = if status == "Approved" && kind == "oa-overtime" {
-                row["overtime"]["endsAt"].clone()
-            } else {
-                Value::Null
-            };
-            items.push(item(
-                &row,
-                text(&row, "title"),
-                format!("{} · {label}", text(&row, "employeeName")),
-                Value::Null,
-                date,
-                instant,
-            ));
+            offset += count;
+            if count == 0 || offset >= total {
+                break;
+            }
         }
         groups.push(Group {
             key: kind,

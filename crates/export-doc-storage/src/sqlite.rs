@@ -77,16 +77,7 @@ impl Sqlite {
         if fresh {
             transaction.execute_batch(include_str!("sqlite.sql"))?;
         }
-        let version = Self::version(&transaction)?;
-        let pending = migrations::pending(version)?;
-        for (index, migration) in pending.iter().enumerate() {
-            transaction.execute_batch(migration.sqlite)?;
-            transaction.execute(
-                "UPDATE schema_version SET version=?1",
-                [version + index as i64 + 1],
-            )?;
-        }
-        if fresh || !pending.is_empty() {
+        if fresh {
             Self::validate(&transaction)?;
         } else {
             Self::validate_structure(&transaction)?;
@@ -202,12 +193,45 @@ impl Sqlite {
         Ok(())
     }
     fn validate_structure(connection: &SqliteConnection) -> Result<()> {
-        migrations::pending(Self::version(connection)?)?;
+        schema::validate(Self::version(connection)?)?;
+        connection.prepare("SELECT request_id,submission,task_key,node_key,assignee_id,acted_by_id,status,active,due_at FROM workflow_tasks LIMIT 0")?;
         connection.prepare("SELECT id,kind,record_id,version,action,actor_id,occurred_at,body FROM audit_logs LIMIT 0")?;
         Ok(())
     }
 }
 impl Adapter for Sqlite {
+    fn replace_workflow_tasks(
+        &self,
+        request: i64,
+        submission: i64,
+        tasks: &[WorkflowTask],
+    ) -> Result<()> {
+        let db = self.connection.borrow();
+        db.execute(
+            "UPDATE workflow_tasks SET active=0 WHERE request_id=?1",
+            [request],
+        )?;
+        db.execute(
+            "DELETE FROM workflow_tasks WHERE request_id=?1 AND submission=?2",
+            params![request, submission],
+        )?;
+        let mut insert=db.prepare("INSERT INTO workflow_tasks(request_id,submission,task_key,node_key,assignee_id,acted_by_id,status,active,due_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)")?;
+        for task in tasks {
+            insert.execute(params![
+                request,
+                submission,
+                task.key,
+                task.node,
+                task.assignee,
+                task.acted_by,
+                task.status,
+                i64::from(task.active),
+                task.due_at
+            ])?;
+        }
+        Ok(())
+    }
+
     fn query_audits(&self, query: &AuditQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, projection) = audit_query::build(query, false);
         let count = if query.count_all {

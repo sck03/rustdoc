@@ -6,7 +6,7 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   const login = await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' });
   const token = login.accessToken;
   const initial = await invoke('GetOaApprovalSettings', undefined, {}, token);
-  assert(initial.rules.every(rule => rule.mode === 'Configured' && rule.stages[1].source === 'CompanyExecutive'));
+  assert(initial.rules.every(rule => rule.stages[1].source === 'CompanyExecutive'));
   const template = initial.sheetTemplates.find(item => item.key === 'expense');
   const design = JSON.parse(template.content);
   const serialized = JSON.stringify(design);
@@ -26,7 +26,8 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   const preview = await invoke('PreviewOaApprovalSheet', template, {}, token);
   assert(preview.html.includes('公司领导审批'));
   assert(preview.html.includes('节点 3'));
-  assert(preview.html.includes('或签'));
+  assert(!/会签|或签/u.test(preview.html));
+  assert(preview.html.includes('本人未签署'));
   // Converting an existing colored design keeps its fields and geometry.
   const colored = structuredClone(initial);
   const coloredDesign = JSON.parse(colored.sheetTemplates[0].content);
@@ -36,12 +37,13 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   await invoke('SaveOaApprovalSettings', { ...colored, expectedVersion: initial.versionNumber }, {}, token);
   const page = await openPage('oa-review', 'Review-2026-Test');
   await page.goto(`${url}/#/office/approval-settings`);
-  const rule = page.getByRole('region', { name: '费用报销审批规则', exact: true });
-  await rule.getByLabel('审批人是提交人或申请人员本人').selectOption('Reject');
-  await rule.getByLabel('同一人兼任多个审批阶段').selectOption('Reject');
-  await rule.getByLabel('节点通过方式').first().selectOption('Any');
+  const rule = page.locator('details[data-definition-key="expense"]');
+  await rule.locator(':scope > summary').click();
+  await rule.getByLabel('遇到申请人本人').first().selectOption('Reject');
+  await rule.getByLabel('人员兼任').first().selectOption('Reject');
+  await rule.getByLabel('通过方式').first().selectOption('Any');
   await rule.getByLabel('审批人来源').first().selectOption('LineManager');
-  assert.equal(await rule.getByLabel('节点通过方式').first().inputValue(), 'Any');
+  assert.equal(await rule.getByLabel('通过方式').first().inputValue(), 'Any');
   await rule.getByLabel('审批人来源').first().selectOption('DepartmentManager');
   await page.getByText('审批单名称与打印模板', { exact: true }).click();
   await page.getByRole('button', { name: '使用黑白打印样式', exact: true }).first().click();
@@ -62,8 +64,8 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   assert.equal(JSON.parse(saved.sheetTemplates[0].content).reportType, 'OaApproval');
   monochrome(JSON.parse(saved.sheetTemplates[0].content));
   const savedRule = saved.rules.find(item => item.kind === 'expense');
-  assert.equal(savedRule.selfApproval, 'Reject');
-  assert.equal(savedRule.repeatedApprover, 'Reject');
+  assert.equal(savedRule.stages[0].selfApproval, 'Reject');
+  assert.equal(savedRule.stages[0].repeatedApprover, 'Reject');
   assert.equal(savedRule.stages[0].decision, 'Any');
   await page.getByRole('button', { name: '全部恢复默认版式', exact: true }).click();
   // Restoration is a settings draft until explicitly saved.

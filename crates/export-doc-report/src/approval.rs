@@ -119,17 +119,12 @@ pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
                 .map(str::to_owned)
                 .unwrap_or_else(|| "审批".into());
             if previous_stage != Some(stage) {
-                let rule = if step["decision"] == "Any" {
-                    "或签：任一人同意"
-                } else {
-                    "会签：全部同意"
-                };
-                decisions.push(format!("节点 {} · {label} · {rule}", stage + 1));
+                decisions.push(format!("节点 {} · {label}", stage + 1));
                 previous_stage = Some(stage);
             }
             let record = if step["status"] == "Skipped" {
                 format!(
-                    "候选审批人：{}（账号 #{}）\n或签节点已由其他审批人通过，本人未签署。",
+                    "审批人：{}（账号 #{}）\n本节点已通过，本人未签署，无需处理。",
                     text(step, "approverName"),
                     step["approverUserId"]
                 )
@@ -157,24 +152,7 @@ pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
         }
     }
     if decisions.is_empty() {
-        decisions.push("节点 1 · 单步审批".into());
-        for decision in snapshot["decisions"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter(|decision| decision["action"] == "approve")
-        {
-            decisions.push(format!(
-                "{}（账号 #{}） · {}\n{}",
-                text(decision, "actorName"),
-                decision["actorId"],
-                text(decision, "occurredAt"),
-                text(decision, "note")
-            ));
-        }
-        if decisions.len() == 1 {
-            return Err(crate::error::invalid("审批单缺少实际批准记录。"));
-        }
+        return Err(crate::error::invalid("审批单缺少实际节点签署记录。"));
     }
     Ok(ReportData {
         report_type: "OaApproval",

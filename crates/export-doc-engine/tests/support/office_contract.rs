@@ -1,10 +1,23 @@
+#[path = "approval_fixture.rs"]
+mod workflow;
 use export_doc_engine::{api::ApiError, contracts, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 
 pub type Request<'a> = dyn Fn(Operation, Option<i64>, &[(&str, String)], Option<Value>) -> Result<Value, ApiError>
     + 'a;
 
-fn save(request: &Request<'_>, operation: Operation, id: Option<i64>, value: Value) -> Value {
+fn save(request: &Request<'_>, operation: Operation, id: Option<i64>, mut value: Value) -> Value {
+    let list = match operation {
+        APPROVE_MEETING_BOOKING | REJECT_MEETING_BOOKING => Some(LIST_MEETING_BOOKINGS),
+        APPROVE_OFFICE_SUPPLY_REQUEST | REJECT_OFFICE_SUPPLY_REQUEST => {
+            Some(LIST_OFFICE_SUPPLY_REQUESTS)
+        }
+        _ => None,
+    };
+    if let Some(list) = list {
+        let page = request(list, None, &[("requestId", id.unwrap().to_string())], None).unwrap();
+        value["taskKey"] = page["items"][0]["reviewTaskKeys"][0].clone();
+    }
     let response = request(
         operation,
         id,
@@ -30,7 +43,33 @@ fn page(
 }
 
 /// The same query, concurrency, history and stock behavior is exercised on both providers.
-pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, employee_id: Option<i64>) {
+pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>) {
+    let admin_user = admin(GET_CURRENT_USER, None, &[], None).unwrap();
+    let mut settings = admin(GET_OA_APPROVAL_SETTINGS, None, &[], None).unwrap();
+    for r in settings["rules"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .filter(|r| r["kind"] == "room" || r["kind"] == "supply")
+    {
+        r["stages"] = json!([workflow::node(
+            "review",
+            &[],
+            "Named",
+            json!([admin_user["id"]])
+        )]);
+    }
+    settings["expectedVersion"] = settings["versionNumber"].clone();
+    settings = admin(SAVE_OA_APPROVAL_SETTINGS, None, &[], Some(settings)).unwrap();
+    for key in ["room", "supply"] {
+        settings = admin(
+            PUBLISH_OA_DEFINITION,
+            None,
+            &[],
+            Some(json!({"expectedVersion":settings["versionNumber"],"definitionKey":key})),
+        )
+        .unwrap();
+    }
     let name = format!("行政契约-{}", nonce().unwrap());
     let room = save(
         admin,
@@ -41,7 +80,15 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, employee_id: Optio
     let room_id = room["id"].as_i64().unwrap();
     let start = chrono::Utc::now() + chrono::Duration::minutes(20);
     let end = start + chrono::Duration::hours(1);
-    let request = json!({"requestKey":nonce().unwrap(),"meetingRoomId":room_id,"title":"业务交接会议","attendeeCount":4,"startsAt":start.to_rfc3339(),"endsAt":end.to_rfc3339(),"employeeId":employee_id});
+    let request = json!({"requestKey":nonce().unwrap(),"meetingRoomId":room_id,"title":"业务交接会议","attendeeCount":4,"startsAt":start.to_rfc3339(),"endsAt":end.to_rfc3339()});
+    let mut spoofed = request.clone();
+    spoofed["employeeId"] = json!(i64::MAX);
+    assert_eq!(
+        applicant(CREATE_MEETING_BOOKING, None, &[], Some(spoofed))
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
     let mut booking = save(applicant, CREATE_MEETING_BOOKING, None, request.clone());
     let id = booking["id"].as_i64();
     assert_eq!(
@@ -56,26 +103,24 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, employee_id: Optio
             .status,
         Some(409)
     );
-    if employee_id.is_none() {
-        assert_eq!(booking["status"], "Pending");
-        assert_eq!(
-            applicant(
-                APPROVE_MEETING_BOOKING,
-                id,
-                &[],
-                Some(json!({"expectedVersion":booking["versionNumber"]}))
-            )
-            .unwrap_err()
-            .status,
-            Some(403)
-        );
-        booking = save(
-            admin,
+    assert_eq!(booking["status"], "Pending");
+    assert_eq!(
+        applicant(
             APPROVE_MEETING_BOOKING,
             id,
-            json!({"expectedVersion":booking["versionNumber"],"note":"同意预约"}),
-        );
-    }
+            &[],
+            Some(json!({"expectedVersion":booking["versionNumber"]}))
+        )
+        .unwrap_err()
+        .status,
+        Some(403)
+    );
+    booking = save(
+        admin,
+        APPROVE_MEETING_BOOKING,
+        id,
+        json!({"expectedVersion":booking["versionNumber"],"note":"同意预约"}),
+    );
     let query = [
         ("resourceId", room_id.to_string()),
         ("requestId", id.unwrap().to_string()),
@@ -149,18 +194,14 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, employee_id: Optio
         applicant,
         CREATE_MEETING_BOOKING,
         None,
-        json!({"requestKey":nonce().unwrap(),"meetingRoomId":room_id,"title":"未来会议","attendeeCount":2,"startsAt":far_start.to_rfc3339(),"endsAt":(far_start+chrono::Duration::hours(1)).to_rfc3339(),"employeeId":employee_id}),
+        json!({"requestKey":nonce().unwrap(),"meetingRoomId":room_id,"title":"未来会议","attendeeCount":2,"startsAt":far_start.to_rfc3339(),"endsAt":(far_start+chrono::Duration::hours(1)).to_rfc3339()}),
     );
-    let future = if employee_id.is_none() {
-        save(
-            admin,
-            APPROVE_MEETING_BOOKING,
-            future["id"].as_i64(),
-            json!({"expectedVersion":future["versionNumber"],"note":"同意"}),
-        )
-    } else {
-        future
-    };
+    let future = save(
+        admin,
+        APPROVE_MEETING_BOOKING,
+        future["id"].as_i64(),
+        json!({"expectedVersion":future["versionNumber"],"note":"同意"}),
+    );
     assert_eq!(
         admin(
             ISSUE_MEETING_ROOM_KEY,
@@ -225,7 +266,15 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, employee_id: Optio
         .now()
         .unwrap()
         .today;
-    let request = json!({"requestKey":nonce().unwrap(),"officeSupplyId":supply_id,"employeeId":employee_id,"quantity":3,"purpose":"会议演示","returnDueDate":today.to_string()});
+    let request = json!({"requestKey":nonce().unwrap(),"officeSupplyId":supply_id,"quantity":3,"purpose":"会议演示","returnDueDate":today.to_string()});
+    let mut spoofed = request.clone();
+    spoofed["employeeId"] = json!(i64::MAX);
+    assert_eq!(
+        applicant(CREATE_OFFICE_SUPPLY_REQUEST, None, &[], Some(spoofed))
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
     for invalid_due in [
         Value::Null,
         json!((today + chrono::Duration::days(366)).to_string()),
@@ -262,8 +311,7 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, employee_id: Optio
     )["items"][0]
         .clone();
     assert_eq!(
-        stock["versionNumber"],
-        if employee_id.is_none() { 2 } else { 3 },
+        stock["versionNumber"], 2,
         "pending requests must not change inventory version"
     );
     for (field, changed) in [("unit", json!("箱")), ("isReturnable", json!(false))] {
@@ -277,14 +325,12 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, employee_id: Optio
             Some(409)
         );
     }
-    if employee_id.is_none() {
-        application = save(
-            admin,
-            APPROVE_OFFICE_SUPPLY_REQUEST,
-            application["id"].as_i64(),
-            json!({"expectedVersion":application["versionNumber"],"note":"同意借用"}),
-        );
-    }
+    application = save(
+        admin,
+        APPROVE_OFFICE_SUPPLY_REQUEST,
+        application["id"].as_i64(),
+        json!({"expectedVersion":application["versionNumber"],"note":"同意借用"}),
+    );
     let supply = page(
         admin,
         LIST_OFFICE_SUPPLIES,

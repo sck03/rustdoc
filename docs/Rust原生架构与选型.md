@@ -47,7 +47,7 @@ Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分
 
 2026-10-28 OA 读写分离并复用严格日期与分页；Storage 筛选时段，`oa/submissions`、`oa/sheet_templates`、`oa/documents` 分别管理提交档案、模板和文档任务。Report 只投影冻结事实，共用 V3 网格增加可选自动增高/续页及文字/底色，前端复用内容展示、OA hook 和设计器。详见[行政与人员](./公司行政协作设计与验收.md)。沿用 records/BLOB 和备份，无 schema 迁移；报表新增对锁图中已有 chrono 的直接依赖，未升级版本。
 
-2026-10-29 OA 节点会签/或签、本人回避和兼任去重由 Domain 统一判定；Engine 将组织解析用于提交与只读预览，Finance 按档案身份索引核验当前状态，不读取 PDF BLOB。审批单删除两级专用字段，复用可续页正文输出实际节点。复用现有 Rust/React 模块，无新增运行依赖或数据库迁移；配置范围与成熟 OA 参考边界见行政设计文档。
+2026-10-29 OA 重新建立发布定义、节点依赖图和任务模型。Domain 负责条件、会签/或签、并行汇合、本人回避及独立复核；Engine 负责组织解析、发布/停用、版本冻结、授权和业务生效；Storage 的 `workflow_tasks` 索引与业务同事务发布。React 页面、设置 hook 和编辑器分别维护展示、请求与规则草稿，会议室/物品共用审批内核。数据库采用 schema 9 全新基线，旧迁移链和单机直接登记逻辑删除；未新增运行依赖。实际能力和厂商参考见行政设计文档。
 
 2026-10-27 本次完整审查修复将报表批次快照归入 `reports/preparation`，任务的最终授权与数据库发布归入 `tasks/persistence`，文件补偿和启动恢复归入 `tasks/output`。HTTP 关闭登记由桌面及服务器组合根共用；页面展示、编辑模型和草稿 hook 继续分离。通用连续扫描仍由 Storage 构造 SQL，严格自然日仍由 Domain 校验，内部权限直接使用领域类型。
 
@@ -67,7 +67,7 @@ Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分
 
 桌面令牌由 Rust 宿主生成，仅由主窗口受限 IPC 获取，不写 URL 或日志。随机回环端口、精确 Host／Origin 校验、官方 endpoint policy、登录会话与对象权限共同控制桌面访问。网络服务不安装本机文件／进程能力。
 
-AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，业务 SQLite 在 DataRoot/Database，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。Rust 数据库保留版本 5 建库基线，从版本 5 起按存储层有序事务迁移升级；不打开原 C# v19 或版本 4 及更早试验库，不做猜测迁移。
+AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，业务 SQLite 在 DataRoot/Database，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。数据库仅接受全新 schema 9；旧测试库和旧 schema 备份拒绝打开或恢复，显式选择新目录/数据库建库，不自动删除原数据。
 
 ## 版本与许可
 

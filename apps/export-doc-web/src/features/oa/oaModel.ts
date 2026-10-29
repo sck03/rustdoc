@@ -17,8 +17,8 @@ export const oaModules = {
   purchase: { name: "采购申请", resource: "office.purchase", description: "提交物品、数量和预算，审批后登记采购验收结果。" },
   general: { name: "通用申请", resource: "office.general", description: "办理用印、证明、IT 支持和维修申请，保留审批与办结记录。" },
 } as const;
-export const oaStatus: Record<OaRequest["status"], string> = { Draft: "草稿", Pending: "待审批", Approved: "已批准", Rejected: "已驳回", Cancelled: "已取消", Completed: "已完成", HandedOff: "已移交财务" };
-export const oaActionLabels = { submit: "提交审批", withdraw: "撤回修改", approve: "批准", reject: "驳回", cancel: "取消申请", void: "作废批准", complete: "完成登记", remind: "催办" } as const;
+export const oaStatus: Record<OaRequest["status"], string> = { Draft: "草稿", Pending: "待审批", Approved: "已批准", Rejected: "最终驳回", Returned: "退回修改", Cancelled: "已取消", Completed: "已完成", HandedOff: "已移交财务" };
+export const oaActionLabels = { submit: "提交审批", withdraw: "撤回修改", approve: "批准", reject: "最终驳回", return: "退回修改", cancel: "取消申请", void: "作废批准", complete: "完成登记", remind: "催办" } as const;
 export type OaActionName = keyof typeof oaActionLabels;
 export function oaAccess(user: ApiUserDto, kind: OaKind, action: string, row?: OaRequest): boolean {
   const resource = oaModules[kind].resource;
@@ -30,17 +30,16 @@ export function oaAccess(user: ApiUserDto, kind: OaKind, action: string, row?: O
 }
 export function oaActions(row: OaRequest, user: ApiUserDto): OaActionName[] {
   const allows = (action: string) => oaAccess(user, row.kind, action, row);
-  const reviewer = (row.kind !== "personnel" && user.capabilities.usesOfficeRegister) || row.ownerUserId !== user.id;
+  const reviewer = row.ownerUserId !== user.id;
   const applicant = allows("edit") && row.ownerUserId === user.id;
-  if (row.status === "Draft" || row.status === "Rejected") return [...(applicant ? ["submit" as const] : []), ...(allows("cancel") ? ["cancel" as const] : [])];
-  if (row.status === "Pending") return [...(applicant ? ["withdraw" as const, "remind" as const] : []), ...((row.canReview ?? (allows("approve") && reviewer)) ? ["approve" as const, "reject" as const] : [])];
+  if (row.status === "Draft" || row.status === "Returned") return [...(applicant ? ["submit" as const] : []), ...(allows("cancel") ? ["cancel" as const] : [])];
+  if (row.status === "Pending") return [...(applicant ? ["withdraw" as const, "remind" as const] : []), ...(row.canReview ? ["approve" as const, "return" as const, "reject" as const] : [])];
   if (row.status === "Approved") return [...(allows("complete") ? ["complete" as const] : []), ...(allows("approve") && reviewer ? ["void" as const] : [])];
   return [];
 }
-export function oaActionLabel(action: OaActionName, kind: OaKind, local: boolean) {
+export function oaActionLabel(action: OaActionName, kind: OaKind) {
   if (action === "complete") return ({ expense: "财务接收", purchase: "登记验收", leave: "销假归档", travel: "返程归档", overtime: "确认加班完成", general: "办结登记", personnel: "变动已生效" } as const)[kind];
   if (action === "approve" && kind === "personnel") return "批准人员变动";
-  if (action === "approve" && local) return "登记批准结果";
   return oaActionLabels[action];
 }
 export function oaDraft(kind: OaKind, user: ApiUserDto): OaRequestSave {

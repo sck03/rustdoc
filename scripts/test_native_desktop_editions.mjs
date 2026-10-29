@@ -106,7 +106,7 @@ for (const edition of selected) {
       assert.equal(unauthorized.status, 403);
     }
     assert.equal(login.body.user.capabilities.canManageUsers, edition === 'Full');
-    assert.equal(login.body.user.capabilities.usesOfficeRegister, true);
+    assert(!Object.hasOwn(login.body.user.capabilities, "usesOfficeRegister"));
     await run("document.querySelector('input[autocomplete=username]').focus()");
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });

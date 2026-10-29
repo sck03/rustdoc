@@ -1,5 +1,5 @@
 //! The same configured workflow is exercised on SQLite and PostgreSQL.
-use super::oa_contract::{call, operation};
+use super::oa_contract::{call, operation, workflow};
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 
@@ -39,7 +39,15 @@ fn list(service: &NativeService, token: &str, finance: bool) -> Value {
 }
 fn settings(service: &NativeService, token: &str, mut value: Value) -> Value {
     value["expectedVersion"] = value["versionNumber"].clone();
-    call(service, token, SAVE_OA_APPROVAL_SETTINGS, 0, Some(value)).unwrap()
+    let saved = call(service, token, SAVE_OA_APPROVAL_SETTINGS, 0, Some(value)).unwrap();
+    call(
+        service,
+        token,
+        PUBLISH_OA_DEFINITION,
+        0,
+        Some(json!({"expectedVersion":saved["versionNumber"],"definitionKey":"expense"})),
+    )
+    .unwrap()
 }
 pub fn exercise(service: &NativeService, root_admin: &str) {
     let root_policy = call(service, root_admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
@@ -127,83 +135,25 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
         )
         .unwrap();
     }
-    let local = call(service, admin, GET_CURRENT_USER, 0, None).unwrap()["capabilities"]["usesOfficeRegister"]
-        == true;
+
     let mut policy = call(service, admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
-    assert_eq!(policy["versionNumber"], 0);
-    let expense_rule = policy["rules"]
+    let expense = policy["rules"]
         .as_array()
         .unwrap()
         .iter()
         .position(|r| r["kind"] == "expense")
         .unwrap();
-    policy["rules"][expense_rule]["mode"] = json!("Named");
-    policy["rules"][expense_rule]["stages"] = json!([]);
-    policy["rules"][expense_rule]["approverUserIds"] = json!([users[2]["id"], users[3]["id"]]);
-    // A named reviewer can never act on a colleague's request with own-only
-    // view or approval scope. Reject the unusable setup before any submission.
-    let mut scope_user = json!({"id":0,"versionNumber":0});
-    for (view, approve) in [("own", "company"), ("company", "own"), ("", "company")] {
-        let mut grants =
-            vec![json!({"resourceKey":"office.expenses","action":"approve","dataScope":approve})];
-        if !view.is_empty() {
-            grants.push(json!({"resourceKey":"office.expenses","action":"view","dataScope":view}));
-        }
-        scope_user = call(service, admin, if scope_user["id"] == 0 {CREATE_USER_ACCOUNT} else {UPDATE_USER_ACCOUNT}, scope_user["id"].as_i64().unwrap(),
-            Some(json!({"username":format!("scope-{suffix}"),"fullName":"审批范围校验","role":"OfficeEmployee","companyScope":company,"departmentId":leaf,"isActive":true,
-                "resetPassword":if scope_user["id"] == 0 {"Approval-Review-2026"} else {""},"expectedVersion":scope_user["versionNumber"],"permissionGrants":grants}))).unwrap()["user"].clone();
-        let mut invalid_policy = policy.clone();
-        invalid_policy["expectedVersion"] = json!(0);
-        invalid_policy["rules"][expense_rule]["approverUserIds"] = json!([scope_user["id"]]);
-        assert_eq!(
-            call(
-                service,
-                admin,
-                SAVE_OA_APPROVAL_SETTINGS,
-                0,
-                Some(invalid_policy)
-            )
-            .unwrap_err()
-            .status,
-            Some(400)
-        );
-        assert_eq!(
-            call(service, admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap()["versionNumber"],
-            0
-        );
-    }
-    let now = chrono::Utc::now();
-    policy["delegations"] = json!([{"key":"first-delegation","principalUserId":users[2]["id"],"delegateUserId":users[4]["id"],"startsAt":(now-chrono::Duration::hours(1)).to_rfc3339(),"endsAt":(now+chrono::Duration::days(1)).to_rfc3339(),"isActive":true}]);
+    policy["rules"][expense]["stages"] = json!([
+        workflow::node("department", &[], "DepartmentManager", json!([])),
+        workflow::node("review", &["department"], "Named", json!([users[3]["id"]]))
+    ]);
+    policy["delegations"] = json!([{"key":"leave-agent","principalUserId":users[2]["id"],"delegateUserId":users[4]["id"],
+        "startsAt":(chrono::Utc::now()-chrono::Duration::hours(1)).to_rfc3339(),"endsAt":(chrono::Utc::now()+chrono::Duration::days(1)).to_rfc3339(),"isActive":true}]);
     policy = settings(service, admin, policy);
-    let mut overlapping = policy.clone();
-    overlapping["expectedVersion"] = policy["versionNumber"].clone();
-    let mut duplicate = overlapping["delegations"][0].clone();
-    duplicate["key"] = json!("overlapping");
-    overlapping["delegations"]
-        .as_array_mut()
-        .unwrap()
-        .push(duplicate);
-    assert_eq!(
-        call(
-            service,
-            admin,
-            SAVE_OA_APPROVAL_SETTINGS,
-            0,
-            Some(overlapping)
-        )
-        .unwrap_err()
-        .status,
-        Some(400)
-    );
-    assert_eq!(
-        call(service, outsider, GET_OA_APPROVAL_SETTINGS, 0, None)
-            .unwrap_err()
-            .status,
-        Some(403)
-    );
     let create = || {
-        let mut row=call(service,applicant,operation("expense","create"),0,Some(json!({"requestKey":nonce().unwrap(),"employeeId":if local {employees[0].clone()} else {Value::Null},"title":"逐级报销","reason":"验收完整流转","currency":"CNY","lines":[{"category":"Travel","spentOn":"2026-09-01","description":"交通","amount":"12.35"}]}))).unwrap();
-        row = service
+        let row=call(service,applicant,operation("expense","create"),0,Some(json!({"requestKey":nonce().unwrap(),"title":"报销流程验收","reason":"凭证核对","currency":"CNY",
+            "lines":[{"category":"Travel","spentOn":"2026-09-01","description":"交通","amount":"12.35"}]}))).unwrap();
+        service
             .upload(
                 operation("expense", "upload"),
                 &[("id", row["id"].to_string())],
@@ -212,325 +162,127 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
                 b"%PDF-1.7\n%%EOF",
                 applicant,
             )
-            .unwrap();
-        row
+            .unwrap()
     };
     let mut row = act(service, applicant, "submit", &create());
-    let id = row["id"].as_i64().unwrap();
-    assert_eq!(
-        call(
-            service,
-            first,
-            operation("expense", "withdraw"),
-            id,
-            Some(json!({"expectedVersion":row["versionNumber"],"note":"审批人不能撤回他人申请"}))
-        )
-        .unwrap_err()
-        .status,
-        Some(403)
-    );
-    assert_eq!(row["approvalPlan"]["steps"].as_array().unwrap().len(), 2);
+    assert_eq!(row["approvalPlan"]["policyVersion"], 1);
     assert_eq!(list(service, first, false)["totalCount"], 1);
+    assert_eq!(list(service, delegate, false)["totalCount"], 1);
     assert_eq!(list(service, second, false)["totalCount"], 0);
     assert_eq!(list(service, outsider, false)["totalCount"], 0);
-    assert_eq!(list(service, delegate, false)["totalCount"], 1);
-    assert_eq!(list(service, finance, true)["totalCount"], 0);
-    // In-flight signatures prevent disabling or narrowing the principal's authority.
-    let own_scope = call(
-        service,
-        admin,
-        CREATE_PERMISSION_TEMPLATE,
-        0,
-        Some(json!({
-            "code":format!("OWN-{suffix}"),"name":"仅本人审批","isActive":true,
-            "grants":[{"resourceKey":"office.expenses","action":"view","dataScope":"company"},
-                      {"resourceKey":"office.expenses","action":"approve","dataScope":"own"}]
-        })),
-    )
-    .unwrap();
-    for change in [
-        json!({"isActive":false}),
-        json!({"role":"OfficeEmployee"}),
-        json!({"permissionTemplateId":own_scope["id"]}),
-    ] {
-        let account = call(service, admin, LIST_USERS, 0, None).unwrap()["users"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|u| u["id"] == users[2]["id"])
-            .unwrap()
-            .clone();
-        let mut update = account.clone();
-        update["expectedVersion"] = account["versionNumber"].clone();
-        for (key, value) in change.as_object().unwrap() {
-            update[key] = value.clone();
-        }
-        let rejected = call(
-            service,
-            admin,
-            UPDATE_USER_ACCOUNT,
-            users[2]["id"].as_i64().unwrap(),
-            Some(update),
-        )
-        .unwrap_err();
-        assert_eq!(rejected.status, Some(409));
-        assert_eq!(list(service, delegate, false)["totalCount"], 1);
-        assert_eq!(
-            call(service, delegate, operation("expense", "get"), id, None).unwrap()["canReview"],
-            true
-        );
-        let unchanged = call(service, admin, LIST_USERS, 0, None).unwrap();
-        assert_eq!(
-            unchanged["users"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .find(|u| u["id"] == account["id"])
-                .unwrap()["versionNumber"],
-            account["versionNumber"]
-        );
-        assert_eq!(list(service, delegate, false)["totalCount"], 1);
+    for token in [applicant, outsider, second] {
+        assert_eq!(call(service,token,operation("expense","approve"),row["id"].as_i64().unwrap(),Some(json!({"expectedVersion":row["versionNumber"],"taskKey":row["approvalPlan"]["steps"][0]["taskKey"],"note":"越权"}))).unwrap_err().status,Some(403));
     }
-    // A fresh login sees the unchanged, still-valid principal permissions.
-    let refreshed_first = call(
-        service,
-        "",
-        LOGIN,
-        0,
-        Some(json!({"username":users[2]["username"],"password":"Approval-Review-2026"})),
-    )
-    .unwrap()["accessToken"]
-        .as_str()
-        .unwrap()
-        .to_owned();
-    let first = &refreshed_first;
-    assert_eq!(
-        call(
-            service,
-            second,
-            operation("expense", "approve"),
-            id,
-            Some(json!({"expectedVersion":row["versionNumber"],"note":"越级"}))
-        )
-        .unwrap_err()
-        .status,
-        Some(403)
-    );
     row = act(service, applicant, "remind", &row);
     assert_eq!(
         call(
             service,
             applicant,
             operation("expense", "remind"),
-            id,
-            Some(json!({"expectedVersion":row["versionNumber"],"note":"重复催办"}))
+            row["id"].as_i64().unwrap(),
+            Some(json!({"expectedVersion":row["versionNumber"],"note":"频繁催办"}))
         )
         .unwrap_err()
         .status,
         Some(429)
     );
-    assert_eq!(
-        call(service, delegate, GET_NOTIFICATION_UNREAD_COUNT, 0, None).unwrap()["unreadCount"],
-        2
-    );
-    // Disable proxy immediately; the in-flight sequence survives a policy edit.
-    policy["delegations"][0]["isActive"] = json!(false);
-    policy["rules"][expense_rule]["mode"] = json!("Single");
-    policy["rules"][expense_rule]["approverUserIds"] = json!([]);
+    // A new publication does not mutate assignments or versions of in-flight requests.
+    policy["rules"][expense]["stages"] = json!([workflow::node(
+        "review",
+        &[],
+        "Named",
+        json!([users[3]["id"]])
+    )]);
     policy = settings(service, admin, policy);
-    assert_eq!(
-        call(service, delegate, operation("expense", "get"), id, None).unwrap()["canReview"],
-        false
-    );
-    assert_eq!(
-        call(
-            service,
-            delegate,
-            operation("expense", "approve"),
-            id,
-            Some(json!({"expectedVersion":row["versionNumber"],"note":"已失效代理"}))
-        )
-        .unwrap_err()
-        .status,
-        Some(403)
-    );
-    policy["delegations"][0]["isActive"] = json!(true);
-    policy["delegations"][0]["startsAt"] = json!((now - chrono::Duration::hours(2)).to_rfc3339());
-    policy["delegations"][0]["endsAt"] = json!((now - chrono::Duration::hours(1)).to_rfc3339());
-    policy = settings(service, admin, policy);
-    assert_eq!(
-        call(service, delegate, operation("expense", "get"), id, None).unwrap()["canReview"],
-        false
-    );
-    assert_eq!(list(service, delegate, false)["totalCount"], 0);
-    policy["delegations"][0]["startsAt"] = json!((now - chrono::Duration::hours(1)).to_rfc3339());
-    policy["delegations"][0]["endsAt"] = json!((now + chrono::Duration::days(1)).to_rfc3339());
-    policy = settings(service, admin, policy);
+    assert_eq!(policy["publications"][0]["version"], 2);
     row = act(service, delegate, "approve", &row);
     assert_eq!(row["status"], "Pending");
+    assert_eq!(row["approvalPlan"]["policyVersion"], 1);
     assert_eq!(
         row["approvalPlan"]["steps"][0]["actedByUserId"],
         users[4]["id"]
     );
     assert_eq!(
         row["approvalPlan"]["steps"][0]["delegationKey"],
-        "first-delegation"
-    );
-    assert_eq!(list(service, finance, true)["totalCount"], 0);
-    assert_eq!(
-        call(service, finance, GET_NOTIFICATION_UNREAD_COUNT, 0, None).unwrap()["unreadCount"],
-        0
+        "leave-agent"
     );
     assert_eq!(list(service, second, false)["totalCount"], 1);
     row = act(service, second, "approve", &row);
     assert_eq!(row["status"], "Approved");
-    let verify = |token: &str,
-                  row: &Value,
-                  number: i64|
-     -> Result<Value, export_doc_engine::api::ApiError> {
-        let value: Value = serde_json::from_slice(&service.dispatch(
-            VERIFY_EXPENSE_APPROVAL,
-            &[("id", row["id"].to_string())],
-            &[("submissionNumber", number.to_string())],
-            None,
-            token,
-        )?)
-        .unwrap();
-        export_doc_contracts::validation::response(VERIFY_EXPENSE_APPROVAL.id, &value).unwrap();
-        Ok(value)
-    };
-    let checked = verify(finance, &row, row["submissionNumber"].as_i64().unwrap()).unwrap();
-    assert_eq!(checked["isValid"], true);
-    assert_eq!(checked["totalAmount"], "12.35");
-    assert_eq!(verify(applicant, &row, 1).unwrap_err().status, Some(403));
-    assert_eq!(verify(root_admin, &row, 1).unwrap_err().status, Some(403));
-    assert_eq!(verify(finance, &row, 999).unwrap_err().status, Some(404));
     assert_eq!(list(service, finance, true)["totalCount"], 1);
     assert_eq!(
-        call(service, finance, GET_NOTIFICATION_UNREAD_COUNT, 0, None).unwrap()["unreadCount"],
-        1
-    );
-    row = act(service, finance, "complete", &row);
-    assert_eq!(row["status"], "HandedOff");
-    assert_eq!(
-        verify(finance, &row, 1).unwrap()["requestStatus"],
+        act(service, finance, "complete", &row)["status"],
         "HandedOff"
     );
-    let history = call(
+
+    // Return allows a new frozen submission; rejection is terminal.
+    let returned = act(
         service,
-        applicant,
-        operation("expense", "history"),
-        id,
-        None,
-    )
-    .unwrap();
-    assert!(
-        history["items"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|e| e["action"] == "approve-step"
-                && e["approvalPlan"]["steps"][0]["delegationKey"] == "first-delegation")
+        second,
+        "return",
+        &act(service, applicant, "submit", &create()),
     );
-    // Default single-step still works for the next submission.
-    let single = act(service, applicant, "submit", &create());
-    assert_eq!(
-        act(service, first, "approve", &single)["status"],
-        "Approved"
-    );
-    // The organisation route resolves the leaf manager then its parent manager.
-    policy["rules"][expense_rule]["mode"] = json!("DepartmentChain");
-    policy = settings(service, admin, policy);
-    let chain = act(service, applicant, "submit", &create());
-    assert_eq!(
-        chain["approvalPlan"]["steps"][0]["approverUserId"],
-        users[2]["id"]
-    );
-    assert_eq!(
-        chain["approvalPlan"]["steps"][1]["approverUserId"],
-        users[3]["id"]
-    );
-    assert!(
-        call(
-            service,
-            admin,
-            GET_PERSONNEL_CLEARANCE,
-            employees[1].as_i64().unwrap(),
-            None
-        )
-        .unwrap()["approvalCount"]
-            .as_i64()
-            .unwrap()
-            > 0
-    );
-    let rejected = act(service, first, "reject", &chain);
-    assert_eq!(rejected["status"], "Rejected");
-    let resubmitted = act(service, applicant, "submit", &rejected);
-    let old_version = verify(finance, &resubmitted, 1).unwrap();
-    assert_eq!(old_version["isValid"], false);
-    assert_eq!(old_version["isCurrent"], false);
-    assert!(old_version.get("title").is_none());
-    let first_done = act(service, first, "approve", &resubmitted);
-    let approved = act(service, second, "approve", &first_done);
-    let notice = call(service, finance, LIST_NOTIFICATIONS, 0, None).unwrap()["items"][0]["id"]
-        .as_i64()
-        .unwrap();
-    act(service, first, "void", &approved);
-    let voided = verify(
-        finance,
-        &approved,
-        approved["submissionNumber"].as_i64().unwrap(),
-    )
-    .unwrap();
-    assert_eq!(voided["isValid"], false);
-    assert_eq!(voided["submissionStatus"], "Voided");
-    assert_eq!(voided["canOpenRequest"], false);
-    assert_eq!(
-        call(service, finance, READ_NOTIFICATION, notice, None)
-            .unwrap_err()
-            .status,
-        Some(403)
-    );
-    // This company's edits leave the other company's existing policy unchanged.
-    assert_eq!(
-        call(service, root_admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap(),
-        root_policy
-    );
-    assert_eq!(policy["rules"][expense_rule]["mode"], "DepartmentChain");
-    let mut root_department = departments[0].clone();
-    root_department["expectedVersion"] = root_department["versionNumber"].clone();
-    root_department["managerEmployeeId"] = Value::Null;
-    service
-        .dispatch(
-            UPDATE_ORGANIZATION_DEPARTMENT,
-            &[("code", root.clone())],
-            &[],
-            Some(root_department),
-            admin,
-        )
-        .unwrap();
-    let draft = create();
+    assert_eq!(returned["status"], "Returned");
+    let resubmitted = act(service, applicant, "submit", &returned);
+    assert_eq!(resubmitted["submissionNumber"], 2);
+    let rejected = act(service, second, "reject", &resubmitted);
     assert_eq!(
         call(
             service,
             applicant,
             operation("expense", "submit"),
-            draft["id"].as_i64().unwrap(),
-            Some(json!({"expectedVersion":draft["versionNumber"],"note":"缺少上级负责人"}))
+            rejected["id"].as_i64().unwrap(),
+            Some(json!({"expectedVersion":rejected["versionNumber"],"note":"不能复活最终驳回"}))
         )
         .unwrap_err()
         .status,
-        Some(400)
+        Some(409)
     );
+
+    // Two parallel roots join before a repeated responsible person signs again.
+    policy["rules"][expense]["stages"] = json!([
+        workflow::node("a", &[], "Named", json!([users[2]["id"]])),
+        workflow::node("b", &[], "Named", json!([users[3]["id"]])),
+        workflow::node("join", &["a", "b"], "Named", json!([users[2]["id"]]))
+    ]);
+    policy = settings(service, admin, policy);
+    let mut parallel = act(service, applicant, "submit", &create());
+    assert_eq!(list(service, first, false)["totalCount"], 1);
+    assert_eq!(list(service, second, false)["totalCount"], 1);
+    parallel = act(service, first, "approve", &parallel);
+    assert_eq!(list(service, first, false)["totalCount"], 0);
+    parallel = act(service, second, "approve", &parallel);
+    assert_eq!(list(service, first, false)["totalCount"], 1);
+    parallel = act(service, first, "approve", &parallel);
+    assert_eq!(parallel["status"], "Approved");
+
+    let waiting = act(service, applicant, "submit", &create());
+    let disabled = call(
+        service,
+        admin,
+        DISABLE_OA_DEFINITION,
+        0,
+        Some(json!({"expectedVersion":policy["versionNumber"],"definitionKey":"expense"})),
+    )
+    .unwrap();
+    assert_eq!(disabled["publications"][0]["enabled"], false);
     assert_eq!(
         call(
             service,
             applicant,
-            operation("expense", "get"),
-            draft["id"].as_i64().unwrap(),
-            None
+            operation("expense", "submit"),
+            create()["id"].as_i64().unwrap(),
+            Some(json!({"expectedVersion":2,"note":"停用流程"}))
         )
-        .unwrap()["status"],
-        "Draft"
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
+    let waiting = act(service, first, "approve", &waiting);
+    let waiting = act(service, second, "approve", &waiting);
+    act(service, first, "approve", &waiting);
+    assert_eq!(
+        call(service, root_admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap(),
+        root_policy
     );
 }

@@ -1,85 +1,30 @@
-//! Ordered approval snapshots and delegation dates, independent of storage/UI.
+//! Runtime graph snapshots. Decisions belong to explicit nodes and tasks.
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ApprovalMode {
-    Single,
-    DepartmentChain,
-    Named,
-    Configured,
-}
-
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ApprovalDecision {
-    #[default]
     All,
     Any,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-    fn snapshot(stages: bool) -> ApprovalPlan {
-        serde_json::from_value(json!({"mode":"Named","policyVersion":1,"steps":(1..=3).map(|id| {
-            let mut step = json!({"approverUserId":id,"approverName":"reviewer","status":"Waiting","actedByUserId":null,"actedByName":"","actedAt":"","note":"","delegationKey":""});
-            if stages { step["stage"] = json!(if id == 3 {1} else {0}); }
-            step
-        }).collect::<Vec<_>>()})).unwrap()
-    }
-    #[test]
-    fn legacy_serial_and_parallel_snapshots_keep_their_order() {
-        let serial = snapshot(false);
-        serial.validate(4).unwrap();
-        assert_eq!(serial.current_indices(), vec![0]);
-        let mut parallel = snapshot(true);
-        assert_eq!(parallel.current_indices(), vec![0, 1]);
-        parallel.steps[1].status = "Approved".into();
-        parallel.steps[1].acted_by_user_id = Some(2);
-        parallel.validate(4).unwrap();
-        assert_eq!(parallel.current_indices(), vec![0]);
-        parallel.steps[2].status = "Approved".into();
-        parallel.steps[2].acted_by_user_id = Some(3);
-        assert!(parallel.validate(4).is_err());
-        parallel.steps[2].status = "Waiting".into();
-        parallel.steps[2].acted_by_user_id = None;
-        parallel.steps[0].status = "Approved".into();
-        parallel.steps[0].acted_by_user_id = Some(1);
-        parallel.validate(4).unwrap();
-        assert_eq!(parallel.current_indices(), vec![2]);
-        parallel.steps[2].status = "Rejected".into();
-        parallel.steps[2].acted_by_user_id = Some(3);
-        assert!(parallel.current_indices().is_empty());
-        assert!(parallel.validate(1).is_err());
-    }
-    #[test]
-    fn any_sign_closes_only_its_node_without_fabricating_other_signatures() {
-        let mut plan = snapshot(true);
-        plan.steps[0].decision = ApprovalDecision::Any;
-        plan.steps[1].decision = ApprovalDecision::Any;
-        plan.validate(4).unwrap();
-        plan.steps[1].status = "Approved".into();
-        plan.steps[1].acted_by_user_id = Some(2);
-        assert!(plan.validate(4).is_err());
-        plan.close_any_stage(1);
-        plan.validate(4).unwrap();
-        assert_eq!(plan.steps[0].status, "Skipped");
-        assert_eq!(plan.steps[0].acted_by_user_id, None);
-        assert_eq!(plan.current_indices(), vec![2]);
-        plan.steps[1].status = "Waiting".into();
-        plan.steps[1].acted_by_user_id = None;
-        assert!(plan.validate(4).is_err());
-    }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApprovalNode {
+    pub key: String,
+    pub name: String,
+    pub depends_on: Vec<String>,
+    pub decision: ApprovalDecision,
+    pub due_hours: u32,
+    pub skipped: bool,
+    pub started_at: String,
+    pub due_at: String,
+    pub independent_review: bool,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApprovalStep {
-    /// Omitted in previously issued serial plans; their array order remains authoritative.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stage: Option<usize>,
-    #[serde(default)]
+    pub task_key: String,
+    pub stage: usize,
     pub decision: ApprovalDecision,
     pub approver_user_id: i64,
     pub approver_name: String,
@@ -93,112 +38,205 @@ pub struct ApprovalStep {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApprovalPlan {
-    pub mode: ApprovalMode,
+    pub definition_key: String,
     pub policy_version: i64,
+    pub nodes: Vec<ApprovalNode>,
     pub steps: Vec<ApprovalStep>,
-    #[serde(default)]
-    pub matched_branch: String,
+    pub notify_user_ids: Vec<i64>,
 }
 impl ApprovalPlan {
-    /// Any-sign closes only the other waiting steps of this node, without
-    /// inventing signatures for people who did not approve it.
+    fn completion(&self) -> Vec<bool> {
+        // Resolve each node once. Dense join graphs must not expand all predecessor paths.
+        let mut done = vec![None; self.nodes.len()];
+        for _ in 0..self.nodes.len() {
+            let mut changed = false;
+            for (index, node) in self.nodes.iter().enumerate() {
+                if done[index].is_some() {
+                    continue;
+                }
+                let dependencies: Option<Vec<_>> = node
+                    .depends_on
+                    .iter()
+                    .map(|key| {
+                        self.nodes
+                            .iter()
+                            .position(|n| &n.key == key)
+                            .and_then(|i| done[i])
+                    })
+                    .collect();
+                if let Some(dependencies) = dependencies {
+                    done[index] =
+                        Some(
+                            dependencies.into_iter().all(|d| d)
+                                && (node.skipped
+                                    || self.steps.iter().filter(|s| s.stage == index).all(|s| {
+                                        matches!(s.status.as_str(), "Approved" | "Skipped")
+                                    })),
+                        );
+                    changed = true;
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        done.into_iter().map(|d| d.unwrap_or(false)).collect()
+    }
+    pub fn completed(&self, node: usize) -> bool {
+        self.completion().get(node).copied().unwrap_or(false)
+    }
+    pub fn current_indices(&self) -> Vec<usize> {
+        if self
+            .steps
+            .iter()
+            .any(|s| matches!(s.status.as_str(), "Rejected" | "Returned" | "Cancelled"))
+        {
+            return vec![];
+        }
+        let completed = self.completion();
+        self.steps
+            .iter()
+            .enumerate()
+            .filter_map(|(i, s)| {
+                (s.status == "Waiting"
+                    && self.nodes[s.stage].depends_on.iter().all(|key| {
+                        self.nodes
+                            .iter()
+                            .position(|n| &n.key == key)
+                            .is_some_and(|j| completed[j])
+                    }))
+                .then_some(i)
+            })
+            .collect()
+    }
+    pub fn current(&self) -> Option<usize> {
+        self.current_indices().first().copied()
+    }
+    pub fn activate(&mut self, now: DateTime<Utc>) {
+        for i in self.current_indices() {
+            let node = &mut self.nodes[self.steps[i].stage];
+            if node.started_at.is_empty() {
+                node.started_at = now.to_rfc3339();
+                node.due_at =
+                    (now + chrono::Duration::hours(i64::from(node.due_hours))).to_rfc3339();
+            }
+        }
+    }
     pub fn close_any_stage(&mut self, approved: usize) {
         let step = &self.steps[approved];
         if step.status != "Approved" || step.decision != ApprovalDecision::Any {
             return;
         }
-        let stage = step.stage.unwrap_or(approved);
-        for (index, other) in self.steps.iter_mut().enumerate() {
-            if other.stage.unwrap_or(index) == stage && other.status == "Waiting" {
+        let stage = step.stage;
+        for other in &mut self.steps {
+            if other.stage == stage && other.status == "Waiting" {
                 other.status = "Skipped".into();
             }
         }
     }
-    pub fn current(&self) -> Option<usize> {
-        self.current_indices().first().copied()
-    }
-    pub fn current_indices(&self) -> Vec<usize> {
-        if self.steps.iter().any(|step| step.status == "Rejected") {
-            return vec![];
-        }
-        let Some(first) = self.steps.iter().position(|step| step.status == "Waiting") else {
-            return vec![];
-        };
-        let stage = self.steps[first].stage.unwrap_or(first);
-        self.steps
-            .iter()
-            .enumerate()
-            .filter_map(|(index, step)| {
-                (step.status == "Waiting" && step.stage.unwrap_or(index) == stage).then_some(index)
-            })
-            .collect()
-    }
     pub fn validate(&self, owner: i64) -> Result<(), String> {
-        if self.mode == ApprovalMode::Single {
-            return if self.steps.is_empty() {
-                Ok(())
-            } else {
-                Err("单步审批不指定逐级步骤。".into())
+        if self.definition_key.is_empty()
+            || self.policy_version <= 0
+            || self.nodes.is_empty()
+            || self.nodes.len() > 32
+            || self.steps.is_empty()
+            || self.steps.len() > 200
+        {
+            return Err("流程实例定义、版本或节点数量无效。".into());
+        }
+        let mut keys = HashSet::new();
+        if self
+            .nodes
+            .iter()
+            .any(|n| n.key.is_empty() || !keys.insert(&n.key))
+        {
+            return Err("流程实例节点编号无效。".into());
+        }
+        let mut done = HashSet::new();
+        loop {
+            let size = done.len();
+            for node in &self.nodes {
+                if node.depends_on.iter().all(|id| done.contains(id)) {
+                    done.insert(node.key.clone());
+                }
+            }
+            if done.len() == self.nodes.len() {
+                break;
+            }
+            if done.len() == size {
+                return Err("流程实例存在循环或无效依赖。".into());
+            }
+        }
+        let mut tasks = HashSet::new();
+        let mut reviewers = HashSet::new();
+        for step in &self.steps {
+            let Some(node) = self.nodes.get(step.stage) else {
+                return Err("审批任务引用未知节点。".into());
             };
-        }
-        if self.steps.is_empty() || self.steps.len() > 50 {
-            return Err("审批须有 1–50 位审批人。".into());
-        }
-        let mut seen = HashSet::new();
-        let mut open_stage = None;
-        let mut previous_stage = 0;
-        let mut stages = std::collections::BTreeMap::new();
-        for (index, step) in self.steps.iter().enumerate() {
-            let entry =
-                stages
-                    .entry(step.stage.unwrap_or(index))
-                    .or_insert((step.decision, 0, 0, 0));
-            if entry.0 != step.decision {
-                return Err("同一审批阶段的通过方式必须一致。".into());
-            }
-            entry.1 += usize::from(step.status == "Approved");
-            entry.2 += usize::from(step.status == "Waiting");
-            entry.3 += usize::from(step.status == "Skipped");
-        }
-        for (decision, approved, waiting, skipped) in stages.values() {
-            if (*decision == ApprovalDecision::All && *skipped > 0)
-                || (*decision == ApprovalDecision::Any
-                    && (*approved > 1
-                        || (*approved == 1 && *waiting > 0)
-                        || (*skipped > 0 && *approved != 1)))
-            {
-                return Err("或签阶段只能有一位批准人，其余步骤须正确关闭。".into());
-            }
-        }
-        for (index, step) in self.steps.iter().enumerate() {
-            let stage = step.stage.unwrap_or(index);
-            if stage >= 10 || (index > 0 && stage < previous_stage) {
-                return Err("审批阶段须有序且不能超过十级。".into());
-            }
-            previous_stage = stage;
-            if step.approver_user_id <= 0
+            if node.skipped
+                || step.task_key.is_empty()
+                || !tasks.insert(&step.task_key)
+                || step.approver_user_id <= 0
                 || step.approver_user_id == owner
-                || !seen.insert(step.approver_user_id)
+                || !reviewers.insert((step.stage, step.approver_user_id))
+                || step.decision != node.decision
             {
-                return Err("逐级审批人必须有效、互不重复且不能是申请人。".into());
+                return Err("审批任务身份、责任人或节点规则无效。".into());
             }
             match step.status.as_str() {
-                "Approved"
-                    if step.acted_by_user_id.is_some()
-                        && open_stage.is_none_or(|open| stage == open) => {}
-                "Rejected"
-                    if step.acted_by_user_id.is_some()
-                        && open_stage.is_none_or(|open| stage == open) =>
-                {
-                    open_stage = Some(stage);
-                }
-                "Waiting" if step.acted_by_user_id.is_none() => {
-                    open_stage.get_or_insert(stage);
-                }
-                "Skipped"
-                    if step.acted_by_user_id.is_none()
-                        && step.decision == ApprovalDecision::Any => {}
-                _ => return Err("审批步骤顺序或办理记录无效。".into()),
+                "Waiting" | "Skipped" | "Cancelled" if step.acted_by_user_id.is_none() => {}
+                "Approved" | "Rejected" | "Returned"
+                    if step
+                        .acted_by_user_id
+                        .is_some_and(|id| id > 0 && id != owner) => {}
+                _ => return Err("审批决定与实际办理人不一致。".into()),
+            }
+        }
+        for (i, node) in self.nodes.iter().enumerate() {
+            let steps: Vec<_> = self.steps.iter().filter(|s| s.stage == i).collect();
+            if !node.skipped && steps.is_empty() {
+                return Err("有效节点没有审批任务。".into());
+            }
+            let approved = steps.iter().filter(|s| s.status == "Approved").count();
+            let skipped = steps.iter().filter(|s| s.status == "Skipped").count();
+            if (node.decision == ApprovalDecision::All && skipped > 0)
+                || (node.decision == ApprovalDecision::Any
+                    && (approved > 1
+                        || (skipped > 0 && approved != 1)
+                        || (approved == 1 && steps.iter().any(|s| s.status == "Waiting"))))
+            {
+                return Err("会签或或签任务关闭状态无效。".into());
+            }
+            if steps.iter().any(|s| s.acted_by_user_id.is_some())
+                && !node.depends_on.iter().all(|key| {
+                    self.nodes
+                        .iter()
+                        .position(|n| &n.key == key)
+                        .is_some_and(|j| self.completed(j))
+                })
+            {
+                return Err("前置节点未完成，不能办理后续节点。".into());
+            }
+            if node.independent_review
+                && steps.iter().any(|step| {
+                    self.steps.iter().any(|other| {
+                        other.stage != i && other.approver_user_id == step.approver_user_id
+                    })
+                })
+            {
+                return Err("独立复核节点不能与其他节点使用相同责任人。".into());
+            }
+            if node.independent_review
+                && steps
+                    .iter()
+                    .filter_map(|s| s.acted_by_user_id)
+                    .any(|actor| {
+                        self.steps
+                            .iter()
+                            .any(|s| s.stage != i && s.acted_by_user_id == Some(actor))
+                    })
+            {
+                return Err("独立复核节点不能由其他节点的实际办理人兼任。".into());
             }
         }
         Ok(())
@@ -208,12 +246,12 @@ pub fn delegation_window(start: &str, end: &str) -> Result<(DateTime<Utc>, DateT
     let parse = |s| {
         DateTime::parse_from_rfc3339(s)
             .map(|v| v.with_timezone(&Utc))
-            .map_err(|_| "代理起止时间须包含时区。".to_owned())
+            .map_err(|_| "代理时间须包含时区。".to_owned())
     };
     let start = parse(start)?;
     let end = parse(end)?;
     if end <= start || end - start > chrono::Duration::days(366) {
-        return Err("代理有效期须大于零且不超过 366 天。".into());
+        return Err("代理期限须大于零且不超过 366 天。".into());
     }
     Ok((start, end))
 }

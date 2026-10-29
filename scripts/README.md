@@ -53,7 +53,7 @@ Windows 批量入口默认 `-Edition All`，仅生成 Document、Sales，共用�
 .\scripts\run-native.cmd -Edition Full -NoPause
 ```
 
-输出 `artifacts/native-desktop/ExportDocManager.Tauri.Full/ExportDocManager.exe`；可直接双击运行，无需安装 PostgreSQL。数据库位于该目录的 `App_Data/Database/exportdoc-native.db`，重新构建保留已有数据。此版采用独立 `com.exportdocmanager.desktop.fulltest` 身份，显示完整单证、销售、行政人事、公告通知及账号权限页面，用于本地界面和流程测试。SQLite 的六类日常 OA 保留选择人员、登记批准结果的单机语义；人员变动审批在 SQLite 也禁止申请人和被变动人员自批。团队本人申请、权限和并发仍须 PostgreSQL 实测。
+输出 `artifacts/native-desktop/ExportDocManager.Tauri.Full/ExportDocManager.exe`；可直接双击运行，无需安装 PostgreSQL。数据库位于 `App_Data/Database/exportdoc-native.db`，重新构建不会删除已有数据，但旧 schema 库不能由新程序打开。此版使用独立 `com.exportdocmanager.desktop.fulltest` 身份，显示完整界面。SQLite 与 PostgreSQL 共用人员关联、流程发布、节点任务、会签/或签及禁止自批规则；管理员可以代录本公司人员申请，须由独立责任人审批。正式团队权限、事务和并发仍用 PostgreSQL 实测。
 
 默认 Release 并包含 OCR 资源；仅检查布局时可加 `-Configuration Debug -WithoutOcr` 生成不含 OCR 的轻量测试包。Full 只通过显式参数生成，不进入 All、正式安装器、GitHub 桌面发布矩阵或自动更新频道。跨平台本地构建可使用 `build-native.ps1 -Edition Full`，每个平台仍需单独验收。
 
@@ -91,7 +91,7 @@ pwsh -NoProfile -File scripts/package-native-web-server.ps1 -Version 1.2.3 -NoPa
 
 桌面业务库统一位于 `App_Data/Database/exportdoc-native.db`，实例锁位于 `App_Data/Locks`。旧位置 `App_Data/exportdoc-native.db` 中受支持的数据库会通过 SQLite 快照自动搬入 Database，原文件保留在 `Backups/DatabaseLayout`；新旧两处同时有库则停止并提示核对。不要手工只移动正在使用的主文件：它可能还有未合并的 WAL。WebView 内部数据库保留在 `WebView` profile 中。
 
-便携包重复构建会保留已有 `App_Data`。Rust 数据库从版本 5 起逐版升级，当前为 8；只有数据库不存在才新建，已有库失败不覆盖。版本 4 及以前不做兼容：确认无需使用后，先退出程序并将原 `App_Data` 整体另存，再启动初始化。不要直接修改版本标记。初始化错误及启动期 panic 会显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；运行目录不可写时提示备用日志位置或日志写入失败。
+便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 9，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
 
 Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便携包携带原版固定清单验证的微软离线安装器；缺少 WebView2 时显示安装／退出选择，保留取消、繁忙、超时和需重启处理。构建时核对微软签名、版本、大小和 SHA-256。Windows GNU 构建同时携带 `WebView2Loader.dll`。
 
@@ -121,9 +121,9 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 源码脚本的启动／更新经过：准备镜像 → 停 API → 等数据库就绪 → 独立维护容器初始化/逐版升级 → 启 API 并检查就绪。构建及缺失镜像取得在停 API 前完成，失败不打断原应用；已有/离线镜像按 missing 策略复用。原 `compose.yml` 的维护服务仍由脚本显式运行，`-SkipBuild` 复用已有镜像。新版 `compose.image.yml` 则声明初始化完成依赖，支持直接 Compose 启动；升级时先 pull，再 down（不删卷）及 up。两种入口的恢复失败均保留 API 停止状态。
 
-应用 schema 升级与 PostgreSQL 软件主版本升级是两件事：当前 Rust schema 为 8，从 5 开始按顺序事务升级；模板权限调整不改变 schema 或备份格式。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。升级前在界面导出备份/完整迁移包并保存在本机故障之外的位置。
+应用 schema 与 PostgreSQL 软件主版本是两件事：当前只支持全新 schema 9，不迁移旧试验库。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。维护前保留需要的备份/完整迁移包。
 
-首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接只供初始化／升级／恢复使用。桌面 SQLite 空库仍为 admin 空密码；当前数据库版本 8，支持从 Rust 版本 5 升级，不兼容 C# v19 或版本 4 及更早试验库。
+首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接供初始化/恢复使用。桌面 SQLite 新库仍为 admin 空密码；当前仅支持全新 schema 9，不兼容此前试验库。
 
 ## 远端入口
 

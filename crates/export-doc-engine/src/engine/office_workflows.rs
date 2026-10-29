@@ -43,14 +43,18 @@ pub fn action(
     store.transaction_as(actor, |tx, actor| {
         auth::authorize(actor, permission, action)?;
         let mut value = store::get(tx, kind, id)?;
-        let allowed = super::handling::resource_access(
-            tx,
-            actor,
-            permission,
-            action,
-            &value,
-            kind == "supplies",
-        )?;
+        let allowed = if action == "approve" {
+            super::oa::approval::authority(tx, actor, &value)?.is_some()
+        } else {
+            super::handling::resource_access(
+                tx,
+                actor,
+                permission,
+                action,
+                &value,
+                kind == "supplies",
+            )?
+        };
         if !allowed {
             return Err(error(403, "没有办理此记录的权限。"));
         }
@@ -64,7 +68,25 @@ pub fn action(
                 "不能审批本人提交的申请，请由另一位有权限的人员办理。",
             ));
         }
-        if kind == "bookings" {
+        let decision = if action == "approve" {
+            Some(super::oa::approval::review(
+                tx,
+                actor,
+                &mut value,
+                if operation.starts_with("Reject") {
+                    "reject"
+                } else {
+                    "approve"
+                },
+                &note,
+                &text(&body, "taskKey"),
+            )?)
+        } else {
+            None
+        };
+        if decision == Some("Pending") {
+            value["status"] = json!("Pending");
+        } else if kind == "bookings" {
             meeting(tx, actor, operation, &mut value)?;
         } else {
             supply(tx, actor, operation, &mut value, &body, business_date)?;
@@ -91,7 +113,19 @@ pub fn action(
         } else {
             0
         };
-        office_events::append(tx, actor, kind, &saved, event, quantity, &note)?;
+        office_events::append(
+            tx,
+            actor,
+            kind,
+            &saved,
+            if decision == Some("Pending") {
+                "ApproveStep"
+            } else {
+                event
+            },
+            quantity,
+            &note,
+        )?;
         Ok(saved)
     })
 }

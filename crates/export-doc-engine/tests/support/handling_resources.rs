@@ -9,7 +9,6 @@ pub(super) fn exercise(
     users: &[Value],
     employee: i64,
     policy: &mut Value,
-    local: bool,
 ) {
     let [admin, applicant, first, second, leader] = tokens;
     let save = |policy: &mut Value| {
@@ -49,7 +48,7 @@ pub(super) fn exercise(
             .any(|r| r["id"] == room_id)
     );
     let start = chrono::Utc::now() + chrono::Duration::minutes(10);
-    let body = json!({"requestKey":nonce().unwrap(),"employeeId":if local {Some(employee)} else {None},"meetingRoomId":room_id,"title":"办理闭环","attendeeCount":2,"startsAt":start.to_rfc3339(),"endsAt":(start+chrono::Duration::hours(1)).to_rfc3339()});
+    let body = json!({"requestKey":nonce().unwrap(),"meetingRoomId":room_id,"title":"办理闭环","attendeeCount":2,"startsAt":start.to_rfc3339(),"endsAt":(start+chrono::Duration::hours(1)).to_rfc3339()});
     let mut booking = call(
         service,
         applicant,
@@ -86,7 +85,7 @@ pub(super) fn exercise(
             .cloned()
             .collect::<Vec<_>>()
     };
-    if !local {
+    {
         assert_eq!(
             queue(first, false)["totalCount"],
             0,
@@ -287,9 +286,9 @@ pub(super) fn exercise(
     let supply = call(service, admin, CREATE_OFFICE_SUPPLY, 0, Some(json!({"name":"共同保管耗材","unit":"件","minimumStock":0,"isActive":true,"isReturnable":false,"handlingKey":"daily"}))).unwrap();
     let supply_id = supply["id"].as_i64().unwrap();
     call(service, first, RESTOCK_OFFICE_SUPPLY, supply_id, Some(json!({"operationId":nonce().unwrap(),"expectedVersion":supply["versionNumber"],"quantity":5,"note":"共同管理入库"}))).unwrap();
-    let mut supply_request = call(service, applicant, CREATE_OFFICE_SUPPLY_REQUEST, 0, Some(json!({"requestKey":nonce().unwrap(),"employeeId":if local {Some(employee)} else {None},"officeSupplyId":supply_id,"quantity":2,"purpose":"双人办理库存只扣一次","returnDueDate":null}))).unwrap();
+    let mut supply_request = call(service, applicant, CREATE_OFFICE_SUPPLY_REQUEST, 0, Some(json!({"requestKey":nonce().unwrap(),"officeSupplyId":supply_id,"quantity":2,"purpose":"双人办理库存只扣一次","returnDueDate":null}))).unwrap();
     let request_id = supply_request["id"].as_i64().unwrap();
-    if !local {
+    {
         supply_request = call(
             service,
             leader,
@@ -339,7 +338,7 @@ pub(super) fn exercise(
     // General services also use any-one handling; a second completion is rejected.
     policy["handlingServices"][0]["handlerUserIds"] = json!([users[2]["id"], users[3]["id"]]);
     save(policy);
-    let draft = call(service, applicant, operation("general", "create"), 0, Some(json!({"requestKey":nonce().unwrap(),"employeeId":if local {Some(employee)} else {None},"title":"多位用印办理","reason":"任意一位完成","category":"Seal","handlingKey":"seal"}))).unwrap();
+    let draft = call(service, applicant, operation("general", "create"), 0, Some(json!({"requestKey":nonce().unwrap(),"title":"多位用印办理","reason":"任意一位完成","category":"Seal","handlingKey":"seal"}))).unwrap();
     let pending = super::act(service, applicant, "submit", &draft);
     let approved = super::act(service, leader, "approve", &pending);
     for token in [first, second] {

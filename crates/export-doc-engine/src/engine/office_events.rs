@@ -24,7 +24,7 @@ pub fn append(
         0,
         json!({
             "requestKind":kind, "requestId":record["id"], "action":action,
-            "quantity":quantity,"actorName":actor.name,"note":note
+            "quantity":quantity,"actorName":actor.name,"note":note,"approvalPlan":record["approvalPlan"]
         }),
         None,
         actor,
@@ -32,8 +32,9 @@ pub fn append(
     )?;
     if matches!(kind, "supply-requests" | "bookings") {
         let action = match action {
-            "Register" | "Approve" => "approve",
+            "Approve" => "approve",
             "Submit" => "submit",
+            "ApproveStep" => "approve-step",
             "Edit" if record["status"] == "Pending" => "submit",
             "Edit" => "approve",
             "Issue" => "issue",

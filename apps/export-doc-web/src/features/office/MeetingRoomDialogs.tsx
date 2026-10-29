@@ -40,7 +40,7 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
   const [times, setTimes] = useState(() => officeBookingDefaults(user.businessTimeZone));
   const [requestKey] = useState(createRequestKey);
   const [employee, setEmployee] = useState<PersonnelDirectoryRecord | null>(null);
-  const register = user.capabilities.usesOfficeRegister;
+  const canSelectEmployee = user.capabilities.canManageUsers;
   const operation = useOfficeOperation();
   const { range, query: availability } = useMeetingAvailability(client, user, room.id, times.start.slice(0, 10));
   const access = officeAccess(user, "rooms");
@@ -75,14 +75,13 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
               <strong>{slot.status === "Pending" ? "待审批" : slot.status === "InUse" ? "使用中" : "已预约"}</strong></li>)}</ul>}
       </div>
       {access.allows("create") && room.isActive && <>
-        {register && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={setEmployee} disabled={operation.busy} />}
+        {canSelectEmployee && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={setEmployee} disabled={operation.busy} />}
         <OfficeApplicantIdentity user={user} />
         <OfficeField label="会议主题" wide><input name="title" required maxLength={200} placeholder="例如：项目周会" /></OfficeField>
         <OfficeField label="参会人数"><input name="attendeeCount" type="number" required min={1} max={room.capacity} defaultValue={1} /></OfficeField>
-        <p className="office-field-wide office-muted">{register ? "登记后占用该时段，请在实际交接时登记使用和归还。" :
-          `提交后等待审批。${room.requiresKey ? "审批通过后，于开始前 30 分钟内联系办理人领钥匙，结束后归还。" : "审批通过后，请由办理人登记使用和结束。"}`}</p>
+        <p className="office-field-wide office-muted">{`提交后等待审批。${room.requiresKey ? "审批通过后，于开始前 30 分钟内联系办理人领钥匙，结束后归还。" : "审批通过后，请由办理人登记使用和结束。"}`}</p>
       </>}
-    </fieldset>{access.allows("create") && room.isActive && <OfficeSubmit label={register ? "登记预约" : "提交预约"} busy={operation.busy}
-      disabled={!range || availability.isPending || availability.isError || !canIdentifyOfficeApplicant(user) || register && !employee} />}</form>
+    </fieldset>{access.allows("create") && room.isActive && <OfficeSubmit label="提交预约" busy={operation.busy}
+      disabled={!range || availability.isPending || availability.isError || !canIdentifyOfficeApplicant(user) || canSelectEmployee && !employee} />}</form>
   </OfficeDialog>;
 }

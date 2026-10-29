@@ -484,7 +484,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
     let staff = login();
     let staff_token = staff["accessToken"].as_str().unwrap();
     let spare = call(service, admin, CREATE_USER_ACCOUNT, 0, Some(json!({"username":format!("spare-{suffix}"),"fullName":"候选账号","role":"OfficeEmployee","departmentId":"GENERAL","companyScope":"DEFAULT","isActive":true,"resetPassword":"Personnel-Test-2026"}))).unwrap()["user"].clone();
-    let draft = call(service, staff_token, CREATE_GENERAL_REQUEST, 0, Some(json!({"requestKey":nonce().unwrap(),"employeeId":if service.provider().unwrap() == "SQLite" {Some(id)} else {None},"title":"更换账号前的未结申请","reason":"保护申请人关联","category":"IT"}))).unwrap();
+    let draft = call(service, staff_token, CREATE_GENERAL_REQUEST, 0, Some(json!({"requestKey":nonce().unwrap(),"title":"更换账号前的未结申请","reason":"保护申请人关联","category":"IT"}))).unwrap();
     let link = json!({"expectedVersion":person["versionNumber"],"userId":spare["id"],"expectedAccountVersion":spare["versionNumber"]});
     let unlink = json!({"expectedVersion":person["versionNumber"],"userId":account["id"],"expectedAccountVersion":person["account"]["versionNumber"],"reason":"有未结申请时不得解绑"});
     for (token, status) in [
@@ -570,7 +570,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
     let future =
         chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d").unwrap() + chrono::Duration::days(1);
     assert_eq!(call(service, admin, TRANSFER_PERSONNEL, id, Some(json!({"expectedVersion":person["versionNumber"],"departmentId":"GENERAL","jobTitle":"新岗位","effectiveDate":future.to_string(),"note":"不允许未来日期立即调岗"}))).unwrap_err().status, Some(400));
-    if service.provider().unwrap() == "PostgreSQL" {
+    {
         let staff = login();
         person = call(service, admin, UPDATE_PERSONNEL, id, Some(json!({"expectedVersion":person["versionNumber"],"profile":{"fullName":"账号同步姓名"},"employmentType":"FullTime"}))).unwrap();
         assert_eq!(person["account"]["fullName"], "账号同步姓名");
@@ -638,7 +638,9 @@ pub fn exercise(service: &NativeService, admin: &str) {
         assert_eq!(corrected["attachments"].as_array().unwrap().len(), 2);
         assert_eq!(corrected["employee"]["status"], "Departed");
         assert_eq!(corrected["account"]["isActive"], false);
-    } else {
+        person = corrected;
+    }
+    {
         let removed: Value = serde_json::from_slice(
             &service
                 .dispatch(
@@ -651,7 +653,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
                 .unwrap(),
         )
         .unwrap();
-        assert_eq!(removed["attachments"], json!([]));
+        assert_eq!(removed["attachments"].as_array().unwrap().len(), 1);
         assert_eq!(
             service
                 .download_file(DOWNLOAD_PERSONNEL_ATTACHMENT, &attachment_path, admin)

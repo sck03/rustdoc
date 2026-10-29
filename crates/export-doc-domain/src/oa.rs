@@ -67,11 +67,12 @@ pub fn expense_total(lines: &Value, currency: &str, today: NaiveDate) -> Result<
 }
 pub fn next_status(status: &str, action: &str, expense: bool) -> Option<&'static str> {
     match (status, action) {
-        ("Draft" | "Rejected", "submit") => Some("Pending"),
+        ("Draft" | "Returned", "submit") => Some("Pending"),
         ("Pending", "approve") => Some("Approved"),
         ("Pending", "reject") => Some("Rejected"),
+        ("Pending", "return") => Some("Returned"),
         ("Pending", "withdraw") => Some("Draft"),
-        ("Draft" | "Rejected", "cancel") | ("Approved", "void") => Some("Cancelled"),
+        ("Draft" | "Returned", "cancel") | ("Approved", "void") => Some("Cancelled"),
         ("Approved", "complete") if expense => Some("HandedOff"),
         ("Approved", "complete") => Some("Completed"),
         _ => None,

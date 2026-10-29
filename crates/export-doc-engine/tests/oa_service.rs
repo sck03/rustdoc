@@ -41,8 +41,9 @@ fn submitted_versions_originals_and_stored_pdf_survive_draft_changes() {
             .as_array()
             .unwrap()
             .iter()
-            .all(|rule| rule["mode"] == "Configured"
-                && rule["stages"][1]["source"] == "CompanyExecutive")
+            .all(
+                |rule| rule["stages"][1]["source"] == "CompanyExecutive" && rule["key"].is_string()
+            )
     );
     oa_archive_contract::exercise(&service, token, token, employee["employee"]["id"].as_i64());
     service.close().unwrap();

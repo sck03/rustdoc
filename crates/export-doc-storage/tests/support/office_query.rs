@@ -30,6 +30,9 @@ pub fn exercise(c: &Connection) {
     };
     let keys = vec!["handler".into()];
     let mut q = OfficeQuery {
+        viewer: 0,
+        assigned_only: false,
+        principals: &[],
         kind: "supply-requests",
         company: "OFFICE-Q",
         view: scope(),

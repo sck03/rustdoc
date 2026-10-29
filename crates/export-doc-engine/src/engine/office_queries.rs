@@ -119,7 +119,11 @@ pub fn list(store: &Store, actor: &Actor, kind: &str, query: &[(&str, String)]) 
         let to = (!directory)
             .then(|| to.map(|date| date.to_rfc3339()))
             .flatten();
+        let principals = super::oa::approval::queue_approvers(tx, actor, resource)?;
         let (total, rows) = tx.query_office(&export_doc_storage::OfficeQuery {
+            viewer: actor.id,
+            assigned_only: actor.oa_assigned_only,
+            principals: &principals,
             kind,
             company: &actor.company,
             view: auth::data_scope(actor, resource, "view"),

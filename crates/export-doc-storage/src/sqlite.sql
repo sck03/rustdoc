@@ -1,6 +1,6 @@
 PRAGMA foreign_keys = ON;
-CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 5));
-INSERT INTO schema_version VALUES (5);
+CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 9));
+INSERT INTO schema_version VALUES (9);
 CREATE TABLE records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL,
@@ -63,3 +63,31 @@ CREATE TABLE files (
     created_at TEXT NOT NULL
 );
 CREATE INDEX files_record ON files(kind, record_id);
+
+
+CREATE INDEX records_status_page ON records(kind, json_extract(body,'$.status'), id DESC);
+CREATE INDEX records_template_catalog ON records(json_extract(body,'$.reportType'), json_extract(body,'$.status'), json_extract(body,'$.name'), id) WHERE kind='report-templates';
+CREATE INDEX records_template_version ON records(json_extract(body,'$.templateKind'), json_extract(body,'$.templateId'), json_extract(body,'$.content.versionNumber') DESC, id) WHERE kind='template-versions';
+CREATE INDEX records_job_owner_time ON records(owner_id, json_extract(body,'$.createdAt') DESC, id DESC) WHERE kind='background-jobs';
+
+
+CREATE INDEX records_hs_code_order ON records(kind, json_extract(body,'$.code') COLLATE BINARY, id) WHERE kind='hs-codes';
+CREATE INDEX records_hs_current_code ON records(kind, lower(json_extract(body,'$.status')), CAST(json_extract(body,'$.effectiveYear') AS TEXT), json_extract(body,'$.code') COLLATE BINARY, id) WHERE kind='hs-codes';
+CREATE INDEX records_hs_example_order ON records(kind, CASE WHEN json_extract(body,'$.isManuallyVerified')=1 THEN 0 ELSE 1 END, json_extract(body,'$.updatedAt') DESC, id) WHERE kind='hs-examples';
+CREATE INDEX records_hs_example_rank ON records(kind, CASE WHEN json_extract(body,'$.isManuallyVerified')=1 THEN 0 ELSE 1 END, COALESCE(json_extract(body,'$.useCount'),0) DESC, json_extract(body,'$.updatedAt') DESC, id) WHERE kind='hs-examples';
+
+
+CREATE TABLE workflow_tasks (
+    request_id INTEGER NOT NULL REFERENCES records(id) ON DELETE RESTRICT,
+    submission INTEGER NOT NULL CHECK(submission > 0),
+    task_key TEXT NOT NULL,
+    node_key TEXT NOT NULL,
+    assignee_id INTEGER NOT NULL REFERENCES records(id) ON DELETE RESTRICT,
+    acted_by_id INTEGER,
+    status TEXT NOT NULL CHECK(status IN ('Waiting','Approved','Rejected','Returned','Skipped','Cancelled')),
+    active INTEGER NOT NULL CHECK(active IN (0,1)),
+    due_at TEXT NOT NULL,
+    PRIMARY KEY(request_id, submission, task_key)
+);
+CREATE INDEX workflow_tasks_inbox ON workflow_tasks(assignee_id, active, status, due_at, request_id);
+CREATE INDEX workflow_tasks_actor ON workflow_tasks(acted_by_id, request_id);

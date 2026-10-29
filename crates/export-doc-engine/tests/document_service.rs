@@ -3,6 +3,8 @@ mod document_samples;
 #[path = "support/native_fixture.rs"]
 #[allow(dead_code)]
 mod native_fixture;
+#[path = "support/approval_fixture.rs"]
+mod workflow;
 use export_doc_engine::generated_api::*;
 use serde_json::{Value, json};
 
@@ -27,20 +29,8 @@ fn office_documents_round_trip_with_type_and_state_validation() {
     )
     .unwrap();
     let token = login["accessToken"].as_str().unwrap();
-    let mut settings: Value = serde_json::from_slice(
-        &service
-            .dispatch(GET_OA_APPROVAL_SETTINGS, &[], &[], None, token)
-            .unwrap(),
-    )
-    .unwrap();
-    settings["expectedVersion"] = settings["versionNumber"].clone();
-    for rule in settings["rules"].as_array_mut().unwrap() {
-        rule["mode"] = json!("Single");
-        rule["stages"] = json!([]);
-    }
-    service
-        .dispatch(SAVE_OA_APPROVAL_SETTINGS, &[], &[], Some(settings), token)
-        .unwrap();
+    let (reviewer_id, _) = workflow::reviewer(&service, token);
+    workflow::configure(&service, token, reviewer_id);
     for (extension, bytes) in document_samples::office_files() {
         row = service
             .upload(

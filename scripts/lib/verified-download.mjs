@@ -3,6 +3,28 @@ import { createReadStream, createWriteStream } from "node:fs";
 import { rename, rm } from "node:fs/promises";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { setTimeout as delay } from "node:timers/promises";
+import path from "node:path";
+
+const publications = new Map();
+async function publishFile(source, destination, signal) {
+  const absolute = path.resolve(destination);
+  const key = process.platform === "win32" ? absolute.toLowerCase() : absolute;
+  const previous = publications.get(key) ?? Promise.resolve();
+  const publication = previous.catch(() => {}).then(async () => {
+    for (let attempt = 0; ; attempt++) {
+      signal.throwIfAborted();
+      try { await rename(source, destination); return; }
+      catch (error) {
+        if (process.platform !== "win32" || !["EPERM", "EBUSY", "EACCES"].includes(error.code) || attempt >= 4) throw error;
+        await delay(50 * 2 ** attempt, undefined, { signal });
+      }
+    }
+  });
+  publications.set(key, publication);
+  try { await publication; }
+  finally { if (publications.get(key) === publication) publications.delete(key); }
+}
 
 export async function fileSha256(filePath, { signal } = {}) {
   const hash = createHash("sha256");
@@ -37,7 +59,7 @@ export async function downloadVerifiedFile(url, destinationPath, { sha256, maxBy
     const actualHash = hash.digest("hex").toUpperCase();
     if (actualHash !== sha256.toUpperCase()) throw new Error(`SHA-256 mismatch: expected ${sha256}, received ${actualHash}.`);
     downloadSignal.throwIfAborted();
-    await rename(temporaryPath, destinationPath);
+    await publishFile(temporaryPath, destinationPath, downloadSignal);
   } finally {
     if (response?.body && !response.body.locked) await response.body.cancel().catch(() => {});
     await rm(temporaryPath, { force: true });

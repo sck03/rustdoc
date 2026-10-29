@@ -157,8 +157,8 @@ export function PersonnelClearancePanel({ client, user, record }: { client: Expo
     })}</ul>}
     {(data.meetingCount > 20 || data.supplyCount > 20) && <p className="office-muted">每类显示前 20 笔，请在相应行政页面按申请人查看全部记录。</p>}
     <div className="office-card-actions"><button type="button" className="command-button secondary" disabled={query.isFetching} onClick={() => void query.refetch()}>重新核对</button>
-      {(user.capabilities.usesOfficeRegister || record.account) && (["rooms", "supplies"] as const).filter((kind) => officeAccess(user, kind).canSeeOthers).map((kind) =>
-        <Link key={kind} to={`/office/${kind === "rooms" ? "meeting-rooms" : "supplies"}?${user.capabilities.usesOfficeRegister ? `employeeId=${record.employee.id}` : `applicantUserId=${record.account!.id}`}`}>{kind === "rooms" ? "全部预约记录" : "全部物品记录"}</Link>)}
+      {(["rooms", "supplies"] as const).filter((kind) => officeAccess(user, kind).canSeeOthers).map((kind) =>
+        <Link key={kind} to={`/office/${kind === "rooms" ? "meeting-rooms" : "supplies"}?employeeId=${record.employee.id}`}>{kind === "rooms" ? "全部预约记录" : "全部物品记录"}</Link>)}
     </div>
   </div>;
 }

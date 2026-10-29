@@ -4,6 +4,7 @@ pub(in crate::engine) mod approval;
 mod approval_handover;
 pub(in crate::engine) mod approval_references;
 mod approval_routing;
+mod definitions;
 mod documents;
 mod handling_handover;
 pub(in crate::engine) mod personnel_changes;
@@ -62,17 +63,18 @@ pub(super) fn assigned_to(
     }
     let principals = approval::queue_approvers(tx, actor, resource)?;
     if approval::plan(row)?.is_some_and(|plan| {
-        plan.steps.iter().any(|step| {
-            step.acted_by_user_id == Some(actor.id)
-                || principals.iter().any(|principal| {
-                    principal.user_id == step.approver_user_id
-                        && principal.departments.as_ref().is_none_or(|departments| {
-                            departments
-                                .iter()
-                                .any(|department| row["departmentId"] == *department)
-                        })
-                })
-        })
+        plan.notify_user_ids.contains(&actor.id)
+            || plan.steps.iter().any(|step| {
+                step.acted_by_user_id == Some(actor.id)
+                    || principals.iter().any(|principal| {
+                        principal.user_id == step.approver_user_id
+                            && principal.departments.as_ref().is_none_or(|departments| {
+                                departments
+                                    .iter()
+                                    .any(|department| row["departmentId"] == *department)
+                            })
+                    })
+            })
     }) {
         return Ok(true);
     }
@@ -89,7 +91,8 @@ pub(super) fn scope_viewable(
 ) -> Result<bool> {
     Ok(row["companyScope"] == actor.company
         && auth::authorize(actor, resource, "view").is_ok()
-        && (auth::visible(actor, resource, "view", row)
+        && (assigned_to(tx, actor, resource, row)?
+            || auth::visible(actor, resource, "view", row)
             || (resource == "office.expenses"
                 && FINANCE_STATUSES.contains(&text(row, "status").as_str())
                 && auth::visible(actor, resource, "complete", row))
@@ -101,7 +104,9 @@ fn access(tx: &Connection, actor: &Actor, meta: &Value, row: &Value) -> Result<(
     let resource = text(meta, "resource");
     let permission = text(meta, "permission");
     auth::authorize(actor, &resource, &permission)?;
-    let visible = if permission == "view" {
+    let visible = if permission == "approve" && row["status"] == "Pending" {
+        assigned_to(tx, actor, resource.as_str(), row)?
+    } else if permission == "view" {
         viewable(tx, actor, &resource, row)?
     } else if permission == "complete" && resource == "office.general" {
         handling::can_handle(tx, actor, row, &resource)?
@@ -114,9 +119,9 @@ fn access(tx: &Connection, actor: &Actor, meta: &Value, row: &Value) -> Result<(
     Ok(())
 }
 pub(super) fn mutable(row: &Value) -> Result<()> {
-    if !["Draft", "Rejected"].contains(&text(row, "status").as_str()) {
+    if !["Draft", "Returned"].contains(&text(row, "status").as_str()) {
         return Err(conflict(
-            "只有草稿或已驳回的申请可修改，请先撤回待审批申请。",
+            "只有草稿或退回修改的申请可修改，请先撤回待审批申请。",
         ));
     }
     Ok(())
@@ -161,6 +166,7 @@ pub(super) fn project(
     };
     if detail {
         row["canReview"] = json!(approval::authority(tx, actor, &row)?.is_some());
+        row["reviewTaskKeys"] = json!(approval::review_tasks(tx, actor, &row)?);
         if let Some(id) = row["submissionId"].as_i64().filter(|id| *id > 0) {
             row["approvalDocument"] =
                 submissions::project(tx, submissions::checked(tx, &row, id)?, false)?;
@@ -356,7 +362,7 @@ pub(super) fn handle(
         if note.chars().count() > 500
             || (matches!(
                 action.as_str(),
-                "reject" | "cancel" | "withdraw" | "void" | "complete" | "remind"
+                "reject" | "return" | "cancel" | "withdraw" | "void" | "complete" | "remind"
             ) && note.is_empty())
         {
             return Err(invalid(
@@ -373,8 +379,7 @@ pub(super) fn handle(
             row["kind"] == "expense",
         )
         .ok_or_else(|| conflict("当前状态不能执行此操作，请刷新后核对。"))?;
-        if matches!(action.as_str(), "approve" | "reject" | "void")
-            && (tx.provider() != "SQLite" || row["kind"] == "personnel")
+        if matches!(action.as_str(), "approve" | "reject" | "return" | "void")
             && row["ownerUserId"] == actor.id
         {
             return Err(error(
@@ -405,15 +410,14 @@ pub(super) fn handle(
             approval::submit(tx, &actor, &mut row)?;
             submissions::begin(tx, &actor, &mut row)?;
         }
-        if matches!(action.as_str(), "approve" | "reject") {
-            next = approval::review(tx, &actor, &mut row, &action, &note)?;
+        if matches!(action.as_str(), "approve" | "reject" | "return") {
+            next = approval::review(tx, &actor, &mut row, &action, &note, &text(body, "taskKey"))?;
         }
         if action == "complete" {
             validation::completion(&row, today)?;
         }
         if row["kind"] == "personnel" && next == "Approved" {
             row["status"] = json!("Completed");
-            row["currentApproverId"] = json!(0);
             if row["personnelChange"]["action"] == "Hire" {
                 let id = personnel_changes::apply(tx, &actor, &row, today)?;
                 row["employeeId"] = json!(id);
@@ -426,9 +430,6 @@ pub(super) fn handle(
             return Ok(saved);
         }
         row["status"] = json!(next);
-        if next != "Pending" {
-            row["currentApproverId"] = json!(0);
-        }
         let event = if action == "approve" && next == "Pending" {
             "approve-step"
         } else {
@@ -548,7 +549,7 @@ pub(super) fn references(
                 Some("Draft"),
                 Some("Pending"),
                 Some("Approved"),
-                Some("Rejected"),
+                Some("Returned"),
             ]
         } else {
             vec![None]

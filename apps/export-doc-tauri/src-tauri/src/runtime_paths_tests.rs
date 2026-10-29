@@ -363,13 +363,7 @@ fn create_directory_link(target: &Path, link: &Path) {
 
 #[cfg(windows)]
 fn create_directory_link(target: &Path, link: &Path) {
-    let status = std::process::Command::new("cmd")
-        .args(["/d", "/c", "mklink", "/J"])
-        .arg(link)
-        .arg(target)
-        .status()
-        .unwrap();
-    assert!(status.success());
+    crate::test_directory_link::create(target, link);
 }
 
 #[cfg(unix)]

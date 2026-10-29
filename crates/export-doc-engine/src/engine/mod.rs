@@ -91,6 +91,7 @@ mod store;
 mod supplier_overview;
 pub mod tasks;
 mod team_backup;
+mod workflow_tasks;
 pub use team_backup::UploadAuthorization;
 #[cfg(feature = "postgres")]
 pub use team_backup::migration::stage_file as stage_postgres_migration_file;

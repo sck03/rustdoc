@@ -1,41 +1,39 @@
-import type { OaApprovalStage, OaApprovalRule } from "../../api/index.ts";
+import type { OaApprovalStage, OaApprovalCondition } from "../../api/index.ts";
 import type { ApprovalAccount } from "./useApprovalSettings.ts";
 import { OfficeField } from "../office/OfficeUi.tsx";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 
 const sources: Record<OaApprovalStage["source"], string> = { Named: "指定人员", DepartmentManager: "任职部门负责人", LineManager: "直属负责人", FunctionalManagers: "职能负责人", CompanyExecutive: "公司领导审批负责人" };
-export const initialStage = (): OaApprovalStage => ({ source: "DepartmentManager", approverUserIds: [] });
+const fields: Record<OaApprovalCondition["field"],string>={Amount:"原币金额",Currency:"币种",Duration:"时长（请假／出差为天，加班为小时）",Department:"部门编号",Category:"业务类别",PersonnelAction:"人员变动类型"};
+const operators:Record<OaApprovalCondition["operator"],string>={Equal:"等于",NotEqual:"不等于",Greater:"大于",GreaterOrEqual:"大于等于",Less:"小于",LessOrEqual:"小于等于"};
+export const initialStage = (dependsOn:string[]=[]): OaApprovalStage => ({ key:createRequestKey(), name:"审批节点",dependsOn, source:"DepartmentManager",approverUserIds:[],decision:"All",selfApproval:"Skip",repeatedApprover:"Allow",conditions:[],dueHours:48 });
 
 export function ApprovalStagesEditor({ stages, accounts, onChange }: { stages: OaApprovalStage[]; accounts: ApprovalAccount[]; onChange: (stages: OaApprovalStage[]) => void }) {
-  const patch = (index: number, stage: OaApprovalStage) => onChange(stages.map((old, i) => i === index ? stage : old));
+  const patch=(index:number,change:Partial<OaApprovalStage>)=>onChange(stages.map((old,i)=>i===index?{...old,...change}:old));
   return <div className="oa-stages-editor">
-    <p className="office-muted">阶段按顺序推进。会签须全部同意，或签任一人同意即可；当前节点任一人先驳回即结束。本人和兼任按流程规则处理，提交时保留快照。</p>
-    {stages.map((stage, index) => <fieldset className="office-resource-card" key={index}><legend>第 {index + 1} 阶段</legend>
-      <OfficeField label="审批人来源"><select value={stage.source} onChange={event => patch(index, { ...stage, source: event.target.value as OaApprovalStage["source"], approverUserIds: [] })}>{Object.entries(sources).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></OfficeField>
-      <OfficeField label="节点通过方式"><select value={stage.decision ?? "All"} onChange={event => patch(index, { ...stage, decision: event.target.value as OaApprovalStage["decision"] })}><option value="All">会签：全部同意</option><option value="Any">或签：任一人同意</option></select></OfficeField>
-      {stage.source === "Named" && <>
-        {stage.approverUserIds.map((id, signer) => <div className="office-card-actions" key={signer}><OfficeField label={`会签人 ${signer + 1}`}><select required value={id || ""} onChange={event => patch(index, { ...stage, approverUserIds: stage.approverUserIds.map((old, i) => i === signer ? Number(event.target.value) : old) })}><option value="">选择会签账号</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.fullName} · {account.username}</option>)}</select></OfficeField>
-          <button type="button" className="command-button secondary" onClick={() => patch(index, { ...stage, approverUserIds: stage.approverUserIds.filter((_, i) => i !== signer) })}>移除会签人</button></div>)}
-        <button type="button" className="command-button secondary" disabled={stage.approverUserIds.length >= 10} onClick={() => patch(index, { ...stage, approverUserIds: [...stage.approverUserIds, 0] })}>添加会签人</button>
-      </>}
-      <div className="office-card-actions"><button type="button" className="command-button secondary" disabled={index === 0} onClick={() => { const next = [...stages]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; onChange(next); }}>阶段上移</button>
-        <button type="button" className="command-button secondary" onClick={() => onChange(stages.filter((_, i) => i !== index))}>移除阶段</button></div>
+    <p className="office-muted">无前置节点的审批同时开始；选择多个前置节点时，须全部结束才进入本节点。条件须全部满足，未满足时跳过节点。发布时检查循环、责任人和条件；提交前可预览实际路线。</p>
+    {stages.map((stage,index)=><fieldset className="office-resource-card" key={stage.key}><legend>{index+1} · {stage.name}</legend>
+      <div className="office-form-grid">
+        <OfficeField label="节点名称"><input required maxLength={100} value={stage.name} onChange={e=>patch(index,{name:e.target.value})}/></OfficeField>
+        <OfficeField label="审批人来源"><select value={stage.source} onChange={e=>patch(index,{source:e.target.value as OaApprovalStage["source"],approverUserIds:[]})}>{Object.entries(sources).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></OfficeField>
+        <OfficeField label="通过方式"><select value={stage.decision} onChange={e=>patch(index,{decision:e.target.value as OaApprovalStage["decision"]})}><option value="All">会签：全部同意</option><option value="Any">或签：任一人同意</option></select></OfficeField>
+        <OfficeField label="办理时限（小时）"><input type="number" min={1} max={8760} required value={stage.dueHours} onChange={e=>patch(index,{dueHours:Number(e.target.value)})}/></OfficeField>
+        <OfficeField label="遇到申请人本人"><select value={stage.selfApproval} onChange={e=>patch(index,{selfApproval:e.target.value as OaApprovalStage["selfApproval"]})}><option value="Skip">回避本人</option><option value="Reject">停止提交，补充责任人</option></select></OfficeField>
+        <OfficeField label="人员兼任"><select value={stage.repeatedApprover} onChange={e=>patch(index,{repeatedApprover:e.target.value as OaApprovalStage["repeatedApprover"]})}><option value="Allow">允许兼任，逐节点签署</option><option value="Reject">要求独立复核人</option></select></OfficeField>
+      </div>
+      <details><summary>前置节点（{stage.dependsOn.length}）</summary>{stages.filter(n=>n.key!==stage.key).map(node=><label className="checkbox-field" key={node.key}><input type="checkbox" checked={stage.dependsOn.includes(node.key)} onChange={e=>patch(index,{dependsOn:e.target.checked?[...stage.dependsOn,node.key]:stage.dependsOn.filter(k=>k!==node.key)})}/>{node.name}</label>)}</details>
+      {stage.source==="Named"&&<OfficeField label="审批账号（可多选）"><select multiple value={stage.approverUserIds.map(String)} onChange={e=>patch(index,{approverUserIds:Array.from(e.target.selectedOptions,o=>Number(o.value))})}>{accounts.map(a=><option key={a.id} value={a.id}>{a.fullName} · {a.username}</option>)}</select></OfficeField>}
+      <details><summary>生效条件（{stage.conditions.length}）</summary><p className="office-muted">金额条件必须同时限定币种，不自动换汇。类别和部门填写业务编号。</p>
+        {stage.conditions.map((c,i)=><div className="office-form-grid" key={i}>
+          <OfficeField label="条件字段"><select value={c.field} onChange={e=>patch(index,{conditions:stage.conditions.map((v,j)=>i===j?{...v,field:e.target.value as OaApprovalCondition["field"]}:v)})}>{Object.entries(fields).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></OfficeField>
+          <OfficeField label="比较方式"><select value={c.operator} onChange={e=>patch(index,{conditions:stage.conditions.map((v,j)=>i===j?{...v,operator:e.target.value as OaApprovalCondition["operator"]}:v)})}>{Object.entries(operators).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></OfficeField>
+          <OfficeField label="条件值"><input required value={c.value} onChange={e=>patch(index,{conditions:stage.conditions.map((v,j)=>i===j?{...v,value:e.target.value}:v)})}/></OfficeField>
+          <button type="button" className="command-button secondary" onClick={()=>patch(index,{conditions:stage.conditions.filter((_,j)=>i!==j)})}>移除条件</button>
+        </div>)}
+        <button type="button" className="command-button secondary" disabled={stage.conditions.length>=16} onClick={()=>patch(index,{conditions:[...stage.conditions,{field:"Department",operator:"Equal",value:""}]})}>添加条件</button>
+      </details>
+      <button type="button" className="command-button secondary" disabled={stages.length===1||stages.some(n=>n.dependsOn.includes(stage.key))} onClick={()=>onChange(stages.filter((_,i)=>i!==index))}>移除节点</button>
     </fieldset>)}
-    <button type="button" className="command-button secondary" disabled={stages.length >= 10} onClick={() => onChange([...stages, initialStage()])}>添加审批阶段</button>
+    <button type="button" className="command-button secondary" disabled={stages.length>=32} onClick={()=>onChange([...stages,initialStage(stages.length?[stages[stages.length-1].key]:[])])}>添加审批节点</button>
   </div>;
-}
-
-export function ApprovalAmountEditor({ rule, accounts, onChange }: { rule: OaApprovalRule; accounts: ApprovalAccount[]; onChange: (patch: Partial<OaApprovalRule>) => void }) {
-  const branches = rule.amountBranches ?? [];
-  const patch = (index: number, value: Partial<typeof branches[number]>) => onChange({ amountBranches: branches.map((old, i) => i === index ? { ...old, ...value } : old) });
-  return <details><summary>金额条件审批（{branches.length} 条）</summary><p className="office-muted">按原币金额判断，下限包含、上限不包含。同币种区间不能重叠；未命中使用上方默认流程，不做隐式汇率换算。</p>
-    {branches.map((branch, index) => <fieldset key={branch.key} className="office-resource-card"><legend>金额条件 {index + 1}</legend><div className="office-form-grid">
-      <OfficeField label="条件名称"><input required maxLength={100} value={branch.name} onChange={event => patch(index, { name: event.target.value })} /></OfficeField>
-      <OfficeField label="条件币种"><select value={branch.currency} onChange={event => patch(index, { currency: event.target.value })}>{["CNY", "USD", "EUR", "HKD", "JPY", "GBP"].map(currency => <option key={currency}>{currency}</option>)}</select></OfficeField>
-      <OfficeField label="金额下限（含）"><input required inputMode="decimal" pattern="[0-9]+([.][0-9]{1,6})?" value={branch.minimum} onChange={event => patch(index, { minimum: event.target.value })} /></OfficeField>
-      <OfficeField label="金额上限（不含，空为不限）"><input inputMode="decimal" pattern="[0-9]+([.][0-9]{1,6})?" value={branch.maximum ?? ""} onChange={event => patch(index, { maximum: event.target.value || null })} /></OfficeField>
-    </div><ApprovalStagesEditor stages={branch.stages} accounts={accounts} onChange={stages => patch(index, { stages })} />
-      <button type="button" className="command-button secondary" onClick={() => onChange({ amountBranches: branches.filter((_, i) => i !== index) })}>移除金额条件</button></fieldset>)}
-    <button type="button" className="command-button secondary" disabled={branches.length >= 10} onClick={() => onChange({ amountBranches: [...branches, { key: createRequestKey(), name: "金额审批", currency: "CNY", minimum: "0", maximum: null, stages: [initialStage()] }] })}>添加金额条件</button>
-  </details>;
 }

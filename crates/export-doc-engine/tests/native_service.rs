@@ -4,6 +4,19 @@ use serde_json::{Value, json};
 mod native_fixture;
 use native_fixture::{ApiClient, Fixture};
 
+fn resource_reviewer(fixture: &Fixture) -> ApiClient {
+    let username = format!("resource-review-{}", nonce().unwrap());
+    let user = fixture.create(CREATE_USER_ACCOUNT, json!({"username":username,"fullName":"资源审批","role":"Admin","companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Resource-Review-2026"}));
+    fixture
+        .client()
+        .configure_approval(user["user"]["id"].as_i64().unwrap());
+    fixture
+        .client()
+        .login(username, "Resource-Review-2026".into())
+        .unwrap()
+        .0
+}
+
 #[test]
 fn personnel_directory_images_and_employment_events_use_the_public_contract() {
     let fixture = Fixture::new();
@@ -485,6 +498,7 @@ fn crm_supplier_and_payment_records_roundtrip_and_keep_optional_fields() {
 #[test]
 fn meeting_bookings_reject_overlaps_but_allow_adjacent_times() {
     let fixture = Fixture::new();
+    let _reviewer = resource_reviewer(&fixture);
     let person = fixture.employee();
     let room=fixture.create(CREATE_MEETING_ROOM,json!({"name":"会议室一","capacity":12,"maximumBookingHours":8,"advanceBookingDays":90,"isActive":true,"requiresKey":true}));
     let day = (export_doc_engine::clock::BusinessClock::default()
@@ -495,7 +509,7 @@ fn meeting_bookings_reject_overlaps_but_allow_adjacent_times() {
     .to_string();
     let request = json!({"requestKey":nonce().unwrap(),"meetingRoomId":room["id"],"employeeId":person["id"],"title":"业务会议","attendeeCount":5,"startsAt":format!("{day}T10:00:00+08:00"),"endsAt":format!("{day}T11:00:00+08:00")});
     let booking = fixture.create(CREATE_MEETING_BOOKING, request.clone());
-    assert_eq!(booking["status"], "Approved");
+    assert_eq!(booking["status"], "Pending");
     let availability: Value = fixture
         .client()
         .json(
@@ -535,12 +549,13 @@ fn meeting_bookings_reject_overlaps_but_allow_adjacent_times() {
     overlapping["endsAt"] = json!(format!("{day}T12:00:00+08:00"));
     assert_eq!(
         fixture.create(CREATE_MEETING_BOOKING, overlapping)["status"],
-        "Approved"
+        "Pending"
     );
 }
 #[test]
 fn stock_reservation_issue_partial_return_and_cancellation_are_atomic() {
     let fixture = Fixture::new();
+    let reviewer = resource_reviewer(&fixture);
     let person = fixture.employee();
     let supply = fixture.create(
         CREATE_OFFICE_SUPPLY,
@@ -553,6 +568,19 @@ fn stock_reservation_issue_partial_return_and_cancellation_are_atomic() {
         .today
         .to_string();
     let request=fixture.create(CREATE_OFFICE_SUPPLY_REQUEST,json!({"requestKey":nonce().unwrap(),"officeSupplyId":supply["id"],"employeeId":person["id"],"quantity":3,"purpose":"办公使用","returnDueDate":due_date}));
+    assert_eq!(request["status"], "Pending");
+    assert_eq!(
+        fixture.request(LIST_OFFICE_SUPPLIES, None, None)["items"][0]["availableQuantity"],
+        10
+    );
+    let request: Value = reviewer
+        .json(
+            APPROVE_OFFICE_SUPPLY_REQUEST,
+            &[("id", request["id"].to_string())],
+            &[],
+            Some(json!({"expectedVersion":request["versionNumber"],"taskKey":request["approvalPlan"]["steps"][0]["taskKey"],"note":"资源审批通过"})),
+        )
+        .unwrap();
     let supplies = fixture.request(LIST_OFFICE_SUPPLIES, None, None);
     assert_eq!(supplies["items"][0]["availableQuantity"], 7);
     assert_eq!(supplies["items"][0]["stockQuantity"], 10);
@@ -579,17 +607,16 @@ fn stock_reservation_issue_partial_return_and_cancellation_are_atomic() {
     assert_eq!(supplies["items"][0]["stockQuantity"], 10);
     assert_eq!(supplies["items"][0]["reservedQuantity"], 0);
     let excessive = json!({"requestKey":nonce().unwrap(),"officeSupplyId":supply["id"],"employeeId":person["id"],"quantity":11,"purpose":"测试不足","returnDueDate":due_date});
+    let excessive = fixture.create(CREATE_OFFICE_SUPPLY_REQUEST, excessive);
     assert_eq!(
-        fixture
-            .client()
+        reviewer
             .json::<Value>(
-                CREATE_OFFICE_SUPPLY_REQUEST,
+                APPROVE_OFFICE_SUPPLY_REQUEST,
+                &[("id", excessive["id"].to_string())],
                 &[],
-                &[],
-                Some(contracts::overlay(
-                    contracts::object(CREATE_OFFICE_SUPPLY_REQUEST.id, true),
-                    &excessive
-                ))
+                Some(
+                    json!({"expectedVersion":excessive["versionNumber"],"taskKey":excessive["approvalPlan"]["steps"][0]["taskKey"],"note":"不足库存不得通过"})
+                )
             )
             .unwrap_err()
             .status,

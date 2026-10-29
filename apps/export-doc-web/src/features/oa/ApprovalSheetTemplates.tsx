@@ -22,7 +22,7 @@ export function ApprovalSheetTemplates({ client, settings, disabled, onChange }:
     }));
   }
   return <details><summary>审批单名称与打印模板</summary>
-    <p className="office-muted">默认 A4 白底黑字，按实际节点依次显示会签／或签、签署人、意见及时间，长流程自动续页。恢复默认版式可更新测试期间保存的两级模板，保留表单名称；修改先进入草稿，保存后用于后续提交版本。</p>
+    <p className="office-muted">默认 A4 白底黑字，按审批节点显示审批人、处理结果、意见及时间，长流程自动续页。恢复默认版式保留表单名称；修改先进入草稿，保存后用于后续提交版本。</p>
     <button className="command-button secondary" type="button" disabled={disabled || !settings.sheetDefaultContent} onClick={() => restoreDefault()}>全部恢复默认版式</button>
     <ul>{settings.sheetTemplates?.map(template => <li key={template.key}>{template.name} <button className="command-button secondary" type="button" disabled={disabled} onClick={() => setSelected(template)}>编辑审批单模板</button> <button className="command-button secondary" type="button" disabled={disabled} onClick={() => applyMonochrome(template.key)}>使用黑白打印样式</button> <button className="command-button secondary" type="button" disabled={disabled || !settings.sheetDefaultContent} onClick={() => restoreDefault(template.key)}>恢复默认版式</button></li>)}</ul>
     {selected && <SheetEditor key={selected.key} client={client} template={selected} catalog={settings.sheetFieldCatalog} onClose={() => setSelected(null)} onApply={template => {

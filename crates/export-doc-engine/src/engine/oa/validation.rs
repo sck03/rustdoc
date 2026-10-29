@@ -8,23 +8,28 @@ pub(super) fn employee(
     body: &Value,
     existing: bool,
 ) -> Result<Value> {
-    let mut person = if tx.provider() == "SQLite" || existing {
-        store::get(tx, "people", records::positive(body, "employeeId", "人员")?)?
-    } else {
-        if body["employeeId"].as_i64().is_some_and(|id| id > 0) {
-            return Err(invalid("团队申请由本人发起，不能代选其他员工。"));
-        }
-        super::super::personnel_accounts::person_for_account(tx, actor.id)?
-            .filter(|person| person["companyScope"] == actor.company)
-            .ok_or_else(|| invalid("请先由人事将账号关联到本公司在职人员。"))?
-    };
+    let mut person =
+        if existing || (actor.admin && body["employeeId"].as_i64().is_some_and(|id| id > 0)) {
+            store::get(tx, "people", records::positive(body, "employeeId", "人员")?)?
+        } else {
+            if body["employeeId"].as_i64().is_some_and(|id| id > 0) {
+                return Err(invalid("团队申请由本人发起，不能代选其他员工。"));
+            }
+            super::super::personnel_accounts::person_for_account(tx, actor.id)?
+                .filter(|person| person["companyScope"] == actor.company)
+                .ok_or_else(|| invalid("请先由人事将账号关联到本公司在职人员。"))?
+        };
     if person["companyScope"] != actor.company {
         return Err(error(403, "只能为本公司员工办理申请。"));
     }
     if !["Active", "Probation"].contains(&text(&person, "status").as_str()) {
         return Err(conflict("员工已离职或状态不可用。"));
     }
-    if tx.provider() != "SQLite" && existing && person["account"]["id"] != body["ownerUserId"] {
+    if existing
+        && !actor.admin
+        && person["account"]["id"] != body["ownerUserId"]
+        && body["ownerUserId"] == actor.id
+    {
         return Err(conflict("申请人与人员账号关联已变化。"));
     }
     let requested = text(body, "departmentId");

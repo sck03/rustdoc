@@ -429,31 +429,19 @@ pub fn user_dto(
                 .is_some_and(|resource| !resource.is_technical && resource.workspace == name)
         })
     };
-    user["capabilities"] = json!({"canManageSettings":actor.admin,"canManageUsers":actor.admin && actor.edition.allows("system.users"),"canViewAllBusinessData":actor.admin,"canUseDocumentWorkspace":workspace("document"),"canUseSalesWorkspace":workspace("sales"),"productEdition":actor.edition.name(),"enabledModules":enabled,"moduleAccess":access,"permissions":actor.grants,"usesOfficeRegister":store.provider()? == "SQLite","availableFeatures":["worklist","business-attachments"]});
+    user["capabilities"] = json!({"canManageSettings":actor.admin,"canManageUsers":actor.admin && actor.edition.allows("system.users"),"canViewAllBusinessData":actor.admin,"canUseDocumentWorkspace":workspace("document"),"canUseSalesWorkspace":workspace("sales"),"productEdition":actor.edition.name(),"enabledModules":enabled,"moduleAccess":access,"permissions":actor.grants,"availableFeatures":["worklist","business-attachments"]});
     user["capabilities"]["oaAssignedOnly"] = json!(actor.oa_assigned_only);
     Ok(user)
 }
 
-/// Company executives cover every office resource that exposes approval in the catalog.
+/// A responsibility assignment grants access only to its routed tasks.
 pub fn is_company_approver(actor: &Actor) -> bool {
-    !actor.oa_assigned_only
-        && permissions::catalog()
-            .resources
-            .iter()
-            .filter(|resource| {
-                resource.workspace == "office"
-                    && resource
-                        .actions
-                        .iter()
-                        .any(|action| action.key == "approve")
-            })
-            .all(|resource| {
-                scope_rank(actor, &resource.key, "view").min(scope_rank(
-                    actor,
-                    &resource.key,
-                    "approve",
-                )) >= 3
-            })
+    permissions::catalog().resources.iter().any(|r| {
+        r.workspace == "office"
+            && r.actions.iter().any(|a| a.key == "approve")
+            && authorize(actor, &r.key, "view").is_ok()
+            && authorize(actor, &r.key, "approve").is_ok()
+    })
 }
 
 pub fn authorize(actor: &Actor, resource: &str, action: &str) -> Result<()> {

@@ -8,6 +8,8 @@ use export_doc_engine::{
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use std::sync::Arc;
+#[path = "approval_fixture.rs"]
+mod workflow;
 
 /// Typed in-process client for native service integration workflows.
 #[derive(Clone)]
@@ -17,6 +19,9 @@ pub struct ApiClient {
 }
 
 impl ApiClient {
+    pub fn configure_approval(&self, id: i64) {
+        workflow::configure(&self.native, &self.access_token, id);
+    }
     pub fn native(paths: RuntimePaths) -> Result<Self, ApiError> {
         Self::native_edition(paths, Default::default(), "Full")
     }

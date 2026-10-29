@@ -3711,7 +3711,6 @@ export interface ApiUserCapabilitiesDto {
   oaAssignedOnly?: boolean;
   permissions: ApiPermissionGrantDto[];
   productEdition: string;
-  usesOfficeRegister: boolean;
 }
 
 export interface ApiUserDto {
@@ -4253,8 +4252,10 @@ export interface MeetingBookingCreateRequest {
 
 export interface MeetingBookingRecord {
   applicantName: string;
+  approvalPlan?: OaApprovalPlan;
   attendeeCount: number;
   canHandle?: boolean;
+  canReview?: boolean;
   createdAt: string;
   departmentId: string;
   employeeId?: number;
@@ -4270,6 +4271,7 @@ export interface MeetingBookingRecord {
   ownerUserId: number;
   requiresKey: boolean;
   returnedAt?: string | null;
+  reviewTaskKeys?: string[];
   roomName: string;
   startsAt: string;
   status: MeetingBookingStatus;
@@ -4340,15 +4342,13 @@ export type NotifyPartyMode = "None" | "SameAsConsignee" | "Separate";
 export interface OaAction {
   expectedVersion: number;
   note: string;
+  taskKey?: string;
 }
 
-export interface OaApprovalAmountBranch {
-  currency: string;
-  key: string;
-  maximum?: string | null;
-  minimum: string;
-  name: string;
-  stages: OaApprovalStage[];
+export interface OaApprovalCondition {
+  field: "Amount" | "Currency" | "Duration" | "Department" | "Category" | "PersonnelAction";
+  operator: "Equal" | "NotEqual" | "Greater" | "GreaterOrEqual" | "Less" | "LessOrEqual";
+  value: string;
 }
 
 export interface OaApprovalDelegation {
@@ -4360,9 +4360,22 @@ export interface OaApprovalDelegation {
   startsAt: string;
 }
 
+export interface OaApprovalNode {
+  decision: "All" | "Any";
+  dependsOn: string[];
+  dueAt: string;
+  dueHours: number;
+  independentReview: boolean;
+  key: string;
+  name: string;
+  skipped: boolean;
+  startedAt: string;
+}
+
 export interface OaApprovalPlan {
-  matchedBranch?: string;
-  mode: "Single" | "DepartmentChain" | "Named" | "Configured";
+  definitionKey: string;
+  nodes: OaApprovalNode[];
+  notifyUserIds: number[];
   policyVersion: number;
   steps: OaApprovalStep[];
 }
@@ -4376,17 +4389,17 @@ export interface OaApprovalReassign {
   expectedVersion: number;
   fromUserId: number;
   note: string;
+  taskKey: string;
   toUserId: number;
 }
 
 export interface OaApprovalRule {
-  amountBranches?: OaApprovalAmountBranch[];
-  approverUserIds: number[];
-  kind: "leave" | "overtime" | "expense" | "travel" | "purchase" | "general" | "personnel";
-  mode: "Single" | "DepartmentChain" | "Named" | "Configured";
-  repeatedApprover?: "LastStage" | "Reject";
-  selfApproval?: "Skip" | "Reject";
-  stages?: OaApprovalStage[];
+  key: string;
+  kind: "leave" | "overtime" | "expense" | "travel" | "purchase" | "general" | "personnel" | "room" | "supply";
+  name: string;
+  notifyUserIds: number[];
+  stages: OaApprovalStage[];
+  variant: string;
 }
 
 export interface OaApprovalSettings {
@@ -4394,6 +4407,7 @@ export interface OaApprovalSettings {
   expectedVersion?: number;
   handlingServices?: OfficeHandlingService[];
   personnelApprovalActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
+  publications: OaPublication[];
   rules: OaApprovalRule[];
   sheetDefaultContent?: string;
   sheetFieldCatalog?: ApiReportTemplateFieldCatalogResponse;
@@ -4412,7 +4426,14 @@ export interface OaApprovalSettingsSave {
 
 export interface OaApprovalStage {
   approverUserIds: number[];
-  decision?: "All" | "Any";
+  conditions: OaApprovalCondition[];
+  decision: "All" | "Any";
+  dependsOn: string[];
+  dueHours: number;
+  key: string;
+  name: string;
+  repeatedApprover: "Allow" | "Reject";
+  selfApproval: "Skip" | "Reject";
   source: "Named" | "DepartmentManager" | "LineManager" | "FunctionalManagers" | "CompanyExecutive";
 }
 
@@ -4422,11 +4443,12 @@ export interface OaApprovalStep {
   actedByUserId?: number | null;
   approverName: string;
   approverUserId: number;
-  decision?: "All" | "Any";
+  decision: "All" | "Any";
   delegationKey: string;
   note: string;
-  stage?: number | null;
-  status: "Waiting" | "Approved" | "Rejected" | "Skipped";
+  stage: number;
+  status: "Waiting" | "Approved" | "Rejected" | "Returned" | "Skipped" | "Cancelled";
+  taskKey: string;
 }
 
 export interface OaApprovalVerification {
@@ -4457,6 +4479,11 @@ export interface OaAttachment {
   mediaType: string;
   purpose?: "ReimbursementForm" | "Voucher" | "Supporting";
   sizeBytes: number;
+}
+
+export interface OaDefinitionAction {
+  definitionKey: string;
+  expectedVersion: number;
 }
 
 export interface OaEvent {
@@ -4509,6 +4536,12 @@ export interface OaPersonnelChange {
   registration?: PersonnelCreateRequest;
 }
 
+export interface OaPublication {
+  enabled: boolean;
+  key: string;
+  version: number;
+}
+
 export interface OaPurchaseLine {
   name: string;
   quantity: string;
@@ -4549,7 +4582,8 @@ export interface OaRequest {
   purchaseLines?: OaPurchaseLine[];
   reason: string;
   requestKey: string;
-  status: "Draft" | "Pending" | "Approved" | "Rejected" | "Cancelled" | "Completed" | "HandedOff";
+  reviewTaskKeys?: string[];
+  status: "Draft" | "Pending" | "Approved" | "Rejected" | "Cancelled" | "Completed" | "HandedOff" | "Returned";
   submissionId?: number;
   submissionNumber?: number;
   title: string;
@@ -4666,7 +4700,8 @@ export interface OaSubmittedRequest {
   purchaseLines?: OaPurchaseLine[];
   reason: string;
   requestKey: string;
-  status: "Draft" | "Pending" | "Approved" | "Rejected" | "Cancelled" | "Completed" | "HandedOff";
+  reviewTaskKeys?: string[];
+  status: "Draft" | "Pending" | "Approved" | "Rejected" | "Cancelled" | "Completed" | "HandedOff" | "Returned";
   title: string;
   totalAmount: string;
   travel?: OaTravel;
@@ -4683,6 +4718,7 @@ export interface OaTravel {
 export interface OfficeDecisionRequest {
   expectedVersion: number;
   note?: string;
+  taskKey?: string;
 }
 
 export interface OfficeHandlingDirectory {
@@ -4701,6 +4737,7 @@ export interface OfficeHandlingService {
 export interface OfficeRequestEventRecord {
   action: string;
   actorName: string;
+  approvalPlan?: OaApprovalPlan;
   createdAt: string;
   id: number;
   note: string;
@@ -4752,7 +4789,9 @@ export interface OfficeSupplyRecord {
 
 export interface OfficeSupplyRequestRecord {
   applicantName: string;
+  approvalPlan?: OaApprovalPlan;
   canHandle?: boolean;
+  canReview?: boolean;
   createdAt: string;
   departmentId: string;
   employeeId?: number;
@@ -4768,6 +4807,7 @@ export interface OfficeSupplyRequestRecord {
   quantity: number;
   returnDueDate?: string | null;
   returnedQuantity: number;
+  reviewTaskKeys?: string[];
   status: SupplyRequestStatus;
   supplyName: string;
   unit: string;
@@ -5797,19 +5837,6 @@ export const HsCodeHistoryCandidatePageDefaults = {
   scannedSourceCount: 0,
 } as const satisfies Partial<HsCodeHistoryCandidatePage>;
 
-export const OaApprovalRuleDefaults = {
-  repeatedApprover: "LastStage",
-  selfApproval: "Skip",
-} as const satisfies Partial<OaApprovalRule>;
-
-export const OaApprovalStageDefaults = {
-  decision: "All",
-} as const satisfies Partial<OaApprovalStage>;
-
-export const OaApprovalStepDefaults = {
-  decision: "All",
-} as const satisfies Partial<OaApprovalStep>;
-
 export const OfficeDecisionRequestDefaults = {
   note: "",
 } as const satisfies Partial<OfficeDecisionRequest>;
@@ -6520,6 +6547,10 @@ export interface DepartPersonnelRequest {
 export interface DisableEmailTemplateRequest {
   id: number;
   body: ApiEmailTemplateLifecycleRequest;
+}
+
+export interface DisableOaDefinitionRequest {
+  body: OaDefinitionAction;
 }
 
 export interface DisableUserReportTemplateRequest {
@@ -7685,6 +7716,10 @@ export interface PublishEmailTemplateRequest {
   body: ApiEmailTemplateLifecycleRequest;
 }
 
+export interface PublishOaDefinitionRequest {
+  body: OaDefinitionAction;
+}
+
 export interface PublishUserReportTemplateRequest {
   id: number;
   body: ApiUserReportTemplateLifecycleRequest;
@@ -7971,6 +8006,41 @@ export interface RestoreUserReportTemplateVersionRequest {
 
 export interface RetryJobRequest {
   jobId: string;
+}
+
+export interface ReturnForCorrectionExpenseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface ReturnForCorrectionGeneralRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface ReturnForCorrectionLeaveRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface ReturnForCorrectionOvertimeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface ReturnForCorrectionPersonnelChangeRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface ReturnForCorrectionPurchaseRequestRequest {
+  id: number;
+  body: OaAction;
+}
+
+export interface ReturnForCorrectionTravelRequestRequest {
+  id: number;
+  body: OaAction;
 }
 
 export interface ReturnMeetingRoomKeyRequest {
@@ -9980,6 +10050,14 @@ export class ExportDocManagerApiClient {
   public disableEmailTemplate(request: DisableEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
     const path = `/api/email-templates/${encodePath(request.id)}/disable`;
     return this.request<ApiEmailTemplateDto>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public disableOaDefinition(request: DisableOaDefinitionRequest, init?: ApiRequestInit): Promise<OaApprovalSettings> {
+    const path = "/api/office/approval-settings/disable";
+    return this.request<OaApprovalSettings>("POST", path, {
       body: request.body,
       init,
     });
@@ -12037,6 +12115,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public publishOaDefinition(request: PublishOaDefinitionRequest, init?: ApiRequestInit): Promise<OaApprovalSettings> {
+    const path = "/api/office/approval-settings/publish";
+    return this.request<OaApprovalSettings>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public publishUserReportTemplate(request: PublishUserReportTemplateRequest, init?: ApiRequestInit): Promise<ApiUserReportTemplateDto> {
     const path = `/api/reports/user-templates/${encodePath(request.id)}/publish`;
     return this.request<ApiUserReportTemplateDto>("POST", path, {
@@ -12530,6 +12616,62 @@ export class ExportDocManagerApiClient {
   public retryJob(request: RetryJobRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = `/api/jobs/${encodePath(request.jobId)}/retry`;
     return this.request<BackgroundJobSnapshot>("POST", path, { init });
+  }
+
+  public returnForCorrectionExpenseRequest(request: ReturnForCorrectionExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/return`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public returnForCorrectionGeneralRequest(request: ReturnForCorrectionGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/return`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public returnForCorrectionLeaveRequest(request: ReturnForCorrectionLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/return`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public returnForCorrectionOvertimeRequest(request: ReturnForCorrectionOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/return`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public returnForCorrectionPersonnelChangeRequest(request: ReturnForCorrectionPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/return`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public returnForCorrectionPurchaseRequest(request: ReturnForCorrectionPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/return`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public returnForCorrectionTravelRequest(request: ReturnForCorrectionTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/return`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public returnMeetingRoomKey(request: ReturnMeetingRoomKeyRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {

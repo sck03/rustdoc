@@ -9,9 +9,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 87821,
+      "baselineAggregateLines": 87783,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 88021,
+      "maximumAggregateLines": 87983,
       "reportFiles": false
     },
     {
@@ -37,9 +37,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 76811,
+      "baselineAggregateLines": 77313,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 76886,
+      "maximumAggregateLines": 77388,
       "reportFiles": false
     },
     {
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 22219,
+      "baselineAggregateLines": 22279,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 22339,
+      "maximumAggregateLines": 22399,
       "reportFiles": false
     },
     {
@@ -66,9 +66,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 38393,
+      "baselineAggregateLines": 38492,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 38543,
+      "maximumAggregateLines": 38642,
       "reportFiles": false
     },
     {

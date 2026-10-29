@@ -90,13 +90,20 @@ pub fn exercise(service: &NativeService, root: &str) {
     let seal = login(&users[2]);
     let supplies = login(&users[3]);
     let leader = login(&users[4]);
-    let local = call(service, &admin, GET_CURRENT_USER, 0, None).unwrap()["capabilities"]["usesOfficeRegister"]
-        == true;
     let mut policy = call(service, &admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
     // This contract exercises service custody after a deliberately single-stage approval.
     for rule in policy["rules"].as_array_mut().unwrap() {
-        rule["mode"] = json!("Single");
-        rule["stages"] = json!([]);
+        let reviewer = if matches!(rule["kind"].as_str(), Some("general" | "room" | "supply")) {
+            &users[4]
+        } else {
+            &users[0]
+        };
+        rule["stages"] = json!([super::oa_contract::workflow::node(
+            "review",
+            &[],
+            "Named",
+            json!([reviewer["id"]])
+        )]);
     }
     policy["handlingServices"] = json!([
         {"key":"seal","name":"公章","category":"Seal","handlerUserIds":[users[2]["id"]],"isActive":true},
@@ -108,8 +115,8 @@ pub fn exercise(service: &NativeService, root: &str) {
         body["expectedVersion"] = body["versionNumber"].clone();
         call(service, &admin, SAVE_OA_APPROVAL_SETTINGS, 0, Some(body)).unwrap()
     };
-    policy = save_policy(policy);
-    let body = |category: &str, key: &str| json!({"requestKey":nonce().unwrap(),"employeeId":if local {Some(person_id)} else {None},"title":format!("{category}分工测试"),"reason":"审批后专岗办理","category":category,"handlingKey":key});
+    policy = super::oa_contract::workflow::publish_all(service, &admin, policy);
+    let body = |category: &str, key: &str| json!({"requestKey":nonce().unwrap(),"title":format!("{category}分工测试"),"reason":"审批后专岗办理","category":category,"handlingKey":key});
     let draft = call(
         service,
         &applicant,
@@ -285,9 +292,9 @@ pub fn exercise(service: &NativeService, root: &str) {
         .unwrap();
         let today =
             call(service, &admin, GET_CURRENT_USER, 0, None).unwrap()["businessDate"].clone();
-        let mut request = call(service,&applicant,CREATE_OFFICE_SUPPLY_REQUEST,0,Some(json!({"requestKey":nonce().unwrap(),"employeeId":if local {Some(person_id)} else {None},"officeSupplyId":supply_id,"quantity":2,"purpose":"领用与归还","returnDueDate":if returnable {today} else {Value::Null}}))).unwrap();
+        let mut request = call(service,&applicant,CREATE_OFFICE_SUPPLY_REQUEST,0,Some(json!({"requestKey":nonce().unwrap(),"officeSupplyId":supply_id,"quantity":2,"purpose":"领用与归还","returnDueDate":if returnable {today} else {Value::Null}}))).unwrap();
         let rid = request["id"].as_i64().unwrap();
-        if !local {
+        {
             request = call(
                 service,
                 &leader,
@@ -371,7 +378,6 @@ pub fn exercise(service: &NativeService, root: &str) {
         &users,
         person_id,
         &mut policy,
-        local,
     );
     // Referenced categories cannot disappear or silently change meaning.
     policy["handlingServices"] = json!([]);

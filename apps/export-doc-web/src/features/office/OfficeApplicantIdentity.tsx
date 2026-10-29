@@ -2,11 +2,11 @@ import type { ApiUserDto } from "../../api/index.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 
 export function canIdentifyOfficeApplicant(user: ApiUserDto) {
-  return user.capabilities.usesOfficeRegister || Boolean(user.employee && user.employee.status !== "Departed");
+  return user.capabilities.canManageUsers || Boolean(user.employee && user.employee.status !== "Departed");
 }
 
 export function OfficeApplicantIdentity({ user }: { user: ApiUserDto }) {
-  if (user.capabilities.usesOfficeRegister) return null;
+  if (user.capabilities.canManageUsers) return null;
   const employee = user.employee;
   return canIdentifyOfficeApplicant(user) && employee
     ? <p className="office-field-wide">申请人：{employee.fullName} · 工号 {employee.employeeNumber} · 部门 {user.departmentId} · {employee.jobTitle}。申请使用本人关联档案。</p>

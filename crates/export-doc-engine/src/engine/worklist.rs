@@ -36,8 +36,7 @@ fn allowed(actor: &Actor, resource: &str, actions: &[&str]) -> bool {
         .all(|action| auth::authorize(actor, resource, action).is_ok())
 }
 fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
-    let local = tx.provider() == "SQLite";
-    let mine = |record: &Value| local || record["ownerUserId"] == actor.id;
+    let mine = |record: &Value| record["ownerUserId"] == actor.id;
     let mut groups = vec![];
     if allowed(actor, "document.invoices", &["view", "operate"]) {
         let rows = rows(
@@ -118,14 +117,17 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
         });
     }
     if allowed(actor, "office.rooms", &["view"]) {
-        let meetings = rows(tx, actor, "bookings", "office.rooms", &["view"], true)?;
-        if !local && allowed(actor, "office.rooms", &["approve"]) {
+        let mut meetings = rows(tx, actor, "bookings", "office.rooms", &["view"], true)?;
+        for r in &mut meetings {
+            r["reviewAllowed"] = json!(super::oa::approval::authority(tx, actor, r)?.is_some());
+        }
+        if allowed(actor, "office.rooms", &["approve"]) {
             let rows = meetings
                 .iter()
                 .filter(|r| {
                     r["status"] == "Pending"
                         && r["ownerUserId"] != actor.id
-                        && auth::visible(actor, "office.rooms", "approve", r)
+                        && r["reviewAllowed"] == true
                 })
                 .map(|r| {
                     item(
@@ -147,22 +149,14 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
         for (key, name, status, due, description) in [
             (
                 "meeting-collection",
-                if local {
-                    "会议室待交接"
-                } else {
-                    "我的会议室待使用"
-                },
+                "会议室待使用／交接",
                 "Approved",
                 "startsAt",
                 "待使用／交接",
             ),
             (
                 "meeting-return",
-                if local {
-                    "会议室待结束／归还"
-                } else {
-                    "我的会议室待结束／归还"
-                },
+                "会议室待结束／归还",
                 "InUse",
                 "endsAt",
                 "待结束使用／归还钥匙",
@@ -199,7 +193,7 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
         }
     }
     if allowed(actor, "office.supplies", &["view"]) {
-        let requests = rows(
+        let mut requests = rows(
             tx,
             actor,
             "supply-requests",
@@ -207,13 +201,16 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
             &["view"],
             true,
         )?;
-        if !local && allowed(actor, "office.supplies", &["approve"]) {
+        for r in &mut requests {
+            r["reviewAllowed"] = json!(super::oa::approval::authority(tx, actor, r)?.is_some());
+        }
+        if allowed(actor, "office.supplies", &["approve"]) {
             let rows = requests
                 .iter()
                 .filter(|r| {
                     r["status"] == "Pending"
                         && r["ownerUserId"] != actor.id
-                        && auth::visible(actor, "office.supplies", "approve", r)
+                        && r["reviewAllowed"] == true
                 })
                 .map(|r| {
                     item(
@@ -280,20 +277,12 @@ fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
         }
         groups.push(Group {
             key: "supply-collection",
-            name: if local {
-                "物品待发放"
-            } else {
-                "我的物品待领用"
-            },
+            name: "物品待领用／发放",
             rows: collection,
         });
         groups.push(Group {
             key: "supply-return",
-            name: if local {
-                "借用物品待归还"
-            } else {
-                "我的借用物品待归还"
-            },
+            name: "借用物品待归还",
             rows: returns,
         });
     }

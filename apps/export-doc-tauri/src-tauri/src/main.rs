@@ -30,6 +30,8 @@ mod runtime_prerequisites;
 mod runtime_tree_manifest;
 mod tauri_updater_commands;
 mod tauri_updater_task;
+#[cfg(all(test, windows))]
+mod test_directory_link;
 mod window;
 #[cfg(windows)]
 mod windows_prerequisites;

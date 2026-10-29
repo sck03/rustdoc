@@ -21,7 +21,7 @@ pub(super) fn instant(body: &Value, key: &str) -> Result<DateTime<FixedOffset>> 
         .map_err(|_| invalid("预约时间须包含日期、时分和时区。"))
 }
 fn person(connection: &Connection, actor: &Actor, value: &Value) -> Result<Value> {
-    let employee = if connection.provider() == "SQLite" {
+    let employee = if actor.admin && value["employeeId"].as_i64().is_some_and(|id| id > 0) {
         parent(
             connection,
             actor,
@@ -39,6 +39,16 @@ fn person(connection: &Connection, actor: &Actor, value: &Value) -> Result<Value
     };
     if employee["companyScope"] != actor.company {
         return Err(super::error::error(403, "不能为其他公司的人员办理登记。"));
+    }
+    if !actor.admin
+        && value["employeeId"]
+            .as_i64()
+            .is_some_and(|id| id > 0 && employee["id"] != id)
+    {
+        return Err(super::error::error(
+            403,
+            "只能为当前账号关联的人员提交申请。",
+        ));
     }
     if employee["status"] == "Departed" {
         return Err(invalid("不能为离职人员办理登记。"));
@@ -219,8 +229,8 @@ pub fn validate(
             if id > 0 && value["meetingRoomId"] != previous["meetingRoomId"] {
                 return Err(invalid("已登记预约不能更换会议室，请取消后重新登记。"));
             }
-            if id > 0 && !["Approved", "Pending"].contains(&text(previous, "status").as_str()) {
-                return Err(conflict("已交接或结束的预约不能修改。"));
+            if id > 0 {
+                return Err(conflict("已提交的申请内容不可修改，请取消后重新申请。"));
             }
             let room = parent(
                 connection,
@@ -288,11 +298,10 @@ pub fn validate(
                 "Room",
                 id == 0,
             )?;
-            value["status"] = json!(if connection.provider() == "SQLite" {
-                "Approved"
-            } else {
-                "Pending"
-            });
+            value["status"] = json!("Pending");
+            value["kind"] = json!("room");
+            value["submissionNumber"] = json!(1);
+            super::oa::approval::submit(connection, actor, value)?;
         }
         "supplies" => {
             super::handling::validate_resource(connection, actor, kind, id, previous, value)?;
@@ -321,21 +330,19 @@ pub fn validate(
         }
         "supply-requests" => {
             required(value, "purpose", "领用用途", 500)?;
-            if id > 0 && !["Approved", "Pending"].contains(&text(previous, "status").as_str()) {
-                return Err(conflict("已发放或结束的领用申请不能修改。"));
+            if id > 0 {
+                return Err(conflict("已提交的申请内容不可修改，请取消后重新申请。"));
             }
             let supply_id = positive(value, "officeSupplyId", "物品")?;
-            let mut supply = parent(connection, actor, "supplies", supply_id)?;
+            let supply = parent(connection, actor, "supplies", supply_id)?;
             if supply["companyScope"] != actor.company {
                 return Err(super::error::error(403, "不能领用其他公司的物品。"));
             }
             if supply["isActive"] != true {
                 return Err(invalid("物品已停用。"));
             }
-            if id > 0 && previous["officeSupplyId"] != supply_id {
-                return Err(invalid("已登记申请不能更换物品，请取消后重新登记。"));
-            }
-            let quantity = integer(value, "quantity", 1, 1_000_000, "领用数量")?;
+
+            integer(value, "quantity", 1, 1_000_000, "领用数量")?;
             let due = value["returnDueDate"]
                 .as_str()
                 .filter(|date| valid_date(date))
@@ -348,18 +355,6 @@ pub fn validate(
                 }
             } else if !value["returnDueDate"].is_null() {
                 return Err(invalid("消耗品不需要归还日期。"));
-            }
-            let previous_quantity = if id > 0 && previous["status"] == "Approved" {
-                previous["quantity"].as_i64().unwrap_or(0)
-            } else {
-                0
-            };
-            let registered = connection.provider() == "SQLite";
-            let delta = if registered { quantity } else { 0 } - previous_quantity;
-            let stock = supply["stockQuantity"].as_i64().unwrap_or(0);
-            let reserved = supply["reservedQuantity"].as_i64().unwrap_or(0);
-            if stock - reserved < delta {
-                return Err(conflict("可用库存不足。"));
             }
             let employee = person(connection, actor, value)?;
             value["employeeId"] = employee["id"].clone();
@@ -378,16 +373,11 @@ pub fn validate(
             )?;
             value["unit"] = supply["unit"].clone();
             value["isReturnable"] = supply["isReturnable"].clone();
-            value["status"] = json!(if registered { "Approved" } else { "Pending" });
+            value["status"] = json!("Pending");
+            value["kind"] = json!("supply");
+            value["submissionNumber"] = json!(1);
+            super::oa::approval::submit(connection, actor, value)?;
             value["returnedQuantity"] = json!(0);
-            if delta != 0 {
-                supply["reservedQuantity"] = json!(reserved + delta);
-                supply_totals(&mut supply);
-                let identity = Some(text(&supply, "name"));
-                store::save(
-                    connection, "supplies", supply_id, supply, identity, actor, "reserve",
-                )?;
-            }
         }
         _ => {}
     }

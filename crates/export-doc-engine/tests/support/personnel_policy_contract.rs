@@ -1,4 +1,6 @@
-//! The same direct/approval lifecycle contract runs against SQLite and PostgreSQL.
+#[path = "approval_fixture.rs"]
+mod workflow;
+// The same direct/approval lifecycle contract runs against SQLite and PostgreSQL.
 use export_doc_engine::{
     api::ApiError, contracts, engine::NativeService, generated_api::*, paths::nonce,
 };
@@ -13,6 +15,7 @@ impl Session<'_> {
             vec![]
         };
         let body = body.map(|v| contracts::overlay(contracts::object(op.id, true), &v));
+        let body = workflow::decision_body(self.0, &self.1, op, id, body);
         let value =
             serde_json::from_slice(&self.0.dispatch(op, &parameters, &[], body, &self.1)?).unwrap();
         export_doc_contracts::validation::response(op.id, &value).unwrap();
@@ -94,13 +97,21 @@ pub fn exercise(service: &NativeService, token: &str) {
     settings["personnelApprovalActions"] =
         json!(["Hire", "Confirm", "Transfer", "Depart", "Rehire"]);
     // This contract tests the opt-in personnel policy with one explicit reviewer.
-    for rule in settings["rules"].as_array_mut().unwrap() {
-        rule["mode"] = json!("Single");
-        rule["stages"] = json!([]);
+    for rule in settings["rules"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .filter(|r| r["kind"] == "personnel")
+    {
+        rule["stages"] = json!([workflow::node(
+            "review",
+            &[],
+            "Named",
+            json!([accounts[2]["id"], accounts[0]["id"]])
+        )]);
+        rule["stages"][0]["decision"] = json!("Any");
     }
-    admin
-        .request(SAVE_OA_APPROVAL_SETTINGS, 0, Some(settings))
-        .unwrap();
+    workflow::publish_all(service, &admin.1, settings);
     let transition = json!({"expectedVersion":direct["versionNumber"],"effectiveDate":"2026-09-02","note":"管理员直接办理"});
     assert_eq!(
         hr.request(CONFIRM_PERSONNEL, direct_id, Some(transition.clone()))
@@ -178,7 +189,12 @@ pub fn exercise(service: &NativeService, token: &str) {
             .status,
         Some(403)
     );
-    let rejected = action(reviewer, REJECT_PERSONNEL_CHANGE_REQUEST, &pending).unwrap();
+    let rejected = action(
+        reviewer,
+        RETURN_FOR_CORRECTION_PERSONNEL_CHANGE_REQUEST,
+        &pending,
+    )
+    .unwrap();
     assert_eq!(
         hr.request(LIST_PERSONNEL, 0, None).unwrap()["totalCount"],
         1
@@ -278,10 +294,7 @@ pub fn exercise(service: &NativeService, token: &str) {
         )
         .unwrap();
     let pending = action(hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &draft).unwrap();
-    let mut blocker = json!({"requestKey":nonce().unwrap(),"title":"交接未完成","reason":"验证最终审批重新检查","category":"Other"});
-    if service.provider().unwrap() == "SQLite" {
-        blocker["employeeId"] = json!(id);
-    }
+    let blocker = json!({"requestKey":nonce().unwrap(),"title":"交接未完成","reason":"验证最终审批重新检查","category":"Other"});
     let blocker = employee
         .request(CREATE_GENERAL_REQUEST, 0, Some(blocker))
         .unwrap();
@@ -328,6 +341,25 @@ pub fn exercise(service: &NativeService, token: &str) {
     for change in ["Depart", "Rehire"] {
         let draft = proposal(hr, &person, change, &new_department);
         let pending = action(hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &draft).unwrap();
+        if change == "Depart" {
+            assert_eq!(
+                action(admin, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending)
+                    .unwrap_err()
+                    .status,
+                Some(409),
+                "published responsibilities must be handed over before departure"
+            );
+            let mut settings = admin.request(GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
+            for rule in settings["rules"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .filter(|r| r["kind"] == "personnel")
+            {
+                rule["stages"][0]["approverUserIds"] = json!([accounts[0]["id"]]);
+            }
+            workflow::publish_all(service, &admin.1, settings);
+        }
         action(admin, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending).unwrap();
         person = admin.request(GET_PERSONNEL, id, None).unwrap();
         assert_eq!(person["account"]["isActive"], false);

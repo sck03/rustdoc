@@ -227,10 +227,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         people[1]["employee"]["employeeNumber"]
     );
     let user = request(service, &tokens[1], GET_CURRENT_USER, &[], &[], None).unwrap();
-    let mut application = json!({"requestKey":nonce().unwrap(),"title":"同名身份核对","reason":"按编号关联本人","category":"Other","currency":"CNY"});
-    if user["capabilities"]["usesOfficeRegister"] == true {
-        application["employeeId"] = people[1]["employee"]["id"].clone();
-    }
+    let application = json!({"requestKey":nonce().unwrap(),"title":"同名身份核对","reason":"按编号关联本人","category":"Other","currency":"CNY"});
     let application = request(
         service,
         &tokens[1],

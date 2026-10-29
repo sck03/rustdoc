@@ -1,3 +1,4 @@
+import { approvalStage, publishDefinitions, approveTask } from './lib/approval-fixtures.mjs';
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -22,10 +23,14 @@ async function wait(expression, message) {
   throw new Error(`${message}\n${await run("document.body.innerText")}`);
 }
 async function click(text, scope = "document") {
-  await run(`(() => {const button=[...${scope}.querySelectorAll('button,a')].find(e=>e.textContent.trim()===${JSON.stringify(text)} && e.getClientRects().length); if(!button) throw new Error('Missing control: '+${JSON.stringify(text)}); button.click();})()`);
+  const target = `[...${scope}.querySelectorAll('button,a')].find(e=>e.textContent.trim()===${JSON.stringify(text)} && e.getClientRects().length && !e.disabled && e.getAttribute('aria-disabled')!=='true')`;
+  await wait(target, `Control not ready: ${text}`);
+  await run(`(${target}).click()`);
 }
 async function fill(label, value) {
-  await run(`(() => {const label=[...document.querySelectorAll('label')].find(e=>(e.querySelector('span')?.textContent ?? e.textContent)===${JSON.stringify(label)}); const input=label?.control ?? label?.querySelector('input,textarea,select'); if(!input) throw new Error('Missing field: '+${JSON.stringify(label)}); Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input),'value').set.call(input,${JSON.stringify(value)}); input.dispatchEvent(new Event('input',{bubbles:true})); input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  const field = `(() => {const label=[...document.querySelectorAll('label')].find(e=>(e.querySelector('span')?.textContent ?? [...e.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join('')).trim()===${JSON.stringify(label)}); return label?.control ?? label?.querySelector('input,textarea,select');})()`;
+  await wait(`${field}?.getClientRects().length`, `Field not ready: ${label}`);
+  await run(`(() => {const input=${field}; Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input),'value').set.call(input,${JSON.stringify(value)}); input.dispatchEvent(new Event('input',{bubbles:true})); input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
 }
 async function navigate(url) { await page.send("Page.navigate", { url }); await wait("document.readyState === 'complete'", "Page load timed out"); }
 async function chooseFiles(selector, files) {
@@ -50,14 +55,28 @@ try {
     server.stderr.on("data", chunk => { log += chunk; });
     server.stdout.on("data", chunk => { log += chunk; const match = log.match(/\{"url":"([^"]+)"\}/u); if (match) { clearTimeout(timer); resolve(match[1]); } });
   });
-  // This broad form/attachment contract explicitly uses single-stage registration;
-  // the default two-stage route is covered by the approval/document UI contracts.
-  const token = (await fetch(`${url}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'oa-review', password: 'Review-2026-Test' }) }).then(r => r.json())).accessToken;
-  const settingsHeaders = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
-  const settingsUrl = `${url}/api/office/approval-settings`;
-  const settings = await fetch(settingsUrl, { headers: settingsHeaders }).then(r => r.json());
-  settings.rules = settings.rules.map(rule => ({ ...rule, mode: 'Single', stages: [], approverUserIds: [], amountBranches: [] }));
-  assert.equal((await fetch(settingsUrl, { method: 'PUT', headers: settingsHeaders, body: JSON.stringify({ ...settings, expectedVersion: settings.versionNumber }) })).status, 200);
+  const spec = JSON.parse(fs.readFileSync(path.join(repo, 'crates/export-doc-contracts/src/openapi.json'), 'utf8'));
+  const operations = new Map(Object.entries(spec.paths).flatMap(([route, methods]) => Object.entries(methods).map(([method, op]) => [op.operationId, { route, method }])));
+  const invoke = async (id, body, parameters = {}, token = '') => {
+    const op = operations.get(id); assert(op, id);
+    const route = op.route.replace(/\{([^}]+)\}/gu, (_, key) => encodeURIComponent(parameters[key]));
+    const response = await fetch(url + route, { method: op.method.toUpperCase(), signal: AbortSignal.timeout(60000), headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    assert(response.ok, `${id}: ${response.status} ${response.ok ? '' : await response.text()}`);
+    return response.json();
+  };
+  const token = (await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' })).accessToken;
+  const reviewer = (await invoke('createUserAccount', { username: 'workflow-auditor', fullName: '独立流程审批人', role: 'Admin', companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Workflow-Auditor-2026' }, {}, token)).user;
+  const reviewerToken = (await invoke('Login', { username: 'workflow-auditor', password: 'Workflow-Auditor-2026' })).accessToken;
+  const settings = await invoke('GetOaApprovalSettings', undefined, {}, token);
+  settings.rules = settings.rules.map(rule => ({ ...rule, stages: [approvalStage('review', [reviewer.id])] }));
+  await publishDefinitions(invoke, token, settings, settings.rules.map(rule => rule.key));
+  const approveResource = async kind => {
+    const route = kind === 'rooms' ? '/api/office/bookings' : '/api/office/supply-requests';
+    const page = await fetch(`${url}${route}?mineOnly=false&status=Pending`, { headers: { authorization: `Bearer ${reviewerToken}` } }).then(r => r.json());
+    const row = page.items[0]; assert(row?.reviewTaskKeys?.length);
+    const response = await fetch(`${url}${route}/${row.id}/approve`, { method: 'POST', headers: { authorization: `Bearer ${reviewerToken}`, 'content-type': 'application/json' }, body: JSON.stringify({ expectedVersion: row.versionNumber, taskKey: row.reviewTaskKeys[0], note: '独立任务签署' }) });
+    assert.equal(response.status, 200, await response.text());
+  };
   const browser = locateChromeForTesting(repo);
   chrome = await startChrome({ browserExecutable: browser, userDataDir: path.join(output, "Chrome"), timeoutMs: 30000 });
   cdp = await CdpClient.connect(chrome.browserWebSocketUrl); page = await createPageSession(cdp);
@@ -68,7 +87,7 @@ try {
   await run(`(() => {for(const [selector,value] of [['input[autocomplete=username]','oa-review'],['input[autocomplete=current-password]','Review-2026-Test']]){const input=document.querySelector(selector);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));}})()`);
   await click("登录");
   await wait("!document.querySelector('.login-submit-button')", "Login failed");
-  await exerciseOfficeResources({ url, page, output, run, wait, click, fill, navigate, captureScreenshot });
+  await exerciseOfficeResources({ url, page, output, run, wait, click, fill, navigate, captureScreenshot, approveResource });
   await navigate(`${url}/#/office/approvals`);
   await wait("document.querySelector('[aria-label=\"申请与审批中心\"]')", "Approval hub missing");
   assert(await run("document.body.innerText.includes('人事管理') && document.body.innerText.includes('行政办公')"), "Separated navigation groups are visible");
@@ -205,7 +224,8 @@ try {
     }
     await act("提交审批", "申请提交");
     await wait("document.querySelector('.oa-detail .office-badge')?.textContent==='待审批'", "Submission state missing");
-    await act("登记批准结果", "同意办理");
+    await approveTask(invoke, reviewerToken, {leave:'Leave',overtime:'Overtime',expense:'Expense',travel:'Travel',purchase:'Purchase',general:'General'}[kind], savedId);
+    await navigate(`${url}/#/office/requests/${kind}?requestId=${savedId}`);
     await wait("document.querySelector('.oa-detail .office-badge')?.textContent==='已批准'", "Approval state missing");
     const label = { leave: "销假归档", overtime: "确认加班完成", expense: "财务接收", travel: "返程归档", purchase: "登记验收", general: "办结登记" }[kind];
     await act(label, kind === "expense" ? "已移交独立财务软件，接收人王会计" : "已核对并完成办理");

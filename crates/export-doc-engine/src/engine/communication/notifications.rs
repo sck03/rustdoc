@@ -66,9 +66,9 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
             approval_principals: vec![],
         });
     }
-    if actor.oa_assigned_only {
+    {
         for scope in &mut result {
-            if let Some(resource) = super::super::oa::approval::resource(&scope.kind) {
+            if let Some(resource) = resource(&scope.kind) {
                 scope.approval_principals =
                     super::super::oa::approval::queue_approvers(tx, actor, resource)?;
             }
@@ -200,7 +200,14 @@ pub(in crate::engine) fn on_event(
         action.as_str(),
         "submit" | "approve-step" | "remind" | "approval-reassign"
     );
-    let distribution = review || completion || handling;
+    let cc = if action == "approve" && row["status"] != "Pending" {
+        super::super::oa::approval::plan(row)?
+            .map(|p| p.notify_user_ids)
+            .unwrap_or_default()
+    } else {
+        vec![]
+    };
+    let distribution = review || completion || handling || !cc.is_empty();
     let resource = text(meta, "resource");
     loop {
         crate::operation::check()?;
@@ -229,7 +236,7 @@ pub(in crate::engine) fn on_event(
                 continue;
             }
             let id = records::positive(&user, "id", "接收人")?;
-            if (review && id == actor.id) || (!distribution && row["ownerUserId"] != id) {
+            if !distribution && row["ownerUserId"] != id {
                 continue;
             }
             let recipient = auth::current_actor_in(tx, id, actor.edition)?;
@@ -239,23 +246,20 @@ pub(in crate::engine) fn on_event(
                 continue;
             }
             if completion
+                && !cc.contains(&id)
                 && row["ownerUserId"] != id
                 && !auth::visible(&recipient, &resource, "complete", row)
             {
                 continue;
             }
             if review {
-                let can_review = if resource_request {
-                    recipient.id != row["ownerUserId"]
-                        && auth::visible(&recipient, &resource, "approve", row)
-                } else {
-                    authority(tx, &recipient, row)?.is_some()
-                };
+                let can_review = authority(tx, &recipient, row)?.is_some();
                 if !can_review {
                     continue;
                 }
             }
             if handling
+                && !cc.contains(&id)
                 && row["ownerUserId"] != id
                 && !handling::can_handle(tx, &recipient, row, &resource)?
             {

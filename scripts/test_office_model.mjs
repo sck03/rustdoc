@@ -32,14 +32,14 @@ const row = { id: 7, meetingRoomId: 2, ownerUserId: 2, departmentId: "D2", statu
   startsAt: "2026-09-07T08:00:00Z", endsAt: "2026-09-07T09:00:00Z" };
 assert.deepEqual(office.officeRequestActions(row, user, "rooms"), [], "viewing a record does not allow operations beyond own scope");
 const manager = { ...user, capabilities: { ...user.capabilities, permissions: grants("company") } };
-assert.deepEqual(office.officeRequestActions(row, manager, "rooms").map(entry => entry.action), ["approve", "reject", "cancel"]);
+assert.deepEqual(office.officeRequestActions({ ...row, canReview: true }, manager, "rooms").map(entry => entry.action), ["approve", "reject", "cancel"]);
 assert(!office.officeRequestActions({ ...row, ownerUserId: 1 }, manager, "rooms").some(entry => entry.action === "approve"), "self approval must not be offered");
 assert(!office.officeAccess({ ...user, capabilities: { permissions: grants("unknown") } }, "rooms").allows("approve"));
 const oaUser = { ...user, capabilities: { permissions: ["view","edit","approve"].map(action => ({ resourceKey:"office.leave", action, dataScope:action==="view"?"company":"own" })) } };
 assert.deepEqual(oa.oaActions({ ...row, kind:"leave" }, oaUser), [], "broad read access must not expose out-of-scope approval actions");
 const oaManager = { ...oaUser, capabilities: { permissions: oaUser.capabilities.permissions.map(grant => ({ ...grant, dataScope:"company" })) } };
 assert(!oa.oaActions({ ...row, kind:"leave", ownerUserId:user.id }, oaManager).includes("approve"), "team self-approval remains unavailable");
-assert.equal(oa.oaActionLabel("complete","expense",false), "财务接收", "expense completion records handoff without implying payment");
+assert.equal(oa.oaActionLabel("complete","expense"), "财务接收", "expense completion records handoff without implying payment");
 assert.equal(office.officeStatus({ ...row, status: "InUse" }, user.businessDate, Date.parse(row.endsAt)), "超时未归还");
 assert.equal(office.officeStatus({ ...row, status: "InUse", requiresKey:false }, user.businessDate, Date.parse(row.endsAt)), "超时未结束");
 assert(isRouteAccessAllowed({ pathname:"/office/approvals", user, canManageSystem:false, isDesktopRuntime:false }), "resource-only users can reach the shared request hub");
@@ -57,11 +57,12 @@ assert.equal(getDefaultWorkspaceRoute(user.capabilities), "/office/approvals", "
 assert.equal(getDefaultWorkspaceRoute({...user.capabilities,productEdition:"Document"}),"/access-denied","shipping editions retain their fixed home boundary");
 assert(navigation.filterWorkspaceNavGroups(user.capabilities).some(group => group.key === "office"));
 assert(!navigation.filterWorkspaceNavGroups({ ...user.capabilities, moduleAccess: [] }).some(group => group.key === "office"), "module enablement alone does not grant navigation access");
-assert(!navigation.filterWorkspaceNavGroups({ ...user.capabilities, isDesktopRuntime: true }).some(group => group.key === "office"));
+assert(navigation.filterWorkspaceNavGroups({ ...user.capabilities, isDesktopRuntime: true }).some(group => group.key === "office"));
 for (const pathname of ["/office/meeting-rooms", "/office/supplies"]) {
   const args = { pathname, user, canManageSystem: false, isDesktopRuntime: false };
   assert(isRouteAccessAllowed(args));
-  assert(!isRouteAccessAllowed({ ...args, isDesktopRuntime: true }), "desktop deep links must be denied even with a stale capability snapshot");
+  assert(isRouteAccessAllowed({ ...args, isDesktopRuntime: true }), "Full SQLite uses the same authorized routes");
+  assert(!isRouteAccessAllowed({ ...args, user: { ...user, capabilities: { ...user.capabilities, productEdition: "Document" } }, isDesktopRuntime: true }), "shipping editions cannot open OA");
   assert(!isRouteAccessAllowed({ ...args, user: { ...user, capabilities: { ...user.capabilities, enabledModules: [] } } }));
 }
 const descriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
@@ -97,24 +98,24 @@ assert.equal(deepMatch.length,32);assert.equal(deepMatch.at(-1).depth,31);assert
 assert.throws(()=>organization.departmentOptions([{code:"A",name:"A",parentCode:"B"},{code:"B",name:"B",parentCode:"A"}]),/循环/);
 assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=15&applicantUserId=7&employeeId=5")), {requestId:15,applicantUserId:7,employeeId:5});
 assert.deepEqual(office.officeRequestFocus(new URLSearchParams("requestId=-1&applicantUserId=2147483648&employeeId=0")), {requestId:undefined,applicantUserId:undefined,employeeId:undefined});
-const registerUser = { ...manager, capabilities: { ...manager.capabilities, productEdition:"Full", usesOfficeRegister:true,
+const fullDesktopUser = { ...manager, capabilities: { ...manager.capabilities, productEdition:"Full",
   canManageSettings:true, canManageUsers:true, ...modules(["office.rooms","office.supplies","office.people","system.about"]),
   permissions:[...grants("all"), ...["view","view-details"].map(action=>({resourceKey:"office.people",action,dataScope:"all"}))] } };
-assert.equal(getDefaultWorkspaceRoute(registerUser.capabilities), "/office/approvals");
-assert.equal(navigation.filterWorkspaceNavGroups({ ...registerUser.capabilities, isDesktopRuntime:true }).filter(group=>['office','personnel'].includes(group.key)).flatMap(group=>group.items).length,4);
+assert.equal(getDefaultWorkspaceRoute(fullDesktopUser.capabilities), "/office/approvals");
+assert.equal(navigation.filterWorkspaceNavGroups({ ...fullDesktopUser.capabilities, isDesktopRuntime:true }).filter(group=>['office','personnel'].includes(group.key)).flatMap(group=>group.items).length,4);
 // Full SQLite is the explicit local test edition; formal desktop editions remain separate.
-const fullTeamUser = { ...registerUser, capabilities: { ...registerUser.capabilities, productEdition: "Full", usesOfficeRegister:false, canUseDocumentWorkspace: true, canUseSalesWorkspace: true } };
+const fullTeamUser = { ...fullDesktopUser, capabilities: { ...fullDesktopUser.capabilities, productEdition: "Full", canUseDocumentWorkspace: true, canUseSalesWorkspace: true } };
 for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies"]) {
   assert(isRouteAccessAllowed({ pathname, user: fullTeamUser, canManageSystem: true, isDesktopRuntime: false }), "Full team edition permits direct administration routes");
   assert(!isRouteAccessAllowed({ pathname, user: { ...fullTeamUser, capabilities: { ...fullTeamUser.capabilities, enabledModules: [], permissions: [] } }, canManageSystem: true, isDesktopRuntime: false }), "edition availability never overrides missing grants");
 }
 for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies", "/system/access-control", "/system/organization"]) {
-  assert(isRouteAccessAllowed({ pathname, user:registerUser, canManageSystem:true, isDesktopRuntime:true }));
+  assert(isRouteAccessAllowed({ pathname, user:fullDesktopUser, canManageSystem:true, isDesktopRuntime:true }));
 }
 assert(!isRouteAccessAllowed({pathname:"/system/organization",user:personnelUser,canManageSystem:false,isDesktopRuntime:false}));
-assert(navigation.searchWorkspaceNavGroups("部门",navigation.filterWorkspaceNavGroups(registerUser.capabilities)).some(group=>group.items.some(item=>item.to==="/system/organization")));
-assert(!isRouteAccessAllowed({pathname:"/invoices",user:registerUser,canManageSystem:true,isDesktopRuntime:true}));
-assert.equal(office.officeRequestActions({...row,status:"Approved"},registerUser,"rooms").find(item=>item.action==='cancel').label,"取消登记");
+assert(navigation.searchWorkspaceNavGroups("部门",navigation.filterWorkspaceNavGroups(fullDesktopUser.capabilities)).some(group=>group.items.some(item=>item.to==="/system/organization")));
+assert(!isRouteAccessAllowed({pathname:"/invoices",user:fullDesktopUser,canManageSystem:true,isDesktopRuntime:true}));
+assert.equal(office.officeRequestActions({...row,status:"Approved"},fullDesktopUser,"rooms").find(item=>item.action==='cancel').label,"取消申请");
 const supplyRow = {id:8,officeSupplyId:2,ownerUserId:2,status:"Approved",handlingKey:"daily",canHandle:false,isReturnable:false};
 assert(!office.officeRequestActions(supplyRow,manager,"supplies").some(entry=>entry.action==="issue"),"company permission cannot bypass an explicit custodian");
 assert(office.officeRequestActions({...supplyRow,canHandle:true},user,"supplies").some(entry=>entry.action==="issue"),"a designated custodian can issue outside ordinary own scope");

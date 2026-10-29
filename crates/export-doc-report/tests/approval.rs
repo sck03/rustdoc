@@ -15,7 +15,16 @@ fn any_sign_sheet_distinguishes_candidates_from_actual_signatures() {
     assert_eq!(approvals.matches("结果：同意").count(), 1);
     assert!(approvals.contains("实际批准人"));
     assert_eq!(approvals.matches("节点 1").count(), 1);
-    assert!(approvals.contains("或签：任一人同意"));
+    assert!(!approvals.contains("或签"));
+    assert!(!approvals.contains("会签"));
+    assert!(approvals.contains("公司领导审批"));
+    assert!(
+        approval::data(
+            &json!({"decisions":[{"action":"approve","actorName":"旧单步记录"}]}),
+            "2026-10-28T10:00:00+08:00"
+        )
+        .is_err()
+    );
     assert!(
         approval::data(
             &json!({"approvalPlan":{"steps":[{"stage":0,"status":"Waiting"}]}}),

@@ -14,8 +14,8 @@ export function MeetingRoomsPage({ client, user }: { client: ExportDocManagerApi
   const { records, setRecords } = useOfficeView();
   if (!user.companyScope) return <PageState tone="permission" title="请先设置所属公司" description="请管理员在账号与权限中为当前账号选择所属公司。" />;
   return <section className="work-surface office-workspace" aria-label="会议室预约工作区">
-    <OfficeTabs records={records} onChange={setRecords} resourcesLabel={user.capabilities.usesOfficeRegister ? "会议室与登记" : undefined}
-      recordsLabel={user.capabilities.usesOfficeRegister ? "预约与钥匙交接记录" : "预约记录与审批"} />
+    <OfficeTabs records={records} onChange={setRecords}
+      recordsLabel="预约记录与审批" />
     {records ? <OfficeRequestsPanel client={client} user={user} kind="rooms" /> : <MeetingRoomsDirectory client={client} user={user} />}
   </section>;
 }

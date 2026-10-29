@@ -21,7 +21,7 @@ export const officeStatusLabels: Record<string, string> = {
 };
 export const officeActionLabels = { approve: "批准", reject: "驳回", cancel: "取消申请", issue: "确认发放", return: "登记归还" };
 export const officeHistoryLabels: Record<string, string> = {
-  Submit: "提交申请", Register: "登记记录", Approve: "审批通过", Reject: "驳回申请", Cancel: "取消申请",
+  Submit: "提交申请", Approve: "审批通过", ApproveStep: "节点通过", Reject: "驳回申请", Cancel: "取消申请",
   Issue: "发放／交接", Return: "归还登记", Restock: "补充入库", Stocktake: "盘点调整",
   Edit: "修改记录", Reassign: "保管职责交接",
 };
@@ -60,11 +60,11 @@ export function readSupplyRequestUpdate(form: FormData, version: number): Supply
 export function officeRequestActions(row: OfficeRequestRow, user: ApiUserDto, kind: OfficeKind) {
   const access = officeAccess(user, kind);
   const actions: { action: OfficeAction; label: string }[] = [];
-  if (row.status === "Pending" && row.ownerUserId !== user.id && access.allows("approve", row)) {
+  if (row.status === "Pending" && row.canReview === true) {
     actions.push({ action: "approve", label: "批准" }, { action: "reject", label: "驳回" });
   }
   if ((row.status === "Pending" || row.status === "Approved") && access.allows("cancel", row))
-    actions.push({ action: "cancel", label: user.capabilities.usesOfficeRegister ? "取消登记" : "取消申请" });
+    actions.push({ action: "cancel", label: "取消申请" });
   if (row.status === "Approved" && access.allows("issue", row))
     actions.push({ action: "issue", label: isMeetingBooking(row) ? (row.requiresKey ? "发放钥匙" : "登记使用") : "确认发放" });
   if ((row.status === "InUse" || row.status === "Issued" && !isMeetingBooking(row) && row.isReturnable) && access.allows("return", row))

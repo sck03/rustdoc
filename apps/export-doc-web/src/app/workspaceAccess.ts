@@ -6,7 +6,7 @@ export function hasWorkspaceItemAccess(item: WorkspaceNavItem, capabilities: Wor
   if (item.requiresAdmin && capabilities.canManageSettings !== true) return false;
   if (item.requiresSystemAdministration && capabilities.canManageUsers !== true) return false;
   if (item.desktopOnly && capabilities.isDesktopRuntime !== true) return false;
-  if (item.workspace === "office" && capabilities.isDesktopRuntime === true && capabilities.usesOfficeRegister !== true) return false;
+  if (item.workspace === "office" && capabilities.productEdition !== "Full") return false;
   if (item.workspace === "document" && capabilities.canUseDocumentWorkspace !== true) return false;
   if (item.workspace === "sales" && capabilities.canUseSalesWorkspace !== true) return false;
   if (item.requiredFeature && !capabilities.availableFeatures?.includes(item.requiredFeature)) return false;

@@ -57,6 +57,9 @@ pub(super) fn rows(
         "companyScope",
         "departmentId",
         "ownerUserId",
+        "kind",
+        "approvalPlan",
+        "applicantAccountId",
     ]
     .into_iter()
     .chain(names.iter().copied())

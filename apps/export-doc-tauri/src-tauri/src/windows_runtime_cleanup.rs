@@ -184,14 +184,7 @@ mod tests {
         let linked_root = fixture.0.join("linked-app");
         fs::create_dir(&linked_root).unwrap();
         let junction = linked_root.join("WebView2Runtime");
-        let status = std::process::Command::new("cmd")
-            .args(["/d", "/c", "mklink", "/J"])
-            .arg(&junction)
-            .arg(fixture.0.join("WebView2Runtime"))
-            .stdout(std::process::Stdio::null())
-            .status()
-            .unwrap();
-        assert!(status.success());
+        crate::test_directory_link::create(&fixture.0.join("WebView2Runtime"), &junction);
         assert!(remove_installer_files(&linked_root).is_err());
         assert!(fixture.installer().exists());
         fs::remove_dir(junction).unwrap();

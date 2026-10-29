@@ -60,7 +60,7 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
     <p className="office-muted">{oaModules[kind].description}填写资料并选择附件，一次保存草稿，核对后提交审批。</p>
     {operation.error && attachments.saved && <p role="status">资料已保存。待保存文件仍在下方，再次保存会继续处理；也可稍后从草稿回访。</p>}
     <form onSubmit={submit} onChangeCapture={() => setDirty(true)}><fieldset disabled={operation.busy} className="office-form-grid">
-      {kind !== "personnel" && user.capabilities.usesOfficeRegister && !record && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={(value) => { setEmployee(value); setDirty(true); }} disabled={operation.busy} />}
+      {kind !== "personnel" && user.capabilities.canManageUsers && !record && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={(value) => { setEmployee(value); setDirty(true); }} disabled={operation.busy} />}
       {kind !== "personnel" && !record && <OfficeApplicantIdentity user={user} />}
       {kind !== "personnel" && !record && <OaDepartmentPicker client={client} user={user} employeeId={employee?.id} value={draft.departmentId} onChange={departmentId => setDraft(current => ({ ...current, departmentId }))} />}
       {kind !== "personnel" && record && <p className="office-field-wide">申请人：{requestPersonLabel(record.employeeName, record)}</p>}
@@ -75,6 +75,6 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
       </>}
       <OfficeField label="本批附件用途"><select value={purpose} onChange={event=>setPurpose(event.target.value)}><option value="ReimbursementForm">报销单</option><option value="Voucher">发票／其他凭证</option><option value="Supporting">补充资料</option></select></OfficeField>
       <AttachmentDraftFields draft={attachments} busy={operation.busy} existingFiles={attachments.saved?.attachments} onChange={() => setDirty(true)} />
-    </fieldset><OfficeSubmit busy={operation.busy} label="保存草稿" disabled={kind === "personnel" ? draft.personnelChange?.action !== "Hire" && !draft.personnelChange?.expectedPersonnelVersion : !record && (!canIdentifyOfficeApplicant(user) || user.capabilities.usesOfficeRegister && !employee)} /></form>
+    </fieldset><OfficeSubmit busy={operation.busy} label="保存草稿" disabled={kind === "personnel" ? draft.personnelChange?.action !== "Hire" && !draft.personnelChange?.expectedPersonnelVersion : !record && (!canIdentifyOfficeApplicant(user) || user.capabilities.canManageUsers && !employee)} /></form>
   </OfficeDialog>;
 }

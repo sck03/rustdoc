@@ -36,7 +36,6 @@ export type WorkspaceCapabilities = {
   moduleAccess?: ApiModuleAccessDto[];
   canManageSettings?: boolean;
   canManageUsers?: boolean;
-  usesOfficeRegister?: boolean;
   canUseDocumentWorkspace?: boolean;
   canUseSalesWorkspace?: boolean;
   isDesktopRuntime?: boolean;

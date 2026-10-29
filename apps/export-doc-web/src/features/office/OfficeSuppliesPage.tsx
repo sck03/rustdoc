@@ -17,8 +17,8 @@ export function OfficeSuppliesPage({ client, user }: { client: ExportDocManagerA
   const { records, setRecords } = useOfficeView();
   if (!user.companyScope) return <PageState tone="permission" title="请先设置所属公司" description="请管理员在账号与权限中为当前账号选择所属公司。" />;
   return <section className="work-surface office-workspace" aria-label="物品领用工作区">
-    <OfficeTabs records={records} onChange={setRecords} resourcesLabel={user.capabilities.usesOfficeRegister ? "物品与登记" : undefined}
-      recordsLabel={user.capabilities.usesOfficeRegister ? "领用与归还记录" : "领用记录与审批"} />
+    <OfficeTabs records={records} onChange={setRecords}
+      recordsLabel="领用记录与审批" />
     {records ? <OfficeRequestsPanel client={client} user={user} kind="supplies" /> : <OfficeSupplyDirectory client={client} user={user} />}
   </section>;
 }
@@ -49,7 +49,7 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
       <p className="office-card-detail"><MapPin size={16} aria-hidden="true" />{supply.location || "领取位置未填写"}</p>
       <p className="office-muted office-card-description">{supply.description || (supply.isReturnable ? "借用后需要按期归还" : "按需领用，交接时确认发放")}</p>
       <footer className="office-card-actions">
-        {supply.isActive && access.allows("create") && <button className="command-button" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "apply", supply })}>{user.capabilities.usesOfficeRegister ? "登记" : "申请"}{supply.isReturnable ? "借用" : "领用"}</button>}
+        {supply.isActive && access.allows("create") && <button className="command-button" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "apply", supply })}>申请{supply.isReturnable ? "借用" : "领用"}</button>}
         {allowsSupply("restock", supply) && <button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "restock", supply })}>补充库存</button>}
         {(allowsSupply("restock", supply) || allowsSupply("manage", supply)) && <details className="office-secondary-actions">
           <summary>更多操作</summary><div>

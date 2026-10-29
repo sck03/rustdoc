@@ -70,7 +70,13 @@ pub(super) fn after_save(
 ) -> Result<()> {
     if !matches!(
         action,
-        "approve" | "approve-step" | "reject" | "withdraw" | "void" | "approval-reassign"
+        "approve"
+            | "approve-step"
+            | "reject"
+            | "return"
+            | "withdraw"
+            | "void"
+            | "approval-reassign"
     ) {
         return Ok(());
     }

@@ -3,6 +3,8 @@ use export_doc_engine::{
 };
 use serde_json::{Value, json};
 use std::sync::{Arc, Barrier};
+#[path = "approval_fixture.rs"]
+pub mod workflow;
 
 pub fn operation(kind: &str, action: &str) -> Operation {
     *ALL_OPERATIONS
@@ -25,6 +27,7 @@ pub fn call(
     } else {
         vec![]
     };
+    let body = workflow::decision_body(service, token, op, id, body);
     let result: Value =
         serde_json::from_slice(&service.dispatch(op, &parameters, &[], body, token)?).unwrap();
     export_doc_contracts::validation::response(op.id, &result).unwrap();
@@ -281,15 +284,9 @@ fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Va
 }
 
 pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, employee: Option<i64>) {
-    // This contract explicitly exercises the legacy single-step configuration.
-    // New-company two-stage routing is covered by the organization contract.
-    let mut settings = call(service, admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
-    settings["expectedVersion"] = settings["versionNumber"].clone();
-    for rule in settings["rules"].as_array_mut().unwrap() {
-        rule["mode"] = json!("Single");
-        rule["stages"] = json!([]);
-    }
-    call(service, admin, SAVE_OA_APPROVAL_SETTINGS, 0, Some(settings)).unwrap();
+    // Exercise a published single-node workflow with an independent reviewer.
+    let (reviewer_id, reviewer_token) = workflow::reviewer(service, admin);
+    workflow::configure(service, admin, reviewer_id);
     let finance = finance_user(service, admin, "Finance", "DEFAULT", "GENERAL");
     let date = (chrono::Utc::now() - chrono::Duration::days(1))
         .date_naive()
@@ -460,7 +457,7 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
                 Some(409)
             );
         }
-        row = act(service, admin, kind, "reject", &row);
+        row = act(service, &reviewer_token, kind, "return", &row);
         body["expectedVersion"] = row["versionNumber"].clone();
         body["title"] = json!(format!("{kind}补正申请"));
         row = call(
@@ -483,7 +480,7 @@ pub fn exercise(service: &Arc<NativeService>, admin: &str, applicant: &str, empl
                         barrier.wait();
                         call(
                             service,
-                            admin,
+                            &reviewer_token,
                             operation(kind, "approve"),
                             id,
                             Some(json!({"expectedVersion":row["versionNumber"],"note":"并发审批"})),

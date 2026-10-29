@@ -13,6 +13,7 @@ export function oaApi(client: ExportDocManagerApiClient, kind: OaKind) {
     create: (body: OaRequestSave, init?: ApiRequestInit) => client[`create${name}Request`]({ body }, init),
     update: (id: number, body: OaRequestSave, init?: ApiRequestInit) => client[`update${name}Request`]({ id, body }, init),
     action: (action: OaActionName, id: number, body: OaAction, init?: ApiRequestInit) => {
+      if (action === "return") return client[`returnForCorrection${name}Request`]({id,body},init);
       if (action === "complete" || action === "void") {
         if (kind === "personnel") throw new Error("人员变动最终批准后自动生效；后续变更须另行申请。");
         return client[`${action}${names[kind]}Request`]({ id, body }, init);

@@ -4,11 +4,54 @@ use export_doc_domain::{approval::delegation_window, approval_policy::ApprovalRu
 use std::collections::HashSet;
 
 const STORAGE_KIND: &str = "oa-approval-settings";
-fn default_rule(kind: &str) -> Value {
-    json!({"kind":kind,"mode":"Configured","approverUserIds":[],"stages":[
-        {"source":"DepartmentManager","approverUserIds":[]},
-        {"source":"CompanyExecutive","approverUserIds":[]}
+fn response(mut settings: Value) -> Result<Value> {
+    settings["sheetFieldCatalog"] = sheet_templates::catalog();
+    settings["sheetDefaultContent"] = json!(sheet_templates::default_content()?);
+    Ok(contracts::dto(
+        contracts::schema("OaApprovalSettings"),
+        settings,
+    ))
+}
+fn default_rule(kind: &str, variant: &str, name: &str) -> Value {
+    let key = format!(
+        "{kind}{}",
+        if variant.is_empty() {
+            String::new()
+        } else {
+            format!(":{variant}")
+        }
+    );
+    json!({"key":key,"kind":kind,"variant":variant,"name":name,"notifyUserIds":[],"stages":[
+        {"key":"department","name":"部门负责人审批","dependsOn":[],"source":"DepartmentManager","approverUserIds":[],"decision":"All","selfApproval":"Skip","repeatedApprover":"Allow","conditions":[],"dueHours":48},
+        {"key":"executive","name":"公司领导审批","dependsOn":["department"],"source":"CompanyExecutive","approverUserIds":[],"decision":"All","selfApproval":"Reject","repeatedApprover":"Allow","conditions":[],"dueHours":48}
     ]})
+}
+fn defaults() -> Vec<Value> {
+    let mut rules: Vec<_> = [
+        ("leave", "请假审批"),
+        ("overtime", "加班审批"),
+        ("expense", "费用报销审批"),
+        ("travel", "出差审批"),
+        ("purchase", "采购审批"),
+        ("general", "通用事项审批"),
+        ("room", "会议室预约审批"),
+        ("supply", "物品领用审批"),
+    ]
+    .iter()
+    .map(|(kind, name)| default_rule(kind, "", name))
+    .collect();
+    rules.extend(
+        [
+            ("Hire", "入职审批"),
+            ("Confirm", "转正审批"),
+            ("Transfer", "调岗审批"),
+            ("Depart", "离职审批"),
+            ("Rehire", "返聘审批"),
+        ]
+        .iter()
+        .map(|(action, name)| default_rule("personnel", action, name)),
+    );
+    rules
 }
 fn personnel_actions(value: &Value) -> std::result::Result<(), &'static str> {
     let actions = value
@@ -27,21 +70,9 @@ fn personnel_actions(value: &Value) -> std::result::Result<(), &'static str> {
     Ok(())
 }
 pub(in crate::engine) fn load(tx: &Connection, company: &str) -> Result<Value> {
-    let mut value = tx.find_identity(STORAGE_KIND, &store::normalize(company))?.unwrap_or_else(|| {
-        json!({"versionNumber":0,"rules":KINDS.iter().map(|kind| default_rule(kind.trim_start_matches("oa-"))).collect::<Vec<_>>(),"delegations":[]})
-    });
-    let rules = value["rules"]
-        .as_array_mut()
-        .ok_or_else(|| super::super::error::unavailable("审批规则损坏。"))?;
-    if !rules.iter().any(|rule| rule["kind"] == "personnel") {
-        rules.push(default_rule("personnel"));
-    }
-    if value.get("personnelApprovalActions").is_none() {
-        value["personnelApprovalActions"] = json!([]);
-    }
-    personnel_actions(&value["personnelApprovalActions"])
-        .map_err(super::super::error::unavailable)?;
-    Ok(value)
+    Ok(tx.find_identity(STORAGE_KIND, &store::normalize(company))?.unwrap_or_else(|| {
+        json!({"versionNumber":0,"rules":defaults(),"publications":[],"delegations":[],"personnelApprovalActions":[]})
+    }))
 }
 fn account(tx: &Connection, actor: &Actor, id: i64) -> Result<Actor> {
     let user = auth::current_actor_in(tx, id, actor.edition)?;
@@ -59,12 +90,7 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         previous["sheetTemplates"] = sheet_templates::defaults()?;
     }
     if action == "settings-get" {
-        previous["sheetFieldCatalog"] = sheet_templates::catalog();
-        previous["sheetDefaultContent"] = json!(sheet_templates::default_content()?);
-        return Ok(contracts::dto(
-            contracts::schema("OaApprovalSettings"),
-            previous,
-        ));
+        return response(previous);
     }
     if previous["versionNumber"] == 0 {
         if store::expected(body) != 0 {
@@ -73,31 +99,50 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
     } else {
         store::check_version(&previous, store::expected(body))?;
     }
+    if matches!(action, "settings-publish" | "settings-disable") {
+        super::definitions::change(tx, actor, &mut previous, action, body)?;
+        let id = previous["id"].as_i64().unwrap_or(0);
+        let saved = store::save(
+            tx,
+            STORAGE_KIND,
+            id,
+            previous,
+            Some(store::normalize(&actor.company)),
+            actor,
+            action,
+        )?;
+        return response(saved);
+    }
     let rules = body["rules"]
         .as_array()
-        .filter(|r| r.len() == KINDS.len())
+        .filter(|r| r.len() == 13)
         .ok_or_else(|| invalid("须配置全部申请类型的审批规则。"))?;
     let mut kinds = HashSet::new();
     for rule in rules {
         let kind = text(rule, "kind");
-        if !KINDS.contains(&format!("oa-{kind}").as_str()) || !kinds.insert(kind.clone()) {
-            return Err(invalid("申请类型缺失或重复。"));
-        }
         let typed: ApprovalRule =
             serde_json::from_value(rule.clone()).map_err(|_| invalid("审批规则格式无效。"))?;
-        typed.validate().map_err(invalid)?;
+        if typed.key
+            != format!(
+                "{}{}",
+                typed.kind,
+                if typed.variant.is_empty() {
+                    String::new()
+                } else {
+                    format!(":{}", typed.variant)
+                }
+            )
+            || !kinds.insert(typed.key.clone())
+        {
+            return Err(invalid("流程编号与业务类型不一致或重复。"));
+        }
+        typed.validate_draft().map_err(invalid)?;
         for id in typed.account_ids() {
             let reviewer = account(tx, actor, id)?;
             let resource =
                 super::approval::resource(&kind).ok_or_else(|| invalid("申请类型无效。"))?;
-            if auth::scope_rank(&reviewer, resource, "approve")
-                .min(auth::scope_rank(&reviewer, resource, "view"))
-                < 2
-            {
-                return Err(invalid(
-                    "指定审批人须有该类申请的部门或公司查看及审批权限；本人范围不能审批同事申请。",
-                ));
-            }
+            auth::authorize(&reviewer, resource, "view")?;
+            auth::authorize(&reviewer, resource, "approve")?;
         }
     }
     let delegations = body["delegations"]
@@ -133,6 +178,7 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         }
     }
     let mut value = contracts::dto(contracts::schema("OaApprovalSettingsSave"), body.clone());
+    value["publications"] = previous["publications"].clone();
     value["sheetTemplates"] = body
         .get("sheetTemplates")
         .cloned()
@@ -176,12 +222,7 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         "approval-settings",
     )?;
     super::handling_handover::notify(tx, actor, &previous, &saved)?;
-    Ok(contracts::dto(contracts::schema("OaApprovalSettings"), {
-        let mut saved = saved;
-        saved["sheetFieldCatalog"] = sheet_templates::catalog();
-        saved["sheetDefaultContent"] = json!(sheet_templates::default_content()?);
-        saved
-    }))
+    response(saved)
 }
 pub(super) fn principals(tx: &Connection, actor: &Actor) -> Result<Vec<(i64, String)>> {
     let settings = load(tx, &actor.company)?;

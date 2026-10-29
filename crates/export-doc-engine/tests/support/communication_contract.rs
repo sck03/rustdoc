@@ -1,3 +1,5 @@
+#[path = "approval_fixture.rs"]
+mod workflow;
 use export_doc_engine::{
     api::ApiError, contracts, engine::NativeService, generated_api::*, paths::nonce,
 };
@@ -17,6 +19,7 @@ fn call(
         vec![]
     };
     let body = body.map(|v| contracts::overlay(contracts::object(op.id, true), &v));
+    let body = workflow::decision_body(service, token, op, id, body);
     let value: Value =
         serde_json::from_slice(&service.dispatch(op, &parameters, query, body, token)?).unwrap();
     export_doc_contracts::validation::response(op.id, &value)
@@ -42,23 +45,6 @@ fn count(service: &NativeService, token: &str) -> i64 {
 
 /// Runs against both SQLite and PostgreSQL using only the public service boundary.
 pub fn exercise(service: &NativeService, admin: &str) -> i64 {
-    let mut settings = call(service, admin, GET_OA_APPROVAL_SETTINGS, 0, &[], None).unwrap();
-    settings["expectedVersion"] = settings["versionNumber"].clone();
-    for rule in settings["rules"].as_array_mut().unwrap() {
-        rule["mode"] = json!("Single");
-        rule["stages"] = json!([]);
-        rule["approverUserIds"] = json!([]);
-        rule["amountBranches"] = json!([]);
-    }
-    call(
-        service,
-        admin,
-        SAVE_OA_APPROVAL_SETTINGS,
-        0,
-        &[],
-        Some(settings),
-    )
-    .unwrap();
     let suffix = nonce().unwrap()[..8].to_owned();
     let create = |op, body| call(service, admin, op, 0, &[], Some(body)).unwrap();
     let company = format!("COMMS-{suffix}");
@@ -416,18 +402,41 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
         CREATE_PERSONNEL,
         json!({"requestKey":nonce().unwrap(),"employeeNumber":format!("COMMS-{suffix}"),"departmentId":"GENERAL","jobTitle":"业务","employmentType":"FullTime","hireDate":"2026-09-01","profile":{"fullName":"reader"}}),
     );
-    let register = call(service, admin, GET_CURRENT_USER, 0, &[], None).unwrap()["capabilities"]["usesOfficeRegister"]
-        == true;
-    if !register {
-        call(service,admin,LINK_PERSONNEL_ACCOUNT,employee["employee"]["id"].as_i64().unwrap(),&[],Some(json!({"expectedVersion":employee["versionNumber"],"userId":users[0]["id"],"expectedAccountVersion":users[0]["versionNumber"]}))).unwrap();
-    }
+    call(service,admin,LINK_PERSONNEL_ACCOUNT,employee["employee"]["id"].as_i64().unwrap(),&[],Some(json!({"expectedVersion":employee["versionNumber"],"userId":users[0]["id"],"expectedAccountVersion":users[0]["versionNumber"]}))).unwrap();
     let reader = login(users[0]["username"].as_str().unwrap());
-    let request=call(service,&reader,CREATE_GENERAL_REQUEST,0,&[],Some(json!({"requestKey":nonce().unwrap(),"employeeId":if register { employee["employee"]["id"].clone() } else { Value::Null },"title":"通知事务验收","reason":"设备维修","category":"IT"}))).unwrap();
+    let request=call(service,&reader,CREATE_GENERAL_REQUEST,0,&[],Some(json!({"requestKey":nonce().unwrap(),"title":"通知事务验收","reason":"设备维修","category":"IT"}))).unwrap();
+    let reviewer = call(service, manager, GET_CURRENT_USER, 0, &[], None).unwrap();
+    let mut settings = workflow::request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
+    let general = settings["rules"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|r| r["key"] == "general")
+        .unwrap();
+    general["stages"] = json!([workflow::node(
+        "review",
+        &[],
+        "Named",
+        json!([reviewer["id"]])
+    )]);
+    settings["expectedVersion"] = settings["versionNumber"].clone();
+    let saved = workflow::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    workflow::request(
+        service,
+        admin,
+        PUBLISH_OA_DEFINITION,
+        Some(json!({"expectedVersion":saved["versionNumber"],"definitionKey":"general"})),
+    );
     let request = action(service, &reader, SUBMIT_GENERAL_REQUEST, &request);
     assert_eq!(count(service, manager), 1);
     assert_eq!(count(service, &reader), 0);
     assert_eq!(count(service, other), 0);
-    let request = action(service, manager, REJECT_GENERAL_REQUEST, &request);
+    let request = action(
+        service,
+        manager,
+        RETURN_FOR_CORRECTION_GENERAL_REQUEST,
+        &request,
+    );
     assert_eq!(count(service, &reader), 1);
     let request = action(service, &reader, SUBMIT_GENERAL_REQUEST, &request);
     let stale = request.clone();

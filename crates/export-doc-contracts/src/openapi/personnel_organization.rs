@@ -59,6 +59,14 @@ pub(super) fn extend(doc: &mut Value) {
         schemas[name]["properties"]["oaAssignedOnly"] = json!({"type":"boolean","default":false,
             "description":"Restrict office requests to the user's own requests and explicitly assigned approval/handling work, within the ordinary data scopes."});
     }
+    schemas["ApiUserCapabilitiesDto"]["properties"]
+        .as_object_mut()
+        .unwrap()
+        .remove("usesOfficeRegister");
+    schemas["ApiUserCapabilitiesDto"]["required"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|field| field != "usesOfficeRegister");
     schemas["OaRequestSave"]["properties"]["departmentId"] = json!({"type":"string","maxLength":50,
         "description":"Choose an active primary or additional assignment when creating a request; defaults to the primary department."});
     schemas["PersonnelClearance"]["properties"]["reportingCount"] =

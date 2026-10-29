@@ -1,5 +1,5 @@
 //! One service contract runs unchanged against SQLite and a real PostgreSQL database.
-use super::oa_contract::{call, operation};
+use super::oa_contract::{call, operation, workflow};
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 
@@ -36,6 +36,45 @@ fn list(service: &NativeService, token: &str, kind: &str, extra: &[(&str, String
     )
     .unwrap()
 }
+fn serial(kind: &str, stages: Value) -> Value {
+    let nodes = stages
+        .as_array()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            let previous = format!("n{}", i.saturating_sub(1));
+            let deps = if i == 0 {
+                vec![]
+            } else {
+                vec![previous.as_str()]
+            };
+            let mut node = workflow::node(
+                &format!("n{i}"),
+                &deps,
+                s["source"].as_str().unwrap(),
+                s["approverUserIds"].clone(),
+            );
+            if s["decision"].is_string() {
+                node["decision"] = s["decision"].clone();
+            }
+            node
+        })
+        .collect::<Vec<_>>();
+    workflow::rule(
+        kind,
+        if kind == "personnel" { "Hire" } else { "" },
+        json!(nodes),
+    )
+}
+
+fn rule_key(kind: &str) -> String {
+    if kind == "personnel" {
+        "personnel:Hire".into()
+    } else {
+        kind.into()
+    }
+}
 fn policy(service: &NativeService, token: &str, kind: &str, rule: Value) -> Value {
     let mut settings = get(service, token, GET_OA_APPROVAL_SETTINGS, 0);
     settings["expectedVersion"] = settings["versionNumber"].clone();
@@ -45,7 +84,16 @@ fn policy(service: &NativeService, token: &str, kind: &str, rule: Value) -> Valu
         .iter_mut()
         .find(|r| r["kind"] == kind)
         .unwrap() = rule;
-    call(service, token, SAVE_OA_APPROVAL_SETTINGS, 0, Some(settings)).unwrap()
+    let key = rule_key(kind);
+    let saved = call(service, token, SAVE_OA_APPROVAL_SETTINGS, 0, Some(settings)).unwrap();
+    call(
+        service,
+        token,
+        PUBLISH_OA_DEFINITION,
+        0,
+        Some(json!({"expectedVersion":saved["versionNumber"],"definitionKey":key})),
+    )
+    .unwrap()
 }
 
 pub fn exercise(service: &NativeService, root: &str) {
@@ -186,19 +234,15 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         logins[1]["user"]["employee"]["organization"]["additionalAssignments"][0]["departmentId"],
         b
     );
-    let sqlite = logins[1]["user"]["capabilities"]["usesOfficeRegister"] == true;
     let create = |kind: &str, extra: Value| {
         let mut body = json!({"requestKey":nonce().unwrap(),"title":"组织闭环申请","reason":"分派可见与任职范围合同","departmentId":b,"category":"Other"});
-        if sqlite {
-            body["employeeId"] = json!(worker_id);
-        }
         for (key, value) in extra.as_object().unwrap() {
             body[key] = value.clone();
         }
         call(service, tokens[1], operation(kind, "create"), 0, Some(body)).unwrap()
     };
     if nodes {
-        // Dynamic dual roles keep only the last node, with all remaining leaders signing.
+        // A manager who also owns a later responsibility signs each node explicitly.
         let department = get(service, admin, GET_ORGANIZATION_DIRECTORY, 0)["departments"]
             .as_array()
             .unwrap()
@@ -222,7 +266,10 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
             service,
             admin,
             "general",
-            json!({"kind":"general","mode":"Configured","approverUserIds":[],"stages":[{"source":"DepartmentManager","approverUserIds":[]},{"source":"Named","approverUserIds":[users[3]["id"],users[4]["id"]]}]}),
+            serial(
+                "general",
+                json!([{"source":"DepartmentManager","approverUserIds":[]},{"source":"Named","approverUserIds":[users[3]["id"],users[4]["id"]]}]),
+            ),
         );
         let dual_draft = create("general", json!({}));
         let preview = get(
@@ -233,10 +280,10 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         );
         assert_eq!(
             preview["approvalPlan"]["steps"].as_array().unwrap().len(),
-            2
+            3
         );
-        assert_eq!(preview["approvalPlan"]["steps"][0]["stage"], 1);
-        assert_eq!(preview["approvalRoutingNotes"].as_array().unwrap().len(), 1);
+        assert_eq!(preview["approvalPlan"]["steps"][0]["stage"], 0);
+        assert_eq!(preview["approvalRoutingNotes"].as_array().unwrap().len(), 0);
         assert_eq!(
             get(
                 service,
@@ -247,7 +294,11 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
             dual_draft["versionNumber"]
         );
         let dual = act(service, tokens[1], "general", "submit", &dual_draft);
-        assert_eq!(dual["approvalPlan"], preview["approvalPlan"]);
+        assert_eq!(
+            dual["approvalPlan"]["steps"],
+            preview["approvalPlan"]["steps"]
+        );
+        let dual = act(service, tokens[4], "general", "approve", &dual);
         let dual = act(service, tokens[3], "general", "approve", &dual);
         assert_eq!(dual["status"], "Pending");
         assert_eq!(
@@ -271,9 +322,12 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
             service,
             admin,
             "general",
-            json!({"kind":"general","mode":"Configured","approverUserIds":[],"stages":[{"source":"Named","approverUserIds":[users[2]["id"],users[3]["id"]]}]}),
+            serial(
+                "general",
+                json!([{"source":"Named","approverUserIds":[users[2]["id"],users[3]["id"]]}]),
+            ),
         );
-        let self_draft = call(service,tokens[2],CREATE_GENERAL_REQUEST,0,Some(json!({"requestKey":nonce().unwrap(),"employeeId":if sqlite {people[2]["employee"]["id"].clone()}else{Value::Null},"departmentId":b,"title":"负责人本人申请","reason":"回避验证","category":"Other"}))).unwrap();
+        let self_draft = call(service,tokens[2],CREATE_GENERAL_REQUEST,0,Some(json!({"requestKey":nonce().unwrap(),"departmentId":b,"title":"负责人本人申请","reason":"回避验证","category":"Other"}))).unwrap();
         let own = act(service, tokens[2], "general", "submit", &self_draft);
         assert_eq!(own["approvalPlan"]["steps"].as_array().unwrap().len(), 1);
         assert_eq!(
@@ -295,7 +349,10 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
             service,
             admin,
             "general",
-            json!({"kind":"general","mode":"Configured","approverUserIds":[],"stages":[{"source":"Named","decision":"Any","approverUserIds":[users[2]["id"],users[3]["id"]]},{"source":"CompanyExecutive","approverUserIds":[]}]}),
+            serial(
+                "general",
+                json!([{"source":"Named","decision":"Any","approverUserIds":[users[2]["id"],users[3]["id"]]},{"source":"CompanyExecutive","approverUserIds":[]}]),
+            ),
         );
         let either = act(
             service,
@@ -320,7 +377,10 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         act(service, tokens[4], "general", "approve", &either);
         return;
     }
-    let parallel = json!({"kind":"general","mode":"Configured","approverUserIds":[],"stages":[{"source":"Named","approverUserIds":[users[2]["id"],users[3]["id"]]},{"source":"CompanyExecutive","approverUserIds":[]}]});
+    let parallel = serial(
+        "general",
+        json!([{"source":"Named","approverUserIds":[users[2]["id"],users[3]["id"]]},{"source":"CompanyExecutive","approverUserIds":[]}]),
+    );
     policy(service, admin, "general", parallel);
     let draft = create("general", json!({}));
     let draft = service
@@ -435,7 +495,10 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         service,
         admin,
         "general",
-        json!({"kind":"general","mode":"Single","approverUserIds":[]}),
+        serial(
+            "general",
+            json!([{"source":"Named","approverUserIds":[users[4]["id"]]}]),
+        ),
     );
     let mut revoke = users[2].clone();
     revoke["expectedVersion"] = revoke["versionNumber"].clone();
@@ -490,24 +553,34 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
     let mut executive = users[4].clone();
     executive["expectedVersion"] = executive["versionNumber"].clone();
     executive["oaAssignedOnly"] = json!(true);
-    assert_eq!(
-        call(
-            service,
-            admin,
-            UPDATE_USER_ACCOUNT,
-            users[4]["id"].as_i64().unwrap(),
-            Some(executive)
-        )
-        .unwrap_err()
-        .status,
-        Some(409)
+    call(
+        service,
+        admin,
+        UPDATE_USER_ACCOUNT,
+        users[4]["id"].as_i64().unwrap(),
+        Some(executive),
+    )
+    .unwrap();
+    // Currency-specific conditions skip only the budget node; final review remains.
+    let mut budget = workflow::node(
+        "budget",
+        &[],
+        "Named",
+        json!([users[3]["id"], users[5]["id"]]),
     );
-    // Currency-specific exact conditions use [minimum, maximum), preserving a default path.
+    budget["conditions"] = json!([{"field":"Currency","operator":"Equal","value":"CNY"},{"field":"Amount","operator":"GreaterOrEqual","value":"100"},{"field":"Amount","operator":"Less","value":"200"}]);
     policy(
         service,
         admin,
         "purchase",
-        json!({"kind":"purchase","mode":"Single","approverUserIds":[],"amountBranches":[{"key":"budget","name":"预算会签","currency":"CNY","minimum":"100","maximum":"200","stages":[{"source":"Named","approverUserIds":[users[3]["id"],users[5]["id"]]},{"source":"CompanyExecutive","approverUserIds":[]}]}]}),
+        workflow::rule(
+            "purchase",
+            "",
+            json!([
+                budget,
+                workflow::node("final", &["budget"], "CompanyExecutive", json!([]))
+            ]),
+        ),
     );
     for (amount, currency, matched) in [
         ("99.99", "CNY", false),
@@ -520,10 +593,7 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
             json!({"currency":currency,"purchaseLines":[{"name":"办公用品","specification":"标准","quantity":"1","unit":"件","unitPrice":amount}]}),
         );
         let pending = act(service, tokens[1], "purchase", "submit", &draft);
-        assert_eq!(
-            pending["approvalPlan"]["matchedBranch"],
-            if matched { "budget" } else { "" }
-        );
+        assert_eq!(pending["approvalPlan"]["nodes"][0]["skipped"], !matched);
         if matched {
             let rejected = act(service, tokens[3], "purchase", "reject", &pending);
             assert_eq!(rejected["status"], "Rejected");
@@ -598,7 +668,10 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         service,
         admin,
         "general",
-        json!({"kind":"general","mode":"Configured","approverUserIds":[],"stages":[{"source":"LineManager","approverUserIds":[]},{"source":"FunctionalManagers","approverUserIds":[]},{"source":"CompanyExecutive","approverUserIds":[]}]}),
+        serial(
+            "general",
+            json!([{"source":"LineManager","approverUserIds":[]},{"source":"FunctionalManagers","approverUserIds":[]},{"source":"CompanyExecutive","approverUserIds":[]}]),
+        ),
     );
     let matrix = act(
         service,
@@ -625,7 +698,10 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         service,
         admin,
         "personnel",
-        json!({"kind":"personnel","mode":"Configured","approverUserIds":[],"stages":[{"source":"LineManager","approverUserIds":[]}]}),
+        serial(
+            "personnel",
+            json!([{"source":"LineManager","approverUserIds":[]}]),
+        ),
     );
     let registration = export_doc_engine::contracts::overlay(
         export_doc_engine::contracts::object(CREATE_PERSONNEL.id, true),
@@ -646,9 +722,7 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         &pending,
     );
     assert_eq!(hired["status"], "Completed");
-    membership_scope(
-        service, admin, &users[6], &people[6], &people[1], &users[1], &a, &b,
-    );
+    membership_scope(service, admin, &users[6], &people[6], &users[1], &a, &b);
 }
 
 fn membership_scope(
@@ -656,7 +730,6 @@ fn membership_scope(
     admin: &str,
     user: &Value,
     reader: &Value,
-    worker: &Value,
     worker_account: &Value,
     a: &str,
     b: &str,
@@ -706,10 +779,7 @@ fn membership_scope(
     )
     .unwrap();
     let applicant = login(service, &worker_account["username"]);
-    let mut body = json!({"requestKey":nonce().unwrap(),"departmentId":a,"title":"主职之外的部门数据","reason":"任职权限撤销合同","category":"Other"});
-    if applicant["user"]["capabilities"]["usesOfficeRegister"] == true {
-        body["employeeId"] = worker["employee"]["id"].clone();
-    }
+    let body = json!({"requestKey":nonce().unwrap(),"departmentId":a,"title":"主职之外的部门数据","reason":"任职权限撤销合同","category":"Other"});
     let row = call(
         service,
         applicant["accessToken"].as_str().unwrap(),

@@ -97,32 +97,43 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                     condition +=
                         &format!(" AND parent.body->>'handlingKey' IN ({})", keys.join(","));
                 }
-                if q.assigned_only && scope.kind.starts_with("oa-") && scope.handling_keys.is_none()
-                {
+                if scope.handling_keys.is_none() {
                     let principals = scope
                         .approval_principals
                         .iter()
-                        .map(|principal| {
+                        .map(|p| {
                             (
-                                format!("CAST({} AS BIGINT)", bind(principal.user_id.to_string())),
-                                principal.departments.as_ref().map(|departments| {
-                                    departments
-                                        .iter()
-                                        .map(|department| bind(department.clone()))
-                                        .collect()
-                                }),
+                                format!("CAST({} AS BIGINT)", bind(p.user_id.to_string())),
+                                None,
                             )
                         })
                         .collect::<Vec<_>>();
-                    condition += &format!(
-                        " AND {}",
-                        crate::record_query::participant_condition(
-                            postgres,
-                            "parent",
-                            &reader,
-                            &principals
-                        )
+                    let participant = crate::record_query::participant_condition(
+                        postgres,
+                        "parent",
+                        &reader,
+                        &principals,
                     );
+                    condition = if q.assigned_only {
+                        format!(
+                            " AND {participant}{condition}",
+                            condition = if scope.statuses.is_empty() {
+                                String::new()
+                            } else {
+                                format!(
+                                    " AND parent.body->>'status' IN ({})",
+                                    scope
+                                        .statuses
+                                        .iter()
+                                        .map(|s| bind(s.clone()))
+                                        .collect::<Vec<_>>()
+                                        .join(",")
+                                )
+                            }
+                        )
+                    } else {
+                        format!(" AND ((TRUE {condition}) OR {participant})")
+                    };
                 }
                 let kind = bind(scope.kind.clone());
                 allowed.push(format!("(parent.kind={kind}{condition})"));

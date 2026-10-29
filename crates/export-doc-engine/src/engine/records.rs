@@ -320,12 +320,6 @@ pub fn handle(
     let business_date = clock.now().map_err(invalid)?.today;
     let value = store.transaction_as(actor, |transaction, actor| {
         auth::authorize(actor, resource.permission, action)?;
-        if transaction.provider() == "PostgreSQL"
-            && matches!(resource.key, "bookings" | "supply-requests")
-            && request["employeeId"].as_i64().is_some()
-        {
-            return Err(invalid("团队模式不能代其他人员申请。"));
-        }
         if record_id == 0 && matches!(resource.key, "bookings" | "supply-requests") {
             let key = text(&request, "requestKey");
             if key.is_empty() || key.len() > 100 {
@@ -351,10 +345,10 @@ pub fn handle(
                     || fields
                         .iter()
                         .any(|field| existing[*field] != request[*field])
-                    || (transaction.provider() == "SQLite"
+                    || (!request["employeeId"].is_null()
                         && existing["employeeId"] != request["employeeId"])
                 {
-                    return Err(conflict("同一请求标识不能用于不同的登记内容。"));
+                    return Err(conflict("同一请求标识不能用于不同的申请内容。"));
                 }
                 return Ok(existing);
             }
@@ -493,13 +487,7 @@ pub(super) fn save_in_transaction(
         scope,
     )?;
     if matches!(resource.key, "bookings" | "supply-requests") {
-        let event = if record_id > 0 {
-            "Edit"
-        } else if transaction.provider() == "SQLite" {
-            "Register"
-        } else {
-            "Submit"
-        };
+        let event = if record_id > 0 { "Edit" } else { "Submit" };
         super::office_events::append(
             transaction,
             actor,
