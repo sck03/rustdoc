@@ -58,7 +58,7 @@
 - [x] 独立集团汇总授权、任务统计与计数/分页前的范围过滤。
 - [x] React/Tauri 真实界面、草稿保护、实际 HTTP、PDF 及身份切换联调（Windows x64 GNU/Debug/WebView2）。
 - [x] SQLite/PostgreSQL 18 同合同、旧基线拒绝及备份恢复验证。
-- [ ] 集中工程门禁、当前事实文档、产物盘点清理、提交与普通快进 main 交付。
+- [x] 集中工程门禁、当前事实文档、产物盘点清理、提交与普通快进 main 交付（业务提交 `d019a62d`）。
 
 本批证据保存在 `.codex-runtime/oa-integration-20261029`：`postgres-storage.log` 验证关系约束及查询，`postgres-engine-verified.log` 验证恢复、输出发布和完整团队业务合同；四组真实 React HTTP 日志覆盖组织流程、审批权限、单位身份和审批单。`desktop-validation-final.log` 验证含 OCR 的 Full SQLite 桌面包，精选界面与 PDF 保留在 `artifacts/oa-integration-evidence`。
 
