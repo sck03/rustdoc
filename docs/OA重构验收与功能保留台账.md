@@ -23,6 +23,8 @@
 
 界面实现 `63569ce5` 已普通快进推送 main，工作分支 `codex/oa-interface-completion` 已删除。[发布脚本检查](https://github.com/sck03/rustdoc/actions/runs/41203948490)通过；[首轮主验证](https://github.com/sck03/rustdoc/actions/runs/41203948557)的前端布局通过，Chromium 编辑回归发现设置页表单说明在灰背景上的对比度为 4.39，低于 4.5。共用表单说明颜色改用 `--text-secondary`，保留对比度标准。随后本地完整执行 CI 的七组前端脚本全部通过：发票编辑、60 项单据编辑、V3 设计器、38 项取消操作、邮件模板、并发反馈、浏览器会话/超时/上传；`ci-test-*.log` 保存结果。`contrast-visual.log` 的 84 场景通过，不更新参考图或放宽阈值；生产构建、样式/源码规模及三版包同步通过。后续远端状态以实际 workflow 回执为准。
 
+补充修复 `eb6a6357` 已普通快进推送 main，工作分支 `codex/frontend-description-contrast` 已删除。该代码提交的 [Release script validation](https://github.com/sck03/rustdoc/actions/runs/41204986669) 与 [Rust native delivery validation](https://github.com/sck03/rustdoc/actions/runs/41204986684) 均为 success；后者实际通过前端构建/布局及 Chromium 编辑/异步回归，Rust 核心与 full-validation 因本次仅改 CSS/文档而 skipped，不计为重新通过。Rust 仍以上方本机完整门禁为证。本回执是后续文档修改，不改变已验证代码；原始远端结果保存在 `github-contrast-runs.json` 与 `github-contrast-native-jobs.json`。
+
 ## 账号、组织与 OA 内核批次：实现与证据规则
 
 源码基线为 schema 11；字段、DDL、指纹及关系见[数据字典](./账号组织OA新基线数据字典.md)，操作见[人员组织权限与 OA 手册](./人员组织权限与OA操作手册.md)。起点为 `e9c1aa8a`，工作分支为 `codex/oa-integration-completion`。起点未提交内容已备份，保留原业务数据和用户私有备份。
