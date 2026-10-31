@@ -146,4 +146,6 @@ Firefox/WebKit、Linux/macOS/ARM64 真机、Docker daemon 生命周期、MSVC �
 
 16 个本轮测试根的未删残留集中到 `E:/rustdoc/待手动删除-20261031/网页测试` 或 `隔离测试库`，已知移动长度 467,080,951 字节。另有 3 个部分删除后遇到 ACL 限制的根，原长度合计 304,052,566 字节；其删除量和剩余移动量均不猜测、不计入上述数字。`maintenance-tests` 的少量剩余目录另存 `maintenance-tests-残留`。历史 8 个受限测试根已整体移入同一待删目录的 `历史受限测试输出`，25 个后代访问限制仍保留。目录内附说明和两份清单，用户可手动删除。
 
-业务库、实际程序、用户/私有备份、起点补丁和可复用 Cargo/npm/浏览器/原生资源缓存继续保留。受保护的 643 个文件共 1,277,356,237 字节，清理前后 SHA-256 全部一致；其中包含三个最新桌面包。41 个原测试根均已不存在，工作树和 Git worktree 边界再次检查。完整回执为本轮 `cleanup-final-result.json`；main 推送与分支回执在实际交付后补记。
+业务库、实际程序、用户/私有备份、起点补丁和可复用 Cargo/npm/浏览器/原生资源缓存继续保留。受保护的 643 个文件共 1,277,356,237 字节，清理前后 SHA-256 全部一致；其中包含三个最新桌面包。41 个原测试根均已不存在，工作树和 Git worktree 边界再次检查。完整回执为本轮 `cleanup-final-result.json`。
+
+重构实现提交 `4e9036ec4c6ed769938bb9331ddd2abbc895f68e` 已普通快进推送 [GitHub main](https://github.com/sck03/rustdoc/tree/main)。推送前再次获取远端并确认无未审查漂移；`codex/oa-integration-completion` 已合并删除。本地仅 `main`，远端仅 `origin/main`（`origin/HEAD` 为指向它的符号引用），仅保留主工作树。此回执随后随 main 文档提交保存；本机证据不代替本次推送触发的 GitHub Actions 结果。
