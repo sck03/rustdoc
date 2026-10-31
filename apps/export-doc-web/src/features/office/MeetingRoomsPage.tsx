@@ -6,7 +6,7 @@ import { officeAccess } from "./officeModel.ts";
 import { MeetingBookingDialog, MeetingRoomEditor } from "./MeetingRoomDialogs.tsx";
 import { OfficeRequestsPanel } from "./OfficeRequestsPanel.tsx";
 import { OfficePager, OfficeQueryState, OfficeTabs } from "./OfficeUi.tsx";
-import { useOfficeDirectory, useOfficeOperation, useOfficeView } from "./useOfficeData.ts";
+import { useOfficeDirectory, useOfficeResourceOperation, useOfficeView } from "./useOfficeData.ts";
 import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
 import "../../styles/routes/office.css";
 
@@ -27,7 +27,7 @@ function MeetingRoomsDirectory({ client, user }: { client: ExportDocManagerApiCl
   const [editing, setEditing] = useState<MeetingRoomRecord | "new" | null>(null);
   const [booking, setBooking] = useState<MeetingRoomRecord | null>(null);
   const [deleting, setDeleting] = useState<MeetingRoomRecord | null>(null);
-  const deletion = useOfficeOperation();
+  const deletion = useOfficeResourceOperation("rooms");
   return <>
     <div className="office-toolbar"><form className="office-search" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
       <input aria-label="搜索会议室" placeholder="会议室名称或位置" maxLength={120} value={keyword} onChange={(event) => model.changeKeyword(event.target.value)} />

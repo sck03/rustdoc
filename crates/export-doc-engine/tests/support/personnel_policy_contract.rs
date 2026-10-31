@@ -1,6 +1,6 @@
+//! Initial registration is direct; every formal change uses the same published workflow.
 #[path = "approval_fixture.rs"]
 mod workflow;
-// The same direct/approval lifecycle contract runs against SQLite and PostgreSQL.
 use export_doc_engine::{
     api::ApiError, contracts, engine::NativeService, generated_api::*, paths::nonce,
 };
@@ -9,33 +9,26 @@ use serde_json::{Value, json};
 struct Session<'a>(&'a NativeService, String);
 impl Session<'_> {
     fn request(&self, op: Operation, id: i64, body: Option<Value>) -> Result<Value, ApiError> {
-        let parameters = if id > 0 {
-            vec![("id", id.to_string())]
-        } else {
-            vec![]
-        };
-        let body = body.map(|v| contracts::overlay(contracts::object(op.id, true), &v));
-        let body = workflow::decision_body(self.0, &self.1, op, id, body);
-        let value =
-            serde_json::from_slice(&self.0.dispatch(op, &parameters, &[], body, &self.1)?).unwrap();
-        export_doc_contracts::validation::response(op.id, &value).unwrap();
-        Ok(value)
+        workflow::call(
+            self.0,
+            &self.1,
+            op,
+            id,
+            workflow::decision_body(self.0, &self.1, op, id, body),
+        )
     }
-    fn login(&self, username: String, password: String) -> Result<Self, ApiError> {
-        let result = self.request(
-            LOGIN,
-            0,
-            Some(json!({"username":username,"password":password})),
-        )?;
-        Ok(Self(self.0, result["accessToken"].as_str().unwrap().into()))
+    fn login(&self, username: &str) -> Self {
+        let login = self
+            .request(
+                LOGIN,
+                0,
+                Some(json!({"username":username,"password":"Personnel-Policy-2026"})),
+            )
+            .unwrap();
+        Self(self.0, login["accessToken"].as_str().unwrap().into())
     }
 }
-
-fn action(
-    client: &Session<'_>,
-    op: Operation,
-    row: &Value,
-) -> Result<Value, export_doc_engine::api::ApiError> {
+fn action(client: &Session<'_>, op: Operation, row: &Value) -> Result<Value, ApiError> {
     client.request(
         op,
         row["id"].as_i64().unwrap(),
@@ -43,21 +36,21 @@ fn action(
     )
 }
 fn proposal(client: &Session<'_>, person: &Value, change: &str, department: &str) -> Value {
-    client.request(CREATE_PERSONNEL_CHANGE_REQUEST, 0, Some(json!({"requestKey":nonce().unwrap(),"employeeId":person["employee"]["id"],"title":"任职变动验收","reason":"按制度办理","personnelChange":{"action":change,"expectedPersonnelVersion":person["versionNumber"],"effectiveDate":"2026-10-01","departmentId":department,"jobTitle":"业务主管","onProbation":true}}))).unwrap()
+    client.request(CREATE_PERSONNEL_CHANGE_REQUEST, 0, Some(json!({"requestKey":nonce().unwrap(),"employeeId":person["employee"]["id"],"title":"任职变动验收","reason":"按发布制度办理","personnelChange":{"action":change,"expectedPersonnelVersion":person["versionNumber"],"effectiveDate":if change=="Rehire" {"2026-10-02"} else {"2026-10-01"},"departmentId":department,"jobTitle":"业务主管","onProbation":true}}))).unwrap()
 }
 pub fn exercise(service: &NativeService, token: &str) {
     let root = Session(service, token.into());
     let key = &nonce().unwrap()[..8];
     let company = format!("POLICY-{key}");
     let department = format!("HR-{key}");
-    let new_department = format!("JOB-{key}");
+    let next_department = format!("JOB-{key}");
     root.request(
         CREATE_ORGANIZATION_COMPANY,
         0,
         Some(json!({"code":company,"name":"人员制度验收公司","isActive":true})),
     )
     .unwrap();
-    for code in [&department, &new_department] {
+    for code in [&department, &next_department] {
         root.request(
             CREATE_ORGANIZATION_DEPARTMENT,
             0,
@@ -65,183 +58,77 @@ pub fn exercise(service: &NativeService, token: &str) {
         )
         .unwrap();
     }
-    let mut accounts = vec![];
-    let mut sessions = vec![];
+    let mut users = vec![];
     for (name, role) in [
         ("admin", "Admin"),
         ("hr", "PersonnelManager"),
-        ("review", "PersonnelManager"),
+        ("employee", "OfficeEmployee"),
     ] {
-        let username = format!("policy-{name}-{key}");
-        let account = root.request(CREATE_USER_ACCOUNT, 0, Some(json!({"username":username,"fullName":name,"role":role,"companyScope":company,"departmentId":department,"isActive":true,"resetPassword":"Personnel-Policy-2026"}))).unwrap()["user"].clone();
-        accounts.push(account);
-        sessions.push(
-            root.login(username, "Personnel-Policy-2026".into())
-                .unwrap(),
-        );
+        users.push(root.request(CREATE_USER_ACCOUNT, 0, Some(json!({"username":format!("policy-{name}-{key}"),"fullName":name,"role":role,"companyScope":company,"departmentId":department,"isActive":true,"resetPassword":"Personnel-Policy-2026"}))).unwrap()["user"].clone());
     }
-    let admin = &sessions[0];
-    let hr = &sessions[1];
-    let reviewer = &sessions[2];
-    let registration = json!({"requestKey":nonce().unwrap(),"employeeNumber":format!("DIRECT-{key}"),"departmentId":department,"jobTitle":"业务员","employmentType":"FullTime","hireDate":"2026-09-01","onProbation":true,"profile":{"fullName":"直接办理"}});
-    let mut direct = hr
-        .request(CREATE_PERSONNEL, 0, Some(registration.clone()))
+    let admin = root.login(users[0]["username"].as_str().unwrap());
+    let registration = |number: &str, name: &str| json!({"requestKey":nonce().unwrap(),"employeeNumber":format!("{number}-{key}"),"departmentId":department,"jobTitle":"业务员","employmentType":"FullTime","hireDate":"2026-09-01","onProbation":true,"profile":{"fullName":name}});
+    let initial = admin
+        .request(
+            CREATE_PERSONNEL,
+            0,
+            Some(registration("INITIAL", "首次建档")),
+        )
         .unwrap();
-    let direct_id = direct["employee"]["id"].as_i64().unwrap();
+    assert_eq!(initial["canCorrectRegistration"], true);
+    let id = initial["employee"]["id"].as_i64().unwrap();
+    let corrected = admin.request(UPDATE_PERSONNEL, id, Some(json!({"expectedVersion":initial["versionNumber"],"profile":initial["profile"],"employmentType":"FullTime","correctionNote":"首次建档纠错","registration":{"employeeNumber":format!("CORRECT-{key}"),"departmentId":department,"jobTitle":"业务助理","hireDate":"2026-09-01","onProbation":true}}))).unwrap();
+    assert_eq!(corrected["employee"]["jobTitle"], "业务助理");
+    for (i, person) in [
+        (
+            1,
+            admin
+                .request(CREATE_PERSONNEL, 0, Some(registration("HR", "人事专员")))
+                .unwrap(),
+        ),
+        (2, corrected),
+    ] {
+        admin.request(LINK_PERSONNEL_ACCOUNT, person["employee"]["id"].as_i64().unwrap(), Some(json!({"expectedVersion":person["versionNumber"],"userId":users[i]["id"],"expectedAccountVersion":users[i]["versionNumber"]}))).unwrap();
+    }
+    let hr = root.login(users[1]["username"].as_str().unwrap());
+    let employee = root.login(users[2]["username"].as_str().unwrap());
+    let (review_id, review_token) = workflow::reviewer(service, &admin.1);
+    let reviewer = Session(service, review_token);
+    workflow::configure(service, &admin.1, review_id);
+    let required = json!(["Confirm", "Transfer", "Depart", "Rehire"]);
     assert_eq!(
         hr.request(GET_PERSONNEL_OPTIONS, 0, None).unwrap()["approvalRequiredActions"],
-        json!([])
+        required
     );
-    let mut settings = admin.request(GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
-    settings["expectedVersion"] = settings["versionNumber"].clone();
-    settings["personnelApprovalActions"] =
-        json!(["Hire", "Confirm", "Transfer", "Depart", "Rehire"]);
-    // This contract tests the opt-in personnel policy with one explicit reviewer.
-    for rule in settings["rules"].as_array_mut().unwrap().iter_mut() {
-        if rule["kind"] != "personnel" {
-            rule["stages"] = json!([workflow::node(
-                "review",
-                &[],
-                "Named",
-                json!([accounts[0]["id"]])
-            )]);
-            continue;
-        }
-        rule["stages"] = json!([workflow::node(
-            "review",
-            &[],
-            "Named",
-            json!([accounts[2]["id"], accounts[0]["id"]])
-        )]);
-        rule["stages"][0]["decision"] = json!("Any");
-    }
-    workflow::publish_all(service, &admin.1, settings);
-    let transition = json!({"expectedVersion":direct["versionNumber"],"effectiveDate":"2026-09-02","note":"管理员直接办理"});
     assert_eq!(
-        hr.request(CONFIRM_PERSONNEL, direct_id, Some(transition.clone()))
+        admin.request(GET_PERSONNEL_OPTIONS, 0, None).unwrap()["approvalRequiredActions"],
+        required
+    );
+    assert!(
+        admin
+            .request(GET_OA_APPROVAL_SETTINGS, 0, None)
+            .unwrap()
+            .get("personnelApprovalActions")
+            .is_none()
+    );
+    let mut person = hr.request(GET_PERSONNEL, id, None).unwrap();
+    assert_eq!(person["canCorrectRegistration"], false);
+    let correction = json!({"expectedVersion":person["versionNumber"],"profile":person["profile"],"employmentType":"FullTime","correctionNote":"禁止绕过正式流程","registration":{"employeeNumber":format!("ESCAPE-{key}"),"departmentId":next_department,"jobTitle":"未经审批","hireDate":"2026-09-01","onProbation":false}});
+    assert_eq!(
+        admin
+            .request(UPDATE_PERSONNEL, id, Some(correction))
             .unwrap_err()
             .status,
         Some(409)
     );
+
+    let draft = proposal(&hr, &person, "Confirm", &department);
+    let pending = action(&hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &draft).unwrap();
     assert_eq!(
-        hr.request(CREATE_PERSONNEL, 0, Some(registration))
-            .unwrap_err()
-            .status,
-        Some(409)
-    );
-    // A global administrator can maintain another company's personnel directly.
-    direct = root
-        .request(CONFIRM_PERSONNEL, direct_id, Some(transition))
-        .unwrap();
-    let history = hr.request(GET_PERSONNEL_HISTORY, direct_id, None).unwrap();
-    assert!(
-        history["items"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|event| event["action"] == "Confirm")
-    );
-    let options: Value = serde_json::from_slice(
-        &service
-            .dispatch(
-                GET_PERSONNEL_OPTIONS,
-                &[],
-                &[("employeeId", direct_id.to_string())],
-                None,
-                &root.1,
-            )
-            .unwrap(),
-    )
-    .unwrap();
-    assert!(
-        options["departments"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|d| d["code"] == department)
-    );
-    assert!(
-        options["departments"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .all(|d| d["code"] == department || d["code"] == new_department)
-    );
-    assert_eq!(direct["employee"]["status"], "Active");
-    assert_eq!(direct["approvalRequiredActions"], json!([]));
-    assert_eq!(direct["canCorrectRegistration"], true);
-    let correction = json!({"expectedVersion":direct["versionNumber"],"profile":direct["profile"],"employmentType":"FullTime","correctionNote":"核对合同后修正工号","registration":{"employeeNumber":format!("CORRECT-{key}"),"departmentId":department,"jobTitle":"业务员","hireDate":"2026-09-01","onProbation":false}});
-    direct = admin
-        .request(UPDATE_PERSONNEL, direct_id, Some(correction))
-        .unwrap();
-    assert_eq!(
-        direct["employee"]["employeeNumber"],
-        format!("CORRECT-{key}")
-    );
-    let body = json!({"requestKey":nonce().unwrap(),"title":"入职审批","reason":"新员工入职","personnelChange":{"action":"Hire","registration":{"requestKey":"ignored-nested-key","employeeNumber":format!("APPROVAL-{key}"),"departmentId":department,"jobTitle":"业务员","employmentType":"FullTime","hireDate":"2026-09-01","onProbation":true,"probationEndsOn":"2026-12-01","contractEndsOn":"2027-12-01","profile":{"fullName":"审批人员"}}}});
-    let draft = hr
-        .request(CREATE_PERSONNEL_CHANGE_REQUEST, 0, Some(body.clone()))
-        .unwrap();
-    assert_eq!(
-        hr.request(LIST_PERSONNEL, 0, None).unwrap()["totalCount"],
-        1
-    );
-    let pending = action(hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &draft).unwrap();
-    assert_eq!(
-        action(hr, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending)
+        action(&admin, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending)
             .unwrap_err()
             .status,
         Some(403)
-    );
-    let rejected = action(
-        reviewer,
-        RETURN_FOR_CORRECTION_PERSONNEL_CHANGE_REQUEST,
-        &pending,
-    )
-    .unwrap();
-    assert_eq!(
-        hr.request(LIST_PERSONNEL, 0, None).unwrap()["totalCount"],
-        1
-    );
-    let pending = action(hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &rejected).unwrap();
-    let approved = action(reviewer, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending).unwrap();
-    assert_eq!(approved["status"], "Completed");
-    assert_eq!(
-        hr.request(CREATE_PERSONNEL_CHANGE_REQUEST, 0, Some(body))
-            .unwrap()["id"],
-        approved["id"]
-    );
-    assert_eq!(
-        action(reviewer, APPROVE_PERSONNEL_CHANGE_REQUEST, &approved)
-            .unwrap_err()
-            .status,
-        Some(409)
-    );
-    let id = approved["employeeId"].as_i64().unwrap();
-    let mut person = admin.request(GET_PERSONNEL, id, None).unwrap();
-    assert_eq!(
-        person["organization"]["primaryAssignmentId"],
-        format!("hire-{}-primary", approved["id"]),
-        "approved hire keeps the request's proposed appointment identity"
-    );
-    person = admin.request(LINK_PERSONNEL_ACCOUNT, id, Some(json!({"expectedVersion":person["versionNumber"],"userId":accounts[2]["id"],"expectedAccountVersion":accounts[2]["versionNumber"]}))).unwrap();
-    let employee = root
-        .login(
-            accounts[2]["username"].as_str().unwrap().into(),
-            "Personnel-Policy-2026".into(),
-        )
-        .unwrap();
-    let draft = proposal(hr, &person, "Confirm", &department);
-    let pending = action(hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &draft).unwrap();
-    assert_eq!(
-        employee
-            .request(
-                GET_PERSONNEL_CHANGE_REQUEST,
-                pending["id"].as_i64().unwrap(),
-                None
-            )
-            .unwrap()["canReview"],
-        false
     );
     assert_eq!(
         action(&employee, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending)
@@ -249,36 +136,27 @@ pub fn exercise(service: &NativeService, token: &str) {
             .status,
         Some(403)
     );
-    let queue: Value = serde_json::from_slice(
-        &service
-            .dispatch(
-                LIST_PERSONNEL_CHANGE_REQUEST,
-                &[],
-                &[
-                    ("approvalsOnly", "true".into()),
-                    ("mineOnly", "false".into()),
-                ],
-                None,
-                &employee.1,
-            )
-            .unwrap(),
+    let returned = action(
+        &reviewer,
+        RETURN_FOR_CORRECTION_PERSONNEL_CHANGE_REQUEST,
+        &pending,
     )
     .unwrap();
-    assert!(
-        !queue["items"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|row| row["id"] == pending["id"])
-    );
-    action(admin, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending).unwrap();
-    person = admin.request(GET_PERSONNEL, id, None).unwrap();
-    assert_eq!(person["employee"]["status"], "Active");
-    let draft = proposal(hr, &person, "Transfer", &new_department);
-    let pending = action(hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &draft).unwrap();
-    person = admin.request(UPDATE_PERSONNEL, id, Some(json!({"expectedVersion":person["versionNumber"],"profile":person["profile"],"employmentType":"FullTime","probationEndsOn":"2026-12-01","contractEndsOn":"2027-12-01"}))).unwrap();
     assert_eq!(
-        action(admin, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending)
+        hr.request(GET_PERSONNEL, id, None).unwrap()["employee"]["status"],
+        "Probation"
+    );
+    let pending = action(&hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &returned).unwrap();
+    let completed = action(&reviewer, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending).unwrap();
+    assert_eq!(completed["status"], "Completed");
+    person = hr.request(GET_PERSONNEL, id, None).unwrap();
+    assert_eq!(person["employee"]["status"], "Active");
+
+    let draft = proposal(&hr, &person, "Transfer", &next_department);
+    let pending = action(&hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &draft).unwrap();
+    person = hr.request(UPDATE_PERSONNEL,id,Some(json!({"expectedVersion":person["versionNumber"],"profile":person["profile"],"employmentType":"FullTime","contractEndsOn":"2027-12-01"}))).unwrap();
+    assert_eq!(
+        action(&reviewer, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending)
             .unwrap_err()
             .status,
         Some(409)
@@ -292,54 +170,29 @@ pub fn exercise(service: &NativeService, token: &str) {
         .unwrap()["versionNumber"],
         pending["versionNumber"]
     );
-    let mut draft = action(hr, WITHDRAW_PERSONNEL_CHANGE_REQUEST, &pending).unwrap();
-    draft["expectedVersion"] = draft["versionNumber"].clone();
-    draft["personnelChange"]["expectedPersonnelVersion"] = person["versionNumber"].clone();
-    let draft = hr
+    let mut withdrawn = action(&hr, WITHDRAW_PERSONNEL_CHANGE_REQUEST, &pending).unwrap();
+    withdrawn["expectedVersion"] = withdrawn["versionNumber"].clone();
+    withdrawn["personnelChange"]["expectedPersonnelVersion"] = person["versionNumber"].clone();
+    let revised = hr
         .request(
             UPDATE_PERSONNEL_CHANGE_REQUEST,
-            draft["id"].as_i64().unwrap(),
-            Some(draft),
+            withdrawn["id"].as_i64().unwrap(),
+            Some(contracts::dto(
+                contracts::schema("OaRequestSave"),
+                withdrawn,
+            )),
         )
         .unwrap();
-    let pending = action(hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &draft).unwrap();
-    let blocker = json!({"requestKey":nonce().unwrap(),"title":"交接未完成","reason":"验证最终审批重新检查","category":"Other"});
-    let blocker = employee
-        .request(CREATE_GENERAL_REQUEST, 0, Some(blocker))
-        .unwrap();
+    let pending = action(&hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &revised).unwrap();
+    let blocker = employee.request(CREATE_GENERAL_REQUEST,0,Some(json!({"requestKey":nonce().unwrap(),"title":"交接未完成","reason":"最终批准必须重新核对","category":"Other"}))).unwrap();
     assert_eq!(
-        action(admin, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending)
+        action(&reviewer, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending)
             .unwrap_err()
             .status,
         Some(409)
     );
-    assert_eq!(
-        admin.request(GET_PERSONNEL, id, None).unwrap()["employee"]["departmentId"],
-        department
-    );
-    assert_eq!(
-        hr.request(
-            GET_PERSONNEL_CHANGE_REQUEST,
-            pending["id"].as_i64().unwrap(),
-            None
-        )
-        .unwrap()["status"],
-        "Pending"
-    );
     action(&employee, CANCEL_GENERAL_REQUEST, &blocker).unwrap();
-    action(admin, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending).unwrap();
-    person = admin.request(GET_PERSONNEL, id, None).unwrap();
-    assert_eq!(person["account"]["departmentId"], new_department);
-    assert_eq!(
-        root.login(
-            accounts[2]["username"].as_str().unwrap().into(),
-            "Personnel-Policy-2026".into()
-        )
-        .unwrap()
-        .request(GET_CURRENT_USER, 0, None)
-        .unwrap()["role"],
-        "PersonnelManager"
-    );
+    action(&reviewer, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending).unwrap();
     assert_eq!(
         employee
             .request(GET_CURRENT_USER, 0, None)
@@ -347,36 +200,83 @@ pub fn exercise(service: &NativeService, token: &str) {
             .status,
         Some(401)
     );
+    person = hr.request(GET_PERSONNEL, id, None).unwrap();
+    assert_eq!(person["employee"]["departmentId"], next_department);
+    assert_eq!(person["account"]["departmentId"], next_department);
+
+    let previous_primary = person["organization"]["primaryAssignmentId"].clone();
     for change in ["Depart", "Rehire"] {
-        let draft = proposal(hr, &person, change, &new_department);
-        let pending = action(hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &draft).unwrap();
-        if change == "Depart" {
-            assert_eq!(
-                action(admin, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending)
-                    .unwrap_err()
-                    .status,
-                Some(409),
-                "published responsibilities must be handed over before departure"
-            );
-            let mut settings = admin.request(GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
-            for rule in settings["rules"]
-                .as_array_mut()
-                .unwrap()
-                .iter_mut()
-                .filter(|r| r["kind"] == "personnel")
-            {
-                rule["stages"][0]["approverUserIds"] = json!([accounts[0]["id"]]);
-            }
-            workflow::publish_all(service, &admin.1, settings);
-        }
-        action(admin, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending).unwrap();
-        person = admin.request(GET_PERSONNEL, id, None).unwrap();
-        assert_eq!(person["account"]["isActive"], false);
+        let draft = proposal(&hr, &person, change, &next_department);
+        let pending = action(&hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &draft).unwrap();
+        action(&reviewer, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending).unwrap();
+        person = hr.request(GET_PERSONNEL, id, None).unwrap();
+        assert_eq!(
+            person["account"]["isActive"], false,
+            "rehire never restores the old account"
+        );
+        let accounts = admin.request(LIST_USERS, 0, None).unwrap();
+        let account = accounts["users"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|u| u["id"] == users[2]["id"])
+            .unwrap();
+        assert_eq!(
+            account["permissionGrants"],
+            json!([]),
+            "departure revokes grants permanently"
+        );
+        assert!(account["permissionTemplateId"].is_null());
     }
     assert_eq!(person["employee"]["status"], "Probation");
     assert_eq!(
-        person["organization"]["primaryStartsOn"], person["hireDate"],
-        "rehire starts a new effective period"
+        person["organization"]["primaryStartsOn"],
+        person["hireDate"]
     );
-    assert!(person["probationEndsOn"].is_null() && person["contractEndsOn"].is_null());
+    assert_ne!(
+        person["organization"]["primaryAssignmentId"],
+        previous_primary
+    );
+    assert!(
+        person["organization"]["additionalAssignments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|a| a["id"] == previous_primary && a["endsOn"] == "2026-10-01")
+    );
+
+    let body = json!({"requestKey":nonce().unwrap(),"title":"正式入职","reason":"独立业务审批后建档","personnelChange":{"action":"Hire","registration":registration("APPROVED","正式入职人员")}});
+    let before = hr.request(LIST_PERSONNEL, 0, None).unwrap()["totalCount"]
+        .as_i64()
+        .unwrap();
+    let draft = hr
+        .request(CREATE_PERSONNEL_CHANGE_REQUEST, 0, Some(body.clone()))
+        .unwrap();
+    assert_eq!(
+        hr.request(LIST_PERSONNEL, 0, None).unwrap()["totalCount"],
+        before
+    );
+    let pending = action(&hr, SUBMIT_PERSONNEL_CHANGE_REQUEST, &draft).unwrap();
+    let completed = action(&reviewer, APPROVE_PERSONNEL_CHANGE_REQUEST, &pending).unwrap();
+    assert_eq!(completed["status"], "Completed");
+    assert_eq!(
+        hr.request(CREATE_PERSONNEL_CHANGE_REQUEST, 0, Some(body))
+            .unwrap()["id"],
+        completed["id"]
+    );
+    assert_eq!(
+        hr.request(LIST_PERSONNEL, 0, None).unwrap()["totalCount"],
+        before + 1
+    );
+    let hired = hr
+        .request(
+            GET_PERSONNEL,
+            completed["employeeId"].as_i64().unwrap(),
+            None,
+        )
+        .unwrap();
+    assert_eq!(
+        hired["organization"]["primaryAssignmentId"],
+        format!("hire-{}-primary", completed["id"])
+    );
 }

@@ -64,6 +64,10 @@ OCR 同样按目标 OS/架构组装 Rust worker、ONNX 和模型。2026-10-15 �
 
 2026-10-29 组织任职/schema 10/单位授权集成包位于 `artifacts/oa-integration-desktop/ExportDocManager.Tauri.Full`，使用本批工作树构建，版本标识为 `0.1.2+git.e3ca1e0d1a43`（提交前父版本，不是已提交的新代码标识）。Full/SQLite/Debug/含 OCR 的真实 WebView2 回归通过：中文字段、表格编辑、私有模板、付款与报销输出、人员删除限制、账号权限变更重新登录、OCR 和正常退出/HTTP 关闭。原始桌面结果在 `artifacts/edition-validation/desktop-1793278928317`，精选截图和 PDF 在 `artifacts/oa-integration-evidence`。付款、报销、金额调整 PDF 已抽查渲染。浏览器另验单位方案、跨单位流程、身份切换草稿保护与自然到期。computer-use 的 `@oai/sky` 运行组件缺失，系统 IME 候选窗未验收；本批不扩大 MSVC 发布、其他 OS/架构、实体打印或 Docker daemon 的验收声明。
 
+2026-10-31 schema 11 完整重构的三个 Windows x64 GNU / Debug 包位于 `artifacts/oa-completion-desktop/ExportDocManager.Tauri.Document`、`ExportDocManager.Tauri.Sales` 和 `ExportDocManager.Tauri.Full`。三版分别通过真实 Tauri/React 窗口回归；Document/Full 包含 OCR，Sales 按产品清单裁剪。Full 覆盖中文字段输入、表格编辑、空白 V3 设计、人员账号关联及删除保护、权限变更重新登录、附件、维护和实际输出。16 份/16 页 PDF 全部渲染查看；窄自定义纸张只验证尺寸保存及既有裁切，不计自动重排。运行依赖图 434 项通过，包含 Tauri/SQLite，不包含 PostgreSQL 服务端适配器或退役 GUI。正常/重复/异常/独立窗口退出全部通过，每实例 6 个 WebView2 进程归零、HTTP 关闭。
+
+上述包由提交前的工作树构建，运行标识中的 `e9c1aa8a` 是父提交，不能当作本批源码提交号。原始日志及精选证据在 `.codex-runtime/oa-completion-20261031/`。文本经真实 WebView2 注入并验证，不等于 Windows 系统 IME 候选窗实测；computer-use 的 `@oai/sky` 缺失，此项明确保留为待验。MSVC 发布、其他 OS/架构 GUI、实体打印和 Docker daemon 生命周期未新增验收。当前精确通过范围见[本轮台账](./OA重构验收与功能保留台账.md)。
+
 ## 2026-09-28 Windows 退出清理
 
 2026-10-27 的新 GNU/Debug/Full SQLite/含 OCR 包为 `artifacts/review-completion-desktop/ExportDocManager.Tauri.Full`，来源 `a1814e57e871`。完整 Tauri、HS／历史维护和未确认文字保存、37 张截图、16 页渲染 PDF、七组 OCR、PDFium worker 及正常／重复／异常／独立窗口退出通过；各实例 WebView2 归零、HTTP 关闭。`@oai/sky` 包缺失，系统 IME 候选窗未由 computer-use 检查，仍不扩大 MSVC／其它 OS/架构／实体打印验收。详细范围、小纸张裁切限制和清理回执见本日进度。

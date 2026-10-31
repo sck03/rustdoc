@@ -72,13 +72,6 @@ impl Management {
     pub fn any(&self) -> bool {
         self.organization || self.appointments || self.workflows || self.roles || self.analytics
     }
-    pub fn contains(&self, requested: &Self) -> bool {
-        (!requested.analytics || self.analytics)
-            && (!requested.organization || self.organization)
-            && (!requested.workflows || self.workflows)
-            && (!requested.appointments || self.appointments)
-            && (!requested.roles || self.roles)
-    }
 }
 
 /// Business grants and delegation ceilings share the existing permission vocabulary.
@@ -87,9 +80,14 @@ pub fn validate_grants(
 ) -> Result<Vec<crate::permissions::Grant>, String> {
     let normalized = crate::permissions::profile::assignable(grants)?;
     if normalized.iter().any(|g| {
-        g.resource_key.starts_with("system.")
-            || g.resource_key.starts_with("organization.")
-            || g.data_scope == "all"
+        crate::permissions::resource(&g.resource_key).is_none_or(|r| {
+            !r.unit_assignable
+                || r.supports_data_scope && g.data_scope == "all"
+                || !r
+                    .actions
+                    .iter()
+                    .any(|a| a.key == g.action && a.unit_assignable)
+        })
     }) {
         return Err("单位权限不能包含平台管理、转授权或全局数据范围。".into());
     }
@@ -142,9 +140,5 @@ mod tests {
         assert!(within_ceiling(&[grant("own")], &[grant("company")]));
         assert!(!within_ceiling(&[grant("company")], &[grant("own")]));
         assert!(validate_grants(&[grant("all")]).is_err());
-        assert!(!Management::default().contains(&Management {
-            roles: true,
-            ..Default::default()
-        }));
     }
 }

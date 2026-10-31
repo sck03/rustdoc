@@ -51,12 +51,35 @@ mod tests {
             }],
         };
         organization.validate(1, "A", "A").unwrap();
-        assert_eq!(organization.departments("A"), vec!["A", "B"]);
         organization.additional_assignments[0].department_id = "A".into();
+        organization.validate(1, "A", "A").unwrap();
+        organization
+            .additional_assignments
+            .push(organization.additional_assignments[0].clone());
         assert!(organization.validate(1, "A", "A").is_err());
         organization.additional_assignments.clear();
         organization.functional_manager_employee_ids.push(1);
         assert!(organization.validate(1, "A", "A").is_err());
+    }
+
+    #[test]
+    fn repeated_appointments_preserve_history_without_overlapping_periods() {
+        let first: Assignment = serde_json::from_value(serde_json::json!({
+            "id":"first","companyCode":"A","departmentId":"HR","jobTitle":"专员",
+            "startsOn":"2026-01-01","endsOn":"2026-09-30","managerEmployeeId":null
+        }))
+        .unwrap();
+        let mut second = first.clone();
+        second.id = "second".into();
+        second.starts_on = "2026-10-01".into();
+        second.ends_on.clear();
+        let mut organization = PersonnelOrganization {
+            additional_assignments: vec![first, second],
+            ..Default::default()
+        };
+        organization.validate(1, "HR", "A").unwrap();
+        organization.additional_assignments[1].starts_on = "2026-09-30".into();
+        assert!(organization.validate(1, "HR", "A").is_err());
     }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -94,33 +117,28 @@ impl PersonnelOrganization {
             .into_iter()
             .collect()
     }
-    pub fn departments(&self, primary: &str) -> Vec<String> {
-        std::iter::once(primary.to_owned())
-            .chain(
-                self.additional_assignments
-                    .iter()
-                    .map(|a| a.department_id.clone()),
-            )
-            .collect()
-    }
-    pub fn validate(&self, employee: i64, primary: &str, company: &str) -> Result<(), String> {
+    pub fn validate(&self, employee: i64, _primary: &str, _company: &str) -> Result<(), String> {
         if self.additional_assignments.len() > 20 {
             return Err("兼职部门最多二十个。".into());
         }
-        let mut departments = HashSet::from([(company, primary)]);
-        for assignment in &self.additional_assignments {
+        for (index, assignment) in self.additional_assignments.iter().enumerate() {
             if assignment.department_id.trim().is_empty()
                 || assignment.company_code.trim().is_empty()
-                || !departments.insert((
-                    assignment.company_code.as_str(),
-                    assignment.department_id.as_str(),
-                ))
                 || assignment.job_title.trim().is_empty()
                 || assignment.job_title.chars().count() > 120
             {
-                return Err("兼职须填写部门和职位，部门不能与主职或其它兼职重复。".into());
+                return Err("兼职须填写单位、部门和职位，同一部门的同一岗位不能重复登记。".into());
             }
             assignment.validate_dates()?;
+            for earlier in &self.additional_assignments[..index] {
+                if earlier.company_code == assignment.company_code
+                    && earlier.department_id == assignment.department_id
+                    && earlier.job_title.trim() == assignment.job_title.trim()
+                    && earlier.overlaps(assignment)?
+                {
+                    return Err("同一岗位的任职期间不能重叠；已结束的历史任职应保留。".into());
+                }
+            }
         }
         for (line, functional) in std::iter::once((
             self.manager_employee_id,
@@ -149,6 +167,16 @@ impl PersonnelOrganization {
 }
 
 impl Assignment {
+    /// UI end dates include the last working day; storage converts to an exclusive bound.
+    fn overlaps(&self, other: &Self) -> Result<bool, String> {
+        let before = |end: &str, start: &str| -> Result<bool, String> {
+            Ok(match (Self::date(end)?, Self::date(start)?) {
+                (Some(end), Some(start)) => end < start,
+                _ => false,
+            })
+        };
+        Ok(!before(&self.ends_on, &other.starts_on)? && !before(&other.ends_on, &self.starts_on)?)
+    }
     fn date(value: &str) -> Result<Option<chrono::NaiveDate>, String> {
         if value.is_empty() {
             return Ok(None);

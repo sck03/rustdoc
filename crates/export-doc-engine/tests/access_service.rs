@@ -66,8 +66,9 @@ fn permission_catalog_preserves_builtin_rules_and_explains_effective_scopes() {
             Some(400)
         );
     }
+    let saved = fixture.client().publish_scheme(saved);
     let user = fixture.create(CREATE_USER_ACCOUNT, json!({"username":"scheme-user","fullName":"权限验收","role":"User",
-        "permissionTemplateId":saved["id"],"companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Scope-Test-2026"}));
+        "permissionTemplateId":saved["id"],"permissionSchemeVersion":saved["publishedVersion"],"companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Scope-Test-2026"}));
     assert!(user["user"]["id"].as_i64().is_some());
     let user_list = fixture.request(LIST_USERS, None, None);
     let account = user_list["users"]

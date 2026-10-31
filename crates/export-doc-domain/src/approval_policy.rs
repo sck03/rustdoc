@@ -1,5 +1,5 @@
 //! One bounded approval graph; a published definition contains no runtime state.
-use crate::approval::ApprovalDecision;
+use crate::approval::{ApprovalDecision, ApprovalVoting};
 pub use crate::approval_conditions::{
     ApprovalCondition, ConditionContext, ConditionField, ConditionOperator,
 };
@@ -42,6 +42,16 @@ pub enum RepeatedApprover {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ApprovalStage {
+    #[serde(default)]
+    pub material_policy: crate::approval::MaterialPolicy,
+    #[serde(default)]
+    pub subflow: Option<SubflowReference>,
+    #[serde(skip)]
+    pub runtime_calendar_key: String,
+    #[serde(default)]
+    pub layout: Option<GraphPoint>,
+    #[serde(default)]
+    pub deadline_mode: crate::business_calendar::DeadlineMode,
     pub key: String,
     pub name: String,
     /// All predecessors must finish; independent roots run in parallel.
@@ -53,15 +63,33 @@ pub struct ApprovalStage {
     pub review_points: Vec<String>,
     pub approver_user_ids: Vec<i64>,
     pub decision: ApprovalDecision,
+    #[serde(flatten)]
+    pub voting: ApprovalVoting,
     pub self_approval: SelfApproval,
     pub repeated_approver: RepeatedApprover,
     /// Conjunction of typed conditions. Excluded nodes do not block successors.
     pub conditions: Vec<ApprovalCondition>,
     pub due_hours: u32,
+    #[serde(default)]
+    pub revision_policy: crate::approval::RevisionPolicy,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GraphPoint {
+    pub x: i32,
+    pub y: i32,
+}
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SubflowReference {
+    pub definition_key: String,
+    pub version: i64,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ApprovalRule {
+    #[serde(default)]
+    pub calendar: Option<crate::business_calendar::BusinessCalendar>,
     pub key: String,
     pub kind: String,
     pub variant: String,
@@ -84,6 +112,18 @@ impl ApprovalRule {
         self.check(false)
     }
     fn check(&self, publishing: bool) -> Result<(), String> {
+        if let Some(calendar) = &self.calendar {
+            calendar.validate()?;
+        }
+        if publishing
+            && self
+                .stages
+                .iter()
+                .any(|s| s.deadline_mode == crate::business_calendar::DeadlineMode::Working)
+            && self.calendar.is_none()
+        {
+            return Err("工作时限流程须冻结公司工作日历。".into());
+        }
         if !key(&self.key) || self.name.trim().is_empty() || self.name.chars().count() > 100 {
             return Err("流程编号或名称无效。".into());
         }
@@ -132,6 +172,16 @@ impl ApprovalRule {
             return Err("抄送账号无效、重复或超过 50 人。".into());
         }
         for node in &self.stages {
+            node.material_policy.validate()?;
+            if node
+                .layout
+                .as_ref()
+                .is_some_and(|p| !(0..=10000).contains(&p.x) || !(0..=10000).contains(&p.y))
+            {
+                return Err("流程画布位置超出范围。".into());
+            }
+            node.revision_policy.validate()?;
+            node.voting.validate(node.decision)?;
             if node.review_points.len() > 12
                 || node
                     .review_points
@@ -280,6 +330,9 @@ impl ApprovalRule {
             retained.push(id);
         }
         previous.extend(&retained);
+        if retained.is_empty() {
+            return Err(format!("{}的责任人全部回避，请补充独立责任人。", node.name));
+        }
         Ok((retained, notes))
     }
 }

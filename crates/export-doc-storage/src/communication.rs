@@ -53,7 +53,7 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
             if q.unread_only {
                 let reader = format!("CAST({} AS BIGINT)", bind(q.reader.to_string()));
                 filter += &format!(
-                    " AND NOT EXISTS (SELECT 1 FROM records receipt WHERE receipt.kind='announcement-receipt' AND receipt.company=r.company AND receipt.owner_id={reader} AND CAST(receipt.body->>'requestId' AS BIGINT)=r.id AND CAST(receipt.body->>'publishVersion' AS BIGINT)=CAST(r.body->>'publishVersion' AS BIGINT))"
+                    " AND NOT EXISTS (SELECT 1 FROM record_rows receipt WHERE receipt.kind='announcement-receipt' AND receipt.company=r.company AND receipt.owner_id={reader} AND CAST(receipt.body->>'requestId' AS BIGINT)=r.id AND CAST(receipt.body->>'publishVersion' AS BIGINT)=CAST(r.body->>'publishVersion' AS BIGINT))"
                 );
             }
             "CASE WHEN CAST(r.body->>'isPinned' AS TEXT) IN ('true','1') THEN 1 ELSE 0 END DESC, r.id DESC"
@@ -146,7 +146,7 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                 allowed.join(" OR ")
             };
             filter += &format!(
-                " AND EXISTS (SELECT 1 FROM records parent WHERE parent.id=CAST(r.body->>'requestId' AS BIGINT) AND parent.kind=r.body->>'requestKind' AND parent.company=r.company AND ({allowed}))"
+                " AND EXISTS (SELECT 1 FROM record_rows parent WHERE parent.id=CAST(r.body->>'requestId' AS BIGINT) AND parent.kind=r.body->>'requestKind' AND parent.company=r.company AND ({allowed}))"
             );
             "r.id DESC"
         }

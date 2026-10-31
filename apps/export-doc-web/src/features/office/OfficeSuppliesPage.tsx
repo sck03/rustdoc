@@ -7,7 +7,7 @@ import { OfficeStockDialog, OfficeSupplyApplication, OfficeSupplyEditor } from "
 import { OfficeHistoryDialog } from "./OfficeHistoryDialog.tsx";
 import { OfficeRequestsPanel } from "./OfficeRequestsPanel.tsx";
 import { OfficePager, OfficeQueryState, OfficeTabs } from "./OfficeUi.tsx";
-import { useOfficeDirectory, useOfficeOperation, useOfficeView } from "./useOfficeData.ts";
+import { useOfficeDirectory, useOfficeResourceOperation, useOfficeView } from "./useOfficeData.ts";
 import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
 import "../../styles/routes/office.css";
 
@@ -31,7 +31,7 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
   const [dialog, setDialog] = useState<SupplyDialog | null>(null);
   const close = () => setDialog(null);
   const saved = (supply: OfficeSupplyRecord) => { model.acceptSaved(supply); close(); };
-  const deletion = useOfficeOperation();
+  const deletion = useOfficeResourceOperation("supplies");
   return <>
     <div className="office-toolbar"><form className="office-search" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
       <input aria-label="搜索办公物品" placeholder="物品名称或存放位置" maxLength={120} value={keyword} onChange={(event) => model.changeKeyword(event.target.value)} /><button className="command-button secondary" type="submit">搜索</button></form>

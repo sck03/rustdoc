@@ -45,6 +45,7 @@ fn open(workspace: &Workspace) -> Arc<NativeService> {
 }
 fn admin() -> Actor {
     Actor {
+        scope_rules: vec![],
         context: String::new(),
         edition: Default::default(),
         id: 1,
@@ -233,6 +234,7 @@ fn license_registration_requires_an_administrator() {
     let workspace = Workspace::new();
     let service = open(&workspace);
     let user = Actor {
+        scope_rules: vec![],
         context: String::new(),
         edition: Default::default(),
         id: 2,

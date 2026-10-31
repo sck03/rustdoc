@@ -12,9 +12,10 @@ postgres = ["dep:postgres", "dep:postgres-native-tls", "dep:native-tls"]
 
 [dependencies]
 serde_json.workspace = true
-rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled", "backup", "functions", "hooks"] }
+rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled", "backup", "cache", "functions", "hooks"] }
 unicode-normalization.workspace = true
 chrono.workspace = true
+sha2.workspace = true
 postgres = { version = "=0.19.14", optional = true }
 postgres-native-tls = { version = "=0.5.3", optional = true }
 native-tls = { version = "=0.2.18", optional = true }

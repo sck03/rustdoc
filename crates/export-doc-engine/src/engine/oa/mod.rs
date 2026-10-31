@@ -2,6 +2,7 @@
 //! no dependency on invoice/payment models, reports or financial software.
 pub(in crate::engine) mod approval;
 mod approval_handover;
+pub(in crate::engine) mod qualification;
 pub(super) use approval_handover::{managed_reassign, managed_tasks};
 pub(in crate::engine) mod approval_integrity;
 pub(in crate::engine) mod approval_references;
@@ -9,16 +10,27 @@ mod approval_routing;
 mod organization_routing;
 mod simulation;
 pub(super) use simulation::{simulate, units as routing_units};
+mod commands;
 mod definitions;
 mod documents;
 mod handling_handover;
 mod hub;
+pub(in crate::engine) mod materials;
 pub(in crate::engine) mod personnel_changes;
 mod queries;
+pub(in crate::engine) mod queue_authority;
+mod resource_requests;
+pub(in crate::engine) mod runtime;
+mod subflows;
+pub(super) use resource_requests::{
+    created as resource_created, event as resource_event, schedule as resource_document,
+};
 pub(in crate::engine) mod settings;
+pub(in crate::engine) use settings::revoke_delegations;
 mod sheet_templates;
 mod submissions;
 mod validation;
+pub(super) use validation::employee as request_employee;
 mod verification;
 use super::{
     NativeService, auth,
@@ -47,7 +59,9 @@ pub fn is_download(operation: Operation) -> bool {
 }
 pub(super) use documents::download;
 fn kind(meta: &Value) -> String {
-    format!("oa-{}", text(meta, "kind"))
+    resource_requests::resource_kind(meta)
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("oa-{}", text(meta, "kind")))
 }
 pub(super) const FINANCE_STATUSES: &[&str] = &["Approved", "HandedOff"];
 pub(super) fn viewable(
@@ -56,6 +70,9 @@ pub(super) fn viewable(
     resource: &str,
     row: &Value,
 ) -> Result<bool> {
+    if matches!(resource, "office.rooms" | "office.supplies") {
+        return handling::resource_access(tx, actor, resource, "view", row, false);
+    }
     Ok(scope_viewable(tx, actor, resource, row)?
         && (!actor.oa_assigned_only || assigned_to(tx, actor, resource, row)?))
 }
@@ -81,9 +98,14 @@ pub(super) fn assigned_to(
     }) {
         return Ok(true);
     }
-    Ok(resource == "office.general"
+    Ok((resource == "office.general"
         && !text(row, "handlingKey").is_empty()
         && handling::GENERAL_STATES.contains(&text(row, "status").as_str())
+        || matches!(resource, "office.rooms" | "office.supplies")
+            && matches!(
+                row["status"].as_str(),
+                Some("Approved" | "InUse" | "Completed" | "Issued" | "Returned")
+            ))
         && handling::can_handle(tx, actor, row, resource)?)
 }
 pub(super) fn scope_viewable(
@@ -107,7 +129,13 @@ fn access(tx: &Connection, actor: &Actor, meta: &Value, row: &Value) -> Result<(
     let resource = text(meta, "resource");
     let permission = text(meta, "permission");
     auth::authorize(actor, &resource, &permission)?;
-    let visible = if permission == "approve" && row["status"] == "Pending" {
+    if resource_requests::resource_kind(row).is_some()
+        && permission == "create"
+        && (row["ownerUserId"] != actor.id || text(row, "_requesterContext") != actor.context)
+    {
+        return Err(error(403, "只有原申请身份可以修改和提交资源草稿。"));
+    }
+    let visible = if permission == "approve" {
         assigned_to(tx, actor, resource.as_str(), row)?
     } else if permission == "view" {
         viewable(tx, actor, &resource, row)?
@@ -168,6 +196,12 @@ pub(super) fn project(
         json!([])
     };
     if detail {
+        if row["kind"] == "personnel" {
+            row["personnelExecution"] = tx
+                .personnel_order(row["id"].as_i64().unwrap_or(0))?
+                .unwrap_or(Value::Null);
+        }
+        row["workflowActions"] = json!(commands::actions(tx, actor, &row)?);
         row["canReview"] = json!(approval::authority(tx, actor, &row)?.is_some());
         row["reviewTaskKeys"] = json!(approval::review_tasks(tx, actor, &row)?);
         if let Some(id) = row["submissionId"].as_i64().filter(|id| *id > 0) {
@@ -179,7 +213,13 @@ pub(super) fn project(
         row["canHandle"] = json!(handling::can_handle(tx, actor, &row, "office.general")?);
         row["handlerNames"] = json!(handling::names(tx, actor, &row)?);
     }
-    Ok(contracts::dto(contracts::schema("OaRequest"), row))
+    let schema = match resource_requests::resource_kind(&row) {
+        Some("bookings") => "MeetingBookingRecord",
+        Some(_) => "OfficeSupplyRequestRecord",
+        None => "OaRequest",
+    };
+    let projected = materials::project(tx, actor, &row, row.clone())?;
+    Ok(contracts::dto(contracts::schema(schema), projected))
 }
 fn append_event(
     tx: &Connection,
@@ -205,6 +245,9 @@ pub(super) fn save(
     action: &str,
     note: &str,
 ) -> Result<Value> {
+    if resource_requests::resource_kind(&row).is_some() {
+        return resource_requests::save(tx, actor, row, action, note);
+    }
     let id = row["id"].as_i64().unwrap_or(0);
     let scope = row.clone();
     let identity = text(&row, "identity");
@@ -283,6 +326,29 @@ pub(super) fn handle(
         }
         let id = records::id(parameters)?;
         let (_, mut row) = current(tx, &actor, meta, id)?;
+        if action == "command-result" {
+            return commands::result(tx, &actor, &row, parameters);
+        }
+        if matches!(
+            action.as_str(),
+            "submit"
+                | "approve"
+                | "reject"
+                | "return"
+                | "withdraw"
+                | "cancel"
+                | "void"
+                | "complete"
+                | "approval-reassign"
+                | "resource-submit"
+                | "workflow-command"
+                | "personnel-execute"
+                | "personnel-cancel"
+        ) {
+            if super::command_receipts::prepare(tx, &actor, &mut row, operation.id, body)? {
+                return project(tx, &actor, row, true);
+            }
+        }
         if action == "verification" {
             return verification::verify(tx, &actor, &row, query);
         }
@@ -296,25 +362,49 @@ pub(super) fn handle(
         if action == "get" {
             return project(tx, &actor, row, true);
         }
+        if action == "workflow-candidates" {
+            return commands::candidates(tx, &actor, &row, query);
+        }
         if action == "submissions" {
             return submissions::list(tx, &row, query);
         }
         if action == "submission" {
-            return submissions::project(
+            let snapshot = materials::snapshot(
                 tx,
+                &actor,
+                &row,
                 submissions::checked(tx, &row, submissions::id(parameters)?)?,
-                true,
-            );
+            )?;
+            return submissions::project(tx, snapshot, true);
         }
         if action == "history" {
             let (page, size) = paging(query)?;
             let (count, items) = children(tx, &row, "oa-event", (page - 1) * size, size)?;
+            let items = materials::history(tx, &actor, &row, items, "")?;
             return Ok(contracts::dto(
                 contracts::schema("OaEventPage"),
                 json!({"items":items,"totalCount":count,"pageNumber":page,"pageSize":size}),
             ));
         }
         store::check_version(&row, store::expected(body))?;
+        if matches!(action.as_str(), "personnel-execute" | "personnel-cancel") {
+            return runtime::execute(
+                tx,
+                &actor,
+                meta,
+                row,
+                body,
+                today,
+                action == "personnel-cancel",
+            );
+        }
+        if action == "workflow-command" {
+            return commands::execute(tx, &actor, meta, row, body);
+        }
+        if matches!(action.as_str(), "resource-submit" | "resource-update") {
+            materials::authorize_edit(tx, &actor, &row)?;
+            return resource_requests::change(tx, &actor, meta, row, body, today);
+        }
         if action == "approval-reassign" {
             approval_handover::reassign(tx, &actor, &mut row, body)?;
             return save(
@@ -331,6 +421,7 @@ pub(super) fn handle(
         }
         if action == "update" {
             mutable(&row)?;
+            materials::authorize_edit(tx, &actor, &row)?;
             if row["requestKey"] != body["requestKey"]
                 || (!text(body, "departmentId").is_empty()
                     && body["departmentId"] != row["departmentId"])
@@ -384,7 +475,13 @@ pub(super) fn handle(
             &action,
             row["kind"] == "expense",
         )
-        .ok_or_else(|| conflict("当前状态不能执行此操作，请刷新后核对。"))?;
+        .ok_or_else(|| {
+            conflict(format!(
+                "当前状态 {} 不能执行 {}，请刷新后核对。",
+                text(&row, "status"),
+                action
+            ))
+        })?;
         if matches!(action.as_str(), "approve" | "reject" | "return" | "void")
             && row["ownerUserId"] == actor.id
         {
@@ -417,23 +514,26 @@ pub(super) fn handle(
             submissions::begin(tx, &actor, &mut row)?;
         }
         if matches!(action.as_str(), "approve" | "reject" | "return") {
-            next = approval::review(tx, &actor, &mut row, &action, &note, &text(body, "taskKey"))?;
+            next = approval::review(
+                tx,
+                &actor,
+                &mut row,
+                &action,
+                &note,
+                &text(body, "taskKey"),
+                body,
+            )?;
         }
         if action == "complete" {
             validation::completion(&row, today)?;
         }
         if row["kind"] == "personnel" && next == "Approved" {
-            row["status"] = json!("Completed");
-            if row["personnelChange"]["action"] == "Hire" {
-                let id = personnel_changes::apply(tx, &actor, &row, today)?;
-                row["employeeId"] = json!(id);
+            if personnel_changes::effective_date(&row)? > today {
+                row["status"] = json!("Approved");
+                runtime::schedule(tx, &actor, &row)?;
                 return save(tx, &actor, meta, row, "approve", &note);
             }
-            // Mark this proposal complete inside the same transaction so its
-            // own clearance reference does not prevent the approved change.
-            let saved = save(tx, &actor, meta, row.clone(), "approve", &note)?;
-            personnel_changes::apply(tx, &actor, &row, today)?;
-            return Ok(saved);
+            return personnel_changes::commit(tx, &actor, meta, row, today, "approve", &note);
         }
         row["status"] = json!(next);
         let event = if action == "approve" && next == "Pending" {

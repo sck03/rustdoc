@@ -2,7 +2,7 @@ use super::*;
 use export_doc_domain::oa as rules;
 use rust_decimal::Decimal;
 
-pub(super) fn employee(
+pub(in crate::engine) fn employee(
     tx: &Connection,
     actor: &Actor,
     body: &Value,
@@ -12,11 +12,15 @@ pub(super) fn employee(
         if existing || (actor.admin && body["employeeId"].as_i64().is_some_and(|id| id > 0)) {
             store::get(tx, "people", records::positive(body, "employeeId", "人员")?)?
         } else {
-            if body["employeeId"].as_i64().is_some_and(|id| id > 0) {
-                return Err(invalid("团队申请由本人发起，不能代选其他员工。"));
+            let person = super::super::personnel_accounts::person_for_account(tx, actor.id)?
+                .ok_or_else(|| invalid("请先由人事将账号关联到在职人员。"))?;
+            if body["employeeId"]
+                .as_i64()
+                .is_some_and(|id| id > 0 && person["id"] != id)
+            {
+                return Err(error(403, "团队申请由本人发起，不能代选其他员工。"));
             }
-            super::super::personnel_accounts::person_for_account(tx, actor.id)?
-                .ok_or_else(|| invalid("请先由人事将账号关联到本公司在职人员。"))?
+            person
         };
     let departments =
         super::super::personnel_organization::departments_in(tx, &person, &actor.company)?;
@@ -150,7 +154,7 @@ pub(super) fn submission(tx: &Connection, row: &Value) -> Result<()> {
         _ => (text(row, "travel.startsOn"), text(row, "travel.endsOn")),
     };
     for kind in kinds {
-        for status in ["Pending", "Approved", "Completed"] {
+        for status in ["Pending", "Suspended", "Approved", "Completed"] {
             let mut offset = 0;
             loop {
                 crate::operation::check()?;

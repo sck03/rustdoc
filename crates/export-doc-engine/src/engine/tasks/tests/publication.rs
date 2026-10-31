@@ -86,7 +86,7 @@ fn business_archive_is_atomic_cancelable_and_survives_task_cleanup() {
             .transaction(|tx| {
                 crate::engine::store::save(
                     tx,
-                    "oa-submission",
+                    "archive-fixture",
                     0,
                     json!({"status":"Approved"}),
                     None,

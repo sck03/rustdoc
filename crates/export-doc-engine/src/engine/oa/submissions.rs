@@ -6,6 +6,13 @@ pub(super) const PDF: &str = "oa-approval-pdf";
 
 pub(super) fn begin(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<()> {
     let number = row["submissionNumber"].as_i64().unwrap_or(0) + 1;
+    capture(tx, actor, row, number)
+}
+pub(super) fn retain(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<()> {
+    let number = records::positive(row, "submissionNumber", "提交轮次")?;
+    capture(tx, actor, row, number)
+}
+fn capture(tx: &Connection, actor: &Actor, row: &mut Value, number: i64) -> Result<()> {
     let mut request = row.clone();
     request["status"] = json!("Pending");
     request["versionNumber"] = json!(store::expected(row) + 1);
@@ -133,6 +140,10 @@ pub(super) fn checked(tx: &Connection, row: &Value, id: i64) -> Result<Value> {
     Ok(snapshot)
 }
 pub(super) fn project(tx: &Connection, mut snapshot: Value, detail: bool) -> Result<Value> {
+    let resource = matches!(
+        snapshot["request"]["kind"].as_str(),
+        Some("room" | "supply")
+    );
     let id = records::positive(&snapshot, "id", "提交版本")?;
     let blob = tx.blob_info(id, PDF)?;
     let job = if let Some(id) = snapshot["documentJobId"]
@@ -182,7 +193,12 @@ pub(super) fn project(tx: &Connection, mut snapshot: Value, detail: bool) -> Res
     } else {
         snapshot.as_object_mut().unwrap().remove("request");
     }
-    Ok(contracts::dto(contracts::schema("OaSubmission"), snapshot))
+    let schema = if resource {
+        "ResourceSubmission"
+    } else {
+        "OaSubmission"
+    };
+    Ok(contracts::dto(contracts::schema(schema), snapshot))
 }
 pub(super) fn id(parameters: &[(&str, String)]) -> Result<i64> {
     parameters

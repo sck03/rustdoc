@@ -1,4 +1,6 @@
 pub use export_doc_contracts::{contracts, generated_api};
+#[cfg(test)]
+extern crate self as export_doc_engine;
 pub use export_doc_domain::{designer, invoice, template};
 pub use export_doc_report::packing as packing_view;
 pub mod api;

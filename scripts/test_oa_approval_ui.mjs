@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
+import { linkBusinessPerson } from './lib/approval-fixtures.mjs';
 
 await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPage }) => {
   const token = (await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' })).accessToken;
@@ -9,9 +10,10 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   for (const [name, role] of [['first', 'OfficeManager'], ['second', 'OfficeManager'], ['proxy', 'OfficeManager'], ['finance', 'Finance']]) {
     users.push((await invoke('createUserAccount', { username: `approval-${name}`, fullName: `审批${name}`, role, companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Approval-UI-2026' }, {}, token)).user);
   }
+  for (const user of users) await linkBusinessPerson(invoke, token, user);
   const admin = await openPage('oa-review', 'Review-2026-Test');
-  await admin.goto(`${url}/#/office/approvals`);
-  await admin.getByRole('link', { name: '审批规则与代理', exact: true }).click();
+  await admin.goto(`${url}/#/office/approvals?view=handling`);
+  await admin.getByRole('link', { name: '流程管理', exact: true }).click();
   const rule = admin.locator('details[data-definition-key="expense"]');
   await rule.locator(':scope > summary').click();
   for (const [index, user] of users.slice(0, 2).entries()) {
@@ -46,7 +48,7 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   await admin.getByText('审批设置已被其他管理员修改。当前草稿已保留，请记录需要保留的内容后重新载入最新设置。', { exact: true }).waitFor({ state: 'hidden' });
   assert.equal(await generalRule.getByLabel('流程名称', { exact: true }).inputValue(), concurrent.rules.find(r => r.key === 'general').name);
   await admin.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
-  assert.deepEqual(await admin.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => v.id)), []);
+  assert.deepEqual(await admin.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => ({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))), []);
   await admin.screenshot({ path: path.join(output, 'approval-settings.png'), fullPage: true });
   await admin.goto(`${url}/#/office/requests/expense`);
   await admin.getByRole('button', { name: '新建费用报销', exact: true }).click();
@@ -102,9 +104,9 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   assert((await preview.locator('iframe').getAttribute('src')).startsWith('blob:'));
   await preview.getByRole('button', { name: '关闭窗口', exact: true }).click();
   const finance = await openPage('approval-finance', 'Approval-UI-2026');
-  await finance.goto(`${url}/#/office/approvals`);
-  await finance.getByText('待财务接收：1', { exact: true }).waitFor();
-  await finance.getByRole('link', { name: '财务待接收', exact: true }).click();
+  await finance.goto(`${url}/#/office/approvals?view=handling`);
+  await finance.locator('.oa-hub-count[aria-label="待财务接收 1 项"]').waitFor();
+  await finance.locator('.oa-hub-queue').filter({has:finance.locator('.oa-hub-count[aria-label="待财务接收 1 项"]')}).getByRole('link', { name: '进入列表', exact: true }).click();
   await finance.getByLabel('纸单申请编号', { exact: true }).fill(requestId);
   await finance.getByLabel('纸单提交版本', { exact: true }).fill('999');
   await finance.getByRole('button', { name: '核对审批单', exact: true }).click();

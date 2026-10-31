@@ -159,8 +159,15 @@ pub(super) fn build_plan(
     version: i64,
     context: &ConditionContext,
 ) -> Result<()> {
+    let compiled = super::subflows::compile(tx, &actor.company, rule)?;
+    let rule = &compiled.rule;
     let employee_user = row["applicantAccountId"].as_i64();
     let mut plan = ApprovalPlan {
+        subflows: compiled.instances,
+        calendars: compiled.calendars,
+        generation: 1,
+        suspended_at: String::new(),
+        paused_seconds: 0,
         definition_key: rule.key.clone(),
         policy_version: version,
         nodes: vec![],
@@ -170,6 +177,7 @@ pub(super) fn build_plan(
     let mut previous = HashSet::new();
     let mut notes = vec![];
     for (index, node) in rule.stages.iter().enumerate() {
+        super::materials::validate_policy(&node.material_policy)?;
         let included = rule.includes(index, &context).map_err(invalid)?;
         let ids = if included {
             let (ids, routed) = rule
@@ -188,21 +196,34 @@ pub(super) fn build_plan(
             vec![]
         };
         plan.nodes.push(ApprovalNode {
+            material_policy: node.material_policy.clone(),
+            deadline_mode: node.deadline_mode,
+            calendar_key: if node.runtime_calendar_key.is_empty() {
+                "main".into()
+            } else {
+                node.runtime_calendar_key.clone()
+            },
             key: node.key.clone(),
             name: node.name.clone(),
             review_points: node.review_points.clone(),
             depends_on: node.depends_on.clone(),
             decision: node.decision,
+            voting: node.voting.clone(),
             due_hours: node.due_hours,
             independent_review: node.repeated_approver
                 == export_doc_domain::approval_policy::RepeatedApprover::Reject,
             skipped: ids.is_empty(),
             started_at: String::new(),
             due_at: String::new(),
+            revision_policy: node.revision_policy.clone(),
         });
         for id in ids {
             let reviewer = approval::reviewer(tx, actor, id, row)?;
             plan.steps.push(ApprovalStep {
+                approver_person_id: Some(super::qualification::person_id(tx, &reviewer)?),
+                acted_by_person_id: None,
+                verification_values: Default::default(),
+                confirmed_review_points: vec![],
                 task_key: format!("{}:{id}", node.key),
                 stage: index,
                 decision: node.decision,
@@ -216,10 +237,11 @@ pub(super) fn build_plan(
                 acted_at: String::new(),
                 note: String::new(),
                 delegation_key: String::new(),
+                source_generation: None,
             });
         }
     }
-    plan.activate(chrono::Utc::now());
+    plan.activate(chrono::Utc::now()).map_err(invalid)?;
     plan.validate(row["ownerUserId"].as_i64().unwrap_or(0))
         .map_err(invalid)?;
     row["approvalStageLabels"] = json!(plan.nodes.iter().map(|n| &n.name).collect::<Vec<_>>());

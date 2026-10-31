@@ -141,7 +141,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | undici-types | 8.9.0 | MIT | web |
 | vite | 8.3.5 | MIT | web |
 
-## cargo (698)
+## cargo (699)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -358,6 +358,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | half | 2.7.1 | MIT OR Apache-2.0 | ocr |
 | hashbrown | 0.12.3 | MIT OR Apache-2.0 | rust-workspace |
 | hashbrown | 0.17.1 | MIT OR Apache-2.0 | excel-analyzer, rust-workspace |
+| hashlink | 0.12.2 | MIT OR Apache-2.0 | rust-workspace |
 | heck | 0.4.1 | MIT OR Apache-2.0 | rust-workspace |
 | heck | 0.5.0 | MIT OR Apache-2.0 | rust-workspace |
 | hermit-abi | 0.5.3 | MIT OR Apache-2.0 | rust-workspace |

@@ -46,11 +46,12 @@ pub(super) fn change(
     body: &Value,
 ) -> Result<()> {
     let key = text(body, "definitionKey");
-    let rule = previous["rules"]
+    let mut rule = previous["rules"]
         .as_array()
         .and_then(|rules| rules.iter().find(|r| r["key"] == key))
         .ok_or_else(|| invalid("流程编号不存在。"))?
         .clone();
+    let calendar = previous["calendar"].clone();
     let publications = previous["publications"]
         .as_array_mut()
         .ok_or_else(|| super::super::error::unavailable("流程发布记录损坏。"))?;
@@ -60,6 +61,7 @@ pub(super) fn change(
         publications[index]["enabled"] = json!(false);
         return Ok(());
     }
+    rule["calendar"] = calendar;
     let typed: ApprovalRule =
         serde_json::from_value(rule.clone()).map_err(|_| invalid("流程定义格式无效。"))?;
     typed.validate().map_err(invalid)?;

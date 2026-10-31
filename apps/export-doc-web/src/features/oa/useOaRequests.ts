@@ -31,6 +31,6 @@ export function useOaRequests(client: ExportDocManagerApiClient, user: ApiUserDt
     queryFn: ({ signal }) => api.get(selected, { signal }), refetchInterval: 30000, refetchIntervalInBackground: false });
   return { query, detail, selected, page, setPage, mineOnly, status, canReceive, financeOnly, canApprove, approvalsOnly,canHandle,handlingOnly,
     changeView: (value: string) => { setParams({ view: value }); setPage(1); },
-    select: (id: number) => setParams((current) => { const next = new URLSearchParams(current); next.delete("change"); next.delete("employeeId"); if (id) next.set("requestId", String(id)); else next.delete("requestId"); return next; }),
+    select: (id: number) => setParams((current) => { const next = new URLSearchParams(current); next.delete("new"); next.delete("change"); next.delete("employeeId"); if (id) next.set("requestId", String(id)); else next.delete("requestId"); return next; }),
     changeMine: (value: boolean) => { setMine(value); setPage(1); }, changeStatus: (value: string) => { setFilter({ view, status: value }); setPage(1); } };
 }

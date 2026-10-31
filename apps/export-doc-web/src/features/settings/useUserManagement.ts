@@ -117,6 +117,7 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
 
     const emptyDraft = createEmptyDraft("OfficeEmployee");
     emptyDraft.permissionTemplateId = permissionTemplates.find(t => t.isSystem && t.code === "OfficeEmployee")?.id ?? null;
+    emptyDraft.permissionSchemeVersion=permissionTemplates.find(t=>t.id===emptyDraft.permissionTemplateId)?.publishedVersion??null;
     setSelectedUserId(0);
     setDraft(emptyDraft);
     setPersistedDraftSnapshot(buildUserDraftSnapshot(emptyDraft));
@@ -162,7 +163,7 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
 
   function changeRole(role: string) {
     const templateId = role === "Admin" ? null : permissionTemplates.find(t => t.isSystem && t.code === role)?.id ?? null;
-    setDraft((current) => ({ ...current, role, permissionTemplateId: templateId, permissionGrants: null, disabledModules: role === "Admin" ? [] : current.disabledModules, oaAssignedOnly: role === "Admin" ? false : current.oaAssignedOnly || selectedTemplate?.oaAssignedOnly === true }));
+    setDraft((current) => ({ ...current, role, permissionTemplateId: templateId, permissionSchemeVersion:permissionTemplates.find(t=>t.id===templateId)?.publishedVersion??null, permissionGrants: null, disabledModules: role === "Admin" ? [] : current.disabledModules, oaAssignedOnly: role === "Admin" ? false : current.oaAssignedOnly || selectedTemplate?.oaAssignedOnly === true }));
     setSuccessMessage(null);
   }
 
@@ -207,6 +208,7 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
       fullName: draft.fullName.trim(),
       role: draft.role,
       permissionTemplateId: draft.permissionTemplateId,
+      permissionSchemeVersion: draft.permissionSchemeVersion,
       permissionGrants: draft.permissionGrants,
       disabledModules: draft.disabledModules,
       oaAssignedOnly: draft.oaAssignedOnly,

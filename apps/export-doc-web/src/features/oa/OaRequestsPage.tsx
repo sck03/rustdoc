@@ -16,8 +16,8 @@ import "../../styles/routes/oa.css";
 export function OaRequestsPage({ client, user, kind }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind }) {
   const model = useOaRequests(client, user, kind);
   const [params, setParams] = useSearchParams();
-  const [editing, setEditing] = useState<OaRequest | "new" | null>(() => kind === "personnel" && params.has("change") && oaAccess(user, kind, "create") ? "new" : null);
-  function closeEditor() { setEditing(null); setParams(current => { const next = new URLSearchParams(current); next.delete("change"); next.delete("employeeId"); return next; }); }
+  const [editing, setEditing] = useState<OaRequest | "new" | null>(() => (params.get("new") === "true" || kind === "personnel" && params.has("change")) && oaAccess(user, kind, "create") ? "new" : null);
+  function closeEditor() { setEditing(null); setParams(current => { const next = new URLSearchParams(current); next.delete("new"); next.delete("change"); next.delete("employeeId"); return next; }); }
   if (!oaAccess(user, kind, "view")) return <PageState tone="permission" title="没有此申请模块的查看权限" />;
   const module = oaModules[kind];
   return <section className="work-surface office-workspace oa-workspace" aria-label={module.name}>

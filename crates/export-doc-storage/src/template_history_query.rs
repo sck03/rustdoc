@@ -34,7 +34,7 @@ fn bytes(pg: bool) -> &'static str {
 pub(crate) fn usage(query: &TemplateVersionQuery<'_>, keep: i64, pg: bool) -> (QuerySql, String) {
     let mut sql = template_query::versions(query, pg);
     let eligible = format!(
-        "r.id NOT IN (SELECT r.id FROM records r WHERE {} ORDER BY {} LIMIT {})",
+        "r.id NOT IN (SELECT r.id FROM record_rows r WHERE {} ORDER BY {} LIMIT {})",
         sql.filter,
         sql.order,
         keep.max(1)

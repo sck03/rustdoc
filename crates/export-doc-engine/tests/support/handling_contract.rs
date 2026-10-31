@@ -86,23 +86,49 @@ pub fn exercise(service: &NativeService, root: &str) {
     let person = call(service,&admin,CREATE_PERSONNEL,0,Some(json!({"requestKey":nonce().unwrap(),"employeeNumber":format!("EMP-{suffix}"),"departmentId":department,"jobTitle":"业务员","employmentType":"FullTime","hireDate":"2026-09-01","profile":{"fullName":"applicant"}}))).unwrap();
     let person_id = person["employee"]["id"].as_i64().unwrap();
     call(service,&admin,LINK_PERSONNEL_ACCOUNT,person_id,Some(json!({"expectedVersion":person["versionNumber"],"userId":users[1]["id"],"expectedAccountVersion":users[1]["versionNumber"]}))).unwrap();
+    for index in 2..=4 {
+        let person = call(
+            service,
+            &admin,
+            CREATE_PERSONNEL,
+            0,
+            Some(json!({
+                "requestKey":nonce().unwrap(),"employeeNumber":format!("HAND-{index}-{suffix}"),
+                "departmentId":department,"jobTitle":"行政办理与审批","employmentType":"FullTime",
+                "hireDate":"2026-09-01","profile":{"fullName":users[index]["fullName"]}
+            })),
+        )
+        .unwrap();
+        call(
+            service,
+            &admin,
+            LINK_PERSONNEL_ACCOUNT,
+            person["employee"]["id"].as_i64().unwrap(),
+            Some(json!({
+                "expectedVersion":person["versionNumber"],"userId":users[index]["id"],
+                "expectedAccountVersion":users[index]["versionNumber"]
+            })),
+        )
+        .unwrap();
+    }
     let applicant = login(&users[1]);
     let seal = login(&users[2]);
     let supplies = login(&users[3]);
     let leader = login(&users[4]);
+    let (other_reviewer, _) = super::oa_contract::workflow::reviewer(service, &admin);
     let mut policy = call(service, &admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
     // This contract exercises service custody after a deliberately single-stage approval.
     for rule in policy["rules"].as_array_mut().unwrap() {
         let reviewer = if matches!(rule["kind"].as_str(), Some("general" | "room" | "supply")) {
-            &users[4]
+            users[4]["id"].clone()
         } else {
-            &users[0]
+            json!(other_reviewer)
         };
         rule["stages"] = json!([super::oa_contract::workflow::node(
             "review",
             &[],
             "Named",
-            json!([reviewer["id"]])
+            json!([reviewer])
         )]);
     }
     policy["handlingServices"] = json!([

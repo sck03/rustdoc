@@ -5,8 +5,12 @@ pub(super) use analytics::summary as workflow_summary;
 mod context;
 mod dispatch;
 pub(super) use dispatch::dispatch;
+mod account_security;
+pub(super) use account_security::{clear_grants, revoke_related};
+mod foundation;
 mod hierarchy;
 mod members;
+mod restrictions;
 mod schemes;
 pub(super) use schemes::{directory as scheme_directory, save as save_scheme};
 #[path = "units/permissions.rs"]
@@ -19,14 +23,15 @@ use super::{
 };
 use crate::engine::store::Connection;
 pub(super) use access::{approvers, directory, save};
-pub(super) use context::{actors_for_operation, contexts, for_operation, resolve};
+pub(super) use context::{actors_for_operation, business_actors, contexts, for_operation, resolve};
 use export_doc_domain::{
     permissions::{self, Grant},
     units::Management,
 };
 pub(super) use hierarchy::{companies, preview as preview_company_change, validate_company};
-pub(super) use members::{members, save_member};
-pub(super) use role_permissions::{validate_issuer, validate_scheme_users};
+pub(super) use members::members;
+pub(super) use role_permissions::invalidate_user;
+pub(super) use role_permissions::validate_issuer;
 use serde_json::{Value, json};
 
 pub(super) const KIND: &str = "unit-access";
@@ -39,18 +44,16 @@ pub(super) fn approval_actor(
     edition: permissions::ProductEdition,
     unit: &str,
 ) -> Result<Actor> {
-    for resource in permissions::catalog()
-        .resources
-        .iter()
-        .filter(|r| r.workspace == "office" && r.actions.iter().any(|a| a.key == "approve"))
-    {
-        match for_operation(tx, id, edition, unit, &resource.key, "approve") {
-            Ok(actor) => return Ok(actor),
-            Err(e) if matches!(e.status, Some(400 | 403 | 404)) => {}
-            Err(e) => return Err(e),
-        }
-    }
-    Err(error(403, "账号在此单位没有有效审批身份。"))
+    business_actors(tx, id, edition, unit)?
+        .into_iter()
+        .find(|actor| {
+            permissions::catalog().resources.iter().any(|r| {
+                r.workflow_resource
+                    && auth::authorize(actor, &r.key, "view").is_ok()
+                    && auth::authorize(actor, &r.key, "approve").is_ok()
+            })
+        })
+        .ok_or_else(|| error(403, "账号在此单位没有有效审批身份。"))
 }
 fn records(tx: &Connection, user: i64) -> Result<Vec<Value>> {
     store::matching(tx, KIND, &[("userId", user.to_string())], &[])
@@ -103,8 +106,12 @@ fn covers(
                 .is_some_and(|parents| parents.iter().any(|p| row["companyCode"] == *p))
 }
 fn tree(tx: &Connection) -> Result<std::collections::BTreeMap<String, Vec<String>>> {
-    let rows: Vec<export_doc_domain::units::Unit> = store::all(tx, "companies")?
-        .into_iter()
+    tree_from(&store::all(tx, "companies")?)
+}
+fn tree_from(units: &[Value]) -> Result<std::collections::BTreeMap<String, Vec<String>>> {
+    let rows: Vec<export_doc_domain::units::Unit> = units
+        .iter()
+        .cloned()
         .map(serde_json::from_value)
         .collect::<std::result::Result<_, _>>()
         .map_err(|_| unavailable("单位目录损坏。"))?;

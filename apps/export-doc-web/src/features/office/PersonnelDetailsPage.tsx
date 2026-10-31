@@ -9,18 +9,16 @@ import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { readRouteChoice } from "../../ui/routeQueryState.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { officeAccess, officeStatusLabels } from "./officeModel.ts";
-import { employmentStatusLabels, employmentTypeLabels, personnelHistoryLabels, personnelReminders, personnelWorkflows, type PersonnelWorkflow } from "./personnelModel.ts";
+import { employmentStatusLabels, employmentTypeLabels, personnelHistoryLabels, personnelReminders, personnelWorkflows } from "./personnelModel.ts";
 import { oaAccess, personnelChangeLabels } from "../oa/oaModel.ts";
 import { usePersonnelClearance, usePersonnelHistory, usePersonnelOperation, usePersonnelRecord } from "./usePersonnelData.ts";
 import { PersonnelFormDialog } from "./PersonnelFormDialog.tsx";
 import { PersonnelAccountDialog } from "./PersonnelAccountDialog.tsx";
 import { PersonnelUnlinkAccountDialog } from "./PersonnelUnlinkAccountDialog.tsx";
-import { PersonnelWorkflowDialog } from "./PersonnelWorkflowDialog.tsx";
 import { PersonnelImagesPanel } from "./PersonnelImagesPanel.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
 import { PersonnelOrganizationFacts } from "./PersonnelOrganizationEditor.tsx";
-import { PersonnelPrimaryAppointmentDialog } from "./PersonnelPrimaryAppointmentDialog.tsx";
 
 type Props = { client: ExportDocManagerApiClient; user: ApiUserDto; id: number; departments: PersonnelDepartmentRecord[]; onClose: () => void };
 export function PersonnelDetailsPage({ client, user, id, departments, onClose }: Props) {
@@ -44,9 +42,7 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
   }
   const [editing, setEditing] = useState<PersonnelRecord | null>(null);
   const [linking, setLinking] = useState(false);
-  const [primaryChanging, setPrimaryChanging] = useState<PersonnelRecord | null>(null);
   const [unlinking, setUnlinking] = useState<PersonnelRecord | null>(null);
-  const [workflow, setWorkflow] = useState<{ record: PersonnelRecord; action: PersonnelWorkflow } | null>(null);
   const record = query.data;
   return <>
     <section className="work-surface office-workspace personnel-workspace personnel-detail-page" aria-label="人员档案详情">
@@ -59,11 +55,8 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
           <span className="office-badge" data-state={record.employee.status}>{employmentStatusLabels[record.employee.status]}</span></div>
         <div className="office-card-actions">
           {record.canEdit && <button type="button" className="command-button" disabled={imageOperation.busy} onClick={() => setEditing(record)}>编辑档案</button>}
-          {personnelWorkflows(record).map((action) => record.approvalRequiredActions?.includes(action)
-            ? oaAccess(user, "personnel", "create") && <Link className="command-button secondary" key={action} to={`/office/requests/personnel?change=${action}&employeeId=${id}`}>申请{personnelChangeLabels[action]}</Link>
-            : <button type="button" className="command-button secondary" disabled={imageOperation.busy} key={action} onClick={() => setWorkflow({ record, action })}>办理{personnelChangeLabels[action]}</button>)}
+          {oaAccess(user, "personnel", "create") && personnelWorkflows(record).map(action => <Link className="command-button secondary" key={action} to={`/office/requests/personnel?change=${action}&employeeId=${id}`}>申请{personnelChangeLabels[action]}</Link>)}
           {record.canLinkAccount && <button type="button" className="command-button secondary" disabled={imageOperation.busy} onClick={() => setLinking(true)}>关联账号</button>}
-          {record.canChangePrimaryAppointment && <button type="button" className="command-button secondary" disabled={imageOperation.busy} onClick={() => setPrimaryChanging(record)}>调整主任职</button>}
           {record.canLinkAccount && record.account && <button type="button" className="command-button secondary" disabled={imageOperation.busy} onClick={() => setUnlinking(record)}>解除账号绑定</button>}
           {record.canDelete && <button type="button" className="command-button secondary" disabled={imageOperation.busy || Boolean(record.deleteRestriction)}
             aria-describedby={record.deleteRestriction ? "personnel-delete-restriction" : undefined}
@@ -81,8 +74,6 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
       </>}
     </section>
     {editing && <PersonnelFormDialog client={client} user={user} departments={departments} record={editing} onClose={() => setEditing(null)} onSaved={() => setEditing(null)} />}
-    {workflow && <PersonnelWorkflowDialog client={client} user={user} departments={departments} {...workflow} onClose={() => setWorkflow(null)} />}
-    {primaryChanging && <PersonnelPrimaryAppointmentDialog client={client} user={user} record={primaryChanging} onClose={() => setPrimaryChanging(null)} />}
     {linking && record && <PersonnelAccountDialog client={client} user={user} record={record} onClose={() => setLinking(false)} onUnlink={() => { setLinking(false); setUnlinking(record); }} />}
     {unlinking && <PersonnelUnlinkAccountDialog client={client} record={unlinking} onClose={() => setUnlinking(null)} />}
     {deleting && <RecordDeleteDialog name={`${deleting.employee.fullName} · ${deleting.employee.employeeNumber}`} version={deleting.versionNumber} operation={deleteOperation}

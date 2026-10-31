@@ -10,7 +10,7 @@ import { OfficeField, OfficeSubmit } from "../office/OfficeUi.tsx";
 import { useApprovalSettings, useApprovalSettingsDraft, type ApprovalAccount } from "./useApprovalSettings.ts";
 import { oaModules, personnelChangeLabels } from "./oaModel.ts";
 import { HandlingServicesEditor } from "./HandlingServicesEditor.tsx";
-import { ApprovalStagesEditor } from "./ApprovalStagesEditor.tsx";
+import { ApprovalGraphEditor } from "./ApprovalGraphEditor.tsx";
 import { ApprovalSheetTemplates } from "./ApprovalSheetTemplates.tsx";
 import { UnitWorkflowTasksPanel } from "./UnitWorkflowTasksPanel.tsx";
 import "../../styles/routes/office.css";
@@ -21,9 +21,9 @@ export function ApprovalSettingsPage({ client, user }: { client: ExportDocManage
   if (!user.capabilities.canManageUsers && !user.capabilities.unitManagement?.workflows) return <PageState tone="permission" title="需要当前单位的流程管理授权" />;
   if (query.isPending) return <PageState tone="loading" title="正在读取审批设置" />;
   if (!query.data) return <PageState tone="error" title="审批设置读取失败" description={readApiError(query.error)} action={<button type="button" onClick={() => void query.refetch()}>重试</button>} />;
-  return <ApprovalSettingsEditor key={`${user.id}:${user.companyScope}`} client={client} user={user} initial={query.data.settings} accounts={query.data.accounts} units={query.data.routingUnits} />;
+  return <ApprovalSettingsEditor key={`${user.id}:${user.companyScope}`} client={client} user={user} initial={query.data.settings} accounts={query.data.accounts} handlers={query.data.handlers} units={query.data.routingUnits} />;
 }
-function ApprovalSettingsEditor({ client, user, initial, accounts, units }: { client: ExportDocManagerApiClient; user: ApiUserDto; initial: OaApprovalSettings; accounts: ApprovalAccount[]; units: OaRoutingUnit[] }) {
+function ApprovalSettingsEditor({ client, user, initial, accounts, handlers, units }: { client: ExportDocManagerApiClient; user: ApiUserDto; initial: OaApprovalSettings; accounts: ApprovalAccount[]; handlers: ApprovalAccount[]; units: OaRoutingUnit[] }) {
   const [simulating,setSimulating] = useState<OaApprovalRule|null>(null);
   const { draft, setDraft, operation, formRef, changeRule, changeDelegate, save, publish, disable, reload, changedElsewhere } = useApprovalSettingsDraft(client, initial);
   const accountOptions = <><option value={0}>请选择账号</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.fullName} · {account.username} · {account.departmentId}</option>)}</>;
@@ -35,26 +35,22 @@ function ApprovalSettingsEditor({ client, user, initial, accounts, units }: { cl
     <form ref={formRef} onInvalidCapture={event => { const section = (event.target as HTMLElement).closest("details"); if (section) section.open = true; }} onSubmit={event => { event.preventDefault(); void save(); }}>
       <fieldset disabled={operation.busy} className="office-form-grid">
         <legend>申请审批规则</legend>
-        <section className="office-resource-card office-field-wide" aria-label="人员变动审批开关"><h3>需要审批的人员变动</h3>
-          <p className="office-muted">默认由获授权的人事直接办理。勾选后，人事须提交审批；管理员仍可直接办理并留下操作记录。在途申请继续按原审批步骤办理。</p>
-          {(Object.keys(personnelChangeLabels) as (keyof typeof personnelChangeLabels)[]).map(action => <label key={action} className="checkbox-field">
-            <input type="checkbox" checked={draft.personnelApprovalActions?.includes(action) ?? false} onChange={event => setDraft(current => ({ ...current,
-              personnelApprovalActions: event.target.checked ? [...(current.personnelApprovalActions ?? []), action] : current.personnelApprovalActions?.filter(value => value !== action) ?? [] }))} />{personnelChangeLabels[action]}须审批</label>)}
-        </section>
+        <p className="office-muted office-field-wide">正式入职、转正、调岗、离职和返聘通过已发布的人员变动流程办理。首次建档和普通档案维护由获授权的人事操作；管理员也不能跳过正式审批。</p>
         {draft.rules.map((rule,index)=>{
           const publication=draft.publications.find(p=>p.key===rule.key);
           const label=rule.kind==="room"?"会议室预约":rule.kind==="supply"?"物品领用":oaModules[rule.kind].name;
           return <details className="office-resource-card office-field-wide" data-definition-key={rule.key} key={rule.key}>
             <summary>{label}{rule.variant? ` · ${personnelChangeLabels[rule.variant as keyof typeof personnelChangeLabels]}`:""} · {publication?`版本 ${publication.version} · ${publication.enabled?"已启用":"已停用"}`:"尚未发布"}</summary>
             <OfficeField label="流程名称"><input required maxLength={100} value={rule.name} onChange={e=>changeRule(index,{name:e.target.value})}/></OfficeField>
-            <ApprovalStagesEditor stages={rule.stages} accounts={accounts} units={units} onChange={stages=>changeRule(index,{stages})}/>
+            <ApprovalGraphEditor stages={rule.stages} accounts={accounts} units={units} onChange={stages=>changeRule(index,{stages})}/>
             <OfficeField label="流程抄送（可查看进度，完成时通知）"><select multiple value={rule.notifyUserIds.map(String)} onChange={e=>changeRule(index,{notifyUserIds:Array.from(e.target.selectedOptions,o=>Number(o.value))})}>{accounts.map(a=><option key={a.id} value={a.id}>{a.fullName} · {a.username}</option>)}</select></OfficeField>
             <div className="office-card-actions"><button type="button" className="command-button secondary" onClick={()=>setSimulating(rule)}>模拟当前流程</button><button type="button" className="command-button" onClick={()=>void publish(rule.key)}>保存并发布此流程</button>
               {publication?.enabled&&<button type="button" className="command-button secondary" onClick={()=>void disable(rule.key)}>停用新申请</button>}</div>
           </details>;
         })}
       </fieldset>
-      <HandlingServicesEditor services={draft.handlingServices ?? []} accounts={accounts} disabled={operation.busy} onChange={handlingServices => setDraft(value => ({ ...value, handlingServices }))} />
+      <BusinessCalendarEditor value={draft.calendar} onChange={calendar=>setDraft(value=>({...value,calendar}))}/>
+      <HandlingServicesEditor services={draft.handlingServices ?? []} accounts={handlers} disabled={operation.busy} onChange={handlingServices => setDraft(value => ({ ...value, handlingServices }))} />
       <ApprovalSheetTemplates client={client} settings={draft} disabled={operation.busy} onChange={sheetTemplates => setDraft(value => ({ ...value, sheetTemplates }))} />
       <details><summary>审批代理</summary>
         <p className="office-muted">代理用于有指定审批人的步骤；只接受直接代理；每个节点单独签署并记录实际办理人。停用或到期立即失效。</p>
@@ -75,3 +71,4 @@ function ApprovalSettingsEditor({ client, user, initial, accounts, units }: { cl
     {simulating && <ApprovalSimulationDialog client={client} user={user} rule={simulating} onClose={()=>setSimulating(null)} />}
   </section>;
 }
+import { BusinessCalendarEditor } from "./BusinessCalendarEditor.tsx";

@@ -205,6 +205,7 @@ pub fn seed(store: &Store) -> Result<()> {
     store.transaction(|tx| {
         let existing = store::all(tx, TYPES)?;
         let actor = Actor {
+            scope_rules: vec![],
             context: String::new(),
             edition: Default::default(),
             id: 0,

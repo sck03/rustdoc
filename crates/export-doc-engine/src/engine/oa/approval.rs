@@ -16,19 +16,8 @@ pub(in crate::engine) fn resource(kind: &str) -> Option<&'static str> {
     }
 }
 pub(in crate::engine) fn resource_for_collaboration(resource: &str) -> bool {
-    [
-        "personnel",
-        "leave",
-        "overtime",
-        "expense",
-        "travel",
-        "purchase",
-        "general",
-        "room",
-        "supply",
-    ]
-    .iter()
-    .any(|kind| self::resource(kind) == Some(resource))
+    export_doc_domain::permissions::resource(resource)
+        .is_some_and(|resource| resource.workflow_resource)
 }
 pub(in crate::engine) fn plan(row: &Value) -> Result<Option<ApprovalPlan>> {
     row.get("approvalPlan")
@@ -49,36 +38,23 @@ pub(in crate::engine) fn reviewer(
     row: &Value,
 ) -> Result<Actor> {
     let resource = resource(&text(row, "kind")).ok_or_else(|| invalid("未知申请类型。"))?;
-    super::super::units::for_operation(tx, id, actor.edition, &actor.company, resource, "approve")
+    let reviewer = super::super::units::for_operation(
+        tx,
+        id,
+        actor.edition,
+        &actor.company,
+        resource,
+        "approve",
+    )?;
+    super::qualification::person_id(tx, &reviewer)?;
+    Ok(reviewer)
 }
 pub(in crate::engine) fn queue_approvers(
     tx: &Connection,
     actor: &Actor,
     resource: &str,
 ) -> Result<Vec<export_doc_storage::RecordApprover>> {
-    use export_doc_storage::RecordApprover;
-    let mut approvers = vec![RecordApprover {
-        user_id: actor.id,
-        context: actor.context.clone(),
-    }];
-    for (id, _) in settings::principals(tx, actor)? {
-        match super::super::units::actors_for_operation(
-            tx,
-            id,
-            actor.edition,
-            &actor.company,
-            resource,
-            "approve",
-        ) {
-            Ok(actors) => approvers.extend(actors.into_iter().map(|p| RecordApprover {
-                user_id: id,
-                context: p.context,
-            })),
-            Err(e) if matches!(e.status, Some(400 | 401 | 403 | 404)) => {}
-            Err(e) => return Err(e),
-        }
-    }
-    Ok(approvers)
+    Ok(super::queue_authority::QueueAuthority::new(tx, actor)?.approvers(resource))
 }
 pub(in crate::engine) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<()> {
     super::approval_routing::submit(tx, actor, row)
@@ -123,6 +99,11 @@ fn authority_for(
     {
         return Ok(None);
     }
+    let signer = match super::qualification::person_id(tx, actor) {
+        Ok(id) => id,
+        Err(cause) if cause.status == Some(403) => return Ok(None),
+        Err(cause) => return Err(cause),
+    };
     let Some(plan) = plan(row)? else {
         return Ok(None);
     };
@@ -131,17 +112,22 @@ fn authority_for(
         .into_iter()
         .filter(|i| {
             task.is_none_or(|key| plan.steps[*i].task_key == key)
-                && !plan.steps.iter().any(|s| {
-                    s.stage != plan.steps[*i].stage
-                        && s.acted_by_user_id == Some(actor.id)
-                        && (plan.nodes[plan.steps[*i].stage].independent_review
-                            || plan.nodes[s.stage].independent_review)
-                })
+                && !plan.independent_signer_conflict(plan.steps[*i].stage, actor.id)
+                && !(plan.nodes[plan.steps[*i].stage].independent_review
+                    && plan.steps.iter().any(|s| {
+                        s.stage != plan.steps[*i].stage
+                            && s.acted_by_user_id.is_some()
+                            && (s.acted_by_person_id == Some(signer)
+                                || s.approver_person_id == Some(signer))
+                    }))
         })
         .collect();
     if indices.iter().any(|i| {
         plan.steps[*i].approver_user_id == actor.id
             && plan.steps[*i].approver_context == actor.context
+            && plan.steps[*i]
+                .approver_person_id
+                .is_none_or(|id| id == signer)
     }) {
         return Ok(Some((actor.id, String::new())));
     }
@@ -184,6 +170,7 @@ pub(in crate::engine) fn review(
     action: &str,
     note: &str,
     task: &str,
+    body: &Value,
 ) -> Result<&'static str> {
     if task.is_empty() {
         return Err(invalid("请选择具体审批任务，刷新后重试。"));
@@ -202,28 +189,39 @@ pub(in crate::engine) fn review(
         .into_iter()
         .find(|i| plan.steps[*i].task_key == task && plan.steps[*i].approver_user_id == principal)
         .ok_or_else(|| conflict("审批任务已变化。"))?;
+    let values =
+        serde_json::from_value(body.get("verificationValues").cloned().unwrap_or(json!({})))
+            .map_err(|_| invalid("核验值格式无效。"))?;
+    let points = serde_json::from_value::<Vec<u16>>(
+        body.get("confirmedReviewPoints")
+            .cloned()
+            .unwrap_or(json!([])),
+    )
+    .map_err(|_| invalid("审查要点确认格式无效。"))?;
+    let node = &plan.nodes[plan.steps[index].stage];
+    if action == "approve" {
+        node.material_policy
+            .verify(&values, &points, node.review_points.len())
+            .map_err(invalid)?;
+    }
     let step = &mut plan.steps[index];
+    step.verification_values = values;
+    step.confirmed_review_points = points;
     step.status = next.into();
     step.acted_by_user_id = Some(actor.id);
+    step.acted_by_person_id = Some(super::qualification::person_id(tx, actor)?);
     step.acted_by_name = actor.name.clone();
     step.acted_by_context = actor.context.clone();
     step.acted_at = store::timestamp();
     step.note = note.into();
     step.delegation_key = delegation;
-    plan.close_any_stage(index);
-    if next != "Approved" {
-        for step in &mut plan.steps {
-            if step.status == "Waiting" {
-                step.status = "Cancelled".into();
-            }
-        }
-    }
-    plan.activate(chrono::Utc::now());
+    plan.settle(index);
+    plan.activate(chrono::Utc::now()).map_err(invalid)?;
     plan.validate(row["ownerUserId"].as_i64().unwrap_or(0))
         .map_err(invalid)?;
-    let current = plan.current();
+    let outcome = plan.outcome();
     row["approvalPlan"] = serde_json::to_value(plan)?;
-    Ok(if current.is_some() { "Pending" } else { next })
+    Ok(outcome)
 }
 pub(super) fn remind(actor: &Actor, row: &mut Value) -> Result<()> {
     if row["ownerUserId"] != actor.id || row["status"] != "Pending" {

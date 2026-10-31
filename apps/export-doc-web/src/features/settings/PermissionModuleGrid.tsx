@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import type { ApiPermissionResourceDefinitionDto } from "../../api/index.ts";
-import { detectPreset, grantKey, presetLabels, scopeLabels, setResourcePreset } from "./permissionSchemeModel.ts";
+import { detectPreset, grantKey, initialGrantScope, presetLabels, scopeLabels, setResourcePreset } from "./permissionSchemeModel.ts";
 import { filterPermissionResources, permissionResourceLocation } from "./permissionNavigationModel.ts";
 
 export function PermissionModuleGrid({
@@ -18,7 +18,7 @@ export function PermissionModuleGrid({
   readOnlyActions?: boolean;
   actionDataScopes?: Record<string, string[]>;
 }) {
-  const [group, setGroup] = useState("");
+  const [group, setGroup] = useState(() => resources.length ? permissionResourceLocation(resources[0]).group : "");
   const [search, setSearch] = useState("");
   const groups = useMemo(() => [...new Set(resources.map((resource) => permissionResourceLocation(resource).group))], [resources]);
   const visible = useMemo(() => filterPermissionResources(resources, group, search), [group, resources, search]);
@@ -34,7 +34,7 @@ export function PermissionModuleGrid({
           </select>
           <label className="permission-module-search">
             <Search size={15} aria-hidden="true" />
-            <input type="search" aria-label="搜索功能模块" placeholder="搜索模块或操作" maxLength={100} value={search} onChange={(event) => setSearch(event.target.value)} />
+            <input type="search" aria-label="搜索功能模块" placeholder="跨分类搜索模块或操作" maxLength={100} value={search} onChange={(event) => { setSearch(event.target.value); if (event.target.value.trim()) setGroup(""); }} />
           </label>
         </div>
       </div>
@@ -49,10 +49,10 @@ export function PermissionModuleGrid({
             {inheritedModules.includes(resource.moduleKey) && <p className="field-help">权限分组已关闭此模块，须先在分组中开放。</p>}
             <div className="permission-resource-header">
               <h4>{resource.name}</h4>
-              <select aria-label={`${resource.name}快捷设置`} disabled={disabled || readOnlyActions || disabledModules.includes(resource.moduleKey)} value={detectPreset(grants, resource)} onChange={(event) => onChange(setResourcePreset(grants, resource, event.target.value))}>
+              <select aria-label={`${resource.name}快捷设置`} disabled={disabled || readOnlyActions || disabledModules.includes(resource.moduleKey)} value={detectPreset(grants, resource)} onChange={(event) => onChange(setResourcePreset(grants, resource, event.target.value, actionDataScopes))}>
                 <option value="custom" disabled>自定义</option>
                 {Object.entries(presetLabels).filter(([value]) => value !== "approve" || resource.actions.some(action => action.key === "approve"))
-                  .map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  .map(([value, label]) => <option key={value} value={value}>{value==="approve"&&!resource.workflowResource?"查看与确认":label}</option>)}
               </select>
             </div>
             <div className="permission-action-list">
@@ -64,7 +64,7 @@ export function PermissionModuleGrid({
                     <label className="checkbox-field permission-action-toggle" title={action.description}>
                       <input type="checkbox" aria-label={`${resource.name}：${action.name}`} checked={enabled} disabled={disabled || readOnlyActions || disabledModules.includes(resource.moduleKey)} onChange={(event) => {
                         const next = { ...grants };
-                        if (event.target.checked) next[key] = resource.supportsDataScope ? "own" : "all";
+                        if (event.target.checked) next[key] = initialGrantScope(resource, key, actionDataScopes);
                         else delete next[key];
                         onChange(next);
                       }} />
@@ -75,7 +75,7 @@ export function PermissionModuleGrid({
                       <select aria-label={`${resource.name}${action.name}数据范围`} value={grants[key] ?? "own"} disabled={!enabled || disabled || readOnlyActions || disabledModules.includes(resource.moduleKey)} onChange={(event) => onChange({ ...grants, [key]: event.target.value })}>
                         {(actionDataScopes?.[key] ?? dataScopes).map((scope) => <option key={scope} value={scope}>{scopeLabels[scope] ?? scope}</option>)}
                       </select>
-                    ) : <span className="permission-global-scope">全局</span>}
+                    ) : <span className="permission-global-scope" title={resource.scopeDescription}>{resource.unitAssignable ? "业务边界" : "功能授权"}</span>}
                   </div>
                 );
               })}
@@ -83,7 +83,7 @@ export function PermissionModuleGrid({
             {!disabledModules.includes(resource.moduleKey) && resource.actions.some(action => action.key === "view") &&
               !grants[grantKey(resource.key, "view")] && resource.actions.some(action => grants[grantKey(resource.key, action.key)]) &&
               <p className="field-help">已配置操作但未配置查看，页面或记录可能无法打开。请核对查看权限及其数据范围。</p>}
-            {!disabledModules.includes(resource.moduleKey) && grants[grantKey(resource.key, "approve")] === "own" &&
+            {resource.workflowResource && !disabledModules.includes(resource.moduleKey) && grants[grantKey(resource.key, "approve")] === "own" &&
               <p className="field-help">可审批明确分派给自己的同公司申请。普通资料范围独立配置，无须为了审批扩大查看范围。</p>}
           </section>
         ))}

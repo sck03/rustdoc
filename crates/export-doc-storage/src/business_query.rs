@@ -131,7 +131,7 @@ pub(crate) fn build(q: &BusinessQuery<'_>, pg: bool) -> Result<(QuerySql, String
             clauses.push("r.kind='attachments'".into());
             // Apply invoice scope inside the correlated lookup, before count/page.
             let invoice_scope = scope.replace("r.", "invoice.");
-            clauses.push(format!("EXISTS (SELECT 1 FROM records invoice WHERE invoice.kind='invoices' AND invoice.id=CAST({} AS BIGINT) AND {invoice_scope})",field("invoiceId",pg)));
+            clauses.push(format!("EXISTS (SELECT 1 FROM record_rows invoice WHERE invoice.kind='invoices' AND invoice.id=CAST({} AS BIGINT) AND {invoice_scope})",field("invoiceId",pg)));
             for (path, id) in [("invoiceId", invoice_id), ("categoryId", category_id)] {
                 if let Some(id) = id {
                     clauses.push(format!(
@@ -161,7 +161,7 @@ pub(crate) fn build(q: &BusinessQuery<'_>, pg: bool) -> Result<(QuerySql, String
             if !keyword.is_empty() {
                 let category_id = field("categoryId", pg);
                 let category = format!(
-                    "SELECT category.body FROM records category WHERE category.kind='attachment-categories' AND category.id=CAST({category_id} AS BIGINT)"
+                    "SELECT category.body FROM record_rows category WHERE category.kind='attachment-categories' AND category.id=CAST({category_id} AS BIGINT)"
                 );
                 let root = if pg {
                     format!(

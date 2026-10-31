@@ -3,6 +3,7 @@ pub mod generated_api;
 pub mod hs_maintenance;
 pub mod invoice_editing;
 pub mod openapi;
+pub mod permission_actions;
 pub mod report_batches;
 pub mod report_pages;
 pub mod template_history;

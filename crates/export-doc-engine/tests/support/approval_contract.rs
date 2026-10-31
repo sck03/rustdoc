@@ -97,13 +97,15 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
     }
     let admin = &tokens[0];
     let mut employees = vec![];
-    for index in [1, 2, 3] {
+    for index in [1, 2, 3, 4, 5] {
         let person=call(service,admin,CREATE_PERSONNEL,0,Some(json!({"requestKey":nonce().unwrap(),"employeeNumber":format!("FLOW-{index}-{suffix}"),"departmentId":users[index]["departmentId"],"jobTitle":"流程岗位","employmentType":"FullTime","hireDate":"2026-09-01","profile":{"fullName":users[index]["fullName"]}}))).unwrap();
         call(service,admin,LINK_PERSONNEL_ACCOUNT,person["employee"]["id"].as_i64().unwrap(),Some(json!({"expectedVersion":person["versionNumber"],"userId":users[index]["id"],"expectedAccountVersion":users[index]["versionNumber"]}))).unwrap();
-        employees.push(person["employee"]["id"].clone());
+        if index <= 3 {
+            employees.push(person["employee"]["id"].clone());
+        }
     }
     // Linking personnel changes account versions, so use fresh sessions.
-    for index in 1..=3 {
+    for index in 1..=5 {
         tokens[index] = call(
             service,
             "",

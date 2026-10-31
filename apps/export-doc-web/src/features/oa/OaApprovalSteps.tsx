@@ -7,8 +7,8 @@ export function OaApprovalSteps({plan,notes,user}:{plan?:OaApprovalPlan;notes?:s
       <ol className="oa-history">{plan.nodes.map((node,index)=><li key={node.key}><strong>{node.name}</strong>
         {Boolean(node.reviewPoints?.length) && <div><span>审批要点</span><ul>{node.reviewPoints?.map((point,i)=><li key={i}>{point}</li>)}</ul></div>}
         {node.skipped?<p>已回避或条件不满足，跳过此节点。</p>:<><p>{node.startedAt?`开始：${formatBusinessDateTime(node.startedAt,user.businessTimeZone)}；期限：${formatBusinessDateTime(node.dueAt,user.businessTimeZone)}`:"等待前置节点完成"}</p>
-          <ul>{plan.steps.filter(s=>s.stage===index).map(step=><li key={step.taskKey}>{step.approverName} · {{Waiting:"待审批",Approved:"已批准",Rejected:"最终驳回",Returned:"退回修改",Skipped:"无需处理（本节点已通过，本人未签署）",Cancelled:"已关闭"}[step.status]}
-            {step.actedByUserId&&<p>{step.delegationKey?"代理办理：":"办理人："}{step.actedByName} · {formatBusinessDateTime(step.actedAt,user.businessTimeZone)} · {step.note}</p>}
+          <ul>{plan.steps.filter(s=>s.stage===index).map(step=><li key={step.taskKey}>{step.approverName} · {{Waiting:"待审批",Approved:"已批准",Rejected:"不同意",Returned:"退回修改",Skipped:"无需处理（本节点已通过，本人未签署）",Cancelled:"已关闭"}[step.status]}
+            {step.actedByUserId&&<p>{step.sourceGeneration?`沿用第 ${step.sourceGeneration} 次执行的签署 · `:""}{step.delegationKey?"代理办理：":"办理人："}{step.actedByName} · {formatBusinessDateTime(step.actedAt,user.businessTimeZone)} · {step.note}</p>}
           </li>)}</ul></>}
       </li>)}</ol>
       {plan.notifyUserIds.length>0&&<p>抄送账号：{plan.notifyUserIds.join("、")}</p>}

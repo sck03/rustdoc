@@ -7,7 +7,7 @@ pub(super) fn extend(doc: &mut Value) {
     let text = json!({"type":"string"});
     let int = json!({"type":"integer","format":"int64"});
     let ids = json!({"type":"array","items":int,"maxItems":50,"uniqueItems":true});
-    let decision = json!({"type":"string","enum":["All","Any"]});
+    let decision = json!({"type":"string","enum":["All","Any","Ratio"]});
     let keys = json!({"type":"array","items":text,"maxItems":32,"uniqueItems":true});
     s["OaOrganizationRoute"] = object(
         json!({"mode":{"type":"string","enum":["Current","Specified","Ancestor"]},"unitId":{"type":["integer","null"],"format":"int64","minimum":1}}),
@@ -78,6 +78,12 @@ pub(super) fn extend(doc: &mut Value) {
     );
     s["OaApprovalNode"]["properties"]["reviewPoints"] =
         json!({"type":"array","items":text,"maxItems":12});
+    for name in ["OaApprovalStage", "OaApprovalNode"] {
+        s[name]["properties"]["approvalPercentage"] =
+            json!({"type":"integer","minimum":1,"maximum":100,"default":100});
+        s[name]["properties"]["rejectionPolicy"] =
+            json!({"type":"string","enum":["Immediate","Collect"],"default":"Immediate"});
+    }
     s["OaApprovalPlan"] = object(
         json!({"definitionKey":text,"policyVersion":int,"nodes":{"type":"array","items":reference("OaApprovalNode"),"maxItems":32},
         "steps":{"type":"array","items":reference("OaApprovalStep"),"maxItems":200},"notifyUserIds":ids}),
@@ -110,7 +116,7 @@ pub(super) fn extend(doc: &mut Value) {
             "isActive",
         ],
     );
-    let props = json!({"expectedVersion":int,"personnelApprovalActions":{"type":"array","items":{"type":"string","enum":["Hire","Confirm","Transfer","Depart","Rehire"]},"maxItems":5,"uniqueItems":true},
+    let props = json!({"expectedVersion":int,
         "rules":{"type":"array","items":reference("OaApprovalRule"),"minItems":13,"maxItems":13},
         "delegations":{"type":"array","items":reference("OaApprovalDelegation"),"maxItems":50}});
     s["OaApprovalSettingsSave"] =

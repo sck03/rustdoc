@@ -4,6 +4,8 @@ use export_doc_domain::designer::{Design, Field, Kind, ReportBlock};
 const DEFAULT: &[u8] =
     include_bytes!("../../../../../Templates/Office/approval_sheet_template.dtpl");
 const TYPES: &[(&str, &str)] = &[
+    ("room", "会议室预约审批单"),
+    ("supply", "物品领用审批单"),
     ("expense", "费用报销审批单"),
     ("leave", "请假审批单"),
     ("overtime", "加班审批单"),

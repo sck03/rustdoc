@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { cargoExampleExecutable } from './cargo-paths.mjs';
 import { locateChromeForTesting } from './chromium-executable.mjs';
@@ -13,7 +14,7 @@ export async function withOfficeUi(name, run) {
   const require = createRequire(path.join(repo, 'apps/export-doc-web/package.json'));
   const { chromium } = require('playwright');
   const spec = JSON.parse(fs.readFileSync(path.join(repo, 'crates/export-doc-contracts/src/openapi.json'), 'utf8'));
-  const operations = new Map(Object.entries(spec.paths).flatMap(([route, methods]) => Object.entries(methods).map(([method, op]) => [op.operationId, { route, method }])));
+  const operations = new Map(Object.entries(spec.paths).flatMap(([route, methods]) => Object.entries(methods).map(([method, op]) => [op.operationId, { route, method, request: op.requestBody?.content?.['application/json']?.schema }])));
   const server = spawnProcessTree(cargoExampleExecutable(repo, 'office_review'), [path.join(output, 'Data')], { cwd: repo, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   const contexts = [];
   const errors = [];
@@ -28,6 +29,8 @@ export async function withOfficeUi(name, run) {
     });
     const invoke = async (id, body, parameters = {}, token = '') => {
       const op = operations.get(id); assert(op, `Unknown operation ${id}`);
+      const schema = op.request?.$ref ? spec.components.schemas[op.request.$ref.split('/').at(-1)] : op.request;
+      if (body && schema?.required?.includes('commandKey') && !body.commandKey) body = { ...body, commandKey: randomUUID() };
       const route = op.route.replace(/\{([^}]+)\}/gu, (_, key) => encodeURIComponent(parameters[key]));
       const query = new URLSearchParams(Object.entries(parameters).filter(([key]) => !op.route.includes(`{${key}}`)).map(([key, value]) => [key, String(value)]));
       const response = await fetch(url + route + (query.size ? '?' + query : ''), { method: op.method.toUpperCase(), signal: AbortSignal.timeout(60000), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });

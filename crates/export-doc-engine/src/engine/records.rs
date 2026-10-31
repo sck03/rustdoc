@@ -187,7 +187,12 @@ pub fn list(
         );
         result["companies"] = json!(store.catalog("companies")?);
         result["departments"] = json!(super::organization::departments(store)?);
-        let templates = store.catalog("permission-templates")?;
+        let templates = store.read(|tx| {
+            store::matching(tx, "permission-templates", &[], &[])?
+                .into_iter()
+                .map(|value| super::permission_templates::project_with_usage(tx, value))
+                .collect::<Result<Vec<_>>>()
+        })?;
         result["permissionTemplates"] = json!(
             templates
                 .iter()
@@ -327,9 +332,8 @@ pub fn handle(
             if key.is_empty() || key.len() > 100 {
                 return Err(invalid("登记请求缺少有效的幂等编号。"));
             }
-            if let Some(existing) = store::all(transaction, resource.key)?
-                .into_iter()
-                .find(|record| record["requestKey"] == key)
+            if let Some(existing) =
+                transaction.find_identity(resource.key, &store::normalize(&key))?
             {
                 let fields: &[&str] = if resource.key == "bookings" {
                     &[
@@ -344,6 +348,7 @@ pub fn handle(
                 };
                 if existing["ownerUserId"] != actor.id
                     || existing["companyScope"] != actor.company
+                    || text(&existing, "_requesterContext") != actor.context
                     || fields
                         .iter()
                         .any(|field| existing[*field] != request[*field])
@@ -484,7 +489,7 @@ pub(super) fn save_in_transaction(
     } else {
         Some(text(&value, resource.identity))
     };
-    let saved = store::save_in_scope(
+    let mut saved = store::save_in_scope(
         transaction,
         resource.key,
         record_id,
@@ -495,16 +500,7 @@ pub(super) fn save_in_transaction(
         scope,
     )?;
     if matches!(resource.key, "bookings" | "supply-requests") {
-        let event = if record_id > 0 { "Edit" } else { "Submit" };
-        super::office_events::append(
-            transaction,
-            actor,
-            resource.key,
-            &saved,
-            event,
-            saved["quantity"].as_i64().unwrap_or(0),
-            "",
-        )?;
+        saved = super::oa::resource_created(transaction, actor, saved)?;
     }
     if resource.key == "departments" {
         super::oa::approval_integrity::company(transaction, actor, &text(&saved, "companyCode"))?;
@@ -515,15 +511,6 @@ pub(super) fn save_in_transaction(
             transaction,
             actor,
             &text(&saved, "code"),
-        )?;
-    }
-    if resource.key == "permission-templates" {
-        super::units::validate_scheme_users(
-            transaction,
-            actor,
-            saved["id"]
-                .as_i64()
-                .ok_or_else(|| super::error::unavailable("方案编号缺失。"))?,
         )?;
     }
     Ok(saved)

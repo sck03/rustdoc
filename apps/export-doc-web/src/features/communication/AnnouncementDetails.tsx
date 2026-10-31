@@ -5,12 +5,12 @@ import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { OfficeDialog, OfficeField, OfficeQueryState, OfficeSubmit } from "../office/OfficeUi.tsx";
-import { useOfficeOperation } from "../office/useOfficeData.ts";
+import { useCommunicationOperation } from "./useCommunication.ts";
 import { announcementActive, announcementStatus, communicationAccess } from "./communicationModel.ts";
 import { CommunicationPager } from "./CommunicationPager.tsx";
 
 export function AnnouncementDetails({ client, user, row, onEdit, onDeleted }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: Announcement; onEdit: () => void; onDeleted: () => void }) {
-  const operation = useOfficeOperation();
+  const operation = useCommunicationOperation();
   const [action, setAction] = useState<"publish" | "withdraw" | "archive" | "delete" | number | null>(null);
   const [receipts, setReceipts] = useState(false);
   const editable = communicationAccess(user, "announcements", "manage") && ["Draft", "Withdrawn"].includes(row.status);
@@ -33,7 +33,7 @@ export function AnnouncementDetails({ client, user, row, onEdit, onDeleted }: { 
   </article>;
 }
 function AnnouncementAction({ client, row, action, onClose, onDeleted }: { client: ExportDocManagerApiClient; row: Announcement; action: "publish" | "withdraw" | "archive" | "delete" | number; onClose: () => void; onDeleted: () => void }) {
-  const operation = useOfficeOperation();
+  const operation = useCommunicationOperation();
   const [note, setNote] = useState("");
   const label = typeof action === "number" ? "移除附件" : { publish: "发布公告", withdraw: "撤回公告", archive: "归档公告", delete: "删除草稿" }[action];
   return <OfficeDialog title={label} onClose={onClose} {...operation} protectChanges><p>{row.title}</p>{action === "publish" && <p>发布后内容冻结，读者需要确认本次发布的内容。有效期未开始时将定时生效。</p>}

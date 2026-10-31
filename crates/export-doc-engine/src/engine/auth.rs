@@ -74,6 +74,7 @@ fn seed_admin(store: &Store, password: &str) -> Result<()> {
         return Ok(());
     }
     let admin = Actor {
+        scope_rules: vec![],
         context: String::new(),
         edition: store.edition,
         id: 1,
@@ -437,7 +438,12 @@ fn actor_from_connection(
     edition: permissions::ProductEdition,
 ) -> Result<Actor> {
     let grants = super::account_permissions::grants(connection, user)?;
-    Ok(Actor {
+    let mut actor = Actor {
+        scope_rules: super::scope_policies::rules(
+            connection,
+            "Account",
+            user["id"].as_i64().unwrap_or(0),
+        )?,
         context: String::new(),
         edition,
         id: user["id"].as_i64().unwrap_or(0),
@@ -455,7 +461,9 @@ fn actor_from_connection(
             .into_iter()
             .filter(|grant| edition.allows(&grant.resource_key))
             .collect(),
-    })
+    };
+    super::scope_policies::restrict(&mut actor);
+    Ok(actor)
 }
 
 pub fn current_actor(store: &Store, id: i64) -> Result<Actor> {
@@ -598,6 +606,16 @@ pub(super) fn scope_rank(actor: &Actor, resource: &str, action: &str) -> u8 {
         return 4;
     }
     let action = permissions::service_action(resource, action);
+    if actor.scope_rules.iter().any(|r| {
+        r.resource_key == resource
+            && r.action == action
+            && matches!(
+                r.mode,
+                export_doc_domain::access_scope::ScopeMode::Participation
+            )
+    }) {
+        return 1;
+    }
     actor
         .grants
         .iter()
@@ -637,7 +655,46 @@ pub(super) fn data_scope<'a>(
             _ => {}
         }
     }
+    scope.restrictions = scope_filters(actor, resource, action);
+    if actor.scope_rules.iter().any(|r| {
+        r.resource_key == resource
+            && r.action == action
+            && matches!(
+                r.mode,
+                export_doc_domain::access_scope::ScopeMode::Participation
+            )
+    }) {
+        scope.all = false;
+        scope.company_wide = false;
+        scope.department_wide = false;
+        scope.own = true;
+    }
     scope
+}
+pub(super) fn scope_filters(
+    actor: &Actor,
+    resource: &str,
+    action: &str,
+) -> Vec<export_doc_storage::ScopeFilter> {
+    use export_doc_domain::access_scope::ScopeMode;
+    use export_doc_storage::ScopeFilter;
+    let action = permissions::service_action(resource, action);
+    actor
+        .scope_rules
+        .iter()
+        .filter(|r| r.resource_key == resource && r.action == action)
+        .filter_map(|r| match r.mode {
+            ScopeMode::Deny => Some(ScopeFilter::Deny),
+            ScopeMode::Units => Some(ScopeFilter::Units(r.unit_codes.iter().cloned().collect())),
+            ScopeMode::Departments => Some(ScopeFilter::Departments(
+                r.departments.iter().cloned().collect(),
+            )),
+            ScopeMode::Projects => Some(ScopeFilter::Projects(
+                r.project_ids.iter().cloned().collect(),
+            )),
+            ScopeMode::Participation | ScopeMode::Unrestricted => None,
+        })
+        .collect()
 }
 pub fn visible(actor: &Actor, resource: &str, action: &str, record: &Value) -> bool {
     if !actor.edition.allows(resource) {
@@ -647,6 +704,22 @@ pub fn visible(actor: &Actor, resource: &str, action: &str, record: &Value) -> b
         return true;
     }
     let action = permissions::service_action(resource, action);
+    if actor
+        .scope_rules
+        .iter()
+        .filter(|r| r.resource_key == resource && r.action == action)
+        .any(|r| {
+            !r.accepts(
+                record["companyScope"].as_str().unwrap_or(""),
+                record["departmentId"].as_str().unwrap_or(""),
+                record["projectId"].as_str(),
+                record["ownerUserId"].as_i64().unwrap_or(0),
+                actor.id,
+            )
+        })
+    {
+        return false;
+    }
     actor
         .grants
         .iter()

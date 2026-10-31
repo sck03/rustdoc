@@ -35,6 +35,7 @@ pub(super) fn verify(
     });
     // A reference to a draft/rejected submission must not expose its private content.
     if approved {
+        let projected = materials::snapshot(tx, actor, row, snapshot.clone())?;
         for key in ["approvedAt", "companyName", "departmentName"] {
             result[key] = snapshot[key].clone();
         }
@@ -45,7 +46,9 @@ pub(super) fn verify(
             "currency",
             "totalAmount",
         ] {
-            result[key] = snapshot["request"][key].clone();
+            if let Some(value) = projected["request"].get(key) {
+                result[key] = value.clone();
+            }
         }
     }
     result["documentStatus"] = submissions::project(tx, snapshot, false)?["documentStatus"].clone();

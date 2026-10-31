@@ -48,7 +48,7 @@ fn expired_files(policy: &JobOutputRetention, pg: bool, input: bool) -> Result<Q
     };
     Ok(QuerySql { filter: format!("r.kind='background-jobs' AND (r.id IN (
         WITH outputs AS (SELECT r.id, r.owner_id, {timestamp} AS completed, SUM({length}) AS bytes
-            FROM records r JOIN files f ON f.record_id=r.id AND f.kind='{blob_kind}'
+            FROM record_rows r JOIN files f ON f.record_id=r.id AND f.kind='{blob_kind}'
             WHERE r.kind='background-jobs' AND {eligible} GROUP BY r.id, r.owner_id, r.body),
         users AS (SELECT *, SUM(bytes) OVER(PARTITION BY owner_id ORDER BY completed DESC,id DESC ROWS UNBOUNDED PRECEDING) AS user_bytes FROM outputs),
         totals AS (SELECT *, SUM(CASE WHEN user_bytes<={user_limit} THEN bytes ELSE 0 END)
@@ -164,7 +164,7 @@ pub(crate) fn build(q: &JobQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
         let job_id = field("jobId", pg);
         clauses.push(format!("r.id NOT IN (SELECT id FROM (SELECT r.id, {timestamp} AS completed, {job_id} AS job_id,
             ROW_NUMBER() OVER(PARTITION BY {owner} ORDER BY {timestamp} DESC, {job_id} DESC) AS user_rank
-            FROM records r WHERE r.kind='background-jobs' AND NOT ({active})) ranked
+            FROM record_rows r WHERE r.kind='background-jobs' AND NOT ({active})) ranked
             WHERE completed>={cutoff} AND user_rank<={per_user} ORDER BY completed DESC, job_id DESC LIMIT {global})",
             active=active(pg),per_user=policy.per_user,global=policy.global));
     }

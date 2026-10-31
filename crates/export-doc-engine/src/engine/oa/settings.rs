@@ -4,6 +4,42 @@ use export_doc_domain::{approval::delegation_window, approval_policy::ApprovalRu
 use std::collections::HashSet;
 
 const STORAGE_KIND: &str = "oa-approval-settings";
+
+pub(in crate::engine) fn revoke_delegations(
+    tx: &Connection,
+    actor: &Actor,
+    account: i64,
+) -> Result<()> {
+    for mut settings in store::all(tx, STORAGE_KIND)? {
+        let mut changed = false;
+        for delegation in settings["delegations"].as_array_mut().into_iter().flatten() {
+            if delegation["isActive"] == true
+                && (delegation["principalUserId"] == account
+                    || delegation["delegateUserId"] == account)
+            {
+                delegation["isActive"] = json!(false);
+                changed = true;
+            }
+        }
+        if changed {
+            let id = records::positive(&settings, "id", "流程配置")?;
+            settings["expectedVersion"] = settings["versionNumber"].clone();
+            let scope = settings.clone();
+            let identity = text(&settings, "companyScope");
+            store::save_in_scope(
+                tx,
+                STORAGE_KIND,
+                id,
+                settings,
+                Some(identity),
+                actor,
+                "revoke-delegations",
+                Some(&scope),
+            )?;
+        }
+    }
+    Ok(())
+}
 fn response(mut settings: Value) -> Result<Value> {
     settings["sheetFieldCatalog"] = sheet_templates::catalog();
     settings["sheetDefaultContent"] = json!(sheet_templates::default_content()?);
@@ -53,26 +89,23 @@ fn defaults() -> Vec<Value> {
     );
     rules
 }
-fn personnel_actions(value: &Value) -> std::result::Result<(), &'static str> {
-    let actions = value
-        .as_array()
-        .filter(|a| a.len() <= 5)
-        .ok_or("人员审批开关无效。")?;
-    let mut seen = HashSet::new();
-    for action in actions {
-        let action = action.as_str().ok_or("人员变动类型无效。")?;
-        if !["Hire", "Confirm", "Transfer", "Depart", "Rehire"].contains(&action)
-            || !seen.insert(action)
-        {
-            return Err("人员审批类型无效或重复。");
-        }
-    }
-    Ok(())
-}
 pub(in crate::engine) fn load(tx: &Connection, company: &str) -> Result<Value> {
-    Ok(tx.find_identity(STORAGE_KIND, &store::normalize(company))?.unwrap_or_else(|| {
-        json!({"versionNumber":0,"rules":defaults(),"publications":[],"delegations":[],"personnelApprovalActions":[]})
-    }))
+    let mut value = tx
+        .find_identity(STORAGE_KIND, &store::normalize(company))?
+        .unwrap_or_else(
+            || json!({"versionNumber":0,"rules":defaults(),"publications":[],"delegations":[]}),
+        );
+    if value["calendar"].is_null() {
+        let mut calendar = export_doc_domain::business_calendar::BusinessCalendar::default();
+        calendar.time_zone = tx
+            .clock
+            .now()
+            .map_err(super::super::error::unavailable)?
+            .time_zone
+            .into();
+        value["calendar"] = serde_json::to_value(calendar)?;
+    }
+    Ok(value)
 }
 fn account(tx: &Connection, actor: &Actor, id: i64) -> Result<Actor> {
     let user = super::super::units::approval_actor(tx, id, actor.edition, &actor.company)?;
@@ -115,6 +148,18 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         .as_array()
         .filter(|r| r.len() == 13)
         .ok_or_else(|| invalid("须配置全部申请类型的审批规则。"))?;
+    let mut calendar = body
+        .get("calendar")
+        .filter(|c| !c.is_null())
+        .cloned()
+        .unwrap_or_else(|| previous["calendar"].clone());
+    calendar["version"] = json!(previous["versionNumber"].as_u64().unwrap_or(0) + 1);
+    serde_json::from_value::<export_doc_domain::business_calendar::BusinessCalendar>(
+        calendar.clone(),
+    )
+    .map_err(|_| invalid("公司工作日历格式无效。"))?
+    .validate()
+    .map_err(invalid)?;
     let mut kinds = HashSet::new();
     for rule in rules {
         let kind = text(rule, "kind");
@@ -183,18 +228,13 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         }
     }
     let mut value = contracts::dto(contracts::schema("OaApprovalSettingsSave"), body.clone());
+    value["calendar"] = calendar;
     value["publications"] = previous["publications"].clone();
     value["sheetTemplates"] = body
         .get("sheetTemplates")
         .cloned()
         .unwrap_or_else(|| previous["sheetTemplates"].clone());
     sheet_templates::validate(&value["sheetTemplates"])?;
-    let actions = body
-        .get("personnelApprovalActions")
-        .cloned()
-        .unwrap_or_else(|| previous["personnelApprovalActions"].clone());
-    personnel_actions(&actions).map_err(invalid)?;
-    value["personnelApprovalActions"] = json!(actions);
     let mut services = body.get("handlingServices").cloned().unwrap_or_else(|| {
         previous
             .get("handlingServices")

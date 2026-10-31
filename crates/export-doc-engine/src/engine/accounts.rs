@@ -43,7 +43,12 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
         } else {
             None
         };
-        for key in ["permissionGrants", "disabledModules", "oaAssignedOnly"] {
+        for key in [
+            "permissionGrants",
+            "disabledModules",
+            "oaAssignedOnly",
+            "permissionSchemeVersion",
+        ] {
             if !body
                 .as_object()
                 .is_some_and(|value| value.contains_key(key))
@@ -65,6 +70,7 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
                 )?
                 .ok_or_else(|| invalid("预置权限方案缺失，请明确选择权限方案。"))?;
             body["permissionTemplateId"] = template["id"].clone();
+            body["permissionSchemeVersion"] = json!(1);
         }
         if let Some(previous) = &previous {
             store::check_version(previous, store::expected(&body))?;
@@ -110,6 +116,18 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
                     .is_none_or(|user| user["permissionTemplateId"] != template_id)
             {
                 return Err(invalid("不能新分配已停用的权限方案。"));
+            }
+            if body["permissionGrants"].is_null() {
+                let version = body["permissionSchemeVersion"]
+                    .as_i64()
+                    .filter(|v| *v > 0)
+                    .ok_or_else(|| invalid("请选择方案已发布的明确版本。"))?;
+                if tx
+                    .permission_scheme_version(template_id, version)?
+                    .is_none()
+                {
+                    return Err(invalid("所选权限方案版本尚未发布。"));
+                }
             }
         }
         let person = if id > 0 {

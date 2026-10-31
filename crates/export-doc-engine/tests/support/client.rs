@@ -19,6 +19,20 @@ pub struct ApiClient {
 }
 
 impl ApiClient {
+    pub fn publish_scheme(&self, scheme: Value) -> Value {
+        workflow::publish_scheme(&self.native, &self.access_token, scheme)
+    }
+    pub fn business_reviewer(&self) -> Self {
+        let (id, token) = workflow::reviewer(&self.native, &self.access_token);
+        self.configure_approval(id);
+        Self {
+            native: self.native.clone(),
+            access_token: token,
+        }
+    }
+    pub fn personnel_change(&self, action: &str, id: i64, body: Value) -> Result<Value, ApiError> {
+        workflow::personnel_change(&self.native, &self.access_token, action, id, Some(body))
+    }
     pub fn configure_approval(&self, id: i64) {
         workflow::configure(&self.native, &self.access_token, id);
     }
@@ -116,6 +130,12 @@ impl ApiClient {
         body: Option<Value>,
         limit: u64,
     ) -> Result<Vec<u8>, ApiError> {
+        let id = path
+            .iter()
+            .find(|(key, _)| *key == "id")
+            .and_then(|(_, value)| value.parse().ok())
+            .unwrap_or(0);
+        let body = workflow::decision_body(&self.native, &self.access_token, operation, id, body);
         let bytes = self
             .native
             .dispatch(operation, path, query, body, &self.access_token)?;

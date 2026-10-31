@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
+import { publishPermissionScheme } from './lib/approval-fixtures.mjs';
 
 await withOfficeUi('template-private-ui', async ({ output, url, invoke, openPage }) => {
   const login = await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' });
@@ -8,8 +9,9 @@ await withOfficeUi('template-private-ui', async ({ output, url, invoke, openPage
   const grants = ['view', 'design', 'clone'].map(action => ({ resourceKey: 'document.report-templates', action, dataScope: 'company' }));
   grants.push({ resourceKey: 'document.invoices', action: 'view', dataScope: 'company' });
   const role = await invoke('CreatePermissionTemplate', { code: 'PRIVATE-DESIGN', name: '私人模板设计', isActive: true, grants }, {}, admin);
+  const published=await publishPermissionScheme(invoke,admin,role);
   for (const username of ['private-owner', 'private-other']) {
-    await invoke('createUserAccount', { username, fullName: username, role: 'User', companyScope: 'DEFAULT', departmentId: 'GENERAL', permissionTemplateId: role.id, isActive: true, resetPassword: 'Private-Test-2026' }, {}, admin);
+    await invoke('createUserAccount', { username, fullName: username, role: 'User', companyScope: 'DEFAULT', departmentId: 'GENERAL', permissionTemplateId: role.id, permissionSchemeVersion: published.version, isActive: true, resetPassword: 'Private-Test-2026' }, {}, admin);
   }
   const file = await invoke('CreateReportTemplate', { reportType: 'ExportDocument', displayName: '团队公共原稿', templatePath: 'user:Export/team-template.dtpl' }, {}, admin);
   await invoke('SetDefaultReportTemplate', { reportType: 'ExportDocument', templatePath: file.templatePath }, {}, admin);
@@ -80,8 +82,8 @@ await withOfficeUi('template-private-ui', async ({ output, url, invoke, openPage
   await page.getByRole('tab', { name: '可视化设计', exact: true }).click();
   await page.locator(`[data-v3-element-id="${detail.id}"]`).click();
   const properties = page.locator('.new-report-detail-properties');
-  await properties.getByLabel('标题', { exact: true }).fill('货物说明（验收）');
-  await properties.getByLabel('标题', { exact: true }).press('Enter');
+  await properties.getByRole('textbox', { name: '标题', exact: true }).fill('货物说明（验收）');
+  await properties.getByRole('textbox', { name: '标题', exact: true }).press('Control+Enter');
   await properties.getByRole('tab', { name: '表格样式', exact: true }).click();
   const styles = properties.locator('[role=tabpanel] > div:not([hidden])');
   await styles.locator('label').filter({ has: page.getByText('设置文字样式', { exact: true }) }).locator('select').selectOption('headerStyle');

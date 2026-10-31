@@ -30,6 +30,26 @@
 .oa-history p { white-space: pre-wrap; overflow-wrap: anywhere; }
 .oa-attachments ul { padding: 0; list-style: none; }
 .oa-attachments li { margin-block: calc(2 * 0.25rem); overflow-wrap: anywhere; }
+.oa-hub-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 1.5rem; background: var(--edm-white); border: 1px solid var(--edm-neutral-250); border-radius: var(--edm-radius-md); }
+.oa-hub-header h2, .oa-hub h3 { margin: 0; }
+.oa-hub-eyebrow { margin: 0 0 .4rem; color: var(--edm-neutral-650); font-size: var(--edm-font-size-sm); }
+.oa-hub-tabs button, .oa-hub a.command-button, .oa-hub-all, .oa-hub-start-card .office-card-actions a { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; }
+.oa-hub-queue-grid, .oa-hub-start-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr)); gap: 1rem; }
+.oa-hub-queue, .oa-hub-start-card { min-width: 0; padding: 1.25rem; border: 1px solid var(--edm-neutral-250); border-radius: var(--edm-radius-md); background: var(--edm-white); }
+.oa-hub-queue { display: flex; flex-direction: column; gap: 1rem; }
+.oa-hub-queue > header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.oa-hub-count { min-width: 2.75rem; padding: .5rem; text-align: center; font-size: var(--edm-font-size-xl); font-weight: 700; color: var(--edm-primary-750); background: var(--edm-neutral-50); border-radius: var(--edm-radius-sm); }
+.oa-hub-queue ul { padding: 0; margin: 0; list-style: none; }
+.oa-hub-queue li + li { border-top: 1px solid var(--edm-neutral-200); }
+.oa-hub-queue li a { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .25rem .5rem; padding-block: .75rem; overflow-wrap: anywhere; }
+.oa-hub-queue li small { grid-column: 1; color: var(--edm-neutral-650); }
+.oa-hub-queue li svg { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+.oa-hub-all { align-self: flex-start; margin-top: auto; min-height: 36px; }
+.oa-hub-empty { padding-block: .75rem; }
+.oa-hub-start-card { display: flex; flex-direction: column; align-items: flex-start; gap: .75rem; }
+.oa-hub-start-card > svg { color: var(--edm-primary-750); }
+.oa-hub-start-card p { margin: 0; }
+.oa-hub-start-card > .office-card-actions, .oa-hub-start-card > a { margin-top: auto; }
 }
 
 .office-dialog.office-dialog-wide { width: min(1500px, calc(100vw - 32px)); max-width: none; }

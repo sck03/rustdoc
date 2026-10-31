@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ExportDocManagerApiClient, PersonnelOrganization, PersonnelAssignment, PersonnelDepartmentRecord, OrganizationPosition } from "../../api/index.ts";
+import type { ExportDocManagerApiClient, OaMaterialPersonnelOrganization, PersonnelOrganization, PersonnelAssignment, PersonnelDepartmentRecord } from "../../api/index.ts";
 import { useQuery } from "@tanstack/react-query";
 import { PersonnelAssignmentFields } from "./PersonnelAssignmentEditor.tsx";
 import { OrganizationManagerPicker } from "../organization/OrganizationManagerPicker.tsx";
@@ -9,7 +9,7 @@ type Reporting = Pick<PersonnelOrganization, "managerEmployeeId" | "managerName"
 
 export function PersonnelOrganizationEditor({ client, company, departments, primaryDepartment, value, onChange }: {
   client: ExportDocManagerApiClient; company: string; departments: PersonnelDepartmentRecord[]; primaryDepartment: string;
-  value: PersonnelOrganization; onChange: (value: PersonnelOrganization) => void; positions?: OrganizationPosition[];
+  value: PersonnelOrganization; onChange: (value: PersonnelOrganization) => void;
 }) {
   const patch = (index: number, update: Partial<PersonnelAssignment>) => onChange({ ...value, additionalAssignments: value.additionalAssignments.map((old, i) => i === index ? { ...old, ...update } : old) });
   const options = useQuery({ queryKey: ["office", "people", "appointment-options", company], queryFn: ({ signal }) => client.getPersonnelOptions({ companyCode: company }, { signal }) });
@@ -22,7 +22,7 @@ export function PersonnelOrganizationEditor({ client, company, departments, prim
     </section> : <fieldset className="office-resource-card" key={assignment.id ?? index}><legend>兼职 {index + 1}</legend><div className="office-form-grid">
       <PersonnelAssignmentFields client={client} assignment={assignment} company={company} companies={options.data?.companies ?? []} departments={departments} primaryDepartment={primaryDepartment} patch={update => patch(index, update)} />
     </div><ReportingEditor client={client} company={assignment.companyCode || company} label={`兼职 ${index + 1} 汇报`} value={assignment} onChange={next => patch(index, next)} />
-      <button type="button" className="command-button secondary" onClick={() => onChange({ ...value, additionalAssignments: value.additionalAssignments.filter((_, i) => i !== index) })}>移除兼职</button>
+      <button type="button" className="command-button secondary" disabled={assignment.canRemove === false} onClick={() => onChange({ ...value, additionalAssignments: value.additionalAssignments.filter((_, i) => i !== index) })}>删除未使用的误建任职</button>{assignment.removalReason && <p>保留原因：{assignment.removalReason}。请通过结束日期办理撤任，并先交接有效职责。</p>}
     </fieldset>)}
     <button type="button" className="command-button secondary" disabled={value.additionalAssignments.length >= 20} onClick={() => onChange({ ...value, additionalAssignments: [...value.additionalAssignments, { companyCode: company, startsOn: "", endsOn: "", departmentId: "", jobTitle: "普通员工", managerEmployeeId: null, functionalManagerEmployeeIds: [] }] })}>添加任职</button>
   </details>;
@@ -44,10 +44,10 @@ export function ReportingEditor({ client, company, label, value, onChange, perso
   </section>;
 }
 
-export function PersonnelOrganizationFacts({ value }: { value?: PersonnelOrganization }) {
+export function PersonnelOrganizationFacts({ value }: { value?: OaMaterialPersonnelOrganization }) {
   if (!value) return null;
-  const reporting = (item: Reporting) => <p>直属负责人：{item.managerName || (item.managerEmployeeId ? `人员 #${item.managerEmployeeId}` : "未设置")}；职能负责人：{item.functionalManagerNames?.join("、") || item.functionalManagerEmployeeIds.map(id => `人员 #${id}`).join("、") || "未设置"}</p>;
+  const reporting = (item: Partial<Reporting>) => <p>直属负责人：{item.managerName || (item.managerEmployeeId ? `人员 #${item.managerEmployeeId}` : "未设置")}；职能负责人：{item.functionalManagerNames?.join("、") || item.functionalManagerEmployeeIds?.map(id => `人员 #${id}`).join("、") || "未设置"}</p>;
   return <section className="personnel-fact-section" aria-label="任职与汇报关系"><h3>任职与汇报关系</h3>{reporting(value)}
-    {value.additionalAssignments.length ? value.additionalAssignments.map(assignment => <div key={`${assignment.companyCode}:${assignment.departmentId}`}><strong>{assignment.companyCode} · {assignment.departmentName || assignment.departmentId} · {assignment.jobTitle}</strong><p>任职日期：{assignment.startsOn || "长期"} 至 {assignment.endsOn || "长期"}</p>{reporting(assignment)}</div>) : <p>兼职部门：未登记</p>}
+    {value.additionalAssignments?.length ? value.additionalAssignments.map(assignment => <div key={`${assignment.companyCode}:${assignment.departmentId}`}><strong>{assignment.companyCode} · {assignment.departmentName || assignment.departmentId} · {assignment.jobTitle}</strong><p>任职日期：{assignment.startsOn || "长期"} 至 {assignment.endsOn || "长期"}</p>{reporting(assignment)}</div>) : <p>兼职部门：未登记</p>}
   </section>;
 }

@@ -37,7 +37,7 @@ pub fn append(
             "ApproveStep" => "approve-step",
             "ApprovalReassign" => "approval-reassign",
             "Edit" if record["status"] == "Pending" => "submit",
-            "Edit" => "approve",
+            "Edit" if record["status"] == "Approved" => "approve",
             "Issue" => "issue",
             "Return" => "return",
             "Reject" => "reject",
@@ -55,6 +55,7 @@ pub fn append(
         ));
         let mut event = event;
         event["action"] = json!(action);
+        super::oa::resource_event(tx, actor, record, action, note)?;
         super::communication::on_event(
             tx,
             actor,
@@ -133,6 +134,11 @@ pub fn history(
             },
             export_doc_storage::RecordOrder::CreatedDescending,
         )?;
+        let events = if stock {
+            events
+        } else {
+            super::oa::materials::history(tx, actor, &record, events, &keyword)?
+        };
         Ok(crate::contracts::page(events, total as usize, page, size))
     })
 }

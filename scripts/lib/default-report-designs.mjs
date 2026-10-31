@@ -252,8 +252,7 @@ export function approvalSheetDesign() {
     [24,[label("reason-label","申请内容"),binding("reason","Oa.Reason")]],
     [13,[label("attachments-label","附件索引"),binding("attachments","Oa.Attachments")]],
   ],9.5);
-  section("oa-approval-heading","三、流程节点与审批记录");
-  add("oa-approvals",[100],[[36,[binding("approvals","Oa.Approvals")]]],9);
+  add("oa-approvals",[100],[[44,[binding("approvals","Oa.Approvals",1,{label:"三、流程节点与审批记录"})]]],9,4);
   add("oa-result",[100],[[12,[binding("approval-result","Oa.ApprovalResult",1,{style:{align:"Center",bold:true}})]]],9,4);
   d.layers[1].elements = blocks;
   d.layers[2].elements = [

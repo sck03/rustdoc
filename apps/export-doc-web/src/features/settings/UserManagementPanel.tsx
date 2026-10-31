@@ -9,6 +9,9 @@ import { useUserManagement } from "./useUserManagement.ts";
 import { minimumPasswordLength } from "./userAccountModel.ts";
 import { getRolePresentation } from "../../app/userRoles.ts";
 import { UserPermissionEditor } from "./UserPermissionEditor.tsx";
+import { PermissionVersionPicker } from "./PermissionVersionPicker.tsx";
+import { AccountSecurityControl } from "./AccountSecurityControl.tsx";
+import { ScopeRestrictionsPanel } from "./ScopeRestrictionsPanel.tsx";
 import { employmentStatusLabels } from "../office/personnelModel.ts";
 import { PersonnelOrganizationFacts } from "../office/PersonnelOrganizationEditor.tsx";
 
@@ -124,12 +127,12 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
             <select
               value={draft.permissionTemplateId ?? ""}
               disabled={isBusy || draft.role === "Admin" || draft.permissionGrants !== null}
-              onChange={(event) => { const permissionTemplateId = Number(event.target.value) || null; setDraft(current => ({ ...current, permissionTemplateId, oaAssignedOnly: current.oaAssignedOnly || selectedTemplate?.oaAssignedOnly === true })); }}
+              onChange={(event) => { const permissionTemplateId = Number(event.target.value) || null; setDraft(current => ({ ...current, permissionTemplateId, permissionSchemeVersion:permissionTemplates.find(t=>t.id===permissionTemplateId)?.publishedVersion??null, oaAssignedOnly: current.oaAssignedOnly || selectedTemplate?.oaAssignedOnly === true })); }}
             >
               <option value="">请选择权限方案</option>
               {permissionTemplates.map((template) => (
-                <option key={template.id} value={template.id} disabled={!template.isActive && template.id !== draft.permissionTemplateId}>
-                  {template.name}{template.isSystem ? "（内置）" : ""}{!template.isActive ? "（已停用）" : ""}
+                <option key={template.id} value={template.id} disabled={(!template.isActive || !template.publishedVersion) && template.id !== draft.permissionTemplateId}>
+                  {template.name}{template.isSystem ? "（内置）" : ""}{!template.publishedVersion ? "（未发布）" : ""}{!template.isActive ? "（已停用）" : ""}
                 </option>
               ))}
             </select>
@@ -143,6 +146,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
                   : "需要选择权限方案或独立配置"}
             </small>
           </label>
+          {draft.role!=="Admin"&&draft.permissionGrants===null&&draft.permissionTemplateId&&<PermissionVersionPicker key={draft.permissionTemplateId} client={client} schemeId={draft.permissionTemplateId} value={draft.permissionSchemeVersion} disabled={isBusy} onChange={permissionSchemeVersion=>patchDraft("permissionSchemeVersion",permissionSchemeVersion)} />}
           <label>
             <span>所属公司</span>
             <select value={draft.companyScope} disabled={isBusy || Boolean(employee)} onChange={(event) => changeCompany(event.target.value)}>
@@ -193,8 +197,11 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
       </div>
 
       {draft.role !== "Admin" ? <UserPermissionEditor client={client} template={selectedTemplate}
+        schemeVersion={draft.permissionSchemeVersion}
         grants={draft.permissionGrants} disabledModules={draft.disabledModules} oaAssignedOnly={draft.oaAssignedOnly} busy={isBusy}
         onChange={(permissionGrants, disabledModules, oaAssignedOnly) => setDraft(current => ({ ...current, permissionGrants, disabledModules, oaAssignedOnly }))} /> : null}
+      {draft.id>0&&<AccountSecurityControl client={client} id={draft.id} version={draft.versionNumber} name={draft.fullName} onSaved={()=>void refreshUsers()} />}
+      {draft.id>0&&draft.role!=="Admin"&&<ScopeRestrictionsPanel client={client} principalKind="Account" principalId={draft.id} company={draft.companyScope} />}
 
       <p className="section-description">公司和部门在 <Link to="/system/organization">组织架构</Link> 中统一维护。</p>
 

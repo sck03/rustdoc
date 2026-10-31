@@ -235,6 +235,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 - 脚本：`verify-script-suite.ps1`、`verify-github-workflow-actions.mjs`、`test_tauri_updater_release_contract.mjs`、`github/verify-public-source.ps1`、`git diff --check`。
 - 人员与审批职责：`node scripts/test_approval_permissions_ui.mjs` 在隔离 Rust `office_review` 宿主上验证常用/自定义职位、从普通员工建立公司审批方案、跨部门行政和人事审批，以及私密档案、财务办理、模块限制和会话撤销边界。
 - 任职与流程闭环：`node scripts/test_organization_workflow_ui.mjs` 复用上述隔离宿主，验证真实兼职/矩阵负责人选择、公司领导审批负责人/职位目录、会签和金额条件设置、未完成审批移交、仅分派可见及窄屏无障碍；先生成客户端、构建 React 和 `cargo build --locked -p export-doc-server --example office_review`。
+- OA 融合与资源档案：`node scripts/test_oa_integration_completion_ui.mjs` 在同一真实宿主验证五种窗口宽度的权限方案内部文字、单位调岗制度、身份缓存、本人范围明确审批、一次聚合查询、草稿附件/正式提交、资源任务移交、PDF 与窄屏无障碍。字段和接口共用生成客户端；原创建 API 默认直接提交，React 显式选择草稿后上传并提交。对应任职及原件/PDF合同同时进入 SQLite 与真实 PostgreSQL 团队回归。
 - PostgreSQL 权限/组织定向回归：`pwsh -NoProfile -File scripts/test-native-postgres.ps1 -PostgresBin <PostgreSQL18/bin> -Scope Workflows` 复用隔离集群与独立账号，串行运行存储合同和完整团队业务合同；`All` 额外运行 PostgreSQL 恢复和输出发布合同；独立的大容量文件流测试不随数据库验收执行。
 - 单位身份与权限方案：`node scripts/test_unit_identity_ui.mjs` 使用同一隔离宿主，验证本单位方案维护、权限来源、跨单位身份切换及中文草稿保护；须先完成当前 React 与 `office_review` 构建。
 
@@ -246,7 +247,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 
 模板预览新增“实际 PDF 页图”，复用已有预览 API 的可选 `previewFormat=PdfPage`、零起始 `pageIndex` 与翻页修订号；未提供参数仍使用矢量预览。`test_invoice_report_ui.mjs` 同时验证多页 PDFium 真正渲染、翻页、修订变化 409、非法页码 400、匿名拒绝与真实 React 页图。运行前准备受管 PDFium 及本批 `office_review`，完整桌面包另行验收。
 
-- OA 审批单：`node scripts/test_oa_approval_documents_ui.mjs`（也纳入 `test:oa-ui`）复用 `office_review`，验证两级默认、共用设计器、名称/颜色保存及 Rust 样例预览。`export-doc-report --test approval` 验证单页、长内容、会签和多阶段完整续页；`oa_service` 与真实 PostgreSQL `team_service` 共用提交版本/原件/PDF/材料包/作废权限合同。
+- OA 审批单：`node scripts/test_oa_approval_documents_ui.mjs`（也纳入 `test:oa-ui`）复用 `office_review`，验证两级默认、共用设计器、名称/颜色保存及 Rust 样例预览。`export-doc-report --test approval` 验证单页、长内容、会签和多阶段完整续页；`oa_service` 与真实 PostgreSQL `team_service` 共用提交版本/原件/PDF/材料包/作废权限合同。`test_oa_material_documents_ui.mjs` 验证有限审批员的受限实际 PDF、完整 ZIP 拒绝及有完整权限人员的重新生成/原件下载；输出须另做 PDF 逐页渲染核对。资源加减签、岗位入口及后续批准由 `test_oa_integration_completion_ui.mjs` 覆盖，流程变更刷新期间禁止继续使用旧版本操作。
 
 ## 工作区清理
 

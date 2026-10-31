@@ -103,7 +103,7 @@ fn office_documents_round_trip_with_type_and_state_validation() {
                 SUBMIT_GENERAL_REQUEST,
                 &path,
                 &[],
-                Some(json!({"expectedVersion":row["versionNumber"],"note":"提交"})),
+                Some(json!({"expectedVersion":row["versionNumber"],"note":"提交","commandKey":export_doc_engine::paths::nonce().unwrap()})),
                 token,
             )
             .unwrap(),

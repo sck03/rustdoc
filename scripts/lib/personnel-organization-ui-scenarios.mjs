@@ -135,7 +135,7 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
   await waitFor(page,"!document.querySelector('.office-dialog')");await clickText(page,"人员档案","a");
   await waitFor(page,"document.querySelector('.personnel-card')");await clickText(page,"人员档案");await waitFor(page,"document.querySelector('.personnel-facts')");
   await read(page,"window.__personnelClear=true");await clickText(page,"交接事项");await waitFor(page,"document.body.innerText.includes('离职前需调整部门负责人')");
-  await clickText(page,"办理离职");await waitFor(page,"document.body.innerText.includes('仍担任部门负责人')");
-  assert(await read(page,"[...document.querySelectorAll('.office-dialog-backdrop:last-of-type button')].find(item=>item.textContent.trim()==='办理离职').disabled"));
+  assert(await read(page,"document.querySelector('a[href*=\"change=Depart\"]') !== null"));
+  assert.equal(await read(page,"[...document.querySelectorAll('button')].some(item=>item.textContent.trim()==='办理离职')"),false);
   await audit(page,"personnel-manager-departure-guard");
 }

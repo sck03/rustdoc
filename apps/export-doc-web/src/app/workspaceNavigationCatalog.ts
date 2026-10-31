@@ -66,10 +66,8 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
       { label: "站内通知", description: "查看申请与审批动态、未读通知及关联业务", to: "/office/notifications", icon: Mail,
         isActive: path => path === "/office/notifications", workspace: "office", moduleKey: "office.notifications", requiredPermissions: [{ resourceKey: "office.notifications", action: "view" }] },
       { label: "申请与审批", description: "查看行政和人事申请进度，办理审批与归档", to: "/office/approvals", icon: ClipboardList,
-        isActive: (path) => path === "/office/approvals" || path === "/office/approval-settings", workspace: "office", permissionMatch: "any",
-        requiredPermissions: [...oaKinds.map((kind) => oaModules[kind].resource), "office.rooms", "office.supplies"].map(resourceKey => ({ resourceKey, action: "view" })),
-        searchItems: [{ label: "审批规则与代理", description: "设置申请审批步骤和有期限的审批代理", to: "/office/approval-settings", icon: ShieldCheck,
-          isActive: path => path === "/office/approval-settings", workspace: "office", unitManagement: ["workflows"] }] },
+        isActive: (path) => path === "/office/approvals", workspace: "office", permissionMatch: "any",
+        requiredPermissions: [...oaKinds.map((kind) => oaModules[kind].resource), "office.rooms", "office.supplies"].map(resourceKey => ({ resourceKey, action: "view" })) },
       { label: "工作概览", description: "按业务权限查看单证与销售概况", to: "/dashboard", icon: LayoutDashboard,
         isActive: (path) => isDashboardRoute(path) || path.startsWith("/crm/dashboard"), showSectionNav: true, children: [
       { label: "单证概览", description: "查看业务金额、近期单据与单证进度", keywords: "仪表盘", to: "/dashboard", icon: LayoutDashboard,
@@ -107,7 +105,7 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     ],
   },
   {
-    key: "customers", label: "客户与供应链", shortLabel: "客户", icon: ContactRound,
+    key: "customers", label: "客户与供货商", shortLabel: "客户", icon: ContactRound,
     items: [
       { label: "客户与跟进", description: "维护销售客户，记录沟通和下一步跟进", to: "/crm/follow-ups", icon: ContactRound,
         isActive: (path) => path.startsWith("/crm/follow-ups"), workspace: "sales", moduleKey: "sales.crm", permissionMatch: "any",
@@ -145,7 +143,7 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
     ],
   },
   {
-    key: "personnel", label: "人事管理", shortLabel: "人事", icon: UsersRound,
+    key: "personnel", label: "人员与组织", shortLabel: "组织", icon: UsersRound,
     items: [
       { label: "人员档案", description: "查找人员，办理入职、转正、调岗和离职", keywords: "人员信息管理 人事 误录修正", to: "/office/people", icon: UsersRound,
         isActive: (path) => path.startsWith("/office/people"), workspace: "office", moduleKey: "office.people",
@@ -153,19 +151,20 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
       { label: "公司通讯录", description: "查找同事的工作电话、邮箱和办公地点", keywords: "联系 同事 部门", to: "/office/directory", icon: ContactRound,
         isActive: (path) => path.startsWith("/office/directory"), workspace: "office", moduleKey: "office.people",
         requiredPermissions: [{ resourceKey: permissionResources.officePeople, action: permissionActions.view }] },
-      ...(["personnel", "leave", "overtime"] as const).map(oaNavigation),
+      { label: "组织与任职", description: "维护经营单位、部门、岗位、雇佣任职和职责，查看交接与权限影响", keywords: "组织架构 公司部门 集团 项目 工号", to: "/system/organization", icon: Network,
+        isActive: (path) => path.startsWith("/system/organization"), workspace: "office", unitManagement: ["organization", "appointments", "roles", "analytics"] },
     ],
   },
   {
-    key: "office", label: "行政办公", shortLabel: "行政", icon: CalendarDays,
+    key: "office", label: "申请与资源", shortLabel: "申请", icon: CalendarDays,
     items: [
+      ...(["leave", "overtime", "expense", "travel", "purchase", "general", "personnel"] as const).map(oaNavigation),
       { label: "会议室预约", description: "查看日程，办理会议室预约与钥匙交接", to: "/office/meeting-rooms", icon: CalendarDays,
         isActive: (path) => path.startsWith("/office/meeting-rooms"), workspace: "office", moduleKey: "office.rooms",
         requiredPermissions: [{ resourceKey: permissionResources.officeRooms, action: permissionActions.view }] },
       { label: "物品领用", description: "登记办公物品领用，办理发放、归还与库存补充", to: "/office/supplies", icon: Package,
         isActive: (path) => path.startsWith("/office/supplies"), workspace: "office", moduleKey: "office.supplies",
         requiredPermissions: [{ resourceKey: permissionResources.officeSupplies, action: permissionActions.view }] },
-      ...(["expense", "travel", "purchase", "general"] as const).map(oaNavigation),
     ],
   },
   {
@@ -196,8 +195,8 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
         isActive: isAccessControlRoute, requiresAdmin: true, requiresSystemAdministration: true, searchItems: [
           { label: "权限方案与模块权限", description: "系统管理 / 账号与权限 / 权限方案", keywords: "资源 动作 数据范围 授权", to: "/system/access-control?view=templates", search: "view=templates", icon: ShieldCheck, isActive: isAccessControlRoute },
         ] },
-      { label: "组织架构", description: "定义公司、部门层级和负责人", keywords: "组织目录 公司部门 综合部", to: "/system/organization", icon: Network,
-        isActive: (path) => path.startsWith("/system/organization"), workspace: "office", unitManagement: ["organization", "appointments", "roles", "analytics"] },
+      { label: "流程管理", description: "设计与发布审批流程，设置代理、办理分工和工作日历", keywords: "审批规则与代理 图形编排 流程版本 时限", to: "/office/approval-settings", icon: ShieldCheck,
+        isActive: (path) => path === "/office/approval-settings", workspace: "office", unitManagement: ["workflows"] },
       { label: "审计日志", description: "查阅和导出关键业务操作记录", to: "/audit-logs", icon: ShieldCheck,
         isActive: isAuditLogRoute, requiresAdmin: true, requiresSystemAdministration: true },
       { label: "关于与支持", description: "查看产品信息、授权注册和软件更新", to: "/system/about", icon: Info,

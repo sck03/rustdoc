@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { personnelChange, publishPermissionScheme } from './lib/approval-fixtures.mjs';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 
 await withOfficeUi('unit-identity-ui', async ({ output, url, operations, invoke, openPage, require }) => {
@@ -20,7 +21,7 @@ await withOfficeUi('unit-identity-ui', async ({ output, url, operations, invoke,
   }
   let person = await invoke('CreatePersonnel',{ requestKey:'unit-ui-worker',employeeNumber:'UNIT-UI-1',departmentId:'GENERAL',jobTitle:'总部业务员',employmentType:'FullTime',hireDate:'2026-01-01',profile:{ fullName:users[0].fullName } },{},admin);
   person = await invoke('LinkPersonnelAccount',{ expectedVersion:person.versionNumber,userId:users[0].id,expectedAccountVersion:users[0].versionNumber },{ id:person.employee.id },admin);
-  person = await invoke('TransferPersonnel',{ expectedVersion:person.versionNumber,effectiveDate:'2026-10-01',departmentId:'GENERAL',jobTitle:'总部业务员',organization:{ managerEmployeeId:null,functionalManagerEmployeeIds:[],additionalAssignments:[{ companyCode:'UNITUI',departmentId:'TRADE',jobTitle:'子公司业务员',startsOn:'2026-10-01',endsOn:'',managerEmployeeId:null,functionalManagerEmployeeIds:[] }] },note:'登记跨单位任职' },{ id:person.employee.id },admin);
+  person = await personnelChange(invoke, admin, person, { action:'Transfer',effectiveDate:'2026-10-01',departmentId:'GENERAL',jobTitle:'总部业务员',organization:{ managerEmployeeId:null,functionalManagerEmployeeIds:[],additionalAssignments:[{ companyCode:'UNITUI',departmentId:'TRADE',jobTitle:'子公司业务员',startsOn:'2026-10-01',endsOn:'',managerEmployeeId:null,functionalManagerEmployeeIds:[] }] } });
   const grants = ['view','create','edit'].map(action=>({ resourceKey:'office.general',action,dataScope:'own' }));
   const base = { companyCode:'UNITUI',permissionGrants:grants,disabledModules:[],oaAssignedOnly:false,management:{ organization:false,appointments:false,workflows:false,roles:false,analytics:false },includeDescendants:false,startsAt:'',endsAt:'',isActive:true,expectedVersion:0 };
   let workerRole = await invoke('SaveUnitAccess',{ ...base,userId:users[0].id,name:'子公司工作身份',mode:'Business',appointmentId:person.organization.additionalAssignments[0].id },{},admin);
@@ -32,14 +33,15 @@ await withOfficeUi('unit-identity-ui', async ({ output, url, operations, invoke,
   await manager.getByRole('button',{ name:'新增单位方案',exact:true }).click();
   const editor = manager.getByRole('dialog',{ name:'新增单位方案',exact:true });
   await editor.getByRole('textbox',{ name:'方案名称',exact:true }).fill('子公司登记方案');
-  await editor.getByLabel('模块分类').selectOption('行政办公');
+  await editor.getByLabel('模块分类').selectOption('申请与资源');
   await editor.getByLabel('通用申请快捷设置').selectOption('operate');
   const savedResponse = manager.waitForResponse(r=>r.url().endsWith('/api/organization/unit-schemes') && r.request().method()==='POST');
   await editor.getByRole('button',{ name:'保存单位方案',exact:true }).click();
   const response = await savedResponse; assert.equal(response.status(),200);
   const scheme = await response.json(); assert.equal(scheme.ownerUnitId,sub.id);
   await editor.waitFor({ state:'hidden' });
-  workerRole = await invoke('SaveUnitAccess',{ ...workerRole,permissionTemplateId:scheme.id,permissionGrants:null,expectedVersion:workerRole.versionNumber },{},admin);
+  const published = await publishPermissionScheme(invoke, admin, scheme);
+  workerRole = await invoke('SaveUnitAccess',{ ...workerRole,permissionTemplateId:scheme.id,permissionSchemeVersion:published.version,permissionGrants:null,expectedVersion:workerRole.versionNumber },{},admin);
   const worker = await openPage('unit-worker','Unit-UI-2026');
   const identity = worker.getByRole('combobox',{ name:'当前单位身份',exact:true });
   const subContext = `unit:${workerRole.id}:UNITUI`;

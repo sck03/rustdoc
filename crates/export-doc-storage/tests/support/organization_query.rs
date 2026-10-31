@@ -39,8 +39,8 @@ pub fn exercise(tx: &Connection) {
     let person = insert(
         tx,
         "people",
-        json!({"companyScope":"ORG-A","departmentId":"PRIMARY","status":"Departed",
-        "organization":{"primaryAssignmentId":"org-primary","additionalAssignments":[{"id":"org-secondary","departmentId":"SECONDARY","jobTitle":"兼任"}]},"profile":{"fullName":"任职查询人员"}}),
+        json!({"companyScope":"ORG-A","departmentId":"PRIMARY","status":"Departed","employeeNumber":"ORG-P1","employmentType":"FullTime","hireDate":"2026-01-01","departedOn":"2026-10-01","jobTitle":"职员",
+        "organization":{"primaryAssignmentId":"org-primary","additionalAssignments":[{"id":"org-secondary","companyCode":"ORG-A","departmentId":"SECONDARY","jobTitle":"兼任","startsOn":"2026-01-01","endsOn":"2026-10-01"}]},"profile":{"fullName":"任职查询人员"}}),
     );
     let private = json!({"notes":"x".repeat(200_000),"personalPhone":"private-contact"});
     tx.set_personnel_private_profile(person, &private).unwrap();
@@ -82,9 +82,47 @@ pub fn exercise(tx: &Connection) {
     insert(
         tx,
         "users",
-        json!({"companyScope":"ORG-A","departmentId":"INACTIVE","isActive":false}),
+        json!({"companyScope":"ORG-A","departmentId":"INACTIVE","isActive":false,"username":"inactive-query-user","fullName":"停用账号","role":"OfficeEmployee","permissionGrants":[],"useRoleDefaults":false}),
     );
     assert!(reference(OrganizationReference::Department, "INACTIVE", 0));
+    let mut account_ids = vec![];
+    for index in 0..205 {
+        account_ids.push(insert(tx, "users", json!({"companyScope":"ORG-A","departmentId":"PRIMARY","isActive":true,"username":format!("page-account-{index}"),"fullName":"公开候选人","role":"OfficeEmployee","permissionGrants":[],"useRoleDefaults":false,"privateMarker":"not-projected"})));
+    }
+    account_ids.reverse();
+    let first = tx
+        .unit_account_page("ORG-A", "2026-10-31", false, None, 100)
+        .unwrap();
+    assert_eq!(first.len(), 100);
+    assert!(first.iter().all(|row| row.get("privateMarker").is_none()));
+    let second = tx
+        .unit_account_page(
+            "ORG-A",
+            "2026-10-31",
+            false,
+            first.last().unwrap()["id"].as_i64(),
+            100,
+        )
+        .unwrap();
+    let third = tx
+        .unit_account_page(
+            "ORG-A",
+            "2026-10-31",
+            false,
+            second.last().unwrap()["id"].as_i64(),
+            100,
+        )
+        .unwrap();
+    let found: Vec<_> = first
+        .iter()
+        .chain(&second)
+        .chain(&third)
+        .map(|row| row["id"].as_i64().unwrap())
+        .collect();
+    assert_eq!(
+        found, account_ids,
+        "cursor pagination preserves scope, ordering and every eligible account"
+    );
     insert(
         tx,
         "not-a-business-resource",

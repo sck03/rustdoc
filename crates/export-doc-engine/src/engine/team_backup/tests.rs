@@ -45,6 +45,7 @@ pub(super) fn open_service(workspace: &Workspace) -> Arc<NativeService> {
 }
 pub(super) fn admin() -> Actor {
     Actor {
+        scope_rules: vec![],
         context: String::new(),
         edition: Default::default(),
         id: 1,

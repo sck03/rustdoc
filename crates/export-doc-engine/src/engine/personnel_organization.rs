@@ -95,10 +95,16 @@ pub fn appointment_in(
     {
         return Err(invalid("所选单位和部门不在人员的有效任职范围内。"));
     }
-    assignments(person)?
-        .into_iter()
-        .find(|a| a.company_code == company && a.department_id == department)
-        .ok_or_else(|| invalid("任职不存在。"))
+    let today = super::units::today(tx)?;
+    for assignment in assignments(person)? {
+        if assignment.company_code == company
+            && assignment.department_id == department
+            && assignment.active_on(today).map_err(unavailable)?
+        {
+            return Ok(assignment);
+        }
+    }
+    Err(invalid("任职不存在。"))
 }
 pub fn appointment_by_id(
     tx: &Connection,
@@ -203,7 +209,9 @@ pub(super) fn validate_with_primary(
             .ok_or_else(|| invalid("新的主任职必须来自此人员的已有任职。"))?;
         organization.primary_starts_on = selected.starts_on.clone();
         selected.id.clone()
-    } else if previous_org.primary_assignment_id.is_empty() {
+    } else if previous_org.primary_assignment_id.is_empty()
+        || (previous["status"] == "Departed" && person["status"] != "Departed")
+    {
         organization.primary_starts_on = text(person, "hireDate");
         crate::paths::nonce().map_err(unavailable)?
     } else {
@@ -220,16 +228,7 @@ pub(super) fn validate_with_primary(
             assignment.company_code = company.clone();
         }
         if assignment.id.is_empty() {
-            assignment.id = previous_org
-                .additional_assignments
-                .iter()
-                .find(|a| {
-                    a.company_code == assignment.company_code
-                        && a.department_id == assignment.department_id
-                })
-                .map(|a| a.id.clone())
-                .filter(|id| !id.is_empty())
-                .unwrap_or(crate::paths::nonce().map_err(unavailable)?);
+            assignment.id = crate::paths::nonce().map_err(unavailable)?;
         } else if !previous_assignments
             .iter()
             .any(|a| a.id == assignment.id && a.company_code == assignment.company_code)
@@ -247,9 +246,41 @@ pub(super) fn validate_with_primary(
         return Err(invalid("任职编号不能重复。"));
     }
     let id = person["id"].as_i64().unwrap_or(0);
+    if organization.additional_assignments.iter().any(|a| {
+        a.company_code == company
+            && a.department_id == text(person, "departmentId")
+            && a.job_title.trim() == text(person, "jobTitle")
+            && (a.ends_on.is_empty() || a.ends_on >= organization.primary_starts_on)
+    }) {
+        return Err(invalid(
+            "同一人员不能在主职部门重复登记同一岗位；其他岗位可作为兼职。",
+        ));
+    }
     organization
         .validate(id, &text(person, "departmentId"), &company)
         .map_err(invalid)?;
+    let removed: Vec<_> = previous_assignments
+        .iter()
+        .filter(|a| {
+            a.id != organization.primary_assignment_id
+                && !organization
+                    .additional_assignments
+                    .iter()
+                    .any(|next| next.id == a.id)
+        })
+        .collect();
+    if !removed.is_empty() {
+        for reference in appointment_references(tx, id)? {
+            if removed.iter().any(|a| reference["id"] == a.id) {
+                let reason = appointment_removal_reason(&reference)?;
+                if !reason.is_empty() {
+                    return Err(super::error::conflict(format!(
+                        "任职不能删除：{reason}。请保留任职记录，通过终止日期办理撤任，并先交接有效职责。"
+                    )));
+                }
+            }
+        }
+    }
     super::personnel_reporting::normalize(tx, &company, &mut organization)?;
     for (unit, department) in std::iter::once((company.as_str(), text(person, "departmentId")))
         .chain(
@@ -294,27 +325,6 @@ pub(super) fn validate_with_primary(
             {
                 return Err(super::error::error(403, "不能结束或改写其他单位的任职。"));
             }
-        }
-    }
-    for (unit, managers) in std::iter::once((
-        company.as_str(),
-        organization
-            .manager_employee_id
-            .into_iter()
-            .chain(organization.functional_manager_employee_ids.iter().copied())
-            .collect::<Vec<_>>(),
-    ))
-    .chain(organization.additional_assignments.iter().map(|a| {
-        (
-            a.company_code.as_str(),
-            a.manager_employee_id
-                .into_iter()
-                .chain(a.functional_manager_employee_ids.iter().copied())
-                .collect(),
-        )
-    })) {
-        for manager in managers {
-            active_person(tx, unit, manager)?;
         }
     }
     person["organization"] = serde_json::to_value(organization)?;
@@ -415,12 +425,18 @@ pub fn project(tx: &Connection, person: &Value) -> Result<Value> {
     }
     enrich(&mut value, &names);
     let mut departments = super::organization::DepartmentNames::default();
+    let references = appointment_references(tx, person["id"].as_i64().unwrap_or(0))?;
     for assignment in value["additionalAssignments"]
         .as_array_mut()
         .into_iter()
         .flatten()
     {
         enrich(assignment, &names);
+        if let Some(reference) = references.iter().find(|r| r["id"] == assignment["id"]) {
+            let reason = appointment_removal_reason(reference)?;
+            assignment["canRemove"] = json!(reason.is_empty());
+            assignment["removalReason"] = json!(reason);
+        }
         assignment["departmentName"] = json!(departments.get(
             tx,
             &text(assignment, "companyCode"),
@@ -428,4 +444,31 @@ pub fn project(tx: &Connection, person: &Value) -> Result<Value> {
         )?);
     }
     Ok(value)
+}
+
+pub(super) fn appointment_references(tx: &Connection, id: i64) -> Result<Vec<Value>> {
+    if id == 0 {
+        return Ok(vec![]);
+    }
+    tx.appointment_references(&[id])?
+        .pop()
+        .and_then(|r| r["appointments"].as_array().cloned())
+        .ok_or_else(|| unavailable("任职引用投影缺失。"))
+}
+pub(super) fn appointment_removal_reason(reference: &Value) -> Result<String> {
+    let mut reasons = vec![];
+    for (field, label) in [
+        ("roleCount", "单位授权（含已停用授权）"),
+        ("reportingCount", "汇报关系"),
+        ("dutyCount", "组织负责人职责"),
+        ("historyCount", "正式申请历史"),
+    ] {
+        let count = reference[field]
+            .as_i64()
+            .ok_or_else(|| unavailable("任职引用计数损坏。"))?;
+        if count > 0 {
+            reasons.push(format!("{count} 项{label}"));
+        }
+    }
+    Ok(reasons.join("、"))
 }

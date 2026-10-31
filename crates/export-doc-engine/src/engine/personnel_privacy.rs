@@ -6,6 +6,11 @@ use super::{
 use serde_json::{Value, json};
 
 const PUBLIC_FIELDS: &[&str] = &["fullName", "workEmail", "workPhone", "workLocation"];
+pub(super) fn public_profile(profile: &mut Value) {
+    if let Some(fields) = profile.as_object_mut() {
+        fields.retain(|key, _| PUBLIC_FIELDS.contains(&key.as_str()));
+    }
+}
 
 /// Only an already-authorized personnel detail or mutation may join private fields.
 pub(super) fn hydrate(tx: &Connection, person: &mut Value) -> Result<()> {

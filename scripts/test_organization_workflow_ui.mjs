@@ -1,4 +1,4 @@
-import { approveTask } from './lib/approval-fixtures.mjs';
+import { approveTask, approvalStage, publishDefinitions } from './lib/approval-fixtures.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
@@ -21,9 +21,11 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
     people.push(await invoke('LinkPersonnelAccount', { expectedVersion: person.versionNumber, userId: user.id, expectedAccountVersion: user.versionNumber }, { id: person.employee.id }, token));
     users.push(user);
   }
+  const initialSettings = await invoke('GetOaApprovalSettings', undefined, {}, token);
+  await publishDefinitions(invoke, token, {...initialSettings,rules:initialSettings.rules.map(rule=>rule.key==='personnel:Transfer'?{...rule,stages:[approvalStage('personnel-review',[users[4].id])]}:rule)}, ['personnel:Transfer']);
   await admin.goto(`${url}/#/office/people/${people[0].employee.id}`);
-  await admin.getByRole('button', { name: '办理调岗', exact: true }).click();
-  const transfer = admin.getByRole('dialog', { name: /办理调岗/u });
+  await admin.getByRole('link', { name: '申请调岗', exact: true }).click();
+  const transfer = admin.getByRole('dialog', { name: /新建人员变动/u });
   await transfer.locator('summary').filter({ hasText: '兼职与汇报关系' }).click();
   await transfer.getByRole('button', { name: '添加任职', exact: true }).click();
   await transfer.getByRole('combobox', { name: '任职部门', exact: true }).selectOption('ORGFIN');
@@ -39,13 +41,21 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   }
   await pick(primary, '选择直属负责人', '会签甲');
   await pick(primary, '添加职能负责人', '会签乙');
-  await transfer.getByRole('textbox', { name: '办理说明（必填）', exact: true }).fill('建立兼职与双线汇报');
-  await transfer.getByRole('button', { name: '办理调岗', exact: true }).click();
+  await transfer.getByRole('textbox', { name: '申请标题', exact: true }).fill('建立兼职与双线汇报');
+  await transfer.getByRole('textbox', { name: '申请说明', exact: true }).fill('正式调岗需独立业务审批');
+  const transferSaved = admin.waitForResponse(response=>response.request().method()==='POST'&&response.url().endsWith('/api/office/personnel-requests'));
+  await transfer.getByRole('button', { name: '保存草稿', exact: true }).click();
+  const transferDraft = await (await transferSaved).json();
   await transfer.waitFor({ state: 'hidden' });
+  assert.equal((await invoke('GetPersonnel', undefined, { id:people[0].employee.id }, token)).organization.additionalAssignments.length, 0, 'saving a request does not change appointment facts');
+  await invoke('SubmitPersonnelChangeRequest', {expectedVersion:transferDraft.versionNumber,note:'提交任职变动'}, {id:transferDraft.id}, token);
+  const personnelReviewer = (await invoke('Login',{username:'org-ui-4',password:'Org-Workflow-2026'})).accessToken;
+  await approveTask(invoke,personnelReviewer,'PersonnelChange',transferDraft.id);
   const updated = await invoke('GetPersonnel', undefined, { id: people[0].employee.id }, token);
   assert.equal(updated.organization.additionalAssignments[0].departmentId, 'ORGFIN');
   assert.equal(updated.organization.managerEmployeeId, people[1].employee.id);
   assert.deepEqual(updated.organization.functionalManagerEmployeeIds, [people[2].employee.id]);
+  await admin.goto(`${url}/#/office/people/${people[0].employee.id}`);
   await admin.screenshot({ path: path.join(output, 'personnel-matrix.png'), fullPage: true });
   await admin.goto(`${url}/#/system/organization`);
   await admin.getByRole('button', { name: '编辑公司', exact: true }).click();

@@ -10,6 +10,33 @@ export interface AISettings {
   systemPrompt: string;
 }
 
+export interface AccessRestrictionList {
+  items: AccessRestrictionRecord[];
+}
+
+export interface AccessRestrictionRecord {
+  action: string;
+  id: string;
+  members: { id: string }[];
+  mode: "Deny" | "Unrestricted" | "Units" | "Departments" | "Projects" | "Participation";
+  principalId?: string;
+  principalKind?: "Account" | "Unit";
+  reason: string;
+  resourceKey: string;
+  versionNumber: number;
+}
+
+export interface AccessRestrictionSave {
+  action: string;
+  expectedVersion: number;
+  members: string[];
+  mode: "Deny" | "Unrestricted" | "Units" | "Departments" | "Projects" | "Participation";
+  principalId: string;
+  principalKind: "Account" | "Unit";
+  reason: string;
+  resourceKey: string;
+}
+
 export interface AccountPersonnelRecord {
   departmentId?: string;
   employeeNumber: string;
@@ -18,6 +45,20 @@ export interface AccountPersonnelRecord {
   jobTitle: string;
   organization?: PersonnelOrganization;
   status: "Probation" | "Active" | "Departed";
+}
+
+export interface AccountSecurityResult {
+  accountId: string;
+  handoverRequired: boolean;
+  isActive: boolean;
+  versionNumber: number;
+}
+
+export interface AccountSecuritySuspension {
+  accountId: string;
+  commandKey: string;
+  expectedVersion: number;
+  note: string;
 }
 
 export interface Announcement {
@@ -2497,6 +2538,7 @@ export interface ApiPermissionActionDefinitionDto {
   name: string;
   presetLevel: string;
   sortOrder: number;
+  unitAssignable?: boolean;
 }
 
 export interface ApiPermissionGrantDto {
@@ -2512,8 +2554,11 @@ export interface ApiPermissionResourceDefinitionDto {
   key: string;
   moduleKey: string;
   name: string;
+  scopeDescription?: string;
   sortOrder: number;
   supportsDataScope: boolean;
+  unitAssignable?: boolean;
+  workflowResource?: boolean;
   workspace: string;
 }
 
@@ -2538,6 +2583,7 @@ export interface ApiPermissionTemplateDto {
   name: string;
   oaAssignedOnly?: boolean;
   ownerUnitId?: number | null;
+  publishedVersion?: number | null;
   unitRoleReferenceCount?: number;
   updatedAt: string;
   versionNumber: number;
@@ -2550,6 +2596,7 @@ export interface ApiPermissionTemplateOptionDto {
   isSystem: boolean;
   name: string;
   oaAssignedOnly?: boolean;
+  publishedVersion?: number | null;
 }
 
 export interface ApiPermissionTemplateSaveRequest {
@@ -3021,6 +3068,7 @@ export interface ApiRuntimeMetricsResponse {
   http: ApiRuntimeHttpMetrics | null;
   jobs: ApiRuntimeJobMetrics;
   storage: ApiRuntimeDatabaseMetrics;
+  workflowSchedule: { lastErrorStatus: number | null; ticks: number };
 }
 
 export interface ApiRuntimePathInfo {
@@ -3710,6 +3758,7 @@ export interface ApiUserAccountDto {
   isActive: boolean;
   oaAssignedOnly?: boolean;
   permissionGrants?: ApiPermissionGrantDto[] | null;
+  permissionSchemeVersion?: number | null;
   permissionTemplateCode: string;
   permissionTemplateId?: number | null;
   permissionTemplateName: string;
@@ -3746,6 +3795,7 @@ export interface ApiUserDto {
   fullName: string;
   id: number;
   isActive: boolean;
+  permissionSchemeVersion?: number | null;
   permissionSource?: PermissionSource;
   primaryCompanyScope?: string;
   role: string;
@@ -3833,6 +3883,7 @@ export interface ApiUserSaveRequest {
   isActive: boolean;
   oaAssignedOnly?: boolean;
   permissionGrants?: ApiPermissionGrantDto[] | null;
+  permissionSchemeVersion?: number | null;
   permissionTemplateId: number | null;
   resetPassword: string;
   role: string;
@@ -4246,6 +4297,159 @@ export type IFormFile = string | null;
 
 export type IFormFileCollection = IFormFile[];
 
+export interface IdentityAppointmentOption {
+  departmentCode: string;
+  departmentId: string;
+  id: string;
+  isPrimary: boolean;
+  jobTitle: string;
+  positionId: string | null;
+}
+
+export interface IdentityAssignment {
+  appointmentId: string;
+  id?: string | null;
+  period: IdentityEffectivePeriod;
+  projectId?: string | null;
+  role?: "" | "Member" | "Leader";
+}
+
+export interface IdentityCandidatePage {
+  departmentCount: number;
+  departments: IdentityDepartmentOption[];
+  items: IdentityPersonOption[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface IdentityDepartmentOption {
+  code: string;
+  id: string;
+  name: string;
+}
+
+export interface IdentityEffectivePeriod {
+  endsOn?: string | null;
+  startsOn: string;
+}
+
+export interface IdentityEmployment {
+  employeeNumber: string;
+  id: string;
+  identityId: string;
+  period: IdentityEffectivePeriod;
+  personId: string;
+  stage: "Probation" | "Regular" | "Departed";
+  unitId: string;
+  versionNumber: number;
+}
+
+export interface IdentityEmploymentPage {
+  items: IdentityEmployment[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface IdentityPersonOption {
+  appointments: IdentityAppointmentOption[];
+  employeeNumber: string;
+  name: string;
+  personId: string;
+}
+
+export interface IdentityPosition {
+  appointmentCount: number;
+  code: string;
+  departmentId: string | null;
+  id: string;
+  isActive: boolean;
+  name: string;
+  unitId: string;
+  versionNumber: number;
+}
+
+export interface IdentityPositionPage {
+  items: IdentityPosition[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface IdentityPositionSave {
+  code: string;
+  departmentId?: string | null;
+  expectedVersion: number;
+  id?: string | null;
+  isActive: boolean;
+  name: string;
+  note: string;
+  unitId: string;
+}
+
+export interface IdentityProject {
+  code: string;
+  id: string;
+  isActive: boolean;
+  members: IdentityAssignment[];
+  name: string;
+  ownerAppointmentId: string;
+  unitId: string;
+  versionNumber: number;
+}
+
+export interface IdentityProjectPage {
+  items: IdentityProject[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface IdentityProjectSave {
+  code: string;
+  expectedVersion: number;
+  id?: string | null;
+  isActive: boolean;
+  members: IdentityAssignment[];
+  name: string;
+  note: string;
+  ownerAppointmentId: string;
+  unitId: string;
+}
+
+export interface IdentityResponsibility {
+  assignments: IdentityAssignment[];
+  code: string;
+  departmentId: string | null;
+  id: string;
+  isActive: boolean;
+  name: string;
+  unitId: string;
+  versionNumber: number;
+  workflowKinds: ("leave" | "overtime" | "expense" | "travel" | "purchase" | "general" | "room" | "supply" | "personnel")[];
+}
+
+export interface IdentityResponsibilityPage {
+  items: IdentityResponsibility[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface IdentityResponsibilitySave {
+  assignments: IdentityAssignment[];
+  code: string;
+  departmentId?: string | null;
+  expectedVersion: number;
+  id?: string | null;
+  isActive: boolean;
+  name: string;
+  note: string;
+  unitId: string;
+  workflowKinds: ("leave" | "overtime" | "expense" | "travel" | "purchase" | "general" | "room" | "supply" | "personnel")[];
+}
+
 export interface InvoiceCloneOptions {
   clearAmounts?: boolean;
   copyHeader?: boolean;
@@ -4266,44 +4470,53 @@ export interface InvoiceReviewResult {
 
 export interface MeetingBookingCreateRequest {
   attendeeCount: number;
+  departmentId?: string;
   employeeId?: number | null;
   endsAt: string;
   meetingRoomId: number;
   requestKey: string;
   startsAt: string;
+  submitImmediately?: boolean;
   title: string;
 }
 
 export interface MeetingBookingRecord {
   applicantName: string;
+  approvalDocument?: ResourceSubmission;
   approvalPlan?: OaApprovalPlan;
-  attendeeCount: number;
+  attachments?: OaAttachment[];
+  attendeeCount?: number;
   canHandle?: boolean;
   canReview?: boolean;
+  companyScope: string;
   createdAt: string;
   departmentId: string;
   employeeId?: number;
   employeeNumber?: string;
-  endsAt: string;
+  endsAt?: string;
   handlerNames?: string;
   handlingKey?: string;
   handlingName?: string;
   id: number;
   issuedAt?: string | null;
-  location: string;
+  location?: string;
+  materialAccess?: OaMaterialAccess;
   meetingRoomId: number;
   ownerUserId: number;
-  requiresKey: boolean;
+  requiresKey?: boolean;
   returnedAt?: string | null;
   reviewTaskKeys?: string[];
-  roomName: string;
-  startsAt: string;
+  roomName?: string;
+  startsAt?: string;
   status: MeetingBookingStatus;
-  title: string;
+  submissionId?: number;
+  submissionNumber?: number;
+  title?: string;
   versionNumber: number;
+  workflowActions?: ("AddBefore" | "AddAfter" | "AddParallel" | "RemoveSigner" | "ReturnToNode" | "Suspend" | "Resume" | "Terminate")[];
 }
 
-export type MeetingBookingStatus = "Pending" | "Approved" | "InUse" | "Completed" | "Rejected" | "Cancelled";
+export type MeetingBookingStatus = "Pending" | "Approved" | "InUse" | "Completed" | "Rejected" | "Cancelled" | "Draft" | "Suspended" | "Terminated";
 
 export interface MeetingBookingUpdateRequest {
   attendeeCount: number;
@@ -4364,9 +4577,12 @@ export interface NotificationPage {
 export type NotifyPartyMode = "None" | "SameAsConsignee" | "Separate";
 
 export interface OaAction {
+  commandKey?: string;
+  confirmedReviewPoints?: number[];
   expectedVersion: number;
   note: string;
   taskKey?: string;
+  verificationValues?: Record<string, string | boolean>;
 }
 
 export interface OaApprovalCondition {
@@ -4391,29 +4607,56 @@ export interface OaApprovalHub {
 export interface OaApprovalHubEntry {
   finance: boolean;
   handling: boolean;
-  kind: "personnel" | "leave" | "overtime" | "expense" | "travel" | "purchase" | "general";
-  page: OaRequestPage;
+  kind: "personnel" | "leave" | "overtime" | "expense" | "travel" | "purchase" | "general" | "rooms" | "supplies";
+  page: OaApprovalHubPage;
+  status: string;
+}
+
+export interface OaApprovalHubItem {
+  employeeId: number;
+  employeeName: string;
+  employeeNumber: string;
+  id: number;
+  title: string;
+}
+
+export interface OaApprovalHubPage {
+  items: OaApprovalHubItem[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
 }
 
 export interface OaApprovalNode {
-  decision: "All" | "Any";
+  approvalPercentage?: number;
+  calendarKey?: string;
+  deadlineMode?: "Natural" | "Working";
+  decision: "All" | "Any" | "Ratio";
   dependsOn: string[];
   dueAt: string;
   dueHours: number;
   independentReview: boolean;
   key: string;
+  materialPolicy?: OaMaterialPolicy;
   name: string;
+  rejectionPolicy?: "Immediate" | "Collect";
   reviewPoints?: string[];
+  revisionPolicy?: OaRevisionPolicy;
   skipped: boolean;
   startedAt: string;
 }
 
 export interface OaApprovalPlan {
+  calendars?: Record<string, OaBusinessCalendar>;
   definitionKey: string;
+  generation?: number;
   nodes: OaApprovalNode[];
   notifyUserIds: number[];
+  pausedSeconds?: number;
   policyVersion: number;
   steps: OaApprovalStep[];
+  subflows?: OaSubflowInstance[];
+  suspendedAt?: string;
 }
 
 export interface OaApprovalPreview {
@@ -4422,6 +4665,7 @@ export interface OaApprovalPreview {
 }
 
 export interface OaApprovalReassign {
+  commandKey: string;
   expectedVersion: number;
   fromUserId: number;
   note: string;
@@ -4431,6 +4675,7 @@ export interface OaApprovalReassign {
 }
 
 export interface OaApprovalRule {
+  calendar?: OaBusinessCalendar | null;
   key: string;
   kind: "leave" | "overtime" | "expense" | "travel" | "purchase" | "general" | "personnel" | "room" | "supply";
   name: string;
@@ -4440,10 +4685,10 @@ export interface OaApprovalRule {
 }
 
 export interface OaApprovalSettings {
+  calendar?: OaBusinessCalendar;
   delegations: OaApprovalDelegation[];
   expectedVersion?: number;
   handlingServices?: OfficeHandlingService[];
-  personnelApprovalActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
   publications: OaPublication[];
   rules: OaApprovalRule[];
   sheetDefaultContent?: string;
@@ -4453,43 +4698,55 @@ export interface OaApprovalSettings {
 }
 
 export interface OaApprovalSettingsSave {
+  calendar?: OaBusinessCalendar;
   delegations: OaApprovalDelegation[];
   expectedVersion: number;
   handlingServices?: OfficeHandlingService[];
-  personnelApprovalActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
   rules: OaApprovalRule[];
   sheetTemplates?: OaSheetTemplate[];
 }
 
 export interface OaApprovalStage {
+  approvalPercentage?: number;
   approverUserIds: number[];
   conditions: OaApprovalCondition[];
-  decision: "All" | "Any";
+  deadlineMode?: "Natural" | "Working";
+  decision: "All" | "Any" | "Ratio";
   dependsOn: string[];
   dueHours: number;
   key: string;
+  layout?: OaGraphPoint | null;
+  materialPolicy?: OaMaterialPolicy;
   name: string;
   organizationRoute?: OaOrganizationRoute;
+  rejectionPolicy?: "Immediate" | "Collect";
   repeatedApprover: "Allow" | "Reject";
   reviewPoints?: string[];
+  revisionPolicy?: OaRevisionPolicy;
   selfApproval: "Skip" | "Reject";
   source: "Named" | "DepartmentManager" | "DepartmentLeaders" | "LineManager" | "FunctionalManagers" | "CompanyExecutive" | "CompanyLeaders";
+  subflow?: OaSubflowReference | null;
 }
 
 export interface OaApprovalStep {
   actedAt: string;
   actedByContext: string;
   actedByName: string;
+  actedByPersonId?: number | null;
   actedByUserId?: number | null;
   approverContext: string;
   approverName: string;
+  approverPersonId?: number | null;
   approverUserId: number;
-  decision: "All" | "Any";
+  confirmedReviewPoints?: number[];
+  decision: "All" | "Any" | "Ratio";
   delegationKey: string;
   note: string;
+  sourceGeneration?: number | null;
   stage: number;
   status: "Waiting" | "Approved" | "Rejected" | "Returned" | "Skipped" | "Cancelled";
   taskKey: string;
+  verificationValues?: Record<string, string | boolean>;
 }
 
 export interface OaApprovalVerification {
@@ -4514,12 +4771,40 @@ export interface OaApprovalVerification {
 }
 
 export interface OaAttachment {
+  classification?: "Internal" | "Restricted";
   digest?: string;
   fileName: string;
   id: number;
   mediaType: string;
   purpose?: "ReimbursementForm" | "Voucher" | "Supporting";
   sizeBytes: number;
+}
+
+export interface OaBusinessCalendar {
+  additionalWorkingDays: string[];
+  holidays: string[];
+  intervals: OaWorkInterval[];
+  timeZone: string;
+  version: number;
+  workingWeekdays: number[];
+}
+
+export interface OaCommandAction {
+  commandKey: string;
+  confirmedReviewPoints?: number[];
+  expectedVersion: number;
+  note: string;
+  taskKey?: string;
+  verificationValues?: Record<string, string | boolean>;
+}
+
+export interface OaCommandResult {
+  command: string;
+  commandKey: string;
+  committedAt: string;
+  committedVersion: number;
+  currentVersion: number;
+  requestId: number;
 }
 
 export interface OaDefinitionAction {
@@ -4552,12 +4837,182 @@ export interface OaExpenseLine {
   spentOn: string;
 }
 
+export interface OaGraphPoint {
+  x: number;
+  y: number;
+}
+
 export interface OaLeave {
   category: "Annual" | "Sick" | "Personal" | "Other";
   endPeriod: "AM" | "PM";
   endsOn: string;
   startPeriod: "AM" | "PM";
   startsOn: string;
+}
+
+export interface OaMaterialAccess {
+  canDownloadArchive: boolean;
+  isPartial: boolean;
+  omittedFields: string[];
+}
+
+export interface OaMaterialOaExpenseLine {
+  amount?: string;
+  category?: "Travel" | "Transport" | "Meals" | "Office" | "Other";
+  description?: string;
+  spentOn?: string;
+}
+
+export interface OaMaterialOaLeave {
+  category?: "Annual" | "Sick" | "Personal" | "Other";
+  endPeriod?: "AM" | "PM";
+  endsOn?: string;
+  startPeriod?: "AM" | "PM";
+  startsOn?: string;
+}
+
+export interface OaMaterialOaOvertime {
+  endsAt?: string;
+  location?: string;
+  startsAt?: string;
+}
+
+export interface OaMaterialOaPersonnelChange {
+  action?: "Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire";
+  departmentId?: string;
+  effectiveDate?: string;
+  expectedPersonnelVersion?: number;
+  jobTitle?: string;
+  onProbation?: boolean;
+  organization?: OaMaterialPersonnelOrganization;
+  primaryAppointmentId?: string;
+  registration?: OaMaterialPersonnelCreateRequest;
+}
+
+export interface OaMaterialOaPersonnelChangeProjection {
+  action?: "Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire";
+  departmentId?: string;
+  effectiveDate?: string;
+  expectedPersonnelVersion?: number;
+  jobTitle?: string;
+  onProbation?: boolean;
+  organization?: OaMaterialPersonnelOrganization;
+  primaryAppointmentId?: string;
+  registration?: OaMaterialOaPersonnelRegistrationProjection;
+}
+
+export interface OaMaterialOaPersonnelProfileProjection {
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  fullName?: string;
+  identityAuthority?: string;
+  identityLongTerm?: boolean;
+  identityNumber?: string;
+  identityValidFrom?: string | null;
+  identityValidUntil?: string | null;
+  notes?: string;
+  personalPhone?: string;
+  registeredAddress?: string;
+  workEmail?: string;
+  workLocation?: string;
+  workPhone?: string;
+}
+
+export interface OaMaterialOaPersonnelRegistrationProjection {
+  contractEndsOn?: string | null;
+  departmentId?: string;
+  employeeNumber?: string;
+  employmentType?: EmploymentType;
+  hireDate?: string;
+  jobTitle?: string;
+  onProbation?: boolean;
+  organization?: OaMaterialPersonnelOrganization;
+  probationEndsOn?: string | null;
+  profile?: OaMaterialOaPersonnelProfileProjection;
+  requestKey?: string;
+}
+
+export interface OaMaterialOaPurchaseLine {
+  name?: string;
+  quantity?: string;
+  specification?: string;
+  unit?: string;
+  unitPrice?: string;
+}
+
+export interface OaMaterialOaTravel {
+  destination?: string;
+  endsOn?: string;
+  startsOn?: string;
+}
+
+export interface OaMaterialPersonnelAssignment {
+  canRemove?: boolean;
+  companyCode?: string;
+  departmentId?: string;
+  departmentName?: string;
+  endsOn?: string;
+  functionalManagerAssignmentIds?: string[];
+  functionalManagerEmployeeIds?: number[];
+  functionalManagerNames?: string[];
+  id?: string;
+  jobTitle?: string;
+  managerAssignmentId?: string | null;
+  managerEmployeeId?: number | null;
+  managerName?: string;
+  removalReason?: string;
+  startsOn?: string;
+}
+
+export interface OaMaterialPersonnelCreateRequest {
+  contractEndsOn?: string | null;
+  departmentId?: string;
+  employeeNumber?: string;
+  employmentType?: EmploymentType;
+  hireDate?: string;
+  jobTitle?: string;
+  onProbation?: boolean;
+  organization?: OaMaterialPersonnelOrganization;
+  probationEndsOn?: string | null;
+  profile?: OaMaterialPersonnelProfile;
+  requestKey?: string;
+}
+
+export interface OaMaterialPersonnelOrganization {
+  additionalAssignments?: OaMaterialPersonnelAssignment[];
+  functionalManagerAssignmentIds?: string[];
+  functionalManagerEmployeeIds?: number[];
+  functionalManagerNames?: string[];
+  managerAssignmentId?: string | null;
+  managerEmployeeId?: number | null;
+  managerName?: string;
+  primaryAssignmentId?: string;
+  primaryStartsOn?: string;
+}
+
+export interface OaMaterialPersonnelProfile {
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  fullName?: string;
+  identityAuthority?: string;
+  identityLongTerm?: boolean;
+  identityNumber?: string;
+  identityValidFrom?: string | null;
+  identityValidUntil?: string | null;
+  notes?: string;
+  personalPhone?: string;
+  registeredAddress?: string;
+  workEmail?: string;
+  workLocation?: string;
+  workPhone?: string;
+}
+
+export interface OaMaterialPolicy {
+  allowRestrictedAttachments?: boolean;
+  hiddenFields?: string[];
+  requireReviewPoints?: boolean;
+  verificationFields?: OaVerificationField[];
+  visibleFields?: string[];
 }
 
 export interface OaOrganizationRoute {
@@ -4579,7 +5034,57 @@ export interface OaPersonnelChange {
   jobTitle?: string;
   onProbation?: boolean;
   organization?: PersonnelOrganization;
+  primaryAppointmentId?: string;
   registration?: PersonnelCreateRequest;
+}
+
+export interface OaPersonnelChangeProjection {
+  action: "Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire";
+  departmentId?: string;
+  effectiveDate?: string;
+  expectedPersonnelVersion?: number;
+  jobTitle?: string;
+  onProbation?: boolean;
+  organization?: PersonnelOrganization;
+  primaryAppointmentId?: string;
+  registration?: OaPersonnelRegistrationProjection;
+}
+
+export interface OaPersonnelExecution {
+  effectiveAt: string;
+  errorCode: string;
+  state: "Pending" | "Applied" | "Blocked" | "Cancelled";
+}
+
+export interface OaPersonnelProfileProjection {
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  fullName: string;
+  identityAuthority?: string;
+  identityLongTerm?: boolean;
+  identityNumber?: string;
+  identityValidFrom?: string | null;
+  identityValidUntil?: string | null;
+  notes?: string;
+  personalPhone?: string;
+  registeredAddress?: string;
+  workEmail?: string;
+  workLocation?: string;
+  workPhone?: string;
+}
+
+export interface OaPersonnelRegistrationProjection {
+  contractEndsOn: string | null;
+  departmentId: string;
+  employeeNumber: string;
+  employmentType: EmploymentType;
+  hireDate: string;
+  jobTitle: string;
+  onProbation: boolean;
+  organization?: PersonnelOrganization;
+  probationEndsOn: string | null;
+  profile: OaPersonnelProfileProjection;
+  requestKey: string;
 }
 
 export interface OaPublication {
@@ -4608,8 +5113,8 @@ export interface OaRequest {
   createdAt: string;
   currency?: "CNY" | "USD" | "EUR" | "HKD" | "JPY" | "GBP";
   departmentId: string;
-  durationDays: string;
-  durationHours: string;
+  durationDays?: string;
+  durationHours?: string;
   employeeId: number;
   employeeName: string;
   employeeNumber?: string;
@@ -4620,23 +5125,26 @@ export interface OaRequest {
   id: number;
   kind: "leave" | "expense" | "travel" | "overtime" | "purchase" | "general" | "personnel";
   lastRemindedAt?: string;
-  leave?: OaLeave;
-  lines?: OaExpenseLine[];
-  overtime?: OaOvertime;
+  leave?: OaMaterialOaLeave;
+  lines?: OaMaterialOaExpenseLine[];
+  materialAccess?: OaMaterialAccess;
+  overtime?: OaMaterialOaOvertime;
   ownerUserId: number;
-  personnelChange?: OaPersonnelChange;
-  purchaseLines?: OaPurchaseLine[];
-  reason: string;
+  personnelChange?: OaMaterialOaPersonnelChangeProjection;
+  personnelExecution?: OaPersonnelExecution | null;
+  purchaseLines?: OaMaterialOaPurchaseLine[];
+  reason?: string;
   requestKey: string;
   reviewTaskKeys?: string[];
-  status: "Draft" | "Pending" | "Approved" | "Rejected" | "Cancelled" | "Completed" | "HandedOff" | "Returned";
+  status: "Draft" | "Pending" | "Approved" | "Rejected" | "Cancelled" | "Completed" | "HandedOff" | "Returned" | "Suspended" | "Terminated";
   submissionId?: number;
   submissionNumber?: number;
-  title: string;
-  totalAmount: string;
-  travel?: OaTravel;
+  title?: string;
+  totalAmount?: string;
+  travel?: OaMaterialOaTravel;
   updatedAt: string;
   versionNumber: number;
+  workflowActions?: ("AddBefore" | "AddAfter" | "AddParallel" | "RemoveSigner" | "ReturnToNode" | "Suspend" | "Resume" | "Terminate")[];
 }
 
 export interface OaRequestPage {
@@ -4662,6 +5170,15 @@ export interface OaRequestSave {
   requestKey: string;
   title: string;
   travel?: OaTravel;
+}
+
+export interface OaRevisionPolicy {
+  allowAddSigners?: boolean;
+  allowRemoveSigners?: boolean;
+  allowReturnToNode?: boolean;
+  minimumSigners?: number;
+  pauseStopsClock?: boolean;
+  protectedUserIds?: number[];
 }
 
 export interface OaRoutingUnit {
@@ -4718,6 +5235,19 @@ export interface OaSimulationResult {
   notes: string[];
 }
 
+export interface OaSubflowInstance {
+  definitionId: number;
+  definitionKey: string;
+  key: string;
+  nodeKeys: string[];
+  version: number;
+}
+
+export interface OaSubflowReference {
+  definitionKey: string;
+  version: number;
+}
+
 export interface OaSubmission {
   applicantJobTitle?: string;
   appointment?: PersonnelAssignment;
@@ -4729,6 +5259,7 @@ export interface OaSubmission {
   documentStatus: "NotApproved" | "Pending" | "Running" | "Ready" | "Failed" | "Voided";
   formName: string;
   id: number;
+  materialAccess?: OaMaterialAccess;
   request?: OaSubmittedRequest;
   requestId: number;
   requestVersion: number;
@@ -4754,8 +5285,8 @@ export interface OaSubmittedRequest {
   createdAt: string;
   currency?: "CNY" | "USD" | "EUR" | "HKD" | "JPY" | "GBP";
   departmentId: string;
-  durationDays: string;
-  durationHours: string;
+  durationDays?: string;
+  durationHours?: string;
   employeeId: number;
   employeeName: string;
   expectedVersion?: number;
@@ -4765,19 +5296,19 @@ export interface OaSubmittedRequest {
   id: number;
   kind: "leave" | "expense" | "travel" | "overtime" | "purchase" | "general" | "personnel";
   lastRemindedAt?: string;
-  leave?: OaLeave;
-  lines?: OaExpenseLine[];
-  overtime?: OaOvertime;
+  leave?: OaMaterialOaLeave;
+  lines?: OaMaterialOaExpenseLine[];
+  overtime?: OaMaterialOaOvertime;
   ownerUserId: number;
-  personnelChange?: OaPersonnelChange;
-  purchaseLines?: OaPurchaseLine[];
-  reason: string;
+  personnelChange?: OaMaterialOaPersonnelChange;
+  purchaseLines?: OaMaterialOaPurchaseLine[];
+  reason?: string;
   requestKey: string;
   reviewTaskKeys?: string[];
   status: "Draft" | "Pending" | "Approved" | "Rejected" | "Cancelled" | "Completed" | "HandedOff" | "Returned";
-  title: string;
-  totalAmount: string;
-  travel?: OaTravel;
+  title?: string;
+  totalAmount?: string;
+  travel?: OaMaterialOaTravel;
   updatedAt: string;
   versionNumber: number;
 }
@@ -4788,10 +5319,45 @@ export interface OaTravel {
   startsOn: string;
 }
 
+export interface OaVerificationField {
+  key: string;
+  kind: "Text" | "Decimal" | "Date" | "Boolean";
+  label: string;
+  required: boolean;
+  restricted?: boolean;
+}
+
+export interface OaWorkInterval {
+  endsAt: string;
+  startsAt: string;
+}
+
+export interface OaWorkflowCandidate {
+  fullName: string;
+  id: number;
+}
+
+export interface OaWorkflowCandidates {
+  nextCursor: number | null;
+  users: OaWorkflowCandidate[];
+}
+
+export interface OaWorkflowCommandSave {
+  command: "AddBefore" | "AddAfter" | "AddParallel" | "RemoveSigner" | "ReturnToNode" | "Suspend" | "Resume" | "Terminate";
+  commandKey: string;
+  expectedVersion: number;
+  note: string;
+  targetNodeKey?: string;
+  userIds?: number[];
+}
+
 export interface OfficeDecisionRequest {
+  commandKey: string;
+  confirmedReviewPoints?: number[];
   expectedVersion: number;
   note?: string;
   taskKey?: string;
+  verificationValues?: Record<string, string | boolean>;
 }
 
 export interface OfficeHandlingDirectory {
@@ -4818,6 +5384,7 @@ export interface OfficeRequestEventRecord {
 }
 
 export interface OfficeReturnRequest {
+  commandKey: string;
   expectedVersion: number;
   note?: string;
   quantity: number;
@@ -4862,9 +5429,12 @@ export interface OfficeSupplyRecord {
 
 export interface OfficeSupplyRequestRecord {
   applicantName: string;
+  approvalDocument?: ResourceSubmission;
   approvalPlan?: OaApprovalPlan;
+  attachments?: OaAttachment[];
   canHandle?: boolean;
   canReview?: boolean;
+  companyScope: string;
   createdAt: string;
   departmentId: string;
   employeeId?: number;
@@ -4873,18 +5443,23 @@ export interface OfficeSupplyRequestRecord {
   handlingKey?: string;
   handlingName?: string;
   id: number;
-  isReturnable: boolean;
+  isReturnable?: boolean;
+  materialAccess?: OaMaterialAccess;
   officeSupplyId: number;
   ownerUserId: number;
-  purpose: string;
-  quantity: number;
+  purpose?: string;
+  quantity?: number;
+  reservationState?: "Unreserved" | "Reserved" | "Insufficient" | "Consumed";
   returnDueDate?: string | null;
-  returnedQuantity: number;
+  returnedQuantity?: number;
   reviewTaskKeys?: string[];
   status: SupplyRequestStatus;
-  supplyName: string;
-  unit: string;
+  submissionId?: number;
+  submissionNumber?: number;
+  supplyName?: string;
+  unit?: string;
   versionNumber: number;
+  workflowActions?: ("AddBefore" | "AddAfter" | "AddParallel" | "RemoveSigner" | "ReturnToNode" | "Suspend" | "Resume" | "Terminate")[];
 }
 
 export interface OfficeSupplySaveRequest {
@@ -5074,6 +5649,64 @@ export interface PaymentTemplateItem {
   templatePath: string;
 }
 
+export interface PermissionBindingImpact {
+  addedActions: string[];
+  fromVersion: number | null;
+  id: string;
+  kind: "Account" | "Unit";
+  removedActions: string[];
+  toVersion: number;
+  versionNumber: number;
+}
+
+export interface PermissionBindingTarget {
+  expectedVersion: number;
+  id: string;
+  kind: "Account" | "Unit";
+}
+
+export interface PermissionSchemeApplication {
+  applied: boolean;
+  schemeId: string;
+  targets: PermissionBindingImpact[];
+  version: number;
+}
+
+export interface PermissionSchemeApply {
+  commandKey: string;
+  note: string;
+  schemeId: string;
+  targets: PermissionBindingTarget[];
+  version: number;
+}
+
+export interface PermissionSchemePublication {
+  publishedAt: string;
+  schemeId: string;
+  version: number;
+  versionNumber: number;
+}
+
+export interface PermissionSchemePublish {
+  commandKey: string;
+  expectedVersion: number;
+  note: string;
+  schemeId: string;
+}
+
+export interface PermissionSchemeVersion {
+  publishedAt: string;
+  schemeId: string;
+  version: number;
+}
+
+export interface PermissionSchemeVersions {
+  items: PermissionSchemeVersion[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
 export interface PermissionSource {
   accountDisabledModules: string[];
   authorityDisabledModules: string[];
@@ -5104,6 +5737,7 @@ export interface PersonnelAccountRequest {
 }
 
 export interface PersonnelAssignment {
+  canRemove?: boolean;
   companyCode?: string;
   departmentId: string;
   departmentName?: string;
@@ -5116,6 +5750,7 @@ export interface PersonnelAssignment {
   managerAssignmentId?: string | null;
   managerEmployeeId?: number | null;
   managerName?: string;
+  removalReason?: string;
   startsOn?: string;
 }
 
@@ -5238,12 +5873,6 @@ export interface PersonnelOrganization {
   primaryStartsOn?: string;
 }
 
-export interface PersonnelPrimaryAppointmentChange {
-  appointmentId: string;
-  expectedVersion: number;
-  note: string;
-}
-
 export interface PersonnelProfile {
   emergencyContact: string;
   emergencyPhone: string;
@@ -5265,7 +5894,6 @@ export interface PersonnelRecord {
   account?: null | PersonnelAccountRecord;
   approvalRequiredActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
   attachments?: PersonnelAttachment[];
-  canChangePrimaryAppointment?: boolean;
   canCorrectRegistration: boolean;
   canDelete: boolean;
   canEdit: boolean;
@@ -5293,16 +5921,6 @@ export interface PersonnelRegistrationCorrection {
   hireDate: string;
   jobTitle: string;
   onProbation: boolean;
-  organization?: PersonnelOrganization;
-}
-
-export interface PersonnelTransitionRequest {
-  departmentId?: string | null;
-  effectiveDate: string;
-  expectedVersion: number;
-  jobTitle?: string | null;
-  note: string;
-  onProbation?: boolean;
   organization?: PersonnelOrganization;
 }
 
@@ -5336,6 +5954,75 @@ export interface ReportTemplateImageResourceListItem {
   mediaType: string;
   ownsUpload: boolean;
   sha256: string;
+}
+
+export interface ResourceSubmission {
+  applicantJobTitle?: string;
+  appointment?: PersonnelAssignment;
+  approvedAt?: string;
+  companyName: string;
+  departmentName: string;
+  documentDigest: string;
+  documentError: string;
+  documentStatus: "NotApproved" | "Pending" | "Running" | "Ready" | "Failed" | "Voided";
+  formName: string;
+  id: number;
+  materialAccess?: OaMaterialAccess;
+  request?: ResourceSubmittedRequest;
+  requestId: number;
+  requestVersion: number;
+  status: string;
+  submissionNumber: number;
+  submittedAt: string;
+}
+
+export interface ResourceSubmissionPage {
+  items: ResourceSubmission[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface ResourceSubmittedRequest {
+  applicantName?: string;
+  approvalPlan: OaApprovalPlan;
+  attachments: OaAttachment[];
+  attendeeCount?: number;
+  canHandle?: boolean;
+  canReview?: boolean;
+  companyScope: unknown;
+  createdAt?: string;
+  departmentId: string;
+  employeeId: number;
+  employeeName: string;
+  employeeNumber: unknown;
+  endsAt?: string;
+  handlerNames?: string;
+  handlingKey?: string;
+  handlingName?: string;
+  id: number;
+  isReturnable?: boolean;
+  issuedAt?: string | null;
+  kind: "room" | "supply";
+  location?: string;
+  meetingRoomId?: number;
+  officeSupplyId?: number;
+  ownerUserId: number;
+  purpose?: string;
+  quantity?: number;
+  reason?: string;
+  requiresKey?: boolean;
+  returnDueDate?: string | null;
+  returnedAt?: string | null;
+  returnedQuantity?: number;
+  reviewTaskKeys?: string[];
+  roomName?: string;
+  startsAt?: string;
+  status?: SupplyRequestStatus;
+  supplyName?: string;
+  title?: string;
+  unit?: string;
+  versionNumber: number;
 }
 
 export type SingleWindowBusinessType = "CustomsCoo" | "AgentConsignment";
@@ -5594,15 +6281,17 @@ export interface SiteNotification {
 }
 
 export interface SupplyRequestCreateRequest {
+  departmentId?: string;
   employeeId?: number | null;
   officeSupplyId: number;
   purpose: string;
   quantity: number;
   requestKey: string;
   returnDueDate: string | null;
+  submitImmediately?: boolean;
 }
 
-export type SupplyRequestStatus = "Pending" | "Approved" | "Issued" | "Returned" | "Rejected" | "Cancelled";
+export type SupplyRequestStatus = "Pending" | "Approved" | "Issued" | "Returned" | "Rejected" | "Cancelled" | "Draft" | "Suspended" | "Terminated";
 
 export interface SupplyRequestUpdateRequest {
   expectedVersion: number;
@@ -5663,6 +6352,7 @@ export interface UnitAccessRecord {
   name: string;
   oaAssignedOnly: boolean;
   permissionGrants: ApiPermissionGrantDto[] | null;
+  permissionSchemeVersion?: number | null;
   permissionTemplateId?: number | null;
   startsAt: string;
   userId: number;
@@ -5684,6 +6374,7 @@ export interface UnitAccessSave {
   name: string;
   oaAssignedOnly: boolean;
   permissionGrants: ApiPermissionGrantDto[] | null;
+  permissionSchemeVersion?: number | null;
   permissionTemplateId?: number | null;
   startsAt: string;
   userId: number;
@@ -5711,6 +6402,7 @@ export interface UnitApproverOption {
 }
 
 export interface UnitApproverOptions {
+  handlers: UnitApproverOption[];
   users: UnitApproverOption[];
 }
 
@@ -5747,6 +6439,7 @@ export interface UnitMember {
 }
 
 export interface UnitMemberAppointment {
+  canRemove?: boolean;
   companyCode: string;
   departmentId: string;
   departmentName?: string;
@@ -5755,11 +6448,13 @@ export interface UnitMemberAppointment {
   functionalManagerEmployeeIds: number[];
   functionalManagerNames?: string[];
   id?: string;
+  isEffective?: boolean;
   isPrimary: boolean;
   jobTitle: string;
   managerAssignmentId?: string | null;
   managerEmployeeId?: number | null;
   managerName?: string;
+  removalReason?: string;
   startsOn: string;
 }
 
@@ -5769,14 +6464,7 @@ export interface UnitMemberDirectory {
   pageNumber: number;
   pageSize: number;
   totalCount: number;
-}
-
-export interface UnitMemberSave {
-  appointments: UnitMemberAppointment[];
-  companyCode: string;
-  expectedVersion: number;
-  note: string;
-  personId: number;
+  unitId: string;
 }
 
 export interface UnitPermissionTemplateSave {
@@ -6058,12 +6746,14 @@ export const ApiPermissionTemplateDtoDefaults = {
   disabledModules: [],
   oaAssignedOnly: false,
   ownerUnitId: null,
+  publishedVersion: null,
   unitRoleReferenceCount: 0,
   versionNumber: 1,
 } as const satisfies Partial<ApiPermissionTemplateDto>;
 
 export const ApiPermissionTemplateOptionDtoDefaults = {
   oaAssignedOnly: false,
+  publishedVersion: null,
 } as const satisfies Partial<ApiPermissionTemplateOptionDto>;
 
 export const ApiPermissionTemplateSaveRequestDefaults = {
@@ -6168,6 +6858,7 @@ export const ApiUserAccountDtoDefaults = {
   employee: null,
   oaAssignedOnly: false,
   permissionGrants: null,
+  permissionSchemeVersion: null,
   versionNumber: 1,
 } as const satisfies Partial<ApiUserAccountDto>;
 
@@ -6177,6 +6868,7 @@ export const ApiUserCapabilitiesDtoDefaults = {
 
 export const ApiUserDtoDefaults = {
   employee: null,
+  permissionSchemeVersion: null,
 } as const satisfies Partial<ApiUserDto>;
 
 export const ApiUserReportTemplateCloneRequestDefaults = {
@@ -6203,6 +6895,7 @@ export const ApiUserSaveRequestDefaults = {
   expectedVersion: 0,
   oaAssignedOnly: false,
   permissionGrants: null,
+  permissionSchemeVersion: null,
 } as const satisfies Partial<ApiUserSaveRequest>;
 
 export const ExchangeRateSettingsDefaults = {
@@ -6221,13 +6914,158 @@ export const HsCodeHistoryCandidatePageDefaults = {
   scannedSourceCount: 0,
 } as const satisfies Partial<HsCodeHistoryCandidatePage>;
 
+export const IdentityAppointmentOptionDefaults = {
+  positionId: null,
+} as const satisfies Partial<IdentityAppointmentOption>;
+
+export const IdentityAssignmentDefaults = {
+  id: null,
+  projectId: null,
+  role: "",
+} as const satisfies Partial<IdentityAssignment>;
+
+export const IdentityEffectivePeriodDefaults = {
+  endsOn: null,
+} as const satisfies Partial<IdentityEffectivePeriod>;
+
+export const IdentityPositionDefaults = {
+  departmentId: null,
+} as const satisfies Partial<IdentityPosition>;
+
+export const IdentityPositionSaveDefaults = {
+  departmentId: null,
+  id: null,
+} as const satisfies Partial<IdentityPositionSave>;
+
+export const IdentityProjectSaveDefaults = {
+  id: null,
+} as const satisfies Partial<IdentityProjectSave>;
+
+export const IdentityResponsibilityDefaults = {
+  departmentId: null,
+} as const satisfies Partial<IdentityResponsibility>;
+
+export const IdentityResponsibilitySaveDefaults = {
+  departmentId: null,
+  id: null,
+} as const satisfies Partial<IdentityResponsibilitySave>;
+
+export const MeetingBookingCreateRequestDefaults = {
+  submitImmediately: true,
+} as const satisfies Partial<MeetingBookingCreateRequest>;
+
+export const OaActionDefaults = {
+  confirmedReviewPoints: [],
+  verificationValues: {},
+} as const satisfies Partial<OaAction>;
+
+export const OaApprovalNodeDefaults = {
+  approvalPercentage: 100,
+  deadlineMode: "Natural",
+  rejectionPolicy: "Immediate",
+} as const satisfies Partial<OaApprovalNode>;
+
+export const OaApprovalStageDefaults = {
+  approvalPercentage: 100,
+  deadlineMode: "Natural",
+  rejectionPolicy: "Immediate",
+} as const satisfies Partial<OaApprovalStage>;
+
+export const OaApprovalStepDefaults = {
+  confirmedReviewPoints: [],
+  verificationValues: {},
+} as const satisfies Partial<OaApprovalStep>;
+
+export const OaAttachmentDefaults = {
+  classification: "Internal",
+} as const satisfies Partial<OaAttachment>;
+
+export const OaCommandActionDefaults = {
+  confirmedReviewPoints: [],
+  verificationValues: {},
+} as const satisfies Partial<OaCommandAction>;
+
+export const OaMaterialOaPersonnelProfileProjectionDefaults = {
+  emergencyContact: "",
+  emergencyPhone: "",
+  identityAuthority: "",
+  identityLongTerm: false,
+  identityNumber: "",
+  notes: "",
+  personalPhone: "",
+  registeredAddress: "",
+  workEmail: "",
+  workLocation: "",
+  workPhone: "",
+} as const satisfies Partial<OaMaterialOaPersonnelProfileProjection>;
+
+export const OaMaterialPersonnelAssignmentDefaults = {
+  companyCode: "",
+  endsOn: "",
+  startsOn: "",
+} as const satisfies Partial<OaMaterialPersonnelAssignment>;
+
+export const OaMaterialPersonnelProfileDefaults = {
+  emergencyContact: "",
+  emergencyPhone: "",
+  identityAuthority: "",
+  identityLongTerm: false,
+  identityNumber: "",
+  notes: "",
+  personalPhone: "",
+  registeredAddress: "",
+  workEmail: "",
+  workLocation: "",
+  workPhone: "",
+} as const satisfies Partial<OaMaterialPersonnelProfile>;
+
+export const OaMaterialPolicyDefaults = {
+  allowRestrictedAttachments: false,
+  hiddenFields: [],
+  requireReviewPoints: false,
+  verificationFields: [],
+  visibleFields: [],
+} as const satisfies Partial<OaMaterialPolicy>;
+
+export const OaPersonnelProfileProjectionDefaults = {
+  emergencyContact: "",
+  emergencyPhone: "",
+  identityAuthority: "",
+  identityLongTerm: false,
+  identityNumber: "",
+  notes: "",
+  personalPhone: "",
+  registeredAddress: "",
+  workEmail: "",
+  workLocation: "",
+  workPhone: "",
+} as const satisfies Partial<OaPersonnelProfileProjection>;
+
+export const OaRevisionPolicyDefaults = {
+  allowAddSigners: false,
+  allowRemoveSigners: false,
+  allowReturnToNode: false,
+  minimumSigners: 1,
+  pauseStopsClock: true,
+} as const satisfies Partial<OaRevisionPolicy>;
+
+export const OaVerificationFieldDefaults = {
+  restricted: false,
+} as const satisfies Partial<OaVerificationField>;
+
 export const OfficeDecisionRequestDefaults = {
+  confirmedReviewPoints: [],
   note: "",
+  verificationValues: {},
 } as const satisfies Partial<OfficeDecisionRequest>;
 
 export const OfficeReturnRequestDefaults = {
   note: "",
 } as const satisfies Partial<OfficeReturnRequest>;
+
+export const PermissionBindingImpactDefaults = {
+  fromVersion: null,
+} as const satisfies Partial<PermissionBindingImpact>;
 
 export const PersonnelAssignmentDefaults = {
   companyCode: "",
@@ -6255,9 +7093,17 @@ export const PersonnelRecordDefaults = {
   deleteRestriction: "",
 } as const satisfies Partial<PersonnelRecord>;
 
-export const PersonnelTransitionRequestDefaults = {
-  onProbation: true,
-} as const satisfies Partial<PersonnelTransitionRequest>;
+export const SupplyRequestCreateRequestDefaults = {
+  submitImmediately: true,
+} as const satisfies Partial<SupplyRequestCreateRequest>;
+
+export const UnitAccessRecordDefaults = {
+  permissionSchemeVersion: null,
+} as const satisfies Partial<UnitAccessRecord>;
+
+export const UnitAccessSaveDefaults = {
+  permissionSchemeVersion: null,
+} as const satisfies Partial<UnitAccessSave>;
 
 export const UnitManagementDefaults = {
   analytics: false,
@@ -6287,19 +7133,23 @@ export interface AnalyzeInvoiceProfitRequest {
   body: ApiInvoiceProfitAnalysisRequest;
 }
 
+export interface ApplyPermissionSchemeVersionRequest {
+  body: PermissionSchemeApply;
+}
+
 export interface ApproveExpenseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ApproveGeneralRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ApproveLeaveRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ApproveMeetingBookingRequest {
@@ -6314,22 +7164,22 @@ export interface ApproveOfficeSupplyRequestRequest {
 
 export interface ApproveOvertimeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ApprovePersonnelChangeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ApprovePurchaseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ApproveTravelRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ArchiveAnnouncementRequest {
@@ -6372,14 +7222,19 @@ export interface BuildCustomsCooExportReviewRequest {
   invoiceId: number;
 }
 
+export interface CancelApprovedPersonnelChangeRequest {
+  id: number;
+  body: OaCommandAction;
+}
+
 export interface CancelExpenseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CancelGeneralRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CancelJobRequest {
@@ -6388,7 +7243,7 @@ export interface CancelJobRequest {
 
 export interface CancelLeaveRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CancelMeetingBookingRequest {
@@ -6403,22 +7258,22 @@ export interface CancelOfficeSupplyRequestRequest {
 
 export interface CancelOvertimeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CancelPersonnelChangeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CancelPurchaseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CancelTravelRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CaptureRemoteHsCodesRequest {
@@ -6475,32 +7330,32 @@ export interface CompleteCrmFollowUpRequest {
 
 export interface CompleteExpenseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CompleteGeneralRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CompleteLeaveRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CompleteOvertimeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CompletePurchaseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CompleteTravelRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ConfirmAnnouncementReadRequest {
@@ -6510,11 +7365,6 @@ export interface ConfirmAnnouncementReadRequest {
 
 export interface ConfirmHsCodesObsoleteRequest {
   body: ApiHsCodeObsoleteRequest;
-}
-
-export interface ConfirmPersonnelRequest {
-  id: number;
-  body: PersonnelTransitionRequest;
 }
 
 export interface ConfirmSupplierAssessmentRequest {
@@ -6748,6 +7598,18 @@ export interface DeleteAttachmentOfLeaveRequestRequest {
   body: OaAction;
 }
 
+export interface DeleteAttachmentOfMeetingBookingRequest {
+  id: number;
+  attachmentId: number;
+  body: OaAction;
+}
+
+export interface DeleteAttachmentOfOfficeSupplyRequestRequest {
+  id: number;
+  attachmentId: number;
+  body: OaAction;
+}
+
 export interface DeleteAttachmentOfOvertimeRequestRequest {
   id: number;
   attachmentId: number;
@@ -6940,11 +7802,6 @@ export interface DeleteUnitRequest {
   id: number;
 }
 
-export interface DepartPersonnelRequest {
-  id: number;
-  body: PersonnelTransitionRequest;
-}
-
 export interface DisableEmailTemplateRequest {
   id: number;
   body: ApiEmailTemplateLifecycleRequest;
@@ -6994,6 +7851,16 @@ export interface DownloadApprovalOfLeaveRequestRequest {
   submissionId: number;
 }
 
+export interface DownloadApprovalOfMeetingBookingRequest {
+  id: number;
+  submissionId: number;
+}
+
+export interface DownloadApprovalOfOfficeSupplyRequestRequest {
+  id: number;
+  submissionId: number;
+}
+
 export interface DownloadApprovalOfOvertimeRequestRequest {
   id: number;
   submissionId: number;
@@ -7025,6 +7892,16 @@ export interface DownloadAttachmentOfGeneralRequestRequest {
 }
 
 export interface DownloadAttachmentOfLeaveRequestRequest {
+  id: number;
+  attachmentId: number;
+}
+
+export interface DownloadAttachmentOfMeetingBookingRequest {
+  id: number;
+  attachmentId: number;
+}
+
+export interface DownloadAttachmentOfOfficeSupplyRequestRequest {
   id: number;
   attachmentId: number;
 }
@@ -7098,6 +7975,16 @@ export interface DownloadMaterialsOfLeaveRequestRequest {
   submissionId: number;
 }
 
+export interface DownloadMaterialsOfMeetingBookingRequest {
+  id: number;
+  submissionId: number;
+}
+
+export interface DownloadMaterialsOfOfficeSupplyRequestRequest {
+  id: number;
+  submissionId: number;
+}
+
 export interface DownloadMaterialsOfOvertimeRequestRequest {
   id: number;
   submissionId: number;
@@ -7156,6 +8043,56 @@ export interface EditBusinessAttachmentMetadataRequest {
   body: BusinessAttachmentMetadataUpdate;
 }
 
+export interface ExecuteApprovedPersonnelChangeRequest {
+  id: number;
+  body: OaCommandAction;
+}
+
+export interface ExecuteExpenseRequestWorkflowRequest {
+  id: number;
+  body: OaWorkflowCommandSave;
+}
+
+export interface ExecuteGeneralRequestWorkflowRequest {
+  id: number;
+  body: OaWorkflowCommandSave;
+}
+
+export interface ExecuteLeaveRequestWorkflowRequest {
+  id: number;
+  body: OaWorkflowCommandSave;
+}
+
+export interface ExecuteMeetingBookingWorkflowRequest {
+  id: number;
+  body: OaWorkflowCommandSave;
+}
+
+export interface ExecuteOfficeSupplyRequestWorkflowRequest {
+  id: number;
+  body: OaWorkflowCommandSave;
+}
+
+export interface ExecuteOvertimeRequestWorkflowRequest {
+  id: number;
+  body: OaWorkflowCommandSave;
+}
+
+export interface ExecutePersonnelChangeRequestWorkflowRequest {
+  id: number;
+  body: OaWorkflowCommandSave;
+}
+
+export interface ExecutePurchaseRequestWorkflowRequest {
+  id: number;
+  body: OaWorkflowCommandSave;
+}
+
+export interface ExecuteTravelRequestWorkflowRequest {
+  id: number;
+  body: OaWorkflowCommandSave;
+}
+
 export interface ExportCrmCustomersRequest {
   keyword?: string;
   status?: string;
@@ -7189,6 +8126,16 @@ export interface GenerateApprovalOfLeaveRequestRequest {
   submissionId: number;
 }
 
+export interface GenerateApprovalOfMeetingBookingRequest {
+  id: number;
+  submissionId: number;
+}
+
+export interface GenerateApprovalOfOfficeSupplyRequestRequest {
+  id: number;
+  submissionId: number;
+}
+
 export interface GenerateApprovalOfOvertimeRequestRequest {
   id: number;
   submissionId: number;
@@ -7207,6 +8154,11 @@ export interface GenerateApprovalOfPurchaseRequestRequest {
 export interface GenerateApprovalOfTravelRequestRequest {
   id: number;
   submissionId: number;
+}
+
+export interface GetAccessRestrictionsRequest {
+  principalKind: "Account" | "Unit";
+  principalId: string;
 }
 
 export interface GetAgentConsignmentDocumentRequest {
@@ -7257,6 +8209,11 @@ export interface GetExpenseRequestRequest {
   id: number;
 }
 
+export interface GetExpenseRequestCommandResultRequest {
+  id: number;
+  commandKey: string;
+}
+
 export interface GetExporterRequest {
   id: number;
 }
@@ -7265,8 +8222,20 @@ export interface GetGeneralRequestRequest {
   id: number;
 }
 
+export interface GetGeneralRequestCommandResultRequest {
+  id: number;
+  commandKey: string;
+}
+
 export interface GetHsCodeRequest {
   code: string;
+}
+
+export interface GetIdentityCandidatesRequest {
+  unitId?: string;
+  pageNumber?: number;
+  pageSize?: number;
+  keyword?: string;
 }
 
 export interface GetInvoiceRequest {
@@ -7287,6 +8256,20 @@ export interface GetJobRequest {
 
 export interface GetLeaveRequestRequest {
   id: number;
+}
+
+export interface GetLeaveRequestCommandResultRequest {
+  id: number;
+  commandKey: string;
+}
+
+export interface GetMeetingBookingRequest {
+  id: number;
+}
+
+export interface GetMeetingBookingCommandResultRequest {
+  id: number;
+  commandKey: string;
 }
 
 export interface GetMeetingBookingHistoryRequest {
@@ -7315,6 +8298,15 @@ export interface GetOfficeStockHistoryRequest {
   pageSize?: number;
 }
 
+export interface GetOfficeSupplyRequestRequest {
+  id: number;
+}
+
+export interface GetOfficeSupplyRequestCommandResultRequest {
+  id: number;
+  commandKey: string;
+}
+
 export interface GetOfficeSupplyRequestHistoryRequest {
   id: number;
   pageNumber?: number;
@@ -7325,12 +8317,30 @@ export interface GetOvertimeRequestRequest {
   id: number;
 }
 
+export interface GetOvertimeRequestCommandResultRequest {
+  id: number;
+  commandKey: string;
+}
+
 export interface GetPayeeRequest {
   id: number;
 }
 
 export interface GetPaymentRequest {
   id: number;
+}
+
+export interface GetPermissionSchemeVersionRequest {
+  schemeId: string;
+  pageNumber?: number;
+  pageSize?: number;
+  version: number;
+}
+
+export interface GetPermissionSchemeVersionsRequest {
+  schemeId: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface GetPersonnelRequest {
@@ -7343,6 +8353,11 @@ export interface GetPersonnelAvatarRequest {
 
 export interface GetPersonnelChangeRequestRequest {
   id: number;
+}
+
+export interface GetPersonnelChangeRequestCommandResultRequest {
+  id: number;
+  commandKey: string;
 }
 
 export interface GetPersonnelClearanceRequest {
@@ -7375,6 +8390,11 @@ export interface GetProductRequest {
 
 export interface GetPurchaseRequestRequest {
   id: number;
+}
+
+export interface GetPurchaseRequestCommandResultRequest {
+  id: number;
+  commandKey: string;
 }
 
 export interface GetReportTemplateContentRequest {
@@ -7414,6 +8434,16 @@ export interface GetSubmissionOfLeaveRequestRequest {
   submissionId: number;
 }
 
+export interface GetSubmissionOfMeetingBookingRequest {
+  id: number;
+  submissionId: number;
+}
+
+export interface GetSubmissionOfOfficeSupplyRequestRequest {
+  id: number;
+  submissionId: number;
+}
+
 export interface GetSubmissionOfOvertimeRequestRequest {
   id: number;
   submissionId: number;
@@ -7440,6 +8470,11 @@ export interface GetSupplierRequest {
 
 export interface GetTravelRequestRequest {
   id: number;
+}
+
+export interface GetTravelRequestCommandResultRequest {
+  id: number;
+  commandKey: string;
 }
 
 export interface GetUnitRequest {
@@ -7635,6 +8670,12 @@ export interface ListEmailTemplatesRequest {
   includeArchived?: boolean;
 }
 
+export interface ListEmploymentsRequest {
+  unitId?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface ListExchangeRatesRequest {
   forceRefresh?: boolean;
 }
@@ -7646,6 +8687,11 @@ export interface ListExpenseRequestRequest {
   status?: string;
   mineOnly?: boolean;
   approvalsOnly?: boolean;
+}
+
+export interface ListExpenseRequestWorkflowCandidatesRequest {
+  id: number;
+  beforeId?: number;
 }
 
 export interface ListExportersRequest {
@@ -7665,6 +8711,11 @@ export interface ListGeneralRequestRequest {
   mineOnly?: boolean;
   approvalsOnly?: boolean;
   handlingOnly?: boolean;
+}
+
+export interface ListGeneralRequestWorkflowCandidatesRequest {
+  id: number;
+  beforeId?: number;
 }
 
 export interface ListHistoryOfExpenseRequestRequest {
@@ -7756,6 +8807,16 @@ export interface ListLeaveRequestRequest {
   handlingOnly?: boolean;
 }
 
+export interface ListLeaveRequestWorkflowCandidatesRequest {
+  id: number;
+  beforeId?: number;
+}
+
+export interface ListMeetingBookingWorkflowCandidatesRequest {
+  id: number;
+  beforeId?: number;
+}
+
 export interface ListMeetingBookingsRequest {
   status?: string;
   mineOnly?: boolean;
@@ -7768,6 +8829,7 @@ export interface ListMeetingBookingsRequest {
   applicantUserId?: number;
   employeeId?: number;
   handlingOnly?: boolean;
+  approvalsOnly?: boolean;
 }
 
 export interface ListMeetingRoomsRequest {
@@ -7791,6 +8853,11 @@ export interface ListOfficeSuppliesRequest {
   pageSize?: number;
 }
 
+export interface ListOfficeSupplyRequestWorkflowCandidatesRequest {
+  id: number;
+  beforeId?: number;
+}
+
 export interface ListOfficeSupplyRequestsRequest {
   status?: string;
   mineOnly?: boolean;
@@ -7803,6 +8870,7 @@ export interface ListOfficeSupplyRequestsRequest {
   applicantUserId?: number;
   employeeId?: number;
   handlingOnly?: boolean;
+  approvalsOnly?: boolean;
 }
 
 export interface ListOrganizationManagersRequest {
@@ -7819,6 +8887,11 @@ export interface ListOvertimeRequestRequest {
   mineOnly?: boolean;
   approvalsOnly?: boolean;
   handlingOnly?: boolean;
+}
+
+export interface ListOvertimeRequestWorkflowCandidatesRequest {
+  id: number;
+  beforeId?: number;
 }
 
 export interface ListPayeesRequest {
@@ -7861,6 +8934,11 @@ export interface ListPersonnelChangeRequestRequest {
   approvalsOnly?: boolean;
 }
 
+export interface ListPersonnelChangeRequestWorkflowCandidatesRequest {
+  id: number;
+  beforeId?: number;
+}
+
 export interface ListPersonnelReportingOptionsRequest {
   companyCode: string;
   keyword?: string;
@@ -7878,11 +8956,23 @@ export interface ListPortsPageRequest {
   keyword?: string;
 }
 
+export interface ListPositionsRequest {
+  unitId?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface ListProductsRequest {
   keyword?: string;
   pageNumber?: number;
   pageSize?: number;
   productCode?: string;
+}
+
+export interface ListProjectsRequest {
+  unitId?: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListPurchaseRequestRequest {
@@ -7892,6 +8982,11 @@ export interface ListPurchaseRequestRequest {
   mineOnly?: boolean;
   approvalsOnly?: boolean;
   handlingOnly?: boolean;
+}
+
+export interface ListPurchaseRequestWorkflowCandidatesRequest {
+  id: number;
+  beforeId?: number;
 }
 
 export interface ListQueriedInvoicesRequest {
@@ -7911,6 +9006,12 @@ export interface ListQueriedInvoicesRequest {
 
 export interface ListReportTemplatesRequest {
   reportType?: string;
+}
+
+export interface ListResponsibilitiesRequest {
+  unitId?: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListSalesOpportunityHistoryRequest {
@@ -7938,6 +9039,18 @@ export interface ListSubmissionsOfGeneralRequestRequest {
 }
 
 export interface ListSubmissionsOfLeaveRequestRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListSubmissionsOfMeetingBookingRequest {
+  id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListSubmissionsOfOfficeSupplyRequestRequest {
   id: number;
   pageNumber?: number;
   pageSize?: number;
@@ -7978,6 +9091,11 @@ export interface ListTravelRequestRequest {
   mineOnly?: boolean;
   approvalsOnly?: boolean;
   handlingOnly?: boolean;
+}
+
+export interface ListTravelRequestWorkflowCandidatesRequest {
+  id: number;
+  beforeId?: number;
 }
 
 export interface ListUnitsRequest {
@@ -8107,6 +9225,10 @@ export interface PreviewPaymentVoucherHtmlRequest {
   body: ApiPaymentReportHtmlPreviewRequest;
 }
 
+export interface PreviewPermissionSchemeApplicationRequest {
+  body: PermissionSchemeApply;
+}
+
 export interface PreviewReportTemplateContentRequest {
   body: ApiReportTemplatePreviewRequest;
 }
@@ -8153,11 +9275,6 @@ export interface PreviewUserReportTemplateHistoryCleanupRequest {
   body: ApiTemplateHistoryCleanupPreviewRequest;
 }
 
-export interface PromotePersonnelAppointmentRequest {
-  id: number;
-  body: PersonnelPrimaryAppointmentChange;
-}
-
 export interface PublishAnnouncementRequest {
   id: number;
   body: OaAction;
@@ -8170,6 +9287,10 @@ export interface PublishEmailTemplateRequest {
 
 export interface PublishOaDefinitionRequest {
   body: OaDefinitionAction;
+}
+
+export interface PublishPermissionSchemeRequest {
+  body: PermissionSchemePublish;
 }
 
 export interface PublishUserReportTemplateRequest {
@@ -8298,24 +9419,19 @@ export interface RegisterLicenseRequest {
   body: ApiLicenseRegisterRequest;
 }
 
-export interface RehirePersonnelRequest {
-  id: number;
-  body: PersonnelTransitionRequest;
-}
-
 export interface RejectExpenseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface RejectGeneralRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface RejectLeaveRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface RejectMeetingBookingRequest {
@@ -8330,22 +9446,22 @@ export interface RejectOfficeSupplyRequestRequest {
 
 export interface RejectOvertimeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface RejectPersonnelChangeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface RejectPurchaseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface RejectTravelRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface RemindExpenseRequestRequest {
@@ -8467,37 +9583,37 @@ export interface RetryJobRequest {
 
 export interface ReturnForCorrectionExpenseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ReturnForCorrectionGeneralRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ReturnForCorrectionLeaveRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ReturnForCorrectionOvertimeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ReturnForCorrectionPersonnelChangeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ReturnForCorrectionPurchaseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ReturnForCorrectionTravelRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface ReturnMeetingRoomKeyRequest {
@@ -8524,6 +9640,10 @@ export interface ReviewInvoiceRequest {
 
 export interface ReviewLetterOfCreditComplianceRequest {
   body: ApiLetterOfCreditReviewRequest;
+}
+
+export interface SaveAccessRestrictionRequest {
+  body: AccessRestrictionSave;
 }
 
 export interface SaveAgentConsignmentDocumentRequest {
@@ -8599,6 +9719,14 @@ export interface SaveOaApprovalSettingsRequest {
   body: OaApprovalSettingsSave;
 }
 
+export interface SavePositionRequest {
+  body: IdentityPositionSave;
+}
+
+export interface SaveProjectRequest {
+  body: IdentityProjectSave;
+}
+
 export interface SaveQueriedInvoicesToPathRequest {
   body: ApiQueryInvoiceExportRequest;
 }
@@ -8613,6 +9741,10 @@ export interface SaveReportTemplateFileToPathRequest {
 
 export interface SaveReportTemplatePackageToPathRequest {
   body: ApiReportTemplatePackageExportRequest;
+}
+
+export interface SaveResponsibilityRequest {
+  body: IdentityResponsibilitySave;
 }
 
 export interface SaveShippingMarkImageRequest {
@@ -8634,11 +9766,6 @@ export interface SaveSupportPackageToRuntimeRequest {
 export interface SaveUnitAccessRequest {
   companyCode?: string;
   body: UnitAccessSave;
-}
-
-export interface SaveUnitMemberRequest {
-  companyCode?: string;
-  body: UnitMemberSave;
 }
 
 export interface SaveUnitPermissionTemplateRequest {
@@ -8793,41 +9920,55 @@ export interface StocktakeOfficeSupplyRequest {
 
 export interface SubmitExpenseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface SubmitGeneralRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface SubmitLeaveRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
+}
+
+export interface SubmitMeetingBookingRequest {
+  id: number;
+  body: OaCommandAction;
+}
+
+export interface SubmitOfficeSupplyRequestRequest {
+  id: number;
+  body: OaCommandAction;
 }
 
 export interface SubmitOvertimeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface SubmitPersonnelChangeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface SubmitPurchaseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface SubmitTravelRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface SuggestEmailServerConfigRequest {
   body: ApiEmailServerSuggestionRequest;
+}
+
+export interface SuspendAccountForSecurityRequest {
+  body: AccountSecuritySuspension;
 }
 
 export interface SwitchUnitContextRequest {
@@ -8837,11 +9978,6 @@ export interface SwitchUnitContextRequest {
 export interface TransferCrmFollowUpRequest {
   id: number;
   body: ApiCrmFollowUpTransferRequest;
-}
-
-export interface TransferPersonnelRequest {
-  id: number;
-  body: PersonnelTransitionRequest;
 }
 
 export interface TransferSharedDatabaseOwnershipRequest {
@@ -8921,6 +10057,16 @@ export interface UpdateCustomerRequest {
 export interface UpdateCustomsCooProducerProfileRequest {
   id: number;
   body: ApiCustomsCooProducerProfileSaveRequest;
+}
+
+export interface UpdateDraftOfMeetingBookingRequest {
+  id: number;
+  body: MeetingBookingUpdateRequest;
+}
+
+export interface UpdateDraftOfOfficeSupplyRequestRequest {
+  id: number;
+  body: SupplyRequestUpdateRequest;
 }
 
 export interface UpdateExpenseRequestRequest {
@@ -9114,6 +10260,16 @@ export interface UploadAttachmentToLeaveRequestRequest {
   body: FormData;
 }
 
+export interface UploadAttachmentToMeetingBookingRequest {
+  id: number;
+  body: FormData;
+}
+
+export interface UploadAttachmentToOfficeSupplyRequestRequest {
+  id: number;
+  body: FormData;
+}
+
 export interface UploadAttachmentToOvertimeRequestRequest {
   id: number;
   body: FormData;
@@ -9218,32 +10374,32 @@ export interface VerifyExpenseApprovalRequest {
 
 export interface VoidExpenseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface VoidGeneralRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface VoidLeaveRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface VoidOvertimeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface VoidPurchaseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface VoidTravelRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface WithdrawAnnouncementRequest {
@@ -9253,37 +10409,37 @@ export interface WithdrawAnnouncementRequest {
 
 export interface WithdrawExpenseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface WithdrawGeneralRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface WithdrawLeaveRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface WithdrawOvertimeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface WithdrawPersonnelChangeRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface WithdrawPurchaseRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface WithdrawTravelRequestRequest {
   id: number;
-  body: OaAction;
+  body: OaCommandAction;
 }
 
 export interface CreateUserAccountRequest {
@@ -9377,6 +10533,14 @@ export class ExportDocManagerApiClient {
   public analyzeInvoiceProfit(request: AnalyzeInvoiceProfitRequest, init?: ApiRequestInit): Promise<ApiInvoiceProfitAnalysisResponse> {
     const path = "/api/invoices/profit-analysis";
     return this.request<ApiInvoiceProfitAnalysisResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public applyPermissionSchemeVersion(request: ApplyPermissionSchemeVersionRequest, init?: ApiRequestInit): Promise<PermissionSchemeApplication> {
+    const path = "/api/organization/permission-versions/apply";
+    return this.request<PermissionSchemeApplication>("POST", path, {
       body: request.body,
       init,
     });
@@ -9516,6 +10680,14 @@ export class ExportDocManagerApiClient {
   public buildCustomsCooExportReview(request: BuildCustomsCooExportReviewRequest, init?: ApiRequestInit): Promise<SingleWindowExportReview> {
     const path = `/api/single-window/coo/${encodePath(request.invoiceId)}/export-review`;
     return this.request<SingleWindowExportReview>("POST", path, { init });
+  }
+
+  public cancelApprovedPersonnelChange(request: CancelApprovedPersonnelChangeRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/cancel-execution`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
   }
 
   public cancelExpenseRequest(request: CancelExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
@@ -9765,14 +10937,6 @@ export class ExportDocManagerApiClient {
   public confirmHsCodesObsolete(request: ConfirmHsCodesObsoleteRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = "/api/master-data/hs-codes/confirm-obsolete";
     return this.request<ApiCommandResponse>("POST", path, {
-      body: request.body,
-      init,
-    });
-  }
-
-  public confirmPersonnel(request: ConfirmPersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
-    const path = `/api/office/people/${encodePath(request.id)}/confirm`;
-    return this.request<PersonnelRecord>("POST", path, {
       body: request.body,
       init,
     });
@@ -10210,6 +11374,22 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public deleteAttachmentOfMeetingBooking(request: DeleteAttachmentOfMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<MeetingBookingRecord>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public deleteAttachmentOfOfficeSupplyRequest(request: DeleteAttachmentOfOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<OfficeSupplyRequestRecord>("DELETE", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public deleteAttachmentOfOvertimeRequest(request: DeleteAttachmentOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return this.request<OaRequest>("DELETE", path, {
@@ -10519,14 +11699,6 @@ export class ExportDocManagerApiClient {
     return this.request<ApiCommandResponse>("DELETE", path, { init });
   }
 
-  public departPersonnel(request: DepartPersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
-    const path = `/api/office/people/${encodePath(request.id)}/depart`;
-    return this.request<PersonnelRecord>("POST", path, {
-      body: request.body,
-      init,
-    });
-  }
-
   public disableEmailTemplate(request: DisableEmailTemplateRequest, init?: ApiRequestInit): Promise<ApiEmailTemplateDto> {
     const path = `/api/email-templates/${encodePath(request.id)}/disable`;
     return this.request<ApiEmailTemplateDto>("POST", path, {
@@ -10599,6 +11771,16 @@ export class ExportDocManagerApiClient {
     return this.request<Blob>("GET", path, { init });
   }
 
+  public downloadApprovalOfMeetingBooking(request: DownloadApprovalOfMeetingBookingRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/pdf`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
+  public downloadApprovalOfOfficeSupplyRequest(request: DownloadApprovalOfOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/pdf`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
   public downloadApprovalOfOvertimeRequest(request: DownloadApprovalOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/pdf`;
     return this.request<Blob>("GET", path, { init });
@@ -10631,6 +11813,16 @@ export class ExportDocManagerApiClient {
 
   public downloadAttachmentOfLeaveRequest(request: DownloadAttachmentOfLeaveRequestRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = `/api/office/leave-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
+  public downloadAttachmentOfMeetingBooking(request: DownloadAttachmentOfMeetingBookingRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
+  public downloadAttachmentOfOfficeSupplyRequest(request: DownloadAttachmentOfOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return this.request<Blob>("GET", path, { init });
   }
 
@@ -10721,6 +11913,16 @@ export class ExportDocManagerApiClient {
     return this.request<Blob>("GET", path, { init });
   }
 
+  public downloadMaterialsOfMeetingBooking(request: DownloadMaterialsOfMeetingBookingRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/bundle`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
+  public downloadMaterialsOfOfficeSupplyRequest(request: DownloadMaterialsOfOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/bundle`;
+    return this.request<Blob>("GET", path, { init });
+  }
+
   public downloadMaterialsOfOvertimeRequest(request: DownloadMaterialsOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<Blob> {
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/bundle`;
     return this.request<Blob>("GET", path, { init });
@@ -10806,6 +12008,86 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public executeApprovedPersonnelChange(request: ExecuteApprovedPersonnelChangeRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/execution`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public executeExpenseRequestWorkflow(request: ExecuteExpenseRequestWorkflowRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/workflow-commands`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public executeGeneralRequestWorkflow(request: ExecuteGeneralRequestWorkflowRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/workflow-commands`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public executeLeaveRequestWorkflow(request: ExecuteLeaveRequestWorkflowRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/workflow-commands`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public executeMeetingBookingWorkflow(request: ExecuteMeetingBookingWorkflowRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/workflow-commands`;
+    return this.request<MeetingBookingRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public executeOfficeSupplyRequestWorkflow(request: ExecuteOfficeSupplyRequestWorkflowRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/workflow-commands`;
+    return this.request<OfficeSupplyRequestRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public executeOvertimeRequestWorkflow(request: ExecuteOvertimeRequestWorkflowRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/workflow-commands`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public executePersonnelChangeRequestWorkflow(request: ExecutePersonnelChangeRequestWorkflowRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/workflow-commands`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public executePurchaseRequestWorkflow(request: ExecutePurchaseRequestWorkflowRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/workflow-commands`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public executeTravelRequestWorkflow(request: ExecuteTravelRequestWorkflowRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/workflow-commands`;
+    return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public exportCrmCustomers(request: ExportCrmCustomersRequest = {}, init?: ApiRequestInit): Promise<Blob> {
     const path = "/api/crm/customers/export";
     return this.request<Blob>("GET", path, {
@@ -10861,6 +12143,16 @@ export class ExportDocManagerApiClient {
     return this.request<OaSubmission>("POST", path, { init });
   }
 
+  public generateApprovalOfMeetingBooking(request: GenerateApprovalOfMeetingBookingRequest, init?: ApiRequestInit): Promise<ResourceSubmission> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/generate`;
+    return this.request<ResourceSubmission>("POST", path, { init });
+  }
+
+  public generateApprovalOfOfficeSupplyRequest(request: GenerateApprovalOfOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<ResourceSubmission> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/generate`;
+    return this.request<ResourceSubmission>("POST", path, { init });
+  }
+
   public generateApprovalOfOvertimeRequest(request: GenerateApprovalOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaSubmission> {
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/generate`;
     return this.request<OaSubmission>("POST", path, { init });
@@ -10879,6 +12171,17 @@ export class ExportDocManagerApiClient {
   public generateApprovalOfTravelRequest(request: GenerateApprovalOfTravelRequestRequest, init?: ApiRequestInit): Promise<OaSubmission> {
     const path = `/api/office/travel-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/generate`;
     return this.request<OaSubmission>("POST", path, { init });
+  }
+
+  public getAccessRestrictions(request: GetAccessRestrictionsRequest, init?: ApiRequestInit): Promise<AccessRestrictionList> {
+    const path = "/api/organization/access-restrictions";
+    return this.request<AccessRestrictionList>("GET", path, {
+      query: {
+        "principalKind": request.principalKind,
+        "principalId": request.principalId,
+      },
+      init,
+    });
   }
 
   public getAgentConsignmentDocument(request: GetAgentConsignmentDocumentRequest, init?: ApiRequestInit): Promise<ApiAgentConsignmentDocumentDto> {
@@ -10981,6 +12284,11 @@ export class ExportDocManagerApiClient {
     return this.request<OaRequest>("GET", path, { init });
   }
 
+  public getExpenseRequestCommandResult(request: GetExpenseRequestCommandResultRequest, init?: ApiRequestInit): Promise<OaCommandResult> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/commands/${encodePath(request.commandKey)}`;
+    return this.request<OaCommandResult>("GET", path, { init });
+  }
+
   public getExporter(request: GetExporterRequest, init?: ApiRequestInit): Promise<ApiExporterDto> {
     const path = `/api/master-data/exporters/${encodePath(request.id)}`;
     return this.request<ApiExporterDto>("GET", path, { init });
@@ -10991,6 +12299,11 @@ export class ExportDocManagerApiClient {
     return this.request<OaRequest>("GET", path, { init });
   }
 
+  public getGeneralRequestCommandResult(request: GetGeneralRequestCommandResultRequest, init?: ApiRequestInit): Promise<OaCommandResult> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/commands/${encodePath(request.commandKey)}`;
+    return this.request<OaCommandResult>("GET", path, { init });
+  }
+
   public getHsCode(request: GetHsCodeRequest, init?: ApiRequestInit): Promise<ApiHsCodeDto> {
     const path = `/api/master-data/hs-codes/${encodePath(request.code)}`;
     return this.request<ApiHsCodeDto>("GET", path, { init });
@@ -10999,6 +12312,19 @@ export class ExportDocManagerApiClient {
   public getHsCodeRemoteHealth(init?: ApiRequestInit): Promise<ApiHsCodeRemoteHealthResponse> {
     const path = "/api/master-data/hs-codes/remote-health";
     return this.request<ApiHsCodeRemoteHealthResponse>("GET", path, { init });
+  }
+
+  public getIdentityCandidates(request: GetIdentityCandidatesRequest = {}, init?: ApiRequestInit): Promise<IdentityCandidatePage> {
+    const path = "/api/organization/identity-candidates";
+    return this.request<IdentityCandidatePage>("GET", path, {
+      query: {
+        "unitId": request.unitId,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "keyword": request.keyword,
+      },
+      init,
+    });
   }
 
   public getInvoice(request: GetInvoiceRequest, init?: ApiRequestInit): Promise<ApiInvoiceDetailDto> {
@@ -11026,9 +12352,24 @@ export class ExportDocManagerApiClient {
     return this.request<OaRequest>("GET", path, { init });
   }
 
+  public getLeaveRequestCommandResult(request: GetLeaveRequestCommandResultRequest, init?: ApiRequestInit): Promise<OaCommandResult> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/commands/${encodePath(request.commandKey)}`;
+    return this.request<OaCommandResult>("GET", path, { init });
+  }
+
   public getLicenseStatus(init?: ApiRequestInit): Promise<ApiLicenseStatusResponse> {
     const path = "/api/system/license";
     return this.request<ApiLicenseStatusResponse>("GET", path, { init });
+  }
+
+  public getMeetingBooking(request: GetMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}`;
+    return this.request<MeetingBookingRecord>("GET", path, { init });
+  }
+
+  public getMeetingBookingCommandResult(request: GetMeetingBookingCommandResultRequest, init?: ApiRequestInit): Promise<OaCommandResult> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/commands/${encodePath(request.commandKey)}`;
+    return this.request<OaCommandResult>("GET", path, { init });
   }
 
   public getMeetingBookingHistory(request: GetMeetingBookingHistoryRequest, init?: ApiRequestInit): Promise<PagedResultOfOfficeRequestEventRecord> {
@@ -11093,6 +12434,16 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public getOfficeSupplyRequest(request: GetOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}`;
+    return this.request<OfficeSupplyRequestRecord>("GET", path, { init });
+  }
+
+  public getOfficeSupplyRequestCommandResult(request: GetOfficeSupplyRequestCommandResultRequest, init?: ApiRequestInit): Promise<OaCommandResult> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/commands/${encodePath(request.commandKey)}`;
+    return this.request<OaCommandResult>("GET", path, { init });
+  }
+
   public getOfficeSupplyRequestHistory(request: GetOfficeSupplyRequestHistoryRequest, init?: ApiRequestInit): Promise<PagedResultOfOfficeRequestEventRecord> {
     const path = `/api/office/supply-requests/${encodePath(request.id)}/history`;
     return this.request<PagedResultOfOfficeRequestEventRecord>("GET", path, {
@@ -11114,6 +12465,11 @@ export class ExportDocManagerApiClient {
     return this.request<OaRequest>("GET", path, { init });
   }
 
+  public getOvertimeRequestCommandResult(request: GetOvertimeRequestCommandResultRequest, init?: ApiRequestInit): Promise<OaCommandResult> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/commands/${encodePath(request.commandKey)}`;
+    return this.request<OaCommandResult>("GET", path, { init });
+  }
+
   public getPayee(request: GetPayeeRequest, init?: ApiRequestInit): Promise<ApiPayeeDto> {
     const path = `/api/master-data/payees/${encodePath(request.id)}`;
     return this.request<ApiPayeeDto>("GET", path, { init });
@@ -11122,6 +12478,31 @@ export class ExportDocManagerApiClient {
   public getPayment(request: GetPaymentRequest, init?: ApiRequestInit): Promise<ApiPaymentDto> {
     const path = `/api/payments/${encodePath(request.id)}`;
     return this.request<ApiPaymentDto>("GET", path, { init });
+  }
+
+  public getPermissionSchemeVersion(request: GetPermissionSchemeVersionRequest, init?: ApiRequestInit): Promise<ApiPermissionTemplateDto> {
+    const path = "/api/organization/permission-versions/definition";
+    return this.request<ApiPermissionTemplateDto>("GET", path, {
+      query: {
+        "schemeId": request.schemeId,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+        "version": request.version,
+      },
+      init,
+    });
+  }
+
+  public getPermissionSchemeVersions(request: GetPermissionSchemeVersionsRequest, init?: ApiRequestInit): Promise<PermissionSchemeVersions> {
+    const path = "/api/organization/permission-versions";
+    return this.request<PermissionSchemeVersions>("GET", path, {
+      query: {
+        "schemeId": request.schemeId,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
   }
 
   public getPersonnel(request: GetPersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
@@ -11137,6 +12518,11 @@ export class ExportDocManagerApiClient {
   public getPersonnelChangeRequest(request: GetPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/personnel-requests/${encodePath(request.id)}`;
     return this.request<OaRequest>("GET", path, { init });
+  }
+
+  public getPersonnelChangeRequestCommandResult(request: GetPersonnelChangeRequestCommandResultRequest, init?: ApiRequestInit): Promise<OaCommandResult> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/commands/${encodePath(request.commandKey)}`;
+    return this.request<OaCommandResult>("GET", path, { init });
   }
 
   public getPersonnelClearance(request: GetPersonnelClearanceRequest, init?: ApiRequestInit): Promise<PersonnelClearance> {
@@ -11184,6 +12570,11 @@ export class ExportDocManagerApiClient {
   public getPurchaseRequest(request: GetPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/purchase-requests/${encodePath(request.id)}`;
     return this.request<OaRequest>("GET", path, { init });
+  }
+
+  public getPurchaseRequestCommandResult(request: GetPurchaseRequestCommandResultRequest, init?: ApiRequestInit): Promise<OaCommandResult> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/commands/${encodePath(request.commandKey)}`;
+    return this.request<OaCommandResult>("GET", path, { init });
   }
 
   public getReportTemplateContent(request: GetReportTemplateContentRequest = {}, init?: ApiRequestInit): Promise<ApiReportTemplateContentDto> {
@@ -11272,6 +12663,16 @@ export class ExportDocManagerApiClient {
     return this.request<OaSubmission>("GET", path, { init });
   }
 
+  public getSubmissionOfMeetingBooking(request: GetSubmissionOfMeetingBookingRequest, init?: ApiRequestInit): Promise<ResourceSubmission> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}`;
+    return this.request<ResourceSubmission>("GET", path, { init });
+  }
+
+  public getSubmissionOfOfficeSupplyRequest(request: GetSubmissionOfOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<ResourceSubmission> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}`;
+    return this.request<ResourceSubmission>("GET", path, { init });
+  }
+
   public getSubmissionOfOvertimeRequest(request: GetSubmissionOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaSubmission> {
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}`;
     return this.request<OaSubmission>("GET", path, { init });
@@ -11305,6 +12706,11 @@ export class ExportDocManagerApiClient {
   public getTravelRequest(request: GetTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/travel-requests/${encodePath(request.id)}`;
     return this.request<OaRequest>("GET", path, { init });
+  }
+
+  public getTravelRequestCommandResult(request: GetTravelRequestCommandResultRequest, init?: ApiRequestInit): Promise<OaCommandResult> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/commands/${encodePath(request.commandKey)}`;
+    return this.request<OaCommandResult>("GET", path, { init });
   }
 
   public getUnit(request: GetUnitRequest, init?: ApiRequestInit): Promise<ApiUnitDto> {
@@ -11705,6 +13111,18 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listEmployments(request: ListEmploymentsRequest = {}, init?: ApiRequestInit): Promise<IdentityEmploymentPage> {
+    const path = "/api/organization/employments";
+    return this.request<IdentityEmploymentPage>("GET", path, {
+      query: {
+        "unitId": request.unitId,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
   public listExchangeRates(request: ListExchangeRatesRequest = {}, init?: ApiRequestInit): Promise<ApiExchangeRateListResponse> {
     const path = "/api/tools/exchange-rates";
     return this.request<ApiExchangeRateListResponse>("GET", path, {
@@ -11725,6 +13143,16 @@ export class ExportDocManagerApiClient {
         "status": request.status,
         "mineOnly": request.mineOnly,
         "approvalsOnly": request.approvalsOnly,
+      },
+      init,
+    });
+  }
+
+  public listExpenseRequestWorkflowCandidates(request: ListExpenseRequestWorkflowCandidatesRequest, init?: ApiRequestInit): Promise<OaWorkflowCandidates> {
+    const path = `/api/office/expense-requests/${encodePath(request.id)}/workflow-candidates`;
+    return this.request<OaWorkflowCandidates>("GET", path, {
+      query: {
+        "beforeId": request.beforeId,
       },
       init,
     });
@@ -11767,6 +13195,16 @@ export class ExportDocManagerApiClient {
         "mineOnly": request.mineOnly,
         "approvalsOnly": request.approvalsOnly,
         "handlingOnly": request.handlingOnly,
+      },
+      init,
+    });
+  }
+
+  public listGeneralRequestWorkflowCandidates(request: ListGeneralRequestWorkflowCandidatesRequest, init?: ApiRequestInit): Promise<OaWorkflowCandidates> {
+    const path = `/api/office/general-requests/${encodePath(request.id)}/workflow-candidates`;
+    return this.request<OaWorkflowCandidates>("GET", path, {
+      query: {
+        "beforeId": request.beforeId,
       },
       init,
     });
@@ -11933,6 +13371,26 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listLeaveRequestWorkflowCandidates(request: ListLeaveRequestWorkflowCandidatesRequest, init?: ApiRequestInit): Promise<OaWorkflowCandidates> {
+    const path = `/api/office/leave-requests/${encodePath(request.id)}/workflow-candidates`;
+    return this.request<OaWorkflowCandidates>("GET", path, {
+      query: {
+        "beforeId": request.beforeId,
+      },
+      init,
+    });
+  }
+
+  public listMeetingBookingWorkflowCandidates(request: ListMeetingBookingWorkflowCandidatesRequest, init?: ApiRequestInit): Promise<OaWorkflowCandidates> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/workflow-candidates`;
+    return this.request<OaWorkflowCandidates>("GET", path, {
+      query: {
+        "beforeId": request.beforeId,
+      },
+      init,
+    });
+  }
+
   public listMeetingBookings(request: ListMeetingBookingsRequest = {}, init?: ApiRequestInit): Promise<PagedResultOfMeetingBookingRecord> {
     const path = "/api/office/bookings";
     return this.request<PagedResultOfMeetingBookingRecord>("GET", path, {
@@ -11948,6 +13406,7 @@ export class ExportDocManagerApiClient {
         "applicantUserId": request.applicantUserId,
         "employeeId": request.employeeId,
         "handlingOnly": request.handlingOnly,
+        "approvalsOnly": request.approvalsOnly,
       },
       init,
     });
@@ -11992,6 +13451,16 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listOfficeSupplyRequestWorkflowCandidates(request: ListOfficeSupplyRequestWorkflowCandidatesRequest, init?: ApiRequestInit): Promise<OaWorkflowCandidates> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/workflow-candidates`;
+    return this.request<OaWorkflowCandidates>("GET", path, {
+      query: {
+        "beforeId": request.beforeId,
+      },
+      init,
+    });
+  }
+
   public listOfficeSupplyRequests(request: ListOfficeSupplyRequestsRequest = {}, init?: ApiRequestInit): Promise<PagedResultOfOfficeSupplyRequestRecord> {
     const path = "/api/office/supply-requests";
     return this.request<PagedResultOfOfficeSupplyRequestRecord>("GET", path, {
@@ -12007,6 +13476,7 @@ export class ExportDocManagerApiClient {
         "applicantUserId": request.applicantUserId,
         "employeeId": request.employeeId,
         "handlingOnly": request.handlingOnly,
+        "approvalsOnly": request.approvalsOnly,
       },
       init,
     });
@@ -12035,6 +13505,16 @@ export class ExportDocManagerApiClient {
         "mineOnly": request.mineOnly,
         "approvalsOnly": request.approvalsOnly,
         "handlingOnly": request.handlingOnly,
+      },
+      init,
+    });
+  }
+
+  public listOvertimeRequestWorkflowCandidates(request: ListOvertimeRequestWorkflowCandidatesRequest, init?: ApiRequestInit): Promise<OaWorkflowCandidates> {
+    const path = `/api/office/overtime-requests/${encodePath(request.id)}/workflow-candidates`;
+    return this.request<OaWorkflowCandidates>("GET", path, {
+      query: {
+        "beforeId": request.beforeId,
       },
       init,
     });
@@ -12120,6 +13600,16 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listPersonnelChangeRequestWorkflowCandidates(request: ListPersonnelChangeRequestWorkflowCandidatesRequest, init?: ApiRequestInit): Promise<OaWorkflowCandidates> {
+    const path = `/api/office/personnel-requests/${encodePath(request.id)}/workflow-candidates`;
+    return this.request<OaWorkflowCandidates>("GET", path, {
+      query: {
+        "beforeId": request.beforeId,
+      },
+      init,
+    });
+  }
+
   public listPersonnelReportingOptions(request: ListPersonnelReportingOptionsRequest, init?: ApiRequestInit): Promise<PagedResultOfOrganizationManagerRecord> {
     const path = "/api/office/people/reporting-options";
     return this.request<PagedResultOfOrganizationManagerRecord>("GET", path, {
@@ -12155,6 +13645,18 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listPositions(request: ListPositionsRequest = {}, init?: ApiRequestInit): Promise<IdentityPositionPage> {
+    const path = "/api/organization/positions";
+    return this.request<IdentityPositionPage>("GET", path, {
+      query: {
+        "unitId": request.unitId,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
   public listPostgreSqlPhysicalBackups(init?: ApiRequestInit): Promise<ApiPostgreSqlPhysicalBackupListResponse> {
     const path = "/api/postgresql-maintenance/backups";
     return this.request<ApiPostgreSqlPhysicalBackupListResponse>("GET", path, { init });
@@ -12173,6 +13675,18 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public listProjects(request: ListProjectsRequest = {}, init?: ApiRequestInit): Promise<IdentityProjectPage> {
+    const path = "/api/organization/projects";
+    return this.request<IdentityProjectPage>("GET", path, {
+      query: {
+        "unitId": request.unitId,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
   public listPurchaseRequest(request: ListPurchaseRequestRequest = {}, init?: ApiRequestInit): Promise<OaRequestPage> {
     const path = "/api/office/purchase-requests";
     return this.request<OaRequestPage>("GET", path, {
@@ -12183,6 +13697,16 @@ export class ExportDocManagerApiClient {
         "mineOnly": request.mineOnly,
         "approvalsOnly": request.approvalsOnly,
         "handlingOnly": request.handlingOnly,
+      },
+      init,
+    });
+  }
+
+  public listPurchaseRequestWorkflowCandidates(request: ListPurchaseRequestWorkflowCandidatesRequest, init?: ApiRequestInit): Promise<OaWorkflowCandidates> {
+    const path = `/api/office/purchase-requests/${encodePath(request.id)}/workflow-candidates`;
+    return this.request<OaWorkflowCandidates>("GET", path, {
+      query: {
+        "beforeId": request.beforeId,
       },
       init,
     });
@@ -12214,6 +13738,18 @@ export class ExportDocManagerApiClient {
     return this.request<ApiReportTemplateDto[]>("GET", path, {
       query: {
         "reportType": request.reportType,
+      },
+      init,
+    });
+  }
+
+  public listResponsibilities(request: ListResponsibilitiesRequest = {}, init?: ApiRequestInit): Promise<IdentityResponsibilityPage> {
+    const path = "/api/organization/responsibilities";
+    return this.request<IdentityResponsibilityPage>("GET", path, {
+      query: {
+        "unitId": request.unitId,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });
@@ -12268,6 +13804,28 @@ export class ExportDocManagerApiClient {
   public listSubmissionsOfLeaveRequest(request: ListSubmissionsOfLeaveRequestRequest, init?: ApiRequestInit): Promise<OaSubmissionPage> {
     const path = `/api/office/leave-requests/${encodePath(request.id)}/submissions`;
     return this.request<OaSubmissionPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listSubmissionsOfMeetingBooking(request: ListSubmissionsOfMeetingBookingRequest, init?: ApiRequestInit): Promise<ResourceSubmissionPage> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/submissions`;
+    return this.request<ResourceSubmissionPage>("GET", path, {
+      query: {
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
+      },
+      init,
+    });
+  }
+
+  public listSubmissionsOfOfficeSupplyRequest(request: ListSubmissionsOfOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<ResourceSubmissionPage> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/submissions`;
+    return this.request<ResourceSubmissionPage>("GET", path, {
       query: {
         "pageNumber": request.pageNumber,
         "pageSize": request.pageSize,
@@ -12340,6 +13898,16 @@ export class ExportDocManagerApiClient {
         "mineOnly": request.mineOnly,
         "approvalsOnly": request.approvalsOnly,
         "handlingOnly": request.handlingOnly,
+      },
+      init,
+    });
+  }
+
+  public listTravelRequestWorkflowCandidates(request: ListTravelRequestWorkflowCandidatesRequest, init?: ApiRequestInit): Promise<OaWorkflowCandidates> {
+    const path = `/api/office/travel-requests/${encodePath(request.id)}/workflow-candidates`;
+    return this.request<OaWorkflowCandidates>("GET", path, {
+      query: {
+        "beforeId": request.beforeId,
       },
       init,
     });
@@ -12594,6 +14162,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public previewPermissionSchemeApplication(request: PreviewPermissionSchemeApplicationRequest, init?: ApiRequestInit): Promise<PermissionSchemeApplication> {
+    const path = "/api/organization/permission-versions/preview";
+    return this.request<PermissionSchemeApplication>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public previewReportTemplateContent(request: PreviewReportTemplateContentRequest, init?: ApiRequestInit): Promise<ApiReportTemplatePreviewResponse> {
     const path = "/api/reports/templates/preview";
     return this.request<ApiReportTemplatePreviewResponse>("POST", path, {
@@ -12675,14 +14251,6 @@ export class ExportDocManagerApiClient {
     });
   }
 
-  public promotePersonnelAppointment(request: PromotePersonnelAppointmentRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
-    const path = `/api/office/people/${encodePath(request.id)}/primary-appointment`;
-    return this.request<PersonnelRecord>("POST", path, {
-      body: request.body,
-      init,
-    });
-  }
-
   public publishAnnouncement(request: PublishAnnouncementRequest, init?: ApiRequestInit): Promise<Announcement> {
     const path = `/api/office/announcements/${encodePath(request.id)}/publish`;
     return this.request<Announcement>("POST", path, {
@@ -12702,6 +14270,14 @@ export class ExportDocManagerApiClient {
   public publishOaDefinition(request: PublishOaDefinitionRequest, init?: ApiRequestInit): Promise<OaApprovalSettings> {
     const path = "/api/office/approval-settings/publish";
     return this.request<OaApprovalSettings>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public publishPermissionScheme(request: PublishPermissionSchemeRequest, init?: ApiRequestInit): Promise<PermissionSchemePublication> {
+    const path = "/api/organization/permission-versions/publish";
+    return this.request<PermissionSchemePublication>("POST", path, {
       body: request.body,
       init,
     });
@@ -12929,14 +14505,6 @@ export class ExportDocManagerApiClient {
   public registerLicense(request: RegisterLicenseRequest, init?: ApiRequestInit): Promise<ApiLicenseRegisterResponse> {
     const path = "/api/system/license/register";
     return this.request<ApiLicenseRegisterResponse>("POST", path, {
-      body: request.body,
-      init,
-    });
-  }
-
-  public rehirePersonnel(request: RehirePersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
-    const path = `/api/office/people/${encodePath(request.id)}/rehire`;
-    return this.request<PersonnelRecord>("POST", path, {
       body: request.body,
       init,
     });
@@ -13327,6 +14895,14 @@ export class ExportDocManagerApiClient {
     return this.request<ApiShutdownMaintenanceResponse>("POST", path, { init });
   }
 
+  public saveAccessRestriction(request: SaveAccessRestrictionRequest, init?: ApiRequestInit): Promise<AccessRestrictionRecord> {
+    const path = "/api/organization/access-restrictions";
+    return this.request<AccessRestrictionRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public saveAgentConsignmentDocument(request: SaveAgentConsignmentDocumentRequest, init?: ApiRequestInit): Promise<ApiAgentConsignmentDocumentSaveResponse> {
     const path = `/api/single-window/acd/${encodePath(request.invoiceId)}`;
     return this.request<ApiAgentConsignmentDocumentSaveResponse>("PUT", path, {
@@ -13455,6 +15031,22 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public savePosition(request: SavePositionRequest, init?: ApiRequestInit): Promise<IdentityPosition> {
+    const path = "/api/organization/positions";
+    return this.request<IdentityPosition>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public saveProject(request: SaveProjectRequest, init?: ApiRequestInit): Promise<IdentityProject> {
+    const path = "/api/organization/projects";
+    return this.request<IdentityProject>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public saveQueriedInvoicesToPath(request: SaveQueriedInvoicesToPathRequest, init?: ApiRequestInit): Promise<BackgroundJobSnapshot> {
     const path = "/api/query/invoices/save-to-path";
     return this.request<BackgroundJobSnapshot>("POST", path, {
@@ -13482,6 +15074,14 @@ export class ExportDocManagerApiClient {
   public saveReportTemplatePackageToPath(request: SaveReportTemplatePackageToPathRequest, init?: ApiRequestInit): Promise<ApiReportTemplatePackageExportResponse> {
     const path = "/api/reports/templates/package/save-to-path";
     return this.request<ApiReportTemplatePackageExportResponse>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public saveResponsibility(request: SaveResponsibilityRequest, init?: ApiRequestInit): Promise<IdentityResponsibility> {
+    const path = "/api/organization/responsibilities";
+    return this.request<IdentityResponsibility>("POST", path, {
       body: request.body,
       init,
     });
@@ -13522,17 +15122,6 @@ export class ExportDocManagerApiClient {
   public saveUnitAccess(request: SaveUnitAccessRequest, init?: ApiRequestInit): Promise<UnitAccessRecord> {
     const path = "/api/organization/unit-access";
     return this.request<UnitAccessRecord>("POST", path, {
-      query: {
-        "companyCode": request.companyCode,
-      },
-      body: request.body,
-      init,
-    });
-  }
-
-  public saveUnitMember(request: SaveUnitMemberRequest, init?: ApiRequestInit): Promise<UnitMember> {
-    const path = "/api/organization/unit-members";
-    return this.request<UnitMember>("POST", path, {
       query: {
         "companyCode": request.companyCode,
       },
@@ -13848,6 +15437,22 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public submitMeetingBooking(request: SubmitMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/submit`;
+    return this.request<MeetingBookingRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public submitOfficeSupplyRequest(request: SubmitOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/submit`;
+    return this.request<OfficeSupplyRequestRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public submitOvertimeRequest(request: SubmitOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/submit`;
     return this.request<OaRequest>("POST", path, {
@@ -13888,6 +15493,14 @@ export class ExportDocManagerApiClient {
     });
   }
 
+  public suspendAccountForSecurity(request: SuspendAccountForSecurityRequest, init?: ApiRequestInit): Promise<AccountSecurityResult> {
+    const path = "/api/organization/account-security";
+    return this.request<AccountSecurityResult>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
   public switchUnitContext(request: SwitchUnitContextRequest, init?: ApiRequestInit): Promise<ApiLoginResponse> {
     const path = "/api/auth/unit-context";
     return this.request<ApiLoginResponse>("POST", path, {
@@ -13914,14 +15527,6 @@ export class ExportDocManagerApiClient {
   public transferCrmFollowUp(request: TransferCrmFollowUpRequest, init?: ApiRequestInit): Promise<ApiCrmFollowUpDto> {
     const path = `/api/crm/follow-ups/${encodePath(request.id)}/transfer`;
     return this.request<ApiCrmFollowUpDto>("POST", path, {
-      body: request.body,
-      init,
-    });
-  }
-
-  public transferPersonnel(request: TransferPersonnelRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
-    const path = `/api/office/people/${encodePath(request.id)}/transfer`;
-    return this.request<PersonnelRecord>("POST", path, {
       body: request.body,
       init,
     });
@@ -14050,6 +15655,22 @@ export class ExportDocManagerApiClient {
   public updateCustomsCooProducerProfile(request: UpdateCustomsCooProducerProfileRequest, init?: ApiRequestInit): Promise<ApiCustomsCooProducerProfileSaveResponse> {
     const path = `/api/single-window/coo/producer-profiles/${encodePath(request.id)}`;
     return this.request<ApiCustomsCooProducerProfileSaveResponse>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public updateDraftOfMeetingBooking(request: UpdateDraftOfMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/draft`;
+    return this.request<MeetingBookingRecord>("PUT", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public updateDraftOfOfficeSupplyRequest(request: UpdateDraftOfOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/draft`;
+    return this.request<OfficeSupplyRequestRecord>("PUT", path, {
       body: request.body,
       init,
     });
@@ -14364,6 +15985,22 @@ export class ExportDocManagerApiClient {
   public uploadAttachmentToLeaveRequest(request: UploadAttachmentToLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
     const path = `/api/office/leave-requests/${encodePath(request.id)}/attachments`;
     return this.request<OaRequest>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadAttachmentToMeetingBooking(request: UploadAttachmentToMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    const path = `/api/office/bookings/${encodePath(request.id)}/attachments`;
+    return this.request<MeetingBookingRecord>("POST", path, {
+      body: request.body,
+      init,
+    });
+  }
+
+  public uploadAttachmentToOfficeSupplyRequest(request: UploadAttachmentToOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    const path = `/api/office/supply-requests/${encodePath(request.id)}/attachments`;
+    return this.request<OfficeSupplyRequestRecord>("POST", path, {
       body: request.body,
       init,
     });

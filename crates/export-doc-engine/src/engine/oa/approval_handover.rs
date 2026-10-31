@@ -98,7 +98,7 @@ pub(super) fn reassign(
     super::super::units::demand(actor, &text(row, "companyScope"), "organization.workflows")?;
     required(body, "note", "审批移交原因", 500)?;
     required(body, "taskKey", "审批任务", 180)?;
-    if row["status"] != "Pending" {
+    if !matches!(row["status"].as_str(), Some("Pending" | "Suspended")) {
         return Err(conflict("只有在途申请可以移交未签署任务。"));
     }
     let from = records::positive(body, "fromUserId", "原审批人")?;
@@ -133,6 +133,7 @@ pub(super) fn reassign(
     if (from == to && plan.steps[index].approver_context == reviewer.context)
         || row["ownerUserId"] == to
         || row["applicantAccountId"] == to
+        || plan.independent_signer_conflict(node, to)
         || plan.steps.iter().enumerate().any(|(i, s)| {
             i != index
                 && s.approver_user_id == to

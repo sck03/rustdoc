@@ -37,7 +37,7 @@ pub(crate) fn usage_sql(pg: bool) -> String {
         CAST(COALESCE(SUM(bytes),0) AS BIGINT), CAST(COALESCE(SUM(CASE WHEN owner_id={owner} THEN bytes ELSE 0 END),0) AS BIGINT)
         FROM (SELECT r.owner_id, {active} AS active, COALESCE((SELECT {length} FROM files f
             WHERE f.record_id=r.id AND f.kind='import-previews'),0) AS bytes
-            FROM records r WHERE r.kind='import-previews') previews")
+            FROM record_rows r WHERE r.kind='import-previews') previews")
 }
 
 pub(crate) fn expired(before: &str, pg: bool) -> QuerySql {

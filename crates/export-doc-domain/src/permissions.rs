@@ -25,6 +25,9 @@ pub struct Resource {
     pub is_technical: bool,
     pub module_key: String,
     pub supports_data_scope: bool,
+    pub unit_assignable: bool,
+    pub workflow_resource: bool,
+    pub scope_description: String,
     pub actions: Vec<Action>,
 }
 
@@ -35,6 +38,7 @@ pub struct Action {
     pub name: String,
     pub description: String,
     pub navigation_access_level: String,
+    pub unit_assignable: bool,
 }
 
 #[derive(Deserialize)]
@@ -233,26 +237,12 @@ pub fn module_access(grants: &[Grant]) -> BTreeMap<String, String> {
 /// CRUD services express intent; standard resources use operate/manage, while
 /// resources with separate actions retain their exact create/edit/delete grant.
 pub fn service_action<'a>(key: &str, action: &'a str) -> &'a str {
-    if key == "organization.directory" {
-        return "manage";
-    }
     let Some(resource) = resource(key) else {
         return action;
     };
-    if resource.actions.iter().any(|a| a.key == action) {
-        return action;
-    }
-    let standard = resource.actions.iter().any(|a| a.key == "operate")
-        && resource.actions.iter().any(|a| a.key == "manage");
-    if standard {
-        match action {
-            "create" | "edit" => "operate",
-            "delete" => "manage",
-            _ => action,
-        }
-    } else {
-        action
-    }
+    export_doc_contracts::permission_actions::service_action(key, action, |key| {
+        resource.actions.iter().any(|a| a.key == key)
+    })
 }
 
 /// Shared by application authorization and native action visibility. A missing
@@ -280,93 +270,59 @@ pub fn allows_edition_operation(
     query: &[(&str, String)],
 ) -> bool {
     let policy = &contracts::contract()["operations"][operation.id]["policy"];
-    if !policy.is_object() {
-        return false;
-    }
-    let allows = |key: &str, action: &str| {
-        edition.allows(key)
-            && !action.is_empty()
-            && (administrator
-                || (!key.starts_with("system.")
-                    && grants.iter().any(|grant| {
-                        grant.resource_key == key && grant.action == service_action(key, action)
-                    })))
-    };
-    if let Some(requirements) = policy["requirements"]
-        .as_array()
-        .filter(|items| !items.is_empty())
-    {
-        return requirements.iter().all(|requirement| {
-            allows(
-                requirement["resourceKey"].as_str().unwrap_or(""),
-                requirement["action"].as_str().unwrap_or(""),
-            )
-        });
-    }
-    if policy["permissionBypass"] == true {
+    matches_access(grants, administrator, edition, &policy["access"], query)
+}
+
+fn matches_access(
+    grants: &[Grant],
+    administrator: bool,
+    edition: ProductEdition,
+    rule: &serde_json::Value,
+    query: &[(&str, String)],
+) -> bool {
+    if rule["bypass"] == true {
         return true;
     }
-    let metadata = &policy["permissions"];
-    if !metadata.is_object() {
-        return false;
-    }
-    let read = operation.method == "GET";
-    let mut module = if read {
-        metadata["readModule"].as_str()
-    } else {
-        metadata["writeModule"]
-            .as_str()
-            .or(metadata["readModule"].as_str())
-    }
-    .unwrap_or("");
-    if read && metadata["selector"] == 1 {
-        module = match query
+    if let Some(parameter) = rule["query"].as_str() {
+        let selected = query
             .iter()
-            .find(|(key, _)| *key == "reportType")
-            .map(|(_, value)| value.as_str())
-        {
-            Some("PaymentVoucher") => "document.payment-reports",
-            Some("ExportDocument") => "document.invoice-reports",
-            _ => module,
+            .find(|(key, _)| *key == parameter)
+            .and_then(|(_, value)| rule["cases"].get(value));
+        return matches_access(
+            grants,
+            administrator,
+            edition,
+            selected.unwrap_or(&rule["fallback"]),
+            query,
+        );
+    }
+    let Some(resources) = rule["resources"]
+        .as_array()
+        .filter(|resources| !resources.is_empty())
+    else {
+        return false;
+    };
+    let allows = |resource: &serde_json::Value| {
+        let Some(key) = resource["resourceKey"].as_str() else {
+            return false;
         };
-    }
-    if module.is_empty() {
-        return false;
-    }
-    let level = if read {
-        metadata["readAccessLevel"].as_str().unwrap_or("view")
-    } else {
-        metadata["writeAccessLevel"]
-            .as_str()
-            .unwrap_or(if operation.method == "DELETE" {
-                "manage"
-            } else {
-                "operate"
-            })
+        edition.allows(key)
+            && (administrator
+                || resource["administratorOnly"] != true
+                    && resource["actions"].as_array().is_some_and(|actions| {
+                        actions.iter().any(|action| {
+                            grants.iter().any(|grant| {
+                                grant.resource_key == key
+                                    && Some(grant.action.as_str()) == action.as_str()
+                            })
+                        })
+                    }))
     };
-    if resource(module).is_some() {
-        return allows(module, level);
+    match rule["match"].as_str() {
+        Some("All") => resources.iter().all(allows),
+        Some("Any") => resources.iter().any(allows),
+        _ => false,
     }
-    let rank = |value: &str| match value {
-        "view" => 1,
-        "operate" => 2,
-        "manage" => 3,
-        _ => 0,
-    };
-    let allowed_grants: Vec<_> = grants
-        .iter()
-        .filter(|grant| edition.allows(&grant.resource_key))
-        .cloned()
-        .collect();
-    rank(level) > 0
-        && catalog()
-            .resources
-            .iter()
-            .any(|resource| resource.module_key == module && edition.allows(&resource.key))
-        && (administrator
-            || module_access(&allowed_grants)
-                .get(module)
-                .is_some_and(|actual| rank(actual) >= rank(level)))
 }
 
 #[cfg(test)]

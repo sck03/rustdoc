@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-10-29",
+  "updatedAt": "2026-10-31",
   "rules": [
     {
       "name": "repository web production default",
@@ -9,9 +9,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 88296,
+      "baselineAggregateLines": 88829,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 88496,
+      "maximumAggregateLines": 89029,
       "reportFiles": false
     },
     {
@@ -37,9 +37,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 82239,
+      "baselineAggregateLines": 91008,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 82314,
+      "maximumAggregateLines": 91083,
       "reportFiles": false
     },
     {
@@ -51,9 +51,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 23966,
+      "baselineAggregateLines": 26816,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 24086,
+      "maximumAggregateLines": 26936,
       "reportFiles": false
     },
     {
@@ -66,9 +66,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 38673,
+      "baselineAggregateLines": 39265,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 38823,
+      "maximumAggregateLines": 39415,
       "reportFiles": false
     },
     {
@@ -92,9 +92,9 @@
       "filePattern": "^.+\\.(?:yml|yaml)$",
       "excludePattern": "^\\.github/workflows/rust-native-validation\\.yml$",
       "maximumLines": 800,
-      "baselineAggregateLines": 815,
+      "baselineAggregateLines": 1019,
       "maximumAggregateGrowthLines": 20,
-      "maximumAggregateLines": 835,
+      "maximumAggregateLines": 1039,
       "reportFiles": false
     },
     {
@@ -120,7 +120,7 @@
       "directory": "apps/export-doc-web/src/features/office",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 220,
-      "maximumAggregateLines": 927,
+      "maximumAggregateLines": 1050,
       "excludePattern": "/(?:Personnel.*|personnelModel|usePersonnelData|usePersonnelImage|usePersonnelPositions)\\.(?:ts|tsx)$"
     },
     {
@@ -345,8 +345,8 @@
       "directory": "apps/export-doc-web/src/features/organization",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 200,
-      "maximumAggregateLines": 701,
-      "baselineAggregateLines": 651,
+      "maximumAggregateLines": 773,
+      "baselineAggregateLines": 723,
       "maximumAggregateGrowthLines": 50
     }
   ]

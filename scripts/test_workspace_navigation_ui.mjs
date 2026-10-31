@@ -111,7 +111,7 @@ try {
   await key("Enter"); await waitFor("document.querySelector('.job-table')");
   assert.equal(await read("document.querySelector('.nav-search input').value"), ""); results.push("search-keyboard-navigation");
   await open(1024); assert.equal(await read("document.querySelectorAll('.nav-rail-item').length"), 8); await audit("compact-groups");
-  await click('.nav-rail-item[aria-label="展开行政办公"]');
+  await click('.nav-rail-item[aria-label="申请：展开申请与资源"]');
   assert(await read("document.activeElement.dataset.navGroup==='office'"));
   assert.equal(await read("document.querySelectorAll('.nav-group-button[aria-expanded=true]').length"), 1); results.push("compact-expand-focus");
   for (const width of [390, 320]) {

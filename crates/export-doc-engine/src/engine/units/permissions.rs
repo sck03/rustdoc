@@ -2,7 +2,11 @@
 use super::super::account_permissions::{self, Profile};
 use super::*;
 
-pub(super) fn profile(tx: &Connection, row: &Value) -> Result<Profile> {
+pub(super) fn profile_in(
+    tx: &Connection,
+    row: &Value,
+    ancestry: &std::collections::BTreeMap<String, Vec<String>>,
+) -> Result<Profile> {
     let mut profile = account_permissions::profile(tx, row)?;
     profile.direct =
         export_doc_domain::units::validate_grants(&profile.direct).map_err(|e| error(403, e))?;
@@ -28,7 +32,7 @@ pub(super) fn profile(tx: &Connection, row: &Value) -> Result<Profile> {
             || authority["mode"] != "Administration"
             || authority["management"]["roles"] != true
             || !window(&authority)?
-            || !covers(&authority, &text(row, "companyCode"), &tree(tx)?)
+            || !covers(&authority, &text(row, "companyCode"), ancestry)
             || !export_doc_domain::units::within_ceiling(&profile.direct, &parent.direct)
         {
             return Err(error(
@@ -44,41 +48,6 @@ pub(super) fn profile(tx: &Connection, row: &Value) -> Result<Profile> {
         profile.assigned_only |= parent.assigned_only || issuer["oaAssignedOnly"] == true;
     }
     Ok(profile)
-}
-
-pub(in crate::engine) fn validate_scheme_users(
-    tx: &Connection,
-    actor: &Actor,
-    template_id: i64,
-) -> Result<()> {
-    let mut users = std::collections::BTreeSet::new();
-    for user in store::matching(
-        tx,
-        "users",
-        &[("permissionTemplateId", template_id.to_string())],
-        &[],
-    )? {
-        if user["permissionGrants"].is_null() {
-            if let Some(id) = user["id"].as_i64() {
-                users.insert(id);
-            }
-        }
-    }
-    for role in store::matching(
-        tx,
-        KIND,
-        &[("permissionTemplateId", template_id.to_string())],
-        &[],
-    )? {
-        if let Some(id) = role["userId"].as_i64() {
-            users.insert(id);
-        }
-    }
-    for user_id in users {
-        validate_user(tx, actor, &store::get(tx, "users", user_id)?)?;
-        invalidate_user(tx, actor, user_id)?;
-    }
-    Ok(())
 }
 
 pub(super) fn validate_dependents(tx: &Connection, actor: &Actor, authority_id: i64) -> Result<()> {
@@ -117,7 +86,7 @@ pub(in crate::engine) fn validate_issuer(
     Ok(())
 }
 
-pub(super) fn invalidate_user(tx: &Connection, actor: &Actor, id: i64) -> Result<()> {
+pub(in crate::engine) fn invalidate_user(tx: &Connection, actor: &Actor, id: i64) -> Result<()> {
     let mut user = store::get(tx, "users", id)?;
     user["expectedVersion"] = user["versionNumber"].clone();
     let scope = user.clone();

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
+import { approvalStage, approveTask, publishDefinitions } from './lib/approval-fixtures.mjs';
 
 await withOfficeUi('communication-ui', async ({ output, require, url, operations, invoke, openPage }) => {
   const page = await openPage('oa-review', 'Review-2026-Test');
@@ -74,8 +75,19 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   assert((await page.locator('.oa-detail-summary').innerText()).includes('发布版本 2'));
   const people = await invoke('ListPersonnel', undefined, {}, token);
   const person = people.items[0]; assert(person);
+  const reviewerName=`communication-reviewer-${Date.now()}`;
+  const reviewer=(await invoke('createUserAccount',{username:reviewerName,fullName:'通信独立审批员',role:'OfficeManager',companyScope:'DEFAULT',departmentId:'GENERAL',isActive:true,resetPassword:'Communication-Review-2026'},{},token)).user;
+  const reviewerPerson=await invoke('CreatePersonnel',{requestKey:reviewerName,employeeNumber:reviewerName,departmentId:'GENERAL',jobTitle:'审批员',employmentType:'FullTime',hireDate:'2026-01-01',profile:{fullName:reviewer.fullName}},{},token);
+  await invoke('LinkPersonnelAccount',{expectedVersion:reviewerPerson.versionNumber,userId:reviewer.id,expectedAccountVersion:reviewer.versionNumber},{id:reviewerPerson.employee.id},token);
+  const reviewerToken=(await invoke('Login',{username:reviewerName,password:'Communication-Review-2026'})).accessToken;
+  const settings=await invoke('GetOaApprovalSettings',undefined,{},token);
+  const definitions=settings.rules.filter(rule=>['general','expense'].includes(rule.kind)&&!rule.companyScope);
+  assert.equal(definitions.length,2);
+  settings.rules=settings.rules.map(rule=>definitions.includes(rule)?{...rule,stages:[approvalStage(`${rule.kind}-review`,[reviewer.id])]}:rule);
+  await publishDefinitions(invoke,token,settings,definitions.map(rule=>rule.key));
   let request = await invoke('CreateGeneralRequest', { requestKey: `notification-ui-${Date.now()}`, employeeId: person.id, title: '站内通知关联申请', reason: '检验审批结果通知', category: 'IT' }, {}, token);
-  for (const op of ['SubmitGeneralRequest', 'ApproveGeneralRequest']) request = await invoke(op, { expectedVersion: request.versionNumber, note: '验收通过' }, { id: request.id }, token);
+  request=await invoke('SubmitGeneralRequest',{expectedVersion:request.versionNumber},{id:request.id},token);
+  request=await approveTask(invoke,reviewerToken,'General',request.id);
   await navigate('/office/notifications');
   await page.getByRole('heading', { name: '审批通过 · 站内通知关联申请', exact: true }).waitFor();
   await page.getByRole('button', { name: '标记已读', exact: true }).click();
@@ -105,7 +117,8 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   const form = new FormData(); form.set('expectedVersion', String(expense.versionNumber)); form.set('file', new Blob([fs.readFileSync(attachment)], { type: 'application/pdf' }), 'expense.pdf');
   const upload = await fetch(url + operations.get('UploadAttachmentToExpenseRequest').route.replace('{id}', expense.id), { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: form });
   assert.equal(upload.status, 200); expense = await upload.json();
-  for (const op of ['SubmitExpenseRequest', 'ApproveExpenseRequest']) expense = await invoke(op, { expectedVersion: expense.versionNumber, note: '审批通过' }, { id: expense.id }, token);
+  expense=await invoke('SubmitExpenseRequest',{expectedVersion:expense.versionNumber},{id:expense.id},token);
+  expense=await approveTask(invoke,reviewerToken,'Expense',expense.id);
   const financePage = await openPage(financeName, 'Finance-Review-2026');
   await financePage.getByRole('link', { name: '站内通知', exact: true }).click();
   await financePage.getByRole('heading', { name: `审批通过 · ${expenseBody.title}`, exact: true }).waitFor();
@@ -113,10 +126,10 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   await financePage.getByRole('heading', { name: '站内通知 · 0 条未读', exact: true }).waitFor();
   await financePage.getByRole('link', { name: '查看关联申请', exact: true }).click();
   await financePage.getByRole('heading', { name: '报销凭证', exact: true }).waitFor();
-  await financePage.goto(`${url}/#/office/approvals`);
-  await financePage.getByText('待财务接收：1', { exact: true }).waitFor();
+  await financePage.goto(`${url}/#/office/approvals?view=handling`);
+  await financePage.locator('.oa-hub-count[aria-label="待财务接收 1 项"]').waitFor();
   await financePage.screenshot({ path: path.join(output, 'finance-hub.png'), fullPage: true });
-  await financePage.getByRole('link', { name: '财务待接收', exact: true }).click();
+  await financePage.locator('.oa-hub-queue').filter({ has: financePage.locator('.oa-hub-count[aria-label="待财务接收 1 项"]') }).getByRole('link', { name: '进入列表', exact: true }).click();
   await financePage.locator('.office-tabs').getByRole('button', { name: '财务接收', exact: true }).waitFor();
   await financePage.getByRole('button', { name: expenseBody.title, exact: true }).waitFor();
   assert.equal(await financePage.getByRole('button', { name: privateDraft.title, exact: true }).count(), 0);
@@ -134,11 +147,11 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   await financePage.getByRole('dialog').getByRole('button', { name: '财务接收', exact: true }).click();
   await financePage.getByRole('dialog').waitFor({ state: 'hidden' });
   await financePage.getByText('财务交接已登记', { exact: true }).waitFor();
-  await financePage.getByText('审批与办理记录', { exact: true }).click();
+  await financePage.locator('details.oa-detail-history > summary').click();
   await financePage.getByText('凭证已核对，财务接收编号 FIN-UI-001', { exact: true }).waitFor();
   await financePage.screenshot({ path: path.join(output, 'finance-received.png'), fullPage: true });
   await financePage.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
   assert.deepEqual(await financePage.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => v.id)), []);
-  await financePage.goto(`${url}/#/office/approvals`);
-  await financePage.getByText('待财务接收：0', { exact: true }).waitFor();
+  await financePage.goto(`${url}/#/office/approvals?view=handling`);
+  await financePage.locator('.oa-hub-count[aria-label="待财务接收 0 项"]').waitFor();
 });

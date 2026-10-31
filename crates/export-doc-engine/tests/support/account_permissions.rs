@@ -4,6 +4,8 @@ use export_doc_engine::{
 use serde_json::{Value, json};
 #[path = "payment_printing_contract.rs"]
 mod payment_printing_contract;
+#[path = "approval_fixture.rs"]
+mod workflow;
 
 fn call(
     service: &NativeService,
@@ -65,6 +67,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         let body = json!({"username":format!("profile-{suffix}-{index}"),"fullName":"权限回归员工","role":"OfficeEmployee","isActive":true,
             "companyScope":"DEFAULT","departmentId":"GENERAL","resetPassword":"Account-Review-2026",
             "permissionTemplateId":if index == 1 { json!(template_id) } else { Value::Null },
+            "permissionSchemeVersion":if index == 1 { employee["publishedVersion"].clone() } else { Value::Null },
             "permissionGrants":if index == 2 { json!([read]) } else { Value::Null }});
         accounts.push(
             call(service, admin, CREATE_USER_ACCOUNT, 0, Some(body)).unwrap()["user"].clone(),
@@ -119,6 +122,17 @@ pub fn exercise(service: &NativeService, admin: &str) {
         Some(group),
     )
     .unwrap();
+    // Saving and publishing never rebind existing accounts implicitly.
+    for session in &sessions[..2] {
+        call(service, token(session), LIST_PERSONNEL, 0, None).unwrap();
+    }
+    let saved = workflow::publish_scheme(service, admin, saved);
+    for session in &sessions[..2] {
+        call(service, token(session), LIST_PERSONNEL, 0, None).unwrap();
+    }
+    for account in &accounts[..2] {
+        workflow::apply_scheme(service, admin, &saved, "Account", account).unwrap();
+    }
     for session in &sessions[..2] {
         assert_eq!(
             call(service, token(session), GET_CURRENT_USER, 0, None)
@@ -248,11 +262,12 @@ pub fn exercise(service: &NativeService, admin: &str) {
         })),
     )
     .unwrap();
+    group = workflow::publish_scheme(service, admin, group);
     accounts[2] = update(
         service,
         admin,
         &accounts[2],
-        json!({"permissionTemplateId":group["id"]}),
+        json!({"permissionTemplateId":group["id"],"permissionSchemeVersion":group["publishedVersion"]}),
     );
     let active_group_login = login(service, accounts[2]["username"].as_str().unwrap());
     group["expectedVersion"] = group["versionNumber"].clone();
@@ -267,6 +282,10 @@ pub fn exercise(service: &NativeService, admin: &str) {
     .unwrap();
     assert_eq!(inactive["effectiveGrants"], json!([]));
     assert_eq!(inactive["grants"], json!([read]));
+    call(service, token(&active_group_login), LIST_PERSONNEL, 0, None).unwrap();
+    let inactive = workflow::publish_scheme(service, admin, inactive);
+    call(service, token(&active_group_login), LIST_PERSONNEL, 0, None).unwrap();
+    workflow::apply_scheme(service, admin, &inactive, "Account", &accounts[2]).unwrap();
     assert_eq!(
         call(
             service,
@@ -297,7 +316,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
     assert!(
         refreshed["versionNumber"].as_i64().unwrap()
             > accounts[2]["versionNumber"].as_i64().unwrap(),
-        "scheme changes invalidate the account revision"
+        "applying a published version invalidates the account revision"
     );
     accounts[2] = refreshed;
     let promoted = update(

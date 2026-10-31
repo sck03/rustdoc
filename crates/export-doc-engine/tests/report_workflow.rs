@@ -212,7 +212,8 @@ impl Fixture {
                 {"resourceKey":"document.invoices","action":"operate","dataScope":"own"}
             ]}),
         );
-        self.create(CREATE_USER_ACCOUNT, json!({"username":name,"fullName":name,"role":"User","permissionTemplateId":permissions["id"],"departmentId":"GENERAL","companyScope":"DEFAULT","isActive":true,"resetPassword":"Report-Test-2026"}));
+        let permissions = self.client().publish_scheme(permissions);
+        self.create(CREATE_USER_ACCOUNT, json!({"username":name,"fullName":name,"role":"User","permissionTemplateId":permissions["id"],"permissionSchemeVersion":permissions["publishedVersion"],"departmentId":"GENERAL","companyScope":"DEFAULT","isActive":true,"resetPassword":"Report-Test-2026"}));
         self.client()
             .login(name.into(), "Report-Test-2026".into())
             .unwrap()

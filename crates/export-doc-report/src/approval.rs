@@ -16,6 +16,10 @@ fn time(value: &str) -> String {
 pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
     let request = &snapshot["request"];
     let mut summary = vec![];
+    let notice = text(snapshot, "materialProjectionNotice");
+    if !notice.is_empty() {
+        summary.push(notice);
+    }
     let money = text(request, "totalAmount");
     if !money.is_empty() {
         summary.push(format!("{} {}", text(request, "currency"), money));
@@ -47,6 +51,12 @@ pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
         ("personnelChange.registration.jobTitle", "入职职位"),
         ("personnelChange.departmentId", "任职部门"),
         ("personnelChange.jobTitle", "职位"),
+        ("roomName", "会议室"),
+        ("location", "地点"),
+        ("startsAt", "预约开始"),
+        ("endsAt", "预约结束"),
+        ("supplyName", "领用物品"),
+        ("returnDueDate", "预计归还日期"),
     ] {
         let value = text(request, key);
         let value = match (key, value.as_str()) {
@@ -56,12 +66,22 @@ pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
             ("leave.category", "Sick") => "病假".into(),
             ("leave.category", "Personal") => "事假".into(),
             ("leave.category", "Other") => "其他".into(),
-            ("overtime.startsAt" | "overtime.endsAt", _) => time(&value),
+            ("overtime.startsAt" | "overtime.endsAt" | "startsAt" | "endsAt", _) => time(&value),
             _ => value,
         };
         if !value.is_empty() {
             summary.push(format!("{label}：{value}"));
         }
+    }
+    if request["kind"] == "room" {
+        summary.push(format!("参会人数：{}", request["attendeeCount"]));
+    }
+    if request["kind"] == "supply" {
+        summary.push(format!(
+            "领用数量：{} {}",
+            request["quantity"],
+            text(request, "unit")
+        ));
     }
     if request["kind"] == "expense" {
         summary.push("详细费用见提交的报销单及凭证附件；金额以本次批准记录为准。".into());

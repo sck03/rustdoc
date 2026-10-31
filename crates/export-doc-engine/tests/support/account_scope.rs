@@ -3,6 +3,8 @@ use export_doc_engine::{
     paths::nonce,
 };
 use serde_json::{Value, json};
+#[path = "approval_fixture.rs"]
+mod workflow;
 
 fn call(
     service: &NativeService,
@@ -48,6 +50,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         {"resourceKey":"document.invoices","action":"view","dataScope":"company"},
         {"resourceKey":"document.invoices","action":"operate","dataScope":"own"}
     ]}))).unwrap();
+    let template = workflow::publish_scheme(service, admin, template);
     let mut accounts = vec![];
     let mut tokens = vec![];
     for (index, company, department) in [
@@ -56,7 +59,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         (2, "DEFAULT", "GENERAL"),
     ] {
         let username = format!("scope-{suffix}-{index}");
-        let user = call(service, admin, CREATE_USER_ACCOUNT, &[], Some(json!({"username":username,"fullName":username,"role":"User","companyScope":company,"departmentId":department,"permissionTemplateId":template["id"],"isActive":true,"resetPassword":"Scope-Test-2026"}))).unwrap()["user"].clone();
+        let user = call(service, admin, CREATE_USER_ACCOUNT, &[], Some(json!({"username":username,"fullName":username,"role":"User","companyScope":company,"departmentId":department,"permissionTemplateId":template["id"],"permissionSchemeVersion":template["publishedVersion"],"isActive":true,"resetPassword":"Scope-Test-2026"}))).unwrap()["user"].clone();
         assert_eq!(user["companyScope"], company);
         assert_eq!(user["departmentId"], department);
         let login = call(

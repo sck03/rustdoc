@@ -34,7 +34,7 @@ fn related(kind: &str, relation: &str, path: &str, json: bool, pg: bool) -> Stri
     }
     .replace("r.body", "related.body");
     format!(
-        "(SELECT {value} FROM records related WHERE related.kind='{kind}' AND related.id=CAST({} AS BIGINT))",
+        "(SELECT {value} FROM record_rows related WHERE related.kind='{kind}' AND related.id=CAST({} AS BIGINT))",
         sql::field(relation, pg)
     )
 }
@@ -120,7 +120,7 @@ pub(crate) fn build(q: &CrmQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
         format!("r.kind='{kind}'"),
         q.scope.filter(&mut values, pg),
         format!(
-            "EXISTS (SELECT 1 FROM records customer WHERE customer.kind='crm-customers' AND customer.id=CAST({} AS BIGINT) AND {parent_scope})",
+            "EXISTS (SELECT 1 FROM record_rows customer WHERE customer.kind='crm-customers' AND customer.id=CAST({} AS BIGINT) AND {parent_scope})",
             sql::field("crmCustomerId", pg)
         ),
     ];

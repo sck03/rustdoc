@@ -34,6 +34,9 @@
   .office-stock-number { font-size: 0.95rem; }
   .office-stock-number strong { font-size: 1.6rem; font-variant-numeric: tabular-nums; color: var(--edm-neutral-850); }
   .office-request-list { display: grid; gap: 14px; }
+  .office-table-scroll { min-width: 0; max-width: 100%; overflow: auto; }
+  .office-table-scroll table { width: 100%; border-collapse: collapse; }
+  .office-table-scroll th, .office-table-scroll td { padding: 8px; text-align: start; white-space: nowrap; border-bottom: 1px solid var(--edm-neutral-200); }
   .office-period { font-variant-numeric: tabular-nums; }
   .office-dialog-backdrop { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 20px; background: color-mix(in srgb, var(--edm-primary-950) 44%, transparent); }
   .office-dialog { display: flex; flex-direction: column; min-width: 0; width: min(100%, 760px); max-height: calc(100dvh - 40px); border-radius: 14px; background: var(--edm-white); color: var(--edm-neutral-850); border: 1px solid var(--edm-neutral-250); }

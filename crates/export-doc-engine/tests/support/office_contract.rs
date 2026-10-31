@@ -7,6 +7,13 @@ pub type Request<'a> = dyn Fn(Operation, Option<i64>, &[(&str, String)], Option<
     + 'a;
 
 fn save(request: &Request<'_>, operation: Operation, id: Option<i64>, mut value: Value) -> Value {
+    if contracts::object(operation.id, true)
+        .get("commandKey")
+        .is_some()
+        && value.get("commandKey").is_none()
+    {
+        value["commandKey"] = json!(nonce().unwrap());
+    }
     let list = match operation {
         APPROVE_MEETING_BOOKING | REJECT_MEETING_BOOKING => Some(LIST_MEETING_BOOKINGS),
         APPROVE_OFFICE_SUPPLY_REQUEST | REJECT_OFFICE_SUPPLY_REQUEST => {
@@ -43,8 +50,8 @@ fn page(
 }
 
 /// The same query, concurrency, history and stock behavior is exercised on both providers.
-pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>) {
-    let admin_user = admin(GET_CURRENT_USER, None, &[], None).unwrap();
+pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, reviewer: &Request<'_>) {
+    let admin_user = reviewer(GET_CURRENT_USER, None, &[], None).unwrap();
     let mut settings = admin(GET_OA_APPROVAL_SETTINGS, None, &[], None).unwrap();
     for r in settings["rules"]
         .as_array_mut()
@@ -116,7 +123,7 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>) {
         Some(403)
     );
     booking = save(
-        admin,
+        reviewer,
         APPROVE_MEETING_BOOKING,
         id,
         json!({"expectedVersion":booking["versionNumber"],"note":"同意预约"}),
@@ -197,7 +204,7 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>) {
         json!({"requestKey":nonce().unwrap(),"meetingRoomId":room_id,"title":"未来会议","attendeeCount":2,"startsAt":far_start.to_rfc3339(),"endsAt":(far_start+chrono::Duration::hours(1)).to_rfc3339()}),
     );
     let future = save(
-        admin,
+        reviewer,
         APPROVE_MEETING_BOOKING,
         future["id"].as_i64(),
         json!({"expectedVersion":future["versionNumber"],"note":"同意"}),
@@ -326,7 +333,7 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>) {
         );
     }
     application = save(
-        admin,
+        reviewer,
         APPROVE_OFFICE_SUPPLY_REQUEST,
         application["id"].as_i64(),
         json!({"expectedVersion":application["versionNumber"],"note":"同意借用"}),

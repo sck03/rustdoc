@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::collections::HashSet;
 
 pub fn departments(tx: &Connection, user: &Value, include_managed: bool) -> Result<Vec<String>> {
-    let mut result: Vec<String> = match user.get("organizationDepartments") {
+    let result: Vec<String> = match user.get("organizationDepartments") {
         Some(value) => {
             serde_json::from_value(value.clone()).map_err(|_| unavailable("账号任职部门损坏。"))?
         }
@@ -20,8 +20,17 @@ pub fn departments(tx: &Connection, user: &Value, include_managed: bool) -> Resu
     else {
         return Ok(result);
     };
+    departments_for_person(tx, user, &person, include_managed)
+}
+
+pub(super) fn departments_for_person(
+    tx: &Connection,
+    user: &Value,
+    person: &Value,
+    include_managed: bool,
+) -> Result<Vec<String>> {
     let company = text(user, "companyScope");
-    result = super::personnel_organization::departments_in(tx, &person, &company)?;
+    let mut result = super::personnel_organization::departments_in(tx, person, &company)?;
     if !include_managed || result.is_empty() {
         return Ok(result);
     }

@@ -7,6 +7,7 @@ use crate::{
 /// current department, so reducing grants to only the largest rank is incorrect.
 #[derive(Default)]
 pub struct DataScope<'a> {
+    pub restrictions: Vec<ScopeFilter>,
     pub all: bool,
     pub company_wide: bool,
     pub department_wide: bool,
@@ -18,8 +19,72 @@ pub struct DataScope<'a> {
     pub personnel_date: Option<&'a str>,
     pub user_id: i64,
 }
+#[derive(Clone)]
+pub enum ScopeFilter {
+    Deny,
+    Units(Vec<String>),
+    Departments(Vec<(String, String)>),
+    Projects(Vec<String>),
+}
 impl DataScope<'_> {
     pub(crate) fn filter(&self, values: &mut Vec<String>, pg: bool) -> String {
+        let base = self.base_filter(values, pg);
+        let mut clauses = vec![format!("({base})")];
+        for rule in &self.restrictions {
+            clauses.push(match rule {
+                ScopeFilter::Deny => "1=0".into(),
+                ScopeFilter::Units(units) => {
+                    if units.is_empty() {
+                        "1=0".into()
+                    } else {
+                        format!(
+                            "r.company IN ({})",
+                            units
+                                .iter()
+                                .map(|unit| bind(values, unit, pg))
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        )
+                    }
+                }
+                ScopeFilter::Departments(departments) => {
+                    if departments.is_empty() {
+                        "1=0".into()
+                    } else {
+                        format!(
+                            "({})",
+                            departments
+                                .iter()
+                                .map(|(unit, department)| {
+                                    let u = bind(values, unit, pg);
+                                    let d = bind(values, department, pg);
+                                    format!("(r.company={u} AND r.department={d})")
+                                })
+                                .collect::<Vec<_>>()
+                                .join(" OR ")
+                        )
+                    }
+                }
+                ScopeFilter::Projects(projects) => {
+                    if projects.is_empty() {
+                        "1=0".into()
+                    } else {
+                        format!(
+                            "{} IN ({})",
+                            field("projectId", pg),
+                            projects
+                                .iter()
+                                .map(|project| bind(values, project, pg))
+                                .collect::<Vec<_>>()
+                                .join(",")
+                        )
+                    }
+                }
+            });
+        }
+        clauses.join(" AND ")
+    }
+    fn base_filter(&self, values: &mut Vec<String>, pg: bool) -> String {
         if self.all {
             return "1=1".into();
         }

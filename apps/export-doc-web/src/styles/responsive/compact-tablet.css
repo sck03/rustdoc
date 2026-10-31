@@ -4,10 +4,13 @@
   }
 
   .workspace-header {
-    align-items: center;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
     min-height: 68px;
     padding: 9px 12px;
   }
+  .session-strip { flex-wrap: wrap; justify-content: flex-start; }
+  .session-strip > button { flex-shrink: 0; }
 
   .workspace-title-block h1 {
     font-size: 21px;

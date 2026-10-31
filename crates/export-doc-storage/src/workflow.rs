@@ -1,18 +1,7 @@
-//! Indexed task projection, published atomically with the owning business record.
-pub struct WorkflowTask {
-    pub key: String,
-    pub node: String,
-    pub assignee: i64,
-    pub context: String,
-    pub acted_by: Option<i64>,
-    pub acted_by_context: String,
-    pub status: String,
-    pub active: bool,
-    pub independent: bool,
-    pub due_at: String,
-    pub started_at: String,
-    pub acted_at: String,
-    pub elapsed_seconds: Option<i64>,
+//! Authorized read projections over canonical workflow and handling state.
+pub struct WorkflowProgress<'a> {
+    pub approval: &'a str,
+    pub handling: Option<(&'a str, &'a str)>,
 }
 
 pub struct WorkflowTaskQuery<'a> {
@@ -62,10 +51,10 @@ pub(crate) fn summary(q: &WorkflowSummaryQuery<'_>, pg: bool) -> (String, Vec<St
     };
     (
         format!(
-            "WITH units AS (SELECT u.id,u.code,c.body->>'name' AS name FROM organization_units u JOIN records c ON c.id=u.id WHERE {filter}),
-            requests AS (SELECT r.id,r.company,r.body->>'status' AS status,CAST(r.body->>'submissionNumber' AS BIGINT) AS submission FROM records r JOIN units u ON r.company=u.code WHERE r.kind IN ('oa-leave','oa-overtime','oa-expense','oa-travel','oa-purchase','oa-general','oa-personnel','bookings','supply-requests')),
-            pending AS (SELECT u.id,COUNT(DISTINCT r.id) AS requests,SUM(CASE WHEN t.active=1 THEN 1 ELSE 0 END) AS active,SUM(CASE WHEN t.active=0 THEN 1 ELSE 0 END) AS queued,SUM(CASE WHEN t.active=1 AND t.due_at<>'' THEN CASE WHEN {due}<{now} THEN 1 ELSE 0 END ELSE 0 END) AS overdue FROM units u LEFT JOIN requests r ON r.company=u.code AND r.status='Pending' LEFT JOIN workflow_tasks t ON t.request_id=r.id AND t.submission=r.submission AND t.status='Waiting' GROUP BY u.id),
-            handled AS (SELECT r.company,COUNT(*) AS completed,AVG(CAST(t.elapsed_seconds AS DOUBLE PRECISION)) AS elapsed FROM requests r JOIN workflow_tasks t ON t.request_id=r.id WHERE CASE WHEN t.status IN ('Approved','Rejected','Returned') THEN {acted}>={since} AND {acted}<={now} ELSE FALSE END GROUP BY r.company),
+            "WITH units AS (SELECT u.id,u.code,c.body->>'name' AS name FROM organization_units u JOIN record_rows c ON c.id=u.id WHERE {filter}),
+            requests AS (SELECT r.id,r.company,r.body->>'status' AS status,CAST(r.body->>'submissionNumber' AS BIGINT) AS submission FROM record_rows r JOIN units u ON r.company=u.code WHERE r.kind IN ('oa-leave','oa-overtime','oa-expense','oa-travel','oa-purchase','oa-general','oa-personnel','bookings','supply-requests')),
+            pending AS (SELECT u.id,COUNT(DISTINCT r.id) AS requests,SUM(CASE WHEN t.active=1 THEN 1 ELSE 0 END) AS active,SUM(CASE WHEN t.active=0 THEN 1 ELSE 0 END) AS queued,SUM(CASE WHEN t.active=1 AND t.due_at<>'' THEN CASE WHEN {due}<{now} THEN 1 ELSE 0 END ELSE 0 END) AS overdue FROM units u LEFT JOIN requests r ON r.company=u.code AND r.status='Pending' LEFT JOIN workflow_current_tasks t ON t.request_id=r.id AND t.submission=r.submission AND t.status='Waiting' GROUP BY u.id),
+            handled AS (SELECT r.company,COUNT(*) AS completed,AVG(CAST(t.elapsed_seconds AS DOUBLE PRECISION)) AS elapsed FROM requests r JOIN workflow_tasks t ON t.request_id=r.id WHERE t.signature IS NOT NULL AND CASE WHEN t.status IN ('Approved','Rejected','Returned') THEN {acted}>={since} AND {acted}<={now} ELSE FALSE END GROUP BY r.company),
             summary AS (SELECT u.id,{projection} AS body FROM units u JOIN pending p ON p.id=u.id LEFT JOIN handled h ON h.company=u.code), page AS (SELECT body FROM summary ORDER BY id LIMIT {limit} OFFSET {offset}) SELECT (SELECT COUNT(*) FROM summary),{rows}",
             limit = q.limit.clamp(1, 100),
             offset = q.offset.max(0)
@@ -100,7 +89,7 @@ pub(crate) fn page(q: &WorkflowTaskQuery<'_>, pg: bool) -> (String, Vec<String>)
     let projection = format!(
         "{json}('requestId',r.id,'requestKind',r.kind,'companyCode',r.company,'versionNumber',r.version,'taskKey',t.task_key,'nodeKey',t.node_key,'assigneeId',t.assignee_id,'assigneeName',COALESCE(u.body->>'fullName',''),'contextId',t.context_id,'active',{active},'dueAt',t.due_at)"
     );
-    let source = "workflow_tasks t JOIN records r ON r.id=t.request_id LEFT JOIN records u ON u.id=t.assignee_id AND u.kind='users'";
+    let source = "workflow_current_tasks t JOIN record_rows r ON r.id=t.request_id LEFT JOIN record_rows u ON u.id=t.assignee_id AND u.kind='users'";
     let rows = if pg {
         "COALESCE((SELECT jsonb_agg(body) FROM page),'[]'::jsonb)::text"
     } else {

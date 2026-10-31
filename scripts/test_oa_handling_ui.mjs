@@ -1,4 +1,4 @@
-import { approvalStage, publishDefinitions, approveResourceTask } from './lib/approval-fixtures.mjs';
+import { approvalStage, publishDefinitions, approveResourceTask, linkBusinessPerson } from './lib/approval-fixtures.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,6 +18,10 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
     ] : undefined;
     users.push((await invoke('createUserAccount', { username: `handling-${name}`, fullName: `办理${name}`, role, companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: password, permissionGrants }, {}, token)).user);
   }
+  for (const user of users) await linkBusinessPerson(invoke, token, user);
+  const candidates = await invoke('GetUnitApproverOptions', undefined, {}, token);
+  assert(!candidates.users.some(user => user.id === users[2].id), 'Handling permission does not grant approval');
+  assert(candidates.handlers.some(user => user.id === users[2].id), 'A dedicated handler can be assigned without approval permission');
   const admin = await openPage('oa-review', 'Review-2026-Test');
   await admin.goto(`${url}/#/office/approval-settings`);
   const section = admin.locator('details[data-definition-key="general"]');
@@ -166,13 +170,13 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
   await special.getByRole('dialog').waitFor({ state: 'hidden' });
   await special.getByText('当前条件下没有申请记录', { exact: true }).waitFor();
   await admin.goto(`${url}/#/office/notifications`);
-  const returned = admin.locator('article').filter({ has: admin.getByRole('heading', { name: '已登记归还 · 多位办理会议室 · 部门联席中文会议', exact: true }) });
+  const returned = admin.locator('article').filter({ has: admin.getByRole('heading', { name: '已登记归还 · 部门联席中文会议', exact: true }) });
   await returned.getByRole('link', { name: '查看关联申请', exact: true }).click();
   await admin.getByRole('button', { name: '处理记录', exact: true }).click();
   await admin.getByRole('dialog').getByText('办理seal · 第一位办理人交付钥匙', { exact: true }).waitFor();
   await admin.getByRole('dialog').getByText('办理special · 第二位办理人核收钥匙', { exact: true }).waitFor();
   await admin.screenshot({ path: path.join(output, 'meeting-handover-history.png'), fullPage: true });
-  await special.goto(`${url}/#/office/approvals`);
+  await special.goto(`${url}/#/office/approvals?view=handling`);
   await special.getByRole('link',{name:'通用申请 · 待办理',exact:true}).waitFor();
   await special.addScriptTag({path:require.resolve('axe-core/axe.min.js')});
   assert.deepEqual(await special.evaluate(async()=> (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v=>['critical','serious'].includes(v.impact)).map(v=>v.id)),[]);

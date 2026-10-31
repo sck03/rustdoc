@@ -6,6 +6,17 @@ pub(super) fn list(
     meta: &Value,
     query: &[(&str, String)],
 ) -> Result<Value> {
+    list_with(tx, actor, meta, query, None, &[])
+}
+
+pub(super) fn list_with(
+    tx: &Connection,
+    actor: &Actor,
+    meta: &Value,
+    query: &[(&str, String)],
+    authority: Option<&super::queue_authority::QueueAuthority>,
+    fields: &[(&str, &str)],
+) -> Result<Value> {
     let resource = text(meta, "resource");
     auth::authorize(actor, &resource, "view")?;
     let get = |name| {
@@ -91,11 +102,15 @@ pub(super) fn list(
     let (page, size) = paging(query)?;
     let handling_keys = handling::keys(tx, actor, "office.general")?;
     let approvers = if approvals || actor.oa_assigned_only || !mine {
-        approval::queue_approvers(tx, actor, &resource)?
+        match authority {
+            Some(authority) => authority.approvers(&resource),
+            None => approval::queue_approvers(tx, actor, &resource)?,
+        }
     } else {
         vec![]
     };
     let (count, rows) = tx.query_records(&RecordQuery {
+        restrictions: auth::scope_filters(actor, &resource, scope_permission),
         kind: &kind(meta),
         company: &actor.company,
         departments: (rank == 2 && !approvals && !actor.oa_assigned_only)
@@ -117,13 +132,19 @@ pub(super) fn list(
             .then_some(handling_keys.as_slice()),
         handling_states: handling::GENERAL_STATES,
         handling_only: handling && meta["kind"] == "general",
+        fields,
         offset: (page - 1) * size,
         limit: size,
         ..Default::default()
     })?;
-    let rows = rows
-        .into_iter()
-        .map(|r| project(tx, actor, r, false))
-        .collect::<Result<Vec<_>>>()?;
+    let rows = if fields.is_empty() {
+        rows.into_iter()
+            .map(|r| project(tx, actor, r, false))
+            .collect::<Result<Vec<_>>>()?
+    } else {
+        rows.into_iter()
+            .map(|row| materials::project(tx, actor, &row, row.clone()))
+            .collect::<Result<Vec<_>>>()?
+    };
     Ok(json!({"items":rows,"totalCount":count,"pageNumber":page,"pageSize":size}))
 }

@@ -2,6 +2,8 @@ use export_doc_engine::{
     api::ApiError, contracts, engine::NativeService, generated_api::*, paths::nonce,
 };
 use serde_json::{Value, json};
+#[path = "approval_fixture.rs"]
+mod workflow;
 
 fn request(
     service: &NativeService,
@@ -242,7 +244,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         people[1]["employee"]["employeeNumber"]
     );
     assert_eq!(application["employeeId"], people[1]["employee"]["id"]);
-    call(DEPART_PERSONNEL, &[("id",people[0]["employee"]["id"].to_string())], &[], Some(json!({"expectedVersion":people[0]["versionNumber"],"effectiveDate":user["businessDate"],"note":"同名同事的申请不应阻止本人离职"}))).unwrap();
+    workflow::personnel_change(service, admin, "Depart", people[0]["employee"]["id"].as_i64().unwrap(), Some(json!({"expectedVersion":people[0]["versionNumber"],"effectiveDate":user["businessDate"],"note":"同名同事的申请不应阻止本人离职"}))).unwrap();
     let reader_name = format!("directory-{suffix}");
     create(
         CREATE_USER_ACCOUNT,

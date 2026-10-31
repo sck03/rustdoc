@@ -45,7 +45,7 @@ aws-sigv4 = { workspace = true, optional = true }
 aws-credential-types = { workspace = true, optional = true }
 aes-gcm = { version = "=0.11.1", default-features = false, features = ["aes", "alloc", "zeroize"] }
 zeroize = "=1.9.1"
-chrono-tz = { version = "=0.10.4", default-features = false, features = ["std"] }
+chrono-tz.workspace = true
 ureq = { version = "=3.5.0", default-features = false, features = ["json", "native-tls"] }
 url = "=2.5.8"
 quick-xml = "=0.42.0"

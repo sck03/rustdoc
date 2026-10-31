@@ -53,14 +53,9 @@ pub(super) fn validate_resource(
     previous: &Value,
     row: &mut Value,
 ) -> Result<()> {
-    let (resource, requests, parent, category) = match kind {
-        "rooms" => ("office.rooms", "bookings", "meetingRoomId", "Room"),
-        "supplies" => (
-            "office.supplies",
-            "supply-requests",
-            "officeSupplyId",
-            "Supply",
-        ),
+    let (resource, requests, category) = match kind {
+        "rooms" => ("office.rooms", "bookings", "Room"),
+        "supplies" => ("office.supplies", "supply-requests", "Supply"),
         _ => return Err(invalid("未知行政资源。")),
     };
     let changed = text(row, "handlingKey") != text(previous, "handlingKey");
@@ -68,11 +63,7 @@ pub(super) fn validate_resource(
         if !resource_access(tx, actor, resource, "edit", previous, true)? {
             return Err(super::error::error(403, "只能维护本人负责的资源。"));
         }
-        if (changed || row["isActive"] == false)
-            && store::all(tx, requests)?
-                .iter()
-                .any(|r| r[parent] == id && (r["status"] == "Pending" || outstanding(r)))
-        {
+        if (changed || row["isActive"] == false) && tx.resource_has_open_requests(requests, id)? {
             return Err(conflict(
                 "资源尚有未结申请，不能停用或更换分工；人员交接请修改原分工的办理人员。",
             ));

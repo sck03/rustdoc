@@ -37,7 +37,6 @@ pub(super) const FIELDS: &[(&str, &[&str])] = &[
     ("PersonnelOptions", &["companies"]),
     ("OrganizationManagerRecord", &["appointments"]),
     ("ApiOrganizationDepartmentDto", &["id"]),
-    ("PersonnelRecord", &["canChangePrimaryAppointment"]),
     ("PersonnelOrganization", &["primaryStartsOn"]),
     (
         "PersonnelEventRecord",
@@ -79,12 +78,6 @@ pub(super) fn extend(doc: &mut Value) {
         json!({"unitId":int,"versionNumber":int,"requiresHandover":{"type":"boolean"},"impacts":{"type":"array","items":reference("OrganizationGrantImpact")}}),
         &["unitId", "versionNumber", "requiresHandover", "impacts"],
     );
-    s["PersonnelPrimaryAppointmentChange"] = object(
-        json!({"appointmentId":{"type":"string","minLength":1,"maxLength":64},"expectedVersion":int,"note":{"type":"string","minLength":1,"maxLength":500}}),
-        &["appointmentId", "expectedVersion", "note"],
-    );
-    s["PersonnelRecord"]["properties"]["canChangePrimaryAppointment"] =
-        json!({"type":"boolean","readOnly":true});
     s["PersonnelOrganization"]["properties"]["primaryStartsOn"] =
         json!({"type":"string","readOnly":true});
     for field in ["previousAppointments", "currentAppointments"] {
@@ -270,10 +263,16 @@ pub(super) fn extend(doc: &mut Value) {
         .unwrap()
         .push(json!("contexts"));
     s["UnitApproverOptions"] = object(
-        json!({"users":{"type":"array","items":reference("UnitApproverOption")}}),
-        &["users"],
+        json!({"users":{"type":"array","items":reference("UnitApproverOption")},"handlers":{"type":"array","items":reference("UnitApproverOption")}}),
+        &["users", "handlers"],
     );
     s["UnitMemberAppointment"] = s["PersonnelAssignment"].clone();
+    for name in ["PersonnelAssignment", "UnitMemberAppointment"] {
+        s[name]["properties"]["canRemove"] = json!({"type":"boolean","readOnly":true});
+        s[name]["properties"]["removalReason"] = json!({"type":"string","readOnly":true});
+    }
+    s["UnitMemberAppointment"]["properties"]["isEffective"] =
+        json!({"type":"boolean","readOnly":true});
     for (name, property) in [
         ("companyCode", text.clone()),
         ("startsOn", text.clone()),
@@ -302,23 +301,14 @@ pub(super) fn extend(doc: &mut Value) {
         ],
     );
     s["UnitMemberDirectory"] = object(
-        json!({"items":{"type":"array","items":reference("UnitMember")},"totalCount":int,"pageNumber":int,"pageSize":int,"departments":{"type":"array","items":reference("PersonnelDepartmentRecord")}}),
+        json!({"unitId":{"type":"string","pattern":"^[1-9][0-9]{0,18}$"},"items":{"type":"array","items":reference("UnitMember")},"totalCount":int,"pageNumber":int,"pageSize":int,"departments":{"type":"array","items":reference("PersonnelDepartmentRecord")}}),
         &[
+            "unitId",
             "items",
             "totalCount",
             "pageNumber",
             "pageSize",
             "departments",
-        ],
-    );
-    s["UnitMemberSave"] = object(
-        json!({"personId":int,"companyCode":text,"expectedVersion":int,"appointments":appointments,"note":{"type":"string","maxLength":500}}),
-        &[
-            "personId",
-            "companyCode",
-            "expectedVersion",
-            "appointments",
-            "note",
         ],
     );
     s["UnitWorkflowTask"] = object(
@@ -451,14 +441,6 @@ pub(super) fn extend(doc: &mut Value) {
             "organization.appointments",
         ),
         (
-            "unit-members",
-            "post",
-            "SaveUnitMember",
-            Some("UnitMemberSave"),
-            "UnitMember",
-            "organization.appointments",
-        ),
-        (
             "unit-tasks",
             "get",
             "GetUnitWorkflowTasks",
@@ -547,16 +529,6 @@ pub(super) fn extend(doc: &mut Value) {
     impact["responses"]["200"]["content"]["application/json"]["schema"] =
         reference("OrganizationChangeImpact");
     doc["paths"]["/api/organization-directory/companies/{id}/impact"] = json!({"post":impact});
-    let mut primary = doc["paths"]["/api/organization/unit-access"]["post"].clone();
-    primary["operationId"] = json!("PromotePersonnelAppointment");
-    primary["x-exportdoc-policy"]["requirements"] =
-        json!([{"resourceKey":"system.users","action":"manage"}]);
-    primary["parameters"] = json!([{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64","minimum":1}}]);
-    primary["requestBody"]["content"]["application/json"]["schema"] =
-        reference("PersonnelPrimaryAppointmentChange");
-    primary["responses"]["200"]["content"]["application/json"]["schema"] =
-        reference("PersonnelRecord");
-    doc["paths"]["/api/office/people/{id}/primary-appointment"] = json!({"post":primary});
     let catalog = &mut doc["x-exportdoc-permissions"];
     for (key, name, order) in [
         ("organization.directory", "单位组织管理", 810),

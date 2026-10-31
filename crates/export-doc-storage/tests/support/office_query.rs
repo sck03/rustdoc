@@ -48,14 +48,21 @@ pub fn exercise(c: &Connection) {
         include_inactive: false,
         low_stock: false,
         handling_only: false,
+        approvals_only: false,
         can_issue: true,
         can_return: true,
         from: None,
         to: None,
+        fields: &[],
         offset: 0,
         limit: 1,
     };
     let (total, page) = c.query_office(&q).unwrap();
+    q.fields = &[("id", "id")];
+    let projected = c.query_office(&q).unwrap();
+    assert_eq!(projected.0, total);
+    assert_eq!(projected.1[0], json!({"id":page[0]["id"]}));
+    q.fields = &[];
     assert_eq!(total, 2);
     assert_eq!(page[0]["id"], ids[1]);
     q.offset = 1;

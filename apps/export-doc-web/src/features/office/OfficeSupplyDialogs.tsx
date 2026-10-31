@@ -1,15 +1,18 @@
 import { useState, type FormEvent } from "react";
-import type { ApiUserDto, ExportDocManagerApiClient, OfficeSupplyRecord, PersonnelDirectoryRecord } from "../../api/index.ts";
+import type { ApiUserDto, ExportDocManagerApiClient, OfficeSupplyRequestRecord, OfficeSupplyRecord, PersonnelDirectoryRecord } from "../../api/index.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { readOfficeSupplyForm } from "./officeModel.ts";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
-import { useOfficeOperation } from "./useOfficeData.ts";
+import { useOfficeResourceOperation } from "./useOfficeData.ts";
 import { OfficeEmployeePicker } from "./OfficeEmployeePicker.tsx";
 import { OfficeApplicantIdentity, canIdentifyOfficeApplicant } from "./OfficeApplicantIdentity.tsx";
 import { HandlingServicePicker } from "../oa/HandlingServicePicker.tsx";
+import { AttachmentDraftFields } from "../../ui/AttachmentDraftFields.tsx";
+import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
+import { attachmentUploadForm } from "../../ui/documentAttachments.ts";
 
 export function OfficeSupplyEditor({ client, user, supply, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; supply?: OfficeSupplyRecord; onClose: () => void; onSaved: (saved: OfficeSupplyRecord) => void }) {
-  const operation = useOfficeOperation();
+  const operation = useOfficeResourceOperation("supplies");
   const [handlingKey, setHandlingKey] = useState(supply?.handlingKey ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -36,29 +39,38 @@ export function OfficeSupplyApplication({ client, supply, user, onClose }: {
   client: ExportDocManagerApiClient; supply: OfficeSupplyRecord; user: ApiUserDto; onClose: () => void;
 }) {
   const [requestKey] = useState(createRequestKey);
+  const attachments = useAttachmentDraft<OfficeSupplyRequestRecord>();
   const [employee, setEmployee] = useState<PersonnelDirectoryRecord | null>(null);
   const canSelectEmployee = user.capabilities.canManageUsers;
-  const operation = useOfficeOperation();
+  const operation = useOfficeResourceOperation("supplies");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canIdentifyOfficeApplicant(user)) return;
     const form = new FormData(event.currentTarget);
-    void operation.run((signal) => client.createOfficeSupplyRequest({ body: {
+    const body = {
       requestKey, officeSupplyId: supply.id, quantity: Number(form.get("quantity")), purpose: String(form.get("purpose") ?? ""),
       returnDueDate: supply.isReturnable ? String(form.get("returnDueDate") ?? "") : null,
       employeeId: employee?.id ?? null,
-    } }, { signal }), onClose);
+      submitImmediately:false,
+    };
+    void operation.run(async signal=>{
+      const saved = await attachments.save(JSON.stringify(body),signal,(current,signal)=>current ? client.updateDraftOfOfficeSupplyRequest({id:current.id,body:{expectedVersion:current.versionNumber,quantity:body.quantity,purpose:body.purpose,returnDueDate:body.returnDueDate}},{signal}):client.createOfficeSupplyRequest({body},{signal}),
+        (current,entry,signal)=>{const body=attachmentUploadForm(entry.file,current.versionNumber);body.set("purpose","Supporting");return client.uploadAttachmentToOfficeSupplyRequest({id:current.id,body},{signal});});
+      return client.submitOfficeSupplyRequest({id:saved.id,body:officeCommand(client,`supplies:${saved.id}:submit`,{commandKey:undefined,expectedVersion:saved.versionNumber,note:""})},{signal});
+    },onClose);
   }
   return <OfficeDialog title={`申请${supply.isReturnable ? "借用" : "领用"} · ${supply.name}`} onClose={onClose} {...operation} protectChanges>
     <p>当前可用 {supply.availableQuantity} {supply.unit} · {supply.location || "请向行政管理员确认领取位置"}</p>
     {supply.handlingName && <p>物品组：{supply.handlingName} · 保管人员：{supply.handlerNames}</p>}
     <p className="office-muted">全部节点审批通过后预留库存，由指定办理人发放；库存不足时须先补充再批准。</p>
+    {operation.error && attachments.saved && <p role="status">草稿 #{attachments.saved.id} 已保存。剩余附件可重试，也可稍后从申请草稿继续办理。</p>}
     <form onSubmit={submit}><fieldset disabled={operation.busy} className="office-form-grid">
       {canSelectEmployee && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={setEmployee} disabled={operation.busy} />}
       <OfficeApplicantIdentity user={user} />
       <OfficeField label={`申请数量（${supply.unit}）`}><input name="quantity" type="number" required min={1} max={1000000} defaultValue={1} /></OfficeField>
       {supply.isReturnable && <OfficeField label="预计归还日期"><input name="returnDueDate" type="date" required min={user.businessDate} defaultValue={user.businessDate} /></OfficeField>}
       <OfficeField label="领用用途" wide><textarea name="purpose" rows={3} required maxLength={500} placeholder="请说明使用用途" /></OfficeField>
+      <AttachmentDraftFields draft={attachments} busy={operation.busy} existingFiles={attachments.saved?.attachments}/>
     </fieldset><OfficeSubmit busy={operation.busy} disabled={!canIdentifyOfficeApplicant(user) || canSelectEmployee && !employee} label="提交申请" /></form>
   </OfficeDialog>;
 }
@@ -67,7 +79,7 @@ export function OfficeStockDialog({ client, supply, stocktake, onClose }: {
   client: ExportDocManagerApiClient; supply: OfficeSupplyRecord; stocktake: boolean; onClose: () => void;
 }) {
   const [operationId] = useState(createRequestKey);
-  const operation = useOfficeOperation();
+  const operation = useOfficeResourceOperation("supplies");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -83,3 +95,4 @@ export function OfficeStockDialog({ client, supply, stocktake, onClose }: {
     </fieldset><OfficeSubmit busy={operation.busy} label={stocktake ? "确认盘点" : "确认入库"} /></form>
   </OfficeDialog>;
 }
+import { officeCommand } from "./officeCommands.ts";

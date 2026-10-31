@@ -1,3 +1,4 @@
+use crate::workflow_fixture::WorkflowFixture;
 use export_doc_storage::{Connection, DataScope, PersonnelQuery, RecordWrite};
 use serde_json::json;
 
@@ -19,7 +20,7 @@ pub fn exercise(connection: &Connection) {
         let number = format!("PERSON-{index}");
         let mut row = json!({"versionNumber":1,"ownerUserId":owner,"companyScope":company,"departmentId":department,
             "organization":{"primaryAssignmentId":format!("person-{index}-primary")},
-            "employeeNumber":number,"status":status,"profile":{"fullName":"同名 E\u{301}cole"}});
+            "employeeNumber":number,"status":status,"employmentType":"FullTime","hireDate":"2026-01-01","departedOn":if status=="Departed" {Some("2026-10-01")} else {None},"jobTitle":"职员","profile":{"fullName":"同名 E\u{301}cole"}});
         let id = connection
             .insert(&RecordWrite {
                 kind: "people",
@@ -147,10 +148,10 @@ pub fn exercise(connection: &Connection) {
     for company in ["A", "B"] {
         let request = connection.insert(&RecordWrite { kind:"oa-general",identity:None,body:&json!({"versionNumber":1,"companyScope":company,"departmentId":"D","ownerUserId":1,"status":"Pending","submissionNumber":1,"title":"private request"}) }).unwrap();
         connection
-            .replace_workflow_tasks(
+            .publish_workflow(
                 request,
                 1,
-                &[export_doc_storage::WorkflowTask {
+                &[crate::workflow_fixture::Task {
                     key: format!("task-{company}"),
                     node: "review".into(),
                     assignee: ids[0],
@@ -203,7 +204,7 @@ pub fn exercise(connection: &Connection) {
                 ("cancelled", "Cancelled", ""),
             ]
             .into_iter()
-            .map(|(key, status, acted)| export_doc_storage::WorkflowTask {
+            .map(|(key, status, acted)| crate::workflow_fixture::Task {
                 key: key.into(),
                 node: "review".into(),
                 assignee: ids[0],
@@ -224,7 +225,7 @@ pub fn exercise(connection: &Connection) {
             })
             .collect::<Vec<_>>();
             connection
-                .replace_workflow_tasks(request, submission, &tasks)
+                .publish_workflow(request, submission, &tasks)
                 .unwrap();
         }
     }

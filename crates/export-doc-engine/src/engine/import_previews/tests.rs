@@ -15,6 +15,7 @@ fn previews_are_bounded_single_use_and_release_payloads_transactionally() {
     let clock = BusinessClock::default();
     let tx = Connection::new(pool.acquire(|| false).unwrap(), &clock);
     let actor = Actor {
+        scope_rules: vec![],
         context: String::new(),
         edition: Default::default(),
         id: 1,

@@ -1,5 +1,7 @@
 //! Official contract composition. The frozen .NET export is preserved verbatim;
 //! new Rust capabilities are added here and both clients consume the same output.
+mod access_scope;
+mod account_security;
 mod accounts;
 mod backup_plan;
 mod communication;
@@ -10,7 +12,12 @@ mod invoice_editing;
 mod observability;
 mod office;
 mod payment_printing;
+mod permission_access;
+mod permission_catalog;
+mod permission_versions;
 mod personnel;
+mod personnel_foundation;
+mod personnel_lifecycle;
 mod product_queries;
 mod report_preview;
 mod reports;
@@ -39,6 +46,14 @@ pub fn document() -> Value {
     product_queries::extend(&mut document);
     invoice_editing::extend(&mut document);
     units::extend(&mut document);
+    personnel_foundation::extend(&mut document);
+    permission_versions::extend(&mut document);
+    access_scope::extend(&mut document);
+    account_security::extend(&mut document);
+    personnel_lifecycle::extend(&mut document);
+    office::materials::extend(&mut document);
+    permission_catalog::extend(&mut document);
+    permission_access::extend(&mut document);
     // The frozen baseline remains read-only; retired products leave the live catalog.
     document["x-exportdoc-permissions"]["editions"]
         .as_object_mut()
@@ -64,7 +79,10 @@ mod tests {
     fn preserves_every_reference_schema_endpoint_and_security_contract() {
         let baseline: Value = serde_json::from_str(include_str!("reference_openapi.json")).unwrap();
         let mut current = document();
+        permission_access::compare(&mut current);
+        office::compare_resource_extensions(&mut current, &baseline);
         units::tests::compare_evolved_contract(&mut current, &baseline);
+        personnel_lifecycle::compare(&mut current, &baseline);
         // OA now has the same workflow semantics on SQLite and PostgreSQL.
         // Verify this intentional removal without weakening the other frozen contracts.
         let capabilities = &mut current["components"]["schemas"]["ApiUserCapabilitiesDto"];
@@ -153,6 +171,7 @@ mod tests {
             .iter()
             .chain(accounts::FIELDS)
             .chain(units::FIELDS)
+            .chain(permission_versions::FIELDS)
             .chain(personnel::FIELDS)
             .chain(exchange::FIELDS)
             .chain(hs_lifecycle::FIELDS)
@@ -252,6 +271,7 @@ mod tests {
                 }
             }
         }
+        permission_catalog::compare(&mut current);
         for (name, schema) in baseline["components"]["schemas"].as_object().unwrap() {
             assert_eq!(
                 &current["components"]["schemas"][name], schema,

@@ -33,7 +33,7 @@ fn action(service: &NativeService, token: &str, op: Operation, row: &Value) -> V
         op,
         row["id"].as_i64().unwrap(),
         &[],
-        Some(json!({"expectedVersion":row["versionNumber"],"note":"验收操作原因"})),
+        Some(json!({"commandKey":nonce().unwrap(),"expectedVersion":row["versionNumber"],"note":"验收操作原因"})),
     )
     .unwrap()
 }
@@ -405,6 +405,13 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
     call(service,admin,LINK_PERSONNEL_ACCOUNT,employee["employee"]["id"].as_i64().unwrap(),&[],Some(json!({"expectedVersion":employee["versionNumber"],"userId":users[0]["id"],"expectedAccountVersion":users[0]["versionNumber"]}))).unwrap();
     let reader = login(users[0]["username"].as_str().unwrap());
     let request=call(service,&reader,CREATE_GENERAL_REQUEST,0,&[],Some(json!({"requestKey":nonce().unwrap(),"title":"通知事务验收","reason":"设备维修","category":"IT"}))).unwrap();
+    let reviewer_person = create(
+        CREATE_PERSONNEL,
+        json!({"requestKey":nonce().unwrap(),"employeeNumber":format!("COMMS-REVIEW-{suffix}"),"departmentId":"GENERAL","jobTitle":"审批员","employmentType":"FullTime","hireDate":"2026-09-01","profile":{"fullName":"manager"}}),
+    );
+    call(service,admin,LINK_PERSONNEL_ACCOUNT,reviewer_person["employee"]["id"].as_i64().unwrap(),&[],Some(json!({"expectedVersion":reviewer_person["versionNumber"],"userId":users[1]["id"],"expectedAccountVersion":users[1]["versionNumber"]}))).unwrap();
+    let manager = login(users[1]["username"].as_str().unwrap());
+    let manager = manager.as_str();
     let reviewer = call(service, manager, GET_CURRENT_USER, 0, &[], None).unwrap();
     let mut settings = workflow::request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
     let general = settings["rules"]
@@ -439,7 +446,15 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
     );
     assert_eq!(count(service, &reader), 1);
     let request = action(service, &reader, SUBMIT_GENERAL_REQUEST, &request);
-    let stale = request.clone();
+    let stale = call(
+        service,
+        manager,
+        GET_GENERAL_REQUEST,
+        request["id"].as_i64().unwrap(),
+        &[],
+        None,
+    )
+    .unwrap();
     let request = action(service, manager, APPROVE_GENERAL_REQUEST, &request);
     assert_eq!(
         call(
@@ -448,7 +463,7 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
             APPROVE_GENERAL_REQUEST,
             stale["id"].as_i64().unwrap(),
             &[],
-            Some(json!({"expectedVersion":stale["versionNumber"],"note":"重复审批"}))
+            Some(json!({"commandKey":nonce().unwrap(),"taskKey":stale["reviewTaskKeys"][0],"expectedVersion":stale["versionNumber"],"note":"重复审批"}))
         )
         .unwrap_err()
         .status,
@@ -497,6 +512,7 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
         CREATE_PERMISSION_TEMPLATE,
         json!({"code":format!("NOTICE-{suffix}"),"name":"仅公告通知","isActive":true,"grants":[{"resourceKey":"office.announcements","action":"view","dataScope":"company"},{"resourceKey":"office.notifications","action":"view","dataScope":"company"}]}),
     );
+    let template = workflow::publish_scheme(service, admin, template);
     let accounts = call(service, admin, LIST_USERS, 0, &[], None).unwrap();
     let mut account = accounts["users"]
         .as_array()
@@ -507,6 +523,7 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
         .clone();
     account["expectedVersion"] = account["versionNumber"].clone();
     account["permissionTemplateId"] = template["id"].clone();
+    account["permissionSchemeVersion"] = template["publishedVersion"].clone();
     call(
         service,
         admin,

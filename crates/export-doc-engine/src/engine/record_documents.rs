@@ -81,9 +81,15 @@ pub(in crate::engine) fn upload(
         _ => return Err(invalid("附件用途无效。")),
     };
     let digest = media::digest(bytes);
+    let classification = match text(body, "classification").as_str() {
+        "" | "Internal" => "Internal",
+        "Restricted" => "Restricted",
+        _ => return Err(invalid("附件材料级别无效。")),
+    };
     service.store.transaction(|tx| {
         let (actor,row)=current(tx,actor,meta,records::id(parameters)?)?;
         mutable(meta,&row)?;
+        if !announcement(meta){oa::materials::attachment(tx,&actor,&row,&json!({"classification":classification}))?;}
         let kind=attachment_kind(meta);
         let (count,existing)=communication::children(tx,&row,kind,0,20)?;
         if let Some(existing) = existing.iter().find(|item| item["digest"]==digest) {
@@ -96,13 +102,14 @@ pub(in crate::engine) fn upload(
         let identity = format!("{}:{digest}",row["id"]);
         if !announcement(meta) && let Some(mut retained) = tx.find_identity(kind,&identity)? {
             if retained["requestId"] != 0 || retained["sourceRequestId"] != row["id"] || retained["fileName"] != name { return Err(conflict("同一原始文件已有历史引用，请保留原文件名。")); }
+            oa::materials::attachment(tx,&actor,&row,&retained)?;
             retained["requestId"] = row["id"].clone();
             retained["purpose"] = json!(purpose);
             let id = records::positive(&retained,"id","附件")?;
             store::save_in_scope(tx,kind,id,retained,Some(identity),&actor,"reattach",Some(&row))?;
             return save(tx,&actor,meta,row,"upload",&name);
         }
-        let record=store::save_in_scope(tx,kind,0,json!({"requestId":row["id"],"sourceRequestId":row["id"],"fileName":name,"mediaType":media_type,"sizeBytes":bytes.len(),"digest":digest,"purpose":purpose}),Some(identity),&actor,"upload",Some(&row))?;
+        let record=store::save_in_scope(tx,kind,0,json!({"requestId":row["id"],"sourceRequestId":row["id"],"fileName":name,"mediaType":media_type,"sizeBytes":bytes.len(),"digest":digest,"purpose":purpose,"classification":classification}),Some(identity),&actor,"upload",Some(&row))?;
         tx.insert_blob(&BlobWrite {kind,record_id:records::positive(&record,"id","附件")?,file_name:&name,media_type,digest:&digest,content:bytes,created_at:&store::timestamp()})?;
         save(tx,&actor,meta,row,"upload",&name)
     })
@@ -181,8 +188,11 @@ pub(in crate::engine) fn download(
 ) -> Result<FileOutput> {
     let meta = metadata(operation).ok_or_else(|| invalid("未知附件下载。"))?;
     service.store.read(|tx| {
-        let (_, row) = current(tx, actor, meta, records::id(parameters)?)?;
+        let (current_actor, row) = current(tx, actor, meta, records::id(parameters)?)?;
         let attachment = attachment(tx, meta, &row, parameters)?;
+        if !announcement(meta) {
+            oa::materials::attachment(tx, &current_actor, &row, &attachment)?;
+        }
         let blob = tx
             .blob(
                 records::positive(&attachment, "id", "附件")?,

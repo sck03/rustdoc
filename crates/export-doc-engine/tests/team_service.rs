@@ -3,6 +3,8 @@
 mod account_permissions;
 #[path = "support/account_scope.rs"]
 mod account_scope;
+#[path = "support/appointment_contract.rs"]
+mod appointment_contract;
 #[path = "support/approval_contract.rs"]
 mod approval_contract;
 #[path = "support/business_contract.rs"]
@@ -15,6 +17,8 @@ mod handling_contract;
 mod identity_contract;
 #[path = "support/invoice_clone_contract.rs"]
 mod invoice_clone_contract;
+#[path = "support/material_contract.rs"]
+mod material_contract;
 #[path = "support/oa_archive_contract.rs"]
 mod oa_archive_contract;
 #[path = "support/oa_contract.rs"]
@@ -25,6 +29,8 @@ mod oa_integration_contract;
 mod office_contract;
 #[path = "support/organization_workflow_contract.rs"]
 mod organization_workflow_contract;
+#[path = "support/permission_identity_contract.rs"]
+mod permission_identity_contract;
 #[path = "support/personnel_contract.rs"]
 mod personnel_contract;
 #[path = "support/personnel_policy_contract.rs"]
@@ -39,6 +45,8 @@ mod tools_contract;
 mod unit_contract;
 #[path = "support/approval_fixture.rs"]
 mod workflow;
+#[path = "support/workflow_operations_contract.rs"]
+mod workflow_operations_contract;
 use export_doc_engine::{
     contracts,
     engine::NativeService,
@@ -62,6 +70,7 @@ fn call(
     } else {
         vec![("id", id.to_string())]
     };
+    let body = workflow::decision_body(service, token, operation, id, body);
     let bytes = service.dispatch(operation, &parameters, &[], body, token)?;
     Ok(serde_json::from_slice(&bytes).unwrap())
 }
@@ -110,6 +119,9 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
             .is_none()
     );
     let token = admin["accessToken"].as_str().unwrap();
+    material_contract::exercise(&service, token);
+    workflow_operations_contract::exercise(&service, token);
+    permission_identity_contract::exercise(&service, token);
     invoice_clone_contract::exercise(&|operation, parameters, query, body| {
         let bytes = service.dispatch(operation, parameters, query, body, token)?;
         Ok(serde_json::from_slice(&bytes).unwrap())
@@ -171,7 +183,8 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
         .status,
         Some(409)
     );
-    workflow::configure(&service, token, admin["user"]["id"].as_i64().unwrap());
+    let (reviewer_id, reviewer_token) = workflow::reviewer(&service, token);
+    workflow::configure(&service, token, reviewer_id);
     let mut delegated = body.clone();
     delegated["employeeId"] = json!(i64::MAX);
     assert_eq!(
@@ -204,7 +217,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     );
     let approved = call(
         &service,
-        token,
+        &reviewer_token,
         APPROVE_MEETING_BOOKING,
         booking_id,
         Some(decision),
@@ -299,6 +312,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
         let parameters = id
             .map(|id| vec![("id", id.to_string())])
             .unwrap_or_default();
+        let body = workflow::decision_body(&service, token, operation, id.unwrap_or(0), body);
         service
             .dispatch(operation, &parameters, query, body, token)
             .map(|bytes| serde_json::from_slice(&bytes).unwrap())
@@ -306,6 +320,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     office_contract::exercise(
         &|op, id, query, body| request(admin_token, op, id, query, body),
         &|op, id, query, body| request(staff_token, op, id, query, body),
+        &|op, id, query, body| request(&reviewer_token, op, id, query, body),
     );
     oa_contract::exercise(&service, admin_token, staff_token, None);
     oa_archive_contract::exercise(&service, admin_token, staff_token, None);
@@ -322,6 +337,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     personnel_contract::exercise(&service, admin_token);
     identity_contract::exercise(&service, admin_token);
     personnel_policy_contract::exercise(&service, admin_token);
+    appointment_contract::exercise(&service, admin_token);
     unit_contract::exercise(&service, admin_token);
     service.close().unwrap();
     drop(Arc::clone(&service));

@@ -10,7 +10,26 @@ pub(in crate::engine) fn dispatch(
     query: &[(&str, String)],
     body: &Value,
 ) -> Option<Result<Value>> {
-    use crate::engine::{oa, organization, personnel_primary};
+    let metadata = &crate::contracts::contract()["operations"][operation.id]["foundation"];
+    if metadata["kind"] == "account-security" {
+        return Some(super::account_security::handle(store, actor, body));
+    }
+    if metadata["kind"] == "access-restrictions" {
+        return Some(super::restrictions::handle(
+            store, actor, metadata, query, body,
+        ));
+    }
+    if metadata["kind"] == "permission-versions" {
+        return Some(crate::engine::permission_templates::publications::handle(
+            store, actor, metadata, query, body,
+        ));
+    }
+    if metadata.is_object() {
+        return Some(super::foundation::handle(
+            store, actor, metadata, query, body,
+        ));
+    }
+    use crate::engine::{oa, organization};
     Some(match operation {
         GET_UNIT_ACCESS_DIRECTORY => directory(store, actor, query),
         GET_UNIT_WORKFLOW_SUMMARY => workflow_summary(store, actor, query),
@@ -18,7 +37,6 @@ pub(in crate::engine) fn dispatch(
         SAVE_UNIT_PERMISSION_TEMPLATE => save_scheme(store, actor, body.clone()),
         GET_UNIT_APPROVER_OPTIONS => approvers(store, actor),
         GET_UNIT_MEMBERS => members(store, actor, query),
-        SAVE_UNIT_MEMBER => save_member(store, actor, body.clone()),
         GET_UNIT_WORKFLOW_TASKS => oa::managed_tasks(store, actor, query),
         REASSIGN_UNIT_WORKFLOW_TASK => oa::managed_reassign(store, actor, body.clone()),
         SIMULATE_OA_DEFINITION => oa::simulate(store, actor, body.clone()),
@@ -28,7 +46,6 @@ pub(in crate::engine) fn dispatch(
         PREVIEW_ORGANIZATION_COMPANY_CHANGE => {
             preview_company_change(store, actor, parameters, body)
         }
-        PROMOTE_PERSONNEL_APPOINTMENT => personnel_primary::promote(store, actor, parameters, body),
         LIST_ORGANIZATION_MANAGERS => managers(store, actor, query),
         _ => return None,
     })

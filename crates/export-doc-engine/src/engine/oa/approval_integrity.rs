@@ -170,6 +170,8 @@ pub(super) fn rule(
     company: &str,
     rule: &ApprovalRule,
 ) -> Result<()> {
+    let compiled = super::subflows::compile(tx, company, rule)?;
+    let rule = &compiled.rule;
     let mut scope = actor.clone();
     scope.company = company.into();
     let mut verified = HashSet::new();

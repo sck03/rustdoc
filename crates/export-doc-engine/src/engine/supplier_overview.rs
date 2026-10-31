@@ -1,86 +1,31 @@
+//! Supplier confirmation is a sales operation; visibility is refreshed in the
+//! read snapshot and storage projects one confirmed assessment per supplier.
 use super::{
     auth,
-    error::Result,
-    records::text,
-    store::{self, Actor, Store},
+    error::{Result, unavailable},
+    store::{Actor, Store},
 };
 use crate::{contracts, generated_api::GET_SUPPLIER_ASSESSMENT_OVERVIEW};
 use rust_decimal::{Decimal, RoundingStrategy};
-use serde_json::{Value, json};
+use serde_json::json;
 
-pub fn query(store: &Store, actor: &Actor) -> Result<Value> {
-    store.read(|tx| {
-        let suppliers: Vec<_> = store::all(tx, "suppliers")?
-            .into_iter()
-            .filter(|row| auth::visible(actor, "sales.supplier-assessments", "view", row))
-            .collect();
-        let mut assessments: Vec<_> = store::all(tx, "supplier-assessments")?
-            .into_iter()
-            .filter(|row| row["status"] == "Confirmed")
-            .collect();
-        assessments.sort_by(|a, b| {
-            b["assessmentDate"]
-                .as_str()
-                .cmp(&a["assessmentDate"].as_str())
-                .then_with(|| b["id"].as_i64().cmp(&a["id"].as_i64()))
-        });
-        let mut by_supplier = std::collections::BTreeMap::<i64, Vec<&Value>>::new();
-        for assessment in &assessments {
-            let id = assessment["supplierCompanyId"]
-                .as_i64()
-                .ok_or_else(|| super::error::unavailable("供应商评价缺少所属编号。"))?;
-            by_supplier.entry(id).or_default().push(assessment);
-        }
-        let mut items = vec![];
-        for supplier in &suppliers {
-            let rows = by_supplier
-                .get(&supplier["id"].as_i64().unwrap_or(0))
-                .map(Vec::as_slice)
-                .unwrap_or_default();
-            if let Some(latest) = rows.first() {
-                let mut value =
-                    contracts::initial(contracts::schema("ApiSupplierAssessmentOverviewItemDto"));
-                for key in [
-                    "supplierCompanyId",
-                    "qualityScore",
-                    "deliveryScore",
-                    "serviceScore",
-                    "priceScore",
-                    "averageScore",
-                    "conclusion",
-                    "notes",
-                ] {
-                    value[key] = latest[key].clone();
-                }
-                value["supplierName"] = supplier["name"].clone();
-                value["supplierStatus"] = supplier["status"].clone();
-                value["category"] = supplier["category"].clone();
-                value["assessmentCount"] = json!(rows.len());
-                value["latestAssessmentDate"] = latest["assessmentDate"].clone();
-                value["latestAssessmentKind"] = latest["assessmentKind"].clone();
-                items.push(value);
-            }
-        }
-        let priority = |row: &Value| {
-            ["暂停合作", "观察", "合格", "优先合作"]
-                .iter()
-                .position(|value| row["conclusion"] == *value)
-                .unwrap_or(4)
-        };
-        items.sort_by(|a, b| {
-            priority(a)
-                .cmp(&priority(b))
-                .then_with(|| {
-                    b["latestAssessmentDate"]
-                        .as_str()
-                        .cmp(&a["latestAssessmentDate"].as_str())
-                })
-                .then_with(|| text(a, "supplierName").cmp(&text(b, "supplierName")))
-        });
+pub fn query(store: &Store, actor: &Actor) -> Result<serde_json::Value> {
+    store.read_for(actor, GET_SUPPLIER_ASSESSMENT_OVERVIEW, &[], |tx, actor| {
+        let data = tx.supplier_overview(&auth::data_scope(
+            actor,
+            "sales.supplier-assessments",
+            "view",
+        ))?;
+        let suppliers = data["totalSuppliers"]
+            .as_i64()
+            .ok_or_else(|| unavailable("供应商统计投影损坏。"))?;
+        let items = data["items"]
+            .as_array()
+            .ok_or_else(|| unavailable("供应商评价投影损坏。"))?;
         let mut result = contracts::object(GET_SUPPLIER_ASSESSMENT_OVERVIEW.id, false);
-        result["totalSuppliers"] = json!(suppliers.len());
+        result["totalSuppliers"] = json!(suppliers);
         result["assessedSuppliers"] = json!(items.len());
-        result["unassessedSuppliers"] = json!(suppliers.len() - items.len());
+        result["unassessedSuppliers"] = json!(suppliers - items.len() as i64);
         for (key, conclusion) in [
             ("preferredCount", "优先合作"),
             ("qualifiedCount", "合格"),
@@ -101,13 +46,12 @@ pub fn query(store: &Store, actor: &Actor) -> Result<Value> {
             ("priceScore", "averagePriceScore"),
         ] {
             let sum: i64 = items.iter().filter_map(|row| row[source].as_i64()).sum();
-            let mean = if items.is_empty() {
+            result[target] = json!(if items.is_empty() {
                 Decimal::ZERO
             } else {
                 (Decimal::from(sum) / Decimal::from(items.len()))
                     .round_dp_with_strategy(2, RoundingStrategy::MidpointNearestEven)
-            };
-            result[target] = json!(mean);
+            });
         }
         result["items"] = json!(items);
         Ok(result)

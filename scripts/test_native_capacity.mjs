@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { spawnProcessTree, stopProcessTree } from './lib/child-process-tree.mjs';
 import { cargoArtifactDirectory } from './lib/cargo-paths.mjs';
+import { approvalStage, publishDefinitions } from './lib/approval-fixtures.mjs';
 
 // Invoked only by the isolated PostgreSQL test runner. No production endpoint
 // or caller-selected database is accepted by this workload.
@@ -78,7 +79,9 @@ async function phase(size,key) {
       const route=op.route.replace(/\{([^}]+)\}/gu,(_,key)=>{assert(parameters[key]!==undefined,`Missing ${key}`);return encodeURIComponent(parameters[key]);});
       const url=new URL(route,origin);for(const [key,value] of Object.entries(query))url.searchParams.set(key,String(value));
       const multipart=body instanceof FormData;
-      const payload=body===undefined?undefined:(multipart?body:requestBody(op.schema,body));
+      const schema=op.schema?.$ref?document.components.schemas[op.schema.$ref.split('/').at(-1)]:op.schema;
+      const commandBody=body && !multipart && schema?.required?.includes('commandKey')?{...body,commandKey:body.commandKey||randomUUID()}:body;
+      const payload=commandBody===undefined?undefined:(multipart?commandBody:requestBody(op.schema,commandBody));
       const started=performance.now();
       for(let attempt=0;;attempt++) {
         const response=await fetch(url,{method:op.method,signal:AbortSignal.timeout(35000),headers:{...(multipart?{}:{'content-type':'application/json'}),...(token?{authorization:`Bearer ${token}`} : {}),...(firstLogin?{'x-exportdocmanager-bootstrap-token':bootstrap}:{})},body:payload===undefined?undefined:(multipart?payload:JSON.stringify(payload))});
@@ -108,6 +111,16 @@ async function phase(size,key) {
     const person=await api('CreatePersonnel',token,{requestKey:randomUUID(),employeeNumber:'CAP-REQUESTER',departmentId:'GENERAL',jobTitle:'Capacity tester',employmentType:'FullTime',hireDate:date,profile:{fullName:'Capacity requester'}});
     await api('LinkPersonnelAccount',token,{expectedVersion:person.versionNumber,userId:requester.id,expectedAccountVersion:requester.versionNumber},{id:person.employee.id});
     const requesterToken=(await api('Login','',{username:requester.username,password})).accessToken;
+    const reviewers=[];
+    for(let n=1;n<=5;n++) {
+      const reviewer=(await api('createUserAccount',token,{username:`capacity-reviewer-${n}`,fullName:`Capacity reviewer ${n}`,role:'OfficeManager',departmentId:'GENERAL',companyScope:'DEFAULT',isActive:true,resetPassword:password})).user;
+      const employee=await api('CreatePersonnel',token,{requestKey:randomUUID(),employeeNumber:`CAP-REVIEWER-${n}`,departmentId:'GENERAL',jobTitle:'Reviewer',employmentType:'FullTime',hireDate:date,profile:{fullName:reviewer.fullName}});
+      await api('LinkPersonnelAccount',token,{expectedVersion:employee.versionNumber,userId:reviewer.id,expectedAccountVersion:reviewer.versionNumber},{id:employee.employee.id});
+      reviewers.push({id:reviewer.id,token:(await api('Login','',{username:reviewer.username,password})).accessToken});
+    }
+    const invoke=(id,body,parameters,identity)=>api(id,identity,body,parameters);
+    const settings=await api('GetOaApprovalSettings',token);
+    await publishDefinitions(invoke,token,{...settings,rules:settings.rules.map(rule=>rule.key==='expense'?{...rule,stages:[{...approvalStage('capacity-review',reviewers.map(reviewer=>reviewer.id)),decision:'Any'}]}:rule)},['expense']);
     const approvals=[];
     for(let n=0;n<5;n++) {
       let row=await api('CreateExpenseRequest',requesterToken,{requestKey:randomUUID(),title:`Capacity expense ${n}`,reason:'Isolated concurrency verification',currency:'CNY',lines:[{category:'Travel',spentOn:date,description:'Sample receipt',amount:'12.34'}]});
@@ -133,7 +146,8 @@ async function phase(size,key) {
     await Promise.all(users.map(async(user,worker)=>{
       for(let n=0;n<50;n++) {
         if(n===10 && worker>=1 && worker<=5) {
-          const row=approvals[worker-1];const approved=await api('ApproveExpenseRequest',user.token,{expectedVersion:row.versionNumber,note:'Capacity approval'},{id:row.id});assert.equal(approved.status,'Approved');
+          const reviewer=reviewers[worker-1];const row=await api('GetExpenseRequest',reviewer.token,undefined,{id:approvals[worker-1].id});assert(row.reviewTaskKeys.length);
+          const approved=await api('ApproveExpenseRequest',reviewer.token,{expectedVersion:row.versionNumber,taskKey:row.reviewTaskKeys[0],note:'Capacity approval'},{id:row.id});assert.equal(approved.status,'Approved');
         } else if(n===25 && worker<2) {
           exports.push([await api('StartInvoiceReportPdfDownloadJob',user.token,{templatePath:template.templatePath,withSeal:false},{invoiceId:user.invoice.id}),user.token]);
         } else if(n%10===0) {
@@ -160,7 +174,7 @@ async function phase(size,key) {
       memory=JSON.parse(stdout);
     }
     latencies.sort((a,b)=>a-b);const percentile=p=>latencies[Math.min(latencies.length-1,Math.ceil(latencies.length*p)-1)];
-    const result={poolSize:size,clients:20,sessionRole:'Admin',invoices:220,approvals:5,exports:2,logicalOperations:latencies.length,durationMs,operationsPerSecond:latencies.length/(durationMs/1000),p95Ms:percentile(.95),p99Ms:percentile(.99),statuses,retried429:retried,memory,metricsBefore:before,metricsAfter:after};
+    const result={poolSize:size,clients:20,sessionRole:'Admin',invoices:220,approvals:5,exports:2,logicalOperations:latencies.length,durationMs,operationsPerSecond:latencies.length/(durationMs/1000),p50Ms:percentile(.50),p95Ms:percentile(.95),p99Ms:percentile(.99),statuses,retried429:retried,memory,metricsBefore:before,metricsAfter:after};
     fs.writeFileSync(path.join(output,'result.json'),JSON.stringify(result,null,2));results.push(result);
     console.log(`Pool ${size}: ${result.logicalOperations} operations; ${result.operationsPerSecond.toFixed(1)}/s; P95 ${result.p95Ms.toFixed(1)} ms; P99 ${result.p99Ms.toFixed(1)} ms; 429 retries ${retried}`);
   } finally {await stopProcessTree(server,5000);log.end();}

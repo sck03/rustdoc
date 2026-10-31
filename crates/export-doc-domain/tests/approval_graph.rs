@@ -16,7 +16,7 @@ fn sign(p: &mut ApprovalPlan, index: usize) {
     p.steps[index].status = "Approved".into();
     p.steps[index].acted_by_user_id = Some(p.steps[index].approver_user_id);
     p.steps[index].acted_at = "2026-10-29T01:00:00Z".into();
-    p.close_any_stage(index);
+    p.settle(index);
 }
 #[test]
 fn parallel_join_does_not_advance_until_every_predecessor_finishes() {
@@ -77,14 +77,14 @@ fn due_dates_start_once_on_activation_and_survive_round_trip() {
     let now = chrono::DateTime::parse_from_rfc3339("2026-10-29T01:00:00Z")
         .unwrap()
         .to_utc();
-    p.activate(now);
+    p.activate(now).unwrap();
     assert!(p.nodes[2].due_at.is_empty());
     let first = p.nodes[0].due_at.clone();
-    p.activate(now + chrono::Duration::hours(1));
+    p.activate(now + chrono::Duration::hours(1)).unwrap();
     assert_eq!(p.nodes[0].due_at, first);
     sign(&mut p, 0);
     sign(&mut p, 1);
-    p.activate(now + chrono::Duration::hours(2));
+    p.activate(now + chrono::Duration::hours(2)).unwrap();
     let restored: ApprovalPlan = serde_json::from_value(serde_json::to_value(&p).unwrap()).unwrap();
     restored.validate(1).unwrap();
     assert_ne!(restored.nodes[2].due_at, first);

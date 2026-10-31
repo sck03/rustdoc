@@ -48,6 +48,7 @@ impl<'a> Connection<'a> {
 }
 #[derive(Clone, Debug)]
 pub struct Actor {
+    pub scope_rules: Vec<export_doc_domain::access_scope::AccessRule>,
     pub context: String,
     pub edition: export_doc_domain::permissions::ProductEdition,
     pub id: i64,
@@ -156,26 +157,43 @@ impl Store {
         })
     }
     pub fn transaction<T>(&self, operation: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
+        self.write_scope(true, operation)
+    }
+    fn write_scope<T>(
+        &self,
+        commit: bool,
+        operation: impl FnOnce(&Connection) -> Result<T>,
+    ) -> Result<T> {
         let observation = self.transactions.start();
         let _write = self.write_guard()?;
         let connection = self.connection()?;
         connection.begin()?;
-        let result = match operation(&connection) {
-            Ok(value) => {
-                if let Err(error) = crate::operation::check() {
-                    connection.rollback()?;
-                    return Err(error);
-                }
-                connection.commit()?;
-                Ok(value)
-            }
-            Err(error) => {
-                connection.rollback()?;
-                Err(error)
-            }
+        let result: Result<T> = match operation(&connection)
+            .and_then(|value| crate::operation::check().map(|_| value))
+        {
+            Ok(value) => (if commit {
+                connection.commit()
+            } else {
+                connection.rollback()
+            })
+            .map(|_| value)
+            .map_err(Into::into),
+            Err(error) => connection.rollback().map_err(Into::into).and(Err(error)),
         };
         observation.finish(result.is_ok());
         result
+    }
+    /// Apply the same relational validators in a write snapshot, then always
+    /// roll it back. No external effects may be started inside this preview.
+    pub(super) fn preview_as<T>(
+        &self,
+        actor: &Actor,
+        work: impl FnOnce(&Connection, &Actor) -> Result<T>,
+    ) -> Result<T> {
+        self.write_scope(false, |tx| {
+            let current = super::auth::refresh_actor_in(tx, actor)?;
+            work(tx, &current)
+        })
     }
     pub fn read<T>(&self, operation: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
         let connection = self.connection()?;
@@ -355,6 +373,9 @@ pub fn save_in_scope(
     scope: Option<&Value>,
 ) -> Result<Value> {
     let now = timestamp();
+    let command_receipt = body
+        .as_object_mut()
+        .and_then(|v| v.remove(super::command_receipts::FIELD));
     let previous = if id > 0 {
         let mut previous = get(connection, kind, id)?;
         if kind == "people" {
@@ -423,6 +444,11 @@ pub fn save_in_scope(
             &super::records::text(&body, "companyCode"),
             &super::records::text(&body, "code"),
         )?)
+    } else if kind == "people" {
+        Some(serde_json::to_string(&[
+            normalize(body["companyScope"].as_str().unwrap_or("")),
+            normalize(body["employeeNumber"].as_str().unwrap_or("")),
+        ])?)
     } else if kind == "invoices" {
         Some(invoice_identity(
             &body["companyScope"],
@@ -462,6 +488,9 @@ pub fn save_in_scope(
         identify_record(&mut body, kind, record_id);
         connection.set_body(record_id, &body)?;
     }
+    if kind == "oa-submission" && id == 0 {
+        connection.freeze_request_revision(record_id, &body)?;
+    }
     super::workflow_tasks::persist(connection, kind, &body)?;
     if let Some(private_profile) = private_profile {
         connection.set_personnel_private_profile(record_id, &private_profile)?;
@@ -479,6 +508,9 @@ pub fn save_in_scope(
         },
         &super::audit_values::changes(previous.as_ref(), Some(&body)),
     )?;
+    if let Some(receipt) = command_receipt {
+        connection.put_command_receipt(&receipt, &body)?;
+    }
     Ok(body)
 }
 

@@ -102,7 +102,7 @@ const fullDesktopUser = { ...manager, capabilities: { ...manager.capabilities, p
   canManageSettings:true, canManageUsers:true, ...modules(["office.rooms","office.supplies","office.people","system.about"]),
   permissions:[...grants("all"), ...["view","view-details"].map(action=>({resourceKey:"office.people",action,dataScope:"all"}))] } };
 assert.equal(getDefaultWorkspaceRoute(fullDesktopUser.capabilities), "/office/approvals");
-assert.equal(navigation.filterWorkspaceNavGroups({ ...fullDesktopUser.capabilities, isDesktopRuntime:true }).filter(group=>['office','personnel'].includes(group.key)).flatMap(group=>group.items).length,4);
+assert.deepEqual(navigation.filterWorkspaceNavGroups({ ...fullDesktopUser.capabilities, isDesktopRuntime:true }).filter(group=>['office','personnel'].includes(group.key)).flatMap(group=>group.items.map(item=>item.to)).sort(), ["/office/directory","/office/meeting-rooms","/office/people","/office/supplies","/system/organization"]);
 // Full SQLite is the explicit local test edition; formal desktop editions remain separate.
 const fullTeamUser = { ...fullDesktopUser, capabilities: { ...fullDesktopUser.capabilities, productEdition: "Full", canUseDocumentWorkspace: true, canUseSalesWorkspace: true } };
 for (const pathname of ["/office/people", "/office/meeting-rooms", "/office/supplies"]) {

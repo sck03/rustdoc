@@ -4,6 +4,8 @@ use export_doc_engine::{
 use serde_json::{Value, json};
 #[path = "template_history_contract.rs"]
 mod history_retention;
+#[path = "approval_fixture.rs"]
+mod workflow;
 
 fn call(
     service: &NativeService,
@@ -27,10 +29,11 @@ pub fn exercise(service: &NativeService, admin: &str) {
     let suffix = nonce().unwrap();
     let grants = ["view","design","clone","publish","share","deactivate","restore","archive","import","export"].iter().map(|action| json!({"resourceKey":"document.report-templates","action":action,"dataScope":"all"})).chain(std::iter::once(json!({"resourceKey":"document.invoices","action":"view","dataScope":"all"}))).collect::<Vec<_>>();
     let role = call(service, admin, CREATE_PERMISSION_TEMPLATE, 0, Some(json!({"code":format!("TPL-{suffix}"),"name":"模板权限回归","isActive":true,"grants":grants}))).unwrap();
+    let role = workflow::publish_scheme(service, admin, role);
     let mut users = vec![];
     for index in 0..2 {
         let username = format!("tpl-{index}-{}", &suffix[..8]);
-        let user = call(service, admin, CREATE_USER_ACCOUNT, 0, Some(json!({"username":username,"fullName":username,"role":"User","companyScope":"DEFAULT","departmentId":"GENERAL","permissionTemplateId":role["id"],"isActive":true,"resetPassword":"Template-Test-2026"}))).unwrap();
+        let user = call(service, admin, CREATE_USER_ACCOUNT, 0, Some(json!({"username":username,"fullName":username,"role":"User","companyScope":"DEFAULT","departmentId":"GENERAL","permissionTemplateId":role["id"],"permissionSchemeVersion":role["publishedVersion"],"isActive":true,"resetPassword":"Template-Test-2026"}))).unwrap();
         let login = call(
             service,
             "",

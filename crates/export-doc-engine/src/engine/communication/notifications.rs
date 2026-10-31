@@ -89,6 +89,25 @@ fn accessible(tx: &Connection, actor: &Actor, row: &Value) -> Result<()> {
     }
     Ok(())
 }
+fn project(tx: &Connection, actor: &Actor, mut notification: Value) -> Result<Value> {
+    let kind = text(&notification, "requestKind");
+    let parent = store::get(
+        tx,
+        &kind,
+        records::positive(&notification, "requestId", "申请")?,
+    )?;
+    let projected =
+        super::super::oa::materials::project(tx, actor, &parent, json!({"title":parent["title"]}))?;
+    notification["title"] = projected
+        .get("title")
+        .filter(|v| v.is_string())
+        .cloned()
+        .unwrap_or_else(|| json!(format!("申请 #{}", parent["id"])));
+    Ok(contracts::dto(
+        contracts::schema("SiteNotification"),
+        notification,
+    ))
+}
 fn mark(tx: &Connection, actor: &Actor, mut row: Value) -> Result<Value> {
     accessible(tx, actor, &row)?;
     if row["status"] == "Unread" {
@@ -106,7 +125,7 @@ fn mark(tx: &Connection, actor: &Actor, mut row: Value) -> Result<Value> {
             "read",
         )?;
     }
-    Ok(contracts::dto(contracts::schema("SiteNotification"), row))
+    project(tx, actor, row)
 }
 pub(super) fn handle(
     tx: &Connection,
@@ -158,8 +177,8 @@ pub(super) fn handle(
     }
     Ok(page(
         rows.into_iter()
-            .map(|r| contracts::dto(contracts::schema("SiteNotification"), r))
-            .collect(),
+            .map(|r| project(tx, actor, r))
+            .collect::<Result<Vec<_>>>()?,
         count,
         number,
         size,
@@ -293,7 +312,7 @@ pub(in crate::engine) fn on_event(
                     tx,
                     "site-notification",
                     0,
-                    json!({"identity":identity,"eventId":event["id"],"requestId":row["id"],"requestKind":match row["kind"].as_str() { Some("supply") => "supply-requests".into(), Some("room") => "bookings".into(), _ => format!("oa-{}",text(row,"kind")) },"title":row["title"],"action":action,"status":"Unread","readAt":""}),
+                    json!({"identity":identity,"eventId":event["id"],"requestId":row["id"],"requestKind":match row["kind"].as_str() { Some("supply") => "supply-requests".into(), Some("room") => "bookings".into(), _ => format!("oa-{}",text(row,"kind")) },"title":format!("申请 #{}",row["id"]),"action":action,"status":"Unread","readAt":""}),
                     Some(identity),
                     actor,
                     "notify",

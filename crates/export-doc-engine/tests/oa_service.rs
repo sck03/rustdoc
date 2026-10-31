@@ -1,7 +1,11 @@
+#[path = "support/appointment_contract.rs"]
+mod appointment_contract;
 #[path = "support/approval_contract.rs"]
 mod approval_contract;
 #[path = "support/handling_contract.rs"]
 mod handling_contract;
+#[path = "support/material_contract.rs"]
+mod material_contract;
 #[path = "support/native_fixture.rs"]
 #[allow(dead_code)]
 mod native_fixture;
@@ -13,12 +17,88 @@ mod oa_contract;
 mod oa_integration_contract;
 #[path = "support/organization_workflow_contract.rs"]
 mod organization_workflow_contract;
+#[path = "support/permission_identity_contract.rs"]
+mod permission_identity_contract;
 #[path = "support/personnel_scope_contract.rs"]
 mod personnel_scope_contract;
 #[path = "support/unit_contract.rs"]
 mod unit_contract;
+#[path = "support/workflow_operations_contract.rs"]
+mod workflow_operations_contract;
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
+
+#[test]
+fn revisions_preserve_task_authority_signatures_and_command_receipts() {
+    let mut fixture = native_fixture::Fixture::new();
+    fixture.client.take();
+    let service = NativeService::open(fixture.paths.clone()).unwrap();
+    let login = oa_contract::call(
+        &service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":"admin","password":""})),
+    )
+    .unwrap();
+    workflow_operations_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    service.close().unwrap();
+}
+
+#[test]
+fn material_projection_protects_details_inboxes_history_and_archives() {
+    let mut fixture = native_fixture::Fixture::new();
+    fixture.client.take();
+    let service = NativeService::open(fixture.paths.clone()).unwrap();
+    let login = oa_contract::call(
+        &service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":"admin","password":""})),
+    )
+    .unwrap();
+    material_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    service.close().unwrap();
+}
+
+#[test]
+fn employee_schemes_and_public_management_identity_keep_unit_boundaries() {
+    let mut fixture = native_fixture::Fixture::new();
+    fixture.client.take();
+    let service = NativeService::open(fixture.paths.clone()).unwrap();
+    let login = oa_contract::call(
+        &service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":"admin","password":""})),
+    )
+    .unwrap();
+    permission_identity_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    service.close().unwrap();
+}
+
+#[test]
+fn appointment_policy_resource_inbox_and_archived_documents_share_the_contract() {
+    let mut fixture = native_fixture::Fixture::new();
+    fixture.client.take();
+    fixture.paths.font_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../Resources/Fonts/OpenSource/NotoSansCJKsc-Regular.otf")
+        .canonicalize()
+        .unwrap();
+    let service = NativeService::open(fixture.paths.clone()).unwrap();
+    let login = oa_contract::call(
+        &service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":"admin","password":""})),
+    )
+    .unwrap();
+    appointment_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    service.close().unwrap();
+}
 
 #[test]
 fn unit_identity_scoped_administration_and_cross_company_approval() {

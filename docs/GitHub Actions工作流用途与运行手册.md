@@ -42,15 +42,21 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 | 工作流 | 范围 |
 | --- | --- |
 | [Release script validation](../.github/workflows/release-script-validation.yml) | 发布相关 push/PR/手工触发；版本、架构、发布冲突回归，脚本语法与 Actionlint |
-| [Rust native delivery validation](../.github/workflows/rust-native-validation.yml) | Rust 契约、测试、依赖边界、对应平台构建与 Docker 生命周期 |
+| [Rust native delivery validation](../.github/workflows/rust-native-validation.yml) | 自动按改动范围执行 Rust/前端；手动 full 完整验证平台、服务包与容器 |
 | [Dependency security and SBOM governance](../.github/workflows/dependency-governance.yml) | npm/Cargo 安全、许可、notices 和 SBOM |
 | [浏览器兼容](../.github/workflows/browser-compatibility.yml) | 仅手工 Firefox/WebKit，不加入普通提交检查 |
 
 先查看第一个失败步骤及完整日志。依赖安全错误、下载故障、工具链和平台编译问题分别处理；取消、ignored、静态语法通过不计为运行验收。
 
+2026-10-30 调整日常校验范围：纯文档提交不会启动 Rust 构建，由发布脚本工作流校验文档链接；仅 React 改动执行前端构建、无障碍、缩放、视觉与编辑/取消回归。Rust 改动执行后端工作区测试和生成契约；Tauri 宿主变动另跑宿主测试，共用 Rust 变动检查桌面组合根。涉及人员/OA 的 Rust 改动另验真实 HTTP、资源附件、审批单及页面操作。编译缓存按锁文件、工具链和清单固定，缓存前清理已完成的测试 EXE，保留库和构建输入；仍使用 locked 命令及 Cargo 的源码校验，不把缓存恢复当作通过。
+
+从本工作流 Run workflow 选择 `validation_mode=full`，才执行完整工作区、全部特性及 [内部平台验收组合](../.github/workflows/native-full-validation.yml)中的五种桌面、四种服务包和两种容器目标。full 组合只接受 workflow_call，没有第二个用户入口；发布工作流及其实际验收保持。日常前端和 Rust 分开并行，独立脚本/依赖门禁继续保留。
+
+调整依据为 [2026-10-29 成功运行](https://github.com/sck03/rustdoc/actions/runs/40892157181)：核心任务 36 分 41 秒，工作区测试含编译 24 分 54 秒、全部特性检查 5 分 18 秒，缩放/视觉合计约 4 分钟。此前只有 Cargo 下载缓存，没有编译产物缓存。该数字属于旧配置；新配置的实际耗时须按之后的云端回执记录，首次冷缓存或锁图变化仍可能较长。
+
 2026-10-25 复核 [run 40121278583](https://github.com/sck03/rustdoc/actions/runs/40121278583/job/120953136194)：主锁图的 `ctutils 0.4.3` 命中新公告 `RUSTSEC-2026-0385`，涉及非常量时间掩码/比较；OCR/Excel 图未命中。独立升级到 `0.4.4` 并重生成 notices，原 MIT/Apache-2.0 许可及既有 GLib 例外保持。审计步骤保留原 JSON 报告并输出依赖、公告和修复版本摘要，不用忽略公告消除失败。主工作区库存标为 `rust-workspace`，与桌面实际运行图分别检查。
 
-普通 Rust 验证使用 `cargo test --locked --workspace`，独立 OCR 工程和 feature 专项继续分别执行。原生库清单、字体、模板、工具链和相关准备脚本加入对应 paths 过滤，避免这些构建输入单独变化时遗漏门禁；Firefox/WebKit 仍仅手工执行。
+2026-10-30 起，日常 Rust 验证使用 `cargo test --locked --workspace --exclude export-doc-tauri`，宿主按变更单独测试；手动 full 使用完整工作区及全部特性，独立 OCR 工程继续分别执行。原生库清单、字体、模板、工具链和相关准备脚本加入对应 paths 过滤，避免这些构建输入单独变化时遗漏门禁；Firefox/WebKit 仍仅手工执行。
 
 同日 [run 40167194980](https://github.com/sck03/rustdoc/actions/runs/40167194980/job/121090563126) 的新增嵌套 Git 保护回归在 Linux 清理隐藏 `.git` 夹具时失败。清理精确的自建夹具使用 `-Force`，Windows 也将该夹具标为 Hidden 以覆盖同一边界；正式包的 Git 保护规则不放宽。
 

@@ -124,7 +124,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
     );
     for invalid in [
         json!({"managerEmployeeId":id}),
-        json!({"additionalAssignments":[{"departmentId":codes[2],"jobTitle":"重复主职"}]}),
+        json!({"additionalAssignments":[{"departmentId":codes[2],"jobTitle":"普通员工"}]}),
         json!({"additionalAssignments":[{"departmentId":"missing","jobTitle":"不存在"}]}),
     ] {
         assert_eq!(

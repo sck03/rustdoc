@@ -1,18 +1,21 @@
 import { useState, type FormEvent } from "react";
-import type { ApiUserDto, ExportDocManagerApiClient, MeetingRoomRecord, PersonnelDirectoryRecord } from "../../api/index.ts";
+import type { ApiUserDto, ExportDocManagerApiClient, MeetingBookingRecord, MeetingRoomRecord, PersonnelDirectoryRecord } from "../../api/index.ts";
 import { businessDateTimeLocalInputToIso, formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { officeAccess, officeBookingDefaults, readMeetingRoomForm, shiftOfficeBookingEnd } from "./officeModel.ts";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
-import { useMeetingAvailability, useOfficeOperation } from "./useOfficeData.ts";
+import { useMeetingAvailability, useOfficeResourceOperation } from "./useOfficeData.ts";
 import { OfficeEmployeePicker } from "./OfficeEmployeePicker.tsx";
 import { OfficeApplicantIdentity, canIdentifyOfficeApplicant } from "./OfficeApplicantIdentity.tsx";
 import { HandlingServicePicker } from "../oa/HandlingServicePicker.tsx";
+import { AttachmentDraftFields } from "../../ui/AttachmentDraftFields.tsx";
+import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
+import { attachmentUploadForm } from "../../ui/documentAttachments.ts";
 
 export function MeetingRoomEditor({ client, user, room, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; room?: MeetingRoomRecord; onClose: () => void; onSaved: (saved: MeetingRoomRecord) => void }) {
-  const operation = useOfficeOperation();
+  const operation = useOfficeResourceOperation("rooms");
   const [handlingKey, setHandlingKey] = useState(room?.handlingKey ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -39,27 +42,31 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
 }) {
   const [times, setTimes] = useState(() => officeBookingDefaults(user.businessTimeZone));
   const [requestKey] = useState(createRequestKey);
+  const attachments = useAttachmentDraft<MeetingBookingRecord>();
   const [employee, setEmployee] = useState<PersonnelDirectoryRecord | null>(null);
   const canSelectEmployee = user.capabilities.canManageUsers;
-  const operation = useOfficeOperation();
+  const operation = useOfficeResourceOperation("rooms");
   const { range, query: availability } = useMeetingAvailability(client, user, room.id, times.start.slice(0, 10));
   const access = officeAccess(user, "rooms");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canIdentifyOfficeApplicant(user)) return;
     const form = new FormData(event.currentTarget);
-    void operation.run((signal) => {
+    void operation.run(async (signal) => {
       const startsAt = businessDateTimeLocalInputToIso(times.start, user.businessTimeZone);
       const endsAt = businessDateTimeLocalInputToIso(times.end, user.businessTimeZone);
       if (!startsAt || !endsAt) throw new Error("请选择预约开始和结束时间。");
-      return client.createMeetingBooking({ body: { requestKey, meetingRoomId: room.id, title: String(form.get("title") ?? ""),
-        attendeeCount: Number(form.get("attendeeCount")), startsAt, endsAt, employeeId: employee?.id ?? null } }, { signal });
+      const body = { requestKey, meetingRoomId: room.id, title: String(form.get("title") ?? ""), attendeeCount: Number(form.get("attendeeCount")), startsAt, endsAt, employeeId: employee?.id ?? null, submitImmediately:false };
+      const saved = await attachments.save(JSON.stringify(body),signal,(current,signal)=>current ? client.updateDraftOfMeetingBooking({id:current.id,body:{expectedVersion:current.versionNumber,title:body.title,attendeeCount:body.attendeeCount,startsAt,endsAt}},{signal}):client.createMeetingBooking({body},{signal}),
+        (current,entry,signal)=>{const body=attachmentUploadForm(entry.file,current.versionNumber);body.set("purpose","Supporting");return client.uploadAttachmentToMeetingBooking({id:current.id,body},{signal});});
+      return client.submitMeetingBooking({id:saved.id,body:officeCommand(client,`rooms:${saved.id}:submit`,{commandKey:undefined,expectedVersion:saved.versionNumber,note:""})},{signal});
     }, onClose);
   }
   return <OfficeDialog title={`${room.name} · 日程与预约`} onClose={onClose} {...operation} protectChanges>
     <p className="office-muted">{room.location || "位置未填写"} · 最多 {room.capacity} 人 · 单次最多 {room.maximumBookingHours} 小时</p>
     <p className="office-muted">时间按公司业务时区 {user.businessTimeZone} 显示。</p>
     {room.handlingName && <p>办理分工：{room.handlingName} · 办理人员：{room.handlerNames}</p>}
+    {operation.error && attachments.saved && <p role="status">草稿 #{attachments.saved.id} 已保存。剩余附件可重试，也可稍后从申请草稿继续办理。</p>}
     <form onSubmit={submit}><fieldset disabled={operation.busy} className="office-form-grid">
       <OfficeField label="开始时间"><input type="datetime-local" value={times.start} required onChange={(event) => {
         const start = event.target.value;
@@ -79,9 +86,11 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
         <OfficeApplicantIdentity user={user} />
         <OfficeField label="会议主题" wide><input name="title" required maxLength={200} placeholder="例如：项目周会" /></OfficeField>
         <OfficeField label="参会人数"><input name="attendeeCount" type="number" required min={1} max={room.capacity} defaultValue={1} /></OfficeField>
+        <AttachmentDraftFields draft={attachments} busy={operation.busy} existingFiles={attachments.saved?.attachments}/>
         <p className="office-field-wide office-muted">{`提交后等待审批。${room.requiresKey ? "审批通过后，于开始前 30 分钟内联系办理人领钥匙，结束后归还。" : "审批通过后，请由办理人登记使用和结束。"}`}</p>
       </>}
     </fieldset>{access.allows("create") && room.isActive && <OfficeSubmit label="提交预约" busy={operation.busy}
       disabled={!range || availability.isPending || availability.isError || !canIdentifyOfficeApplicant(user) || canSelectEmployee && !employee} />}</form>
   </OfficeDialog>;
 }
+import { officeCommand } from "./officeCommands.ts";

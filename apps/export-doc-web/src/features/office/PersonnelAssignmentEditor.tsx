@@ -21,8 +21,8 @@ export function PersonnelAssignmentFields({ client, assignment, company, compani
       <option value="">选择任职部门</option>{available.filter(d => d.isActive && (target !== company || d.code !== primaryDepartment)).map(d => <option key={d.code} value={d.code}>{d.name}</option>)}
     </select></OfficeField>
     <OfficeField label="任职职位"><JobTitleInput name={`assignment-${target}-${assignment.departmentId}`} positions={options.data?.positions} value={assignment.jobTitle} onChange={event => patch({ jobTitle: event.target.value })} /></OfficeField>
-    <OfficeField label="任职开始日期"><input type="date" value={assignment.startsOn ?? ""} max={assignment.endsOn || undefined} onChange={event => patch({ startsOn: event.target.value })} /></OfficeField>
-    <OfficeField label="任职结束日期（选填）"><input type="date" value={assignment.endsOn ?? ""} min={assignment.startsOn || undefined} onChange={event => patch({ endsOn: event.target.value })} /></OfficeField>
+    <details className="office-field-wide"><summary>任职日期与撤任</summary><p>普通任职无需固定任期，留空持续有效。结束日期当天仍有效；结束任职保留历史。</p><OfficeField label="任职开始日期"><input type="date" value={assignment.startsOn ?? ""} max={assignment.endsOn || undefined} onChange={event => patch({ startsOn: event.target.value })} /></OfficeField>
+    <OfficeField label="任职结束日期（选填）"><input type="date" value={assignment.endsOn ?? ""} min={assignment.startsOn || undefined} onChange={event => patch({ endsOn: event.target.value })} /></OfficeField></details>
     {options.isError && <p role="alert">任职选项加载失败：{readApiError(options.error)} <button type="button" className="text-button" onClick={() => void options.refetch()}>重试</button></p>}
   </>;
 }

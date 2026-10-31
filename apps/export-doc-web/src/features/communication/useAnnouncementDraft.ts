@@ -5,10 +5,10 @@ import { businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from ".
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
-import { useOfficeOperation } from "../office/useOfficeData.ts";
+import { useCommunicationOperation } from "./useCommunication.ts";
 
 export function useAnnouncementDraft(client: ExportDocManagerApiClient, user: ApiUserDto, record: Announcement | undefined, onSaved: (row: Announcement) => void) {
-  const operation = useOfficeOperation();
+  const operation = useCommunicationOperation();
   const attachments = useAttachmentDraft(record);
   const [dirty, setDirty] = useState(false);
   const [draft, setDraft] = useState<AnnouncementSave>(() => ({ requestKey: record?.requestKey ?? createRequestKey(), title: record?.title ?? "", body: record?.body ?? "", audienceDepartment: record?.audienceDepartment ?? "", isPinned: record?.isPinned ?? false,

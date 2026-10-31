@@ -1,10 +1,11 @@
-import { approvalStage, publishDefinitions } from './lib/approval-fixtures.mjs';
+import { approvalStage, publishDefinitions, publishPermissionScheme } from './lib/approval-fixtures.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 
 async function verifyOfficeNavigation(page, personnel, administration) {
-  for (const [name, links] of [['人事管理', personnel], ['行政办公', administration]]) {
+  for (const [name, links] of [['人员与组织', personnel.filter(label=>label==='人员档案')], ['申请与资源', [...personnel.filter(label=>label!=='人员档案'),...administration]]]) {
+    if (!links.length) continue;
     const group = page.locator('nav').getByRole('button', { name, exact: true });
     await group.waitFor();
     if (await group.getAttribute('aria-expanded') === 'false') await group.click();
@@ -47,14 +48,15 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   await newSchemeDialog.getByLabel('新建方案起点').selectOption('company');
   await newSchemeDialog.getByRole('button', { name: '建立方案草稿', exact: true }).click();
   assert.equal(await schemes.getByLabel('方案名称', { exact: true }).inputValue(), '公司审批负责人');
-  await schemes.getByLabel('模块分类').selectOption('人事管理');
+  await schemes.getByLabel('模块分类').selectOption('申请与资源');
   assert.equal(await schemes.getByLabel('员工请假查看数据范围', { exact: true }).inputValue(), 'company');
   assert.equal(await schemes.getByLabel('员工请假任务审批数据范围', { exact: true }).inputValue(), 'company');
   assert.equal(await schemes.getByLabel('人员变动审批快捷设置').inputValue(), 'approve');
   const savedScheme = admin.waitForResponse(response => response.url().endsWith('/api/permission-templates') && response.request().method() === 'POST');
   await schemes.getByRole('button', { name: '保存方案', exact: true }).click();
   const schemeHttp = await savedScheme; assert(schemeHttp.ok()); const scheme = await schemeHttp.json();
-  await schemes.getByRole('status').filter({ hasText: '权限方案已保存' }).waitFor();
+  await schemes.getByRole('status').filter({ hasText: '权限方案草稿已保存' }).waitFor();
+  await publishPermissionScheme(invoke,adminToken,scheme);
   await admin.screenshot({ path: path.join(output, 'company-approval-scheme.png'), fullPage: true });
   await admin.goto(`${url}/#/system/access-control?userId=${account.id}`);
   const accounts = admin.locator('.user-management-section');
@@ -71,7 +73,7 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   const employee = await invoke('CreatePersonnel', { requestKey: 'approval-worker', employeeNumber: 'APPROVAL-WORKER', departmentId: 'TRADE',
     jobTitle: '普通员工', employmentType: 'FullTime', hireDate: '2026-09-01', onProbation: true, profile: { fullName: '跨部门审批员工' } }, {}, adminToken);
   const policy = await invoke('GetOaApprovalSettings', undefined, {}, adminToken);
-  await publishDefinitions(invoke, adminToken, { ...policy, personnelApprovalActions: ['Confirm'],
+  await publishDefinitions(invoke, adminToken, { ...policy,
     rules: policy.rules.map(rule => ['general', 'personnel:Confirm'].includes(rule.key) ? { ...rule, stages: [approvalStage('review', [account.id])] } : rule) }, ['general', 'personnel:Confirm']);
   for (const [kind, op, extra, button] of [
     ['general', 'General', { category: 'Other' }, '批准'],
@@ -122,12 +124,13 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   const combinedResponse = admin.waitForResponse(response => response.url().endsWith('/api/permission-templates') && response.request().method() === 'POST');
   await schemes.getByRole('button', { name: '保存方案', exact: true }).click();
   const combinedHttp = await combinedResponse; assert(combinedHttp.ok()); const combined = await combinedHttp.json();
-  await schemes.getByRole('status').filter({ hasText: '权限方案已保存' }).waitFor();
+  await schemes.getByRole('status').filter({ hasText: '权限方案草稿已保存' }).waitFor();
   await admin.setViewportSize({ width: 390, height: 844 });
   assert(await admin.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   await admin.screenshot({ path: path.join(output, 'combined-duties-mobile.png'), fullPage: true });
+  const combinedVersion = await publishPermissionScheme(invoke,adminToken,combined);
   await invoke('createUserAccount', { username: 'combined-worker', fullName: '人事行政财务兼任', role: 'OfficeEmployee',
-    companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Combined-Worker-2026', permissionTemplateId: combined.id }, {}, adminToken);
+    companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Combined-Worker-2026', permissionTemplateId: combined.id,permissionSchemeVersion:combinedVersion.version }, {}, adminToken);
   const combinedLogin = await invoke('Login', { username: 'combined-worker', password: 'Combined-Worker-2026' });
   for (const [resourceKey, action] of [['office.people', 'view-details'], ['office.general', 'approve'], ['office.expenses', 'complete']]) {
     assert(combinedLogin.user.capabilities.permissions.some(grant => grant.resourceKey === resourceKey && grant.action === action && grant.dataScope === 'company'));

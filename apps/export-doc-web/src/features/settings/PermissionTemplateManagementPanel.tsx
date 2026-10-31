@@ -8,7 +8,7 @@ import type {
   ApiPermissionTemplateSaveRequest,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
-import { queryKeys } from "../../api/queryKeys.ts";
+import { identityQueryRoots, queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
@@ -17,6 +17,7 @@ import { combinePermissionSchemes, createSchemeFromEmployee, getEditableSchemeGr
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { OfficeDialog } from "../office/OfficeUi.tsx";
+import { PermissionPublicationActions } from "./PermissionPublicationActions.tsx";
 
 type TemplateDraft = {
   id: number;
@@ -48,6 +49,7 @@ export function PermissionTemplateManagementPanel({
   const [startingPoint, setStartingPoint] = useState<SchemeStartingPoint>("blank");
   const [sourceIds, setSourceIds] = useState<number[]>([]);
   const [creating, setCreating] = useState(false);
+  const [publicationBusy,setPublicationBusy]=useState(false);
 
   const catalogQuery = useQuery({
     queryKey: queryKeys.permissionTemplates(),
@@ -81,11 +83,8 @@ export function PermissionTemplateManagementPanel({
       setDraft(savedDraft);
       setPersistedDraftSnapshot(buildTemplateDraftSnapshot(savedDraft));
       setMessage(null);
-      setSuccessMessage("权限方案已保存；使用该方案的现有会话已立即撤销，相关用户需要重新登录。");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.permissionTemplates() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.users() }),
-      ]);
+      setSuccessMessage("权限方案草稿已保存。发布并明确应用后，才改变已绑定身份的权限。");
+      await Promise.all([...identityQueryRoots, ["office"], ["worklist"]].map(queryKey => queryClient.invalidateQueries({ queryKey })));
     },
     onError: (error) => {
       setMessage(readApiError(error));
@@ -101,10 +100,7 @@ export function PermissionTemplateManagementPanel({
       setPersistedDraftSnapshot(null);
       setMessage(null);
       setSuccessMessage("权限方案已删除。");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.permissionTemplates() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.users() }),
-      ]);
+      await Promise.all([...identityQueryRoots, ["office"], ["worklist"]].map(queryKey => queryClient.invalidateQueries({ queryKey })));
     },
     onError: (error) => {
       setMessage(readApiError(error));
@@ -124,7 +120,7 @@ export function PermissionTemplateManagementPanel({
 
   if (!canManageUsers) return null;
   const isAdminTemplate = draft.isSystem && draft.code.toLowerCase() === "admin";
-  const isBusy = catalogQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
+  const isBusy = publicationBusy || catalogQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
   const enabledActionCount = toPermissionGrants(draft.grants).filter(grant =>
     !draft.disabledModules.includes(resourceByKey.get(grant.resourceKey)?.moduleKey ?? "")).length;
 
@@ -136,6 +132,7 @@ export function PermissionTemplateManagementPanel({
   }
 
   async function selectTemplate(template: ApiPermissionTemplateDto) {
+    if(isBusy)return;
     if (template.id === selectedId || !await confirmDiscardChanges(`切换到权限方案“${template.name}”`)) return;
     applyTemplate(template);
     setMessage(null);
@@ -269,14 +266,16 @@ export function PermissionTemplateManagementPanel({
       <div className="permission-template-layout">
         <div className="permission-template-list" role="group" aria-label="权限方案目录">
           {templates.map((template) => (
-            <button key={template.id} type="button" title={template.description || template.name} aria-pressed={template.id === selectedId} className={template.id === selectedId ? "permission-template-card selected" : "permission-template-card"} onClick={() => void selectTemplate(template)}>
-              <span><strong>{template.name}</strong>{template.isSystem ? <small>内置</small> : null}{!template.isActive ? <small>停用</small> : null}
-                <small>{template.accountReferenceCount ?? 0} 个主账号 · {template.unitRoleReferenceCount ?? 0} 个单位身份</small>{template.ownerUnitId != null && <small>单位专用</small>}</span>
+            <button key={template.id} type="button" title={[template.name, template.description].filter(Boolean).join("：")} aria-pressed={template.id === selectedId} className={template.id === selectedId ? "permission-template-card selected" : "permission-template-card"} onClick={() => void selectTemplate(template)}>
+              <strong>{template.name}</strong>
+              {(template.isSystem || !template.isActive || template.ownerUnitId != null) && <span className="permission-template-badges">{template.isSystem && <small>内置</small>}{!template.isActive && <small>停用</small>}{template.ownerUnitId != null && <small>单位专用</small>}</span>}
+              <small className="permission-template-references">{template.accountReferenceCount ?? 0} 个主账号 · {template.unitRoleReferenceCount ?? 0} 个单位身份</small>
             </button>
           ))}
         </div>
 
         <div className="permission-template-editor">
+          {selectedTemplate&&!isAdminTemplate&&<PermissionPublicationActions key={selectedTemplate.id} client={client} scheme={selectedTemplate} disabled={hasUnsavedTemplateChanges||saveMutation.isPending} accountTargets onBusy={setPublicationBusy} onPublished={versionNumber=>{const next={...draft,versionNumber};setDraft(next);setPersistedDraftSnapshot(buildTemplateDraftSnapshot(next));}} />}
           {isAdminTemplate ? <PermissionNotice>系统管理员方案由管理员身份固定授予全部能力，不能委托或修改。</PermissionNotice> : null}
           <div className="field-grid permission-template-meta-grid">
             <label><span>方案名称</span><input value={draft.name} disabled={isBusy || isAdminTemplate} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>
@@ -366,7 +365,7 @@ function EffectivePermissionSummary({
         const resource = resourceByKey.get(grant.resourceKey);
         const action = resource?.actions.find((item) => item.key === grant.action);
         const source = grant.sourceResourceKey ? resourceByKey.get(grant.sourceResourceKey)?.name || grant.sourceResourceKey : "岗位方案";
-        return <li key={`${grant.resourceKey}:${grant.action}`}><strong>{resource?.name || grant.resourceKey} · {action?.name || grant.action}</strong><span>{scopeLabels[grant.dataScope] ?? grant.dataScope}；来源：{grant.source === "dependency" ? `继承自 ${source}` : source}</span></li>;
+        return <li key={`${grant.resourceKey}:${grant.action}`}><strong>{resource?.name || grant.resourceKey} · {action?.name || grant.action}</strong><span>{resource?.supportsDataScope ? scopeLabels[grant.dataScope] ?? grant.dataScope : resource?.scopeDescription ?? "功能授权"}；来源：{grant.source === "dependency" ? `继承自 ${source}` : source}</span></li>;
       })}</ul>}
     </details>
   );

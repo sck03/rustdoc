@@ -30,7 +30,8 @@ pub fn call(
     let body = workflow::decision_body(service, token, op, id, body);
     let result: Value =
         serde_json::from_slice(&service.dispatch(op, &parameters, &[], body, token)?).unwrap();
-    export_doc_contracts::validation::response(op.id, &result).unwrap();
+    export_doc_contracts::validation::response(op.id, &result)
+        .unwrap_or_else(|cause| panic!("{} response: {cause}", op.id));
     Ok(result)
 }
 fn act(service: &NativeService, token: &str, kind: &str, action: &str, row: &Value) -> Value {
@@ -41,7 +42,7 @@ fn act(service: &NativeService, token: &str, kind: &str, action: &str, row: &Val
         row["id"].as_i64().unwrap(),
         Some(json!({"expectedVersion":row["versionNumber"],"note":"流程验收说明"})),
     )
-    .unwrap()
+    .unwrap_or_else(|cause| panic!("{kind}/{action}, input state {}: {cause:?}", row["status"]))
 }
 
 fn finance_user(

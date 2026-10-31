@@ -45,7 +45,7 @@ pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value
     }
     record["employee"] = employee(tx, actor, &record)?;
     let editable = actor.admin || record["status"] != "Departed";
-    let required_actions = super::oa::personnel_changes::required_actions(tx, actor)?;
+    let required_actions = super::oa::personnel_changes::required_actions();
     let restriction = office::deletion_restriction(
         tx,
         record["id"]
@@ -58,23 +58,12 @@ pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value
         ("canTransition", "transition", true),
         ("canLinkAccount", "assign", editable && actor.admin),
         ("canDelete", "delete", true),
-        (
-            "canCorrectRegistration",
-            "edit",
-            editable
-                && (actor.admin
-                    || (correct && required_actions.as_array().is_some_and(Vec::is_empty))),
-        ),
+        ("canCorrectRegistration", "edit", editable && correct),
     ] {
         record[field] = json!(allowed && auth::visible(actor, "office.people", action, &record));
     }
     record["deleteRestriction"] = json!(restriction.unwrap_or_default());
     record["approvalRequiredActions"] = required_actions;
-    record["canChangePrimaryAppointment"] = json!(
-        actor.admin
-            && actor.edition.allows("office.people")
-            && matches!(record["status"].as_str(), Some("Active" | "Probation"))
-    );
     Ok(record)
 }
 
@@ -108,7 +97,7 @@ pub fn options(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result
             contracts::project(contracts::schema("PersonnelDepartmentRecord"), department)
         })
         .collect();
-    let actions = super::oa::personnel_changes::required_actions(tx, actor)?;
+    let actions = super::oa::personnel_changes::required_actions();
     Ok(
         json!({"companies":companies,"departments":departments,"positions":tx.find_identity("companies", &store::normalize(&company))?.and_then(|c| c.get("positions").cloned()).unwrap_or(json!([])),"canCreate":auth::authorize(actor,"office.people","create").is_ok(),"approvalRequiredActions":actions}),
     )

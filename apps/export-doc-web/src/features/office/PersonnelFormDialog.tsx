@@ -63,7 +63,7 @@ export function PersonnelFormDialog({ client, user, departments, record, onClose
         </select></OfficeField>
         <OfficeField label="试用截止日期（选填）"><input type="date" name="probationEndsOn" min={hireDate} defaultValue={record?.probationEndsOn ?? ""} /></OfficeField>
         <OfficeField label="合同截止日期（选填）"><input type="date" name="contractEndsOn" min={hireDate} defaultValue={record?.contractEndsOn ?? ""} /></OfficeField>
-        {canCorrectRegistration && <PersonnelOrganizationEditor client={client} company={record?.companyScope ?? user.companyScope} departments={departments} primaryDepartment={departmentId} value={organization} onChange={setOrganization} positions={positions.data?.positions} />}
+        {canCorrectRegistration && <PersonnelOrganizationEditor client={client} company={record?.companyScope ?? user.companyScope} departments={departments} primaryDepartment={departmentId} value={organization} onChange={setOrganization} />}
       </fieldset>
       <fieldset className="office-form-grid" disabled={operation.busy}><legend>工作联系方式 · 公司通讯录可见</legend>
         <OfficeField label="工作邮箱"><input type="email" name="workEmail" maxLength={254} defaultValue={record?.profile.workEmail ?? ""} /></OfficeField>

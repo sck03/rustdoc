@@ -28,7 +28,7 @@ pub(super) fn extend(document: &mut Value) {
         json!({"requests":latency,"queueWait":latency,"queueCapacity":counter(),"queuedRequests":counter(),"admissionRejected":counter(),"bulkRejected":counter(),"requestCapacity":counter(),"availableRequestSlots":counter(),"bulkCapacity":counter(),"availableBulkSlots":counter(),"uptimeSeconds":counter(),"logsDropped":counter(),"logWriteErrors":counter(),"downloads":latency,"downloadCapacity":counter(),"downloadTimeouts":counter(),"downloadDisconnects":counter(),"downloadReadErrors":counter()}),
     );
     schemas["ApiRuntimeMetricsResponse"] = object(
-        json!({"checkedAt":{"type":"string","format":"date-time"},"storage":reference("ApiRuntimeDatabaseMetrics"),"jobs":reference("ApiRuntimeJobMetrics"),"http":{"anyOf":[reference("ApiRuntimeHttpMetrics"),{"type":"null"}]}}),
+        json!({"checkedAt":{"type":"string","format":"date-time"},"storage":reference("ApiRuntimeDatabaseMetrics"),"jobs":reference("ApiRuntimeJobMetrics"),"workflowSchedule":object(json!({"ticks":counter(),"lastErrorStatus":{"type":["integer","null"],"minimum":100,"maximum":599}})),"http":{"anyOf":[reference("ApiRuntimeHttpMetrics"),{"type":"null"}]}}),
     );
     document["paths"]["/api/diagnostics/metrics"] = json!({"get":{
         "tags":["ExportDocManager.Api"],"operationId":"GetRuntimeMetrics",

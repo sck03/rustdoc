@@ -2,6 +2,8 @@ use export_doc_engine::{
     api::ApiError, contracts, engine::NativeService, generated_api::*, paths::nonce,
 };
 use serde_json::{Value, json};
+#[path = "approval_fixture.rs"]
+mod workflow;
 
 fn call(
     service: &NativeService,
@@ -15,6 +17,7 @@ fn call(
     } else {
         vec![]
     };
+    let body = workflow::decision_body(service, token, op, id, body);
     let body = body.map(|value| contracts::overlay(contracts::object(op.id, true), &value));
     let result =
         serde_json::from_slice(&service.dispatch(op, &parameters, &[], body, token)?).unwrap();
@@ -569,7 +572,22 @@ pub fn exercise(service: &NativeService, admin: &str) {
     let today = login()["user"]["businessDate"].as_str().unwrap().to_owned();
     let future =
         chrono::NaiveDate::parse_from_str(&today, "%Y-%m-%d").unwrap() + chrono::Duration::days(1);
-    assert_eq!(call(service, admin, TRANSFER_PERSONNEL, id, Some(json!({"expectedVersion":person["versionNumber"],"departmentId":"GENERAL","jobTitle":"新岗位","effectiveDate":future.to_string(),"note":"不允许未来日期立即调岗"}))).unwrap_err().status, Some(400));
+    let scheduled = call(service, admin, CREATE_PERSONNEL_CHANGE_REQUEST, 0, Some(json!({
+        "requestKey":nonce().unwrap(),"employeeId":id,"title":"未来调岗申请","reason":"生效日前保留当前任职",
+        "personnelChange":{"action":"Transfer","expectedPersonnelVersion":person["versionNumber"],"departmentId":"GENERAL","jobTitle":"新岗位","effectiveDate":future.to_string()}
+    }))).unwrap();
+    assert_eq!(
+        call(service, admin, GET_PERSONNEL, id, None).unwrap(),
+        person
+    );
+    call(
+        service,
+        admin,
+        CANCEL_PERSONNEL_CHANGE_REQUEST,
+        scheduled["id"].as_i64().unwrap(),
+        Some(json!({"expectedVersion":scheduled["versionNumber"],"note":"结束未来申请草稿验收"})),
+    )
+    .unwrap();
     {
         let staff = login();
         person = call(service, admin, UPDATE_PERSONNEL, id, Some(json!({"expectedVersion":person["versionNumber"],"profile":{"fullName":"账号同步姓名"},"employmentType":"FullTime"}))).unwrap();
@@ -589,7 +607,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         );
         let department = format!("TRANSFER-{}", &suffix[..8]);
         call(service, admin, CREATE_ORGANIZATION_DEPARTMENT, 0, Some(json!({"code":department,"companyCode":"DEFAULT","name":"调岗部门","isActive":true}))).unwrap();
-        person = call(service, admin, TRANSFER_PERSONNEL, id, Some(json!({"expectedVersion":person["versionNumber"],"departmentId":department,"jobTitle":"新岗位","effectiveDate":"2026-09-02","note":"部门调整"}))).unwrap();
+        person = workflow::personnel_change(service, admin, "Transfer", id, Some(json!({"expectedVersion":person["versionNumber"],"departmentId":department,"jobTitle":"新岗位","effectiveDate":"2026-09-02","note":"部门调整"}))).unwrap();
         assert_eq!(login()["user"]["departmentId"], department);
         assert_eq!(
             login()["user"]["role"],
@@ -597,7 +615,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
             "Job changes do not assign permissions"
         );
         let staff = login();
-        person = call(service, admin, DEPART_PERSONNEL, id, Some(json!({"expectedVersion":person["versionNumber"],"effectiveDate":"2026-09-03","note":"完成交接离职"}))).unwrap();
+        person = workflow::personnel_change(service, admin, "Depart", id, Some(json!({"expectedVersion":person["versionNumber"],"effectiveDate":"2026-09-03","note":"完成交接离职"}))).unwrap();
         assert_eq!(person["account"]["isActive"], false);
         assert_eq!(
             call(

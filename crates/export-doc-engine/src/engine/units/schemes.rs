@@ -94,13 +94,6 @@ pub(in crate::engine) fn save(store: &Store, actor: &Actor, input: Value) -> Res
             "unit-scheme",
             Some(&scope),
         )?;
-        validate_scheme_users(
-            tx,
-            actor,
-            saved["id"]
-                .as_i64()
-                .ok_or_else(|| unavailable("方案编号缺失。"))?,
-        )?;
         permission_templates::project_with_usage(tx, saved)
     })
 }

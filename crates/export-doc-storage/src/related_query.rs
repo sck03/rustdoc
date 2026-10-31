@@ -52,7 +52,7 @@ pub(crate) fn build(q: &RelatedQuery<'_>, pg: bool) -> Result<(QuerySql, String)
         let value = if q.kind == "supplier-products" {
             if let Some(path) = product_path {
                 let field = sql::json_field(path, pg).replace("r.body", "product.body");
-                let value = format!("(SELECT {field} FROM records product WHERE product.kind='products' AND product.id=CAST({} AS BIGINT))", sql::field("productId", pg));
+                let value = format!("(SELECT {field} FROM record_rows product WHERE product.kind='products' AND product.id=CAST({} AS BIGINT))", sql::field("productId", pg));
                 if *name == "__linkedProductId" { value } else { format!("COALESCE({value},{})", if pg { "'\"\"'::jsonb" } else { "'\"\"'" }) }
             } else { sql::json_field(path, pg) }
         } else { sql::json_field(path, pg) };

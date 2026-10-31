@@ -219,6 +219,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | half | 2.7.1 | MIT OR Apache-2.0 | ocr |
 | cargo | hashbrown | 0.12.3 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | hashbrown | 0.17.1 | MIT OR Apache-2.0 | excel-analyzer, rust-workspace |
+| cargo | hashlink | 0.12.2 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | heck | 0.4.1 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | heck | 0.5.0 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | hermit-abi | 0.5.3 | MIT OR Apache-2.0 | rust-workspace |

@@ -205,6 +205,7 @@ mod tests {
             let paths = RuntimePaths::server(&root, &root.join("Data")).unwrap();
             let store = Store::open(&paths).unwrap();
             let actor = Actor {
+                scope_rules: vec![],
                 context: String::new(),
                 edition: Default::default(),
                 id: 1,
@@ -377,6 +378,7 @@ mod tests {
     fn non_admin_is_rejected() {
         let fixture = Fixture::new();
         let staff = Actor {
+            scope_rules: vec![],
             context: String::new(),
             admin: false,
             ..fixture.actor.clone()

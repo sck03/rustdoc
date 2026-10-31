@@ -127,7 +127,7 @@ pub(in crate::engine) fn validate_account_in(
             let (total, rows) = tx.query_records(&RecordQuery {
                 kind,
                 company: &company,
-                status: Some("Pending"),
+                statuses: &["Pending", "Suspended"],
                 visible_user: Some(id),
                 offset,
                 limit: 100,
@@ -186,7 +186,11 @@ pub(in crate::engine) fn assigned(
             let (count, rows) = tx.query_records(&RecordQuery {
                 kind,
                 company,
-                status: pending.then_some("Pending"),
+                statuses: if pending {
+                    &["Pending", "Suspended"]
+                } else {
+                    &[]
+                },
                 visible_user: Some(user),
                 offset,
                 limit: 100,

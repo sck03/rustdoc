@@ -178,6 +178,9 @@ pub fn generate(document: &Value, operations: &[Operation<'_>]) -> Result<(Strin
         if let Some(metadata) = op.value.get("x-exportdoc-communication") {
             contract["communication"] = metadata.clone();
         }
+        if let Some(metadata) = op.value.get("x-exportdoc-foundation") {
+            contract["foundation"] = metadata.clone();
+        }
         contracts.insert(op.id.into(), contract);
     }
     writeln!(

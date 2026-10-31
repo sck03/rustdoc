@@ -4,6 +4,11 @@ import { useSearchParams } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { communicationAccess } from "./communicationModel.ts";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
+import { useOfficeOperation } from "../office/useOfficeData.ts";
+
+export function useCommunicationOperation() {
+  return useOfficeOperation([["office", "communication"], ["office", "receipts"]], false);
+}
 
 function useFilters(defaultManage = false) {
   const [page, setPage] = useState(1);

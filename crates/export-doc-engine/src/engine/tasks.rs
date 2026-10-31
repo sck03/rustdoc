@@ -7,6 +7,7 @@ mod persistence;
 mod queries;
 pub mod retention;
 pub(crate) mod retry;
+pub(crate) mod scheduled;
 #[cfg(test)]
 mod tests;
 

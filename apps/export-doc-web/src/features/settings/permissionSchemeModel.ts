@@ -12,6 +12,7 @@ export const scopeLabels: Record<string, string> = {
   company: "公司",
   all: "全部",
 };
+export const dataScopeOrder: readonly string[] = ["own", "department", "company", "all"];
 
 export const presetLabels: Record<string, string> = {
   "": "未授权",
@@ -44,15 +45,17 @@ export function splitGrantKey(key: string) {
   return [resourceKey, action] as const;
 }
 
-export function firstResourceScope(grants: Record<string, string>, resourceKey: string) {
-  return Object.entries(grants).find(([key]) => splitGrantKey(key)[0] === resourceKey)?.[1] ?? "";
+export function initialGrantScope(resource: ApiPermissionResourceDefinitionDto, key: string, actionDataScopes?: Record<string, string[]>) {
+  if (!resource.supportsDataScope) return "all";
+  const choices = actionDataScopes?.[key];
+  return choices && !choices.includes("own") ? choices[0] ?? "own" : "own";
 }
 
-export function setResourcePreset(current: Record<string, string>, resource: ApiPermissionResourceDefinitionDto, level: string) {
+export function setResourcePreset(current: Record<string, string>, resource: ApiPermissionResourceDefinitionDto, level: string, actionDataScopes?: Record<string, string[]>) {
   const grants = Object.fromEntries(Object.entries(current).filter(([key]) => splitGrantKey(key)[0] !== resource.key));
-  const scope = firstResourceScope(current, resource.key) || (resource.supportsDataScope ? "own" : "all");
   for (const action of presetActions(resource, level)) {
-    grants[grantKey(resource.key, action.key)] = scope;
+    const key = grantKey(resource.key, action.key);
+    grants[key] = current[key] ?? initialGrantScope(resource, key, actionDataScopes);
   }
   return grants;
 }
@@ -81,7 +84,7 @@ export function createSchemeFromEmployee(source: ApiPermissionTemplateDto, resou
   const grants = getEditableSchemeGrants(source.grants, resources);
   if (scope !== "employee") {
     for (const resource of resources.values()) {
-      if (resource.isTechnical || resource.workspace !== "office" || !resource.actions.some(action => action.key === "approve")) continue;
+      if (resource.isTechnical || !resource.workflowResource) continue;
       for (const action of presetActions(resource, "approve")) grants[grantKey(resource.key, action.key)] = scope;
     }
   }
@@ -90,7 +93,7 @@ export function createSchemeFromEmployee(source: ApiPermissionTemplateDto, resou
 
 export function combinePermissionSchemes(sources: ApiPermissionTemplateDto[], resources: ReadonlyMap<string, ApiPermissionResourceDefinitionDto>) {
   const grants: Record<string, string> = {};
-  const ranks = ["own", "department", "company", "all"];
+  const ranks = dataScopeOrder;
   for (const source of sources) {
     for (const [key, scope] of Object.entries(getEditableSchemeGrants(source.grants, resources))) {
       if (!(key in grants) || ranks.indexOf(scope) > ranks.indexOf(grants[key])) grants[key] = scope;

@@ -17,7 +17,6 @@ pub(super) const FIELDS: &[(&str, &[&str])] = &[
         "PersonnelOptions",
         &["approvalRequiredActions", "positions"],
     ),
-    ("PersonnelTransitionRequest", &["organization"]),
     ("PersonnelCreateRequest", &["organization"]),
     ("PersonnelRegistrationCorrection", &["organization"]),
     ("ApiUserDto", &["effectiveDepartmentIds"]),

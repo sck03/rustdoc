@@ -85,6 +85,7 @@ pub(super) fn actor_snapshot(actor: &Actor, record: &Value) -> Value {
 }
 pub(super) fn owner(job: &Value) -> Result<Actor> {
     Ok(Actor {
+        scope_rules: vec![],
         context: text(job, "_actorContext"),
         edition: Default::default(),
         id: job["requestedByUserId"]

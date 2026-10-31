@@ -1,5 +1,6 @@
 import { approvalStage, publishDefinitions, approveTask } from './lib/approval-fixtures.mjs';
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
@@ -55,25 +56,29 @@ try {
     server.stdout.on("data", chunk => { log += chunk; const match = log.match(/\{"url":"([^"]+)"\}/u); if (match) { clearTimeout(timer); resolve(match[1]); } });
   });
   const spec = JSON.parse(fs.readFileSync(path.join(repo, 'crates/export-doc-contracts/src/openapi.json'), 'utf8'));
-  const operations = new Map(Object.entries(spec.paths).flatMap(([route, methods]) => Object.entries(methods).map(([method, op]) => [op.operationId, { route, method }])));
+  const operations = new Map(Object.entries(spec.paths).flatMap(([route, methods]) => Object.entries(methods).map(([method, op]) => [op.operationId, { route, method, schema: op.requestBody?.content?.['application/json']?.schema }])));
   const invoke = async (id, body, parameters = {}, token = '') => {
     const op = operations.get(id); assert(op, id);
+    const schema=op.schema?.$ref?spec.components.schemas[op.schema.$ref.split('/').at(-1)]:op.schema;
+    if(body && schema?.required?.includes('commandKey') && !body.commandKey)body={...body,commandKey:randomUUID()};
     const route = op.route.replace(/\{([^}]+)\}/gu, (_, key) => encodeURIComponent(parameters[key]));
     const response = await fetch(url + route, { method: op.method.toUpperCase(), signal: AbortSignal.timeout(60000), headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
     assert(response.ok, `${id}: ${response.status} ${response.ok ? '' : await response.text()}`);
     return response.json();
   };
   const token = (await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' })).accessToken;
-  const reviewer = (await invoke('createUserAccount', { username: 'workflow-auditor', fullName: '独立流程审批人', role: 'Admin', companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Workflow-Auditor-2026' }, {}, token)).user;
+  const reviewer = (await invoke('createUserAccount', { username: 'workflow-auditor', fullName: '独立流程审批人', role: 'OfficeManager', permissionGrants: ['leave','overtime','expenses','travel','purchase','general','rooms','supplies'].flatMap(kind => ['view','approve'].map(action => ({ resourceKey: `office.${kind}`, action, dataScope: 'company' }))), companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Workflow-Auditor-2026' }, {}, token)).user;
+  const reviewerPerson=await invoke('CreatePersonnel',{requestKey:randomUUID(),employeeNumber:'WORKFLOW-AUDITOR',departmentId:'GENERAL',jobTitle:'审批员',employmentType:'FullTime',hireDate:'2026-01-01',profile:{fullName:reviewer.fullName}},{},token);
+  await invoke('LinkPersonnelAccount',{expectedVersion:reviewerPerson.versionNumber,userId:reviewer.id,expectedAccountVersion:reviewer.versionNumber},{id:reviewerPerson.employee.id},token);
   const reviewerToken = (await invoke('Login', { username: 'workflow-auditor', password: 'Workflow-Auditor-2026' })).accessToken;
   const settings = await invoke('GetOaApprovalSettings', undefined, {}, token);
-  settings.rules = settings.rules.map(rule => ({ ...rule, stages: [approvalStage('review', [reviewer.id])] }));
-  await publishDefinitions(invoke, token, settings, settings.rules.map(rule => rule.key));
+  settings.rules = settings.rules.map(rule => rule.kind === 'personnel' ? rule : ({ ...rule, stages: [approvalStage('review', [reviewer.id])] }));
+  await publishDefinitions(invoke, token, settings, settings.rules.filter(rule => rule.kind !== 'personnel').map(rule => rule.key));
   const approveResource = async kind => {
     const route = kind === 'rooms' ? '/api/office/bookings' : '/api/office/supply-requests';
     const page = await fetch(`${url}${route}?mineOnly=false&status=Pending`, { headers: { authorization: `Bearer ${reviewerToken}` } }).then(r => r.json());
     const row = page.items[0]; assert(row?.reviewTaskKeys?.length);
-    const response = await fetch(`${url}${route}/${row.id}/approve`, { method: 'POST', headers: { authorization: `Bearer ${reviewerToken}`, 'content-type': 'application/json' }, body: JSON.stringify({ expectedVersion: row.versionNumber, taskKey: row.reviewTaskKeys[0], note: '独立任务签署' }) });
+    const response = await fetch(`${url}${route}/${row.id}/approve`, { method: 'POST', headers: { authorization: `Bearer ${reviewerToken}`, 'content-type': 'application/json' }, body: JSON.stringify({ commandKey:randomUUID(), expectedVersion: row.versionNumber, taskKey: row.reviewTaskKeys[0], note: '独立任务签署' }) });
     assert.equal(response.status, 200, await response.text());
   };
   const browser = locateChromeForTesting(repo);
@@ -89,7 +94,7 @@ try {
   await exerciseOfficeResources({ url, page, output, run, wait, click, fill, navigate, captureScreenshot, approveResource });
   await navigate(`${url}/#/office/approvals`);
   await wait("document.querySelector('[aria-label=\"申请与审批中心\"]')", "Approval hub missing");
-  assert(await run("document.body.innerText.includes('人事管理') && document.body.innerText.includes('行政办公')"), "Separated navigation groups are visible");
+  assert(await run("document.body.innerText.includes('人员与组织') && document.body.innerText.includes('申请与资源')"), "Separated navigation groups are visible");
   await captureScreenshot(page, path.join(output, "approval-center.png"));
   const receipt = path.join(output, "receipt.pdf");
   const supporting = path.join(output, "supporting.pdf");

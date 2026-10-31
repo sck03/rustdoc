@@ -16,14 +16,15 @@ export function officeRequestFocus(search: URLSearchParams) {
 export type OfficePage<T> = { items: T[]; totalCount: number; totalPages: number; pageNumber: number; pageSize: number };
 
 export const officeStatusLabels: Record<string, string> = {
+  Draft: "草稿",
   Pending: "待审批", Approved: "待领用", InUse: "使用中", Completed: "已完成",
-  Rejected: "已驳回", Cancelled: "已取消", Issued: "已领用", Returned: "已归还",
+  Suspended: "已暂停", Terminated: "已终止", Rejected: "已驳回", Cancelled: "已取消", Issued: "已领用", Returned: "已归还",
 };
 export const officeActionLabels = { approve: "批准", reject: "驳回", cancel: "取消申请", issue: "确认发放", return: "登记归还" };
 export const officeHistoryLabels: Record<string, string> = {
   Submit: "提交申请", Approve: "审批通过", ApproveStep: "节点通过", Reject: "驳回申请", Cancel: "取消申请",
   Issue: "发放／交接", Return: "归还登记", Restock: "补充入库", Stocktake: "盘点调整",
-  Edit: "修改记录", Reassign: "保管职责交接",
+  Edit: "修改记录", Reassign: "保管职责交接", Draft: "创建草稿", Upload: "上传附件", DeleteAttachment: "移除附件", ApprovalReassign: "审批职责移交",
 };
 
 export function officeAccess(user: ApiUserDto, kind: OfficeKind) {
@@ -63,23 +64,23 @@ export function officeRequestActions(row: OfficeRequestRow, user: ApiUserDto, ki
   if (row.status === "Pending" && row.canReview === true) {
     actions.push({ action: "approve", label: "批准" }, { action: "reject", label: "驳回" });
   }
-  if ((row.status === "Pending" || row.status === "Approved") && access.allows("cancel", row))
+  if (["Draft", "Pending", "Approved"].includes(row.status) && access.allows("cancel", row))
     actions.push({ action: "cancel", label: "取消申请" });
-  if (row.status === "Approved" && access.allows("issue", row))
+  if (row.status === "Approved" && !row.materialAccess?.isPartial && access.allows("issue", row))
     actions.push({ action: "issue", label: isMeetingBooking(row) ? (row.requiresKey ? "发放钥匙" : "登记使用") : "确认发放" });
-  if ((row.status === "InUse" || row.status === "Issued" && !isMeetingBooking(row) && row.isReturnable) && access.allows("return", row))
+  if ((row.status === "InUse" || row.status === "Issued" && !isMeetingBooking(row) && row.isReturnable) && !row.materialAccess?.isPartial && access.allows("return", row))
     actions.push({ action: "return", label: isMeetingBooking(row) ? (row.requiresKey ? "归还钥匙" : "结束使用") : "登记归还" });
   return actions;
 }
 
 export function officeStatus(row: OfficeRequestRow, businessDate: string, now = Date.now()) {
   if (isMeetingBooking(row)) {
-    if (row.status === "InUse" && Date.parse(row.endsAt) <= now) return row.requiresKey ? "超时未归还" : "超时未结束";
-    if (["Pending", "Approved"].includes(row.status) && Date.parse(row.endsAt) <= now) return "已过期（未使用）";
+    if (row.status === "InUse" && row.endsAt !== undefined && Date.parse(row.endsAt) <= now) return row.requiresKey ? "超时未归还" : "超时未结束";
+    if (["Pending", "Approved"].includes(row.status) && row.endsAt !== undefined && Date.parse(row.endsAt) <= now) return "已过期（未使用）";
     if (row.status === "Approved") return row.requiresKey ? "待领钥匙" : "待使用";
   } else if (row.status === "Issued" && row.isReturnable) {
     if (row.returnDueDate && row.returnDueDate < businessDate) return "逾期未归还";
-    return row.returnedQuantity > 0 ? "部分归还" : "借用中";
+    return row.returnedQuantity !== undefined && row.returnedQuantity > 0 ? "部分归还" : "借用中";
   }
   return officeStatusLabels[row.status] ?? row.status;
 }

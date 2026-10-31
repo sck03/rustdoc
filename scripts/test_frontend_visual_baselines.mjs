@@ -25,12 +25,16 @@ const updateApprovedBaselines = process.env.UPDATE_FRONTEND_VISUAL_BASELINES ===
 // retaining overflow, geometry, text, interaction and accessibility assertions.
 const maximumPixelDifferenceRatio = Number(process.env.FRONTEND_VISUAL_MAX_DIFF_RATIO ?? "0.005");
 const pages = ["login", "login-expired", "dashboard", "query", "invoice", "invoiceParties", "hs", "singleWindow", "report", "state-loading", "state-empty", "state-error", "state-fatal", "state-offline", "state-offline-local", "state-service-unavailable", "state-permission", "state-route-redirect", "state-conflict", "state-feedback", "dialog"];
-const viewports = [
+const allViewports = [
   { name: "desktop-1366", width: 1366, height: 768 },
   { name: "desktop-1920", width: 1920, height: 1080 },
   { name: "tablet-1024", width: 1024, height: 768 },
   { name: "mobile-390", width: 390, height: 844 },
 ];
+const requestedViewports = (process.env.FRONTEND_VISUAL_VIEWPORT_FILTER ?? "").split(",").map(name => name.trim()).filter(Boolean);
+const unknownViewports = requestedViewports.filter(name => !allViewports.some(viewport => viewport.name === name));
+if (unknownViewports.length) throw new Error(`Unknown visual viewports: ${unknownViewports.join(", ")}`);
+const viewports = requestedViewports.length ? allViewports.filter(viewport => requestedViewports.includes(viewport.name)) : allViewports;
 
 mkdirSync(outputRoot, { recursive: true });
 mkdirSync(approvedRoot, { recursive: true });

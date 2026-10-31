@@ -81,6 +81,11 @@ export const queryKeys = {
   users: () => ["users"] as const,
   organizationDirectory: () => ["organization-directory"] as const,
   permissionTemplates: () => ["permission-templates"] as const,
+  unitMembers: () => ["unit-members"] as const,
+  unitAccess: () => ["unit-access"] as const,
+  unitSchemes: () => ["unit-schemes"] as const,
+  unitWorkflowTasks: () => ["unit-workflow-tasks"] as const,
+  unitWorkflowSummary: () => ["unit-workflow-summary"] as const,
   singleWindowAgentConsignmentDocument: (invoiceId: number) => ["single-window", "acd", invoiceId, "document"] as const,
   singleWindowAgentConsignmentExportReview: (invoiceId: number) =>
     ["single-window", "acd", invoiceId, "export-review"] as const,
@@ -104,4 +109,15 @@ export const queryKeys = {
   singleWindowOperationCenterRoot: () => ["single-window", "operation-center"] as const,
 };
 
-export const identityQueryRoots = [queryKeys.users(), queryKeys.organizationDirectory(), ["organization-managers"]] as const;
+export const identityQueryRoots = [queryKeys.users(), queryKeys.organizationDirectory(), ["organization-managers"],
+  queryKeys.permissionTemplates(), queryKeys.unitMembers(), queryKeys.unitAccess(), queryKeys.unitSchemes(),
+  queryKeys.unitWorkflowTasks(), queryKeys.unitWorkflowSummary(), ["personnel-foundation"], ["permission-versions"], ["permission-version-definition"]] as const;
+
+export function officeResourceQueryRoots(kind: "rooms" | "supplies") {
+  return [
+    ["office", kind], ["office", "resource-request", kind], ["office", "history", kind],
+    kind === "rooms" ? ["office", "availability"] : ["office", "history", "stock"],
+    ["office", "oa", "hub"], ["office", "communication"], ["office", "approval-document"],
+    ["office", "people", "clearance"], queryKeys.unitWorkflowTasks(), queryKeys.unitWorkflowSummary(),
+  ] as const;
+}

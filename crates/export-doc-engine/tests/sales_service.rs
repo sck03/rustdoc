@@ -147,7 +147,8 @@ fn opportunity_edit_permissions_do_not_grant_quote_writes() {
         {"resourceKey":"sales.opportunities","action":"edit","dataScope":"all"},
         {"resourceKey":"sales.opportunities","action":"create","dataScope":"all"}]}),
     );
-    fixture.create(CREATE_USER_ACCOUNT, json!({"username":"opportunity-editor","fullName":"商机维护","role":"User","permissionTemplateId":template["id"],"companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Sales-Test-2026"}));
+    let template = fixture.client().publish_scheme(template);
+    fixture.create(CREATE_USER_ACCOUNT, json!({"username":"opportunity-editor","fullName":"商机维护","role":"User","permissionTemplateId":template["id"],"permissionSchemeVersion":template["publishedVersion"],"companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Sales-Test-2026"}));
     let client = fixture
         .client()
         .clone()

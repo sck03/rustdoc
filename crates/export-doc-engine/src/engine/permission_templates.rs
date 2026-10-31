@@ -6,6 +6,7 @@ use super::{
 };
 use export_doc_domain::permissions::{self, Grant};
 use serde_json::{Value, json};
+pub(super) mod publications;
 
 pub(super) fn project_with_usage(tx: &Connection, value: Value) -> Result<Value> {
     let mut value = project(value)?;
@@ -26,6 +27,15 @@ pub(super) fn project_with_usage(tx: &Connection, value: Value) -> Result<Value>
     };
     value["accountReferenceCount"] = json!(count("users")?);
     value["unitRoleReferenceCount"] = json!(count(super::units::KIND)?);
+    value["publishedVersion"] = tx.permission_scheme_versions(
+        id.parse().map_err(|_| invalid("方案编号无效。"))?,
+        0,
+        1,
+    )?["items"]
+        .as_array()
+        .and_then(|items| items.first())
+        .map(|row| row["version"].clone())
+        .unwrap_or(Value::Null);
     Ok(value)
 }
 

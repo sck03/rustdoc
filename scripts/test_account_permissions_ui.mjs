@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
+import { publishPermissionScheme } from './lib/approval-fixtures.mjs';
 
 await withOfficeUi('account-permissions-ui', async ({ output, url, invoke, openPage, require, operations }) => {
   const token = (await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' })).accessToken;
@@ -29,8 +30,10 @@ await withOfficeUi('account-permissions-ui', async ({ output, url, invoke, openP
   const resources = new Map(catalog.resources.map(item => [item.key, item]));
   const group = await invoke('CreatePermissionTemplate', { id: 0, code: 'employee-ui-group', name: '行政自助分组', description: '共享分组验收', isActive: true,
     grants: source.grants.filter(grant => !resources.get(grant.resourceKey).isTechnical), disabledModules: ['office.purchase'] }, {}, token);
+  const published=await publishPermissionScheme(invoke,token,group);
   await form.getByRole('button', { name: '刷新用户', exact: true }).click();
   await form.getByRole('combobox', { name: /^权限方案/u }).selectOption(String(group.id));
+  await form.getByRole('combobox', { name: '权限发布版本', exact:true }).selectOption(String(published.version));
   await form.getByRole('button', { name: '保存', exact: true }).click();
   await form.getByRole('status').filter({ hasText: '账号已保存' }).waitFor();
   let login = await invoke('Login', { username: 'employee-ui', password: 'Employee-UI-2026' });
@@ -43,7 +46,7 @@ await withOfficeUi('account-permissions-ui', async ({ output, url, invoke, openP
   // Independent account settings retain the copied restrictions and can narrow actions/scopes.
   await form.getByText(/账号单独配置与模块权限/u).click();
   await form.getByLabel('账号权限来源').selectOption('custom');
-  await form.getByLabel('模块分类').selectOption('人事管理');
+  await form.getByLabel('模块分类').selectOption('人员与组织');
   const people = form.getByRole('region', { name: '人员档案与通讯录', exact: true });
   await people.getByLabel('人员档案与通讯录模块开放', { exact: true }).uncheck();
   await form.getByLabel('账号权限来源').selectOption('inherit');

@@ -7,7 +7,7 @@ import { useOfficeOperation } from "../office/useOfficeData.ts";
 export type ApprovalAccount = { id: number; fullName: string; username: string; departmentId: string; contexts?: { id: string; name: string; departmentId: string }[] };
 export function useApprovalSettings(client: ExportDocManagerApiClient, user: ApiUserDto) {
   return useQuery({ queryKey: ["office", "approval-settings", user.id, user.companyScope, user.contextId], enabled: user.capabilities.canManageUsers || user.capabilities.unitManagement?.workflows,
-    queryFn: async ({ signal }) => { const [settings, accounts, routing] = await Promise.all([client.getOaApprovalSettings({ signal }), client.getUnitApproverOptions({}, { signal }), client.getOaRoutingUnits({ signal })]); return { settings, accounts: accounts.users, routingUnits: routing.items }; }, refetchOnWindowFocus: false });
+    queryFn: async ({ signal }) => { const [settings, accounts, routing] = await Promise.all([client.getOaApprovalSettings({ signal }), client.getUnitApproverOptions({}, { signal }), client.getOaRoutingUnits({ signal })]); return { settings, accounts: accounts.users, handlers: accounts.handlers, routingUnits: routing.items }; }, refetchOnWindowFocus: false });
 }
 export function useApprovalSettingsDraft(client: ExportDocManagerApiClient, initial: OaApprovalSettings) {
   const [draft, setDraft] = useState(initial);
@@ -19,9 +19,9 @@ export function useApprovalSettingsDraft(client: ExportDocManagerApiClient, init
   const changeRule = (index: number, change: Partial<OaApprovalSettings["rules"][number]>) => setDraft(value => ({ ...value, rules: value.rules.map((rule, i) => i === index ? { ...rule, ...change } : rule) }));
   const changeDelegate = (index: number, change: Partial<OaApprovalSettings["delegations"][number]>) => setDraft(value => ({ ...value, delegations: value.delegations.map((item, i) => i === index ? { ...item, ...change } : item) }));
   const accept = (saved: OaApprovalSettings) => { setBaseline(saved); setDraft(saved); };
-  const save = () => operation.run(signal => client.saveOaApprovalSettings({ body: { expectedVersion: baseline.versionNumber, rules: draft.rules, delegations: draft.delegations, handlingServices: draft.handlingServices ?? [], personnelApprovalActions: draft.personnelApprovalActions ?? [], sheetTemplates: draft.sheetTemplates } }, { signal }), accept);
+  const save = () => operation.run(signal => client.saveOaApprovalSettings({ body: { expectedVersion: baseline.versionNumber, rules: draft.rules, delegations: draft.delegations, handlingServices: draft.handlingServices ?? [], sheetTemplates: draft.sheetTemplates, calendar:draft.calendar } }, { signal }), accept);
   const publish = (definitionKey:string) => operation.run(async signal => {
-    const saved=await client.saveOaApprovalSettings({body:{expectedVersion:baseline.versionNumber,rules:draft.rules,delegations:draft.delegations,handlingServices:draft.handlingServices??[],personnelApprovalActions:draft.personnelApprovalActions??[],sheetTemplates:draft.sheetTemplates}},{signal});
+    const saved=await client.saveOaApprovalSettings({body:{expectedVersion:baseline.versionNumber,rules:draft.rules,delegations:draft.delegations,handlingServices:draft.handlingServices??[],sheetTemplates:draft.sheetTemplates,calendar:draft.calendar}},{signal});
     accept(saved);
     return client.publishOaDefinition({body:{expectedVersion:saved.versionNumber,definitionKey}},{signal});
   },accept);

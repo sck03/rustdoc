@@ -18,7 +18,7 @@ impl From<::postgres::Error> for Error {
     fn from(error: ::postgres::Error) -> Self {
         if let Some(db) = error.as_db_error() {
             let kind = match db.code().code() {
-                "23505" | "23503" | "40001" => ErrorKind::Conflict,
+                "23505" | "23503" | "23514" | "40001" => ErrorKind::Conflict,
                 "55P03" => ErrorKind::Busy,
                 "57014" => ErrorKind::Timeout,
                 _ => ErrorKind::Unavailable,
@@ -132,6 +132,27 @@ fn schema_version(client: &mut impl ::postgres::GenericClient) -> Result<i64> {
 }
 fn validate_schema(client: &mut impl ::postgres::GenericClient) -> Result<()> {
     schema_version(client)?;
+    let marker = client.query_one(
+        "SELECT model,shape FROM schema_model WHERE version=$1",
+        &[&schema::SCHEMA_VERSION],
+    )?;
+    schema::validate_model(
+        true,
+        &marker.try_get::<_, String>(0)?,
+        &marker.try_get::<_, String>(1)?,
+        &schema::postgres_shape(client)?,
+    )?;
+    client.query(
+        "SELECT id,request_id,revision,state,generation,definition FROM workflow_instances LIMIT 0",
+        &[],
+    )?;
+    client.query(
+        "SELECT id,request_id,revision,body FROM request_revisions LIMIT 0",
+        &[],
+    )?;
+    client.query("SELECT instance_id,generation,node_key,position,definition,started_at,due_at FROM node_instances LIMIT 0",&[])?;
+    client.query("SELECT actor_id,context_id,command_key,request_digest,result FROM command_receipts LIMIT 0",&[])?;
+    client.query("SELECT id,kind,body FROM record_rows LIMIT 0", &[])?;
     client.query("SELECT request_id,submission,task_key,node_key,assignee_id,acted_by_id,context_id,acted_by_context,status,active,due_at,independent,started_at,acted_at,elapsed_seconds FROM workflow_tasks LIMIT 0",&[])?;
     client.query("SELECT id,person_id,unit_id,department_id,company,department,job_title,starts_on,ends_on,is_primary FROM personnel_memberships LIMIT 0",&[])?;
     client.query("SELECT appointment_id,manager_appointment_id,relation_type FROM reporting_relations LIMIT 0",&[])?;
@@ -200,50 +221,29 @@ pub fn initialize(connection_string: &str, owner: &str) -> Result<()> {
     let mut transaction = client.transaction()?;
     transaction.batch_execute(&format!("SET LOCAL ROLE \"{owner}\""))?;
     transaction.batch_execute(include_str!("postgres.sql"))?;
+    transaction.batch_execute(include_str!("permission_versions_postgres.sql"))?;
+    transaction.batch_execute(include_str!("identity_runtime_postgres.sql"))?;
+    transaction.batch_execute(include_str!("personnel_foundation_postgres.sql"))?;
+    transaction.batch_execute(include_str!("access_scope_postgres.sql"))?;
+    transaction.batch_execute(include_str!("workflow_runtime_postgres.sql"))?;
+    let shape = schema::postgres_shape(&mut transaction)?;
+    transaction.execute(
+        "INSERT INTO schema_model(version,model,shape) VALUES($1,$2,$3)",
+        &[
+            &schema::SCHEMA_VERSION,
+            &schema::model_fingerprint(true),
+            &shape,
+        ],
+    )?;
     validate_schema(&mut transaction)?;
     transaction.commit()?;
     validate_schema(&mut client)
 }
 impl Adapter for Postgres {
-    fn replace_workflow_tasks(
-        &self,
-        request: i64,
-        submission: i64,
-        tasks: &[WorkflowTask],
-    ) -> Result<()> {
-        let mut db = self.client.borrow_mut();
-        db.execute(
-            "UPDATE workflow_tasks SET active=0 WHERE request_id=$1",
-            &[&request],
-        )?;
-        db.execute(
-            "DELETE FROM workflow_tasks WHERE request_id=$1 AND submission=$2",
-            &[&request, &submission],
-        )?;
-        let insert=db.prepare("INSERT INTO workflow_tasks(request_id,submission,task_key,node_key,assignee_id,acted_by_id,status,active,due_at,independent,context_id,acted_by_context,started_at,acted_at,elapsed_seconds) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)")?;
-        for task in tasks {
-            db.execute(
-                &insert,
-                &[
-                    &request,
-                    &submission,
-                    &task.key,
-                    &task.node,
-                    &task.assignee,
-                    &task.acted_by,
-                    &task.status,
-                    &i64::from(task.active),
-                    &task.due_at,
-                    &i64::from(task.independent),
-                    &task.context,
-                    &task.acted_by_context,
-                    &task.started_at,
-                    &task.acted_at,
-                    &task.elapsed_seconds,
-                ],
-            )?;
-        }
-        Ok(())
+    fn execute_statement(&self, statement: &str, values: &[String]) -> Result<u64> {
+        let parameters: Vec<&(dyn ::postgres::types::ToSql + Sync)> =
+            values.iter().map(|value| value as _).collect();
+        Ok(self.client.borrow_mut().execute(statement, &parameters)?)
     }
 
     fn query_audits(&self, query: &AuditQuery<'_>) -> Result<(i64, Vec<Value>)> {
@@ -275,7 +275,7 @@ impl Adapter for Postgres {
         &self,
         company: &str,
     ) -> Result<std::collections::BTreeMap<i64, i64>> {
-        self.client.borrow_mut().query("SELECT c.id,COUNT(*) FROM records a JOIN records c ON c.id=CAST(a.body->>'categoryId' AS BIGINT) AND c.kind='attachment-categories' WHERE a.kind='attachments' AND c.company=$1 GROUP BY c.id", &[&company])?.into_iter().map(|row| Ok((row.try_get(0)?, row.try_get(1)?))).collect()
+        self.client.borrow_mut().query("SELECT c.id,COUNT(*) FROM record_rows a JOIN record_rows c ON c.id=CAST(a.body->>'categoryId' AS BIGINT) AND c.kind='attachment-categories' WHERE a.kind='attachments' AND c.company=$1 GROUP BY c.id", &[&company])?.into_iter().map(|row| Ok((row.try_get(0)?, row.try_get(1)?))).collect()
     }
     fn import_preview_usage(&self, owner: i64) -> Result<ImportPreviewUsage> {
         let row = self
@@ -294,7 +294,7 @@ impl Adapter for Postgres {
     }
     fn job_counts(&self) -> Result<Value> {
         let mut counts = serde_json::Map::new();
-        for row in self.client.borrow_mut().query("SELECT body->>'status',COUNT(*) FROM records WHERE kind='background-jobs' GROUP BY body->>'status'",&[])? {
+        for row in self.client.borrow_mut().query("SELECT body->>'status',COUNT(*) FROM record_rows WHERE kind='background-jobs' GROUP BY body->>'status'",&[])? {
             let status:Option<String>=row.try_get(0)?;
             counts.insert(status.unwrap_or_else(||"Unknown".into()),json!(row.try_get::<_,i64>(1)?));
         }
@@ -314,7 +314,12 @@ impl Adapter for Postgres {
     }
     fn query_records(&self, q: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let sql = super::record_query::sql(q, true);
-        self.query_page(&sql, "r.body::text", q.offset, q.limit.clamp(1, 100))
+        self.query_page(
+            &sql,
+            &super::sql::projection(q.fields, true)?,
+            q.offset,
+            q.limit.clamp(1, 100),
+        )
     }
     fn query_workflow_summary(&self, q: &WorkflowSummaryQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, values) = super::workflow::summary(q, true);
@@ -346,7 +351,7 @@ impl Adapter for Postgres {
         let parameters: Vec<&(dyn ::postgres::types::ToSql + Sync)> =
             sql.values.iter().map(|value| value as _).collect();
         let query = format!(
-            "SELECT {projection} FROM records r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
+            "SELECT {projection} FROM record_rows r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
             sql.filter,
             sql.order,
             limit.clamp(1, 2000),
@@ -358,6 +363,12 @@ impl Adapter for Postgres {
             .into_iter()
             .map(|row| Ok(serde_json::from_str(&row.try_get::<_, String>(0)?)?))
             .collect()
+    }
+    fn query_json(&self, statement: &str, values: &[String]) -> Result<Value> {
+        let parameters: Vec<&(dyn ::postgres::types::ToSql + Sync)> =
+            values.iter().map(|value| value as _).collect();
+        let row = self.client.borrow_mut().query_one(statement, &parameters)?;
+        Ok(serde_json::from_str(&row.try_get::<_, String>(0)?)?)
     }
     fn query_page(
         &self,
@@ -372,9 +383,9 @@ impl Adapter for Postgres {
             .iter()
             .map(|v| v as &(dyn ::postgres::types::ToSql + Sync))
             .collect();
-        let query = format!("SELECT (SELECT COUNT(*) FROM records r WHERE {filter}),
+        let query = format!("SELECT (SELECT COUNT(*) FROM record_rows r WHERE {filter}),
             COALESCE((SELECT jsonb_agg(page.body::jsonb) FROM
-             (SELECT {projection} AS body FROM records r WHERE {filter} ORDER BY {order} LIMIT {limit} OFFSET {offset}) page), '[]'::jsonb)::text",
+             (SELECT {projection} AS body FROM record_rows r WHERE {filter} ORDER BY {order} LIMIT {limit} OFFSET {offset}) page), '[]'::jsonb)::text",
             filter=sql.filter, order=sql.order, limit=limit.clamp(1,200), offset=offset.max(0));
         let row = client.query_one(&query, &params)?;
         Ok((
@@ -421,7 +432,7 @@ impl Adapter for Postgres {
         self.client
             .borrow_mut()
             .query_opt(
-                "SELECT body::text FROM records WHERE kind=$1 AND id=$2",
+                "SELECT body::text FROM record_rows WHERE kind=$1 AND id=$2",
                 &[&kind, &id],
             )?
             .map(|row| {
@@ -434,7 +445,7 @@ impl Adapter for Postgres {
         self.client
             .borrow_mut()
             .query(
-                "SELECT body::text FROM records WHERE kind=$1 ORDER BY id DESC",
+                "SELECT body::text FROM record_rows WHERE kind=$1 ORDER BY id DESC",
                 &[&kind],
             )?
             .into_iter()
@@ -448,7 +459,7 @@ impl Adapter for Postgres {
         self.client
             .borrow_mut()
             .query_opt(
-                "SELECT body::text FROM records WHERE kind=$1 AND identity=$2",
+                "SELECT body::text FROM record_rows WHERE kind=$1 AND identity=$2",
                 &[&kind, &identity],
             )?
             .map(|row| {
@@ -458,24 +469,53 @@ impl Adapter for Postgres {
             .transpose()
     }
     fn insert(&self, r: &RecordWrite<'_>) -> Result<i64> {
-        let b = r.body;
-        let body = serde_json::to_string(b)?;
-        Ok(self.client.borrow_mut().query_one("INSERT INTO records(kind,identity,version,owner_id,company,department,body) VALUES($1,$2,$3,$4,$5,$6,$7::text::jsonb) RETURNING id",
-            &[&r.kind,&r.identity,&b["versionNumber"].as_i64(),&b["ownerUserId"].as_i64(),&b["companyScope"].as_str().unwrap_or(""),&b["departmentId"].as_str().unwrap_or(""),&body])?.try_get(0)?)
+        crate::identity_runtime::atomic(self, r.kind, || {
+            let stored = crate::identity_runtime::document(
+                r.kind,
+                &crate::workflow_runtime::document(r.kind, r.body),
+            );
+            let b = &stored;
+            let body = serde_json::to_string(b)?;
+            let id=self.client.borrow_mut().query_one("INSERT INTO records(kind,identity,version,owner_id,company,department,body) VALUES($1,$2,$3,$4,$5,$6,$7::text::jsonb) RETURNING id",&[&r.kind,&r.identity,&b["versionNumber"].as_i64(),&b["ownerUserId"].as_i64(),&b["companyScope"].as_str().unwrap_or(""),&b["departmentId"].as_str().unwrap_or(""),&body])?.try_get(0)?;
+            crate::identity_runtime::persist(self, id, r.kind, r.body)?;
+            Ok(id)
+        })
     }
     fn update(&self, id: i64, expected: i64, r: &RecordWrite<'_>) -> Result<bool> {
-        let b = r.body;
-        let body = serde_json::to_string(b)?;
-        Ok(self.client.borrow_mut().execute("UPDATE records SET identity=$1,version=$2,body=$3::text::jsonb,owner_id=$4,company=$5,department=$6 WHERE kind=$7 AND id=$8 AND version=$9",
-            &[&r.identity,&b["versionNumber"].as_i64(),&body,&b["ownerUserId"].as_i64(),&b["companyScope"].as_str().unwrap_or(""),&b["departmentId"].as_str().unwrap_or(""),&r.kind,&id,&expected])?==1)
+        crate::identity_runtime::atomic(self, r.kind, || {
+            let stored = crate::identity_runtime::document(
+                r.kind,
+                &crate::workflow_runtime::document(r.kind, r.body),
+            );
+            let b = &stored;
+            let body = serde_json::to_string(b)?;
+            let changed=self.client.borrow_mut().execute("UPDATE records SET identity=$1,version=$2,body=$3::text::jsonb,owner_id=$4,company=$5,department=$6 WHERE kind=$7 AND id=$8 AND version=$9",&[&r.identity,&b["versionNumber"].as_i64(),&body,&b["ownerUserId"].as_i64(),&b["companyScope"].as_str().unwrap_or(""),&b["departmentId"].as_str().unwrap_or(""),&r.kind,&id,&expected])?==1;
+            if changed {
+                crate::identity_runtime::persist(self, id, r.kind, r.body)?;
+            }
+            Ok(changed)
+        })
     }
     fn set_body(&self, id: i64, body: &Value) -> Result<()> {
+        let kind: String = self
+            .client
+            .borrow_mut()
+            .query_one("SELECT kind FROM record_rows WHERE id=$1", &[&id])?
+            .try_get(0)?;
+        let stored = crate::identity_runtime::document(
+            &kind,
+            &crate::workflow_runtime::document(&kind, body),
+        );
+        let body = &stored;
         if self.client.borrow_mut().execute(
             "UPDATE records SET body=$1::text::jsonb WHERE id=$2",
             &[&serde_json::to_string(body)?, &id],
         )? != 1
         {
             return Err(Error::unavailable("写入记录编号失败。"));
+        }
+        if crate::identity_runtime::supports(&kind) {
+            crate::identity_runtime::project(self, id)?;
         }
         Ok(())
     }
@@ -568,7 +608,7 @@ impl Adapter for Postgres {
         Ok(())
     }
     fn attachment_bytes(&self, invoice_id: i64) -> Result<i64> {
-        Ok(self.client.borrow_mut().query_one("SELECT COALESCE(SUM(octet_length(f.content)),0)::bigint FROM files f JOIN records r ON r.id=f.record_id WHERE r.kind='attachments' AND (r.body->>'invoiceId')::bigint=$1",&[&invoice_id])?.try_get(0)?)
+        Ok(self.client.borrow_mut().query_one("SELECT COALESCE(SUM(octet_length(f.content)),0)::bigint FROM files f JOIN record_rows r ON r.id=f.record_id WHERE r.kind='attachments' AND (r.body->>'invoiceId')::bigint=$1",&[&invoice_id])?.try_get(0)?)
     }
     fn insert_blob(&self, b: &BlobWrite<'_>) -> Result<()> {
         self.client.borrow_mut().execute("INSERT INTO files(kind,record_id,file_name,media_type,digest,content,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)",&[&b.kind,&b.record_id,&b.file_name,&b.media_type,&b.digest,&b.content,&b.created_at])?;

@@ -198,14 +198,14 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         .unwrap();
     let worker_id = people[1]["employee"]["id"].as_i64().unwrap();
     let organization = json!({"managerEmployeeId":people[2]["employee"]["id"],"functionalManagerEmployeeIds":[people[3]["employee"]["id"]],"additionalAssignments":[{"departmentId":b,"jobTitle":"行政兼职","managerEmployeeId":people[2]["employee"]["id"],"functionalManagerEmployeeIds":[people[3]["employee"]["id"]]}]});
-    people[1] = call(service,admin,TRANSFER_PERSONNEL,worker_id,Some(json!({"expectedVersion":people[1]["versionNumber"],"effectiveDate":"2026-10-01","departmentId":a,"jobTitle":"组织协调专员","organization":organization,"note":"建立兼职和矩阵汇报"}))).unwrap();
+    people[1] = workflow::personnel_change(service, admin, "Transfer",worker_id,Some(json!({"expectedVersion":people[1]["versionNumber"],"effectiveDate":"2026-10-01","departmentId":a,"jobTitle":"组织协调专员","organization":organization,"note":"建立兼职和矩阵汇报"}))).unwrap();
     assert_eq!(
         people[1]["organization"]["additionalAssignments"][0]["departmentId"],
         b
     );
     let options = get(service, admin, GET_PERSONNEL_OPTIONS, 0);
     assert_eq!(options["positions"][0]["name"], "组织协调专员");
-    let loop_change = call(service,admin,TRANSFER_PERSONNEL,people[2]["employee"]["id"].as_i64().unwrap(),Some(json!({"expectedVersion":people[2]["versionNumber"],"effectiveDate":"2026-10-01","departmentId":b,"jobTitle":"经理","organization":{"managerEmployeeId":worker_id},"note":"拒绝循环"}))).unwrap_err();
+    let loop_change = workflow::personnel_change(service, admin, "Transfer",people[2]["employee"]["id"].as_i64().unwrap(),Some(json!({"expectedVersion":people[2]["versionNumber"],"effectiveDate":"2026-10-01","departmentId":b,"jobTitle":"经理","organization":{"managerEmployeeId":worker_id},"note":"拒绝循环"}))).unwrap_err();
     assert_eq!(loop_change.status, Some(400));
     assert_eq!(
         get(
@@ -633,6 +633,7 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
     }
     // A template change must also preserve CEO obligations, transactionally.
     let template = call(service,admin,CREATE_PERMISSION_TEMPLATE,0,Some(json!({"code":format!("ceo-{suffix}"),"name":"CEO方案","isActive":true,"grants":logins[4]["user"]["capabilities"]["permissions"].as_array().unwrap().iter().filter(|g| g["resourceKey"].as_str().unwrap().starts_with("office.") && g["resourceKey"] != "office.approval-hub").cloned().collect::<Vec<_>>()}))).unwrap();
+    let template = crate::oa_contract::workflow::publish_scheme(service, admin, template);
     directory = get(service, admin, LIST_USERS, 0);
     let mut executive = directory["users"]
         .as_array()
@@ -642,29 +643,34 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         .unwrap()
         .clone();
     executive["permissionTemplateId"] = template["id"].clone();
+    executive["permissionSchemeVersion"] = template["publishedVersion"].clone();
     executive["expectedVersion"] = executive["versionNumber"].clone();
     executive["permissionGrants"] = Value::Null;
-    call(
+    let executive = call(
         service,
         admin,
         UPDATE_USER_ACCOUNT,
         users[4]["id"].as_i64().unwrap(),
         Some(executive),
     )
-    .unwrap();
+    .unwrap()["user"]
+        .clone();
     let mut broken = template.clone();
     broken["expectedVersion"] = broken["versionNumber"].clone();
     broken["grants"] = json!([]);
+    let broken = call(
+        service,
+        admin,
+        UPDATE_PERMISSION_TEMPLATE,
+        template["id"].as_i64().unwrap(),
+        Some(broken),
+    )
+    .unwrap();
+    let broken = crate::oa_contract::workflow::publish_scheme(service, admin, broken);
     assert_eq!(
-        call(
-            service,
-            admin,
-            UPDATE_PERMISSION_TEMPLATE,
-            template["id"].as_i64().unwrap(),
-            Some(broken)
-        )
-        .unwrap_err()
-        .status,
+        crate::oa_contract::workflow::apply_scheme(service, admin, &broken, "Account", &executive)
+            .unwrap_err()
+            .status,
         Some(409)
     );
     // Resolve line and functional managers from the selected appointment, not job-title strings.
@@ -833,7 +839,7 @@ fn membership_scope(
         Some(403)
     );
     let id = reader["employee"]["id"].as_i64().unwrap();
-    let moved = call(service,admin,TRANSFER_PERSONNEL,id,Some(json!({"expectedVersion":reader["versionNumber"],"effectiveDate":"2026-10-01","departmentId":b,"jobTitle":"部门阅览员","organization":{"additionalAssignments":[{"departmentId":a,"jobTitle":"跨部门阅览"}]},"note":"增加兼职范围"}))).unwrap();
+    let moved = workflow::personnel_change(service, admin, "Transfer",id,Some(json!({"expectedVersion":reader["versionNumber"],"effectiveDate":"2026-10-01","departmentId":b,"jobTitle":"部门阅览员","organization":{"additionalAssignments":[{"departmentId":a,"jobTitle":"跨部门阅览","functionalManagerEmployeeIds":[]}]},"note":"增加兼职范围"}))).unwrap();
     let expanded = login(service, &user["username"]);
     let token = expanded["accessToken"].as_str().unwrap();
     assert_eq!(
@@ -852,7 +858,7 @@ fn membership_scope(
             .iter()
             .any(|v| v["id"] == row["id"])
     );
-    call(service,admin,TRANSFER_PERSONNEL,id,Some(json!({"expectedVersion":moved["versionNumber"],"effectiveDate":"2026-10-02","departmentId":b,"jobTitle":"部门阅览员","organization":{},"note":"移除兼职并撤销范围"}))).unwrap();
+    workflow::personnel_change(service, admin, "Transfer",id,Some(json!({"expectedVersion":moved["versionNumber"],"effectiveDate":"2026-10-02","departmentId":b,"jobTitle":"部门阅览员","organization":{},"note":"移除兼职并撤销范围"}))).unwrap();
     assert_eq!(
         call(
             service,

@@ -35,7 +35,17 @@ fn sqlite_office_directory_schedule_handover_and_stock_follow_the_original_contr
             body,
         )
     };
-    office_contract::exercise(&call, &applicant_call);
+    let reviewer = fixture.client().business_reviewer();
+    let reviewer_call = |op, id: Option<i64>, query: &[(&str, String)], body| {
+        reviewer.json(
+            op,
+            &id.map(|id| vec![("id", id.to_string())])
+                .unwrap_or_default(),
+            query,
+            body,
+        )
+    };
+    office_contract::exercise(&call, &applicant_call, &reviewer_call);
 }
 
 #[test]

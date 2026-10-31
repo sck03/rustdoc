@@ -40,6 +40,7 @@ fn open(workspace: &Workspace) -> Arc<NativeService> {
 }
 fn admin() -> Actor {
     Actor {
+        scope_rules: vec![],
         context: String::new(),
         edition: Default::default(),
         id: 1,

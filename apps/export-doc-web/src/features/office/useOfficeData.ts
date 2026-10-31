@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient, ListOfficeSuppliesRequest, OfficeRequestEventRecord, OfficeStockMovementRecord } from "../../api/index.ts";
+import { officeResourceQueryRoots } from "../../api/queryKeys.ts";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { officeAccess, officeDayRange, officeRequestFocus, type OfficeAction, type OfficeKind, type OfficePage, type OfficeRequestRow } from "./officeModel.ts";
@@ -98,42 +99,46 @@ export function useOfficeOperation(relatedKeys: readonly QueryKey[] = [], includ
   return { run, busy, error };
 }
 
+export const useOfficeResourceOperation = (kind: OfficeKind) => useOfficeOperation(officeResourceQueryRoots(kind), false);
+
 export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUserDto, kind: OfficeKind) {
   const access = officeAccess(user, kind);
   const [search, setSearch] = useSearchParams();
   const focus = officeRequestFocus(search);
   const focused = Boolean(focus.requestId || focus.applicantUserId || focus.employeeId);
   const handlingOnly = search.get("handlingOnly") === "true" && !focused;
+  const approvalsOnly = search.get("approvalsOnly") === "true" && !focused;
   const paging = useOfficePaging();
   const [mineOnlyFilter, setMineOnly] = useState(!access.canSeeOthers && !access.allows("approve"));
   const statusFilter = search.get("status") ?? (access.allows("approve") ? "Pending" : "");
-  const mineOnly = focused || handlingOnly ? false : mineOnlyFilter;
-  const status = focused ? "" : statusFilter;
+  const mineOnly = focused || handlingOnly || approvalsOnly ? false : mineOnlyFilter;
+  const status = focused ? "" : approvalsOnly ? "Pending" : statusFilter;
   const query = useQuery({
-    queryKey: ["office", kind, "requests", user.id, user.companyScope, paging.pageNumber, paging.pageSize, mineOnly, status, focus, handlingOnly],
+    queryKey: ["office", kind, "requests", user.id, user.companyScope, paging.pageNumber, paging.pageSize, mineOnly, status, focus, handlingOnly, approvalsOnly],
     queryFn: async ({ signal }): Promise<OfficePage<OfficeRequestRow>> => {
-      const input = { mineOnly, status: status || undefined, handlingOnly, pageNumber: paging.pageNumber, pageSize: paging.pageSize, ...focus };
+      const input = { mineOnly, status: status || undefined, handlingOnly, approvalsOnly, pageNumber: paging.pageNumber, pageSize: paging.pageSize, ...focus };
       return kind === "rooms" ? client.listMeetingBookings(input, { signal }) : client.listOfficeSupplyRequests(input, { signal });
     },
     refetchInterval: 30000,
     refetchIntervalInBackground: false,
   });
-  const showRequests = (nextStatus: string, handling = false) => {
-    setSearch({ view: "requests", status: nextStatus, ...(handling ? { handlingOnly: "true" } : {}) });
+  const showRequests = (nextStatus: string, handling = false, approvals = false) => {
+    setSearch({ view: "requests", status: nextStatus, ...(handling ? { handlingOnly: "true" } : {}), ...(approvals ? { approvalsOnly: "true" } : {}) });
     paging.resetPage();
   };
-  return { access, paging, query, mineOnly, status, focus, focused, handlingOnly,
+  return { access, paging, query, mineOnly, status, focus, focused, handlingOnly, approvalsOnly,
+    changeApprovals: (value: boolean) => showRequests("Pending", false, value),
     changeHandling: (value: boolean) => showRequests("", value),
-    clearFocus: () => { setMineOnly(!access.canSeeOthers); showRequests(""); },
+    clearFocus: () => { setMineOnly(!access.canSeeOthers && !access.allows("approve")); showRequests(""); },
     changeMineOnly: (value: boolean) => { setMineOnly(value); showRequests(status); },
-    changeStatus: (value: string) => showRequests(value, handlingOnly) };
+    changeStatus: (value: string) => showRequests(value, handlingOnly, approvalsOnly && value === "Pending") };
 }
 
 export function applyOfficeAction(client: ExportDocManagerApiClient, kind: OfficeKind, row: OfficeRequestRow,
   action: OfficeAction, note: string, quantity: number, signal: AbortSignal, taskKey?: string): Promise<OfficeRequestRow> {
   const init = { signal };
   if (kind === "rooms") {
-    const request = { id: row.id, body: { expectedVersion: row.versionNumber, note, taskKey } };
+    const request = { id: row.id, body: officeCommand(client,`${kind}:${row.id}:${action}`,{commandKey:undefined,expectedVersion: row.versionNumber, note, taskKey}) };
     switch (action) {
       case "approve": return client.approveMeetingBooking(request, init);
       case "reject": return client.rejectMeetingBooking(request, init);
@@ -142,7 +147,7 @@ export function applyOfficeAction(client: ExportDocManagerApiClient, kind: Offic
       case "return": return client.returnMeetingRoomKey(request, init);
     }
   }
-  const request = { id: row.id, body: { expectedVersion: row.versionNumber, note, quantity, taskKey } };
+  const request = { id: row.id, body: officeCommand(client,`${kind}:${row.id}:${action}`,{commandKey:undefined,expectedVersion: row.versionNumber, note, quantity, taskKey}) };
   switch (action) {
     case "approve": return client.approveOfficeSupplyRequest(request, init);
     case "reject": return client.rejectOfficeSupplyRequest(request, init);
@@ -151,3 +156,4 @@ export function applyOfficeAction(client: ExportDocManagerApiClient, kind: Offic
     case "return": return client.returnOfficeSupply(request, init);
   }
 }
+import { officeCommand } from "./officeCommands.ts";

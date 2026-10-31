@@ -20,10 +20,12 @@ pub struct OfficeQuery<'a> {
     pub include_inactive: bool,
     pub low_stock: bool,
     pub handling_only: bool,
+    pub approvals_only: bool,
     pub can_issue: bool,
     pub can_return: bool,
     pub from: Option<&'a str>,
     pub to: Option<&'a str>,
+    pub fields: &'a [(&'a str, &'a str)],
     pub offset: i64,
     pub limit: i64,
 }
@@ -78,6 +80,16 @@ pub(crate) fn build(q: &OfficeQuery<'_>, pg: bool) -> Result<QuerySql> {
             })
             .collect::<Vec<_>>();
         let context = sql::bind(&mut values, q.context, pg);
+        if q.approvals_only {
+            clauses.push(format!(
+                "({})",
+                crate::record_query::approval_condition("r", Some(&viewer), &principals)
+            ));
+            clauses.push(format!(
+                "r.owner_id<>{viewer} AND COALESCE(CAST({} AS BIGINT),0)<>{viewer}",
+                sql::field("applicantAccountId", pg)
+            ));
+        }
         let participant = crate::record_query::participant_condition(
             pg,
             "r",
@@ -205,6 +217,24 @@ pub(crate) fn build(q: &OfficeQuery<'_>, pg: bool) -> Result<QuerySql> {
         order: order.into(),
         values,
     })
+}
+
+pub(crate) fn projection(kind: &str, pg: bool) -> String {
+    if kind != "rooms" {
+        return if pg { "r.body::text" } else { "r.body" }.into();
+    }
+    let occupied = if pg {
+        "EXISTS(SELECT 1 FROM record_rows b WHERE b.kind='bookings' AND b.company=r.company AND b.body->>'status'='InUse' AND (b.body->>'meetingRoomId')::bigint=r.id)"
+    } else {
+        "EXISTS(SELECT 1 FROM record_rows b WHERE b.kind='bookings' AND b.company=r.company AND json_extract(b.body,'$.status')='InUse' AND json_extract(b.body,'$.meetingRoomId')=r.id)"
+    };
+    if pg {
+        format!("(r.body || jsonb_build_object('inUse',{occupied}))::text")
+    } else {
+        format!(
+            "json_set(r.body,'$.inUse',json(CASE WHEN {occupied} THEN 'true' ELSE 'false' END))"
+        )
+    }
 }
 
 fn truth(path: &str, pg: bool) -> String {

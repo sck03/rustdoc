@@ -123,6 +123,7 @@ impl NativeService {
             return true;
         }
         catalog::find_resource_operation(operation)
+            || contracts::contract()["operations"][operation.id]["foundation"].is_object()
             || pdf_merge::OPERATIONS.contains(&operation)
             || packing::OPERATIONS.contains(&operation)
             || hs::OPERATIONS.contains(&operation)

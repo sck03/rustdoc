@@ -11,6 +11,7 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'deploy/rust-native/**'
+      - 'docs/**'
   pull_request:
     paths:
       - '.github/workflows/**'
@@ -19,6 +20,7 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'deploy/rust-native/**'
+      - 'docs/**'
 
 permissions:
   contents: read
@@ -43,7 +45,9 @@ jobs:
         with:
           node-version: 26
       - name: Validate release contracts
-        run: node scripts/test_native_release_contract.mjs
+        run: |
+          node scripts/test_native_release_contract.mjs
+          node scripts/test_native_validation_plan.mjs
       - name: Validate action pins and updater boundary
         run: |
           node scripts/verify-github-workflow-actions.mjs

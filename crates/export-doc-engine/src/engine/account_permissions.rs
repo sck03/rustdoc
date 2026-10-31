@@ -20,13 +20,18 @@ pub fn template(connection: &Connection, user: &Value) -> Result<Option<Value>> 
         .as_i64()
         .filter(|id| *id > 0)
         .ok_or_else(|| unavailable("身份缺少明确的权限方案或独立权限配置。"))?;
+    let version = user["permissionSchemeVersion"]
+        .as_i64()
+        .filter(|v| *v > 0)
+        .ok_or_else(|| unavailable("身份缺少明确的已发布权限版本。"))?;
     Ok(Some(
         connection
-            .get("permission-templates", id)?
-            .ok_or_else(|| unavailable("引用的权限方案不存在。"))?,
+            .permission_scheme_version(id, version)?
+            .ok_or_else(|| unavailable("引用的权限方案发布版本不存在。"))?,
     ))
 }
 
+#[derive(Clone)]
 pub(super) struct Profile {
     pub direct: Vec<Grant>,
     pub disabled: Vec<String>,
@@ -136,7 +141,16 @@ pub(super) fn source(
                 "company" => "单位",
                 _ => "全部",
             };
-            Some(format!("{} · {} · {scope}", resource.name, action.name))
+            Some(format!(
+                "{} · {} · {}",
+                resource.name,
+                action.name,
+                if resource.supports_data_scope {
+                    scope
+                } else {
+                    &resource.scope_description
+                }
+            ))
         })
         .collect();
     Ok(
@@ -170,6 +184,8 @@ pub fn validate(value: &mut Value) -> Result<()> {
             .map_err(|_| invalid("账号权限须为资源、操作和数据范围列表。"))?;
         value["permissionGrants"] =
             json!(permissions::profile::assignable(&direct).map_err(invalid)?);
+        value["permissionTemplateId"] = Value::Null;
+        value["permissionSchemeVersion"] = Value::Null;
     }
     if value["role"] == "Admin" {
         value["oaAssignedOnly"] = json!(false);

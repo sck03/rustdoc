@@ -66,6 +66,12 @@ pub(super) fn start(
         if snapshot["status"] != "Approved" {
             return Err(conflict("只有已批准且未作废的提交版本可以生成正式审批单。"));
         }
+        if !super::materials::full(tx, actor, &row, &snapshot)? {
+            return Err(error(
+                403,
+                "生成完整归档审批单需要完整材料权限；可下载本节点的材料投影审批单。",
+            ));
+        }
         Ok(snapshot)
     })?;
     let projected = service
@@ -128,6 +134,14 @@ pub(super) fn start(
                     if submissions::checked(tx, &row, id)?["status"] != "Approved" {
                         return Err(conflict("批准已作废，不发布正式审批单。"));
                     }
+                    if !super::materials::full(
+                        tx,
+                        current_actor,
+                        &row,
+                        &submissions::checked(tx, &row, id)?,
+                    )? {
+                        return Err(error(403, "材料权限已变化，不发布完整审批单。"));
+                    }
                     Ok(())
                 })),
             })
@@ -173,6 +187,53 @@ pub(in crate::engine) fn download(
     parameters: &[(&str, String)],
 ) -> Result<FileOutput> {
     let meta = metadata(operation).ok_or_else(|| invalid("未知审批单下载。"))?;
+    let partial = service.store.read(|tx| {
+        let (actor, row) = current(tx, actor, meta, records::id(parameters)?)?;
+        let snapshot = submissions::checked(tx, &row, submissions::id(parameters)?)?;
+        if snapshot["status"] != "Approved" {
+            return Err(conflict("该提交版本尚未批准或已作废。"));
+        }
+        if super::materials::full(tx, &actor, &row, &snapshot)? {
+            return Ok(None);
+        }
+        if meta["action"] != "document-download" {
+            return Err(error(403, "完整材料归档需要完整材料权限。"));
+        }
+        Ok(Some(super::materials::snapshot(
+            tx, &actor, &row, snapshot,
+        )?))
+    })?;
+    if let Some(snapshot) = partial {
+        crate::operation::check()?;
+        let cancelled = crate::operation::cancellation_flag();
+        let design = sheet_templates::validate_design(&text(&snapshot, "template.content"))?;
+        let data = export_doc_report::approval::data(&snapshot, &store::timestamp())?;
+        let _fonts = service.report_fonts.enter()?;
+        let document = export_doc_report::render_design(&data, &design, &cancelled)?;
+        let bytes = export_doc_report::pdf_document(&document, &service.report_fonts, &cancelled)?;
+        if bytes.len() > 16 * 1024 * 1024 {
+            return Err(unavailable("材料投影审批单超过容量。"));
+        }
+        service.store.read(|tx| {
+            let (actor, row) = current(tx, actor, meta, records::id(parameters)?)?;
+            let current = submissions::checked(tx, &row, submissions::id(parameters)?)?;
+            if current["status"] != "Approved" {
+                return Err(conflict("批准已作废。"));
+            }
+            let current = super::materials::snapshot(tx, &actor, &row, current)?;
+            if current["request"] != snapshot["request"]
+                || current["approvalPlan"] != snapshot["approvalPlan"]
+            {
+                return Err(conflict("材料权限或版本已变化，请重新下载。"));
+            }
+            Ok(())
+        })?;
+        return Ok(FileOutput {
+            file_name: format!("审批单-{}-材料投影.pdf", records::id(parameters)?),
+            media_type: "application/pdf".into(),
+            content: bytes,
+        });
+    }
     service.store.read(|tx| {
         let (_, row) = current(tx, actor, meta, records::id(parameters)?)?;
         let id = submissions::id(parameters)?;

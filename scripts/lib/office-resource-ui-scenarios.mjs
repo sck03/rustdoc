@@ -35,11 +35,10 @@ export async function exerciseOfficeResources({ url, page, output, run, wait, cl
   await wait("document.querySelector('.office-resource-card')", 'Supply save missing');
   await click('补充库存'); await fill('本次补充数量（件）', '5'); await fill('入库说明／采购单号', '匿名测试入库'); await finish('Restock');
   await click('申请借用'); await employee(); await fill('申请数量（件）', '3'); await fill('领用用途', '匿名测试借用'); await finish('Request supply');
-  await navigate(`${url}/#/office/approvals`);
-  await wait("[...document.querySelectorAll('.office-resource-card li')].some(n=>n.textContent.includes('资源流程验收设备'))", 'Resource request missing from hub');
-  await captureScreenshot(page, path.join(output, 'resource-hub-pending.png'));
-  await run("[...document.querySelectorAll('.office-resource-card li a')].find(n=>n.textContent.includes('资源流程验收设备')).click()");
-  await wait("document.querySelector('.office-request-card')?.textContent.includes('资源流程验收设备')", 'Hub did not open exact request');
+  // The maintenance account follows its submitted record; assigned reviewer hub navigation is exercised by the integration contract.
+  await navigate(`${url}/#/office/supplies?view=requests&status=Pending`);
+  await wait("document.querySelector('.office-request-card')?.textContent.includes('资源流程验收设备')", 'Submitted resource request missing from the request list');
+  await captureScreenshot(page, path.join(output, 'resource-request-pending.png'));
   await approveResource('supplies');
   await navigate(`${url}/#/office/supplies?view=requests&status=Approved`);
   await wait("document.querySelector('.office-filter select')?.value==='Approved'", 'Same-route status navigation did not update the filter');

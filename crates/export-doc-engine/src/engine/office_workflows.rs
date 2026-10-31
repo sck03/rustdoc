@@ -5,13 +5,13 @@ use super::{
     office::{instant, integer, supply_totals},
     office_events,
     records::{positive, required, text},
-    store::{self, Actor, Store},
+    store::{self, Actor},
 };
 use crate::engine::store::Connection;
 use serde_json::{Value, json};
 
 pub fn action(
-    store: &Store,
+    service: &super::NativeService,
     actor: &Actor,
     operation: &str,
     id: i64,
@@ -40,11 +40,11 @@ pub fn action(
     {
         return Err(invalid("取消或驳回须填写处理原因，备注不得超过 500 字。"));
     }
-    store.transaction_as(actor, |tx, actor| {
+    let mut result = service.store.transaction_as(actor, |tx, actor| {
         auth::authorize(actor, permission, action)?;
         let mut value = store::get(tx, kind, id)?;
         let allowed = if action == "approve" {
-            super::oa::approval::authority(tx, actor, &value)?.is_some()
+            super::oa::assigned_to(tx, actor, permission, &value)?
         } else {
             super::handling::resource_access(
                 tx,
@@ -61,7 +61,13 @@ pub fn action(
         if kind == "supplies" {
             return stock(tx, actor, operation, value, &body);
         }
+        if super::command_receipts::prepare(tx, actor, &mut value, operation, &body)? {
+            return super::oa::project(tx, actor, value, true);
+        }
         store::check_version(&value, store::expected(&body))?;
+        if matches!(action, "issue" | "return") {
+            super::oa::materials::authorize_edit(tx, actor, &value)?;
+        }
         if action == "approve" && value["ownerUserId"] == actor.id {
             return Err(error(
                 403,
@@ -80,6 +86,7 @@ pub fn action(
                 },
                 &note,
                 &text(&body, "taskKey"),
+                &body,
             )?)
         } else {
             None
@@ -126,8 +133,21 @@ pub fn action(
             quantity,
             &note,
         )?;
-        Ok(saved)
-    })
+        super::oa::project(tx, actor, saved, true)
+    })?;
+    if operation.starts_with("Approve")
+        && result["status"] == "Approved"
+        && result["submissionId"].as_i64().is_some()
+    {
+        match super::oa::resource_document(service, actor, kind, &result) {
+            Ok(document) => result["approvalDocument"] = document,
+            Err(cause) => eprintln!(
+                "Resource approval {} committed; document scheduling failed: {cause}",
+                result["id"]
+            ),
+        }
+    }
+    Ok(result)
 }
 
 fn stock(
@@ -205,7 +225,7 @@ fn meeting(tx: &Connection, actor: &Actor, operation: &str, value: &mut Value) -
     let next = match (operation, state.as_str()) {
         ("ApproveMeetingBooking", "Pending") => "Approved",
         ("RejectMeetingBooking", "Pending") => "Rejected",
-        ("CancelMeetingBooking", "Pending" | "Approved") => "Cancelled",
+        ("CancelMeetingBooking", "Draft" | "Pending" | "Approved") => "Cancelled",
         ("IssueMeetingRoomKey", "Approved") => "InUse",
         ("ReturnMeetingRoomKey", "InUse") => "Completed",
         _ => return Err(conflict("当前预约状态不能执行此操作。")),
@@ -233,10 +253,13 @@ fn meeting(tx: &Connection, actor: &Actor, operation: &str, value: &mut Value) -
         {
             return Err(conflict("请在预约开始前 30 分钟至结束前办理交接。"));
         }
-        if store::all(tx, "bookings")?
-            .iter()
-            .any(|row| row["meetingRoomId"] == value["meetingRoomId"] && row["status"] == "InUse")
-        {
+        if tx.record_exists(
+            "bookings",
+            &[
+                ("meetingRoomId", value["meetingRoomId"].to_string()),
+                ("status", "InUse".into()),
+            ],
+        )? {
             return Err(conflict("上一场使用尚未结束或钥匙尚未归还，请先核实归还。"));
         }
         value["issuedAt"] = json!(now.to_rfc3339());
@@ -276,28 +299,44 @@ fn supply(
     let mut delta = 0;
     match (operation, text(value, "status").as_str()) {
         ("CancelOfficeSupplyRequest", "Approved") => {
-            if reserved < quantity {
+            if value["reservationState"] != "Insufficient" && reserved < quantity {
                 return Err(conflict("库存与预留状态不一致，已停止取消。"));
             }
-            supply["reservedQuantity"] = json!(reserved - quantity);
+            if value["reservationState"] != "Insufficient" {
+                supply["reservedQuantity"] = json!(reserved - quantity);
+            }
             value["status"] = json!("Cancelled");
         }
-        ("CancelOfficeSupplyRequest", "Pending") => value["status"] = json!("Cancelled"),
+        ("CancelOfficeSupplyRequest", "Draft" | "Pending") => value["status"] = json!("Cancelled"),
         ("RejectOfficeSupplyRequest", "Pending") => value["status"] = json!("Rejected"),
         ("ApproveOfficeSupplyRequest", "Pending") => {
-            if supply["isActive"] != true || stock - reserved < quantity {
-                return Err(conflict("物品已停用或可用库存不足。"));
+            if supply["isActive"] != true {
+                return Err(conflict("物品已停用。"));
             }
-            supply["reservedQuantity"] = json!(reserved + quantity);
+            if stock - reserved < quantity {
+                value["reservationState"] = json!("Insufficient");
+            } else {
+                supply["reservedQuantity"] = json!(reserved + quantity);
+                value["reservationState"] = json!("Reserved");
+            }
             value["status"] = json!("Approved");
         }
         ("IssueOfficeSupply", "Approved") => {
-            if supply["isActive"] != true || reserved < quantity {
+            let has_reservation = value["reservationState"] != "Insufficient";
+            if supply["isActive"] != true
+                || (has_reservation && reserved < quantity)
+                || (!has_reservation && stock - reserved < quantity)
+            {
                 return Err(conflict("物品已停用或预留库存不足。"));
             }
             delta = -quantity;
             supply["stockQuantity"] = json!(stock - quantity);
-            supply["reservedQuantity"] = json!(reserved - quantity);
+            supply["reservedQuantity"] = json!(if has_reservation {
+                reserved - quantity
+            } else {
+                reserved
+            });
+            value["reservationState"] = json!("Consumed");
             value["status"] = json!("Issued");
         }
         ("ReturnOfficeSupply", "Issued") => {

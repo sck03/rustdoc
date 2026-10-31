@@ -1,8 +1,7 @@
 use super::{
-    auth,
     error::{Result, conflict, invalid},
     records::{parent, positive, required, text},
-    store::{self, Actor, Store},
+    store::{self, Actor},
 };
 use crate::contracts;
 use crate::engine::store::Connection;
@@ -21,39 +20,7 @@ pub(super) fn instant(body: &Value, key: &str) -> Result<DateTime<FixedOffset>> 
         .map_err(|_| invalid("预约时间须包含日期、时分和时区。"))
 }
 fn person(connection: &Connection, actor: &Actor, value: &Value) -> Result<Value> {
-    let employee = if actor.admin && value["employeeId"].as_i64().is_some_and(|id| id > 0) {
-        parent(
-            connection,
-            actor,
-            "people",
-            positive(value, "employeeId", "在职人员")?,
-        )?
-    } else {
-        let owner = value["ownerUserId"]
-            .as_i64()
-            .filter(|id| *id > 0)
-            .unwrap_or(actor.id);
-        super::personnel_accounts::person_for_account(connection, owner)?
-            .filter(|person| person["companyScope"] == actor.company)
-            .ok_or_else(|| invalid("团队申请需要关联本公司的在职人员档案。"))?
-    };
-    if employee["companyScope"] != actor.company {
-        return Err(super::error::error(403, "不能为其他公司的人员办理登记。"));
-    }
-    if !actor.admin
-        && value["employeeId"]
-            .as_i64()
-            .is_some_and(|id| id > 0 && employee["id"] != id)
-    {
-        return Err(super::error::error(
-            403,
-            "只能为当前账号关联的人员提交申请。",
-        ));
-    }
-    if employee["status"] == "Departed" {
-        return Err(invalid("不能为离职人员办理登记。"));
-    }
-    Ok(employee)
+    super::oa::request_employee(connection, actor, value, false)
 }
 pub fn validate(
     connection: &Connection,
@@ -64,6 +31,7 @@ pub fn validate(
     value: &mut Value,
     business_date: chrono::NaiveDate,
 ) -> Result<()> {
+    let submit = value["submitImmediately"].as_bool().unwrap_or(true);
     match kind {
         "people" => {
             required(value, "profile.fullName", "姓名", 100)?;
@@ -96,14 +64,9 @@ pub fn validate(
                     .cloned()
                 {
                     let unused = can_correct(connection, id)?;
-                    if !actor.admin
-                        && (!unused
-                            || !super::oa::personnel_changes::required_actions(connection, actor)?
-                                .as_array()
-                                .is_some_and(Vec::is_empty))
-                    {
+                    if !unused {
                         return Err(conflict(
-                            "已有任职记录或启用了审批，请通过人员变动办理；登记错误可由管理员纠正。",
+                            "已有账号、业务或正式任职记录，请通过人员变动申请办理。",
                         ));
                     }
                     required(value, "correctionNote", "登记纠错原因", 500)?;
@@ -275,7 +238,12 @@ pub fn validate(
                     "请选择当前时间之后、会议室允许提前预约天数以内的时段。",
                 ));
             }
-            for booking in store::all(connection, "bookings")? {
+            for booking in store::matching(
+                connection,
+                "bookings",
+                &[("meetingRoomId", value["meetingRoomId"].to_string())],
+                &[],
+            )? {
                 if booking["id"] != id
                     && booking["meetingRoomId"] == value["meetingRoomId"]
                     && ["Approved", "Pending", "InUse"].contains(&text(&booking, "status").as_str())
@@ -302,10 +270,17 @@ pub fn validate(
                 "Room",
                 id == 0,
             )?;
-            value["status"] = json!("Pending");
+            value["status"] = json!(if submit { "Pending" } else { "Draft" });
             value["kind"] = json!("room");
-            value["submissionNumber"] = json!(1);
-            super::oa::approval::submit(connection, actor, value)?;
+            value["employeeName"] = value["applicantName"].clone();
+            value["reason"] = value["title"].clone();
+            value["_requesterContext"] = json!(actor.context);
+            value["submissionNumber"] = json!(if submit { 1 } else { 0 });
+            if submit {
+                super::oa::approval::submit(connection, actor, value)?;
+            } else {
+                value.as_object_mut().unwrap().remove("approvalPlan");
+            }
         }
         "supplies" => {
             super::handling::validate_resource(connection, actor, kind, id, previous, value)?;
@@ -377,13 +352,24 @@ pub fn validate(
             )?;
             value["unit"] = supply["unit"].clone();
             value["isReturnable"] = supply["isReturnable"].clone();
-            value["status"] = json!("Pending");
+            value["status"] = json!(if submit { "Pending" } else { "Draft" });
             value["kind"] = json!("supply");
-            value["submissionNumber"] = json!(1);
-            super::oa::approval::submit(connection, actor, value)?;
+            value["employeeName"] = value["applicantName"].clone();
+            value["title"] = json!(format!("{}领用", text(value, "supplyName")));
+            value["reason"] = value["purpose"].clone();
+            value["_requesterContext"] = json!(actor.context);
+            value["submissionNumber"] = json!(if submit { 1 } else { 0 });
+            if submit {
+                super::oa::approval::submit(connection, actor, value)?;
+            } else {
+                value.as_object_mut().unwrap().remove("approvalPlan");
+            }
             value["returnedQuantity"] = json!(0);
         }
         _ => {}
+    }
+    if matches!(kind, "bookings" | "supply-requests") {
+        value.as_object_mut().unwrap().remove("submitImmediately");
     }
     Ok(())
 }
@@ -523,30 +509,6 @@ fn validate_identity(profile: &Value) -> Result<()> {
         return Err(invalid("身份证有效期无效。"));
     }
     Ok(())
-}
-
-pub fn action(
-    store: &Store,
-    actor: &Actor,
-    operation: &str,
-    id: i64,
-    body: Value,
-    business_date: chrono::NaiveDate,
-) -> Result<Value> {
-    if ![
-        "ConfirmPersonnel",
-        "TransferPersonnel",
-        "DepartPersonnel",
-        "RehirePersonnel",
-    ]
-    .contains(&operation)
-    {
-        return super::office_workflows::action(store, actor, operation, id, body, business_date);
-    }
-    auth::authorize(actor, "office.people", "transition")?;
-    store.transaction_as(actor, |tx, actor| {
-        super::oa::personnel_changes::direct(tx, actor, id, operation, &body, business_date)
-    })
 }
 
 #[cfg(test)]

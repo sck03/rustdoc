@@ -3,6 +3,7 @@ import path from 'node:path';
 import { delay } from './chromium-cdp.mjs';
 import { captureScreenshot } from './web-runtime-browser-session.mjs';
 import { verifyDesktopPayment } from './native-payment-workflow.mjs';
+import { linkBusinessPerson } from './approval-fixtures.mjs';
 
 export async function verifyDesktopOfficePermissions({ run, request, token, cdp, output, edition }) {
   const identity = { username: 'desktop-employee', fullName: '普通员工桌面验收', role: 'OfficeEmployee',
@@ -10,6 +11,11 @@ export async function verifyDesktopOfficePermissions({ run, request, token, cdp,
     resetPassword: 'Desktop-Employee-2026' };
   const account = await request('createUserAccount', token, identity);
   assert.equal(account.status, 200);
+  const person = await linkBusinessPerson(async (id, body, parameters, accessToken) => {
+    const result = await request(id, accessToken, body, parameters);
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    return result.body;
+  }, token, account.body.user);
   const signIn = async () => {
     const deadline = Date.now() + 30000;
     while (Date.now() < deadline && !await run("!!document.querySelector('input[autocomplete=username]')")) await delay(100);
@@ -28,7 +34,7 @@ export async function verifyDesktopOfficePermissions({ run, request, token, cdp,
   await signIn();
   assert.equal(await run('location.hash'), '#/office/approvals', 'Employee opens the office workspace');
   const text = await run('document.body.innerText');
-  assert(text.includes('人事管理') && text.includes('行政办公'));
+  assert(text.includes('人员与组织') && text.includes('申请与资源'));
   const navigation = await run("document.querySelector('#workspace-primary-navigation').textContent");
   assert(navigation.includes('工作台') && !navigation.includes('付款报销打印') && !navigation.includes('报表模板管理'));
   assert(!text.includes('单证概览') && !text.includes('账号与权限') && !text.includes('人员档案'));
@@ -37,7 +43,7 @@ export async function verifyDesktopOfficePermissions({ run, request, token, cdp,
     ['document.report-templates', ['view', 'design', 'clone']], ['document.report-resources', ['upload']]]
     .flatMap(([resourceKey, actions]) => actions.map(action => ({ resourceKey, action, dataScope: 'own' })));
   const updated = await request('updateUserAccount', token,
-    { ...identity, resetPassword: '', expectedVersion: account.body.user.versionNumber, permissionGrants }, { id: account.body.user.id });
+    { ...identity, resetPassword: '', expectedVersion: person.account.versionNumber, permissionGrants }, { id: account.body.user.id });
   assert.equal(updated.status, 200);
   // A permission change revokes the old session; reload and authenticate afresh.
   await run('location.reload(); true');

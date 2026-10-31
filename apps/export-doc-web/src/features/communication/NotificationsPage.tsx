@@ -4,9 +4,8 @@ import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { OfficeQueryState } from "../office/OfficeUi.tsx";
-import { useOfficeOperation } from "../office/useOfficeData.ts";
 import { communicationAccess, notificationActions, notificationLink } from "./communicationModel.ts";
-import { useNotifications, useNotificationCount } from "./useCommunication.ts";
+import { useCommunicationOperation, useNotifications, useNotificationCount } from "./useCommunication.ts";
 import { CommunicationPager } from "./CommunicationPager.tsx";
 import "../../styles/routes/office.css";
 import "../../styles/routes/oa.css";
@@ -14,7 +13,7 @@ import "../../styles/routes/oa.css";
 export function NotificationsPage({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
   const m = useNotifications(client, user);
   const count = useNotificationCount(client, user);
-  const operation = useOfficeOperation();
+  const operation = useCommunicationOperation();
   if (!communicationAccess(user, "notifications")) return <PageState tone="permission" title="没有站内通知权限" />;
   return <section className="work-surface office-workspace oa-workspace" aria-label="站内通知"><header className="oa-heading"><h2>站内通知{count.data && ` · ${count.data.unreadCount} 条未读`}</h2></header>
     <p className="office-muted">查看申请与审批动态，进入关联申请继续办理。标记已读仅更新通知状态。</p>

@@ -234,7 +234,8 @@ fn imports_use_single_use_server_previews_and_export_contacts_in_original_column
     assert_eq!(contacts["items"][0]["name"], "李经理");
     assert_eq!(contacts["items"][0]["isPrimary"], true);
     let template = fixture.create(CREATE_PERMISSION_TEMPLATE,json!({"code":"IMPORT-ONLY","name":"导入业务","isActive":true,"grants":[{"resourceKey":"sales.customers","action":"import","dataScope":"company"}]}));
-    fixture.create(CREATE_USER_ACCOUNT,json!({"username":"import-user","fullName":"导入业务","role":"User","permissionTemplateId":template["id"],"companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Import-Test-2026"}));
+    let template = fixture.client().publish_scheme(template);
+    fixture.create(CREATE_USER_ACCOUNT,json!({"username":"import-user","fullName":"导入业务","role":"User","permissionTemplateId":template["id"],"permissionSchemeVersion":template["publishedVersion"],"companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Import-Test-2026"}));
     let other = client
         .clone()
         .login("import-user".into(), "Import-Test-2026".into())

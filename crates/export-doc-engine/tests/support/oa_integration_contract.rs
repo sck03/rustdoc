@@ -95,13 +95,13 @@ pub fn exercise(service: &NativeService, root: &str) {
     let admin_login = login(0);
     let admin = admin_login["accessToken"].as_str().unwrap();
     let mut people = vec![Value::Null];
-    for i in 1..4 {
+    for i in 1..5 {
         let person = call(service, admin, CREATE_PERSONNEL, 0, Some(json!({"requestKey":nonce().unwrap(),"employeeNumber":format!("REG-{i}-{suffix}"),"departmentId":users[i]["departmentId"],"jobTitle":"主职","employmentType":"FullTime","hireDate":"2026-09-01","profile":{"fullName":users[i]["fullName"]}}))).unwrap();
         people.push(call(service, admin, LINK_PERSONNEL_ACCOUNT, person["employee"]["id"].as_i64().unwrap(), Some(json!({"expectedVersion":person["versionNumber"],"userId":users[i]["id"],"expectedAccountVersion":users[i]["versionNumber"]}))).unwrap());
     }
     let worker = people[1]["employee"]["id"].as_i64().unwrap();
     let reporting = json!({"managerEmployeeId":people[2]["employee"]["id"],"functionalManagerEmployeeIds":[],"additionalAssignments":[{"departmentId":b,"jobTitle":"兼职审批联络员","managerEmployeeId":people[2]["employee"]["id"],"functionalManagerEmployeeIds":[]}]});
-    people[1] = call(service, admin, TRANSFER_PERSONNEL, worker, Some(json!({"expectedVersion":people[1]["versionNumber"],"effectiveDate":"2026-10-01","departmentId":a,"jobTitle":"主职","organization":reporting,"note":"建立兼职"}))).unwrap();
+    people[1] = workflow::personnel_change(service, admin, "Transfer", worker, Some(json!({"expectedVersion":people[1]["versionNumber"],"effectiveDate":"2026-10-01","departmentId":a,"jobTitle":"主职","organization":reporting,"note":"建立兼职"}))).unwrap();
     for d in &mut departments {
         *d = organization(
             service,
@@ -211,7 +211,7 @@ pub fn exercise(service: &NativeService, root: &str) {
             json!([workflow::node("line", &[], "LineManager", json!([]))]),
         ),
     );
-    let removal = call(service, admin, TRANSFER_PERSONNEL, worker, Some(json!({"expectedVersion":people[1]["versionNumber"],"effectiveDate":"2026-10-02","departmentId":a,"jobTitle":"主职","organization":{"managerEmployeeId":null,"functionalManagerEmployeeIds":[],"additionalAssignments":[]},"note":"不能删除已发布职责"}))).unwrap_err();
+    let removal = workflow::personnel_change(service, admin, "Transfer", worker, Some(json!({"expectedVersion":people[1]["versionNumber"],"effectiveDate":"2026-10-02","departmentId":a,"jobTitle":"主职","organization":{"managerEmployeeId":null,"functionalManagerEmployeeIds":[],"additionalAssignments":[]},"note":"不能删除已发布职责"}))).unwrap_err();
     assert_eq!(removal.status, Some(409));
     assert_eq!(
         get(service, admin, GET_PERSONNEL, worker)["versionNumber"],
@@ -265,6 +265,36 @@ pub fn exercise(service: &NativeService, root: &str) {
             &[("approvalsOnly", "true".into())]
         )["totalCount"],
         1
+    );
+    act(service, applicant, "general", "withdraw", &next);
+    // A prior actual delegate is distinct from the original principal. Handover
+    // must reject this candidate before an unusable independent task is saved.
+    let mut settings = get(service, admin, GET_OA_APPROVAL_SETTINGS, 0);
+    settings["expectedVersion"] = settings["versionNumber"].clone();
+    settings["delegations"] = json!([{"key":"first-actual-delegate","principalUserId":users[2]["id"],"delegateUserId":users[4]["id"],"startsAt":(chrono::Utc::now()-chrono::Duration::hours(1)).to_rfc3339(),"endsAt":(chrono::Utc::now()+chrono::Duration::days(1)).to_rfc3339(),"isActive":true}]);
+    call(service, admin, SAVE_OA_APPROVAL_SETTINGS, 0, Some(settings)).unwrap();
+    let delegate_login = login(4);
+    let delegate = delegate_login["accessToken"].as_str().unwrap();
+    let pending = act(service, applicant, "general", "submit", &create(&a));
+    let next = act(service, delegate, "general", "approve", &pending);
+    assert_eq!(
+        next["approvalPlan"]["steps"][0]["approverUserId"],
+        users[2]["id"]
+    );
+    assert_eq!(
+        next["approvalPlan"]["steps"][0]["actedByUserId"],
+        users[4]["id"]
+    );
+    let failed = call(service, admin, REASSIGN_GENERAL_REQUEST_APPROVAL, next["id"].as_i64().unwrap(), Some(json!({"expectedVersion":next["versionNumber"],"taskKey":next["approvalPlan"]["steps"][1]["taskKey"],"fromUserId":users[3]["id"],"toUserId":users[4]["id"],"note":"禁止重复独立签署"}))).unwrap_err();
+    assert_eq!(failed.status, Some(400));
+    assert_eq!(
+        get(
+            service,
+            admin,
+            operation("general", "get"),
+            next["id"].as_i64().unwrap()
+        )["versionNumber"],
+        next["versionNumber"]
     );
     act(service, applicant, "general", "withdraw", &next);
     // An unlinked named reviewer cannot leave the company while the definition is enabled.

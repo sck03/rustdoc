@@ -27,10 +27,11 @@ pub fn exercise(service: &NativeService, root: &str) {
         {"resourceKey":"office.general","action":"complete","dataScope":"own"}
     ]);
     let scheme = call(service, root, CREATE_PERMISSION_TEMPLATE, 0, Some(json!({"code":format!("HP-{suffix}"),"name":"办理权限","isActive":true,"grants":grants}))).unwrap();
+    let scheme = crate::oa_contract::workflow::publish_scheme(service, root, scheme);
     let create_user = |name: &str, role: &str, direct: bool, template: Value| {
         call(service, root, CREATE_USER_ACCOUNT, 0, Some(json!({"username":format!("hp-{name}-{suffix}"),"fullName":name,"role":role,
             "companyScope":company,"departmentId":department,"isActive":true,"resetPassword":"Handling-Permissions-2026",
-            "permissionTemplateId":template,"permissionGrants":if direct {grants.clone()} else {Value::Null}}))).unwrap()["user"].clone()
+            "permissionTemplateId":template,"permissionSchemeVersion":if direct||template.is_null(){Value::Null}else{scheme["publishedVersion"].clone()},"permissionGrants":if direct {grants.clone()} else {Value::Null}}))).unwrap()["user"].clone()
     };
     let admin = create_user("admin", "Admin", false, Value::Null);
     let inherited = create_user("inherited", "OfficeEmployee", false, scheme["id"].clone());
@@ -108,28 +109,39 @@ pub fn exercise(service: &NativeService, root: &str) {
         );
         call(service, &inherited_token, GET_CURRENT_USER, 0, None).unwrap();
     }
+    let mut current_scheme = scheme.clone();
     for patch in [
         json!({"isActive":false}),
         json!({"grants":[]}),
         json!({"disabledModules":["office.general"]}),
     ] {
         let mut body = contracts::overlay(scheme.clone(), &patch);
-        body["expectedVersion"] = scheme["versionNumber"].clone();
+        body["expectedVersion"] = current_scheme["versionNumber"].clone();
+        let draft = call(
+            service,
+            root,
+            UPDATE_PERMISSION_TEMPLATE,
+            scheme["id"].as_i64().unwrap(),
+            Some(body),
+        )
+        .unwrap();
+        call(service, &inherited_token, GET_CURRENT_USER, 0, None).unwrap();
+        current_scheme = crate::oa_contract::workflow::publish_scheme(service, root, draft);
         assert_eq!(
-            call(
+            crate::oa_contract::workflow::apply_scheme(
                 service,
                 root,
-                UPDATE_PERMISSION_TEMPLATE,
-                scheme["id"].as_i64().unwrap(),
-                Some(body)
+                &current_scheme,
+                "Account",
+                &inherited
             )
             .unwrap_err()
             .status,
             Some(409)
         );
         assert_eq!(
-            read_scheme(&scheme["id"])["versionNumber"],
-            scheme["versionNumber"]
+            read_user(&inherited["id"])["permissionSchemeVersion"],
+            scheme["publishedVersion"]
         );
     }
     settings["handlingServices"][0]["handlerUserIds"] = json!([independent["id"]]);
@@ -147,7 +159,7 @@ pub fn exercise(service: &NativeService, root: &str) {
     .unwrap();
     let mut reduced = scheme.clone();
     reduced["grants"] = json!([]);
-    reduced["expectedVersion"] = scheme["versionNumber"].clone();
+    reduced["expectedVersion"] = current_scheme["versionNumber"].clone();
     call(
         service,
         root,
@@ -158,7 +170,7 @@ pub fn exercise(service: &NativeService, root: &str) {
     .unwrap();
     call(service, &independent_token, GET_CURRENT_USER, 0, None).unwrap();
 
-    // A role-default source is also checked; direct accounts do not inherit it.
+    // Editing a preset draft never enlarges either an existing or a new binding.
     let original = call(service, root, LIST_PERMISSION_TEMPLATES, 0, None).unwrap()["templates"]
         .as_array()
         .unwrap()
@@ -188,18 +200,54 @@ pub fn exercise(service: &NativeService, root: &str) {
     )
     .unwrap();
     let default_user = create_user("default", "OfficeEmployee", false, Value::Null);
+    assert_eq!(default_user["permissionSchemeVersion"], 1);
+    let default_login = login(&default_user);
+    let capabilities = call(service, &default_login, GET_CURRENT_USER, 0, None).unwrap();
+    assert!(
+        !capabilities["capabilities"]["permissions"]
+            .as_array()
+            .unwrap_or_else(|| capabilities["user"]["capabilities"]["permissions"]
+                .as_array()
+                .unwrap())
+            .iter()
+            .any(|g| g["resourceKey"] == "office.general" && g["action"] == "complete")
+    );
+    let enabled = crate::oa_contract::workflow::publish_scheme(service, root, enabled);
+    let mut binding = default_user.clone();
+    binding["permissionTemplateId"] = enabled["id"].clone();
+    binding["permissionSchemeVersion"] = enabled["publishedVersion"].clone();
+    binding["permissionGrants"] = Value::Null;
+    binding["expectedVersion"] = default_user["versionNumber"].clone();
+    let default_user = call(
+        service,
+        root,
+        UPDATE_USER_ACCOUNT,
+        default_user["id"].as_i64().unwrap(),
+        Some(binding),
+    )
+    .unwrap()["user"]
+        .clone();
     settings["handlingServices"][0]["handlerUserIds"] = json!([default_user["id"]]);
     settings = save_settings(settings);
     let mut invalid = enabled.clone();
     invalid["disabledModules"] = json!(["office.general"]);
     invalid["expectedVersion"] = enabled["versionNumber"].clone();
+    let invalid = call(
+        service,
+        root,
+        UPDATE_PERMISSION_TEMPLATE,
+        enabled["id"].as_i64().unwrap(),
+        Some(invalid),
+    )
+    .unwrap();
+    let invalid = crate::oa_contract::workflow::publish_scheme(service, root, invalid);
     assert_eq!(
-        call(
+        crate::oa_contract::workflow::apply_scheme(
             service,
             root,
-            UPDATE_PERMISSION_TEMPLATE,
-            enabled["id"].as_i64().unwrap(),
-            Some(invalid)
+            &invalid,
+            "Account",
+            &default_user
         )
         .unwrap_err()
         .status,
@@ -208,7 +256,7 @@ pub fn exercise(service: &NativeService, root: &str) {
     settings["handlingServices"][0]["handlerUserIds"] = json!([independent["id"]]);
     save_settings(settings);
     let mut restored = original;
-    restored["expectedVersion"] = enabled["versionNumber"].clone();
+    restored["expectedVersion"] = read_scheme(&enabled["id"])["versionNumber"].clone();
     call(
         service,
         root,

@@ -88,6 +88,7 @@ mod tests {
             let paths = RuntimePaths::server(&root, &root.join("Data")).unwrap();
             let store = Store::open(&paths).unwrap();
             let actor = Actor {
+                scope_rules: vec![],
                 context: String::new(),
                 edition: Default::default(),
                 id: 1,

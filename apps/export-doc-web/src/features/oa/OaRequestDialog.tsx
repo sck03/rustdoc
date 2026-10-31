@@ -19,13 +19,24 @@ import { PersonnelChangeFields } from "./PersonnelChangeFields.tsx";
 import { personnelChangeLabels } from "./oaModel.ts";
 import { OaDepartmentPicker } from "./OaDepartmentPicker.tsx";
 
+
 export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind; record?: OaRequest; onClose: () => void; onSaved: (record: OaRequest) => void }) {
   const operation = useOaOperation(kind);
   const [purpose,setPurpose] = useState("Voucher");
   const [params] = useSearchParams();
   const attachments = useAttachmentDraft(record);
-  const [draft, storeDraft] = useState<OaRequestSave>(() => record ? { ...record, expectedVersion: record.versionNumber,
-    ...(record.overtime ? { overtime: { ...record.overtime, startsAt: toBusinessDateTimeLocalInput(record.overtime.startsAt, user.businessTimeZone), endsAt: toBusinessDateTimeLocalInput(record.overtime.endsAt, user.businessTimeZone) } } : {}) } : (() => {
+  const [draft, storeDraft] = useState<OaRequestSave>(() => {
+    if (record) {
+      // A complete projection carries the original request facts. Partial materials
+      // never become an editable draft or receive replacement values.
+      if (record.materialAccess?.isPartial) throw new Error("当前仅能查看部分材料，不能编辑完整申请。");
+      const draft = structuredClone(record) as OaRequestSave;
+      draft.expectedVersion = record.versionNumber;
+      if (draft.overtime) draft.overtime = { ...draft.overtime,
+        startsAt: toBusinessDateTimeLocalInput(draft.overtime.startsAt, user.businessTimeZone),
+        endsAt: toBusinessDateTimeLocalInput(draft.overtime.endsAt, user.businessTimeZone) };
+      return draft;
+    }
       const draft = oaDraft(kind, user);
       const action = params.get("change");
       if (kind === "personnel" && action && action !== "Hire" && Object.hasOwn(personnelChangeLabels, action)) {
@@ -33,14 +44,14 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
         draft.personnelChange = { action: action as keyof typeof personnelChangeLabels, effectiveDate: user.businessDate, onProbation: true };
       }
       return draft;
-    })());
+    });
   const [employee, setEmployee] = useState<PersonnelDirectoryRecord | null>(null);
   const [dirty, setDirty] = useState(false);
   const setDraft: Dispatch<SetStateAction<OaRequestSave>> = (value) => { setDirty(true); storeDraft(value); };
   useUnsavedChangesGuard({ isDirty: dirty, message: "申请有未保存的修改。" });
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (kind !== "personnel" && !record && !canIdentifyOfficeApplicant(user)) return;
+    if (record?.materialAccess?.isPartial || kind !== "personnel" && !record && !canIdentifyOfficeApplicant(user)) return;
     void operation.run((signal) => {
       const body: OaRequestSave = { ...draft, employeeId: kind === "personnel" ? draft.employeeId : record?.employeeId ?? employee?.id };
       if (body.personnelChange?.registration) body.personnelChange = { ...body.personnelChange, registration: { ...body.personnelChange.registration, requestKey: body.requestKey } };

@@ -1,6 +1,14 @@
 mod approval;
+mod calendars;
 pub(super) mod documents;
 mod hub;
+pub(super) mod materials;
+mod operations;
+#[cfg(test)]
+mod resource_tests;
+mod resources;
+#[cfg(test)]
+pub(super) use resource_tests::verify_and_strip as compare_resource_extensions;
 mod schemas;
 use serde_json::{Value, json};
 
@@ -193,7 +201,10 @@ pub(super) fn extend(doc: &mut Value) {
     }
     approval::extend(doc);
     documents::extend(doc);
+    resources::extend(doc);
     hub::extend(doc);
+    operations::extend(doc);
+    calendars::extend(doc);
 }
 
 fn permissions(doc: &mut Value, kind: &str, resource: &str, label: &str, group: &str, order: i32) {

@@ -15,7 +15,6 @@ pub(super) fn registration(
     request: &Value,
     value: &mut Value,
 ) -> Result<Option<Value>> {
-    super::oa::personnel_changes::authorize_direct(transaction, actor, "Hire")?;
     records::required(request, "requestKey", "请求编号", 100)?;
     value["companyScope"] = json!(actor.company);
     value["ownerUserId"] = json!(actor.id);
@@ -119,7 +118,7 @@ pub(super) fn persist(
             || user["departmentId"] != value["departmentId"]
             || (departed && user["isActive"] == true)
             || user["organizationDepartments"] != organization_departments
-            || matches!(event_action, "Transfer" | "Rehire")
+            || matches!(event_action, "Transfer" | "Depart" | "Rehire")
         {
             if primary_transfer {
                 user["companyScope"] = value["companyScope"].clone();
@@ -128,7 +127,8 @@ pub(super) fn persist(
             user["departmentId"] = value["departmentId"].clone();
             user["organizationDepartments"] = organization_departments;
             if departed {
-                user["isActive"] = json!(false);
+                super::units::clear_grants(&mut user);
+                super::units::revoke_related(tx, actor, user_id, "personnel-departure")?;
             }
             let username = records::text(&user, "username");
             user = store::save(
@@ -339,8 +339,18 @@ pub fn handle(
             }
             if operation == LIST_PERSONNEL_ACCOUNT_OPTIONS {
                 store.read(|tx| {
-                    let people = super::personnel_accounts::links(tx)?;
-                    let accounts = store::all(tx, "users")?
+                    let users = store::matching(
+                        tx,
+                        "users",
+                        &[("companyScope", records::text(&current, "companyScope"))],
+                        &[],
+                    )?;
+                    let ids = users
+                        .iter()
+                        .filter_map(|u| u["id"].as_i64())
+                        .collect::<Vec<_>>();
+                    let people = super::personnel_accounts::links(tx, &ids)?;
+                    let accounts = users
                         .into_iter()
                         .filter(|user| {
                             user["companyScope"] == current["companyScope"]

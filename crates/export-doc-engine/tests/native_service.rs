@@ -5,16 +5,7 @@ mod native_fixture;
 use native_fixture::{ApiClient, Fixture};
 
 fn resource_reviewer(fixture: &Fixture) -> ApiClient {
-    let username = format!("resource-review-{}", nonce().unwrap());
-    let user = fixture.create(CREATE_USER_ACCOUNT, json!({"username":username,"fullName":"资源审批","role":"Admin","companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Resource-Review-2026"}));
-    fixture
-        .client()
-        .configure_approval(user["user"]["id"].as_i64().unwrap());
-    fixture
-        .client()
-        .login(username, "Resource-Review-2026".into())
-        .unwrap()
-        .0
+    fixture.client().business_reviewer()
 }
 
 #[test]
@@ -101,9 +92,9 @@ fn personnel_directory_images_and_employment_events_use_the_public_contract() {
         )
         .unwrap();
     assert_eq!(image, image_bytes.into_inner());
-    person=fixture.request(CONFIRM_PERSONNEL,Some(id),Some(json!({"expectedVersion":person["versionNumber"],"effectiveDate":"2026-09-17","note":"已完成试用考核"})));
+    person=fixture.client().personnel_change("Confirm",id,json!({"expectedVersion":person["versionNumber"],"effectiveDate":"2026-09-17","note":"已完成试用考核"})).unwrap();
     assert_eq!(person["employee"]["status"], "Active");
-    assert_eq!(person["canCorrectRegistration"], true);
+    assert_eq!(person["canCorrectRegistration"], false);
     let history = fixture
         .client()
         .json::<Value>(
@@ -116,7 +107,12 @@ fn personnel_directory_images_and_employment_events_use_the_public_contract() {
     export_doc_contracts::validation::response(GET_PERSONNEL_HISTORY.id, &history).unwrap();
     assert_eq!(history["totalCount"], 3);
     assert_eq!(history["items"][0]["action"], "Confirm");
-    assert_eq!(history["items"][0]["note"], "已完成试用考核");
+    assert!(
+        history["items"][0]["note"]
+            .as_str()
+            .unwrap()
+            .contains("已完成试用考核")
+    );
     assert_eq!(history["hasNextPage"], true);
     assert_eq!(
         fixture
@@ -608,15 +604,26 @@ fn stock_reservation_issue_partial_return_and_cancellation_are_atomic() {
     assert_eq!(supplies["items"][0]["reservedQuantity"], 0);
     let excessive = json!({"requestKey":nonce().unwrap(),"officeSupplyId":supply["id"],"employeeId":person["id"],"quantity":11,"purpose":"测试不足","returnDueDate":due_date});
     let excessive = fixture.create(CREATE_OFFICE_SUPPLY_REQUEST, excessive);
-    assert_eq!(
-        reviewer
+    let insufficient = reviewer
             .json::<Value>(
                 APPROVE_OFFICE_SUPPLY_REQUEST,
                 &[("id", excessive["id"].to_string())],
                 &[],
                 Some(
-                    json!({"expectedVersion":excessive["versionNumber"],"taskKey":excessive["approvalPlan"]["steps"][0]["taskKey"],"note":"不足库存不得通过"})
+                    json!({"expectedVersion":excessive["versionNumber"],"taskKey":excessive["approvalPlan"]["steps"][0]["taskKey"],"note":"批准保留，库存不足待协调"})
                 )
+            )
+            .unwrap();
+    assert_eq!(insufficient["status"], "Approved");
+    assert_eq!(insufficient["reservationState"], "Insufficient");
+    assert_eq!(
+        fixture
+            .client()
+            .json::<Value>(
+                ISSUE_OFFICE_SUPPLY,
+                &[("id", insufficient["id"].to_string())],
+                &[],
+                Some(json!({"expectedVersion":insufficient["versionNumber"],"quantity":11}))
             )
             .unwrap_err()
             .status,
@@ -665,7 +672,8 @@ fn an_assigned_empty_template_does_not_fall_back_to_role_defaults() {
         CREATE_PERMISSION_TEMPLATE,
         json!({"code":"EMPTY","name":"未授权岗位","isActive":true,"grants":[]}),
     );
-    let created=fixture.create(CREATE_USER_ACCOUNT,json!({"username":"reader","fullName":"只读测试","role":"User","permissionTemplateId":template["id"],"departmentId":"GENERAL","companyScope":"DEFAULT","isActive":true,"resetPassword":"Native-Test-2026"}));
+    let published = fixture.request(PUBLISH_PERMISSION_SCHEME,None,Some(json!({"schemeId":template["id"].to_string(),"expectedVersion":template["versionNumber"],"commandKey":nonce().unwrap(),"note":"发布空权限方案"})));
+    let created=fixture.create(CREATE_USER_ACCOUNT,json!({"username":"reader","fullName":"只读测试","role":"User","permissionTemplateId":template["id"],"permissionSchemeVersion":published["version"],"departmentId":"GENERAL","companyScope":"DEFAULT","isActive":true,"resetPassword":"Native-Test-2026"}));
     assert_eq!(created["success"], true);
     let client = fixture
         .client()

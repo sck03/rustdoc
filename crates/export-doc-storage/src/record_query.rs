@@ -181,23 +181,20 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
         }
     }
     if let Some(approvers) = q.approvers {
-        let mut choices = vec!["FALSE".to_owned()];
-        for approver in approvers {
-            let user = bind(approver.user_id.to_string(), "BIGINT");
-            let context = bind(approver.context.clone(), "TEXT");
-            let mut choice = format!(
-                "EXISTS (SELECT 1 FROM workflow_tasks task WHERE task.request_id=r.id AND task.active=1 AND task.status='Waiting' AND task.assignee_id={user} AND task.context_id={context})"
-            );
-            if let Some(actor) = q.approval_actor {
-                let actor = bind(actor.to_string(), "BIGINT");
-                // Match the actual decision rule for both direct and delegated signatures.
-                choice = format!(
-                    "EXISTS (SELECT 1 FROM workflow_tasks task WHERE task.request_id=r.id AND task.active=1 AND task.status='Waiting' AND task.assignee_id={user} AND task.context_id={context} AND NOT EXISTS (SELECT 1 FROM workflow_tasks signed WHERE signed.request_id=task.request_id AND signed.submission=task.submission AND signed.node_key<>task.node_key AND signed.acted_by_id={actor} AND (task.independent=1 OR signed.independent=1)))"
-                );
-            }
-            choices.push(choice);
-        }
-        filter += &format!(" AND ({})", choices.join(" OR "));
+        let principals = approvers
+            .iter()
+            .map(|p| {
+                (
+                    bind(p.user_id.to_string(), "BIGINT"),
+                    bind(p.context.clone(), "TEXT"),
+                )
+            })
+            .collect::<Vec<_>>();
+        let actor = q.approval_actor.map(|a| bind(a.to_string(), "BIGINT"));
+        filter += &format!(
+            " AND ({})",
+            approval_condition("r", actor.as_deref(), &principals)
+        );
     }
     if let Some(participant) = participant.filter(|_| !q.include_participants) {
         filter += &format!(" AND ({} OR ({assigned}))", participant);
@@ -209,10 +206,34 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
             property("applicantAccountId", true)
         );
     }
+    let restricted = crate::DataScope {
+        all: true,
+        restrictions: q.restrictions.clone(),
+        ..Default::default()
+    }
+    .filter(&mut values, postgres);
+    filter += &format!(" AND ({restricted})");
     QuerySql {
         filter,
         order: "r.id DESC".into(),
         values,
+    }
+}
+/// The inbox uses the same submission, context and independent-signature rule
+/// for ordinary OA and resource approvals, before counting or paging.
+pub(crate) fn approval_condition(
+    record: &str,
+    actor: Option<&str>,
+    principals: &[(String, String)],
+) -> String {
+    let choices = principals.iter().map(|(user, context)| {
+        let independence = actor.map(|actor| format!(" AND NOT EXISTS (SELECT 1 FROM workflow_current_tasks signed WHERE signed.request_id=task.request_id AND signed.submission=task.submission AND signed.acted_by_id={actor} AND (signed.node_key=task.node_key OR task.independent=1 OR signed.independent=1))")).unwrap_or_default();
+        format!("EXISTS (SELECT 1 FROM workflow_current_tasks task WHERE task.request_id={record}.id AND task.submission=CAST({record}.body->>'submissionNumber' AS BIGINT) AND task.active=1 AND task.status='Waiting' AND task.assignee_id={user} AND task.context_id={context}{independence})")
+    }).collect::<Vec<_>>();
+    if choices.is_empty() {
+        "FALSE".into()
+    } else {
+        choices.join(" OR ")
     }
 }
 pub(crate) fn participant_condition(
@@ -245,7 +266,7 @@ pub(crate) fn participant_condition(
         format!("json_each({record}.body,'$.approvalPlan.notifyUserIds') AS cc")
     };
     format!(
-        "({record}.owner_id={user} OR EXISTS (SELECT 1 FROM workflow_tasks viewer WHERE viewer.request_id={record}.id AND viewer.submission=CAST({record}.body->>'submissionNumber' AS BIGINT) AND ({})) OR EXISTS (SELECT 1 FROM {cc} WHERE CAST(cc.value AS BIGINT)={user}))",
+        "({record}.owner_id={user} OR EXISTS (SELECT 1 FROM workflow_current_tasks viewer WHERE viewer.request_id={record}.id AND viewer.submission=CAST({record}.body->>'submissionNumber' AS BIGINT) AND ({})) OR EXISTS (SELECT 1 FROM {cc} WHERE CAST(cc.value AS BIGINT)={user}))",
         choices.join(" OR ")
     )
 }

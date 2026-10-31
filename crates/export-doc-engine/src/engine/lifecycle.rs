@@ -4,6 +4,7 @@ use super::*;
 impl NativeService {
     pub fn request_shutdown(&self) -> Result<()> {
         let mut failure = None;
+        remember(&mut failure, self.workflow_scheduler.request_stop());
         #[cfg(feature = "exchange-rates")]
         remember(&mut failure, self.exchange_scheduler.request_stop());
         remember(&mut failure, self.backup_scheduler.request_stop());
@@ -12,6 +13,7 @@ impl NativeService {
     }
     pub fn close(&self) -> Result<()> {
         let mut failure = self.request_shutdown().err();
+        remember(&mut failure, self.workflow_scheduler.stop());
         #[cfg(feature = "exchange-rates")]
         remember(&mut failure, self.exchange_scheduler.stop());
         remember(&mut failure, self.backup_scheduler.stop());
@@ -21,6 +23,7 @@ impl NativeService {
     }
     fn activate(service: Self) -> Result<Arc<Self>> {
         let service = Arc::new(service);
+        tasks::scheduled::Scheduler::bind(&service)?;
         team_backup::scheduled::Scheduler::bind(&service)?;
         #[cfg(feature = "exchange-rates")]
         exchange::Scheduler::bind(&service)?;
@@ -28,7 +31,7 @@ impl NativeService {
     }
     pub fn runtime_metrics(&self) -> Result<Value> {
         Ok(
-            json!({"checkedAt":store::timestamp(),"storage":self.store.metrics(),"jobs":self.jobs.metrics()?,"http":null}),
+            json!({"checkedAt":store::timestamp(),"storage":self.store.metrics(),"jobs":self.jobs.metrics()?,"workflowSchedule":self.workflow_scheduler.metrics(),"http":null}),
         )
     }
     pub fn open(paths: RuntimePaths) -> Result<Arc<Self>> {
@@ -64,6 +67,7 @@ impl NativeService {
             store,
             sessions: auth::Sessions::default(),
             jobs,
+            workflow_scheduler: Default::default(),
             backup_scheduler: Default::default(),
             bootstrap_token: String::new(),
             clock: crate::clock::BusinessClock::default(),
@@ -139,6 +143,7 @@ impl NativeService {
             store,
             sessions: auth::Sessions::default(),
             jobs,
+            workflow_scheduler: Default::default(),
             backup_scheduler: Default::default(),
             bootstrap_token,
             clock,

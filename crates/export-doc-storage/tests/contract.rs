@@ -7,6 +7,8 @@ mod capacity_query;
 mod communication_query;
 #[path = "support/crm_query.rs"]
 mod crm_query;
+#[path = "support/foundation_query.rs"]
+mod foundation_query;
 #[path = "support/import_preview_query.rs"]
 mod import_preview_query;
 #[path = "support/integrity_query.rs"]
@@ -35,10 +37,14 @@ mod related_query;
 mod resource_query;
 #[path = "support/scaling_query.rs"]
 mod scaling_query;
+#[path = "support/supplier_overview_query.rs"]
+mod supplier_overview_query;
 #[path = "support/template_history_query.rs"]
 mod template_history_query;
 #[path = "support/template_query.rs"]
 mod template_query;
+#[path = "support/workflow_fixture.rs"]
+mod workflow_fixture;
 use serde_json::json;
 use std::{
     fs,
@@ -88,13 +94,37 @@ fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
     }
     fs::remove_dir_all(root).unwrap();
 }
+#[test]
+fn sqlite_model_and_structure_validation_preserve_rejected_files() {
+    let root = scratch();
+    for (name, statement) in [
+        ("model", "UPDATE schema_model SET model='unknown-baseline'"),
+        ("structure", "DROP INDEX positions_name"),
+    ] {
+        let file = root.join(format!("{name}.db"));
+        drop(Connection::sqlite(&file).unwrap());
+        let raw = rusqlite::Connection::open(&file).unwrap();
+        raw.execute(statement, []).unwrap();
+        drop(raw);
+        let before = fs::read(&file).unwrap();
+        assert!(Connection::sqlite(&file).is_err());
+        assert_eq!(
+            fs::read(&file).unwrap(),
+            before,
+            "rejection must not rewrite a database"
+        );
+    }
+    fs::remove_dir_all(root).unwrap();
+}
 
 fn roundtrip(connection: &Connection) {
+    foundation_query::exercise(connection);
     maintenance_query::exercise(connection);
     organization_query::exercise(connection);
     template_history_query::exercise(connection);
     integrity_query::exercise(connection);
     related_query::exercise(connection);
+    supplier_overview_query::exercise(connection);
     import_preview_query::exercise(connection);
     capacity_query::exercise(connection);
     office_query::exercise(connection);
@@ -140,7 +170,7 @@ fn roundtrip(connection: &Connection) {
             .len(),
         1
     );
-    let body = json!({"versionNumber":1,"ownerUserId":7,"companyScope":"公司é","departmentId":"销售部","status":"Pending","amount":123456.789,"items":["零件",null]});
+    let body = json!({"versionNumber":1,"ownerUserId":7,"companyScope":"公司é","departmentId":"销售部","status":"Pending","submissionNumber":1,"amount":123456.789,"items":["零件",null]});
     connection.begin().unwrap();
     let id = connection
         .insert(&RecordWrite {
@@ -150,56 +180,6 @@ fn roundtrip(connection: &Connection) {
         })
         .unwrap();
     connection.set_body(id, &body).unwrap();
-    connection
-        .replace_workflow_tasks(
-            id,
-            1,
-            &[export_doc_storage::WorkflowTask {
-                key: "review".into(),
-                node: "review".into(),
-                assignee: id,
-                context: String::new(),
-                acted_by: None,
-                acted_by_context: String::new(),
-                status: "Waiting".into(),
-                active: true,
-                independent: false,
-                due_at: "2026-10-30T00:00:00+00:00".into(),
-                started_at: "2026-10-29T00:00:00Z".into(),
-                acted_at: String::new(),
-                elapsed_seconds: None,
-            }],
-        )
-        .unwrap();
-    // A previous submission's task must not expose a revised submission.
-    let visibility = export_doc_storage::RecordQuery {
-        kind: "contract",
-        company: "公司é",
-        visible_user: Some(id),
-        limit: 1,
-        ..Default::default()
-    };
-    for (submission, expected) in [(1, 1), (2, 0)] {
-        let mut revision = body.clone();
-        revision["submissionNumber"] = json!(submission);
-        connection.set_body(id, &revision).unwrap();
-        assert_eq!(connection.query_records(&visibility).unwrap().0, expected);
-    }
-    connection.set_body(id, &body).unwrap();
-    {
-        let approvers = [export_doc_storage::RecordApprover {
-            user_id: id,
-            context: String::new(),
-        }];
-        let query = export_doc_storage::RecordQuery {
-            kind: "contract",
-            company: "公司é",
-            approvers: Some(&approvers),
-            limit: 1,
-            ..Default::default()
-        };
-        assert_eq!(connection.query_records(&query).unwrap().0, 1);
-    }
     connection
         .set_credential(id, &[1; 32], &[2; 32], 600000)
         .unwrap();
@@ -269,17 +249,11 @@ fn roundtrip(connection: &Connection) {
     connection.rollback().unwrap();
     assert_eq!(connection.get("contract", id).unwrap(), Some(body));
     connection.begin().unwrap();
-    assert!(
-        connection.delete("contract", id, 1).is_err(),
-        "workflow history protects its parent"
-    );
-    connection.rollback().unwrap();
-    connection.begin().unwrap();
-    connection.replace_workflow_tasks(id, 1, &[]).unwrap();
     connection.delete_blobs(id).unwrap();
     assert!(connection.delete("contract", id, 1).unwrap());
     connection.commit().unwrap();
     assert!(connection.credential(id).unwrap().is_none());
+    workflow_fixture::exercise(connection);
 }
 
 #[test]

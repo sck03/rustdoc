@@ -88,7 +88,7 @@ pub fn exercise(service: &NativeService, root: &str) {
         users.push(user);
         people.push(person);
     }
-    people[0] = call(service,admin,TRANSFER_PERSONNEL,people[0]["employee"]["id"].as_i64().unwrap(),Some(json!({"expectedVersion":people[0]["versionNumber"],"effectiveDate":"2026-10-01","departmentId":main_department,"jobTitle":"总部主职","organization":{"managerEmployeeId":null,"functionalManagerEmployeeIds":[],"additionalAssignments":[{"companyCode":sub,"departmentId":sub_department,"jobTitle":"子公司兼职","startsOn":"2026-10-01","endsOn":"","managerEmployeeId":null,"functionalManagerEmployeeIds":[]}]},"note":"多单位任职"}))).unwrap();
+    people[0] = workflow::personnel_change(service, admin, "Transfer",people[0]["employee"]["id"].as_i64().unwrap(),Some(json!({"expectedVersion":people[0]["versionNumber"],"effectiveDate":"2026-10-01","departmentId":main_department,"jobTitle":"总部主职","organization":{"managerEmployeeId":null,"functionalManagerEmployeeIds":[],"additionalAssignments":[{"companyCode":sub,"departmentId":sub_department,"jobTitle":"子公司兼职","startsOn":"2026-10-01","endsOn":"","managerEmployeeId":null,"functionalManagerEmployeeIds":[]}]},"note":"多单位任职"}))).unwrap();
     let mut worker_role = access(
         service,
         admin,
@@ -106,7 +106,9 @@ pub fn exercise(service: &NativeService, root: &str) {
         no_management.clone(),
     );
     let mut worker_scheme = call(service,admin,CREATE_PERMISSION_TEMPLATE,0,Some(json!({"code":format!("unit-worker-{suffix}"),"name":"单位申请人方案","description":"明确绑定当前单位","grants":worker_role["permissionGrants"],"disabledModules":[],"oaAssignedOnly":false,"isActive":true,"expectedVersion":0}))).unwrap();
+    worker_scheme = crate::oa_contract::workflow::publish_scheme(service, admin, worker_scheme);
     worker_role["permissionTemplateId"] = worker_scheme["id"].clone();
+    worker_role["permissionSchemeVersion"] = worker_scheme["publishedVersion"].clone();
     worker_role["permissionGrants"] = Value::Null;
     worker_role["expectedVersion"] = worker_role["versionNumber"].clone();
     worker_role = call(service, admin, SAVE_UNIT_ACCESS, 0, Some(worker_role)).unwrap();
@@ -239,18 +241,13 @@ pub fn exercise(service: &NativeService, root: &str) {
     let member = &member_directory["items"][0];
     assert_eq!(member["fullName"], "集团人员0");
     assert!(member.get("profile").is_none());
-    let mut member_save = json!({"companyCode":sub,"personId":member["personId"],"expectedVersion":member["versionNumber"],"appointments":member["appointments"],"note":"单位管理员维护兼职"});
-    member_save["appointments"][0]["jobTitle"] = json!("子公司采购专员");
-    let maintained = call(
-        service,
-        token(&manager_sub),
-        SAVE_UNIT_MEMBER,
-        0,
-        Some(member_save),
-    )
-    .unwrap();
-    assert_eq!(maintained["appointments"][0]["jobTitle"], "子公司采购专员");
-    assert!(maintained.get("profile").is_none());
+    assert_eq!(member["appointments"][0]["jobTitle"], "子公司兼职");
+    assert!(
+        export_doc_contracts::openapi::document()["paths"]["/api/organization/unit-members"]
+            .get("post")
+            .is_none(),
+        "direct appointment mutation is retired"
+    );
     assert_eq!(
         call(
             service,
@@ -565,12 +562,22 @@ pub fn exercise(service: &NativeService, root: &str) {
     );
     worker_scheme["expectedVersion"] = worker_scheme["versionNumber"].clone();
     worker_scheme["disabledModules"] = json!(["office.general"]);
-    call(
+    let changed_scheme = call(
         service,
         admin,
         UPDATE_PERMISSION_TEMPLATE,
         worker_scheme["id"].as_i64().unwrap(),
         Some(worker_scheme),
+    )
+    .unwrap();
+    let changed_scheme =
+        crate::oa_contract::workflow::publish_scheme(service, admin, changed_scheme);
+    crate::oa_contract::workflow::apply_scheme(
+        service,
+        admin,
+        &changed_scheme,
+        "Unit",
+        &worker_role,
     )
     .unwrap();
     assert_eq!(
@@ -642,12 +649,15 @@ pub fn exercise(service: &NativeService, root: &str) {
         Some(scheme_body),
     )
     .unwrap();
+    let unit_scheme =
+        crate::oa_contract::workflow::publish_scheme(service, token(&manager_sub), unit_scheme);
     assert_eq!(unit_scheme["ownerUnitId"], schemes["unitId"]);
     let mut scoped_role = worker_role.clone();
     scoped_role["id"] = json!(0);
     scoped_role["expectedVersion"] = json!(0);
     scoped_role["name"] = json!("单位只读身份");
     scoped_role["permissionTemplateId"] = unit_scheme["id"].clone();
+    scoped_role["permissionSchemeVersion"] = unit_scheme["publishedVersion"].clone();
     let scoped_role = call(
         service,
         token(&manager_sub),
@@ -722,12 +732,12 @@ pub fn exercise(service: &NativeService, root: &str) {
     )
     .unwrap();
     let before = login(0);
-    let promotion = json!({"appointmentId":worker_role["appointmentId"],"expectedVersion":person["versionNumber"],"note":"子公司兼任职调整为主职"});
+    let promotion = json!({"primaryAppointmentId":worker_role["appointmentId"],"effectiveDate":hq_admin["user"]["businessDate"],"expectedVersion":person["versionNumber"],"note":"子公司兼任职调整为主职"});
     assert_eq!(
-        call(
+        workflow::personnel_change(
             service,
             token(&before),
-            PROMOTE_PERSONNEL_APPOINTMENT,
+            "Transfer",
             person["employee"]["id"].as_i64().unwrap(),
             Some(promotion.clone())
         )
@@ -736,10 +746,10 @@ pub fn exercise(service: &NativeService, root: &str) {
         Some(403)
     );
     assert_eq!(
-        call(
+        workflow::personnel_change(
             service,
             admin,
-            PROMOTE_PERSONNEL_APPOINTMENT,
+            "Transfer",
             person["employee"]["id"].as_i64().unwrap(),
             Some(promotion)
         )
@@ -755,14 +765,14 @@ pub fn exercise(service: &NativeService, root: &str) {
         None,
     )
     .unwrap();
-    let person = call(service,admin,TRANSFER_PERSONNEL,person["employee"]["id"].as_i64().unwrap(),Some(json!({"expectedVersion":person["versionNumber"],"effectiveDate":"2026-10-01","departmentId":main_department,"jobTitle":"总部主职","organization":{"additionalAssignments":[{"companyCode":sub,"departmentId":sub_department,"jobTitle":"子公司主职候选","startsOn":"2026-10-01","endsOn":"","functionalManagerEmployeeIds":[]}]},"note":"登记调任目标任职"}))).unwrap();
+    let person = workflow::personnel_change(service, admin, "Transfer",person["employee"]["id"].as_i64().unwrap(),Some(json!({"expectedVersion":person["versionNumber"],"effectiveDate":"2026-10-01","departmentId":main_department,"jobTitle":"总部主职","organization":{"additionalAssignments":[{"companyCode":sub,"departmentId":sub_department,"jobTitle":"子公司主职候选","startsOn":"2026-10-01","endsOn":"","functionalManagerEmployeeIds":[]}]},"note":"登记调任目标任职"}))).unwrap();
     let target_assignment = person["organization"]["additionalAssignments"][0]["id"].clone();
     let before = login(3);
-    let promotion = json!({"appointmentId":target_assignment,"expectedVersion":person["versionNumber"],"note":"子公司兼任职调整为主职"});
-    let promoted = call(
+    let promotion = json!({"primaryAppointmentId":target_assignment,"effectiveDate":hq_admin["user"]["businessDate"],"expectedVersion":person["versionNumber"],"note":"子公司兼任职调整为主职"});
+    let promoted = workflow::personnel_change(
         service,
         admin,
-        PROMOTE_PERSONNEL_APPOINTMENT,
+        "Transfer",
         person["employee"]["id"].as_i64().unwrap(),
         Some(promotion),
     )

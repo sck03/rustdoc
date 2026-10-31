@@ -27,6 +27,7 @@ impl Fixture {
             root,
             paths,
             actor: Actor {
+                scope_rules: vec![],
                 context: String::new(),
                 edition: Default::default(),
                 id: 1,
@@ -109,6 +110,7 @@ fn output_and_snapshot_survive_restart_and_cleanup_is_idempotent() {
     assert_eq!(file.file_name, "测试.pdf");
     assert_eq!(file.content, bytes);
     let other = Actor {
+        scope_rules: vec![],
         context: String::new(),
         edition: Default::default(),
         id: 2,
@@ -228,6 +230,7 @@ fn queries_filter_status_and_text_without_disclosing_another_users_jobs() {
     assert_eq!(
         jobs.list(
             &Actor {
+                scope_rules: vec![],
                 context: String::new(),
                 edition: Default::default(),
                 id: 2,
@@ -641,6 +644,7 @@ fn retry_survives_restart_reauthorizes_and_keeps_private_requests_off_the_wire()
         retry::execute(
             &service,
             &Actor {
+                scope_rules: vec![],
                 context: String::new(),
                 edition: Default::default(),
                 id: other_id,
@@ -657,6 +661,7 @@ fn retry_survives_restart_reauthorizes_and_keeps_private_requests_off_the_wire()
         retry::execute(
             &service,
             &Actor {
+                scope_rules: vec![],
                 context: String::new(),
                 admin: false,
                 grants: vec![],
