@@ -17,9 +17,11 @@
 | Windows Tauri 三版 | Document / Sales / Full 均从本批工作树 locked 重建并通过真实桌面回归，日志 `final-desktop-*.log`。修复启动前短暂 Full 标题；含真实 OCR、表格/中文文本、原件/版本、权限和维护。Full 的 16 份/16 页实际 PDF 已渲染查看；小纸张沿用尺寸与已有裁切边界 |
 | 脚本、依赖与规模 | 脚本套件、56 项 Actions 引用、updater、release contract、公开源码通过；835 components，unresolved=0 / disallowed=0。最终样式和源码规模通过；Web 生产 88,543 行，比原基线减少 286 行 |
 
-本批不改数据库与 API；下方 PostgreSQL 18、容量、备份恢复为上一内核批次证据，不冒充本批重跑。Windows 系统 IME 候选窗、其它 OS/架构、Docker daemon、实体打印继续各自验收。三版程序位于 `artifacts/oa-completion-desktop/ExportDocManager.Tauri.{Document,Sales,Full}`；构建版本 `0.1.2+git.98f5f7a435ba` 表示构建时父提交，包内含本批工作树实现。
+本批不改数据库与 API；下方 PostgreSQL 18、容量、备份恢复为上一内核批次证据，不冒充本批重跑。Windows 系统 IME 候选窗、其它 OS/架构、Docker daemon、实体打印继续各自验收。三版程序位于 `artifacts/oa-completion-desktop/ExportDocManager.Tauri.{Document,Sales,Full}`；构建版本中的 Git 标识为打包时父提交，实际版本以包清单为准，包内含本批工作树实现。
 
 本批按明确来源、活动进程、链接/Git 边界及逐文件 SHA-256 清理 11 个已结束界面测试根，确认全部删除 **418,219,133 字节（约 398.85 MiB）**。保留最新同名截图/PDF/结果约 12.35 MiB；删除量是原文件长度，不能算作磁盘净释放。一次 Code Cache “目录不是空的”后，仅重验原清单剩余文件并逐项删除，最终 0 个残留根。551 个实际/私有保留文件 SHA-256 全部一致；最新三版程序、Cargo/npm/浏览器及原生资源缓存保留。精确清单和回执为本批 `cleanup-plan.json`、`cleanup-receipt.json`、`cleanup-result.json`；精选证据在 `retained-evidence/`，当前桌面复现输出另位于 `artifacts/oa-interface-desktop-validation/`。
+
+界面实现 `63569ce5` 已普通快进推送 main，工作分支 `codex/oa-interface-completion` 已删除。[发布脚本检查](https://github.com/sck03/rustdoc/actions/runs/41203948490)通过；[首轮主验证](https://github.com/sck03/rustdoc/actions/runs/41203948557)的前端布局通过，Chromium 编辑回归发现设置页表单说明在灰背景上的对比度为 4.39，低于 4.5。共用表单说明颜色改用 `--text-secondary`，保留对比度标准。随后本地完整执行 CI 的七组前端脚本全部通过：发票编辑、60 项单据编辑、V3 设计器、38 项取消操作、邮件模板、并发反馈、浏览器会话/超时/上传；`ci-test-*.log` 保存结果。`contrast-visual.log` 的 84 场景通过，不更新参考图或放宽阈值；生产构建、样式/源码规模及三版包同步通过。后续远端状态以实际 workflow 回执为准。
 
 ## 账号、组织与 OA 内核批次：实现与证据规则
 

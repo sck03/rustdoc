@@ -63,7 +63,7 @@ label {
 }
 
 .form-field-description {
-  color: var(--edm-ink-500);
+  color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.45;
