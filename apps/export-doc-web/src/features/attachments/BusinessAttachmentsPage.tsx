@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Plus, RefreshCw, Search } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useBusinessAttachments } from "./useBusinessAttachments.ts";
@@ -68,12 +70,17 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
     {model.query.isPending ? <PageState tone="loading" title="正在读取业务资料" /> : model.query.isError ?
       <PageState tone="error" title="资料加载失败" description={readApiError(model.query.error)} /> : <>
         {!data?.page.items.length ? <PageState title="没有符合条件的业务资料" description={invoiceId ? "可从本单上传客户资料或实际交付文件。" : "这里汇总已上传的附件，不会自动列出发票记录。点击“上传资料”，选择关联发票后归档文件。"} /> :
-        <ul className="business-records-list">{data.page.items.map((item) => <li key={item.id} className="business-records-card">
-          <div><span className="business-records-muted">{item.invoiceNo} · {item.invoiceType} · {item.categoryName}</span>
-            <h3>{item.title}</h3><p>{item.customerName}{item.poNumber ? ` · PO ${item.poNumber}` : ""}{item.styleNo ? ` · 款号 ${item.styleNo}` : ""}</p>
-            <p className="business-records-muted">{attachmentVersionLabel(item)}</p></div>
-          <button type="button" className="command-button secondary" disabled={model.busy || editorOpen} onClick={() => model.setSelectedId(item.id)}>查看版本</button>
-        </li>)}</ul>}
+        <ResponsiveTableFrame label="业务资料目录" mobileLayout="cards" busy={model.query.isFetching}>
+          <table className="data-table responsive-data-table"><thead><tr><th>资料名称</th><th>关联单据</th><th>客户与业务标记</th><th>分类</th><th>版本</th><th>操作</th></tr></thead>
+            <tbody>{data.page.items.map(item => <tr key={item.id}>
+              <td data-label="资料名称"><TablePrimaryText value={item.title} /></td>
+              <td data-label="关联单据"><div><strong>{item.invoiceNo}</strong><div className="business-records-muted">{item.invoiceType}</div></div></td>
+              <td data-label="客户与业务标记"><div><TablePrimaryText value={item.customerName} />{(item.poNumber || item.styleNo) && <div className="business-records-muted">{item.poNumber ? `PO ${item.poNumber}` : ""}{item.styleNo ? ` · 款号 ${item.styleNo}` : ""}</div>}</div></td>
+              <td data-label="分类">{item.categoryName}</td><td data-label="版本">{attachmentVersionLabel(item)}</td>
+              <td data-label="操作"><button type="button" className="command-button secondary" disabled={model.busy || editorOpen} onClick={() => model.setSelectedId(item.id)}>查看版本</button></td>
+            </tr>)}</tbody>
+          </table>
+        </ResponsiveTableFrame>}
         <ListPaginationControls pageNumber={model.pageNumber} pageSize={model.pageSize} totalCount={data?.page.totalCount ?? 0} totalPages={data?.page.totalPages ?? 0}
           pageSizeOptions={[20, 50, 100]} isBusy={model.query.isFetching} onPageChange={model.setPageNumber} onPageSizeChange={model.changePageSize} />
       </>}

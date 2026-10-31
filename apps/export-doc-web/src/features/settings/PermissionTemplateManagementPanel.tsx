@@ -236,7 +236,7 @@ export function PermissionTemplateManagementPanel({
   return (
     <section className="form-section permission-template-section" aria-label="权限方案">
       <div className="section-header">
-        <div><h2>权限方案</h2><p className="section-description">主账号与单位身份明确选择共享方案，也可独立配置。方案关闭模块同时限制菜单和接口；已保存方案不会随岗位名称或程序升级自动增权。</p></div>
+        <div><h2>权限方案</h2><p className="section-description">选择方案 → 按分类设置权限 → 保存草稿 → 发布并应用。</p></div>
         <div className="toolbar-actions">
           <button className="icon-button" type="button" title="刷新方案" aria-label="刷新方案" disabled={isBusy} onClick={() => void refreshTemplates()}><RefreshCw size={18} /></button>
           <button className="icon-button" type="button" title="新建方案" aria-label="新建方案" disabled={isBusy} onClick={() => setCreating(true)}><Plus size={18} /></button>
@@ -275,7 +275,6 @@ export function PermissionTemplateManagementPanel({
         </div>
 
         <div className="permission-template-editor">
-          {selectedTemplate&&!isAdminTemplate&&<PermissionPublicationActions key={selectedTemplate.id} client={client} scheme={selectedTemplate} disabled={hasUnsavedTemplateChanges||saveMutation.isPending} accountTargets onBusy={setPublicationBusy} onPublished={versionNumber=>{const next={...draft,versionNumber};setDraft(next);setPersistedDraftSnapshot(buildTemplateDraftSnapshot(next));}} />}
           {isAdminTemplate ? <PermissionNotice>系统管理员方案由管理员身份固定授予全部能力，不能委托或修改。</PermissionNotice> : null}
           <div className="field-grid permission-template-meta-grid">
             <label><span>方案名称</span><input value={draft.name} disabled={isBusy || isAdminTemplate} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} /></label>
@@ -296,6 +295,7 @@ export function PermissionTemplateManagementPanel({
             disabledModules={draft.disabledModules}
             onModulesChange={disabledModules => setDraft(current => ({ ...current, disabledModules }))}
           />
+          {selectedTemplate&&!isAdminTemplate&&<PermissionPublicationActions key={selectedTemplate.id} client={client} scheme={selectedTemplate} disabled={hasUnsavedTemplateChanges||saveMutation.isPending} accountTargets onBusy={setPublicationBusy} onPublished={versionNumber=>{const next={...draft,versionNumber};setDraft(next);setPersistedDraftSnapshot(buildTemplateDraftSnapshot(next));}} />}
           <details className="permission-effective-details">
             <summary>权限设置说明</summary>
             <p>总经理等跨部门负责人可从“公司审批负责人”新建方案，部门主管可从“部门审批负责人”开始，再按职责增减。方案复制普通员工的操作和关闭模块，只增加人事、行政的查看与审批；查看范围内的草稿与历史也可见。审批步骤、财务接收、档案维护及系统管理分别配置。部门范围包含主职、兼职及本人负责的部门与启用子部门；可另启用仅本人和分派申请可见。</p>

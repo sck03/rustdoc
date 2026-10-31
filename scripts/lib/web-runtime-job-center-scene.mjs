@@ -33,6 +33,8 @@ export function createJobCenterSmokeScene(runtime) {
     const checkUrl = buildJobCenterCheckUrl(options.webUrl);
     try {
       await page.send("Page.navigate", { url: checkUrl });
+      await waitForRuntimeDiagnostics(page, ["任务记录", "新建文件任务"], timeoutMs);
+      await openJobCenterTaskDetails(page);
       const expectedText = [
         "批量报表 ZIP",
         "PDF 合并",
@@ -404,8 +406,9 @@ export function createJobCenterSmokeScene(runtime) {
       );
 
       await page.send("Page.navigate", { url: checkUrl });
-      await waitForRuntimeDiagnostics(page, ["批量报表 ZIP", "PDF 合并", "任务", "类型", "进度", "输出"], timeoutMs);
+      await waitForRuntimeDiagnostics(page, ["任务记录", "新建文件任务"], timeoutMs);
       await openJobCenterTaskDetails(page);
+      await waitForRuntimeDiagnostics(page, ["批量报表 ZIP", "PDF 合并", "任务", "类型", "进度", "输出"], timeoutMs);
       const pathPanelsCheck = await waitForPageExpression(
         page,
         `(() => Boolean(
@@ -479,6 +482,12 @@ export function createJobCenterSmokeScene(runtime) {
   }
 
   async function openJobCenterTaskDetails(page) {
+    await evaluate(page, `(() => {
+      const button = document.querySelector('[aria-controls="job-creation-tools"]');
+      if (button?.getAttribute('aria-expanded') === 'false') button.click();
+      return Boolean(button);
+    })()`, true);
+    await waitForPageExpression(page, `document.querySelector('[aria-controls="job-creation-tools"]')?.getAttribute('aria-expanded') === 'true'`, 10000, "Task creation tools did not open.");
     await evaluate(
       page,
       `(() => {

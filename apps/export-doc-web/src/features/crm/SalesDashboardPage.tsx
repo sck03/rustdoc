@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { KeyboardEvent } from "react";
+import { useId, useState, type KeyboardEvent } from "react";
 import { AlarmClock, ArrowRight, CalendarRange, CircleDollarSign, ContactRound, RefreshCw, TrendingUp, UsersRound } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
@@ -10,9 +10,13 @@ import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
+import { WorkspaceGuide } from "../../ui/WorkspaceGuide.tsx";
+import { TaskViewPanel, TaskViewTabs } from "../../ui/TaskViewTabs.tsx";
 
 export function SalesDashboardPage({ businessTimeZone, client }: { businessTimeZone: string; client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
+  const tabsId = useId();
+  const [view, setView] = useState("work");
   const query = useQuery({ queryKey: queryKeys.crmDashboard(), queryFn: ({ signal }) => client.getCrmDashboard({ signal }) });
   const dashboard = query.data;
   const openOpportunityCount = (dashboard?.opportunityStages ?? [])
@@ -50,7 +54,7 @@ export function SalesDashboardPage({ businessTimeZone, client }: { businessTimeZ
 
       {query.isError ? <InlineNotice tone="error" title="销售工作台加载失败">{readApiError(query.error)}</InlineNotice> : null}
       {query.isLoading ? <PageState tone="loading" title="正在加载销售概览" description="正在读取客户、跟进和商机摘要。" /> : null}
-      {isFirstRun ? <section className="sales-first-run" aria-label="销售工作区开始使用">
+      {isFirstRun ? <WorkspaceGuide title="首次使用：建立客户、跟进与商机"><section className="sales-first-run" aria-label="销售工作区开始使用">
         <div className="sales-first-run-heading">
           <div><span>首次使用</span><h2>从一位客户开始</h2><p>只需完成下面三步，销售概览就会自动形成，不需要先配置复杂流程。</p></div>
         </div>
@@ -65,7 +69,7 @@ export function SalesDashboardPage({ businessTimeZone, client }: { businessTimeZ
             <strong><span>3</span>建立销售商机</strong><small>跟踪阶段、金额和预计日期</small><ArrowRight size={17} aria-hidden="true" />
           </button>
         </div>
-      </section> : null}
+      </section></WorkspaceGuide> : null}
       <div className="dashboard-metric-grid">
         {metrics.map((metric) => {
           const Icon = metric.icon;
@@ -77,13 +81,16 @@ export function SalesDashboardPage({ businessTimeZone, client }: { businessTimeZ
         })}
       </div>
 
+      <TaskViewTabs idPrefix={tabsId} label="销售概览视图" value={view} onChange={setView} items={[{ id: "work", label: "跟进与成交" }, { id: "analysis", label: "经营分析" }]} />
+      <TaskViewPanel idPrefix={tabsId} id="work" active={view === "work"}>
+      <div className="dashboard-section-stack">
       <section className="form-section" aria-label="近期跟进待办">
         <div className="section-header"><h2>近期跟进待办</h2></div>
-        <ResponsiveTableFrame label="近期跟进待办" mobileLayout="scroll" busy={query.isFetching}>
+        <ResponsiveTableFrame className="summary-table-frame" label="近期跟进待办" mobileLayout="scroll" busy={query.isFetching}>
           <table className="dashboard-recent-table responsive-data-table">
             <thead><tr><th>客户</th><th data-table-priority="secondary">联系人</th><th>下次动作</th><th>提醒时间</th></tr></thead>
             <tbody>
-              {(dashboard?.upcomingFollowUps ?? []).map((item) => <tr className="clickable-row" key={item.id} tabIndex={0} onClick={() => navigate("/crm/follow-ups")} onKeyDown={(event) => handleRowKeyDown(event, () => navigate("/crm/follow-ups"))}>
+              {(dashboard?.upcomingFollowUps ?? []).map((item) => <tr className="clickable-row" key={item.id} tabIndex={0} onClick={() => navigate(`/crm/follow-ups?view=followups&followUpId=${item.id}`)} onKeyDown={(event) => handleRowKeyDown(event, () => navigate(`/crm/follow-ups?view=followups&followUpId=${item.id}`))}>
                 <td className="strong-cell">{item.customerName}</td>
                 <td data-table-priority="secondary">{item.contactName || "-"}</td>
                 <td>{item.nextAction || item.summary}</td>
@@ -95,30 +102,34 @@ export function SalesDashboardPage({ businessTimeZone, client }: { businessTimeZ
         </ResponsiveTableFrame>
       </section>
 
+      <section className="form-section" aria-label="近期预计成交">
+        <div className="section-header"><h2>未来 30 天预计成交</h2></div>
+        <ResponsiveTableFrame className="summary-table-frame" label="未来 30 天预计成交" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th data-table-priority="secondary">阶段</th><th>预计金额</th><th data-table-priority="secondary">概率</th><th>预计日期</th></tr></thead><tbody>
+          {(dashboard?.upcomingOpportunityClosings ?? []).map((item) => <tr className="clickable-row" key={item.id} tabIndex={0} onClick={() => navigate(`/crm/opportunities?view=editor&opportunityId=${item.id}`)} onKeyDown={(event) => handleRowKeyDown(event, () => navigate(`/crm/opportunities?view=editor&opportunityId=${item.id}`))}><td><TablePrimaryText value={item.title} /></td><td><TablePrimaryText value={item.customerName} /></td><td data-table-priority="secondary"><BusinessStatusBadge value={item.stage} /></td><td>{item.currency} {formatAmount(item.estimatedAmount)}</td><td data-table-priority="secondary">{item.probabilityPercent}%</td><td>{formatDate(item.expectedCloseDate)}</td></tr>)}
+          {!query.isFetching && !query.isError && !dashboard?.upcomingOpportunityClosings.length ? <tr><td className="empty-cell" colSpan={6}>未来 30 天暂无预计成交商机。</td></tr> : null}
+        </tbody></table></ResponsiveTableFrame>
+      </section>
+      </div>
+      </TaskViewPanel>
+      <TaskViewPanel idPrefix={tabsId} id="analysis" active={view === "analysis"}>
       <div className="two-column-layout">
         <section className="form-section" aria-label="商机阶段漏斗">
           <div className="section-header"><h2>商机阶段漏斗</h2></div>
-          <ResponsiveTableFrame label="商机阶段漏斗" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>阶段</th><th>数量</th></tr></thead><tbody>
+          <ResponsiveTableFrame className="summary-table-frame" label="商机阶段漏斗" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>阶段</th><th>数量</th></tr></thead><tbody>
             {(dashboard?.opportunityStages ?? []).map((item) => <tr className="clickable-row" key={item.stage} tabIndex={0} onClick={() => navigate("/crm/opportunities")} onKeyDown={(event) => handleRowKeyDown(event, () => navigate("/crm/opportunities"))}><td><BusinessStatusBadge value={item.stage} /></td><td>{item.count}</td></tr>)}
             {!query.isFetching && !query.isError && !dashboard?.opportunityStages.length ? <tr><td className="empty-cell" colSpan={2}>暂无商机阶段数据。</td></tr> : null}
           </tbody></table></ResponsiveTableFrame>
         </section>
         <section className="form-section" aria-label="商机金额汇总">
           <div className="section-header"><h2>进行中商机金额</h2><span>按币种分组</span></div>
-          <ResponsiveTableFrame label="进行中商机金额" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>币种</th><th>商机数</th><th>预计金额</th><th>加权金额</th></tr></thead><tbody>
+          <ResponsiveTableFrame className="summary-table-frame" label="进行中商机金额" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>币种</th><th>商机数</th><th>预计金额</th><th>加权金额</th></tr></thead><tbody>
             {(dashboard?.opportunityCurrencies ?? []).map((item) => <tr key={item.currency}><td>{item.currency}</td><td>{item.count}</td><td>{formatAmount(item.estimatedAmount)}</td><td>{formatAmount(item.weightedAmount)}</td></tr>)}
             {!query.isFetching && !query.isError && !dashboard?.opportunityCurrencies.length ? <tr><td className="empty-cell" colSpan={4}>暂无进行中商机金额。</td></tr> : null}
           </tbody></table></ResponsiveTableFrame>
         </section>
       </div>
 
-      <section className="form-section" aria-label="近期预计成交">
-        <div className="section-header"><h2>未来 30 天预计成交</h2></div>
-        <ResponsiveTableFrame label="未来 30 天预计成交" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th data-table-priority="secondary">阶段</th><th>预计金额</th><th data-table-priority="secondary">概率</th><th>预计日期</th></tr></thead><tbody>
-          {(dashboard?.upcomingOpportunityClosings ?? []).map((item) => <tr className="clickable-row" key={item.id} tabIndex={0} onClick={() => navigate("/crm/opportunities")} onKeyDown={(event) => handleRowKeyDown(event, () => navigate("/crm/opportunities"))}><td><TablePrimaryText value={item.title} /></td><td><TablePrimaryText value={item.customerName} /></td><td data-table-priority="secondary"><BusinessStatusBadge value={item.stage} /></td><td>{item.currency} {formatAmount(item.estimatedAmount)}</td><td data-table-priority="secondary">{item.probabilityPercent}%</td><td>{formatDate(item.expectedCloseDate)}</td></tr>)}
-          {!query.isFetching && !query.isError && !dashboard?.upcomingOpportunityClosings.length ? <tr><td className="empty-cell" colSpan={6}>未来 30 天暂无预计成交商机。</td></tr> : null}
-        </tbody></table></ResponsiveTableFrame>
-      </section>
+      </TaskViewPanel>
     </section>
   );
 }

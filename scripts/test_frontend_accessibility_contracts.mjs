@@ -367,17 +367,6 @@ for (const scriptName of ["test_frontend_visual_baselines.mjs", "test_frontend_s
     failures.push(`${scriptName}: 不得通过 cmd/npm 外层进程启动 Vite`);
   }
 }
-for (const motionContract of [
-  "@keyframes login-ambient-sweep",
-  "@keyframes login-grid-drift",
-  "@keyframes login-brand-enter",
-  "@keyframes login-card-enter",
-  ".login-submit-button:hover:not(:disabled) svg",
-]) {
-  if (!responsiveCss.includes(motionContract)) {
-    failures.push(`responsiveOverrides.css: 登录页轻量 CSS 动效契约缺少 ${motionContract}`);
-  }
-}
 
 const themeCss = readCssImportGraph(path.join(root, "theme.css"));
 const queryPageSource = fs.readFileSync(path.join(root, "features", "query", "QueryPage.tsx"), "utf8");

@@ -39,9 +39,7 @@ body {
   line-height: var(--edm-line-height-normal);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background:
-    radial-gradient(circle at 92% 4%, color-mix(in srgb, var(--edm-primary-500) 8%, transparent), transparent 26rem),
-    var(--edm-canvas);
+  background: var(--edm-canvas);
 }
 
 html[data-interface-density="compact"] {
@@ -136,11 +134,9 @@ html[data-interface-density="compact"] body {
   min-height: 100dvh;
   padding: 18px 14px 20px;
   color: var(--edm-primary-25);
-  background:
-    radial-gradient(circle at 14% 8%, color-mix(in srgb, var(--edm-primary-400) 16%, transparent), transparent 15rem),
-    linear-gradient(180deg, var(--edm-primary-925) 0%, var(--edm-primary-900) 56%, var(--edm-primary-950) 100%);
+  background: var(--edm-primary-900);
   border-right: 1px solid color-mix(in srgb, var(--edm-white) 6%, transparent);
-  box-shadow: 12px 0 36px color-mix(in srgb, var(--edm-ink-950) 8%, transparent);
+  box-shadow: none;
 }
 
 .brand-mark {

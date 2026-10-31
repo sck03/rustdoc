@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 import { approvalStage, publishDefinitions, personnelChange } from './lib/approval-fixtures.mjs';
+import { verifyWorkspacePresentation } from './lib/workspace-presentation-review.mjs';
 
 await withOfficeUi('oa-completion-ui', async ({output,url,invoke,openPage,require,operations}) => {
   const adminToken=(await invoke('Login',{username:'oa-review',password:'Review-2026-Test'})).accessToken;
@@ -19,6 +20,7 @@ await withOfficeUi('oa-completion-ui', async ({output,url,invoke,openPage,requir
   }
   const longName='跨单位联合任职行政审批资源办理与独立复核岗位权限方案'.repeat(3);
   await invoke('CreatePermissionTemplate',{code:'COMPLETION-LONG',name:longName,description:'长名称排版验收',isActive:true,grants:[],disabledModules:[],oaAssignedOnly:false},{},adminToken);
+  await verifyWorkspacePresentation({ page: admin, url, output });
   await admin.goto(`${url}/#/system/access-control?view=templates`);
   await admin.locator('.permission-template-card').filter({hasText:longName}).waitFor();
   const layouts=[];

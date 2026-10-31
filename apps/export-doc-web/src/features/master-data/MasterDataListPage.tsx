@@ -12,6 +12,7 @@ readApiError,
 readRouteSuccessMessage
 } from "../../ui/formUtils.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
@@ -245,22 +246,18 @@ export function MasterDataListPage({
           当前权限模板仅允许查看主数据；新建、导入、联网保存和修改已禁用，删除需要管理权限。
         </PermissionNotice>
       ) : null}
-      <div className="toolbar">
-        <form className="search-form" onSubmit={handleSearch}>
-          <Search size={17} aria-hidden="true" />
-          <input
-            aria-label={`搜索${config.label}`}
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder={config.searchPlaceholder}
-          />
-        </form>
-        <div className="toolbar-actions">
-          {config.key === "hs-codes" && canManage && <HsCodeObsoleteAction client={client} records={Array.from(selectedRecords.values())} disabled={isBusy} onChanged={async () => {
+      <ListWorkspaceHeader title={config.listLabel} count={page?.totalCount}
+        description={`查找和维护${config.label}，打开记录查看详情或编辑。`}
+        actions={<>
+          <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void masterDataQuery.refetch()}><RefreshCw size={18} aria-hidden="true" /></button>
+          {canOperate && <button className="command-button" type="button" onClick={() => navigate(`/master-data/${config.key}/new`)}><Plus size={17} aria-hidden="true" />新建</button>}
+        </>}
+        selection={config.key === "hs-codes" && canManage ? <>
+          <span>已选 {selectedRecordIds.size} 条编码</span>
+          <HsCodeObsoleteAction client={client} records={Array.from(selectedRecords.values())} disabled={isBusy} onChanged={async () => {
             setSelectedRecords(new Map());
             await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("hs-codes") });
-          }} />}
-          {config.key === "hs-codes" && canManage ? (
+          }} />
             <button
               className="command-button secondary danger"
               type="button"
@@ -270,22 +267,14 @@ export function MasterDataListPage({
               <Trash2 size={17} aria-hidden="true" />
               <span>删除选中</span>
             </button>
-          ) : null}
-          <button
-            className="icon-button"
-            type="button"
-            title="刷新" aria-label="刷新"
-            disabled={isBusy}
-            onClick={() => void masterDataQuery.refetch()}
-          >
-            <RefreshCw size={18} aria-hidden="true" />
-          </button>
-          {canOperate ? <button className="command-button" type="button" onClick={() => navigate(`/master-data/${config.key}/new`)}>
-            <Plus size={17} aria-hidden="true" />
-            <span>新建</span>
-          </button> : null}
-        </div>
-      </div>
+        </> : null}>
+        <form className="list-workspace-filters" role="search" aria-label={`筛选${config.label}`} onSubmit={handleSearch}>
+          <div className="search-form"><Search size={17} aria-hidden="true" />
+            <input aria-label={`搜索${config.label}`} value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder={config.searchPlaceholder} />
+          </div>
+          <button type="submit" className="command-button secondary">搜索</button>
+        </form>
+      </ListWorkspaceHeader>
 
       {message ? <InlineNotice tone="error" title="操作未完成">{message}</InlineNotice> : null}
       {successMessage ? <InlineNotice tone="success">{successMessage}</InlineNotice> : null}

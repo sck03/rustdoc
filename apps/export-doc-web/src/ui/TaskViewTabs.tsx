@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 export type TaskViewTab<T extends string> = {
   id: T;
@@ -64,4 +64,14 @@ export function getTaskViewPanelProps(idPrefix: string, tabId: string) {
     role: "tabpanel" as const,
     "aria-labelledby": getTaskViewTabId(idPrefix, tabId),
   };
+}
+
+export function TaskViewPanel({ idPrefix, id, active, children }: {
+  idPrefix: string; id: string; active: boolean; children: ReactNode;
+}) {
+  const [visited, setVisited] = useState(active);
+  useEffect(() => { if (active) setVisited(true); }, [active]);
+  return <div {...getTaskViewPanelProps(idPrefix, id)} hidden={!active} tabIndex={0}>
+    {active || visited ? children : null}
+  </div>;
 }

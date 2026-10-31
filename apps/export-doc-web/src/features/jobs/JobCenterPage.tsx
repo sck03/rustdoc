@@ -7,6 +7,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
@@ -45,6 +46,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(initialListViewState.pageSize);
   const [reportToolsOpen, setReportToolsOpen] = useState(false);
+  const [createToolsOpen, setCreateToolsOpen] = useState(false);
   const desktopAvailable = isDesktopBridgeAvailable();
   const canCreateInvoiceReportZip =
     workspaceDeviceCapabilities.canImportExport
@@ -181,8 +183,27 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
           ? "可创建、下载和处理文件任务；受限屏幕下不提供批量清理，密集任务管理建议使用更宽屏幕。"
           : "可查看任务进度并处理单个失败任务；连接鼠标或触控板后可创建、下载和处理文件任务。"}
       />
+      <ListWorkspaceHeader title="任务记录" count={page?.totalCount} description="查看处理进度、下载结果，或继续处理失败任务。" actions={<>
+          {workspaceDeviceCapabilities.canUseBatchOperations ? (
+            <button className="command-button secondary" type="button" title="清理已完成、失败、已取消的任务记录" disabled={!jobPermission.canManage || isActionBusy || jobs.length === 0} onClick={() => void operations.handleClearFinishedJobs()}>
+              <Trash2 size={17} aria-hidden="true" /><span>清理已结束</span>
+            </button>
+          ) : null}
+          <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={jobsQuery.isFetching || operations.isBusy} onClick={handleRefresh}>
+            <RefreshCw size={18} aria-hidden="true" />
+          </button>
+          {jobPermission.canOperate && workspaceDeviceCapabilities.canImportExport && <button className="command-button" type="button" aria-expanded={createToolsOpen} aria-controls="job-creation-tools" onClick={() => setCreateToolsOpen(value => !value)}>{createToolsOpen ? "收起新建任务" : "新建文件任务"}</button>}
+      </>}>
+        <form className="list-workspace-filters" role="search" aria-label="筛选文件任务" onSubmit={handleSearch}>
+          <Search size={17} aria-hidden="true" />
+          <input aria-label="搜索任务" value={keyword} onChange={(event) => handleKeywordChange(event.target.value)} placeholder="任务号、标题、输出文件、错误" />
+          <label className="inline-filter"><span>状态</span><select value={status} onChange={(event) => changeStatus(event.target.value)}><option value="">全部</option>{jobStatusOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+          <button className="command-button secondary" type="submit" disabled={jobsQuery.isFetching || operations.isBusy}>搜索</button>
+          <button className="icon-button" type="button" title="清除搜索" aria-label="清除搜索" disabled={jobsQuery.isFetching || operations.isBusy || (!keyword && !committedKeyword && !focusedJobId)} onClick={() => applyFilters("")}><X size={18} aria-hidden="true" /></button>
+        </form>
+      </ListWorkspaceHeader>
       {jobPermission.canOperate && workspaceDeviceCapabilities.canImportExport ? (
-        <section className="job-create-panel" aria-label="新建任务">
+        <div id="job-creation-tools" hidden={!createToolsOpen}><section className="job-create-panel" aria-label="新建任务">
           {canCreateInvoiceReportZip ? (
             <details onToggle={(event) => setReportToolsOpen(event.currentTarget.open)}>
               <summary><span>批量报表 ZIP</span><small>{reportInvoiceIdList.length} 张发票</small></summary>
@@ -229,34 +250,10 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
               </form>
             )}
           </details> : null}
-        </section>
+        </section></div>
       ) : null}
 
-      <div className="toolbar">
-        <form className="search-form" onSubmit={handleSearch}>
-          <Search size={17} aria-hidden="true" />
-          <input aria-label="搜索任务" value={keyword} onChange={(event) => handleKeywordChange(event.target.value)} placeholder="任务号、标题、输出文件、错误" />
-        </form>
-        <div className="filter-bar"><label className="inline-filter"><span>状态</span>
-          <select value={status} onChange={(event) => changeStatus(event.target.value)}>
-            <option value="">全部</option>
-            {jobStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-        </label></div>
-        <div className="toolbar-actions">
-          <button className="icon-button" type="button" title="清除搜索" aria-label="清除搜索" disabled={jobsQuery.isFetching || operations.isBusy || (!keyword && !committedKeyword && !focusedJobId)} onClick={() => applyFilters("")}>
-            <X size={18} aria-hidden="true" />
-          </button>
-          {workspaceDeviceCapabilities.canUseBatchOperations ? (
-            <button className="command-button secondary" type="button" title="清理已完成、失败、已取消的任务记录" disabled={!jobPermission.canManage || isActionBusy || jobs.length === 0} onClick={() => void operations.handleClearFinishedJobs()}>
-              <Trash2 size={17} aria-hidden="true" /><span>清理已结束</span>
-            </button>
-          ) : null}
-          <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={jobsQuery.isFetching || operations.isBusy} onClick={handleRefresh}>
-            <RefreshCw size={18} aria-hidden="true" />
-          </button>
-        </div>
-      </div>
+
 
       {errorMessage ? <InlineNotice tone="error" title="文件任务操作失败">{errorMessage}</InlineNotice> : null}
       {operations.message ? <InlineNotice tone={operations.messageTone}>{operations.message}</InlineNotice> : null}

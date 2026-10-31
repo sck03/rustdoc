@@ -10,6 +10,7 @@ import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
+import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
 
 export function CrmCustomerDirectoryPanel({ client, canCreate, canDeactivate, canExport, canImport, onImport, onCreateCustomer, onSelectCustomer }: {
   client: ExportDocManagerApiClient;
@@ -57,19 +58,25 @@ export function CrmCustomerDirectoryPanel({ client, canCreate, canDeactivate, ca
   }
 
   return <section className="form-section">
-    <div className="section-header"><div><h3>客户目录</h3><p className="section-description">查找销售客户并进入联系人资料。</p></div><div className="section-header-actions"><span>共 {page?.totalCount ?? 0} 家</span>{canCreate ? <button className="primary-button" type="button" onClick={onCreateCustomer}>新建客户</button> : null}</div></div>
-    <form className="toolbar" onSubmit={search}>
+    <ListWorkspaceHeader title="客户目录" description="查找销售客户，打开资料后维护联系人与跟进。" count={page?.totalCount} unit="家" actions={<>
+      {canImport && <button className="secondary-button" type="button" onClick={onImport}>导入客户</button>}
+      {canExport && <button className="secondary-button" type="button" onClick={() => void exportRows()}>导出当前筛选</button>}
+      {canCreate && <button className="primary-button" type="button" onClick={onCreateCustomer}>新建客户</button>}
+    </>} selection={canDeactivate && selectedIds.length > 0 ? <>
+      <strong>已选 {selectedIds.length} 家客户</strong>
+      <select aria-label="批量客户状态" defaultValue="" onChange={(event) => { if (event.target.value) void updateBatchStatus(event.target.value); event.target.value = ""; }}>
+        <option value="">批量修改状态...</option><option>潜在客户</option><option>跟进中</option><option>已成交</option><option>暂停</option><option>已流失</option>
+      </select>
+      <button className="secondary-button" type="button" onClick={() => setSelectedIds([])}>取消选择</button>
+    </> : undefined}>
+    <form className="list-workspace-filters" role="search" aria-label="筛选客户目录" onSubmit={search}>
       <input aria-label="搜索客户目录" value={inputKeyword} onChange={(event) => setInputKeyword(event.target.value)} placeholder="搜索名称、国家、网站、来源或备注" />
       <select aria-label="客户状态" value={status} onChange={(event) => { setStatus(event.target.value); setPageNumber(1); }}>
         <option value="">全部状态</option><option>潜在客户</option><option>跟进中</option><option>已成交</option><option>暂停</option><option>已流失</option>
       </select>
       <button className="secondary-button" type="submit">搜索</button>
-      {canImport && <button className="secondary-button" type="button" onClick={onImport}>导入客户</button>}
-      {canExport ? <button className="secondary-button" type="button" onClick={() => void exportRows()}>导出当前筛选</button> : null}
-      {canDeactivate ? <select aria-label="批量客户状态" defaultValue="" onChange={(event) => { if (event.target.value) void updateBatchStatus(event.target.value); event.target.value = ""; }}>
-        <option value="">批量修改状态...</option><option>潜在客户</option><option>跟进中</option><option>已成交</option><option>暂停</option><option>已流失</option>
-      </select> : null}
     </form>
+    </ListWorkspaceHeader>
     <OperationFeedback feedback={feedback} />
     {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}
     <ResponsiveTableFrame label="CRM 客户目录" mobileLayout="scroll" busy={pageQuery.isFetching}><table className="data-table responsive-data-table"><thead><tr>{canDeactivate ? <th><input type="checkbox" aria-label="选择本页 CRM 客户" checked={(page?.items.length ?? 0) > 0 && page!.items.every((item) => selectedIds.includes(item.id))} onChange={(event) => setSelectedIds(event.target.checked ? Array.from(new Set([...selectedIds, ...(page?.items.map((item) => item.id) ?? [])])) : selectedIds.filter((id) => !page?.items.some((item) => item.id === id)))} /></th> : null}<th>客户</th><th data-table-priority="secondary">国家/地区</th><th>状态</th><th data-table-priority="secondary">来源</th><th /></tr></thead>

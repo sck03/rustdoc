@@ -134,6 +134,12 @@ async function audit(page, name) {
   await read(page, "document.fonts.ready.then(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))");
   await evaluate(page, fs.readFileSync(require.resolve("axe-core/axe.min.js"), "utf8"), false);
   const issues = await read(page, "axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>r.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})))");
+  const overlappingCards = await read(page, `Array.from(document.querySelectorAll('[data-mobile-layout="cards"] tbody td')).filter(cell => {
+    if (getComputedStyle(cell).display !== 'grid' || !cell.getClientRects().length) return false;
+    const bounds = cell.getBoundingClientRect();
+    return Array.from(cell.children).some(child => child.getBoundingClientRect().bottom > bounds.bottom + 1);
+  }).map(cell => cell.getAttribute('data-label'))`);
+  assert.deepEqual(overlappingCards, [], `${name}: card values stay inside their field rows`);
   await captureScreenshot(page, path.join(output, `${name}.png`));
   assert.deepEqual(issues, [], `${name}: accessibility`);
   assert(await read(page, "document.documentElement.scrollWidth<=innerWidth+1"), `${name}: horizontal overflow`);
@@ -153,11 +159,13 @@ try {
   for (const width of [1440, 1024, 390, 320]) {
     await open("worklist", width); await waitFor(page, "document.querySelectorAll('.business-records-card').length===3");
     await audit(page, `worklist-${width}`);
-    await open("attachments", width); await click(page, "查看版本"); await waitFor(page, "document.querySelectorAll('.attachment-version').length===2");
+    await open("attachments", width); await waitFor(page, "document.querySelectorAll('.responsive-data-table tbody tr').length > 0");
+    await audit(page, `attachment-directory-${width}`);
+    await click(page, "查看版本"); await waitFor(page, "document.querySelectorAll('.attachment-version').length===2");
     await audit(page, `versions-${width}`);
   }
   await open("worklist");
-  await input(page, ".business-records-toolbar label:nth-child(2) select", "Overdue");
+  await input(page, ".list-workspace-filters label:nth-child(2) select", "Overdue");
   await waitFor(page, "document.querySelectorAll('.business-records-card').length===1");
   assert(await read(page, "window.__calls.some(c=>c.name==='worklist'&&c.input.due==='Overdue')"));
   await click(page, "查看并处理", "a"); await waitFor(page, "window.__destination");

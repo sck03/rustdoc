@@ -18,9 +18,10 @@ export function PermissionModuleGrid({
   readOnlyActions?: boolean;
   actionDataScopes?: Record<string, string[]>;
 }) {
-  const [group, setGroup] = useState(() => resources.length ? permissionResourceLocation(resources[0]).group : "");
+  const [selectedGroup, setGroup] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const groups = useMemo(() => [...new Set(resources.map((resource) => permissionResourceLocation(resource).group))], [resources]);
+  const group = selectedGroup === "" ? "" : groups.includes(selectedGroup ?? "") ? selectedGroup! : groups[0] ?? "";
   const visible = useMemo(() => filterPermissionResources(resources, group, search), [group, resources, search]);
 
   return (
@@ -34,16 +35,18 @@ export function PermissionModuleGrid({
           </select>
           <label className="permission-module-search">
             <Search size={15} aria-hidden="true" />
-            <input type="search" aria-label="搜索功能模块" placeholder="跨分类搜索模块或操作" maxLength={100} value={search} onChange={(event) => { setSearch(event.target.value); if (event.target.value.trim()) setGroup(""); }} />
+            <input type="search" aria-label="搜索功能模块" placeholder="跨分类搜索模块或操作" maxLength={100} value={search} onChange={(event) => { setSearch(event.target.value); setGroup(event.target.value.trim() ? "" : null); }} />
           </label>
         </div>
       </div>
-      <p className="permission-navigation-note">关闭模块同时隐藏入口并拒绝后台访问，保留勾选配置以便重新开放。同一页面的模块开关同步生效；各项操作独立设置数据范围，筛选不会丢失草稿。</p>
-      <p className="permission-navigation-note">查看、日常操作和管理分别授权，管理不会自动取得编辑权限。使用页面通常还需勾选“查看”，查看范围应覆盖需办理的记录；公司范围的查看不代表可以编辑同事的数据。</p>
+      <details className="permission-module-help"><summary>模块开关与操作权限如何配合</summary>
+        <p className="permission-navigation-note">关闭模块同时隐藏入口并拒绝后台访问，保留勾选配置以便重新开放。同一页面的模块开关同步生效；各项操作独立设置数据范围，筛选不会丢失草稿。</p>
+        <p className="permission-navigation-note">查看、日常操作和管理分别授权，管理不会自动取得编辑权限。使用页面通常还需勾选“查看”，查看范围应覆盖需办理的记录；公司范围的查看不代表可以编辑同事的数据。</p>
+      </details>
       <div className="permission-module-grid">
         {visible.map((resource) => (
           <section className="permission-resource-card" key={resource.key} aria-label={resource.name}>
-            <p className="permission-resource-location">{permissionResourceLocation(resource).path}</p>
+            <p className="permission-resource-location">{permissionResourceLocation(resource).path}<span>{disabledModules.includes(resource.moduleKey) ? "模块已关闭" : `${resource.actions.filter(action => grants[grantKey(resource.key, action.key)]).length} / ${resource.actions.length} 项已授权`}</span></p>
             <label className="checkbox-field"><input type="checkbox" aria-label={`${resource.name}模块开放`} checked={!disabledModules.includes(resource.moduleKey)} disabled={disabled || inheritedModules.includes(resource.moduleKey)}
               onChange={event => onModulesChange(event.target.checked ? disabledModules.filter(key => key !== resource.moduleKey) : [...disabledModules, resource.moduleKey])} /><span>开放模块（仍需勾选操作）</span></label>
             {inheritedModules.includes(resource.moduleKey) && <p className="field-help">权限分组已关闭此模块，须先在分组中开放。</p>}

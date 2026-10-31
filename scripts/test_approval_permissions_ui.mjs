@@ -101,6 +101,7 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   assert.deepEqual((await gm.evaluate(async () => window.axe.run(document.querySelector('main'), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } }))).violations, []);
   // Account restrictions survive changing the fallback role, and close both UI/API access.
   await accounts.locator('summary').filter({ hasText: '账号单独配置与模块权限' }).click();
+  await accounts.getByLabel('模块分类', { exact: true }).selectOption('申请与资源');
   await accounts.getByLabel('员工请假模块开放', { exact: true }).uncheck();
   await accounts.getByRole('combobox', { name: /^角色/u }).selectOption('Sales');
   assert.equal(await accounts.getByLabel('员工请假模块开放', { exact: true }).isChecked(), false);

@@ -69,8 +69,16 @@
 }
 
 .permission-resource-location {
-  padding: 10px 12px 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px;
+  padding-bottom: 8px;
 }
+
+.permission-module-help { margin-bottom: 12px; color: var(--text-secondary); }
+.permission-module-help summary { cursor: pointer; font-size: var(--edm-font-size-sm); }
+.permission-module-help p { margin-top: 8px; }
 
 .knowledge-help {
   border-bottom: 1px solid var(--edm-neutral-200);

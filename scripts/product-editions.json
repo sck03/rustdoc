@@ -5,7 +5,7 @@
     "Document": {
       "slug": "document",
       "identifier": "com.exportdocmanager.desktop.document",
-      "productName": "外贸业务综合管理系统（单证版）",
+      "productName": "外贸单证管理（单证版）",
       "displayName": "单证版",
       "resourceProfile": {
         "ocr": true,
@@ -20,7 +20,7 @@
     "Sales": {
       "slug": "sales",
       "identifier": "com.exportdocmanager.desktop.sales",
-      "productName": "外贸业务综合管理系统（业务员版）",
+      "productName": "外贸业务工作台（业务员版）",
       "displayName": "业务员版",
       "resourceProfile": {
         "ocr": false,
@@ -37,8 +37,8 @@
     "Full": {
       "slug": "full-test",
       "identifier": "com.exportdocmanager.desktop.fulltest",
-      "productName": "外贸业务综合管理系统（Full 单机测试版）",
-      "displayName": "全功能版",
+      "productName": "业务协同平台（Full 单机测试版）",
+      "displayName": "Full 单机测试版",
       "resourceProfile": {
         "ocr": true,
         "documentResources": true

@@ -4,7 +4,7 @@
   --edm-black: #000000;
   --edm-neutral-25: #fbfcfd;
   --edm-neutral-50: #f8fafb;
-  --edm-neutral-75: #f3f7f5;
+  --edm-neutral-75: #f4f6f9;
   --edm-neutral-100: #f1f4f6;
   --edm-neutral-150: #eef2f5;
   --edm-neutral-200: #e8edf1;
@@ -12,8 +12,8 @@
   --edm-neutral-300: #dde3e8;
   --edm-neutral-350: #d8e0e6;
   --edm-neutral-400: #cfd8df;
-  --edm-neutral-450: #aebfbb;
-  --edm-neutral-500: #91aab2;
+  --edm-neutral-450: #b2bdcc;
+  --edm-neutral-500: #94a3b8;
   --edm-neutral-550: #69737d;
   --edm-neutral-600: #58616a;
   --edm-neutral-650: #4d5963;
@@ -23,41 +23,41 @@
   --edm-neutral-850: #1f2933;
   --edm-neutral-900: #111827;
 
-  --edm-ink-100: #eef6f5;
-  --edm-ink-200: #d9e3e0;
-  --edm-ink-300: #c5d3cf;
-  --edm-ink-400: #91a8a2;
-  --edm-ink-500: #607572;
-  --edm-ink-600: #526866;
-  --edm-ink-700: #354742;
-  --edm-ink-800: #263c3a;
-  --edm-ink-900: #173f3b;
-  --edm-ink-950: #102322;
+  --edm-ink-100: #f0f4f8;
+  --edm-ink-200: #dce3ed;
+  --edm-ink-300: #c5cfde;
+  --edm-ink-400: #94a3b8;
+  --edm-ink-500: #64748b;
+  --edm-ink-600: #526176;
+  --edm-ink-700: #3b4b63;
+  --edm-ink-800: #283b53;
+  --edm-ink-900: #203650;
+  --edm-ink-950: #18283e;
 
   /* Brand palette. */
-  --edm-primary-25: #f8fbfa;
-  --edm-primary-50: #effcf8;
-  --edm-primary-75: #eef8f5;
-  --edm-primary-80: #f1faf7;
-  --edm-primary-100: #d7f7ed;
-  --edm-primary-150: #d9eee9;
-  --edm-primary-200: #afeedc;
-  --edm-primary-300: #98d0c5;
-  --edm-primary-325: #a9d5cc;
-  --edm-primary-350: #65aaa2;
-  --edm-primary-400: #58d7b7;
-  --edm-primary-500: #119b88;
-  --edm-primary-550: #16a38f;
-  --edm-primary-600: #0f7f72;
-  --edm-primary-650: #0f766e;
-  --edm-primary-700: #0c655d;
-  --edm-primary-750: #0b615a;
-  --edm-primary-775: #095c55;
-  --edm-primary-800: #104f4b;
-  --edm-primary-850: #0f4f46;
-  --edm-primary-900: #102725;
-  --edm-primary-925: #132d2b;
-  --edm-primary-950: #0d211f;
+  --edm-primary-25: #f8faff;
+  --edm-primary-50: #eff5ff;
+  --edm-primary-75: #edf3fc;
+  --edm-primary-80: #f2f6fd;
+  --edm-primary-100: #e0ecff;
+  --edm-primary-150: #dbe7fa;
+  --edm-primary-200: #c3d9fc;
+  --edm-primary-300: #a3c0ee;
+  --edm-primary-325: #afc8ed;
+  --edm-primary-350: #779fdc;
+  --edm-primary-400: #6b9de8;
+  --edm-primary-500: #3574cc;
+  --edm-primary-550: #306ec4;
+  --edm-primary-600: #245da8;
+  --edm-primary-650: #205596;
+  --edm-primary-700: #1d4a83;
+  --edm-primary-750: #1c4579;
+  --edm-primary-775: #1b4070;
+  --edm-primary-800: #203f65;
+  --edm-primary-850: #203a59;
+  --edm-primary-900: #1a2d46;
+  --edm-primary-925: #20344e;
+  --edm-primary-950: #15263c;
 
   /* Status and data-visualization palettes. */
   --edm-success-50: #ecfdf5;
@@ -136,7 +136,7 @@
   --edm-earth-800: #5b4b20;
   --edm-earth-900: #4b2c27;
 
-  --edm-workspace-aqua-50: #f3f8f8;
+  --edm-workspace-aqua-50: #f3f6fa;
 
   /* Stable semantic roles consumed by every feature stylesheet. */
   --edm-line: var(--edm-ink-200);

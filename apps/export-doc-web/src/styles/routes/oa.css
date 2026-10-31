@@ -2,8 +2,8 @@
 .oa-workspace { display: grid; gap: calc(4 * 0.25rem); }
 .oa-heading { display: flex; align-items: start; justify-content: space-between; gap: calc(4 * 0.25rem); flex-wrap: wrap; }
 .oa-heading h2, .oa-detail h2 { margin: 0; }
-.oa-workspace a { color: var(--edm-primary-750); text-decoration: none; }
-.oa-workspace a:hover { text-decoration: underline; }
+.oa-workspace a:not(.command-button) { color: var(--edm-primary-750); text-decoration: none; }
+.oa-workspace a:not(.command-button):hover { text-decoration: underline; }
 .oa-workspace > .command-button { justify-self: start; }
 .oa-toolbar .office-field { display: flex; align-items: center; gap: calc(2 * 0.25rem); }
 .oa-toolbar .office-field > span { white-space: nowrap; }
@@ -49,6 +49,14 @@
 .oa-hub-start-card { display: flex; flex-direction: column; align-items: flex-start; gap: .75rem; }
 .oa-hub-start-card > svg { color: var(--edm-primary-750); }
 .oa-hub-start-card p { margin: 0; }
+.oa-application-group { margin-top: 24px; }
+.oa-application-group > h3 { margin: 0 0 12px; }
+.oa-hub-start-card h4 { margin: 0; font-size: var(--edm-font-size-lg); }
+.oa-hub-idle-categories { margin-top: 16px; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: var(--edm-radius-sm); }
+.oa-hub-idle-categories summary { cursor: pointer; font-weight: 600; }
+.oa-hub-idle-categories ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; padding: 0; list-style: none; }
+.oa-hub-idle-categories li, .oa-hub-idle-categories a { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.oa-hub-idle-categories a { flex: 1; }
 .oa-hub-start-card > .office-card-actions, .oa-hub-start-card > a { margin-top: auto; }
 }
 

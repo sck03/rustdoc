@@ -142,13 +142,13 @@ export function WorkspaceShell({
   }, [pathname, location.search]);
 
   useEffect(() => {
-    const product = getProductEditionPresentation(user.capabilities.productEdition);
+    const product = getProductEditionPresentation(user.capabilities.productEdition, isDesktopRuntime);
     document.title = `${context.title} · ${product.displayName}`;
     const focusFrame = window.requestAnimationFrame(() => {
       workspaceTitleRef.current?.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(focusFrame);
-  }, [context.title, pathname, user.capabilities.productEdition]);
+  }, [context.title, pathname, user.capabilities.productEdition, isDesktopRuntime]);
 
   useEffect(() => {
     if (!isMobileNavOpen) {
@@ -266,7 +266,7 @@ export function WorkspaceShell({
 
   const ContextIcon = context.icon;
   const displayName = user.fullName || user.username;
-  const productText = renderProductText(user);
+  const productText = renderProductText(user, isDesktopRuntime);
   const showConnectivityNotice = !isDesktopRuntime && !isOnline;
   const serviceConnectionState = resolveServiceConnectionState({ isDesktopRuntime, isOnline, availability: serviceAvailability });
   const showServiceUnavailableNotice = serviceConnectionState === "unreachable";
@@ -489,7 +489,7 @@ function renderUserWorkspaceLabel(user: ApiUserDto) {
   return getRolePresentation(user.role).label;
 }
 
-function renderProductText(user: ApiUserDto) {
-  const product = getProductEditionPresentation(user.capabilities.productEdition);
+function renderProductText(user: ApiUserDto, isDesktopRuntime: boolean) {
+  const product = getProductEditionPresentation(user.capabilities.productEdition, isDesktopRuntime);
   return { title: product.productName, subtitle: product.editionName };
 }

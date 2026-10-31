@@ -21,6 +21,7 @@ import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { readRouteChoice, readRouteId } from "../../ui/routeQueryState.ts";
 import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { useConfirmUnsavedChanges, useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
@@ -305,7 +306,6 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
   }
 
   return <section className="work-surface">
-    {view === "directory" && <p className="section-description">查找供应商，打开资料后维护联系人、供应产品和评价。</p>}
     <OperationFeedback feedback={feedback} />
     {(view === "profile" ? supplierDraft : contactDraft).hasPendingServerVersion ? <ServerDraftUpdateNotice
       entityLabel={view === "profile" ? "供应商" : "联系人"}
@@ -346,14 +346,18 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
           {importPreview.rows.slice(0, 30).map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.name || "-"}</td><td>{row.category || "-"}</td><td>{row.contactName || "-"}</td><td>{row.error || (row.isDuplicate ? "重复，跳过" : "可导入")}</td></tr>)}
         </tbody></table></ResponsiveTableFrame></> : null}
     </section> : null}
-    {view === "directory" ? <section className="form-section" {...getTaskViewPanelProps(supplierTabsId, "directory")}><div className="section-header"><div><h3>供应商目录</h3><p className="section-description">查找供货单位并进入资料、联系人或供应产品。</p></div><div className="section-header-actions"><span>共 {page?.totalCount ?? 0} 家</span>{canCreateSupplier ? <button className="primary-button" type="button" onClick={() => void beginNewSupplier()}>新建供应商</button> : null}</div></div>
-      <form className="toolbar" onSubmit={(event) => { event.preventDefault(); setKeyword(keywordInput.trim()); setPageNumber(1); }}>
+    {view === "directory" ? <section className="form-section" {...getTaskViewPanelProps(supplierTabsId, "directory")}>
+      <ListWorkspaceHeader title="供应商目录" count={page?.totalCount} unit="家" description="查找供货单位，打开资料后维护联系人、供应产品和评价。" actions={<>
+        {canImportSupplier && <button className="secondary-button" type="button" onClick={() => void changeView("import")}>导入供应商</button>}
+        {canExportSupplier && <button className="secondary-button" type="button" onClick={() => void exportRows()}>导出当前筛选</button>}
+        {canCreateSupplier && <button className="primary-button" type="button" onClick={() => void beginNewSupplier()}>新建供应商</button>}
+      </>}>
+      <form className="list-workspace-filters" role="search" aria-label="筛选供应商目录" onSubmit={(event) => { event.preventDefault(); setKeyword(keywordInput.trim()); setPageNumber(1); }}>
         <input aria-label="搜索供应商目录" value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="搜索名称、分类、产品或国家" />
         <select aria-label="供应商状态" value={status} onChange={(event) => { setStatus(event.target.value); setPageNumber(1); }}><option value="">全部状态</option><option>合作中</option><option>考察中</option><option>暂停</option><option>停用</option></select>
         <button className="secondary-button" type="submit">搜索</button>
-        {canImportSupplier && <button className="secondary-button" type="button" onClick={() => void changeView("import")}>导入供应商</button>}
-        {canExportSupplier && <button className="secondary-button" type="button" onClick={() => void exportRows()}>导出当前筛选</button>}
       </form>
+      </ListWorkspaceHeader>
       {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}
       <ResponsiveTableFrame label="供应商目录" mobileLayout="scroll" busy={pageQuery.isFetching}><table className="data-table responsive-data-table"><thead><tr><th>供应商</th><th data-table-priority="secondary">分类</th><th data-table-priority="secondary">主要产品</th><th>状态</th><th /></tr></thead><tbody>
         {(page?.items ?? []).map((item) => <tr key={item.id}><td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.category || "-"}</td><td data-table-priority="secondary">{item.mainProducts || "-"}</td><td><BusinessStatusBadge value={item.status} /></td><td><button className="secondary-button" type="button" onClick={() => void openSupplier(item)}>打开</button></td></tr>)}

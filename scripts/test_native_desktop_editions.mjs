@@ -66,6 +66,8 @@ for (const edition of selected) {
     assert(cdp, `${edition}: packaged WebView did not open`);
     while (Date.now() < deadline && !await run("!!document.querySelector('input[autocomplete=username]')")) await delay(100);
     assert(await run("!!document.querySelector('input[autocomplete=username]')"), `${edition}: login missing`);
+    assert.equal(await run('document.title'), catalog[edition].productName, `${edition}: login title matches the package`);
+    await captureScreenshot(cdp, path.join(output, `${edition}-login.png`));
     const context = await run("window.__TAURI_INTERNALS__.invoke('get_desktop_runtime_context')");
     assert.equal(context.productEdition, edition);
     const sealBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==', 'base64');

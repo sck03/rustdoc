@@ -7,6 +7,7 @@ import { useModulePermission, usePermission } from "../../app/PermissionAccessCo
 import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
@@ -72,8 +73,11 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
 
   return (
     <section className="work-surface" aria-label="付款报销列表">
-      <div className="toolbar">
-        <form className="search-form" onSubmit={handleSearch}>
+      <ListWorkspaceHeader title="付款报销打印单" count={payments?.totalCount} actions={<>
+        <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void paymentsQuery.refetch()}><RefreshCw size={18} aria-hidden="true" /></button>
+        {paymentPermission.canOperate && <button className="command-button" type="button" onClick={() => navigate("/payments/new")}><Plus size={17} aria-hidden="true" /><span>新建</span></button>}
+      </>}>
+        <form className="list-workspace-filters" role="search" aria-label="筛选付款报销" onSubmit={handleSearch}>
           <Search size={17} aria-hidden="true" />
           <input
             aria-label="搜索付款报销"
@@ -81,8 +85,7 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
             onChange={(event) => setKeyword(event.target.value)}
             placeholder="付款单号、参考号、收款方、付款方、部门、项目"
           />
-        </form>
-        <div className="toolbar-actions">
+          <button className="command-button secondary" type="submit" disabled={isBusy}>搜索</button>
           <button
             className="icon-button"
             type="button"
@@ -92,23 +95,8 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
           >
             <X size={18} aria-hidden="true" />
           </button>
-          <button
-            className="icon-button"
-            type="button"
-            title="刷新" aria-label="刷新"
-            disabled={isBusy}
-            onClick={() => void paymentsQuery.refetch()}
-          >
-            <RefreshCw size={18} aria-hidden="true" />
-          </button>
-          {paymentPermission.canOperate ? (
-            <button className="command-button" type="button" onClick={() => navigate("/payments/new")}>
-              <Plus size={17} aria-hidden="true" />
-              <span>新建</span>
-            </button>
-          ) : null}
-        </div>
-      </div>
+        </form>
+      </ListWorkspaceHeader>
 
       <InlineNotice tone="info" action={expensePermission.canView ? <Link to="/office/requests/expense">报销申请与审批</Link> : undefined}>
         填写付款单或报销打印单，保存后选择模板打印或导出 PDF。打印单不代表审批通过或已经付款。

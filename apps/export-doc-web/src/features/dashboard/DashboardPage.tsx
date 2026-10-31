@@ -24,6 +24,7 @@ import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
+import { WorkspaceGuide } from "../../ui/WorkspaceGuide.tsx";
 
 export function DashboardPage({ client }: { client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
@@ -165,7 +166,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
       ) : null}
 
       {showFirstUseGuide ? (
-        <section className="dashboard-first-use" aria-label="首次使用向导">
+        <WorkspaceGuide title="首次使用：准备资料并建立第一笔业务"><section className="dashboard-first-use" aria-label="首次使用向导">
           <div>
             <span className="dashboard-first-use-kicker">首次使用</span>
             <h2>从基础资料开始建立第一笔业务</h2>
@@ -179,7 +180,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
           {masterDataPermission.canView ? (
             <button className="command-button" type="button" onClick={() => navigate("/master-data")}>开始配置</button>
           ) : null}
-        </section>
+        </section></WorkspaceGuide>
       ) : null}
 
       <div className="dashboard-metric-grid">

@@ -16,6 +16,7 @@ import {
   selectExcelFile,
 } from "../../desktop/desktopBridge.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
@@ -501,26 +502,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
           ? "可查看、编辑并执行 Excel/单据包导入导出；大批量处理建议使用更宽屏幕。"
           : "可查看、搜索、新建基础草稿和进行轻量编辑；连接鼠标或触控板后可使用 Excel 与单据包导入导出。"}
       />
-      <div className="toolbar">
-        <form className="search-form" onSubmit={handleSearch}>
-          <Search size={17} aria-hidden="true" />
-          <input
-            aria-label="搜索发票"
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-            placeholder="发票号、合同号、客户、港口"
-          />
-        </form>
-        <div className="toolbar-actions">
-          <button
-            className="icon-button"
-            type="button"
-            title="重置搜索" aria-label="重置搜索"
-            disabled={isBusy || (!keyword && !committedKeyword)}
-            onClick={handleResetSearch}
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
+      <ListWorkspaceHeader title="发票目录" count={invoices?.totalCount} description="查找单据、继续制单，或勾选发票批量输出。" actions={<>
           {workspaceDeviceCapabilities.canImportExport && invoicePermission.canOperate && excelPermission.canOperate ? <button
             className="command-button secondary"
             type="button"
@@ -564,8 +546,14 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
             <Plus size={17} aria-hidden="true" />
             <span>新建</span>
           </button> : null}
-        </div>
-      </div>
+      </>}>
+        <form className="list-workspace-filters" role="search" aria-label="筛选发票" onSubmit={handleSearch}>
+          <Search size={17} aria-hidden="true" />
+          <input aria-label="搜索发票" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="发票号、合同号、客户、港口" />
+          <button className="command-button secondary" type="submit" disabled={isBusy}>搜索</button>
+          <button className="icon-button" type="button" title="重置搜索" aria-label="重置搜索" disabled={isBusy || (!keyword && !committedKeyword)} onClick={handleResetSearch}><X size={18} aria-hidden="true" /></button>
+        </form>
+      </ListWorkspaceHeader>
 
       {message ? <InlineNotice tone="error" title="发票操作未完成">{message}</InlineNotice> : null}
       {routeSuccessMessage ? <InlineNotice tone="success">{routeSuccessMessage}</InlineNotice> : null}

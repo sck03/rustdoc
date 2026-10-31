@@ -62,12 +62,16 @@
 
   .responsive-table-frame[data-mobile-layout="cards"] tbody td {
     display: grid;
+    height: auto;
+    min-height: 42px;
     grid-template-columns: minmax(92px, 36%) minmax(0, 1fr);
     gap: 10px;
     padding: 7px 0;
     border: 0;
     border-bottom: 1px solid var(--edm-ink-100);
     text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .responsive-table-frame[data-mobile-layout="cards"] tbody td::before {

@@ -141,6 +141,7 @@ try {
   await open(1366, "path=/office/people&denied=1"); assert(await read("document.body.innerText.includes('当前页面无权限')")); results.push("direct-route-boundaries");
   await open(1366, "path=/jobs"); await waitFor("document.querySelector('.job-table')");
   assert.equal(await read("window.__requests.filter(request=>request.kind==='search').length"), 0, "viewing progress does not fetch invoices until the creation panel is opened");
+  await click('[aria-controls="job-creation-tools"]');
   await click('.job-create-panel summary'); await waitFor("document.querySelector('.job-invoice-selection select')?.options.length>1");
   const select = '.job-invoice-selection select';
   await input(select, "7"); await input(select, "7"); assert.equal(await read("document.querySelectorAll('.job-invoice-selection-list li').length"), 1);

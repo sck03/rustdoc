@@ -59,15 +59,6 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
   {
     key: "workspace", label: "工作台", shortLabel: "工作台", icon: LayoutDashboard,
     items: [
-      { label: "我的待办", description: "查看需要办理的业务事项，进入对应业务继续处理", to: "/worklist", icon: ClipboardList,
-        isActive: (path) => path === "/worklist", requiredFeature: "worklist" },
-      { label: "公司公告", description: "阅读公司公告，确认制度与安排，发布和管理公告", to: "/office/announcements", icon: Info,
-        isActive: path => path === "/office/announcements", workspace: "office", moduleKey: "office.announcements", requiredPermissions: [{ resourceKey: "office.announcements", action: "view" }] },
-      { label: "站内通知", description: "查看申请与审批动态、未读通知及关联业务", to: "/office/notifications", icon: Mail,
-        isActive: path => path === "/office/notifications", workspace: "office", moduleKey: "office.notifications", requiredPermissions: [{ resourceKey: "office.notifications", action: "view" }] },
-      { label: "申请与审批", description: "查看行政和人事申请进度，办理审批与归档", to: "/office/approvals", icon: ClipboardList,
-        isActive: (path) => path === "/office/approvals", workspace: "office", permissionMatch: "any",
-        requiredPermissions: [...oaKinds.map((kind) => oaModules[kind].resource), "office.rooms", "office.supplies"].map(resourceKey => ({ resourceKey, action: "view" })) },
       { label: "工作概览", description: "按业务权限查看单证与销售概况", to: "/dashboard", icon: LayoutDashboard,
         isActive: (path) => isDashboardRoute(path) || path.startsWith("/crm/dashboard"), showSectionNav: true, children: [
       { label: "单证概览", description: "查看业务金额、近期单据与单证进度", keywords: "仪表盘", to: "/dashboard", icon: LayoutDashboard,
@@ -81,6 +72,15 @@ export const workspaceNavGroups: WorkspaceNavGroupConfig[] = [
           { resourceKey: permissionResources.salesOpportunities, action: permissionActions.view },
         ] },
       ] },
+      { label: "我的待办", description: "查看需要办理的业务事项，进入对应业务继续处理", to: "/worklist", icon: ClipboardList,
+        isActive: (path) => path === "/worklist", requiredFeature: "worklist" },
+      { label: "公司公告", description: "阅读公司公告，确认制度与安排，发布和管理公告", to: "/office/announcements", icon: Info,
+        isActive: path => path === "/office/announcements", workspace: "office", moduleKey: "office.announcements", requiredPermissions: [{ resourceKey: "office.announcements", action: "view" }] },
+      { label: "站内通知", description: "查看申请与审批动态、未读通知及关联业务", to: "/office/notifications", icon: Mail,
+        isActive: path => path === "/office/notifications", workspace: "office", moduleKey: "office.notifications", requiredPermissions: [{ resourceKey: "office.notifications", action: "view" }] },
+      { label: "申请与审批", description: "查看行政和人事申请进度，办理审批与归档", to: "/office/approvals", icon: ClipboardList,
+        isActive: (path) => path === "/office/approvals", workspace: "office", permissionMatch: "any",
+        requiredPermissions: [...oaKinds.map((kind) => oaModules[kind].resource), "office.rooms", "office.supplies"].map(resourceKey => ({ resourceKey, action: "view" })) },
       { label: "邮件中心", description: "写邮件、查询投递结果和维护业务模板", to: "/tools/email", icon: Mail,
         isActive: (path) => path.startsWith("/tools/email") || path.startsWith("/crm/email-templates"), showSectionNav: true, children: [
       { label: "邮件发送", description: "发送业务邮件和附件，查询投递记录", to: "/tools/email", icon: Mail,

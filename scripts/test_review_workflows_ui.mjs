@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
+import { verifyBusinessWorkspaceLayouts } from './lib/workspace-layout-review.mjs';
 
 await withOfficeUi('review-workflows-ui',async({repo,output,require,url,invoke,openPage})=>{
   const login=await invoke('Login',{username:'oa-review',password:'Review-2026-Test'});
@@ -27,6 +28,7 @@ await withOfficeUi('review-workflows-ui',async({repo,output,require,url,invoke,o
   await page.screenshot({path:path.join(output,'dashboard-currencies-mobile.png'),fullPage:true});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
   await page.setViewportSize({width:1440,height:1000});
+  await verifyBusinessWorkspaceLayouts({ page, invoke, token, url, output, businessDate: login.user.businessDate, require });
   await page.goto(url+'/#/crm/email-templates');
   await page.getByRole('button',{name:'新建模板',exact:true}).click();
   await page.getByLabel('模板名称',{exact:true}).fill('完整邮件流程验证');

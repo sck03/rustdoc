@@ -9,15 +9,13 @@ import { OrganizationCompanyForm, OrganizationDepartmentForm } from "./Organizat
 import { OrganizationTree } from "./OrganizationTree.tsx";
 import { OrganizationCompanyList } from "./OrganizationCompanyList.tsx";
 import { RecordDeleteDialog } from "../office/RecordDeleteDialog.tsx";
-import { UnitAccessPanel } from "./UnitAccessPanel.tsx";
-import { UnitMembersPanel } from "./UnitMembersPanel.tsx";
-import { UnitWorkflowSummary } from "./UnitWorkflowSummary.tsx";
+import { OrganizationUnitWorkspace } from "./OrganizationUnitWorkspace.tsx";
 import "../../styles/routes/office.css";
 import "../../styles/routes/organization.css";
 
 export function OrganizationDirectoryPage({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
   return user.capabilities.canManageUsers || user.capabilities.unitManagement?.organization ? <DirectoryWorkspace client={client} user={user} />
-    : <section className="work-surface office-workspace organization-workspace" aria-label="单位管理">{user.capabilities.unitManagement?.appointments && <UnitMembersPanel client={client} user={user} company={user.companyScope} />}{user.capabilities.unitManagement?.roles && <UnitAccessPanel client={client} user={user} company={user.companyScope} />}{user.capabilities.unitManagement?.analytics && <UnitWorkflowSummary client={client} user={user} />}</section>;
+    : <section className="work-surface office-workspace organization-workspace" aria-label="单位管理"><OrganizationUnitWorkspace key={user.companyScope} client={client} user={user} company={user.companyScope} /></section>;
 }
 
 function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
@@ -33,7 +31,7 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
   const company = companies.find((item) => item.code === companyCode) ?? companies.find((item) => item.isActive) ?? companies[0];
   const departments = (query.data?.departments ?? []).filter((item) => item.companyCode === company?.code);
   return <section className="work-surface office-workspace organization-workspace" aria-label="组织架构管理">
-    <div className="organization-heading"><div><h2>公司与部门</h2><p className="office-muted">公司与部门确定数据归属；负责人用于部门逐级审批，操作权限在账号与权限配置。员工调岗从人员档案办理。</p></div>
+    <div className="organization-heading"><div><h2>组织与任职</h2><p className="office-muted">先选择单位，再维护部门、任职或授权。</p></div>
       <div className="organization-actions">{user.capabilities.enabledModules?.includes("office.people") && <Link className="command-button secondary" to="/office/people">人员档案</Link>}
         {user.capabilities.canManageUsers && <Link className="command-button secondary" to="/system/access-control">账号与权限</Link>}
         {user.capabilities.canManageUsers && <button type="button" className="command-button secondary" onClick={() => setCompanyEditor({})}><Plus size={16} aria-hidden="true" />新增公司</button>}</div></div>
@@ -43,7 +41,7 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
       <div className="organization-directory-layout">
       <OrganizationCompanyList companies={companies} departments={query.data?.departments ?? []} selectedCode={company.code}
         onSelect={(code) => { setCompanyCode(code); setSearch(""); }} />
-      <section className="organization-departments" aria-label="部门层级">
+      <section className="organization-departments" aria-label="当前单位工作区">
         <div className="organization-company-summary" aria-label="公司信息">
           <div className="organization-company-title"><Building2 size={19} aria-hidden="true" /><h3>{company.name}</h3>
             <span className="organization-state" data-active={company.isActive}>{company.isActive ? "启用" : "停用"}</span></div>
@@ -52,6 +50,7 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
           <p className="office-muted">{company.code}{company.code === user.companyScope ? " · 当前账号所属公司" : ""} · {departments.length} 个部门 · {departments.filter((item) => item.isActive).length} 个启用 · {departments.filter((item) => item.managerEmployeeId).length} 个已设负责人</p>
           {company.unitKind !== "Group" && <p>公司领导审批负责人：{company.executiveName || "未设置"}</p>}
         </div>
+        <OrganizationUnitWorkspace key={company.code} client={client} user={user} company={company.code} unitId={company.id} isGroup={company.unitKind === "Group"} departments={<div className="organization-section">
         <div className="organization-heading"><div><h3>部门层级</h3></div>
           <button type="button" className="command-button" disabled={!company.isActive || company.unitKind === "Group"} onClick={() => setDepartmentEditor({})}><Plus size={17} aria-hidden="true" />新增部门</button></div>
         <div className="organization-search"><Search size={17} aria-hidden="true" /><input aria-label="查找部门或负责人" type="search" maxLength={100} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="查找部门名称、代码或负责人" />
@@ -60,12 +59,10 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
           revealDepartmentCode={revealDepartmentCode} onRevealed={() => setRevealDepartmentCode(null)}
           onEdit={(record) => setDepartmentEditor({ record })} onAdd={(parentCode) => setDepartmentEditor({ parentCode })}
           onDelete={(record) => setDeleting({ kind: "department", record })} />
+        </div>} />
       </section>
       </div>
     </>}
-    {company && (user.capabilities.canManageUsers || user.capabilities.unitManagement?.roles) && <UnitAccessPanel key={company.code} client={client} user={user} company={company.code} />}
-    {company && (user.capabilities.canManageUsers || user.capabilities.unitManagement?.analytics) && <UnitWorkflowSummary key={`summary:${company.id}`} client={client} user={user} unitId={user.capabilities.canManageUsers ? company.id : undefined} />}
-    {company && company.unitKind !== "Group" && (user.capabilities.canManageUsers || user.capabilities.unitManagement?.appointments) && <UnitMembersPanel key={`members:${company.code}`} client={client} user={user} company={company.code} />}
     {companyEditor && <OrganizationCompanyForm client={client} companies={companies} canStructure={user.capabilities.canManageUsers} record={companyEditor.record} onClose={() => setCompanyEditor(null)}
       onSaved={(saved) => { setCompanyCode(saved.code); setCompanyEditor(null); }} />}
     {departmentEditor && company && <OrganizationDepartmentForm client={client} company={company} departments={departments} {...departmentEditor}

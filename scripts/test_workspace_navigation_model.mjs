@@ -224,9 +224,13 @@ assert(product.getDefaultWorkspaceRoute({ productEdition: "Sales", canUseSalesWo
 assert(product.getDefaultWorkspaceRoute({ productEdition: "Sales", canUseSalesWorkspace: true, ...moduleGrants(["sales.opportunities"]), permissions: [permissionGrant("sales.opportunities", "view")] }) === "/access-denied", "custom permissions do not change the fixed edition home");
 assert(product.getDefaultWorkspaceRoute({ ...moduleGrants([]) }) === "/access-denied", "empty permission template uses access denied route");
 assert(product.getDefaultWorkspaceRoute({ ...moduleGrants([]), availableFeatures: ["worklist"] }) === "/access-denied", "feature availability alone does not expose business navigation");
-assert(product.getProductEditionPresentation("Document").displayName === "外贸业务综合管理系统（单证版）", "document edition brand name");
-assert(product.getProductEditionPresentation("Sales").displayName === "外贸业务综合管理系统（业务员版）", "sales edition brand name");
-assert(product.getProductEditionPresentation("Full").displayName === "外贸业务综合管理系统（全功能版）", "full edition brand name");
+assert(product.getProductEditionPresentation("Document").displayName === "外贸单证管理（单证版）", "document edition brand name");
+assert(product.getProductEditionPresentation("Sales").displayName === "外贸业务工作台（业务员版）", "sales edition brand name");
+assert(product.getProductEditionPresentation("Full").displayName === "业务协同平台", "full web and Docker brand name");
+const desktopNames = JSON.parse(fs.readFileSync(path.join(repoRoot, "scripts/product-editions.json"), "utf8"));
+for (const [edition, metadata] of Object.entries({...desktopNames.editions, ...desktopNames.localTestEditions})) {
+  assert(product.getProductEditionPresentation(edition, true).displayName === metadata.productName, `${edition} shell, login and desktop package use the same name`);
+}
 assert(product.getProductEditionPresentation("Administration").edition === "Full", "retired editions have no active presentation");
 const editionPermissions = JSON.parse(fs.readFileSync(path.join(repoRoot, "crates/export-doc-contracts/src/generated_contract.json"), "utf8")).permissions;
 const employeeGrants = editionPermissions.roles.find(role => role.code === "OfficeEmployee").grants;
@@ -263,7 +267,7 @@ for (const edition of ["Full", "Document", "Sales"]) {
     assert(routes.includes(route) === (edition === "Full"), `${edition}: team administration route ${route}`);
   }
 }
-assert(new Set(["Document", "Sales", "Full"].map((edition) => product.getProductEditionPresentation(edition).productName)).size === 1, "all editions share the same product brand");
+assert(new Set(["Document", "Sales", "Full"].map((edition) => product.getProductEditionPresentation(edition).productName)).size === 3, "edition names explain distinct workspaces");
 assert(device.getWorkspaceDeviceCapabilities("phone").canUseDenseWorkbench === false, "phone blocks dense workbench");
 assert(device.getWorkspaceDeviceCapabilities("phone").canImportExport === false, "phone blocks import and export operations");
 assert(device.getWorkspaceDeviceCapabilities("phone").canUseAdvancedTools === false, "phone blocks advanced tools");

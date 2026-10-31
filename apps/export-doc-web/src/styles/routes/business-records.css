@@ -7,7 +7,7 @@
   .business-records h2, .business-records h3, .business-records p { margin: 0; overflow-wrap: anywhere; }
   .business-records h2 { font-size: var(--edm-font-size-xl); }
   .business-records h3 { font-size: var(--edm-font-size-lg); margin: 5px 0; }
-  .business-records-heading p, .business-records-muted { color: var(--edm-ink-500); font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-relaxed); }
+  .business-records-heading p, .business-records-muted { color: var(--edm-ink-600); font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-relaxed); }
   .business-records-list { display: grid; gap: var(--edm-layout-gap); padding: 0; margin: 0; list-style: none; }
   .business-records-card, .business-records-form, .attachment-version { min-width: 0; padding: var(--edm-section-padding); border: 1px solid var(--edm-line); border-radius: var(--edm-radius-md); background: var(--edm-surface); box-shadow: var(--edm-shadow-sm); }
   .business-records-card { display: flex; justify-content: space-between; align-items: center; gap: 16px; }

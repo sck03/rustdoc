@@ -89,7 +89,13 @@ mod tests {
     fn window_title_matches_compiled_product_edition() {
         let title = product_window_title();
         assert!(title.contains("版）"));
-        assert!(title.contains("管理系统"));
+        let expected = match env!("EXPORTDOCMANAGER_PRODUCT_EDITION") {
+            "Document" => "外贸单证管理（单证版）",
+            "Sales" => "外贸业务工作台（业务员版）",
+            "Full" => "业务协同平台（Full 单机测试版）",
+            other => panic!("unexpected product edition: {other}"),
+        };
+        assert_eq!(title, expected);
     }
 
     #[test]

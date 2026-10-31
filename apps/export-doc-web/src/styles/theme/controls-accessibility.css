@@ -1,20 +1,21 @@
 
 .command-button {
   min-height: var(--edm-control-height);
-  background: linear-gradient(135deg, var(--edm-primary-600), var(--edm-primary-700));
-  border-color: var(--edm-primary-700);
-  box-shadow: 0 5px 13px color-mix(in srgb, var(--edm-primary-600) 17%, transparent);
+  background: var(--edm-primary-600);
+  border-color: var(--edm-primary-600);
+  box-shadow: none;
+  text-decoration: none;
 }
 
 .command-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, var(--edm-primary-650), var(--edm-primary-775));
-  border-color: var(--edm-primary-775);
-  box-shadow: 0 8px 18px color-mix(in srgb, var(--edm-primary-600) 22%, transparent);
-  transform: translateY(-1px);
+  background: var(--edm-primary-700);
+  border-color: var(--edm-primary-700);
+  box-shadow: none;
+  text-decoration: none;
 }
 
 /* Destructive actions use a dedicated high-contrast surface. The old rule
-   only changed the text to red while retaining the teal command background,
+   only changed the text to red while retaining the primary command background,
    which made the 作废 label difficult to read in the invoice editor. */
 .command-button.danger,
 .command-button.danger-command {

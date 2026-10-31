@@ -15,6 +15,7 @@ import {
   subscribeToAppExitRequests,
 } from "./desktop/desktopBridge.ts";
 import { LoginPage } from "./features/auth/LoginPage.tsx";
+import { PageState } from "./ui/PageState.tsx";
 import { readDesktopError } from "./ui/DesktopPathActions.tsx";
 import { readApiError } from "./ui/formUtils.ts";
 import { useConfirmUnsavedChanges, useHasUnsavedChanges } from "./ui/unsavedChangesGuard.tsx";
@@ -95,13 +96,14 @@ function App() {
   const canManageAuditLogs = canManageSystem && session?.user.capabilities.canManageUsers === true;
   const activeProduct = getProductEditionPresentation(
     session?.user.capabilities?.productEdition ?? desktopProductEdition,
+    isDesktopRuntime,
   );
 
   useEffect(() => {
     if (!session) {
-      document.title = activeProduct.displayName;
+      document.title = desktopContextLoading ? "正在启动…" : activeProduct.displayName;
     }
-  }, [activeProduct.displayName, session]);
+  }, [activeProduct.displayName, desktopContextLoading, session]);
 
   useEffect(() => {
     if (!isDesktopRuntime) {
@@ -563,7 +565,7 @@ function App() {
   }, [location.pathname, navigate, session]);
 
   const isBusy = loginState === "loading" || desktopContextLoading;
-  const loginProduct = getProductEditionPresentation(desktopProductEdition);
+  const loginProduct = getProductEditionPresentation(desktopProductEdition, isDesktopRuntime);
   const sessionAttention: WorkspaceSessionAttention | null = sessionAttentionState
     ? {
         state: sessionAttentionState,
@@ -579,6 +581,10 @@ function App() {
         onDiscardAndLogout: () => { void handleDiscardExpiredDraftAndLogout(); },
       }
     : null;
+
+  if (desktopContextLoading) {
+    return <main className="login-screen"><PageState tone="loading" title="正在准备工作空间" /></main>;
+  }
 
   if (!session) {
     return (

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
 import { PageState } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useWorklist } from "./useWorklist.ts";
@@ -13,10 +14,9 @@ export function WorklistPage({ client, user }: { client: ExportDocManagerApiClie
   const { query } = model;
   const data = query.data;
   return <section className="work-surface business-records" aria-label="我的待办">
-    <header className="business-records-heading"><div><h2>我的待办</h2>
-      <p>按业务来源分组，进入原业务处理后自动更新。到期时间按公司业务时区显示。</p></div>
-      <button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => void query.refetch()}><RefreshCw size={16} aria-hidden="true" />刷新</button></header>
-    <div className="business-records-toolbar">
+    <ListWorkspaceHeader title="待办清单" count={data?.page.totalCount} description="按来源和到期时间查找，进入原业务处理后自动更新。" actions={
+      <button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => void query.refetch()}><RefreshCw size={16} aria-hidden="true" />刷新</button>}>
+    <div className="list-workspace-filters">
       <label>事项来源<select value={model.source} onChange={(event) => model.changeSource(event.target.value)}>
         <option value="">全部来源</option>{data?.sources.map((source) => <option key={source.key} value={source.key}>{source.name}（{source.count}）</option>)}
       </select></label>
@@ -25,6 +25,7 @@ export function WorklistPage({ client, user }: { client: ExportDocManagerApiClie
         if (option) model.changeDue(option.value);
       }}>{worklistDueOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
     </div>
+    </ListWorkspaceHeader>
     {query.isPending ? <PageState tone="loading" title="正在读取待办" /> : query.isError ?
       <PageState tone="error" title="待办加载失败" description={readApiError(query.error)} /> : <>
         {!data?.page.items.length && <PageState title="当前没有符合条件的待办" description="仅汇总当前账号有权查看和处理的业务事项。" />}

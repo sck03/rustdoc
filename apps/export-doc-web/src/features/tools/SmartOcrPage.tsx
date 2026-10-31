@@ -136,14 +136,11 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
           }
         />
         <div className="toolbar-actions smart-ocr-action-bar">
-          <button className="icon-button" type="button" title="粘贴图片" aria-label="粘贴图片" disabled={isBusy || !canUseOcr} onClick={() => void pasteImage()}>
-            <ClipboardPaste size={18} aria-hidden="true" />
+          <button className="command-button secondary" type="button" disabled={isBusy || !canUseOcr} onClick={() => void pasteImage()}>
+            <ClipboardPaste size={18} aria-hidden="true" />粘贴图片
           </button>
-          <button className="icon-button" type="button" title="复制文本" aria-label="复制文本" disabled={!canCopy} onClick={() => void copyText()}>
-            <Copy size={18} aria-hidden="true" />
-          </button>
-          <button className="icon-button solid" type="button" title="开始识别" aria-label="开始识别" disabled={!canRecognize} onClick={() => void recognizeCurrentImage()}>
-            <Play size={18} aria-hidden="true" />
+          <button className="command-button" type="button" aria-label="开始识别" disabled={!canRecognize} onClick={() => void recognizeCurrentImage()}>
+            <Play size={18} aria-hidden="true" />{isBusy ? "正在识别" : "开始识别"}
           </button>
         </div>
       </div>
@@ -250,6 +247,9 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
                 <h2>识别结果</h2>
                 <span>{result ? `${result.lines?.length ?? 0} 行` : "等待识别"}</span>
               </div>
+              <button className="command-button secondary" type="button" disabled={!canCopy} onClick={() => void copyText()}>
+                <Copy size={16} aria-hidden="true" />复制文本
+              </button>
             </div>
             <textarea aria-label="识别文本" value={recognizedText || (isBusy ? "正在识别中，请稍候..." : "")} readOnly />
           </section>

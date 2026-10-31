@@ -37,11 +37,11 @@ export function InvoiceBatchReportPanel({ client, selected, onChange, hidden = f
     onSuccess: () => { setOpen(false); void queries.invalidateQueries({ queryKey: queryKeys.jobsRoot() }); },
   });
   return <div className="invoice-batch-report" hidden={hidden}>
-    <div className="toolbar"><strong>已选 {selected.length} 张发票</strong>
+    {!selected.length && !open ? <p className="section-description">勾选下方发票后可生成批量报表，支持跨页选择。</p> : <div className="list-workspace-selection"><strong>已选 {selected.length} 张发票</strong>
       <button className="command-button secondary" type="button" disabled={!selected.length || exportMutation.isPending} onClick={() => setOpen((value) => !value)}>{open ? "收起批量报表" : "生成批量报表"}</button>
       {selected.length > 0 && <button className="command-button secondary" type="button" disabled={exportMutation.isPending} onClick={() => onChange([])}>清空选择</button>}
       <span className="section-description">可跨页选择，单次最多生成 {invoiceReportBatchLimits.maxReports} 份 PDF</span>
-    </div>
+    </div>}
     {exportMutation.isError && <InlineNotice tone="error">{readApiError(exportMutation.error)}</InlineNotice>}
     {exportMutation.data && <InlineNotice tone="success" action={<ViewJobButton jobId={exportMutation.data.jobId} />}>批量报表任务已创建，可在文件任务中查看进度和结果。</InlineNotice>}
     {message && <InlineNotice tone="error">{message}</InlineNotice>}

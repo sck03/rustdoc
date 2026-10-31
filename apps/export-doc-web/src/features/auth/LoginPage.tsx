@@ -35,7 +35,6 @@ export function LoginPage({
 }: LoginPageProps) {
   return (
     <main className="login-screen">
-      <div className="login-grid-overlay" aria-hidden="true" />
       <div className="login-composition">
         <section className="login-brand-copy" aria-label="系统名称">
           <div className="login-brand-lockup">
@@ -43,7 +42,7 @@ export function LoginPage({
               <FileText size={28} aria-hidden="true" />
             </span>
             <span className="login-brand-lockup-copy">
-              <strong>{product.productName}</strong>
+              <strong>有序工作，协同共进</strong>
               <small>{product.englishName}</small>
             </span>
           </div>
@@ -52,6 +51,7 @@ export function LoginPage({
             <span className="login-edition-badge">{product.editionName}</span>
           </div>
           <p>{product.loginTagline}</p>
+          <ul className="login-highlights" aria-label="工作空间用途">{product.loginHighlights.map(item => <li key={item}><ShieldCheck size={18} aria-hidden="true" />{item}</li>)}</ul>
         </section>
 
         <form className="login-card" onSubmit={onSubmit}>
@@ -59,7 +59,7 @@ export function LoginPage({
             <div>
               <p className="login-kicker">工作区</p>
               <h2>登录</h2>
-              <p className="login-card-subtitle">使用管理员分配的账号进入业务工作台</p>
+              <p className="login-card-subtitle">{isDesktopRuntime ? "登录本机工作空间，继续处理业务" : "使用工作账号，进入团队协同空间"}</p>
             </div>
             <span className="login-card-mark">
               <LogIn size={20} aria-hidden="true" />

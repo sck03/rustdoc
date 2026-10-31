@@ -9,35 +9,39 @@ export type ProductEditionPresentation = {
   editionName: string;
   loginTagline: string;
   englishName: string;
+  loginHighlights: readonly string[];
   defaultRoute: "/dashboard" | "/crm/dashboard" | "/office/people";
 };
 
 const presentations: Record<ProductEdition, ProductEditionPresentation> = {
   Document: {
     edition: "Document",
-    productName: "外贸业务综合管理系统",
-    displayName: "外贸业务综合管理系统（单证版）",
+    productName: "外贸单证管理",
+    displayName: "外贸单证管理（单证版）",
     editionName: "单证版",
     loginTagline: "单证制作与交付工作台",
-    englishName: "Foreign Trade Business Management System",
+    englishName: "ExportDocManager · Documents",
+    loginHighlights: ["制单与校验", "模板与导出", "资料与归档"],
     defaultRoute: "/dashboard",
   },
   Sales: {
     edition: "Sales",
-    productName: "外贸业务综合管理系统",
-    displayName: "外贸业务综合管理系统（业务员版）",
+    productName: "外贸业务工作台",
+    displayName: "外贸业务工作台（业务员版）",
     editionName: "业务员版",
     loginTagline: "个人外贸工作台",
-    englishName: "Foreign Trade Business Management System",
+    englishName: "ExportDocManager · Sales",
+    loginHighlights: ["客户与跟进", "商机与报价", "供货商资料"],
     defaultRoute: "/crm/dashboard",
   },
   Full: {
     edition: "Full",
-    productName: "外贸业务综合管理系统",
-    displayName: "外贸业务综合管理系统（全功能版）",
-    editionName: "全功能版",
-    loginTagline: "单证、销售、行政与人事一站式工作台",
-    englishName: "Foreign Trade Business Management System",
+    productName: "业务协同平台",
+    displayName: "业务协同平台",
+    editionName: "协同版",
+    loginTagline: "客户业务、单证、人事与审批协同工作空间",
+    englishName: "ExportDocManager · Collaboration",
+    loginHighlights: ["业务与单证", "人员与组织", "申请与审批"],
     defaultRoute: "/dashboard",
   },
 };
@@ -47,8 +51,15 @@ export function normalizeProductEdition(value: unknown): ProductEdition {
   return "Full";
 }
 
-export function getProductEditionPresentation(value: unknown) {
-  return presentations[normalizeProductEdition(value)];
+const desktopFullPresentation: ProductEditionPresentation = {
+  ...presentations.Full,
+  displayName: "业务协同平台（Full 单机测试版）",
+  editionName: "Full 单机测试版",
+};
+
+export function getProductEditionPresentation(value: unknown, isDesktopRuntime = false) {
+  const edition = normalizeProductEdition(value);
+  return edition === "Full" && isDesktopRuntime ? desktopFullPresentation : presentations[edition];
 }
 
 export function getDefaultWorkspaceRoute(capabilities: WorkspaceCapabilities) {

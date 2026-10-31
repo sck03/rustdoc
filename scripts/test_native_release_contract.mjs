@@ -125,7 +125,9 @@ async function testScriptSuiteExitStatus() {
 
 async function testContainerRestartWorkflows() {
   const execute = promisify(execFile);
-  for (const name of ['rust-native-validation', 'rust-native-container-release']) {
+  const entry = await readFile(path.join(root, '.github/workflows/rust-native-validation.yml'), 'utf8');
+  assert.match(entry, /uses: \.\/\.github\/workflows\/native-full-validation\.yml/u, 'full validation remains reachable from the public workflow');
+  for (const name of ['native-full-validation', 'rust-native-container-release']) {
     const workflow = await readFile(path.join(root, `.github/workflows/${name}.yml`), 'utf8');
     const blocks = [...workflow.matchAll(/name: (?:Restart|Reapply|Restore with independent)[^\n]+\r?\n\s+shell: pwsh\r?\n\s+run: \|\r?\n([\s\S]*?)(?=      - name:)/gu)].map(match => match[1]);
     assert.equal(blocks.length, 3, `${name} verifies live redeployment, maintenance restore and persistence`);

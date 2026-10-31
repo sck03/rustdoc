@@ -2,7 +2,26 @@
 
 核对日期：2026-10-31。对应[执行方案](./OA审批与组织权限整体重构执行方案.md)的 T01–T42、F01–F20、S1–S8 和 A01–A40。软件实现和本机可执行门禁已完成；Windows 系统 IME 候选窗及独立平台限制在下方明确记录。清理和 Git 回执见文末，不把本机结果扩大为所有平台验收。
 
-## 实现与证据规则
+## 2026-10-31 前端结构与视觉追加验收
+
+本批从 `98f5f7a4` 开始，工作分支为 `codex/oa-interface-completion`。完整页面审查、产品名称及设计参考见[前端视觉与产品命名规范](./前端视觉与产品命名规范.md)。原始日志位于 `.codex-runtime/oa-interface-20261031/`，与下方账号/组织/OA 内核批次分开记账。
+
+| 检查 | 本批结果及证据 |
+| --- | --- |
+| Rust 完整门禁 | `final-fmt.log`、`cargo-workspace-test.log`、`cargo-workspace-check.log` 均退出 0；含 doc-tests 82 组，481 passed / 0 failed / 5 ignored |
+| Web 构建与通用门禁 | `final-web-build.log` 通过；198 个缩放、84 个视觉场景通过；手机卡片修复后 `final-visual-cards.log` 追加 42 个平板/手机场景通过，像素阈值保持 0.5% |
+| 业务列表、资料与 OCR | 33 项业务界面、15 项导航/报表选择、9 项 OCR 回归通过；资料卡片 320/390/768/1440 宽度检查；多行字段增加边界断言并目视确认 |
+| 真实业务布局 | `final-layout-review-verified.log` 通过：示例发票、长中英文客户名、供应商、跟进/商机、具体记录跳转、申请分类搜索、文件任务展开状态保留；1440/390 画面与无障碍检查 |
+| OA、组织与权限布局 | 113 个办公场景、真实 OA completion、账号/审批权限、单位身份、27 项导航重组回归通过；组织延迟挂载/保留输入、首分类异步加载、HS 横排和申请按钮白字单独断言 |
+| 六类模板与批量文件 | 初次返回预览 504；Rust 全量结束后 `final-batch-file-isolated.log` 独立完整复验通过，未延长时限或放宽断言 |
+| Windows Tauri 三版 | Document / Sales / Full 均从本批工作树 locked 重建并通过真实桌面回归，日志 `final-desktop-*.log`。修复启动前短暂 Full 标题；含真实 OCR、表格/中文文本、原件/版本、权限和维护。Full 的 16 份/16 页实际 PDF 已渲染查看；小纸张沿用尺寸与已有裁切边界 |
+| 脚本、依赖与规模 | 脚本套件、56 项 Actions 引用、updater、release contract、公开源码通过；835 components，unresolved=0 / disallowed=0。最终样式和源码规模通过；Web 生产 88,543 行，比原基线减少 286 行 |
+
+本批不改数据库与 API；下方 PostgreSQL 18、容量、备份恢复为上一内核批次证据，不冒充本批重跑。Windows 系统 IME 候选窗、其它 OS/架构、Docker daemon、实体打印继续各自验收。三版程序位于 `artifacts/oa-completion-desktop/ExportDocManager.Tauri.{Document,Sales,Full}`；构建版本 `0.1.2+git.98f5f7a435ba` 表示构建时父提交，包内含本批工作树实现。
+
+本批按明确来源、活动进程、链接/Git 边界及逐文件 SHA-256 清理 11 个已结束界面测试根，确认全部删除 **418,219,133 字节（约 398.85 MiB）**。保留最新同名截图/PDF/结果约 12.35 MiB；删除量是原文件长度，不能算作磁盘净释放。一次 Code Cache “目录不是空的”后，仅重验原清单剩余文件并逐项删除，最终 0 个残留根。551 个实际/私有保留文件 SHA-256 全部一致；最新三版程序、Cargo/npm/浏览器及原生资源缓存保留。精确清单和回执为本批 `cleanup-plan.json`、`cleanup-receipt.json`、`cleanup-result.json`；精选证据在 `retained-evidence/`，当前桌面复现输出另位于 `artifacts/oa-interface-desktop-validation/`。
+
+## 账号、组织与 OA 内核批次：实现与证据规则
 
 源码基线为 schema 11；字段、DDL、指纹及关系见[数据字典](./账号组织OA新基线数据字典.md)，操作见[人员组织权限与 OA 手册](./人员组织权限与OA操作手册.md)。起点为 `e9c1aa8a`，工作分支为 `codex/oa-integration-completion`。起点未提交内容已备份，保留原业务数据和用户私有备份。
 
@@ -10,7 +29,7 @@
 
 本轮日志根为 `.codex-runtime/oa-completion-20261031/`。清理后保留日志、精确清单及 `retained-evidence/` 中的容量/恢复结果和精选 PDF/截图；原 `artifacts/*-ui/` 与隔离测试库目录已退役。上述本地证据不提交 Git；测试入口、具体断言和本台账保留在源码。
 
-## 当前集中门禁
+## 账号、组织与 OA 内核批次：集中门禁
 
 | 检查 | 当前结果及证据 |
 | --- | --- |

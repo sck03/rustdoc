@@ -61,6 +61,6 @@ export async function verifyAttachmentManagementUi({ page, open, read, waitFor, 
   await click(page, "永久删除", "[role=dialog] button");
   await waitFor(page, "!document.querySelector('.attachment-detail') && window.__calls.some(call=>call.name==='deleteAttachment')");
   assert.deepEqual(await read(page, "window.__calls.find(call=>call.name==='deleteAttachment').input.body"), { expectedVersion: 3, note: "重复上传的资料" });
-  assert.equal(await read(page, "document.querySelectorAll('.business-records-card').length"), 0);
+  assert.equal(await read(page, "document.querySelectorAll('.responsive-data-table tbody tr').length"), 0);
   results.push("permanent-delete-requires-reason-confirmation-and-current-version");
 }
