@@ -25,6 +25,8 @@ mod oa_archive_contract;
 mod oa_contract;
 #[path = "support/oa_integration_contract.rs"]
 mod oa_integration_contract;
+#[path = "support/oa_review_contract.rs"]
+mod oa_review_contract;
 #[path = "support/office_contract.rs"]
 mod office_contract;
 #[path = "support/organization_workflow_contract.rs"]
@@ -119,6 +121,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
             .is_none()
     );
     let token = admin["accessToken"].as_str().unwrap();
+    oa_review_contract::exercise(&service, token);
     material_contract::exercise(&service, token);
     workflow_operations_contract::exercise(&service, token);
     permission_identity_contract::exercise(&service, token);

@@ -10,6 +10,7 @@ import { InlineNotice } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { officeCommand } from "../office/officeCommands.ts";
 import { workflowTargets } from "./workflowOperationModel.ts";
+import { officeWorkflowQueryRoots } from "../../api/queryKeys.ts";
 type Command=OaWorkflowCommandSave["command"];
 const labels:Record<Command,string>={AddBefore:"前加签",AddAfter:"后加签",AddParallel:"并行加签",RemoveSigner:"减签",ReturnToNode:"退回指定节点",Suspend:"暂停流程",Resume:"恢复流程",Terminate:"终止流程"};
 export function WorkflowOperations({client,row,disabled=false}:{client:ExportDocManagerApiClient;row:OaRequest|OfficeRequestRow;disabled?:boolean}) {
@@ -18,7 +19,8 @@ export function WorkflowOperations({client,row,disabled=false}:{client:ExportDoc
   return <><button type="button" className="command-button secondary" disabled={disabled} onClick={()=>setOpened(true)}>流程操作</button>{opened&&<WorkflowOperationDialog client={client} row={row} onClose={()=>setOpened(false)}/>}</>;
 }
 function WorkflowOperationDialog({client,row,onClose}:{client:ExportDocManagerApiClient;row:OaRequest|OfficeRequestRow;onClose:()=>void}) {
-  const operation=useOfficeOperation([["office","oa"],["office","resource-request"],["office","rooms"],["office","supplies"],["office","communication"],["worklist"]]);
+  const kind="meetingRoomId" in row?"room":"officeSupplyId" in row?"supply":row.kind;
+  const operation=useOfficeOperation(officeWorkflowQueryRoots(kind),false);
   const [command,setCommand]=useState<Command>(row.workflowActions![0]);
   const [target,setTarget]=useState("");
   const [users,setUsers]=useState<number[]>([]);

@@ -121,3 +121,12 @@ export function officeResourceQueryRoots(kind: "rooms" | "supplies") {
     ["office", "people", "clearance"], queryKeys.unitWorkflowTasks(), queryKeys.unitWorkflowSummary(),
   ] as const;
 }
+
+export function officeWorkflowQueryRoots(kind: string) {
+  if (kind === "room" || kind === "bookings") return officeResourceQueryRoots("rooms");
+  if (kind === "supply" || kind === "supply-requests") return officeResourceQueryRoots("supplies");
+  const requestKind = kind.replace(/^oa-/, "");
+  return [["office", "oa", requestKind], ["office", "oa", "hub"], ["office", "communication"],
+    ["office", "people", "clearance"], queryKeys.unitWorkflowTasks(), queryKeys.unitWorkflowSummary(),
+    ...(requestKind === "personnel" ? [["office", "people"], ...identityQueryRoots] : [])];
+}

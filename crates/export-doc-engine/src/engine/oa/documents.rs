@@ -234,69 +234,82 @@ pub(in crate::engine) fn download(
             content: bytes,
         });
     }
-    service.store.read(|tx| {
-        let (_, row) = current(tx, actor, meta, records::id(parameters)?)?;
-        let id = submissions::id(parameters)?;
-        let snapshot = submissions::checked(tx, &row, id)?;
-        if snapshot["status"] != "Approved" {
-            return Err(conflict("该提交版本尚未批准或已作废，不能下载正式审批单。"));
-        }
+    service
+        .store
+        .read(|tx| full_download(tx, actor, meta, parameters))
+}
+fn full_download(
+    tx: &Connection,
+    actor: &Actor,
+    meta: &Value,
+    parameters: &[(&str, String)],
+) -> Result<FileOutput> {
+    let (actor, row) = current(tx, actor, meta, records::id(parameters)?)?;
+    let id = submissions::id(parameters)?;
+    let snapshot = submissions::checked(tx, &row, id)?;
+    if snapshot["status"] != "Approved" {
+        return Err(conflict("该提交版本尚未批准或已作废，不能下载正式审批单。"));
+    }
+    if !super::materials::full(tx, &actor, &row, &snapshot)? {
+        return Err(error(403, "材料权限已变化，请重新下载当前授权的审批材料。"));
+    }
+    let info = tx
+        .blob_info(id, submissions::PDF)?
+        .ok_or_else(|| conflict("审批单尚未生成，请等待或重试。"))?;
+    if info.size > 16 * 1024 * 1024 {
+        return Err(unavailable("审批单超过下载容量。"));
+    }
+    let blob = tx
+        .blob(id, submissions::PDF)?
+        .ok_or_else(|| unavailable("审批单文件缺失。"))?;
+    if media::digest(&blob.content) != blob.digest || blob.digest != info.digest {
+        return Err(unavailable("审批单完整性校验失败。"));
+    }
+    if meta["action"] == "document-download" {
+        return Ok(FileOutput {
+            file_name: blob.file_name,
+            media_type: blob.media_type,
+            content: blob.content,
+        });
+    }
+    let mut archive = export_doc_report::DocumentArchive::new();
+    archive.add(&blob.file_name, &blob.content)?;
+    let attachments = snapshot["request"]["attachments"]
+        .as_array()
+        .ok_or_else(|| unavailable("提交附件清单损坏。"))?;
+    for (index, attachment) in attachments.iter().enumerate() {
+        crate::operation::check()?;
+        let id = records::positive(attachment, "id", "附件")?;
         let info = tx
-            .blob_info(id, submissions::PDF)?
-            .ok_or_else(|| conflict("审批单尚未生成，请等待或重试。"))?;
-        if info.size > 16 * 1024 * 1024 {
-            return Err(unavailable("审批单超过下载容量。"));
+            .blob_info(id, "oa-attachment")?
+            .ok_or_else(|| unavailable("历史附件元数据缺失。"))?;
+        if info.size > media::DOCUMENT_LIMIT as u64 || attachment["digest"] != info.digest {
+            return Err(unavailable("历史附件元数据不一致。"));
         }
-        let blob = tx
-            .blob(id, submissions::PDF)?
-            .ok_or_else(|| unavailable("审批单文件缺失。"))?;
-        if media::digest(&blob.content) != blob.digest || blob.digest != info.digest {
-            return Err(unavailable("审批单完整性校验失败。"));
+        let file = tx
+            .blob(id, "oa-attachment")?
+            .ok_or_else(|| unavailable("历史附件原文件缺失。"))?;
+        if media::digest(&file.content) != info.digest {
+            return Err(unavailable("历史附件完整性校验失败。"));
         }
-        if meta["action"] == "document-download" {
-            return Ok(FileOutput {
-                file_name: blob.file_name,
-                media_type: blob.media_type,
-                content: blob.content,
-            });
-        }
-        let mut archive = export_doc_report::DocumentArchive::new();
-        archive.add(&blob.file_name, &blob.content)?;
-        let attachments = snapshot["request"]["attachments"]
-            .as_array()
-            .ok_or_else(|| unavailable("提交附件清单损坏。"))?;
-        for (index, attachment) in attachments.iter().enumerate() {
-            crate::operation::check()?;
-            let id = records::positive(attachment, "id", "附件")?;
-            let info = tx
-                .blob_info(id, "oa-attachment")?
-                .ok_or_else(|| unavailable("历史附件元数据缺失。"))?;
-            if info.size > media::DOCUMENT_LIMIT as u64 || attachment["digest"] != info.digest {
-                return Err(unavailable("历史附件元数据不一致。"));
-            }
-            let file = tx
-                .blob(id, "oa-attachment")?
-                .ok_or_else(|| unavailable("历史附件原文件缺失。"))?;
-            if media::digest(&file.content) != info.digest {
-                return Err(unavailable("历史附件完整性校验失败。"));
-            }
-            archive.add(
-                &format!("{:02}-{}", index + 1, file.file_name),
-                &file.content,
-            )?;
-        }
-        let manifest = submissions::project(tx, snapshot.clone(), false)?;
         archive.add(
-            "审批材料清单.json",
-            &serde_json::to_vec_pretty(&json!({"submission":manifest,"attachments":attachments}))?,
+            &format!("{:02}-{}", index + 1, file.file_name),
+            &file.content,
         )?;
-        Ok(FileOutput {
-            file_name: format!(
-                "审批材料-{}-v{}.zip",
-                row["id"], snapshot["submissionNumber"]
-            ),
-            media_type: "application/zip".into(),
-            content: archive.finish()?,
-        })
+    }
+    let manifest = submissions::project(tx, snapshot.clone(), false)?;
+    archive.add(
+        "审批材料清单.json",
+        &serde_json::to_vec_pretty(&json!({"submission":manifest,"attachments":attachments}))?,
+    )?;
+    Ok(FileOutput {
+        file_name: format!(
+            "审批材料-{}-v{}.zip",
+            row["id"], snapshot["submissionNumber"]
+        ),
+        media_type: "application/zip".into(),
+        content: archive.finish()?,
     })
 }
+#[cfg(test)]
+mod tests;

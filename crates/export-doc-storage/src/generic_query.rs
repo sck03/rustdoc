@@ -26,61 +26,86 @@ pub enum ScopeFilter {
     Departments(Vec<(String, String)>),
     Projects(Vec<String>),
 }
+pub(crate) fn restriction_condition(
+    rules: &[ScopeFilter],
+    record: &str,
+    pg: bool,
+    bind: &mut impl FnMut(String) -> String,
+) -> String {
+    let mut clauses = vec![];
+    for rule in rules {
+        clauses.push(match rule {
+            ScopeFilter::Deny => "FALSE".into(),
+            ScopeFilter::Units(units) => {
+                if units.is_empty() {
+                    "FALSE".into()
+                } else {
+                    format!(
+                        "{record}.company IN ({})",
+                        units
+                            .iter()
+                            .map(|v| bind(v.clone()))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    )
+                }
+            }
+            ScopeFilter::Departments(departments) => {
+                if departments.is_empty() {
+                    "FALSE".into()
+                } else {
+                    format!(
+                        "({})",
+                        departments
+                            .iter()
+                            .map(|(unit, department)| {
+                                let u = bind(unit.clone());
+                                let d = bind(department.clone());
+                                format!("({record}.company={u} AND {record}.department={d})")
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" OR ")
+                    )
+                }
+            }
+            ScopeFilter::Projects(projects) => {
+                if projects.is_empty() {
+                    "FALSE".into()
+                } else {
+                    let project = if pg {
+                        format!("{record}.body->>'projectId'")
+                    } else {
+                        format!("json_extract({record}.body,'$.projectId')")
+                    };
+                    format!(
+                        "{project} IN ({})",
+                        projects
+                            .iter()
+                            .map(|v| bind(v.clone()))
+                            .collect::<Vec<_>>()
+                            .join(",")
+                    )
+                }
+            }
+        });
+    }
+    if clauses.is_empty() {
+        "TRUE".into()
+    } else {
+        clauses.join(" AND ")
+    }
+}
 impl DataScope<'_> {
     pub(crate) fn filter(&self, values: &mut Vec<String>, pg: bool) -> String {
         let base = self.base_filter(values, pg);
         let mut clauses = vec![format!("({base})")];
-        for rule in &self.restrictions {
-            clauses.push(match rule {
-                ScopeFilter::Deny => "1=0".into(),
-                ScopeFilter::Units(units) => {
-                    if units.is_empty() {
-                        "1=0".into()
-                    } else {
-                        format!(
-                            "r.company IN ({})",
-                            units
-                                .iter()
-                                .map(|unit| bind(values, unit, pg))
-                                .collect::<Vec<_>>()
-                                .join(",")
-                        )
-                    }
-                }
-                ScopeFilter::Departments(departments) => {
-                    if departments.is_empty() {
-                        "1=0".into()
-                    } else {
-                        format!(
-                            "({})",
-                            departments
-                                .iter()
-                                .map(|(unit, department)| {
-                                    let u = bind(values, unit, pg);
-                                    let d = bind(values, department, pg);
-                                    format!("(r.company={u} AND r.department={d})")
-                                })
-                                .collect::<Vec<_>>()
-                                .join(" OR ")
-                        )
-                    }
-                }
-                ScopeFilter::Projects(projects) => {
-                    if projects.is_empty() {
-                        "1=0".into()
-                    } else {
-                        format!(
-                            "{} IN ({})",
-                            field("projectId", pg),
-                            projects
-                                .iter()
-                                .map(|project| bind(values, project, pg))
-                                .collect::<Vec<_>>()
-                                .join(",")
-                        )
-                    }
-                }
-            });
+        if !self.restrictions.is_empty() {
+            clauses.push(restriction_condition(
+                &self.restrictions,
+                "r",
+                pg,
+                &mut |v| bind(values, v, pg),
+            ));
         }
         clauses.join(" AND ")
     }

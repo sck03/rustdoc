@@ -123,8 +123,9 @@ pub struct RecordWrite<'a> {
     pub identity: Option<&'a str>,
     pub body: &'a Value,
 }
-/// One eligible approval principal and its optional department restriction.
+/// A principal's explicit limits intersect its delegated participation grant.
 pub struct RecordApprover {
+    pub restrictions: Vec<ScopeFilter>,
     pub user_id: i64,
     pub context: String,
 }
@@ -333,6 +334,7 @@ delegate! {
     records_by_ids(kind:&str,ids:&[i64],fields:&[(&str,&str)])->Vec<Value>;
     unit_accounts(company:&str,date:&str,all:bool)->Vec<Value>;
     unit_account_page(company:&str,date:&str,all:bool,before:Option<i64>,limit:i64)->Vec<Value>;
+    workflow_notification_account_page(company:&str,date:&str,before:Option<i64>,limit:i64)->Vec<Value>;
     resource_has_open_requests(kind:&str,parent:i64)->bool;
     supplier_overview(scope:&DataScope<'_>)->Value;
     query_workflow_summary(query:&WorkflowSummaryQuery<'_>)->(i64,Vec<Value>);

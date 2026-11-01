@@ -118,8 +118,8 @@ pub(in crate::engine) fn personnel_changed(
         .map(|a| a.company_code)
         .collect();
     for company in companies {
-        let departments =
-            super::super::personnel_organization::departments_in(tx, saved, &company)?;
+        let today = super::super::units::today(tx)?;
+        let current = super::super::personnel_organization::assignments(saved)?;
         for rule in published_rules(tx, &company)? {
             if rule.kind == "personnel" && rule.variant == "Hire" {
                 continue;
@@ -130,16 +130,28 @@ pub(in crate::engine) fn personnel_changed(
                     ApproverSource::FunctionalManagers => true,
                     _ => continue,
                 };
-                for department in
-                    super::super::personnel_organization::departments_in(tx, previous, &company)?
-                {
-                    if departments.contains(&department)
-                        && applies_to_department(stage, &department)?
+                for appointment in super::super::personnel_organization::assignments(previous)? {
+                    if appointment.company_code != company
+                        || !appointment
+                            .active_on(today)
+                            .map_err(super::super::error::unavailable)?
+                    {
+                        continue;
+                    }
+                    let still_active = current
+                        .iter()
+                        .find(|a| a.id == appointment.id)
+                        .map(|a| a.active_on(today))
+                        .transpose()
+                        .map_err(super::super::error::unavailable)?
+                        .unwrap_or(false);
+                    if still_active
+                        && applies_to_department(stage, &appointment.department_id)?
                         && !super::super::personnel_organization::appointment_managers(
                             tx,
                             previous,
                             &company,
-                            &department,
+                            &appointment.id,
                             functional,
                         )?
                         .is_empty()
@@ -147,7 +159,7 @@ pub(in crate::engine) fn personnel_changed(
                             tx,
                             saved,
                             &company,
-                            &department,
+                            &appointment.id,
                             functional,
                         )?
                         .is_empty()
@@ -220,19 +232,28 @@ pub(super) fn rule(
                     .iter()
                     .filter(|p| matches!(p["status"].as_str(), Some("Active" | "Probation")))
                 {
-                    for department in
-                        super::super::personnel_organization::departments_in(tx, person, company)?
-                    {
+                    for appointment in super::super::personnel_organization::assignments(person)? {
+                        if appointment.company_code != company
+                            || !appointment
+                                .active_on(super::super::units::today(tx)?)
+                                .map_err(super::super::error::unavailable)?
+                        {
+                            continue;
+                        }
                         if !super::super::personnel_organization::appointment_managers(
                             tx,
                             person,
                             company,
-                            &department,
+                            &appointment.id,
                             stage.source == ApproverSource::FunctionalManagers,
                         )?
                         .is_empty()
                         {
-                            contexts.push((department, person.clone()));
+                            contexts.push((
+                                appointment.department_id,
+                                person.clone(),
+                                appointment.id,
+                            ));
                         }
                     }
                 }
@@ -240,16 +261,16 @@ pub(super) fn rule(
             }
             ApproverSource::DepartmentManager | ApproverSource::DepartmentLeaders => departments
                 .iter()
-                .map(|d| (text(d, "code"), Value::Null))
+                .map(|d| (text(d, "code"), Value::Null, String::new()))
                 .collect(),
-            _ => vec![(String::new(), Value::Null)],
+            _ => vec![(String::new(), Value::Null, String::new())],
         };
         let mut resolved = false;
-        for (department, employee) in contexts {
+        for (department, employee, appointment) in contexts {
             if !department.is_empty() && !applies_to_department(stage, &department)? {
                 continue;
             }
-            let row = json!({"kind":rule.kind,"departmentId":department});
+            let row = json!({"kind":rule.kind,"departmentId":department,"applicantAppointmentId":appointment});
             let ids = approval_routing::resolve(tx, &scope, &row, &employee, stage)?;
             if ids.is_empty() {
                 return Err(invalid(format!("节点“{}”缺少负责人", stage.name)));

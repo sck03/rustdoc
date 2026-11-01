@@ -511,35 +511,7 @@ pub(super) fn user_dto_for(
     actor: &Actor,
 ) -> Result<Value> {
     let mut user = contracts::overlay(contracts::initial(contracts::schema("ApiUserDto")), record);
-    user["employee"] = if !actor.admin && actor.edition.allows("office.people") {
-        store
-            .read(|tx| super::personnel_accounts::linked_person(tx, actor.id))?
-            .map(super::personnel_accounts::summary)
-            .unwrap_or(Value::Null)
-    } else {
-        Value::Null
-    };
-    if !actor.context.is_empty() {
-        user["employee"] = store.read(|tx| -> Result<Value> {
-            let Some(person) = super::personnel_accounts::person_for_account(tx, actor.id)? else {
-                return Ok(Value::Null);
-            };
-            if actor.department.is_empty() {
-                return Ok(Value::Null);
-            }
-            let appointment = super::personnel_organization::appointment_in(
-                tx,
-                &person,
-                &actor.company,
-                &actor.department,
-            )?;
-            let mut summary = super::personnel_accounts::summary(person);
-            summary["jobTitle"] = json!(appointment.job_title);
-            summary["departmentId"] = json!(actor.department);
-            summary["companyScope"] = json!(actor.company);
-            Ok(summary)
-        })?;
-    }
+    user["employee"] = store.read(|tx| super::personnel_accounts::actor_summary(tx, actor))?;
     user["primaryCompanyScope"] = record["companyScope"].clone();
     user["companyScope"] = json!(actor.company);
     user["departmentId"] = json!(actor.department);
@@ -655,7 +627,11 @@ pub(super) fn data_scope<'a>(
             _ => {}
         }
     }
-    scope.restrictions = scope_filters(actor, resource, action);
+    scope.restrictions = if permissions::resource(resource).is_some_and(|r| r.workflow_resource) {
+        object_scope_filters(actor, resource, action)
+    } else {
+        scope_filters(actor, resource, action)
+    };
     if actor.scope_rules.iter().any(|r| {
         r.resource_key == resource
             && r.action == action
@@ -696,30 +672,58 @@ pub(super) fn scope_filters(
         })
         .collect()
 }
-pub fn visible(actor: &Actor, resource: &str, action: &str, record: &Value) -> bool {
+pub(super) fn object_scope_filters(
+    actor: &Actor,
+    resource: &str,
+    action: &str,
+) -> Vec<export_doc_storage::ScopeFilter> {
+    let mut filters = scope_filters(actor, resource, "view");
+    if permissions::service_action(resource, action) != "view" {
+        filters.extend(scope_filters(actor, resource, action));
+    }
+    filters
+}
+/// Object restrictions always intersect an additional participation grant.
+/// Participation can satisfy only the participation rule, never a unit,
+/// department, project or explicit deny restriction.
+pub(in crate::engine) fn restriction_allows(
+    actor: &Actor,
+    resource: &str,
+    action: &str,
+    record: &Value,
+    participant: bool,
+) -> bool {
     if !actor.edition.allows(resource) {
+        return false;
+    }
+    let action = permissions::service_action(resource, action);
+    actor
+        .scope_rules
+        .iter()
+        .filter(|r| r.resource_key == resource && r.action == action)
+        .all(|r| {
+            (participant
+                && matches!(
+                    r.mode,
+                    export_doc_domain::access_scope::ScopeMode::Participation
+                ))
+                || r.accepts(
+                    record["companyScope"].as_str().unwrap_or(""),
+                    record["departmentId"].as_str().unwrap_or(""),
+                    record["projectId"].as_str(),
+                    record["ownerUserId"].as_i64().unwrap_or(0),
+                    actor.id,
+                )
+        })
+}
+pub fn visible(actor: &Actor, resource: &str, action: &str, record: &Value) -> bool {
+    if !restriction_allows(actor, resource, action, record, false) {
         return false;
     }
     if actor.admin {
         return true;
     }
     let action = permissions::service_action(resource, action);
-    if actor
-        .scope_rules
-        .iter()
-        .filter(|r| r.resource_key == resource && r.action == action)
-        .any(|r| {
-            !r.accepts(
-                record["companyScope"].as_str().unwrap_or(""),
-                record["departmentId"].as_str().unwrap_or(""),
-                record["projectId"].as_str(),
-                record["ownerUserId"].as_i64().unwrap_or(0),
-                actor.id,
-            )
-        })
-    {
-        return false;
-    }
     actor
         .grants
         .iter()

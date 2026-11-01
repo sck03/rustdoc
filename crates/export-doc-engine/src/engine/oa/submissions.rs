@@ -55,12 +55,7 @@ fn capture(tx: &Connection, actor: &Actor, row: &mut Value, number: i64) -> Resu
         )?
         .ok_or_else(|| super::super::error::unavailable("申请部门资料缺失。"))?;
     let settings = settings::load(tx, &actor.company)?;
-    let appointment = super::super::personnel_organization::appointment_in(
-        tx,
-        &person,
-        &actor.company,
-        &text(row, "departmentId"),
-    )?;
+    let appointment = super::request_identity::appointment(tx, actor, &person, row)?;
     let template = sheet_templates::select(&settings, row)?;
     let value = json!({"requestId":row["id"],"submissionNumber":number,"requestVersion":request["versionNumber"],
         "submittedAt":store::timestamp(),"status":"Pending","request":request,
@@ -85,7 +80,7 @@ pub(super) fn after_save(
     actor: &Actor,
     row: &Value,
     action: &str,
-    note: &str,
+    _note: &str,
 ) -> Result<()> {
     if !matches!(
         action,
@@ -106,18 +101,16 @@ pub(super) fn after_save(
     snapshot["status"] = json!(match action {
         "withdraw" => "Withdrawn",
         "void" => "Voided",
-        _ if action == "approve" => "Approved",
+        _ if matches!(
+            row["status"].as_str(),
+            Some("Approved" | "Completed" | "HandedOff")
+        ) =>
+            "Approved",
         _ => row["status"].as_str().unwrap_or("Pending"),
     });
     // The submitted content is immutable. Approval outcomes are a separate seal.
     snapshot["approvalPlan"] = row["approvalPlan"].clone();
-    if matches!(action, "approve" | "approve-step" | "reject") {
-        if snapshot.get("decisions").is_none() {
-            snapshot["decisions"] = json!([]);
-        }
-        snapshot["decisions"].as_array_mut().ok_or_else(||super::super::error::unavailable("审批决定记录损坏。"))?.push(json!({"actorId":actor.id,"actorName":actor.name,"action":action,"note":note,"occurredAt":store::timestamp()}));
-    }
-    if action == "approve" {
+    if action == "approve" && matches!(row["status"].as_str(), Some("Approved" | "Completed")) {
         snapshot["approvedAt"] = json!(store::timestamp());
     }
     store::save_in_scope(

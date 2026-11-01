@@ -199,7 +199,10 @@ pub(super) fn list_with(
             limit: size as i64,
         })?;
         let mut items = Vec::with_capacity(rows.len());
-        for row in rows {
+        for mut row in rows {
+            if !directory && !fields.is_empty() {
+                row["kind"] = json!(if kind == "bookings" { "room" } else { "supply" });
+            }
             let row = if fields.is_empty() {
                 super::handling::project_resource(tx, actor, resource, row)?
             } else {

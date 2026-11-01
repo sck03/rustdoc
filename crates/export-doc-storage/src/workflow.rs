@@ -87,7 +87,7 @@ pub(crate) fn page(q: &WorkflowTaskQuery<'_>, pg: bool) -> (String, Vec<String>)
         "json_object"
     };
     let projection = format!(
-        "{json}('requestId',r.id,'requestKind',r.kind,'companyCode',r.company,'versionNumber',r.version,'taskKey',t.task_key,'nodeKey',t.node_key,'assigneeId',t.assignee_id,'assigneeName',COALESCE(u.body->>'fullName',''),'contextId',t.context_id,'active',{active},'dueAt',t.due_at)"
+        "{json}('requestId',r.id,'requestKind',r.kind,'companyCode',r.company,'versionNumber',r.version,'taskKey',t.task_key,'nodeKey',t.node_key,'assigneeId',t.assignee_id,'assigneeName',COALESCE(u.body->>'fullName',''),'contextId',t.context_id,'active',{active},'dueAt',t.due_at,'_assigneePersonId',t.assignee_person_id,'_scope',{json}('kind',r.kind,'companyScope',r.company,'departmentId',r.department,'ownerUserId',r.owner_id,'employeeId',CAST(r.body->>'employeeId' AS BIGINT),'applicantAccountId',CAST(r.body->>'applicantAccountId' AS BIGINT),'projectId',r.body->>'projectId'))"
     );
     let source = "workflow_current_tasks t JOIN record_rows r ON r.id=t.request_id LEFT JOIN record_rows u ON u.id=t.assignee_id AND u.kind='users'";
     let rows = if pg {

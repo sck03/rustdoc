@@ -188,8 +188,8 @@ impl ApprovalPlan {
                 if members < usize::from(node.revision_policy.minimum_signers) {
                     return Err("减签后人数低于发布的最低人数。".into());
                 }
-                if self.completed(index) {
-                    return Err("人数修订本身不能使节点自动通过。".into());
+                if self.node_outcome(index) != super::VoteOutcome::Pending {
+                    return Err("减签本身不能使审批节点通过或驳回；请由剩余责任人签署。".into());
                 }
             }
             _ => {

@@ -1,6 +1,6 @@
 # 账号、组织与 OA 新基线数据字典
 
-核对日期：2026-10-31。本文描述源码中的 schema 11；验收结果见[本轮执行记录](./OA重构验收与功能保留台账.md)。SQLite 桌面与 PostgreSQL 18 团队服务使用同一用例和规则，各自的物理 DDL、模型指纹分别计算。
+核对日期：2026-11-01。本文描述源码中的 schema 11；验收结果见[本轮执行记录](./OA重构验收与功能保留台账.md)。SQLite 桌面与 PostgreSQL 18 团队服务使用同一用例和规则，各自的物理 DDL、模型指纹分别计算。
 
 ## 基线与唯一来源
 
@@ -17,12 +17,14 @@
 
 后五组分别以 `sqlite.sql` 或 `postgres.sql` 结尾。模型指纹是上述源码按固定顺序、统一 LF 换行、以零字节分隔后的 SHA-256；另记录实际数据库结构指纹。启动和恢复核对版本、模型及实际结构，拒绝旧库、空文件、损坏、缺表、模型不匹配和未知版本，并保留原文件。PostgreSQL 初始化/恢复使用独立维护连接，API 连接没有 DDL 权限。
 
+2026-11-01 在同一尚未生产部署的 schema 11 基线中修正未签任务的稳定人员列与回读、签署不可变保护。模型/结构指纹随完整 DDL 改变；此前生成但指纹不同的 schema 11 测试库和备份同样拒绝打开/恢复，使用新的隔离数据根或数据库。没有追加迁移链，也不自动改写或删除原数据。
+
 ## 身份、组织和授权
 
 | 表 / 字段 | 含义和约束 |
 | --- | --- |
 | `records.id/kind/version` | 受管记录编号、资源类型、乐观并发版本；保留原销售、制单、付款等独立业务种类 |
-| `organization_units.id/parent_id` | 稳定经营单位 ID 及层级；代码和名称是可编辑属性 |
+| `organization_units.id/parent_id` | 稳定经营单位 ID 及层级；已有代码不改写，名称可编辑 |
 | `organization_departments.id/unit_id` | 部门属于一个单位；编辑/删除使用稳定 ID |
 | `persons.id` | 自然人公开事实；姓名不作身份键，不含联系方式等私密档案正文 |
 | `personnel_private_profiles.person_id` | 私密档案独立保存，公开目录与任职查询不读取私密正文 |
@@ -38,7 +40,7 @@
 | `reporting_relations.appointment_id/manager_appointment_id` | 行政/职能汇报指向明确任职；校验有效期、单位和循环 |
 | `organization_duties.appointment_id` | 单位/部门负责人职责，不以姓名或账号管理权限替代 |
 | `responsibilities/responsibility_assignments` | 单位内职责目录与任职分配；可限制流程种类和项目，分配有有效期间 |
-| `project_scopes/project_memberships` | 仅用于 OA 找人的有限项目范围及 Member/Leader 任职；不关联客户、订单或单证 |
+| `project_scopes/project_memberships` | 有限项目范围及 Member/Leader 任职基础资料与限制集合；尚未接入审批来源，不关联客户、订单或单证 |
 | `unit_access_roles` | 账号在单位中的业务、协作或管理身份、有效期及能力上限；业务身份绑定任职 |
 | `permission_schemes` | 可编辑权限方案草稿及所属范围 |
 | `permission_scheme_versions(scheme_id,version)` | 发布正文、发布时间及发布人；已发布行禁止修改/删除 |
@@ -56,12 +58,13 @@
 | `request_revisions(request_id,revision)` | 不可变提交正文和材料快照；唯一提交序号，禁止更新/删除 |
 | `workflow_instances.id/request_id/revision/generation` | 提交版本对应的根实例；执行代次 1–1000，状态与办理状态分别保存 |
 | `workflow_instances.definition` | 提交时冻结的发布版本、条件解析及流程设置 |
-| `workflow_subinstances` | 父实例、固定定义版本、提交材料、输入快照、展开节点和状态；绑定禁止改写 |
+| `workflow_subinstances` | 父实例、固定定义版本、父提交材料快照、展开节点和状态；绑定禁止改写，尚无输入输出映射及可配置传播/补偿政策 |
 | `node_instances(instance_id,generation,node_key)` | 节点定义、顺序、实际开始及到期时间、提醒级别 0–2；每代最多 32 个节点位置 |
 | `workflow_tasks(request_id,submission,generation,task_key)` | 指定审批账号/身份、实际办理账号/身份、状态、时间、代理依据及签署事实 |
+| `workflow_tasks.assignee_person_id` | 非空稳定人员 ID，外键引用 persons；未签回读同样返回 approverPersonId，移交更新此列，已签记录不可改写 |
 | `workflow_tasks.signature/source_generation` | 当前代次真实签署，或引用之前代次的有效签署；不能同时伪造一份新签署 |
 | `workflow_operations` | 加减签、退回、暂停等受控操作的执行人、身份、原因、代次及详情；禁止改写/删除 |
-| `handling_tasks` | 审批后的实际办理 Pending/InProgress/Completed/Blocked/Cancelled；`result_status` 表示资源/业务办理结果 |
+| `handling_tasks` | 每申请/提交的一份办理进度，Pending/InProgress/Completed/Blocked/Cancelled；result_status 表示专用业务结果，不是通用多节点办理图 |
 | `personnel_change_orders` | 冻结的人员变动提交版本、批准执行身份、生效时间及 Pending/Applied/Blocked/Cancelled 状态 |
 | `command_receipts(actor_id,context_id,command_key)` | 当前身份的幂等键、请求摘要、目标、已提交结果及时间；同键同文返回回执，不同正文冲突 |
 | `workflow_current_tasks/task_decisions/workflow_plans/record_rows` | 从规范化事实组合的查询视图，不维护第二份可独立修改的审批状态 |
@@ -75,6 +78,8 @@
 常用索引覆盖单位/部门/人员关系、职责有效期间、权限版本绑定、主体资源限制、待办账号/状态/期限、实际签署人、实例代次及人员变动到期队列。流程操作的审批候选按账号 ID 游标，每次最多检查 100 个公开账号，再核验当前业务资格；客户端通过 `nextCursor` 加载后续候选。流程设置的人员目录分别返回审批候选和办理候选，办理权限不会隐含授予审批权，保存分工时仍按事项复核查看及办理动作。
 
 详情、列表、待办、通知、历史、材料下载、审批单和 ZIP 共用字段/附件投影规则。审批任务提供所获准申请材料的访问资格，不附带全量人员、销售、制单或付款权限。通用存储的 JSON 承载资源正文，不允许页面、HTTP 路由或用例直接拼接 SQL。
+
+明确分派和代理不绕过主体显式限制；SQL 先对普通范围与参与范围的并集应用限制，再计数/分页，代理同时携带原责任人的限制。材料只使用当前激活节点；没有当前任务时才使用已激活的历史参与规则。未来分派不能提供完整材料，完整下载在取文件的快照中重新检查。
 
 自然日采用 `YYYY-MM-DD`，时间点采用带偏移的 RFC 3339。金额仍按原精确十进制用例和契约处理。文件、模板、附件、原业务资料及备份继续遵守受管 DataRoot，不为新 OA 增加第二数据库或默认外部文件目录。
 

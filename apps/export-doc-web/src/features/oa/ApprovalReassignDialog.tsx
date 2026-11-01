@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ExportDocManagerApiClient, OaRequest, UnitTaskReassignment } from "../../api/index.ts";
-import { queryKeys } from "../../api/queryKeys.ts";
+import { officeWorkflowQueryRoots } from "../../api/queryKeys.ts";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "../office/OfficeUi.tsx";
 import { useOfficeOperation } from "../office/useOfficeData.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
@@ -9,7 +9,8 @@ import { readApiError } from "../../ui/formUtils.ts";
 import type { OfficeRequestRow } from "../office/officeModel.ts";
 
 export function ApprovalReassignDialog({ client, row, onClose }: { client: ExportDocManagerApiClient; row: OaRequest | OfficeRequestRow; onClose: () => void }) {
-  const operation = useOfficeOperation([queryKeys.unitWorkflowTasks(),queryKeys.unitWorkflowSummary()]);
+  const kind = "meetingRoomId" in row ? "room" : "officeSupplyId" in row ? "supply" : row.kind;
+  const operation = useOfficeOperation(officeWorkflowQueryRoots(kind),false);
   const accounts = useQuery({ queryKey: ["office","approval-reassign",row.companyScope], queryFn: ({ signal }) => client.getUnitApproverOptions({companyCode:row.companyScope}, { signal }) });
   const requestKind: UnitTaskReassignment["requestKind"] = "meetingRoomId" in row ? "bookings" : "officeSupplyId" in row ? "supply-requests" : `oa-${row.kind}`;
   const waiting = row.approvalPlan?.steps.filter(step => step.status === "Waiting") ?? [];

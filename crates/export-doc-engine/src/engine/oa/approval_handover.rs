@@ -23,9 +23,16 @@ pub(in crate::engine) fn managed_tasks(
                 limit: size,
             })?;
         for task in &mut items {
+            let scope = task
+                .as_object_mut()
+                .and_then(|fields| fields.remove("_scope"))
+                .ok_or_else(|| unavailable("审批任务范围投影缺失。"))?;
+            let person = task
+                .as_object_mut()
+                .and_then(|fields| fields.remove("_assigneePersonId"))
+                .and_then(|id| id.as_i64())
+                .ok_or_else(|| unavailable("审批任务人员投影缺失。"))?;
             let context = text(task, "contextId");
-            let resource = approval::resource(&text(task, "requestKind"))
-                .ok_or_else(|| unavailable("任务业务类型损坏。"))?;
             let eligibility = super::super::units::resolve(
                 tx,
                 task["assigneeId"]
@@ -35,11 +42,10 @@ pub(in crate::engine) fn managed_tasks(
                 &context,
             )
             .and_then(|candidate| {
-                if candidate.company != actor.company {
-                    return Err(error(403, "任务身份单位不匹配。"));
+                if approval::qualified_person(tx, &candidate, &scope)? != person {
+                    return Err(error(403, "原分派人员身份已变化。"));
                 }
-                auth::authorize(&candidate, resource, "view")?;
-                auth::authorize(&candidate, resource, "approve")
+                Ok(())
             });
             task["identityAvailable"] = json!(match eligibility {
                 Ok(()) => true,
@@ -130,13 +136,16 @@ pub(super) fn reassign(
         .ok_or_else(|| error(403, "接任身份已失效或不具备此事项的审批权限。"))?,
         None => approval::reviewer(tx, actor, to, row)?,
     };
+    let person = approval::qualified_person(tx, &reviewer, row)?;
     if (from == to && plan.steps[index].approver_context == reviewer.context)
         || row["ownerUserId"] == to
         || row["applicantAccountId"] == to
         || plan.independent_signer_conflict(node, to)
         || plan.steps.iter().enumerate().any(|(i, s)| {
             i != index
-                && s.approver_user_id == to
+                && (s.approver_user_id == to
+                    || s.approver_person_id == Some(person)
+                    || s.acted_by_person_id == Some(person))
                 && (s.stage == node
                     || plan.nodes[node].independent_review
                     || plan.nodes[s.stage].independent_review)
@@ -147,6 +156,7 @@ pub(super) fn reassign(
         ));
     }
     plan.steps[index].approver_user_id = to;
+    plan.steps[index].approver_person_id = Some(person);
     plan.steps[index].approver_name = reviewer.name;
     plan.steps[index].approver_context = reviewer.context;
     plan.validate(row["ownerUserId"].as_i64().unwrap_or(0))

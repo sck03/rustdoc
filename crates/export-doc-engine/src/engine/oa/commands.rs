@@ -3,25 +3,39 @@ use super::*;
 use export_doc_domain::approval::{ApprovalStep, RevisionKind};
 
 pub(super) fn actions(tx: &Connection, actor: &Actor, row: &Value) -> Result<Vec<String>> {
+    let review = approval::ReviewSnapshot::read(tx, actor, row)?;
+    Ok(actions_for(
+        actor,
+        row,
+        review.plan.as_ref(),
+        &review.task_keys(),
+    ))
+}
+pub(super) fn actions_for(
+    actor: &Actor,
+    row: &Value,
+    plan: Option<&export_doc_domain::approval::ApprovalPlan>,
+    tasks: &[String],
+) -> Vec<String> {
     let mut actions = vec![];
     let manager =
         super::super::units::demand(actor, &actor.company, "organization.workflows").is_ok();
-    let Some(plan) = approval::plan(row)? else {
-        return Ok(actions);
+    let Some(plan) = plan else {
+        return actions;
     };
     if row["status"] == "Suspended" {
         if manager {
             actions.extend(["Resume", "Terminate"].map(str::to_owned));
         }
-        return Ok(actions);
+        return actions;
     }
     if row["status"] != "Pending" {
-        return Ok(actions);
+        return actions;
     }
     if manager {
         actions.extend(["Suspend", "Terminate"].map(str::to_owned));
     }
-    let controlled = controlled_nodes(tx, actor, row, &plan, manager)?;
+    let controlled = controlled_nodes(plan, tasks, manager);
     for &i in &controlled {
         let node = &plan.nodes[i];
         if node.revision_policy.allow_add_signers {
@@ -39,22 +53,23 @@ pub(super) fn actions(tx: &Connection, actor: &Actor, row: &Value) -> Result<Vec
     }
     actions.sort();
     actions.dedup();
-    Ok(actions)
+    actions
 }
 fn controlled_nodes(
-    tx: &Connection,
-    actor: &Actor,
-    row: &Value,
     plan: &export_doc_domain::approval::ApprovalPlan,
+    tasks: &[String],
     manager: bool,
-) -> Result<Vec<usize>> {
-    let tasks = approval::review_tasks(tx, actor, row)?;
-    Ok(plan
-        .current_indices()
+) -> Vec<usize> {
+    plan.current_indices()
         .into_iter()
         .filter(|i| manager || tasks.contains(&plan.steps[*i].task_key))
         .map(|i| plan.steps[i].stage)
-        .collect())
+        .fold(vec![], |mut nodes, node| {
+            if !nodes.contains(&node) {
+                nodes.push(node);
+            }
+            nodes
+        })
 }
 fn ancestors(plan: &export_doc_domain::approval::ApprovalPlan, current: &[usize]) -> Vec<usize> {
     let mut result = current.to_vec();
@@ -146,10 +161,18 @@ pub(super) fn execute(
     required(body, "note", "操作原因", 500)?;
     let command = text(body, "command");
     let note = text(body, "note");
-    if !actions(tx, actor, &row)?.iter().any(|a| a == &command) {
+    let mut review = approval::ReviewSnapshot::read(tx, actor, &row)?;
+    let review_tasks = review.task_keys();
+    if !actions_for(actor, &row, review.plan.as_ref(), &review_tasks)
+        .iter()
+        .any(|a| a == &command)
+    {
         return Err(error(403, "当前身份或发布的节点政策没有开放此操作。"));
     }
-    let mut plan = approval::plan(&row)?.ok_or_else(|| conflict("申请没有流程实例。"))?;
+    let mut plan = review
+        .plan
+        .take()
+        .ok_or_else(|| conflict("申请没有流程实例。"))?;
     let now = chrono::Utc::now();
     match command.as_str() {
         "Suspend" => {
@@ -223,7 +246,7 @@ pub(super) fn execute(
             let manager =
                 super::super::units::demand(actor, &actor.company, "organization.workflows")
                     .is_ok();
-            let controlled = controlled_nodes(tx, actor, &row, &plan, manager)?;
+            let controlled = controlled_nodes(&plan, &review_tasks, manager);
             let permitted = if revision == RevisionKind::ReturnToNode {
                 ancestors(&plan, &controlled)
             } else {

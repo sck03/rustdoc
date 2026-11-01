@@ -16,7 +16,7 @@ export type ApprovalDocumentApi = {
   materials: (id: number, submissionId: number, init?: ApiRequestInit) => Promise<Blob>;
 };
 export function ApprovalDocument({api,user,row,scope,submissionId = row.submissionId}: {api: ApprovalDocumentApi;user:ApiUserDto;row:{id:number;status:string;versionNumber:number;submissionId?:number};scope:string;submissionId?:number}) {
-  const operation = useOfficeOperation();
+  const operation = useOfficeOperation([["office","approval-document",scope,user.id,user.contextId,row.id]],false);
   const [preview,setPreview] = useState<Blob|null>(null);
   const url = useBlobUrl(preview);
   const query = useQuery({queryKey:["office","approval-document",scope,user.id,user.contextId,row.id,submissionId,row.versionNumber],enabled:Boolean(submissionId),

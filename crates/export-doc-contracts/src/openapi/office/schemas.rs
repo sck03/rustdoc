@@ -46,7 +46,7 @@ pub(super) fn extend(doc: &mut Value) {
     );
     schemas["OaRequestSave"] = object(
         json!({
-            "requestKey":string,"expectedVersion":integer,"employeeId":integer,"title":string,"reason":string,
+            "requestKey":string,"expectedVersion":integer,"employeeId":integer,"appointmentId":string,"title":string,"reason":string,
             "personnelChange":reference("OaPersonnelChange"),
             "leave":reference("OaLeave"),"travel":reference("OaTravel"),"overtime":reference("OaOvertime"),
             "category":{"type":"string","enum":["Seal","Certificate","IT","Repair","Other"]},
@@ -103,6 +103,10 @@ pub(super) fn extend(doc: &mut Value) {
             "attachments",
         ],
     );
+    schemas["OaRequest"]["properties"]["applicantAppointmentId"] =
+        json!({"type":"string","readOnly":true});
+    schemas["OaRequest"]["properties"]["applicantJobTitle"] =
+        json!({"type":"string","readOnly":true});
     for (name, item) in [("OaRequestPage", "OaRequest"), ("OaEventPage", "OaEvent")] {
         schemas[name] = object(
             json!({"items":{"type":"array","items":reference(item)},"totalCount":integer,"pageNumber":integer,"pageSize":integer}),

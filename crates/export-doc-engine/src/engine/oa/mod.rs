@@ -19,6 +19,7 @@ pub(in crate::engine) mod materials;
 pub(in crate::engine) mod personnel_changes;
 mod queries;
 pub(in crate::engine) mod queue_authority;
+mod request_identity;
 mod resource_requests;
 pub(in crate::engine) mod runtime;
 mod subflows;
@@ -85,7 +86,7 @@ pub(super) fn assigned_to(
     if row["ownerUserId"] == actor.id {
         return Ok(true);
     }
-    let principals = approval::queue_approvers(tx, actor, resource)?;
+    let principals = approval::object_approvers(tx, actor, resource, row)?;
     if approval::plan(row)?.is_some_and(|plan| {
         plan.notify_user_ids.contains(&actor.id)
             || plan.steps.iter().any(|step| {
@@ -116,6 +117,7 @@ pub(super) fn scope_viewable(
 ) -> Result<bool> {
     Ok(row["companyScope"] == actor.company
         && auth::authorize(actor, resource, "view").is_ok()
+        && auth::restriction_allows(actor, resource, "view", row, true)
         && (assigned_to(tx, actor, resource, row)?
             || auth::visible(actor, resource, "view", row)
             || (resource == "office.expenses"
@@ -129,6 +131,11 @@ fn access(tx: &Connection, actor: &Actor, meta: &Value, row: &Value) -> Result<(
     let resource = text(meta, "resource");
     let permission = text(meta, "permission");
     auth::authorize(actor, &resource, &permission)?;
+    if !auth::restriction_allows(actor, &resource, "view", row, true)
+        || !auth::restriction_allows(actor, &resource, &permission, row, true)
+    {
+        return Err(error(403, "此申请超出当前身份的显式数据范围限制。"));
+    }
     if resource_requests::resource_kind(row).is_some()
         && permission == "create"
         && (row["ownerUserId"] != actor.id || text(row, "_requesterContext") != actor.context)
@@ -190,6 +197,12 @@ pub(super) fn project(
     mut row: Value,
     detail: bool,
 ) -> Result<Value> {
+    let review = if detail {
+        Some(approval::ReviewSnapshot::read(tx, actor, &row)?)
+    } else {
+        None
+    };
+    let plan = if detail { None } else { approval::plan(&row)? };
     row["attachments"] = if detail {
         json!(children(tx, &row, "oa-attachment", 0, 20)?.1)
     } else {
@@ -201,9 +214,16 @@ pub(super) fn project(
                 .personnel_order(row["id"].as_i64().unwrap_or(0))?
                 .unwrap_or(Value::Null);
         }
-        row["workflowActions"] = json!(commands::actions(tx, actor, &row)?);
-        row["canReview"] = json!(approval::authority(tx, actor, &row)?.is_some());
-        row["reviewTaskKeys"] = json!(approval::review_tasks(tx, actor, &row)?);
+        let review = review.as_ref().expect("detail authorization snapshot");
+        let tasks = review.task_keys();
+        row["workflowActions"] = json!(commands::actions_for(
+            actor,
+            &row,
+            review.plan.as_ref(),
+            &tasks
+        ));
+        row["canReview"] = json!(!tasks.is_empty());
+        row["reviewTaskKeys"] = json!(tasks);
         if let Some(id) = row["submissionId"].as_i64().filter(|id| *id > 0) {
             row["approvalDocument"] =
                 submissions::project(tx, submissions::checked(tx, &row, id)?, false)?;
@@ -218,7 +238,11 @@ pub(super) fn project(
         Some(_) => "OfficeSupplyRequestRecord",
         None => "OaRequest",
     };
-    let projected = materials::project(tx, actor, &row, row.clone())?;
+    let current_plan = review
+        .as_ref()
+        .and_then(|r| r.plan.as_ref())
+        .or(plan.as_ref());
+    let projected = materials::project_with_plan(tx, actor, &row, row.clone(), current_plan)?;
     Ok(contracts::dto(contracts::schema(schema), projected))
 }
 fn append_event(
@@ -423,6 +447,8 @@ pub(super) fn handle(
             mutable(&row)?;
             materials::authorize_edit(tx, &actor, &row)?;
             if row["requestKey"] != body["requestKey"]
+                || (!text(body, "appointmentId").is_empty()
+                    && body["appointmentId"] != row["applicantAppointmentId"])
                 || (!text(body, "departmentId").is_empty()
                     && body["departmentId"] != row["departmentId"])
                 || (body["employeeId"].is_number() && row["employeeId"] != body["employeeId"])
@@ -617,6 +643,10 @@ fn create(
     row["employeeName"] = employee["fullName"].clone();
     row["employeeNumber"] = employee["employeeNumber"].clone();
     row["departmentId"] = employee["departmentId"].clone();
+    if let Some(id) = employee["applicantAppointmentId"].as_str() {
+        row["applicantAppointmentId"] = json!(id);
+        row["applicantJobTitle"] = employee["jobTitle"].clone();
+    }
     row["companyScope"] = json!(actor.company);
     row["ownerUserId"] = json!(actor.id);
     row["_requesterContext"] = json!(actor.context);

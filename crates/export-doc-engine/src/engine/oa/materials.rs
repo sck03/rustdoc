@@ -15,6 +15,7 @@ const SYSTEM: &[&str] = &[
     "employeeNumber",
     "applicantAccountId",
     "applicantName",
+    "applicantAppointmentId",
     "meetingRoomId",
     "officeSupplyId",
     "createdAt",
@@ -72,28 +73,46 @@ fn policies(
     actor: &Actor,
     row: &Value,
     restricted: bool,
+    plan: Option<&export_doc_domain::approval::ApprovalPlan>,
 ) -> Result<Vec<MaterialPolicy>> {
-    let mut result = vec![];
-    if let Some(plan) = approval::plan(row)? {
-        let principals = settings::principals(tx, actor)?;
-        for step in &plan.steps {
+    let mut current = vec![];
+    let mut history = vec![];
+    let mut participant = false;
+    if let Some(plan) = plan {
+        let resource = approval::resource(&text(row, "kind"))
+            .ok_or_else(|| super::super::error::unavailable("申请材料类型损坏。"))?;
+        let principals = approval::object_approvers(tx, actor, resource, row)?;
+        let active = plan.current_indices();
+        for (index, step) in plan.steps.iter().enumerate() {
             if step.approver_user_id == actor.id && step.approver_context == actor.context
                 || step.acted_by_user_id == Some(actor.id) && step.acted_by_context == actor.context
                 || step.status == "Waiting"
-                    && principals
-                        .iter()
-                        .any(|(id, _)| *id == step.approver_user_id)
+                    && principals.iter().any(|p| {
+                        p.user_id == step.approver_user_id && p.context == step.approver_context
+                    })
             {
-                result.push(plan.nodes[step.stage].material_policy.clone());
+                participant = true;
+                let node = &plan.nodes[step.stage];
+                if active.contains(&index) && !node.started_at.is_empty() {
+                    current.push(node.material_policy.clone());
+                } else if !node.started_at.is_empty() {
+                    history.push(node.material_policy.clone());
+                }
             }
         }
     }
-    if result.is_empty() {
-        let mut policy = MaterialPolicy::default();
-        policy.allow_restricted_attachments = restricted;
-        result.push(policy);
+    if !current.is_empty() {
+        return Ok(current);
     }
-    Ok(result)
+    if !history.is_empty() || participant {
+        // A future assignment grants progress access, but no material policy.
+        // Past participation cannot widen a currently active node's policy.
+        return Ok(history);
+    }
+    Ok(vec![MaterialPolicy {
+        allow_restricted_attachments: restricted,
+        ..Default::default()
+    }])
 }
 fn filter(
     value: &mut Value,
@@ -154,10 +173,20 @@ pub(in crate::engine) fn project(
     tx: &Connection,
     actor: &Actor,
     row: &Value,
+    value: Value,
+) -> Result<Value> {
+    let plan = approval::plan(row)?;
+    project_with_plan(tx, actor, row, value, plan.as_ref())
+}
+pub(in crate::engine) fn project_with_plan(
+    tx: &Connection,
+    actor: &Actor,
+    row: &Value,
     mut value: Value,
+    plan: Option<&export_doc_domain::approval::ApprovalPlan>,
 ) -> Result<Value> {
     let restricted = private_access(tx, actor, row)?;
-    let policies = policies(tx, actor, row, restricted)?;
+    let policies = policies(tx, actor, row, restricted, plan)?;
     let mut omitted = vec![];
     if let Some(fields) = value.as_object_mut() {
         for key in fields.keys().cloned().collect::<Vec<_>>() {
@@ -241,12 +270,10 @@ pub(in crate::engine) fn history(
         .into_iter()
         .map(|mut event| {
             if event["approvalPlan"].is_object() {
-                let mut policy_row = row.clone();
-                policy_row["approvalPlan"] = event["approvalPlan"].clone();
                 let plan = project(
                     tx,
                     actor,
-                    &policy_row,
+                    row,
                     json!({"approvalPlan":event["approvalPlan"]}),
                 )?;
                 event["approvalPlan"] = plan["approvalPlan"].clone();
@@ -271,11 +298,9 @@ pub(super) fn snapshot(
     row: &Value,
     mut snapshot: Value,
 ) -> Result<Value> {
-    let mut policy_row = row.clone();
-    policy_row["approvalPlan"] = snapshot["approvalPlan"].clone();
     let mut request = snapshot["request"].clone();
     request["approvalPlan"] = snapshot["approvalPlan"].clone();
-    let projected = project(tx, actor, &policy_row, request)?;
+    let projected = project(tx, actor, row, request)?;
     snapshot["approvalPlan"] = projected["approvalPlan"].clone();
     snapshot["materialAccess"] = projected["materialAccess"].clone();
     snapshot["request"] = projected;
@@ -296,7 +321,8 @@ pub(in crate::engine) fn attachment(
     file: &Value,
 ) -> Result<()> {
     let restricted = private_access(tx, actor, row)?;
-    let policy = policies(tx, actor, row, restricted)?;
+    let plan = approval::plan(row)?;
+    let policy = policies(tx, actor, row, restricted, plan.as_ref())?;
     if !allowed("attachments", &policy)
         || file["classification"] == "Restricted"
             && (!restricted || !policy.iter().any(|p| p.allow_restricted_attachments))

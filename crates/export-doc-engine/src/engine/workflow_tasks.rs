@@ -45,6 +45,12 @@ pub(super) fn persist(tx: &Connection, kind: &str, row: &Value) -> Result<()> {
         }
     };
     let progress = export_doc_storage::WorkflowProgress { approval, handling };
+    if (approval == "Pending" && (plan.outcome() != "Pending" || active.is_empty()))
+        || (approval == "Approved" && plan.outcome() != "Approved")
+        || (approval == "Rejected" && plan.outcome() != "Rejected")
+    {
+        return Err(unavailable("申请状态与审批结果不一致，未发布本次变更。"));
+    }
     tx.save_workflow_state(
         row["id"].as_i64().unwrap_or(0),
         revision,

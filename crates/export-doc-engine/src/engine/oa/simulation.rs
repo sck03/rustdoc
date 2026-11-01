@@ -24,7 +24,7 @@ pub(in crate::engine) fn simulate(
             Ok(Some(value))
         };
         let context = ConditionContext { amount:decimal("amount")?,currency:text(&body,"currency"),duration:decimal("duration")?,department:appointment.department_id.clone(),category:text(&body,"category"),personnel_action:rule.variant.clone() };
-        let mut row = json!({"kind":rule.kind,"departmentId":appointment.department_id,"companyScope":actor.company,"ownerUserId":person["account"]["id"].as_i64().unwrap_or(0),"applicantAccountId":person["account"]["id"]});
+        let mut row = json!({"kind":rule.kind,"departmentId":appointment.department_id,"applicantAppointmentId":appointment.id,"companyScope":actor.company,"ownerUserId":person["account"]["id"].as_i64().unwrap_or(0),"applicantAccountId":person["account"]["id"]});
         super::approval_routing::build_plan(tx,&actor,&mut row,&person,&rule,1,&context)?;
         row["approvalPlan"]["policyVersion"] = json!(0);
         Ok(json!({"approvalPlan":row["approvalPlan"],"notes":row["approvalRoutingNotes"]}))

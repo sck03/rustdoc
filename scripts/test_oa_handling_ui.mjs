@@ -177,6 +177,8 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
   await admin.getByRole('dialog').getByText('办理special · 第二位办理人核收钥匙', { exact: true }).waitFor();
   await admin.screenshot({ path: path.join(output, 'meeting-handover-history.png'), fullPage: true });
   await special.goto(`${url}/#/office/approvals?view=handling`);
+  await special.getByText('当前没有待处理事项', { exact: true }).waitFor();
+  await special.getByText(/^暂无待办的事项（\d+ 类）$/u).click();
   await special.getByRole('link',{name:'通用申请 · 待办理',exact:true}).waitFor();
   await special.addScriptTag({path:require.resolve('axe-core/axe.min.js')});
   assert.deepEqual(await special.evaluate(async()=> (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v=>['critical','serious'].includes(v.impact)).map(v=>v.id)),[]);

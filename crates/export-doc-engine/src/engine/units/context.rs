@@ -202,6 +202,30 @@ pub(in crate::engine) fn resolve(
     role_actor(tx, &actor, &record, company, &mut Snapshot::new(tx)?)
 }
 
+/// OA needs the selected appointment, including appointments in the same department.
+pub(in crate::engine) fn selected_appointment_id(
+    tx: &Connection,
+    actor: &Actor,
+) -> Result<Option<String>> {
+    let Some((id, unit)) = actor
+        .context
+        .strip_prefix("unit:")
+        .and_then(|v| v.split_once(':'))
+    else {
+        return Ok(None);
+    };
+    let id = id
+        .parse::<i64>()
+        .map_err(|_| unavailable("当前单位身份编号损坏。"))?;
+    let role = tx
+        .get(KIND, id)?
+        .ok_or_else(|| error(403, "单位身份已撤销。"))?;
+    if role["userId"] != actor.id || unit != actor.company || !window(&role)? {
+        return Err(error(403, "当前任职身份已失效。"));
+    }
+    Ok((role["mode"] == "Business").then(|| text(&role, "appointmentId")))
+}
+
 pub(in crate::engine) fn contexts(tx: &Connection, actor: &Actor) -> Result<Vec<Value>> {
     let base = auth::current_actor_in(tx, actor.id, actor.edition)?;
     let units = store::all(tx, "companies")?;

@@ -143,6 +143,11 @@ pub(in crate::engine) fn can_handle(
         return Ok(false);
     }
     let action = action(resource)?;
+    if !auth::restriction_allows(actor, resource, "view", row, true)
+        || !auth::restriction_allows(actor, resource, action, row, true)
+    {
+        return Ok(false);
+    }
     if text(row, "handlingKey").is_empty() {
         return Ok(auth::visible(actor, resource, action, row));
     }
@@ -156,7 +161,10 @@ pub(in crate::engine) fn resource_access(
     row: &Value,
     directory: bool,
 ) -> Result<bool> {
-    if row["companyScope"] != actor.company || auth::authorize(actor, resource, action).is_err() {
+    if row["companyScope"] != actor.company
+        || auth::authorize(actor, resource, action).is_err()
+        || !auth::restriction_allows(actor, resource, action, row, true)
+    {
         return Ok(false);
     }
     let assigned = can_handle(tx, actor, row, resource)?;
@@ -189,8 +197,10 @@ pub(in crate::engine) fn project_resource(
     }
     row["canHandle"] = json!(can_handle(tx, actor, &row, resource)?);
     row["handlerNames"] = json!(names(tx, actor, &row)?);
-    row["reviewTaskKeys"] = json!(super::oa::approval::review_tasks(tx, actor, &row)?);
-    row["canReview"] = json!(super::oa::approval::authority(tx, actor, &row)?.is_some());
+    let review = super::oa::approval::ReviewSnapshot::read(tx, actor, &row)?;
+    let tasks = review.task_keys();
+    row["canReview"] = json!(!tasks.is_empty());
+    row["reviewTaskKeys"] = json!(tasks);
     Ok(row)
 }
 pub(in crate::engine) fn select(

@@ -15,18 +15,42 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   await admin.goto(`${url}/#/office/approvals?view=handling`);
   await admin.getByRole('link', { name: '流程管理', exact: true }).click();
   const rule = admin.locator('details[data-definition-key="expense"]');
+  assert.equal(await rule.getByLabel('审批人来源').count(), 0, 'closed workflow editors mount only when first opened');
   await rule.locator(':scope > summary').click();
   for (const [index, user] of users.slice(0, 2).entries()) {
     await rule.getByLabel('审批人来源').nth(index).selectOption('Named');
     await rule.getByLabel('审批账号（可多选）').nth(index).selectOption([String(user.id)]);
   }
+  await rule.locator(':scope > summary').click();
+  assert.equal(await rule.getByLabel('审批账号（可多选）').first().inputValue(), String(users[0].id), 'closing keeps the edited rule');
+  await rule.locator(':scope > summary').click();
+  const calendar=admin.locator('details').filter({has:admin.locator('summary').filter({hasText:/^公司工作日历/u})});
+  await calendar.locator(':scope > summary').click();
+  const holidays=calendar.getByRole('textbox',{name:'节假日（每行 YYYY-MM-DD）',exact:true});
+  await holidays.fill('2026-12-25\n');
+  assert.equal(await holidays.inputValue(),'2026-12-25\n');
+  await holidays.pressSequentially('2026-12-26');
+  assert.equal(await holidays.inputValue(),'2026-12-25\n2026-12-26');
   await admin.getByText('审批代理', { exact: true }).click();
   await admin.getByRole('button', { name: '添加代理', exact: true }).click();
   await admin.getByRole('combobox', { name: /^原审批人/u }).selectOption(String(users[0].id));
   await admin.getByRole('combobox', { name: /^代理人/u }).selectOption(String(users[2].id));
   const saved = admin.waitForResponse(response => response.url().endsWith('/api/office/approval-settings') && response.request().method() === 'PUT');
+  let release;
+  const held=new Promise(resolve=>{release=resolve;});
+  await admin.route('**/api/office/approval-settings',async route=>{
+    if(route.request().method()!=='PUT') return route.continue();
+    const response=await route.fetch(); await held; await route.fulfill({response});
+  });
   await admin.getByRole('button', { name: '保存审批设置', exact: true }).click();
+  assert.equal(await holidays.isDisabled(),true,'calendar uses the same save lock as all settings');
+  assert.equal(await calendar.getByRole('textbox',{name:'业务时区',exact:true}).isDisabled(),true);
+  release();
   assert.equal((await saved).status(), 200);
+  await admin.unroute('**/api/office/approval-settings');
+  await admin.waitForFunction(()=>document.querySelector('textarea') && !document.querySelector('button[type="submit"]')?.disabled);
+  assert.equal(await calendar.evaluate(element=>element.open),true,'saving preserves the expanded calendar');
+  assert.equal(await holidays.inputValue(),'2026-12-25\n2026-12-26');
   // Another administrator saves while this form has unsaved changes.
   await rule.getByRole('button', { name: '保存并发布此流程', exact: true }).click();
   await rule.locator(':scope > summary').getByText(/已启用/u).waitFor();

@@ -3,7 +3,7 @@ use super::*;
 use export_doc_storage::RecordApprover;
 
 pub(in crate::engine) struct QueueAuthority {
-    current: RecordApprover,
+    current: Actor,
     principals: Vec<Actor>,
 }
 impl QueueAuthority {
@@ -21,30 +21,48 @@ impl QueueAuthority {
             }
         }
         Ok(Self {
-            current: RecordApprover {
-                user_id: actor.id,
-                context: actor.context.clone(),
-            },
+            current: actor.clone(),
             principals,
         })
     }
-    pub(in crate::engine) fn approvers(&self, resource: &str) -> Vec<RecordApprover> {
-        std::iter::once(RecordApprover {
-            user_id: self.current.user_id,
-            context: self.current.context.clone(),
+    fn delegates<'a>(&'a self, resource: &'a str) -> impl Iterator<Item = &'a Actor> {
+        self.principals.iter().filter(move |actor| {
+            auth::authorize(actor, resource, "view").is_ok()
+                && auth::authorize(actor, resource, "approve").is_ok()
         })
-        .chain(
-            self.principals
-                .iter()
-                .filter(|actor| {
-                    auth::authorize(actor, resource, "view").is_ok()
-                        && auth::authorize(actor, resource, "approve").is_ok()
-                })
-                .map(|actor| RecordApprover {
-                    user_id: actor.id,
-                    context: actor.context.clone(),
-                }),
-        )
-        .collect()
+    }
+    fn principal(actor: &Actor, resource: &str) -> RecordApprover {
+        RecordApprover {
+            user_id: actor.id,
+            context: actor.context.clone(),
+            restrictions: auth::object_scope_filters(actor, resource, "approve"),
+        }
+    }
+    pub(in crate::engine) fn approvers(&self, resource: &str) -> Vec<RecordApprover> {
+        std::iter::once(Self::principal(&self.current, resource))
+            .chain(
+                self.delegates(resource)
+                    .map(|actor| Self::principal(actor, resource)),
+            )
+            .collect()
+    }
+    pub(in crate::engine) fn approvers_for(
+        &self,
+        resource: &str,
+        row: &Value,
+    ) -> Vec<RecordApprover> {
+        let direct = auth::restriction_allows(&self.current, resource, "view", row, true);
+        direct
+            .then(|| Self::principal(&self.current, resource))
+            .into_iter()
+            .chain(
+                self.delegates(resource)
+                    .filter(|actor| {
+                        auth::restriction_allows(actor, resource, "view", row, true)
+                            && auth::restriction_allows(actor, resource, "approve", row, true)
+                    })
+                    .map(|actor| Self::principal(actor, resource)),
+            )
+            .collect()
     }
 }

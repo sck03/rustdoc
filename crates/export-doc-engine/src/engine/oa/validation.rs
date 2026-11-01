@@ -22,11 +22,6 @@ pub(in crate::engine) fn employee(
             }
             person
         };
-    let departments =
-        super::super::personnel_organization::departments_in(tx, &person, &actor.company)?;
-    if departments.is_empty() {
-        return Err(error(403, "只能为本公司员工办理申请。"));
-    }
     if !["Active", "Probation"].contains(&text(&person, "status").as_str()) {
         return Err(conflict("员工已离职或状态不可用。"));
     }
@@ -37,30 +32,10 @@ pub(in crate::engine) fn employee(
     {
         return Err(conflict("申请人与人员账号关联已变化。"));
     }
-    let mut requested = text(body, "departmentId");
-    if !existing && requested.is_empty() {
-        requested = if departments.contains(&actor.department) {
-            actor.department.clone()
-        } else {
-            departments[0].clone()
-        };
-    }
-    if existing || !requested.is_empty() {
-        if !departments.contains(&requested) {
-            return Err(conflict(
-                "申请部门已不在员工的有效主职或兼职范围内，请重新选择。",
-            ));
-        }
-        super::super::organization::validate_assignment(tx, &actor.company, &requested)?;
-        let appointment = super::super::personnel_organization::appointment_in(
-            tx,
-            &person,
-            &actor.company,
-            &requested,
-        )?;
-        person["jobTitle"] = json!(appointment.job_title);
-        person["departmentId"] = json!(requested);
-    }
+    let appointment = super::request_identity::appointment(tx, actor, &person, body)?;
+    person["jobTitle"] = json!(appointment.job_title);
+    person["departmentId"] = json!(appointment.department_id);
+    person["applicantAppointmentId"] = json!(appointment.id);
     person["companyScope"] = json!(actor.company);
     Ok(person)
 }

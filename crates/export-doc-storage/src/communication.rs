@@ -1,6 +1,7 @@
 //! Shared filtering before counting/pagination; both adapters bind every value.
 use super::QuerySql;
 pub struct NotificationScope {
+    pub restrictions: Vec<crate::ScopeFilter>,
     pub kind: String,
     pub rank: u8,
     /// Empty accepts every parent state; otherwise filter before pagination.
@@ -106,6 +107,12 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                             (
                                 format!("CAST({} AS BIGINT)", bind(p.user_id.to_string())),
                                 bind(p.context.clone()),
+                                crate::generic_query::restriction_condition(
+                                    &p.restrictions,
+                                    "parent",
+                                    postgres,
+                                    &mut bind,
+                                ),
                             )
                         })
                         .collect::<Vec<_>>();
@@ -138,7 +145,15 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                     };
                 }
                 let kind = bind(scope.kind.clone());
-                allowed.push(format!("(parent.kind={kind}{condition})"));
+                let restriction = crate::generic_query::restriction_condition(
+                    &scope.restrictions,
+                    "parent",
+                    postgres,
+                    &mut bind,
+                );
+                allowed.push(format!(
+                    "(parent.kind={kind}{condition} AND ({restriction}))"
+                ));
             }
             let allowed = if allowed.is_empty() {
                 "FALSE".into()

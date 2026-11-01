@@ -66,6 +66,7 @@ CREATE TABLE workflow_tasks (
     node_key TEXT NOT NULL,
     stage BIGINT NOT NULL CHECK(stage BETWEEN 0 AND 31),
     assignee_id BIGINT NOT NULL REFERENCES records(id) ON DELETE RESTRICT,
+    assignee_person_id BIGINT NOT NULL REFERENCES persons(id) ON DELETE RESTRICT,
     assignee_name TEXT NOT NULL,
     context_id TEXT NOT NULL,
     acted_by_context TEXT NOT NULL,
@@ -116,7 +117,7 @@ CREATE TABLE command_receipts (
     PRIMARY KEY(actor_id,context_id,command_key)
 );
 CREATE VIEW workflow_current_tasks AS SELECT t.* FROM workflow_tasks t JOIN workflow_instances w ON w.request_id=t.request_id AND w.revision=t.submission AND w.generation=t.generation;
-CREATE VIEW task_decisions AS SELECT request_id,submission,generation,task_key,assignee_id,context_id,acted_by_id,acted_by_context,status,note,acted_at,delegation_key,signature FROM workflow_tasks WHERE signature IS NOT NULL;
+CREATE VIEW task_decisions AS SELECT request_id,submission,generation,task_key,assignee_id,assignee_person_id,context_id,acted_by_id,acted_by_context,status,note,acted_at,delegation_key,signature FROM workflow_tasks WHERE signature IS NOT NULL;
 CREATE FUNCTION exportdoc_immutable_workflow() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_TABLE_NAME='workflow_tasks' THEN
@@ -132,7 +133,7 @@ END $$;
 CREATE TRIGGER workflow_signature_immutable BEFORE UPDATE OR DELETE ON workflow_tasks FOR EACH ROW EXECUTE FUNCTION exportdoc_immutable_workflow();
 CREATE TRIGGER request_revision_immutable BEFORE UPDATE OR DELETE ON request_revisions FOR EACH ROW EXECUTE FUNCTION exportdoc_immutable_workflow();
 CREATE TRIGGER workflow_operation_immutable BEFORE UPDATE OR DELETE ON workflow_operations FOR EACH ROW EXECUTE FUNCTION exportdoc_immutable_workflow();
-CREATE VIEW workflow_plans AS SELECT w.id,w.definition || jsonb_build_object('suspendedAt',w.suspended_at,'pausedSeconds',w.paused_seconds,'generation',w.generation,'nodes',COALESCE((SELECT jsonb_agg(value) FROM (SELECT n.definition || jsonb_build_object('startedAt',n.started_at,'dueAt',n.due_at) AS value FROM node_instances n WHERE n.instance_id=w.id AND n.generation=w.generation ORDER BY n.position) q),'[]'::jsonb),'steps',COALESCE((SELECT jsonb_agg(value) FROM (SELECT COALESCE(t.signature,(s.signature || jsonb_build_object('sourceGeneration',t.source_generation)),jsonb_build_object('taskKey',t.task_key,'stage',t.stage,'decision',t.decision,'approverUserId',t.assignee_id,'approverName',t.assignee_name,'approverContext',t.context_id,'status',t.status,'actedByUserId',t.acted_by_id,'actedByName',t.acted_by_name,'actedByContext',t.acted_by_context,'actedAt',t.acted_at,'note',t.note,'delegationKey',t.delegation_key,'sourceGeneration',t.source_generation)) AS value FROM workflow_tasks t LEFT JOIN workflow_tasks s ON s.request_id=t.request_id AND s.submission=t.submission AND s.generation=t.source_generation AND s.task_key=t.task_key WHERE t.request_id=w.request_id AND t.submission=w.revision AND t.generation=w.generation ORDER BY t.stage,t.task_key) q),'[]'::jsonb)) AS body FROM workflow_instances w;
+CREATE VIEW workflow_plans AS SELECT w.id,w.definition || jsonb_build_object('suspendedAt',w.suspended_at,'pausedSeconds',w.paused_seconds,'generation',w.generation,'nodes',COALESCE((SELECT jsonb_agg(value) FROM (SELECT n.definition || jsonb_build_object('startedAt',n.started_at,'dueAt',n.due_at) AS value FROM node_instances n WHERE n.instance_id=w.id AND n.generation=w.generation ORDER BY n.position) q),'[]'::jsonb),'steps',COALESCE((SELECT jsonb_agg(value) FROM (SELECT COALESCE(t.signature,(s.signature || jsonb_build_object('sourceGeneration',t.source_generation)),jsonb_build_object('taskKey',t.task_key,'stage',t.stage,'decision',t.decision,'approverUserId',t.assignee_id,'approverPersonId',t.assignee_person_id,'actedByPersonId',NULL,'verificationValues',jsonb_build_object(),'confirmedReviewPoints',jsonb_build_array(),'approverName',t.assignee_name,'approverContext',t.context_id,'status',t.status,'actedByUserId',t.acted_by_id,'actedByName',t.acted_by_name,'actedByContext',t.acted_by_context,'actedAt',t.acted_at,'note',t.note,'delegationKey',t.delegation_key,'sourceGeneration',t.source_generation)) AS value FROM workflow_tasks t LEFT JOIN workflow_tasks s ON s.request_id=t.request_id AND s.submission=t.submission AND s.generation=t.source_generation AND s.task_key=t.task_key WHERE t.request_id=w.request_id AND t.submission=w.revision AND t.generation=w.generation ORDER BY t.stage,t.task_key) q),'[]'::jsonb)) AS body FROM workflow_instances w;
 CREATE VIEW record_rows AS
 SELECT r.id,r.kind,r.identity,r.version,r.owner_id,r.company,r.department,r.search_text,
     CASE WHEN w.id IS NULL THEN COALESCE(v.body,'{}'::jsonb) || r.body ELSE COALESCE(v.body,'{}'::jsonb) || r.body || jsonb_build_object('approvalPlan',p.body,'status',CASE WHEN w.state='Withdrawn' AND r.kind<>'oa-submission' THEN 'Draft' WHEN w.state='Voided' AND r.kind<>'oa-submission' THEN 'Cancelled' WHEN w.state='Approved' AND r.kind<>'oa-submission' THEN COALESCE(h.result_status,w.state) ELSE w.state END) END AS body

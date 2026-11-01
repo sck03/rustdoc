@@ -215,12 +215,7 @@ pub(super) fn validate_with_primary(
         organization.primary_starts_on = text(person, "hireDate");
         crate::paths::nonce().map_err(unavailable)?
     } else {
-        organization.primary_starts_on =
-            if previous["status"] == "Departed" && person["status"] != "Departed" {
-                text(person, "hireDate")
-            } else {
-                previous_assignments[0].starts_on.clone()
-            };
+        organization.primary_starts_on = previous_assignments[0].starts_on.clone();
         previous_org.primary_assignment_id.clone()
     };
     for assignment in &mut organization.additional_assignments {
@@ -380,10 +375,10 @@ pub fn appointment_managers(
     tx: &Connection,
     person: &Value,
     company: &str,
-    department: &str,
+    appointment: &str,
     functional: bool,
 ) -> Result<Vec<i64>> {
-    let assignment = appointment_in(tx, person, company, department)?;
+    let assignment = appointment_by_id(tx, person, company, appointment)?;
     Ok(if functional {
         assignment.functional_manager_employee_ids.clone()
     } else {

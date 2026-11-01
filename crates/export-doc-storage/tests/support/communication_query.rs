@@ -86,6 +86,7 @@ pub fn exercise(db: &Connection) {
     for (rank, expected) in [(0, 0), (1, 0), (2, 1), (3, 1), (4, 1)] {
         let scopes = [
             NotificationScope {
+                restrictions: vec![],
                 approval_principals: vec![],
                 handling_keys: None,
                 kind: "oa-general".into(),
@@ -93,6 +94,7 @@ pub fn exercise(db: &Connection) {
                 statuses: vec![],
             },
             NotificationScope {
+                restrictions: vec![],
                 approval_principals: vec![],
                 kind: "oa-general".into(),
                 rank: 3,
@@ -131,6 +133,7 @@ pub fn exercise(db: &Connection) {
         );
     }
     let scopes = [NotificationScope {
+        restrictions: vec![],
         approval_principals: vec![],
         handling_keys: None,
         kind: "oa-expense".into(),

@@ -50,6 +50,36 @@ pub fn links(tx: &Connection, users: &[i64]) -> Result<HashMap<i64, Value>> {
 pub fn summary(person: Value) -> Value {
     contracts::dto(contracts::schema("AccountPersonnelRecord"), person)
 }
+pub(super) fn actor_summary(tx: &Connection, actor: &Actor) -> Result<Value> {
+    if actor.admin
+        || !actor.edition.allows("office.people")
+        || (!actor.context.is_empty() && actor.department.is_empty())
+    {
+        return Ok(Value::Null);
+    }
+    let Some(person) = linked_person(tx, actor.id)? else {
+        return Ok(Value::Null);
+    };
+    let appointment = if actor.context.is_empty() {
+        None
+    } else {
+        let selected = super::units::selected_appointment_id(tx, actor)?
+            .ok_or_else(|| unavailable("当前业务身份缺少明确任职。"))?;
+        Some(super::personnel_organization::appointment_by_id(
+            tx,
+            &person,
+            &actor.company,
+            &selected,
+        )?)
+    };
+    let mut result = summary(person);
+    if let Some(appointment) = appointment {
+        result["jobTitle"] = serde_json::json!(appointment.job_title);
+        result["departmentId"] = serde_json::json!(appointment.department_id);
+        result["companyScope"] = serde_json::json!(actor.company);
+    }
+    Ok(result)
+}
 
 pub fn enrich_users(store: &Store, users: &mut [Value]) -> Result<()> {
     let ids = users

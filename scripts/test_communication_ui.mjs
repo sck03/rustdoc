@@ -153,5 +153,8 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   await financePage.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
   assert.deepEqual(await financePage.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => v.id)), []);
   await financePage.goto(`${url}/#/office/approvals?view=handling`);
-  await financePage.locator('.oa-hub-count[aria-label="待财务接收 0 项"]').waitFor();
+  await financePage.getByText('当前没有待处理事项', { exact: true }).waitFor();
+  await financePage.getByText(/^暂无待办的事项（\d+ 类）$/u).click();
+  const emptyFinance = financePage.locator('.oa-hub-idle-categories li').filter({ has: financePage.getByRole('link', { name: '财务待接收', exact: true }) });
+  await emptyFinance.getByText('0 项', { exact: true }).waitFor();
 });

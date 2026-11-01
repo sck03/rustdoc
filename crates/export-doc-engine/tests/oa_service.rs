@@ -15,6 +15,8 @@ mod oa_archive_contract;
 mod oa_contract;
 #[path = "support/oa_integration_contract.rs"]
 mod oa_integration_contract;
+#[path = "support/oa_review_contract.rs"]
+mod oa_review_contract;
 #[path = "support/organization_workflow_contract.rs"]
 mod organization_workflow_contract;
 #[path = "support/permission_identity_contract.rs"]
@@ -27,6 +29,23 @@ mod unit_contract;
 mod workflow_operations_contract;
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
+
+#[test]
+fn participation_limits_and_same_department_appointments_are_consistent() {
+    let mut fixture = native_fixture::Fixture::new();
+    fixture.client.take();
+    let service = NativeService::open(fixture.paths.clone()).unwrap();
+    let login = oa_contract::call(
+        &service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":"admin","password":""})),
+    )
+    .unwrap();
+    oa_review_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    service.close().unwrap();
+}
 
 #[test]
 fn revisions_preserve_task_authority_signatures_and_command_receipts() {

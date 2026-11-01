@@ -171,4 +171,124 @@ pub fn exercise(service: &NativeService, admin: &str) {
         workflow::call(service, admin, GET_GENERAL_REQUEST, id, None).unwrap()["reason"],
         secret
     );
+    activated_materials(
+        service,
+        admin,
+        user["id"].as_i64().unwrap(),
+        token,
+        &applicant,
+    );
+}
+
+fn activated_materials(
+    service: &NativeService,
+    admin: &str,
+    reviewer: i64,
+    token: &str,
+    applicant: &Value,
+) {
+    let (future_id, future) = workflow::reviewer(service, admin);
+    for (same_person, past_full) in [(true, false), (false, false), (true, true)] {
+        let secret = format!("node-material-{}", nonce().unwrap());
+        let mut first = workflow::node("first", &[], "Named", json!([reviewer]));
+        let mut second = workflow::node(
+            "second",
+            &["first"],
+            "Named",
+            json!([if same_person { reviewer } else { future_id }]),
+        );
+        if past_full {
+            second["materialPolicy"] = json!({"hiddenFields":["reason"]});
+        } else {
+            first["materialPolicy"] = json!({"hiddenFields":["reason"]});
+        }
+        let mut settings = workflow::request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
+        settings["rules"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|r| r["key"] == "general")
+            .unwrap()["stages"] = json!([first, second]);
+        settings["expectedVersion"] = settings["versionNumber"].clone();
+        let saved = workflow::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+        workflow::request(
+            service,
+            admin,
+            PUBLISH_OA_DEFINITION,
+            Some(json!({"expectedVersion":saved["versionNumber"],"definitionKey":"general"})),
+        );
+        let draft = workflow::request(
+            service,
+            admin,
+            CREATE_GENERAL_REQUEST,
+            Some(
+                json!({"requestKey":nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":"按激活节点检查材料","reason":secret,"category":"Other"}),
+            ),
+        );
+        let id = draft["id"].as_i64().unwrap();
+        let mut row = workflow::call(
+            service,
+            admin,
+            SUBMIT_GENERAL_REQUEST,
+            id,
+            workflow::decision_body(
+                service,
+                admin,
+                SUBMIT_GENERAL_REQUEST,
+                id,
+                Some(json!({"expectedVersion":draft["versionNumber"],"note":"提交节点材料回归"})),
+            ),
+        )
+        .unwrap();
+        let before = workflow::call(service, token, GET_GENERAL_REQUEST, id, None).unwrap();
+        assert_eq!(
+            before.get("reason").is_some(),
+            past_full,
+            "a future node never widens the current policy"
+        );
+        if !same_person {
+            let queued = workflow::call(service, &future, GET_GENERAL_REQUEST, id, None).unwrap();
+            assert_eq!(queued["canReview"], false);
+            assert!(
+                queued.get("reason").is_none(),
+                "future-only assignment has no business materials"
+            );
+        }
+        let sign = |token: &str, row: &Value| {
+            workflow::call(
+                service,
+                token,
+                APPROVE_GENERAL_REQUEST,
+                id,
+                workflow::decision_body(
+                    service,
+                    token,
+                    APPROVE_GENERAL_REQUEST,
+                    id,
+                    Some(json!({"expectedVersion":row["versionNumber"],"note":secret})),
+                ),
+            )
+            .unwrap()
+        };
+        row = sign(token, &row);
+        let next = if same_person { token } else { future.as_str() };
+        let current = workflow::call(service, next, GET_GENERAL_REQUEST, id, None).unwrap();
+        assert_eq!(
+            current.get("reason").is_some(),
+            !past_full,
+            "current restrictions override an earlier broad node"
+        );
+        if past_full {
+            let history = workflow::call(
+                service,
+                token,
+                super::oa_contract::operation("general", "history"),
+                id,
+                None,
+            )
+            .unwrap();
+            assert!(!history.to_string().contains(&secret));
+        }
+        assert_eq!(sign(next, &row)["status"], "Approved");
+    }
 }

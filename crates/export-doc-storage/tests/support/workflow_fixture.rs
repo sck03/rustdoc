@@ -19,6 +19,31 @@ pub struct Task {
 pub trait WorkflowFixture {
     fn publish_workflow(&self, request: i64, revision: i64, tasks: &[Task]) -> Result<()>;
 }
+fn person(tx: &Connection, account: i64) -> i64 {
+    let identity = format!("workflow-fixture-person-{account}");
+    if let Some(row) = tx.find_identity("people", &identity).unwrap() {
+        return row["id"].as_i64().unwrap();
+    }
+    let unit = "WORKFLOW-SIGNATURES";
+    if tx
+        .find_identity("companies", &unit.to_lowercase())
+        .unwrap()
+        .is_none()
+    {
+        super::organization_fixture::unit(tx, unit, &["D"]);
+    }
+    let mut body = json!({"versionNumber":1,"companyScope":unit,"departmentId":"D","employeeNumber":identity,"status":"Active","employmentType":"FullTime","hireDate":"2020-01-01","jobTitle":"复核人","ownerUserId":account,"profile":{"fullName":"匿名复核人员"},"organization":{"primaryAssignmentId":identity,"additionalAssignments":[]}});
+    let id = tx
+        .insert(&RecordWrite {
+            kind: "people",
+            identity: Some(&identity),
+            body: &body,
+        })
+        .unwrap();
+    body["id"] = json!(id);
+    tx.set_body(id, &body).unwrap();
+    id
+}
 impl WorkflowFixture for Connection {
     fn publish_workflow(&self, request: i64, revision: i64, tasks: &[Task]) -> Result<()> {
         let row = self
@@ -31,7 +56,7 @@ impl WorkflowFixture for Connection {
             };
             json!({"key":format!("{}-{i}",t.node),"name":"复核","decision":"All","dependsOn":[],"approvalPercentage":100,"rejectionPolicy":"Immediate","skipped":false,"independentReview":t.independent,"dueHours":0,"reviewPoints":[],"startedAt":start,"dueAt":t.due_at})
         }).collect();
-        let steps:Vec<_>=tasks.iter().enumerate().map(|(i,t)|json!({"taskKey":t.key,"stage":i,"decision":"All","approverUserId":t.assignee,"approverName":"匿名责任人","approverContext":t.context,"status":t.status,"actedByUserId":t.acted_by,"actedByName":if t.acted_by.is_some(){"匿名签署人"}else{""},"actedByContext":t.acted_by_context,"actedAt":t.acted_at,"note":"","delegationKey":"","sourceGeneration":null})).collect();
+        let steps:Vec<_>=tasks.iter().enumerate().map(|(i,t)|json!({"taskKey":t.key,"stage":i,"decision":"All","approverUserId":t.assignee,"approverPersonId":person(self,t.assignee),"approverName":"匿名责任人","approverContext":t.context,"status":t.status,"actedByUserId":t.acted_by,"actedByPersonId":t.acted_by.map(|id|person(self,id)),"verificationValues":{},"confirmedReviewPoints":[],"actedByName":if t.acted_by.is_some(){"匿名签署人"}else{""},"actedByContext":t.acted_by_context,"actedAt":t.acted_at,"note":"","delegationKey":"","sourceGeneration":null})).collect();
         let plan = json!({"definitionKey":"query-fixture","policyVersion":1,"generation":1,"notifyUserIds":[],"calendars":{},"subflows":[],"nodes":nodes,"steps":steps});
         let mut snapshot = json!({"versionNumber":1,"requestId":request,"submissionNumber":revision,"ownerUserId":row["ownerUserId"],"companyScope":row["companyScope"],"departmentId":row["departmentId"],"request":row,"approvalPlan":plan});
         let archive = self.insert(&RecordWrite {
@@ -91,7 +116,30 @@ pub fn exercise(tx: &Connection) {
         elapsed_seconds: None,
     };
     tx.publish_workflow(request, 1, &[task]).unwrap();
+    let saved = tx.get("oa-general", request).unwrap().unwrap();
+    let plan = &saved["approvalPlan"];
+    let person_id = plan["steps"][0]["approverPersonId"].as_i64().unwrap();
+    assert!(
+        tx.get("people", person_id).unwrap().is_some(),
+        "unsigned assignments retain a real stable person"
+    );
+    tx.save_workflow_state(
+        request,
+        1,
+        &WorkflowProgress {
+            approval: "Pending",
+            handling: None,
+        },
+        plan,
+        &["review".into()],
+    )
+    .unwrap();
+    assert_eq!(
+        tx.get("oa-general", request).unwrap().unwrap()["approvalPlan"],
+        *plan
+    );
     let principals = [export_doc_storage::RecordApprover {
+        restrictions: vec![],
         user_id: request,
         context: String::new(),
     }];

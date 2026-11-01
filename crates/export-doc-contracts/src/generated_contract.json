@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "cbe1cfaf38b48e678a73cfe94d7dd1bb1e6fc35a761941aec19b684545a694ae",
+  "digest": "dbe7ffc0b1ba648f55e3aaa456e2030d071a62e2a543796f3cb003ffc330b519",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -108982,6 +108982,10 @@
         "departmentId": {
           "type": "string",
           "maxLength": 50
+        },
+        "appointmentId": {
+          "type": "string",
+          "maxLength": 100
         }
       }
     },
@@ -109131,6 +109135,14 @@
           "$ref": "#/components/schemas/ResourceSubmission"
         },
         "companyScope": {
+          "type": "string",
+          "readOnly": true
+        },
+        "applicantAppointmentId": {
+          "type": "string",
+          "readOnly": true
+        },
+        "applicantJobTitle": {
           "type": "string",
           "readOnly": true
         },
@@ -111630,6 +111642,9 @@
           "type": "integer",
           "format": "int64"
         },
+        "appointmentId": {
+          "type": "string"
+        },
         "title": {
           "type": "string"
         },
@@ -111748,6 +111763,14 @@
           "items": {
             "$ref": "#/components/schemas/OaAttachment"
           }
+        },
+        "applicantAppointmentId": {
+          "type": "string",
+          "readOnly": true
+        },
+        "applicantJobTitle": {
+          "type": "string",
+          "readOnly": true
         },
         "approvalPlan": {
           "$ref": "#/components/schemas/OaApprovalPlan"
@@ -111890,6 +111913,9 @@
         "employeeId": {
           "type": "integer",
           "format": "int64"
+        },
+        "appointmentId": {
+          "type": "string"
         },
         "title": {
           "type": "string"
@@ -112293,6 +112319,9 @@
           "type": "integer",
           "format": "int64"
         },
+        "appointmentId": {
+          "type": "string"
+        },
         "title": {
           "type": "string"
         },
@@ -112409,6 +112438,14 @@
           "items": {
             "$ref": "#/components/schemas/OaAttachment"
           }
+        },
+        "applicantAppointmentId": {
+          "type": "string",
+          "readOnly": true
+        },
+        "applicantJobTitle": {
+          "type": "string",
+          "readOnly": true
         },
         "approvalPlan": {
           "$ref": "#/components/schemas/OaApprovalPlan"
@@ -113149,6 +113186,14 @@
           "$ref": "#/components/schemas/ResourceSubmission"
         },
         "companyScope": {
+          "type": "string",
+          "readOnly": true
+        },
+        "applicantAppointmentId": {
+          "type": "string",
+          "readOnly": true
+        },
+        "applicantJobTitle": {
           "type": "string",
           "readOnly": true
         },
@@ -115765,6 +115810,14 @@
           "type": "string"
         },
         "employeeNumber": null,
+        "applicantAppointmentId": {
+          "type": "string",
+          "readOnly": true
+        },
+        "applicantJobTitle": {
+          "type": "string",
+          "readOnly": true
+        },
         "title": {
           "type": "string"
         },
@@ -117162,6 +117215,10 @@
         "departmentId": {
           "type": "string",
           "maxLength": 50
+        },
+        "appointmentId": {
+          "type": "string",
+          "maxLength": 100
         }
       }
     },

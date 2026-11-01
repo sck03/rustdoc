@@ -120,13 +120,16 @@ pub(crate) trait Adapter: Send {
         before: Option<i64>,
         limit: i64,
     ) -> Result<Vec<Value>> {
-        let pg = self.provider() == "PostgreSQL";
-        let (mut query, projection) = personnel_links::unit_accounts(company, date, all, pg)?;
-        if let Some(id) = before {
-            let parameter = sql::bind(&mut query.values, id, pg);
-            query.filter += &format!(" AND r.id<CAST({parameter} AS BIGINT)");
-        }
-        self.query_slice(&query, &projection, 0, limit.clamp(1, 200))
+        personnel_links::account_page(self, company, date, all, false, before, limit)
+    }
+    fn workflow_notification_account_page(
+        &self,
+        company: &str,
+        date: &str,
+        before: Option<i64>,
+        limit: i64,
+    ) -> Result<Vec<Value>> {
+        personnel_links::account_page(self, company, date, false, true, before, limit)
     }
     fn resource_has_open_requests(&self, kind: &str, parent: i64) -> Result<bool> {
         let pg = self.provider() == "PostgreSQL";

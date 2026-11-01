@@ -1,6 +1,7 @@
 //! Company announcements and personal, transactional OA notifications.
 mod announcements;
 mod notifications;
+mod recipients;
 use super::{
     NativeService, auth,
     error::{Result, conflict, error, invalid},

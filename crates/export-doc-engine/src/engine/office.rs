@@ -256,6 +256,8 @@ pub fn validate(
             let employee = person(connection, actor, value)?;
             value["employeeId"] = employee["id"].clone();
             value["departmentId"] = employee["departmentId"].clone();
+            value["applicantAppointmentId"] = employee["applicantAppointmentId"].clone();
+            value["applicantJobTitle"] = employee["jobTitle"].clone();
             value["applicantUserId"] = value["ownerUserId"].clone();
             value["applicantName"] = employee["profile"]["fullName"].clone();
             value["employeeNumber"] = employee["employeeNumber"].clone();
@@ -338,6 +340,8 @@ pub fn validate(
             let employee = person(connection, actor, value)?;
             value["employeeId"] = employee["id"].clone();
             value["departmentId"] = employee["departmentId"].clone();
+            value["applicantAppointmentId"] = employee["applicantAppointmentId"].clone();
+            value["applicantJobTitle"] = employee["jobTitle"].clone();
             value["applicantUserId"] = value["ownerUserId"].clone();
             value["applicantName"] = employee["profile"]["fullName"].clone();
             value["employeeNumber"] = employee["employeeNumber"].clone();

@@ -270,14 +270,32 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
     response(saved)
 }
 pub(super) fn principals(tx: &Connection, actor: &Actor) -> Result<Vec<(i64, String)>> {
-    let settings = load(tx, &actor.company)?;
+    Ok(active_delegations(tx, &actor.company)?
+        .into_iter()
+        .filter(|(_, delegate, _)| *delegate == actor.id)
+        .map(|(principal, _, key)| (principal, key))
+        .collect())
+}
+pub(in crate::engine) fn delegates_for(
+    tx: &Connection,
+    company: &str,
+    principals: &std::collections::BTreeSet<i64>,
+) -> Result<Vec<i64>> {
+    Ok(active_delegations(tx, company)?
+        .into_iter()
+        .filter(|(principal, _, _)| principals.contains(principal))
+        .map(|(_, delegate, _)| delegate)
+        .collect())
+}
+fn active_delegations(tx: &Connection, company: &str) -> Result<Vec<(i64, i64, String)>> {
+    let settings = load(tx, company)?;
     let mut result = vec![];
     let now = chrono::Utc::now();
     for d in settings["delegations"]
         .as_array()
         .ok_or_else(|| super::super::error::unavailable("审批代理设置损坏。"))?
     {
-        if d["isActive"] != true || d["delegateUserId"] != actor.id {
+        if d["isActive"] != true {
             continue;
         }
         let (start, end) = delegation_window(&text(d, "startsAt"), &text(d, "endsAt"))
@@ -285,6 +303,7 @@ pub(super) fn principals(tx: &Connection, actor: &Actor) -> Result<Vec<(i64, Str
         if start <= now && now < end {
             result.push((
                 records::positive(d, "principalUserId", "原审批人")?,
+                records::positive(d, "delegateUserId", "代理人")?,
                 text(d, "key"),
             ));
         }

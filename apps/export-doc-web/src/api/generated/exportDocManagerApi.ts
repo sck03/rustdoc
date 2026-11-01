@@ -4469,6 +4469,7 @@ export interface InvoiceReviewResult {
 }
 
 export interface MeetingBookingCreateRequest {
+  appointmentId?: string;
   attendeeCount: number;
   departmentId?: string;
   employeeId?: number | null;
@@ -4481,6 +4482,8 @@ export interface MeetingBookingCreateRequest {
 }
 
 export interface MeetingBookingRecord {
+  applicantAppointmentId?: string;
+  applicantJobTitle?: string;
   applicantName: string;
   approvalDocument?: ResourceSubmission;
   approvalPlan?: OaApprovalPlan;
@@ -5102,6 +5105,9 @@ export interface OaPurchaseLine {
 }
 
 export interface OaRequest {
+  applicantAppointmentId?: string;
+  applicantJobTitle?: string;
+  appointmentId?: string;
   approvalDocument?: OaSubmission;
   approvalPlan?: OaApprovalPlan;
   approvalRoutingNotes?: string[];
@@ -5155,6 +5161,7 @@ export interface OaRequestPage {
 }
 
 export interface OaRequestSave {
+  appointmentId?: string;
   category?: "Seal" | "Certificate" | "IT" | "Repair" | "Other";
   currency?: "CNY" | "USD" | "EUR" | "HKD" | "JPY" | "GBP";
   departmentId?: string;
@@ -5276,6 +5283,9 @@ export interface OaSubmissionPage {
 }
 
 export interface OaSubmittedRequest {
+  applicantAppointmentId?: string;
+  applicantJobTitle?: string;
+  appointmentId?: string;
   approvalPlan?: OaApprovalPlan;
   approvalRoutingNotes?: string[];
   attachments: OaAttachment[];
@@ -5428,6 +5438,8 @@ export interface OfficeSupplyRecord {
 }
 
 export interface OfficeSupplyRequestRecord {
+  applicantAppointmentId?: string;
+  applicantJobTitle?: string;
   applicantName: string;
   approvalDocument?: ResourceSubmission;
   approvalPlan?: OaApprovalPlan;
@@ -5984,6 +5996,8 @@ export interface ResourceSubmissionPage {
 }
 
 export interface ResourceSubmittedRequest {
+  applicantAppointmentId?: string;
+  applicantJobTitle?: string;
   applicantName?: string;
   approvalPlan: OaApprovalPlan;
   attachments: OaAttachment[];
@@ -6281,6 +6295,7 @@ export interface SiteNotification {
 }
 
 export interface SupplyRequestCreateRequest {
+  appointmentId?: string;
   departmentId?: string;
   employeeId?: number | null;
   officeSupplyId: number;

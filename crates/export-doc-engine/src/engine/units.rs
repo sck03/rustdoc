@@ -23,7 +23,10 @@ use super::{
 };
 use crate::engine::store::Connection;
 pub(super) use access::{approvers, directory, save};
-pub(super) use context::{actors_for_operation, business_actors, contexts, for_operation, resolve};
+pub(super) use context::{
+    actors_for_operation, business_actors, contexts, for_operation, resolve,
+    selected_appointment_id,
+};
 use export_doc_domain::{
     permissions::{self, Grant},
     units::Management,

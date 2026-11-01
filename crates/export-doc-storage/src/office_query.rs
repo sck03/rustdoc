@@ -65,7 +65,18 @@ pub(crate) fn build(q: &OfficeQuery<'_>, pg: bool) -> Result<QuerySql> {
     } else {
         "FALSE".into()
     };
-    let can_issue = format!("((COALESCE({handling},'')='' AND {issue}) OR {assigned})");
+    let issue_limit =
+        crate::generic_query::restriction_condition(&q.issue.restrictions, "r", pg, &mut |v| {
+            sql::bind(&mut values, v, pg)
+        });
+    let can_issue =
+        format!("(((COALESCE({handling},'')='' AND {issue}) OR {assigned}) AND ({issue_limit}))");
+    clauses.push(crate::generic_query::restriction_condition(
+        &q.view.restrictions,
+        "r",
+        pg,
+        &mut |v| sql::bind(&mut values, v, pg),
+    ));
     if !directory {
         let view = q.view.filter(&mut values, pg);
         let viewer = format!("CAST({} AS BIGINT)", sql::bind(&mut values, q.viewer, pg));
@@ -76,6 +87,12 @@ pub(crate) fn build(q: &OfficeQuery<'_>, pg: bool) -> Result<QuerySql> {
                 (
                     format!("CAST({} AS BIGINT)", sql::bind(&mut values, p.user_id, pg)),
                     sql::bind(&mut values, &p.context, pg),
+                    crate::generic_query::restriction_condition(
+                        &p.restrictions,
+                        "r",
+                        pg,
+                        &mut |v| sql::bind(&mut values, v, pg),
+                    ),
                 )
             })
             .collect::<Vec<_>>();
@@ -113,7 +130,15 @@ pub(crate) fn build(q: &OfficeQuery<'_>, pg: bool) -> Result<QuerySql> {
     }
     if q.handling_only {
         let return_scope = q.return_scope.filter(&mut values, pg);
-        let can_return = format!("((COALESCE({handling},'')='' AND {return_scope}) OR {assigned})");
+        let return_limit = crate::generic_query::restriction_condition(
+            &q.return_scope.restrictions,
+            "r",
+            pg,
+            &mut |v| sql::bind(&mut values, v, pg),
+        );
+        let can_return = format!(
+            "(((COALESCE({handling},'')='' AND {return_scope}) OR {assigned}) AND ({return_limit}))"
+        );
         clauses.push(format!("(({state}='Approved' AND {} AND {can_issue}) OR (({state}='InUse' OR ({state}='Issued' AND {})) AND {} AND {can_return}))", q.can_issue, truth("isReturnable", pg), q.can_return));
     }
     if directory && !q.include_inactive {

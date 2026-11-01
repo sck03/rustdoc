@@ -93,6 +93,8 @@ pub fn action(
         };
         if decision == Some("Pending") {
             value["status"] = json!("Pending");
+        } else if decision == Some("Rejected") {
+            value["status"] = json!("Rejected");
         } else if kind == "bookings" {
             meeting(tx, actor, operation, &mut value)?;
         } else {
@@ -125,7 +127,7 @@ pub fn action(
             actor,
             kind,
             &saved,
-            if decision == Some("Pending") {
+            if decision == Some("Pending") && operation.starts_with("Approve") {
                 "ApproveStep"
             } else {
                 event

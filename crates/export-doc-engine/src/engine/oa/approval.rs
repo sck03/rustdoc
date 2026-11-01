@@ -1,6 +1,8 @@
 //! Assignment-scoped authorization and graph task decisions.
 use super::*;
 use export_doc_domain::approval::ApprovalPlan;
+mod snapshot;
+pub(in crate::engine) use snapshot::ReviewSnapshot;
 pub(in crate::engine) fn resource(kind: &str) -> Option<&'static str> {
     match kind.trim_start_matches("oa-") {
         "personnel" => Some("office.personnel-changes"),
@@ -38,7 +40,7 @@ pub(in crate::engine) fn reviewer(
     row: &Value,
 ) -> Result<Actor> {
     let resource = resource(&text(row, "kind")).ok_or_else(|| invalid("未知申请类型。"))?;
-    let reviewer = super::super::units::for_operation(
+    let reviewers = super::super::units::actors_for_operation(
         tx,
         id,
         actor.edition,
@@ -46,8 +48,41 @@ pub(in crate::engine) fn reviewer(
         resource,
         "approve",
     )?;
-    super::qualification::person_id(tx, &reviewer)?;
-    Ok(reviewer)
+    for reviewer in reviewers {
+        match qualified_person(tx, &reviewer, row) {
+            Ok(_) => return Ok(reviewer),
+            Err(cause) if cause.status == Some(403) => {}
+            Err(cause) => return Err(cause),
+        }
+    }
+    Err(error(
+        403,
+        "责任人在此单位没有符合申请范围的有效人员审批身份。",
+    ))
+}
+pub(in crate::engine) fn qualified_person(
+    tx: &Connection,
+    candidate: &Actor,
+    row: &Value,
+) -> Result<i64> {
+    let resource = resource(&text(row, "kind")).ok_or_else(|| invalid("未知申请类型。"))?;
+    auth::authorize(candidate, resource, "view")?;
+    auth::authorize(candidate, resource, "approve")?;
+    if row["companyScope"].is_string()
+        && (row["companyScope"] != candidate.company
+            || !auth::restriction_allows(candidate, resource, "view", row, true)
+            || !auth::restriction_allows(candidate, resource, "approve", row, true))
+    {
+        return Err(error(403, "审批事项超出此身份的显式数据范围限制。"));
+    }
+    let person = super::qualification::person_id(tx, candidate)?;
+    if row["ownerUserId"] == candidate.id
+        || row["applicantAccountId"] == candidate.id
+        || row["employeeId"] == person
+    {
+        return Err(error(403, "申请人或代填人不能承担本事项审批。"));
+    }
+    Ok(person)
 }
 pub(in crate::engine) fn queue_approvers(
     tx: &Connection,
@@ -55,6 +90,14 @@ pub(in crate::engine) fn queue_approvers(
     resource: &str,
 ) -> Result<Vec<export_doc_storage::RecordApprover>> {
     Ok(super::queue_authority::QueueAuthority::new(tx, actor)?.approvers(resource))
+}
+pub(in crate::engine) fn object_approvers(
+    tx: &Connection,
+    actor: &Actor,
+    resource: &str,
+    row: &Value,
+) -> Result<Vec<export_doc_storage::RecordApprover>> {
+    Ok(super::queue_authority::QueueAuthority::new(tx, actor)?.approvers_for(resource, row))
 }
 pub(in crate::engine) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<()> {
     super::approval_routing::submit(tx, actor, row)
@@ -64,104 +107,7 @@ pub(in crate::engine) fn authority(
     actor: &Actor,
     row: &Value,
 ) -> Result<Option<(i64, String)>> {
-    authority_for(tx, actor, row, None)
-}
-pub(in crate::engine) fn review_tasks(
-    tx: &Connection,
-    actor: &Actor,
-    row: &Value,
-) -> Result<Vec<String>> {
-    let mut tasks = vec![];
-    if let Some(plan) = plan(row)? {
-        for i in plan.current_indices() {
-            if authority_for(tx, actor, row, Some(&plan.steps[i].task_key))?.is_some() {
-                tasks.push(plan.steps[i].task_key.clone());
-            }
-        }
-    }
-    Ok(tasks)
-}
-fn authority_for(
-    tx: &Connection,
-    actor: &Actor,
-    row: &Value,
-    task: Option<&str>,
-) -> Result<Option<(i64, String)>> {
-    let Some(resource) = resource(&text(row, "kind")) else {
-        return Ok(None);
-    };
-    if row["status"] != "Pending"
-        || row["companyScope"] != actor.company
-        || row["ownerUserId"] == actor.id
-        || row["applicantAccountId"] == actor.id
-        || auth::authorize(actor, resource, "view").is_err()
-        || auth::authorize(actor, resource, "approve").is_err()
-    {
-        return Ok(None);
-    }
-    let signer = match super::qualification::person_id(tx, actor) {
-        Ok(id) => id,
-        Err(cause) if cause.status == Some(403) => return Ok(None),
-        Err(cause) => return Err(cause),
-    };
-    let Some(plan) = plan(row)? else {
-        return Ok(None);
-    };
-    let indices: Vec<_> = plan
-        .current_indices()
-        .into_iter()
-        .filter(|i| {
-            task.is_none_or(|key| plan.steps[*i].task_key == key)
-                && !plan.independent_signer_conflict(plan.steps[*i].stage, actor.id)
-                && !(plan.nodes[plan.steps[*i].stage].independent_review
-                    && plan.steps.iter().any(|s| {
-                        s.stage != plan.steps[*i].stage
-                            && s.acted_by_user_id.is_some()
-                            && (s.acted_by_person_id == Some(signer)
-                                || s.approver_person_id == Some(signer))
-                    }))
-        })
-        .collect();
-    if indices.iter().any(|i| {
-        plan.steps[*i].approver_user_id == actor.id
-            && plan.steps[*i].approver_context == actor.context
-            && plan.steps[*i]
-                .approver_person_id
-                .is_none_or(|id| id == signer)
-    }) {
-        return Ok(Some((actor.id, String::new())));
-    }
-    for (principal, key) in settings::principals(tx, actor)? {
-        if !indices
-            .iter()
-            .any(|i| plan.steps[*i].approver_user_id == principal)
-        {
-            continue;
-        }
-        for i in indices
-            .iter()
-            .filter(|i| plan.steps[**i].approver_user_id == principal)
-        {
-            match super::super::units::resolve(
-                tx,
-                principal,
-                actor.edition,
-                &plan.steps[*i].approver_context,
-            ) {
-                Ok(p)
-                    if p.company == actor.company
-                        && auth::authorize(&p, resource, "view").is_ok()
-                        && auth::authorize(&p, resource, "approve").is_ok() =>
-                {
-                    return Ok(Some((principal, key)));
-                }
-                Ok(_) => {}
-                Err(e) if matches!(e.status, Some(400 | 401 | 403 | 404)) => {}
-                Err(e) => return Err(e),
-            }
-        }
-    }
-    Ok(None)
+    Ok(ReviewSnapshot::read(tx, actor, row)?.authority(None))
 }
 pub(in crate::engine) fn review(
     tx: &Connection,
@@ -175,7 +121,9 @@ pub(in crate::engine) fn review(
     if task.is_empty() {
         return Err(invalid("请选择具体审批任务，刷新后重试。"));
     }
-    let (principal, delegation) = authority_for(tx, actor, row, Some(task))?
+    let mut review = ReviewSnapshot::read(tx, actor, row)?;
+    let (principal, delegation) = review
+        .authority(Some(task))
         .ok_or_else(|| error(403, "此任务不由您审批，或代理已失效；不能审批本人申请。"))?;
     let next = match action {
         "reject" => "Rejected",
@@ -183,7 +131,10 @@ pub(in crate::engine) fn review(
         "approve" => "Approved",
         _ => return Err(invalid("未知审批决定。")),
     };
-    let mut plan = plan(row)?.ok_or_else(|| conflict("申请缺少流程实例。"))?;
+    let mut plan = review
+        .plan
+        .take()
+        .ok_or_else(|| conflict("申请缺少流程实例。"))?;
     let index = plan
         .current_indices()
         .into_iter()

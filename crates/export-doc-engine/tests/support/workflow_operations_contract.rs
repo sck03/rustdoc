@@ -279,6 +279,77 @@ pub fn exercise(service: &NativeService, admin: &str) {
             .iter()
             .all(|s| s["status"] == "Cancelled")
     );
+    let mut settings = fixture::request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
+    let mut collect = fixture::node("collect", &[], "Named", json!([first_id, added_id]));
+    collect["rejectionPolicy"] = json!("Collect");
+    collect["revisionPolicy"] = json!({"allowRemoveSigners":true,"minimumSigners":1});
+    settings["rules"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|r| r["key"] == "general")
+        .unwrap()["stages"] = json!([collect]);
+    settings["expectedVersion"] = settings["versionNumber"].clone();
+    let saved = fixture::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    fixture::request(
+        service,
+        admin,
+        PUBLISH_OA_DEFINITION,
+        Some(json!({"expectedVersion":saved["versionNumber"],"definitionKey":"general"})),
+    );
+    let pending = create();
+    let id = pending["id"].as_i64().unwrap();
+    let rejected_vote = fixture::call(
+        service,
+        &first,
+        REJECT_GENERAL_REQUEST,
+        id,
+        fixture::decision_body(
+            service,
+            &first,
+            REJECT_GENERAL_REQUEST,
+            id,
+            Some(json!({"expectedVersion":pending["versionNumber"],"note":"继续收集其他意见"})),
+        ),
+    )
+    .unwrap();
+    assert_eq!(rejected_vote["status"], "Pending");
+    assert_eq!(
+        execute(
+            service,
+            admin,
+            &rejected_vote,
+            "RemoveSigner",
+            "collect",
+            &[added_id]
+        )
+        .unwrap_err()
+        .status,
+        Some(400)
+    );
+    let unchanged = fixture::call(service, admin, GET_GENERAL_REQUEST, id, None).unwrap();
+    assert_eq!(unchanged["versionNumber"], rejected_vote["versionNumber"]);
+    assert_eq!(
+        unchanged["approvalPlan"]["steps"],
+        rejected_vote["approvalPlan"]["steps"]
+    );
+    let rejected = sign(service, &added, &unchanged, false);
+    assert_eq!(
+        rejected["status"], "Rejected",
+        "the last actual signature settles the collected rejection"
+    );
+    assert!(
+        rejected["approvalDocument"]["approvedAt"]
+            .as_str()
+            .is_none_or(str::is_empty)
+    );
+    resource_collected_rejection(
+        service,
+        admin,
+        &person,
+        (first_id, &first),
+        (added_id, &added),
+    );
     subflow_versions(
         service,
         admin,
@@ -287,6 +358,149 @@ pub fn exercise(service: &NativeService, admin: &str) {
         (parallel_id, &parallel),
         (last_id, &last),
     );
+}
+
+fn resource_collected_rejection(
+    service: &NativeService,
+    admin: &str,
+    applicant: &Value,
+    first: (i64, &str),
+    last: (i64, &str),
+) {
+    let mut node = fixture::node("collect-resource", &[], "Named", json!([first.0, last.0]));
+    node["rejectionPolicy"] = json!("Collect");
+    let mut settings = fixture::request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
+    for rule in settings["rules"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .filter(|r| matches!(r["kind"].as_str(), Some("room" | "supply")))
+    {
+        rule["stages"] = json!([node.clone()]);
+    }
+    settings["expectedVersion"] = settings["versionNumber"].clone();
+    let mut saved = fixture::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    for kind in ["room", "supply"] {
+        saved = fixture::request(
+            service,
+            admin,
+            PUBLISH_OA_DEFINITION,
+            Some(json!({"expectedVersion":saved["versionNumber"],"definitionKey":kind})),
+        );
+    }
+    let room = fixture::request(
+        service,
+        admin,
+        CREATE_MEETING_ROOM,
+        Some(
+            json!({"name":format!("收集拒绝意见-{}",nonce().unwrap()),"capacity":4,"maximumBookingHours":8,"advanceBookingDays":90,"requiresKey":false,"isActive":true}),
+        ),
+    );
+    let supply = fixture::request(
+        service,
+        admin,
+        CREATE_OFFICE_SUPPLY,
+        Some(
+            json!({"name":format!("收集拒绝意见物品-{}",nonce().unwrap()),"unit":"件","minimumStock":0,"isReturnable":false,"isActive":true}),
+        ),
+    );
+    fixture::call(service,admin,RESTOCK_OFFICE_SUPPLY,supply["id"].as_i64().unwrap(),Some(json!({"operationId":nonce().unwrap(),"expectedVersion":supply["versionNumber"],"quantity":3,"note":"准备匿名测试库存"}))).unwrap();
+    let inventory = || {
+        let directory: Value = serde_json::from_slice(
+            &service
+                .dispatch(
+                    LIST_OFFICE_SUPPLIES,
+                    &[],
+                    &[("keyword", supply["name"].as_str().unwrap().into())],
+                    None,
+                    admin,
+                )
+                .unwrap(),
+        )
+        .unwrap();
+        directory["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|s| s["id"] == supply["id"])
+            .unwrap()
+            .clone()
+    };
+    let stock = inventory();
+    let start = chrono::Utc::now() + chrono::Duration::hours(1);
+    for (create, reject, approve, body) in [
+        (
+            CREATE_MEETING_BOOKING,
+            REJECT_MEETING_BOOKING,
+            APPROVE_MEETING_BOOKING,
+            json!({"requestKey":nonce().unwrap(),"meetingRoomId":room["id"],"employeeId":applicant["employee"]["id"],"title":"继续收集拒绝票","attendeeCount":1,"startsAt":start.to_rfc3339(),"endsAt":(start+chrono::Duration::hours(1)).to_rfc3339()}),
+        ),
+        (
+            CREATE_OFFICE_SUPPLY_REQUEST,
+            REJECT_OFFICE_SUPPLY_REQUEST,
+            APPROVE_OFFICE_SUPPLY_REQUEST,
+            json!({"requestKey":nonce().unwrap(),"officeSupplyId":supply["id"],"employeeId":applicant["employee"]["id"],"quantity":1,"purpose":"继续收集拒绝票"}),
+        ),
+    ] {
+        let row = fixture::request(service, admin, create, Some(body.clone()));
+        let id = row["id"].as_i64().unwrap();
+        let row = fixture::call(
+            service,
+            first.1,
+            reject,
+            id,
+            fixture::decision_body(
+                service,
+                first.1,
+                reject,
+                id,
+                Some(json!({"expectedVersion":row["versionNumber"],"note":"拒绝并收集其他意见"})),
+            ),
+        )
+        .unwrap();
+        assert_eq!(row["status"], "Pending");
+        let row=fixture::call(service,last.1,approve,id,fixture::decision_body(service,last.1,approve,id,Some(json!({"expectedVersion":row["versionNumber"],"note":"同意意见不能覆盖已形成的拒绝结果"})))).unwrap();
+        assert_eq!(
+            row["status"], "Rejected",
+            "resource status follows the voting outcome, not the endpoint name"
+        );
+        if create == CREATE_MEETING_BOOKING {
+            let mut next = body;
+            next["requestKey"] = json!(nonce().unwrap());
+            let next = fixture::request(service, admin, create, Some(next));
+            let id = next["id"].as_i64().unwrap();
+            fixture::call(
+                service,
+                admin,
+                CANCEL_MEETING_BOOKING,
+                id,
+                fixture::decision_body(
+                    service,
+                    admin,
+                    CANCEL_MEETING_BOOKING,
+                    id,
+                    Some(json!({"expectedVersion":next["versionNumber"],"note":"回归结束"})),
+                ),
+            )
+            .unwrap();
+        } else {
+            assert_eq!(row["reservationState"], "Unreserved");
+            let after = inventory();
+            assert_eq!(
+                after["versionNumber"], stock["versionNumber"],
+                "a rejected result does not reserve inventory"
+            );
+        }
+    }
+    // Each resource scenario must publish its own definition in a shared database.
+    for kind in ["room", "supply"] {
+        saved = fixture::request(
+            service,
+            admin,
+            DISABLE_OA_DEFINITION,
+            Some(json!({"expectedVersion":saved["versionNumber"],"definitionKey":kind})),
+        );
+    }
 }
 
 fn subflow_versions(

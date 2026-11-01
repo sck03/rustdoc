@@ -110,7 +110,7 @@ pub(super) fn list_with(
         vec![]
     };
     let (count, rows) = tx.query_records(&RecordQuery {
-        restrictions: auth::scope_filters(actor, &resource, scope_permission),
+        restrictions: auth::object_scope_filters(actor, &resource, scope_permission),
         kind: &kind(meta),
         company: &actor.company,
         departments: (rank == 2 && !approvals && !actor.oa_assigned_only)
@@ -143,7 +143,10 @@ pub(super) fn list_with(
             .collect::<Result<Vec<_>>>()?
     } else {
         rows.into_iter()
-            .map(|row| materials::project(tx, actor, &row, row.clone()))
+            .map(|mut row| {
+                row["kind"] = meta["kind"].clone();
+                materials::project(tx, actor, &row, row.clone())
+            })
             .collect::<Result<Vec<_>>>()?
     };
     Ok(json!({"items":rows,"totalCount":count,"pageNumber":page,"pageSize":size}))

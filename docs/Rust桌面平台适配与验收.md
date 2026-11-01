@@ -68,6 +68,10 @@ OCR 同样按目标 OS/架构组装 Rust worker、ONNX 和模型。2026-10-15 �
 
 上述包由提交前的工作树构建，运行标识中的 `e9c1aa8a` 是父提交，不能当作本批源码提交号。原始日志及精选证据在 `.codex-runtime/oa-completion-20261031/`。文本经真实 WebView2 注入并验证，不等于 Windows 系统 IME 候选窗实测；computer-use 的 `@oai/sky` 缺失，此项明确保留为待验。MSVC 发布、其他 OS/架构 GUI、实体打印和 Docker daemon 生命周期未新增验收。当前精确通过范围见[本轮台账](./OA重构验收与功能保留台账.md)。
 
+2026-11-01 审查整改后的三版 Windows x64 GNU / Release / SQLite 包为 `artifacts/oa-review-desktop/ExportDocManager.Tauri.{Document,Sales,Full}`，标识 `0.1.2+git.89f66742bc4b` 为构建时父提交，包含本批工作树实现。三版 WebView2、Full 包内七组 OCR、PDFium 与正常/重复/异常/独立窗口退出通过；各实例六个 WebView2 进程归零、HTTP 关闭。依赖图 434 项，Tauri 2.12.5/SQLite。16 页桌面 PDF 已渲染检查，窄纸张沿用既有裁切边界；主程序各 33.1 MiB，三包共约 386 MiB。过期 Debug 程序/资源按摘要清理，旧 App_Data 保留，详细清单及回执见本日[进度](./程序改进重构进度文档.md)。
+
+本日 `@oai/sky` 导入与原生窗口清单恢复，可访问性测试参数能够读取控件；原生捕获接口持续返回 `0x80004002`，点击缺少坐标几何，系统 IME 候选窗仍待验。此次真实 WebView2 中文文本检查不替代原生拼音组合验证，也不扩大 MSVC、其他 OS/架构 GUI、实体打印或 Docker daemon 验收声明。
+
 ## 2026-09-28 Windows 退出清理
 
 2026-10-27 的新 GNU/Debug/Full SQLite/含 OCR 包为 `artifacts/review-completion-desktop/ExportDocManager.Tauri.Full`，来源 `a1814e57e871`。完整 Tauri、HS／历史维护和未确认文字保存、37 张截图、16 页渲染 PDF、七组 OCR、PDFium worker 及正常／重复／异常／独立窗口退出通过；各实例 WebView2 归零、HTTP 关闭。`@oai/sky` 包缺失，系统 IME 候选窗未由 computer-use 检查，仍不扩大 MSVC／其它 OS/架构／实体打印验收。详细范围、小纸张裁切限制和清理回执见本日进度。

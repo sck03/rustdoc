@@ -80,6 +80,10 @@ pub(in crate::openapi) fn verify_and_strip(current: &mut Value, baseline: &Value
             props.remove("departmentId"),
             Some(json!({"type":"string","maxLength":50}))
         );
+        assert_eq!(
+            props.remove("appointmentId"),
+            Some(json!({"type":"string","maxLength":100}))
+        );
     }
     for name in ["MeetingBookingRecord", "OfficeSupplyRequestRecord"] {
         let schema = &mut current["components"]["schemas"][name];
@@ -112,6 +116,12 @@ pub(in crate::openapi) fn verify_and_strip(current: &mut Value, baseline: &Value
         );
         schema["required"] = json!(original_required);
         let props = schema["properties"].as_object_mut().unwrap();
+        for key in ["applicantAppointmentId", "applicantJobTitle"] {
+            assert_eq!(
+                props.remove(key),
+                Some(json!({"type":"string","readOnly":true}))
+            );
+        }
         assert_eq!(
             props.remove("workflowActions"),
             Some(

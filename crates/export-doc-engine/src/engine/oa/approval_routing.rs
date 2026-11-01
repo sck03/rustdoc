@@ -41,12 +41,7 @@ pub(super) fn resolve(
             ids
         }
         ApproverSource::LineManager | ApproverSource::FunctionalManagers => {
-            let appointment = super::super::personnel_organization::appointment_in(
-                tx,
-                employee,
-                &actor.company,
-                &text(row, "departmentId"),
-            )?;
+            let appointment = super::request_identity::appointment(tx, actor, employee, row)?;
             if stage.source == ApproverSource::FunctionalManagers {
                 appointment
                     .functional_manager_employee_ids
@@ -109,6 +104,9 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
     } else {
         employee["account"]["id"].as_i64()
     };
+    let appointment = super::request_identity::appointment(tx, actor, &employee, row)?;
+    row["applicantAppointmentId"] = json!(appointment.id);
+    row["applicantJobTitle"] = json!(appointment.job_title);
     row["applicantAccountId"] = json!(employee_user);
     let duration = match kind.as_str() {
         "leave" => {

@@ -34,12 +34,17 @@ pub(super) fn extend(doc: &mut Value) {
         "employeeId",
         "employeeName",
         "employeeNumber",
+        "applicantAppointmentId",
+        "applicantJobTitle",
         "title",
         "reason",
         "attachments",
         "approvalPlan",
         "versionNumber",
     ] {
+        request["properties"][key] = s["OaSubmittedRequest"]["properties"][key].clone();
+    }
+    for key in ["applicantAppointmentId", "applicantJobTitle"] {
         request["properties"][key] = s["OaSubmittedRequest"]["properties"][key].clone();
     }
     for name in ["MeetingBookingRecord", "OfficeSupplyRequestRecord"] {
@@ -54,6 +59,8 @@ pub(super) fn extend(doc: &mut Value) {
             json!({"type":"integer","format":"int64","readOnly":true});
         s[name]["properties"]["approvalDocument"] = reference("ResourceSubmission");
         s[name]["properties"]["companyScope"] = json!({"type":"string","readOnly":true});
+        s[name]["properties"]["applicantAppointmentId"] = json!({"type":"string","readOnly":true});
+        s[name]["properties"]["applicantJobTitle"] = json!({"type":"string","readOnly":true});
         s[name]["required"]
             .as_array_mut()
             .unwrap()
@@ -69,6 +76,7 @@ pub(super) fn extend(doc: &mut Value) {
         assert!(s[name].is_object(), "Resource create schema {name}");
         s[name]["properties"]["submitImmediately"] = json!({"type":"boolean","default":true});
         s[name]["properties"]["departmentId"] = json!({"type":"string","maxLength":50});
+        s[name]["properties"]["appointmentId"] = json!({"type":"string","maxLength":100});
     }
     for schema in ["OaApprovalSettings", "OaApprovalSettingsSave"] {
         s[schema]["properties"]["sheetTemplates"]["maxItems"] = json!(18);

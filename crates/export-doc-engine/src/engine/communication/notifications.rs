@@ -28,6 +28,7 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
                 return vec![];
             }
             let mut scopes = vec![NotificationScope {
+                restrictions: auth::object_scope_filters(actor, resource, "view"),
                 kind: kind.into(),
                 rank: auth::scope_rank(actor, resource, "view"),
                 statuses: vec![],
@@ -36,6 +37,7 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
             }];
             if kind == "oa-expense" {
                 scopes.push(NotificationScope {
+                    restrictions: auth::object_scope_filters(actor, resource, "complete"),
                     kind: kind.into(),
                     handling_keys: None,
                     approval_principals: vec![],
@@ -59,6 +61,15 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
         ("bookings", "office.rooms", handling::ROOM_STATES),
     ] {
         result.push(NotificationScope {
+            restrictions: auth::object_scope_filters(
+                actor,
+                resource,
+                if resource == "office.general" {
+                    "complete"
+                } else {
+                    "issue"
+                },
+            ),
             kind: kind.into(),
             rank: 3,
             statuses: states.iter().map(|s| (*s).into()).collect(),
@@ -67,10 +78,10 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
         });
     }
     {
+        let authority = super::super::oa::queue_authority::QueueAuthority::new(tx, actor)?;
         for scope in &mut result {
             if let Some(resource) = resource(&scope.kind) {
-                scope.approval_principals =
-                    super::super::oa::approval::queue_approvers(tx, actor, resource)?;
+                scope.approval_principals = authority.approvers(resource);
             }
         }
     }
@@ -209,7 +220,6 @@ pub(in crate::engine) fn on_event(
     ) {
         return Ok(());
     }
-    let mut offset = 0;
     let resource_request = matches!(row["kind"].as_str(), Some("supply" | "room"));
     let assigned_request = resource_request || row["kind"] == "general";
     let completion = action == "approve" && row["status"] == "Approved" && !assigned_request;
@@ -227,44 +237,13 @@ pub(in crate::engine) fn on_event(
     } else {
         vec![]
     };
-    let distribution = review || completion || handling || !cc.is_empty();
+
     let resource = text(meta, "resource");
-    loop {
+    let mut candidates =
+        super::recipients::Candidates::new(tx, actor, row, review, completion, handling, &cc)?;
+    while let Some(ids) = candidates.next(tx)? {
         crate::operation::check()?;
-        let users = if distribution {
-            tx.query_generic(&export_doc_storage::GenericQuery {
-                kind: "users",
-                scope: export_doc_storage::DataScope {
-                    all: true,
-                    ..Default::default()
-                },
-                filters: &[("isActive", "true".into())],
-                keyword: "",
-                search_root: None,
-                fields: &[("id", "id"), ("isActive", "isActive")],
-                offset,
-                limit: 100,
-            })?
-            .1
-        } else {
-            vec![store::get(
-                tx,
-                "users",
-                records::positive(row, "ownerUserId", "申请人")?,
-            )?]
-        };
-        if users.is_empty() {
-            break;
-        }
-        offset += users.len() as i64;
-        for user in users {
-            if user["isActive"] != true {
-                continue;
-            }
-            let id = records::positive(&user, "id", "接收人")?;
-            if !distribution && row["ownerUserId"] != id {
-                continue;
-            }
+        for id in ids {
             let recipients = match super::super::units::actors_for_operation(
                 tx,
                 id,
@@ -320,9 +299,6 @@ pub(in crate::engine) fn on_event(
                 )?;
                 break;
             }
-        }
-        if !distribution {
-            break;
         }
     }
     Ok(())

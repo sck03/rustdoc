@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient, ListOfficeSuppliesRequest, OfficeRequestEventRecord, OfficeStockMovementRecord } from "../../api/index.ts";
@@ -78,21 +78,27 @@ export function useOfficeOperation(relatedKeys: readonly QueryKey[] = [], includ
   const inFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const mounted = useRef(true);
+  const revision = useRef(0);
+  useLayoutEffect(() => { mounted.current = true; return () => { mounted.current = false; revision.current++; }; }, []);
   const refresh = () => Promise.all([...(includeOffice ? [["office"]] : []), ["worklist"], ...relatedKeys].map(queryKey => queries.invalidateQueries({ queryKey })));
   async function run<T>(operation: (signal: AbortSignal) => Promise<T>, done: (result: T) => void, refreshAfter = true) {
     if (inFlight.current) return;
     inFlight.current = true;
+    const current = ++revision.current;
     setBusy(true);
     setError("");
     try {
       const result = await abortable(operation);
       // Apply the result before refreshes can unmount a deleted or filtered record.
       done(result);
-      if (refreshAfter) await refresh();
+      if (refreshAfter) void refresh().catch(failure => {
+        if (mounted.current && revision.current === current) setError(`操作已成功，列表刷新失败：${readApiError(failure)}`);
+      });
     } catch (failure) {
       if (!isAbortError(failure)) {
         setError(readApiError(failure));
-        if (refreshAfter) void refresh();
+        if (refreshAfter) void refresh().catch(() => {});
       }
     } finally { inFlight.current = false; setBusy(false); }
   }

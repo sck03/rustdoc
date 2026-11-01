@@ -66,6 +66,12 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
                 (
                     bind(p.user_id.to_string(), "BIGINT"),
                     bind(p.context.clone(), "TEXT"),
+                    crate::generic_query::restriction_condition(
+                        &p.restrictions,
+                        "r",
+                        postgres,
+                        &mut |v| bind(v, "TEXT"),
+                    ),
                 )
             })
             .collect::<Vec<_>>();
@@ -187,6 +193,12 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
                 (
                     bind(p.user_id.to_string(), "BIGINT"),
                     bind(p.context.clone(), "TEXT"),
+                    crate::generic_query::restriction_condition(
+                        &p.restrictions,
+                        "r",
+                        postgres,
+                        &mut |v| bind(v, "TEXT"),
+                    ),
                 )
             })
             .collect::<Vec<_>>();
@@ -224,11 +236,11 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
 pub(crate) fn approval_condition(
     record: &str,
     actor: Option<&str>,
-    principals: &[(String, String)],
+    principals: &[(String, String, String)],
 ) -> String {
-    let choices = principals.iter().map(|(user, context)| {
+    let choices = principals.iter().map(|(user, context, restriction)| {
         let independence = actor.map(|actor| format!(" AND NOT EXISTS (SELECT 1 FROM workflow_current_tasks signed WHERE signed.request_id=task.request_id AND signed.submission=task.submission AND signed.acted_by_id={actor} AND (signed.node_key=task.node_key OR task.independent=1 OR signed.independent=1))")).unwrap_or_default();
-        format!("EXISTS (SELECT 1 FROM workflow_current_tasks task WHERE task.request_id={record}.id AND task.submission=CAST({record}.body->>'submissionNumber' AS BIGINT) AND task.active=1 AND task.status='Waiting' AND task.assignee_id={user} AND task.context_id={context}{independence})")
+        format!("EXISTS (SELECT 1 FROM workflow_current_tasks task WHERE task.request_id={record}.id AND task.submission=CAST({record}.body->>'submissionNumber' AS BIGINT) AND task.active=1 AND task.status='Waiting' AND task.assignee_id={user} AND task.context_id={context}{independence} AND ({restriction}))")
     }).collect::<Vec<_>>();
     if choices.is_empty() {
         "FALSE".into()
@@ -241,7 +253,7 @@ pub(crate) fn participant_condition(
     record: &str,
     user: &str,
     context: Option<&str>,
-    principals: &[(String, String)],
+    principals: &[(String, String, String)],
 ) -> String {
     let signed_context = context
         .map(|c| format!(" AND viewer.acted_by_context={c}"))
@@ -253,9 +265,9 @@ pub(crate) fn participant_condition(
         format!("(viewer.acted_by_id={user}{signed_context})"),
         format!("(viewer.assignee_id={user}{assigned_context})"),
     ];
-    for (principal, context) in principals {
+    for (principal, context, restriction) in principals {
         choices.push(format!(
-            "(viewer.assignee_id={principal} AND viewer.context_id={context})"
+            "(viewer.assignee_id={principal} AND viewer.context_id={context} AND ({restriction}))"
         ));
     }
     let cc = if postgres {

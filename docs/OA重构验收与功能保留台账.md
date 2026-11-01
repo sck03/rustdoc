@@ -1,6 +1,38 @@
 # OA 重构验收与功能保留台账
 
-核对日期：2026-10-31。对应[执行方案](./OA审批与组织权限整体重构执行方案.md)的 T01–T42、F01–F20、S1–S8 和 A01–A40。软件实现和本机可执行门禁已完成；Windows 系统 IME 候选窗及独立平台限制在下方明确记录。清理和 Git 回执见文末，不把本机结果扩大为所有平台验收。
+核对日期：2026-11-01。对应[执行方案](./OA审批与组织权限整体重构执行方案.md)的 T01–T42、F01–F20、S1–S8 和 A01–A40。下方按日期登记实际实现和验证；高级流程合同仍有未实现部分，不能将现有测试通过写成整个执行方案完成。Windows 系统 IME 候选窗及独立平台限制另列，清理/Git 回执不代替功能验收。
+
+## 2026-11-01 审查整改与完成状态校正
+
+本批依据关联只读会话修复权限、任职、材料、流程终结、关闭和设置草稿问题，并优化共享查询、任务写入和刷新。`oa-contract-regression-2.log` 的 12 项 SQLite OA 回归通过，包含新 `oa_review_contract`、当前/未来/历史节点材料及减签拒绝票；`download-revocation.log` 验证准备快照后撤销私密材料权限，完整下载第二阶段返回 403；`workflow-write-count-3.log` 验证不变保存只写实例控制行，单次签署只再写受影响任务，原签署不被覆盖。完整门禁、实库、UI/桌面、清理和 Git 的最终回执统一进入本日[进度](./程序改进重构进度文档.md)。本地证据根为 `.codex-runtime/oa-review-20261101/`。
+
+本批最终验证与清理已完成，准确结果如下；Git 与远端验证回执在本日进度补记。
+
+| 检查 | 本批结果 |
+| --- | --- |
+| Rust / 契约 | fmt、locked workspace test、all-features、生成器检查通过；82 组、485 passed / 0 failed / 5 ignored；727 operations / 659 schemas |
+| SQLite / PostgreSQL 18 | SQLite 含新权限/任职/材料/减签/签名和写入计数回归；PostgreSQL 存储、发布/恢复、维护恢复及团队组织/OA 四项真实合同通过，隔离流程夹具修正后重跑 |
+| React / Rust HTTP | 六类申请、日历原文与保存锁、审批/办理、可编辑模板、资源档案、材料下载、通知与财务接收通过；198 缩放、84 视觉、无障碍、构建和规模门禁通过 |
+| Windows Release | Document / Sales / Full 各自 locked 构建并通过 WebView2 回归；包内 OCR 七组、PDFium 及各退出场景通过；依赖 434 项，Tauri 2.12.5 / SQLite |
+| PDF / 平台边界 | 桌面 16 页及网页审批单 6 页已渲染查看；小纸张既有裁切、系统 IME、MSVC、其他 OS/架构 GUI、实体打印、Docker daemon 仍各自验收 |
+| 清理 / 数据保护 | 158 项测试产物、818 旧增量会话、12,657 个旧程序/测试/缓存/日志文件及 npm 孤立内容清理；约 31.9 GiB 文件长度。1,095 个缓存校验信息和 643 个保留文件摘要一致；旧 App_Data、原件、备份及私有补丁保留，八个不可读取历史根未删 |
+
+最新程序包为 `artifacts/oa-review-desktop/ExportDocManager.Tauri.{Document,Sales,Full}`，主程序各约 33.1 MiB，三包合计约 386 MiB。`0.1.2+git.89f66742bc4b` 是构建时父提交标识，包含本批工作树实现。旧 `oa-completion-desktop` 的未修改受管程序/资源已被替代并清理，App_Data 和非受管文件留在原位。当前日志、精确清单和精选输出在 `.codex-runtime/oa-review-20261101/`；完整批次说明见[进度](./程序改进重构进度文档.md)。
+
+`@oai/sky` 及依赖导入、窗口清单已恢复；原生截图接口仍返回 `capture factory: 不支持此接口 (0x80004002)`，点击缺少坐标几何。中文字段的 WebView2 注入验证不能替代系统拼音候选窗，未把被取消的隔离 IME 夹具记为通过。
+
+原 T17/T27/T29/T33 勾选过宽，现按源码拆分如下；这张表描述能力范围，不将静态检查当作运行通过。
+
+| 目标 | 当前实际支持 | 尚未实现的合同 |
+| --- | --- | --- |
+| 职责找人（T17） | 指定账号、部门负责人/分管、直属/职能上级、公司负责人/分管、指定及上级经营单位负责人；稳定任职选择 | 岗位、业务职责、项目职责作为流程来源 |
+| 条件与分支（T17/T29、A07） | 有限比较、逐项 AND、可选审批节点、依赖图串并行及汇合 | OR 组合、排他分支唯一命中、显式默认分支和覆盖检查 |
+| 节点编排（T29） | 审批依赖图；13 类专用批准/办理用例，审批和实际办理状态分开 | 通用办理、受控系统动作等完整节点图合同 |
+| 子流程（T27、A09） | 固定发布版本展开、父提交快照、等待子节点、递归/节点/任务限制 | 输入输出字段映射、可配置拒绝/取消/异常/补偿传播 |
+| 发布（T17、A16） | 草稿、不可变发布版本、立即启用/停用、在途版本保留、共用路由的手动模拟 | 定时启用持久任务、发布前必须通过样例仿真的门禁 |
+| 时限升级（T33、A12） | 工作日历/时区、自然与工作 SLA、冻结期限、暂停政策、到期和 24 小时后的当前责任人提醒 | 逐级督办、上级知会、授权转派或异常处置政策 |
+
+S1 的现有组织来源/单位身份/并行审批/专用办理组合已验证，岗位及项目职责来源、完整办理图仍待实现。A07/A09/A12/A16 只对上表已实现部分有证据。历史 F/S/A 表保留原日期及实际入口，不覆盖或补造高级能力通过记录。Release、大历史及长时间负载也不能由下方 Debug 容量样本推断。
 
 ## 2026-10-31 前端结构与视觉追加验收
 
@@ -88,7 +120,7 @@
 
 | 编号 | 具体入口 | 本轮状态 |
 | --- | --- | --- |
-| S1 | `organization_workflow_contract`、`unit_contract`、`handling_contract`、`workflow_operations_contract`；真实 organization-workflow UI | 真实调岗、完整双库合同与流程操作边界组合通过 |
+| S1 | `organization_workflow_contract`、`unit_contract`、`handling_contract`、`workflow_operations_contract`；真实 organization-workflow UI | 现有组织来源、单位身份、并行审批及专用办理的双库组合通过；岗位/项目职责来源和完整办理图待实现 |
 | S2 | `oa_archive_contract`、`material_contract`、`approval_voting`；communication / oa-approval-documents UI | 材料投影、拒绝受限 ZIP、财务接收通过；受限 PDF 1 页/完整 PDF 3 页全部渲染查看，原件 ZIP 逐字节一致 |
 | S3 | `appointment_contract`、`identity_periods`、`oa/runtime_tests`、`unit_contract` | 期间、未来生效/重启/冲突/取消单元场景及稳定任职 ID 双库合同通过 |
 | S4 | `excel_workflow`、`invoice_cloning`、`document_package_workflow`、invoice-editing / invoice-report / batch-file UI | Excel、手工、编辑、单据包、批量 UI 独立复验及 Full 桌面/OCR 全部通过 |
@@ -109,16 +141,16 @@
 | A04 | unit-identity UI、concurrency-feedback、abortable-operations UI：切换、缓存与迟到响应 |
 | A05 | `material_contract`：详情/列表/通知/历史/附件/归档投影；受限实际 PDF 无私密标记，完整 PDF 包含标记，均已渲染查看 |
 | A06 | `approval_voting`、`approval_contract`：真实计票、同人去重、否决/或签/比例 |
-| A07 | `approval_graph`、`organization_workflow_contract`：条件、缺人、并行汇合 |
+| A07 | `approval_graph`、`organization_workflow_contract`：现有 AND 条件、缺人及并行汇合；排他/默认分支未实现 |
 | A08 | `approval_operations`、`workflow_operations_contract`：加减签、指定退回、代次、旧签署引用 |
-| A09 | `workflow_operations_contract`、子流程领域校验：固定版本、拒绝循环、累计预算与传播 |
+| A09 | `workflow_operations_contract`、子流程领域校验：固定版本展开、拒绝循环、累计预算及已有结果等待；输入输出映射和可配置传播未实现 |
 | A10 | `oa_contract`、`office_contract`：审批与取消/资源争用的事务冲突 |
 | A11 | `workflow_operations_contract`、`command_receipts`：同键重试、不同行为冲突与回执 |
-| A12 | `business_calendar`、`oa/runtime_tests`：时区、节假日、暂停、提醒去重、无自动批准 |
+| A12 | `business_calendar`、`oa/runtime_tests`：时区、节假日、暂停、当前责任人提醒去重、无自动批准；逐级督办/授权升级未实现 |
 | A13 | `oa/runtime_tests`、`appointment_contract`：未来变更重新核验、Blocked、取消保留签署 |
 | A14 | `office_contract`、`resource_contract`、`handling_contract`：资源预留/发放/分次归还、交接及补偿 |
 | A15 | `tasks/tests`、`team_backup/tests`、storage contract：取消、崩溃恢复、原子发布通过；PostgreSQL 发布恢复与物理恢复两项实库通过 |
-| A16 | `approval_contract`、`workflow_operations_contract`、权限发布合同：草稿与在途冻结 |
+| A16 | `approval_contract`、`workflow_operations_contract`、权限发布合同：草稿、立即发布/停用与在途冻结；定时启用和强制样例门禁未实现 |
 | A17 | organization-workflow、oa-approval、office-workspace UI：列表/图形与窄屏；真实系统中文 IME 待验，文本注入单列 |
 | A18 | oa-approval-documents / integration-completion UI、`oa_archive_contract`：V3、原件、续页及受限实际 PDF 均通过 |
 | A19 | storage contract、`team_backup/tests`：两库新建、版本/指纹拒绝、恢复不改原库通过；网页维护流程另列 |
