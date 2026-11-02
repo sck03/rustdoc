@@ -131,13 +131,22 @@ async function phase(size,key) {
     };
     const settings=await api('GetOaApprovalSettings',token);
     const activePolicy=await publishDefinitions(invoke,token,{...settings,rules:settings.rules.map(rule=>rule.key==='expense'?{...rule,stages:[{...approvalStage('capacity-review',reviewers.map(reviewer=>reviewer.id)),decision:'Any'}]}:rule)},['expense']);
-    const scheduled=await api('PublishOaDefinition',token,{expectedVersion:activePolicy.versionNumber,definitionKey:'expense',commandKey:randomUUID(),activateAt:new Date(Date.now()+10000).toISOString(),samples:[{employeeId:person.employee.id,appointmentId:person.organization.primaryAssignmentId,amount:'12.34',currency:'CNY',duration:'1',category:'Other',isReturnable:true}]});
+    const scheduled=await api('ScheduleOaDefinition',token,{expectedVersion:activePolicy.versionNumber,definitionKey:'expense',commandKey:randomUUID(),activateAt:new Date(Date.now()+10000).toISOString(),samples:[{employeeId:person.employee.id,appointmentId:person.organization.primaryAssignmentId,amount:'12.34',currency:'CNY',duration:'1',category:'Other',isReturnable:true}]});
     const activation=scheduled.activations.find(row=>row.definitionKey==='expense'&&row.state==='Pending');
     assert(activation,'Scheduled publication must persist a pending activation');
-    const activationDeadline=Date.now()+30000;
-    let activationState=activation.state;
-    while(activationState==='Pending'&&Date.now()<activationDeadline){await delay(250);const current=await api('GetOaApprovalSettings',token);activationState=current.activations.find(row=>row.id===activation.id)?.state;}
-    assert.equal(activationState,'Applied','The real PostgreSQL HTTP scheduler must activate the fixed version');
+    // The existing shared worker checks each 60s; allow one check plus its
+    // bounded 30s operation. HTTP/job deadlines below remain unchanged.
+    const activationStarted=performance.now();
+    const activationDeadline=Date.now()+90000;
+    let activated=false;
+    while(!activated&&Date.now()<activationDeadline){
+      await delay(250);
+      const current=await api('GetOaApprovalSettings',token);
+      assert.notEqual(current.activations.find(row=>row.id===activation.id)?.state,'Blocked','Scheduled publication must not fail its authority/version checks');
+      activated=current.publications.some(row=>row.key==='expense'&&row.version===activation.definitionVersion&&row.enabled);
+    }
+    assert(activated,'The real PostgreSQL HTTP scheduler must enable the fixed version; completed activations leave the pending list');
+    const scheduledActivationMs=performance.now()-activationStarted;
     const approvals=[];
     for(let n=0;n<5;n++) {
       let row=await api('CreateExpenseRequest',requesterToken,{requestKey:randomUUID(),title:`Capacity expense ${n}`,reason:'Isolated concurrency verification',currency:'CNY',lines:[{category:'Travel',spentOn:date,description:'Sample receipt',amount:'12.34'}]});
@@ -192,7 +201,7 @@ async function phase(size,key) {
       memory=JSON.parse(stdout);
     }
     latencies.sort((a,b)=>a-b);const percentile=p=>latencies[Math.min(latencies.length-1,Math.ceil(latencies.length*p)-1)];
-    const result={poolSize:size,clients:20,rounds,sessionRole:'Admin',invoices:historyRows+users.length,approvals:5,exports:2,logicalOperations:latencies.length,durationMs,operationsPerSecond:latencies.length/(durationMs/1000),p50Ms:percentile(.50),p95Ms:percentile(.95),p99Ms:percentile(.99),statuses,retried429:retried,memory,metricsBefore:before,metricsAfter:after};
+    const result={poolSize:size,clients:20,rounds,sessionRole:'Admin',invoices:historyRows+users.length,scheduledPublicationVersion:activation.definitionVersion,scheduledActivationMs,approvals:5,exports:2,logicalOperations:latencies.length,durationMs,operationsPerSecond:latencies.length/(durationMs/1000),p50Ms:percentile(.50),p95Ms:percentile(.95),p99Ms:percentile(.99),statuses,retried429:retried,memory,metricsBefore:before,metricsAfter:after};
     fs.writeFileSync(path.join(output,'result.json'),JSON.stringify(result,null,2));results.push(result);
     console.log(`Pool ${size}: ${result.logicalOperations} operations; ${result.operationsPerSecond.toFixed(1)}/s; P95 ${result.p95Ms.toFixed(1)} ms; P99 ${result.p99Ms.toFixed(1)} ms; 429 retries ${retried}`);
   } finally {await stopProcessTree(server,5000);log.end();}

@@ -239,7 +239,21 @@ pub(crate) fn build(q: &GenericQuery<'_>, pg: bool) -> Result<(QuerySql, String)
             format!("record_json({root})")
         };
         let keyword = bind(&mut values, q.keyword, pg);
-        clauses.push(sql::contains(&text, &keyword, pg));
+        let cached = q.search_root.is_none()
+            && !crate::identity_runtime::supports(q.kind)
+            && !crate::workflow_runtime::projects_body(q.kind)
+            && (!pg
+                || !q
+                    .keyword
+                    .contains(['{', '}', '[', ']', ':', ',', '"', '\\']));
+        if cached {
+            // Generated metadata is bounded and transactionally follows body.
+            // Large documents retain the same full search through the fallback.
+            let text = format!("COALESCE(r.search_document,{})", sql::normalized(&text, pg));
+            clauses.push(sql::substring(&text, &sql::normalized(&keyword, pg), pg));
+        } else {
+            clauses.push(sql::contains(&text, &keyword, pg));
+        }
     }
     Ok((
         QuerySql {

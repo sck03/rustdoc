@@ -1,4 +1,5 @@
 use super::*;
+mod search;
 #[cfg(test)]
 mod tests;
 use rusqlite::{
@@ -79,6 +80,7 @@ impl Sqlite {
     pub fn open(path: &Path) -> Result<Self> {
         let fresh = !path.try_exists()?;
         let mut connection = SqliteConnection::open(path)?;
+        search::register(&connection)?;
         connection.set_prepared_statement_cache_capacity(128);
         connection.progress_handler(1000, Some(operation::cancelled as fn() -> bool))?;
         connection.busy_timeout(Duration::from_secs(5))?;
@@ -114,37 +116,6 @@ impl Sqlite {
             Self::validate_structure(&transaction)?;
         }
         transaction.commit()?;
-        connection.create_scalar_function(
-            "template_normalize",
-            1,
-            rusqlite::functions::FunctionFlags::SQLITE_UTF8
-                | rusqlite::functions::FunctionFlags::SQLITE_DETERMINISTIC,
-            |context| {
-                use unicode_normalization::UnicodeNormalization;
-                Ok(context
-                    .get::<Option<String>>(0)?
-                    .unwrap_or_default()
-                    .nfc()
-                    .collect::<String>()
-                    .trim()
-                    .to_lowercase())
-            },
-        )?;
-        connection.create_scalar_function(
-            "record_json",
-            1,
-            rusqlite::functions::FunctionFlags::SQLITE_UTF8
-                | rusqlite::functions::FunctionFlags::SQLITE_DETERMINISTIC,
-            |context| {
-                let source = context
-                    .get::<Option<String>>(0)?
-                    .unwrap_or_else(|| "null".into());
-                let value: Value = serde_json::from_str(&source)
-                    .map_err(|e| rusqlite::Error::UserFunctionError(Box::new(e)))?;
-                serde_json::to_string(&value)
-                    .map_err(|e| rusqlite::Error::UserFunctionError(Box::new(e)))
-            },
-        )?;
         connection.create_scalar_function(
             "record_date",
             1,
@@ -214,6 +185,7 @@ impl Sqlite {
         Ok(version.expect("validated marker"))
     }
     fn validate(connection: &SqliteConnection) -> Result<()> {
+        search::register(connection)?;
         operation::check()?;
         connection.progress_handler(1000, Some(operation::cancelled as fn() -> bool))?;
         Self::validate_structure(connection)?;
@@ -485,7 +457,7 @@ impl Adapter for Sqlite {
             let b = &stored;
             let id = {
                 let c = self.connection.borrow();
-                c.execute("INSERT INTO records(kind,identity,version,owner_id,company,department,search_text,body) VALUES(?1,?2,?3,?4,?5,?6,'',?7)",params![r.kind,r.identity,b["versionNumber"].as_i64(),b["ownerUserId"].as_i64(),b["companyScope"].as_str().unwrap_or(""),b["departmentId"].as_str().unwrap_or(""),serde_json::to_string(b)?])?;
+                c.execute("INSERT INTO records(kind,identity,version,owner_id,company,department,body) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![r.kind,r.identity,b["versionNumber"].as_i64(),b["ownerUserId"].as_i64(),b["companyScope"].as_str().unwrap_or(""),b["departmentId"].as_str().unwrap_or(""),serde_json::to_string(b)?])?;
                 c.last_insert_rowid()
             };
             crate::identity_runtime::persist(self, id, r.kind, r.body)?;

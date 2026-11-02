@@ -10,8 +10,11 @@ CREATE TABLE records (
     owner_id INTEGER NOT NULL,
     company TEXT NOT NULL,
     department TEXT NOT NULL,
-    search_text TEXT NOT NULL,
     body TEXT NOT NULL CHECK(json_valid(body)),
+    search_document TEXT GENERATED ALWAYS AS (
+        CASE WHEN length(CAST(body AS BLOB))<=65536
+        THEN template_normalize(record_json(body)) ELSE NULL END
+    ) STORED,
     UNIQUE(kind, identity),
     CHECK(kind<>'people' OR json_remove(COALESCE(body->>'profile','{}'),'$.fullName','$.workEmail','$.workPhone','$.workLocation')='{}')
 );

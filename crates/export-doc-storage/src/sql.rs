@@ -59,6 +59,9 @@ pub(crate) fn normalized(value: &str, postgres: bool) -> String {
 }
 pub(crate) fn contains(value: &str, keyword: &str, postgres: bool) -> String {
     let (value, keyword) = (normalized(value, postgres), normalized(keyword, postgres));
+    substring(&value, &keyword, postgres)
+}
+pub(crate) fn substring(value: &str, keyword: &str, postgres: bool) -> String {
     if postgres {
         format!("strpos({value},{keyword})>0")
     } else {

@@ -20,6 +20,11 @@ pub(crate) fn request_kind(kind: &str) -> bool {
     )
 }
 
+/// Archives also reconstruct material and plan fields from frozen relations.
+pub(crate) fn projects_body(kind: &str) -> bool {
+    request_kind(kind) || kind == "oa-submission"
+}
+
 /// Neither a request nor its archive stores a second writable workflow plan.
 pub(crate) fn document(kind: &str, body: &Value) -> Value {
     let mut value = body.clone();

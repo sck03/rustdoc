@@ -1,5 +1,7 @@
 //! Publish actual submitted material, instances, nodes and immutable decisions.
-use export_doc_storage::{Connection, RecordWrite, Result, WorkflowProgress};
+use export_doc_storage::{
+    Connection, DataScope, GenericQuery, RecordWrite, Result, WorkflowProgress,
+};
 use serde_json::json;
 pub struct Task {
     pub key: String,
@@ -118,6 +120,28 @@ pub fn exercise(tx: &Connection) {
         elapsed_seconds: None,
     };
     tx.publish_workflow(request, 1, &[task]).unwrap();
+    for keyword in ["匿名申请", "匿名责任人"] {
+        let (count, _) = tx
+            .query_generic(&GenericQuery {
+                kind: "oa-submission",
+                scope: DataScope {
+                    company_wide: true,
+                    company: "WORKFLOW-FIXTURE",
+                    ..Default::default()
+                },
+                filters: &[],
+                keyword,
+                search_root: None,
+                fields: &[("id", "id")],
+                offset: 0,
+                limit: 20,
+            })
+            .unwrap();
+        assert_eq!(
+            count, 1,
+            "archives search frozen material and runtime plans"
+        );
+    }
     let saved = tx.get("oa-general", request).unwrap().unwrap();
     let plan = &saved["approvalPlan"];
     let person_id = plan["steps"][0]["approverPersonId"].as_i64().unwrap();

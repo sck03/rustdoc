@@ -23,7 +23,7 @@ fn fixture() -> crate::sqlite::Sqlite {
             (4, "oa-submission"),
             (5, "users"),
         ] {
-            connection.execute("INSERT INTO records(id,kind,version,owner_id,company,department,search_text,body) VALUES(?1,?2,1,5,'TEST','D','',?3)",rusqlite::params![id,kind,if id==1 {r#"{"id":1,"submissionNumber":1,"ownerUserId":5,"kind":"general","status":"Pending"}"#}else{"{}"}]).unwrap();
+            connection.execute("INSERT INTO records(id,kind,version,owner_id,company,department,body) VALUES(?1,?2,1,5,'TEST','D',?3)",rusqlite::params![id,kind,if id==1 {r#"{"id":1,"submissionNumber":1,"ownerUserId":5,"kind":"general","status":"Pending"}"#}else{"{}"}]).unwrap();
         }
         connection.execute("INSERT INTO persons(id,full_name,employee_number,status,employment_type,hire_date) VALUES(3,'匿名签署人员','003','Active','FullTime','2026-01-01')",[]).unwrap();
     }
@@ -134,8 +134,8 @@ fn unchanged_workflow_saves_skip_assignments_and_a_signature_changes_one_task() 
 fn expiring_responsibility_revokes_list_count_and_approval_inbox_together() {
     let sqlite = fixture();
     sqlite.connection.borrow().execute_batch(
-        "INSERT INTO records(id,kind,version,owner_id,company,department,search_text,body) VALUES
-         (6,'companies',1,5,'TEST','D','','{}'),(7,'departments',1,5,'TEST','D','','{}');
+        "INSERT INTO records(id,kind,version,owner_id,company,department,body) VALUES
+         (6,'companies',1,5,'TEST','D','{}'),(7,'departments',1,5,'TEST','D','{}');
          INSERT INTO organization_units VALUES(6,'TEST',NULL,'Company');
          INSERT INTO organization_departments VALUES(7,6,'D',NULL);
          INSERT INTO organization_labels VALUES(6,'测试单位',1),(7,'测试部门',1);

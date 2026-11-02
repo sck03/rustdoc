@@ -9,8 +9,11 @@ CREATE TABLE records (
     owner_id BIGINT NOT NULL,
     company TEXT NOT NULL,
     department TEXT NOT NULL,
-    search_text TEXT NOT NULL DEFAULT '',
     body JSONB NOT NULL,
+    search_document TEXT GENERATED ALWAYS AS (
+        CASE WHEN octet_length(body::text)<=65536
+        THEN lower(normalize(body::text,NFC) COLLATE pg_unicode_fast) ELSE NULL END
+    ) STORED,
     UNIQUE(kind, identity),
     CHECK(kind<>'people' OR (COALESCE(NULLIF(body->'profile','null'::jsonb),'{}'::jsonb)-ARRAY['fullName','workEmail','workPhone','workLocation'])='{}'::jsonb)
 );

@@ -15,6 +15,8 @@ mod import_preview_query;
 mod integrity_query;
 #[path = "support/maintenance_query.rs"]
 mod maintenance_query;
+#[path = "support/normalized_search.rs"]
+mod normalized_search;
 #[path = "support/oa_period_query.rs"]
 mod oa_period_query;
 #[path = "support/office_query.rs"]
@@ -118,6 +120,7 @@ fn sqlite_model_and_structure_validation_preserve_rejected_files() {
 }
 
 fn roundtrip(connection: &Connection) {
+    normalized_search::exercise(connection);
     foundation_query::exercise(connection);
     maintenance_query::exercise(connection);
     organization_query::exercise(connection);
