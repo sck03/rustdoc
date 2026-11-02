@@ -10,6 +10,7 @@ import { OfficeHistoryDialog } from "./OfficeHistoryDialog.tsx";
 import { OaApprovalSteps } from "../oa/OaApprovalSteps.tsx";
 import { requestPersonLabel } from "./requestIdentity.ts";
 import { ResourceRequestDetails } from "./ResourceRequestDetails.tsx";
+import { ApprovalVerificationFields } from "../oa/ApprovalVerificationFields.tsx";
 
 export function OfficeRequestsPanel({ client, user, kind }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OfficeKind }) {
   const model = useOfficeRequests(client, user, kind);
@@ -61,6 +62,10 @@ function OfficeActionDialog({ client, kind, row, action, label, onClose }: {
   client: ExportDocManagerApiClient; kind: OfficeKind; row: OfficeRequestRow; action: OfficeAction; label: string; onClose: () => void;
 }) {
   const operation = useOfficeResourceOperation(kind);
+  const [taskKey, setTaskKey] = useState(action==="approve"||action==="reject"?row.reviewTaskKeys?.[0]??"":"");
+  const handlingNode=row.approvalPlan?.nodes.find(node=>node.kind==="Handling"&&node.handlingAction===(action==="issue"?"Issue":"Return")&&!node.skipped);
+  const [verificationValues, setVerificationValues] = useState<Record<string, string | boolean>>({});
+  const [confirmedReviewPoints, setConfirmedReviewPoints] = useState<number[]>([]);
   const remaining = !isMeetingBooking(row) && row.quantity !== undefined && row.returnedQuantity !== undefined ? row.quantity - row.returnedQuantity : undefined;
   const partialReturn = action === "return" && remaining !== undefined;
   const needsReason = action === "reject" || action === "cancel";
@@ -72,13 +77,15 @@ function OfficeActionDialog({ client, kind, row, action, label, onClose }: {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     void operation.run((signal) => applyOfficeAction(client, kind, row, action, String(form.get("note") ?? ""),
-      partialReturn ? Number(form.get("quantity")) : 0, signal, String(form.get("taskKey")??"")), onClose);
+      partialReturn ? Number(form.get("quantity")) : 0, signal, taskKey, { verificationValues, confirmedReviewPoints, nodeKey:action==="issue"||action==="return"?handlingNode?.key:undefined }), onClose);
   }
   return <OfficeDialog title={label || officeActionLabels[action]} onClose={onClose} {...operation} protectChanges>
     <p><strong>{requestPersonLabel(row.applicantName, row)}</strong> · {isMeetingBooking(row) ? `${row.roomName} · ${row.title}` : `${row.supplyName} · ${row.quantity} ${row.unit}`}</p>
     <p className="office-muted">{description}</p>
     <form onSubmit={submit}><fieldset className="office-form-grid" disabled={operation.busy}>
-      {["approve","reject"].includes(action)&&<OfficeField label="当前审批任务"><select name="taskKey" required>{row.reviewTaskKeys?.map(key=>{const task=row.approvalPlan?.steps.find(s=>s.taskKey===key);return <option key={key} value={key}>{task?row.approvalPlan?.nodes[task.stage].name:key} · {task?.approverName}</option>;})}</select></OfficeField>}
+      {["approve","reject"].includes(action)&&<OfficeField label="当前审批任务"><select name="taskKey" required value={taskKey} onChange={event => { setTaskKey(event.target.value); setVerificationValues({}); setConfirmedReviewPoints([]); }}>{row.reviewTaskKeys?.map(key=>{const task=row.approvalPlan?.steps.find(s=>s.taskKey===key);return <option key={key} value={key}>{task?row.approvalPlan?.nodes[task.stage].name:key} · {task?.approverName}</option>;})}</select></OfficeField>}
+      {action === "approve" && <ApprovalVerificationFields node={row.approvalPlan?.nodes[row.approvalPlan.steps.find(step => step.taskKey === taskKey)?.stage ?? -1]} values={verificationValues} points={confirmedReviewPoints} onValues={setVerificationValues} onPoints={setConfirmedReviewPoints} disabled={operation.busy} />}
+      {(action==="issue"||action==="return")&&<ApprovalVerificationFields node={handlingNode} values={verificationValues} points={confirmedReviewPoints} onValues={setVerificationValues} onPoints={setConfirmedReviewPoints} disabled={operation.busy}/>}
       {partialReturn && !isMeetingBooking(row) && <OfficeField label={`本次归还数量（尚欠 ${remaining} ${row.unit}）`} wide>
         <input type="number" name="quantity" required min={1} max={remaining} defaultValue={remaining} /></OfficeField>}
       <OfficeField label={needsReason ? "处理原因（必填）" : "交接／处理备注"} wide><textarea name="note" rows={3} maxLength={500} required={needsReason} /></OfficeField>

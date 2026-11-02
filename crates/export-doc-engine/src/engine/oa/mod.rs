@@ -4,22 +4,34 @@ pub(in crate::engine) mod approval;
 mod approval_handover;
 pub(in crate::engine) mod qualification;
 pub(super) use approval_handover::{managed_reassign, managed_tasks};
+mod actor_binding;
 pub(in crate::engine) mod approval_integrity;
 pub(in crate::engine) mod approval_references;
 mod approval_routing;
+mod business_nodes;
+pub(in crate::engine) mod fulfillment;
 mod organization_routing;
 mod simulation;
 pub(super) use simulation::{simulate, units as routing_units};
 mod commands;
+mod decisions;
+mod definition_queries;
 mod definitions;
+mod document_schedule;
 mod documents;
+mod escalations;
+mod exception_operations;
 mod handling_handover;
 mod hub;
+mod live_assignments;
 pub(in crate::engine) mod materials;
 pub(in crate::engine) mod personnel_changes;
+mod publication_schedule;
 mod queries;
 pub(in crate::engine) mod queue_authority;
 mod request_identity;
+mod request_projects;
+mod reservation_schedule;
 mod resource_requests;
 pub(in crate::engine) mod runtime;
 mod subflows;
@@ -58,7 +70,7 @@ pub fn is_download(operation: Operation) -> bool {
         )
     })
 }
-pub(super) use documents::download;
+pub(super) use documents::{download, prepare as prepare_download};
 fn kind(meta: &Value) -> String {
     resource_requests::resource_kind(meta)
         .map(str::to_owned)
@@ -86,17 +98,38 @@ pub(super) fn assigned_to(
     if row["ownerUserId"] == actor.id {
         return Ok(true);
     }
+    if !approval::ReviewSnapshot::read(tx, actor, row)?
+        .task_keys()
+        .is_empty()
+    {
+        return Ok(true);
+    }
     let principals = approval::object_approvers(tx, actor, resource, row)?;
+    let people = super::personnel_accounts::links(
+        tx,
+        &principals.iter().map(|p| p.user_id).collect::<Vec<_>>(),
+    )?;
+    let actor_person =
+        super::personnel_accounts::person_for_account(tx, actor.id)?.and_then(|p| p["id"].as_i64());
     if approval::plan(row)?.is_some_and(|plan| {
         plan.notify_user_ids.contains(&actor.id)
             || plan.steps.iter().any(|step| {
-                (step.acted_by_user_id == Some(actor.id) && step.acted_by_context == actor.context)
+                (step.acted_by_user_id == Some(actor.id)
+                    && step.acted_by_context == actor.context
+                    && step.acted_by_person_id == actor_person)
                     || principals.iter().any(|principal| {
                         principal.user_id == step.approver_user_id
                             && principal.context == step.approver_context
+                            && people
+                                .get(&principal.user_id)
+                                .and_then(|p| p["id"].as_i64())
+                                == step.approver_person_id
                     })
             })
     }) {
+        return Ok(true);
+    }
+    if fulfillment::assigned(tx, actor, row)? {
         return Ok(true);
     }
     Ok((resource == "office.general"
@@ -146,8 +179,11 @@ fn access(tx: &Connection, actor: &Actor, meta: &Value, row: &Value) -> Result<(
         assigned_to(tx, actor, resource.as_str(), row)?
     } else if permission == "view" {
         viewable(tx, actor, &resource, row)?
-    } else if permission == "complete" && resource == "office.general" {
-        handling::can_handle(tx, actor, row, &resource)?
+    } else if permission == "complete" && approval::plan(row)?.is_some() {
+        auth::visible(actor, &resource, &permission, row)
+            || fulfillment::can_handle(tx, actor, row, "complete")?
+            || matches!(row["status"].as_str(), Some("Completed" | "HandedOff"))
+                && assigned_to(tx, actor, &resource, row)?
     } else {
         row["companyScope"] == actor.company && auth::visible(actor, &resource, &permission, row)
     };
@@ -209,6 +245,10 @@ pub(super) fn project(
         json!([])
     };
     if detail {
+        row["workflowTasks"] = fulfillment::tasks(tx, actor, &row)?;
+        if let Some(plan) = review.as_ref().and_then(|r| r.plan.as_ref()) {
+            row["fulfillmentState"] = json!(fulfillment::state(plan));
+        }
         if row["kind"] == "personnel" {
             row["personnelExecution"] = tx
                 .personnel_order(row["id"].as_i64().unwrap_or(0))?
@@ -253,8 +293,10 @@ fn append_event(
     note: &str,
 ) -> Result<Value> {
     let mut body = json!({"requestId":row["id"],"requestVersion":row["versionNumber"],"action":action,"actorName":actor.name,"occurredAt":store::timestamp(),"note":note});
-    if let Some(plan) = row.get("approvalPlan") {
-        body["approvalPlan"] = plan.clone();
+    if let Some(plan) = row.get("approvalPlan").filter(|p| p.is_object()) {
+        body["approvalGeneration"] = plan["generation"].clone();
+        body["definitionVersion"] = plan["policyVersion"].clone();
+        body["definitionKey"] = plan["definitionKey"].clone();
     }
     if let Some(id) = row["submissionId"].as_i64() {
         body["submissionId"] = json!(id);
@@ -333,6 +375,9 @@ pub(super) fn handle(
     let execute = |tx: &Connection| {
         let actor = auth::refresh_actor_in(tx, actor)?;
         auth::authorize(&actor, &text(meta, "resource"), &text(meta, "permission"))?;
+        if action == "project-options" {
+            return request_projects::options(tx, &actor, query);
+        }
         if meta["kind"] == "approval-hub" {
             return hub::list(tx, &actor);
         }
@@ -340,7 +385,7 @@ pub(super) fn handle(
             if action.starts_with("handling-") {
                 return handling::directory(tx, &actor, &text(meta, "resource"));
             }
-            return settings::handle(tx, &actor, &action, body);
+            return settings::handle(tx, &actor, &action, body, parameters, query);
         }
         if action == "list" {
             return queries::list(tx, &actor, meta, query);
@@ -368,6 +413,7 @@ pub(super) fn handle(
                 | "workflow-command"
                 | "personnel-execute"
                 | "personnel-cancel"
+                | "fulfillment"
         ) {
             if super::command_receipts::prepare(tx, &actor, &mut row, operation.id, body)? {
                 return project(tx, &actor, row, true);
@@ -410,7 +456,13 @@ pub(super) fn handle(
                 json!({"items":items,"totalCount":count,"pageNumber":page,"pageSize":size}),
             ));
         }
+        if action == "decisions" {
+            return decisions::list(tx, &actor, &row, query);
+        }
         store::check_version(&row, store::expected(body))?;
+        if matches!(action.as_str(), "fulfillment" | "complete") {
+            return fulfillment::execute(tx, &actor, meta, row, body, today);
+        }
         if matches!(action.as_str(), "personnel-execute" | "personnel-cancel") {
             return runtime::execute(
                 tx,
@@ -550,10 +602,13 @@ pub(super) fn handle(
                 body,
             )?;
         }
-        if action == "complete" {
-            validation::completion(&row, today)?;
-        }
-        if row["kind"] == "personnel" && next == "Approved" {
+        if row["kind"] == "personnel"
+            && next == "Approved"
+            && fulfillment::active_system(
+                &row,
+                export_doc_domain::approval_graph::SystemAction::ApplyPersonnel,
+            )?
+        {
             if personnel_changes::effective_date(&row)? > today {
                 row["status"] = json!("Approved");
                 runtime::schedule(tx, &actor, &row)?;
@@ -576,6 +631,10 @@ pub(super) fn handle(
         if action == "approve"
             && matches!(result["status"].as_str(), Some("Approved" | "Completed"))
             && result["submissionId"].as_i64().is_some()
+            && fulfillment::active_system(
+                &result,
+                export_doc_domain::approval_graph::SystemAction::GenerateApprovalDocument,
+            )?
         {
             // PDF work starts after approval commits; a rendering failure never
             // reverses the actual approval or personnel action.
@@ -685,6 +744,7 @@ pub(super) fn references(
             vec![
                 Some("Draft"),
                 Some("Pending"),
+                Some("Suspended"),
                 Some("Approved"),
                 Some("Returned"),
             ]

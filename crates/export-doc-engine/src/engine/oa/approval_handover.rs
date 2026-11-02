@@ -140,7 +140,7 @@ pub(super) fn reassign(
     if (from == to && plan.steps[index].approver_context == reviewer.context)
         || row["ownerUserId"] == to
         || row["applicantAccountId"] == to
-        || plan.independent_signer_conflict(node, to)
+        || plan.signer_conflict(node, to, Some(person))
         || plan.steps.iter().enumerate().any(|(i, s)| {
             i != index
                 && (s.approver_user_id == to
@@ -159,6 +159,7 @@ pub(super) fn reassign(
     plan.steps[index].approver_person_id = Some(person);
     plan.steps[index].approver_name = reviewer.name;
     plan.steps[index].approver_context = reviewer.context;
+    plan.steps[index].origin = Default::default();
     plan.validate(row["ownerUserId"].as_i64().unwrap_or(0))
         .map_err(invalid)?;
     row["approvalPlan"] = serde_json::to_value(plan)?;

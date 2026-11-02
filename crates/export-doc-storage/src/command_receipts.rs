@@ -58,7 +58,8 @@ pub(crate) fn put(db: &(impl Adapter + ?Sized), receipt: &Value, result: &Value)
         p("targetId", true)?,
         p("requestDigest", false)?,
     ];
-    let result = sql::bind(&mut values, serde_json::to_string(result)?, pg);
+    let summary = serde_json::json!({"id":result["id"],"versionNumber":result["versionNumber"],"status":result["status"],"submissionNumber":result["submissionNumber"]});
+    let result = sql::bind(&mut values, serde_json::to_string(&summary)?, pg);
     let time = sql::bind(
         &mut values,
         receipt["createdAt"]
@@ -89,6 +90,10 @@ pub(crate) fn operation(db: &(impl Adapter + ?Sized), entry: &Value) -> Result<(
     ];
     let mut parameters = vec![];
     for (index, key) in keys.iter().enumerate() {
+        if *key == "actorId" && entry["executionIdentity"] == "System" {
+            parameters.push("NULL".into());
+            continue;
+        }
         let value = if index < 4 {
             entry[*key].as_i64().map(|v| v.to_string())
         } else {
@@ -108,6 +113,15 @@ pub(crate) fn operation(db: &(impl Adapter + ?Sized), entry: &Value) -> Result<(
     } else {
         details
     });
-    db.execute_statement(&format!("INSERT INTO workflow_operations(request_id,submission,generation,actor_id,context_id,command,reason,occurred_at,details) VALUES({})",parameters.join(",")),&values)?;
+    parameters.push(sql::bind(
+        &mut values,
+        if entry["executionIdentity"] == "System" {
+            "System"
+        } else {
+            "User"
+        },
+        pg,
+    ));
+    db.execute_statement(&format!("INSERT INTO workflow_operations(request_id,submission,generation,actor_id,context_id,command,reason,occurred_at,details,execution_identity) VALUES({})",parameters.join(",")),&values)?;
     Ok(())
 }

@@ -12,6 +12,7 @@ import { toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
 import { ApprovalDocument } from "../oa/ApprovalDocument.tsx";
 import { ApprovalReassignDialog } from "../oa/ApprovalReassignDialog.tsx";
 import { WorkflowOperations } from "../oa/WorkflowOperations.tsx";
+import { WorkflowFulfillmentPanel } from "../oa/WorkflowFulfillmentPanel.tsx";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
 import { useOfficeResourceOperation } from "./useOfficeData.ts";
 import { isMeetingBooking, officeAccess, readMeetingBookingUpdate, readSupplyRequestUpdate, type OfficeKind, type OfficeRequestRow } from "./officeModel.ts";
@@ -41,6 +42,7 @@ function Details({client,user,kind,row}: {client: ExportDocManagerApiClient;user
     <ul>{(current.attachments ?? []).map(file=><li className="office-card-actions" key={file.id}><span>{file.fileName} · {Math.ceil(file.sizeBytes/1024)} KiB</span><button type="button" className="command-button secondary" disabled={operation.busy} onClick={()=>void operation.run(signal=>api.download(current.id,file.id,{signal}),blob=>downloadBlob(blob,file.fileName),false)}>下载附件</button>{editable && <button type="button" className="text-button" onClick={()=>{setRemoving(file.id);setNote("");}}>移除附件</button>}</li>)}</ul>
     <ApprovalDocument api={api} user={user} row={current} scope={kind} />
     <WorkflowOperations client={client} row={current} disabled={query.isFetching}/>
+    <WorkflowFulfillmentPanel client={client} user={user} row={current}/>
     {(user.capabilities.canManageUsers || user.capabilities.unitManagement?.workflows) && current.status === "Pending" && <button type="button" className="command-button secondary" onClick={()=>setReassigning(true)}>移交未完成审批</button>}
     {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
     {editing && <ResourceDraftEditor client={client} user={user} kind={kind} row={current} onClose={()=>setEditing(false)} />}

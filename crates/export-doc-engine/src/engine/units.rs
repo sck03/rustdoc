@@ -92,7 +92,7 @@ fn window(row: &Value) -> Result<bool> {
         && parse("startsAt")?.is_none_or(|v| v <= now)
         && parse("endsAt")?.is_none_or(|v| now < v))
 }
-fn company(tx: &Connection, code: &str) -> Result<Value> {
+pub(in crate::engine) fn company(tx: &Connection, code: &str) -> Result<Value> {
     tx.find_identity("companies", &store::normalize(code))?
         .filter(|c| c["isActive"] == true && c["code"] == code)
         .ok_or_else(|| error(403, "单位不存在或已停用。"))

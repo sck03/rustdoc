@@ -33,7 +33,20 @@ pub fn call(
     } else {
         vec![]
     };
-    let body = body.map(|value| contracts::overlay(contracts::object(op.id, true), &value));
+    let body = body.map(|value| {
+        if op == PUBLISH_OA_DEFINITION {
+            publication_body(service, token, value)
+        } else {
+            value
+        }
+    });
+    let body = body.map(|value| {
+        let mut defaults = contracts::object(op.id, true);
+        if op == SIMULATE_OA_DEFINITION && value.get("reporting").is_none() {
+            defaults.as_object_mut().unwrap().remove("reporting");
+        }
+        contracts::overlay(defaults, &value)
+    });
     let bytes = service.dispatch(op, &parameters, &[], body, token)?;
     let value = serde_json::from_slice(&bytes).unwrap();
     export_doc_contracts::validation::response(op.id, &value).unwrap();
@@ -59,6 +72,17 @@ pub fn publish_all(service: &NativeService, token: &str, mut settings: Value) ->
     saved
 }
 pub fn configure(service: &NativeService, admin: &str, reviewer: i64) -> Value {
+    // A published sample needs an applicant independent of the signing person.
+    // The fixture establishes that real public identity through the normal API.
+    let department = active_department(service, admin);
+    request(
+        service,
+        admin,
+        CREATE_PERSONNEL,
+        Some(
+            json!({"requestKey":nonce().unwrap(),"employeeNumber":format!("SAMPLE-{}",nonce().unwrap()),"departmentId":department,"jobTitle":"流程仿真申请人","employmentType":"FullTime","hireDate":"2026-01-01","profile":{"fullName":"独立发布样例"}}),
+        ),
+    );
     let mut settings = request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
     for rule in settings["rules"].as_array_mut().unwrap() {
         rule["stages"] = json!([node("review", &[], "Named", json!([reviewer]))]);
@@ -174,8 +198,7 @@ pub fn apply_scheme(
 pub fn reviewer(service: &NativeService, admin: &str) -> (i64, String) {
     let current = request(service, admin, GET_CURRENT_USER, None);
     let username = format!("workflow-review-{}", nonce().unwrap());
-    let directory = request(service, admin, GET_ORGANIZATION_DIRECTORY, None);
-    let department=directory["departments"].as_array().and_then(|rows|rows.iter().find(|row|row["companyCode"]==current["companyScope"]&&row["isActive"]==true)).map(|row|row["code"].clone()).unwrap_or_else(||request(service,admin,CREATE_ORGANIZATION_DEPARTMENT,Some(json!({"code":format!("REVIEW-{}",&nonce().unwrap()[..8]),"name":"审批验收部门","companyCode":current["companyScope"],"isActive":true})))["code"].clone());
+    let department = active_department(service, admin);
     let mut grants = export_doc_domain::permissions::catalog()
         .resources
         .iter()
@@ -245,6 +268,11 @@ pub fn reviewer(service: &NativeService, admin: &str) -> (i64, String) {
         login["accessToken"].as_str().unwrap().into(),
     )
 }
+fn active_department(service: &NativeService, admin: &str) -> Value {
+    let current = request(service, admin, GET_CURRENT_USER, None);
+    let directory = request(service, admin, GET_ORGANIZATION_DIRECTORY, None);
+    directory["departments"].as_array().and_then(|rows|rows.iter().find(|row|row["companyCode"]==current["companyScope"]&&row["isActive"]==true)).map(|row|row["code"].clone()).unwrap_or_else(||request(service,admin,CREATE_ORGANIZATION_DEPARTMENT,Some(json!({"code":format!("REVIEW-{}",&nonce().unwrap()[..8]),"name":"审批验收部门","companyCode":current["companyScope"],"isActive":true})))["code"].clone())
+}
 /// Test clients select a server-authorized task just as the detail form does.
 pub fn decision_body(
     service: &NativeService,
@@ -254,6 +282,9 @@ pub fn decision_body(
     body: Option<Value>,
 ) -> Option<Value> {
     let mut body = body?;
+    if op == PUBLISH_OA_DEFINITION {
+        return Some(publication_body(service, token, body));
+    }
     let metadata = &contracts::contract()["operations"][op.id]["office"];
     if matches!(
         metadata["action"].as_str(),
@@ -338,4 +369,75 @@ pub fn decision_body(
         }
     }
     Some(body)
+}
+/// Old scenario fixtures now submit an explicit, successfully simulated sample.
+/// Negative publication tests call dispatch directly so no invalid request is repaired.
+pub fn publication_body(service: &NativeService, token: &str, mut body: Value) -> Value {
+    if body["commandKey"].as_str().is_none_or(|key| key.is_empty()) {
+        body["commandKey"] = json!(nonce().unwrap());
+    }
+    if body["samples"]
+        .as_array()
+        .is_some_and(|samples| !samples.is_empty())
+    {
+        return body;
+    }
+    let fetch = |op, query: &[(&str, String)]| -> Result<Value, export_doc_engine::api::ApiError> {
+        Ok(serde_json::from_slice(&service.dispatch(op, &[], query, None, token)?).unwrap())
+    };
+    let current = fetch(GET_CURRENT_USER, &[]).unwrap();
+    let settings = match fetch(GET_OA_APPROVAL_SETTINGS, &[]) {
+        Ok(value) => value,
+        Err(error) if error.status == Some(403) => return body,
+        Err(error) => panic!("Publication fixture settings: {error}"),
+    };
+    let rule = settings["rules"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["key"] == body["definitionKey"])
+        .unwrap();
+    let people = fetch(
+        LIST_ORGANIZATION_MANAGERS,
+        &[
+            ("companyCode", text_value(&current, "companyScope")),
+            ("pageSize", "100".into()),
+        ],
+    )
+    .unwrap();
+    let mut failures = vec![];
+    for (person, appointment) in
+        people["items"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .flat_map(|person| {
+                person["appointments"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(move |appointment| (person, appointment))
+            })
+    {
+        let sample = json!({"employeeId":person["id"],"appointmentId":appointment["id"],"amount":"0","currency":"CNY","duration":"1","category":if rule["kind"]=="leave"{"Annual"}else{"Other"},"isReturnable":true});
+        let mut simulation = sample.clone();
+        simulation["definition"] = rule.clone();
+        match service.dispatch(SIMULATE_OA_DEFINITION, &[], &[], Some(simulation), token) {
+            Ok(_) => {
+                body["samples"] = json!([sample]);
+                return body;
+            }
+            Err(error) if matches!(error.status, Some(400 | 403 | 409)) => {
+                failures.push(error.message);
+            }
+            Err(error) => panic!("Publication sample failed: {error}"),
+        }
+    }
+    panic!(
+        "No valid publication sample for {} in {}: {:?}",
+        body["definitionKey"], current["companyScope"], failures
+    );
+}
+fn text_value(value: &Value, key: &str) -> String {
+    value[key].as_str().unwrap_or("").into()
 }

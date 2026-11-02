@@ -24,7 +24,7 @@ pub fn append(
         0,
         json!({
             "requestKind":kind, "requestId":record["id"], "action":action,
-            "quantity":quantity,"actorName":actor.name,"note":note,"approvalPlan":record["approvalPlan"]
+            "quantity":quantity,"actorName":actor.name,"note":note,"approvalGeneration":record["approvalPlan"]["generation"],"definitionVersion":record["approvalPlan"]["policyVersion"]
         }),
         None,
         actor,

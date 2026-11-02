@@ -111,6 +111,7 @@ fn publication_checks_typed_business_fields_currency_and_no_implicit_approver() 
         department: "D".into(),
         category: "".into(),
         personnel_action: "".into(),
+        returnable: "".into(),
     };
     assert!(r.includes(0, &c).unwrap());
     c.currency = "USD".into();

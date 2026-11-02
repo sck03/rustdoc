@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from "react";
+import { OaDepartmentPicker } from "../oa/OaDepartmentPicker.tsx";
+import { WorkflowProjectPicker } from "../oa/WorkflowProjectPicker.tsx";
 import type { ApiUserDto, ExportDocManagerApiClient, OfficeSupplyRequestRecord, OfficeSupplyRecord, PersonnelDirectoryRecord } from "../../api/index.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { readOfficeSupplyForm } from "./officeModel.ts";
@@ -41,6 +43,8 @@ export function OfficeSupplyApplication({ client, supply, user, onClose }: {
   const [requestKey] = useState(createRequestKey);
   const attachments = useAttachmentDraft<OfficeSupplyRequestRecord>();
   const [employee, setEmployee] = useState<PersonnelDirectoryRecord | null>(null);
+  const [appointment,setAppointment]=useState<{id?:string;departmentId?:string}>({});
+  const [projectId,setProjectId]=useState<string|null>(null);
   const canSelectEmployee = user.capabilities.canManageUsers;
   const operation = useOfficeResourceOperation("supplies");
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -51,10 +55,11 @@ export function OfficeSupplyApplication({ client, supply, user, onClose }: {
       requestKey, officeSupplyId: supply.id, quantity: Number(form.get("quantity")), purpose: String(form.get("purpose") ?? ""),
       returnDueDate: supply.isReturnable ? String(form.get("returnDueDate") ?? "") : null,
       employeeId: employee?.id ?? null,
+      appointmentId:appointment.id,departmentId:appointment.departmentId,projectId,
       submitImmediately:false,
     };
     void operation.run(async signal=>{
-      const saved = await attachments.save(JSON.stringify(body),signal,(current,signal)=>current ? client.updateDraftOfOfficeSupplyRequest({id:current.id,body:{expectedVersion:current.versionNumber,quantity:body.quantity,purpose:body.purpose,returnDueDate:body.returnDueDate}},{signal}):client.createOfficeSupplyRequest({body},{signal}),
+      const saved = await attachments.save(JSON.stringify(body),signal,(current,signal)=>current ? client.updateDraftOfOfficeSupplyRequest({id:current.id,body:{expectedVersion:current.versionNumber,quantity:body.quantity,purpose:body.purpose,returnDueDate:body.returnDueDate,projectId}},{signal}):client.createOfficeSupplyRequest({body},{signal}),
         (current,entry,signal)=>{const body=attachmentUploadForm(entry.file,current.versionNumber);body.set("purpose","Supporting");return client.uploadAttachmentToOfficeSupplyRequest({id:current.id,body},{signal});});
       return client.submitOfficeSupplyRequest({id:saved.id,body:officeCommand(client,`supplies:${saved.id}:submit`,{commandKey:undefined,expectedVersion:saved.versionNumber,note:""})},{signal});
     },onClose);
@@ -65,8 +70,10 @@ export function OfficeSupplyApplication({ client, supply, user, onClose }: {
     <p className="office-muted">全部节点审批通过后预留库存，由指定办理人发放；库存不足时须先补充再批准。</p>
     {operation.error && attachments.saved && <p role="status">草稿 #{attachments.saved.id} 已保存。剩余附件可重试，也可稍后从申请草稿继续办理。</p>}
     <form onSubmit={submit}><fieldset disabled={operation.busy} className="office-form-grid">
-      {canSelectEmployee && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={setEmployee} disabled={operation.busy} />}
+      {canSelectEmployee && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={person=>{setEmployee(person);setAppointment({});setProjectId(null);}} disabled={operation.busy} />}
       <OfficeApplicantIdentity user={user} />
+      <OaDepartmentPicker client={client} user={user} employeeId={employee?.id} value={appointment.id} onChange={value=>{setAppointment(value);setProjectId(null);}}/>
+      <WorkflowProjectPicker client={client} user={user} kind="supply" employeeId={employee?.id} appointmentId={appointment.id} departmentId={appointment.departmentId} value={projectId} onChange={setProjectId}/>
       <OfficeField label={`申请数量（${supply.unit}）`}><input name="quantity" type="number" required min={1} max={1000000} defaultValue={1} /></OfficeField>
       {supply.isReturnable && <OfficeField label="预计归还日期"><input name="returnDueDate" type="date" required min={user.businessDate} defaultValue={user.businessDate} /></OfficeField>}
       <OfficeField label="领用用途" wide><textarea name="purpose" rows={3} required maxLength={500} placeholder="请说明使用用途" /></OfficeField>

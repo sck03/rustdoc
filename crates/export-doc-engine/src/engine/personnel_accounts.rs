@@ -74,9 +74,12 @@ pub(super) fn actor_summary(tx: &Connection, actor: &Actor) -> Result<Value> {
     };
     let mut result = summary(person);
     if let Some(appointment) = appointment {
+        result["appointmentId"] = serde_json::json!(appointment.id);
         result["jobTitle"] = serde_json::json!(appointment.job_title);
         result["departmentId"] = serde_json::json!(appointment.department_id);
         result["companyScope"] = serde_json::json!(actor.company);
+    } else {
+        result["appointmentId"] = result["organization"]["primaryAssignmentId"].clone();
     }
     Ok(result)
 }

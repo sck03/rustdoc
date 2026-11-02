@@ -41,6 +41,8 @@ TestResults/
 *.suo
 *.cache
 *.log
+*~RF*.TMP
+.codex-format-*
 deploy/container/.env
 deploy/browser-server/browser-server.env.path
 deploy/container/runtime/

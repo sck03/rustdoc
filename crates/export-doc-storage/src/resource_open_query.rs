@@ -1,5 +1,5 @@
 use crate::{Error, QuerySql, Result, sql};
-pub(crate) fn build(kind: &str, parent: i64, pg: bool) -> Result<QuerySql> {
+pub(crate) fn build(kind: &str, parent: i64, states: &[&str], pg: bool) -> Result<QuerySql> {
     let field = match kind {
         "bookings" => "meetingRoomId",
         "supply-requests" => "officeSupplyId",
@@ -9,6 +9,11 @@ pub(crate) fn build(kind: &str, parent: i64, pg: bool) -> Result<QuerySql> {
     let kind = sql::bind(&mut values, kind, pg);
     let id = sql::bind(&mut values, parent, pg);
     let state = sql::field("status", pg);
+    let states = states
+        .iter()
+        .map(|state| sql::bind(&mut values, state, pg))
+        .collect::<Vec<_>>()
+        .join(",");
     let returnable = sql::field("isReturnable", pg);
     let issued = if pg {
         format!("COALESCE(({returnable})::boolean,false)")
@@ -17,7 +22,7 @@ pub(crate) fn build(kind: &str, parent: i64, pg: bool) -> Result<QuerySql> {
     };
     Ok(QuerySql {
         filter: format!(
-            "r.kind={kind} AND CAST({} AS BIGINT)=CAST({id} AS BIGINT) AND ({state} IN ('Pending','Approved','InUse') OR ({state}='Issued' AND {issued}))",
+            "r.kind={kind} AND CAST({} AS BIGINT)=CAST({id} AS BIGINT) AND ({state} IN ({states}) OR ({state}='Issued' AND {issued}))",
             sql::field(field, pg)
         ),
         order: "r.id DESC".into(),

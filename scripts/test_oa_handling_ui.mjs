@@ -1,4 +1,4 @@
-import { approvalStage, publishDefinitions, approveResourceTask, linkBusinessPerson } from './lib/approval-fixtures.mjs';
+import { approvalStage, fulfillNodeInUi, publishDefinitions, approveResourceTask, linkBusinessPerson } from './lib/approval-fixtures.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,8 +27,8 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
   const section = admin.locator('details[data-definition-key="general"]');
   await section.locator(':scope > summary').click();
   for (const [i, user] of users.slice(0,2).entries()) {
-    await section.getByLabel('审批人来源').nth(i).selectOption('Named');
-    await section.getByLabel('审批账号（可多选）').nth(i).selectOption([String(user.id)]);
+    await section.getByLabel('责任人来源').nth(i).selectOption('Named');
+    await section.getByLabel('责任账号（可多选）').nth(i).selectOption([String(user.id)]);
   }
   for (const [i,[category,name,handler]] of [['Seal','公章',2],['Seal','合同章',3],['Certificate','在职证明',3],['Supply','日常用品',2],['Supply','服装辅料',3],['Room','会议接待',2]].entries()) {
     await admin.getByRole('button', { name: '添加办理分工', exact: true }).click();
@@ -110,7 +110,7 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
     assert.equal((await download).suggestedFilename(),'seal-proof.pdf');
     await other.goto(requestUrl); await other.getByText('申请读取失败',{exact:true}).waitFor();
     await handler.screenshot({path:path.join(output,`${category}-${name}.png`),fullPage:true});
-    await act(handler,'办结登记',`${name}已当面交付，接收人确认无误`);
+    await fulfillNodeInUi(handler,`${name}已当面交付，接收人确认无误`);
     await handler.locator('.oa-detail-summary .office-badge').getByText('已完成',{exact:true}).waitFor();
   }
   for (const [group,name,handler,other] of [['日常用品','卫生卷纸',seal,special],['服装辅料','服装吊牌',special,seal]]) {

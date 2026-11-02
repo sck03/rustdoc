@@ -13,6 +13,7 @@ type BusinessDateSessionRefreshOptions = {
   sessionRef: { current: WebSessionState | null };
   setSession: (session: WebSessionState) => void;
   validatedUserTokenRef: { current: string | undefined };
+  allowAuthenticationFailure?: () => boolean;
 };
 
 export function useBusinessDateSessionRefresh({
@@ -23,6 +24,7 @@ export function useBusinessDateSessionRefresh({
   sessionRef,
   setSession,
   validatedUserTokenRef,
+  allowAuthenticationFailure,
 }: BusinessDateSessionRefreshOptions) {
   const activeRefreshRef = useRef<{ accessToken: string; promise: Promise<void> } | null>(null);
   const accessToken = session?.accessToken;
@@ -49,7 +51,7 @@ export function useBusinessDateSessionRefresh({
         setSession(nextSession);
       })
       .catch((error) => {
-        if (sessionRef.current?.accessToken === accessToken) notifyAuthenticationFailure(error);
+        if (sessionRef.current?.accessToken === accessToken && (allowAuthenticationFailure?.() ?? true)) notifyAuthenticationFailure(error);
       })
       .finally(() => {
         if (activeRefreshRef.current?.promise === refresh) {

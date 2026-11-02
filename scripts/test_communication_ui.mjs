@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
-import { approvalStage, approveTask, publishDefinitions } from './lib/approval-fixtures.mjs';
+import { approvalStage, approveTask, fulfillNodeInUi, linkBusinessPerson, publishDefinitions } from './lib/approval-fixtures.mjs';
 
 await withOfficeUi('communication-ui', async ({ output, require, url, operations, invoke, openPage }) => {
   const page = await openPage('oa-review', 'Review-2026-Test');
@@ -109,7 +109,8 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   await page.screenshot({ path: path.join(output, 'announcement-mobile.png'), fullPage: true });
   assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Mobile page must not overflow');
   const financeName = `finance-ui-${Date.now()}`;
-  await invoke('createUserAccount', { username: financeName, fullName: '财务接收验收', role: 'Finance', companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Finance-Review-2026' }, {}, token);
+  const finance = (await invoke('createUserAccount', { username: financeName, fullName: '财务接收验收', role: 'Finance', companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Finance-Review-2026' }, {}, token)).user;
+  await linkBusinessPerson(invoke, token, finance);
   const businessUser = await invoke('getCurrentUser', undefined, {}, token);
   const expenseBody = { requestKey: `expense-ui-${Date.now()}`, employeeId: person.id, title: '已批准报销财务接收', reason: '核对凭证并移交独立财务软件', currency: 'CNY', lines: [{ category: 'Travel', spentOn: businessUser.businessDate, description: '市内交通', amount: '12.35' }] };
   let expense = await invoke('CreateExpenseRequest', expenseBody, {}, token);
@@ -142,10 +143,7 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   await financePage.getByRole('button', { name: '下载', exact: true }).click();
   await (await expenseDownload).saveAs(path.join(output, 'finance-receipt.pdf'));
   assert.deepEqual(fs.readFileSync(path.join(output, 'finance-receipt.pdf')), fs.readFileSync(attachment));
-  await financePage.getByRole('button', { name: '财务接收', exact: true }).click();
-  await financePage.getByRole('dialog').getByLabel('处理说明').fill('凭证已核对，财务接收编号 FIN-UI-001');
-  await financePage.getByRole('dialog').getByRole('button', { name: '财务接收', exact: true }).click();
-  await financePage.getByRole('dialog').waitFor({ state: 'hidden' });
+  await fulfillNodeInUi(financePage, '凭证已核对，财务接收编号 FIN-UI-001');
   await financePage.getByText('财务交接已登记', { exact: true }).waitFor();
   await financePage.locator('details.oa-detail-history > summary').click();
   await financePage.getByText('凭证已核对，财务接收编号 FIN-UI-001', { exact: true }).waitFor();

@@ -159,7 +159,7 @@ pub(super) fn exercise(
         Some(403),
         "broad permissions do not replace named handlers"
     );
-    booking = call(
+    let issued = call(
         service,
         first,
         ISSUE_MEETING_ROOM_KEY,
@@ -167,6 +167,7 @@ pub(super) fn exercise(
         Some(issue.clone()),
     )
     .unwrap();
+    assert_eq!(issued["status"], "InUse");
     assert_eq!(
         call(service, second, ISSUE_MEETING_ROOM_KEY, id, Some(issue))
             .unwrap_err()
@@ -221,7 +222,7 @@ pub(super) fn exercise(
         "disabled service blocks new requests"
     );
     let returned =
-        json!({"expectedVersion":booking["versionNumber"],"note":"第二位办理人核收钥匙"});
+        json!({"expectedVersion":current["versionNumber"],"note":"第二位办理人核收钥匙"});
     assert_eq!(
         call(
             service,

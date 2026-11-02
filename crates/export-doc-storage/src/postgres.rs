@@ -313,13 +313,7 @@ impl Adapter for Postgres {
         self.query_page(&sql, "r.body::text", q.offset, q.limit.clamp(1, 100))
     }
     fn query_records(&self, q: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)> {
-        let sql = super::record_query::sql(q, true);
-        self.query_page(
-            &sql,
-            &super::sql::projection(q.fields, true)?,
-            q.offset,
-            q.limit.clamp(1, 100),
-        )
+        super::record_query::page(self, q)
     }
     fn query_workflow_summary(&self, q: &WorkflowSummaryQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let (sql, values) = super::workflow::summary(q, true);

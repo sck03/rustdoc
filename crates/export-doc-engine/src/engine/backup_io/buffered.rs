@@ -20,6 +20,12 @@ impl Budget {
         if bytes == 0 || bytes > 64 * 1024 * 1024 {
             return Err(error(503, "任务结果大小无效。"));
         }
+        self.reserve_working(bytes)
+    }
+    pub fn reserve_working(self: &Arc<Self>, bytes: usize) -> Result<Reservation> {
+        if bytes == 0 || bytes > CAPACITY {
+            return Err(error(503, "文件处理大小超出可用容量。"));
+        }
         self.used
             .try_update(Relaxed, Relaxed, |used| {
                 used.checked_add(bytes).filter(|total| *total <= CAPACITY)
@@ -40,6 +46,14 @@ impl Budget {
 impl Drop for Reservation {
     fn drop(&mut self) {
         self.budget.used.fetch_sub(self.bytes, Relaxed);
+    }
+}
+impl Reservation {
+    pub fn shrink_to(&mut self, bytes: usize) {
+        if bytes < self.bytes {
+            self.budget.used.fetch_sub(self.bytes - bytes, Relaxed);
+            self.bytes = bytes;
+        }
     }
 }
 

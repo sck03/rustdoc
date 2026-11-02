@@ -3,7 +3,7 @@ use super::*;
 use export_doc_domain::{approval::delegation_window, approval_policy::ApprovalRule};
 use std::collections::HashSet;
 
-const STORAGE_KIND: &str = "oa-approval-settings";
+pub(super) const STORAGE_KIND: &str = "oa-approval-settings";
 
 pub(in crate::engine) fn revoke_delegations(
     tx: &Connection,
@@ -40,9 +40,10 @@ pub(in crate::engine) fn revoke_delegations(
     }
     Ok(())
 }
-fn response(mut settings: Value) -> Result<Value> {
+fn response(tx: &Connection, company: &str, mut settings: Value) -> Result<Value> {
     settings["sheetFieldCatalog"] = sheet_templates::catalog();
     settings["sheetDefaultContent"] = json!(sheet_templates::default_content()?);
+    settings["activations"] = json!(tx.workflow_activation_list(company, None)?);
     Ok(contracts::dto(
         contracts::schema("OaApprovalSettings"),
         settings,
@@ -62,7 +63,7 @@ fn default_rule(kind: &str, variant: &str, name: &str) -> Value {
         {"key":"executive","name":"公司领导审批","dependsOn":["department"],"source":"CompanyExecutive","approverUserIds":[],"decision":"All","selfApproval":"Reject","repeatedApprover":"Allow","conditions":[],"dueHours":48}
     ]})
 }
-fn defaults() -> Vec<Value> {
+fn defaults() -> Result<Vec<Value>> {
     let mut rules: Vec<_> = [
         ("leave", "请假审批"),
         ("overtime", "加班审批"),
@@ -87,14 +88,24 @@ fn defaults() -> Vec<Value> {
         .iter()
         .map(|(action, name)| default_rule("personnel", action, name)),
     );
-    rules
+    for rule in &mut rules {
+        let leaves = vec!["executive".to_owned()];
+        let kind = text(rule, "kind");
+        let additions = super::business_nodes::defaults(&kind, &leaves)?;
+        let stages = rule["stages"]
+            .as_array_mut()
+            .ok_or_else(|| invalid("默认流程节点损坏。"))?;
+        for node in additions {
+            stages.push(serde_json::to_value(node)?);
+        }
+    }
+    Ok(rules)
 }
 pub(in crate::engine) fn load(tx: &Connection, company: &str) -> Result<Value> {
-    let mut value = tx
-        .find_identity(STORAGE_KIND, &store::normalize(company))?
-        .unwrap_or_else(
-            || json!({"versionNumber":0,"rules":defaults(),"publications":[],"delegations":[]}),
-        );
+    let mut value = match tx.find_identity(STORAGE_KIND, &store::normalize(company))? {
+        Some(value) => value,
+        None => json!({"versionNumber":0,"rules":defaults()?,"publications":[],"delegations":[]}),
+    };
     if value["calendar"].is_null() {
         let mut calendar = export_doc_domain::business_calendar::BusinessCalendar::default();
         calendar.time_zone = tx
@@ -114,14 +125,96 @@ fn account(tx: &Connection, actor: &Actor, id: i64) -> Result<Actor> {
     }
     Ok(user)
 }
-pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value) -> Result<Value> {
+pub(super) fn handle(
+    tx: &Connection,
+    actor: &Actor,
+    action: &str,
+    body: &Value,
+    parameters: &[(&str, String)],
+    query: &[(&str, String)],
+) -> Result<Value> {
     super::super::units::demand(actor, &actor.company, "organization.workflows")?;
+    if action == "settings-exceptions" {
+        let (page, size) = paging(query)?;
+        return Ok(tx.workflow_exceptions(&actor.company, (page - 1) * size, size)?);
+    }
+    if action == "settings-retry-system" {
+        return super::exception_operations::retry(tx, actor, body);
+    }
     let mut previous = load(tx, &actor.company)?;
+    if matches!(
+        action,
+        "settings-versions" | "settings-diff" | "settings-routing-sources"
+    ) {
+        return super::definition_queries::read(tx, actor, action, query);
+    }
+    if action == "settings-cancel-activation" {
+        let id = parameters
+            .iter()
+            .find(|(k, _)| *k == "activationId")
+            .and_then(|(_, v)| v.parse::<i64>().ok())
+            .filter(|id| *id > 0)
+            .ok_or_else(|| invalid("调度编号无效。"))?;
+        if super::super::command_receipts::prepare(
+            tx,
+            actor,
+            &mut previous,
+            &format!("CancelOaActivation:{id}"),
+            body,
+        )? {
+            return response(tx, &actor.company, previous);
+        }
+        let entry = tx
+            .workflow_activation_list(&actor.company, None)?
+            .into_iter()
+            .find(|e| e["id"] == id.to_string())
+            .ok_or_else(|| error(404, "没有可取消的发布调度。"))?;
+        if entry["definitionKey"] != body["definitionKey"]
+            || !tx.workflow_activation_state(id, store::expected(body), "Cancelled", "")?
+        {
+            return Err(conflict("发布调度已变化，请刷新后重试。"));
+        }
+        let receipt = previous
+            .as_object_mut()
+            .and_then(|r| r.remove(super::super::command_receipts::FIELD))
+            .ok_or_else(|| super::super::error::unavailable("取消调度回执缺失。"))?;
+        tx.put_command_receipt(&receipt, &previous)?;
+        return response(tx, &actor.company, previous);
+    }
+    if action == "settings-schedule" {
+        let key = text(body, "commandKey");
+        super::super::command_receipts::validate_key(&key)?;
+        if let Some(receipt) = tx.workflow_activation_receipt(actor.id, &actor.context, &key)? {
+            let mut request = body.clone();
+            request.sort_all_objects();
+            if receipt["companyCode"] != actor.company
+                || receipt["requestDigest"]
+                    != super::super::media::digest(&serde_json::to_vec(&request)?)
+            {
+                return Err(conflict("同一调度操作编号不能用于不同发布内容。"));
+            }
+            return response(tx, &actor.company, previous);
+        }
+    }
     if previous.get("sheetTemplates").is_none() {
         previous["sheetTemplates"] = sheet_templates::defaults()?;
     }
     if action == "settings-get" {
-        return response(previous);
+        return response(tx, &actor.company, previous);
+    }
+    if action == "settings-publish" {
+        if previous["id"].as_i64().is_none_or(|id| id <= 0) {
+            return Err(conflict("请先保存流程草稿，再通过样例仿真发布。"));
+        }
+        if super::super::command_receipts::prepare(
+            tx,
+            actor,
+            &mut previous,
+            "PublishOaDefinition",
+            body,
+        )? {
+            return response(tx, &actor.company, previous);
+        }
     }
     if previous["versionNumber"] == 0 {
         if store::expected(body) != 0 {
@@ -130,7 +223,10 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
     } else {
         store::check_version(&previous, store::expected(body))?;
     }
-    if matches!(action, "settings-publish" | "settings-disable") {
+    if matches!(
+        action,
+        "settings-publish" | "settings-disable" | "settings-schedule"
+    ) {
         super::definitions::change(tx, actor, &mut previous, action, body)?;
         let id = previous["id"].as_i64().unwrap_or(0);
         let saved = store::save(
@@ -142,7 +238,7 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
             actor,
             action,
         )?;
-        return response(saved);
+        return response(tx, &actor.company, saved);
     }
     let rules = body["rules"]
         .as_array()
@@ -180,19 +276,33 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
             return Err(invalid("流程编号与业务类型不一致或重复。"));
         }
         typed.validate_draft().map_err(invalid)?;
-        for id in typed.account_ids() {
-            let resource =
-                super::approval::resource(&kind).ok_or_else(|| invalid("申请类型无效。"))?;
-            let reviewer = super::super::units::for_operation(
-                tx,
-                id,
-                actor.edition,
-                &actor.company,
-                resource,
-                "approve",
-            )?;
-            auth::authorize(&reviewer, resource, "view")?;
-            auth::authorize(&reviewer, resource, "approve")?;
+        let resource = super::approval::resource(&kind).ok_or_else(|| invalid("申请类型无效。"))?;
+        for stage in &typed.stages {
+            let mut requirements = stage
+                .approver_user_ids
+                .iter()
+                .map(|id| (*id, super::actor_binding::action(stage)))
+                .collect::<Vec<_>>();
+            for escalation in &stage.escalations {
+                if let Some(target) = &escalation.target {
+                    requirements.extend(target.user_ids.iter().map(|id|(*id,if escalation.action==export_doc_domain::approval_graph::EscalationAction::NotifySupervisor{"view"}else{super::actor_binding::action(stage)})));
+                }
+            }
+            for (id, action) in requirements {
+                let reviewer = super::super::units::for_operation(
+                    tx,
+                    id,
+                    actor.edition,
+                    &actor.company,
+                    resource,
+                    action,
+                )?;
+                auth::authorize(&reviewer, resource, "view")?;
+                auth::authorize(&reviewer, resource, action)?;
+                if stage.kind == export_doc_domain::approval_graph::NodeKind::Approval {
+                    super::qualification::person_id(tx, &reviewer)?;
+                }
+            }
         }
     }
     let delegations = body["delegations"]
@@ -267,7 +377,7 @@ pub(super) fn handle(tx: &Connection, actor: &Actor, action: &str, body: &Value)
         "approval-settings",
     )?;
     super::handling_handover::notify(tx, actor, &previous, &saved)?;
-    response(saved)
+    response(tx, &actor.company, saved)
 }
 pub(super) fn principals(tx: &Connection, actor: &Actor) -> Result<Vec<(i64, String)>> {
     Ok(active_delegations(tx, &actor.company)?

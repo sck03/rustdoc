@@ -69,6 +69,12 @@ pub fn department_identity(company: &str, code: &str) -> Result<String> {
         normalize(code),
     ])?)
 }
+pub fn personnel_identity(company: &str, number: &str) -> Result<String> {
+    Ok(serde_json::to_string(&[
+        normalize(company),
+        normalize(number),
+    ])?)
+}
 
 impl Store {
     pub fn open(paths: &RuntimePaths) -> Result<Self> {
@@ -326,7 +332,7 @@ pub fn normalize(text: &str) -> String {
     text.nfc().collect::<String>().trim().to_lowercase()
 }
 pub fn timestamp() -> String {
-    Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+    Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Nanos, true)
 }
 pub fn check_version(previous: &Value, expected: i64) -> Result<()> {
     if expected <= 0 || previous["versionNumber"].as_i64() != Some(expected) {
@@ -445,10 +451,10 @@ pub fn save_in_scope(
             &super::records::text(&body, "code"),
         )?)
     } else if kind == "people" {
-        Some(serde_json::to_string(&[
-            normalize(body["companyScope"].as_str().unwrap_or("")),
-            normalize(body["employeeNumber"].as_str().unwrap_or("")),
-        ])?)
+        Some(personnel_identity(
+            body["companyScope"].as_str().unwrap_or(""),
+            body["employeeNumber"].as_str().unwrap_or(""),
+        )?)
     } else if kind == "invoices" {
         Some(invoice_identity(
             &body["companyScope"],

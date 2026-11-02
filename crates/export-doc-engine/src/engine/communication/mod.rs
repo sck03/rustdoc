@@ -12,7 +12,7 @@ use crate::engine::store::Connection;
 use crate::{contracts, generated_api::Operation};
 pub(super) use announcements::{current, mutable, project, save};
 use export_doc_storage::{CommunicationQuery, CommunicationView, RecordQuery};
-pub(super) use notifications::on_event;
+pub(super) use notifications::{on_event, to_bindings};
 
 pub(super) fn check_references(tx: &Connection, kind: &str, record: &Value) -> Result<()> {
     if !matches!(kind, "users" | "companies" | "departments") {

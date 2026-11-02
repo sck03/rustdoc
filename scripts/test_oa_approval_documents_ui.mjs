@@ -40,11 +40,11 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   const rule = page.locator('details[data-definition-key="expense"]');
   await rule.locator(':scope > summary').click();
   await rule.getByLabel('遇到申请人本人').first().selectOption('Reject');
-  await rule.getByLabel('人员兼任').first().selectOption('Reject');
+  await rule.getByLabel('独立复核').first().selectOption('Reject');
   await rule.getByLabel('通过方式').first().selectOption('Any');
-  await rule.getByLabel('审批人来源').first().selectOption('LineManager');
+  await rule.getByLabel('责任人来源').first().selectOption('LineManager');
   assert.equal(await rule.getByLabel('通过方式').first().inputValue(), 'Any');
-  await rule.getByLabel('审批人来源').first().selectOption('DepartmentManager');
+  await rule.getByLabel('责任人来源').first().selectOption('DepartmentManager');
   await page.getByText('审批单名称与打印模板', { exact: true }).click();
   await page.getByRole('button', { name: '使用黑白打印样式', exact: true }).first().click();
   await page.getByRole('button', { name: '编辑审批单模板', exact: true }).first().click();

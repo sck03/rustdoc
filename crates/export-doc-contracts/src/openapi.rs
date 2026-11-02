@@ -111,7 +111,6 @@ mod tests {
                 "OfficeSupplyRequestRecord",
                 &["approvalPlan", "canReview", "reviewTaskKeys"][..],
             ),
-            ("OfficeRequestEventRecord", &["approvalPlan"][..]),
         ] {
             for field in fields {
                 assert!(
@@ -119,10 +118,28 @@ mod tests {
                         .as_object_mut()
                         .unwrap()
                         .remove(*field)
-                        .is_some()
+                        .is_some(),
+                    "missing intentional extension {schema}.{field}"
                 );
             }
         }
+        let events = current["components"]["schemas"]["OfficeRequestEventRecord"]["properties"]
+            .as_object_mut()
+            .unwrap();
+        assert!(
+            !events.contains_key("approvalPlan"),
+            "events reference original decisions instead of duplicating plans"
+        );
+        for field in ["approvalGeneration", "definitionVersion"] {
+            assert_eq!(
+                events.remove(field),
+                Some(serde_json::json!({"type":"integer","format":"int64"}))
+            );
+        }
+        assert_eq!(
+            events.remove("definitionKey"),
+            Some(serde_json::json!({"type":"string"}))
+        );
         let parameters = current["paths"]["/api/master-data/products"]["get"]["parameters"]
             .as_array_mut()
             .unwrap();

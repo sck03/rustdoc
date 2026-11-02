@@ -6,6 +6,8 @@ pub struct OfficeQuery<'a> {
     pub context: &'a str,
     pub assigned_only: bool,
     pub principals: &'a [crate::RecordApprover],
+    pub node_access: Vec<crate::NodeAccess>,
+    pub workflow_date: Option<chrono::NaiveDate>,
     pub kind: &'a str,
     pub company: &'a str,
     pub view: DataScope<'a>,
@@ -100,19 +102,31 @@ pub(crate) fn build(q: &OfficeQuery<'_>, pg: bool) -> Result<QuerySql> {
         if q.approvals_only {
             clauses.push(format!(
                 "({})",
-                crate::record_query::approval_condition("r", Some(&viewer), &principals)
+                crate::record_query::approval_condition(
+                    pg,
+                    "r",
+                    Some(&viewer),
+                    &principals,
+                    q.workflow_date
+                )
             ));
             clauses.push(format!(
                 "r.owner_id<>{viewer} AND COALESCE(CAST({} AS BIGINT),0)<>{viewer}",
                 sql::field("applicantAccountId", pg)
             ));
         }
+        let node_access =
+            crate::record_query::node_access_condition(pg, "r", &q.node_access, &mut |value| {
+                sql::bind(&mut values, value, pg)
+            });
         let participant = crate::record_query::participant_condition(
             pg,
             "r",
             &viewer,
             Some(&context),
             &principals,
+            &node_access,
+            q.workflow_date,
         );
         let view = if q.assigned_only {
             participant.clone()

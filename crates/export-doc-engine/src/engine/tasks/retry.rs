@@ -94,7 +94,7 @@ impl Replay {
             input: None,
         }
     }
-    #[cfg(any(feature = "excel", test))]
+    #[cfg(feature = "excel")]
     pub fn with_input(mut self, name: &str, bytes: &[u8]) -> Self {
         self.input = Some(FileOutput {
             file_name: name.into(),

@@ -44,6 +44,9 @@ pub(super) fn fields(meta: &Value, body: &Value, today: chrono::NaiveDate) -> Re
     required(body, "title", "申请标题", 150)?;
     required(body, "reason", "申请说明", 2000)?;
     let mut row = json!({"title":text(body,"title"),"reason":text(body,"reason"),"totalAmount":"","durationDays":"","durationHours":""});
+    row["projectId"] = body["projectId"].clone();
+    row["projectName"] = json!("");
+    row["projectCode"] = json!("");
     match text(meta, "kind").as_str() {
         "personnel" => {
             row["personnelChange"] = contracts::dto(

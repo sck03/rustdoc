@@ -14,15 +14,7 @@ pub(super) fn prepare(
     body: &Value,
 ) -> Result<bool> {
     let key = text(body, "commandKey");
-    if !(8..=128).contains(&key.len())
-        || !key
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"-_:".contains(&b))
-    {
-        return Err(invalid(
-            "操作编号须为 8–128 位字母、数字或 -_:；重试须保留相同编号。",
-        ));
-    }
+    validate_key(&key)?;
     let target = row["id"]
         .as_i64()
         .ok_or_else(|| invalid("命令目标无效。"))?;
@@ -42,4 +34,16 @@ pub(super) fn prepare(
     }
     row[FIELD] = json!({"actorId":actor.id,"contextId":actor.context,"commandKey":key,"command":command,"targetId":target,"requestDigest":digest,"createdAt":super::store::timestamp()});
     Ok(false)
+}
+pub(in crate::engine) fn validate_key(key: &str) -> Result<()> {
+    if !(8..=128).contains(&key.len())
+        || !key
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_:".contains(&b))
+    {
+        return Err(invalid(
+            "操作编号须为 8–128 位字母、数字或 -_:；重试须保留相同编号。",
+        ));
+    }
+    Ok(())
 }

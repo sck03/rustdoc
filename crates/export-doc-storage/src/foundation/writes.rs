@@ -342,6 +342,9 @@ pub(crate) fn sync_person(db: &(impl Adapter + ?Sized), person: i64, body: &Valu
     );
     let appointments = s.query(db, query)?;
     for appointment in appointments.as_array().into_iter().flatten() {
+        if appointment["positionId"].is_string() {
+            continue;
+        }
         if text(appointment, "title").is_empty() {
             continue;
         }

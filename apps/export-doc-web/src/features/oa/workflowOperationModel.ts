@@ -2,6 +2,7 @@ import type { OaApprovalPlan, OaWorkflowCommandSave } from "../../api/index.ts";
 
 export function workflowTargets(plan: OaApprovalPlan | null | undefined, reviewTasks: string[] | undefined, actions: OaWorkflowCommandSave["command"][], command: OaWorkflowCommandSave["command"]) {
   if (!plan) return [];
+  if(command==="RetryNode")return plan.nodes.filter(node=>node.kind==="System"&&node.state==="Blocked");
   const manages = actions.some(action => ["Suspend", "Resume", "Terminate"].includes(action));
   const controlled = new Set(plan.steps.filter(step => step.status === "Waiting" && (manages ? Boolean(plan.nodes[step.stage]?.startedAt) : reviewTasks?.includes(step.taskKey))).map(step => step.stage));
   if (command === "ReturnToNode") {

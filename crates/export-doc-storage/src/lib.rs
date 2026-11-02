@@ -31,9 +31,11 @@ mod supplier_overview_query;
 pub use job_query::{JobOutputRetention, JobQuery, JobRetention};
 pub use office_query::OfficeQuery;
 pub use personnel_query::PersonnelQuery;
+mod record_export;
 mod record_query;
 mod related_query;
 mod resource_query;
+mod workflow_origin;
 pub use generic_query::ScopedQuery;
 pub use related_query::RelatedQuery;
 mod sql;
@@ -58,6 +60,8 @@ mod identity_runtime;
 mod permission_versions;
 mod schema;
 mod workflow;
+mod workflow_decisions;
+mod workflow_publications;
 mod workflow_runtime;
 mod workflow_schedule;
 pub use communication::{CommunicationQuery, CommunicationView, NotificationScope};
@@ -130,6 +134,11 @@ pub struct RecordApprover {
     pub context: String,
 }
 /// Indexed, bounded reads with authorization scope applied before pagination.
+#[derive(Clone)]
+pub struct NodeAccess {
+    pub action: &'static str,
+    pub restrictions: Vec<ScopeFilter>,
+}
 #[derive(Default)]
 pub struct RecordQuery<'a> {
     pub restrictions: Vec<ScopeFilter>,
@@ -143,6 +152,8 @@ pub struct RecordQuery<'a> {
     /// RFC 3339 instants for overtime. Values are parameter-bound by adapters.
     pub period: Option<(&'a str, &'a str)>,
     pub parent: Option<i64>,
+    /// Room or supply identity for internal resource queries.
+    pub resource_id: Option<i64>,
     pub status: Option<&'a str>,
     pub statuses: &'a [&'a str],
     pub approvers: Option<&'a [RecordApprover]>,
@@ -151,6 +162,9 @@ pub struct RecordQuery<'a> {
     /// None is reserved for internal account-wide responsibility audits.
     pub visible_context: Option<&'a str>,
     pub visible_principals: &'a [RecordApprover],
+    pub node_access: Vec<NodeAccess>,
+    /// Public participation queries use one business date; reference audits use None.
+    pub workflow_date: Option<chrono::NaiveDate>,
     /// Explicit participation extends ordinary visibility, without changing its scope.
     pub include_participants: bool,
     pub handling_key: Option<&'a str>,
@@ -158,6 +172,9 @@ pub struct RecordQuery<'a> {
     pub handling_keys: Option<&'a [String]>,
     pub handling_states: &'a [&'a str],
     pub handling_only: bool,
+    pub handling_user: Option<i64>,
+    pub handling_context: Option<&'a str>,
+    pub handling_principals: Option<&'a [RecordApprover]>,
     /// Project after authorization and pagination; an empty list returns the body.
     pub fields: &'a [(&'a str, &'a str)],
     pub offset: i64,
@@ -331,11 +348,12 @@ delegate! {
     foundation_get(kind:&str,unit:i64,id:i64)->Option<Value>;
     foundation_save(kind:&str,id:Option<i64>,unit:i64,expected:i64,body:&Value)->Value;
     responsibility_appointments(unit:i64,responsibility:i64,project:Option<i64>,kind:&str,date:&str)->Vec<Value>;
+    placement_appointments(unit:i64,source:&str,id:i64,date:&str)->Vec<Value>;
     records_by_ids(kind:&str,ids:&[i64],fields:&[(&str,&str)])->Vec<Value>;
     unit_accounts(company:&str,date:&str,all:bool)->Vec<Value>;
     unit_account_page(company:&str,date:&str,all:bool,before:Option<i64>,limit:i64)->Vec<Value>;
     workflow_notification_account_page(company:&str,date:&str,before:Option<i64>,limit:i64)->Vec<Value>;
-    resource_has_open_requests(kind:&str,parent:i64)->bool;
+    resource_has_open_requests(kind:&str,parent:i64,states:&[&str])->bool;
     supplier_overview(scope:&DataScope<'_>)->Value;
     query_workflow_summary(query:&WorkflowSummaryQuery<'_>)->(i64,Vec<Value>);
     query_workflow_tasks(query:&WorkflowTaskQuery<'_>)->(i64,Vec<Value>);
@@ -345,7 +363,19 @@ delegate! {
     schedule_personnel_order(entry:&Value)->();
     personnel_order_state(id:i64,state:&str,error:&str)->();
     personnel_order(id:i64)->Option<Value>;
-    workflow_reminder_level(entry:&Value,level:i64)->bool;
+    workflow_version_next(company:&str,key:&str)->i64;
+    workflow_versions(company:&str,key:&str,offset:i64,limit:i64)->Value;
+    workflow_activation_save(entry:&Value)->Value;
+    workflow_activation_list(company:&str,due:Option<&str>)->Vec<Value>;
+    workflow_activation_state(id:i64,expected:i64,state:&str,error:&str)->bool;
+    workflow_activation_receipt(actor:i64,context:&str,key:&str)->Option<Value>;
+    foundation_catalog(kind:&str,unit:i64,offset:i64,limit:i64)->Value;
+    foundation_project_options(unit:i64,appointment:&str,day:&str,offset:i64,limit:i64)->Value;
+    workflow_system_requests(action:&str)->Vec<Value>;
+    workflow_exceptions(company:&str,offset:i64,limit:i64)->Value;
+    workflow_decisions(request:i64,revision:i64,generation:Option<i64>,offset:i64,limit:i64)->Value;
+    export_record_page(query:&GenericQuery<'_>,search_fields:&[&str],count:bool)->(i64,Vec<Value>);
+    export_primary_contacts(kind:&str,scope:&DataScope<'_>,relation:&str,parents:&[i64])->Vec<Value>;
     command_receipt(actor:i64,context:&str,key:&str)->Option<Value>;
     put_command_receipt(receipt:&Value,result:&Value)->();
     append_workflow_operation(entry:&Value)->();

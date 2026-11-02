@@ -55,6 +55,8 @@ pub fn action(
                 kind == "supplies",
             )?
         };
+        let allowed = allowed
+            || kind != "supplies" && super::oa::fulfillment::can_handle(tx, actor, &value, action)?;
         if !allowed {
             return Err(error(403, "没有办理此记录的权限。"));
         }
@@ -73,6 +75,14 @@ pub fn action(
                 403,
                 "不能审批本人提交的申请，请由另一位有权限的人员办理。",
             ));
+        }
+        if action == "issue" && value["reservationState"] == "Insufficient" {
+            super::oa::fulfillment::system_result(
+                &mut value,
+                export_doc_domain::approval_graph::SystemAction::ReserveSupply,
+                export_doc_domain::approval_graph::NodeState::Completed,
+                "",
+            )?;
         }
         let decision = if action == "approve" {
             Some(super::oa::approval::review(
@@ -99,6 +109,34 @@ pub fn action(
             meeting(tx, actor, operation, &mut value)?;
         } else {
             supply(tx, actor, operation, &mut value, &body, business_date)?;
+        }
+        if decision == Some("Approved") && kind == "supply-requests" {
+            if super::oa::fulfillment::active_system(
+                &value,
+                export_doc_domain::approval_graph::SystemAction::ReserveSupply,
+            )? {
+                reserve(tx, actor, &mut value, business_date)?;
+            }
+            let insufficient = value["reservationState"] == "Insufficient";
+            super::oa::fulfillment::system_result(
+                &mut value,
+                export_doc_domain::approval_graph::SystemAction::ReserveSupply,
+                if insufficient {
+                    export_doc_domain::approval_graph::NodeState::Blocked
+                } else {
+                    export_doc_domain::approval_graph::NodeState::Completed
+                },
+                if insufficient {
+                    "StockInsufficient"
+                } else {
+                    ""
+                },
+            )?;
+        }
+        if matches!(action, "issue" | "return") {
+            let finished = action == "issue"
+                || matches!(value["status"].as_str(), Some("Returned" | "Completed"));
+            super::oa::fulfillment::progress(tx, actor, &mut value, &body, action, finished)?;
         }
         let identity = Some(text(&value, "requestKey"));
         let saved = store::save(tx, kind, id, value, identity, actor, action)?;
@@ -140,6 +178,10 @@ pub fn action(
     if operation.starts_with("Approve")
         && result["status"] == "Approved"
         && result["submissionId"].as_i64().is_some()
+        && super::oa::fulfillment::active_system(
+            &result,
+            export_doc_domain::approval_graph::SystemAction::GenerateApprovalDocument,
+        )?
     {
         match super::oa::resource_document(service, actor, kind, &result) {
             Ok(document) => result["approvalDocument"] = document,
@@ -273,6 +315,97 @@ fn meeting(tx: &Connection, actor: &Actor, operation: &str, value: &mut Value) -
     Ok(())
 }
 
+pub(super) fn reserve(
+    tx: &Connection,
+    actor: &Actor,
+    value: &mut Value,
+    business_date: chrono::NaiveDate,
+) -> Result<()> {
+    let id = positive(value, "officeSupplyId", "物品")?;
+    let mut supply = super::records::parent(tx, actor, "supplies", id)?;
+    if supply["isActive"] != true
+        || value["returnDueDate"]
+            .as_str()
+            .is_some_and(|day| day < business_date.to_string().as_str())
+    {
+        return Err(conflict("物品已停用或借用日期已过。"));
+    }
+    if matches!(
+        value["reservationState"].as_str(),
+        Some("Reserved" | "Consumed")
+    ) {
+        return Ok(());
+    }
+    let stock = integer(&supply, "stockQuantity", 0, 1_000_000, "在库数量")?;
+    let reserved = integer(&supply, "reservedQuantity", 0, stock, "预留数量")?;
+    let quantity = positive(value, "quantity", "数量")?;
+    if stock - reserved < quantity {
+        value["reservationState"] = json!("Insufficient");
+    } else {
+        supply["reservedQuantity"] = json!(reserved + quantity);
+        supply_totals(&mut supply);
+        let identity = Some(text(&supply, "name"));
+        store::save(tx, "supplies", id, supply, identity, actor, "reserve")?;
+        value["reservationState"] = json!("Reserved");
+    }
+    Ok(())
+}
+pub(super) fn compensate(
+    tx: &Connection,
+    actor: &Actor,
+    value: &mut Value,
+    body: &Value,
+    pending: bool,
+) -> Result<()> {
+    let kind = text(value, "kind");
+    let room = matches!(kind.as_str(), "bookings" | "room");
+    let resource = if room {
+        "office.rooms"
+    } else {
+        "office.supplies"
+    };
+    let action = if pending { "cancel" } else { "return" };
+    auth::authorize(actor, resource, action)?;
+    if !auth::restriction_allows(actor, resource, action, value, true) {
+        return Err(error(403, "补偿超出当前身份的资源范围。"));
+    }
+    if pending && matches!(value["status"].as_str(), Some("Issued" | "InUse")) {
+        return Err(conflict("资源已经实际交付，须先办理真实归还再终止。"));
+    }
+    if room {
+        meeting(
+            tx,
+            actor,
+            if pending {
+                "CancelMeetingBooking"
+            } else {
+                "ReturnMeetingRoomKey"
+            },
+            value,
+        )?;
+    } else {
+        if !pending {
+            let outstanding = positive(value, "quantity", "数量")?
+                - value["returnedQuantity"].as_i64().unwrap_or(0);
+            if body["quantity"] != outstanding {
+                return Err(invalid("子流程资源补偿须登记全部尚未归还数量。"));
+            }
+        }
+        supply(
+            tx,
+            actor,
+            if pending {
+                "CancelOfficeSupplyRequest"
+            } else {
+                "ReturnOfficeSupply"
+            },
+            value,
+            body,
+            super::units::today(tx)?,
+        )?;
+    }
+    Ok(())
+}
 fn supply(
     tx: &Connection,
     actor: &Actor,
@@ -301,10 +434,10 @@ fn supply(
     let mut delta = 0;
     match (operation, text(value, "status").as_str()) {
         ("CancelOfficeSupplyRequest", "Approved") => {
-            if value["reservationState"] != "Insufficient" && reserved < quantity {
+            if value["reservationState"] == "Reserved" && reserved < quantity {
                 return Err(conflict("库存与预留状态不一致，已停止取消。"));
             }
-            if value["reservationState"] != "Insufficient" {
+            if value["reservationState"] == "Reserved" {
                 supply["reservedQuantity"] = json!(reserved - quantity);
             }
             value["status"] = json!("Cancelled");
@@ -315,16 +448,10 @@ fn supply(
             if supply["isActive"] != true {
                 return Err(conflict("物品已停用。"));
             }
-            if stock - reserved < quantity {
-                value["reservationState"] = json!("Insufficient");
-            } else {
-                supply["reservedQuantity"] = json!(reserved + quantity);
-                value["reservationState"] = json!("Reserved");
-            }
             value["status"] = json!("Approved");
         }
         ("IssueOfficeSupply", "Approved") => {
-            let has_reservation = value["reservationState"] != "Insufficient";
+            let has_reservation = value["reservationState"] == "Reserved";
             if supply["isActive"] != true
                 || (has_reservation && reserved < quantity)
                 || (!has_reservation && stock - reserved < quantity)

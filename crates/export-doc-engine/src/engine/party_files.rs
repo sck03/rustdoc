@@ -134,38 +134,66 @@ fn export(
     let rows = service
         .store
         .read_for(actor, operation, query, |tx, actor| {
-            let mut rows: Vec<_> = store::all(tx, resource.key)?
-                .into_iter()
-                .filter(|row| {
-                    auth::visible(actor, resource.permission, "export", row)
-                        && (read("status").is_empty() || row["status"] == read("status"))
-                        && (keyword.is_empty()
-                            || [
-                                "name",
-                                "countryRegion",
-                                "website",
-                                "source",
-                                "notes",
-                                "category",
-                                "mainProducts",
-                            ]
-                            .iter()
-                            .any(|key| store::normalize(&text(row, key)).contains(&keyword)))
-                })
-                .collect();
-            if rows.len() > 10_000 {
+            let filters = if read("status").is_empty() {
+                vec![]
+            } else {
+                vec![("status", read("status").to_owned())]
+            };
+            let fields = [
+                "name",
+                "countryRegion",
+                "website",
+                "source",
+                "notes",
+                "category",
+                "mainProducts",
+            ];
+            let selection = |offset, limit| export_doc_storage::GenericQuery {
+                kind: resource.key,
+                scope: auth::data_scope(actor, resource.permission, "export"),
+                filters: &filters,
+                keyword: &keyword,
+                search_root: None,
+                fields: &[],
+                offset,
+                limit,
+            };
+            let count = tx
+                .export_record_page(&selection(i64::MAX, 1), &fields, true)?
+                .0;
+            if count > 10_000 {
                 return Err(invalid("当前筛选超过 10000 条，请缩小范围后导出。"));
+            }
+            let mut rows = Vec::with_capacity(count as usize);
+            while rows.len() < (count as usize) {
+                operation::check()?;
+                let page = tx
+                    .export_record_page(&selection(rows.len() as i64, 2000), &fields, false)?
+                    .1;
+                if page.is_empty() {
+                    return Err(unavailable("导出结果在读取中缺失。"));
+                }
+                rows.extend(page);
             }
             rows.sort_by_key(|row| text(row, "name"));
             let contact_resource = catalog::resource(contact_kind(supplier)).unwrap();
-            let mut contacts: Vec<_> = store::all(tx, contact_resource.key)?
-                .into_iter()
-                .filter(|row| auth::visible(actor, contact_resource.permission, "view", row))
-                .collect();
-            contacts.sort_by_key(|row| (row["isPrimary"] != true, row["id"].as_i64()));
+            let ids = rows
+                .iter()
+                .filter_map(|row| row["id"].as_i64())
+                .collect::<Vec<_>>();
+            let mut contacts = vec![];
+            for chunk in ids.chunks(1000) {
+                operation::check()?;
+                contacts.extend(tx.export_primary_contacts(
+                    contact_resource.key,
+                    &auth::data_scope(actor, contact_resource.permission, "view"),
+                    relation(supplier),
+                    chunk,
+                )?);
+            }
             let mut primary_contacts = BTreeMap::new();
             for contact in &contacts {
-                if let Some(id) = contact[relation(supplier)].as_i64() {
+                if let Some(id) = contact["parentId"].as_i64() {
                     primary_contacts.entry(id).or_insert(contact);
                 }
             }

@@ -25,6 +25,7 @@ export function PersonnelOrganizationEditor({ client, company, departments, prim
       <button type="button" className="command-button secondary" disabled={assignment.canRemove === false} onClick={() => onChange({ ...value, additionalAssignments: value.additionalAssignments.filter((_, i) => i !== index) })}>删除未使用的误建任职</button>{assignment.removalReason && <p>保留原因：{assignment.removalReason}。请通过结束日期办理撤任，并先交接有效职责。</p>}
     </fieldset>)}
     <button type="button" className="command-button secondary" disabled={value.additionalAssignments.length >= 20} onClick={() => onChange({ ...value, additionalAssignments: [...value.additionalAssignments, { companyCode: company, startsOn: "", endsOn: "", departmentId: "", jobTitle: "普通员工", managerEmployeeId: null, functionalManagerEmployeeIds: [] }] })}>添加任职</button>
+    <AssignmentHistory items={value.assignmentHistory??[]}/>
   </details>;
 }
 
@@ -49,5 +50,12 @@ export function PersonnelOrganizationFacts({ value }: { value?: OaMaterialPerson
   const reporting = (item: Partial<Reporting>) => <p>直属负责人：{item.managerName || (item.managerEmployeeId ? `人员 #${item.managerEmployeeId}` : "未设置")}；职能负责人：{item.functionalManagerNames?.join("、") || item.functionalManagerEmployeeIds?.map(id => `人员 #${id}`).join("、") || "未设置"}</p>;
   return <section className="personnel-fact-section" aria-label="任职与汇报关系"><h3>任职与汇报关系</h3>{reporting(value)}
     {value.additionalAssignments?.length ? value.additionalAssignments.map(assignment => <div key={`${assignment.companyCode}:${assignment.departmentId}`}><strong>{assignment.companyCode} · {assignment.departmentName || assignment.departmentId} · {assignment.jobTitle}</strong><p>任职日期：{assignment.startsOn || "长期"} 至 {assignment.endsOn || "长期"}</p>{reporting(assignment)}</div>) : <p>兼职部门：未登记</p>}
+    <AssignmentHistory items={value.assignmentHistory??[]}/>
   </section>;
+}
+function AssignmentHistory({items}:{items:ReadonlyArray<Partial<PersonnelAssignment>>}) {
+  const [page,setPage]=useState(1);
+  if(!items.length)return null;
+  const reversed=[...items].reverse();
+  return <details><summary>历史主任职（{items.length}）</summary><p className="office-muted">历史保持稳定编号和原任职期间，不构成当前身份或权限来源。</p><ol>{reversed.slice((page-1)*20,page*20).map(item=><li key={item.id}>{item.companyCode} · {item.departmentName||item.departmentId} · {item.jobTitle} · {item.startsOn} 至 {item.endsOn}</li>)}</ol><div className="office-card-actions"><button type="button" disabled={page===1} onClick={()=>setPage(p=>p-1)}>上一页历史任职</button><span>第 {page} 页</span><button type="button" disabled={page*20>=items.length} onClick={()=>setPage(p=>p+1)}>下一页历史任职</button></div></details>;
 }

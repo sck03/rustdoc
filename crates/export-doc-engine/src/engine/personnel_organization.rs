@@ -192,6 +192,52 @@ pub(super) fn validate_with_primary(
     action: &str,
     primary: Option<&str>,
 ) -> Result<()> {
+    validate_primary(
+        tx,
+        actor,
+        person,
+        submitted,
+        action,
+        primary.map_or(PrimaryChange::Preserve, PrimaryChange::Existing),
+    )
+}
+
+pub(in crate::engine) fn validate_new_primary(
+    tx: &Connection,
+    actor: &Actor,
+    person: &mut Value,
+    submitted: &Value,
+    id: &str,
+    starts_on: &str,
+) -> Result<()> {
+    validate_primary(
+        tx,
+        actor,
+        person,
+        submitted,
+        "transition",
+        PrimaryChange::New {
+            id,
+            start: starts_on,
+        },
+    )
+}
+
+#[derive(Clone, Copy)]
+enum PrimaryChange<'a> {
+    Preserve,
+    Existing(&'a str),
+    New { id: &'a str, start: &'a str },
+}
+
+fn validate_primary(
+    tx: &Connection,
+    actor: &Actor,
+    person: &mut Value,
+    submitted: &Value,
+    action: &str,
+    change: PrimaryChange<'_>,
+) -> Result<()> {
     let mut organization: PersonnelOrganization = serde_json::from_value(submitted.clone())
         .map_err(|_| invalid("任职与汇报关系格式无效。"))?;
     let company = text(person, "companyScope");
@@ -202,7 +248,43 @@ pub(super) fn validate_with_primary(
     };
     let previous_assignments = assignments(&previous)?;
     let previous_org = self::organization(&previous)?;
-    organization.primary_assignment_id = if let Some(primary) = primary {
+    if matches!(change, PrimaryChange::Preserve) {
+        organization.assignment_history = previous_org.assignment_history.clone();
+    } else if matches!(change, PrimaryChange::New { .. }) {
+        if !organization
+            .assignment_history
+            .starts_with(&previous_org.assignment_history)
+            || organization.assignment_history.len() != previous_org.assignment_history.len() + 1
+            || organization.assignment_history.last().is_none_or(|a| {
+                previous_assignments
+                    .first()
+                    .is_none_or(|old| old.id != a.id)
+            })
+        {
+            return Err(invalid("调岗历史须原样保留，并关闭原主任职。"));
+        }
+    } else if let PrimaryChange::Existing(primary) = change {
+        organization.assignment_history = previous_org.assignment_history.clone();
+        if let Some(old) = previous_assignments.first().filter(|a| a.id != primary) {
+            if let Some(index) = organization
+                .additional_assignments
+                .iter()
+                .position(|a| a.id == old.id && !a.ends_on.is_empty())
+            {
+                organization
+                    .assignment_history
+                    .push(organization.additional_assignments.remove(index));
+            }
+        }
+    }
+    organization.primary_assignment_id = if let PrimaryChange::New { id, start } = change {
+        if previous_assignments.iter().any(|a| a.id == id) {
+            return Err(invalid("新任职编号不能复用已有任职。"));
+        }
+        export_doc_domain::business_date::parse(start).map_err(invalid)?;
+        organization.primary_starts_on = start.into();
+        id.into()
+    } else if let PrimaryChange::Existing(primary) = change {
         let selected = previous_assignments
             .iter()
             .find(|a| a.id == primary && a.company_code == company)
@@ -260,6 +342,10 @@ pub(super) fn validate_with_primary(
             a.id != organization.primary_assignment_id
                 && !organization
                     .additional_assignments
+                    .iter()
+                    .any(|next| next.id == a.id)
+                && !organization
+                    .assignment_history
                     .iter()
                     .any(|next| next.id == a.id)
         })

@@ -211,7 +211,8 @@ pub(crate) fn persist(
         s.text(plan["suspendedAt"].as_str().unwrap_or("")),
         s.number(plan["pausedSeconds"].as_u64().unwrap_or(0)),
     );
-    if s.execute(db,&format!("INSERT INTO workflow_instances(id,request_id,revision,state,generation,definition,suspended_at,paused_seconds) VALUES({key},{r},{v},{st},{g},{m},{suspended},{paused}) ON CONFLICT(id) DO UPDATE SET state=excluded.state,generation=excluded.generation,suspended_at=excluded.suspended_at,paused_seconds=excluded.paused_seconds WHERE workflow_instances.definition=excluded.definition"))? == 0 {
+    let participants = s.json(plan.get("participants").unwrap_or(&json!([])))?;
+    if s.execute(db,&format!("INSERT INTO workflow_instances(id,request_id,revision,state,generation,definition,suspended_at,paused_seconds,participants) VALUES({key},{r},{v},{st},{g},{m},{suspended},{paused},{participants}) ON CONFLICT(id) DO UPDATE SET state=excluded.state,generation=excluded.generation,suspended_at=excluded.suspended_at,paused_seconds=excluded.paused_seconds,participants=excluded.participants WHERE workflow_instances.definition=excluded.definition"))? == 0 {
         return Err(conflict("在途流程不能更换已绑定的发布版本。"));
     }
     if let Some((handling_state, result)) = handling {
@@ -237,9 +238,22 @@ pub(crate) fn persist(
         let version = s.number(positive(subflow, "version")?);
         let request = s.number(request);
         let revision = s.number(revision);
-        let name = s.text(format!("{}:{index}", required(subflow, "key")?));
+        let name = s.text(required(subflow, "key")?);
         let keys = s.json(&subflow["nodeKeys"])?;
-        s.execute(db,&format!("INSERT INTO workflow_subinstances(id,parent_instance_id,definition_id,definition_version,submission_id,subflow_key,state,node_keys,input_snapshot) SELECT {key},{parent},{definition},{version},id,{name},'Pending',{keys},body FROM request_revisions WHERE request_id={request} AND revision={revision} ON CONFLICT(id) DO NOTHING"))?;
+        let input = s.json(&subflow["inputSnapshot"])?;
+        s.execute(db,&format!("INSERT INTO workflow_subinstances(id,parent_instance_id,definition_id,definition_version,submission_id,subflow_key,state,node_keys,input_snapshot) SELECT {key},{parent},{definition},{version},id,{name},'Pending',{keys},{input} FROM request_revisions WHERE request_id={request} AND revision={revision} ON CONFLICT(id) DO NOTHING"))?;
+        if let Some(progress) = plan["subflowProgress"].get(required(subflow, "key")?) {
+            let mut s = Statement::new(db);
+            let key = s.text(format!("{instance}:sub:{index}"));
+            let state = s.text(progress["state"].as_str().unwrap_or("Pending"));
+            let outcome = s.text(progress["outcome"].as_str().unwrap_or("Pending"));
+            let outputs = s.json(&progress["outputs"])?;
+            let error = s.text(progress["errorCode"].as_str().unwrap_or(""));
+            let control = s.text(progress["controlOutcome"].as_str().unwrap_or(""));
+            let compensated = s.number(i64::from(progress["compensationCompleted"] == true));
+            let g = s.number(generation);
+            s.execute(db,&format!("UPDATE workflow_subinstances SET state={state},outcome={outcome},generation={g},outputs={outputs},error_code={error},control_outcome={control},compensation_completed={compensated} WHERE id={key}"))?;
+        }
     }
     if previous.generation != generation {
         let mut s = Statement::new(db);
@@ -263,9 +277,19 @@ pub(crate) fn persist(
         if let Some(v) = spec.as_object_mut() {
             v.remove("startedAt");
             v.remove("dueAt");
+            for key in [
+                "state",
+                "execution",
+                "errorCode",
+                "escalationCursor",
+                "reminderLevel",
+                "nextEscalationAt",
+            ] {
+                v.remove(key);
+            }
         }
         let mut s = Statement::new(db);
-        let (key, g, n, p, body, start, due) = (
+        let (key, g, n, p, body, start, due, phase, state, execution, error) = (
             s.text(&instance),
             s.number(generation),
             s.text(required(node, "key")?),
@@ -273,9 +297,54 @@ pub(crate) fn persist(
             s.json(&spec)?,
             s.text(required(node, "startedAt")?),
             s.text(required(node, "dueAt")?),
+            s.text(required(node, "phase")?),
+            s.text(required(node, "state")?),
+            if node["execution"].is_null() {
+                "NULL".into()
+            } else {
+                s.json(&node["execution"])?
+            },
+            s.text(node["errorCode"].as_str().unwrap_or("")),
         );
-        if s.execute(db,&format!("INSERT INTO node_instances(instance_id,generation,node_key,position,definition,started_at,due_at) VALUES({key},{g},{n},{p},{body},{start},{due}) ON CONFLICT(instance_id,generation,node_key) DO UPDATE SET started_at=excluded.started_at,due_at=excluded.due_at WHERE node_instances.definition=excluded.definition"))?==0 {
+        let cursor = s.number(node["escalationCursor"].as_u64().unwrap_or(0));
+        let reminder = s.number(node["reminderLevel"].as_u64().unwrap_or(0));
+        let next = s.text(node["nextEscalationAt"].as_str().unwrap_or(""));
+        if s.execute(db,&format!("INSERT INTO node_instances(instance_id,generation,node_key,position,definition,started_at,due_at,phase,execution_state,execution,error_code,escalation_cursor,reminder_level,next_escalation_at) VALUES({key},{g},{n},{p},{body},{start},{due},{phase},{state},{execution},{error},{cursor},{reminder},{next}) ON CONFLICT(instance_id,generation,node_key) DO UPDATE SET started_at=excluded.started_at,due_at=excluded.due_at,execution_state=excluded.execution_state,execution=excluded.execution,error_code=excluded.error_code,escalation_cursor=excluded.escalation_cursor,reminder_level=excluded.reminder_level,next_escalation_at=excluded.next_escalation_at WHERE node_instances.definition=excluded.definition"))?==0 {
             return Err(conflict("运行节点定义不可覆盖；重审或加减签须建立新的执行代次。"));
+        }
+        let direct = node["actors"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|a| (a, 0));
+        let targets = node["escalationTargets"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .enumerate()
+            .flat_map(|(i, level)| {
+                level
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(move |a| (a, i + 1))
+            });
+        for (actor, level) in direct.chain(targets) {
+            let mut s = Statement::new(db);
+            let instance = s.text(&instance);
+            let g = s.number(generation);
+            let node = s.text(required(node, "key")?);
+            let user = s.number(positive(actor, "userId")?);
+            let context = s.text(required(actor, "context")?);
+            let origin = s.json(&actor["origin"])?;
+            let person = if actor["personId"].is_null() {
+                "NULL".into()
+            } else {
+                s.number(positive(actor, "personId")?)
+            };
+            let admin = s.number(i64::from(actor["administration"] == true));
+            let level = s.number(level);
+            s.execute(db,&format!("INSERT INTO workflow_node_actors(instance_id,generation,node_key,actor_id,person_id,context_id,origin,administration,activation_level) VALUES({instance},{g},{node},{user},{person},{context},{origin},{admin},{level}) ON CONFLICT(instance_id,generation,node_key,actor_id,context_id,activation_level) DO NOTHING"))?;
         }
     }
     tasks::persist(

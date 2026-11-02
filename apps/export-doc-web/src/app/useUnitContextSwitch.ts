@@ -7,8 +7,9 @@ import { getDefaultWorkspaceRoute } from "./productEdition.ts";
 import { useConfirmUnsavedChanges } from "../ui/unsavedChangesGuard.tsx";
 import { readApiError } from "../ui/formUtils.ts";
 import { isCurrentSession } from "./sessionChannel.ts";
+import { notifyAuthenticationFailure } from "../api/authenticationFailureEvents.ts";
 
-export function useUnitContextSwitch(client: ExportDocManagerApiClient, session: WebSessionState | null, accept: (next: WebSessionState, previous: WebSessionState) => void, sessionBusy = false) {
+export function useUnitContextSwitch(client: ExportDocManagerApiClient, session: WebSessionState | null, accept: (next: WebSessionState, previous: WebSessionState) => void, sessionBusy = false, transition?: { current: boolean }) {
   const [busy, setBusy] = useState(false);
   const [destination, setDestination] = useState<{ route: string; token: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +29,7 @@ export function useUnitContextSwitch(client: ExportDocManagerApiClient, session:
     if (!previous || sessionBusy || destination || controller.current || contextId === (previous.user.contextId ?? "")) return;
     const request = new AbortController();
     controller.current = request;
+    if (transition) transition.current = true;
     setBusy(true); setError(null);
     try {
       if (!await confirmSwitch("切换单位身份") || request.signal.aborted || !isCurrentSession(current.current, previous)) return;
@@ -40,9 +42,13 @@ export function useUnitContextSwitch(client: ExportDocManagerApiClient, session:
       accept({ ...previous, accessToken: result.accessToken, expiresAt: result.expiresAt, user: result.user }, previous);
       navigate(route, { replace: true });
     } catch (cause) {
-      if (!request.signal.aborted && isCurrentSession(current.current, previous)) setError(readApiError(cause));
+      if (!request.signal.aborted && isCurrentSession(current.current, previous)) {
+        if (transition) transition.current = false;
+        setError(readApiError(cause));
+        notifyAuthenticationFailure(cause);
+      }
     } finally {
-      if (controller.current === request) { controller.current = null; setBusy(false); }
+      if (controller.current === request) { controller.current = null; if (transition) transition.current = false; setBusy(false); }
     }
   }
   return { busy: busy || destination !== null, error, switchContext };

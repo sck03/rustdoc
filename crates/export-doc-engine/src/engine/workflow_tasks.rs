@@ -39,13 +39,21 @@ pub(super) fn persist(tx: &Connection, kind: &str, row: &Value) -> Result<()> {
         "Approved"
     } else {
         match state.as_str() {
+            "Suspended" => plan.outcome(),
             "Draft" => "Withdrawn",
             "Cancelled" if plan.outcome() == "Approved" => "Voided",
             state => state,
         }
     };
     let progress = export_doc_storage::WorkflowProgress { approval, handling };
-    if (approval == "Pending" && (plan.outcome() != "Pending" || active.is_empty()))
+    if (approval == "Pending"
+        && (plan.outcome() != "Pending"
+            || active.is_empty()
+                && plan.suspended_at.is_empty()
+                && !plan
+                    .nodes
+                    .iter()
+                    .any(|n| n.state == export_doc_domain::approval_graph::NodeState::Blocked)))
         || (approval == "Approved" && plan.outcome() != "Approved")
         || (approval == "Rejected" && plan.outcome() != "Rejected")
     {

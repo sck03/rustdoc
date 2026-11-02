@@ -345,6 +345,13 @@ pub(crate) fn persist(
                     .cloned()
                     .unwrap_or_default(),
             );
+            let history_start = appointments.len();
+            appointments.extend(
+                body["organization"]["assignmentHistory"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default(),
+            );
             // Remove only absent appointments; reference guards and deferred FKs
             // preserve actual history. Unchanged rows retain their stable identity.
             let mut s = Write::new(db);
@@ -373,13 +380,20 @@ pub(crate) fn persist(
                     s.text(text(a, "jobTitle")),
                     s.text(text(a, "startsOn")),
                     s.text(text(a, "endsOn")),
-                    s.number(i64::from(index == 0)),
+                    s.number(i64::from(index == 0 || index >= history_start)),
                     s.text(text(a, "id")),
                     s.unit(company),
                     s.department(company, department),
-                    // Re-resolve the position in sync_person before this transaction commits.
-                    // A previous department's position cannot accompany the new appointment facts.
-                    "NULL".into(),
+                    // Keep the stable position for the same appointment location.
+                    // Initial and explicitly moved appointments resolve once in sync_person.
+                    {
+                        let appointment = s.text(text(a, "id"));
+                        let unit = s.unit(company);
+                        let department = s.department(company, department);
+                        format!(
+                            "(SELECT m.position_id FROM personnel_memberships m WHERE m.id={appointment} AND m.unit_id={unit} AND m.department_id={department})"
+                        )
+                    },
                 ];
                 upsert(
                     db,

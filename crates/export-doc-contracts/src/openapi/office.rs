@@ -1,3 +1,4 @@
+mod advanced;
 mod approval;
 mod calendars;
 pub(super) mod documents;
@@ -205,6 +206,7 @@ pub(super) fn extend(doc: &mut Value) {
     hub::extend(doc);
     operations::extend(doc);
     calendars::extend(doc);
+    advanced::extend(doc);
 }
 
 fn permissions(doc: &mut Value, kind: &str, resource: &str, label: &str, group: &str, order: i32) {

@@ -672,6 +672,16 @@ pub(super) fn scope_filters(
         })
         .collect()
 }
+pub(super) fn node_access(actor: &Actor, resource: &str) -> Vec<export_doc_storage::NodeAccess> {
+    ["complete", "issue", "return"]
+        .into_iter()
+        .filter(|action| authorize(actor, resource, action).is_ok())
+        .map(|action| export_doc_storage::NodeAccess {
+            action,
+            restrictions: object_scope_filters(actor, resource, action),
+        })
+        .collect()
+}
 pub(super) fn object_scope_filters(
     actor: &Actor,
     resource: &str,

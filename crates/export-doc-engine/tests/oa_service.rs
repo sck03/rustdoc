@@ -29,6 +29,28 @@ mod unit_contract;
 mod workflow_operations_contract;
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
+#[path = "support/advanced_workflow_contract.rs"]
+mod advanced_workflow_contract;
+#[test]
+fn advanced_duties_subflow_outputs_and_fulfillment_execute_on_sqlite() {
+    let mut fixture = native_fixture::Fixture::new();
+    fixture.client.take();
+    fixture.paths.font_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../Resources/Fonts/OpenSource/NotoSansCJKsc-Regular.otf")
+        .canonicalize()
+        .unwrap();
+    let service = NativeService::open(fixture.paths.clone()).unwrap();
+    let login = oa_contract::call(
+        &service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":"admin","password":""})),
+    )
+    .unwrap();
+    advanced_workflow_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    service.close().unwrap();
+}
 
 #[test]
 fn participation_limits_and_same_department_appointments_are_consistent() {

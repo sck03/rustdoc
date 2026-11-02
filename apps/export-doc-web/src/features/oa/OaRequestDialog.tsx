@@ -18,6 +18,7 @@ import { HandlingServicePicker } from "./HandlingServicePicker.tsx";
 import { PersonnelChangeFields } from "./PersonnelChangeFields.tsx";
 import { personnelChangeLabels } from "./oaModel.ts";
 import { OaDepartmentPicker } from "./OaDepartmentPicker.tsx";
+import { WorkflowProjectPicker } from "./WorkflowProjectPicker.tsx";
 
 
 export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind; record?: OaRequest; onClose: () => void; onSaved: (record: OaRequest) => void }) {
@@ -73,9 +74,10 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
     <form onSubmit={submit} onChangeCapture={() => setDirty(true)}><fieldset disabled={operation.busy} className="office-form-grid">
       {kind !== "personnel" && user.capabilities.canManageUsers && !record && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={(value) => { setEmployee(value); setDirty(true); }} disabled={operation.busy} />}
       {kind !== "personnel" && !record && <OfficeApplicantIdentity user={user} />}
-      {kind !== "personnel" && !record && <OaDepartmentPicker client={client} user={user} employeeId={employee?.id} value={draft.departmentId} onChange={departmentId => setDraft(current => ({ ...current, departmentId }))} />}
+      {kind !== "personnel" && !record && <OaDepartmentPicker client={client} user={user} employeeId={employee?.id} value={draft.appointmentId} onChange={appointment => setDraft(current => ({ ...current, departmentId:appointment.departmentId, appointmentId:appointment.id, projectId:null }))} />}
       {kind !== "personnel" && record && <p className="office-field-wide">申请人：{requestPersonLabel(record.employeeName, record)}</p>}
       {kind === "personnel" && <PersonnelChangeFields client={client} user={user} draft={draft} setDraft={setDraft} />}
+      {(kind!=="personnel" || draft.personnelChange?.action!=="Hire")&&<WorkflowProjectPicker client={client} user={user} kind={kind} employeeId={record?.employeeId??employee?.id??draft.employeeId} appointmentId={draft.appointmentId} departmentId={draft.departmentId} value={draft.projectId} onChange={projectId=>setDraft(current=>({...current,projectId}))}/>}
       <OfficeField label="申请标题" wide><input required maxLength={150} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></OfficeField>
       <OfficeField label="申请说明" wide><textarea required rows={3} maxLength={2000} value={draft.reason} onChange={(event) => setDraft({ ...draft, reason: event.target.value })} /></OfficeField>
       <OaTemporalFields draft={draft} setDraft={setDraft} timeZone={user.businessTimeZone} />

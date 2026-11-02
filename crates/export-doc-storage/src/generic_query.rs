@@ -5,7 +5,7 @@ use crate::{
 
 /// Permission alternatives are a union: own records can be outside the actor's
 /// current department, so reducing grants to only the largest rank is incorrect.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct DataScope<'a> {
     pub restrictions: Vec<ScopeFilter>,
     pub all: bool,

@@ -53,7 +53,11 @@ fn finance_user(
     department: &str,
 ) -> String {
     let username = format!("finance-{}", nonce().unwrap());
-    call(service, admin, CREATE_USER_ACCOUNT, 0, Some(json!({"username":username,"fullName":"财务验收","role":role,"companyScope":company,"departmentId":department,"isActive":true,"resetPassword":"Finance-Review-2026"}))).unwrap();
+    let user=call(service, admin, CREATE_USER_ACCOUNT, 0, Some(json!({"username":username,"fullName":"财务验收","role":role,"companyScope":company,"departmentId":department,"isActive":true,"resetPassword":"Finance-Review-2026"}))).unwrap();
+    if call(service, admin, GET_CURRENT_USER, 0, None).unwrap()["companyScope"] == company {
+        let person=call(service,admin,CREATE_PERSONNEL,0,Some(json!({"requestKey":nonce().unwrap(),"employeeNumber":nonce().unwrap(),"departmentId":department,"jobTitle":"财务接收","hireDate":"2026-01-01","employmentType":"FullTime","profile":{"fullName":"财务验收"}}))).unwrap();
+        call(service,admin,LINK_PERSONNEL_ACCOUNT,person["employee"]["id"].as_i64().unwrap(),Some(json!({"expectedVersion":person["versionNumber"],"userId":user["user"]["id"],"expectedAccountVersion":user["user"]["versionNumber"]}))).unwrap();
+    }
     call(
         service,
         "",
@@ -105,10 +109,12 @@ fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Va
         finance_list(service, finance, "Approved", true).unwrap()["items"][0]["id"],
         id
     );
+    let visible = finance_list(service, finance, "", false).unwrap();
     assert_eq!(
-        finance_list(service, finance, "", false).unwrap()["totalCount"],
-        0
+        visible["totalCount"], 1,
+        "only the assigned fulfillment is visible"
     );
+    assert_eq!(visible["items"][0]["id"], id);
     assert_eq!(
         finance_list(service, finance, "Pending", true)
             .unwrap_err()
@@ -265,6 +271,15 @@ fn receive_expense(service: &NativeService, admin: &str, finance: &str, row: &Va
     )
     .unwrap();
     let revoked = login["accessToken"].as_str().unwrap();
+    assert_eq!(
+        finance_list(service, revoked, "", false).unwrap()["totalCount"],
+        0,
+        "revoked handling access cannot survive through historical assignments"
+    );
+    assert_eq!(
+        call(service, revoked, GET_NOTIFICATION_UNREAD_COUNT, 0, None).unwrap()["unreadCount"],
+        0
+    );
     assert_eq!(
         call(service, revoked, LIST_NOTIFICATIONS, 0, None).unwrap()["totalCount"],
         0

@@ -33,6 +33,7 @@ import { isCurrentSession, openSessionChannel, shouldAcceptSessionUpdate, type S
 import { useBusinessDateSessionRefresh } from "./app/useBusinessDateSessionRefresh.ts";
 import { useUnitContextSwitch } from "./app/useUnitContextSwitch.ts";
 import { prefetchLandingDashboard } from "./app/loginPrefetch.ts";
+import { createSessionApiClient } from "./app/sessionApiClient.ts";
 import { isDashboardRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
 import {
   getDefaultWorkspaceRoute,
@@ -71,6 +72,8 @@ function App() {
   const sessionRef = useRef<SessionState | null>(session);
   const validatedUserTokenRef = useRef<string | undefined>(undefined);
   const sessionActionRef = useRef<symbol | null>(null);
+  const unitTransitionRef = useRef(false);
+  const allowAuthenticationFailure = useCallback(() => !sessionActionRef.current && !unitTransitionRef.current, []);
   const apiBaseUrlRef = useRef(apiBaseUrl);
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   const setSession = useCallback((nextSession: SessionState | null) => {
@@ -230,11 +233,11 @@ function App() {
 
   const client = useMemo(
     () =>
-      createExportDocManagerApiClient({
+      createSessionApiClient({
         baseUrl: sessionApiBaseUrl ?? apiBaseUrl,
         accessToken: () => sessionAccessToken,
         desktopAccessToken: () => desktopAccessToken,
-      }),
+      }, () => !sessionActionRef.current && !unitTransitionRef.current && sessionRef.current?.accessToken === sessionAccessToken && sessionRef.current?.apiBaseUrl === (sessionApiBaseUrl ?? apiBaseUrl)),
     [apiBaseUrl, desktopAccessToken, sessionAccessToken, sessionApiBaseUrl],
   );
   const unitContext = useUnitContextSwitch(client, session, (next, previous) => {
@@ -242,7 +245,7 @@ function App() {
     resetSessionAttention();
     setWorkspaceNotice(null);
     sessionChannelRef.current?.post({ type: "session-expired", apiBaseUrl: previous.apiBaseUrl, accessToken: previous.accessToken, reason: "其他标签页已切换单位身份，请重新验证后继续当前单位的工作。" });
-  }, sessionActionBusy);
+  }, sessionActionBusy, unitTransitionRef);
 
   useEffect(() => {
     if (!isDesktopBridgeAvailable()) {
@@ -355,6 +358,7 @@ function App() {
     sessionRef,
     setSession,
     validatedUserTokenRef,
+    allowAuthenticationFailure,
   });
 
   const routeAccessAllowed = !session || isRouteAccessAllowed({
@@ -466,11 +470,11 @@ function App() {
       if (defaultRoute === "/dashboard" || defaultRoute === "/crm/dashboard") {
         prefetchLandingDashboard({
           queryClient,
-          client: createExportDocManagerApiClient({
+          client: createSessionApiClient({
             baseUrl: apiBaseUrl,
             accessToken: () => nextSession.accessToken,
             desktopAccessToken: () => desktopAccessToken,
-          }),
+          }, () => sessionRef.current?.accessToken === nextSession.accessToken && sessionRef.current?.apiBaseUrl === apiBaseUrl),
           route: defaultRoute,
         });
       }

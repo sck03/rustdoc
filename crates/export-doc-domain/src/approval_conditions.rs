@@ -11,6 +11,7 @@ pub enum ConditionField {
     Department,
     Category,
     PersonnelAction,
+    Returnable,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ConditionOperator {
@@ -28,7 +29,7 @@ pub struct ApprovalCondition {
     pub operator: ConditionOperator,
     pub value: String,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct ConditionContext {
     pub amount: Option<Decimal>,
     pub currency: String,
@@ -36,6 +37,7 @@ pub struct ConditionContext {
     pub department: String,
     pub category: String,
     pub personnel_action: String,
+    pub returnable: String,
 }
 impl ApprovalCondition {
     pub fn validate(&self) -> Result<(), String> {
@@ -78,6 +80,7 @@ impl ApprovalCondition {
                     ConditionField::Department => &context.department,
                     ConditionField::Category => &context.category,
                     ConditionField::PersonnelAction => &context.personnel_action,
+                    ConditionField::Returnable => &context.returnable,
                     _ => unreachable!(),
                 };
                 actual.cmp(&self.value)

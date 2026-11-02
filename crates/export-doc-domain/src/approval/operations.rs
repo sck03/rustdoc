@@ -85,7 +85,7 @@ impl ApprovalPlan {
         candidates: &[ApprovalStep],
         remove: &[i64],
     ) -> Result<(), String> {
-        if self.outcome() != "Pending" || self.generation >= 1000 {
+        if !matches!(self.outcome(), "Pending" | "Approved") || self.generation >= 1000 {
             return Err("当前流程不能修订，或已达到执行代次上限。".into());
         }
         let index = self
@@ -94,6 +94,14 @@ impl ApprovalPlan {
             .position(|n| n.key == target)
             .ok_or("目标节点不存在。")?;
         let node = self.nodes[index].clone();
+        let current_phase = if self.outcome() == "Approved" {
+            crate::approval_graph::Phase::Fulfillment
+        } else {
+            crate::approval_graph::Phase::Decision
+        };
+        if node.kind != crate::approval_graph::NodeKind::Approval || node.phase != current_phase {
+            return Err("只能修订当前阶段的审批节点，批准后不得重开审批决定。".into());
+        }
         let permitted = match kind {
             RevisionKind::ReturnToNode => node.revision_policy.allow_return_to_node,
             RevisionKind::RemoveSigner => node.revision_policy.allow_remove_signers,
@@ -120,6 +128,7 @@ impl ApprovalPlan {
         }
         let generation = self.generation;
         self.generation += 1;
+        self.subflow_progress.clear();
         for step in &mut self.steps {
             if step.acted_by_user_id.is_some() && step.source_generation.is_none() {
                 step.source_generation = Some(generation);
@@ -147,6 +156,9 @@ impl ApprovalPlan {
                 {
                     node.started_at.clear();
                     node.due_at.clear();
+                    node.state = crate::approval_graph::NodeState::Pending;
+                    node.error_code.clear();
+                    node.execution = None;
                     for step in self.steps.iter_mut().filter(|s| s.stage == i) {
                         step.status = "Waiting".into();
                         step.acted_by_user_id = None;
@@ -171,6 +183,11 @@ impl ApprovalPlan {
                     || remove
                         .iter()
                         .any(|id| node.revision_policy.protected_user_ids.contains(id))
+                    || remove.iter().any(|id| {
+                        self.steps
+                            .iter()
+                            .any(|s| s.stage == index && s.approver_user_id == *id && s.mandatory)
+                    })
                     || node.independent_review
                 {
                     return Err("不能减去必经责任人或独立复核任务。".into());
@@ -231,6 +248,8 @@ impl ApprovalPlan {
                     }
                     let stage = self.nodes.len();
                     self.nodes.push(ApprovalNode {
+                        phase: node.phase,
+                        handling_action: node.handling_action,
                         material_policy: node.material_policy.clone(),
                         deadline_mode: node.deadline_mode,
                         calendar_key: node.calendar_key.clone(),
@@ -251,6 +270,7 @@ impl ApprovalPlan {
                         due_at: String::new(),
                         independent_review: node.independent_review,
                         revision_policy: RevisionPolicy::default(),
+                        ..Default::default()
                     });
                     stage
                 };

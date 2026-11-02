@@ -1,9 +1,9 @@
-import { approveTask, approvalStage, publishDefinitions } from './lib/approval-fixtures.mjs';
+import { approveTask, approvalStage, publishDefinitionInUi, publishDefinitions } from './lib/approval-fixtures.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 
-await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, openPage, require }) => {
+await withOfficeUi('organization-workflow-ui', async ({ output, url, operations, invoke, openPage, require }) => {
   const login = await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' });
   const token = login.accessToken;
   const admin = await openPage('oa-review', 'Review-2026-Test');
@@ -143,13 +143,13 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   await admin.goto(`${url}/#/office/approval-settings`);
   const general = admin.locator('details[data-definition-key="general"]');
   await general.locator(':scope > summary').click();
-  await general.getByLabel('审批人来源').first().selectOption('Named');
-  await general.getByLabel('审批账号（可多选）').selectOption([String(users[1].id), String(users[2].id)]);
-  await general.getByRole('button', { name: '保存并发布此流程', exact: true }).click();
+  await general.getByLabel('责任人来源').first().selectOption('Named');
+  await general.getByLabel('责任账号（可多选）').selectOption([String(users[1].id), String(users[2].id)]);
+  await publishDefinitionInUi(admin, general, '兼职员工', operations, dialog => dialog.getByLabel('类别代码', { exact: true }).fill('Other'), '测试财务部');
   await general.locator(':scope > summary').getByText(/已启用/u).waitFor();
   const purchase = admin.locator('details[data-definition-key="purchase"]');
   await purchase.locator(':scope > summary').click();
-  const conditional = purchase.locator('.oa-stages-editor > fieldset').last();
+  const conditional = purchase.locator('.oa-stages-editor > fieldset').nth(1);
   await conditional.locator('summary').filter({ hasText: '生效条件' }).click();
   for (let i = 0; i < 2; i++) await conditional.getByRole('button', { name: '添加条件', exact: true }).click();
   await conditional.getByLabel('条件字段').nth(0).selectOption('Amount');
@@ -163,7 +163,7 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, invoke, ope
   assert.equal(await conditional.getByLabel('条件值', { exact: true }).nth(1).inputValue(), 'CNY');
   const stoppedPolicy = await invoke('GetOaApprovalSettings', undefined, {}, token);
   assert.deepEqual(stoppedPolicy.rules.find(r => r.key === 'purchase').stages[1].conditions, [], 'Disabling another flow preserves unsaved conditions without silently saving them');
-  await general.getByRole('button', { name: '保存并发布此流程', exact: true }).click();
+  await publishDefinitionInUi(admin, general, '兼职员工', operations, dialog => dialog.getByLabel('类别代码', { exact: true }).fill('Other'), '测试财务部');
   await general.locator(':scope > summary').getByText(/已启用/u).waitFor();
   assert.equal(await admin.getByText('审批设置已被其他管理员修改。', { exact: false }).count(), 0, 'Own successful publication is not a concurrent edit');
   assert(await admin.getByRole('button', { name: '全部恢复默认版式', exact: true, includeHidden: true }).isEnabled(), 'Published settings retain the template editing catalog and defaults');

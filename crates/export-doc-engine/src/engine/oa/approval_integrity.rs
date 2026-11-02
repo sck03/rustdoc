@@ -186,7 +186,6 @@ pub(super) fn rule(
     let rule = &compiled.rule;
     let mut scope = actor.clone();
     scope.company = company.into();
-    let mut verified = HashSet::new();
     // Hire routing uses the prospective registration, whose reporting edges do
     // not exist yet. It is validated in preview/submission and then by frozen tasks.
     let prospective = rule.kind == "personnel" && rule.variant == "Hire";
@@ -217,6 +216,28 @@ pub(super) fn rule(
     };
     for stage in &rule.stages {
         crate::operation::check()?;
+        if !matches!(
+            stage.kind,
+            export_doc_domain::approval_graph::NodeKind::Approval
+                | export_doc_domain::approval_graph::NodeKind::Handling
+                | export_doc_domain::approval_graph::NodeKind::Copy
+        ) {
+            continue;
+        }
+        // These sources depend on the actual applicant or selected service. A
+        // synthetic empty record cannot establish their scope. Publication
+        // samples and submission resolve them; live tasks and service changes
+        // separately protect already assigned obligations.
+        if matches!(
+            stage.source,
+            ApproverSource::Handlers | ApproverSource::Requester
+        ) {
+            continue;
+        }
+        if stage.source == ApproverSource::ProjectLeader {
+            super::actor_binding::validate_project_source(tx, &scope, stage)?;
+            continue;
+        }
         if prospective
             && matches!(
                 stage.source,
@@ -271,23 +292,17 @@ pub(super) fn rule(
                 continue;
             }
             let row = json!({"kind":rule.kind,"departmentId":department,"applicantAppointmentId":appointment});
-            let ids = approval_routing::resolve(tx, &scope, &row, &employee, stage)?;
+            let ids = super::actor_binding::resolve(tx, &scope, &row, &employee, stage)?
+                .into_iter()
+                .map(|b| b.user_id)
+                .collect::<Vec<_>>();
             if ids.is_empty() {
                 return Err(invalid(format!("节点“{}”缺少负责人", stage.name)));
             }
-            for id in ids {
-                if verified.insert(id) {
-                    approval::reviewer(tx, &scope, id, &row).map_err(|e| {
-                        if matches!(e.status, Some(400 | 403 | 404)) {
-                            invalid(format!(
-                                "流程“{}”节点“{}”的账号 {id} 无法承担职责：{e}",
-                                rule.name, stage.name
-                            ))
-                        } else {
-                            e
-                        }
-                    })?;
-                }
+            if stage.kind == export_doc_domain::approval_graph::NodeKind::Approval
+                && ids.len() < usize::from(stage.revision_policy.minimum_signers)
+            {
+                return Err(invalid("解析后的实际责任人数低于发布的参与人数下限。"));
             }
             resolved = true;
         }

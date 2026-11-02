@@ -12,6 +12,7 @@ export function oaApi(client: ExportDocManagerApiClient, kind: OaKind) {
     previewApproval: (id: number, init?: ApiRequestInit) => client[`previewApprovalOf${name}Request`]({ id }, init),
     reassign: (id: number, body: ApprovalReassignInput, init?: ApiRequestInit) => client[`reassign${name}RequestApproval`]({ id, body:officeCommand(client,`${kind}:${id}:reassign`,body) }, init),
     workflow: (id:number,body:OaWorkflowCommandSave,init?:ApiRequestInit)=>client[`execute${name}RequestWorkflow`]({id,body},init),
+    fulfillment:(id:number,input:OfficeActionInput,init?:ApiRequestInit)=>client[`execute${name}RequestFulfillment`]({id,body:officeCommand(client,`${kind}:${id}:fulfillment`,input)},init),
     workflowCandidates: (id:number,beforeId?:number,init?:ApiRequestInit)=>client[`list${name}RequestWorkflowCandidates`]({id,beforeId},init),
     create: (body: OaRequestSave, init?: ApiRequestInit) => client[`create${name}Request`]({ body }, init),
     update: (id: number, body: OaRequestSave, init?: ApiRequestInit) => client[`update${name}Request`]({ id, body }, init),
@@ -25,6 +26,7 @@ export function oaApi(client: ExportDocManagerApiClient, kind: OaKind) {
       return client[`${action}${name}Request`]({ id, body }, init);
     },
     history: (id: number, pageNumber: number, init?: ApiRequestInit) => client[`listHistoryOf${name}Request`]({ id, pageNumber, pageSize: 20 }, init),
+    decisions:(id:number,pageNumber:number,init?:ApiRequestInit)=>client[`listDecisionsOf${name}Request`]({id,pageNumber,pageSize:20},init),
     submissions: (id: number, pageNumber: number, init?: ApiRequestInit) => client[`listSubmissionsOf${name}Request`]({ id, pageNumber, pageSize: 20 }, init),
     submission: (id: number, submissionId: number, init?: ApiRequestInit) => client[`getSubmissionOf${name}Request`]({ id, submissionId }, init),
     approvalPdf: (id: number, submissionId: number, init?: ApiRequestInit) => client[`downloadApprovalOf${name}Request`]({ id, submissionId }, init),

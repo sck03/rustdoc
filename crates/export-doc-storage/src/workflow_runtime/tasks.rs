@@ -33,7 +33,7 @@ pub(super) fn persist(
                 return Err(conflict("已签署任务不可修改、转派或删除。"));
             }
         }
-        let active = state == "Pending"
+        let active = matches!(state, "Pending" | "Approved")
             && task["status"] == "Waiting"
             && active_tasks.iter().any(|key| key == task_key);
         if previous.task(generation, task_key) == Some(task) && previous.active(task_key) == active
@@ -50,13 +50,16 @@ pub(super) fn persist(
             "stage",
             "assignee_id",
             "assignee_person_id",
+            "origin",
             "context_id",
             "assignee_name",
             "acted_by_context",
             "acted_by_id",
+            "acted_by_person_id",
             "status",
             "active",
             "independent",
+            "mandatory",
             "due_at",
             "started_at",
             "acted_at",
@@ -97,13 +100,22 @@ pub(super) fn persist(
             s.number(position),
             s.number(positive(task, "approverUserId")?),
             s.number(positive(task, "approverPersonId")?),
+            s.json(&task["origin"])?,
             s.text(required(task, "approverContext")?),
             s.text(required(task, "approverName")?),
             s.text(required(task, "actedByContext")?),
             nullable(&mut s, actual),
+            nullable(
+                &mut s,
+                task["actedByPersonId"]
+                    .as_i64()
+                    .map(|v| v.to_string())
+                    .unwrap_or_default(),
+            ),
             s.text(required(task, "status")?),
             s.number(i64::from(active)),
             s.number(i64::from(node["independentReview"] == true)),
+            s.number(i64::from(task["mandatory"] == true)),
             s.text(required(node, "dueAt")?),
             s.text(required(node, "startedAt")?),
             s.text(required(task, "actedAt")?),

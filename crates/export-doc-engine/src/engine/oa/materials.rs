@@ -28,6 +28,8 @@ const SYSTEM: &[&str] = &[
     "canReview",
     "reviewTaskKeys",
     "workflowActions",
+    "workflowTasks",
+    "fulfillmentState",
     "personnelExecution",
     "canHandle",
     "handlerNames",
@@ -78,25 +80,81 @@ fn policies(
     let mut current = vec![];
     let mut history = vec![];
     let mut participant = false;
+    if row["ownerUserId"] == actor.id && text(row, "_requesterContext") == actor.context {
+        return Ok(vec![MaterialPolicy {
+            allow_restricted_attachments: restricted,
+            ..Default::default()
+        }]);
+    }
     if let Some(plan) = plan {
         let resource = approval::resource(&text(row, "kind"))
             .ok_or_else(|| super::super::error::unavailable("申请材料类型损坏。"))?;
         let principals = approval::object_approvers(tx, actor, resource, row)?;
+        let principal_people = super::super::personnel_accounts::links(
+            tx,
+            &principals.iter().map(|p| p.user_id).collect::<Vec<_>>(),
+        )?;
+        let actor_person = super::super::personnel_accounts::person_for_account(tx, actor.id)?
+            .and_then(|p| p["id"].as_i64());
         let active = plan.current_indices();
+        let actionable = approval::ReviewSnapshot::read(tx, actor, row)?.task_keys();
         for (index, step) in plan.steps.iter().enumerate() {
-            if step.approver_user_id == actor.id && step.approver_context == actor.context
-                || step.acted_by_user_id == Some(actor.id) && step.acted_by_context == actor.context
+            if step.approver_user_id == actor.id
+                && step.approver_context == actor.context
+                && step.approver_person_id == actor_person
+                || step.acted_by_user_id == Some(actor.id)
+                    && step.acted_by_context == actor.context
+                    && step.acted_by_person_id == actor_person
+                || actionable.contains(&step.task_key)
                 || step.status == "Waiting"
                     && principals.iter().any(|p| {
-                        p.user_id == step.approver_user_id && p.context == step.approver_context
+                        p.user_id == step.approver_user_id
+                            && p.context == step.approver_context
+                            && principal_people
+                                .get(&p.user_id)
+                                .and_then(|person| person["id"].as_i64())
+                                == step.approver_person_id
                     })
             {
                 participant = true;
                 let node = &plan.nodes[step.stage];
+                if step.acted_by_user_id != Some(actor.id)
+                    && !super::actor_binding::origin_available(
+                        tx,
+                        row,
+                        step.approver_person_id
+                            .ok_or_else(|| super::super::error::unavailable("任务人员缺失。"))?,
+                        &step.origin,
+                    )?
+                {
+                    continue;
+                }
                 if active.contains(&index) && !node.started_at.is_empty() {
                     current.push(node.material_policy.clone());
                 } else if !node.started_at.is_empty() {
                     history.push(node.material_policy.clone());
+                }
+            }
+        }
+        for node in &plan.nodes {
+            for binding in node.actors.iter().chain(
+                node.escalation_targets
+                    .iter()
+                    .take(usize::from(node.escalation_cursor))
+                    .flatten(),
+            ) {
+                if super::fulfillment::identity_matches(tx, actor, binding)? {
+                    participant = true;
+                    if !super::fulfillment::binding_available(tx, actor, row, binding)? {
+                        continue;
+                    }
+                    if node.state == export_doc_domain::approval_graph::NodeState::Active
+                        && !node.started_at.is_empty()
+                    {
+                        current.push(node.material_policy.clone());
+                    } else if !node.started_at.is_empty() {
+                        history.push(node.material_policy.clone());
+                    }
                 }
             }
         }
@@ -157,6 +215,17 @@ fn filter(
     }
 }
 fn redact_notes(value: &mut Value) {
+    if let Some(nodes) = value
+        .get_mut("approvalPlan")
+        .and_then(|p| p.get_mut("nodes"))
+        .and_then(Value::as_array_mut)
+    {
+        for node in nodes {
+            if node["execution"].is_object() {
+                node["execution"]["note"] = json!("详细办理记录按材料权限保留。");
+            }
+        }
+    }
     if let Some(steps) = value
         .get_mut("approvalPlan")
         .and_then(|p| p.get_mut("steps"))
@@ -243,6 +312,98 @@ pub(in crate::engine) fn project_with_plan(
                 }
             }
         }
+        if !restricted {
+            if let Some(nodes) = plan.get_mut("nodes").and_then(Value::as_array_mut) {
+                for (index, node) in nodes.iter_mut().enumerate() {
+                    let fields = node["materialPolicy"]["verificationFields"]
+                        .as_array()
+                        .cloned()
+                        .unwrap_or_default();
+                    for field in fields.into_iter().filter(|f| f["restricted"] == true) {
+                        if let Some(values) =
+                            node["execution"]["verificationValues"].as_object_mut()
+                        {
+                            let key = field["key"].as_str().unwrap_or("");
+                            if values.remove(key).is_some() {
+                                omitted.push(format!(
+                                    "approvalPlan.nodes.{index}.execution.verificationValues.{key}"
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+            let subflows = plan
+                .get("subflows")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            if let Some(progress) = plan
+                .get_mut("subflowProgress")
+                .and_then(Value::as_object_mut)
+            {
+                for child in &subflows {
+                    let key = child["key"].as_str().unwrap_or("");
+                    for mapping in child["outputs"].as_array().into_iter().flatten() {
+                        let private = nodes
+                            .iter()
+                            .find(|n| n["key"] == mapping["nodeKey"])
+                            .and_then(|n| n["materialPolicy"]["verificationFields"].as_array())
+                            .is_some_and(|fields| {
+                                fields.iter().any(|f| {
+                                    f["key"] == mapping["verificationKey"]
+                                        && f["restricted"] == true
+                                })
+                            });
+                        if private {
+                            if let Some(values) = progress
+                                .get_mut(key)
+                                .and_then(|p| p["outputs"].as_object_mut())
+                            {
+                                let target = mapping["target"].as_str().unwrap_or("");
+                                if values.remove(target).is_some() {
+                                    omitted.push(format!(
+                                        "approvalPlan.subflowProgress.{key}.outputs.{target}"
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if let Some(subflows) = plan.get_mut("subflows").and_then(Value::as_array_mut) {
+            for child in subflows {
+                let input = child["inputSnapshot"]
+                    .as_object_mut()
+                    .ok_or_else(|| super::super::error::unavailable("子流程输入快照缺失。"))?;
+                let sources = input
+                    .remove("sources")
+                    .ok_or_else(|| super::super::error::unavailable("子流程输入权限来源缺失。"))?;
+                for field in [
+                    "amount",
+                    "currency",
+                    "duration",
+                    "department",
+                    "category",
+                    "personnelAction",
+                    "returnable",
+                ] {
+                    let paths = sources[field]
+                        .as_array()
+                        .filter(|paths| !paths.is_empty())
+                        .ok_or_else(|| {
+                            super::super::error::unavailable("子流程输入权限来源损坏。")
+                        })?;
+                    let visible = paths
+                        .iter()
+                        .all(|path| path.as_str().is_some_and(|path| allowed(path, &policies)));
+                    if !visible && input.remove(field).is_some() {
+                        omitted.push(format!("approvalPlan.subflows.inputSnapshot.{field}"));
+                    }
+                }
+            }
+        }
     }
     omitted.sort();
     omitted.dedup();
@@ -269,15 +430,6 @@ pub(in crate::engine) fn history(
     events
         .into_iter()
         .map(|mut event| {
-            if event["approvalPlan"].is_object() {
-                let plan = project(
-                    tx,
-                    actor,
-                    row,
-                    json!({"approvalPlan":event["approvalPlan"]}),
-                )?;
-                event["approvalPlan"] = plan["approvalPlan"].clone();
-            }
             if partial {
                 event["note"] = json!("详细意见按材料权限保留。");
                 redact_notes(&mut event);

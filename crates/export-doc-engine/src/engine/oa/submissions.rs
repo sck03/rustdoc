@@ -132,6 +132,16 @@ pub(super) fn checked(tx: &Connection, row: &Value, id: i64) -> Result<Value> {
     }
     Ok(snapshot)
 }
+pub(super) fn list_revision_id(tx: &Connection, row: &Value, revision: i64) -> Result<i64> {
+    let identity = store::normalize(&format!(
+        "{}:{revision}",
+        records::positive(row, "id", "申请")?
+    ));
+    let snapshot = tx
+        .find_identity(KIND, &identity)?
+        .ok_or_else(|| error(404, "正式提交版本不存在。"))?;
+    records::positive(&snapshot, "id", "提交版本")
+}
 pub(super) fn project(tx: &Connection, mut snapshot: Value, detail: bool) -> Result<Value> {
     let resource = matches!(
         snapshot["request"]["kind"].as_str(),

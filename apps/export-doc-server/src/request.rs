@@ -414,8 +414,8 @@ async fn execute(
                     {
                         return state
                             .service
-                            .download_file(operation, &parameters, &token)
-                            .map(response::Reply::file);
+                            .prepare_file_download(operation, &parameters, &token)
+                            .map(response::Reply::download);
                     }
                     if operation == DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE {
                         return state

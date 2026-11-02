@@ -1,4 +1,4 @@
--- Part of the complete schema 11 baseline; never applied to an existing database.
+-- Part of the complete schema 12 baseline; never applied to an existing database.
 CREATE TABLE request_revisions (
     id INTEGER PRIMARY KEY REFERENCES records(id) ON DELETE RESTRICT,
     request_id INTEGER NOT NULL REFERENCES records(id) ON DELETE RESTRICT,
@@ -15,6 +15,7 @@ CREATE TABLE workflow_instances (
     definition TEXT NOT NULL,
     suspended_at TEXT NOT NULL DEFAULT '',
     paused_seconds INTEGER NOT NULL DEFAULT 0 CHECK(paused_seconds>=0),
+    participants TEXT NOT NULL DEFAULT '[]',
     FOREIGN KEY(request_id,revision) REFERENCES request_revisions(request_id,revision) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED
 );
 CREATE UNIQUE INDEX workflow_instances_revision ON workflow_instances(request_id,revision);
@@ -22,8 +23,11 @@ CREATE TABLE workflow_subinstances (
  id TEXT PRIMARY KEY,parent_instance_id TEXT NOT NULL REFERENCES workflow_instances(id),
  definition_id INTEGER NOT NULL REFERENCES records(id),definition_version INTEGER NOT NULL,
  submission_id INTEGER NOT NULL REFERENCES request_revisions(id),subflow_key TEXT NOT NULL,
- state TEXT NOT NULL CHECK(state IN('Pending','Approved','Rejected','Returned','Cancelled','Suspended','Blocked')),
- node_keys TEXT NOT NULL,input_snapshot TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN('Pending','Active','Completed','Cancelled','Blocked')),
+ outcome TEXT NOT NULL DEFAULT 'Pending',generation INTEGER NOT NULL DEFAULT 1,
+ outputs TEXT NOT NULL DEFAULT '{}',error_code TEXT NOT NULL DEFAULT '',
+ control_outcome TEXT NOT NULL DEFAULT '',compensation_completed INTEGER NOT NULL DEFAULT 0 CHECK(compensation_completed IN(0,1)),
+ node_keys TEXT NOT NULL,input_snapshot TEXT NOT NULL CHECK(COALESCE(json_type(input_snapshot,'$.sources'),'')='object'),
  UNIQUE(parent_instance_id,subflow_key)
 );
 CREATE TRIGGER subinstance_binding_update BEFORE UPDATE OF parent_instance_id,definition_id,definition_version,submission_id,subflow_key,node_keys,input_snapshot ON workflow_subinstances BEGIN SELECT RAISE(ABORT,'Immutable subflow binding'); END;
@@ -55,7 +59,12 @@ CREATE TABLE node_instances (
     definition TEXT NOT NULL,
     started_at TEXT NOT NULL,
     due_at TEXT NOT NULL,
-    reminder_level INTEGER NOT NULL DEFAULT 0 CHECK(reminder_level BETWEEN 0 AND 2),
+    phase TEXT NOT NULL CHECK(phase IN('Decision','Fulfillment')),
+    execution_state TEXT NOT NULL CHECK(execution_state IN('Pending','Active','Completed','Blocked','Cancelled')),
+    execution TEXT,error_code TEXT NOT NULL DEFAULT '',
+    escalation_cursor INTEGER NOT NULL DEFAULT 0 CHECK(escalation_cursor BETWEEN 0 AND 4),
+    next_escalation_at TEXT NOT NULL DEFAULT '',
+    reminder_level INTEGER NOT NULL DEFAULT 0 CHECK(reminder_level BETWEEN 0 AND 1),
     PRIMARY KEY(instance_id,generation,node_key),
     UNIQUE(instance_id,generation,position)
 );
@@ -68,13 +77,16 @@ CREATE TABLE workflow_tasks (
     stage INTEGER NOT NULL CHECK(stage BETWEEN 0 AND 31),
     assignee_id INTEGER NOT NULL REFERENCES records(id) ON DELETE RESTRICT,
     assignee_person_id INTEGER NOT NULL REFERENCES persons(id) ON DELETE RESTRICT,
+    origin TEXT NOT NULL DEFAULT '{}',
     assignee_name TEXT NOT NULL,
     context_id TEXT NOT NULL,
     acted_by_context TEXT NOT NULL,
     acted_by_id INTEGER REFERENCES records(id) ON DELETE RESTRICT,
+    acted_by_person_id INTEGER REFERENCES persons(id) ON DELETE RESTRICT,
     status TEXT NOT NULL CHECK(status IN ('Waiting','Approved','Rejected','Returned','Skipped','Cancelled')),
     active INTEGER NOT NULL CHECK(active IN (0,1)),
     independent INTEGER NOT NULL CHECK(independent IN (0,1)),
+    mandatory INTEGER NOT NULL DEFAULT 0 CHECK(mandatory IN(0,1)),
     due_at TEXT NOT NULL,
     started_at TEXT NOT NULL,
     acted_at TEXT NOT NULL,
@@ -91,6 +103,16 @@ CREATE TABLE workflow_tasks (
         OR (status IN ('Waiting','Skipped','Cancelled') AND signature IS NULL AND source_generation IS NULL AND acted_by_id IS NULL AND elapsed_seconds IS NULL)),
     PRIMARY KEY(request_id,submission,generation,task_key)
 );
+CREATE TABLE workflow_node_actors (
+ instance_id TEXT NOT NULL,generation INTEGER NOT NULL,node_key TEXT NOT NULL,
+ actor_id INTEGER NOT NULL REFERENCES records(id) ON DELETE RESTRICT,
+ person_id INTEGER REFERENCES persons(id) ON DELETE RESTRICT,context_id TEXT NOT NULL,
+ origin TEXT NOT NULL,administration INTEGER NOT NULL CHECK(administration IN(0,1)),
+ activation_level INTEGER NOT NULL DEFAULT 0 CHECK(activation_level BETWEEN 0 AND 4),
+ PRIMARY KEY(instance_id,generation,node_key,actor_id,context_id,activation_level),
+ FOREIGN KEY(instance_id,generation,node_key) REFERENCES node_instances(instance_id,generation,node_key) ON DELETE RESTRICT
+);
+CREATE INDEX workflow_node_actors_inbox ON workflow_node_actors(actor_id,context_id,person_id,instance_id,generation);
 CREATE INDEX workflow_tasks_inbox ON workflow_tasks(assignee_id,active,status,due_at,request_id);
 CREATE INDEX workflow_tasks_actor ON workflow_tasks(acted_by_id,request_id);
 CREATE INDEX workflow_tasks_generation ON workflow_tasks(request_id,submission,generation,stage,task_key);
@@ -99,7 +121,8 @@ CREATE TABLE workflow_operations (
     request_id INTEGER NOT NULL REFERENCES records(id) ON DELETE RESTRICT,
     submission INTEGER NOT NULL,
     generation INTEGER NOT NULL,
-    actor_id INTEGER NOT NULL REFERENCES records(id) ON DELETE RESTRICT,
+    actor_id INTEGER REFERENCES records(id) ON DELETE RESTRICT,
+    execution_identity TEXT NOT NULL DEFAULT 'User' CHECK(execution_identity IN('User','System')),
     context_id TEXT NOT NULL,
     command TEXT NOT NULL,
     reason TEXT NOT NULL,
@@ -117,21 +140,49 @@ CREATE TABLE command_receipts (
     created_at TEXT NOT NULL,
     PRIMARY KEY(actor_id,context_id,command_key)
 );
+CREATE TABLE workflow_activations (
+ id INTEGER PRIMARY KEY AUTOINCREMENT,company TEXT NOT NULL REFERENCES organization_units(code),
+ definition_key TEXT NOT NULL,definition_record_id INTEGER NOT NULL REFERENCES records(id),
+ definition_version INTEGER NOT NULL CHECK(definition_version>0),expected_active_version INTEGER NOT NULL,
+ expected_active_enabled INTEGER NOT NULL CHECK(expected_active_enabled IN(0,1)),
+ actor_id INTEGER NOT NULL REFERENCES records(id),context_id TEXT NOT NULL,command_key TEXT NOT NULL,
+ request_digest TEXT NOT NULL CHECK(length(request_digest)=64),activate_at TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN('Pending','Applied','Blocked','Cancelled')),
+ error_code TEXT NOT NULL DEFAULT '',version INTEGER NOT NULL DEFAULT 1,
+ UNIQUE(actor_id,context_id,command_key)
+);
+CREATE INDEX workflow_activations_due ON workflow_activations(state,activate_at,id);
 CREATE VIEW workflow_current_tasks AS SELECT t.* FROM workflow_tasks t JOIN workflow_instances w ON w.request_id=t.request_id AND w.revision=t.submission AND w.generation=t.generation;
 CREATE VIEW task_decisions AS SELECT request_id,submission,generation,task_key,assignee_id,assignee_person_id,context_id,acted_by_id,acted_by_context,status,note,acted_at,delegation_key,signature FROM workflow_tasks WHERE signature IS NOT NULL;
 CREATE TRIGGER request_revision_update BEFORE UPDATE ON request_revisions BEGIN SELECT RAISE(ABORT,'Immutable submitted material'); END;
 CREATE TRIGGER request_revision_delete BEFORE DELETE ON request_revisions BEGIN SELECT RAISE(ABORT,'Immutable submitted material'); END;
-CREATE TRIGGER workflow_signature_update BEFORE UPDATE OF request_id,submission,generation,task_key,node_key,stage,assignee_id,assignee_person_id,assignee_name,context_id,acted_by_context,acted_by_id,status,independent,due_at,started_at,acted_at,elapsed_seconds,note,acted_by_name,delegation_key,decision,signature,source_generation ON workflow_tasks WHEN OLD.signature IS NOT NULL OR OLD.source_generation IS NOT NULL BEGIN SELECT RAISE(ABORT,'Immutable workflow signature'); END;
+CREATE TRIGGER workflow_signature_update BEFORE UPDATE OF request_id,submission,generation,task_key,node_key,stage,assignee_id,assignee_person_id,origin,assignee_name,context_id,acted_by_context,acted_by_id,acted_by_person_id,status,independent,mandatory,due_at,started_at,acted_at,elapsed_seconds,note,acted_by_name,delegation_key,decision,signature,source_generation ON workflow_tasks WHEN OLD.signature IS NOT NULL OR OLD.source_generation IS NOT NULL BEGIN SELECT RAISE(ABORT,'Immutable workflow signature'); END;
 CREATE TRIGGER workflow_signature_delete BEFORE DELETE ON workflow_tasks WHEN OLD.signature IS NOT NULL OR OLD.source_generation IS NOT NULL BEGIN SELECT RAISE(ABORT,'Immutable workflow signature'); END;
 CREATE TRIGGER workflow_operation_update BEFORE UPDATE ON workflow_operations BEGIN SELECT RAISE(ABORT,'Immutable workflow operation'); END;
 CREATE TRIGGER workflow_operation_delete BEFORE DELETE ON workflow_operations BEGIN SELECT RAISE(ABORT,'Immutable workflow operation'); END;
-CREATE VIEW workflow_plans AS SELECT w.id,json_set(w.definition,'$.suspendedAt',w.suspended_at,'$.pausedSeconds',w.paused_seconds,'$.generation',w.generation,'$.nodes',json((SELECT json_group_array(json(value)) FROM (SELECT json_set(n.definition,'$.startedAt',n.started_at,'$.dueAt',n.due_at) AS value FROM node_instances n WHERE n.instance_id=w.id AND n.generation=w.generation ORDER BY n.position) q)),'$.steps',json((SELECT json_group_array(json(value)) FROM (SELECT COALESCE(t.signature,json_set(s.signature,'$.sourceGeneration',t.source_generation),json_object('taskKey',t.task_key,'stage',t.stage,'decision',t.decision,'approverUserId',t.assignee_id,'approverPersonId',t.assignee_person_id,'actedByPersonId',NULL,'verificationValues',json_object(),'confirmedReviewPoints',json_array(),'approverName',t.assignee_name,'approverContext',t.context_id,'status',t.status,'actedByUserId',t.acted_by_id,'actedByName',t.acted_by_name,'actedByContext',t.acted_by_context,'actedAt',t.acted_at,'note',t.note,'delegationKey',t.delegation_key,'sourceGeneration',t.source_generation)) AS value FROM workflow_tasks t LEFT JOIN workflow_tasks s ON s.request_id=t.request_id AND s.submission=t.submission AND s.generation=t.source_generation AND s.task_key=t.task_key WHERE t.request_id=w.request_id AND t.submission=w.revision AND t.generation=w.generation ORDER BY t.stage,t.task_key) q))) AS body FROM workflow_instances w;
+CREATE VIEW workflow_plans AS SELECT w.id,json_set(w.definition,'$.participants',json(w.participants),'$.subflowProgress',json((SELECT json_group_object(s.subflow_key,json_object('state',s.state,'outcome',s.outcome,'outputs',json(s.outputs),'errorCode',s.error_code,'controlOutcome',s.control_outcome,'compensationCompleted',json(CASE WHEN s.compensation_completed=1 THEN 'true' ELSE 'false' END))) FROM workflow_subinstances s WHERE s.parent_instance_id=w.id)),'$.suspendedAt',w.suspended_at,'$.pausedSeconds',w.paused_seconds,'$.generation',w.generation,'$.nodes',json((SELECT json_group_array(json(value)) FROM (SELECT json_set(n.definition,'$.startedAt',n.started_at,'$.dueAt',n.due_at,'$.state',n.execution_state,'$.execution',json(n.execution),'$.errorCode',n.error_code,'$.escalationCursor',n.escalation_cursor,'$.reminderLevel',n.reminder_level,'$.nextEscalationAt',n.next_escalation_at) AS value FROM node_instances n WHERE n.instance_id=w.id AND n.generation=w.generation ORDER BY n.position) q)),'$.steps',json((SELECT json_group_array(json(value)) FROM (SELECT COALESCE(t.signature,json_set(s.signature,'$.sourceGeneration',t.source_generation),json_object('taskKey',t.task_key,'stage',t.stage,'decision',t.decision,'approverUserId',t.assignee_id,'approverPersonId',t.assignee_person_id,'origin',json(t.origin),'actedByPersonId',t.acted_by_person_id,'verificationValues',json_object(),'confirmedReviewPoints',json_array(),'approverName',t.assignee_name,'approverContext',t.context_id,'mandatory',json(CASE WHEN t.mandatory=1 THEN 'true' ELSE 'false' END),'status',t.status,'actedByUserId',t.acted_by_id,'actedByName',t.acted_by_name,'actedByContext',t.acted_by_context,'actedAt',t.acted_at,'note',t.note,'delegationKey',t.delegation_key,'sourceGeneration',t.source_generation)) AS value FROM workflow_tasks t LEFT JOIN workflow_tasks s ON s.request_id=t.request_id AND s.submission=t.submission AND s.generation=t.source_generation AND s.task_key=t.task_key WHERE t.request_id=w.request_id AND t.submission=w.revision AND t.generation=w.generation ORDER BY t.stage,t.task_key) q))) AS body FROM workflow_instances w;
 CREATE VIEW record_rows AS
 SELECT r.id,r.kind,r.identity,r.version,r.owner_id,r.company,r.department,r.search_text,
-    CASE WHEN w.id IS NULL THEN CASE WHEN v.id IS NULL THEN r.body ELSE (SELECT json_group_object(j.key,json(CASE j.type WHEN 'text' THEN json_quote(j.value) WHEN 'null' THEN 'null' WHEN 'true' THEN 'true' WHEN 'false' THEN 'false' ELSE CAST(j.value AS TEXT) END)) FROM (SELECT a.key,a.value,a.type FROM json_each(v.body) a WHERE NOT EXISTS (SELECT 1 FROM json_each(r.body) b WHERE b.key=a.key) UNION ALL SELECT b.key,b.value,b.type FROM json_each(r.body) b) j) END ELSE json_set(CASE WHEN v.id IS NULL THEN r.body ELSE (SELECT json_group_object(j.key,json(CASE j.type WHEN 'text' THEN json_quote(j.value) WHEN 'null' THEN 'null' WHEN 'true' THEN 'true' WHEN 'false' THEN 'false' ELSE CAST(j.value AS TEXT) END)) FROM (SELECT a.key,a.value,a.type FROM json_each(v.body) a WHERE NOT EXISTS (SELECT 1 FROM json_each(r.body) b WHERE b.key=a.key) UNION ALL SELECT b.key,b.value,b.type FROM json_each(r.body) b) j) END,'$.approvalPlan',json(p.body),'$.status',CASE WHEN w.state='Withdrawn' AND r.kind<>'oa-submission' THEN 'Draft' WHEN w.state='Voided' AND r.kind<>'oa-submission' THEN 'Cancelled' WHEN w.state='Approved' AND r.kind<>'oa-submission' THEN COALESCE(h.result_status,w.state) ELSE w.state END) END AS body
+    CASE WHEN w.id IS NULL THEN CASE WHEN v.id IS NULL THEN r.body ELSE (SELECT json_group_object(j.key,json(CASE j.type WHEN 'text' THEN json_quote(j.value) WHEN 'null' THEN 'null' WHEN 'true' THEN 'true' WHEN 'false' THEN 'false' ELSE CAST(j.value AS TEXT) END)) FROM (SELECT a.key,a.value,a.type FROM json_each(v.body) a WHERE NOT EXISTS (SELECT 1 FROM json_each(r.body) b WHERE b.key=a.key) UNION ALL SELECT b.key,b.value,b.type FROM json_each(r.body) b) j) END ELSE json_set(CASE WHEN v.id IS NULL THEN r.body ELSE (SELECT json_group_object(j.key,json(CASE j.type WHEN 'text' THEN json_quote(j.value) WHEN 'null' THEN 'null' WHEN 'true' THEN 'true' WHEN 'false' THEN 'false' ELSE CAST(j.value AS TEXT) END)) FROM (SELECT a.key,a.value,a.type FROM json_each(v.body) a WHERE NOT EXISTS (SELECT 1 FROM json_each(r.body) b WHERE b.key=a.key) UNION ALL SELECT b.key,b.value,b.type FROM json_each(r.body) b) j) END,'$.approvalPlan',json(p.body),'$.status',CASE WHEN w.suspended_at<>'' AND w.state='Pending' THEN 'Suspended' WHEN w.state='Withdrawn' AND r.kind<>'oa-submission' THEN 'Draft' WHEN w.state='Voided' AND r.kind<>'oa-submission' THEN 'Cancelled' WHEN w.state='Approved' AND r.kind<>'oa-submission' THEN COALESCE(h.result_status,w.state) ELSE w.state END) END AS body
 FROM identity_rows r
 LEFT JOIN request_revisions v ON v.id=r.id AND r.kind='oa-submission'
 LEFT JOIN workflow_instances w ON w.request_id=CASE WHEN v.id IS NOT NULL THEN v.request_id ELSE r.id END
     AND w.revision=CASE WHEN v.id IS NOT NULL THEN v.revision ELSE CAST(NULLIF(r.body->>'submissionNumber','') AS BIGINT) END
 LEFT JOIN workflow_plans p ON p.id=w.id
+LEFT JOIN handling_tasks h ON h.request_id=w.request_id AND h.revision=w.revision;
+-- Lists project graph metadata without materializing full signature payloads.
+CREATE VIEW workflow_list_plans AS SELECT w.id,json_set(w.definition,'$.participants',json(w.participants),'$.subflowProgress',json((SELECT json_group_object(s.subflow_key,json_object('state',s.state,'outcome',s.outcome,'outputs',json_object(),'errorCode',s.error_code,'controlOutcome',s.control_outcome,'compensationCompleted',json(CASE WHEN s.compensation_completed=1 THEN 'true' ELSE 'false' END))) FROM workflow_subinstances s WHERE s.parent_instance_id=w.id)),'$.suspendedAt',w.suspended_at,'$.pausedSeconds',w.paused_seconds,'$.generation',w.generation,'$.nodes',json((SELECT json_group_array(json(value)) FROM (SELECT json_set(n.definition,'$.startedAt',n.started_at,'$.dueAt',n.due_at,'$.state',n.execution_state,'$.execution',json(CASE WHEN n.execution IS NULL THEN NULL ELSE json_set(json_remove(n.execution,'$.verificationValues','$.note'),'$.verificationValues',json_object(),'$.note','') END),'$.errorCode',n.error_code,'$.escalationCursor',n.escalation_cursor,'$.reminderLevel',n.reminder_level,'$.nextEscalationAt',n.next_escalation_at) AS value FROM node_instances n WHERE n.instance_id=w.id AND n.generation=w.generation ORDER BY n.position) q)),'$.steps',json((SELECT json_group_array(json(value)) FROM (SELECT json_object('taskKey',t.task_key,'stage',t.stage,'decision',t.decision,'approverUserId',t.assignee_id,'approverPersonId',t.assignee_person_id,'origin',json(t.origin),'actedByPersonId',t.acted_by_person_id,'verificationValues',json_object(),'confirmedReviewPoints',json_array(),'approverName',t.assignee_name,'approverContext',t.context_id,'mandatory',json(CASE WHEN t.mandatory=1 THEN 'true' ELSE 'false' END),'status',t.status,'actedByUserId',t.acted_by_id,'actedByName',t.acted_by_name,'actedByContext',t.acted_by_context,'actedAt',t.acted_at,'note','','delegationKey',t.delegation_key,'sourceGeneration',t.source_generation) AS value FROM workflow_tasks t WHERE t.request_id=w.request_id AND t.submission=w.revision AND t.generation=w.generation ORDER BY t.stage,t.task_key) q))) AS body FROM workflow_instances w;
+CREATE VIEW workflow_list_records AS
+SELECT r.id,r.kind,r.identity,r.version,r.owner_id,r.company,r.department,r.search_text,
+    CASE WHEN w.id IS NULL THEN CASE WHEN v.id IS NULL THEN r.body ELSE (SELECT json_group_object(j.key,json(CASE j.type WHEN 'text' THEN json_quote(j.value) WHEN 'null' THEN 'null' WHEN 'true' THEN 'true' WHEN 'false' THEN 'false' ELSE CAST(j.value AS TEXT) END)) FROM (SELECT a.key,a.value,a.type FROM json_each(v.body) a WHERE NOT EXISTS (SELECT 1 FROM json_each(r.body) b WHERE b.key=a.key) UNION ALL SELECT b.key,b.value,b.type FROM json_each(r.body) b) j) END ELSE json_set(CASE WHEN v.id IS NULL THEN r.body ELSE (SELECT json_group_object(j.key,json(CASE j.type WHEN 'text' THEN json_quote(j.value) WHEN 'null' THEN 'null' WHEN 'true' THEN 'true' WHEN 'false' THEN 'false' ELSE CAST(j.value AS TEXT) END)) FROM (SELECT a.key,a.value,a.type FROM json_each(v.body) a WHERE NOT EXISTS (SELECT 1 FROM json_each(r.body) b WHERE b.key=a.key) UNION ALL SELECT b.key,b.value,b.type FROM json_each(r.body) b) j) END,'$.approvalPlan',json(p.body),'$.status',CASE WHEN w.suspended_at<>'' AND w.state='Pending' THEN 'Suspended' WHEN w.state='Withdrawn' AND r.kind<>'oa-submission' THEN 'Draft' WHEN w.state='Voided' AND r.kind<>'oa-submission' THEN 'Cancelled' WHEN w.state='Approved' AND r.kind<>'oa-submission' THEN COALESCE(h.result_status,w.state) ELSE w.state END) END AS body
+FROM identity_rows r
+LEFT JOIN request_revisions v ON v.id=r.id AND r.kind='oa-submission'
+LEFT JOIN workflow_instances w ON w.request_id=CASE WHEN v.id IS NOT NULL THEN v.request_id ELSE r.id END
+    AND w.revision=CASE WHEN v.id IS NOT NULL THEN v.revision ELSE CAST(NULLIF(r.body->>'submissionNumber','') AS BIGINT) END
+LEFT JOIN workflow_list_plans p ON p.id=w.id
+LEFT JOIN handling_tasks h ON h.request_id=w.request_id AND h.revision=w.revision;
+CREATE VIEW workflow_record_filters AS
+SELECT r.id,r.kind,r.identity,r.version,r.owner_id,r.company,r.department,r.search_text,
+ CASE WHEN w.id IS NULL THEN r.body ELSE json_set(r.body,'$.status',CASE WHEN w.suspended_at<>'' AND w.state='Pending' THEN 'Suspended' WHEN w.state='Withdrawn' THEN 'Draft' WHEN w.state='Voided' THEN 'Cancelled' WHEN w.state='Approved' THEN COALESCE(h.result_status,w.state) ELSE w.state END) END AS body
+FROM records r LEFT JOIN workflow_instances w ON w.request_id=r.id AND w.revision=CAST(NULLIF(r.body->>'submissionNumber','') AS BIGINT)
 LEFT JOIN handling_tasks h ON h.request_id=w.request_id AND h.revision=w.revision;

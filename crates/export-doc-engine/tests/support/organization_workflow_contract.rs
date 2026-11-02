@@ -87,6 +87,15 @@ fn rule_key(kind: &str) -> String {
     }
 }
 pub(super) fn policy(service: &NativeService, token: &str, kind: &str, rule: Value) -> Value {
+    policy_with_samples(service, token, kind, rule, None)
+}
+fn policy_with_samples(
+    service: &NativeService,
+    token: &str,
+    kind: &str,
+    rule: Value,
+    samples: Option<Value>,
+) -> Value {
     let mut settings = get(service, token, GET_OA_APPROVAL_SETTINGS, 0);
     settings["expectedVersion"] = settings["versionNumber"].clone();
     *settings["rules"]
@@ -102,7 +111,9 @@ pub(super) fn policy(service: &NativeService, token: &str, kind: &str, rule: Val
         token,
         PUBLISH_OA_DEFINITION,
         0,
-        Some(json!({"expectedVersion":saved["versionNumber"],"definitionKey":key})),
+        Some(
+            json!({"expectedVersion":saved["versionNumber"],"definitionKey":key,"samples":samples}),
+        ),
     )
     .unwrap()
 }
@@ -721,13 +732,16 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
         ]
     );
     act(service, tokens[1], "general", "withdraw", &matrix);
-    policy(
+    policy_with_samples(
         service,
         admin,
         "personnel",
         serial(
             "personnel",
             json!([{"source":"LineManager","approverUserIds":[]}]),
+        ),
+        Some(
+            json!([{"employeeId":people[1]["employee"]["id"],"appointmentId":people[1]["organization"]["primaryAssignmentId"],"reporting":{"managerEmployeeId":people[4]["employee"]["id"],"functionalManagerEmployeeIds":[]}}]),
         ),
     );
     let registration = export_doc_engine::contracts::overlay(
@@ -839,6 +853,15 @@ fn membership_scope(
         Some(403)
     );
     let id = reader["employee"]["id"].as_i64().unwrap();
+    let transfer = json!({"expectedVersion":reader["versionNumber"],"effectiveDate":"2026-10-01","departmentId":b,"jobTitle":"部门阅览员","organization":{"additionalAssignments":[{"departmentId":a,"jobTitle":"跨部门阅览","functionalManagerEmployeeIds":[]}]},"note":"增加兼职范围"});
+    assert_eq!(
+        workflow::personnel_change(service, admin, "Transfer", id, Some(transfer))
+            .unwrap_err()
+            .status,
+        Some(400),
+        "a manager transfer requires an explicit reporting handover"
+    );
+    workflow::personnel_change(service,admin,"Transfer",hire["employee"]["id"].as_i64().unwrap(),Some(json!({"expectedVersion":hire["versionNumber"],"effectiveDate":"2026-09-02","departmentId":b,"jobTitle":"普通员工","organization":{"managerEmployeeId":null,"functionalManagerEmployeeIds":[],"additionalAssignments":hire["organization"]["additionalAssignments"]},"note":"调岗前明确移交直属汇报"}))).unwrap();
     let moved = workflow::personnel_change(service, admin, "Transfer",id,Some(json!({"expectedVersion":reader["versionNumber"],"effectiveDate":"2026-10-01","departmentId":b,"jobTitle":"部门阅览员","organization":{"additionalAssignments":[{"departmentId":a,"jobTitle":"跨部门阅览","functionalManagerEmployeeIds":[]}]},"note":"增加兼职范围"}))).unwrap();
     let expanded = login(service, &user["username"]);
     let token = expanded["accessToken"].as_str().unwrap();

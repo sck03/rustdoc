@@ -370,6 +370,17 @@ impl Jobs {
         let _completion = self.completion.read()?;
         persistence::download(&self.store, actor, id, &self.download_budget)
     }
+    pub(super) fn reserve_download(
+        &self,
+        bytes: usize,
+        working: bool,
+    ) -> Result<super::backup_io::Reservation> {
+        if working {
+            self.download_budget.reserve_working(bytes)
+        } else {
+            self.download_budget.reserve(bytes)
+        }
+    }
 
     pub fn operation(&self, operation: Operation, actor: &Actor, id: &str) -> Result<Vec<u8>> {
         self.health()?;

@@ -25,24 +25,35 @@ impl QueueAuthority {
             principals,
         })
     }
-    fn delegates<'a>(&'a self, resource: &'a str) -> impl Iterator<Item = &'a Actor> {
+    fn delegates<'a>(
+        &'a self,
+        resource: &'a str,
+        action: &'a str,
+    ) -> impl Iterator<Item = &'a Actor> {
         self.principals.iter().filter(move |actor| {
             auth::authorize(actor, resource, "view").is_ok()
-                && auth::authorize(actor, resource, "approve").is_ok()
+                && auth::authorize(actor, resource, action).is_ok()
         })
     }
-    fn principal(actor: &Actor, resource: &str) -> RecordApprover {
+    fn principal(actor: &Actor, resource: &str, action: &str) -> RecordApprover {
         RecordApprover {
             user_id: actor.id,
             context: actor.context.clone(),
-            restrictions: auth::object_scope_filters(actor, resource, "approve"),
+            restrictions: auth::object_scope_filters(actor, resource, action),
         }
     }
     pub(in crate::engine) fn approvers(&self, resource: &str) -> Vec<RecordApprover> {
-        std::iter::once(Self::principal(&self.current, resource))
+        self.for_action(resource, "approve")
+    }
+    pub(in crate::engine) fn for_action(
+        &self,
+        resource: &str,
+        action: &str,
+    ) -> Vec<RecordApprover> {
+        std::iter::once(Self::principal(&self.current, resource, action))
             .chain(
-                self.delegates(resource)
-                    .map(|actor| Self::principal(actor, resource)),
+                self.delegates(resource, action)
+                    .map(|actor| Self::principal(actor, resource, action)),
             )
             .collect()
     }
@@ -53,15 +64,15 @@ impl QueueAuthority {
     ) -> Vec<RecordApprover> {
         let direct = auth::restriction_allows(&self.current, resource, "view", row, true);
         direct
-            .then(|| Self::principal(&self.current, resource))
+            .then(|| Self::principal(&self.current, resource, "approve"))
             .into_iter()
             .chain(
-                self.delegates(resource)
+                self.delegates(resource, "approve")
                     .filter(|actor| {
                         auth::restriction_allows(actor, resource, "view", row, true)
                             && auth::restriction_allows(actor, resource, "approve", row, true)
                     })
-                    .map(|actor| Self::principal(actor, resource)),
+                    .map(|actor| Self::principal(actor, resource, "approve")),
             )
             .collect()
     }

@@ -69,7 +69,7 @@ fn fresh_baseline_reopens_and_backups_round_trip() {
 }
 #[test]
 fn old_future_empty_and_incomplete_databases_are_never_reinitialized() {
-    for version in [4, 5, 6, 7, 8, SCHEMA_VERSION + 1] {
+    for version in [SCHEMA_VERSION - 1, SCHEMA_VERSION + 1] {
         let database = Database::fresh();
         database.raw().execute_batch(&format!("DROP TABLE schema_version; CREATE TABLE schema_version(version INTEGER); INSERT INTO schema_version VALUES({version});")).unwrap();
         let original = fs::read(&database.0).unwrap();

@@ -1,6 +1,7 @@
 //! Shared filtering before counting/pagination; both adapters bind every value.
 use super::QuerySql;
 pub struct NotificationScope {
+    pub workflow_date: Option<chrono::NaiveDate>,
     pub restrictions: Vec<crate::ScopeFilter>,
     pub kind: String,
     pub rank: u8,
@@ -8,6 +9,7 @@ pub struct NotificationScope {
     pub statuses: Vec<String>,
     pub handling_keys: Option<Vec<String>>,
     pub approval_principals: Vec<crate::RecordApprover>,
+    pub node_access: Vec<crate::NodeAccess>,
 }
 pub enum CommunicationView<'a> {
     Announcements { manage: bool, now: &'a str },
@@ -116,12 +118,20 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                             )
                         })
                         .collect::<Vec<_>>();
+                    let node_access = crate::record_query::node_access_condition(
+                        postgres,
+                        "parent",
+                        &scope.node_access,
+                        &mut bind,
+                    );
                     let participant = crate::record_query::participant_condition(
                         postgres,
                         "parent",
                         &reader,
                         Some(&bind(q.context.into())),
                         &principals,
+                        &node_access,
+                        scope.workflow_date,
                     );
                     condition = if q.assigned_only {
                         format!(

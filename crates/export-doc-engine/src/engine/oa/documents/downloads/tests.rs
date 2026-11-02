@@ -1,5 +1,5 @@
 use super::*;
-#[path = "../../../../tests/support/approval_fixture.rs"]
+#[path = "../../../../../tests/support/approval_fixture.rs"]
 mod fixture;
 
 #[test]
@@ -39,12 +39,20 @@ fn complete_download_rechecks_private_material_after_the_preparation_snapshot() 
     );
     let mut node = fixture::node("review", &[], "Named", json!([reviewer_id]));
     node["materialPolicy"] = json!({"allowRestrictedAttachments":true});
+    let mut handling = fixture::node("handle", &["review"], "Named", json!([reviewer_id]));
+    handling["kind"] = json!("Handling");
+    handling["phase"] = json!("Fulfillment");
+    handling["materialPolicy"] = json!({"allowRestrictedAttachments":true});
+    let mut document = fixture::node("document", &["review"], "Named", json!([]));
+    document["kind"] = json!("System");
+    document["phase"] = json!("Fulfillment");
+    document["systemAction"] = json!("GenerateApprovalDocument");
     settings["rules"]
         .as_array_mut()
         .unwrap()
         .iter_mut()
         .find(|r| r["key"] == "general")
-        .unwrap()["stages"] = json!([node]);
+        .unwrap()["stages"] = json!([node, handling, document]);
     settings["expectedVersion"] = settings["versionNumber"].clone();
     let saved = fixture::request(
         &service,
@@ -123,7 +131,7 @@ fn complete_download_rechecks_private_material_after_the_preparation_snapshot() 
         .read(|tx| {
             let (current, row) = current(tx, &actor, meta, id)?;
             let snapshot = submissions::checked(tx, &row, submissions::id(&parameters)?)?;
-            assert!(super::super::materials::full(
+            assert!(super::super::super::materials::full(
                 tx, &current, &row, &snapshot
             )?);
             Ok(())
@@ -156,7 +164,7 @@ fn complete_download_rechecks_private_material_after_the_preparation_snapshot() 
         .unwrap();
     let result = service
         .store
-        .read(|tx| full_download(tx, &actor, meta, &parameters));
+        .read(|tx| gather(&service, tx, &actor, meta, &parameters));
     assert_eq!(
         result.err().unwrap().status,
         Some(403),

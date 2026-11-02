@@ -3,6 +3,8 @@
 mod account_permissions;
 #[path = "support/account_scope.rs"]
 mod account_scope;
+#[path = "support/advanced_workflow_contract.rs"]
+mod advanced_workflow_contract;
 #[path = "support/appointment_contract.rs"]
 mod appointment_contract;
 #[path = "support/approval_contract.rs"]
@@ -121,6 +123,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
             .is_none()
     );
     let token = admin["accessToken"].as_str().unwrap();
+    advanced_workflow_contract::exercise(&service, token);
     oa_review_contract::exercise(&service, token);
     material_contract::exercise(&service, token);
     workflow_operations_contract::exercise(&service, token);

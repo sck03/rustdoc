@@ -26,7 +26,7 @@ pub struct VerificationField {
     #[serde(default)]
     pub restricted: bool,
 }
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum VerificationKind {
     Text,
     Decimal,
@@ -74,18 +74,36 @@ impl MaterialPolicy {
         points: &[u16],
         point_count: usize,
     ) -> Result<(), String> {
+        self.verify_decision(values, points, point_count, true)
+    }
+    /// Every decision validates supplied facts; only approval requires completion.
+    pub fn verify_decision(
+        &self,
+        values: &BTreeMap<String, Value>,
+        points: &[u16],
+        point_count: usize,
+        approving: bool,
+    ) -> Result<(), String> {
         self.validate()?;
-        if values
-            .keys()
-            .any(|key| !self.verification_fields.iter().any(|f| &f.key == key))
+        if values.len() > 20
+            || values
+                .keys()
+                .any(|key| !self.verification_fields.iter().any(|f| &f.key == key))
         {
             return Err("提交了本节点未声明的核验字段。".into());
         }
         for field in &self.verification_fields {
             let value = values.get(&field.key);
-            if value.is_none_or(|v| v.is_null() || v.as_str().is_some_and(|s| s.trim().is_empty()))
-            {
-                if field.required {
+            if value.is_some_and(|v| {
+                !v.is_boolean() && !v.as_str().is_some_and(|s| s.chars().count() <= 1000)
+            }) {
+                return Err(format!(
+                    "核验项须为布尔值或不超过 1000 字的文本：{}。",
+                    field.label
+                ));
+            }
+            if value.is_none_or(|v| v.as_str().is_some_and(|s| s.trim().is_empty())) {
+                if approving && field.required {
                     return Err(format!("请填写核验项：{}。", field.label));
                 }
                 continue;
@@ -106,9 +124,11 @@ impl MaterialPolicy {
             }
         }
         let unique = points.iter().copied().collect::<HashSet<_>>();
-        if unique.len() != points.len()
+        if point_count > 12
+            || points.len() > 12
+            || unique.len() != points.len()
             || points.iter().any(|p| usize::from(*p) >= point_count)
-            || (self.require_review_points && unique.len() != point_count)
+            || (approving && self.require_review_points && unique.len() != point_count)
         {
             return Err("请逐项确认本节点的审查要点，不能遗漏或重复。".into());
         }

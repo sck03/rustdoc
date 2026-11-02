@@ -95,6 +95,15 @@ pub(crate) trait Adapter: Send {
         }
         Ok(result)
     }
+    fn placement_appointments(
+        &self,
+        unit: i64,
+        source: &str,
+        id: i64,
+        date: &str,
+    ) -> Result<Vec<Value>> {
+        foundation::placement_appointments(self, unit, source, id, date)
+    }
     fn unit_accounts(&self, company: &str, date: &str, all: bool) -> Result<Vec<Value>> {
         let mut result = vec![];
         let mut cursor = None;
@@ -131,11 +140,11 @@ pub(crate) trait Adapter: Send {
     ) -> Result<Vec<Value>> {
         personnel_links::account_page(self, company, date, false, true, before, limit)
     }
-    fn resource_has_open_requests(&self, kind: &str, parent: i64) -> Result<bool> {
+    fn resource_has_open_requests(&self, kind: &str, parent: i64, states: &[&str]) -> Result<bool> {
         let pg = self.provider() == "PostgreSQL";
         Ok(!self
             .query_slice(
-                &resource_open_query::build(kind, parent, pg)?,
+                &resource_open_query::build(kind, parent, states, pg)?,
                 &sql::projection(&[("id", "id")], pg)?,
                 0,
                 1,
@@ -161,8 +170,59 @@ pub(crate) trait Adapter: Send {
         Ok(result)
     }
     fn execute_statement(&self, statement: &str, values: &[String]) -> Result<u64>;
+    fn workflow_version_next(&self, company: &str, key: &str) -> Result<i64> {
+        workflow_publications::next(self, company, key)
+    }
+    fn workflow_versions(
+        &self,
+        company: &str,
+        key: &str,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Value> {
+        workflow_publications::versions(self, company, key, offset, limit)
+    }
+    fn workflow_activation_save(&self, entry: &Value) -> Result<Value> {
+        workflow_publications::save(self, entry)
+    }
+    fn workflow_activation_list(&self, company: &str, due: Option<&str>) -> Result<Vec<Value>> {
+        workflow_publications::list(self, company, due)
+    }
+    fn workflow_activation_state(
+        &self,
+        id: i64,
+        expected: i64,
+        state: &str,
+        error: &str,
+    ) -> Result<bool> {
+        workflow_publications::state(self, id, expected, state, error)
+    }
+    fn workflow_activation_receipt(
+        &self,
+        actor: i64,
+        context: &str,
+        key: &str,
+    ) -> Result<Option<Value>> {
+        workflow_publications::receipt(self, actor, context, key)
+    }
+    fn foundation_catalog(&self, kind: &str, unit: i64, offset: i64, limit: i64) -> Result<Value> {
+        foundation::catalog(self, kind, unit, offset, limit)
+    }
+    fn foundation_project_options(
+        &self,
+        unit: i64,
+        appointment: &str,
+        day: &str,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Value> {
+        foundation::project_options(self, unit, appointment, day, offset, limit)
+    }
     fn due_personnel_orders(&self, now: &str) -> Result<Vec<Value>> {
         workflow_schedule::due(self, now)
+    }
+    fn workflow_system_requests(&self, action: &str) -> Result<Vec<Value>> {
+        crate::workflow_schedule::systems(self, action)
     }
     fn due_workflow_nodes(&self, now: &str) -> Result<Vec<Value>> {
         workflow_schedule::due_nodes(self, now)
@@ -170,14 +230,14 @@ pub(crate) trait Adapter: Send {
     fn schedule_personnel_order(&self, entry: &Value) -> Result<()> {
         workflow_schedule::schedule(self, entry)
     }
+    fn workflow_exceptions(&self, company: &str, offset: i64, limit: i64) -> Result<Value> {
+        crate::workflow_schedule::exceptions(self, company, offset, limit)
+    }
     fn personnel_order_state(&self, id: i64, state: &str, error: &str) -> Result<()> {
         workflow_schedule::state(self, id, state, error)
     }
     fn personnel_order(&self, id: i64) -> Result<Option<Value>> {
         workflow_schedule::order(self, id)
-    }
-    fn workflow_reminder_level(&self, entry: &Value, level: i64) -> Result<bool> {
-        workflow_schedule::reminder(self, entry, level)
     }
     fn command_receipt(&self, actor: i64, context: &str, key: &str) -> Result<Option<Value>> {
         command_receipts::get(self, actor, context, key)
@@ -470,7 +530,34 @@ pub(crate) trait Adapter: Send {
     fn find_identity(&self, kind: &str, identity: &str) -> Result<Option<Value>>;
     fn all(&self, kind: &str) -> Result<Vec<Value>>;
     fn query_records(&self, query: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)>;
+    fn export_record_page(
+        &self,
+        query: &GenericQuery<'_>,
+        search_fields: &[&str],
+        count: bool,
+    ) -> Result<(i64, Vec<Value>)> {
+        record_export::page(self, query, search_fields, count)
+    }
+    fn export_primary_contacts(
+        &self,
+        kind: &str,
+        scope: &DataScope<'_>,
+        relation: &str,
+        parents: &[i64],
+    ) -> Result<Vec<Value>> {
+        record_export::contacts(self, kind, scope, relation, parents)
+    }
     fn query_workflow_tasks(&self, query: &WorkflowTaskQuery<'_>) -> Result<(i64, Vec<Value>)>;
+    fn workflow_decisions(
+        &self,
+        request: i64,
+        revision: i64,
+        generation: Option<i64>,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Value> {
+        crate::workflow_decisions::page(self, request, revision, generation, offset, limit)
+    }
     fn query_workflow_summary(&self, query: &WorkflowSummaryQuery<'_>)
     -> Result<(i64, Vec<Value>)>;
     fn query_page(

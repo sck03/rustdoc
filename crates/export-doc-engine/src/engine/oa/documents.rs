@@ -60,23 +60,41 @@ pub(super) fn start(
     let meta = metadata(operation).ok_or_else(|| invalid("未知审批单操作。"))?;
     let id = submissions::id(parameters)?;
     let request_id = records::id(parameters)?;
-    let snapshot = service.store.read(|tx| {
-        let (_, row) = current(tx, actor, meta, request_id)?;
+    let (current_actor, snapshot, projected) = service.store.read(|tx| {
+        let (actor, row) = current(tx, actor, meta, request_id)?;
         let snapshot = submissions::checked(tx, &row, id)?;
         if snapshot["status"] != "Approved" {
             return Err(conflict("只有已批准且未作废的提交版本可以生成正式审批单。"));
         }
-        if !super::materials::full(tx, actor, &row, &snapshot)? {
+        if approval::plan(&row)?.is_some_and(|plan| {
+            plan.nodes.iter().any(|n| {
+                n.system_action
+                    == export_doc_domain::approval_graph::SystemAction::GenerateApprovalDocument
+                    && !n.skipped
+            }) && !plan.nodes.iter().any(|n| {
+                n.system_action
+                    == export_doc_domain::approval_graph::SystemAction::GenerateApprovalDocument
+                    && !n.skipped
+                    && matches!(
+                        n.state,
+                        export_doc_domain::approval_graph::NodeState::Active
+                            | export_doc_domain::approval_graph::NodeState::Blocked
+                            | export_doc_domain::approval_graph::NodeState::Completed
+                    )
+            })
+        }) {
+            return Err(conflict("审批单系统节点尚未激活，请先完成前置办理。"));
+        }
+        if !super::materials::full(tx, &actor, &row, &snapshot)? {
             return Err(error(
                 403,
                 "生成完整归档审批单需要完整材料权限；可下载本节点的材料投影审批单。",
             ));
         }
-        Ok(snapshot)
+        let projected = submissions::project(tx, snapshot.clone(), true)?;
+        Ok((actor, snapshot, projected))
     })?;
-    let projected = service
-        .store
-        .read(|tx| submissions::project(tx, snapshot.clone(), true))?;
+    let actor = &current_actor;
     if matches!(
         projected["documentStatus"].as_str(),
         Some("Ready" | "Running")
@@ -129,7 +147,7 @@ pub(super) fn start(
                     },
                 }),
                 publication: Some(PublicationCheck::new(move |tx, current_actor| {
-                    let row = store::get(tx, &check_kind, request_id)?;
+                    let mut row = store::get(tx, &check_kind, request_id)?;
                     access(tx, current_actor, meta, &row)?;
                     if submissions::checked(tx, &row, id)?["status"] != "Approved" {
                         return Err(conflict("批准已作废，不发布正式审批单。"));
@@ -142,13 +160,20 @@ pub(super) fn start(
                     )? {
                         return Err(error(403, "材料权限已变化，不发布完整审批单。"));
                     }
+                    super::fulfillment::system_result(
+                        &mut row,
+                        export_doc_domain::approval_graph::SystemAction::GenerateApprovalDocument,
+                        export_doc_domain::approval_graph::NodeState::Completed,
+                        "",
+                    )?;
+                    super::super::workflow_tasks::persist(tx, &check_kind, &row)?;
                     Ok(())
                 })),
             })
         },
     )?;
     let projected = service.store.transaction(|tx| {
-        let (_, row) = current(tx, actor, meta, request_id)?;
+        let (actor, row) = current(tx, actor, meta, request_id)?;
         let mut snapshot = submissions::checked(tx, &row, id)?;
         if snapshot["status"] != "Approved" {
             return Err(conflict("批准已作废，不能生成正式审批单。"));
@@ -161,7 +186,7 @@ pub(super) fn start(
             id,
             snapshot,
             Some(format!("{}:{}", row["id"], snapshot_number(tx, id)?)),
-            actor,
+            &actor,
             "generate-document",
             Some(&row),
         )?;
@@ -180,136 +205,6 @@ fn snapshot_number(tx: &Connection, id: i64) -> Result<i64> {
     )
 }
 
-pub(in crate::engine) fn download(
-    service: &NativeService,
-    actor: &Actor,
-    operation: Operation,
-    parameters: &[(&str, String)],
-) -> Result<FileOutput> {
-    let meta = metadata(operation).ok_or_else(|| invalid("未知审批单下载。"))?;
-    let partial = service.store.read(|tx| {
-        let (actor, row) = current(tx, actor, meta, records::id(parameters)?)?;
-        let snapshot = submissions::checked(tx, &row, submissions::id(parameters)?)?;
-        if snapshot["status"] != "Approved" {
-            return Err(conflict("该提交版本尚未批准或已作废。"));
-        }
-        if super::materials::full(tx, &actor, &row, &snapshot)? {
-            return Ok(None);
-        }
-        if meta["action"] != "document-download" {
-            return Err(error(403, "完整材料归档需要完整材料权限。"));
-        }
-        Ok(Some(super::materials::snapshot(
-            tx, &actor, &row, snapshot,
-        )?))
-    })?;
-    if let Some(snapshot) = partial {
-        crate::operation::check()?;
-        let cancelled = crate::operation::cancellation_flag();
-        let design = sheet_templates::validate_design(&text(&snapshot, "template.content"))?;
-        let data = export_doc_report::approval::data(&snapshot, &store::timestamp())?;
-        let _fonts = service.report_fonts.enter()?;
-        let document = export_doc_report::render_design(&data, &design, &cancelled)?;
-        let bytes = export_doc_report::pdf_document(&document, &service.report_fonts, &cancelled)?;
-        if bytes.len() > 16 * 1024 * 1024 {
-            return Err(unavailable("材料投影审批单超过容量。"));
-        }
-        service.store.read(|tx| {
-            let (actor, row) = current(tx, actor, meta, records::id(parameters)?)?;
-            let current = submissions::checked(tx, &row, submissions::id(parameters)?)?;
-            if current["status"] != "Approved" {
-                return Err(conflict("批准已作废。"));
-            }
-            let current = super::materials::snapshot(tx, &actor, &row, current)?;
-            if current["request"] != snapshot["request"]
-                || current["approvalPlan"] != snapshot["approvalPlan"]
-            {
-                return Err(conflict("材料权限或版本已变化，请重新下载。"));
-            }
-            Ok(())
-        })?;
-        return Ok(FileOutput {
-            file_name: format!("审批单-{}-材料投影.pdf", records::id(parameters)?),
-            media_type: "application/pdf".into(),
-            content: bytes,
-        });
-    }
-    service
-        .store
-        .read(|tx| full_download(tx, actor, meta, parameters))
-}
-fn full_download(
-    tx: &Connection,
-    actor: &Actor,
-    meta: &Value,
-    parameters: &[(&str, String)],
-) -> Result<FileOutput> {
-    let (actor, row) = current(tx, actor, meta, records::id(parameters)?)?;
-    let id = submissions::id(parameters)?;
-    let snapshot = submissions::checked(tx, &row, id)?;
-    if snapshot["status"] != "Approved" {
-        return Err(conflict("该提交版本尚未批准或已作废，不能下载正式审批单。"));
-    }
-    if !super::materials::full(tx, &actor, &row, &snapshot)? {
-        return Err(error(403, "材料权限已变化，请重新下载当前授权的审批材料。"));
-    }
-    let info = tx
-        .blob_info(id, submissions::PDF)?
-        .ok_or_else(|| conflict("审批单尚未生成，请等待或重试。"))?;
-    if info.size > 16 * 1024 * 1024 {
-        return Err(unavailable("审批单超过下载容量。"));
-    }
-    let blob = tx
-        .blob(id, submissions::PDF)?
-        .ok_or_else(|| unavailable("审批单文件缺失。"))?;
-    if media::digest(&blob.content) != blob.digest || blob.digest != info.digest {
-        return Err(unavailable("审批单完整性校验失败。"));
-    }
-    if meta["action"] == "document-download" {
-        return Ok(FileOutput {
-            file_name: blob.file_name,
-            media_type: blob.media_type,
-            content: blob.content,
-        });
-    }
-    let mut archive = export_doc_report::DocumentArchive::new();
-    archive.add(&blob.file_name, &blob.content)?;
-    let attachments = snapshot["request"]["attachments"]
-        .as_array()
-        .ok_or_else(|| unavailable("提交附件清单损坏。"))?;
-    for (index, attachment) in attachments.iter().enumerate() {
-        crate::operation::check()?;
-        let id = records::positive(attachment, "id", "附件")?;
-        let info = tx
-            .blob_info(id, "oa-attachment")?
-            .ok_or_else(|| unavailable("历史附件元数据缺失。"))?;
-        if info.size > media::DOCUMENT_LIMIT as u64 || attachment["digest"] != info.digest {
-            return Err(unavailable("历史附件元数据不一致。"));
-        }
-        let file = tx
-            .blob(id, "oa-attachment")?
-            .ok_or_else(|| unavailable("历史附件原文件缺失。"))?;
-        if media::digest(&file.content) != info.digest {
-            return Err(unavailable("历史附件完整性校验失败。"));
-        }
-        archive.add(
-            &format!("{:02}-{}", index + 1, file.file_name),
-            &file.content,
-        )?;
-    }
-    let manifest = submissions::project(tx, snapshot.clone(), false)?;
-    archive.add(
-        "审批材料清单.json",
-        &serde_json::to_vec_pretty(&json!({"submission":manifest,"attachments":attachments}))?,
-    )?;
-    Ok(FileOutput {
-        file_name: format!(
-            "审批材料-{}-v{}.zip",
-            row["id"], snapshot["submissionNumber"]
-        ),
-        media_type: "application/zip".into(),
-        content: archive.finish()?,
-    })
-}
-#[cfg(test)]
-mod tests;
+#[path = "documents/downloads.rs"]
+mod downloads;
+pub(in crate::engine) use downloads::{download, prepare};

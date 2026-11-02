@@ -350,7 +350,7 @@ pub(super) fn extend(doc: &mut Value) {
         &["requestId", "versionNumber"],
     );
     s["OaRoutingUnit"] = object(
-        json!({"id":int,"code":text,"name":text}),
+        json!({"id":int,"code":text,"name":text,"ancestorCompanyIds":{"type":"array","items":int,"maxItems":32,"readOnly":true}}),
         &["id", "code", "name"],
     );
     s["OaRoutingUnits"] = object(
@@ -358,7 +358,7 @@ pub(super) fn extend(doc: &mut Value) {
         &["items"],
     );
     s["OaSimulationRequest"] = object(
-        json!({"definition":reference("OaApprovalRule"),"employeeId":int,"appointmentId":text,"amount":text,"currency":text,"duration":text,"category":text}),
+        json!({"definition":reference("OaApprovalRule"),"employeeId":int,"appointmentId":text,"amount":text,"currency":text,"duration":text,"category":text,"isReturnable":{"type":"boolean"},"projectId":{"type":["string","null"],"pattern":"^[1-9][0-9]*$"}}),
         &[
             "definition",
             "employeeId",
@@ -373,6 +373,7 @@ pub(super) fn extend(doc: &mut Value) {
         json!({"approvalPlan":reference("OaApprovalPlan"),"notes":{"type":"array","items":text}}),
         &["approvalPlan", "notes"],
     );
+    s["OaSimulationRequest"]["properties"]["reporting"] = reference("OaSimulationReporting");
     for name in ["UnitTaskReassignment", "OaApprovalReassign"] {
         s[name]["properties"]["toContextId"] = json!({"type":"string","maxLength":150});
     }
@@ -587,6 +588,13 @@ pub(super) fn extend(doc: &mut Value) {
                 "SaveOaApprovalSettings",
                 "PublishOaDefinition",
                 "DisableOaDefinition",
+                "ScheduleOaDefinition",
+                "CancelOaActivation",
+                "ListOaDefinitionVersions",
+                "DiffOaDefinitions",
+                "GetOaRoutingSources",
+                "ListOaWorkflowExceptions",
+                "RetryOaSystemNode",
                 "GetOaApproverOptions",
             ]
             .contains(&id)

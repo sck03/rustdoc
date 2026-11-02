@@ -1,4 +1,5 @@
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -43,7 +44,7 @@ if (profiles.length === 0) {
 }
 
 rmSync(outputRoot, { recursive: true, force: true });
-rmSync(profileRoot, { recursive: true, force: true });
+await rm(profileRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 mkdirSync(outputRoot, { recursive: true });
 mkdirSync(profileRoot, { recursive: true });
 
@@ -136,8 +137,7 @@ try {
   cdp?.close();
   if (chrome) await closeChrome(chrome.browserWebSocketUrl, chrome.process);
   await stopProcessTree(vite);
-  await delay(250);
-  rmSync(profileRoot, { recursive: true, force: true });
+  await rm(profileRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 }
 
 function buildAuditExpression(isMobile) {

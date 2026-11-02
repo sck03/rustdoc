@@ -8,6 +8,7 @@ import { PersonnelOrganizationFacts } from "../office/PersonnelOrganizationEdito
 // Both current details and frozen submissions use the same read-only content.
 export function OaRequestContent({row,user}:{row:OaSubmittedRequest|OaRequest;user:ApiUserDto}) {
   return <section className="oa-detail-content" aria-label="申请内容"><h3>申请内容</h3>
+    {row.projectName&&<p>申请项目：{row.projectName} · {row.projectCode}</p>}
     <div className="oa-reason"><h4>申请说明</h4><p>{row.reason ?? "申请说明未在当前材料权限内展示。"}</p></div>
     {row.personnelChange && <dl className="oa-facts">
       <div><dt>变动类型</dt><dd>{row.personnelChange.action ? personnelChangeLabels[row.personnelChange.action] : "受限字段"}</dd></div>

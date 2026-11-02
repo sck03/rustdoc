@@ -1,7 +1,7 @@
 PRAGMA foreign_keys = ON;
 CREATE TABLE schema_model (version INTEGER PRIMARY KEY,model TEXT NOT NULL,shape TEXT NOT NULL);
-CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 11));
-INSERT INTO schema_version VALUES (11);
+CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 12));
+INSERT INTO schema_version VALUES (12);
 CREATE TABLE records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL,
@@ -50,7 +50,7 @@ CREATE TABLE personnel_memberships (
     CHECK(starts_on='' OR ends_on='' OR starts_on<=ends_on)
 );
 CREATE INDEX personnel_memberships_unit ON personnel_memberships(company,department,person_id);
-CREATE UNIQUE INDEX personnel_memberships_primary ON personnel_memberships(person_id) WHERE is_primary=1;
+CREATE UNIQUE INDEX personnel_memberships_primary ON personnel_memberships(person_id) WHERE is_primary=1 AND ends_on='';
 CREATE TABLE reporting_relations (
     appointment_id TEXT NOT NULL REFERENCES personnel_memberships(id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
     manager_appointment_id TEXT NOT NULL REFERENCES personnel_memberships(id) DEFERRABLE INITIALLY DEFERRED,

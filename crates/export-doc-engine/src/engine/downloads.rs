@@ -10,6 +10,33 @@ use crate::generated_api::{
 };
 
 impl NativeService {
+    pub fn prepare_file_download(
+        &self,
+        operation: Operation,
+        parameters: &[(&str, String)],
+        token: &str,
+    ) -> Result<backup_io::Download> {
+        if super::oa::metadata(operation).is_some_and(|m| {
+            matches!(
+                m["action"].as_str(),
+                Some("document-download" | "bundle-download")
+            )
+        }) {
+            let _access = self
+                .maintenance
+                .read()
+                .map_err(|_| unavailable("数据库维护状态异常。"))?;
+            let actor = self.sessions.actor(&self.store, token)?;
+            self.authorize_operation(&actor, operation, &[])?;
+            return super::oa::prepare_download(self, &actor, operation, parameters);
+        }
+        let output = self.download_file(operation, parameters, token)?;
+        let reservation = self.jobs.reserve_download(output.content.len(), false)?;
+        Ok(backup_io::Download::Memory {
+            output,
+            reservation,
+        })
+    }
     pub fn download_job(&self, job_id: &str, token: &str) -> Result<tasks::FileOutput> {
         self.prepare_job_download(job_id, token)?.into_memory()
     }

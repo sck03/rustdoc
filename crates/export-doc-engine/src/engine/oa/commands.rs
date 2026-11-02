@@ -23,13 +23,42 @@ pub(super) fn actions_for(
     let Some(plan) = plan else {
         return actions;
     };
-    if row["status"] == "Suspended" {
+    if !plan.suspended_at.is_empty() {
         if manager {
             actions.extend(["Resume", "Terminate"].map(str::to_owned));
         }
         return actions;
     }
-    if row["status"] != "Pending" {
+    if manager {
+        if plan.nodes.iter().any(|n| {
+            n.state == export_doc_domain::approval_graph::NodeState::Blocked
+                && n.kind == export_doc_domain::approval_graph::NodeKind::System
+        }) {
+            actions.push("RetryNode".into());
+        }
+        if plan.subflows.iter().any(|s| {
+            plan.subflow_progress
+                .get(&s.key)
+                .is_some_and(|p| !matches!(p.outcome.as_str(), "Pending" | "Approved" | "Ignored"))
+        }) {
+            actions.extend(["RetrySubflow", "CompensateSubflow"].map(str::to_owned));
+        }
+        if plan.subflows.iter().any(|s| {
+            plan.subflow_progress.get(&s.key).is_none_or(|p| {
+                matches!(
+                    p.state,
+                    export_doc_domain::approval_graph::NodeState::Pending
+                        | export_doc_domain::approval_graph::NodeState::Active
+                        | export_doc_domain::approval_graph::NodeState::Blocked
+                )
+            })
+        }) {
+            actions.push("CancelSubflow".into());
+        }
+    }
+    if row["status"] != "Pending"
+        && (plan.outcome() != "Approved" || super::fulfillment::business_complete(plan))
+    {
         return actions;
     }
     if manager {
@@ -45,10 +74,15 @@ pub(super) fn actions_for(
             actions.push("RemoveSigner".into());
         }
     }
-    if ancestors(&plan, &controlled)
-        .iter()
-        .any(|i| plan.nodes[*i].revision_policy.allow_return_to_node)
-    {
+    if ancestors(&plan, &controlled).iter().any(|i| {
+        plan.nodes[*i].revision_policy.allow_return_to_node
+            && plan.nodes[*i].phase
+                == if plan.outcome() == "Approved" {
+                    export_doc_domain::approval_graph::Phase::Fulfillment
+                } else {
+                    export_doc_domain::approval_graph::Phase::Decision
+                }
+    }) {
         actions.push("ReturnToNode".into());
     }
     actions.sort();
@@ -177,7 +211,9 @@ pub(super) fn execute(
     match command.as_str() {
         "Suspend" => {
             plan.suspended_at = now.to_rfc3339();
-            row["status"] = json!("Suspended");
+            if plan.outcome() == "Pending" {
+                row["status"] = json!("Suspended");
+            }
         }
         "Resume" => {
             let since = chrono::DateTime::parse_from_rfc3339(&plan.suspended_at)
@@ -189,10 +225,14 @@ pub(super) fn execute(
             for (i, node) in plan.nodes.iter_mut().enumerate() {
                 if node.revision_policy.pause_stops_clock
                     && !node.due_at.is_empty()
-                    && plan
+                    && (matches!(
+                        node.state,
+                        export_doc_domain::approval_graph::NodeState::Active
+                            | export_doc_domain::approval_graph::NodeState::Blocked
+                    ) || plan
                         .steps
                         .iter()
-                        .any(|s| s.stage == i && s.status == "Waiting")
+                        .any(|s| s.stage == i && s.status == "Waiting"))
                 {
                     let due = chrono::DateTime::parse_from_rfc3339(&node.due_at)
                         .map_err(|_| super::super::error::unavailable("节点期限损坏。"))?;
@@ -228,15 +268,148 @@ pub(super) fn execute(
                 .checked_add(pause.num_seconds() as u64)
                 .ok_or_else(|| invalid("暂停时间累计溢出。"))?;
             plan.suspended_at.clear();
-            row["status"] = json!("Pending");
+            if row["status"] == "Suspended" {
+                row["status"] = json!(plan.outcome());
+            }
+            plan.refresh_escalation_deadlines().map_err(invalid)?;
         }
         "Terminate" => {
+            if matches!(
+                text(&row, "kind").as_str(),
+                "room" | "supply" | "bookings" | "supply-requests"
+            ) {
+                if row["status"] == "Suspended" {
+                    row["status"] = json!(plan.outcome());
+                }
+                if matches!(row["status"].as_str(), Some("Pending" | "Approved")) {
+                    super::super::office_workflows::compensate(tx, actor, &mut row, body, true)?;
+                } else if matches!(row["status"].as_str(), Some("InUse" | "Issued"))
+                    && (row["kind"] == "room" || row["isReturnable"] == true)
+                {
+                    return Err(conflict(
+                        "资源已经实际交付，请先登记真实归还，再终止后续办理。",
+                    ));
+                }
+            }
+            if row["kind"] == "personnel" {
+                tx.personnel_order_state(
+                    records::positive(&row, "id", "人员申请")?,
+                    "Cancelled",
+                    "",
+                )?;
+            }
             for task in &mut plan.steps {
                 if task.status == "Waiting" {
                     task.status = "Cancelled".into();
                 }
             }
-            row["status"] = json!("Terminated");
+            for node in &mut plan.nodes {
+                if matches!(
+                    node.state,
+                    export_doc_domain::approval_graph::NodeState::Active
+                        | export_doc_domain::approval_graph::NodeState::Pending
+                        | export_doc_domain::approval_graph::NodeState::Blocked
+                ) {
+                    node.state = export_doc_domain::approval_graph::NodeState::Cancelled;
+                }
+            }
+            plan.suspended_at.clear();
+            if !matches!(
+                row["status"].as_str(),
+                Some("Completed" | "Returned" | "Issued")
+            ) {
+                row["status"] = json!("Terminated");
+            }
+        }
+        "RetryNode" => {
+            let target = text(body, "targetNodeKey");
+            let node = plan
+                .nodes
+                .iter_mut()
+                .find(|n| {
+                    n.key == target
+                        && n.kind == export_doc_domain::approval_graph::NodeKind::System
+                        && n.state == export_doc_domain::approval_graph::NodeState::Blocked
+                })
+                .ok_or_else(|| conflict("只有失败的受控系统节点可以重试。"))?;
+            node.state = export_doc_domain::approval_graph::NodeState::Active;
+            node.error_code.clear();
+            if node.system_action == export_doc_domain::approval_graph::SystemAction::ApplyPersonnel
+            {
+                tx.personnel_order_state(
+                    records::positive(&row, "id", "人员申请")?,
+                    "Pending",
+                    "",
+                )?;
+            }
+            plan.refresh_subflows().map_err(invalid)?;
+        }
+        "CancelSubflow" | "RetrySubflow" | "CompensateSubflow" => {
+            required(body, "subflowKey", "子流程", 180)?;
+            let key = text(body, "subflowKey");
+            let child = plan
+                .subflows
+                .iter()
+                .find(|s| s.key == key)
+                .ok_or_else(|| invalid("子流程不存在。"))?
+                .clone();
+            match command.as_str() {
+                "CancelSubflow" => plan.cancel_child(&key).map_err(invalid)?,
+                "RetrySubflow" => {
+                    plan.retry_child(
+                        &key,
+                        row["ownerUserId"].as_i64().unwrap_or(0),
+                        chrono::Utc::now(),
+                    )
+                    .map_err(invalid)?;
+                    if matches!(
+                        row["status"].as_str(),
+                        Some("Returned" | "Rejected" | "Cancelled")
+                    ) {
+                        row["status"] = json!(plan.outcome());
+                    }
+                    if child.policy.compensation
+                        == export_doc_domain::approval_graph::Compensation::ReturnResource
+                        && plan.outcome() == "Approved"
+                    {
+                        row["status"] = json!("Approved");
+                        if matches!(text(&row, "kind").as_str(), "supply" | "supply-requests") {
+                            row["reservationState"] = json!("Unreserved");
+                            row["returnedQuantity"] = json!(0);
+                        }
+                    }
+                }
+                _ => {
+                    match child.policy.compensation {
+                        export_doc_domain::approval_graph::Compensation::None => {
+                            return Err(conflict("发布合同未声明补偿。"));
+                        }
+                        export_doc_domain::approval_graph::Compensation::ManualReview => {}
+                        export_doc_domain::approval_graph::Compensation::ReturnResource => {
+                            super::super::office_workflows::compensate(
+                                tx, actor, &mut row, body, false,
+                            )?
+                        }
+                        export_doc_domain::approval_graph::Compensation::CancelPendingPersonnel => {
+                            let id = records::positive(&row, "id", "人员申请")?;
+                            if row["kind"] != "personnel"
+                                || tx
+                                    .personnel_order(id)?
+                                    .is_none_or(|o| o["state"] == "Applied")
+                            {
+                                return Err(conflict("只能补偿尚未生效的人员变动。"));
+                            }
+                            tx.personnel_order_state(id, "Cancelled", "")?;
+                        }
+                    }
+                    plan.mark_child_compensated(&key).map_err(invalid)?;
+                }
+            }
+            if child.phase == export_doc_domain::approval_graph::Phase::Decision
+                && command == "CancelSubflow"
+            {
+                row["status"] = json!(plan.outcome());
+            }
         }
         _ => {
             let revision: RevisionKind =
@@ -280,11 +453,23 @@ pub(super) fn execute(
                 RevisionKind::AddBefore | RevisionKind::AddAfter | RevisionKind::AddParallel
             ) {
                 for id in &ids {
-                    let reviewer = approval::reviewer(tx, actor, *id, &row)?;
+                    let target_node = plan
+                        .nodes
+                        .iter()
+                        .find(|n| n.key == target)
+                        .ok_or_else(|| invalid("目标节点不存在。"))?;
+                    let action = super::actor_binding::node_action(
+                        target_node.phase,
+                        target_node.kind,
+                        target_node.handling_action,
+                    );
+                    let reviewer = approval::reviewer_for(tx, actor, *id, &row, action, true)?;
                     if row["ownerUserId"] == *id || row["applicantAccountId"] == *id {
                         return Err(error(403, "申请人与代填人不能被加入审批。"));
                     }
                     candidates.push(ApprovalStep {
+                        mandatory: false,
+                        origin: Default::default(),
                         approver_person_id: Some(super::qualification::person_id(tx, &reviewer)?),
                         acted_by_person_id: None,
                         verification_values: Default::default(),
@@ -317,7 +502,19 @@ pub(super) fn execute(
             plan.activate(now).map_err(invalid)?;
         }
     }
+    super::live_assignments::check(tx, actor, &row, &mut plan)?;
     row["approvalPlan"] = serde_json::to_value(&plan)?;
     tx.append_workflow_operation(&json!({"requestId":row["id"],"submissionNumber":row["submissionNumber"],"generation":plan.generation,"actorId":actor.id,"contextId":actor.context,"command":command,"reason":note,"occurredAt":store::timestamp(),"details":{"targetNodeKey":body["targetNodeKey"],"userIds":body["userIds"]}}))?;
+    if matches!(command.as_str(), "RetryNode" | "RetrySubflow") && plan.outcome() == "Approved" {
+        return super::fulfillment::advance(
+            tx,
+            actor,
+            meta,
+            row,
+            super::super::units::today(tx)?,
+            "workflow-command",
+            &note,
+        );
+    }
     save(tx, actor, meta, row, "workflow-command", &note)
 }

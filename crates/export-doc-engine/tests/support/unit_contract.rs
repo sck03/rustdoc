@@ -101,7 +101,8 @@ pub fn exercise(service: &NativeService, root: &str) {
         json!([
             grant("office.general", "view"),
             grant("office.general", "create"),
-            grant("office.general", "edit")
+            grant("office.general", "edit"),
+            grant("office.general", "complete")
         ]),
         no_management.clone(),
     );

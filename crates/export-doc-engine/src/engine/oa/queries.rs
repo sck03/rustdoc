@@ -78,17 +78,9 @@ pub(super) fn list_with(
         return Err(invalid("待我办理仅查询已批准或已完成的申请。"));
     }
     if !status.is_empty()
-        && ![
-            "Draft",
-            "Pending",
-            "Approved",
-            "Rejected",
-            "Returned",
-            "Cancelled",
-            "Completed",
-            "HandedOff",
-        ]
-        .contains(&status)
+        && !contracts::schema("OaRequest")["properties"]["status"]["enum"]
+            .as_array()
+            .is_some_and(|values| values.iter().any(|v| v == status))
     {
         return Err(invalid("申请状态无效。"));
     }
@@ -100,6 +92,14 @@ pub(super) fn list_with(
         return Err(error(403, "没有有效的申请数据访问范围。"));
     }
     let (page, size) = paging(query)?;
+    let handling_authority = if handling || finance {
+        Some(
+            super::queue_authority::QueueAuthority::new(tx, actor)?
+                .for_action(&resource, "complete"),
+        )
+    } else {
+        None
+    };
     let handling_keys = handling::keys(tx, actor, "office.general")?;
     let approvers = if approvals || actor.oa_assigned_only || !mine {
         match authority {
@@ -115,13 +115,17 @@ pub(super) fn list_with(
         company: &actor.company,
         departments: (rank == 2 && !approvals && !actor.oa_assigned_only)
             .then_some(actor.departments.as_slice()),
-        owner: (mine || (rank == 1 && !approvals && !actor.oa_assigned_only)).then_some(actor.id),
+        owner: (mine
+            || (rank == 1 && !approvals && !handling && !finance && !actor.oa_assigned_only))
+            .then_some(actor.id),
         status: (!status.is_empty()).then_some(status),
         approvers: approvals.then_some(approvers.as_slice()),
         approval_actor: approvals.then_some(actor.id),
         visible_user: (actor.oa_assigned_only || (!mine && !finance && !handling && !approvals))
             .then_some(actor.id),
         visible_principals: &approvers,
+        node_access: auth::node_access(actor, &resource),
+        workflow_date: Some(crate::engine::units::today(tx)?),
         visible_context: Some(&actor.context),
         include_participants: !actor.oa_assigned_only
             && !mine
@@ -132,6 +136,9 @@ pub(super) fn list_with(
             .then_some(handling_keys.as_slice()),
         handling_states: handling::GENERAL_STATES,
         handling_only: handling && meta["kind"] == "general",
+        handling_user: (handling || finance).then_some(actor.id),
+        handling_context: Some(&actor.context),
+        handling_principals: handling_authority.as_deref(),
         fields,
         offset: (page - 1) * size,
         limit: size,

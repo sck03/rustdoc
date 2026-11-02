@@ -230,8 +230,13 @@ pub fn exercise(service: &NativeService, admin: &str) {
             .as_array()
             .unwrap()
             .iter()
-            .any(|event| event["approvalPlan"]["steps"][0]["actedAt"] == signed["actedAt"])
+            .any(|event| event["approvalGeneration"] == 1)
     );
+    let decisions = fixture::call(service, admin, op("decisions"), id, None).unwrap();
+    assert!(decisions["items"].as_array().unwrap().iter().any(
+        |decision| decision["signature"]["actedAt"] == signed["actedAt"]
+            && decision["signature"]["verificationValues"] == signed["verificationValues"]
+    ));
     row = sign(service, &first, &row, true);
     row = sign(service, &last, &row, false);
     assert_eq!(row["status"], "Approved");
@@ -543,6 +548,8 @@ fn subflow_versions(
         json!([first.0])
     )]));
     let mut wrapper = fixture::node("sub-review", &[], "Named", json!([first.0]));
+    wrapper["kind"] = json!("Subflow");
+    wrapper["approverUserIds"] = json!([]);
     wrapper["subflow"] = json!({"definitionKey":"general","version":child_version});
     let parent_version = publish(json!([
         wrapper,

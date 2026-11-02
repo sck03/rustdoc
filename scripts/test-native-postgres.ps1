@@ -2,7 +2,10 @@
 param(
     [Parameter(Mandatory = $true)][string]$PostgresBin,
     [ValidateRange(60, 7200)][int]$TimeoutSeconds = 1800,
-    [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance')][string]$Scope = 'All'
+    [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance')][string]$Scope = 'All',
+    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
+    [ValidateRange(200, 100000)][int]$HistoryRows = 10000,
+    [ValidateRange(50, 1000)][int]$Rounds = 200
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib/build-script-support.ps1')
@@ -98,7 +101,12 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SEL
     }
     if ($Scope -eq 'Capacity') {
         $environment['EXPORTDOC_CAPACITY_ISOLATED'] = '1'
-        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('build', '--locked', '-p', 'export-doc-server') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build the measured Rust HTTP service'
+        $environment['EXPORTDOC_CAPACITY_CONFIGURATION'] = $Configuration
+        $environment['EXPORTDOC_CAPACITY_HISTORY_ROWS'] = "$HistoryRows"
+        $environment['EXPORTDOC_CAPACITY_ROUNDS'] = "$Rounds"
+        $buildArguments = @('build', '--locked', '-p', 'export-doc-server')
+        if ($Configuration -eq 'Release') { $buildArguments += '--release' }
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments $buildArguments -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build the measured Rust HTTP service'
         Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_native_capacity.mjs') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Twenty-session query, approval and PDF capacity comparison'
     }
     if ($Scope -eq 'Maintenance') {

@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import type { ApiUserDto, ExportDocManagerApiClient, ListOfficeSuppliesRequest, OfficeRequestEventRecord, OfficeStockMovementRecord } from "../../api/index.ts";
+import type { ApiUserDto, ExportDocManagerApiClient, ListOfficeSuppliesRequest, OaAction, OfficeRequestEventRecord, OfficeStockMovementRecord } from "../../api/index.ts";
 import { officeResourceQueryRoots } from "../../api/queryKeys.ts";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -141,10 +141,10 @@ export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUs
 }
 
 export function applyOfficeAction(client: ExportDocManagerApiClient, kind: OfficeKind, row: OfficeRequestRow,
-  action: OfficeAction, note: string, quantity: number, signal: AbortSignal, taskKey?: string): Promise<OfficeRequestRow> {
+  action: OfficeAction, note: string, quantity: number, signal: AbortSignal, taskKey?: string, verification: Pick<OaAction, "verificationValues" | "confirmedReviewPoints" | "nodeKey"> = {}): Promise<OfficeRequestRow> {
   const init = { signal };
   if (kind === "rooms") {
-    const request = { id: row.id, body: officeCommand(client,`${kind}:${row.id}:${action}`,{commandKey:undefined,expectedVersion: row.versionNumber, note, taskKey}) };
+    const request = { id: row.id, body: officeCommand(client,`${kind}:${row.id}:${action}`,{commandKey:undefined,expectedVersion: row.versionNumber, note, taskKey, ...verification}) };
     switch (action) {
       case "approve": return client.approveMeetingBooking(request, init);
       case "reject": return client.rejectMeetingBooking(request, init);
@@ -153,7 +153,7 @@ export function applyOfficeAction(client: ExportDocManagerApiClient, kind: Offic
       case "return": return client.returnMeetingRoomKey(request, init);
     }
   }
-  const request = { id: row.id, body: officeCommand(client,`${kind}:${row.id}:${action}`,{commandKey:undefined,expectedVersion: row.versionNumber, note, quantity, taskKey}) };
+  const request = { id: row.id, body: officeCommand(client,`${kind}:${row.id}:${action}`,{commandKey:undefined,expectedVersion: row.versionNumber, note, quantity, taskKey, ...verification}) };
   switch (action) {
     case "approve": return client.approveOfficeSupplyRequest(request, init);
     case "reject": return client.rejectOfficeSupplyRequest(request, init);

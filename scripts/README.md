@@ -93,7 +93,7 @@ pwsh -NoProfile -File scripts/package-native-web-server.ps1 -Version 1.2.3 -NoPa
 
 桌面业务库统一位于 `App_Data/Database/exportdoc-native.db`，实例锁位于 `App_Data/Locks`。旧位置 `App_Data/exportdoc-native.db` 中受支持的数据库会通过 SQLite 快照自动搬入 Database，原文件保留在 `Backups/DatabaseLayout`；新旧两处同时有库则停止并提示核对。不要手工只移动正在使用的主文件：它可能还有未合并的 WAL。WebView 内部数据库保留在 `WebView` profile 中。
 
-便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 11，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
+便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 12，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
 
 Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便携包携带原版固定清单验证的微软离线安装器；缺少 WebView2 时显示安装／退出选择，保留取消、繁忙、超时和需重启处理。构建时核对微软签名、版本、大小和 SHA-256。Windows GNU 构建同时携带 `WebView2Loader.dll`。
 
@@ -139,7 +139,7 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 
 已声明的 API 响应带 `X-Request-Id`。`DataRoot/Logs/requests.jsonl` 记录对应操作名、时间、状态与耗时，约 8 MiB 轮转到 `requests.previous.jsonl`，保留两个文件；日志使用 256 条有界队列和批量写入，不记录令牌、密码、SQL 或请求正文。丢弃和写入失败可在指标中观察；这是运维日志，数据库中的事务审计继续独立保存。
 
-`test-native-postgres.ps1 -PostgresBin <PostgreSQL-18-bin>` 默认执行存储、团队业务及恢复实库契约，可用 `-Scope Storage` 或 `-Scope Engine` 定向验证。`-Scope Capacity` 是独立的 20 会话负载：使用新建的隔离数据库比较 1/4 连接，包含查询、发票保存、人员关联后的报销提交/审批及 PDF 导出。运行前需准备前端 npm 依赖和随包字体；脚本构建实际 Debug HTTP 服务，原数据库和便携数据不参与测试。输出吞吐、P95/P99、HTTP 状态、内存及指标快照到 `.codex-runtime/native-capacity`，不把 Debug 场景当成生产 SLA。
+`test-native-postgres.ps1 -PostgresBin <PostgreSQL-18-bin>` 默认执行存储、团队业务及恢复实库契约，可用 `-Scope Storage` 或 `-Scope Engine` 定向验证。`-Scope Capacity -Configuration Release -HistoryRows 10000 -Rounds 200` 使用真实 Release HTTP 服务、20 会话和隔离历史库比较 1/4 连接，包含查询、发票保存、实际人员关联的报销提交/审批及 PDF。Configuration 默认 Debug，历史/轮数可明确指定；原数据库和便携数据不参与。运行前准备前端依赖和字体，输出构建类型、样本规模、实际时长、吞吐、P50/P95/P99、状态、内存及指标到 `.codex-runtime/native-capacity`。不同类型或规模的样本不能直接比较，也不作为生产 SLA。
 
 存储故障演练分别终止隔离库的实例锁连接和业务连接，验证已提交数据保留、未提交写入回滚及重建连接池耗时；测试维护账号的 `pg_signal_backend` 仅在临时测试集群授予，生产部署不授予。升级失败和损坏备份保持失败与回滚边界。连接重建的恢复点与从备份恢复的时间点分别记录，生产备份频率和设备故障演练由部署环境制定。
 

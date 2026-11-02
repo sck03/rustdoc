@@ -32,7 +32,7 @@ fn person(tx: &Connection, account: i64) -> i64 {
     {
         super::organization_fixture::unit(tx, unit, &["D"]);
     }
-    let mut body = json!({"versionNumber":1,"companyScope":unit,"departmentId":"D","employeeNumber":identity,"status":"Active","employmentType":"FullTime","hireDate":"2020-01-01","jobTitle":"复核人","ownerUserId":account,"profile":{"fullName":"匿名复核人员"},"organization":{"primaryAssignmentId":identity,"additionalAssignments":[]}});
+    let mut body = json!({"versionNumber":1,"companyScope":unit,"departmentId":"D","employeeNumber":identity,"status":"Active","employmentType":"FullTime","hireDate":"2020-01-01","jobTitle":"复核人","ownerUserId":account,"account":{"id":account},"profile":{"fullName":"匿名复核人员"},"organization":{"primaryAssignmentId":identity,"additionalAssignments":[]}});
     let id = tx
         .insert(&RecordWrite {
             kind: "people",
@@ -54,7 +54,7 @@ impl WorkflowFixture for Connection {
                 Some(seconds)=>(chrono::DateTime::parse_from_rfc3339(&t.acted_at).expect("fixture timestamp")-chrono::Duration::seconds(seconds)).to_rfc3339(),
                 None=>t.started_at.clone(),
             };
-            json!({"key":format!("{}-{i}",t.node),"name":"复核","decision":"All","dependsOn":[],"approvalPercentage":100,"rejectionPolicy":"Immediate","skipped":false,"independentReview":t.independent,"dueHours":0,"reviewPoints":[],"startedAt":start,"dueAt":t.due_at})
+            json!({"key":format!("{}-{i}",t.node),"name":"复核","kind":"Approval","phase":"Decision","state":match t.status.as_str(){"Approved"|"Rejected"|"Returned"|"Skipped"=>"Completed","Cancelled"=>"Cancelled",_ if t.active=>"Active",_=>"Pending"},"decision":"All","dependsOn":[],"approvalPercentage":100,"rejectionPolicy":"Immediate","skipped":false,"independentReview":t.independent,"dueHours":1,"reviewPoints":[],"startedAt":start,"dueAt":t.due_at})
         }).collect();
         let steps:Vec<_>=tasks.iter().enumerate().map(|(i,t)|json!({"taskKey":t.key,"stage":i,"decision":"All","approverUserId":t.assignee,"approverPersonId":person(self,t.assignee),"approverName":"匿名责任人","approverContext":t.context,"status":t.status,"actedByUserId":t.acted_by,"actedByPersonId":t.acted_by.map(|id|person(self,id)),"verificationValues":{},"confirmedReviewPoints":[],"actedByName":if t.acted_by.is_some(){"匿名签署人"}else{""},"actedByContext":t.acted_by_context,"actedAt":t.acted_at,"note":"","delegationKey":"","sourceGeneration":null})).collect();
         let plan = json!({"definitionKey":"query-fixture","policyVersion":1,"generation":1,"notifyUserIds":[],"calendars":{},"subflows":[],"nodes":nodes,"steps":steps});
@@ -90,6 +90,8 @@ impl WorkflowFixture for Connection {
 }
 pub fn exercise(tx: &Connection) {
     tx.begin().unwrap();
+    super::organization_fixture::unit(tx, "WORKFLOW-FIXTURE", &["D"]);
+    let account=tx.insert(&RecordWrite{kind:"users",identity:Some("workflow-fixture-account"),body:&json!({"versionNumber":1,"ownerUserId":0,"companyScope":"WORKFLOW-FIXTURE","departmentId":"D","username":"workflow-fixture-account","fullName":"匿名查询账号","role":"OfficeEmployee","isActive":true,"permissionGrants":[]})}).unwrap();
     let mut body = json!({"versionNumber":1,"ownerUserId":7,"companyScope":"WORKFLOW-FIXTURE","departmentId":"D","status":"Pending","submissionNumber":1,"title":"匿名申请"});
     let request = tx
         .insert(&RecordWrite {
@@ -103,7 +105,7 @@ pub fn exercise(tx: &Connection) {
     let task = Task {
         key: "review".into(),
         node: "review".into(),
-        assignee: request,
+        assignee: account,
         context: String::new(),
         acted_by: None,
         acted_by_context: String::new(),
@@ -140,7 +142,7 @@ pub fn exercise(tx: &Connection) {
     );
     let principals = [export_doc_storage::RecordApprover {
         restrictions: vec![],
-        user_id: request,
+        user_id: account,
         context: String::new(),
     }];
     for (submission, expected) in [(1, 1), (2, 0)] {
@@ -150,7 +152,7 @@ pub fn exercise(tx: &Connection) {
             let query = export_doc_storage::RecordQuery {
                 kind: "oa-general",
                 company: "WORKFLOW-FIXTURE",
-                visible_user: (!approval).then_some(request),
+                visible_user: (!approval).then_some(account),
                 approvers: approval.then_some(principals.as_slice()),
                 limit: 1,
                 ..Default::default()

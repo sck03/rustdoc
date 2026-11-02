@@ -27,38 +27,52 @@ impl ReviewSnapshot {
         let Some(resource) = resource(&text(row, "kind")) else {
             return Ok(snapshot);
         };
-        if row["status"] != "Pending"
-            || row["companyScope"] != actor.company
+        if !matches!(
+            row["status"].as_str(),
+            Some(
+                "Pending"
+                    | "Approved"
+                    | "Issued"
+                    | "InUse"
+                    | "Completed"
+                    | "Returned"
+                    | "HandedOff"
+            )
+        ) || row["companyScope"] != actor.company
             || row["ownerUserId"] == actor.id
             || row["applicantAccountId"] == actor.id
             || auth::authorize(actor, resource, "view").is_err()
-            || auth::authorize(actor, resource, "approve").is_err()
             || !auth::restriction_allows(actor, resource, "view", row, true)
-            || !auth::restriction_allows(actor, resource, "approve", row, true)
         {
             return Ok(snapshot);
         }
-        let signer = match super::qualified_person(tx, actor, row) {
+        let signer = match crate::engine::oa::qualification::person_id(tx, actor) {
             Ok(id) => id,
             Err(cause) if cause.status == Some(403) => return Ok(snapshot),
             Err(cause) => return Err(cause),
         };
+        if row["employeeId"] == signer {
+            return Ok(snapshot);
+        }
         let current = plan.current_indices();
         let mut independence = HashMap::new();
         let mut eligible = vec![];
         for index in current {
             let step = &plan.steps[index];
-            let allowed = *independence.entry(step.stage).or_insert_with(|| {
-                !plan.independent_signer_conflict(step.stage, actor.id)
-                    && !plan.steps.iter().any(|other| {
-                        other.stage != step.stage
-                            && (plan.nodes[step.stage].independent_review
-                                || plan.nodes[other.stage].independent_review)
-                            && other.acted_by_user_id.is_some()
-                            && (other.acted_by_person_id == Some(signer)
-                                || other.approver_person_id == Some(signer))
-                    })
-            });
+            let node = &plan.nodes[step.stage];
+            let action = crate::engine::oa::actor_binding::node_action(
+                node.phase,
+                node.kind,
+                node.handling_action,
+            );
+            if auth::authorize(actor, resource, action).is_err()
+                || !auth::restriction_allows(actor, resource, action, row, true)
+            {
+                continue;
+            }
+            let allowed = *independence
+                .entry(step.stage)
+                .or_insert_with(|| !plan.signer_conflict(step.stage, actor.id, Some(signer)));
             if allowed {
                 eligible.push(index);
             }
@@ -72,9 +86,24 @@ impl ReviewSnapshot {
         } else {
             vec![]
         };
-        let mut principals: HashMap<(i64, String), Option<i64>> = HashMap::new();
+        let mut principals: HashMap<(i64, String, String), Option<i64>> = HashMap::new();
         for index in eligible {
             let step = &plan.steps[index];
+            let node = &plan.nodes[step.stage];
+            let action = crate::engine::oa::actor_binding::node_action(
+                node.phase,
+                node.kind,
+                node.handling_action,
+            );
+            if !crate::engine::oa::actor_binding::origin_available(
+                tx,
+                row,
+                step.approver_person_id
+                    .ok_or_else(|| crate::engine::error::unavailable("任务人员缺失。"))?,
+                &step.origin,
+            )? {
+                continue;
+            }
             if step.approver_user_id == actor.id
                 && step.approver_context == actor.context
                 && step.approver_person_id == Some(signer)
@@ -88,7 +117,7 @@ impl ReviewSnapshot {
                 if *principal != step.approver_user_id {
                     continue;
                 }
-                let key = (*principal, step.approver_context.clone());
+                let key = (*principal, step.approver_context.clone(), action.to_owned());
                 if !principals.contains_key(&key) {
                     let person =
                         match units::resolve(tx, *principal, actor.edition, &step.approver_context)
@@ -96,15 +125,15 @@ impl ReviewSnapshot {
                             Ok(p)
                                 if p.company == actor.company
                                     && auth::authorize(&p, resource, "view").is_ok()
-                                    && auth::authorize(&p, resource, "approve").is_ok()
+                                    && auth::authorize(&p, resource, action).is_ok()
                                     && auth::restriction_allows(
                                         &p, resource, "view", row, true,
                                     )
                                     && auth::restriction_allows(
-                                        &p, resource, "approve", row, true,
+                                        &p, resource, action, row, true,
                                     ) =>
                             {
-                                match super::qualified_person(tx, &p, row) {
+                                match super::qualified_person_for(tx, &p, row, action, true) {
                                     Ok(id) => Some(id),
                                     Err(cause) if cause.status == Some(403) => None,
                                     Err(cause) => return Err(cause),

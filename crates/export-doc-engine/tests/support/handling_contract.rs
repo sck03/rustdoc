@@ -262,7 +262,12 @@ pub fn exercise(service: &NativeService, root: &str) {
         1
     );
     assert_eq!(
-        act(service, &supplies, "complete", &approved)["status"],
+        act(
+            service,
+            &supplies,
+            "complete",
+            &call(service, &supplies, operation("general", "get"), id, None).unwrap()
+        )["status"],
         "Completed"
     );
     let certificate = call(

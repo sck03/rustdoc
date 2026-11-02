@@ -30,6 +30,8 @@ pub fn exercise(c: &Connection) {
     };
     let keys = vec!["handler".into()];
     let mut q = OfficeQuery {
+        workflow_date: None,
+        node_access: vec![],
         viewer: 0,
         assigned_only: false,
         context: "",

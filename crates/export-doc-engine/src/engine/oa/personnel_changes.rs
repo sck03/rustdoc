@@ -52,7 +52,7 @@ pub(super) fn prepare(
         if tx
             .find_identity(
                 "people",
-                &store::normalize(&text(&registration, "employeeNumber")),
+                &store::personnel_identity(&actor.company, &text(&registration, "employeeNumber"))?,
             )?
             .is_some()
         {
@@ -163,28 +163,83 @@ pub(super) fn prepare(
     };
     records::required(&value, "jobTitle", "职位", 120)?;
     if primary.is_empty() && matches!(action.as_str(), "Transfer" | "Rehire") {
-        let organization = if action == "Rehire" {
+        let mut organization = if action == "Rehire" {
             value["organization"].clone()
         } else {
             change
                 .get("organization")
                 .filter(|value| !value.is_null())
                 .cloned()
-                .unwrap_or_else(|| {
-                    if action == "Rehire" {
-                        json!({})
-                    } else {
-                        value.get("organization").cloned().unwrap_or(json!({}))
-                    }
-                })
+                .unwrap_or_else(|| value.get("organization").cloned().unwrap_or(json!({})))
         };
-        super::super::personnel_organization::validate(
-            tx,
-            actor,
-            &mut value,
-            &organization,
-            "transition",
-        )?;
+        if action == "Transfer" {
+            let previous = store::get(
+                tx,
+                "people",
+                records::positive(row, "employeeId", "变动人员")?,
+            )?;
+            if value["departmentId"] == previous["departmentId"]
+                && value["jobTitle"] == previous["jobTitle"]
+            {
+                // Reporting or secondary appointment changes do not end an
+                // otherwise unchanged primary placement or its stable ID.
+                super::super::personnel_organization::validate(
+                    tx,
+                    actor,
+                    &mut value,
+                    &organization,
+                    "transition",
+                )?;
+            } else {
+                let mut original =
+                    super::super::personnel_organization::assignments(&previous)?.remove(0);
+                let starts = if original.starts_on.is_empty() {
+                    text(&previous, "hireDate")
+                } else {
+                    original.starts_on.clone()
+                };
+                let effective = effective_date(row)?;
+                let original_start =
+                    export_doc_domain::business_date::parse(&starts).map_err(invalid)?;
+                if original_start > effective {
+                    return Err(invalid("调岗生效日不能早于原主任职起点。"));
+                }
+                original.ends_on = if effective == original_start {
+                    effective
+                } else {
+                    effective
+                        .pred_opt()
+                        .ok_or_else(|| invalid("调岗日期超出范围。"))?
+                }
+                .to_string();
+                let mut history = previous["organization"]["assignmentHistory"]
+                    .as_array()
+                    .cloned()
+                    .unwrap_or_default();
+                history.push(serde_json::to_value(original)?);
+                organization["assignmentHistory"] = json!(history);
+                let key = format!(
+                    "transfer-{}-primary",
+                    &super::super::media::digest(text(row, "requestKey").as_bytes())[..24]
+                );
+                super::super::personnel_organization::validate_new_primary(
+                    tx,
+                    actor,
+                    &mut value,
+                    &organization,
+                    &key,
+                    &effective.to_string(),
+                )?;
+            }
+        } else {
+            super::super::personnel_organization::validate(
+                tx,
+                actor,
+                &mut value,
+                &organization,
+                "transition",
+            )?;
+        }
     }
     let department = text(&value, "departmentId");
     if !store::all(tx, "departments")?.iter().any(|d| {
@@ -341,7 +396,19 @@ pub(super) fn commit(
     if effective_date(&row)? > today {
         return Err(conflict("人员变动尚未到生效日期。"));
     }
+    if !super::fulfillment::active_system(
+        &row,
+        export_doc_domain::approval_graph::SystemAction::ApplyPersonnel,
+    )? {
+        return Err(conflict("人员生效系统节点尚未激活，请先完成前置办理。"));
+    }
     validate(tx, actor, &row, today)?;
+    super::fulfillment::system_result(
+        &mut row,
+        export_doc_domain::approval_graph::SystemAction::ApplyPersonnel,
+        export_doc_domain::approval_graph::NodeState::Completed,
+        "",
+    )?;
     row["status"] = json!("Completed");
     let saved = if row["personnelChange"]["action"] == "Hire" {
         row["employeeId"] = json!(apply(tx, actor, &row, today)?);

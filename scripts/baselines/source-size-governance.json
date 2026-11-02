@@ -1,7 +1,8 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-11-01",
+  "updatedAt": "2026-11-02",
+  "reviewNotes": "2026-11-02: explicit T17/T27/T29/T33 scope adds the shared workflow graph, actor binding, subflow and scheduled-operation modules plus real regression scenarios. Rebaseline measured aggregate totals after module review; retain every existing per-file limit and aggregate growth allowance. Office growth covers project/appointment selection and node verification in the existing resource forms.",
   "rules": [
     {
       "name": "repository web production default",
@@ -37,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 91966,
+      "baselineAggregateLines": 99301,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 92041,
+      "maximumAggregateLines": 99376,
       "reportFiles": false
     },
     {
@@ -51,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 27712,
+      "baselineAggregateLines": 28665,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 27832,
+      "maximumAggregateLines": 28785,
       "reportFiles": false
     },
     {
@@ -66,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 39439,
+      "baselineAggregateLines": 39649,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 39589,
+      "maximumAggregateLines": 39799,
       "reportFiles": false
     },
     {
@@ -120,7 +121,9 @@
       "directory": "apps/export-doc-web/src/features/office",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 220,
-      "maximumAggregateLines": 1050,
+      "maximumAggregateLines": 1100,
+      "baselineAggregateLines": 1063,
+      "maximumAggregateGrowthLines": 30,
       "excludePattern": "/(?:Personnel.*|personnelModel|usePersonnelData|usePersonnelImage|usePersonnelPositions)\\.(?:ts|tsx)$"
     },
     {

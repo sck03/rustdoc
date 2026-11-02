@@ -24,6 +24,8 @@ import { OaApprovalSteps } from "./OaApprovalSteps.tsx";
 import { OaApprovalPreview } from "./OaApprovalPreview.tsx";
 import { WorkflowOperations } from "./WorkflowOperations.tsx";
 import { PersonnelExecutionNotice } from "./PersonnelExecutionNotice.tsx";
+import { WorkflowFulfillmentPanel } from "./WorkflowFulfillmentPanel.tsx";
+import { WorkflowDecisionHistory } from "./WorkflowDecisionHistory.tsx";
 
 export function OaRequestDetails({ client, user, row, onEdit }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: OaRequest; onEdit: () => void }) {
   const operation = useOaOperation(row.kind);
@@ -52,6 +54,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     {user.capabilities.canManageUsers && row.status === "Pending" && Boolean(row.approvalPlan?.steps.some(step => step.status === "Waiting")) && <button type="button" className="command-button secondary" onClick={() => setReassigning(true)}>移交未完成审批</button>}
     <OaApprovalSteps plan={row.approvalPlan} notes={row.approvalRoutingNotes} user={user} />
     <WorkflowOperations client={client} row={row}/>
+    <WorkflowFulfillmentPanel client={client} user={user} row={row}/>
     <OaRequestContent row={row} user={user} />
     {row.materialAccess?.isPartial && <InlineNotice tone="info">当前身份仅可查看部分申请材料。编辑完整草稿和下载全部原件需要完整材料权限。</InlineNotice>}
     <section className="oa-attachments" aria-label="申请附件"><h3>{row.kind === "expense" ? "报销凭证" : "申请附件"}</h3>
@@ -64,7 +67,7 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
         {editable && <button className="command-button secondary" type="button" disabled={operation.busy} onClick={() => setAction(file.id)}>移除</button>}
       </li>)}</ul>
     </section>
-    <details className="oa-detail-history" onToggle={event => setHistoryOpened(event.currentTarget.open)}><summary>审批与办理记录、提交版本</summary>{historyOpened && <><OaHistory client={client} user={user} row={row} /><OaSubmissionHistory client={client} user={user} row={row} /></>}</details>
+    <details className="oa-detail-history" onToggle={event => setHistoryOpened(event.currentTarget.open)}><summary>审批与办理记录、提交版本</summary>{historyOpened && <><OaHistory client={client} user={user} row={row} /><WorkflowDecisionHistory client={client} user={user} row={row}/><OaSubmissionHistory client={client} user={user} row={row} /></>}</details>
     {action !== null && <OaActionDialog client={client} user={user} row={row} action={action} onClose={() => setAction(null)} />}
     {reassigning && <ApprovalReassignDialog client={client} row={row} onClose={() => setReassigning(false)} />}
     {previewing && <OaApprovalPreview client={client} user={user} row={row} onClose={() => setPreviewing(false)} />}
@@ -84,8 +87,8 @@ function OaActionDialog({ client, row, action, onClose }: { client: ExportDocMan
     <form onSubmit={(event) => { event.preventDefault(); const api = oaApi(client, row.kind); const body = { expectedVersion: row.versionNumber, note, taskKey, verificationValues, confirmedReviewPoints };
       void operation.run((signal) => typeof action === "number" ? api.remove(row.id, action, body, { signal }) : api.action(action, row.id, body, { signal }), onClose);
     }}>
-      {typeof action==="string"&&["approve","reject","return"].includes(action)&&<OfficeField label="当前审批任务"><select required value={taskKey} onChange={e=>{setTaskKey(e.target.value);setVerificationValues({});setConfirmedReviewPoints([]);}}>{row.reviewTaskKeys?.map(key=>{const task=row.approvalPlan?.steps.find(s=>s.taskKey===key);return <option key={key} value={key}>{task?row.approvalPlan?.nodes[task.stage].name:key} · {task?.approverName}</option>;})}</select></OfficeField>}
-      {action==="approve"&&<ApprovalVerificationFields node={row.approvalPlan?.nodes[row.approvalPlan.steps.find(step=>step.taskKey===taskKey)?.stage??-1]} values={verificationValues} points={confirmedReviewPoints} onValues={setVerificationValues} onPoints={setConfirmedReviewPoints}/>}<OfficeField label="处理说明"><textarea required maxLength={500} rows={4} value={note} disabled={operation.busy} onChange={(event) => setNote(event.target.value)} /></OfficeField><OfficeSubmit busy={operation.busy} label={label} /></form>
+      {typeof action==="string"&&["approve","reject","return"].includes(action)&&<OfficeField label="当前审批任务"><select required disabled={operation.busy} value={taskKey} onChange={e=>{setTaskKey(e.target.value);setVerificationValues({});setConfirmedReviewPoints([]);}}>{row.reviewTaskKeys?.map(key=>{const task=row.approvalPlan?.steps.find(s=>s.taskKey===key);return <option key={key} value={key}>{task?row.approvalPlan?.nodes[task.stage].name:key} · {task?.approverName}</option>;})}</select></OfficeField>}
+      {action==="approve"&&<ApprovalVerificationFields node={row.approvalPlan?.nodes[row.approvalPlan.steps.find(step=>step.taskKey===taskKey)?.stage??-1]} values={verificationValues} points={confirmedReviewPoints} onValues={setVerificationValues} onPoints={setConfirmedReviewPoints} disabled={operation.busy}/>}<OfficeField label="处理说明"><textarea required maxLength={500} rows={4} value={note} disabled={operation.busy} onChange={(event) => setNote(event.target.value)} /></OfficeField><OfficeSubmit busy={operation.busy} label={label} /></form>
   </OfficeDialog>;
 }
 

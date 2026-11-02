@@ -1,10 +1,13 @@
 //! Canonical personnel foundation repositories; callers own the transaction.
+pub(crate) mod authority;
 mod candidates;
+mod projects;
 mod queries;
 mod writes;
 use crate::{Adapter, Error, ErrorKind, Result, sql};
 pub(crate) use candidates::list as candidates;
-pub(crate) use queries::{appointment, get, list, resolve_duty};
+pub(crate) use projects::options as project_options;
+pub(crate) use queries::{appointment, catalog, get, list, placement_appointments, resolve_duty};
 use serde_json::Value;
 pub(crate) use writes::{save, sync_person};
 pub(crate) fn table(kind: &str) -> Result<&'static str> {

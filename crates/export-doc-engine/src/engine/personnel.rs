@@ -288,22 +288,25 @@ pub fn handle(
         DELETE_PERSONNEL_IMAGE => "edit",
         _ => "assign",
     };
-    let current = person(&store.connection()?, actor, id, action)?;
     let result = match operation {
         UNLINK_PERSONNEL_ACCOUNT => super::personnel_accounts::unlink(store, actor, id, body)?,
-        GET_PERSONNEL_CLEARANCE => {
-            store.read(|tx| super::office_queries::clearance(tx, &current))?
-        }
+        GET_PERSONNEL_CLEARANCE => store.read(|tx| {
+            let actor = auth::refresh_actor_in(tx, actor)?;
+            let current = person(tx, &actor, id, action)?;
+            super::office_queries::clearance(tx, &current)
+        })?,
         GET_PERSONNEL_AVATAR | GET_PERSONNEL_IMAGE => {
             let kind = if operation == GET_PERSONNEL_AVATAR {
                 "Avatar"
             } else {
                 image_kind(parameters)?
             };
-            let blob = store
-                .connection()?
-                .blob(id, &format!("personnel:{kind}"))?
-                .ok_or_else(|| error(404, "人员图片不存在。"))?;
+            let blob = store.read(|tx| {
+                let actor = auth::refresh_actor_in(tx, actor)?;
+                person(tx, &actor, id, action)?;
+                tx.blob(id, &format!("personnel:{kind}"))?
+                    .ok_or_else(|| error(404, "人员图片不存在。"))
+            })?;
             if media::digest(&blob.content) != blob.digest {
                 return Err(unavailable("人员图片内容校验失败。"));
             }
@@ -339,6 +342,11 @@ pub fn handle(
             }
             if operation == LIST_PERSONNEL_ACCOUNT_OPTIONS {
                 store.read(|tx| {
+                    let actor = auth::refresh_actor_in(tx, actor)?;
+                    if !actor.admin {
+                        return Err(error(403, "只有管理员可以关联账号。"));
+                    }
+                    let current = person(tx, &actor, id, action)?;
                     let users = store::matching(
                         tx,
                         "users",

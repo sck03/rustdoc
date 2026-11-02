@@ -53,24 +53,41 @@ pub(super) fn change(
         .clone();
     let calendar = previous["calendar"].clone();
     let publications = previous["publications"]
-        .as_array_mut()
+        .as_array()
         .ok_or_else(|| super::super::error::unavailable("流程发布记录损坏。"))?;
     let existing = publications.iter().position(|p| p["key"] == key);
     if action == "settings-disable" {
         let index = existing.ok_or_else(|| conflict("流程尚未发布。"))?;
-        publications[index]["enabled"] = json!(false);
+        previous["publications"][index]["enabled"] = json!(false);
         return Ok(());
     }
     rule["calendar"] = calendar;
-    let typed: ApprovalRule =
+    let mut typed: ApprovalRule =
         serde_json::from_value(rule.clone()).map_err(|_| invalid("流程定义格式无效。"))?;
+    super::business_nodes::instantiate_standard(&mut typed)?;
+    rule = serde_json::to_value(&typed)?;
+    if let Some(draft) = previous["rules"]
+        .as_array_mut()
+        .and_then(|rules| rules.iter_mut().find(|r| r["key"] == key))
+    {
+        *draft = rule.clone();
+    }
+    let publications = previous["publications"]
+        .as_array_mut()
+        .ok_or_else(|| super::super::error::unavailable("发布目录损坏。"))?;
     typed.validate().map_err(invalid)?;
     super::approval_integrity::rule(tx, actor, &actor.company, &typed)?;
-    let version = existing
-        .map(|i| publications[i]["version"].as_i64().unwrap_or(0))
-        .unwrap_or(0)
-        + 1;
-    store::save(
+    let samples = body["samples"]
+        .as_array()
+        .filter(|s| !s.is_empty() && s.len() <= 20)
+        .ok_or_else(|| invalid("发布前必须提供 1–20 个实际样例并通过同一内核仿真。"))?;
+    for sample in samples {
+        let mut sample = sample.clone();
+        sample["definition"] = serde_json::to_value(&typed)?;
+        super::simulation::simulate_in(tx, actor, &sample)?;
+    }
+    let version = tx.workflow_version_next(&actor.company, &key)?;
+    let snapshot = store::save(
         tx,
         "oa-definition-version",
         0,
@@ -79,11 +96,74 @@ pub(super) fn change(
         actor,
         "publish-definition",
     )?;
+    if action == "settings-schedule" {
+        let requested = text(body, "activateAt");
+        let at = chrono::DateTime::parse_from_rfc3339(&requested)
+            .map_err(|_| invalid("定时启用须使用包含时区的时间。"))?
+            .with_timezone(&chrono::Utc);
+        let now = chrono::Utc::now();
+        if at <= now || at > now + chrono::Duration::days(366) {
+            return Err(invalid("定时启用须在未来三百六十六天以内。"));
+        }
+        let command = text(body, "commandKey");
+        super::super::command_receipts::validate_key(&command)?;
+        let mut request = body.clone();
+        request.sort_all_objects();
+        tx.workflow_activation_save(&json!({"company":actor.company,"definitionKey":key,"definitionRecordId":snapshot["id"],"definitionVersion":version,"expectedActiveVersion":existing.map(|i|publications[i]["version"].clone()).unwrap_or(json!(0)),"expectedActiveEnabled":existing.is_some_and(|i|publications[i]["enabled"]==true),"actorId":actor.id,"contextId":actor.context,"commandKey":command,"requestDigest":super::super::media::digest(&serde_json::to_vec(&request)?),"activateAt":at.to_rfc3339_opts(chrono::SecondsFormat::Nanos,true)}))?;
+        return Ok(());
+    }
     let publication = json!({"key":key,"version":version,"enabled":true});
     if let Some(index) = existing {
         publications[index] = publication;
     } else {
         publications.push(publication);
     }
+    Ok(())
+}
+pub(super) fn activate_scheduled(tx: &Connection, actor: &Actor, entry: &Value) -> Result<()> {
+    super::super::units::demand(actor, &text(entry, "companyCode"), "organization.workflows")?;
+    let mut previous = settings::load(tx, &actor.company)?;
+    let key = text(entry, "definitionKey");
+    let current = previous["publications"]
+        .as_array()
+        .and_then(|p| p.iter().find(|p| p["key"] == key))
+        .cloned();
+    let current_version = current
+        .as_ref()
+        .map(|p| p["version"].clone())
+        .unwrap_or(json!(0));
+    let current_enabled = current.as_ref().is_some_and(|p| p["enabled"] == true);
+    if current_version != entry["expectedActiveVersion"]
+        || json!(current_enabled) != entry["expectedActiveEnabled"]
+    {
+        return Err(conflict("活动流程已变更，定时启用进入待处理状态。"));
+    }
+    let snapshot = store::get(
+        tx,
+        "oa-definition-version",
+        records::positive(entry, "definitionRecordId", "发布版本")?,
+    )?;
+    let rule: ApprovalRule = serde_json::from_value(snapshot["definition"].clone())
+        .map_err(|_| super::super::error::unavailable("定时流程版本损坏。"))?;
+    super::approval_integrity::rule(tx, actor, &actor.company, &rule)?;
+    let publications = previous["publications"]
+        .as_array_mut()
+        .ok_or_else(|| super::super::error::unavailable("发布目录损坏。"))?;
+    let value = json!({"key":key,"version":entry["definitionVersion"],"enabled":true});
+    if let Some(i) = publications.iter().position(|p| p["key"] == key) {
+        publications[i] = value;
+    } else {
+        publications.push(value);
+    }
+    let id = records::positive(&previous, "id", "流程配置")?;
+    store::save(
+        tx,
+        settings::STORAGE_KIND,
+        id,
+        previous,
+        Some(store::normalize(&actor.company)),
+        actor,
+        "scheduled-activation",
+    )?;
     Ok(())
 }

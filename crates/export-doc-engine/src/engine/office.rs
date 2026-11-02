@@ -246,7 +246,8 @@ pub fn validate(
             )? {
                 if booking["id"] != id
                     && booking["meetingRoomId"] == value["meetingRoomId"]
-                    && ["Approved", "Pending", "InUse"].contains(&text(&booking, "status").as_str())
+                    && export_doc_domain::oa::ROOM_OCCUPYING_STATES
+                        .contains(&text(&booking, "status").as_str())
                     && start < instant(&booking, "endsAt")?
                     && end > instant(&booking, "startsAt")?
                 {

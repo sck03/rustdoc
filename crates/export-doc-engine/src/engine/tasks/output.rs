@@ -406,9 +406,39 @@ impl Publication {
         if manifest.try_exists()? {
             fs::remove_file(manifest)?;
         }
-        fs::remove_dir(&self.root)?;
+        remove_journal_directory(&self.root)?;
         Ok(())
     }
+}
+
+fn remove_journal_directory(root: &Path) -> Result<()> {
+    fs::remove_dir(root)?;
+    #[cfg(windows)]
+    {
+        // Windows can keep a successfully removed directory in its parent's
+        // enumeration while an earlier open handle is being closed.
+        let parent = root
+            .parent()
+            .ok_or_else(|| unavailable("恢复目录缺少父路径。"))?;
+        let name = root
+            .file_name()
+            .ok_or_else(|| unavailable("恢复目录名称无效。"))?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        loop {
+            let mut visible = false;
+            for entry in fs::read_dir(parent)? {
+                visible |= entry?.file_name() == name;
+            }
+            if !visible {
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(unavailable("输出恢复目录清理尚未完成，请稍后重新核验。"));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn recover(store: &Store) -> Result<()> {
@@ -435,7 +465,7 @@ pub(super) fn recover(store: &Store) -> Result<()> {
         if !path.try_exists()? && fs::read_dir(&directory)?.next().is_none() {
             // The manifest is removed last; an empty receipt directory is safe
             // after either initial creation or completed cleanup.
-            fs::remove_dir(directory)?;
+            remove_journal_directory(&directory)?;
             continue;
         }
         if fs::metadata(&path)?.len() > 64 * 1024 {

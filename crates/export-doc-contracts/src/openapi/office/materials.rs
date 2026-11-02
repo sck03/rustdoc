@@ -55,6 +55,8 @@ const IDENTITY_FIELDS: &[&str] = &[
     "canReview",
     "reviewTaskKeys",
     "workflowActions",
+    "workflowTasks",
+    "fulfillmentState",
     "personnelExecution",
     "canHandle",
     "handlerNames",

@@ -13,6 +13,12 @@ import { approvalStage, publishDefinitions } from './lib/approval-fixtures.mjs';
 // Invoked only by the isolated PostgreSQL test runner. No production endpoint
 // or caller-selected database is accepted by this workload.
 const repo=path.resolve(import.meta.dirname,'..');
+const configuration=process.env.EXPORTDOC_CAPACITY_CONFIGURATION??'Debug';
+assert(['Debug','Release'].includes(configuration),'Unknown measured build configuration');
+const historyRows=Number(process.env.EXPORTDOC_CAPACITY_HISTORY_ROWS??10000);
+const rounds=Number(process.env.EXPORTDOC_CAPACITY_ROUNDS??200);
+assert(Number.isInteger(historyRows)&&historyRows>=200&&historyRows<=100000,'Invalid history scale');
+assert(Number.isInteger(rounds)&&rounds>=50&&rounds<=1000,'Invalid workload duration');
 const root=path.join(repo,'.codex-runtime','native-capacity',randomUUID());
 fs.mkdirSync(root,{recursive:true});
 const web=path.join(repo,'apps/export-doc-web');
@@ -20,7 +26,7 @@ const require=createRequire(path.join(web,'package.json'));
 const models=path.join(root,'invoice-models.mjs');
 await require('esbuild').build({stdin:{loader:'ts',resolveDir:web,contents:`export {createEmptyInvoice} from ${JSON.stringify(path.join(web,'src/features/invoices/invoiceModel.ts'))}; export {createEmptyInvoiceItem} from ${JSON.stringify(path.join(web,'src/features/invoices/invoiceItemsEditorModel.ts'))};`},bundle:true,platform:'node',format:'esm',outfile:models});
 const {createEmptyInvoice,createEmptyInvoiceItem}=await import(pathToFileURL(models).href);
-const executable=path.join(cargoArtifactDirectory(repo),'export-doc-server'+(process.platform==='win32'?'.exe':''));
+const executable=path.join(cargoArtifactDirectory(repo,process.env,configuration.toLowerCase()),'export-doc-server'+(process.platform==='win32'?'.exe':''));
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const results=[];
 assert.equal(process.env.EXPORTDOC_CAPACITY_ISOLATED,'1','Use the isolated PostgreSQL test runner');
@@ -99,7 +105,7 @@ async function phase(size,key) {
       const draft={...createEmptyInvoice(date),invoiceNo:number,exporterNameEN:'CAPACITY SAMPLE EXPORTER',customerNameEN:'Capacity sample customer',currency:'USD'};
       draft.items=[{...createEmptyInvoiceItem(),styleNo:'CAP-ITEM',styleName:'Sample product',quantity:10,cartons:1,unitEN:'PCS',ctnUnitEN:'CTNS',unitPrice:1.25,totalPrice:12.5}];return draft;
     };
-    for(let n=0;n<200;n++)await api('CreateInvoice',token,invoice(`CAP-SEED-${n}`));
+    for(let n=0;n<historyRows;n++)await api('CreateInvoice',token,invoice(`CAP-SEED-${n}`));
     const users=[];
     for(let n=0;n<20;n++) {
       const account=(await api('createUserAccount',token,{username:`capacity-${n}`,fullName:`Capacity ${n}`,role:'Admin',departmentId:'GENERAL',companyScope:'DEFAULT',isActive:true,resetPassword:password})).user;
@@ -118,9 +124,20 @@ async function phase(size,key) {
       await api('LinkPersonnelAccount',token,{expectedVersion:employee.versionNumber,userId:reviewer.id,expectedAccountVersion:reviewer.versionNumber},{id:employee.employee.id});
       reviewers.push({id:reviewer.id,token:(await api('Login','',{username:reviewer.username,password})).accessToken});
     }
-    const invoke=(id,body,parameters,identity)=>api(id,identity,body,parameters);
+    const invoke=(id,body,parameters={},identity)=>{
+      const route=operations.get(id).route;
+      const entries=Object.entries(parameters);
+      return api(id,identity,body,Object.fromEntries(entries.filter(([key])=>route.includes(`{${key}}`))),Object.fromEntries(entries.filter(([key])=>!route.includes(`{${key}}`))));
+    };
     const settings=await api('GetOaApprovalSettings',token);
-    await publishDefinitions(invoke,token,{...settings,rules:settings.rules.map(rule=>rule.key==='expense'?{...rule,stages:[{...approvalStage('capacity-review',reviewers.map(reviewer=>reviewer.id)),decision:'Any'}]}:rule)},['expense']);
+    const activePolicy=await publishDefinitions(invoke,token,{...settings,rules:settings.rules.map(rule=>rule.key==='expense'?{...rule,stages:[{...approvalStage('capacity-review',reviewers.map(reviewer=>reviewer.id)),decision:'Any'}]}:rule)},['expense']);
+    const scheduled=await api('PublishOaDefinition',token,{expectedVersion:activePolicy.versionNumber,definitionKey:'expense',commandKey:randomUUID(),activateAt:new Date(Date.now()+10000).toISOString(),samples:[{employeeId:person.employee.id,appointmentId:person.organization.primaryAssignmentId,amount:'12.34',currency:'CNY',duration:'1',category:'Other',isReturnable:true}]});
+    const activation=scheduled.activations.find(row=>row.definitionKey==='expense'&&row.state==='Pending');
+    assert(activation,'Scheduled publication must persist a pending activation');
+    const activationDeadline=Date.now()+30000;
+    let activationState=activation.state;
+    while(activationState==='Pending'&&Date.now()<activationDeadline){await delay(250);const current=await api('GetOaApprovalSettings',token);activationState=current.activations.find(row=>row.id===activation.id)?.state;}
+    assert.equal(activationState,'Applied','The real PostgreSQL HTTP scheduler must activate the fixed version');
     const approvals=[];
     for(let n=0;n<5;n++) {
       let row=await api('CreateExpenseRequest',requesterToken,{requestKey:randomUUID(),title:`Capacity expense ${n}`,reason:'Isolated concurrency verification',currency:'CNY',lines:[{category:'Travel',spentOn:date,description:'Sample receipt',amount:'12.34'}]});
@@ -144,7 +161,7 @@ async function phase(size,key) {
     const before=await api('GetRuntimeMetrics',token);const exports=[];
     measure=true;const started=performance.now();
     await Promise.all(users.map(async(user,worker)=>{
-      for(let n=0;n<50;n++) {
+      for(let n=0;n<rounds;n++) {
         if(n===10 && worker>=1 && worker<=5) {
           const reviewer=reviewers[worker-1];const row=await api('GetExpenseRequest',reviewer.token,undefined,{id:approvals[worker-1].id});assert(row.reviewTaskKeys.length);
           const approved=await api('ApproveExpenseRequest',reviewer.token,{expectedVersion:row.versionNumber,taskKey:row.reviewTaskKeys[0],note:'Capacity approval'},{id:row.id});assert.equal(approved.status,'Approved');
@@ -154,7 +171,7 @@ async function phase(size,key) {
           const saved=await api('UpdateInvoice',user.token,{...user.invoice,contractNo:`capacity-${worker}-${n}`},{id:user.invoice.id});assert.equal(saved.success,true);user.invoice=saved.invoice;
         } else {
           switch(n%4) {
-            case 0:{const page=await api('ListInvoices',user.token,undefined,{}, {pageNumber:1+n%5,pageSize:20,keyword:'Capacity'});assert.equal(page.totalCount,220);assert.equal(page.items.length,20);break;}
+            case 0:{const page=await api('ListInvoices',user.token,undefined,{}, {pageNumber:1+n%5,pageSize:20,keyword:'Capacity'});assert.equal(page.totalCount,historyRows+users.length);assert.equal(page.items.length,20);break;}
             case 1:assert.equal((await api('GetInvoice',user.token,undefined,{id:user.invoice.id})).id,user.invoice.id);break;
             case 2:await api('ListJobs',user.token,undefined,{}, {pageNumber:1,pageSize:20});break;
             default:await api('ListExpenseRequest',user.token,undefined,{}, {pageNumber:1,pageSize:20,mineOnly:false});
@@ -164,7 +181,8 @@ async function phase(size,key) {
     }));
     for(const [job,owner] of exports)await waitJob(job,owner);
     const durationMs=performance.now()-started;measure=false;
-    for(let n=0;n<users.length;n++){const row=await api('GetInvoice',users[n].token,undefined,{id:users[n].invoice.id});assert.equal(row.contractNo,`capacity-${n}-40`);}
+    const lastEdit=Math.floor((rounds-1)/10)*10;
+    for(let n=0;n<users.length;n++){const row=await api('GetInvoice',users[n].token,undefined,{id:users[n].invoice.id});assert.equal(row.contractNo,`capacity-${n}-${lastEdit}`);}
     let after=await api('GetRuntimeMetrics',token);
     for(let attempt=0;after.jobs.active>0 && attempt<50;attempt++){await delay(100);after=await api('GetRuntimeMetrics',token);}
     assert.equal(after.storage.capacity,size);assert.equal(after.storage.failed,false);assert.equal(after.jobs.active,0);
@@ -174,11 +192,11 @@ async function phase(size,key) {
       memory=JSON.parse(stdout);
     }
     latencies.sort((a,b)=>a-b);const percentile=p=>latencies[Math.min(latencies.length-1,Math.ceil(latencies.length*p)-1)];
-    const result={poolSize:size,clients:20,sessionRole:'Admin',invoices:220,approvals:5,exports:2,logicalOperations:latencies.length,durationMs,operationsPerSecond:latencies.length/(durationMs/1000),p50Ms:percentile(.50),p95Ms:percentile(.95),p99Ms:percentile(.99),statuses,retried429:retried,memory,metricsBefore:before,metricsAfter:after};
+    const result={poolSize:size,clients:20,rounds,sessionRole:'Admin',invoices:historyRows+users.length,approvals:5,exports:2,logicalOperations:latencies.length,durationMs,operationsPerSecond:latencies.length/(durationMs/1000),p50Ms:percentile(.50),p95Ms:percentile(.95),p99Ms:percentile(.99),statuses,retried429:retried,memory,metricsBefore:before,metricsAfter:after};
     fs.writeFileSync(path.join(output,'result.json'),JSON.stringify(result,null,2));results.push(result);
     console.log(`Pool ${size}: ${result.logicalOperations} operations; ${result.operationsPerSecond.toFixed(1)}/s; P95 ${result.p95Ms.toFixed(1)} ms; P99 ${result.p99Ms.toFixed(1)} ms; 429 retries ${retried}`);
   } finally {await stopProcessTree(server,5000);log.end();}
 }
 for(const [size,key] of [[1,'CAPACITY_ONE'],[4,'CAPACITY_FOUR']])await phase(size,key);
-fs.writeFileSync(path.join(root,'result.json'),JSON.stringify({platform:process.platform,configuration:'Debug',results},null,2));
+fs.writeFileSync(path.join(root,'result.json'),JSON.stringify({platform:process.platform,configuration,historyRows,rounds,results},null,2));
 console.log(`Native 20-session capacity evidence: ${root}`);

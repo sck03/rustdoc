@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
-import { linkBusinessPerson } from './lib/approval-fixtures.mjs';
+import { fulfillNodeInUi, linkBusinessPerson, publishDefinitionInUi } from './lib/approval-fixtures.mjs';
 
-await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPage }) => {
+await withOfficeUi('approval-ui', async ({ output, require, url, operations, invoke, openPage }) => {
   const token = (await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' })).accessToken;
   const users = [];
   for (const [name, role] of [['first', 'OfficeManager'], ['second', 'OfficeManager'], ['proxy', 'OfficeManager'], ['finance', 'Finance']]) {
@@ -15,14 +15,14 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   await admin.goto(`${url}/#/office/approvals?view=handling`);
   await admin.getByRole('link', { name: '流程管理', exact: true }).click();
   const rule = admin.locator('details[data-definition-key="expense"]');
-  assert.equal(await rule.getByLabel('审批人来源').count(), 0, 'closed workflow editors mount only when first opened');
+  assert.equal(await rule.getByLabel('责任人来源').count(), 0, 'closed workflow editors mount only when first opened');
   await rule.locator(':scope > summary').click();
   for (const [index, user] of users.slice(0, 2).entries()) {
-    await rule.getByLabel('审批人来源').nth(index).selectOption('Named');
-    await rule.getByLabel('审批账号（可多选）').nth(index).selectOption([String(user.id)]);
+    await rule.getByLabel('责任人来源').nth(index).selectOption('Named');
+    await rule.getByLabel('责任账号（可多选）').nth(index).selectOption([String(user.id)]);
   }
   await rule.locator(':scope > summary').click();
-  assert.equal(await rule.getByLabel('审批账号（可多选）').first().inputValue(), String(users[0].id), 'closing keeps the edited rule');
+  assert.equal(await rule.getByLabel('责任账号（可多选）').first().inputValue(), String(users[0].id), 'closing keeps the edited rule');
   await rule.locator(':scope > summary').click();
   const calendar=admin.locator('details').filter({has:admin.locator('summary').filter({hasText:/^公司工作日历/u})});
   await calendar.locator(':scope > summary').click();
@@ -52,7 +52,7 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   assert.equal(await calendar.evaluate(element=>element.open),true,'saving preserves the expanded calendar');
   assert.equal(await holidays.inputValue(),'2026-12-25\n2026-12-26');
   // Another administrator saves while this form has unsaved changes.
-  await rule.getByRole('button', { name: '保存并发布此流程', exact: true }).click();
+  await publishDefinitionInUi(admin, rule, 'OA-001', operations);
   await rule.locator(':scope > summary').getByText(/已启用/u).waitFor();
   const generalRule = admin.locator('details[data-definition-key="general"]');
   await generalRule.locator(':scope > summary').click();
@@ -141,7 +141,7 @@ await withOfficeUi('approval-ui', async ({ output, require, url, invoke, openPag
   await finance.getByRole('region', { name: '核对纸质审批单', exact: true }).getByText('CNY 12.35', { exact: true }).waitFor();
   await finance.screenshot({ path: path.join(output, 'finance-verification.png'), fullPage: true });
   await finance.getByRole('button', { name: '打开申请、审批单及原始凭证', exact: true }).click();
-  await act(finance, '财务接收');
+  await fulfillNodeInUi(finance, '凭证及纸单核对后，登记实际财务接收');
   await finance.getByText('财务交接已登记', { exact: true }).waitFor();
   await finance.getByRole('button', { name: '返回申请列表', exact: true }).click();
   await finance.getByLabel('纸单申请编号', { exact: true }).fill(requestId);

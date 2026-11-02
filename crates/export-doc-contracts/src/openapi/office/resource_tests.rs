@@ -84,6 +84,19 @@ pub(in crate::openapi) fn verify_and_strip(current: &mut Value, baseline: &Value
             props.remove("appointmentId"),
             Some(json!({"type":"string","maxLength":100}))
         );
+        assert_eq!(
+            props.remove("projectId"),
+            Some(json!({"type":["string","null"],"pattern":"^[1-9][0-9]*$"}))
+        );
+    }
+    for name in ["MeetingBookingUpdateRequest", "SupplyRequestUpdateRequest"] {
+        assert_eq!(
+            current["components"]["schemas"][name]["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("projectId"),
+            Some(json!({"type":["string","null"],"pattern":"^[1-9][0-9]*$"}))
+        );
     }
     for name in ["MeetingBookingRecord", "OfficeSupplyRequestRecord"] {
         let schema = &mut current["components"]["schemas"][name];
@@ -125,9 +138,29 @@ pub(in crate::openapi) fn verify_and_strip(current: &mut Value, baseline: &Value
         assert_eq!(
             props.remove("workflowActions"),
             Some(
-                json!({"type":"array","items":{"type":"string","enum":["AddBefore","AddAfter","AddParallel","RemoveSigner","ReturnToNode","Suspend","Resume","Terminate"]},"uniqueItems":true})
+                json!({"type":"array","items":{"type":"string","enum":["AddBefore","AddAfter","AddParallel","RemoveSigner","ReturnToNode","Suspend","Resume","Terminate","RetryNode","CancelSubflow","RetrySubflow","CompensateSubflow"]},"uniqueItems":true})
             )
         );
+        assert_eq!(
+            props.remove("workflowTasks"),
+            Some(json!({"type":"array","items":reference("OaFulfillmentTask"),"maxItems":32}))
+        );
+        assert_eq!(
+            props.remove("fulfillmentState"),
+            Some(
+                json!({"type":"string","enum":["Pending","Active","Completed","Blocked","Suspended","Cancelled"]})
+            )
+        );
+        assert_eq!(
+            props.remove("projectId"),
+            Some(json!({"type":["string","null"],"pattern":"^[1-9][0-9]*$"}))
+        );
+        for key in ["projectName", "projectCode"] {
+            assert_eq!(
+                props.remove(key),
+                Some(json!({"type":"string","readOnly":true}))
+            );
+        }
         assert_eq!(
             props.remove("materialAccess"),
             Some(reference("OaMaterialAccess"))
@@ -176,6 +209,20 @@ pub(in crate::openapi) fn verify_and_strip(current: &mut Value, baseline: &Value
     }
     for name in ["OfficeDecisionRequest", "OfficeReturnRequest"] {
         let schema = &mut current["components"]["schemas"][name];
+        assert_eq!(
+            schema["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("nodeKey"),
+            Some(json!({"type":"string"}))
+        );
+        assert_eq!(
+            schema["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("decision"),
+            Some(json!({"type":"string","enum":["Approve","Reject","Return"],"default":"Approve"}))
+        );
         assert_eq!(
             schema["properties"]
                 .as_object_mut()

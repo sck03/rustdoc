@@ -19,6 +19,8 @@ pub struct PersonnelOrganization {
     pub functional_manager_employee_ids: Vec<i64>,
     #[serde(default)]
     pub additional_assignments: Vec<Assignment>,
+    #[serde(default)]
+    pub assignment_history: Vec<Assignment>,
 }
 
 #[cfg(test)]
@@ -49,6 +51,7 @@ mod tests {
                 manager_employee_id: Some(4),
                 functional_manager_employee_ids: vec![],
             }],
+            assignment_history: vec![],
         };
         organization.validate(1, "A", "A").unwrap();
         organization.additional_assignments[0].department_id = "A".into();
@@ -118,6 +121,15 @@ impl PersonnelOrganization {
             .collect()
     }
     pub fn validate(&self, employee: i64, _primary: &str, _company: &str) -> Result<(), String> {
+        if self.assignment_history.len() > 1000 {
+            return Err("历史任职超过当前一次性读取容量，请联系维护人员。".into());
+        }
+        for history in &self.assignment_history {
+            history.validate_dates()?;
+            if history.id.is_empty() || history.ends_on.is_empty() {
+                return Err("历史主任职须有稳定编号和终止日期。".into());
+            }
+        }
         if self.additional_assignments.len() > 20 {
             return Err("兼职部门最多二十个。".into());
         }
@@ -181,12 +193,7 @@ impl Assignment {
         if value.is_empty() {
             return Ok(None);
         }
-        let parsed = chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
-            .map_err(|_| "任职日期须为 YYYY-MM-DD。".to_owned())?;
-        if parsed.to_string() != value {
-            return Err("任职日期须为 YYYY-MM-DD。".into());
-        }
-        Ok(Some(parsed))
+        crate::business_date::parse(value).map(Some)
     }
     pub fn validate_dates(&self) -> Result<(), String> {
         if let (Some(start), Some(end)) = (Self::date(&self.starts_on)?, Self::date(&self.ends_on)?)

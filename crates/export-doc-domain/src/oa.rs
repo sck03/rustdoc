@@ -3,6 +3,13 @@ use chrono::{Datelike, NaiveDate};
 use rust_decimal::Decimal;
 use serde_json::Value;
 use std::str::FromStr;
+pub const APPROVAL_OPEN_STATES: &[&str] = &["Pending", "Suspended"];
+pub const ROOM_OCCUPYING_STATES: &[&str] = &["Pending", "Suspended", "Approved", "InUse"];
+pub const ROOM_OPEN_STATES: &[&str] = &["Draft", "Pending", "Suspended", "Approved", "InUse"];
+pub const SUPPLY_OPEN_STATES: &[&str] = &["Draft", "Pending", "Suspended", "Approved"];
+pub const SUPPLY_IN_FLIGHT_STATES: &[&str] = &["Pending", "Suspended", "Approved"];
+pub const OA_UNFINISHED_STATES: &[&str] =
+    &["Draft", "Pending", "Suspended", "Approved", "Returned"];
 
 fn string<'a>(value: &'a Value, key: &str) -> &'a str {
     value[key].as_str().unwrap_or("")

@@ -7,6 +7,7 @@ use crate::engine::{
 
 pub(super) fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
     let mut groups = vec![];
+    let workflow_date = crate::engine::units::today(tx)?;
     for (kind, name) in [
         ("oa-personnel", "人员变动审批"),
         ("oa-leave", "请假审批与销假"),
@@ -41,6 +42,8 @@ pub(super) fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
                 owner: (rank == 1 && !actor.oa_assigned_only).then_some(actor.id),
                 visible_user: Some(actor.id),
                 visible_principals: &principals,
+                node_access: auth::node_access(actor, resource),
+                workflow_date: Some(workflow_date),
                 visible_context: Some(&actor.context),
                 include_participants: !actor.oa_assigned_only,
                 handling_keys: (kind == "oa-general").then_some(keys.as_slice()),

@@ -16,6 +16,7 @@ fn viewable(tx: &Connection, actor: &Actor, resource: &str, row: &Value) -> Resu
     }
 }
 fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
+    let workflow_date = crate::engine::units::today(tx)?;
     let mut result: Vec<_> = super::super::oa::KINDS
         .iter()
         .copied()
@@ -34,6 +35,8 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
                 statuses: vec![],
                 handling_keys: None,
                 approval_principals: vec![],
+                node_access: auth::node_access(actor, resource),
+                workflow_date: Some(workflow_date),
             }];
             if kind == "oa-expense" {
                 scopes.push(NotificationScope {
@@ -41,6 +44,8 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
                     kind: kind.into(),
                     handling_keys: None,
                     approval_principals: vec![],
+                    node_access: auth::node_access(actor, resource),
+                    workflow_date: Some(workflow_date),
                     rank: auth::scope_rank(actor, resource, "complete"),
                     statuses: super::super::oa::FINANCE_STATUSES
                         .iter()
@@ -75,6 +80,8 @@ fn scopes(tx: &Connection, actor: &Actor) -> Result<Vec<NotificationScope>> {
             statuses: states.iter().map(|s| (*s).into()).collect(),
             handling_keys: Some(handling::keys(tx, actor, resource)?),
             approval_principals: vec![],
+            node_access: auth::node_access(actor, resource),
+            workflow_date: Some(workflow_date),
         });
     }
     {
@@ -212,6 +219,7 @@ pub(in crate::engine) fn on_event(
             | "remind"
             | "reject"
             | "complete"
+            | "handling-step"
             | "void"
             | "reassign"
             | "issue"
@@ -300,6 +308,96 @@ pub(in crate::engine) fn on_event(
                 break;
             }
         }
+    }
+    if matches!(
+        action.as_str(),
+        "approve" | "handling-step" | "reassign" | "approval-reassign"
+    ) {
+        if let Some(plan) =
+            super::super::oa::approval::plan(row)?.filter(|plan| plan.outcome() == "Approved")
+        {
+            use export_doc_domain::approval_graph::{ActorBinding, NodeKind, NodeState, Phase};
+            let mut bindings = plan
+                .nodes
+                .iter()
+                .filter(|node| {
+                    node.phase == Phase::Fulfillment
+                        && node.kind == NodeKind::Handling
+                        && node.state == NodeState::Active
+                })
+                .flat_map(|node| node.actors.clone())
+                .collect::<Vec<_>>();
+            bindings.extend(
+                plan.current_indices()
+                    .into_iter()
+                    .filter(|index| {
+                        plan.nodes[plan.steps[*index].stage].phase == Phase::Fulfillment
+                    })
+                    .map(|index| {
+                        let step = &plan.steps[index];
+                        ActorBinding {
+                            user_id: step.approver_user_id,
+                            person_id: step.approver_person_id,
+                            name: step.approver_name.clone(),
+                            context: step.approver_context.clone(),
+                            origin: step.origin.clone(),
+                            administration: false,
+                        }
+                    }),
+            );
+            to_bindings(tx, actor, row, event, &bindings)?;
+        }
+    }
+    Ok(())
+}
+pub(in crate::engine) fn to_bindings(
+    tx: &Connection,
+    actor: &Actor,
+    row: &Value,
+    event: &Value,
+    bindings: &[export_doc_domain::approval_graph::ActorBinding],
+) -> Result<()> {
+    let resource = super::super::oa::approval::resource(&text(row, "kind"))
+        .ok_or_else(|| invalid("通知类型无效。"))?;
+    let mut sent = std::collections::BTreeSet::new();
+    for binding in bindings {
+        let recipient = match super::super::units::resolve(
+            tx,
+            binding.user_id,
+            actor.edition,
+            &binding.context,
+        ) {
+            Ok(recipient) => recipient,
+            Err(cause) if matches!(cause.status, Some(400 | 401 | 403 | 404 | 409)) => continue,
+            Err(cause) => return Err(cause),
+        };
+        if !sent.insert(recipient.id)
+            || auth::authorize(&recipient, "office.notifications", "view").is_err()
+            || !super::super::oa::fulfillment::binding_available(tx, &recipient, row, binding)?
+            || !viewable(tx, &recipient, resource, row)?
+        {
+            continue;
+        }
+        let identity = format!("{}:{}", event["id"], recipient.id);
+        if tx.find_identity("site-notification", &identity)?.is_some() {
+            continue;
+        }
+        let scope = json!({"companyScope":recipient.company,"departmentId":recipient.department,"ownerUserId":recipient.id});
+        let kind = match text(row, "kind").as_str() {
+            "room" | "bookings" => "bookings".into(),
+            "supply" | "supply-requests" => "supply-requests".into(),
+            kind => format!("oa-{}", kind.trim_start_matches("oa-")),
+        };
+        store::save_in_scope(
+            tx,
+            "site-notification",
+            0,
+            json!({"identity":identity,"eventId":event["id"],"requestId":row["id"],"requestKind":kind,"title":format!("申请 #{}",row["id"]),"action":event["action"],"status":"Unread","readAt":""}),
+            Some(identity),
+            actor,
+            "notify",
+            Some(&scope),
+        )?;
     }
     Ok(())
 }

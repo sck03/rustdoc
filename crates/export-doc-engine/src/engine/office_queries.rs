@@ -60,28 +60,16 @@ pub(super) fn list_with(
     } else {
         get("status")
     };
-    let allowed = if kind == "bookings" {
-        &[
-            "Draft",
-            "Pending",
-            "Approved",
-            "InUse",
-            "Completed",
-            "Rejected",
-            "Cancelled",
-        ][..]
+    let allowed = &crate::contracts::schema(if kind == "bookings" {
+        "MeetingBookingStatus"
     } else {
-        &[
-            "Draft",
-            "Pending",
-            "Approved",
-            "Issued",
-            "Returned",
-            "Rejected",
-            "Cancelled",
-        ][..]
-    };
-    if !status.is_empty() && !allowed.contains(&status) {
+        "SupplyRequestStatus"
+    })["enum"];
+    if !status.is_empty()
+        && !allowed
+            .as_array()
+            .is_some_and(|values| values.iter().any(|v| v == status))
+    {
         return Err(invalid("未知的行政记录状态。"));
     }
     if approvals
@@ -175,6 +163,8 @@ pub(super) fn list_with(
             context: &actor.context,
             assigned_only: actor.oa_assigned_only,
             principals: &principals,
+            node_access: auth::node_access(actor, resource),
+            workflow_date: Some(crate::engine::units::today(tx)?),
             kind,
             company: &actor.company,
             view: auth::data_scope(actor, resource, "view"),
@@ -239,15 +229,22 @@ pub fn availability(
         return Err(invalid("可用时段查询须在一周以内。"));
     }
     store.read(|tx|{
-        let room=records::parent(tx,actor,"rooms",id)?;
+        let actor=auth::refresh_actor_in(tx,actor)?;
+        auth::authorize(&actor,"office.rooms","view")?;
+        let room=records::parent(tx,&actor,"rooms",id)?;
         if room["companyScope"]!=actor.company{return Err(error(403,"不能查看其他公司的会议室。"));}
         let now=Utc::now();let mut slots=vec![];
-        for booking in store::matching(tx,"bookings", &[("meetingRoomId",id.to_string()),("companyScope",actor.company.clone())], &[("startsAt","startsAt"),("endsAt","endsAt"),("status","status")])?.iter().filter(|booking|["Pending","Suspended","Approved","InUse"].contains(&text(booking,"status").as_str())) {
+        let first=from.to_rfc3339();let last=to.to_rfc3339();let mut offset=0;
+        loop {
+        let (count,bookings)=tx.query_records(&export_doc_storage::RecordQuery{kind:"bookings",company:&actor.company,resource_id:Some(id),statuses:export_doc_domain::oa::ROOM_OCCUPYING_STATES,period:Some((&first,&last)),fields:&[("startsAt","startsAt"),("endsAt","endsAt"),("status","status")],offset,limit:100,..Default::default()})?;
+        for booking in &bookings {
             let start=DateTime::parse_from_rfc3339(&text(booking,"startsAt")).map_err(|_|super::error::unavailable("预约开始时间损坏。"))?;
             let end=DateTime::parse_from_rfc3339(&text(booking,"endsAt")).map_err(|_|super::error::unavailable("预约结束时间损坏。"))?;
             if start<to&&(end>from||booking["status"]=="InUse") {
                 slots.push((start,json!({"startsAt":start.to_rfc3339(),"endsAt":if booking["status"]=="InUse"&&end<now{to.to_rfc3339()}else{end.to_rfc3339()},"status":booking["status"]})));
             }
+        }
+        offset+=100;if offset>=count {break;}
         }
         slots.sort_by_key(|(start,_)|*start);
         Ok(json!(slots.into_iter().map(|(_,slot)|slot).collect::<Vec<_>>()))
@@ -315,16 +312,38 @@ fn clearance_for(
         let mut rows = std::collections::BTreeMap::new();
         for (field, id) in [("employeeId", employee), ("ownerUserId", account)] {
             if let Some(id) = id {
-                for row in store::matching(
-                    tx,
-                    kind,
-                    &[
-                        ("companyScope", company.as_str().unwrap_or("").into()),
-                        (field, id.to_string()),
-                    ],
-                    &[],
-                )? {
-                    rows.insert(records::positive(&row, "id", "行政记录")?, row);
+                let mut offset = 0;
+                loop {
+                    let (count, batch) = tx.query_records(&export_doc_storage::RecordQuery {
+                        kind,
+                        company: company.as_str().unwrap_or(""),
+                        owner: (field == "ownerUserId").then_some(id),
+                        employee: (field == "employeeId").then_some(id),
+                        statuses: if kind == "bookings" {
+                            export_doc_domain::oa::ROOM_OPEN_STATES
+                        } else {
+                            &["Draft", "Pending", "Suspended", "Approved", "Issued"]
+                        },
+                        fields: &[
+                            ("id", "id"),
+                            ("roomName", "roomName"),
+                            ("supplyName", "supplyName"),
+                            ("status", "status"),
+                            ("quantity", "quantity"),
+                            ("returnedQuantity", "returnedQuantity"),
+                            ("isReturnable", "isReturnable"),
+                        ],
+                        offset,
+                        limit: 100,
+                        ..Default::default()
+                    })?;
+                    for row in batch {
+                        rows.insert(records::positive(&row, "id", "行政记录")?, row);
+                    }
+                    offset += 100;
+                    if offset >= count {
+                        break;
+                    }
                 }
             }
         }
@@ -334,14 +353,15 @@ fn clearance_for(
     let mut supplies = vec![];
     for booking in related("bookings")?
         .iter()
-        .filter(|r| ["Draft", "Pending", "Approved", "InUse"].contains(&text(r, "status").as_str()))
+        .filter(|r| export_doc_domain::oa::ROOM_OPEN_STATES.contains(&text(r, "status").as_str()))
     {
         meetings.push(json!({"kind":"rooms","requestId":booking["id"],"resourceName":booking["roomName"],"status":booking["status"],"outstandingQuantity":if booking["status"]=="InUse"{1}else{0}}));
     }
     for request in related("supply-requests")?.iter() {
         let remaining = request["quantity"].as_i64().unwrap_or(0)
             - request["returnedQuantity"].as_i64().unwrap_or(0);
-        let pending = ["Draft", "Pending", "Approved"].contains(&text(request, "status").as_str());
+        let pending =
+            export_doc_domain::oa::SUPPLY_OPEN_STATES.contains(&text(request, "status").as_str());
         if pending
             || (request["status"] == "Issued" && request["isReturnable"] == true && remaining > 0)
         {

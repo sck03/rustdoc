@@ -4,7 +4,7 @@ use export_doc_domain::approval::ApprovalPlan;
 mod snapshot;
 pub(in crate::engine) use snapshot::ReviewSnapshot;
 pub(in crate::engine) fn resource(kind: &str) -> Option<&'static str> {
-    match kind.trim_start_matches("oa-") {
+    match business_kind(kind) {
         "personnel" => Some("office.personnel-changes"),
         "leave" => Some("office.leave"),
         "overtime" => Some("office.overtime"),
@@ -15,6 +15,13 @@ pub(in crate::engine) fn resource(kind: &str) -> Option<&'static str> {
         "room" | "bookings" => Some("office.rooms"),
         "supply" | "supply-requests" => Some("office.supplies"),
         _ => None,
+    }
+}
+pub(in crate::engine) fn business_kind(kind: &str) -> &str {
+    match kind {
+        "bookings" => "room",
+        "supply-requests" => "supply",
+        kind => kind.trim_start_matches("oa-"),
     }
 }
 pub(in crate::engine) fn resource_for_collaboration(resource: &str) -> bool {
@@ -39,6 +46,16 @@ pub(in crate::engine) fn reviewer(
     id: i64,
     row: &Value,
 ) -> Result<Actor> {
+    reviewer_for(tx, actor, id, row, "approve", true)
+}
+pub(in crate::engine) fn reviewer_for(
+    tx: &Connection,
+    actor: &Actor,
+    id: i64,
+    row: &Value,
+    action: &str,
+    forbid_subject: bool,
+) -> Result<Actor> {
     let resource = resource(&text(row, "kind")).ok_or_else(|| invalid("未知申请类型。"))?;
     let reviewers = super::super::units::actors_for_operation(
         tx,
@@ -46,10 +63,10 @@ pub(in crate::engine) fn reviewer(
         actor.edition,
         &actor.company,
         resource,
-        "approve",
+        action,
     )?;
     for reviewer in reviewers {
-        match qualified_person(tx, &reviewer, row) {
+        match qualified_person_for(tx, &reviewer, row, action, forbid_subject) {
             Ok(_) => return Ok(reviewer),
             Err(cause) if cause.status == Some(403) => {}
             Err(cause) => return Err(cause),
@@ -65,20 +82,30 @@ pub(in crate::engine) fn qualified_person(
     candidate: &Actor,
     row: &Value,
 ) -> Result<i64> {
+    qualified_person_for(tx, candidate, row, "approve", true)
+}
+pub(in crate::engine) fn qualified_person_for(
+    tx: &Connection,
+    candidate: &Actor,
+    row: &Value,
+    action: &str,
+    forbid_subject: bool,
+) -> Result<i64> {
     let resource = resource(&text(row, "kind")).ok_or_else(|| invalid("未知申请类型。"))?;
     auth::authorize(candidate, resource, "view")?;
-    auth::authorize(candidate, resource, "approve")?;
+    auth::authorize(candidate, resource, action)?;
     if row["companyScope"].is_string()
         && (row["companyScope"] != candidate.company
             || !auth::restriction_allows(candidate, resource, "view", row, true)
-            || !auth::restriction_allows(candidate, resource, "approve", row, true))
+            || !auth::restriction_allows(candidate, resource, action, row, true))
     {
         return Err(error(403, "审批事项超出此身份的显式数据范围限制。"));
     }
     let person = super::qualification::person_id(tx, candidate)?;
-    if row["ownerUserId"] == candidate.id
-        || row["applicantAccountId"] == candidate.id
-        || row["employeeId"] == person
+    if forbid_subject
+        && (row["ownerUserId"] == candidate.id
+            || row["applicantAccountId"] == candidate.id
+            || row["employeeId"] == person)
     {
         return Err(error(403, "申请人或代填人不能承担本事项审批。"));
     }
@@ -150,11 +177,14 @@ pub(in crate::engine) fn review(
     )
     .map_err(|_| invalid("审查要点确认格式无效。"))?;
     let node = &plan.nodes[plan.steps[index].stage];
-    if action == "approve" {
-        node.material_policy
-            .verify(&values, &points, node.review_points.len())
-            .map_err(invalid)?;
-    }
+    node.material_policy
+        .verify_decision(
+            &values,
+            &points,
+            node.review_points.len(),
+            action == "approve",
+        )
+        .map_err(invalid)?;
     let step = &mut plan.steps[index];
     step.verification_values = values;
     step.confirmed_review_points = points;
@@ -166,8 +196,15 @@ pub(in crate::engine) fn review(
     step.acted_at = store::timestamp();
     step.note = note.into();
     step.delegation_key = delegation;
+    let stage = step.stage;
+    let person = step.acted_by_person_id;
+    let principal_person = step.approver_person_id;
+    plan.record_participant(stage, actor.id, person, principal_person, &actor.context)
+        .map_err(invalid)?;
     plan.settle(index);
+    plan.refresh_subflows().map_err(invalid)?;
     plan.activate(chrono::Utc::now()).map_err(invalid)?;
+    super::live_assignments::check(tx, actor, row, &mut plan)?;
     plan.validate(row["ownerUserId"].as_i64().unwrap_or(0))
         .map_err(invalid)?;
     let outcome = plan.outcome();

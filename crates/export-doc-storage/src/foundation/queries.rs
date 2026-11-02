@@ -103,6 +103,41 @@ pub(crate) fn list(
     );
     s.query(db, query)
 }
+pub(crate) fn catalog(
+    db: &(impl Adapter + ?Sized),
+    kind: &str,
+    unit: i64,
+    offset: i64,
+    limit: i64,
+) -> Result<Value> {
+    let table = table(kind)?;
+    let mut s = Statement::new(db);
+    let unit = s.number(unit);
+    let body = format!(
+        "{}('id',CAST(r.id AS TEXT),'unitId',CAST(r.unit_id AS TEXT),'code',r.code,'name',r.name)",
+        object(s.pg)
+    );
+    let filter = format!("r.unit_id={unit} AND r.is_active=1");
+    let items = json_value(
+        &aggregate(
+            &format!(
+                "SELECT {body} AS body FROM {table} r WHERE {filter} ORDER BY r.id DESC LIMIT {} OFFSET {}",
+                limit.clamp(1, 100),
+                offset.max(0)
+            ),
+            s.pg,
+        ),
+        s.pg,
+    );
+    let query = read_json(
+        format!(
+            "SELECT {}('items',{items},'totalCount',(SELECT COUNT(*) FROM {table} r WHERE {filter}))",
+            object(s.pg)
+        ),
+        s.pg,
+    );
+    s.query(db, query)
+}
 pub(crate) fn get(
     db: &(impl Adapter + ?Sized),
     kind: &str,
@@ -138,14 +173,10 @@ pub(crate) fn resolve_duty(
     let date = s.text(date);
     let project = s.nullable_number(project.as_ref().map(|id| id.to_string()).as_deref());
     let kind = s.text(kind);
-    let kinds = if s.pg {
-        format!("r.workflow_kinds ? {kind}")
-    } else {
-        format!("EXISTS(SELECT 1 FROM json_each(r.workflow_kinds) WHERE value={kind})")
-    };
+    let eligible = authority::responsibility(s.pg, ("r", "a", "m"), &project, &kind, &date);
     let obj = object(s.pg);
     let select = format!(
-        "SELECT {obj}('personId',m.person_id,'appointmentId',m.id,'assignmentId',CAST(a.id AS TEXT)) AS body FROM responsibilities r JOIN responsibility_assignments a ON a.responsibility_id=r.id JOIN personnel_memberships m ON m.id=a.appointment_id WHERE r.id={responsibility} AND r.unit_id={unit} AND r.is_active=1 AND {kinds} AND a.starts_on<={date} AND (a.ends_on IS NULL OR {date}<a.ends_on) AND (a.project_id IS NULL OR a.project_id={project} AND EXISTS(SELECT 1 FROM project_scopes p JOIN project_memberships x ON x.project_id=p.id WHERE p.id={project} AND p.is_active=1 AND x.appointment_id=m.id AND x.starts_on<={date} AND (x.ends_on IS NULL OR {date}<x.ends_on))) ORDER BY m.person_id,m.id"
+        "SELECT {obj}('personId',m.person_id,'appointmentId',m.id,'assignmentId',CAST(a.id AS TEXT)) AS body FROM responsibilities r JOIN responsibility_assignments a ON a.responsibility_id=r.id JOIN personnel_memberships m ON m.id=a.appointment_id WHERE r.id={responsibility} AND r.unit_id={unit} AND {eligible} ORDER BY m.person_id,m.id"
     );
     let query = read_json(format!("SELECT {}", aggregate(&select, s.pg)), s.pg);
     Ok(serde_json::from_value(s.query(db, query)?)?)
@@ -168,4 +199,31 @@ pub(crate) fn appointment(
     );
     let value = s.query(db, query)?;
     Ok((!value.is_null()).then_some(value))
+}
+pub(crate) fn placement_appointments(
+    db: &(impl Adapter + ?Sized),
+    unit: i64,
+    source: &str,
+    id: i64,
+    date: &str,
+) -> Result<Vec<Value>> {
+    let mut s = Statement::new(db);
+    let u = s.number(unit);
+    let id = s.number(id);
+    let date = s.text(date);
+    let selected = authority::placement(source, "m", &u, &id, &date)?;
+    let current = authority::appointment("m", &date);
+    let obj = object(s.pg);
+    let select = format!(
+        "SELECT {obj}('personId',m.person_id,'appointmentId',m.id,'userId',a.user_id) AS body FROM personnel_memberships m JOIN persons p ON p.id=m.person_id LEFT JOIN personnel_accounts a ON a.person_id=m.person_id WHERE m.unit_id={u} AND p.status IN ('Active','Probation') AND {current} AND ({selected}) ORDER BY m.person_id,m.id LIMIT 201"
+    );
+    let query = read_json(format!("SELECT {}", aggregate(&select, s.pg)), s.pg);
+    let values: Vec<Value> = serde_json::from_value(s.query(db, query)?)?;
+    if values.len() > 200 {
+        return Err(Error::new(
+            ErrorKind::Busy,
+            "岗位或项目责任候选超过二百人，请缩小审批职责范围。",
+        ));
+    }
+    Ok(values)
 }

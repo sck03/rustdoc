@@ -9,6 +9,7 @@ pub mod access_scope;
 pub mod announcement;
 pub mod approval;
 pub mod approval_conditions;
+pub mod approval_graph;
 pub mod approval_policy;
 pub mod backup_plan;
 pub mod business_calendar;

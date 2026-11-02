@@ -63,7 +63,14 @@ pub(super) fn validate_resource(
         if !resource_access(tx, actor, resource, "edit", previous, true)? {
             return Err(super::error::error(403, "只能维护本人负责的资源。"));
         }
-        if (changed || row["isActive"] == false) && tx.resource_has_open_requests(requests, id)? {
+        let states = if requests == "bookings" {
+            export_doc_domain::oa::ROOM_OCCUPYING_STATES
+        } else {
+            export_doc_domain::oa::SUPPLY_IN_FLIGHT_STATES
+        };
+        if (changed || row["isActive"] == false)
+            && tx.resource_has_open_requests(requests, id, states)?
+        {
             return Err(conflict(
                 "资源尚有未结申请，不能停用或更换分工；人员交接请修改原分工的办理人员。",
             ));

@@ -45,6 +45,7 @@ pub(super) fn extend(doc: &mut Value) {
         schemas[name]["properties"]["functionalManagerNames"] =
             json!({"type":"array","items":{"type":"string"},"readOnly":true});
     }
+    schemas["PersonnelOrganization"]["properties"]["assignmentHistory"] = json!({"type":"array","items":{"$ref":"#/components/schemas/PersonnelAssignment"},"maxItems":1000,"readOnly":true});
     schemas["PersonnelAssignment"]["properties"]["id"] = json!({"type":"string","maxLength":64,"description":"Stable appointment identifier; omitted only for a new appointment."});
     schemas["OrganizationManagerAppointment"] = json!({"type":"object","properties":{"id":{"type":"string"},"departmentId":{"type":"string"},"departmentName":{"type":"string"},"jobTitle":{"type":"string"}},"required":["id","departmentId","departmentName","jobTitle"]});
     schemas["OrganizationManagerRecord"]["properties"]["appointments"] = json!({"type":"array","items":{"$ref":"#/components/schemas/OrganizationManagerAppointment"}});
@@ -64,6 +65,8 @@ pub(super) fn extend(doc: &mut Value) {
     schemas["ApiUserDto"]["properties"]["effectiveDepartmentIds"] = json!({"type":"array","items":{"type":"string"},"readOnly":true,
         "description":"Current department data scope: appointments plus departments managed by the linked employee and their active descendants. Does not grant operations."});
     schemas["AccountPersonnelRecord"]["properties"]["departmentId"] = json!({"type":"string"});
+    schemas["AccountPersonnelRecord"]["properties"]["appointmentId"] =
+        json!({"type":"string","readOnly":true});
     for name in ["PersonnelRecord", "OaRequest"] {
         schemas[name]["properties"]["companyScope"] = json!({"type":"string","readOnly":true});
     }

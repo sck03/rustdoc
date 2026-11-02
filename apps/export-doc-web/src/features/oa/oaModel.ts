@@ -35,7 +35,7 @@ export function oaActions(row: OaRequest, user: ApiUserDto): OaActionName[] {
   const applicant = allows("edit") && row.ownerUserId === user.id;
   if (row.status === "Draft" || row.status === "Returned") return [...(applicant ? ["submit" as const] : []), ...(allows("cancel") ? ["cancel" as const] : [])];
   if (row.status === "Pending") return [...(applicant ? ["withdraw" as const, "remind" as const] : []), ...(row.canReview ? ["approve" as const, "return" as const, "reject" as const] : [])];
-  if (row.status === "Approved" && row.kind !== "personnel") return [...(allows("complete") ? ["complete" as const] : []), ...(allows("void") && reviewer ? ["void" as const] : [])];
+  if (row.status === "Approved" && row.kind !== "personnel") return [...(!row.workflowTasks && allows("complete") ? ["complete" as const] : []), ...(allows("void") && reviewer ? ["void" as const] : [])];
   return [];
 }
 export function oaActionLabel(action: OaActionName, kind: OaKind) {

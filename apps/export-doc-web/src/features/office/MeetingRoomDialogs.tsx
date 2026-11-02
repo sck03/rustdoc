@@ -1,4 +1,6 @@
 import { useState, type FormEvent } from "react";
+import { OaDepartmentPicker } from "../oa/OaDepartmentPicker.tsx";
+import { WorkflowProjectPicker } from "../oa/WorkflowProjectPicker.tsx";
 import type { ApiUserDto, ExportDocManagerApiClient, MeetingBookingRecord, MeetingRoomRecord, PersonnelDirectoryRecord } from "../../api/index.ts";
 import { businessDateTimeLocalInputToIso, formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
@@ -44,6 +46,8 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
   const [requestKey] = useState(createRequestKey);
   const attachments = useAttachmentDraft<MeetingBookingRecord>();
   const [employee, setEmployee] = useState<PersonnelDirectoryRecord | null>(null);
+  const [appointment,setAppointment]=useState<{id?:string;departmentId?:string}>({});
+  const [projectId,setProjectId]=useState<string|null>(null);
   const canSelectEmployee = user.capabilities.canManageUsers;
   const operation = useOfficeResourceOperation("rooms");
   const { range, query: availability } = useMeetingAvailability(client, user, room.id, times.start.slice(0, 10));
@@ -56,8 +60,8 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
       const startsAt = businessDateTimeLocalInputToIso(times.start, user.businessTimeZone);
       const endsAt = businessDateTimeLocalInputToIso(times.end, user.businessTimeZone);
       if (!startsAt || !endsAt) throw new Error("请选择预约开始和结束时间。");
-      const body = { requestKey, meetingRoomId: room.id, title: String(form.get("title") ?? ""), attendeeCount: Number(form.get("attendeeCount")), startsAt, endsAt, employeeId: employee?.id ?? null, submitImmediately:false };
-      const saved = await attachments.save(JSON.stringify(body),signal,(current,signal)=>current ? client.updateDraftOfMeetingBooking({id:current.id,body:{expectedVersion:current.versionNumber,title:body.title,attendeeCount:body.attendeeCount,startsAt,endsAt}},{signal}):client.createMeetingBooking({body},{signal}),
+      const body = { requestKey, meetingRoomId: room.id, title: String(form.get("title") ?? ""), attendeeCount: Number(form.get("attendeeCount")), startsAt, endsAt, employeeId: employee?.id ?? null, appointmentId:appointment.id,departmentId:appointment.departmentId,projectId,submitImmediately:false };
+      const saved = await attachments.save(JSON.stringify(body),signal,(current,signal)=>current ? client.updateDraftOfMeetingBooking({id:current.id,body:{expectedVersion:current.versionNumber,title:body.title,attendeeCount:body.attendeeCount,startsAt,endsAt,projectId}},{signal}):client.createMeetingBooking({body},{signal}),
         (current,entry,signal)=>{const body=attachmentUploadForm(entry.file,current.versionNumber);body.set("purpose","Supporting");return client.uploadAttachmentToMeetingBooking({id:current.id,body},{signal});});
       return client.submitMeetingBooking({id:saved.id,body:officeCommand(client,`rooms:${saved.id}:submit`,{commandKey:undefined,expectedVersion:saved.versionNumber,note:""})},{signal});
     }, onClose);
@@ -82,8 +86,10 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
               <strong>{slot.status === "Pending" ? "待审批" : slot.status === "InUse" ? "使用中" : "已预约"}</strong></li>)}</ul>}
       </div>
       {access.allows("create") && room.isActive && <>
-        {canSelectEmployee && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={setEmployee} disabled={operation.busy} />}
+        {canSelectEmployee && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={person=>{setEmployee(person);setAppointment({});setProjectId(null);}} disabled={operation.busy} />}
         <OfficeApplicantIdentity user={user} />
+        <OaDepartmentPicker client={client} user={user} employeeId={employee?.id} value={appointment.id} onChange={value=>{setAppointment(value);setProjectId(null);}}/>
+        <WorkflowProjectPicker client={client} user={user} kind="room" employeeId={employee?.id} appointmentId={appointment.id} departmentId={appointment.departmentId} value={projectId} onChange={setProjectId}/>
         <OfficeField label="会议主题" wide><input name="title" required maxLength={200} placeholder="例如：项目周会" /></OfficeField>
         <OfficeField label="参会人数"><input name="attendeeCount" type="number" required min={1} max={room.capacity} defaultValue={1} /></OfficeField>
         <AttachmentDraftFields draft={attachments} busy={operation.busy} existingFiles={attachments.saved?.attachments}/>
