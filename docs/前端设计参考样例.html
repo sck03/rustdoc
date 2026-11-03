@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="zh-CN" data-density="comfortable">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>前端设计参考样例 · 商务蓝 克制扁平（目标态，未实施）</title>
+<style>
+/* ===== 1. 令牌（与《前端设计系统规范》§3–§8 一致） ===== */
+:root{
+  --edm-white:#ffffff;
+  --edm-neutral-25:#fbfcfd;--edm-neutral-50:#f8fafb;--edm-neutral-75:#f4f6f9;--edm-neutral-100:#f1f4f6;--edm-neutral-150:#eef2f5;--edm-neutral-200:#e8edf1;--edm-neutral-300:#dde3e8;--edm-neutral-400:#cfd8df;--edm-neutral-450:#b2bdcc;--edm-neutral-500:#94a3b8;--edm-neutral-550:#69737d;--edm-neutral-700:#39424c;--edm-neutral-900:#111827;
+  --edm-ink-100:#f0f4f8;--edm-ink-200:#dce3ed;--edm-ink-300:#c5cfde;--edm-ink-400:#94a3b8;--edm-ink-500:#64748b;--edm-ink-600:#526176;--edm-ink-700:#3b4b63;--edm-ink-800:#283b53;--edm-ink-900:#203650;--edm-ink-950:#18283e;
+  --edm-primary-25:#f8faff;--edm-primary-50:#eff5ff;--edm-primary-75:#edf3fc;--edm-primary-100:#e0ecff;--edm-primary-150:#dbe7fa;--edm-primary-200:#c3d9fc;--edm-primary-300:#a3c0ee;--edm-primary-500:#3574cc;--edm-primary-600:#245da8;--edm-primary-700:#1d4a83;--edm-primary-800:#203f65;--edm-primary-900:#1a2d46;
+  --edm-success-50:#ecfdf5;--edm-success-200:#bbf7d0;--edm-success-600:#1aa876;--edm-success-700:#12805c;--edm-success-800:#166534;
+  --edm-warning-50:#fff8e8;--edm-warning-300:#fde68a;--edm-warning-600:#b56b08;--edm-warning-800:#92400e;
+  --edm-danger-50:#fff0ed;--edm-danger-200:#f1c3c3;--edm-danger-500:#c84a43;--edm-danger-600:#b4233f;--edm-danger-700:#982f23;--edm-danger-800:#8a1f13;
+  --edm-info-50:#eff6ff;--edm-info-300:#93c5fd;--edm-info-800:#1f4f73;
+  /* 语义 */
+  --edm-bg-canvas:var(--edm-neutral-75);--edm-bg-surface:var(--edm-white);--edm-bg-muted:var(--edm-primary-25);--edm-bg-hover:var(--edm-primary-50);--edm-bg-selected:var(--edm-primary-150);--edm-bg-disabled:var(--edm-neutral-150);
+  --edm-line:var(--edm-ink-200);--edm-line-strong:var(--edm-ink-300);
+  --edm-text:var(--edm-ink-950);--edm-text-secondary:var(--edm-ink-600);--edm-text-tertiary:var(--edm-ink-500);--edm-text-disabled:var(--edm-neutral-500);--edm-text-inverse:var(--edm-white);
+  --edm-accent:var(--edm-primary-600);--edm-accent-hover:var(--edm-primary-700);--edm-accent-pressed:var(--edm-primary-800);
+  --edm-danger-action:var(--edm-danger-600);--edm-danger-hover:var(--edm-danger-700);--edm-danger-pressed:var(--edm-danger-800);
+  --edm-focus-ring:color-mix(in srgb,var(--edm-primary-600) 18%,transparent);
+  /* 间距 / 圆角 / 阴影 / 层级 / 动效 */
+  --edm-space-1:4px;--edm-space-2:8px;--edm-space-3:12px;--edm-space-4:16px;--edm-space-5:20px;--edm-space-6:24px;--edm-space-8:32px;--edm-space-10:40px;
+  --edm-radius-xs:4px;--edm-radius-sm:6px;--edm-radius-md:8px;--edm-radius-lg:10px;--edm-radius-xl:12px;--edm-radius-2xl:16px;--edm-radius-full:999px;
+  --edm-shadow-1:0 1px 2px color-mix(in srgb,var(--edm-ink-900) 5%,transparent);
+  --edm-shadow-2:0 2px 8px color-mix(in srgb,var(--edm-ink-900) 6%,transparent);
+  --edm-shadow-3:0 10px 28px color-mix(in srgb,var(--edm-ink-900) 10%,transparent);
+  --edm-shadow-4:0 24px 64px color-mix(in srgb,var(--edm-ink-950) 16%,transparent);
+  --edm-z-sticky:10;--edm-z-header:20;--edm-z-popover:100;--edm-z-drawer:300;--edm-z-modal:400;--edm-z-toast:500;--edm-z-skip-link:1000;
+  --edm-motion-fast:120ms;--edm-motion-base:160ms;--edm-motion-slow:220ms;--edm-ease:cubic-bezier(.2,0,0,1);
+  /* 字阶 */
+  --edm-font-sans:"Segoe UI Variable Text","Segoe UI","SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei UI","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
+  --edm-font-mono:"Cascadia Mono","SFMono-Regular",Consolas,monospace;
+  --edm-fs-caption:12px;--edm-lh-caption:18px;--edm-fs-dense:13px;--edm-lh-dense:20px;--edm-fs-body:14px;--edm-lh-body:22px;--edm-fs-h3:14px;--edm-lh-h3:22px;--edm-fs-h2:16px;--edm-lh-h2:24px;--edm-fs-h1:20px;--edm-lh-h1:28px;--edm-fs-display:26px;--edm-lh-display:34px;
+  /* 密度（舒适） */
+  --edm-control-height:40px;--edm-control-height-sm:32px;--edm-touch-target:44px;--edm-page-padding-x:24px;--edm-page-padding-y:20px;--edm-section-padding:16px;--edm-layout-gap:16px;--edm-cell-py:10px;--edm-cell-px:12px;--edm-tab-height:36px;--edm-header-height:64px;
+}
+html[data-density="compact"]{--edm-control-height:34px;--edm-control-height-sm:28px;--edm-page-padding-x:16px;--edm-page-padding-y:12px;--edm-section-padding:12px;--edm-layout-gap:12px;--edm-cell-py:7px;--edm-cell-px:10px;--edm-fs-body:13px;--edm-tab-height:32px;--edm-header-height:60px;}
+
+/* ===== 2. 基础 ===== */
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font:400 var(--edm-fs-body)/var(--edm-lh-body) var(--edm-font-sans);color:var(--edm-text);background:var(--edm-bg-canvas);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3,p{margin:0}
+a{color:var(--edm-primary-700);text-decoration:none}
+a:hover{color:var(--edm-primary-800);text-decoration:underline}
+.num{font-variant-numeric:tabular-nums}
+:where(button,a,input,select,textarea,[tabindex]):focus-visible{outline:2px solid var(--edm-primary-600);outline-offset:2px}
+:where(button,input,select,textarea){transition:color var(--edm-motion-fast) var(--edm-ease),background-color var(--edm-motion-fast) var(--edm-ease),border-color var(--edm-motion-fast) var(--edm-ease),box-shadow var(--edm-motion-fast) var(--edm-ease)}
+
+/* 字阶类 */
+.t-display{font-size:var(--edm-fs-display);line-height:var(--edm-lh-display);font-weight:700;letter-spacing:-.01em}
+.t-h1{font-size:var(--edm-fs-h1);line-height:var(--edm-lh-h1);font-weight:700;letter-spacing:-.01em}
+.t-h2{font-size:var(--edm-fs-h2);line-height:var(--edm-lh-h2);font-weight:700;letter-spacing:-.01em}
+.t-h3{font-size:var(--edm-fs-h3);line-height:var(--edm-lh-h3);font-weight:600}
+.t-body{font-size:var(--edm-fs-body);line-height:var(--edm-lh-body)}
+.t-dense{font-size:var(--edm-fs-dense);line-height:var(--edm-lh-dense)}
+.t-caption{font-size:var(--edm-fs-caption);line-height:var(--edm-lh-caption);color:var(--edm-text-secondary)}
+.t-eyebrow{font-size:var(--edm-fs-caption);line-height:var(--edm-lh-caption);font-weight:600;letter-spacing:.02em;color:var(--edm-primary-700)}
+
+/* ===== 3. 样例页自身布局 ===== */
+.banner{position:sticky;top:0;z-index:var(--edm-z-header);display:flex;align-items:center;justify-content:space-between;gap:var(--edm-space-3);min-height:var(--edm-header-height);padding:0 var(--edm-page-padding-x);background:color-mix(in srgb,var(--edm-white) 92%,transparent);border-bottom:1px solid var(--edm-line);backdrop-filter:blur(12px)}
+.banner strong{font-weight:700}
+.banner .warn{display:inline-flex;align-items:center;gap:var(--edm-space-2);padding:2px 8px;border-radius:var(--edm-radius-sm);background:var(--edm-warning-50);color:var(--edm-warning-800);border:1px solid var(--edm-warning-300);font-size:var(--edm-fs-caption);font-weight:600}
+main{display:grid;gap:var(--edm-space-8);max-width:1240px;margin:0 auto;padding:var(--edm-space-6) var(--edm-page-padding-x) var(--edm-space-10)}
+section.spec{display:grid;gap:var(--edm-space-4)}
+section.spec>header{display:grid;gap:var(--edm-space-1)}
+.card{background:var(--edm-bg-surface);border:1px solid var(--edm-line);border-radius:var(--edm-radius-lg);padding:var(--edm-section-padding);box-shadow:var(--edm-shadow-1)}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--edm-space-3)}
+.grid{display:grid;gap:var(--edm-space-3)}
+.grid-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.grid-4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.label{font-size:var(--edm-fs-caption);line-height:var(--edm-lh-caption);color:var(--edm-text-secondary);font-weight:600}
+code{font-family:var(--edm-font-mono);font-size:12px;color:var(--edm-ink-700);background:var(--edm-neutral-100);padding:1px 6px;border-radius:var(--edm-radius-xs)}
+@media (max-width:860px){.grid-3,.grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.grid-2,.grid-3,.grid-4{grid-template-columns:minmax(0,1fr)}}
+
+/* ===== 4. 色板 ===== */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:var(--edm-space-2)}
+.sw{display:grid;gap:var(--edm-space-1);font-size:var(--edm-fs-caption);line-height:var(--edm-lh-caption)}
+.sw i{display:block;height:44px;border-radius:var(--edm-radius-md);border:1px solid var(--edm-line)}
+.sw b{font-weight:600;color:var(--edm-text)}
+.sw span{color:var(--edm-text-tertiary);font-family:var(--edm-font-mono)}
+.roles{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:var(--edm-space-2)}
+.role{display:grid;grid-template-columns:40px minmax(0,1fr);gap:var(--edm-space-2);align-items:center;padding:var(--edm-space-2);border:1px solid var(--edm-line);border-radius:var(--edm-radius-md)}
+.role i{height:40px;border-radius:var(--edm-radius-sm);border:1px solid var(--edm-line)}
+.role b{display:block;font-size:var(--edm-fs-dense)}
+.role small{color:var(--edm-text-tertiary);font-family:var(--edm-font-mono);font-size:11px}
+
+/* ===== 5. 间距 / 圆角 / 阴影 ===== */
+.spaces{display:grid;gap:var(--edm-space-2)}
+.space{display:grid;grid-template-columns:120px 1fr;align-items:center;gap:var(--edm-space-3)}
+.space i{display:block;height:12px;background:var(--edm-primary-300);border-radius:2px}
+.radii{display:flex;flex-wrap:wrap;gap:var(--edm-space-3)}
+.radius{display:grid;place-items:center;width:88px;height:56px;background:var(--edm-primary-50);border:1px solid var(--edm-primary-300);color:var(--edm-primary-800);font-size:var(--edm-fs-caption);font-weight:600}
+.shadows{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--edm-space-4);padding:var(--edm-space-4);background:var(--edm-bg-canvas);border-radius:var(--edm-radius-lg)}
+.shadow{display:grid;place-content:center;min-height:88px;background:var(--edm-white);border:1px solid var(--edm-line);border-radius:var(--edm-radius-lg);text-align:center}
+@media (max-width:860px){.shadows{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ===== 6. 按钮 ===== */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--edm-space-2);min-height:var(--edm-control-height);padding:0 var(--edm-space-4);border:1px solid transparent;border-radius:var(--edm-radius-md);font-weight:600;cursor:pointer;white-space:nowrap;text-decoration:none}
+.btn-sm{min-height:var(--edm-control-height-sm);padding:0 var(--edm-space-3)}
+.btn svg{width:18px;height:18px}
+.btn-primary{background:var(--edm-accent);color:var(--edm-text-inverse)}
+.btn-primary.is-hover{background:var(--edm-accent-hover)}
+.btn-primary.is-active{background:var(--edm-accent-pressed);transform:translateY(1px)}
+.btn-secondary{background:var(--edm-white);color:var(--edm-ink-800);border-color:var(--edm-line-strong);box-shadow:var(--edm-shadow-1)}
+.btn-secondary.is-hover{background:var(--edm-bg-hover);color:var(--edm-primary-700);border-color:var(--edm-primary-300)}
+.btn-secondary.is-active{background:var(--edm-bg-hover);color:var(--edm-primary-700);border-color:var(--edm-primary-300);transform:translateY(1px)}
+.btn-danger{background:var(--edm-danger-action);color:var(--edm-text-inverse)}
+.btn-danger.is-hover{background:var(--edm-danger-hover)}
+.btn-danger.is-active{background:var(--edm-danger-pressed);transform:translateY(1px)}
+.btn-text{background:transparent;color:var(--edm-primary-700);padding:0 var(--edm-space-2)}
+.btn-text.is-hover,.btn-text.is-active{background:var(--edm-bg-hover)}
+.btn.is-focus{outline:2px solid var(--edm-primary-600);outline-offset:2px}
+.btn.is-disabled,.btn:disabled{cursor:not-allowed;box-shadow:none}
+.btn-primary.is-disabled,.btn-danger.is-disabled{background:var(--edm-bg-disabled);color:var(--edm-text-disabled)}
+.btn-secondary.is-disabled{background:var(--edm-white);color:var(--edm-text-disabled);border-color:var(--edm-line)}
+.btn-text.is-disabled{color:var(--edm-text-disabled)}
+.btn.is-loading{pointer-events:none}
+.spinner{width:16px;height:16px;border-radius:50%;border:2px solid color-mix(in srgb,currentColor 30%,transparent);border-top-color:currentColor;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.icon-btn{display:inline-grid;place-items:center;width:var(--edm-control-height-sm);height:var(--edm-control-height-sm);padding:0;border-radius:var(--edm-radius-md);background:var(--edm-white);border:1px solid var(--edm-line-strong);color:var(--edm-ink-700);cursor:pointer}
+.icon-btn.is-hover{color:var(--edm-primary-700);background:var(--edm-bg-hover);border-color:var(--edm-primary-300)}
+.icon-btn svg{width:16px;height:16px}
+@media (hover:hover) and (pointer:fine){
+  .btn-primary:hover{background:var(--edm-accent-hover)}
+  .btn-secondary:hover{background:var(--edm-bg-hover);color:var(--edm-primary-700);border-color:var(--edm-primary-300)}
+  .btn-danger:hover{background:var(--edm-danger-hover)}
+  .btn-text:hover{background:var(--edm-bg-hover)}
+  .icon-btn:hover{color:var(--edm-primary-700);background:var(--edm-bg-hover);border-color:var(--edm-primary-300)}
+}
+.btn:active:not(:disabled){transform:translateY(1px)}
+.states{display:grid;grid-template-columns:120px repeat(5,minmax(0,1fr));gap:var(--edm-space-2) var(--edm-space-3);align-items:center}
+.states>.label{text-align:left}
+.states .hd{font-size:var(--edm-fs-caption);color:var(--edm-text-tertiary);font-weight:600}
+@media (max-width:860px){.states{grid-template-columns:100px repeat(5,minmax(0,1fr))}}
+
+/* ===== 7. 表单控件 ===== */
+.field{display:grid;gap:var(--edm-space-2);min-width:0}
+.field>span{display:flex;justify-content:space-between;gap:var(--edm-space-2);font-size:var(--edm-fs-dense);font-weight:600;color:var(--edm-ink-800)}
+.field .req{color:var(--edm-danger-700);font-size:var(--edm-fs-caption);font-weight:600}
+.field small{font-size:var(--edm-fs-caption);line-height:var(--edm-lh-caption);color:var(--edm-text-secondary)}
+.input{width:100%;min-height:var(--edm-control-height);padding:0 var(--edm-space-3);background:var(--edm-white);border:1px solid var(--edm-line-strong);border-radius:var(--edm-radius-md);color:var(--edm-text)}
+.input::placeholder{color:var(--edm-text-tertiary)}
+.input.is-hover{border-color:var(--edm-neutral-450)}
+.input.is-focus,.input:focus{border-color:var(--edm-primary-600);box-shadow:0 0 0 3px var(--edm-focus-ring);outline:0}
+.input.is-readonly{background:var(--edm-neutral-50);color:var(--edm-ink-600);border-color:var(--edm-line)}
+.input.is-disabled,.input:disabled{background:var(--edm-bg-disabled);color:var(--edm-text-disabled);border-color:var(--edm-line);cursor:not-allowed}
+.input.is-error{border-color:var(--edm-danger-500);box-shadow:0 0 0 3px color-mix(in srgb,var(--edm-danger-500) 16%,transparent)}
+.field .err{font-size:var(--edm-fs-caption);line-height:var(--edm-lh-caption);color:var(--edm-danger-700)}
+textarea.input{min-height:88px;padding:10px 12px;resize:vertical}
+.check{display:inline-flex;align-items:center;gap:var(--edm-space-2);min-height:var(--edm-control-height-sm);font-size:var(--edm-fs-dense)}
+.check input{width:16px;height:16px;margin:0;accent-color:var(--edm-primary-600)}
+.switch{position:relative;width:36px;height:20px;border-radius:var(--edm-radius-full);background:var(--edm-neutral-400);border:0;cursor:pointer;padding:0}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--edm-white);transition:transform var(--edm-motion-base) var(--edm-ease)}
+.switch.on{background:var(--edm-accent)}
+.switch.on::after{transform:translateX(16px)}
+
+/* ===== 8. 表格 ===== */
+.table-frame{overflow:auto;background:var(--edm-bg-surface);border:1px solid var(--edm-line);border-radius:var(--edm-radius-xl)}
+table{width:100%;border-collapse:collapse;font-size:var(--edm-fs-dense);line-height:var(--edm-lh-dense)}
+th{height:var(--edm-control-height);padding:0 var(--edm-cell-px);text-align:left;font-size:var(--edm-fs-caption);font-weight:600;letter-spacing:.02em;color:var(--edm-ink-600);background:var(--edm-ink-100);border-bottom:1px solid var(--edm-ink-200);white-space:nowrap}
+td{padding:var(--edm-cell-py) var(--edm-cell-px);border-bottom:1px solid var(--edm-ink-100);color:var(--edm-ink-800);vertical-align:middle}
+tbody tr:nth-child(even){background:var(--edm-neutral-25)}
+tbody tr.is-hover{background:var(--edm-primary-75)}
+@media (hover:hover) and (pointer:fine){tbody tr:hover{background:var(--edm-primary-75)}}
+tbody tr.is-selected{background:var(--edm-bg-selected);box-shadow:inset 3px 0 0 var(--edm-primary-600)}
+td.amount,th.amount{text-align:right}
+.cell-primary{display:block;font-weight:600;color:var(--edm-ink-900);max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cell-secondary{display:block;font-size:var(--edm-fs-caption);color:var(--edm-ink-500);margin-top:2px}
+.row-actions{display:inline-flex;gap:var(--edm-space-1)}
+
+/* ===== 9. 页签 / 分段 / 导航 ===== */
+.tabs{display:flex;gap:var(--edm-space-2);overflow-x:auto;padding-bottom:2px}
+.tab{display:inline-flex;align-items:center;gap:var(--edm-space-2);min-height:var(--edm-tab-height);padding:0 var(--edm-space-4);border:1px solid var(--edm-line-strong);border-radius:var(--edm-radius-md);background:var(--edm-white);color:var(--edm-ink-700);font-weight:600;white-space:nowrap;cursor:pointer}
+.tab.is-hover{color:var(--edm-primary-700);border-color:var(--edm-primary-300)}
+.tab[aria-selected="true"]{background:var(--edm-accent);color:var(--edm-text-inverse);border-color:var(--edm-accent)}
+.tab.is-disabled{color:var(--edm-text-disabled);cursor:not-allowed}
+.tab .badge-count{min-width:18px;height:18px;padding:0 6px;border-radius:var(--edm-radius-full);background:color-mix(in srgb,currentColor 14%,transparent);font-size:11px;line-height:18px;text-align:center}
+.seg{display:inline-flex;gap:2px;padding:4px;background:var(--edm-neutral-100);border-radius:var(--edm-radius-lg)}
+.seg button{min-height:32px;padding:0 var(--edm-space-3);border:0;border-radius:var(--edm-radius-sm);background:transparent;color:var(--edm-ink-600);font-weight:600;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--edm-white);color:var(--edm-ink-900);box-shadow:var(--edm-shadow-1)}
+.nav{width:264px;padding:var(--edm-space-4) 14px;background:var(--edm-primary-900);color:var(--edm-primary-150);border-radius:var(--edm-radius-xl)}
+.nav .brand{display:flex;align-items:center;gap:var(--edm-space-3);min-height:56px;padding:0 var(--edm-space-2);margin-bottom:var(--edm-space-3);color:var(--edm-white)}
+.nav .brand i{display:grid;place-items:center;width:36px;height:36px;border-radius:var(--edm-radius-md);background:var(--edm-primary-600)}
+.nav .brand small{display:block;font-size:var(--edm-fs-caption);color:var(--edm-primary-150);font-weight:600}
+.nav .search{display:flex;align-items:center;gap:var(--edm-space-2);min-height:40px;padding:0 var(--edm-space-3);margin-bottom:var(--edm-space-2);border:1px solid color-mix(in srgb,var(--edm-white) 22%,transparent);border-radius:var(--edm-radius-md);background:color-mix(in srgb,var(--edm-white) 8%,transparent);font-size:var(--edm-fs-dense)}
+.nav .group{display:flex;align-items:center;justify-content:space-between;min-height:36px;padding:0 var(--edm-space-2);border-radius:var(--edm-radius-md);font-size:var(--edm-fs-caption);font-weight:600;letter-spacing:.04em;color:var(--edm-primary-150)}
+.nav .group.active{background:color-mix(in srgb,var(--edm-white) 7%,transparent);color:var(--edm-white)}
+.nav .items{display:grid;gap:2px;margin:2px 0 var(--edm-space-2) var(--edm-space-4);padding-left:var(--edm-space-2);border-left:1px solid color-mix(in srgb,var(--edm-primary-300) 20%,transparent)}
+.nav .item{display:flex;align-items:center;gap:var(--edm-space-2);min-height:36px;padding:0 var(--edm-space-2);border-radius:var(--edm-radius-md);font-size:var(--edm-fs-dense);color:color-mix(in srgb,var(--edm-primary-150) 72%,transparent)}
+.nav .item.hover{background:color-mix(in srgb,var(--edm-white) 7.5%,transparent);color:var(--edm-white)}
+.nav .item.active{background:var(--edm-accent);color:var(--edm-white)}
+.nav svg{width:16px;height:16px;flex:0 0 auto}
+
+/* ===== 10. 徽标 / 提示 / 状态 ===== */
+.badge{display:inline-flex;align-items:center;gap:var(--edm-space-1);height:24px;padding:0 var(--edm-space-2);border:1px solid;border-radius:var(--edm-radius-sm);font-size:var(--edm-fs-caption);font-weight:600;white-space:nowrap}
+.badge.pill{border-radius:var(--edm-radius-full)}
+.badge[data-tone="info"]{color:var(--edm-info-800);background:var(--edm-info-50);border-color:var(--edm-info-300)}
+.badge[data-tone="positive"]{color:var(--edm-success-800);background:var(--edm-success-50);border-color:var(--edm-success-200)}
+.badge[data-tone="warning"]{color:var(--edm-warning-800);background:var(--edm-warning-50);border-color:var(--edm-warning-300)}
+.badge[data-tone="danger"]{color:var(--edm-danger-800);background:var(--edm-danger-50);border-color:var(--edm-danger-200)}
+.badge[data-tone="muted"]{color:var(--edm-ink-600);background:var(--edm-neutral-75);border-color:var(--edm-ink-200)}
+.notice{display:flex;gap:var(--edm-space-3);align-items:flex-start;padding:10px 12px;border:1px solid;border-radius:var(--edm-radius-lg);font-size:var(--edm-fs-dense);line-height:var(--edm-lh-dense)}
+.notice strong{display:block;font-weight:600}
+.notice svg{width:16px;height:16px;flex:0 0 auto;margin-top:2px}
+.notice[data-tone="info"]{color:var(--edm-info-800);background:var(--edm-info-50);border-color:var(--edm-info-300)}
+.notice[data-tone="success"]{color:var(--edm-success-800);background:var(--edm-success-50);border-color:var(--edm-success-200)}
+.notice[data-tone="warning"]{color:var(--edm-warning-800);background:var(--edm-warning-50);border-color:var(--edm-warning-300)}
+.notice[data-tone="error"]{color:var(--edm-danger-800);background:var(--edm-danger-50);border-color:var(--edm-danger-200)}
+.state{display:grid;justify-items:center;gap:var(--edm-space-2);min-height:160px;padding:var(--edm-space-6) var(--edm-space-5);text-align:center;background:var(--edm-bg-muted);border:1px dashed var(--edm-line-strong);border-radius:var(--edm-radius-lg);color:var(--edm-text-tertiary)}
+.state svg{width:24px;height:24px;color:var(--edm-ink-400)}
+.state[data-tone="error"] svg{color:var(--edm-danger-600)}
+.state strong{font-size:var(--edm-fs-body);font-weight:600;color:var(--edm-ink-700)}
+.state span{font-size:var(--edm-fs-dense)}
+.skeleton{display:grid;gap:var(--edm-space-2)}
+.skeleton i{display:block;height:14px;border-radius:var(--edm-radius-sm);background:var(--edm-neutral-100);animation:pulse 1.2s ease-in-out infinite}
+.skeleton i:nth-child(2){width:80%}.skeleton i:nth-child(3){width:60%}.skeleton i:nth-child(4){width:90%}.skeleton i:nth-child(5){width:70%}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.kpi{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--edm-space-3);align-items:center;padding:var(--edm-space-4);background:var(--edm-white);border:1px solid var(--edm-line);border-left:4px solid var(--edm-primary-600);border-radius:var(--edm-radius-lg)}
+.kpi[data-tone="green"]{border-left-color:var(--edm-success-600)}
+.kpi[data-tone="amber"]{border-left-color:var(--edm-warning-600)}
+.kpi i{display:grid;place-items:center;width:36px;height:36px;border-radius:var(--edm-radius-md);background:var(--edm-primary-50);color:var(--edm-primary-700)}
+.kpi b{display:block;font-size:var(--edm-fs-h1);line-height:var(--edm-lh-h1);font-weight:700}
+.kpi span{display:block;font-size:var(--edm-fs-caption);color:var(--edm-text-secondary)}
+
+/* ===== 11. 弹窗 / 分页 / 筛选 / 页头 ===== */
+.dialog-demo{display:grid;place-items:center;padding:var(--edm-space-8);background:color-mix(in srgb,var(--edm-ink-950) 40%,transparent);border-radius:var(--edm-radius-lg)}
+.dialog{width:min(640px,100%);background:var(--edm-white);border-radius:var(--edm-radius-xl);box-shadow:var(--edm-shadow-4);overflow:hidden}
+.dialog header{display:flex;align-items:center;justify-content:space-between;gap:var(--edm-space-3);min-height:56px;padding:var(--edm-space-4) var(--edm-space-5);border-bottom:1px solid var(--edm-line)}
+.dialog .body{display:grid;gap:var(--edm-space-4);padding:var(--edm-space-5)}
+.dialog footer{display:flex;justify-content:flex-end;gap:var(--edm-space-2);padding:var(--edm-space-3) var(--edm-space-5);border-top:1px solid var(--edm-line)}
+.pager{display:flex;flex-wrap:wrap;align-items:center;gap:var(--edm-space-3);min-height:52px;padding:var(--edm-space-2) var(--edm-space-3);background:var(--edm-white);border:1px solid var(--edm-line);border-radius:var(--edm-radius-xl);font-size:var(--edm-fs-dense)}
+.pager .grow{flex:1 1 auto}
+.pager select,.pager input{min-height:32px;padding:0 var(--edm-space-2);border:1px solid var(--edm-line-strong);border-radius:var(--edm-radius-md);background:var(--edm-white)}
+.pager input{width:56px}
+.filter{display:flex;flex-wrap:wrap;align-items:center;gap:var(--edm-space-2);padding:var(--edm-space-3);background:var(--edm-bg-muted);border:1px solid var(--edm-line);border-radius:var(--edm-radius-lg)}
+.filter .input{flex:1 1 260px;width:auto}
+.page-header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:var(--edm-space-3)}
+.page-header .meta{display:flex;align-items:baseline;flex-wrap:wrap;gap:var(--edm-space-3)}
+.page-header .count{font-size:var(--edm-fs-dense);color:var(--edm-text-secondary)}
+.page-header p{margin-top:var(--edm-space-1);font-size:var(--edm-fs-dense);color:var(--edm-text-secondary)}
+.page-header .actions{display:flex;flex-wrap:wrap;gap:var(--edm-space-2)}
+.workspace-header{display:flex;align-items:center;justify-content:space-between;gap:var(--edm-space-4);min-height:var(--edm-header-height);padding:0 var(--edm-page-padding-x);background:color-mix(in srgb,var(--edm-white) 92%,transparent);border-bottom:1px solid var(--edm-line);border-radius:var(--edm-radius-xl) var(--edm-radius-xl) 0 0}
+.workspace-header .ctx{display:flex;align-items:center;gap:var(--edm-space-3)}
+.workspace-header .ctx i{display:grid;place-items:center;width:36px;height:36px;border-radius:var(--edm-radius-md);background:var(--edm-primary-50);color:var(--edm-primary-700)}
+.workspace-header .desc{font-size:var(--edm-fs-caption);color:var(--edm-text-secondary)}
+.chip{display:inline-flex;align-items:center;gap:var(--edm-space-2);min-height:32px;padding:0 var(--edm-space-3);border:1px solid var(--edm-line);border-radius:var(--edm-radius-full);background:var(--edm-white);font-size:var(--edm-fs-caption);font-weight:600;color:var(--edm-ink-700)}
+.chip .dot{width:8px;height:8px;border-radius:50%;background:var(--edm-success-600)}
+.avatar{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--edm-primary-600);color:var(--edm-white);font-size:12px;font-weight:700}
+.page-mock{display:grid;grid-template-columns:264px minmax(0,1fr);gap:var(--edm-space-4);align-items:start}
+.page-mock .surface{display:grid;gap:var(--edm-layout-gap);padding:0 0 var(--edm-page-padding-y)}
+.page-mock .surface>*:not(.workspace-header){margin:0 var(--edm-page-padding-x)}
+.page-mock .surface .workspace-header{margin-bottom:var(--edm-page-padding-y)}
+@media (max-width:1000px){.page-mock{grid-template-columns:minmax(0,1fr)}.page-mock .nav{display:none}}
+
+/* ===== 12. 登录 / 启动骨架 ===== */
+.login{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,400px);gap:var(--edm-space-10);align-items:center;padding:var(--edm-space-10);background:var(--edm-bg-canvas);border:1px solid var(--edm-line);border-radius:var(--edm-radius-xl)}
+.login .brand{display:grid;gap:var(--edm-space-4)}
+.login .lockup{display:flex;align-items:center;gap:var(--edm-space-3)}
+.login .lockup i{display:grid;place-items:center;width:48px;height:48px;border-radius:var(--edm-radius-lg);background:var(--edm-accent);color:var(--edm-white)}
+.login .lockup small{display:block;font-size:var(--edm-fs-caption);color:var(--edm-text-secondary)}
+.login .edition{display:inline-flex;align-items:center;height:26px;padding:0 10px;border:1px solid var(--edm-primary-200);border-radius:var(--edm-radius-sm);background:var(--edm-primary-50);color:var(--edm-primary-700);font-size:var(--edm-fs-dense);font-weight:600;vertical-align:middle;margin-left:var(--edm-space-3)}
+.login ul{display:grid;gap:var(--edm-space-3);margin:var(--edm-space-2) 0 0;padding:var(--edm-space-4) 0 0;border-top:1px solid var(--edm-line);list-style:none;color:var(--edm-text-secondary)}
+.login li{display:flex;align-items:center;gap:var(--edm-space-3)}
+.login li svg{width:18px;height:18px;color:var(--edm-primary-600)}
+.login-card{display:grid;gap:var(--edm-space-5);padding:var(--edm-space-8);background:var(--edm-white);border:1px solid var(--edm-line);border-radius:var(--edm-radius-2xl);box-shadow:var(--edm-shadow-4)}
+.login-card .input{min-height:44px}
+.login-card .btn{min-height:44px}
+.login-card details summary{cursor:pointer;color:var(--edm-text-secondary);font-size:var(--edm-fs-dense)}
+@media (max-width:860px){.login{grid-template-columns:minmax(0,1fr);gap:var(--edm-space-6);padding:var(--edm-space-6)}}
+.boot{display:grid;place-items:center;min-height:260px;background:var(--edm-bg-canvas);border:1px solid var(--edm-line);border-radius:var(--edm-radius-xl)}
+.boot .inner{display:grid;justify-items:center;gap:var(--edm-space-3);text-align:center}
+.boot .mark{display:grid;place-items:center;width:56px;height:56px;border-radius:var(--edm-radius-lg);background:var(--edm-accent);color:var(--edm-white)}
+.boot .bar{width:200px;height:4px;border-radius:var(--edm-radius-full);background:var(--edm-neutral-200);overflow:hidden}
+.boot .bar i{display:block;width:40%;height:100%;background:var(--edm-accent);border-radius:inherit;animation:slide 1.4s var(--edm-ease) infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(260%)}}
+.boot-error{display:grid;gap:var(--edm-space-3);max-width:560px;margin:0 auto;padding:var(--edm-space-5);background:var(--edm-white);border:1px solid var(--edm-danger-200);border-radius:var(--edm-radius-xl)}
+.boot-error pre{margin:0;padding:var(--edm-space-3);background:var(--edm-neutral-50);border:1px solid var(--edm-line);border-radius:var(--edm-radius-md);font-family:var(--edm-font-mono);font-size:12px;line-height:18px;white-space:pre-wrap;color:var(--edm-ink-700)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<header class="banner">
+  <div class="row">
+    <strong>前端设计参考样例</strong>
+    <span class="t-caption">商务蓝 · 克制扁平 · 与《前端设计系统规范》数值一致</span>
+    <span class="warn">目标态 · 未实施 · 示例数据均为虚构</span>
+  </div>
+  <div class="row">
+    <span class="t-caption">密度</span>
+    <div class="seg" role="group" aria-label="密度">
+      <button type="button" aria-pressed="true" data-density="comfortable">舒适 40px</button>
+      <button type="button" aria-pressed="false" data-density="compact">紧凑 34px</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- 色板 -->
+<section class="spec" id="palette">
+  <header><span class="t-eyebrow">§3</span><h2 class="t-h1">色板与语义角色</h2><p class="t-caption">基础调色板保留现有 hex；组件只能引用下方语义角色，不得直接使用基础色或新 hex。</p></header>
+  <div class="card">
+    <p class="label">主色 primary（仅主操作、激活导航、链接）</p>
+    <div class="swatches">
+      <div class="sw"><i style="background:#eff5ff"></i><b>50</b><span>#eff5ff</span></div>
+      <div class="sw"><i style="background:#edf3fc"></i><b>75</b><span>#edf3fc</span></div>
+      <div class="sw"><i style="background:#dbe7fa"></i><b>150</b><span>#dbe7fa</span></div>
+      <div class="sw"><i style="background:#a3c0ee"></i><b>300</b><span>#a3c0ee</span></div>
+      <div class="sw"><i style="background:#3574cc"></i><b>500</b><span>#3574cc</span></div>
+      <div class="sw"><i style="background:#245da8"></i><b>600 主操作</b><span>#245da8</span></div>
+      <div class="sw"><i style="background:#1d4a83"></i><b>700 悬停</b><span>#1d4a83</span></div>
+      <div class="sw"><i style="background:#203f65"></i><b>800 按下</b><span>#203f65</span></div>
+      <div class="sw"><i style="background:#1a2d46"></i><b>900 导航底</b><span>#1a2d46</span></div>
+    </div>
+    <p class="label" style="margin-top:12px">墨蓝灰 ink（文字与线）</p>
+    <div class="swatches">
+      <div class="sw"><i style="background:#f0f4f8"></i><b>100 表头底</b><span>#f0f4f8</span></div>
+      <div class="sw"><i style="background:#dce3ed"></i><b>200 发丝线</b><span>#dce3ed</span></div>
+      <div class="sw"><i style="background:#c5cfde"></i><b>300 强边框</b><span>#c5cfde</span></div>
+      <div class="sw"><i style="background:#94a3b8"></i><b>400 图标弱</b><span>#94a3b8</span></div>
+      <div class="sw"><i style="background:#64748b"></i><b>500 三级字</b><span>#64748b</span></div>
+      <div class="sw"><i style="background:#526176"></i><b>600 次要字</b><span>#526176</span></div>
+      <div class="sw"><i style="background:#283b53"></i><b>800 表格字</b><span>#283b53</span></div>
+      <div class="sw"><i style="background:#18283e"></i><b>950 正文</b><span>#18283e</span></div>
+    </div>
+    <p class="label" style="margin-top:12px">中性 neutral（底与禁用）与状态色</p>
+    <div class="swatches">
+      <div class="sw"><i style="background:#f4f6f9"></i><b>75 页面底</b><span>#f4f6f9</span></div>
+      <div class="sw"><i style="background:#eef2f5"></i><b>150 禁用底</b><span>#eef2f5</span></div>
+      <div class="sw"><i style="background:#94a3b8"></i><b>500 禁用字</b><span>#94a3b8</span></div>
+      <div class="sw"><i style="background:#1aa876"></i><b>success 600</b><span>#1aa876</span></div>
+      <div class="sw"><i style="background:#b56b08"></i><b>warning 600</b><span>#b56b08</span></div>
+      <div class="sw"><i style="background:#b4233f"></i><b>danger 600</b><span>#b4233f</span></div>
+      <div class="sw"><i style="background:#2f6fae"></i><b>info 600</b><span>#2f6fae</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <p class="label">语义角色（组件唯一允许的引用层）</p>
+    <div class="roles">
+      <div class="role"><i style="background:#f4f6f9"></i><div><b>--edm-bg-canvas</b><small>#f4f6f9 页面底</small></div></div>
+      <div class="role"><i style="background:#fff"></i><div><b>--edm-bg-surface</b><small>#ffffff 卡片/表格/弹窗</small></div></div>
+      <div class="role"><i style="background:#f8faff"></i><div><b>--edm-bg-muted</b><small>#f8faff 筛选条/说明块</small></div></div>
+      <div class="role"><i style="background:#eff5ff"></i><div><b>--edm-bg-hover</b><small>#eff5ff 行/次按钮悬停</small></div></div>
+      <div class="role"><i style="background:#dbe7fa"></i><div><b>--edm-bg-selected</b><small>#dbe7fa 选中行</small></div></div>
+      <div class="role"><i style="background:#eef2f5"></i><div><b>--edm-bg-disabled</b><small>#eef2f5 禁用控件</small></div></div>
+      <div class="role"><i style="background:#dce3ed"></i><div><b>--edm-line</b><small>#dce3ed 发丝线</small></div></div>
+      <div class="role"><i style="background:#c5cfde"></i><div><b>--edm-line-strong</b><small>#c5cfde 输入/按钮边框</small></div></div>
+      <div class="role"><i style="background:#18283e"></i><div><b>--edm-text</b><small>#18283e 14.87:1</small></div></div>
+      <div class="role"><i style="background:#526176"></i><div><b>--edm-text-secondary</b><small>#526176 6.31:1</small></div></div>
+      <div class="role"><i style="background:#64748b"></i><div><b>--edm-text-tertiary</b><small>#64748b 4.76:1</small></div></div>
+      <div class="role"><i style="background:#245da8"></i><div><b>--edm-accent</b><small>#245da8 白字 6.55:1</small></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 字阶 -->
+<section class="spec" id="type">
+  <header><span class="t-eyebrow">§4</span><h2 class="t-h1">字阶（六档）</h2><p class="t-caption">现状 350 处声明、34 种值 → 6 档。密度切换只改 body 14→13。数字一律 tabular-nums。</p></header>
+  <div class="card grid" style="gap:12px">
+    <div class="row"><span class="label" style="width:160px">display 26/34 700</span><span class="t-display">外贸单证管理</span></div>
+    <div class="row"><span class="label" style="width:160px">h1 20/28 700</span><span class="t-h1">发票目录</span></div>
+    <div class="row"><span class="label" style="width:160px">h2 16/24 700</span><span class="t-h2">商品明细</span></div>
+    <div class="row"><span class="label" style="width:160px">h3 14/22 600</span><span class="t-h3">地址与银行</span></div>
+    <div class="row"><span class="label" style="width:160px">body 14/22 400</span><span class="t-body">查找单据、继续制单，或勾选发票批量输出。</span></div>
+    <div class="row"><span class="label" style="width:160px">dense 13/20 400</span><span class="t-dense">YH2026-001 · SUNRISE TRADING LTD · 2026-11-01</span></div>
+    <div class="row"><span class="label" style="width:160px">caption 12/18</span><span class="t-caption">通常无需修改；仅在管理员要求切换业务服务器时填写。</span></div>
+    <div class="row"><span class="label" style="width:160px">数字</span><span class="t-dense num">USD 12,300.00 · 1,000 件 · 第 1 / 62 页</span></div>
+  </div>
+</section>
+
+<!-- 间距 圆角 阴影 -->
+<section class="spec" id="scales">
+  <header><span class="t-eyebrow">§5</span><h2 class="t-h1">间距 · 圆角 · 阴影 · 动效</h2><p class="t-caption">间距只用 4 的倍数；圆角七档；阴影四级，导航激活、指标卡、主按钮不带阴影与渐变。</p></header>
+  <div class="grid grid-3">
+    <div class="card">
+      <p class="label">间距 --edm-space-*</p>
+      <div class="spaces" style="margin-top:8px">
+        <div class="space"><code>space-1 · 4</code><i style="width:4px"></i></div>
+        <div class="space"><code>space-2 · 8</code><i style="width:8px"></i></div>
+        <div class="space"><code>space-3 · 12</code><i style="width:12px"></i></div>
+        <div class="space"><code>space-4 · 16</code><i style="width:16px"></i></div>
+        <div class="space"><code>space-5 · 20</code><i style="width:20px"></i></div>
+        <div class="space"><code>space-6 · 24</code><i style="width:24px"></i></div>
+        <div class="space"><code>space-8 · 32</code><i style="width:32px"></i></div>
+        <div class="space"><code>space-10 · 40</code><i style="width:40px"></i></div>
+      </div>
+    </div>
+    <div class="card">
+      <p class="label">圆角 --edm-radius-*</p>
+      <div class="radii" style="margin-top:8px">
+        <div class="radius" style="border-radius:4px">xs 4</div>
+        <div class="radius" style="border-radius:6px">sm 6</div>
+        <div class="radius" style="border-radius:8px">md 8</div>
+        <div class="radius" style="border-radius:10px">lg 10</div>
+        <div class="radius" style="border-radius:12px">xl 12</div>
+        <div class="radius" style="border-radius:16px">2xl 16</div>
+        <div class="radius" style="border-radius:999px">full</div>
+      </div>
+      <p class="t-caption" style="margin-top:12px">控件 8 · 卡片 10 · 弹窗/表格 12 · 登录卡 16 · 胶囊 full</p>
+    </div>
+    <div class="card">
+      <p class="label">动效</p>
+      <p class="t-dense" style="margin-top:8px">fast 120ms · base 160ms · slow 220ms<br>缓动 <code>cubic-bezier(.2,0,0,1)</code><br>仅颜色/边框/阴影/透明度；位移 ≤1px；悬停仅指针设备；减少动效时全部关闭。</p>
+    </div>
+  </div>
+  <div class="shadows">
+    <div class="shadow" style="box-shadow:var(--edm-shadow-1)"><b>shadow-1</b><span class="t-caption">静置卡片</span></div>
+    <div class="shadow" style="box-shadow:var(--edm-shadow-2)"><b>shadow-2</b><span class="t-caption">悬停卡片 / 粘性条</span></div>
+    <div class="shadow" style="box-shadow:var(--edm-shadow-3)"><b>shadow-3</b><span class="t-caption">下拉 / 浮层 / 页头</span></div>
+    <div class="shadow" style="box-shadow:var(--edm-shadow-4)"><b>shadow-4</b><span class="t-caption">弹窗 / 抽屉 / 登录卡</span></div>
+  </div>
+</section>
+
+<!-- 按钮 -->
+<section class="spec" id="buttons">
+  <header><span class="t-eyebrow">§7.1</span><h2 class="t-h1">按钮状态矩阵</h2><p class="t-caption">md 高 40（紧凑 34）/ sm 高 32（紧凑 28）；圆角 8；禁用用显式颜色而非透明度。列为静态复刻状态，真实悬停同样生效。</p></header>
+  <div class="card states">
+    <span class="hd"></span><span class="hd">默认</span><span class="hd">悬停</span><span class="hd">按下</span><span class="hd">键盘焦点</span><span class="hd">禁用</span>
+    <span class="label">primary</span>
+    <button class="btn btn-primary">保存发票</button><button class="btn btn-primary is-hover">保存发票</button><button class="btn btn-primary is-active">保存发票</button><button class="btn btn-primary is-focus">保存发票</button><button class="btn btn-primary is-disabled" disabled>保存发票</button>
+    <span class="label">secondary</span>
+    <button class="btn btn-secondary">导入 Excel</button><button class="btn btn-secondary is-hover">导入 Excel</button><button class="btn btn-secondary is-active">导入 Excel</button><button class="btn btn-secondary is-focus">导入 Excel</button><button class="btn btn-secondary is-disabled" disabled>导入 Excel</button>
+    <span class="label">danger</span>
+    <button class="btn btn-danger">作废</button><button class="btn btn-danger is-hover">作废</button><button class="btn btn-danger is-active">作废</button><button class="btn btn-danger is-focus">作废</button><button class="btn btn-danger is-disabled" disabled>作废</button>
+    <span class="label">text</span>
+    <button class="btn btn-text">查看全部</button><button class="btn btn-text is-hover">查看全部</button><button class="btn btn-text is-active">查看全部</button><button class="btn btn-text is-focus">查看全部</button><button class="btn btn-text is-disabled" disabled>查看全部</button>
+    <span class="label">加载 / 小号 / 图标</span>
+    <button class="btn btn-primary is-loading"><span class="spinner" aria-hidden="true"></span>正在保存</button>
+    <button class="btn btn-secondary btn-sm">sm 32</button>
+    <button class="icon-btn" aria-label="刷新"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    <button class="icon-btn is-hover" aria-label="刷新（悬停）"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    <span></span>
+  </div>
+</section>
+
+<!-- 表单 -->
+<section class="spec" id="inputs">
+  <header><span class="t-eyebrow">§7.2</span><h2 class="t-h1">输入控件状态</h2><p class="t-caption">高 40（紧凑 34）；边框 ink-300；聚焦 = primary-600 边框 + 3px 18% 光环；错误 = danger-500 边框 + 文案。</p></header>
+  <div class="card grid grid-4">
+    <label class="field"><span>默认</span><input class="input" placeholder="发票号、合同号、客户"></label>
+    <label class="field"><span>悬停</span><input class="input is-hover" value="YH2026-001"></label>
+    <label class="field"><span>聚焦</span><input class="input is-focus" value="YH2026-001"></label>
+    <label class="field"><span>只读</span><input class="input is-readonly" readonly value="SUNRISE TRADING LTD"></label>
+    <label class="field"><span>禁用</span><input class="input is-disabled" disabled value="不可编辑"></label>
+    <label class="field"><span>错误 <em class="req">必填</em></span><input class="input is-error" value=""><em class="err">请填写发票号，用于生成单据文件名。</em></label>
+    <label class="field"><span>带说明</span><select class="input"><option>一般贸易</option><option>来料加工</option></select><small>新建发票默认使用报关数据与一般贸易。</small></label>
+    <div class="field"><span>勾选与开关</span><div class="row" style="min-height:40px"><label class="check"><input type="checkbox" checked>复制明细</label><label class="check"><input type="checkbox">清空金额</label><button class="switch on" type="button" aria-label="自动获取汇率" aria-pressed="true"></button></div></div>
+  </div>
+</section>
+
+<!-- 表格 -->
+<section class="spec" id="table">
+  <header><span class="t-eyebrow">§7.3</span><h2 class="t-h1">表格</h2><p class="t-caption">表头 ink-100 · 12px 600；行 10×12（紧凑 7×10）；斑马 neutral-25；悬停 primary-75；选中 primary-150 + 左侧 3px 主色；数字右对齐。</p></header>
+  <div class="table-frame">
+    <table>
+      <thead><tr><th style="width:36px"><input type="checkbox" aria-label="全选" style="accent-color:#245da8"></th><th>发票号 / 合同号</th><th>状态</th><th>客户</th><th>日期</th><th class="amount">金额</th><th style="width:120px">操作</th></tr></thead>
+      <tbody>
+        <tr><td><input type="checkbox" aria-label="选择"></td><td><span class="cell-primary">YH2026-001</span><span class="cell-secondary">PO-88213</span></td><td><span class="badge" data-tone="positive">已核对</span></td><td>SUNRISE TRADING LTD</td><td class="num">2026-11-01</td><td class="amount num">USD 12,300.00</td><td><span class="row-actions"><button class="icon-btn" aria-label="打开"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 12h16"/><path d="m14 6 6 6-6 6"/></svg></button><button class="icon-btn" aria-label="复制"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg></button><button class="icon-btn" aria-label="更多"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></button></span></td></tr>
+        <tr class="is-hover"><td><input type="checkbox" aria-label="选择"></td><td><span class="cell-primary">YH2026-002</span><span class="cell-secondary">PO-88220</span></td><td><span class="badge" data-tone="warning">草稿</span></td><td>示例国际贸易有限公司（名称较长时在 320px 截断显示）</td><td class="num">2026-11-02</td><td class="amount num">EUR 8,640.00</td><td><span class="t-caption">悬停行</span></td></tr>
+        <tr class="is-selected"><td><input type="checkbox" checked aria-label="已选择" style="accent-color:#245da8"></td><td><span class="cell-primary">YH2026-003</span><span class="cell-secondary">PO-88231</span></td><td><span class="badge" data-tone="info">已出运</span></td><td>NORTHWIND IMPORTS</td><td class="num">2026-11-02</td><td class="amount num">USD 3,250.00</td><td><span class="t-caption">选中行</span></td></tr>
+        <tr><td><input type="checkbox" aria-label="选择"></td><td><span class="cell-primary">YH2026-004</span><span class="cell-secondary">PO-88240</span></td><td><span class="badge" data-tone="danger">已作废</span></td><td>示例贸易</td><td class="num">2026-11-03</td><td class="amount num">USD 0.00</td><td></td></tr>
+        <tr><td><input type="checkbox" aria-label="选择"></td><td><span class="cell-primary">YH2026-005</span><span class="cell-secondary">—</span></td><td><span class="badge" data-tone="muted">停用</span></td><td>示例贸易</td><td class="num">2026-11-03</td><td class="amount num">USD 980.00</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="pager">
+    <span class="num">第 1 / 62 页 · 1,234 条</span>
+    <span class="grow"></span>
+    <label class="row" style="gap:8px">每页 <select><option>20</option><option>50</option><option>100</option></select> 条</label>
+    <label class="row" style="gap:8px">跳至 <input class="num" value="1" inputmode="numeric" aria-label="跳转页"> <button class="btn btn-secondary btn-sm">跳转</button></label>
+    <span class="row" style="gap:4px"><button class="btn btn-secondary btn-sm is-disabled" disabled>首页</button><button class="btn btn-secondary btn-sm is-disabled" disabled>上一页</button><button class="btn btn-secondary btn-sm">下一页</button><button class="btn btn-secondary btn-sm">末页</button></span>
+  </div>
+</section>
+
+<!-- 页签 分段 导航 -->
+<section class="spec" id="tabs">
+  <header><span class="t-eyebrow">§7.4–7.5</span><h2 class="t-h1">页签 · 分段导航 · 侧栏</h2><p class="t-caption">文档页签选中 = 实色主色；分段选中 = 白底 + shadow-1；侧栏激活 = 实色 primary-600，无渐变无光晕。</p></header>
+  <div class="grid grid-2">
+    <div class="card grid" style="gap:16px">
+      <div><p class="label" style="margin-bottom:8px">文档页签（发票五页签）</p>
+        <div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="true">基本信息</button><button class="tab" role="tab" aria-selected="false">商品明细 <span class="badge-count">12</span></button><button class="tab is-hover" role="tab" aria-selected="false">运输与报关</button><button class="tab" role="tab" aria-selected="false">辅助分析</button><button class="tab is-disabled" role="tab" aria-selected="false" aria-disabled="true">预览与导出</button></div></div>
+      <div><p class="label" style="margin-bottom:8px">分段导航（视图切换）</p>
+        <div class="seg" role="group"><button type="button" aria-pressed="true">审批与进度</button><button type="button" aria-pressed="false">待我办理</button><button type="button" aria-pressed="false">发起申请</button></div></div>
+      <div><p class="label" style="margin-bottom:8px">筛选条（三层：搜索 / 筛选 / 所选操作）</p>
+        <div class="filter"><input class="input" placeholder="发票号、合同号、客户、港口"><select class="input" style="width:auto;flex:0 1 160px"><option>全部状态</option></select><button class="btn btn-secondary">搜索</button><button class="icon-btn" aria-label="重置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div>
+    </div>
+    <nav class="nav" aria-label="主导航样例">
+      <div class="brand"><i><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg></i><div><strong>外贸单证管理</strong><small>单证版</small></div></div>
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>查找功能</div>
+      <div class="group active"><span>工作台</span><span>⌄</span></div>
+      <div class="items"><div class="item">工作概览</div><div class="item">我的待办</div><div class="item active">发票管理</div><div class="item hover">付款报销打印</div><div class="item">文件任务</div></div>
+      <div class="group"><span>单证与申报</span><span>›</span></div>
+      <div class="group"><span>资料与工具</span><span>›</span></div>
+      <div class="group"><span>系统管理</span><span>›</span></div>
+    </nav>
+  </div>
+</section>
+
+<!-- 徽标 提示 状态 -->
+<section class="spec" id="feedback">
+  <header><span class="t-eyebrow">§7.6–7.9</span><h2 class="t-h1">徽标 · 行内提示 · 查询状态 · 指标卡</h2><p class="t-caption">状态色必须带文字；空/载/错三态同尺寸；指标卡只保留左侧色条，无渐变、无悬停位移。</p></header>
+  <div class="card row">
+    <span class="badge" data-tone="info">审批中</span><span class="badge" data-tone="positive">已批准</span><span class="badge" data-tone="warning">待财务接收</span><span class="badge" data-tone="danger">已驳回</span><span class="badge" data-tone="muted">草稿</span>
+    <span class="badge pill" data-tone="positive">● 服务正常</span><span class="badge pill" data-tone="warning">● 登录即将到期</span>
+  </div>
+  <div class="grid grid-2">
+    <div class="notice" data-tone="success"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 5-5"/></svg><div><strong>发票已保存</strong>单据包已交给浏览器下载。</div></div>
+    <div class="notice" data-tone="error"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><div><strong>发票操作未完成</strong>这条数据已在其他位置更新，请加载最新版本后再保存。</div></div>
+    <div class="notice" data-tone="warning"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></svg><div><strong>当前页面不可用</strong>当前账号、产品版本或运行模式不允许访问此页面。</div></div>
+    <div class="notice" data-tone="info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><div><strong>仅查看权限</strong>新建、复制、导入和单据包维护已禁用。</div></div>
+  </div>
+  <div class="grid grid-3">
+    <div class="state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 7h16v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M4 11h16M9 15h6"/></svg><strong>当前没有符合条件的待办</strong><span>仅汇总当前账号有权查看和处理的业务事项。</span><button class="btn btn-secondary btn-sm">清除筛选</button></div>
+    <div class="state" data-tone="error"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><strong>待办加载失败</strong><span>业务服务暂不可达（HTTP 503）。恢复后请重试。</span><button class="btn btn-secondary btn-sm">重试</button></div>
+    <div class="card"><p class="label" style="margin-bottom:8px">加载（骨架优先）</p><div class="skeleton"><i></i><i></i><i></i><i></i><i></i></div></div>
+  </div>
+  <div class="grid grid-3">
+    <div class="kpi"><i><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></i><div><span>本月出口额（USD）</span><b class="num">128,450.00</b><span class="t-caption">较上月 4.2%</span></div></div>
+    <div class="kpi" data-tone="green"><i><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75"><path d="m3 17 6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg></i><div><span>本月预估利润（CNY）</span><b class="num">36,120.00</b><span class="t-caption">与上月持平</span></div></div>
+    <div class="kpi" data-tone="amber"><i><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 12h6M9 16h4"/></svg></i><div><span>待处理订单</span><b class="num">17</b><span class="t-caption">草稿 9 · 已核对 8</span></div></div>
+  </div>
+</section>
+
+<!-- 弹窗 -->
+<section class="spec" id="dialog">
+  <header><span class="t-eyebrow">§7.7</span><h2 class="t-h1">弹窗</h2><p class="t-caption">宽 480/640/880/1120；圆角 12；遮罩 ink-950 40%；头 56 · 正文 20 · 底 12/20；主操作最右，危险用 danger。</p></header>
+  <div class="dialog-demo">
+    <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title">
+      <header><h2 class="t-h2" id="dlg-title">复制发票</h2><button class="icon-btn" aria-label="关闭"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 6 6 18M6 6l12 12"/></svg></button></header>
+      <div class="body">
+        <label class="field"><span>新发票号 <em class="req">必填</em></span><input class="input" value="YH2026-006"></label>
+        <div class="row"><label class="check"><input type="checkbox" checked>复制表头</label><label class="check"><input type="checkbox" checked>复制明细</label><label class="check"><input type="checkbox" checked>重置日期</label><label class="check"><input type="checkbox">清空金额</label></div>
+        <div class="notice" data-tone="info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><div>复制到新发票号会清除金额调整，避免沿用旧定金。</div></div>
+      </div>
+      <footer><button class="btn btn-secondary">取消</button><button class="btn btn-primary">复制并打开</button></footer>
+    </div>
+  </div>
+</section>
+
+<!-- 列表页样张 -->
+<section class="spec" id="list-page">
+  <header><span class="t-eyebrow">§9</span><h2 class="t-h1">列表页样张（ListWorkspace）</h2><p class="t-caption">外壳页头 64 · 页面留白 24/20 · 页头 → 筛选 → 表格 → 分页；页面不再自建外壳与页头。</p></header>
+  <div class="page-mock">
+    <nav class="nav" aria-label="主导航">
+      <div class="brand"><i><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg></i><div><strong>外贸单证管理</strong><small>单证版</small></div></div>
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>查找功能</div>
+      <div class="group"><span>工作台</span><span>›</span></div>
+      <div class="group active"><span>单证与申报</span><span>⌄</span></div>
+      <div class="items"><div class="item active">发票管理</div><div class="item">统计查询</div><div class="item">业务资料</div><div class="item">单一窗口</div><div class="item">HS 编码知识</div></div>
+      <div class="group"><span>资料与工具</span><span>›</span></div>
+      <div class="group"><span>系统管理</span><span>›</span></div>
+    </nav>
+    <div class="card surface" style="padding:0;overflow:hidden">
+      <div class="workspace-header">
+        <div class="ctx"><i><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg></i><div><span class="t-eyebrow">单证与申报</span><h1 class="t-h1">发票管理</h1><span class="desc">新建和维护出口发票，核对并输出单据</span></div></div>
+        <div class="row" style="gap:8px"><span class="chip"><span class="dot"></span>本机服务正常</span><span class="chip"><span class="avatar">张</span>张伟 · 管理员</span><button class="btn btn-text btn-sm">退出</button></div>
+      </div>
+      <div class="page-header">
+        <div><div class="meta"><h2 class="t-h2">发票目录</h2><span class="count num">共 1,234 条</span></div><p>查找单据、继续制单，或勾选发票批量输出。</p></div>
+        <div class="actions"><button class="btn btn-secondary">导入 Excel</button><button class="btn btn-secondary">导入单据包</button><button class="icon-btn" aria-label="刷新" style="width:40px;height:40px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button><button class="btn btn-primary">＋ 新建</button></div>
+      </div>
+      <div class="filter"><input class="input" placeholder="发票号、合同号、客户、港口"><select class="input" style="width:auto;flex:0 1 160px"><option>全部状态</option></select><button class="btn btn-secondary">搜索</button></div>
+      <div class="table-frame"><table>
+        <thead><tr><th style="width:36px"></th><th>发票号 / 合同号</th><th>状态</th><th>客户</th><th>日期</th><th class="amount">金额</th></tr></thead>
+        <tbody>
+          <tr><td><input type="checkbox" aria-label="选择"></td><td><span class="cell-primary">YH2026-001</span><span class="cell-secondary">PO-88213</span></td><td><span class="badge" data-tone="positive">已核对</span></td><td>SUNRISE TRADING LTD</td><td class="num">2026-11-01</td><td class="amount num">USD 12,300.00</td></tr>
+          <tr><td><input type="checkbox" aria-label="选择"></td><td><span class="cell-primary">YH2026-002</span><span class="cell-secondary">PO-88220</span></td><td><span class="badge" data-tone="warning">草稿</span></td><td>示例国际贸易有限公司</td><td class="num">2026-11-02</td><td class="amount num">EUR 8,640.00</td></tr>
+          <tr><td><input type="checkbox" aria-label="选择"></td><td><span class="cell-primary">YH2026-003</span><span class="cell-secondary">PO-88231</span></td><td><span class="badge" data-tone="info">已出运</span></td><td>NORTHWIND IMPORTS</td><td class="num">2026-11-02</td><td class="amount num">USD 3,250.00</td></tr>
+        </tbody></table></div>
+      <div class="pager"><span class="num">第 1 / 62 页 · 1,234 条</span><span class="grow"></span><label class="row" style="gap:8px">每页 <select><option>20</option></select> 条</label><span class="row" style="gap:4px"><button class="btn btn-secondary btn-sm is-disabled" disabled>上一页</button><button class="btn btn-secondary btn-sm">下一页</button></span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 登录与启动 -->
+<section class="spec" id="login">
+  <header><span class="t-eyebrow">§3.4 / §9</span><h2 class="t-h1">启动骨架 · 登录页</h2><p class="t-caption">启动：画布底 + 品牌标 + 细进度条，不再白屏或复用登录壳；登录卡圆角 16、shadow-4、输入与按钮 44px；底色为画布色，无渐变。</p></header>
+  <div class="grid grid-2">
+    <div class="boot"><div class="inner"><div class="mark"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg></div><div class="t-h2">正在准备工作空间</div><div class="t-caption">检查运行组件 · 启动本机服务</div><div class="bar"><i></i></div></div></div>
+    <div class="boot-error" role="alert">
+      <div class="row" style="gap:8px"><span class="badge" data-tone="danger">启动失败</span><strong class="t-h2">程序包缺少中文报表字体</strong></div>
+      <p class="t-dense">请完整解压或重新安装本程序；诊断日志已写入下方路径，可复制后交给维护人员。</p>
+      <pre>E:\ExportDocManager\App_Data\Logs\tauri-bootstrap-error.log</pre>
+      <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn btn-secondary">复制日志路径</button><button class="btn btn-primary">重试</button></div>
+    </div>
+  </div>
+  <div class="login">
+    <div class="brand">
+      <div class="lockup"><i><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg></i><div><strong>有序工作，协同共进</strong><small>ExportDocManager · Documents</small></div></div>
+      <h1 class="t-display">外贸单证管理<span class="edition">单证版</span></h1>
+      <p class="t-body" style="color:var(--edm-text-secondary)">单证制作与交付工作台</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>制单与校验</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>模板与导出</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg>资料与归档</li>
+      </ul>
+    </div>
+    <form class="login-card" onsubmit="return false">
+      <div><span class="t-eyebrow">工作区</span><h2 class="t-h1">登录</h2><p class="t-caption">登录本机工作空间，继续处理业务</p></div>
+      <label class="field"><span>账号</span><input class="input" value="admin" autocomplete="username"></label>
+      <label class="field"><span>密码</span><input class="input" type="password" value="••••••••" autocomplete="current-password"></label>
+      <button class="btn btn-primary" type="submit">登录</button>
+      <details><summary>高级连接选项</summary><label class="field" style="margin-top:12px"><span>服务器地址</span><input class="input" value="http://127.0.0.1:5188"><small>通常无需修改；仅在管理员要求切换业务服务器时填写。</small></label></details>
+    </form>
+  </div>
+</section>
+
+<p class="t-caption" style="text-align:center">本页为静态参考样张，仅用于评审风格与数值；不属于应用构建产物，不代表任何已实现功能。</p>
+</main>
+
+<script>
+for (const button of document.querySelectorAll('.banner .seg button')) {
+  button.addEventListener('click', () => {
+    document.documentElement.dataset.density = button.dataset.density;
+    for (const other of document.querySelectorAll('.banner .seg button')) other.setAttribute('aria-pressed', String(other === button));
+  });
+}
+</script>
+</body>
+</html>
