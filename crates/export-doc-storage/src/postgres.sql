@@ -5,8 +5,8 @@ INSERT INTO schema_version VALUES (13);
 CREATE FUNCTION exportdoc_record_text(value jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
   SELECT CASE jsonb_typeof(value)
-    WHEN 'object' THEN (SELECT '{' || COALESCE(string_agg(to_jsonb(key)::text || ':' || exportdoc_record_text(item), ',' ORDER BY key COLLATE "C"), '') || '}' FROM jsonb_each(value) AS entries(key,item))
-    WHEN 'array' THEN (SELECT '[' || COALESCE(string_agg(exportdoc_record_text(item), ',' ORDER BY ordinal), '') || ']' FROM jsonb_array_elements(value) WITH ORDINALITY AS entries(item,ordinal))
+    WHEN 'object' THEN (SELECT '{' || COALESCE(string_agg(to_jsonb(key)::text || ':' || public.exportdoc_record_text(item), ',' ORDER BY key COLLATE "C"), '') || '}' FROM jsonb_each(value) AS entries(key,item))
+    WHEN 'array' THEN (SELECT '[' || COALESCE(string_agg(public.exportdoc_record_text(item), ',' ORDER BY ordinal), '') || ']' FROM jsonb_array_elements(value) WITH ORDINALITY AS entries(item,ordinal))
     ELSE value::text END
 $$;
 GRANT EXECUTE ON FUNCTION exportdoc_record_text(jsonb) TO PUBLIC;

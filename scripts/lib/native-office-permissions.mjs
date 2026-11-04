@@ -34,7 +34,7 @@ export async function verifyDesktopOfficePermissions({ run, request, token, cdp,
   await signIn();
   assert.equal(await run('location.hash'), '#/office/approvals', 'Employee opens the office workspace');
   const text = await run('document.body.innerText');
-  assert(text.includes('人员与组织') && text.includes('申请与资源'));
+  assert(text.includes('行政与人事') && text.includes('申请与审批'));
   const navigation = await run("document.querySelector('#workspace-primary-navigation').textContent");
   assert(navigation.includes('工作台') && !navigation.includes('付款报销打印') && !navigation.includes('报表模板管理'));
   assert(!text.includes('单证概览') && !text.includes('账号与权限') && !text.includes('人员档案'));
