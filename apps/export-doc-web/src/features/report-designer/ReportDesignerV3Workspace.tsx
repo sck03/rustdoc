@@ -4,6 +4,7 @@ import { ReportDesignerUploadState } from "./reportDesignerUploadState.ts";
 import { ReportDesignerPreviewProvider } from "./ReportDesignerPreviewContext.tsx";
 import { useReportDesignerV3Shortcuts } from "./useReportDesignerV3Shortcuts.ts";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
 import {
   AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignHorizontalJustifyStart,
   AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart,
@@ -442,15 +443,15 @@ export function ReportDesignerV3Workspace({
           <ToolbarButton label="适合窗口" icon={<Maximize2 size={15} />} onClick={() => { setFitWidth(false); setAutoFit(true); setFitRequest((value) => value + 1); }} />
         </div>
       </div>
-      {editingEnabled ? <div className="report-designer-v3-compact-tabs" role="group" aria-label="设计工作区切换">
-        {([['resources', '添加内容'], ['canvas', '画布'], ['properties', '属性']] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={compactPanel === value} onClick={() => setCompactPanel(value)}>{label}{value === "properties" && history.state.selectedIds.length ? `（${history.state.selectedIds.length}）` : ""}</button>)}
+      {editingEnabled ? <div className="report-designer-v3-compact-tabs">
+        <SegmentedNav label="设计工作区切换" value={compactPanel} onChange={setCompactPanel}
+          items={([['resources', '添加内容'], ['canvas', '画布'], ['properties', '属性']] as const).map(([key, label]) => ({ key, label: `${label}${key === "properties" && history.state.selectedIds.length ? `（${history.state.selectedIds.length}）` : ""}` }))} />
       </div> : null}
       <div className={`report-designer-v3-layout${editingEnabled ? "" : " is-read-only"}`}>
         {editingEnabled ? <aside className="report-designer-v3-sidebar">
-          <div className="report-designer-v3-sidebar-tabs" role="tablist" aria-label="设计器资源面板">
-            <TabButton active={sidebarTab === "components"} label="组件" onClick={() => setSidebarTab("components")} />
-            <TabButton active={sidebarTab === "fields"} label="字段" onClick={() => setSidebarTab("fields")} />
-            <TabButton active={sidebarTab === "layers"} label="图层" onClick={() => setSidebarTab("layers")} />
+          <div className="report-designer-v3-sidebar-tabs">
+            <SegmentedNav label="设计器资源面板" value={sidebarTab} onChange={setSidebarTab}
+              items={[{ key: "components", label: "组件" }, { key: "fields", label: "字段" }, { key: "layers", label: "图层" }]} />
           </div>
           {sidebarTab === "components" ? <ComponentPalette reportType={reportType} actions={insertionActions} canEdit={editingEnabled} /> : null}
           {sidebarTab === "fields" ? (
@@ -539,8 +540,4 @@ export function ReportDesignerV3Workspace({
 
 function ToolbarButton({ label, title, icon, onClick, disabled, danger }: { label: string; title?: string; icon: React.ReactNode; onClick: () => void; disabled?: boolean; danger?: boolean }) {
   return <button className={`report-designer-v3-tool-button${danger ? " is-danger" : ""}`} type="button" title={title || label} aria-label={label} onClick={onClick} disabled={disabled}>{icon}<span>{label}</span></button>;
-}
-
-function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return <button className={active ? "is-active" : ""} type="button" role="tab" aria-selected={active} onClick={onClick}>{label}</button>;
 }

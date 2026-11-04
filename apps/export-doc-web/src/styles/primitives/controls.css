@@ -15,7 +15,8 @@ button { cursor: pointer; }
 .command-button.secondary, [data-ui="button"][data-variant="secondary"], .icon-button {
   color: var(--edm-ink-800); border-color: var(--edm-line-strong); background: var(--edm-bg-surface);
 }
-.command-button.danger, [data-ui="button"][data-variant="danger"] { color: var(--edm-text-inverse); border-color: var(--edm-danger-600); background: var(--edm-danger-600); }
+.command-button.secondary, [data-ui="button"][data-variant="secondary"] { box-shadow: var(--edm-shadow-1); }
+.command-button.danger, [data-ui="button"][data-variant="danger"] { color: var(--edm-text-inverse); border-color: var(--edm-danger-600); background: var(--edm-danger-600); box-shadow: none; }
 .text-button, [data-ui="button"][data-variant="text"] { color: var(--edm-primary-700); background: transparent; border-color: transparent; }
 .icon-button { width: var(--edm-control-height-sm); min-height: var(--edm-control-height-sm); padding: 0; }
 button:disabled, .command-button:disabled, [data-ui="button"]:disabled { color: var(--edm-text-disabled); border-color: var(--edm-line); background: var(--edm-bg-disabled); cursor: not-allowed; }
@@ -30,13 +31,29 @@ input::placeholder, textarea::placeholder { color: var(--edm-text-tertiary); }
 input:focus, select:focus, textarea:focus { border-color: var(--edm-accent); box-shadow: var(--edm-shadow-focus); outline: 0; }
 input[readonly], textarea[readonly] { background: var(--edm-neutral-50); color: var(--edm-text-secondary); border-color: var(--edm-line); }
 input:disabled, select:disabled, textarea:disabled { background: var(--edm-bg-disabled); color: var(--edm-text-disabled); border-color: var(--edm-line); cursor: not-allowed; }
-input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--edm-danger-500); }
+input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--edm-danger-500); box-shadow: var(--edm-shadow-error); }
 @media (hover: hover) and (pointer: fine) {
   .command-button:hover:not(:disabled), [data-ui="button"]:hover:not(:disabled) { background: var(--edm-accent-hover); }
   .command-button.secondary:hover:not(:disabled), .icon-button:hover:not(:disabled), [data-ui="button"][data-variant="secondary"]:hover:not(:disabled) { color: var(--edm-primary-700); background: var(--edm-bg-hover); border-color: var(--edm-primary-300); }
   .command-button.danger:hover:not(:disabled), [data-ui="button"][data-variant="danger"]:hover:not(:disabled) { background: var(--edm-danger-700); }
-  input:hover:not(:disabled), select:hover:not(:disabled), textarea:hover:not(:disabled) { border-color: var(--edm-neutral-450); }
+  .text-button:hover:not(:disabled), [data-ui="button"][data-variant="text"]:hover:not(:disabled) { background: var(--edm-bg-hover); }
+  input:hover:not(:disabled):not(:focus):not([readonly]):not([aria-invalid="true"]), select:hover:not(:disabled):not(:focus):not([aria-invalid="true"]), textarea:hover:not(:disabled):not(:focus):not([readonly]):not([aria-invalid="true"]) { border-color: var(--edm-neutral-450); }
 }
+.command-button:active:not(:disabled), [data-ui="button"]:active:not(:disabled) { background: var(--edm-accent-pressed); }
+.command-button.secondary:active:not(:disabled), .icon-button:active:not(:disabled), [data-ui="button"][data-variant="secondary"]:active:not(:disabled) { color: var(--edm-primary-700); background: var(--edm-bg-hover); border-color: var(--edm-primary-300); }
+.text-button:active:not(:disabled), [data-ui="button"][data-variant="text"]:active:not(:disabled) { color: var(--edm-primary-700); background: var(--edm-bg-hover); border-color: transparent; }
+.command-button.danger:active:not(:disabled), [data-ui="button"][data-variant="danger"]:active:not(:disabled) { color: var(--edm-text-inverse); background: var(--edm-danger-800); }
+.command-button.secondary:disabled, .icon-button:disabled, [data-ui="button"][data-variant="secondary"]:disabled { background: var(--edm-bg-surface); box-shadow: none; }
+.text-button:disabled, [data-ui="button"][data-variant="text"]:disabled { background: transparent; border-color: transparent; }
+.command-button.danger:disabled, [data-ui="button"][data-variant="danger"]:disabled { background: var(--edm-bg-disabled); }
+[data-ui="button"][aria-busy="true"] { color: var(--edm-text-inverse); background: var(--edm-accent); border-color: var(--edm-accent); cursor: wait; }
+[data-ui="button"][data-variant="secondary"][aria-busy="true"] { color: var(--edm-ink-800); background: var(--edm-bg-surface); border-color: var(--edm-line-strong); }
+[data-ui="button"][data-variant="danger"][aria-busy="true"] { background: var(--edm-danger-600); border-color: var(--edm-danger-600); }
+[data-ui="button"][data-variant="text"][aria-busy="true"] { color: var(--edm-primary-700); background: transparent; border-color: transparent; }
+[data-ui="button-indicator"] { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex: 0 0 18px; }
+[aria-busy="true"] > [data-ui="button-indicator"] > svg { animation: edm-control-spin 1s linear infinite; }
+@keyframes edm-control-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { [aria-busy="true"] > [data-ui="button-indicator"] > svg { animation: none; } }
 @media (max-width: 680px) {
   button, .command-button, .icon-button { min-height: var(--edm-touch-target); min-width: var(--edm-touch-target); }
   input, select, textarea { font-size: var(--edm-font-size-lg); }

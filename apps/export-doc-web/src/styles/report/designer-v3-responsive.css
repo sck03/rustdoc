@@ -36,21 +36,9 @@
 
 @media (max-width: 1180px) {
   .report-designer-v3-compact-tabs {
-    display: flex;
-    gap: 8px;
+    display: block;
+    min-width: 0;
     margin: 8px 0;
-  }
-  .report-designer-v3-compact-tabs button {
-    flex: 1;
-    min-height: 40px;
-    border: 1px solid var(--edm-neutral-300);
-    border-radius: var(--edm-radius-sm);
-    color: var(--edm-neutral-750);
-    background: var(--edm-white);
-  }
-  .report-designer-v3-compact-tabs button[aria-pressed="true"] {
-    color: var(--edm-white);
-    background: var(--edm-primary-650);
   }
   .report-designer-v3-workspace[data-compact-panel="canvas"] .report-designer-v3-sidebar,
 .report-designer-v3-workspace[data-compact-panel="canvas"] .report-designer-v3-inspector,

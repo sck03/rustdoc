@@ -1,5 +1,6 @@
 import { Eye, Save } from "lucide-react";
 import { SelectField } from "../../ui/FormFields.tsx";
+import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
 import { type ReportDesignerPreviewSampleProfile } from "../report-designer/reportDesignerPreviewSamples.ts";
 import { type TemplatePreviewMode } from "./reportTemplateDesignerModel.ts";
 
@@ -38,25 +39,8 @@ export function ReportTemplatePreviewWorkspace({
     <div className="report-template-preview-workspace">
       <div className="report-template-preview-toolbar">
         <SelectField label="预览方式" value={pdf.format} disabled={isBusy} options={[{ value: "Svg", label: "矢量排版" }, { value: "PdfPage", label: "实际 PDF 页图" }]} onChange={value => pdf.onFormatChange(value === "PdfPage" ? "PdfPage" : "Svg")} />
-        <div className="new-report-preview-mode-tabs report-template-preview-mode-tabs" role="tablist" aria-label="模板预览数据">
-          <button
-            className={mode === "sample" ? "segmented-active" : ""}
-            type="button"
-            role="tab"
-            aria-selected={mode === "sample"}
-            onClick={() => onModeChange("sample")}
-          >
-            样例数据
-          </button>
-          <button
-            className={mode === "savedSource" ? "segmented-active" : ""}
-            type="button"
-            role="tab"
-            aria-selected={mode === "savedSource"}
-            onClick={() => onModeChange("savedSource")}
-          >
-            当前单据
-          </button>
+        <div className="report-template-preview-mode-tabs">
+          <SegmentedNav label="模板预览数据" value={mode} onChange={onModeChange} items={[{ key: "sample", label: "样例数据" }, { key: "savedSource", label: "当前单据" }]} />
         </div>
         {mode === "sample" ? (
           <SelectField

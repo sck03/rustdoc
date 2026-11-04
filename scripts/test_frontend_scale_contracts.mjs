@@ -92,6 +92,7 @@ try {
           await page.send("Page.navigate", { url });
           await waitForReady(page);
           await evaluate(page, "document.fonts?.ready ?? Promise.resolve()", false);
+          const sharedControls = pageName === "globalStyles" ? (await evaluate(page, "window.runSharedControlContracts()", true)).value : null;
           const audit = await evaluate(page, buildAuditExpression(profile.mobile), true);
           const value = audit.value;
           const expectedFieldGridColumns = profile.width <= 680 ? 1 : profile.width <= 1180 ? 2 : 4;
@@ -104,7 +105,7 @@ try {
             && (pageName !== "globalStyles" || value.fieldGridMaximumColumnCount === expectedFieldGridColumns)
             && (pageName !== "invoiceParties" || value.invoicePartyGridContractPassed)
             && (pageName !== "query" || (value.queryFilterContractPassed && value.queryExportSummaryCompact))
-            && (pageName !== "globalStyles" || value.globalStyleContractPassed);
+            && (pageName !== "globalStyles" || (value.globalStyleContractPassed && sharedControls?.passed));
 
           let screenshotPath = null;
           if (pageName === "dashboard" || pageName === "query" || pageName === "report" || pageName === "globalStyles") {
@@ -112,7 +113,7 @@ try {
             await captureScreenshot(page, screenshotPath, { captureBeyondViewport: false });
           }
 
-          results.push({ page: pageName, density, profile, url, screenshotPath, passed, ...value });
+          results.push({ page: pageName, density, profile, url, screenshotPath, passed, sharedControls, ...value });
           process.stdout.write(`[scale] ${passed ? "Passed" : "Failed"} ${scene}.\n`);
         }
       }

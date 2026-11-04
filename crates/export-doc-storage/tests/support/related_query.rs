@@ -45,6 +45,21 @@ pub fn exercise(c: &Connection) {
     assert_eq!(rows[0]["id"], expected[0]);
     assert_eq!(rows[1]["id"], *expected.last().unwrap());
     assert!(rows.iter().all(|row| row.get("privateMarker").is_none()));
+    let mut lookup_ids = expected.clone();
+    lookup_ids.extend_from_slice(&expected);
+    lookup_ids.push(i64::MAX);
+    let indexed = c
+        .records_by_ids("crm-contacts", &lookup_ids, &fields)
+        .unwrap();
+    assert_eq!(indexed.len(), expected.len());
+    assert_eq!(
+        indexed
+            .iter()
+            .map(|row| row["id"].as_i64().unwrap())
+            .collect::<Vec<_>>(),
+        expected.iter().rev().copied().collect::<Vec<_>>()
+    );
+    assert!(indexed.iter().all(|row| row.get("privateMarker").is_none()));
     let (_, next) = c
         .query_related(&RelatedQuery { offset: 2, ..query })
         .unwrap();

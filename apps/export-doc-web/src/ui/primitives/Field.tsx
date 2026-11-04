@@ -9,9 +9,12 @@ export function Field({ label, children, wide = false, required = false, error, 
   const controls = Children.map(content, child => {
     if (!isValidElement<AriaAttributes>(child)
       || typeof child.type !== "string" || !["input", "select", "textarea"].includes(child.type)) return child;
+    const describedBy = error || description
+      ? [...new Set([...(child.props["aria-describedby"] ?? "").split(/\s+/).filter(Boolean), hintId])].join(" ")
+      : child.props["aria-describedby"];
     return cloneElement(child, {
       "aria-label": child.props["aria-label"] ?? (child.props["aria-labelledby"] ? undefined : label),
-      "aria-describedby": child.props["aria-describedby"] ?? (error || description ? hintId : undefined),
+      "aria-describedby": describedBy,
       "aria-invalid": error ? true : child.props["aria-invalid"],
       "aria-required": mandatory || child.props["aria-required"] || undefined,
     });

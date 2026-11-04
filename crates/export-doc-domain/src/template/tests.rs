@@ -129,7 +129,7 @@ fn original_v3_flow_blocks_validate_and_round_trip() {
         &mut design,
         "grid-1",
         "Grid",
-        ReportBlock::Grid(crate::designer::ReportGridBlock {
+        ReportBlock::Grid(Box::new(crate::designer::ReportGridBlock {
             id: "grid-1".into(),
             grow_to_content: false,
             output: None,
@@ -162,7 +162,7 @@ fn original_v3_flow_blocks_validate_and_round_trip() {
             margin_bottom_mm: None,
             border: ReportBorderStyle::default(),
             default_cell_style: ReportTextStyle::default(),
-        }),
+        })),
         8000,
     );
     append_flow(
@@ -294,7 +294,7 @@ fn grid_diagonal_header_round_trips_through_dtpl() {
         &mut design,
         "grid-diagonal",
         "Grid",
-        ReportBlock::Grid(crate::designer::ReportGridBlock {
+        ReportBlock::Grid(Box::new(crate::designer::ReportGridBlock {
             id: "grid-diagonal".into(),
             grow_to_content: false,
             output: None,
@@ -331,7 +331,7 @@ fn grid_diagonal_header_round_trips_through_dtpl() {
             margin_bottom_mm: None,
             border: ReportBorderStyle::default(),
             default_cell_style: ReportTextStyle::default(),
-        }),
+        })),
         6000,
     );
     validate(&design, &fields()).unwrap();

@@ -94,6 +94,14 @@ pub(crate) trait Adapter: Send {
         fields: &[(&str, &str)],
     ) -> Result<Vec<Value>> {
         let pg = self.provider() == "PostgreSQL";
+        let source = crate::query_source::Source::for_kind(kind);
+        let ids: Vec<_> = ids
+            .iter()
+            .copied()
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
+            .rev()
+            .collect();
         let mut result = vec![];
         for ids in ids.chunks(200) {
             operation::check()?;
@@ -105,7 +113,7 @@ pub(crate) trait Adapter: Send {
                 .collect::<Vec<_>>()
                 .join(",");
             let query = QuerySql {
-                source: crate::query_source::Source::Projected,
+                source,
                 filter: format!("r.kind={kind} AND r.id IN ({ids})"),
                 order: "r.id DESC".into(),
                 values,

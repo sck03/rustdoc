@@ -155,7 +155,7 @@ pub struct ReportPageBreakBlock {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ReportBlock {
     Row(ReportRowBlock),
-    Grid(ReportGridBlock),
+    Grid(Box<ReportGridBlock>),
     Conditional(Box<ReportConditionalBlock>),
     DetailTable(Box<DetailTable>),
     PageBreak(ReportPageBreakBlock),
@@ -194,23 +194,21 @@ impl Serialize for ReportBlock {
     where
         S: serde::Serializer,
     {
-        use serde::ser::SerializeMap;
-        let mut map = serializer.serialize_map(None)?;
-        map.serialize_entry("type", self.kind())?;
-        let value = match self {
-            Self::Row(block) => serde_json::to_value(block),
-            Self::Grid(block) => serde_json::to_value(block),
-            Self::Conditional(block) => serde_json::to_value(block),
-            Self::DetailTable(table) => serde_json::to_value(table),
-            Self::PageBreak(block) => serde_json::to_value(block),
+        #[derive(Serialize)]
+        struct WireBlock<'a, T: Serialize> {
+            #[serde(rename = "type")]
+            kind: &'static str,
+            #[serde(flatten)]
+            block: &'a T,
         }
-        .map_err(serde::ser::Error::custom)?;
-        for (key, value) in value.as_object().into_iter().flatten() {
-            if key != "type" {
-                map.serialize_entry(key, value)?;
-            }
+        let kind = self.kind();
+        match self {
+            Self::Row(block) => WireBlock { kind, block }.serialize(serializer),
+            Self::Grid(block) => WireBlock { kind, block }.serialize(serializer),
+            Self::Conditional(block) => WireBlock { kind, block }.serialize(serializer),
+            Self::DetailTable(block) => WireBlock { kind, block }.serialize(serializer),
+            Self::PageBreak(block) => WireBlock { kind, block }.serialize(serializer),
         }
-        map.end()
     }
 }
 impl<'de> Deserialize<'de> for ReportBlock {

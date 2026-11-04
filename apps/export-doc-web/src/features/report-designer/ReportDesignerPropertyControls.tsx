@@ -1,5 +1,6 @@
 import { type ChangeEvent as ReactChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useReportDesignerPointerGesture } from "./useReportDesignerPointerGesture.ts";
+import { Tabs } from "../../ui/primitives/Tabs.tsx";
 import { useReportDesignerPendingInput } from "./ReportDesignerPendingInputContext.tsx";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type { ReportBorderStyle, ReportTextStyle } from "./reportDesignerSchema.ts";
@@ -25,16 +26,7 @@ export function DesignerCheckbox({ checked, mixed = false, disabled = false, onC
 }
 
 export function DesignerPropertyTabs<T extends string>({ value, options, onChange, children }: { value: T; options: readonly { value: T; label: string }[]; onChange: (value: T) => void; children: ReactNode }) {
-  const id = useId();
-  return <div className="report-designer-property-tabs"><div role="tablist" aria-label="属性分类">
-    {options.map((option, index) => <button key={option.value} id={`${id}-${option.value}`} type="button" role="tab" tabIndex={option.value === value ? 0 : -1} aria-selected={option.value === value} aria-controls={`${id}-panel`} onClick={() => onChange(option.value)} onKeyDown={(event) => {
-      const next = event.key === "ArrowRight" ? (index + 1) % options.length : event.key === "ArrowLeft" ? (index + options.length - 1) % options.length : event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : -1;
-      if (next < 0) return;
-      event.preventDefault();
-      onChange(options[next].value);
-      (event.currentTarget.parentElement?.children[next] as HTMLElement | undefined)?.focus();
-    }}>{option.label}</button>)}
-  </div><div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${value}`}>{children}</div></div>;
+  return <div className="report-designer-property-tabs"><Tabs label="属性分类" value={value} onChange={onChange} items={options.map(option => ({ key: option.value, label: option.label }))}>{children}</Tabs></div>;
 }
 
 /** Keep a damaged/removed persisted value visible until the user repairs it. */

@@ -110,34 +110,6 @@
   min-width: 0;
 }
 
-.report-designer-property-tabs > [role="tablist"] {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  padding: 4px;
-  border-radius: var(--edm-radius-sm);
-  background: var(--edm-neutral-100);
-  border: 1px solid var(--edm-neutral-250);
-}
-
-.report-designer-property-tabs [role="tab"] {
-  min-width: 0;
-  min-height: 32px;
-  padding: 4px 8px;
-  border: 0;
-  border-radius: var(--edm-radius-xs);
-  background: transparent;
-  color: var(--edm-neutral-650);
-  font-size: var(--edm-font-size-xs);
-  cursor: pointer;
-}
-
-.report-designer-property-tabs [role="tab"][aria-selected="true"] {
-  background: var(--edm-white);
-  color: var(--edm-primary-800);
-  font-weight: 700;
-}
-
 .report-designer-v3-style-editor {
   display: grid;
   gap: 8px;

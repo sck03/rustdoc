@@ -1,6 +1,7 @@
 import ReactDOM from "react-dom/client";
 import { Button, IconButton } from "../../src/ui/Button.tsx";
 import { Field } from "../../src/ui/primitives/Field.tsx";
+import { runSharedControlContracts } from "./shared-control-contract.tsx";
 import { applyInterfaceDensity } from "../../src/app/interfaceDensity.ts";
 import "../../src/styles/index.css";
 import "../../src/styles/jobs-excel.css";
@@ -8,6 +9,7 @@ import "../../src/styles/workspaces.css";
 import "../../src/styles/responsive.css";
 
 const requestedDensity = new URLSearchParams(location.search).get("density");
+Object.assign(window, { runSharedControlContracts });
 applyInterfaceDensity(requestedDensity === "compact" ? "compact" : "comfortable");
 
 function GlobalStyleContract() {

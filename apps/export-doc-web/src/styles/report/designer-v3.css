@@ -188,15 +188,9 @@
 .report-designer-v3-sidebar > .report-designer-v3-panel-content { min-height: 0; overflow: auto; }
 
 .report-designer-v3-sidebar-tabs {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  overflow: hidden;
-  background: var(--edm-white);
-  border: 1px solid var(--edm-neutral-350);
-  border-radius: var(--edm-radius-md);
+  min-width: 0;
 }
 
-.report-designer-v3-sidebar-tabs button,
 .report-designer-v3-orientation-control button {
   min-height: 34px;
   padding: 0 8px;
@@ -208,12 +202,10 @@
   font-weight: 700;
 }
 
-.report-designer-v3-sidebar-tabs button + button,
 .report-designer-v3-orientation-control button + button {
   border-left: 1px solid var(--edm-neutral-350);
 }
 
-.report-designer-v3-sidebar-tabs button.is-active,
 .report-designer-v3-orientation-control button.is-active {
   color: var(--edm-white);
   background: var(--edm-primary-650);

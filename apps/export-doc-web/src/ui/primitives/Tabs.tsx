@@ -7,6 +7,8 @@ export function Tabs<T extends string>({ items, value, onChange, label, variant 
 }) {
   const generatedId = useId();
   const id = idPrefix ?? generatedId;
+  const currentItem = items.find(item => item.key === value);
+  const focusKey = currentItem && !currentItem.disabled ? value : items.find(item => !item.disabled)?.key;
   function move(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     const enabled = items.map((item, index) => item.disabled ? -1 : index).filter(index => index >= 0);
     const position = enabled.indexOf(index);
@@ -23,11 +25,11 @@ export function Tabs<T extends string>({ items, value, onChange, label, variant 
   return <>
     <div data-ui="tabs" data-variant={variant} role="tablist" aria-label={label}>
       {items.map((item, index) => <button key={item.key} id={getTabId(id, item.key)} type="button" role="tab"
-        disabled={item.disabled} aria-selected={value === item.key} tabIndex={value === item.key ? 0 : -1}
+        disabled={item.disabled} aria-selected={value === item.key} tabIndex={focusKey === item.key ? 0 : -1}
         aria-controls={item.panelId ?? (children === undefined ? undefined : `${id}-panel`)}
         onClick={() => onChange(item.key)} onKeyDown={event => move(event, index)}>{item.label}</button>)}
     </div>
-    {children !== undefined && <div id={`${id}-panel`} role="tabpanel" aria-labelledby={getTabId(id, value)} data-ui="tab-panel">{children}</div>}
+    {children !== undefined && <div id={`${id}-panel`} role="tabpanel" aria-labelledby={currentItem ? getTabId(id, value) : undefined} aria-label={currentItem ? undefined : label} data-ui="tab-panel">{children}</div>}
   </>;
 }
 export function getTabId(idPrefix: string, key: string) { return `${idPrefix}-tab-${key}`; }

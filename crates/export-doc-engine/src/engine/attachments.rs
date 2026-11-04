@@ -8,6 +8,7 @@ use super::{
 use crate::{contracts, generated_api::*, paths};
 use export_doc_storage::{AuditWrite, BlobWrite};
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use unicode_normalization::UnicodeNormalization;
 
 pub const FILE_LIMIT: usize = 16 * 1024 * 1024;
@@ -23,9 +24,6 @@ pub const OPERATIONS: &[Operation] = &[
     SAVE_BUSINESS_ATTACHMENT_TO_PATH,
 ];
 
-fn invoice(store: &Store, actor: &Actor, id: i64, action: &str) -> Result<Value> {
-    invoice_in(&store.connection()?, actor, id, action)
-}
 fn invoice_in(
     tx: &crate::engine::store::Connection,
     actor: &Actor,
@@ -92,18 +90,31 @@ pub fn upload(
         Ok(record)
     })
 }
-pub fn read(store: &Store, actor: &Actor, id: i64, revision: i64) -> Result<(Value, Vec<u8>)> {
-    let record = store.get("attachments", id)?;
-    invoice(
-        store,
-        actor,
-        record["invoiceId"].as_i64().unwrap_or(0),
-        "view",
-    )?;
-    let file = store
-        .connection()?
-        .blob(id, &format!("attachment:{revision}"))?
-        .ok_or_else(|| error(404, "资料版本不存在。"))?;
+pub fn read(
+    store: &Store,
+    actor: &Actor,
+    operation: Operation,
+    id: i64,
+    revision: i64,
+) -> Result<(Value, Vec<u8>)> {
+    let file = store.read_for(actor, operation, &[], |tx, actor| {
+        let record = store::get(tx, "attachments", id)?;
+        invoice_in(tx, actor, parent_invoice_id(&record)?, "view")?;
+        let kind = format!("attachment:{revision}");
+        let info = tx
+            .blob_info(id, &kind)?
+            .ok_or_else(|| error(404, "资料版本不存在。"))?;
+        if info.size == 0 || info.size > FILE_LIMIT as u64 {
+            return Err(unavailable("资料内容容量无效，已停止下载。"));
+        }
+        let file = tx
+            .blob(id, &kind)?
+            .ok_or_else(|| unavailable("资料内容缺失，已停止下载。"))?;
+        if file.content.len() as u64 != info.size {
+            return Err(unavailable("资料内容长度不一致，已停止下载。"));
+        }
+        Ok(file)
+    })?;
     let (name, content_type, expected_digest, bytes) =
         (file.file_name, file.media_type, file.digest, file.content);
     if digest(&bytes) != expected_digest {
@@ -120,7 +131,6 @@ pub fn handle(
     body: Value,
 ) -> Result<Vec<u8>> {
     let value = if operation == LIST_BUSINESS_ATTACHMENTS {
-        auth::authorize(actor, "document.invoices", "view")?;
         let invoice_id = query
             .iter()
             .find(|(key, _)| *key == "invoiceId")
@@ -132,7 +142,7 @@ pub fn handle(
             .iter()
             .find(|(key, _)| *key == "categoryId")
             .and_then(|(_, value)| value.parse::<i64>().ok());
-        store.read(|tx| {
+        store.read_for(actor, operation, query, |tx, actor| {
             let (page, size, offset) = store::page_parameters(query);
             let keyword = store::normalize(super::hs::read(query,"keyword"));
             let (total, mut items) = tx.query_business(&export_doc_storage::BusinessQuery {
@@ -140,145 +150,152 @@ pub fn handle(
                 scope: auth::data_scope(actor,"document.invoices","view"),
                 fields: &[], offset, limit: size as i64,
             })?;
-            let mut invoices = std::collections::BTreeMap::new();
-            let mut categories = std::collections::BTreeMap::new();
+            let mut invoice_ids = items.iter().map(parent_invoice_id).collect::<Result<Vec<_>>>()?;
+            if let Some(id) = invoice_id { invoice_ids.push(id); }
+            let category_ids = items.iter().filter_map(|item| item["categoryId"].as_i64()).collect::<Vec<_>>();
+            let invoices = indexed_records(tx, "invoices", &invoice_ids, &[("id","id"),("companyScope","companyScope"),("departmentId","departmentId"),("projectId","projectId"),("ownerUserId","ownerUserId")])?;
+            let categories = indexed_records(tx, "attachment-categories", &category_ids, &[("id","id"),("name","name")])?;
             for item in &mut items {
                 crate::operation::check()?;
-                let id = item["invoiceId"].as_i64().ok_or_else(|| unavailable("资料所属发票编号损坏。"))?;
-                if !invoices.contains_key(&id) { invoices.insert(id, store::get(tx,"invoices",id)?); }
-                set_permissions(item,actor,&invoices[&id]);
+                let id = parent_invoice_id(item)?;
+                let invoice = invoices.get(&id).ok_or_else(|| error(404,"资料所属发票不存在。"))?;
+                set_permissions(item,actor,invoice);
                 if let Some(id) = item["categoryId"].as_i64() {
-                    if !categories.contains_key(&id) { categories.insert(id,tx.get("attachment-categories",id)?); }
-                    if let Some(category) = &categories[&id] { item["categoryName"] = category["name"].clone(); }
+                    if let Some(category) = categories.get(&id) { item["categoryName"] = category["name"].clone(); }
                 }
             }
-            let used = if let Some(id) = invoice_id { invoice_in(tx,actor,id,"view")?; Some(tx.attachment_bytes(id)?) } else { None };
-            Ok(json!({"page":contracts::page(items,total as usize,page,size),"canUpload":auth::authorize(actor,"document.invoices","operate").is_ok(),"usedBytes":used,"fileBytesLimit":FILE_LIMIT,"invoiceBytesLimit":INVOICE_LIMIT}))
+            let (used, can_upload) = if let Some(id) = invoice_id {
+                let invoice = invoices.get(&id).ok_or_else(|| error(404, "发票不存在。"))?;
+                if !auth::visible(actor, "document.invoices", "view", invoice) { return Err(error(403, "没有访问此发票资料的权限。")); }
+                (Some(tx.attachment_bytes(id)?), auth::visible(actor, "document.invoices", "operate", invoice))
+            } else { (None, auth::authorize(actor,"document.invoices","operate").is_ok()) };
+            Ok(json!({"page":contracts::page(items,total as usize,page,size),"canUpload":can_upload,"usedBytes":used,"fileBytesLimit":FILE_LIMIT,"invoiceBytesLimit":INVOICE_LIMIT}))
         })?
+    } else if operation == GET_BUSINESS_ATTACHMENT {
+        let id = super::records::id(parameters)?;
+        store.read_for(actor, operation, query, |tx, actor| {
+            let mut record = store::get(tx, "attachments", id)?;
+            let parent = invoice_in(tx, actor, parent_invoice_id(&record)?, "view")?;
+            set_permissions(&mut record, actor, &parent);
+            let category_id = record["categoryId"].as_i64().ok_or_else(|| unavailable("资料分类编号无效。"))?;
+            record["categoryName"] = store::get(tx, "attachment-categories", category_id)?["name"].clone();
+            let events = record["events"].as_array().ok_or_else(|| unavailable("资料事件历史无效。"))?.clone();
+            Ok(json!({"attachment":record,"revisions":record["revisions"],"eventCount":events.len(),"events":events}))
+        })?
+    } else if operation == DOWNLOAD_BUSINESS_ATTACHMENT
+        || operation == SAVE_BUSINESS_ATTACHMENT_TO_PATH
+    {
+        let id = super::records::id(parameters)?;
+        let revision = parameters
+            .iter()
+            .find(|(key, _)| *key == "revision")
+            .and_then(|(_, value)| value.parse::<i64>().ok())
+            .ok_or_else(|| invalid("缺少有效资料版本号。"))?;
+        let (metadata, bytes) = read(store, actor, operation, id, revision)?;
+        if operation == DOWNLOAD_BUSINESS_ATTACHMENT {
+            return Ok(bytes);
+        }
+        let path = std::path::PathBuf::from(text(&body, "destinationPath"));
+        paths::ensure_safe_absolute(&path).map_err(invalid)?;
+        let original = std::path::Path::new(metadata["fileName"].as_str().unwrap_or(""));
+        let same_extension = match (
+            path.extension().and_then(|value| value.to_str()),
+            original.extension().and_then(|value| value.to_str()),
+        ) {
+            (Some(left), Some(right)) => left.eq_ignore_ascii_case(right),
+            (None, None) => true,
+            _ => false,
+        };
+        if !same_extension {
+            return Err(invalid("请保留原文件扩展名。"));
+        }
+        paths::atomic_write(&path, &bytes).map_err(unavailable)?;
+        json!({"success":true,"message":"文件已保存"})
     } else {
         let id = super::records::id(parameters)?;
-        let mut record = store.get("attachments", id)?;
         let action = match operation {
             DELETE_BUSINESS_ATTACHMENT => "manage",
             UPDATE_BUSINESS_ATTACHMENT | EDIT_BUSINESS_ATTACHMENT_METADATA => "operate",
             _ => "view",
         };
-        let parent = invoice(
-            store,
-            actor,
-            record["invoiceId"].as_i64().unwrap_or(0),
-            action,
-        )?;
-        set_permissions(&mut record, actor, &parent);
         match operation {
-            GET_BUSINESS_ATTACHMENT => {
-                let category = store.get(
-                    "attachment-categories",
-                    record["categoryId"]
-                        .as_i64()
-                        .ok_or_else(|| unavailable("资料分类编号无效。"))?,
-                )?;
-                record["categoryName"] = category["name"].clone();
-                let events = record["events"].as_array().cloned().unwrap_or_default();
-                json!({"attachment":record,"revisions":record["revisions"],"eventCount":events.len(),"events":events})
-            }
-            DOWNLOAD_BUSINESS_ATTACHMENT | SAVE_BUSINESS_ATTACHMENT_TO_PATH => {
-                let revision = parameters
-                    .iter()
-                    .find(|(key, _)| *key == "revision")
-                    .and_then(|(_, value)| value.parse::<i64>().ok())
-                    .ok_or_else(|| invalid("缺少有效资料版本号。"))?;
-                let (metadata, bytes) = read(store, actor, id, revision)?;
-                if operation == DOWNLOAD_BUSINESS_ATTACHMENT {
-                    return Ok(bytes);
-                }
-                let path = std::path::PathBuf::from(text(&body, "destinationPath"));
-                paths::ensure_safe_absolute(&path).map_err(invalid)?;
-                if path.extension()
-                    != std::path::Path::new(metadata["fileName"].as_str().unwrap_or("")).extension()
-                {
-                    return Err(invalid("请保留原文件扩展名。"));
-                }
-                paths::atomic_write(&path, &bytes).map_err(unavailable)?;
-                json!({"success":true,"message":"文件已保存"})
-            }
             UPDATE_BUSINESS_ATTACHMENT
             | EDIT_BUSINESS_ATTACHMENT_METADATA
-            | DELETE_BUSINESS_ATTACHMENT => store.transaction_as(actor, |transaction, actor| {
-                let mut record = store::get(transaction, "attachments", id)?;
-                let parent = invoice_in(
-                    transaction,
-                    actor,
-                    record["invoiceId"].as_i64().unwrap_or(0),
-                    action,
-                )?;
-                store::check_version(&record, store::expected(&body))?;
-                required(&body, "note", "变更说明", 500)?;
-                if operation == DELETE_BUSINESS_ATTACHMENT {
-                    transaction.delete_blobs(id)?;
-                    if !transaction.delete("attachments", id, store::expected(&record))? {
-                        return Err(conflict("资料版本已变化，删除已取消。"));
-                    }
-                    transaction.append_audit(&AuditWrite {
-                        kind: "attachments",
-                        record_id: id,
-                        version: record["versionNumber"].as_i64().unwrap_or(0),
-                        action: "delete",
-                        actor_id: actor.id,
-                        occurred_at: &store::timestamp(),
-                        note: &text(&body, "note"),
-                    })?;
-                    return Ok(json!({"success":true,"message":"资料及全部版本已删除"}));
-                }
-                if operation == UPDATE_BUSINESS_ATTACHMENT {
-                    if let Some(revision) = body["currentRevision"].as_i64() {
-                        if revision < 1 || revision > record["latestRevision"].as_i64().unwrap_or(0)
-                        {
-                            return Err(invalid("有效版本号不存在。"));
+            | DELETE_BUSINESS_ATTACHMENT => {
+                store.transaction_for(actor, operation, query, |transaction, actor| {
+                    let mut record = store::get(transaction, "attachments", id)?;
+                    let parent =
+                        invoice_in(transaction, actor, parent_invoice_id(&record)?, action)?;
+                    set_permissions(&mut record, actor, &parent);
+                    store::check_version(&record, store::expected(&body))?;
+                    required(&body, "note", "变更说明", 500)?;
+                    if operation == DELETE_BUSINESS_ATTACHMENT {
+                        transaction.delete_blobs(id)?;
+                        if !transaction.delete("attachments", id, store::expected(&record))? {
+                            return Err(conflict("资料版本已变化，删除已取消。"));
                         }
+                        transaction.append_audit(&AuditWrite {
+                            kind: "attachments",
+                            record_id: id,
+                            version: record["versionNumber"].as_i64().unwrap_or(0),
+                            action: "delete",
+                            actor_id: actor.id,
+                            occurred_at: &store::timestamp(),
+                            note: &text(&body, "note"),
+                        })?;
+                        return Ok(json!({"success":true,"message":"资料及全部版本已删除"}));
                     }
-                    let event_action = if record["isArchived"] != body["isArchived"] {
-                        if body["isArchived"] == true {
-                            "Archive"
-                        } else {
-                            "Restore"
-                        }
-                    } else {
-                        "Confirm"
-                    };
-                    append_event(&mut record, actor, event_action, &body);
-                    record["currentRevision"] = body["currentRevision"].clone();
-                    record["isArchived"] = body["isArchived"].clone();
-                } else {
-                    required(&body, "title", "资料名称", 200)?;
-                    let category = store::get(
-                        transaction,
-                        "attachment-categories",
-                        body["categoryId"].as_i64().unwrap_or(0),
-                    )?;
-                    if category["companyScope"] != parent["companyScope"] {
-                        return Err(error(403, "不能使用其他公司的资料分类。"));
-                    }
-                    for key in ["title", "categoryId", "poNumber", "styleNo"] {
-                        record[key] = body[key].clone();
-                    }
-                    record["categoryName"] = category["name"].clone();
-                    append_event(&mut record, actor, "Edit", &body);
-                }
-                store::save(
-                    transaction,
-                    "attachments",
-                    id,
-                    record,
-                    None,
-                    actor,
                     if operation == UPDATE_BUSINESS_ATTACHMENT {
-                        "confirm"
+                        if let Some(revision) = body["currentRevision"].as_i64() {
+                            if revision < 1
+                                || revision > record["latestRevision"].as_i64().unwrap_or(0)
+                            {
+                                return Err(invalid("有效版本号不存在。"));
+                            }
+                        }
+                        let event_action = if record["isArchived"] != body["isArchived"] {
+                            if body["isArchived"] == true {
+                                "Archive"
+                            } else {
+                                "Restore"
+                            }
+                        } else {
+                            "Confirm"
+                        };
+                        append_event(&mut record, actor, event_action, &body);
+                        record["currentRevision"] = body["currentRevision"].clone();
+                        record["isArchived"] = body["isArchived"].clone();
                     } else {
-                        "edit-metadata"
-                    },
-                )
-            })?,
+                        required(&body, "title", "资料名称", 200)?;
+                        let category = store::get(
+                            transaction,
+                            "attachment-categories",
+                            body["categoryId"].as_i64().unwrap_or(0),
+                        )?;
+                        if category["companyScope"] != parent["companyScope"] {
+                            return Err(error(403, "不能使用其他公司的资料分类。"));
+                        }
+                        for key in ["title", "categoryId", "poNumber", "styleNo"] {
+                            record[key] = body[key].clone();
+                        }
+                        record["categoryName"] = category["name"].clone();
+                        append_event(&mut record, actor, "Edit", &body);
+                    }
+                    store::save(
+                        transaction,
+                        "attachments",
+                        id,
+                        record,
+                        None,
+                        actor,
+                        if operation == UPDATE_BUSINESS_ATTACHMENT {
+                            "confirm"
+                        } else {
+                            "edit-metadata"
+                        },
+                    )
+                })?
+            }
             _ => return Err(invalid("上传资料需要文件内容。")),
         }
     };
@@ -298,9 +315,33 @@ fn set_permissions(record: &mut Value, actor: &Actor, invoice: &Value) {
     ));
     record["canDelete"] = json!(auth::visible(actor, "document.invoices", "manage", invoice));
 }
+fn parent_invoice_id(record: &Value) -> Result<i64> {
+    record["invoiceId"]
+        .as_i64()
+        .filter(|id| *id > 0)
+        .ok_or_else(|| unavailable("资料所属发票编号损坏。"))
+}
+fn indexed_records(
+    tx: &store::Connection<'_>,
+    kind: &str,
+    ids: &[i64],
+    fields: &[(&str, &str)],
+) -> Result<BTreeMap<i64, Value>> {
+    tx.records_by_ids(kind, ids, fields)?
+        .into_iter()
+        .map(|row| {
+            let id = row["id"]
+                .as_i64()
+                .ok_or_else(|| unavailable("关联资料编号损坏。"))?;
+            Ok((id, row))
+        })
+        .collect()
+}
 fn append_event(record: &mut Value, actor: &Actor, action: &str, body: &Value) {
     if !record["events"].is_array() {
         record["events"] = json!([]);
     }
     record["events"].as_array_mut().unwrap().push(json!({"action":action,"revision":body["currentRevision"],"actorName":actor.name,"note":text(body,"note"),"createdAt":store::timestamp()}));
 }
+#[cfg(test)]
+mod tests;

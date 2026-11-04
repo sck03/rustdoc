@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { Columns3, FilePlus2, Hash, Image as ImageIcon, ListFilter, Pilcrow, Table2 } from "lucide-react";
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
+import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
 
 export type PaletteActions = {
   text: () => void;
@@ -89,8 +90,9 @@ export function FieldPanel({
   }, [focusRequest]);
   return (
     <div className="report-designer-v3-panel-content">
-      {onProductFieldsChange ? <div className="report-designer-field-scope" role="tablist" aria-label="字段用途">
-        {[false, true].map(value => <button key={String(value)} className={productFields === value ? "is-active" : ""} type="button" role="tab" aria-selected={productFields === value} onClick={() => onProductFieldsChange(value)}>{value ? "商品明细字段" : "普通字段"}</button>)}
+      {onProductFieldsChange ? <div className="report-designer-field-scope">
+        <SegmentedNav label="字段用途" value={productFields ? "product" : "ordinary"} onChange={value => onProductFieldsChange(value === "product")}
+          items={[{ key: "ordinary", label: "普通字段" }, { key: "product", label: "商品明细字段" }]} />
       </div> : null}
       <div className="report-designer-v3-panel-caption">
         <Pilcrow size={15} aria-hidden="true" />

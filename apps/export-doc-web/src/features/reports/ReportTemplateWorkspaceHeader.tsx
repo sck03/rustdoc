@@ -1,6 +1,7 @@
 import { ArrowLeft, Eye, LayoutTemplate, Save } from "lucide-react";
 import { type TemplateWorkspaceMode } from "./reportTemplateDesignerModel.ts";
 import { Button } from "../../ui/Button.tsx";
+import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
 
 export function ReportTemplateWorkspaceHeader({
   title,
@@ -34,33 +35,13 @@ export function ReportTemplateWorkspaceHeader({
         </div>
         <div className="toolbar-actions">
           <div
-            className="segmented-control report-template-view-tabs v3-only"
-            role="tablist"
-            aria-label="报表设计视图"
+            className="report-template-view-tabs v3-only"
           >
-            <button
-              className={workspaceMode === "design" ? "segmented-active" : ""}
-              type="button"
-              role="tab"
-              aria-selected={workspaceMode === "design"}
-              disabled={designDisabled}
-              onClick={onDesign}
-              title={designDisabled ? "当前设备仅提供模板选择与预览，完整设计请使用桌面端" : undefined}
-            >
-              <LayoutTemplate size={16} aria-hidden="true" />
-              <span>可视化设计</span>
-            </button>
-            <button
-              className={workspaceMode === "preview" ? "segmented-active" : ""}
-              type="button"
-              role="tab"
-              aria-selected={workspaceMode === "preview"}
-              disabled={!canPreview}
-              onClick={onPreview}
-            >
-              <Eye size={16} aria-hidden="true" />
-              <span>预览</span>
-            </button>
+            <SegmentedNav label="报表设计视图" value={workspaceMode} onChange={value => value === "design" ? onDesign() : onPreview()}
+              items={[
+                { key: "design", disabled: designDisabled, label: <><LayoutTemplate size={16} aria-hidden="true" /><span title={designDisabled ? "当前设备仅提供模板选择与预览，完整设计请使用桌面端" : undefined}>可视化设计</span></> },
+                { key: "preview", disabled: !canPreview, label: <><Eye size={16} aria-hidden="true" /><span>预览</span></> },
+              ]} />
           </div>
           <Button variant="primary" type="submit" icon={<Save size={17} aria-hidden="true" />} disabled={designDisabled || !canSave}>保存</Button>
         </div>

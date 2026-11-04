@@ -4,5 +4,6 @@
   --edm-shadow-3: 0 10px 28px color-mix(in srgb, var(--edm-ink-900) 10%, transparent);
   --edm-shadow-4: 0 24px 64px color-mix(in srgb, var(--edm-ink-950) 16%, transparent);
   --edm-shadow-focus: 0 0 0 3px var(--edm-focus-ring);
+  --edm-shadow-error: 0 0 0 3px color-mix(in srgb, var(--edm-danger-500) 16%, transparent);
   --edm-shadow-selected: inset 3px 0 0 var(--edm-accent);
 }
