@@ -78,7 +78,7 @@ export async function verifyDetailProperties({ page, url, read, waitFor, click, 
   results.push({ test: "unvisited detail editors load on demand and retain the selected column after visiting other tabs", initialOptions, passed: true });
   for (const width of [1366, 390]) {
     await page.send("Emulation.setDeviceMetricsOverride", { width, height: 1000, deviceScaleFactor: 1, mobile: width < 500 });
-    if (width < 500) await click(page, ".report-designer-v3-compact-tabs button:nth-child(3)");
+    if (await read(page, "Boolean(document.querySelector('.report-designer-v3-compact-tabs')?.getClientRects().length)")) await click(page, ".report-designer-v3-compact-tabs button:nth-child(3)");
     for (const label of ["明细列", "表格样式", "说明与合计", "分页与高级"]) {
       await tab(label);
       assert(await read(page, 'document.querySelector(".report-designer-v3-inspector").scrollWidth <= document.querySelector(".report-designer-v3-inspector").clientWidth + 1'));
