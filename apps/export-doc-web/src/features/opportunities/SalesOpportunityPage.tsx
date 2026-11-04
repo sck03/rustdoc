@@ -1,3 +1,4 @@
+import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
@@ -15,8 +16,8 @@ import { permissionActions, permissionResources } from "../../app/permissionCata
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { FormGuidance, PageState, PermissionNotice } from "../../ui/PageState.tsx";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
-import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -192,32 +193,32 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
     navigate("/crm/follow-ups?view=profile");
   }
 
-  return <section className="work-surface">
+  return <ListWorkspace >
     <OperationFeedback feedback={feedback} />
     {!canCreateOpportunity && !canEditOpportunity && !canTransitionOpportunity
       ? <PermissionNotice>当前岗位只有商机查看权限；新建、编辑、阶段流转和归档分别授权。</PermissionNotice>
       : null}
-    {view !== "directory" && <div className="record-context-heading"><button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回商机目录</button>
-      <strong>{selected?.title ?? (selectedId ? "商机详情" : "新建商机")}</strong>{selected && <span>{selected.customerName}</span>}</div>}
+    {view !== "directory" && <PageHeader title={selected?.title ?? (selectedId ? "商机详情" : "新建商机")} description={selected?.customerName}
+      actions={<button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回商机目录</button>} />}
     {view !== "directory" && selected && <TaskViewTabs idPrefix={opportunityTabsId} value={view} label="商机详情" onChange={changeView} items={[
       { id: "editor", label: "商机资料" }, { id: "history", label: "报价与阶段历史" },
     ]} />}
     {view !== "directory" && selectedId && !selected && <PageState tone={feedback ? "error" : "loading"} title="正在定位商机资料" />}
     {view === "directory" ? <section className="form-section" aria-label="商机目录">
-      <ListWorkspaceHeader title="商机目录" count={page?.totalCount} unit="项" description="按客户、阶段和报价编号查找商机，打开后维护资料及报价历史。"
+      <PageHeader title="商机目录" count={page?.totalCount} unit="项" description="按客户、阶段和报价编号查找商机，打开后维护资料及报价历史。"
         actions={canCreateOpportunity ? <button className="primary-button" type="button" onClick={() => { setSelected(null); changeView("editor"); }}>新建商机</button> : null}>
       <form className="list-workspace-filters" role="search" aria-label="筛选商机目录" onSubmit={(event) => { event.preventDefault(); setKeyword(keywordInput.trim()); setPageNumber(1); }}>
         <input aria-label="搜索商机目录" value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="搜索商机、客户、产品或报价编号" />
         <select aria-label="商机阶段" value={stage} onChange={(event) => { setStage(event.target.value); setPageNumber(1); }}><option value="">全部阶段</option>{stages.map((item) => <option key={item}>{item}</option>)}</select>
         <button className="secondary-button" type="submit">搜索</button>
       </form>
-      </ListWorkspaceHeader>
+      </PageHeader>
       {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}
       <ResponsiveTableFrame label="销售商机列表" mobileLayout="scroll" busy={pageQuery.isFetching}><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th data-table-priority="secondary">产品</th><th>金额</th><th data-table-priority="secondary">概率</th><th>阶段</th><th /></tr></thead><tbody>
         {(page?.items ?? []).map((item) => <tr key={item.id}><td><TablePrimaryText value={item.title} secondary={item.quotationNo || "未填报价编号"} /></td><td><TablePrimaryText value={item.customerName} /></td><td data-table-priority="secondary"><TablePrimaryText value={item.productCode || item.productName} /></td><td>{item.currency} {item.estimatedAmount.toFixed(2)}</td><td data-table-priority="secondary">{item.probabilityPercent}%</td><td><BusinessStatusBadge value={item.stage} /></td><td><button className="secondary-button" type="button" onClick={() => { setSelected(item); changeView("editor"); }}>{canEditOpportunity ? "编辑" : "查看"}</button></td></tr>)}
         {!pageQuery.isFetching && !pageQuery.isError && !page?.items.length ? <tr><td className="empty-cell" colSpan={7}><div className="empty-cell-content"><strong>暂无商机记录</strong><span>{canCreateOpportunity ? "从一位销售客户开始，记录阶段、预计金额和下一步动作。" : "当前没有可查看的商机记录。"}</span>{canCreateOpportunity ? <button className="primary-button" type="button" onClick={() => { setSelected(null); changeView("editor"); }}>建立第一条商机</button> : null}</div></td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
-      <ListPaginationControls pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />
+      <Pagination pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />
     </section> : null}
     {view === "editor" && (selected || !selectedId) ? <form className="form-grid" key={`${selected?.id ?? "new"}-${selected?.versionNumber ?? 0}`} onSubmit={save} {...(selected ? getTaskViewPanelProps(opportunityTabsId, "editor") : { "aria-label": "新建商机" })}>
       <div className="section-header"><h3>{selected ? canEditOpportunity ? "编辑商机" : "查看商机" : "新建商机"}</h3><span>轻量销售跟踪</span></div>
@@ -258,7 +259,7 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
         {!history.length ? <tr><td className="empty-cell" colSpan={8}>暂无版本历史。</td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
     </section> : null}
-  </section>;
+  </ListWorkspace>;
 }
 
 function readOpportunityView(value: string | null): "directory" | "editor" | "history" {

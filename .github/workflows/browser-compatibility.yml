@@ -43,14 +43,11 @@ jobs:
           path: ${{ env.PLAYWRIGHT_BROWSERS_PATH }}
           key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('apps/export-doc-web/package-lock.json') }}-firefox-webkit
 
-      - name: Install frontend dependencies
-        run: npm ci --prefix apps/export-doc-web
+      - uses: ./.github/actions/prepare-web
 
       - name: Build frontend and API
         shell: pwsh
         run: |
-          node scripts/provision-report-fonts.mjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm --prefix apps/export-doc-web run build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cargo build --locked -p export-doc-server --example office_review

@@ -4,13 +4,7 @@ use export_doc_storage::{
 use serde_json::{Value, json};
 
 fn insert(c: &Connection, kind: &str, mut body: Value) -> i64 {
-    let id = c
-        .insert(&RecordWrite {
-            kind,
-            identity: None,
-            body: &body,
-        })
-        .unwrap();
+    let id = c.insert(&RecordWrite::unkeyed(kind, &body)).unwrap();
     body["id"] = json!(id);
     c.set_body(id, &body).unwrap();
     id

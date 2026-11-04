@@ -168,9 +168,9 @@ try {
           const commonGridColumnCount = commonGridStyle.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length;
           const advancedGridColumnCount = advancedGridStyle.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length;
           const dateRangeColumnCount = dateRangeStyle?.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length ?? 0;
-          const expectedCommonGridColumnCount = innerWidth <= 860 ? 1 : 2;
-          const expectedAdvancedGridColumnCount = innerWidth <= 620 ? 1 : innerWidth <= 1180 ? 2 : 4;
-          const expectedDateRangeColumnCount = innerWidth <= 620 ? 1 : 2;
+          const expectedCommonGridColumnCount = innerWidth <= 1180 ? 1 : 2;
+          const expectedAdvancedGridColumnCount = innerWidth <= 680 ? 1 : innerWidth <= 1180 ? 2 : 4;
+          const expectedDateRangeColumnCount = innerWidth <= 680 ? 1 : 2;
           const expectedFieldCount = 7;
           const expectedAdvancedOpen = innerWidth > 1180;
           const advancedSummaryVisible = visibleElement(advancedSummary);
@@ -197,7 +197,7 @@ try {
               && Math.min(filterRect.bottom, actionsRect.bottom) - Math.max(filterRect.top, actionsRect.top) > 1
             : true;
           const actionsPlacementMatches = actionsRect
-            ? innerWidth <= 860
+            ? innerWidth <= 1180
               ? actionsRect.top >= filterRect.bottom - 1
               : actionsRect.left >= filterRect.right - 1
             : false;

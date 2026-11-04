@@ -8,6 +8,8 @@ export type DesktopRuntimeContext = {
   productEdition: ProductEdition;
   platform: string;
   singleWindowStationCapable: boolean;
+  startupError?: string | null;
+  logPath?: string;
 };
 
 export type RuntimeStorageContext = {
@@ -67,6 +69,15 @@ function getInvoke() {
 
 export function isDesktopBridgeAvailable() {
   return Boolean(getInvoke());
+}
+export async function showReadyDesktopWindow() {
+  if (!isDesktopBridgeAvailable()) return;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().show();
+}
+export async function restartFailedDesktopStartup() {
+  const call = getInvoke();
+  if (call) await call("restart_after_startup_failure");
 }
 
 export async function getDesktopRuntimeContext() {

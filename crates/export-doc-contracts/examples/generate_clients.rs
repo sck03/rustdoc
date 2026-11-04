@@ -29,13 +29,19 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let generated = codegen::generate(&document)?;
     let formatted_rust = format_rust(&root, &generated.rust)?;
-    let files = [
-        (
-            option("--output")?.unwrap_or_else(|| {
-                root.join("apps/export-doc-web/src/api/generated/exportDocManagerApi.ts")
-            }),
-            generated.web,
-        ),
+    let web_path = option("--output")?.unwrap_or_else(|| {
+        root.join("apps/export-doc-web/src/api/generated/exportDocManagerApi.ts")
+    });
+    let web_root = web_path
+        .parent()
+        .ok_or("The client output requires a parent directory")?;
+    let mut files: Vec<_> = generated
+        .web_modules
+        .into_iter()
+        .map(|(name, content)| (web_root.join(name), content))
+        .collect();
+    files.extend([
+        (web_path, generated.web),
         (
             root.join("crates/export-doc-contracts/src/generated_api.rs"),
             formatted_rust,
@@ -48,7 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             root.join("crates/export-doc-contracts/src/openapi.json"),
             serde_json::to_string_pretty(&document)? + "\n",
         ),
-    ];
+    ]);
     let check = args.iter().any(|arg| arg == "--check");
     // Validate every projection before changing any generated file.
     for (path, content) in &files {

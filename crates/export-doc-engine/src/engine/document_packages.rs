@@ -80,37 +80,6 @@ pub(super) fn files(
     Ok(files)
 }
 
-/// Native desktop preview renders the same document package through the same
-/// permission checks and report renderer, but returns one in-memory PDF
-/// instead of creating a durable ZIP job.
-pub fn preview_pdf(
-    service: &NativeService,
-    actor: &Actor,
-    invoice: i64,
-    body: &Value,
-) -> Result<Vec<u8>> {
-    let items = items(body)?;
-    let source = service.store.get("invoices", invoice)?;
-    if !auth::visible(actor, "document.invoices", "view", &source) {
-        return Err(error(403, "单据不在当前账号的输出范围内。"));
-    }
-    let merged = files(
-        &service.store,
-        &service.paths,
-        &service.report_fonts,
-        actor,
-        invoice,
-        &items,
-        true,
-        "export-zip",
-        &crate::operation::cancellation_flag(),
-    )?;
-    merged
-        .into_iter()
-        .find(|(name, _)| name == "合并单据.pdf")
-        .map(|(_, bytes)| bytes)
-        .ok_or_else(|| invalid("组合单据预览未生成合并 PDF。"))
-}
 pub fn handle(
     service: &NativeService,
     actor: &Actor,

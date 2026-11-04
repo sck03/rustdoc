@@ -9,9 +9,9 @@
   min-width: 0;
   padding: 16px;
   overflow: hidden;
-  background: var(--edm-surface-muted);
+  background: var(--edm-bg-muted);
   border: 1px solid var(--edm-line);
-  border-radius: 14px;
+  border-radius: var(--edm-radius-xl);
 }
 
 .invoice-party-group::before {
@@ -35,15 +35,15 @@
   max-width: 100%;
 }
 
-.invoice-party-details { margin-top: 14px; padding-top: 10px; }
-.invoice-party-details summary small { margin-left: 8px; color: var(--text-secondary); font-weight: var(--edm-font-weight-medium); font-size: var(--edm-font-size-xs); }
+.invoice-party-details { margin-top: 16px; padding-top: 12px; }
+.invoice-party-details summary small { margin-left: 8px; color: var(--edm-text-secondary); font-weight: var(--edm-font-weight-semibold); font-size: var(--edm-font-size-xs); }
 
 .invoice-party-group-heading {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr) auto;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .invoice-party-group-icon {
@@ -54,24 +54,24 @@
   color: var(--edm-primary-600);
   background: var(--edm-primary-50);
   border: 1px solid var(--edm-primary-200);
-  border-radius: 10px;
+  border-radius: var(--edm-radius-lg);
 }
 
 .invoice-party-group-heading > div {
   display: grid;
   min-width: 0;
-  gap: 2px;
+  gap: 4px;
 }
 
-.invoice-party-group-heading strong { color: var(--text-primary); font-size: var(--edm-font-size-md); }
-.invoice-party-group-heading span { color: var(--text-secondary); font-size: var(--edm-font-size-xs); }
+.invoice-party-group-heading strong { color: var(--edm-text); font-size: var(--edm-font-size-md); }
+.invoice-party-group-heading span { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); }
 
 .invoice-party-group-heading small {
   padding: 4px 8px;
   color: var(--edm-ink-600);
-  background: var(--edm-canvas);
+  background: var(--edm-bg-canvas);
   border: 1px solid var(--edm-line);
-  border-radius: 999px;
+  border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
   font-weight: 700;
   white-space: nowrap;
@@ -89,17 +89,14 @@
   resize: vertical;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1180px) {
   .invoice-party-groups { grid-template-columns: 1fr; }
   .invoice-party-group-exporter { grid-column: auto; }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 680px) {
   .invoice-party-group .field-grid { grid-template-columns: 1fr; }
   .invoice-party-group-exporter .field-grid-span-2 { grid-column: auto; }
-}
-
-@media (max-width: 560px) {
   .invoice-party-group { padding: 12px; }
   .invoice-party-group-heading { grid-template-columns: 32px minmax(0, 1fr); align-items: start; }
   .invoice-party-group-icon { width: 32px; height: 32px; }

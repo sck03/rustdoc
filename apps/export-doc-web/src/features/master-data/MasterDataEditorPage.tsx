@@ -1,3 +1,4 @@
+import { EditorWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useMutation,useQuery,useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft,Edit3,Eye,Save,Trash2 } from "lucide-react";
 import { FormEvent,useEffect,useMemo,useRef,useState } from "react";
@@ -429,7 +430,7 @@ export function MasterDataEditorPage({
   }
 
   return (
-    <section className="editor-surface" aria-label={isNew ? config.newLabel : config.editLabel}>
+    <EditorWorkspace className="editor-surface" aria-label={isNew ? config.newLabel : config.editLabel}>
       <div className="editor-toolbar">
         <button className="command-button secondary" type="button" onClick={handleBackToMasterDataList}>
           <ArrowLeft size={17} aria-hidden="true" />
@@ -534,7 +535,7 @@ export function MasterDataEditorPage({
           }}
         />
       ) : null}
-    </section>
+    </EditorWorkspace>
   );
 }
 

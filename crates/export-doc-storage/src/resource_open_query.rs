@@ -21,6 +21,7 @@ pub(crate) fn build(kind: &str, parent: i64, states: &[&str], pg: bool) -> Resul
         format!("COALESCE({returnable},0)=1")
     };
     Ok(QuerySql {
+        source: crate::query_source::Source::Projected,
         filter: format!(
             "r.kind={kind} AND CAST({} AS BIGINT)=CAST({id} AS BIGINT) AND ({state} IN ({states}) OR ({state}='Issued' AND {issued}))",
             sql::field(field, pg)

@@ -83,7 +83,7 @@ pub(super) fn authorize(service: &NativeService, actor: &Actor, body: &Value) ->
         actor,
         body["adminPassword"].as_str().unwrap_or(""),
     )?;
-    let (ticket, expiry) = super::issue_sensitive_ticket(actor, action)?;
+    let (ticket, expiry) = service.backup_tickets.issue_sensitive(actor, action)?;
     super::audit(
         &service.store,
         actor,

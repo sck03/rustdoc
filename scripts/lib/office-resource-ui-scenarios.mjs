@@ -22,7 +22,7 @@ export async function exerciseOfficeResources({ url, page, output, run, wait, cl
   await approveResource('rooms');
   await navigate(`${url}/#/office/meeting-rooms?view=requests&status=Approved`);
   await wait("document.querySelector('.office-request-card')?.textContent.includes('资源流程验收会议')", 'Full admin lost new booking');
-  assert.equal(await run("document.querySelector('.office-filter select').value"), 'Approved');
+  assert.equal(await run("document.querySelector('select[aria-label=申请状态]').value"), 'Approved');
   await fill('申请状态', '');
   await action('发放钥匙'); await wait("document.querySelector('.office-badge')?.textContent==='使用中'", 'Room not in use');
   await action('归还钥匙'); await wait("document.querySelector('.office-badge')?.textContent==='已完成'", 'Room not completed');
@@ -41,7 +41,7 @@ export async function exerciseOfficeResources({ url, page, output, run, wait, cl
   await captureScreenshot(page, path.join(output, 'resource-request-pending.png'));
   await approveResource('supplies');
   await navigate(`${url}/#/office/supplies?view=requests&status=Approved`);
-  await wait("document.querySelector('.office-filter select')?.value==='Approved'", 'Same-route status navigation did not update the filter');
+  await wait("document.querySelector('select[aria-label=申请状态]')?.value==='Approved'", 'Same-route status navigation did not update the filter');
   await wait("document.querySelector('.office-request-card')", 'Approved supply request missing');
   await fill('申请状态', '');
   await action('确认发放'); await click('登记归还');

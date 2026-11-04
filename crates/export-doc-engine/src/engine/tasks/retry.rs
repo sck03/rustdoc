@@ -13,9 +13,65 @@ use crate::{
 use export_doc_storage::BlobWrite;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::cell::RefCell;
 
 const INPUT: &str = "job-input";
 const MAX_INPUT: usize = 25 * 1024 * 1024;
+
+#[derive(Clone)]
+struct Source {
+    job_id: String,
+    version: i64,
+}
+thread_local! { static SOURCE: RefCell<Option<Source>> = const { RefCell::new(None) }; }
+fn with_source<T>(source: Source, work: impl FnOnce() -> T) -> T {
+    struct Restore(Option<Source>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            SOURCE.with(|value| *value.borrow_mut() = self.0.take());
+        }
+    }
+    let _restore = Restore(SOURCE.with(|value| value.replace(Some(source))));
+    work()
+}
+/// Called only inside the transaction that creates the replacement task.
+pub(super) fn consume_source(
+    tx: &Connection,
+    actor: &Actor,
+    replacement: &mut Value,
+) -> Result<()> {
+    let source = SOURCE.with(|value| value.borrow().clone());
+    let Some(source) = source else {
+        return Ok(());
+    };
+    let mut job = persistence::checked(tx, actor, &source.job_id)?;
+    if job["versionNumber"].as_i64() != Some(source.version)
+        || !job["_retryConsumedBy"].is_null()
+        || !matches!(job["status"].as_str(), Some("Failed" | "Canceled"))
+    {
+        return Err(conflict("此任务已重试或发生变化，请刷新任务列表。"));
+    }
+    if job["companyScope"] != actor.company
+        || crate::engine::records::text(&job, "_actorContext") != actor.context
+    {
+        return Err(error(403, "请切换到任务创建时的单位身份后重试。"));
+    }
+    auth::authorize_operation(actor, RETRY_JOB, &[])?;
+    job["_retryConsumedBy"] = replacement["jobId"].clone();
+    replacement["_retrySourceJobId"] = serde_json::json!(source.job_id);
+    crate::engine::store::save(
+        tx,
+        persistence::KIND,
+        job["id"]
+            .as_i64()
+            .ok_or_else(|| unavailable("任务记录缺少编号。"))?,
+        job,
+        Some(source.job_id),
+        actor,
+        "retry-consumed",
+    )?;
+    Ok(())
+}
 
 #[derive(Clone, Copy)]
 enum Handler {
@@ -141,7 +197,7 @@ pub(super) fn remove_input(tx: &Connection, id: i64) -> Result<()> {
     tx.delete_blob(id, INPUT)?;
     Ok(())
 }
-fn read(store: &Store, actor: &Actor, id: &str) -> Result<Replay> {
+fn read(store: &Store, actor: &Actor, id: &str) -> Result<(Replay, Source)> {
     store.read_for(actor, RETRY_JOB, &[], |tx, current| {
         let job = persistence::checked(tx, current, id)?;
         if job["companyScope"] != current.company
@@ -151,6 +207,7 @@ fn read(store: &Store, actor: &Actor, id: &str) -> Result<Replay> {
         }
         if !matches!(job["status"].as_str(), Some("Failed" | "Canceled"))
             || !job["_retry"].is_object()
+            || !job["_retryConsumedBy"].is_null()
         {
             return Err(conflict("仅失败或取消且保留重试输入的任务可重试。"));
         }
@@ -189,13 +246,21 @@ fn read(store: &Store, actor: &Actor, id: &str) -> Result<Replay> {
                 content: blob.content,
             });
         }
-        Ok(replay)
+        Ok((
+            replay,
+            Source {
+                job_id: id.into(),
+                version: job["versionNumber"]
+                    .as_i64()
+                    .ok_or_else(|| unavailable("任务记录缺少版本。"))?,
+            },
+        ))
     })
 }
 
 pub(crate) fn execute(service: &NativeService, actor: &Actor, id: &str) -> Result<Value> {
     let _preparation = service.jobs.prepare_retry()?;
-    let replay = read(&service.store, actor, id)?;
+    let (replay, source) = read(&service.store, actor, id)?;
     let operation = ALL_OPERATIONS
         .iter()
         .find(|op| op.id == replay.operation)
@@ -214,7 +279,7 @@ pub(crate) fn execute(service: &NativeService, actor: &Actor, id: &str) -> Resul
     }
     let (handler, _) = registration(operation.id)
         .ok_or_else(|| conflict("此任务不能自动重试，请回到原功能重新提交。"))?;
-    match handler {
+    with_source(source, || match handler {
         #[cfg(feature = "excel")]
         Handler::InvoiceQuery => {
             crate::engine::invoice_query::export(service, actor, operation, &replay.body)
@@ -244,5 +309,5 @@ pub(crate) fn execute(service: &NativeService, actor: &Actor, id: &str) -> Resul
         Handler::Email => {
             crate::engine::email::handle(service, actor, operation, &parameters, &[], &replay.body)
         }
-    }
+    })
 }

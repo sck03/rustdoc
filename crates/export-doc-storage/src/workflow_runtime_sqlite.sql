@@ -153,7 +153,6 @@ CREATE TABLE workflow_activations (
 );
 CREATE INDEX workflow_activations_due ON workflow_activations(state,activate_at,id);
 CREATE VIEW workflow_current_tasks AS SELECT t.* FROM workflow_tasks t JOIN workflow_instances w ON w.request_id=t.request_id AND w.revision=t.submission AND w.generation=t.generation;
-CREATE VIEW task_decisions AS SELECT request_id,submission,generation,task_key,assignee_id,assignee_person_id,context_id,acted_by_id,acted_by_context,status,note,acted_at,delegation_key,signature FROM workflow_tasks WHERE signature IS NOT NULL;
 CREATE TRIGGER request_revision_update BEFORE UPDATE ON request_revisions BEGIN SELECT RAISE(ABORT,'Immutable submitted material'); END;
 CREATE TRIGGER request_revision_delete BEFORE DELETE ON request_revisions BEGIN SELECT RAISE(ABORT,'Immutable submitted material'); END;
 CREATE TRIGGER workflow_signature_update BEFORE UPDATE OF request_id,submission,generation,task_key,node_key,stage,assignee_id,assignee_person_id,origin,assignee_name,context_id,acted_by_context,acted_by_id,acted_by_person_id,status,independent,mandatory,due_at,started_at,acted_at,elapsed_seconds,note,acted_by_name,delegation_key,decision,signature,source_generation ON workflow_tasks WHEN OLD.signature IS NOT NULL OR OLD.source_generation IS NOT NULL BEGIN SELECT RAISE(ABORT,'Immutable workflow signature'); END;

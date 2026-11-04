@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { Check, Search, ShieldCheck, X } from "lucide-react";
+import { Check, Search, ShieldCheck } from "lucide-react";
 import type {
   ApiInvoiceItemDto,
   ExportDocManagerApiClient,
@@ -7,7 +7,7 @@ import type {
   HsCodeKnowledgeSearchResult,
 } from "../../api/index.ts";
 import { normalizeText, readApiError } from "../../ui/formUtils.ts";
-import { useModalDialog } from "../../ui/useModalDialog.ts";
+import { Drawer } from "../../ui/primitives/Dialog.tsx";
 import { buildInvoiceHsFeedbackContext, buildInvoiceHsQuery } from "./invoiceHsKnowledgeModel.ts";
 
 export function InvoiceHsKnowledgePanel({
@@ -29,11 +29,6 @@ export function InvoiceHsKnowledgePanel({
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const queryRef = useRef<HTMLTextAreaElement | null>(null);
-  const panelRef = useModalDialog<HTMLElement>(onClose, {
-    active: open,
-    canClose: !busy,
-    initialFocusRef: queryRef,
-  });
 
   useEffect(() => {
     if (!open) return;
@@ -97,16 +92,9 @@ export function InvoiceHsKnowledgePanel({
 
   if (!open) return null;
   return (
-    <div className="invoice-hs-panel-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && !busy && onClose()}>
-      <aside ref={panelRef} className="invoice-hs-panel" role="dialog" aria-modal="true" aria-labelledby="invoice-hs-panel-title">
-        <header>
-          <div>
-            <span className="eyebrow">本地已审核知识</span>
-            <h2 id="invoice-hs-panel-title">智能匹配 HS 编码</h2>
-            <p>查询本地已审核知识，回填后记录本次选择；最终结果随发票保存生效。</p>
-          </div>
-          <button className="icon-button" type="button" title="关闭" aria-label="关闭" onClick={onClose}><X size={18}/></button>
-        </header>
+    <Drawer title="智能匹配 HS 编码" description="查询本地已审核知识，回填后记录本次选择；最终结果随发票保存生效。"
+      busy={busy} onClose={onClose} closeLabel="关闭" initialFocusRef={queryRef}>
+      <div className="invoice-hs-panel">
         <div className="invoice-hs-search" role="search" aria-label="智能匹配 HS 编码">
           <textarea
             ref={queryRef}
@@ -141,8 +129,8 @@ export function InvoiceHsKnowledgePanel({
             </article>
           ))}
         </div>
-      </aside>
-    </div>
+      </div>
+    </Drawer>
   );
 }
 

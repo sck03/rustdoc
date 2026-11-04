@@ -1,7 +1,6 @@
 #[path = "support/identity_contract.rs"]
 mod identity_contract;
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod native_fixture;
 #[path = "support/personnel_contract.rs"]
 mod personnel_contract;

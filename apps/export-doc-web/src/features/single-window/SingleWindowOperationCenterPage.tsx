@@ -1,3 +1,4 @@
+import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileInput, HardDrive, RefreshCw, Search, Server, Upload } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
@@ -7,7 +8,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { getDesktopRuntimeContext, isDesktopBridgeAvailable, selectSingleWindowPackageFile } from "../../desktop/desktopBridge.ts";
 import { DesktopIconButton, readDesktopError } from "../../ui/DesktopPathActions.tsx";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { PathField } from "../../ui/PathField.tsx";
@@ -103,7 +104,7 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
   const isBusy = operationCenterQuery.isFetching;
 
   return (
-    <section className="work-surface single-window-surface" aria-label="单一窗口操作中心">
+    <RecordWorkspace className="single-window-surface" aria-label="单一窗口操作中心">
       <SingleWindowTabs activeKey="operation-center" />
 
       <div className={isDesktopStation ? "single-window-mode-banner station-mode" : "single-window-mode-banner office-mode"}>
@@ -163,7 +164,7 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
       ) : null}
 
       <OperationCenterTable data={rows} isBusy={isBusy} selectedBatchId={selectedBatchId} onSelect={setSelectedBatchId} onOpen={(batchId) => navigate(`/single-window/operation-center/${batchId}`)} />
-      <ListPaginationControls
+      <Pagination
         pageNumber={page?.pageNumber ?? pageNumber}
         totalPages={Math.max(page?.totalPages ?? 1, 1)}
         totalCount={page?.totalCount ?? 0}
@@ -173,7 +174,7 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
         onPageChange={setPageNumber}
         onPageSizeChange={(value) => { setPageSize(normalizeListPageSize(value)); setPageNumber(1); }}
       />
-    </section>
+    </RecordWorkspace>
   );
 }
 

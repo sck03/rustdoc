@@ -1,3 +1,4 @@
+import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import type { ReactNode } from "react";
 import type { WorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
@@ -32,7 +33,7 @@ export function ReportTemplateManagementView({
   onReturn: () => void;
 }) {
   return (
-    <section className="editor-surface report-template-surface report-template-management-surface" aria-label="报表模板管理">
+    <RecordWorkspace className="editor-surface report-template-surface report-template-management-surface" aria-label="报表模板管理">
       <form
         className="report-template-layout report-template-management-layout"
         onSubmit={(event) => event.preventDefault()}
@@ -55,6 +56,6 @@ export function ReportTemplateManagementView({
         <ReportTemplateFeedback message={message} type={messageType} />
         {managementWorkspace}
       </form>
-    </section>
+    </RecordWorkspace>
   );
 }

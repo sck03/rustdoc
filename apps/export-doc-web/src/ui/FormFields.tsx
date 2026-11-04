@@ -1,5 +1,6 @@
 import { type ReactNode, useId } from "react";
 import { dateInputToApiDate, numberInputValue, readNumber, toDateInputValue } from "./formUtils.ts";
+import { Field } from "./primitives/Field.tsx";
 
 type FieldShellProps = {
   label: string;
@@ -18,7 +19,6 @@ export function FieldShell({
   description,
   children,
 }: FieldShellProps) {
-  const descriptionId = `field-description-${useId().replace(/:/g, "-")}`;
   const classes = [
     "form-field",
     required ? "form-field-required" : "",
@@ -28,20 +28,7 @@ export function FieldShell({
     .filter(Boolean)
     .join(" ");
 
-  return (
-    <label className={classes}>
-      <span className="form-field-label">
-        <span>{label}</span>
-        {required ? <strong className="form-field-required-badge">必填</strong> : null}
-      </span>
-      {children(description ? descriptionId : undefined)}
-      {description ? (
-        <span id={descriptionId} className="form-field-description">
-          {description}
-        </span>
-      ) : null}
-    </label>
-  );
+  return <Field label={label} required={required} className={classes} description={description}>{children}</Field>;
 }
 
 export function TextField({

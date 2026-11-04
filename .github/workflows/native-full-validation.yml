@@ -64,8 +64,7 @@ jobs:
             .codex-runtime/cargo-home/registry
             .codex-runtime/cargo-home/git
           key: native-cargo-${{ matrix.target }}-${{ hashFiles('Cargo.lock') }}
-      - name: Provision verified shared fonts
-        run: node scripts/provision-report-fonts.mjs
+      - uses: ./.github/actions/prepare-web
       - name: Verify product version and compiler build identity
         shell: pwsh
         run: |
@@ -83,8 +82,6 @@ jobs:
           cargo run --locked -p export-doc-contracts --example generate_clients -- --check
           exit $LASTEXITCODE
       # Clippy's all-features check also embeds the Tauri frontend assets.
-      - name: Install frontend dependencies
-        run: npm --prefix apps/export-doc-web ci
       - name: Build frontend
         run: npm --prefix apps/export-doc-web run build
       - name: Workspace tests

@@ -1,4 +1,4 @@
-import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -13,15 +13,16 @@ import {
   isDesktopBridgeAvailable,
   requestAppExit,
   subscribeToAppExitRequests,
+  showReadyDesktopWindow,
+  restartFailedDesktopStartup,
 } from "./desktop/desktopBridge.ts";
 import { LoginPage } from "./features/auth/LoginPage.tsx";
 import { PageState } from "./ui/PageState.tsx";
+import { StartupScreen } from "./app/StartupScreen.tsx";
 import { readDesktopError } from "./ui/DesktopPathActions.tsx";
 import { readApiError } from "./ui/formUtils.ts";
 import { useConfirmUnsavedChanges, useHasUnsavedChanges } from "./ui/unsavedChangesGuard.tsx";
-import { WorkspaceShell, type WorkspaceNotice, type WorkspaceSessionAttention } from "./app/WorkspaceShell.tsx";
-import { PermissionAccessProvider } from "./app/PermissionAccessContext.tsx";
-import { AppWorkspaceRoutes } from "./app/AppWorkspaceRoutes.tsx";
+import type { WorkspaceNotice, WorkspaceSessionAttention } from "./app/WorkspaceShell.tsx";
 import { isRouteAccessAllowed } from "./app/routeAccess.ts";
 import {
   clearStoredSession,
@@ -42,6 +43,7 @@ import {
 } from "./app/productEdition.ts";
 
 const defaultApiBaseUrl = readDefaultApiBaseUrl();
+const AuthenticatedWorkspace = lazy(() => import("./app/AuthenticatedWorkspace.tsx").then(module => ({ default: module.AuthenticatedWorkspace })));
 
 type SessionState = WebSessionState;
 
@@ -52,6 +54,10 @@ function App() {
   const [desktopAccessToken, setDesktopAccessToken] = useState<string | undefined>(undefined);
   const [desktopProductEdition, setDesktopProductEdition] = useState<ProductEdition>("Full");
   const [desktopContextLoading, setDesktopContextLoading] = useState(() => isDesktopBridgeAvailable());
+  const [startupError,setStartupError] = useState<string | null>(null);
+  const [startupAttempt,setStartupAttempt] = useState(0);
+  const [startupLog,setStartupLog] = useState<string | undefined>();
+  const [restartStartup,setRestartStartup] = useState(false);
   const [username, setUsername] = useState(() => isDesktopBridgeAvailable() ? "admin" : "");
   const [password, setPassword] = useState("");
   const [bootstrapToken, setBootstrapToken] = useState("");
@@ -92,6 +98,7 @@ function App() {
   apiBaseUrlRef.current = apiBaseUrl;
   hasUnsavedChangesRef.current = hasUnsavedChanges;
   const isDesktopRuntime = isDesktopBridgeAvailable();
+  useEffect(() => { void showReadyDesktopWindow().catch(error => console.error("Unable to show the prepared window",error)); }, []);
   const sessionAccessToken = session?.accessToken;
   const sessionApiBaseUrl = session?.apiBaseUrl;
   const workspacePathname = session ? location.pathname : "/dashboard";
@@ -254,6 +261,7 @@ function App() {
 
     let isStale = false;
     setDesktopContextLoading(true);
+    setStartupError(null);
     void getDesktopRuntimeContext()
       .then((context) => {
         if (isStale || !context) {
@@ -263,6 +271,9 @@ function App() {
         const nextApiBaseUrl = context.apiBaseUrl.trim();
         const nextDesktopAccessToken = context.desktopAccessToken.trim() || undefined;
         setDesktopProductEdition(context.productEdition);
+        setStartupLog(context.logPath);
+        setRestartStartup(Boolean(context.startupError));
+        if(context.startupError) { setStartupError(context.startupError);return; }
         if (nextApiBaseUrl) {
           setApiBaseUrl(nextApiBaseUrl);
           if (sessionRef.current && sessionRef.current.apiBaseUrl !== nextApiBaseUrl) {
@@ -275,11 +286,7 @@ function App() {
       })
       .catch((error) => {
         if (!isStale) {
-          if (!isDesktopRuntimeContextUnavailable(error)) {
-            setMessage(`无法读取桌面运行上下文：${readDesktopError(error)}`);
-          } else {
-            console.warn("Desktop runtime context is unavailable.", error);
-          }
+          setStartupError(`无法连接桌面服务：${readDesktopError(error)}`);
         }
       })
       .finally(() => {
@@ -291,7 +298,7 @@ function App() {
     return () => {
       isStale = true;
     };
-  }, [queryClient, setSession]);
+  }, [queryClient, setSession, startupAttempt]);
 
   useEffect(() => {
     if (session) {
@@ -587,8 +594,10 @@ function App() {
     : null;
 
   if (desktopContextLoading) {
-    return <main className="login-screen"><PageState tone="loading" title="正在准备工作空间" /></main>;
+    return <StartupScreen />;
   }
+  if (startupError) return <StartupScreen name={loginProduct.displayName} error={startupError} logPath={startupLog}
+    onRetry={() => { if(restartStartup) void restartFailedDesktopStartup().catch(error => setStartupError(readDesktopError(error)));else setStartupAttempt(value => value+1); }} />;
 
   if (!session) {
     return (
@@ -611,47 +620,18 @@ function App() {
   }
 
   return (
-    <PermissionAccessProvider
-      subject={session.user}
-      grants={session.user.capabilities.moduleAccess}
-      permissions={session.user.capabilities.permissions}
-      canManageSettings={session.user.capabilities.canManageSettings}
-    >
-      <WorkspaceShell
-        key={`${session.user.id}:${session.user.contextId ?? ""}`}
-        pathname={workspacePathname}
-        apiBaseUrl={session.apiBaseUrl ?? apiBaseUrl}
-        isDesktopRuntime={isDesktopRuntime}
-        user={session.user}
-        onLogout={handleLogout}
-        unitContext={unitContext}
-        notice={workspaceNotice}
-        onDismissNotice={() => setWorkspaceNotice(null)}
-        sessionAttention={sessionAttention}
-      >
-      <AppWorkspaceRoutes
-        sessionToken={session.accessToken}
-          activeProduct={activeProduct}
-          canManageAuditLogs={canManageAuditLogs}
-          client={client}
-          routeAccessAllowed={routeAccessAllowed}
-          user={session.user}
-        />
-      </WorkspaceShell>
-    </PermissionAccessProvider>
+    <Suspense fallback={<PageState tone="loading" title="正在准备工作空间" />}>
+      <AuthenticatedWorkspace key={`${session.user.id}:${session.user.contextId ?? ""}`}
+        shell={{ pathname:workspacePathname, apiBaseUrl:session.apiBaseUrl ?? apiBaseUrl,
+          isDesktopRuntime, user:session.user, onLogout:handleLogout, unitContext, notice:workspaceNotice,
+          onDismissNotice:()=>setWorkspaceNotice(null), sessionAttention }}
+        routes={{ sessionToken:session.accessToken, activeProduct, canManageAuditLogs, client, routeAccessAllowed, user:session.user }} />
+    </Suspense>
   );
 }
 
 function readDefaultApiBaseUrl() {
   return import.meta.env.VITE_EXPORTDOC_API_BASE_URL ?? window.location.origin;
-}
-
-function isDesktopRuntimeContextUnavailable(error: unknown) {
-  const message = readDesktopError(error).toLowerCase();
-  return (
-    message.includes("get_desktop_runtime_context") &&
-    (message.includes("not allowed") || message.includes("plugin not found"))
-  );
 }
 
 export default App;

@@ -1,8 +1,8 @@
-import { LockKeyholeOpen, X } from "lucide-react";
+import { LockKeyholeOpen } from "lucide-react";
 import { ApiSingleWindowLockedFieldDto } from "../../api/index.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { useModalDialog } from "../../ui/useModalDialog.ts";
+import { Dialog } from "../../ui/primitives/Dialog.tsx";
 
 export function SingleWindowLockedFieldsDialog({
   title,
@@ -25,27 +25,11 @@ export function SingleWindowLockedFieldsDialog({
 }) {
   const selectedCount = selectedKeys.size;
   const allSelected = fields.length > 0 && selectedCount === fields.length;
-  const dialogRef = useModalDialog<HTMLDivElement>(onClose, { canClose: !isBusy });
 
   return (
-    <div className="workspace-modal-backdrop" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget && !isBusy) {
-        onClose();
-      }
-    }}>
-      <div ref={dialogRef} className="workspace-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="single-window-lock-title">
-        <header className="workspace-modal-header">
-          <div className="workspace-modal-title">
-            <LockKeyholeOpen size={18} aria-hidden="true" />
-            <h2 id="single-window-lock-title">{title}</h2>
-            <span>{fields.length}</span>
-          </div>
-          <button className="icon-button" type="button" title="关闭" aria-label="关闭" onClick={onClose} disabled={isBusy}>
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
-
-        <div className="workspace-modal-toolbar">
+    <Dialog title={title} description={`共 ${fields.length} 个锁定字段`} size="large" busy={isBusy} onClose={onClose} closeLabel="关闭">
+      <div>
+        <div data-ui="dialog-toolbar">
           <label className="single-window-lock-select-all">
             <input type="checkbox" checked={allSelected} disabled={fields.length === 0 || isBusy} onChange={onToggleAll} />
             <span>全选</span>
@@ -92,7 +76,7 @@ export function SingleWindowLockedFieldsDialog({
           </ResponsiveTableFrame>
         )}
 
-        <footer className="workspace-modal-footer">
+        <footer data-ui="dialog-footer">
           <button className="command-button secondary" type="button" onClick={onClose} disabled={isBusy}>
             <span>关闭</span>
           </button>
@@ -102,7 +86,7 @@ export function SingleWindowLockedFieldsDialog({
           </button>
         </footer>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

@@ -1,4 +1,5 @@
 import { Navigate,useParams } from "react-router-dom";
+import "../../styles/master-data.css";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { getMasterDataConfig } from "./masterDataConfigs.ts";

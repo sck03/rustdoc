@@ -1,3 +1,4 @@
+import { Dialog } from "../../ui/primitives/Dialog.tsx";
 import type {
   ClipboardEventHandler,
   KeyboardEventHandler,
@@ -124,7 +125,7 @@ export function ReferenceCatalogToolbar({
           <Save size={17} aria-hidden="true" />
           <span>保存</span>
         </button>
-        <button className="command-button danger-command" type="button" disabled={!canReset || isBusy} onClick={onReset}>
+        <button className="command-button danger" type="button" disabled={!canReset || isBusy} onClick={onReset}>
           <RotateCcw size={17} aria-hidden="true" />
           <span>恢复内置</span>
         </button>
@@ -321,7 +322,6 @@ export function ReferenceCatalogContextMenu({
 export function ReferenceCatalogAliasDialog({
   activePage,
   editor,
-  dialogRef,
   inputRef,
   onClose,
   onChange,
@@ -329,25 +329,15 @@ export function ReferenceCatalogAliasDialog({
 }: {
   activePage: CatalogPageDefinition;
   editor: AliasEditorState;
-  dialogRef: MutableRefObject<HTMLDivElement | null>;
   inputRef: MutableRefObject<HTMLTextAreaElement | null>;
   onClose: () => void;
   onChange: (value: string) => void;
   onApply: () => void;
 }) {
   return (
-    <div className="workspace-modal-backdrop" onMouseDown={(event) => {
-      if (event.target === event.currentTarget) onClose();
-    }}>
-      <div ref={dialogRef} className="workspace-modal-dialog reference-catalog-alias-dialog"
-        role="dialog" aria-modal="true" aria-labelledby="reference-catalog-alias-title">
-        <div className="workspace-modal-header">
-          <div className="workspace-modal-title">
-            <h2 id="reference-catalog-alias-title">编辑别名</h2>
-            <span>{activePage.label}</span>
-          </div>
-        </div>
-        <div className="workspace-modal-toolbar"><span>第 {editor.rowIndex + 1} 行</span></div>
+    <Dialog title="编辑别名" description={activePage.label} onClose={onClose} initialFocusRef={inputRef}>
+      <div className="reference-catalog-alias-dialog">
+        <div data-ui="dialog-toolbar"><span>第 {editor.rowIndex + 1} 行</span></div>
         <textarea ref={inputRef} value={editor.value} onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
@@ -359,11 +349,11 @@ export function ReferenceCatalogAliasDialog({
               onApply();
             }
           }} />
-        <div className="workspace-modal-footer">
+        <div data-ui="dialog-footer">
           <button className="command-button secondary" type="button" onClick={onClose}>取消</button>
           <button className="command-button" type="button" onClick={onApply}>应用</button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }

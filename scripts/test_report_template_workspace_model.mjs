@@ -37,8 +37,8 @@ const workspaceStateModelPath = path.join(
   "reportTemplateWorkspaceState.ts",
 );
 const stylesRoot = path.join(repoRoot, "apps", "export-doc-web", "src");
-const reportWorkspaceCss = readCssGraph(path.join(stylesRoot, "reportWorkspace.css"));
-const responsiveOverridesCss = readCssGraph(path.join(stylesRoot, "responsiveOverrides.css"));
+const reportWorkspaceCss = readCssGraph(path.join(stylesRoot, "styles/report/index.css"));
+const responsiveOverridesCss = readCssGraph(path.join(stylesRoot, "styles/responsive/index.css"));
 const workspaceStateSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "reportTemplateWorkspaceState.ts"), "utf8");
 const userPanelSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "ReportTemplateUserPanel.tsx"), "utf8");
 const exportDefaultsPanelSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "ReportExportDefaultsPanel.tsx"), "utf8");
@@ -309,7 +309,7 @@ assertMatch(
 );
 assertMatch(
   responsiveOverridesCss,
-  /@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.template-selection-panel\s*\{\s*grid-column:\s*1\s*\/\s*-1/,
+  /@media\s*\(min-width:\s*681px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.template-selection-panel\s*\{\s*grid-column:\s*1\s*\/\s*-1/,
   "中等宽度应继续让选择区独占首行",
 );
 assertMatch(

@@ -1,21 +1,7 @@
+import { DashboardWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowDownRight,
-  ArrowRight,
-  ArrowUpRight,
-  BadgeCheck,
-  BookOpen,
-  CalendarDays,
-  ClipboardList,
-  FilePlus2,
-  ListChecks,
-  Minus,
-  RefreshCw,
-  Search,
-  Ship,
-  TrendingUp,
-  WalletCards,
-} from "lucide-react";
+import "../../styles/dashboard.css";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, BookOpen, FilePlus2, ListChecks, Minus, RefreshCw, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { formatDate as formatBusinessDate } from "../../ui/formUtils.ts";
@@ -25,6 +11,7 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { WorkspaceGuide } from "../../ui/WorkspaceGuide.tsx";
+import { Card, KpiTile } from "../../ui/primitives/Card.tsx";
 
 export function DashboardPage({ client }: { client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
@@ -46,8 +33,6 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
       label: amount.currency ? `本月出口额（${amount.currency}）` : "本月出口额",
       value: dashboard && amount.currency ? formatAmount(amount.monthlyAmount) : "—",
       detail: dashboard && amount.currency ? buildMonthTrend(amount.monthlyAmount, amount.previousMonthlyAmount) : null,
-      icon: CalendarDays,
-      tone: "teal",
       route: "/query/invoices",
       enabled: queryPermission.canView,
     })),
@@ -55,8 +40,6 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
       label: "本月预估利润（CNY）",
       value: dashboard ? formatAmount(dashboard.monthlyProfit) : "—",
       detail: dashboard ? buildMonthTrend(dashboard.monthlyProfit, dashboard.previousMonthlyProfit) : null,
-      icon: TrendingUp,
-      tone: "green",
       route: "/query/invoices",
       enabled: queryPermission.canView,
     },
@@ -64,8 +47,6 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
       label: "本月退税额（CNY）",
       value: dashboard ? formatAmount(dashboard.monthlyTaxRefund) : "—",
       detail: dashboard ? buildMonthTrend(dashboard.monthlyTaxRefund, dashboard.previousMonthlyTaxRefund) : null,
-      icon: WalletCards,
-      tone: "violet",
       route: "/query/invoices",
       enabled: queryPermission.canView,
     },
@@ -73,8 +54,6 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
       label: "待处理订单",
       value: dashboard ? formatCount(dashboard.pendingCount) : "—",
       detail: dashboard ? { text: `草稿 ${dashboard.draftCount} · 已核对 ${dashboard.verifiedCount}`, direction: "flat" as const } : null,
-      icon: ClipboardList,
-      tone: "amber",
       route: "/invoices",
       enabled: invoicePermission.canView,
     },
@@ -82,8 +61,6 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
       label: "已出运",
       value: dashboard ? formatCount(dashboard.shippedCount) : "—",
       detail: dashboard ? { text: `已结汇 ${dashboard.completedCount}`, direction: "flat" as const } : null,
-      icon: Ship,
-      tone: "blue",
       route: "/invoices",
       enabled: invoicePermission.canView,
     },
@@ -91,8 +68,6 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
       label: dashboard?.periodLabel ? `${dashboard.periodLabel}发票` : "本月发票",
       value: dashboard ? formatCount(dashboard.monthlyInvoiceCount) : "—",
       detail: dashboard ? { text: `有效订单共 ${dashboard.totalActiveCount}`, direction: "flat" as const } : null,
-      icon: BadgeCheck,
-      tone: "slate",
       route: "/invoices",
       enabled: invoicePermission.canView,
     },
@@ -116,7 +91,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
   }
 
   return (
-    <section className="dashboard-page" aria-label="仪表盘">
+    <DashboardWorkspace className="dashboard-page" aria-label="仪表盘">
       <div className="toolbar dashboard-toolbar">
         <div className="toolbar-summary">
           <strong>{dashboard?.singleWindowStatusSummary ?? "单一窗口近况：加载中。"}</strong>
@@ -185,39 +160,22 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
 
       <div className="dashboard-metric-grid">
         {metrics.map((metric) => {
-          const Icon = metric.icon;
           const TrendIcon = metric.detail?.direction === "up"
             ? ArrowUpRight
             : metric.detail?.direction === "down"
               ? ArrowDownRight
               : Minus;
           return (
-            <button
-              className={`dashboard-metric dashboard-metric-${metric.tone}`}
-              type="button"
-              key={metric.label}
-              disabled={!metric.enabled}
-              onClick={() => navigate(metric.route)}
-              aria-label={`${metric.label}：${metric.value}`}
-            >
-              <span className="dashboard-metric-icon"><Icon size={19} aria-hidden="true" /></span>
-              <span className="dashboard-metric-content">
-                <span className="dashboard-metric-label">{metric.label}</span>
-                <strong>{metric.value}</strong>
-                {metric.detail ? (
-                  <small className={`dashboard-metric-trend dashboard-trend-${metric.detail.direction}`}>
-                    <TrendIcon size={13} aria-hidden="true" />
-                    {metric.detail.text}
-                  </small>
-                ) : null}
-              </span>
-            </button>
+            <KpiTile key={metric.label} label={metric.label} value={metric.value} disabled={!metric.enabled}
+              onActivate={() => navigate(metric.route)} description={metric.detail ? <span className={`dashboard-trend-${metric.detail.direction}`}>
+                <TrendIcon size={13} aria-hidden="true" />{metric.detail.text}
+              </span> : undefined} />
           );
         })}
       </div>
 
       <div className="dashboard-work-grid">
-        <section className="form-section dashboard-recent-section" aria-label="最新订单">
+        <Card className="form-section dashboard-recent-section" aria-label="最新订单">
           <div className="section-header dashboard-section-header">
             <div><h2>最新订单</h2><span>最近更新的有效发票</span></div>
             {invoicePermission.canView ? (
@@ -263,9 +221,9 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
               </tbody>
             </table>
           </ResponsiveTableFrame>
-        </section>
+        </Card>
 
-        <section className="form-section dashboard-todo-section" aria-label="待办事项">
+        <Card className="form-section dashboard-todo-section" aria-label="待办事项">
           <div className="section-header dashboard-section-header">
             <div><h2>待办事项</h2><span>优先处理的业务节点</span></div>
             {invoicePermission.canView ? (
@@ -290,9 +248,9 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
               <div className="small-empty">{isBusy ? "加载中" : "当前没有待办事项"}</div>
             ) : null}
           </div>
-        </section>
+        </Card>
       </div>
-    </section>
+    </DashboardWorkspace>
   );
 }
 

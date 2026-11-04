@@ -17,8 +17,8 @@ export default defineConfig({
           groups: [
             { name: "vendor-three", test: /node_modules[\\/]three[\\/]/, priority: 30 },
             { name: "vendor-react", test: /node_modules[\\/](?:react|react-dom|react-router|react-router-dom|scheduler|@tanstack|@remix-run)[\\/]/, priority: 20 },
-            { name: "vendor-icons", test: /node_modules[\\/]lucide-react[\\/]/, priority: 10 },
-            { name: "vendor", test: /node_modules[\\/]/ },
+            { name: "vendor-icons", test: /node_modules[\\/]lucide-react[\\/]dist[\\/]esm[\\/](?!icons[\\/])/, priority: 10 },
+            { name: "vendor", test: /node_modules[\\/](?!lucide-react[\\/])/ },
           ],
         },
       },

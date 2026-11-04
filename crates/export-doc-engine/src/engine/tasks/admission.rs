@@ -2,6 +2,53 @@
 use super::{Jobs, Runtime};
 use crate::engine::error::{Result, error, unavailable};
 use std::sync::{Arc, Mutex};
+pub(super) struct Starting {
+    runtime: Arc<Mutex<Runtime>>,
+    key: String,
+    armed: bool,
+}
+impl Starting {
+    pub(super) fn acquire(
+        runtime: &Arc<Mutex<Runtime>>,
+        scope: crate::operation::OperationScope,
+    ) -> Result<Self> {
+        crate::operation::check()?;
+        let key = format!("preparing:{}", crate::paths::nonce().map_err(unavailable)?);
+        let mut state = runtime
+            .lock()
+            .map_err(|_| unavailable("文件任务状态异常。"))?;
+        if state.stopping || state.failure.is_some() {
+            return Err(unavailable("文件任务正在关闭或等待恢复。"));
+        }
+        if state.active.len() >= 2 {
+            return Err(error(429, "同时最多运行两个文件任务。"));
+        }
+        state.active.insert(key.clone(), scope);
+        Ok(Self {
+            runtime: runtime.clone(),
+            key,
+            armed: true,
+        })
+    }
+    pub(super) fn bind(&mut self, runtime: &mut Runtime, id: &str) {
+        if let Some(scope) = runtime.active.remove(&self.key) {
+            runtime.active.insert(id.into(), scope);
+        }
+        self.key = id.into();
+    }
+    pub(super) fn started(mut self) {
+        self.armed = false;
+    }
+}
+impl Drop for Starting {
+    fn drop(&mut self) {
+        if self.armed {
+            if let Ok(mut state) = self.runtime.lock() {
+                state.active.remove(&self.key);
+            }
+        }
+    }
+}
 
 pub(super) struct Preparation(Arc<Mutex<Runtime>>);
 

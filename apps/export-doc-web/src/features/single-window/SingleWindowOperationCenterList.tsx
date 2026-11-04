@@ -1,3 +1,4 @@
+import { Field } from "../../ui/primitives/Field.tsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Files, FolderInput, Send } from "lucide-react";
 import { type KeyboardEvent, useEffect, useState } from "react";
@@ -38,13 +39,12 @@ export function FilterSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="inline-filter">
-      <span>{label}</span>
+    <Field label={label}>
       <select value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="">全部</option>
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
-    </label>
+    </Field>
   );
 }
 

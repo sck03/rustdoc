@@ -1,3 +1,4 @@
+import { EditorWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { FormEvent, useMemo, useState } from "react";
 import "../../styles/routes/single-window.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -430,7 +431,7 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
   }
 
   return (
-    <section className="editor-surface agent-consignment-surface" aria-label="报关代理委托草稿">
+    <EditorWorkspace className="editor-surface agent-consignment-surface" aria-label="报关代理委托草稿">
       <SingleWindowTabs activeKey="agent-consignment" />
 
       <SingleWindowDocumentActionBar
@@ -550,6 +551,6 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
           onUnlockSelected={lockedFieldsWorkspace.unlockSelected}
         />
       ) : null}
-    </section>
+    </EditorWorkspace>
   );
 }

@@ -130,6 +130,7 @@ pub struct Jobs {
     completion: Arc<completion::Completion>,
     retention: retention::Retention,
     download_budget: Arc<super::backup_io::Budget>,
+    admissions: std::sync::RwLock<()>,
 }
 
 impl Jobs {
@@ -165,6 +166,7 @@ impl Jobs {
             completion: Arc::default(),
             retention,
             download_budget: Arc::default(),
+            admissions: Default::default(),
         })
     }
 
@@ -243,21 +245,21 @@ impl Jobs {
             replay,
             timeout,
         } = spec;
+        let _admission = self
+            .admissions
+            .read()
+            .map_err(|_| unavailable("任务登记状态异常。"))?;
         self.health()?;
-        let mut runtime = self
+        let scope = OperationScope::detached(timeout);
+        let mut admission = admission::Starting::acquire(&self.runtime, scope.clone())?;
+        let finished: Vec<_> = self
             .runtime
             .lock()
-            .map_err(|_| unavailable("文件任务状态异常。"))?;
-        if runtime.stopping {
-            return Err(error(503, "程序正在关闭，不能开始新任务。"));
-        }
-        if runtime.active.len() >= 2 {
-            return Err(error(429, "同时最多运行两个文件任务。"));
-        }
-        for worker in runtime
+            .map_err(|_| unavailable("文件任务状态异常。"))?
             .workers
             .extract_if(.., |worker| worker.is_finished())
-        {
+            .collect();
+        for worker in finished {
             worker
                 .join()
                 .map_err(|_| unavailable("文件任务异常退出。"))?;
@@ -274,8 +276,23 @@ impl Jobs {
             .as_str()
             .ok_or_else(|| unavailable("任务编号缺失。"))?
             .to_owned();
-        let scope = OperationScope::new(timeout);
-        runtime.active.insert(job_id.clone(), scope.clone());
+        let mut runtime = self
+            .runtime
+            .lock()
+            .map_err(|_| unavailable("文件任务状态异常。"))?;
+        if runtime.stopping || runtime.failure.is_some() {
+            drop(runtime);
+            OperationScope::detached(Duration::from_secs(30)).run_result(|| {
+                persistence::finish(
+                    &self.store,
+                    actor,
+                    &job_id,
+                    Err(unavailable("任务登记后服务已停止，未启动处理。")),
+                )
+            })?;
+            return Err(unavailable("程序正在关闭，任务已保留失败回执。"));
+        }
+        admission.bind(&mut runtime, &job_id);
         let store = self.store.clone();
         let state = self.runtime.clone();
         let completion = self.completion.clone();
@@ -306,15 +323,21 @@ impl Jobs {
                 }
             });
         match worker {
-            Ok(worker) => runtime.workers.push(worker),
+            Ok(worker) => {
+                runtime.workers.push(worker);
+                admission.started();
+            }
             Err(cause) => {
                 runtime.active.remove(&job_id);
-                persistence::finish(
-                    &self.store,
-                    actor,
-                    &job_id,
-                    Err(unavailable(cause.to_string())),
-                )?;
+                drop(runtime);
+                OperationScope::detached(Duration::from_secs(30)).run_result(|| {
+                    persistence::finish(
+                        &self.store,
+                        actor,
+                        &job_id,
+                        Err(unavailable(cause.to_string())),
+                    )
+                })?;
                 return Err(unavailable("无法启动文件处理线程。"));
             }
         }
@@ -412,6 +435,16 @@ impl Jobs {
     }
 
     pub fn clear_finished(&self, actor: &Actor) -> Result<Value> {
+        let failed = self
+            .runtime
+            .lock()
+            .map_err(|_| unavailable("文件任务状态异常。"))?
+            .failure
+            .is_some();
+        if failed {
+            super::auth::authorize(actor, "system.settings", "manage")?;
+            self.recover()?;
+        }
         self.health()?;
         let _completion = self.completion.read()?;
         let count = persistence::clear_finished(&self.store, actor)?;
@@ -436,28 +469,56 @@ impl Jobs {
         Ok(())
     }
     pub fn recover(&self) -> Result<()> {
-        self.ensure_idle()?;
+        let _admissions = self
+            .admissions
+            .write()
+            .map_err(|_| unavailable("任务登记状态异常。"))?;
+        {
+            let runtime = self
+                .runtime
+                .lock()
+                .map_err(|_| unavailable("文件任务状态异常。"))?;
+            if runtime.stopping || !runtime.active.is_empty() || runtime.preparing_retries != 0 {
+                return Err(error(409, "请先停止任务，再核验输出恢复状态。"));
+            }
+        }
+        self.store.health()?;
+        output::recover(&self.store)?;
         persistence::recover(&self.store)?;
         retention::prune(&self.store, self.retention, chrono::Utc::now())?;
+        self.runtime
+            .lock()
+            .map_err(|_| unavailable("文件任务状态异常。"))?
+            .failure = None;
         Ok(())
     }
 
     pub fn close(&self) -> Result<()> {
+        self.request_stop()?;
+        let _admissions = self
+            .admissions
+            .write()
+            .map_err(|_| unavailable("任务登记状态异常。"))?;
         let mut failure = None;
-        let workers = {
+        let (workers, ids) = {
             let mut runtime = self
                 .runtime
                 .lock()
                 .map_err(|_| unavailable("文件任务状态异常。"))?;
             runtime.stopping = true;
-            for (id, scope) in &runtime.active {
+            for scope in runtime.active.values() {
                 scope.cancel();
-                if let Err(error) = persistence::cancel_system(&self.store, id) {
-                    failure.get_or_insert(error);
-                }
             }
-            std::mem::take(&mut runtime.workers)
+            (
+                std::mem::take(&mut runtime.workers),
+                runtime.active.keys().cloned().collect::<Vec<_>>(),
+            )
         };
+        for id in ids {
+            if let Err(error) = persistence::cancel_system(&self.store, &id) {
+                failure.get_or_insert(error);
+            }
+        }
         for worker in workers {
             if worker.join().is_err() {
                 failure.get_or_insert_with(|| unavailable("文件任务异常退出。"));

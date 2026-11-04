@@ -62,22 +62,7 @@ use export_doc_storage::Connection;
 use serde_json::{Value, json};
 use std::{path::PathBuf, sync::Arc};
 
-fn call(
-    service: &NativeService,
-    token: &str,
-    operation: Operation,
-    id: i64,
-    body: Option<Value>,
-) -> Result<Value, export_doc_engine::api::ApiError> {
-    let parameters = if id == 0 {
-        vec![]
-    } else {
-        vec![("id", id.to_string())]
-    };
-    let body = workflow::decision_body(service, token, operation, id, body);
-    let bytes = service.dispatch(operation, &parameters, &[], body, token)?;
-    Ok(serde_json::from_slice(&bytes).unwrap())
-}
+use oa_contract::call;
 
 #[test]
 #[ignore = "requires an isolated PostgreSQL 18 database"]

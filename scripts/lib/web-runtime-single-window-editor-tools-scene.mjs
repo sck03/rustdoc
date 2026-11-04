@@ -159,7 +159,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
         const lockDialogCheck = await waitForPageExpression(
           page,
           `(() => {
-            const dialog = document.querySelector('.workspace-modal-dialog[role="dialog"]');
+            const dialog = document.querySelector('[data-ui="dialog"][role="dialog"]');
             const text = dialog ? dialog.innerText || '' : '';
             return Boolean(dialog &&
               text.includes(${JSON.stringify(config.lockDialogTitle)}) &&
@@ -172,7 +172,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
         await evaluate(
           page,
           `(() => {
-            const dialog = document.querySelector('.workspace-modal-dialog[role="dialog"]');
+            const dialog = document.querySelector('[data-ui="dialog"][role="dialog"]');
             const buttons = dialog ? Array.from(dialog.querySelectorAll('button')) : [];
             const button = buttons.find((element) => (element.title || '').includes('关闭')) ||
               buttons.find((element) => (element.innerText || '').trim() === '关闭');
@@ -648,7 +648,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
     const aliasDialogCheck = await waitForPageExpression(
       page,
       `(() => {
-        const dialog = document.querySelector('.reference-catalog-alias-dialog[role="dialog"]');
+        const dialog = document.querySelector('.reference-catalog-alias-dialog');
         return Boolean(dialog && (dialog.innerText || '').includes('编辑别名') && dialog.querySelector('textarea'));
       })()`,
       timeoutMs,
@@ -658,7 +658,7 @@ export function createSingleWindowEditorToolsSmokeScene(runtime) {
     await evaluate(
       page,
       `(() => {
-        const dialog = document.querySelector('.reference-catalog-alias-dialog[role="dialog"]');
+        const dialog = document.querySelector('.reference-catalog-alias-dialog');
         const textarea = dialog ? dialog.querySelector('textarea') : null;
         const apply = dialog ? Array.from(dialog.querySelectorAll('button')).find((button) => (button.innerText || '').includes('应用')) : null;
         if (!textarea || !apply) {

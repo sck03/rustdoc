@@ -23,7 +23,7 @@ struct Worker {
 #[derive(Default)]
 pub(crate) struct Scheduler {
     worker: Mutex<Option<Worker>>,
-    state: Mutex<(u64, Option<u16>)>,
+    state: crate::engine::scheduler_health::Health,
 }
 impl Scheduler {
     pub(crate) fn bind(service: &Arc<NativeService>) -> Result<()> {
@@ -52,16 +52,14 @@ impl Scheduler {
                             }
                             control.active = Some(scope.clone());
                         }
-                        let result =
-                            scope.run_result(|| oa::runtime::tick(&service, chrono::Utc::now()));
+                        let _result = service.workflow_scheduler.state.run(
+                            || scope.run_result(|| oa::runtime::tick(&service, chrono::Utc::now())),
+                            || service.store.health().is_ok(),
+                        );
                         stop.0.lock().unwrap_or_else(|p| p.into_inner()).active = None;
-                        let mut state = service
-                            .workflow_scheduler
-                            .state
-                            .lock()
-                            .unwrap_or_else(|p| p.into_inner());
-                        state.0 += 1;
-                        state.1 = result.err().map(|e| e.status.unwrap_or(503));
+                        if service.workflow_scheduler.state.check().is_err() {
+                            break;
+                        }
                     }
                     drop(service);
                     if wait_for_stop(&stop, Duration::from_secs(60)) {
@@ -114,8 +112,31 @@ impl Scheduler {
         Ok(())
     }
     pub(crate) fn metrics(&self) -> serde_json::Value {
-        let state = self.state.lock().unwrap_or_else(|p| p.into_inner());
-        serde_json::json!({"ticks":state.0,"lastErrorStatus":state.1})
+        let mut metrics = self.state.metrics();
+        metrics["threadAlive"] = serde_json::json!(self.worker.lock().is_ok_and(|worker| {
+            worker
+                .as_ref()
+                .is_some_and(|worker| !worker.handle.is_finished())
+        }));
+        metrics
+    }
+    pub(crate) fn health(&self) -> Result<()> {
+        self.state.check()?;
+        let worker = self
+            .worker
+            .lock()
+            .map_err(|_| unavailable("流程调度器状态异常。"))?;
+        if worker.as_ref().is_some_and(|worker| {
+            worker.handle.is_finished()
+                && worker
+                    .signal
+                    .0
+                    .lock()
+                    .is_ok_and(|control| !control.stopping)
+        }) {
+            return Err(unavailable("流程调度线程已异常退出，请核对状态后重启。"));
+        }
+        Ok(())
     }
 }
 fn wait_for_stop(signal: &Signal, timeout: Duration) -> bool {

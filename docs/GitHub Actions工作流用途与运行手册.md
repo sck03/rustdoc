@@ -4,6 +4,8 @@
 
 ## 发布入口
 
+普通门禁与发布共用前端准备 action，保留各 OS 的资源和平台步骤。`dependency-governance.yml` 除相关路径的 main 推送和手动触发外，每周一 **02:23 UTC（北京时间 10:23）** 定时运行；字体许可检查随准备/治理执行。Firefox/WebKit 重型兼容验收仍只在 `browser-compatibility.yml` 手动触发，不进入每次提交的普通门禁。
+
 | Actions 名称 / 文件 | 系统与架构 | 结果 |
 | --- | --- | --- |
 | [Build Windows desktop package](../.github/workflows/windows-desktop-package.yml) | x64、arm64、all | 所选版本便携 ZIP、NSIS 安装器归档 |

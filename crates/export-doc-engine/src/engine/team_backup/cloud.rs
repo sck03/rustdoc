@@ -276,24 +276,13 @@ fn parse_propfind(xml: &str) -> Result<Vec<CloudItem>> {
     use quick_xml::Reader;
     use quick_xml::events::Event;
 
+    #[derive(Default)]
     struct Pending {
         display_name: String,
         href: String,
         size_bytes: u64,
         last_modified: String,
         collection: bool,
-    }
-
-    impl Default for Pending {
-        fn default() -> Self {
-            Self {
-                display_name: String::new(),
-                href: String::new(),
-                size_bytes: 0,
-                last_modified: String::new(),
-                collection: false,
-            }
-        }
     }
 
     fn local_name(name: &str) -> &str {

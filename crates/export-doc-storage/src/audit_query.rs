@@ -13,6 +13,7 @@ pub struct AuditQuery<'a> {
     pub offset: i64,
     pub limit: i64,
     pub count_all: bool,
+    pub before_id: Option<i64>,
 }
 pub(crate) fn build(query: &AuditQuery<'_>, pg: bool) -> (QuerySql, String) {
     let mut values = Vec::new();
@@ -47,6 +48,12 @@ pub(crate) fn build(query: &AuditQuery<'_>, pg: bool) -> (QuerySql, String) {
         "record_json(COALESCE(r.body->'newValues',json_object('versionNumber',r.version)))"
     };
     let mut filters = Vec::new();
+    if let Some(id) = query.before_id {
+        filters.push(format!(
+            "r.id<CAST({} AS BIGINT)",
+            sql::bind(&mut values, id, pg)
+        ));
+    }
     for (expression, value) in [(&entity[..], query.entity), (action, query.action)] {
         if !value.is_empty() {
             filters.push(format!(
@@ -97,6 +104,7 @@ pub(crate) fn build(query: &AuditQuery<'_>, pg: bool) -> (QuerySql, String) {
     );
     (
         QuerySql {
+            source: crate::query_source::Source::Projected,
             filter: filters.join(" AND "),
             order: "r.id DESC".into(),
             values,

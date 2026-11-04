@@ -1,5 +1,7 @@
 export function navigationReorganizationUiFixture(source, setup = "") {
   return `
+import ${source("styles/index.css")};
+import ${source("styles/workspaces.css")}; import ${source("styles/responsive.css")};
 import React from 'react';
 import {createRoot} from 'react-dom/client';
 import {HashRouter,useLocation} from 'react-router-dom';
@@ -13,8 +15,6 @@ import {PermissionAccessProvider} from ${source("app/PermissionAccessContext.tsx
 import {permissionResources,permissionActions} from ${source("app/permissionCatalog.ts")};
 import {ConfirmationProvider} from ${source("ui/ConfirmationProvider.tsx")};
 import {UnsavedChangesProvider} from ${source("ui/unsavedChangesGuard.tsx")};
-import ${source("styles/cascade.css")}; import ${source("styles/foundation.css")};
-import ${source("styles/workspaces.css")}; import ${source("styles/responsive.css")};
 const role=new URLSearchParams(location.search).get('role')||'admin';
 const rows=Array.from({length:135},(_,i)=>({id:i+1,name:'示例单位 '+String(i+1).padStart(3,'0'),countryRegion:'CN',website:'',status:'合作中',category:'纺织',mainProducts:'服装',notes:'',source:'展会',versionNumber:1}));
 const opportunities=rows.map(row=>({...row,title:'商机 '+row.id,crmCustomerId:row.id,customerName:row.name,productId:null,productCode:'',productName:'',stage:'线索',quotationNo:'QT-'+row.id,estimatedAmount:100,currency:'USD',probabilityPercent:20,nextAction:'确认需求',allowedNextStages:['需求确认']}));

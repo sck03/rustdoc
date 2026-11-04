@@ -1,4 +1,5 @@
-export type BusinessStatusTone = "info" | "positive" | "warning" | "danger" | "muted";
+import type { StatusTone } from "./primitives/Card.tsx";
+export type BusinessStatusTone = StatusTone;
 
 export function getBusinessStatusTone(value: string): BusinessStatusTone {
   if (["已成交", "合作中", "启用", "供货中", "已完成", "优先合作", "合格"].includes(value)) return "positive";

@@ -6,13 +6,7 @@ pub(super) fn read(
     action: &str,
     query: &[(&str, String)],
 ) -> Result<Value> {
-    let argument = |key| {
-        query
-            .iter()
-            .find(|(k, _)| *k == key)
-            .map(|(_, v)| v.as_str())
-            .unwrap_or("")
-    };
+    let argument = |key| crate::engine::request_values::find(query, key).unwrap_or("");
     if action == "settings-routing-sources" {
         let kind = match argument("source") {
             "Position" => "positions",

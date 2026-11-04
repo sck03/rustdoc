@@ -1,4 +1,6 @@
+import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react";
+import "../../styles/tools-ocr-exchange.css";
 import { ClipboardPaste, Copy, FileImage, Play, RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
@@ -111,7 +113,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
   }
 
   return (
-    <section className="work-surface smart-ocr-surface" aria-label="智能 OCR">
+    <RecordWorkspace className="smart-ocr-surface" aria-label="智能 OCR">
       <div className="toolbar smart-ocr-toolbar">
         <PathField
           label={desktopAvailable ? "图片路径" : "图片文件"}
@@ -255,7 +257,7 @@ export function SmartOcrPage({ client }: { client: ExportDocManagerApiClient }) 
           </section>
         </div>
       </div>
-    </section>
+    </RecordWorkspace>
   );
 }
 

@@ -29,7 +29,9 @@ pub(super) fn begin(
     };
     managed_file(&service.paths.cache_root, file_name, extension)?;
     confirmation(parameters, confirmation_text)?;
-    sensitive_ticket(parameters, actor, action)?;
+    service
+        .backup_tickets
+        .authorize(parameters, actor, action)?;
     Ok(UploadAuthorization {
         actor_id: actor.id,
         operation,

@@ -152,9 +152,6 @@ pub fn directory(tx: &Connection, company: &str) -> Result<Vec<Value>> {
                 personnel_date: Some(&super::units::today(tx)?.to_string()),
                 ..Default::default()
             },
-            filters: &[],
-            keyword: "",
-            search_root: None,
             fields: &[
                 ("id", "id"),
                 ("status", "status"),
@@ -166,6 +163,7 @@ pub fn directory(tx: &Connection, company: &str) -> Result<Vec<Value>> {
             ],
             offset: result.len() as i64,
             limit: 200,
+            ..Default::default()
         })?;
         result.extend(rows);
         if result.len() as i64 >= total {

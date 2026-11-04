@@ -42,19 +42,6 @@ fn number(value: Decimal) -> f64 {
 }
 
 /// 0: perspective, 1: top, 2: side, 3: door. Drawing never changes placement.
-pub fn diagram(
-    container: &ApiContainerDimensionsDto,
-    analysis: &ApiContainerPackingAnalysisDto,
-    projection: i32,
-    angle: f64,
-    filled: bool,
-    selected: i32,
-) -> Result<String> {
-    diagram_labeled(
-        container, analysis, projection, angle, filled, selected, None,
-    )
-}
-
 fn diagram_labeled(
     container: &ApiContainerDimensionsDto,
     analysis: &ApiContainerPackingAnalysisDto,

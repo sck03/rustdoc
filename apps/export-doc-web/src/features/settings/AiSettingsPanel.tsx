@@ -1,16 +1,17 @@
 import type { ApiSettingsSecretsDto } from "../../api/index.ts";
-import { TextAreaSetting, TextSetting } from "./SettingsFieldControls.tsx";
+import { SecretToggle, TextAreaSetting, TextSetting } from "./SettingsFieldControls.tsx";
 import type { SettingsRecord } from "./settingsTypes.ts";
 
-export default function AiSettingsPanel({ settings, secrets, disabled, updateSecrets, onChange }: {
+export default function AiSettingsPanel({ settings, secrets, disabled, updateSecrets, onUpdateSecrets, onChange }: {
   settings: SettingsRecord;
   secrets: ApiSettingsSecretsDto | null;
   disabled: boolean;
   updateSecrets: boolean;
+  onUpdateSecrets: (update: boolean) => void;
   onChange: (path: string[], value: unknown) => void;
 }) {
   return <section className="form-section settings-ai-section" aria-label="AI 服务">
-    <div className="section-header"><h2>AI 服务</h2></div>
+    <div className="section-header"><h2>AI 服务</h2><SecretToggle checked={updateSecrets} disabled={disabled} onChange={onUpdateSecrets} /></div>
     <fieldset className="settings-fieldset" disabled={disabled}>
       <div className="field-grid settings-ai-grid">
         <TextSetting settings={settings} path={["ai", "apiEndpoint"]} label="AI API 地址" onChange={onChange} />

@@ -33,7 +33,7 @@ await withOfficeUi('unit-identity-ui', async ({ output, url, operations, invoke,
   await manager.getByRole('button',{ name:'新增单位方案',exact:true }).click();
   const editor = manager.getByRole('dialog',{ name:'新增单位方案',exact:true });
   await editor.getByRole('textbox',{ name:'方案名称',exact:true }).fill('子公司登记方案');
-  await editor.getByLabel('模块分类').selectOption('申请与资源');
+  await editor.getByLabel('模块分类').selectOption({ label: '工作台' });
   await editor.getByLabel('通用申请快捷设置').selectOption('operate');
   const savedResponse = manager.waitForResponse(r=>r.url().endsWith('/api/organization/unit-schemes') && r.request().method()==='POST');
   await editor.getByRole('button',{ name:'保存单位方案',exact:true }).click();

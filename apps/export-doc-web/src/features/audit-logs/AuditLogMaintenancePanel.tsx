@@ -1,3 +1,4 @@
+import { Field } from "../../ui/primitives/Field.tsx";
 import { useState } from "react";
 import { CalendarClock, Download, FileSpreadsheet, FolderOpen, SlidersHorizontal, Trash2 } from "lucide-react";
 import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
@@ -84,15 +85,14 @@ export function AuditLogMaintenancePanel({
           </div>
           {isDesktopRuntime ? (
             <>
-              <label className="inline-filter audit-log-export-path-filter">
-                <span>Excel 保存位置</span>
+              <Field label="Excel 保存位置" className="audit-log-export-path-filter">
                 <input
                   value={exportPath}
                   placeholder="AuditLogs.xlsx"
                   disabled={isBusy}
                   onChange={(event) => onExportPathChange(event.target.value)}
                 />
-              </label>
+              </Field>
               <div className="audit-log-maintenance-actions">
               <button className="command-button secondary" type="button" title="选择 Excel 保存位置" disabled={isBusy} onClick={onSelectExportPath}>
                 <FolderOpen size={16} aria-hidden="true" />
@@ -124,8 +124,7 @@ export function AuditLogMaintenancePanel({
               <p>保留最近指定天数，删除更早的历史日志；当前筛选条件不参与清理。</p>
             </div>
           </div>
-          <label className="inline-filter audit-log-retention-filter">
-            <span>保留最近</span>
+          <Field label="保留最近" className="audit-log-retention-filter">
             <div className="audit-log-number-field">
               <input
                 type="number"
@@ -137,7 +136,7 @@ export function AuditLogMaintenancePanel({
               />
               <span>天</span>
             </div>
-          </label>
+          </Field>
           <div className="audit-log-maintenance-actions">
             <button
               className="command-button secondary danger-button"

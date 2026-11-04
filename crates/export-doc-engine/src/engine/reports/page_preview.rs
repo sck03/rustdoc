@@ -118,11 +118,7 @@ pub(super) fn response(
         hash.update(name.as_bytes());
         hash.update(media::digest(&image.bytes).as_bytes());
     }
-    let revision = hash
-        .finalize()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
+    let revision = crate::paths::hex(&hash.finalize());
     if body["previewRevision"]
         .as_str()
         .is_some_and(|expected| expected != revision)

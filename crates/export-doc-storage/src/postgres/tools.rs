@@ -55,14 +55,7 @@ pub struct MaintenanceLease {
 }
 impl MaintenanceLease {
     pub fn acquire(connection: &str, owner: &str) -> Result<Self> {
-        if owner.is_empty()
-            || owner.len() > 63
-            || !owner
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b == b'_')
-        {
-            return Err(Error::unavailable("数据库所有者角色无效。"));
-        }
+        crate::postgres_privileges::role_name(owner)?;
         let mut client = connect(connection)?;
         acquire_lock(&mut client)?;
         let valid: bool = client.query_one("SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1 AND NOT rolcanlogin AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole) AND pg_has_role(current_user,$1,'MEMBER')", &[&owner])?.try_get(0)?;
@@ -77,14 +70,8 @@ impl MaintenanceLease {
         validate_schema(&mut self.client)
     }
     pub fn finish(&mut self, owner: &str, application: &str) -> Result<()> {
-        if application.is_empty()
-            || application.len() > 63
-            || !application
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || b == b'_')
-        {
-            return Err(Error::unavailable("业务角色名称无效。"));
-        }
+        crate::postgres_privileges::role_name(owner)?;
+        let grants = crate::postgres_privileges::grants(application)?;
         let valid: bool = self.client.query_one("SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1 AND rolcanlogin AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole) AND NOT pg_has_role($1,$2,'MEMBER')", &[&application,&owner])?.try_get(0)?;
         if !valid {
             return Err(Error::unavailable(
@@ -92,11 +79,8 @@ impl MaintenanceLease {
             ));
         }
         let mut transaction = self.client.transaction()?;
-        transaction.batch_execute(&format!("SET LOCAL ROLE \"{owner}\"; REVOKE CREATE ON SCHEMA public FROM PUBLIC; GRANT USAGE ON SCHEMA public TO \"{application}\"; GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO \"{application}\"; GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{application}\"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO \"{application}\"; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE,SELECT ON SEQUENCES TO \"{application}\";"))?;
+        transaction.batch_execute(&format!("SET LOCAL ROLE \"{owner}\";\n{grants}"))?;
         super::validate_schema(&mut transaction)?;
-        transaction.batch_execute(&format!(
-            "GRANT EXECUTE ON FUNCTION public.exportdoc_record_text(jsonb) TO \"{application}\";"
-        ))?;
         transaction.commit()?;
         Ok(())
     }

@@ -6,13 +6,7 @@ fn insert(c: &Connection, kind: &str, mut body: Value, owner: i64, company: &str
     body["departmentId"] = json!("D");
     body["ownerUserId"] = json!(owner);
     body["versionNumber"] = json!(1);
-    let id = c
-        .insert(&RecordWrite {
-            kind,
-            identity: None,
-            body: &body,
-        })
-        .unwrap();
+    let id = c.insert(&RecordWrite::unkeyed(kind, &body)).unwrap();
     body["id"] = json!(id);
     c.set_body(id, &body).unwrap();
     id

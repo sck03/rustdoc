@@ -583,8 +583,8 @@ export function createInvoiceItemTableSmokeScene(runtime) {
       const state = await evaluate(
         page,
         `(() => {
-          const dialog = document.querySelector('.confirmation-dialog[role="dialog"]');
-          const confirmButton = dialog ? dialog.querySelector('button.confirmation-dialog-confirm') : null;
+          const dialog = document.querySelector('[data-dialog-purpose=confirmation][role="dialog"]');
+          const confirmButton = dialog ? dialog.querySelector('button[data-dialog-action=confirm]') : null;
           const text = dialog ? dialog.innerText || '' : '';
           if (!dialog || !confirmButton || !text.includes('更新商品库')) {
             return false;

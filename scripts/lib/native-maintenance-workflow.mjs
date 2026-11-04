@@ -40,7 +40,7 @@ export async function verifyDesktopMaintenance({ run, request, token, businessDa
   await run(`document.querySelector('input[type=checkbox][aria-label*="${b.code}"]').click();true`);
   await click('确认作废');
   await wait(() => run("Boolean(document.querySelector('textarea[aria-label=确认作废原因]'))"));
-  assert.equal(await run("document.querySelector('.confirmation-dialog-confirm').disabled"), true);
+  assert.equal(await run("document.querySelector('[data-dialog-action=confirm]').disabled"), true);
   await run("document.querySelector('textarea[aria-label=确认作废原因]').focus()");
   await cdp.send('Input.insertText', { text:'核对官方年度公告后确认作废' });
   await click('确认 1 条作废');

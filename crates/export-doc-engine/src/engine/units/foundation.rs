@@ -60,11 +60,7 @@ pub(super) fn handle(
                 .ok_or_else(|| unavailable("单位编号缺失。"))?;
             let scope = auth::data_scope(&actor, "office.people", "view-details");
             if kind == "candidates" {
-                let keyword = query
-                    .iter()
-                    .find(|(k, _)| *k == "keyword")
-                    .map(|(_, v)| v.as_str())
-                    .unwrap_or("");
+                let keyword = crate::engine::request_values::find(query, "keyword").unwrap_or("");
                 return Ok(tx.foundation_candidates(
                     unit,
                     keyword,

@@ -94,11 +94,7 @@ impl NativeService {
 }
 
 fn preview(query: &[(&str, String)]) -> Result<tasks::FileOutput> {
-    let selected = query
-        .iter()
-        .find(|(key, _)| *key == "filePath")
-        .map(|(_, value)| value.as_str())
-        .unwrap_or("");
+    let selected = crate::engine::request_values::find(query, "filePath").unwrap_or("");
     if selected.is_empty() {
         return Err(invalid("请提供本机图片路径。"));
     }

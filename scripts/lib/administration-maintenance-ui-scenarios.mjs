@@ -23,9 +23,9 @@ export async function runAdministrationMaintenanceUi({page,open,read,waitFor,cli
   await input(page,'textarea[name="reason"]',"重复登记");
   await clickText(page,"确认删除");
   assert.equal(await read(page,"window.__officeCalls.some(item=>item.name==='deletePerson')"),false,"deletion requires explicit checkbox confirmation");
-  await read(page,"document.querySelector('.office-dialog-backdrop:last-of-type input[type=checkbox]').click()");
+  await read(page,"document.querySelector('[data-ui=dialog-backdrop]:has([data-dialog-purpose=content]):last-of-type input[type=checkbox]').click()");
   await audit(page,"personnel-delete-confirmation");await clickText(page,"确认删除");
-  await waitFor(page,"window.__officeCalls.some(item=>item.name==='deletePerson') && !document.querySelector('.office-dialog')");
+  await waitFor(page,"window.__officeCalls.some(item=>item.name==='deletePerson') && !document.querySelector('[data-dialog-purpose=content]')");
   assert.equal((await read(page,"window.__officeCalls.find(item=>item.name==='deletePerson').input.body")).expectedVersion,2);
   results.push("personnel-correction-and-confirmed-deletion");
   for (const kind of ["rooms","supplies"]) {
@@ -33,16 +33,16 @@ export async function runAdministrationMaintenanceUi({page,open,read,waitFor,cli
     await waitFor(page,"document.querySelector('.office-request-card')");
     assert.equal(await read(page,"[...document.querySelectorAll('.office-request-card button')].some(button=>button.textContent.trim()==='修改')"),false,"Submitted resource requests remain frozen");
     await clickText(page,"取消申请");await input(page,'textarea[name="note"]',"内容调整，取消后重新申请");
-    await audit(page,`${kind}-request-cancel-mobile`);await clickText(page,"取消申请",".office-dialog button");
+    await audit(page,`${kind}-request-cancel-mobile`);await clickText(page,"取消申请","[data-dialog-purpose=content] button");
     const action=kind==="rooms"?"cancelBooking":"cancelRequest";
-    await waitFor(page,`window.__officeCalls.some(item=>item.name==='${action}') && !document.querySelector('.office-dialog')`);
+    await waitFor(page,`window.__officeCalls.some(item=>item.name==='${action}') && !document.querySelector('[data-dialog-purpose=content]')`);
     const body=await read(page,`window.__officeCalls.find(item=>item.name==='${action}').input.body`);
     assert.equal(body.expectedVersion,1);assert.equal(body.note,"内容调整，取消后重新申请");
     results.push(`${kind}-frozen-request-cancel-contract`);
   }
   await open("organization",390);await read(page,"document.querySelector('[aria-label=删除业务部]').click()");
-  await input(page,'textarea[name="reason"]',"测试误建目录");await read(page,"document.querySelector('.office-dialog input[type=checkbox]').click()");
-  await clickText(page,"确认删除");await waitFor(page,"window.__officeCalls.some(item=>item.name==='deleteDepartment') && !document.querySelector('.office-dialog')");
+  await input(page,'textarea[name="reason"]',"测试误建目录");await read(page,"document.querySelector('[data-dialog-purpose=content] input[type=checkbox]').click()");
+  await clickText(page,"确认删除");await waitFor(page,"window.__officeCalls.some(item=>item.name==='deleteDepartment') && !document.querySelector('[data-dialog-purpose=content]')");
   assert.equal((await read(page,"window.__officeCalls.find(item=>item.name==='deleteDepartment').input.body")).expectedVersion,1);
   results.push("organization-delete-version-contract");
 }

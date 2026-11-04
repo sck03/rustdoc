@@ -1,0 +1,5 @@
+:root {
+  --edm-radius-xs: 4px; --edm-radius-sm: 6px; --edm-radius-md: 8px;
+  --edm-radius-lg: 10px; --edm-radius-xl: 12px; --edm-radius-2xl: 16px;
+  --edm-radius-full: 999px;
+}

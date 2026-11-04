@@ -1,7 +1,6 @@
 #[path = "support/invoice_clone_contract.rs"]
 mod invoice_clone_contract;
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod native_fixture;
 
 #[test]

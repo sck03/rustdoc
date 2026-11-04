@@ -26,7 +26,7 @@ export async function verifyDesktopPersonnelDeletion({ run, request, token, cdp,
   const edit = "[...document.querySelectorAll('button')].find(e=>e.textContent==='编辑档案')";
   const close = "document.querySelector('[role=dialog] button[aria-label=关闭窗口]')";
   const correction = "document.querySelector('[role=dialog] [data-dialog-control] input')";
-  const confirmation = "document.querySelector('.confirmation-dialog')";
+  const confirmation = "document.querySelector('[data-dialog-purpose=confirmation]')";
   async function click(expression) {
     await wait(expression);
     const point = await run(`(() => { const r = (${expression}).getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
@@ -44,11 +44,11 @@ export async function verifyDesktopPersonnelDeletion({ run, request, token, cdp,
   await click(close);
   await wait(confirmation);
   await captureScreenshot(cdp, path.join(output, 'Full-personnel-discard.png'));
-  await click("[...document.querySelectorAll('.confirmation-dialog button')].find(e=>e.textContent.trim()==='取消')");
+  await click("[...document.querySelectorAll('[data-dialog-purpose=confirmation] button')].find(e=>e.textContent.trim()==='取消')");
   await wait(`!${confirmation}`);
   assert(await run(`Boolean(${close})`), 'Cancel keeps the personnel draft open');
   await click(close);
-  await click("[...document.querySelectorAll('.confirmation-dialog button')].find(e=>e.textContent.trim()==='关闭窗口')");
+  await click("[...document.querySelectorAll('[data-dialog-purpose=confirmation] button')].find(e=>e.textContent.trim()==='关闭窗口')");
   await wait("!document.querySelector('[role=dialog]')");
   assert.equal((await request('GetPersonnel', token, undefined, { id: unlinked.employee.id })).body.versionNumber, unlinked.versionNumber, 'Discard does not save personnel changes');
   await run(`${button}.click(); true`);

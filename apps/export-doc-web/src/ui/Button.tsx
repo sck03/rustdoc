@@ -16,7 +16,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
     : variant === "danger" ? "command-button secondary danger"
       : variant === "text" ? "text-button"
         : "command-button secondary";
-  return <button ref={ref} className={`${variantClass} ${className}`.trim()} type="button" {...props}>
+  return <button ref={ref} data-ui="button" data-variant={variant} className={`${variantClass} ${className}`.trim()} type="button" {...props}>
     {icon}
     {children ? <span>{children}</span> : null}
   </button>;

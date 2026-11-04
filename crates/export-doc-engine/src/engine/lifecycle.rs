@@ -30,9 +30,14 @@ impl NativeService {
         Ok(service)
     }
     pub fn runtime_metrics(&self) -> Result<Value> {
-        Ok(
-            json!({"checkedAt":store::timestamp(),"storage":self.store.metrics(),"jobs":self.jobs.metrics()?,"workflowSchedule":self.workflow_scheduler.metrics(),"http":null}),
-        )
+        let value = json!({"checkedAt":store::timestamp(),"storage":self.store.metrics(),"jobs":self.jobs.metrics()?,"workflowSchedule":self.workflow_scheduler.metrics(),"http":null});
+        #[cfg(feature = "exchange-rates")]
+        let value = {
+            let mut value = value;
+            value["workflowSchedule"]["exchange"] = self.exchange_scheduler.metrics();
+            value
+        };
+        Ok(value)
     }
     pub fn open(paths: RuntimePaths) -> Result<Arc<Self>> {
         Self::open_with_retention(paths, Default::default())
@@ -69,9 +74,13 @@ impl NativeService {
             jobs,
             workflow_scheduler: Default::default(),
             backup_scheduler: Default::default(),
+            backup_tickets: Default::default(),
             bootstrap_token: String::new(),
             clock: crate::clock::BusinessClock::default(),
             license_gate: Default::default(),
+            license_cache: Default::default(),
+            #[cfg(feature = "ai")]
+            ai_budget: Default::default(),
             packing_gate: Default::default(),
             oa_document_gate: Default::default(),
             #[cfg(feature = "ocr")]
@@ -145,9 +154,13 @@ impl NativeService {
             jobs,
             workflow_scheduler: Default::default(),
             backup_scheduler: Default::default(),
+            backup_tickets: Default::default(),
             bootstrap_token,
             clock,
             license_gate: Default::default(),
+            license_cache: Default::default(),
+            #[cfg(feature = "ai")]
+            ai_budget: Default::default(),
             packing_gate: Default::default(),
             oa_document_gate: Default::default(),
             #[cfg(feature = "ocr")]
@@ -159,6 +172,7 @@ impl NativeService {
         })
     }
     pub fn health(&self) -> Result<()> {
+        self.workflow_scheduler.health()?;
         #[cfg(feature = "exchange-rates")]
         self.exchange_scheduler.health()?;
         self.jobs.health()?;

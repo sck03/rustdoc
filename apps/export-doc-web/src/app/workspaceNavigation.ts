@@ -18,7 +18,8 @@ export function filterWorkspaceNavGroups(capabilities: WorkspaceCapabilities) {
       const children = item.children ? filter(item.children) : undefined;
       if (children && !children.length) return [];
       const searchItems = item.searchItems ? filter(item.searchItems) : undefined;
-      return [{ ...item, children, searchItems, to: children?.[0]?.to ?? item.to }];
+      const hiddenRoutes = item.hiddenRoutes ? filter(item.hiddenRoutes) : undefined;
+      return [{ ...item, children, searchItems, hiddenRoutes, to: children?.[0]?.to ?? item.to }];
     });
   }
   return workspaceNavGroups.map((group) => ({ ...group, items: filter(group.items) }))
@@ -47,7 +48,7 @@ function searchCandidates(item: WorkspaceNavItem, parent: string): WorkspaceNavI
 }
 
 export function getWorkspaceRouteItems(groups: WorkspaceNavGroupConfig[] = workspaceNavGroups) {
-  return groups.flatMap((group) => group.items.flatMap((item) => item.children ?? [item]));
+  return groups.flatMap((group) => group.items.flatMap((item) => [...(item.children ?? [item]), ...(item.hiddenRoutes ?? [])]));
 }
 
 export function findWorkspaceNavItem(pathname: string) {

@@ -89,11 +89,7 @@ impl Template {
     }
 }
 fn query_value<'a>(query: &'a [(&str, String)], key: &str) -> &'a str {
-    query
-        .iter()
-        .find(|(k, _)| *k == key)
-        .map(|(_, v)| v.as_str())
-        .unwrap_or("")
+    crate::engine::request_values::find(query, key).unwrap_or("")
 }
 fn default_path(kind: &str) -> &'static str {
     if kind == "PaymentVoucher" {
@@ -265,23 +261,6 @@ fn payment_data(store: &Store, actor: &Actor, payment: Value) -> Result<ReportDa
     ReportData::payment(&payment, payee).map_err(Into::into)
 }
 
-pub fn preview_document(
-    service: &NativeService,
-    actor: &Actor,
-    operation: Operation,
-    parameters: &[(&str, String)],
-    body: &Value,
-) -> Result<(Document, Value)> {
-    let (data, template, metadata) = prepare_preview(service, actor, operation, parameters, body)?;
-    Ok((
-        template.render(
-            &data,
-            &service.report_fonts,
-            &crate::operation::cancellation_flag(),
-        )?,
-        metadata,
-    ))
-}
 fn prepare_preview(
     service: &NativeService,
     actor: &Actor,

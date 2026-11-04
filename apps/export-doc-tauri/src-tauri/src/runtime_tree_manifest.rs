@@ -190,12 +190,19 @@ impl TreeManifest {
 
 impl TreeEntry {
     pub(crate) fn verify_file(&self, path: &Path) -> Result<(), Box<dyn Error>> {
+        self.verify_size(path)?;
+        self.verify_digest(path, &hash_file(path)?)
+    }
+    fn verify_digest(&self, path: &Path, digest: &str) -> Result<(), Box<dyn Error>> {
+        if self.sha256.as_deref() != Some(digest) {
+            return Err(format!("迁移文件已变化，已保留原内容：{}", path.display()).into());
+        }
+        Ok(())
+    }
+    fn verify_size(&self, path: &Path) -> Result<(), Box<dyn Error>> {
         reject_link_like_path(path)?;
         let metadata = fs::symlink_metadata(path)?;
-        if !metadata.is_file()
-            || metadata.len() != self.bytes
-            || self.sha256.as_ref() != Some(&hash_file(path)?)
-        {
+        if !metadata.is_file() || metadata.len() != self.bytes {
             return Err(format!("迁移文件已变化，已保留原内容：{}", path.display()).into());
         }
         Ok(())
@@ -204,14 +211,21 @@ impl TreeEntry {
 
 fn hash_file(path: &Path) -> Result<String, Box<dyn Error>> {
     let mut file = fs::File::open(path)?;
+    hash_to(&mut file, &mut std::io::sink())
+}
+fn hash_to(
+    input: &mut impl Read,
+    output: &mut impl std::io::Write,
+) -> Result<String, Box<dyn Error>> {
     let mut hasher = Sha256::new();
     let mut buffer = vec![0_u8; 1024 * 1024];
     loop {
-        let read = file.read(&mut buffer)?;
+        let read = input.read(&mut buffer)?;
         if read == 0 {
             break;
         }
         hasher.update(&buffer[..read]);
+        output.write_all(&buffer[..read])?;
     }
     Ok(hasher
         .finalize()
@@ -247,16 +261,17 @@ pub(crate) fn copy_verified_tree(
             continue;
         }
         let original = source.join(&entry.path);
-        entry.verify_file(&original)?;
+        entry.verify_size(&original)?;
         let mut input = fs::File::open(&original)?;
         let mut output = fs::OpenOptions::new()
             .create_new(true)
             .write(true)
             .open(&temporary)?;
-        std::io::copy(
+        let digest = hash_to(
             &mut input.by_ref().take(entry.bytes.saturating_add(1)),
             &mut output,
         )?;
+        entry.verify_digest(&original, &digest)?;
         output.sync_all()?;
         drop(output);
         entry.verify_file(&temporary)?;
@@ -282,6 +297,13 @@ mod tests {
         let first = collect_tree_manifest(&root).unwrap();
         fs::write(&file, b"other").unwrap();
         assert_ne!(first, collect_tree_manifest(&root).unwrap());
+        let target = root.with_extension("copy");
+        assert!(copy_verified_tree(&first, &root, &target).is_err());
+        assert!(!target.join("Database/data.db").exists());
+        let current = collect_tree_manifest(&root).unwrap();
+        copy_verified_tree(&current, &root, &target).unwrap();
+        assert_eq!(fs::read(target.join("Database/data.db")).unwrap(), b"other");
+        fs::remove_dir_all(target).unwrap();
         assert!(first.remove_verified_source(&root).is_err());
         assert_eq!(fs::read(&file).unwrap(), b"other");
         fs::remove_dir_all(root).unwrap();

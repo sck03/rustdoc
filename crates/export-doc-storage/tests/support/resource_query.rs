@@ -20,12 +20,7 @@ pub fn exercise(c: &Connection) {
         body["versionNumber"] = json!(1);
         body["ownerUserId"] = json!(1);
         body["departmentId"] = json!("A");
-        c.insert(&RecordWrite {
-            kind,
-            identity: None,
-            body: &body,
-        })
-        .unwrap();
+        c.insert(&RecordWrite::unkeyed(kind, &body)).unwrap();
         let (_, rows) = c.resource_references(kind, 0, 200).unwrap();
         let row = rows.iter().find(|row| row["id"] == body["id"]).unwrap();
         assert!(!row.to_string().contains("private-body"));
@@ -36,11 +31,7 @@ pub fn exercise(c: &Connection) {
     }
     let mut malformed = json!({"versionNumber":1,"ownerUserId":1,"departmentId":"A","companyScope":"REF-Q","contentHtml":json!({"version":"3","resources":[]}).to_string()});
     let id = c
-        .insert(&RecordWrite {
-            kind: "report-templates",
-            identity: None,
-            body: &malformed,
-        })
+        .insert(&RecordWrite::unkeyed("report-templates", &malformed))
         .unwrap();
     malformed["id"] = json!(id);
     c.set_body(id, &malformed).unwrap();

@@ -1,3 +1,4 @@
+import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useState } from "react";
 import type { Announcement, ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { PageState } from "../../ui/PageState.tsx";
@@ -7,7 +8,7 @@ import { announcementStatus, communicationAccess } from "./communicationModel.ts
 import { useAnnouncements } from "./useCommunication.ts";
 import { AnnouncementDialog } from "./AnnouncementDialog.tsx";
 import { AnnouncementDetails } from "./AnnouncementDetails.tsx";
-import { CommunicationPager } from "./CommunicationPager.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { useOfficeOperation } from "../office/useOfficeData.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import "../../styles/routes/office.css";
@@ -19,7 +20,7 @@ export function AnnouncementsPage({ client, user }: { client: ExportDocManagerAp
   const [editing, setEditing] = useState<Announcement | "new" | null>(null);
   const opening = useOfficeOperation();
   if (!communicationAccess(user, "announcements")) return <PageState tone="permission" title="没有公告查看权限" />;
-  return <section className="work-surface office-workspace oa-workspace" aria-label="公司公告"><header className="oa-heading"><h2>公司公告</h2></header>
+  return <ListWorkspace className="office-workspace oa-workspace" title="公司公告">
     {m.selected ? <><button type="button" className="command-button secondary" onClick={() => m.select(0)}>返回公告列表</button>{m.detail.isPending ? <PageState tone="loading" title="正在读取公告" /> : m.detail.isError ? <PageState tone="error" title="公告读取失败" description={readApiError(m.detail.error)} /> : m.detail.data && <AnnouncementDetails client={client} user={user} row={m.detail.data} onEdit={() => setEditing(m.detail.data!)} onDeleted={() => m.select(0)} />}</> : <>
       <div className="office-toolbar oa-toolbar">{communicationAccess(user, "announcements", "manage") && <><label className="checkbox-field"><input type="checkbox" checked={m.manage} onChange={e => m.changeManage(e.target.checked)} />发布管理（含草稿和归档）</label><button type="button" className="command-button" onClick={() => setEditing("new")}>新建公告</button></>}
         {!m.manage && <label className="checkbox-field"><input type="checkbox" checked={m.unread} onChange={e => m.changeUnread(e.target.checked)} />仅未确认</label>}<button type="button" className="command-button secondary" disabled={m.query.isFetching} onClick={() => void m.query.refetch()}>刷新</button></div>
@@ -34,7 +35,7 @@ export function AnnouncementsPage({ client, user }: { client: ExportDocManagerAp
           <button type="button" className="command-button secondary" onClick={() => m.select(row.id)}>{m.manage ? "查看与管理" : "查看公告"}</button>
         </div>
       </article>)}</div>
-      <CommunicationPager page={m.page} total={m.query.data?.totalCount ?? 0} busy={m.query.isFetching} change={m.setPage} /></>}
+      <Pagination pageNumber={m.page} totalCount={m.query.data?.totalCount ?? 0} pageSize={20} isBusy={m.query.isFetching} onPageChange={m.setPage} /></>}
     {editing && <AnnouncementDialog client={client} user={user} record={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} onSaved={row => { setEditing(null); m.select(row.id); }} />}
-  </section>;
+  </ListWorkspace>;
 }

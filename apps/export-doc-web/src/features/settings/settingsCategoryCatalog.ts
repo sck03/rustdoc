@@ -19,9 +19,11 @@ export const settingsCategories: SettingsCategoryConfig[] = [
   { key: "excel-import", label: "Excel 导入", section: "excelImport", icon: FileSpreadsheet, requiresDocumentWorkspace: true },
   { key: "exchange-rate", label: "汇率与币制", section: "exchangeRate", icon: Coins },
   { key: "communication", label: "邮件设置", section: "email", icon: Mail },
-  { key: "backup", label: "备份与恢复", section: "backupPolicy", icon: Archive },
   { key: "ai", label: "AI 服务", section: "ai", icon: Network, requiresDocumentWorkspace: true },
-  { key: "maintenance", label: "维护工具", section: "maintenance", icon: Wrench },
+];
+export const allSettingsCategories: SettingsCategoryConfig[] = [...settingsCategories,
+  { key: "backup", label: "备份与恢复", section: "plan", icon: Archive },
+  { key: "maintenance", label: "系统维护", section: "diagnostics", icon: Wrench },
 ];
 
 export function filterSettingsCategories(capabilities: SettingsCategoryCapabilities) {

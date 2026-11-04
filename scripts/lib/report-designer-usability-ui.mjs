@@ -24,12 +24,12 @@ export async function verifyDesignerUsability({ page, url, read, waitFor, click,
   const draft = await read(page, 'window.__designerHtml');
   const reload = () => read(page, `[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='重新载入').click()`);
   await reload();
-  await waitFor(page, 'document.querySelector(".confirmation-dialog")');
-  await read(page, `[...document.querySelectorAll('.confirmation-dialog button')].find(e=>e.textContent.trim()==='取消').click()`);
+  await waitFor(page, 'document.querySelector("[data-dialog-purpose=confirmation]")');
+  await read(page, `[...document.querySelectorAll('[data-dialog-purpose=confirmation] button')].find(e=>e.textContent.trim()==='取消').click()`);
   assert.equal(await read(page, 'window.__designerHtml'), draft);
   await reload();
-  await waitFor(page, 'document.querySelector(".confirmation-dialog")');
-  await read(page, `[...document.querySelectorAll('.confirmation-dialog button')].find(e=>e.textContent.trim()==='放弃修改并载入').click()`);
+  await waitFor(page, 'document.querySelector("[data-dialog-purpose=confirmation]")');
+  await read(page, `[...document.querySelectorAll('[data-dialog-purpose=confirmation] button')].find(e=>e.textContent.trim()==='放弃修改并载入').click()`);
   await waitFor(page, '!window.__designerDraftState.isDirty');
   results.push({ test: 'reload requires explicit discard and cancellation preserves draft', passed: true });
   await click(page, 'button[aria-label="选择字段"]');

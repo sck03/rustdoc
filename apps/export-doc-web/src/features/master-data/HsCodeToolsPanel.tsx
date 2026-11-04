@@ -12,7 +12,8 @@ readApiError
 } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { useModalDialog } from "../../ui/useModalDialog.ts";
+import type { ReactNode } from "react";
+import { Dialog } from "../../ui/primitives/Dialog.tsx";
 
 
 import {
@@ -212,10 +213,6 @@ export function HsCodeToolsPanel({
     fetchDetailMutation.isPending ||
     saveRemoteMutation.isPending ||
     clearAllMutation.isPending;
-  const workspaceDialogRef = useModalDialog<HTMLElement>(closeWorkspace, {
-    active: mode === "hub" && workspace !== "none",
-    canClose: !isBusy,
-  });
   const canClearAllLocalHsCodes = !isBusy && clearAllConfirmation.trim() === hsCodeClearAllConfirmationText;
   const remoteResultStatus = remoteResults.length > 0
     ? `${remoteResults.length} 条联网结果`
@@ -379,14 +376,13 @@ export function HsCodeToolsPanel({
       <input ref={uploadInputRef} type="file" accept=".xlsx,.xlsm" className="visually-hidden" onChange={handleUploadFile} />
 
       {workspace !== "none" ? (
-        <div className={mode === "hub" ? "hs-code-workspace-backdrop" : "hs-code-inline-workspace"} role="presentation">
-          <section ref={mode === "hub" ? workspaceDialogRef : undefined} className="hs-code-workspace" role={mode === "hub" ? "dialog" : "region"} aria-modal={mode === "hub" ? true : undefined} aria-label={workspace === "import" ? "HS编码智能导入" : "HS编码联网查询"}>
+        <HsCodeWorkspace modal={mode === "hub"} busy={isBusy} onClose={closeWorkspace}
+          title={workspace === "import" ? "HS编码智能导入" : "HS编码联网查询"}>
             <header>
               <div>
                 <strong>{workspace === "import" ? "智能导入向导" : "联网查询"}</strong>
                 <span>{workspace === "import" ? "先分析文件，确认差异后才写入本地库" : "联网结果不会自动覆盖本地资料"}</span>
               </div>
-              {mode === "hub" ? <button className="icon-button" type="button" title="关闭" aria-label="关闭" disabled={isBusy} onClick={closeWorkspace}><X size={18} /></button> : null}
             </header>
 
             {workspace === "import" ? (
@@ -417,8 +413,7 @@ export function HsCodeToolsPanel({
                 {remoteResults.length > 0 ? <HsCodeRemoteResults items={remoteResults} expandedResultKey={expandedResultKey} setExpandedResultKey={setExpandedResultKey} isBusy={isBusy} fetchDetail={(item) => fetchDetailMutation.mutate(item)} saveItem={(item) => saveRemoteMutation.mutate(item)} /> : null}
               </div>
             )}
-          </section>
-        </div>
+        </HsCodeWorkspace>
       ) : null}
 
       {mode === "hub" && clearAllConfirmOpen ? (
@@ -451,6 +446,14 @@ export function HsCodeToolsPanel({
 
     </section>
   );
+}
+
+function HsCodeWorkspace({ modal, title, busy, onClose, children }: {
+  modal: boolean; title: string; busy: boolean; onClose: () => void; children: ReactNode;
+}) {
+  const content = <section className="hs-code-workspace" aria-label={modal ? undefined : title}>{children}</section>;
+  return modal ? <Dialog title={title} size="full" busy={busy} onClose={onClose} closeLabel="关闭">{content}</Dialog>
+    : <div className="hs-code-inline-workspace">{content}</div>;
 }
 
 function parseImportYear(value: string) {

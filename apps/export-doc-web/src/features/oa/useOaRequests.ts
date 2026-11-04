@@ -18,7 +18,7 @@ export function useOaRequests(client: ExportDocManagerApiClient, user: ApiUserDt
   const approvalsOnly = canApprove && view === "approvals";
   const handlingOnly = canHandle && view === "handling";
   const completing = financeOnly || handlingOnly;
-  const [mineOnly, setMine] = useState(!oaAccess(user, kind, "approve"));
+  const [mineOnly, setMine] = useState(params.get("mineOnly") === "true" || !oaAccess(user, kind, "approve"));
   const [filter, setFilter] = useState({ view, status: completing ? "Approved" : approvalsOnly ? "Pending" : "" });
   const status = filter.view === view ? filter.status : completing ? "Approved" : approvalsOnly ? "Pending" : "";
   const api = oaApi(client, kind);

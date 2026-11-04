@@ -5,14 +5,7 @@ use export_doc_engine::{contracts, engine::NativeService, generated_api::*, path
 use serde_json::{Value, json};
 
 fn read(service: &NativeService, token: &str, op: Operation, query: &[(&str, String)]) -> Value {
-    let value: Value = serde_json::from_slice(
-        &service
-            .dispatch(op, &[], query, None, token)
-            .unwrap_or_else(|e| panic!("{} read failed: {e:?}", op.id)),
-    )
-    .unwrap();
-    export_doc_contracts::validation::response(op.id, &value).unwrap();
-    value
+    workflow::dispatch(service, token, op, &[], query, None).unwrap()
 }
 fn login(service: &NativeService, user: &Value) -> Value {
     call(

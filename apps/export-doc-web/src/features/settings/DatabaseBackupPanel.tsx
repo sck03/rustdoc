@@ -16,7 +16,7 @@ export function DatabaseBackupPanel({ controller: c, onPathError }: { controller
       <div className="backup-action-grid">
         <SelectField label="还原备份" value={c.restoreFileName} disabled={!c.canManageSettings || c.isBusy || !c.backups.length} options={c.backups.map((backup) => ({ value: backup.fileName, label: backup.fileName }))} onChange={(value) => { c.setRestoreFileName(value); c.setRestoreConfirmation(""); }} />
         <label><span>确认文本</span><input value={c.restoreConfirmation} disabled={!c.canManageSettings || c.isBusy} placeholder="RESTORE" onChange={(event) => c.setRestoreConfirmation(event.target.value)} /></label>
-        <button className="command-button danger-command" type="button" disabled={!c.canRestore} onClick={c.restoreBackup}><RotateCcw size={17} aria-hidden="true" /><span>还原数据库</span></button>
+        <button className="command-button danger" type="button" disabled={!c.canRestore} onClick={c.restoreBackup}><RotateCcw size={17} aria-hidden="true" /><span>还原数据库</span></button>
       </div>
       <div className="backup-action-grid">
         <NumberField label="快照保留天数" value={c.cleanupDays} disabled={!c.canManageSettings || c.isBusy} step="1" onChange={c.setCleanupDays} />

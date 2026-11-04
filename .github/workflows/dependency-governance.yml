@@ -23,6 +23,8 @@ on:
       - "scripts/verify-dependency-policy.mjs"
       - "scripts/test_dependency_policy.mjs"
       - "scripts/verify-github-workflow-actions.mjs"
+      - ".github/actions/**"
+      - "scripts/verify-font-license-policy.mjs"
       - ".github/workflows/dependency-governance.yml"
       - "scripts/verify-rustsec-glib-exception.mjs"
       - "scripts/summarize-rustsec-reports.mjs"
@@ -44,6 +46,8 @@ on:
       - "scripts/verify-dependency-policy.mjs"
       - "scripts/test_dependency_policy.mjs"
       - "scripts/verify-github-workflow-actions.mjs"
+      - ".github/actions/**"
+      - "scripts/verify-font-license-policy.mjs"
       - ".github/workflows/dependency-governance.yml"
       - "scripts/verify-rustsec-glib-exception.mjs"
       - "scripts/summarize-rustsec-reports.mjs"
@@ -80,10 +84,11 @@ jobs:
         with:
           toolchain: 1.99.1
 
+      - uses: ./.github/actions/prepare-web
+
       - name: Restore locked dependency graphs
         id: restore
         run: |
-          npm ci --prefix apps/export-doc-web
           npm ci --prefix apps/export-doc-tauri
           cargo fetch --locked
           cargo fetch --locked --manifest-path apps/exportdoc-ocr-rs/Cargo.toml

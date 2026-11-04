@@ -19,8 +19,10 @@ pub(crate) fn open_main_window(
         .on_navigation(allow_main_navigation)
         .data_directory(webview_data_directory(&paths.data_root))
         .title(product_window_title())
-        .inner_size(1280.0, 800.0)
-        .min_inner_size(1024.0, 680.0)
+        .inner_size(1440.0, 900.0)
+        .min_inner_size(1180.0, 720.0)
+        .background_color(tauri::webview::Color(244, 246, 249, 255))
+        .visible(false)
         .build()?;
 
     #[cfg(windows)]

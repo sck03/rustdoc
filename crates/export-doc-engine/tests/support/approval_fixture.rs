@@ -40,6 +40,16 @@ pub fn call(
             value
         }
     });
+    query(service, token, op, &parameters, &[], body)
+}
+pub fn query(
+    service: &NativeService,
+    token: &str,
+    op: Operation,
+    parameters: &[(&str, String)],
+    query: &[(&str, String)],
+    body: Option<Value>,
+) -> Result<Value, export_doc_engine::api::ApiError> {
     let body = body.map(|value| {
         let mut defaults = contracts::object(op.id, true);
         if op == SIMULATE_OA_DEFINITION && value.get("reporting").is_none() {
@@ -47,7 +57,17 @@ pub fn call(
         }
         contracts::overlay(defaults, &value)
     });
-    let bytes = service.dispatch(op, &parameters, &[], body, token)?;
+    dispatch(service, token, op, parameters, query, body)
+}
+pub fn dispatch(
+    service: &NativeService,
+    token: &str,
+    op: Operation,
+    parameters: &[(&str, String)],
+    query: &[(&str, String)],
+    body: Option<Value>,
+) -> Result<Value, export_doc_engine::api::ApiError> {
+    let bytes = service.dispatch(op, parameters, query, body, token)?;
     let value = serde_json::from_slice(&bytes).unwrap();
     export_doc_contracts::validation::response(op.id, &value).unwrap();
     Ok(value)

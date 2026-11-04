@@ -1,6 +1,6 @@
 export function documentEditorUiFixture(source) {
   return `
-import ${source("styles/cascade.css")}; import ${source("styles/foundation.css")};
+import ${source("styles/index.css")};
 import ${source("styles/workspaces.css")}; import ${source("styles/responsive.css")};
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -10,10 +10,12 @@ import { mockIPC } from '@tauri-apps/api/mocks';
 import { PermissionAccessProvider } from ${source("app/PermissionAccessContext.tsx")};
 import { permissionResources, permissionActions } from ${source("app/permissionCatalog.ts")};
 import { ConfirmationProvider } from ${source("ui/ConfirmationProvider.tsx")};
-import { UnsavedChangesProvider } from ${source("ui/unsavedChangesGuard.tsx")};
+import { UnsavedChangesProvider, useConfirmUnsavedChanges } from ${source("ui/unsavedChangesGuard.tsx")};
 import { InvoiceEditorPage } from ${source("features/invoices/InvoiceEditorPage.tsx")};
 import { PaymentEditorPage } from ${source("features/payments/PaymentEditorPage.tsx")};
 import { SettingsPage } from ${source("features/settings/SettingsPage.tsx")};
+import { BackupRecoveryPage } from ${source("features/settings/BackupRecoveryPage.tsx")};
+import { SystemMaintenancePage } from ${source("features/settings/SystemMaintenancePage.tsx")};
 import { ReportExportDefaultsPanel } from ${source("features/reports/ReportExportDefaultsPanel.tsx")};
 import { useReportExportDefaults } from ${source("features/reports/useReportExportDefaults.ts")};
 import { ApiError } from ${source("api/index.ts")};
@@ -105,7 +107,7 @@ window.__renameField=async(group,key,name)=>{settings.system.documentFieldLabels
 window.__changeSettingOnServer=(path,value)=>{settings=structuredClone(settings);setNestedValue(settings,path,value);settings.revision++;};
 window.__changeBackupPlanOnServer=()=>{backupPlan={...backupPlan,revision:backupPlan.revision+1};};
 window.__changePaymentOnServer=patch=>{payment={...payment,...patch,rowVersion:payment.rowVersion+1};};
-function LocationProbe(){const current=useLocation();window.__navigate=useNavigate();window.__route=current.pathname+current.search;return null;}
+function LocationProbe(){const current=useLocation(),navigate=useNavigate(),confirm=useConfirmUnsavedChanges();window.__navigate=navigate;window.__navigateGuarded=async target=>{if(await confirm('离开当前页面'))navigate(target);};window.__route=current.pathname+current.search;return null;}
 function ExportDefaultsFixture(){
   const query=useQuery({queryKey:['settings'],queryFn:()=>client.getSettings()});
   const defaults=useReportExportDefaults({client,response:query.data,refetch:query.refetch,onFeedback:message=>{window.__feedback=message;}});
@@ -115,6 +117,7 @@ const grants=['document.invoices','document.payments','document.master-data','do
 const permissions=Object.values(permissionResources).flatMap(resourceKey=>Object.values(permissionActions).map(action=>({resourceKey,action,dataScope:'all'})));
 permissions.push(...grants.flatMap(({moduleKey})=>(readonly?['view']:['view','operate','manage']).map(action=>({resourceKey:moduleKey,action,dataScope:'all'}))));
 const entry=mode==='payment'?'/payments/9':mode==='payment-new'?'/payments/new':mode==='settings'?'/settings?'+new URLSearchParams({section:params.get('section')||'documentDefaults',group:params.get('group')||'invoice'}):mode==='export-defaults'?'/export-defaults':mode==='edit'?'/invoices/7':'/invoices/new';
+const settingsProps={client,canManageSettings:!readonly,canManageUsers:!readonly&&!params.has('desktop'),canUseDocumentWorkspace:params.get('edition')!=='Sales',isDesktopRuntime:params.has('desktop'),productName:'单据工作台'};
 createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[entry]}><QueryClientProvider client={queries}>
   <PermissionAccessProvider grants={grants} permissions={permissions} subject={{id:1,companyScope:'DEMO',departmentId:'OFFICE'}} canManageSettings={!readonly}><ConfirmationProvider><UnsavedChangesProvider>
     <main className='workspace-content'><h1>单据工作台</h1><LocationProbe/><Routes>
@@ -122,7 +125,9 @@ createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries=
       <Route path='/invoices/:invoiceId' element={<InvoiceEditorPage client={client} businessDate={date} mode='edit'/>}/>
       <Route path='/payments/:paymentId' element={<PaymentEditorPage client={client} businessDate={date} mode='edit'/>}/>
       <Route path='/payments/new' element={<PaymentEditorPage client={client} businessDate={date} mode='new'/>}/>
-      <Route path='/settings' element={<SettingsPage client={client} canManageSettings={!readonly} canManageUsers={!readonly&&!params.has('desktop')} canUseDocumentWorkspace={params.get('edition')!=='Sales'} isDesktopRuntime={params.has('desktop')} productName='单据工作台'/>}/>
+      <Route path='/settings' element={<SettingsPage {...settingsProps}/>}/>
+      <Route path='/system/backup' element={<BackupRecoveryPage {...settingsProps}/>}/>
+      <Route path='/system/maintenance' element={<SystemMaintenancePage {...settingsProps}/>}/>
       <Route path='/export-defaults' element={<ExportDefaultsFixture/>}/>
       <Route path='*' element={<p>已返回列表</p>}/>
     </Routes></main>

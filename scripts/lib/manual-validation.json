@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "tests": {
+    "test_native_desktop_editions.mjs": {
+      "environment": "Windows WebView2；分别准备 Document、Sales、Full SQLite 隔离包，Full/Document 含 OCR；先完成 locked build。",
+      "commands": [
+        "node scripts/test_native_desktop_editions.mjs <packages> Document",
+        "node scripts/test_native_desktop_editions.mjs <packages> Sales",
+        "node scripts/test_native_desktop_editions.mjs <packages> Full"
+      ]
+    },
+    "test_native_desktop_shutdown.mjs": {
+      "environment": "Windows，已完成启动/业务验证的隔离便携包与对应 EXE；检测本实例进程，不使用业务 DataRoot。",
+      "commands": ["node scripts/test_native_desktop_shutdown.mjs <package> <exe>"]
+    },
+    "test_native_pdf.mjs": {
+      "environment": "对应平台的已打包 EXE、包内 PDFium 动态库和匿名 PDF；执行文字、页图、OCR 页图、合并重开及异常边界。",
+      "commands": ["node scripts/test_native_pdf.mjs <exe> <pdfium-library> <sample.pdf>"]
+    }
+  }
+}

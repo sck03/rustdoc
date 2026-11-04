@@ -16,7 +16,7 @@ const require = createRequire(path.join(web, "package.json"));
 fs.mkdirSync(output, { recursive: true });
 const source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\", "/"));
 await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, contents: `
-  import ${source("styles/cascade.css")}; import ${source("styles/foundation.css")};
+   import ${source("styles/index.css")};
   import ${source("styles/workspaces.css")}; import ${source("styles/responsive.css")};
   import React from 'react';
   import { createRoot } from 'react-dom/client';
@@ -168,9 +168,11 @@ async function audit(page,label){
   const violations=await read(page,"axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(result=>result.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})))");
   if(violations.length)await captureScreenshot(page,path.join(output,`${label}-failed.png`));
   assert.deepEqual(violations,[],`${label}: accessibility`);
-  assert.equal(await read(page,"document.documentElement.scrollWidth <= innerWidth + 1"),true,`${label}: page overflow`);
-  assert.equal(await read(page,"[...document.querySelectorAll('.office-workspace')].every(node=>node.classList.contains('work-surface') && parseFloat(getComputedStyle(node).paddingLeft)>=12)"),true,`${label}: shared workspace spacing`);
-  assert.equal(await read(page,"[...document.querySelectorAll('.office-dialog-body')].every(n=>n.scrollWidth<=n.clientWidth+1)"),true,`${label}: dialog overflow`);
+  const overflow=await read(page,"document.documentElement.scrollWidth > innerWidth + 1 ? [...document.querySelectorAll('body *')].filter(n=>n.getBoundingClientRect().right>innerWidth+1).slice(0,12).map(n=>({tag:n.tagName,class:n.className,width:n.getBoundingClientRect().width,right:n.getBoundingClientRect().right})) : []");
+  if(overflow.length)await captureScreenshot(page,path.join(output,`${label}-overflow.png`));
+  assert.deepEqual(overflow,[],`${label}: page overflow`);
+  assert.equal(await read(page,"[...document.querySelectorAll('.office-workspace')].every(node=>node.dataset.ui==='workspace' && parseFloat(getComputedStyle(node).paddingLeft)>=12)"),true,`${label}: shared workspace spacing`);
+  assert.equal(await read(page,"[...document.querySelectorAll('[data-dialog-purpose=content] [data-ui=dialog-body]')].every(n=>n.scrollWidth<=n.clientWidth+1)"),true,`${label}: dialog overflow`);
   assert.deepEqual(await read(page,"window.__officeErrors"),[],`${label}: browser errors`);
   results.push(label);
 }
@@ -192,29 +194,29 @@ try {
         assert.equal(await read(page,"document.querySelector('.office-secondary-actions').open"),false);
         await clickText(page,"更多操作","summary");await audit(page,`supply-more-actions-${width}`);
         await clickText(page,"库存流水");await waitFor(page,"document.querySelector('.office-history')");
-        await read(page,"document.querySelector('.office-dialog [aria-label=关闭窗口]').click()");
+        await read(page,"document.querySelector('[data-dialog-purpose=content] [aria-label=关闭窗口]').click()");
       }
       await clickText(page,mode==="rooms"?"查看日程与预约":"申请借用");
-      await waitFor(page,"document.querySelector('[role=dialog]') && !document.querySelector('.office-dialog [aria-busy=true]')");
+      await waitFor(page,"document.querySelector('[role=dialog]') && !document.querySelector('[data-dialog-purpose=content] [aria-busy=true]')");
       await audit(page,`${mode}-dialog-${width}`);
       if(width===390)await captureScreenshot(page,path.join(output,`${mode}-dialog-${width}.png`));
     }
   }
   await open("rooms",1024,"employee");assert.equal(await read(page,"document.body.innerText.includes('添加会议室')"),false);
   await clickText(page,"查看日程与预约");await input(page,'input[name="title"]',"跨部门项目沟通");
-  await clickText(page,"提交预约");await waitFor(page,"window.__officeCalls.some(c=>c.name==='createBooking') && !document.querySelector('.office-dialog')");
+  await clickText(page,"提交预约");await waitFor(page,"window.__officeCalls.some(c=>c.name==='createBooking') && !document.querySelector('[data-dialog-purpose=content]')");
   const booking=await read(page,"window.__officeCalls.find(c=>c.name==='createBooking').input.body");
   assert.match(booking.requestKey,/^[0-9a-f-]{36}$/);assert.match(booking.startsAt,/Z$/);assert.equal(booking.title,"跨部门项目沟通");results.push("employee-booking");
   await clickText(page,"预约记录与审批");await waitFor(page,"document.querySelector('.office-request-card')");assert.equal(await read(page,"[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='批准')"),false);results.push("employee-permissions");
   await open("rooms",1024);await clickText(page,"预约记录与审批");await waitFor(page,"document.querySelector('.office-request-card')");await clickText(page,"批准");
-  await clickText(page,"批准",".office-dialog button");await waitFor(page,"window.__officeCalls.some(c=>c.name==='approveBooking')");
+  await clickText(page,"批准","[data-dialog-purpose=content] button");await waitFor(page,"window.__officeCalls.some(c=>c.name==='approveBooking')");
   assert.equal((await read(page,"window.__officeCalls.find(c=>c.name==='approveBooking').input.body")).expectedVersion,1);results.push("admin-approval");
   await open("supplies",390);await clickText(page,"补充库存");await input(page,'textarea[name="note"]',"采购入库");await input(page,'input[name="quantity"]',"8");await clickText(page,"确认入库");
   await waitFor(page,"window.__officeCalls.some(c=>c.name==='restock')");assert.equal((await read(page,"window.__officeCalls.find(c=>c.name==='restock').input.body")).quantity,8);results.push("stock-replenishment");
-  await open("supplies",390);await clickText(page,"申请借用");await input(page,'textarea[name="purpose"]',"保留草稿");await read(page,"document.querySelector('.office-dialog [aria-label=关闭窗口]').click()");
-  await waitFor(page,"document.querySelector('.confirmation-dialog')");await audit(page,"nested-discard-confirmation");await clickText(page,"取消",".confirmation-dialog button");assert.equal(await read(page,"document.querySelector('textarea[name=purpose]').value"),"保留草稿");
+  await open("supplies",390);await clickText(page,"申请借用");await input(page,'textarea[name="purpose"]',"保留草稿");await read(page,"document.querySelector('[data-dialog-purpose=content] [aria-label=关闭窗口]').click()");
+  await waitFor(page,"document.querySelector('[data-dialog-purpose=confirmation]')");await audit(page,"nested-discard-confirmation");await clickText(page,"取消","[data-dialog-purpose=confirmation] button");assert.equal(await read(page,"document.querySelector('textarea[name=purpose]').value"),"保留草稿");
   await open("permissions",1440);await waitFor(page,"document.querySelector('.permission-template-meta-grid input')?.value === '公司员工'");await audit(page,"office-permission-modules");await captureScreenshot(page,path.join(output,"permission-modules.png"));
-  await input(page,'select[aria-label="模块分类"]','申请与资源');
+  await input(page,'select[aria-label="模块分类"]','行政与人事');
   await read(page,"document.querySelector('input[aria-label=\"会议室预约：审批\"]').click()");
   await read(page,"(()=>{const select=document.querySelector('select[aria-label=\"会议室预约审批数据范围\"]');select.value='company';select.dispatchEvent(new Event('change',{bubbles:true}))})()");
   await clickText(page,"保存方案");await waitFor(page,"window.__officeCalls.some(c=>c.name==='savePermissions')");
@@ -242,7 +244,7 @@ try {
   await open("people",1024);await clickText(page,"人员档案");await waitFor(page,"document.querySelector('.personnel-facts')");await clickText(page,"任职与操作记录");await waitFor(page,"document.querySelector('.office-history li')");await audit(page,"personnel-history");
   await clickText(page,"交接事项");await waitFor(page,"document.querySelector('.personnel-clearance a')");await read(page,"document.querySelector('.personnel-clearance a').click()");await waitFor(page,"document.querySelector('.office-request-card')");
   assert(await read(page,"window.__officeCalls.some(c=>c.name==='listBookings' && c.input.requestId===1 && c.input.mineOnly===false)"));results.push("personnel-clearance-opens-exact-request");
-  await open("permissions",390);await input(page,'select[aria-label="模块分类"]','人员与组织');await waitFor(page,"document.querySelector('input[aria-label=\"人员信息管理：人事档案与记录\"]')");
+  await open("permissions",390);await input(page,'select[aria-label="模块分类"]','行政与人事');await waitFor(page,"document.querySelector('input[aria-label=\"人员信息管理：人事档案与记录\"]')");
   await read(page,"document.querySelector('input[aria-label=\"人员信息管理：人事档案与记录\"]').click()");await clickText(page,"保存方案");await waitFor(page,"window.__officeCalls.some(c=>c.name==='savePermissions')");
   assert(await read(page,"window.__officeCalls.find(c=>c.name==='savePermissions').input.body.grants.some(g=>g.resourceKey==='office.people' && g.action==='view-details')"));await audit(page,"personnel-permission-module-save");
   for(const width of [1024,390]){
@@ -259,7 +261,7 @@ try {
     await audit(page,`local-supply-${width}`);await clickText(page,"提交申请");await waitFor(page,"window.__officeCalls.some(c=>c.name==='createSupplyRequest')");
     assert.equal((await read(page,"window.__officeCalls.find(c=>c.name==='createSupplyRequest').input.body")).employeeId,1);results.push(`local-supply-submit-${width}`);
     await clickText(page,"领用记录与审批");await waitFor(page,"document.querySelector('.office-request-card')");
-    assert.equal(await read(page,"document.querySelector('.office-filter select').value"),"Pending");results.push(`local-admin-records-${width}`);
+    assert.equal(await read(page,"document.querySelector('select[aria-label=申请状态]').value"),"Pending");results.push(`local-admin-records-${width}`);
   }
   for(const role of ['unlinked','employee']) {
     await open('hub',390,role);await waitFor(page,"document.querySelectorAll('.oa-hub-queue li').length===2");

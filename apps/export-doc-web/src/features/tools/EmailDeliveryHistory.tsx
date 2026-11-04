@@ -3,7 +3,7 @@ import { RefreshCw } from "lucide-react";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { PageState } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
@@ -37,7 +37,7 @@ export function EmailDeliveryHistory({ client, businessTimeZone }: { client: Exp
         </tr>)}{!query.data?.items.length && <tr><td className="empty-cell" colSpan={6}>{query.isFetching ? "正在加载" : "没有符合条件的投递记录"}</td></tr>}</tbody>
       </table>
     </ResponsiveTableFrame>}
-    <ListPaginationControls pageNumber={pageNumber} pageSize={pageSize} totalCount={query.data?.totalCount ?? 0} totalPages={query.data?.totalPages ?? 0}
+    <Pagination pageNumber={pageNumber} pageSize={pageSize} totalCount={query.data?.totalCount ?? 0} totalPages={query.data?.totalPages ?? 0}
       pageSizeOptions={[20, 50, 100]} isBusy={query.isFetching} onPageChange={state.setPageNumber} onPageSizeChange={state.setPageSize} />
   </section>;
 }

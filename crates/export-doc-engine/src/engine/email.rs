@@ -292,7 +292,7 @@ fn deliver(
             row["sentAt"] = json!(store::timestamp());
         }
         // Persist SMTP acknowledgement independently of HTTP cancellation.
-        operation::OperationScope::new(Duration::from_secs(10)).run(|| {
+        operation::OperationScope::detached(Duration::from_secs(10)).run(|| {
             store.transaction(|tx| {
                 store::save(
                     tx,

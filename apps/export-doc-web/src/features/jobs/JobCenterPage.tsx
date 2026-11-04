@@ -1,4 +1,7 @@
+import { Field } from "../../ui/primitives/Field.tsx";
+import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { type FormEvent, useEffect, useState } from "react";
+import "../../styles/jobs-excel.css";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Play, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
@@ -6,8 +9,8 @@ import { type BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
-import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
@@ -172,7 +175,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const isActionBusy = operations.isBusy || reportTemplatesQuery.isFetching;
 
   return (
-    <section className="work-surface job-center-surface" aria-label="文件任务">
+    <ListWorkspace className="job-center-surface" aria-label="文件任务">
       {!jobPermission.canOperate ? (
         <PermissionNotice>当前权限模板仅允许查看任务；新建、取消和重试已禁用，删除与批量清理需要管理权限。</PermissionNotice>
       ) : null}
@@ -183,7 +186,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
           ? "可创建、下载和处理文件任务；受限屏幕下不提供批量清理，密集任务管理建议使用更宽屏幕。"
           : "可查看任务进度并处理单个失败任务；连接鼠标或触控板后可创建、下载和处理文件任务。"}
       />
-      <ListWorkspaceHeader title="任务记录" count={page?.totalCount} description="查看处理进度、下载结果，或继续处理失败任务。" actions={<>
+      <PageHeader title="任务记录" count={page?.totalCount} description="查看处理进度、下载结果，或继续处理失败任务。" actions={<>
           {workspaceDeviceCapabilities.canUseBatchOperations ? (
             <button className="command-button secondary" type="button" title="清理已完成、失败、已取消的任务记录" disabled={!jobPermission.canManage || isActionBusy || jobs.length === 0} onClick={() => void operations.handleClearFinishedJobs()}>
               <Trash2 size={17} aria-hidden="true" /><span>清理已结束</span>
@@ -197,11 +200,11 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
         <form className="list-workspace-filters" role="search" aria-label="筛选文件任务" onSubmit={handleSearch}>
           <Search size={17} aria-hidden="true" />
           <input aria-label="搜索任务" value={keyword} onChange={(event) => handleKeywordChange(event.target.value)} placeholder="任务号、标题、输出文件、错误" />
-          <label className="inline-filter"><span>状态</span><select value={status} onChange={(event) => changeStatus(event.target.value)}><option value="">全部</option>{jobStatusOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+          <Field label="状态"><select value={status} onChange={(event) => changeStatus(event.target.value)}><option value="">全部</option>{jobStatusOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>
           <button className="command-button secondary" type="submit" disabled={jobsQuery.isFetching || operations.isBusy}>搜索</button>
           <button className="icon-button" type="button" title="清除搜索" aria-label="清除搜索" disabled={jobsQuery.isFetching || operations.isBusy || (!keyword && !committedKeyword && !focusedJobId)} onClick={() => applyFilters("")}><X size={18} aria-hidden="true" /></button>
         </form>
-      </ListWorkspaceHeader>
+      </PageHeader>
       {jobPermission.canOperate && workspaceDeviceCapabilities.canImportExport ? (
         <div id="job-creation-tools" hidden={!createToolsOpen}><section className="job-create-panel" aria-label="新建任务">
           {canCreateInvoiceReportZip ? (
@@ -244,7 +247,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
               />
             ) : (
               <form className="job-tool-panel" onSubmit={(event) => { event.preventDefault(); operations.clearFeedback(); operations.pdfMergeMutation.mutate(); }}>
-                <label className="inline-filter"><span>源 PDF</span><input type="file" accept="application/pdf,.pdf" multiple disabled={isActionBusy} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; operations.setPdfUploadFiles(files); }} /></label>
+                <Field label="源 PDF"><input type="file" accept="application/pdf,.pdf" multiple disabled={isActionBusy} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; operations.setPdfUploadFiles(files); }} /></Field>
                 <div className="job-tool-submit-row"><span>{pdfUploadFiles.length} 个源文件</span><button className="solid action-button" type="submit" disabled={!canStartPdfMerge}><Play size={16} aria-hidden="true" /><span>合并并下载</span></button></div>
                 <div className="field-help">文件仅暂存在程序临时区，任务结束后自动清理。</div>
               </form>
@@ -275,7 +278,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
         desktopAvailable={desktopAvailable}
       />
 
-      <ListPaginationControls
+      <Pagination
         pageNumber={page?.pageNumber ?? pageNumber}
         totalPages={totalPages}
         totalCount={page?.totalCount ?? 0}
@@ -285,6 +288,6 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
         onPageChange={setPageNumber}
         onPageSizeChange={handlePageSizeChange}
       />
-    </section>
+    </ListWorkspace>
   );
 }

@@ -29,6 +29,7 @@ use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
+    sync::Mutex,
     time::SystemTime,
 };
 use zip::{CompressionMethod, ZipWriter, write::SimpleFileOptions};
@@ -62,6 +63,39 @@ pub trait SignatureVerifier: Send + Sync {
         machine_id: &str,
         license_key: &str,
     ) -> std::result::Result<Option<i64>, String>;
+}
+#[derive(Default)]
+pub(super) struct SignatureCache(Mutex<Option<(String, std::result::Result<Option<i64>, String>)>>);
+impl SignatureCache {
+    fn validate(
+        &self,
+        machine: &str,
+        key: &str,
+        verifier: &dyn SignatureVerifier,
+    ) -> std::result::Result<Option<i64>, String> {
+        let digest = sha256_hex(&format!("{BINDING_VERSION}|{machine}|{key}"));
+        if let Some((_, result)) = self
+            .0
+            .lock()
+            .map_err(|_| "授权缓存状态异常。".to_owned())?
+            .as_ref()
+            .filter(|(current, _)| *current == digest)
+        {
+            return result.clone();
+        }
+        // Cryptographic work never holds the cache or anchor state lock.
+        let result = verifier.validate(machine, key);
+        *self.0.lock().map_err(|_| "授权缓存状态异常。".to_owned())? =
+            Some((digest, result.clone()));
+        result
+    }
+}
+struct CachedVerifier<'a>(&'a SignatureCache);
+impl SignatureVerifier for CachedVerifier<'_> {
+    fn validate(&self, machine: &str, key: &str) -> std::result::Result<Option<i64>, String> {
+        self.0
+            .validate(machine, key, &verifier().map_err(|e| e.to_string())?)
+    }
 }
 /// ECDSA P-256 with SHA-256 over the raw EDM2- payload bytes.
 fn verifier() -> Result<EcdsaVerifier> {
@@ -168,9 +202,7 @@ fn random_bytes(count: usize) -> Result<Vec<u8>> {
 fn sha256_hex(value: &str) -> String {
     hex(&Sha256::digest(value))
 }
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-}
+use crate::paths::hex;
 pub(super) fn normalize_machine_id(machine_id: &str) -> String {
     machine_id.trim().to_lowercase()
 }
@@ -190,19 +222,27 @@ fn ensure_anchor(
     protector: &crate::secrets::Protector,
     today: NaiveDate,
 ) -> Result<Anchor> {
-    match store.settings(ANCHOR_NAME)? {
-        Some(Value::String(ciphertext)) => {
-            let plain = protector
-                .unprotect(ANCHOR_NAME, &ciphertext)
-                .map_err(unavailable)?;
-            serde_json::from_str(&plain).map_err(|error| unavailable(error.to_string()))
-        }
-        Some(_) => Err(unavailable("授权锚点记录损坏。")),
+    match read_anchor(store, protector)? {
+        Some(anchor) => Ok(anchor),
         None => {
             let anchor = Anchor::new(today)?;
             write_anchor(store, protector, &anchor)?;
             Ok(anchor)
         }
+    }
+}
+fn read_anchor(store: &Store, protector: &crate::secrets::Protector) -> Result<Option<Anchor>> {
+    match store.settings(ANCHOR_NAME)? {
+        Some(Value::String(ciphertext)) => {
+            let plain = protector
+                .unprotect(ANCHOR_NAME, &ciphertext)
+                .map_err(unavailable)?;
+            serde_json::from_str(&plain)
+                .map(Some)
+                .map_err(|error| unavailable(error.to_string()))
+        }
+        Some(_) => Err(unavailable("授权锚点记录损坏。")),
+        None => Ok(None),
     }
 }
 fn write_anchor(
@@ -223,10 +263,37 @@ fn status(
     clock: &BusinessClock,
     verifier: &dyn SignatureVerifier,
 ) -> Result<Value> {
+    status_with_gate(store, protector, clock, verifier, None)
+}
+fn status_with_gate(
+    store: &Store,
+    protector: &crate::secrets::Protector,
+    clock: &BusinessClock,
+    verifier: &dyn SignatureVerifier,
+    gate: Option<&Mutex<()>>,
+) -> Result<Value> {
     let today = clock.now().map_err(unavailable)?.today;
-    let mut anchor = ensure_anchor(store, protector, today)?;
-    let identity = machine_identity(&anchor, store.provider()?);
-    let changed = anchor.refresh(&identity, today)?;
+    let existing = read_anchor(store, protector)?;
+    let needs_write = existing.as_ref().is_none_or(|anchor| {
+        anchor.fingerprint_hash.is_empty()
+            || anchor.binding_hash.is_empty()
+            || anchor.last_run_date.as_str() < today.to_string().as_str()
+    });
+    let (anchor, identity) = if needs_write {
+        let _guard = gate
+            .map(|gate| gate.lock().map_err(|_| unavailable("授权状态异常。")))
+            .transpose()?;
+        let mut anchor = ensure_anchor(store, protector, today)?;
+        let identity = machine_identity(&anchor, store.provider()?);
+        if anchor.refresh(&identity, today)? {
+            write_anchor(store, protector, &anchor)?;
+        }
+        (anchor, identity)
+    } else {
+        let anchor = existing.ok_or_else(|| unavailable("授权锚点缺失。"))?;
+        let identity = machine_identity(&anchor, store.provider()?);
+        (anchor, identity)
+    };
     let mut response = contracts::initial(contracts::schema("ApiLicenseStatusResponse"));
     response["machineId"] = json!(identity.machine_id);
     response["trialDays"] = json!(TRIAL_DAYS);
@@ -283,10 +350,16 @@ fn status(
             response["message"] = json!(format!("试用期剩余 {} 天。", remaining.max(0)));
         }
     }
-    if changed {
-        write_anchor(store, protector, &anchor)?;
-    }
     Ok(response)
+}
+fn current_status(service: &NativeService) -> Result<Value> {
+    status_with_gate(
+        &service.store,
+        &service.protector,
+        &service.clock,
+        &CachedVerifier(&service.license_cache),
+        Some(&service.license_gate),
+    )
 }
 fn expire_date(clock: &BusinessClock, unix: i64) -> Result<NaiveDate> {
     let instant = DateTime::from_timestamp(unix, 0).ok_or_else(|| invalid("注册码有效期无效。"))?;
@@ -665,19 +738,14 @@ pub fn handle(
     _query: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
-    let _gate = service
-        .license_gate
-        .lock()
-        .map_err(|_| unavailable("授权状态异常。"))?;
     match operation {
-        GET_LICENSE_STATUS => status(
-            &service.store,
-            &service.protector,
-            &service.clock,
-            &verifier()?,
-        ),
+        GET_LICENSE_STATUS => current_status(service),
         REGISTER_LICENSE => {
             auth::authorize(actor, "system.about", "manage")?;
+            let _gate = service
+                .license_gate
+                .lock()
+                .map_err(|_| unavailable("授权状态异常。"))?;
             register(
                 &service.store,
                 &service.protector,
@@ -701,16 +769,7 @@ pub(super) fn check_operation(service: &NativeService, operation: Operation) -> 
     if !required {
         return Ok(());
     }
-    let _gate = service
-        .license_gate
-        .lock()
-        .map_err(|_| unavailable("授权状态异常。"))?;
-    let state = status(
-        &service.store,
-        &service.protector,
-        &service.clock,
-        &verifier()?,
-    )?;
+    let state = current_status(service)?;
     if state["isRegistered"] == true
         || (state["isTrialExpired"] == false
             && state["daysRemaining"].as_i64().is_some_and(|days| days > 0))

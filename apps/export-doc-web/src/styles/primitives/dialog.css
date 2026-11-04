@@ -1,0 +1,14 @@
+[data-ui="dialog-backdrop"] { position: fixed; inset: 0; z-index: var(--edm-z-modal); display: grid; place-items: center; padding: var(--edm-space-6); background: color-mix(in srgb, var(--edm-ink-950) 40%, transparent); }
+[data-ui="dialog"] { display: grid; grid-template-rows: auto minmax(0,1fr) auto; width: 640px; max-width: calc(100vw - 48px); max-height: calc(100dvh - 48px); border-radius: var(--edm-radius-xl); border: 1px solid var(--edm-line); background: var(--edm-bg-surface); box-shadow: var(--edm-shadow-4); overflow: hidden; }
+[data-ui="dialog"][data-size="small"] { width: 480px; }
+[data-ui="dialog"][data-size="large"] { width: 880px; }
+[data-ui="dialog"][data-size="full"] { width: 1120px; }
+[data-ui="dialog-header"] { display: flex; align-items: center; justify-content: space-between; min-height: 56px; gap: var(--edm-space-3); padding: var(--edm-space-4) var(--edm-space-5); border-bottom: 1px solid var(--edm-line); }
+[data-ui="dialog-header"] h2 { margin: 0; font-size: var(--edm-font-size-lg); }
+[data-ui="dialog-header"] p { margin: var(--edm-space-2) 0 0; color: var(--edm-text-secondary); font-size: var(--edm-font-size-sm); }
+[data-ui="dialog-body"] { display: grid; align-content: start; gap: var(--edm-layout-gap); padding: var(--edm-space-5); min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+[data-ui="dialog-footer"] { display: flex; align-items: center; flex-wrap: wrap; justify-content: end; gap: var(--edm-space-2); padding: var(--edm-space-3) var(--edm-space-5); border-top: 1px solid var(--edm-line); }
+[data-ui="dialog-toolbar"] { display: flex; align-items: center; flex-wrap: wrap; gap: var(--edm-space-3); }
+[data-ui="dialog-backdrop"][data-variant="drawer"] { place-items: stretch end; padding: 0; }
+[data-ui="dialog"][data-variant="drawer"] { max-height: 100dvh; height: 100dvh; border-start-end-radius: 0; border-end-end-radius: 0; }
+@media (max-width: 680px) { [data-ui="dialog-backdrop"] { padding: var(--edm-space-3); } [data-ui="dialog"] { max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); } }

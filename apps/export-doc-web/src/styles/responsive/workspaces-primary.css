@@ -1,22 +1,22 @@
 /* Responsive overrides loaded after workspace feature styles. */
-@media (min-width: 861px) and (max-width: 1320px) {
+@media (min-width: 681px) and (max-width: 1180px) {
   .settings-category-panel .field-grid,
-  .settings-category-panel .runtime-detail-grid,
-  .settings-category-panel .communication-settings-grid,
-  .settings-category-panel .maintenance-section-nav {
+.settings-category-panel .runtime-detail-grid,
+.settings-category-panel .communication-settings-grid,
+.settings-category-panel .maintenance-section-nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .settings-category-panel .communication-settings-grid .email-body-template-field,
-  .settings-category-panel .communication-settings-grid .webdav-password-setting,
-  .settings-category-panel .communication-settings-grid .webdav-enabled-setting {
+.settings-category-panel .communication-settings-grid .webdav-password-setting,
+.settings-category-panel .communication-settings-grid .webdav-enabled-setting {
     grid-column: auto;
     grid-row: auto;
   }
 
 }
 
-@media (min-width: 861px) and (max-width: 1100px) {
+@media (min-width: 681px) and (max-width: 1180px) {
   .settings-category-panel .exchange-currency-manager {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -27,26 +27,21 @@
   }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 680px) {
   .app-shell {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(0, 1fr);
   }
 
-  .identity-management-intro {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
 .workspace-nav {
     position: sticky;
     top: 0;
-    z-index: 60;
+    z-index: var(--edm-z-modal);
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     max-height: none;
-    padding: 10px 12px;
+    padding: 12px 12px;
     overflow: visible;
   }
 
@@ -55,7 +50,7 @@
     top: calc(100% + 1px);
     right: 0;
     left: 0;
-    z-index: 62;
+    z-index: var(--edm-z-modal);
     display: none;
     max-height: min(72vh, 620px);
     padding: 12px;
@@ -64,7 +59,6 @@
     color: var(--edm-primary-25);
     background: var(--edm-primary-900);
     border-bottom: 1px solid color-mix(in srgb, var(--edm-white) 9%, transparent);
-    box-shadow: 0 22px 46px color-mix(in srgb, var(--edm-primary-950) 26%, transparent);
   }
 
   .workspace-nav-mobile-open .nav-list {
@@ -79,19 +73,26 @@
 
   .nav-sub-list {
     margin: 4px 0 0 28px;
-    padding: 6px;
+    padding: 8px;
     border: 1px solid color-mix(in srgb, var(--edm-white) 8%, transparent);
   }
 
   .nav-group-button,
-  .nav-item {
+.nav-item {
     width: 100%;
+  }
+}
+
+@media (max-width: 1180px) {
+  .identity-management-intro {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .toolbar,
-  .editor-toolbar,
-  .settings-command-strip,
-  .pagination-bar {
+.editor-toolbar,
+.settings-command-strip,
+.pagination-bar {
     align-items: stretch;
     flex-direction: column;
   }
@@ -100,14 +101,14 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
     min-height: 72px;
-    padding-top: 10px;
-    padding-bottom: 10px;
+    padding-top: 12px;
+    padding-bottom: 12px;
   }
 
   .workspace-title-cluster,
-  .workspace-title-block {
+.workspace-title-block {
     min-width: 0;
   }
 
@@ -134,8 +135,8 @@
   }
 
   .single-window-tool-group,
-  .single-window-section-tools,
-  .single-window-tool-group-primary {
+.single-window-section-tools,
+.single-window-tool-group-primary {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     flex: 0 1 auto;
@@ -147,8 +148,8 @@
   }
 
   .single-window-tool-group .command-button,
-  .single-window-section-tools .command-button,
-  .single-window-tool-group-primary .command-button {
+.single-window-section-tools .command-button,
+.single-window-tool-group-primary .command-button {
     justify-content: center;
     width: 100%;
   }
@@ -162,7 +163,7 @@
   }
 
   .settings-ai-grid,
-  .settings-single-window-grid {
+.settings-single-window-grid {
     grid-template-columns: 1fr;
   }
 
@@ -185,31 +186,6 @@
   .settings-category-item {
     flex: 0 0 auto;
     width: auto;
-  }
-
-  .workspace-modal-backdrop {
-    padding: 10px;
-  }
-
-  .workspace-modal-dialog {
-    width: calc(100vw - 20px);
-    max-height: calc(100vh - 20px);
-    max-height: calc(100dvh - 20px);
-    min-height: min(520px, calc(100vh - 20px));
-    min-height: min(520px, calc(100dvh - 20px));
-    padding: 12px;
-  }
-
-  .workspace-modal-header,
-  .workspace-modal-toolbar,
-  .workspace-modal-footer {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .workspace-modal-footer .command-button {
-    justify-content: center;
-    width: 100%;
   }
 
   .producer-profile-toolbar {
@@ -271,12 +247,7 @@
     max-width: 100%;
   }
 
-  .login-panel {
-    margin: 18px 12px;
-    width: calc(100vw - 24px);
-  }
-
-  .work-surface {
+  [data-ui="workspace"] {
     padding: 12px;
   }
 
@@ -293,7 +264,7 @@
   }
 
   .dashboard-table-frame,
-  .dashboard-todo-list {
+.dashboard-todo-list {
     min-height: 280px;
   }
 
@@ -304,7 +275,7 @@
   .workspace-nav-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 50;
+    z-index: var(--edm-z-modal);
     display: block;
     width: 100%;
     height: 100%;
@@ -326,7 +297,7 @@
   }
 
   .job-excel-analysis-meta,
-  .job-excel-analysis-fields {
+.job-excel-analysis-fields {
     grid-template-columns: 1fr;
   }
 
@@ -352,7 +323,7 @@
   }
 
   .container-packing-field-grid,
-  .container-packing-rules-grid {
+.container-packing-rules-grid {
     grid-template-columns: 1fr;
   }
 
@@ -361,8 +332,8 @@
   }
 
   .container-packing-visual-header,
-  .container-packing-3d-header,
-  .container-packing-projection-header {
+.container-packing-3d-header,
+.container-packing-projection-header {
     align-items: stretch;
     flex-direction: column;
   }
@@ -380,7 +351,7 @@
   }
 
   .container-packing-3d-stage,
-  .container-packing-3d-canvas {
+.container-packing-3d-canvas {
     height: 300px;
     min-height: 280px;
     max-height: 360px;
@@ -419,7 +390,7 @@
   }
 
   .hs-code-import-actions .command-button,
-  .hs-code-remote-form .command-button {
+.hs-code-remote-form .command-button {
     justify-content: center;
     width: 100%;
   }
@@ -434,8 +405,8 @@
   }
 
   .communication-settings-grid .email-body-template-field,
-  .communication-settings-grid .webdav-password-setting,
-  .communication-settings-grid .webdav-enabled-setting {
+.communication-settings-grid .webdav-password-setting,
+.communication-settings-grid .webdav-enabled-setting {
     grid-column: auto;
     grid-row: auto;
   }

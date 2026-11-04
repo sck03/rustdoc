@@ -64,7 +64,7 @@ export function MaintenanceFullMigrationPanel({
         {view !== "migration" && <><label><span>待恢复迁移包</span><input ref={restoreInputRef} hidden type="file" accept=".edmmigration" onChange={(event) => { onRestoreFileChange(event.currentTarget.files?.[0] ?? null); event.currentTarget.value = ""; }} /><button className="command-button secondary" type="button" disabled={!canManageSettings || busy} onClick={() => restoreInputRef.current?.click()}><Upload size={17} aria-hidden="true" /><span>{restoreFile?.name || "选择 .edmmigration 文件"}</span></button></label>
         <label><span>迁移包密码</span><input type="password" autoComplete="current-password" value={restorePassword} disabled={!canManageSettings || busy || !restoreFile} onChange={(event) => onRestorePasswordChange(event.target.value)} /></label>
         <label><span>恢复确认文本</span><input value={restoreConfirmation} disabled={!canManageSettings || busy || !restoreFile} placeholder="MIGRATE" onChange={(event) => onRestoreConfirmationChange(event.target.value)} /></label>
-        <button className="command-button danger-command" type="button" disabled={!canRestore} onClick={onRestore}><RotateCcw size={17} aria-hidden="true" /><span>安排完整恢复</span></button></>}
+        <button className="command-button danger" type="button" disabled={!canRestore} onClick={onRestore}><RotateCcw size={17} aria-hidden="true" /><span>安排完整恢复</span></button></>}
       </div>
       <p className="settings-helper-text">安排迁移只完成校验和暂存。随后须由服务器管理员停止应用、执行恢复维护命令，成功后再启动；仅刷新页面或普通重启不会完成恢复。</p>
       <p className="settings-helper-text">{status?.message} 大包可由管理员直接从服务器目录导入；创建与恢复前请预留备份及恢复副本所需的磁盘空间。</p>

@@ -1,0 +1,4 @@
+:root {
+  --edm-z-base: 0; --edm-z-sticky: 10; --edm-z-header: 20; --edm-z-popover: 100;
+  --edm-z-drawer: 300; --edm-z-modal: 400; --edm-z-toast: 500; --edm-z-skip-link: 1000;
+}

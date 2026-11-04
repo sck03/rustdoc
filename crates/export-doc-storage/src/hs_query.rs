@@ -34,7 +34,6 @@ pub(crate) fn build(query: &HsQuery<'_>, pg: bool) -> Result<(QuerySql, String)>
         ));
     }
     if !query.prefix.is_empty() {
-        let prefix = bind(&mut values, query.prefix, pg);
         let paths = if query.kind == "hs-examples" {
             vec!["rawReportedHsCode", "resolvedCurrentHsCode"]
         } else {
@@ -44,7 +43,7 @@ pub(crate) fn build(query: &HsQuery<'_>, pg: bool) -> Result<(QuerySql, String)>
             "({})",
             paths
                 .iter()
-                .map(|path| format!("substr({},1,length({prefix}))={prefix}", field(path, pg)))
+                .map(|path| sql::prefix(&field(path, pg), query.prefix, &mut values, pg))
                 .collect::<Vec<_>>()
                 .join(" OR ")
         ));
@@ -72,6 +71,7 @@ pub(crate) fn build(query: &HsQuery<'_>, pg: bool) -> Result<(QuerySql, String)>
     };
     Ok((
         QuerySql {
+            source: crate::query_source::Source::Records,
             filter: clauses.join(" AND "),
             order: order.into(),
             values,

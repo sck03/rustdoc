@@ -1,0 +1,475 @@
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useNavigate } from "react-router-dom";
+import { ApiInvoiceListItemDto, ExportDocManagerApiClient } from "../../../api/index.ts";
+import { queryKeys } from "../../../api/queryKeys.ts";
+import { useModulePermission, usePermission } from "../../../app/PermissionAccessContext.tsx";
+import { permissionActions, permissionResources } from "../../../app/permissionCatalog.ts";
+import { useWorkspaceDeviceProfile } from "../../../app/workspaceDevice.ts";
+import { isDesktopBridgeAvailable, openPath, selectExcelFile } from "../../../desktop/desktopBridge.ts";
+import { useServerPageNumber } from "../../../ui/useServerPageNumber.ts";
+import { readApiError, readRouteSuccessMessage } from "../../../ui/formUtils.ts";
+import { loadListViewState, normalizeListPageSize, saveListViewState } from "../../../ui/listViewState.ts";
+import { downloadBlob } from "../../../ui/downloadBlob.ts";
+import { readDefaultExportDirectory } from "../../settings/settingsPaths.ts";
+import { useInvoiceListSingleWindowOperations } from "../useInvoiceListSingleWindowOperations.ts";
+import { readPathDialogError, requestPackageOpenPath, requestPackageSavePath } from "../invoiceListDesktopPaths.ts";
+import { sanitizePackageFileName } from "../invoiceListFileNames.ts";
+import { buildDefaultCopyInvoiceNo, buildExcelImportRouteSuccessMessage, createEmptyInvoiceTransferImportDraft, createInvoiceTransferImportDraft, normalizeRequiredPackagePath, validateInvoiceCopyDraft, validateInvoiceTransferImportDraft, type InvoiceTransferImportDraft, type InvoiceCopyDraft } from "../invoiceListModels.ts";
+const invoiceListViewStateStorageKey = "export-doc-manager.invoice-list-view-state.v1";
+
+export function useInvoiceListWorkspace({ client }: { client: ExportDocManagerApiClient }) {
+  const invoicePermission = useModulePermission("document.invoices");
+  const excelPermission = useModulePermission("document.excel");
+  const singleWindowPermission = useModulePermission("document.single-window");
+  const jobPermission = useModulePermission("document.jobs");
+  const reportPermission = useModulePermission("document.reports");
+  const [batchInvoices, setBatchInvoices] = useState<ApiInvoiceListItemDto[]>([]);
+  const invoicePackageExportPermission = usePermission(
+    permissionResources.invoiceOutput,
+    permissionActions.exportZip,
+  );
+  const workspaceDeviceProfile = useWorkspaceDeviceProfile();
+  const workspaceDeviceMode = workspaceDeviceProfile.mode;
+  const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
+  const canAuthorizeBatchExport = invoicePackageExportPermission.allowed && jobPermission.canOperate && reportPermission.canView;
+  const canBatchExport = canAuthorizeBatchExport && workspaceDeviceCapabilities.canImportExport;
+  const [initialListViewState] = useState(() => loadListViewState(invoiceListViewStateStorageKey));
+  const [keyword, setKeyword] = useState(initialListViewState.keyword);
+  const [committedKeyword, setCommittedKeyword] = useState(initialListViewState.keyword);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [pageSize, setPageSize] = useState(initialListViewState.pageSize);
+  const [copyDraft, setCopyDraft] = useState<InvoiceCopyDraft | null>(null);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [transferDraft, setTransferDraft] = useState<InvoiceTransferImportDraft | null>(null);
+  const [transferUploadFile, setTransferUploadFile] = useState<File | null>(null);
+  const [transferMessage, setTransferMessage] = useState<string | null>(null);
+  const [transferSuccessMessage, setTransferSuccessMessage] = useState<string | null>(null);
+  const [lastExportedPackagePath, setLastExportedPackagePath] = useState<string | null>(null);
+  const excelImportInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const routeSuccessMessage = readRouteSuccessMessage(location.state);
+  const queryClient = useQueryClient();
+
+  const invoicesQuery = useQuery({
+    queryKey: queryKeys.invoices(pageNumber, pageSize, committedKeyword.trim()),
+    queryFn: ({ signal }) =>
+      client.listInvoices({
+        pageNumber,
+        pageSize,
+        keyword: committedKeyword.trim() || undefined,
+        sortColumn: "InvoiceDate",
+        ascending: false,
+      }, { signal }),
+    placeholderData: keepPreviousData,
+  });
+
+  const settingsQuery = useQuery({
+    queryKey: queryKeys.settings(),
+    queryFn: ({ signal }) => client.getSettings({ signal }),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
+  const singleWindow = useInvoiceListSingleWindowOperations({
+    client,
+    queryClient,
+    defaultExportDirectory,
+    canView: singleWindowPermission.canView,
+    canOperate: singleWindowPermission.canOperate,
+    canExportBookingSheet: excelPermission.canOperate,
+  });
+
+  useServerPageNumber(invoicesQuery, pageNumber, setPageNumber);
+
+  useEffect(() => {
+    saveListViewState(invoiceListViewStateStorageKey, {
+      keyword: committedKeyword,
+      pageSize,
+    });
+  }, [committedKeyword, pageSize]);
+
+  function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextKeyword = keyword.trim();
+    setKeyword(nextKeyword);
+    setCommittedKeyword(nextKeyword);
+    setPageNumber(1);
+  }
+
+  function handleResetSearch() {
+    setKeyword("");
+    setCommittedKeyword("");
+    setPageNumber(1);
+  }
+
+  function handlePageSizeChange(value: number) {
+    setPageSize(normalizeListPageSize(value));
+    setPageNumber(1);
+  }
+
+  const cloneInvoiceMutation = useMutation({
+    mutationFn: (draft: InvoiceCopyDraft) =>
+      client.cloneInvoice({
+        id: draft.source.id,
+        body: {
+          newInvoiceNo: draft.newInvoiceNo.trim(),
+          options: {
+            copyHeader: draft.copyHeader,
+            copyItems: draft.copyItems,
+            resetDates: draft.resetDates,
+            clearAmounts: draft.clearAmounts,
+          },
+        },
+      }),
+    onSuccess: async (response) => {
+      setCopyDraft(null);
+      setCopyMessage(null);
+      queryClient.setQueryData(queryKeys.invoice(response.id), response.invoice);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() }),
+      ]);
+      navigate(`/invoices/${response.id}`, {
+        state: { successMessage: response.message || "发票已复制。" },
+      });
+    },
+    onError: (error) => {
+      setCopyMessage(readApiError(error));
+    },
+  });
+
+  const exportTransferPackageMutation = useMutation({
+    mutationFn: async ({ invoice, packagePath }: { invoice: ApiInvoiceListItemDto; packagePath: string }) => {
+      if (isDesktopBridgeAvailable()) {
+        const response = await client.saveInvoiceTransferPackageToPath({ id: invoice.id, body: { packagePath } });
+        return { mode: "desktop" as const, response };
+      }
+
+      const blob = await client.downloadInvoiceTransferPackage({ id: invoice.id });
+      downloadBlob(blob, `${sanitizePackageFileName(invoice.invoiceNo || "invoice")}.edpkg`);
+      return { mode: "browser" as const };
+    },
+    onSuccess: (result) => {
+      setTransferMessage(null);
+      if (result.mode === "desktop") {
+        setTransferSuccessMessage(`${result.response.message} ${result.response.packagePath}`);
+        setLastExportedPackagePath(result.response.packagePath);
+      } else {
+        setTransferSuccessMessage("发票单据包已交给浏览器下载。");
+        setLastExportedPackagePath(null);
+      }
+    },
+    onError: (error) => {
+      setTransferMessage(readApiError(error));
+      setTransferSuccessMessage(null);
+      setLastExportedPackagePath(null);
+    },
+  });
+
+  const previewTransferPackageMutation = useMutation({
+    mutationFn: async ({ packagePath, uploadFile }: { packagePath: string; uploadFile?: File | null }) => {
+      const response = isDesktopBridgeAvailable()
+        ? await client.previewInvoiceTransferPackage({ body: { packagePath } })
+        : await client.previewUploadedInvoiceTransferPackage({ fileName: uploadFile?.name, body: uploadFile ?? new Blob() });
+      return { packagePath: uploadFile?.name || packagePath, response };
+    },
+    onSuccess: ({ packagePath, response }) => {
+      setTransferDraft(createInvoiceTransferImportDraft(packagePath, response));
+      setTransferMessage(null);
+      setTransferSuccessMessage(null);
+      setLastExportedPackagePath(null);
+    },
+    onError: (error) => {
+      setTransferMessage(readApiError(error));
+      setTransferSuccessMessage(null);
+    },
+  });
+
+  const importTransferPackageMutation = useMutation({
+    mutationFn: (draft: InvoiceTransferImportDraft) => isDesktopBridgeAvailable()
+      ? client.importInvoiceTransferPackage({
+        body: {
+          packagePath: draft.packagePath.trim(),
+          conflictAction: draft.conflictAction,
+          newInvoiceNo: draft.newInvoiceNo.trim(),
+        },
+      })
+      : client.importUploadedInvoiceTransferPackage({
+          fileName: transferUploadFile?.name,
+          conflictAction: draft.conflictAction,
+          newInvoiceNo: draft.newInvoiceNo.trim() || undefined,
+          body: transferUploadFile ?? new Blob(),
+        }),
+    onSuccess: async (response) => {
+      setTransferDraft(null);
+      setTransferMessage(null);
+      setTransferSuccessMessage(response.message || "单据包已导入。");
+      setLastExportedPackagePath(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() }),
+      ]);
+      if (response.result.invoiceId && response.result.invoiceId > 0) {
+        navigate(`/invoices/${response.result.invoiceId}`, {
+          state: { successMessage: response.message || "单据包已导入。" },
+        });
+      }
+    },
+    onError: (error) => {
+      setTransferMessage(readApiError(error));
+      setTransferSuccessMessage(null);
+    },
+  });
+
+  const excelImportPreviewMutation = useMutation({
+    mutationFn: ({ filePath, uploadFile }: { filePath?: string; uploadFile?: File }) =>
+      uploadFile
+        ? client.previewUploadedExcelImport({ fileName: uploadFile.name, body: uploadFile })
+        : client.previewExcelImport({ body: { filePath: filePath ?? "" } }),
+    onSuccess: (response) => {
+      if (!response.invoice) {
+        setTransferMessage("Excel 已解析，但没有生成可用的发票草稿。请检查模板内容。");
+        setTransferSuccessMessage(null);
+        return;
+      }
+
+      setTransferDraft(null);
+      setTransferMessage(null);
+      setTransferSuccessMessage(null);
+      setLastExportedPackagePath(null);
+      navigate("/invoices/new", {
+        state: {
+          invoiceDraft: response.invoice,
+          successMessage: buildExcelImportRouteSuccessMessage(response),
+        },
+      });
+    },
+    onError: (error) => {
+      setTransferMessage(readApiError(error));
+      setTransferSuccessMessage(null);
+    },
+  });
+
+  function openCopyPanel(invoice: ApiInvoiceListItemDto) {
+    if (!invoicePermission.canOperate) return;
+
+    setCopyDraft({
+      source: invoice,
+      newInvoiceNo: buildDefaultCopyInvoiceNo(invoice.invoiceNo),
+      copyHeader: true,
+      copyItems: true,
+      resetDates: true,
+      clearAmounts: false,
+    });
+    setCopyMessage(null);
+  }
+
+  function openSingleWindowPanel(invoice: ApiInvoiceListItemDto) {
+    singleWindow.open(invoice);
+  }
+
+  function patchCopyDraft(next: Partial<InvoiceCopyDraft>) {
+    setCopyDraft((current) => (current ? { ...current, ...next } : current));
+    setCopyMessage(null);
+  }
+
+  function submitCopyInvoice(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!invoicePermission.canOperate || !copyDraft || cloneInvoiceMutation.isPending) {
+      return;
+    }
+
+    const validationMessage = validateInvoiceCopyDraft(copyDraft);
+    if (validationMessage) {
+      setCopyMessage(validationMessage);
+      return;
+    }
+
+    setCopyMessage(null);
+    cloneInvoiceMutation.mutate(copyDraft);
+  }
+
+  async function handleExportTransferPackage(invoice: ApiInvoiceListItemDto) {
+    if (!invoicePackageExportPermission.allowed || exportTransferPackageMutation.isPending) {
+      return;
+    }
+
+    if (!isDesktopBridgeAvailable()) {
+      setTransferMessage(null);
+      setTransferSuccessMessage(null);
+      setLastExportedPackagePath(null);
+      exportTransferPackageMutation.mutate({ invoice, packagePath: "" });
+      return;
+    }
+
+    const defaultFileName = `${sanitizePackageFileName(invoice.invoiceNo || "invoice")}.edpkg`;
+    const packagePath = await requestPackageSavePath(defaultFileName, defaultExportDirectory).catch((error) => {
+      setTransferMessage(readPathDialogError(error));
+      setTransferSuccessMessage(null);
+      return "";
+    });
+    if (!packagePath) {
+      return;
+    }
+
+    setTransferMessage(null);
+    setTransferSuccessMessage(null);
+    setLastExportedPackagePath(null);
+    exportTransferPackageMutation.mutate({ invoice, packagePath });
+  }
+
+  async function handleChooseImportTransferPackage() {
+    if (!invoicePermission.canOperate || previewTransferPackageMutation.isPending || importTransferPackageMutation.isPending) {
+      return;
+    }
+
+    if (!isDesktopBridgeAvailable()) {
+      setTransferDraft(createEmptyInvoiceTransferImportDraft());
+      setTransferUploadFile(null);
+      setTransferMessage("请选择本机 .edpkg 单据包上传预览；网页版只处理您主动选择的文件。");
+      setTransferSuccessMessage(null);
+      setLastExportedPackagePath(null);
+      return;
+    }
+
+    const packagePath = await requestPackageOpenPath().catch((error) => {
+      setTransferMessage(readPathDialogError(error));
+      setTransferSuccessMessage(null);
+      return "";
+    });
+    if (!packagePath) {
+      return;
+    }
+
+    setTransferMessage(null);
+    setTransferSuccessMessage(null);
+    previewTransferPackageMutation.mutate({ packagePath });
+  }
+
+  async function handleChooseExcelImport() {
+    if (!invoicePermission.canOperate || !excelPermission.canOperate || excelImportPreviewMutation.isPending) {
+      return;
+    }
+
+    if (!isDesktopBridgeAvailable()) {
+      setTransferMessage(null);
+      setTransferSuccessMessage(null);
+      excelImportInputRef.current?.click();
+      return;
+    }
+
+    const filePath = await selectExcelFile().catch((error) => {
+      setTransferMessage(readPathDialogError(error));
+      setTransferSuccessMessage(null);
+      return "";
+    });
+    if (!filePath) {
+      return;
+    }
+
+    setTransferMessage(null);
+    setTransferSuccessMessage(null);
+    setLastExportedPackagePath(null);
+    excelImportPreviewMutation.mutate({ filePath });
+  }
+
+  function handleExcelImportUpload(file: File | undefined) {
+    if (!file || !invoicePermission.canOperate || !excelPermission.canOperate || excelImportPreviewMutation.isPending) {
+      return;
+    }
+
+    setTransferMessage(null);
+    setTransferSuccessMessage(null);
+    setLastExportedPackagePath(null);
+    excelImportPreviewMutation.mutate({ uploadFile: file });
+  }
+
+  function handlePreviewTransferPackage(packagePath: string) {
+    if (!invoicePermission.canOperate) return;
+
+    const normalized = normalizeRequiredPackagePath(packagePath);
+    if (normalized.error) {
+      setTransferMessage(normalized.error);
+      setTransferSuccessMessage(null);
+      return;
+    }
+
+    setTransferMessage(null);
+    setTransferSuccessMessage(null);
+    previewTransferPackageMutation.mutate({ packagePath: normalized.value });
+  }
+
+  function handlePreviewTransferUpload(file: File | null) {
+    setTransferUploadFile(file);
+    setTransferMessage(null);
+    setTransferSuccessMessage(null);
+    if (file) {
+      previewTransferPackageMutation.mutate({ packagePath: file.name, uploadFile: file });
+    }
+  }
+
+  function patchTransferDraft(next: Partial<InvoiceTransferImportDraft>) {
+    setTransferDraft((current) => (current ? { ...current, ...next } : current));
+    setTransferMessage(null);
+    setTransferSuccessMessage(null);
+  }
+
+  function submitTransferImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!invoicePermission.canOperate || !transferDraft || importTransferPackageMutation.isPending) {
+      return;
+    }
+
+    const validationMessage = validateInvoiceTransferImportDraft(transferDraft);
+    if (validationMessage) {
+      setTransferMessage(validationMessage);
+      setTransferSuccessMessage(null);
+      return;
+    }
+
+    setTransferMessage(null);
+    setTransferSuccessMessage(null);
+    importTransferPackageMutation.mutate(transferDraft);
+  }
+
+  async function handleOpenLastExportedPackage() {
+    if (!lastExportedPackagePath) {
+      return;
+    }
+
+    try {
+      await openPath(lastExportedPackagePath);
+    } catch (error) {
+      setTransferMessage(error instanceof Error ? error.message : "打开单据包失败。");
+      setTransferSuccessMessage(null);
+    }
+  }
+
+  const invoices = invoicesQuery.data ?? null;
+  const message = invoicesQuery.isError ? readApiError(invoicesQuery.error) : copyMessage ?? transferMessage;
+  const isBusy =
+    invoicesQuery.isFetching ||
+    cloneInvoiceMutation.isPending ||
+    exportTransferPackageMutation.isPending ||
+    previewTransferPackageMutation.isPending ||
+    importTransferPackageMutation.isPending ||
+    excelImportPreviewMutation.isPending ||
+    singleWindow.isBusy;
+  return {
+    invoicePermission, excelPermission, singleWindowPermission, batchInvoices, setBatchInvoices,
+    invoicePackageExportPermission, workspaceDeviceMode, workspaceDeviceCapabilities, canAuthorizeBatchExport, canBatchExport,
+    keyword, setKeyword, committedKeyword, pageNumber, setPageNumber,
+    pageSize, copyDraft, setCopyDraft, setCopyMessage, transferDraft,
+    setTransferDraft, transferUploadFile, setTransferUploadFile, setTransferMessage, transferSuccessMessage,
+    lastExportedPackagePath, excelImportInputRef, navigate, routeSuccessMessage, invoicesQuery,
+    singleWindow, handleSearch, handleResetSearch, handlePageSizeChange, cloneInvoiceMutation,
+    previewTransferPackageMutation, importTransferPackageMutation, openCopyPanel, openSingleWindowPanel, patchCopyDraft,
+    submitCopyInvoice, handleExportTransferPackage, handleChooseImportTransferPackage, handleChooseExcelImport, handleExcelImportUpload,
+    handlePreviewTransferPackage, handlePreviewTransferUpload, patchTransferDraft, submitTransferImport, handleOpenLastExportedPackage,
+    invoices, message, isBusy,
+  };
+}

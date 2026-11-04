@@ -1,3 +1,4 @@
+import { EditorWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Edit3, Trash2 } from "lucide-react";
@@ -328,7 +329,7 @@ export function PaymentEditorPage({
   }
 
   return (
-    <section className="editor-surface" aria-label={isNew ? "新建付款报销" : "编辑付款报销"}>
+    <EditorWorkspace className="editor-surface" aria-label={isNew ? "新建付款报销" : "编辑付款报销"}>
       <div className="editor-toolbar">
         <button className="command-button secondary" type="button" onClick={handleBackToPaymentList}>
           <ArrowLeft size={17} aria-hidden="true" />
@@ -404,7 +405,7 @@ export function PaymentEditorPage({
           </form>
         </DocumentFieldLabelsProvider>
       ) : null}
-    </section>
+    </EditorWorkspace>
   );
 }
 

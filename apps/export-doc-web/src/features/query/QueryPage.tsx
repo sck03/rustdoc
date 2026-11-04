@@ -1,4 +1,7 @@
+import { Field } from "../../ui/primitives/Field.tsx";
+import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { FocusEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import "../../styles/audit-query.css";
 import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { Download, FolderOpen, RefreshCw, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -10,7 +13,7 @@ import { isDesktopBridgeAvailable, selectSaveExcelPath } from "../../desktop/des
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { readStoredJson, writeStoredJson } from "../../ui/browserStorage.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { RemoteSelectField } from "../../ui/RemoteSelectField.tsx";
@@ -228,7 +231,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
   }
 
   return (
-    <section className="work-surface query-surface" aria-label="单据查询">
+    <ListWorkspace className="query-surface" aria-label="单据查询">
       <form className="toolbar query-toolbar" onSubmit={handleSearch} onKeyDown={handleQueryFormKeyDown}>
         <div className="query-filter-stack">
           <span className="query-filter-section-label">常用条件</span>
@@ -362,15 +365,14 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
           <small>{page ? `${page.totalCount} 条当前结果` : "等待查询"}</small>
         </summary>
         <div className="query-export-grid">
-          {isDesktop ? <label className="inline-filter query-export-path-filter">
-            <span>输出路径</span>
+          {isDesktop ? <Field label="输出路径" className="query-export-path-filter">
             <input
               value={exportPath}
               placeholder="QueryResults.xlsx"
               disabled={isActionBusy}
               onChange={(event) => setExportPath(event.target.value)}
             />
-          </label> : <div className="field-help">文件将保存到浏览器默认下载目录。</div>}
+          </Field> : <div className="field-help">文件将保存到浏览器默认下载目录。</div>}
           <div className="query-inline-actions">
             {isDesktop ? (
               <DesktopIconButton title="选择 Excel 保存位置" disabled={isActionBusy} onClick={handleSelectExportPath}>
@@ -399,7 +401,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
 
       <QueryResultTable data={rows} isBusy={isBusy} onOpen={(invoiceId) => navigate(`/invoices/${invoiceId}`)} />
 
-      <ListPaginationControls
+      <Pagination
         pageNumber={page?.pageNumber ?? pageNumber}
         totalPages={page?.totalPages ?? 1}
         totalCount={page?.totalCount ?? 0}
@@ -409,7 +411,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
         onPageChange={setPageNumber}
         onPageSizeChange={handlePageSizeChange}
       />
-    </section>
+    </ListWorkspace>
   );
 }
 

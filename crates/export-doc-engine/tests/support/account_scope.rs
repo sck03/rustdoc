@@ -1,6 +1,5 @@
 use export_doc_engine::{
-    api::ApiError, contracts, engine::NativeService, generated_api::*, invoice::InvoiceDraft,
-    paths::nonce,
+    api::ApiError, engine::NativeService, generated_api::*, invoice::InvoiceDraft, paths::nonce,
 };
 use serde_json::{Value, json};
 #[path = "approval_fixture.rs"]
@@ -13,12 +12,7 @@ fn call(
     parameters: &[(&str, String)],
     body: Option<Value>,
 ) -> Result<Value, ApiError> {
-    let body = body.map(|value| contracts::overlay(contracts::object(op.id, true), &value));
-    let value: Value =
-        serde_json::from_slice(&service.dispatch(op, parameters, &[], body, token)?).unwrap();
-    export_doc_contracts::validation::response(op.id, &value)
-        .unwrap_or_else(|cause| panic!("{}: {cause}", op.id));
-    Ok(value)
+    workflow::query(service, token, op, parameters, &[], body)
 }
 
 /// The same contract is exercised on SQLite and an isolated PostgreSQL 18.

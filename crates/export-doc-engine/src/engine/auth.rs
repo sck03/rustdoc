@@ -8,7 +8,8 @@ use chrono::{Duration, Utc};
 use export_doc_domain::permissions;
 use serde_json::{Value, json};
 use sha2::Sha256;
-use std::{collections::HashMap, sync::Mutex, time::Instant};
+use std::{collections::HashMap, sync::Mutex};
+mod login_budget;
 use subtle::ConstantTimeEq;
 use unicode_normalization::UnicodeNormalization;
 
@@ -30,17 +31,10 @@ struct Session {
     version: (i64, i64),
     context: String,
 }
+#[derive(Default)]
 pub struct Sessions {
     values: Mutex<HashMap<String, Session>>,
-    attempts: Mutex<HashMap<String, (u32, Instant)>>,
-}
-impl Default for Sessions {
-    fn default() -> Self {
-        Self {
-            values: Mutex::new(HashMap::new()),
-            attempts: Mutex::new(HashMap::new()),
-        }
-    }
+    attempts: login_budget::Budget,
 }
 
 pub fn seed(store: &Store) -> Result<()> {
@@ -58,12 +52,9 @@ fn has_users(connection: &store::Connection) -> Result<bool> {
                 all: true,
                 ..Default::default()
             },
-            filters: &[],
-            keyword: "",
-            search_root: None,
             fields: &[("id", "id")],
-            offset: 0,
             limit: 1,
+            ..Default::default()
         })?
         .0
         > 0)
@@ -153,19 +144,7 @@ impl Sessions {
         if password.chars().count() > 128 {
             return Err(invalid("账号或密码长度无效。"));
         }
-        {
-            let mut attempts = self
-                .attempts
-                .lock()
-                .map_err(|_| unavailable("登录状态异常。"))?;
-            attempts.retain(|_, (_, last)| last.elapsed().as_secs() < 300);
-            if attempts.get(&key).is_some_and(|(count, _)| *count >= 10) {
-                return Err(error(429, "登录尝试过多，请五分钟后重试。"));
-            }
-            if attempts.len() >= 1024 && !attempts.contains_key(&key) {
-                return Err(error(429, "登录请求过多，请稍后重试。"));
-            }
-        }
+        let reservation = self.attempts.reserve(&key, crate::operation::source())?;
         let record = store.connection()?.find_identity("users", &key)?;
         let credentials = if let Some(record) = &record {
             store
@@ -184,19 +163,10 @@ impl Sessions {
         if actual.as_slice().ct_eq(&expected).unwrap_u8() != 1
             || record.as_ref().is_none_or(|user| user["isActive"] != true)
         {
-            let mut attempts = self
-                .attempts
-                .lock()
-                .map_err(|_| unavailable("登录状态异常。"))?;
-            let attempt = attempts.entry(key).or_insert((0, Instant::now()));
-            attempt.0 += 1;
-            attempt.1 = Instant::now();
+            reservation.finish(false)?;
             return Err(error(401, "账号或密码错误，或账号已停用。"));
         }
-        self.attempts
-            .lock()
-            .map_err(|_| unavailable("登录状态异常。"))?
-            .remove(&key);
+        reservation.finish(true)?;
         let record = record.ok_or_else(|| error(401, "登录失败。"))?;
         let version = store.transaction(|tx| {
             let current = store::get(tx, "users", record["id"].as_i64().unwrap_or(0))?;
@@ -437,7 +407,7 @@ fn actor_from_connection(
     user: &Value,
     edition: permissions::ProductEdition,
 ) -> Result<Actor> {
-    let grants = super::account_permissions::grants(connection, user)?;
+    let (grants, oa_assigned_only) = super::account_permissions::resolve(connection, user)?;
     let mut actor = Actor {
         scope_rules: super::scope_policies::rules(
             connection,
@@ -455,7 +425,7 @@ fn actor_from_connection(
             user,
             user["role"] != "Admin" && grants.iter().any(|grant| grant.data_scope == "department"),
         )?,
-        oa_assigned_only: super::account_permissions::assigned_only(connection, user)?,
+        oa_assigned_only,
         admin: user["role"] == "Admin",
         grants: grants
             .into_iter()

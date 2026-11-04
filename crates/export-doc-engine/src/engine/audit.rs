@@ -171,6 +171,7 @@ fn select(
     offset: usize,
     limit: usize,
     count_all: bool,
+    before_id: Option<i64>,
 ) -> Result<(Vec<Value>, usize)> {
     let (total, events) = tx.query_audits(&export_doc_storage::AuditQuery {
         invoice: &criteria.invoice,
@@ -184,9 +185,42 @@ fn select(
         offset: i64::try_from(offset).unwrap_or(i64::MAX),
         limit: limit as i64,
         count_all,
+        before_id,
     })?;
     let rows = events.into_iter().map(project).collect::<Vec<_>>();
     Ok((rows, total as usize))
+}
+fn scan(
+    tx: &Connection,
+    criteria: &Criteria,
+    limit: usize,
+    mut consume: impl FnMut(&[Value]) -> Result<()>,
+) -> Result<usize> {
+    let mut before = i64::MAX;
+    let mut count = 0;
+    while count < limit {
+        crate::operation::check()?;
+        let (rows, _) = select(
+            tx,
+            criteria,
+            0,
+            (limit - count).min(2000),
+            false,
+            Some(before),
+        )?;
+        if rows.is_empty() {
+            break;
+        }
+        let next = rows
+            .last()
+            .and_then(|row| row["id"].as_i64())
+            .filter(|id| *id > 0 && *id < before)
+            .ok_or_else(|| super::error::unavailable("审计导出游标损坏。"))?;
+        consume(&rows)?;
+        count += rows.len();
+        before = next;
+    }
+    Ok(count)
 }
 fn command(count: usize, destination: &str, message: &str) -> Value {
     json!({"success":true,"message":format!("{message}（{count} 条）"),"affectedCount":count,"destinationPath":destination,"storagePolicy":POLICY})
@@ -230,6 +264,7 @@ pub fn handle(
                     page.saturating_sub(1).saturating_mul(size),
                     size,
                     true,
+                    None,
                 )
             })?;
         return serde_json::to_vec(&contracts::page(rows, total, page, size)).map_err(Into::into);
@@ -242,26 +277,44 @@ pub fn handle(
             .filter(|value| *value > 0)
             .unwrap_or(50_000)
             .min(50_000) as usize;
-        let (rows, _) = service
+        let (bytes, count) = service
             .store
             .read_for(actor, operation, query, |tx, _actor| {
-                select(tx, &criteria, 0, limit, false)
+                let mut count = 0;
+                let mut source_error = None;
+                let bytes = export_doc_excel::table_stream(
+                    &[
+                        ("id", "编号"),
+                        ("entityName", "实体"),
+                        ("entityId", "业务编号"),
+                        ("action", "操作"),
+                        ("userId", "操作人"),
+                        ("timestamp", "时间"),
+                        ("oldValues", "原值"),
+                        ("newValues", "新值"),
+                    ],
+                    |emit| match scan(tx, &criteria, limit, |rows| {
+                        for row in rows {
+                            emit(row).map_err(invalid)?;
+                        }
+                        Ok(())
+                    }) {
+                        Ok(amount) => {
+                            count = amount;
+                            Ok(())
+                        }
+                        Err(cause) => {
+                            source_error = Some(cause);
+                            Err("审计导出未完成。".into())
+                        }
+                    },
+                    &|| crate::operation::check().map_err(|error| error.to_string()),
+                );
+                if let Some(cause) = source_error {
+                    return Err(cause);
+                }
+                Ok((bytes.map_err(invalid)?, count))
             })?;
-        let bytes = export_doc_excel::table(
-            &[
-                ("id", "编号"),
-                ("entityName", "实体"),
-                ("entityId", "业务编号"),
-                ("action", "操作"),
-                ("userId", "操作人"),
-                ("timestamp", "时间"),
-                ("oldValues", "原值"),
-                ("newValues", "新值"),
-            ],
-            &rows,
-            &|| crate::operation::check().map_err(|error| error.to_string()),
-        )
-        .map_err(invalid)?;
         if operation == DOWNLOAD_AUDIT_LOGS {
             return Ok(bytes);
         }
@@ -281,12 +334,8 @@ pub fn handle(
             return Err(invalid("请选择合法的 .xlsx 输出文件。"));
         }
         crate::paths::atomic_write(&path, &bytes).map_err(unavailable)?;
-        return serde_json::to_vec(&command(
-            rows.len(),
-            &path.to_string_lossy(),
-            "审计日志已导出",
-        ))
-        .map_err(Into::into);
+        return serde_json::to_vec(&command(count, &path.to_string_lossy(), "审计日志已导出"))
+            .map_err(Into::into);
     }
     if body["confirmed"] != true {
         return Err(invalid("删除或清理审计记录前必须明确确认。"));
@@ -312,10 +361,19 @@ pub fn handle(
     let count = service
         .store
         .transaction_for(actor, operation, query, |tx, actor| {
-            let (rows, _) = select(tx, &criteria, 0, limit, false)?;
-            let ids: Vec<_> = rows.iter().filter_map(|row| row["id"].as_i64()).collect();
-            crate::operation::check()?;
-            let count = tx.delete_audits(&ids)?;
+            let mut count = 0;
+            scan(tx, &criteria, limit, |rows| {
+                let ids: Vec<_> = rows
+                    .iter()
+                    .map(|row| {
+                        row["id"]
+                            .as_i64()
+                            .ok_or_else(|| super::error::unavailable("审计编号损坏。"))
+                    })
+                    .collect::<Result<_>>()?;
+                count += tx.delete_audits(&ids)?;
+                Ok(())
+            })?;
             if count > 0 {
                 tx.append_audit_details(
                     &AuditWrite {

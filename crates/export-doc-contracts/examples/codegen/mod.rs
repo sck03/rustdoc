@@ -2,6 +2,7 @@ pub mod native;
 #[cfg(test)]
 mod tests;
 pub mod typescript;
+mod typescript_modules;
 
 use serde_json::Value;
 use std::{collections::HashSet, error::Error, io::Write, path::Path};
@@ -9,6 +10,7 @@ pub type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 pub struct Generated {
     pub web: String,
+    pub web_modules: std::collections::BTreeMap<String, String>,
     pub rust: String,
     pub contract: String,
     pub operation_count: usize,
@@ -100,10 +102,11 @@ pub fn generate(document: &Value) -> Result<Generated> {
             }
         }
     }
-    let web = typescript::generate(document, &operations);
+    let (web, web_modules) = typescript::generate(document, &operations);
     let (rust, contract, schema_count) = native::generate(document, &operations)?;
     Ok(Generated {
         web,
+        web_modules,
         rust,
         contract,
         operation_count: operations.len(),

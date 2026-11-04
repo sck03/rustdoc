@@ -9,7 +9,8 @@ const relatedModules: Record<string, string> = {
 export function permissionResourceLocation(resource: ApiPermissionResourceDefinitionDto) {
   const moduleKey = relatedModules[resource.moduleKey] ?? resource.moduleKey;
   const locations = workspaceNavGroups.flatMap((group) => group.items.flatMap((item) =>
-    (item.children ?? [item]).filter((route) => route.moduleKey === moduleKey).map(() => ({ group: group.label, page: item.label }))));
+    [...(item.children ?? [item]), ...(item.hiddenRoutes ?? [])]
+      .filter((route) => route.moduleKey === moduleKey).map(() => ({ group: group.label, page: item.label }))));
   const group = locations[0]?.group ?? resource.group;
   const pages = [...new Set(locations.map((location) => location.page))];
   return { group, path: [group, pages.join(" / ")].filter(Boolean).join(" / ") };

@@ -193,7 +193,7 @@ export function SharedDatabaseOwnershipPanel({
           <span>其他业务资料</span>
         </label>
         <button
-          className="command-button danger-command"
+          className="command-button danger"
           type="button"
           disabled={!canTransfer}
           onClick={() => {

@@ -45,7 +45,9 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
             *stages.entry(text(&row, "stage")).or_default() += 1;
             if rules::closed(&text(&row, "stage")) { return Ok(()); }
             let amount: Decimal = serde_json::from_value(row["estimatedAmount"].clone())?;
-            let probability = Decimal::from(row["probabilityPercent"].as_i64().unwrap_or(0));
+            let probability = Decimal::from(row["probabilityPercent"].as_i64()
+                .filter(|value| (0..=100).contains(value))
+                .ok_or_else(|| unavailable("商机成交概率缺失或超出 0 至 100，请核对记录。"))?);
             let entry = currencies.entry(text(&row, "currency")).or_default();
             entry.0 += 1;
             entry.1 = entry.1.checked_add(amount).ok_or_else(|| unavailable("商机金额汇总超出范围。"))?;

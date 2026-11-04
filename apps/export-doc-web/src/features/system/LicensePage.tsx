@@ -1,3 +1,4 @@
+import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, KeyRound, RefreshCw } from "lucide-react";
@@ -78,7 +79,7 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
   }
 
   return (
-    <section className="work-surface license-surface" aria-label="授权注册">
+    <RecordWorkspace className="license-surface" aria-label="授权注册">
       <div className="toolbar license-toolbar">
         <div className="toolbar-summary">
           <strong>{statusText}</strong>
@@ -158,7 +159,7 @@ export function LicensePage({ client }: { client: ExportDocManagerApiClient }) {
           </button>
         </div>
       </section>
-    </section>
+    </RecordWorkspace>
   );
 }
 

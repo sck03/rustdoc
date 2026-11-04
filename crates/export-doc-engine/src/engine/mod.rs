@@ -56,6 +56,7 @@ mod licensing;
 mod lifecycle;
 mod maintenance;
 mod media;
+mod request_values;
 pub use media::{SEAL_LIMIT, read_seal_image};
 pub mod oa;
 #[cfg(feature = "ocr")]
@@ -89,6 +90,7 @@ mod report_template_files;
 mod report_templates;
 pub mod reports;
 mod sales;
+mod scheduler_health;
 mod scope_policies;
 mod settings;
 #[cfg(feature = "single-window")]
@@ -125,9 +127,13 @@ pub struct NativeService {
     jobs: tasks::Jobs,
     workflow_scheduler: tasks::scheduled::Scheduler,
     backup_scheduler: team_backup::scheduled::Scheduler,
+    backup_tickets: team_backup::Tickets,
     bootstrap_token: String,
     clock: crate::clock::BusinessClock,
     license_gate: std::sync::Mutex<()>,
+    license_cache: licensing::SignatureCache,
+    #[cfg(feature = "ai")]
+    ai_budget: std::sync::atomic::AtomicUsize,
     packing_gate: std::sync::Mutex<()>,
     oa_document_gate: std::sync::Mutex<()>,
     #[cfg(feature = "ocr")]
@@ -150,29 +156,6 @@ impl NativeService {
     pub fn provider(&self) -> Result<&'static str> {
         self.store.provider()
     }
-    /// Native preview uses the same use case and permissions as HTTP HTML
-    /// preview, then encodes its layout as PDF without writing a business row.
-    pub fn preview_report_pdf(
-        &self,
-        operation: Operation,
-        parameters: &[(&str, String)],
-        body: &Value,
-        token: &str,
-    ) -> Result<Vec<u8>> {
-        let _access = self
-            .maintenance
-            .read()
-            .map_err(|_| unavailable("数据库维护状态异常。"))?;
-        let actor = self.sessions.actor(&self.store, token)?;
-        self.authorize_operation(&actor, operation, &[])?;
-        let (document, _) = reports::preview_document(self, &actor, operation, parameters, body)?;
-        export_doc_report::pdf_document(
-            &document,
-            &self.report_fonts,
-            &crate::operation::cancellation_flag(),
-        )
-        .map_err(Into::into)
-    }
     pub fn session_actor(&self, token: &str) -> Result<Actor> {
         self.sessions.actor(&self.store, token)
     }
@@ -191,19 +174,6 @@ impl NativeService {
             "system.settings",
             "manage",
         )
-    }
-    pub fn document_package_preview_pdf(
-        &self,
-        actor: &Actor,
-        invoice_id: i64,
-        body: &Value,
-    ) -> Result<Vec<u8>> {
-        let _access = self
-            .maintenance
-            .read()
-            .map_err(|_| unavailable("数据库维护状态异常。"))?;
-        self.authorize_operation(actor, PREVIEW_INVOICE_DOCUMENT_PACKAGE_HTML, &[])?;
-        document_packages::preview_pdf(self, actor, invoice_id, body)
     }
     pub fn download_report_resource(
         &self,
@@ -686,10 +656,7 @@ impl NativeService {
                 ]
                 .contains(&operation)
                 {
-                    let job_id = parameters
-                        .iter()
-                        .find(|(key, _)| *key == "jobId")
-                        .map(|(_, value)| value.as_str())
+                    let job_id = crate::engine::request_values::find(parameters, "jobId")
                         .ok_or_else(|| invalid("缺少文件任务编号。"))?;
                     if operation == RETRY_JOB {
                         return serde_json::to_vec(&tasks::retry::execute(self, &actor, job_id)?)

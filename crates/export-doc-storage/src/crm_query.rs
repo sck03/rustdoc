@@ -230,6 +230,7 @@ pub(crate) fn build(q: &CrmQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
     )?;
     Ok((
         QuerySql {
+            source: crate::query_source::Source::Records,
             filter: clauses.join(" AND "),
             order,
             values,

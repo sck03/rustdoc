@@ -9,7 +9,7 @@
 .operation-center-list-action-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(150px, 1fr));
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -27,6 +27,6 @@
 
 .section-count {
   color: var(--edm-neutral-600);
-  font-size: 13px;
+  font-size: var(--edm-font-size-sm);
   font-weight: 700;
 }

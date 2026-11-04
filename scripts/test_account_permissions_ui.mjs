@@ -46,7 +46,7 @@ await withOfficeUi('account-permissions-ui', async ({ output, url, invoke, openP
   // Independent account settings retain the copied restrictions and can narrow actions/scopes.
   await form.getByText(/账号单独配置与模块权限/u).click();
   await form.getByLabel('账号权限来源').selectOption('custom');
-  await form.getByLabel('模块分类').selectOption('人员与组织');
+  await form.getByLabel('模块分类').selectOption({ label: '行政与人事' });
   const people = form.getByRole('region', { name: '人员档案与通讯录', exact: true });
   await people.getByLabel('人员档案与通讯录模块开放', { exact: true }).uncheck();
   await form.getByLabel('账号权限来源').selectOption('inherit');

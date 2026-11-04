@@ -297,11 +297,7 @@ pub fn managers(store: &Store, query: &[(&str, String)]) -> Result<Value> {
         .map(|(_, value)| value.trim())
         .filter(|value| !value.is_empty() && value.chars().count() <= 50)
         .ok_or_else(|| invalid("请选择所属公司。"))?;
-    let keyword = query
-        .iter()
-        .find(|(key, _)| *key == "keyword")
-        .map(|(_, value)| value.as_str())
-        .unwrap_or("");
+    let keyword = crate::engine::request_values::find(query, "keyword").unwrap_or("");
     if keyword.chars().count() > 100 {
         return Err(invalid("搜索词不能超过 100 字。"));
     }

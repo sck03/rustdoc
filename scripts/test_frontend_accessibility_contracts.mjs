@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { inspectTypeScriptSources, checkJsxAccessibility } from "./lib/frontend-accessibility-jsx.mjs";
+import { walkSourceFiles } from "./lib/source-files.mjs";
 
 const root = path.resolve(import.meta.dirname, "../apps/export-doc-web/src");
 const failures = [];
 
-const files = [...walk(root)].filter(file => file.endsWith(".tsx") || file.endsWith(".ts"));
+const files = walkSourceFiles(root).filter(file => file.endsWith(".tsx") || file.endsWith(".ts"));
 inspectTypeScriptSources(files, (file, source) => {
   const sourceText = source.text;
   const sourceRelativePath = path.relative(root, file).replaceAll("\\", "/");
@@ -53,7 +54,7 @@ inspectTypeScriptSources(files, (file, source) => {
     failures.push(`${sourceRelativePath}: 收款对象分类是可选辅助信息，不得作为保存必填项`);
   }
 
-  if (sourceRelativePath === "features/invoices/InvoiceEditorPage.tsx") {
+  if (sourceRelativePath === "features/invoices/hooks/useInvoiceEditorWorkspace.ts") {
     if (!sourceText.includes("useInvoiceItemsWorkspace")) {
       failures.push(`${sourceRelativePath}: 商品库与明细表操作必须保持独立工作区 Hook`);
     }
@@ -65,7 +66,7 @@ inspectTypeScriptSources(files, (file, source) => {
   }
 
   if (new Set([
-    "features/invoices/InvoiceEditorPage.tsx",
+    "features/invoices/hooks/useInvoiceEditorWorkspace.ts",
     "features/payments/PaymentEditorPage.tsx",
     "features/master-data/MasterDataEditorPage.tsx",
     "features/single-window/AgentConsignmentPage.tsx",
@@ -96,8 +97,8 @@ inspectTypeScriptSources(files, (file, source) => {
     }
   }
 
-  if (["ui/ConfirmationDialog.tsx", "features/invoices/InvoiceStatusReasonDialog.tsx"].includes(sourceRelativePath)) {
-    if (!sourceText.includes("useModalDialog")) {
+  if (["ui/primitives/Dialog.tsx", "features/invoices/InvoiceStatusReasonDialog.tsx"].includes(sourceRelativePath)) {
+    if (!sourceText.includes(sourceRelativePath === "ui/primitives/Dialog.tsx" ? "useModalDialog" : 'from "../../ui/primitives/Dialog.tsx"')) {
       failures.push(`${sourceRelativePath}: 模态框必须复用公共焦点循环、Escape 关闭和焦点恢复 Hook`);
     }
     for (const duplicatedModalImplementation of ["window.addEventListener(\"keydown\"", "previouslyFocusedElement", "querySelectorAll<HTMLElement>"]) {
@@ -116,7 +117,7 @@ inspectTypeScriptSources(files, (file, source) => {
   }
 
   if (sourceRelativePath === "features/invoices/InvoiceProductLibraryPickerDialog.tsx") {
-    for (const productLibraryContract of ["ListPaginationControls", "totalCount", "onPageSizeChange"]) {
+    for (const productLibraryContract of ["Pagination", "totalCount", "onPageSizeChange"]) {
       if (!sourceText.includes(productLibraryContract)) {
         failures.push(`${sourceRelativePath}: 商品库选择器必须使用服务端分页并展示准确总数：${productLibraryContract}`);
       }
@@ -124,7 +125,7 @@ inspectTypeScriptSources(files, (file, source) => {
   }
 
   if (sourceRelativePath === "features/master-data/HsCodeKnowledgePage.tsx") {
-    for (const hsKnowledgeContract of ["useDebouncedValue", "placeholderData: keepPreviousData", "ListPaginationControls", "confirmSelected", "queryFn: ({ signal })"]) {
+    for (const hsKnowledgeContract of ["useDebouncedValue", "placeholderData: keepPreviousData", "Pagination", "confirmSelected", "queryFn: ({ signal })"]) {
       if (!sourceText.includes(hsKnowledgeContract)) {
         failures.push(`${sourceRelativePath}: HS 实例、候选和历史列表缺少防抖/分页/准确反馈闭环：${hsKnowledgeContract}`);
       }
@@ -146,7 +147,7 @@ inspectTypeScriptSources(files, (file, source) => {
   }
 
   if (["features/suppliers/SupplierDirectoryPage.tsx", "features/opportunities/SalesOpportunityPage.tsx", "features/crm/CrmCustomerDirectoryPanel.tsx"].includes(sourceRelativePath)) {
-    for (const listContract of ["usePagedDirectoryQuery", "(signal)", "ListPaginationControls"]) {
+    for (const listContract of ["usePagedDirectoryQuery", "(signal)", "Pagination"]) {
       if (!sourceText.includes(listContract)) {
         failures.push(`${sourceRelativePath}: 业务目录分页必须统一使用可取消查询和公共分页组件：${listContract}`);
       }
@@ -217,10 +218,16 @@ inspectTypeScriptSources(files, (file, source) => {
     "features/single-window/CustomsCooPage.tsx": ["useSingleWindowLockedFields", "useCustomsCooProducerProfiles", "useCustomsCooAuthoritySelection"],
     "features/single-window/AgentConsignmentPage.tsx": ["useSingleWindowLockedFields"],
     "features/single-window/SingleWindowReferenceCatalogPage.tsx": ["useReferenceCatalogExcelWorkspace"],
-    "features/invoices/InvoiceListPage.tsx": ["useInvoiceListSingleWindowOperations"],
+    "features/invoices/InvoiceListPage.tsx": ["useInvoiceListWorkspace"],
+    "features/invoices/InvoiceEditorPage.tsx": ["useInvoiceEditorWorkspace"],
+    "features/invoices/hooks/useInvoiceListWorkspace.ts": ["useInvoiceListSingleWindowOperations"],
+    "features/audit-logs/AuditLogPage.tsx": ["useAuditLogWorkspace"],
+    "features/crm/CustomerFollowUpPage.tsx": ["useCustomerFollowUpWorkspace"],
+    "features/master-data/MasterDataListPage.tsx": ["useMasterDataListWorkspace"],
     "features/reports/ReportTemplateWorkspacePage.tsx": ["useReportTemplatePackageWorkspace"],
     "features/invoices/InvoiceItemsEditor.tsx": ["useInvoiceItemsEditorInteraction", "InvoiceItemsEditorDialogs", "InvoiceItemsEditorProps"],
-    "features/settings/SettingsPage.tsx": ["useSettingsMaintenanceActions", "useSettingsDraftSync"],
+    "features/settings/SettingsPage.tsx": ["useSettingsWorkspace"],
+    "ui/ConfirmationDialog.tsx": ["<Dialog", "initialFocusRef={cancelRef}"],
   };
   for (const requiredCoordinator of coordinatorContracts[sourceRelativePath] ?? []) {
     if (!sourceText.includes(requiredCoordinator)) {
@@ -275,7 +282,7 @@ inspectTypeScriptSources(files, (file, source) => {
   }
 
   if (sourceRelativePath === "App.tsx") {
-    for (const requiredWorkspaceNoticeContract of ["setWorkspaceNotice", "notice={workspaceNotice}", "onDismissNotice"]) {
+    for (const requiredWorkspaceNoticeContract of ["setWorkspaceNotice", "notice:workspaceNotice", "onDismissNotice"]) {
       if (!sourceText.includes(requiredWorkspaceNoticeContract)) {
         failures.push(`${sourceRelativePath}: 权限或授权跳转必须在已登录工作区显示可关闭通知：${requiredWorkspaceNoticeContract}`);
       }
@@ -283,10 +290,10 @@ inspectTypeScriptSources(files, (file, source) => {
   }
 
   if (sourceRelativePath === "main.tsx") {
-    for (const cssLayer of ["./styles/foundation.css", "./styles/workspaces.css", "./styles/responsive.css"]) {
+    for (const cssLayer of ["./styles/index.css"]) {
       if (!sourceText.includes(cssLayer)) failures.push(`${sourceRelativePath}: CSS 入口缺少分层加载：${cssLayer}`);
     }
-    if (sourceText.includes('import "./responsiveOverrides.css"')) failures.push(`${sourceRelativePath}: 响应式覆盖不应绕过最终 responsive 层`);
+    if (sourceText.includes('import "./styles/responsive/index.css"')) failures.push(`${sourceRelativePath}: 响应式覆盖不应绕过最终 responsive 层`);
   }
 
   if (sourceRelativePath === "app/WorkspaceShell.tsx") {
@@ -320,7 +327,7 @@ inspectTypeScriptSources(files, (file, source) => {
   }
 });
 
-const globalFoundationManifest = fs.readFileSync(path.join(root, "styles.css"), "utf8");
+const globalFoundationManifest = fs.readFileSync(path.join(root, "styles", "index.css"), "utf8");
 const globalWorkspaceManifest = fs.readFileSync(path.join(root, "styles", "workspaces.css"), "utf8");
 for (const routeOnlyStyle of [
   "single-window-core.css",
@@ -330,10 +337,10 @@ for (const routeOnlyStyle of [
   "container-packing.css",
 ]) {
   if (globalFoundationManifest.includes(routeOnlyStyle)) {
-    failures.push(`styles.css: 重型路由样式不得重新进入首屏清单：${routeOnlyStyle}`);
+    failures.push(`styles/index.css: 重型路由样式不得重新进入首屏清单：${routeOnlyStyle}`);
   }
 }
-if (globalWorkspaceManifest.includes("reportWorkspace.css")) {
+if (globalWorkspaceManifest.includes("styles/report/index.css")) {
   failures.push("styles/workspaces.css: 报表设计样式必须随 lazy route 加载");
 }
 for (const [sourceRelativePath, routeStyle] of [
@@ -350,12 +357,12 @@ for (const [sourceRelativePath, routeStyle] of [
   }
 }
 
-const responsiveCss = readCssImportGraph(path.join(root, "responsiveOverrides.css"));
-if (!/@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.field-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/u.test(responsiveCss)) {
-  failures.push("responsiveOverrides.css: 公共业务表单必须在 861—1180px 中等桌面宽度切换为双列");
+const responsiveCss = readCssImportGraph(path.join(root, "styles/responsive/index.css"));
+if (!/@media\s*\(min-width:\s*681px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.field-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/u.test(responsiveCss)) {
+  failures.push("styles/responsive/index.css: 公共业务表单必须在 681—1180px 中等桌面宽度切换为双列");
 }
-if (!/@media\s*\(min-width:\s*861px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.invoice-party-group-exporter\s+\.field-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/u.test(responsiveCss)) {
-  failures.push("responsiveOverrides.css: 并排的客户与出口商面板在中等宽度应保持双列字段，避免压缩长名称与地址");
+if (!/@media\s*\(min-width:\s*681px\)\s*and\s*\(max-width:\s*1180px\)[\s\S]*?\.invoice-party-group-exporter\s+\.field-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/u.test(responsiveCss)) {
+  failures.push("styles/responsive/index.css: 并排的客户与出口商面板在中等宽度应保持双列字段，避免压缩长名称与地址");
 }
 
 for (const scriptName of ["test_frontend_visual_baselines.mjs", "test_frontend_scale_contracts.mjs"]) {
@@ -368,7 +375,7 @@ for (const scriptName of ["test_frontend_visual_baselines.mjs", "test_frontend_s
   }
 }
 
-const themeCss = readCssImportGraph(path.join(root, "theme.css"));
+const themeCss = readCssImportGraph(path.join(root, "styles/theme/index.css")) + readCssImportGraph(path.join(root, "styles/index.css"));
 const queryPageSource = fs.readFileSync(path.join(root, "features", "query", "QueryPage.tsx"), "utf8");
 for (const queryLayoutContract of [
   "query-filter-stack",
@@ -394,10 +401,9 @@ if (remoteSelectCss.includes(".query-party-filter")) {
 }
 const auditQueryCss = fs.readFileSync(path.join(root, "styles", "audit-query.css"), "utf8");
 for (const queryBreakpoint of [
-  "@media (min-width: 1720px)",
+  "@media (min-width: 1181px)",
   "@media (max-width: 1180px)",
-  "@media (max-width: 860px)",
-  "@media (max-width: 620px)",
+  "@media (max-width: 680px)",
 ]) {
   if (!auditQueryCss.includes(queryBreakpoint)) {
     failures.push(`styles/audit-query.css: 单据查询筛选区缺少响应式断点 ${queryBreakpoint}`);
@@ -414,7 +420,7 @@ for (const queryGridContract of [
   }
 }
 const queryTabletBreakpointStart = auditQueryCss.indexOf("@media (max-width: 1180px)");
-const queryNarrowBreakpointStart = auditQueryCss.indexOf("@media (max-width: 860px)");
+const queryNarrowBreakpointStart = auditQueryCss.indexOf("@media (max-width: 680px)");
 const queryTabletCss = queryTabletBreakpointStart >= 0 && queryNarrowBreakpointStart > queryTabletBreakpointStart
   ? auditQueryCss.slice(queryTabletBreakpointStart, queryNarrowBreakpointStart)
   : "";
@@ -439,25 +445,25 @@ for (const sharedWorkspacePrimitive of [
   ".field-grid-span-2 {",
   ".textarea-field {",
   ".filter-bar {",
-  ".inline-filter {",
+  '[data-ui="field"] {',
   ".inline-check {",
   ".row-actions-cell {",
   ".detail-grid {",
   ".detail-item-wide {",
   ".detail-value-row {",
   ".detail-item-actions {",
-  ".workspace-modal-backdrop {",
-  ".workspace-modal-dialog {",
-  ".workspace-modal-header {",
-  ".workspace-modal-footer {",
+  '[data-ui="dialog-backdrop"] {',
+  '[data-ui="dialog"] {',
+  '[data-ui="dialog-header"] {',
+  '[data-ui="dialog-footer"] {',
 ]) {
   if (!themeCss.includes(sharedWorkspacePrimitive)) {
-    failures.push(`theme.css: 公共工作区原语不能依赖报表或单一窗口 lazy route 样式：${sharedWorkspacePrimitive}`);
+    failures.push(`styles/theme/index.css: 公共工作区原语不能依赖报表或单一窗口 lazy route 样式：${sharedWorkspacePrimitive}`);
   }
 }
-const settingsPageSource = fs.readFileSync(path.join(root, "features", "settings", "SettingsPage.tsx"), "utf8");
+const settingsPageSource = fs.readFileSync(path.join(root, "features", "settings", "SystemMaintenancePage.tsx"), "utf8");
 if (!settingsPageSource.includes('import "../../styles/runtime-diagnostics.css"')) {
-  failures.push("features/settings/SettingsPage.tsx: 运行诊断样式必须随设置路由加载，不能依赖 Single Window 或进入首屏 CSS");
+  failures.push("features/settings/SystemMaintenancePage.tsx: 运行诊断样式必须随维护路由加载，不能依赖 Single Window 或进入首屏 CSS");
 }
 const runtimeDiagnosticsCss = fs.readFileSync(path.join(root, "styles", "runtime-diagnostics.css"), "utf8");
 for (const settingsRuntimeStyle of [
@@ -471,11 +477,11 @@ for (const settingsRuntimeStyle of [
     failures.push(`runtime-diagnostics.css: 设置页运行诊断缺少独立样式 ${settingsRuntimeStyle}`);
   }
 }
-const globalFoundationCss = readCssImportGraph(path.join(root, "styles.css"));
-if (!globalFoundationCss.includes(".job-title-cell {")) {
-  failures.push("styles.css: 任务中心标题布局不能依赖装柜 lazy route");
+const jobStyles = readCssImportGraph(path.join(root, "styles", "jobs-excel.css"));
+if (!jobStyles.includes(".job-title-cell {")) {
+  failures.push("styles/jobs-excel.css: 任务中心标题布局必须由自己的路由加载");
 }
-const globalBusinessCss = readCssImportGraph(path.join(root, "businessFeatures.css"));
+const globalBusinessCss = readCssImportGraph(path.join(root, "styles/business/index.css"));
 for (const globalBusinessStyle of [
   ".invoice-single-window-action-buttons {",
   ".review-severity {",
@@ -484,11 +490,11 @@ for (const globalBusinessStyle of [
   ".review-severity-info {",
 ]) {
   if (!globalBusinessCss.includes(globalBusinessStyle)) {
-    failures.push(`businessFeatures.css: 发票与审核公共样式不能依赖单一窗口 lazy route：${globalBusinessStyle}`);
+    failures.push(`styles/business/index.css: 发票与审核公共样式不能依赖单一窗口 lazy route：${globalBusinessStyle}`);
   }
 }
 const invoicePartiesCss = readCssImportGraph(path.join(root, "styles", "business", "invoice-parties.css"));
-if (!/@media\s*\(max-width:\s*860px\)[\s\S]*?\.invoice-party-group\s+\.field-grid\s*\{[\s\S]*?grid-template-columns:\s*1fr/u.test(invoicePartiesCss)) {
+if (!/@media\s*\(max-width:\s*680px\)[\s\S]*?\.invoice-party-group\s+\.field-grid\s*\{[\s\S]*?grid-template-columns:\s*1fr/u.test(invoicePartiesCss)) {
   failures.push("invoice-parties.css: 客户与出口商的字段布局必须在窄窗口退化为单列");
 }
 for (const [routeCssPath, forbiddenSharedDefinitions] of [
@@ -506,13 +512,14 @@ for (const [routeCssPath, forbiddenSharedDefinitions] of [
     }
   }
 }
+const primitiveControlsCss = readCssImportGraph(path.join(root, "styles", "primitives", "controls.css"));
 for (const sharedDangerActionContract of [
-  ".command-button.danger-command",
-  ".command-button.danger-command:hover:not(:disabled)",
-  ".command-button.danger-command:disabled",
+  ".command-button.danger",
+  ".command-button.danger:hover:not(:disabled)",
+  ".command-button:disabled",
 ]) {
-  if (!themeCss.includes(sharedDangerActionContract)) {
-    failures.push(`theme.css: 维护与恢复页面的危险操作样式不能依赖报表 lazy route：${sharedDangerActionContract}`);
+  if (!primitiveControlsCss.includes(sharedDangerActionContract)) {
+    failures.push(`styles/theme/index.css: 维护与恢复页面的危险操作样式不能依赖报表 lazy route：${sharedDangerActionContract}`);
   }
 }
 for (const saveActionContract of [
@@ -520,23 +527,23 @@ for (const saveActionContract of [
   ".document-editor-sticky-actions .command-button:disabled",
 ]) {
   if (!themeCss.includes(saveActionContract)) {
-    failures.push(`theme.css: 发票顶部保存操作缺少清晰的状态文字或禁用按钮对比度契约 ${saveActionContract}`);
+    failures.push(`styles/theme/index.css: 发票顶部保存操作缺少清晰的状态文字或禁用按钮对比度契约 ${saveActionContract}`);
   }
 }
 if (themeCss.includes(".document-editor-sticky-actions span {")) {
-  failures.push("theme.css: 发票保存区状态文字选择器不得覆盖按钮组件内部文字");
+  failures.push("styles/theme/index.css: 发票保存区状态文字选择器不得覆盖按钮组件内部文字");
 }
-const hsKnowledgeCss = fs.readFileSync(path.join(root, "features", "master-data", "hsKnowledge.css"), "utf8");
-if (!hsKnowledgeCss.includes("background: var(--input-background, var(--edm-white))")) {
+const hsKnowledgeCss = fs.readFileSync(path.join(root, "styles", "features", "hs-knowledge.css"), "utf8");
+if (!hsKnowledgeCss.includes("background: var(--edm-bg-surface, var(--edm-white))")) {
   failures.push("hsKnowledge.css: 智能 HS 查询输入框必须有稳定的非透明背景回退");
 }
 for (const reducedMotionContract of [
   "@media (prefers-reduced-motion: reduce)",
-  "animation-duration: 0.01ms !important",
-  "animation-iteration-count: 1 !important",
+  "animation-duration: 0.01ms",
+  "animation-iteration-count: 1",
 ]) {
   if (!themeCss.includes(reducedMotionContract)) {
-    failures.push(`theme.css: 减少动态模式缺少 ${reducedMotionContract}`);
+    failures.push(`styles/theme/index.css: 减少动态模式缺少 ${reducedMotionContract}`);
   }
 }
 
@@ -560,12 +567,4 @@ function readCssImportGraph(entryPath, visited = new Set()) {
     .join("\n");
 
   return `${importedCss}\n${css}`;
-}
-
-function* walk(directory) {
-  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    const fullPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) yield* walk(fullPath);
-    else yield fullPath;
-  }
 }

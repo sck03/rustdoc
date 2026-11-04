@@ -55,6 +55,7 @@ pub(crate) fn build(q: &PersonnelQuery<'_>, pg: bool) -> Result<(QuerySql, Strin
     }
     Ok((
         QuerySql {
+            source: crate::query_source::Source::Projected,
             filter: clauses.join(" AND "),
             order: if pg {
                 "r.identity COLLATE \"C\" ASC, r.id ASC"

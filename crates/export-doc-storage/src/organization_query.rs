@@ -17,6 +17,7 @@ pub(crate) fn build(
 ) -> QuerySql {
     if kinds.is_empty() {
         return QuerySql {
+            source: crate::query_source::Source::Projected,
             filter: "1=0".into(),
             order: "r.id ASC".into(),
             values: vec![],
@@ -48,6 +49,7 @@ pub(crate) fn build(
         }
     };
     QuerySql {
+        source: crate::query_source::Source::Projected,
         filter: format!("r.kind IN ({kinds}) AND r.id<>CAST({excluded} AS BIGINT) AND {fields}"),
         order: "r.id ASC".into(),
         values,

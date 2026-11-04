@@ -98,13 +98,7 @@ pub(super) fn projected(mut value: Value) -> Value {
 }
 
 fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
-    let read = |key: &str| {
-        query
-            .iter()
-            .find(|(name, _)| *name == key)
-            .map(|(_, value)| value.as_str())
-            .unwrap_or("")
-    };
+    let read = |key: &str| crate::engine::request_values::find(query, key).unwrap_or("");
     let stage = read("stage").trim();
     if !stage.is_empty() && !sales::STAGES.contains(&stage) {
         return Err(invalid("商机阶段无效。"));

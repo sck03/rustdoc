@@ -280,10 +280,8 @@ pub(in crate::engine) fn owned_counts(tx: &Connection, user: i64) -> Result<[i64
             },
             filters: &[("ownerUserId", user.to_string())],
             fields: &[("id", "id")],
-            keyword: "",
-            search_root: None,
-            offset: 0,
             limit: 1,
+            ..Default::default()
         })?;
         counts[match kind {
             INVOICE_KIND => 0,

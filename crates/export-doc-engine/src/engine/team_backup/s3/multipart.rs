@@ -114,7 +114,7 @@ impl Target {
             Ok(())
         })();
         if result.is_err() {
-            let cleanup = crate::operation::OperationScope::new(CONTROL_TIMEOUT).run(|| {
+            let cleanup = crate::operation::OperationScope::detached(CONTROL_TIMEOUT).run(|| {
                 let agent = export_doc_network::storage_agent(
                     CONTROL_TIMEOUT,
                     crate::operation::cancellation_flag(),

@@ -19,13 +19,7 @@ pub(super) fn list_with(
 ) -> Result<Value> {
     let resource = text(meta, "resource");
     auth::authorize(actor, &resource, "view")?;
-    let get = |name| {
-        query
-            .iter()
-            .find(|(k, _)| *k == name)
-            .map(|(_, v)| v.as_str())
-            .unwrap_or("")
-    };
+    let get = |name| crate::engine::request_values::find(query, name).unwrap_or("");
     let handling = match get("handlingOnly") {
         "" | "false" => false,
         "true" if meta["kind"] != "expense" => true,

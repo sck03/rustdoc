@@ -28,7 +28,7 @@ async function click(text, scope = "document") {
   await wait(`(() => {const button=${target}; if(!button) return false; button.click(); return true;})()`, `Control not ready: ${text}`);
 }
 async function fill(label, value) {
-  const field = `(() => {const label=[...document.querySelectorAll('label')].find(e=>(e.querySelector('span')?.textContent ?? [...e.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join('')).trim()===${JSON.stringify(label)}); return label?.control ?? label?.querySelector('input,textarea,select');})()`;
+  const field = `(() => {const label=[...document.querySelectorAll('label')].find(e=>{const title=e.querySelector('span')?.cloneNode(true);title?.querySelectorAll('[aria-hidden="true"]').forEach(node=>node.remove());return (title?.textContent ?? [...e.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join('')).trim()===${JSON.stringify(label)};}); return label?.control ?? label?.querySelector('input,textarea,select');})()`;
   await wait(`${field}?.getClientRects().length`, `Field not ready: ${label}`);
   await run(`(() => {const input=${field}; Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input),'value').set.call(input,${JSON.stringify(value)}); input.dispatchEvent(new Event('input',{bubbles:true})); input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
 }
@@ -87,7 +87,9 @@ try {
   await exerciseOfficeResources({ url, page, output, run, wait, click, fill, navigate, captureScreenshot, approveResource });
   await navigate(`${url}/#/office/approvals`);
   await wait("document.querySelector('[aria-label=\"申请与审批中心\"]')", "Approval hub missing");
-  assert(await run("document.body.innerText.includes('人员与组织') && document.body.innerText.includes('申请与资源')"), "Separated navigation groups are visible");
+  const groups = await run("[...document.querySelectorAll('.nav-group-button')].map(button=>button.textContent.trim())");
+  assert.equal(groups.length, 6, "The approved six navigation groups remain visible");
+  assert(groups.includes('行政与人事') && !groups.includes('申请与资源'), "Resource pages belong to the shared office group");
   await captureScreenshot(page, path.join(output, "approval-center.png"));
   const receipt = path.join(output, "receipt.pdf");
   const supporting = path.join(output, "supporting.pdf");

@@ -60,6 +60,7 @@ pub(crate) fn build(q: &RelatedQuery<'_>, pg: bool) -> Result<(QuerySql, String)
     }), pg)?;
     Ok((
         QuerySql {
+            source: crate::query_source::Source::Records,
             filter,
             order,
             values,

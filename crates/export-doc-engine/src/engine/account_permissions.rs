@@ -2,7 +2,22 @@
 use super::error::{Result, invalid, unavailable};
 use crate::engine::store::Connection;
 use export_doc_domain::permissions::{self, Grant};
+use serde::Deserialize;
 use serde_json::{Value, json};
+
+/// Internal projection of a saved permission source; not a second wire contract.
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct Selection {
+    role: String,
+    permission_template_id: Option<i64>,
+    permission_scheme_version: Option<i64>,
+    permission_grants: Option<Vec<Grant>>,
+    grants: Option<Vec<Grant>>,
+    disabled_modules: Vec<String>,
+    oa_assigned_only: bool,
+    is_active: bool,
+}
 
 pub(super) fn validate_references(
     connection: &Connection,
@@ -13,15 +28,18 @@ pub(super) fn validate_references(
 }
 
 pub fn template(connection: &Connection, user: &Value) -> Result<Option<Value>> {
-    if user["role"] == "Admin" || !user["permissionGrants"].is_null() {
+    selected_template(connection, &Selection::deserialize(user)?)
+}
+fn selected_template(connection: &Connection, source: &Selection) -> Result<Option<Value>> {
+    if source.role == "Admin" || source.permission_grants.is_some() {
         return Ok(None);
     }
-    let id = user["permissionTemplateId"]
-        .as_i64()
+    let id = source
+        .permission_template_id
         .filter(|id| *id > 0)
         .ok_or_else(|| unavailable("身份缺少明确的权限方案或独立权限配置。"))?;
-    let version = user["permissionSchemeVersion"]
-        .as_i64()
+    let version = source
+        .permission_scheme_version
         .filter(|v| *v > 0)
         .ok_or_else(|| unavailable("身份缺少明确的已发布权限版本。"))?;
     Ok(Some(
@@ -40,40 +58,55 @@ pub(super) struct Profile {
 
 /// Account and unit identities resolve exactly one source, then apply restrictions.
 pub(super) fn profile(connection: &Connection, identity: &Value) -> Result<Profile> {
-    let template = template(connection, identity)?;
+    let source = Selection::deserialize(identity)?;
+    let template = selected_template(connection, &source)?;
+    let template = template.as_ref().map(Selection::deserialize).transpose()?;
     let direct = if let Some(template) = &template {
-        if template["isActive"] == true {
-            super::permission_templates::direct_grants(template)?
+        if template.is_active {
+            template
+                .grants
+                .clone()
+                .ok_or_else(|| unavailable("权限方案缺少授权列表。"))?
         } else {
             vec![]
         }
     } else {
-        serde_json::from_value(identity["permissionGrants"].clone())?
+        source
+            .permission_grants
+            .ok_or_else(|| unavailable("身份缺少独立权限列表。"))?
     };
-    let mut disabled = modules(identity)?;
+    let mut disabled = source.disabled_modules;
     if let Some(template) = &template {
-        disabled.extend(modules(template)?);
+        disabled.extend(template.disabled_modules.iter().cloned());
     }
     Ok(Profile {
         direct,
         disabled,
-        assigned_only: identity["oaAssignedOnly"] == true
-            || template.is_some_and(|t| t["oaAssignedOnly"] == true),
+        assigned_only: source.oa_assigned_only || template.is_some_and(|t| t.oa_assigned_only),
     })
 }
 
-pub fn grants(connection: &Connection, user: &Value) -> Result<Vec<Grant>> {
+pub fn resolve(connection: &Connection, user: &Value) -> Result<(Vec<Grant>, bool)> {
     if user["role"] == "Admin" {
-        return permissions::role_grants("Admin").map_err(unavailable);
+        return Ok((
+            permissions::role_grants("Admin").map_err(unavailable)?,
+            false,
+        ));
     }
     let profile = profile(connection, user)?;
-    permissions::profile::resolve(&profile.direct, &profile.disabled).map_err(unavailable)
+    Ok((
+        permissions::profile::resolve(&profile.direct, &profile.disabled).map_err(unavailable)?,
+        profile.assigned_only,
+    ))
 }
 
 pub(super) fn modules(value: &Value) -> Result<Vec<String>> {
-    Ok(serde_json::from_value(
-        value.get("disabledModules").cloned().unwrap_or(json!([])),
-    )?)
+    value
+        .get("disabledModules")
+        .map(Vec::deserialize)
+        .transpose()
+        .map(Option::unwrap_or_default)
+        .map_err(Into::into)
 }
 
 pub(super) fn source(
@@ -159,14 +192,6 @@ pub(super) fn source(
         "accountDisabledModules":names(modules(user)?),"identityDisabledModules":names(if role.is_some() {modules(identity)?} else {vec![]}),"schemeDisabledModules":names(scheme.as_ref().map(modules).transpose()?.unwrap_or_default()),"authorityDisabledModules":names(authority_modules),"operations":operations,
         "startsAt":super::records::text(identity,"startsAt"),"endsAt":super::records::text(identity,"endsAt"),"oaAssignedOnly":actor.oa_assigned_only}),
     )
-}
-
-pub fn assigned_only(connection: &Connection, user: &Value) -> Result<bool> {
-    if user["role"] == "Admin" {
-        return Ok(false);
-    }
-    Ok(user["oaAssignedOnly"] == true
-        || template(connection, user)?.is_some_and(|template| template["oaAssignedOnly"] == true))
 }
 
 pub fn validate(value: &mut Value) -> Result<()> {

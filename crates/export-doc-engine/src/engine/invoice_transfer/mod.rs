@@ -29,9 +29,7 @@ pub const UPLOADS: &[Operation] = &[
     IMPORT_UPLOADED_INVOICE_TRANSFER_PACKAGE,
 ];
 const POLICY: &str = "单据包保留业务内容，导入按当前账号的数据范围和权限保存。";
-fn text(v: &Value, key: &str) -> String {
-    records::text(v, key)
-}
+use super::records::text;
 fn clean(schema: &str, value: Value) -> Value {
     let mut result = contracts::dto(contracts::schema(schema), value);
     if let Some(fields) = result.as_object_mut() {

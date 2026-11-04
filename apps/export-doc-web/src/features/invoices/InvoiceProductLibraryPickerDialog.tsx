@@ -1,10 +1,10 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
-import { PackagePlus, PackageSearch, RefreshCw, Search, X } from "lucide-react";
+import { PackagePlus, RefreshCw, Search } from "lucide-react";
 import type { ApiProductDto } from "../../api/index.ts";
 import { formatPlainNumber, normalizeText, numberValue } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
-import { useModalDialog } from "../../ui/useModalDialog.ts";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import { Dialog } from "../../ui/primitives/Dialog.tsx";
 
 export function ProductLibraryPickerDialog({
   focusedRowIndex,
@@ -42,10 +42,6 @@ export function ProductLibraryPickerDialog({
   onPageSizeChange: (pageSize: number) => void;
 }) {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
-  const dialogRef = useModalDialog<HTMLDivElement>(onClose, {
-    canClose: !isBusy,
-    initialFocusRef: searchInputRef,
-  });
   const [keyword, setKeyword] = useState(initialKeyword);
   const [selectedProductId, setSelectedProductId] = useState(() => products[0]?.id ?? 0);
   const displayedProducts = products;
@@ -86,23 +82,8 @@ export function ProductLibraryPickerDialog({
   }
 
   return (
-    <div className="workspace-modal-backdrop" onMouseDown={(event) => {
-      if (event.target === event.currentTarget && !isBusy) {
-        onClose();
-      }
-    }}>
-      <div ref={dialogRef} className="workspace-modal-dialog product-library-dialog" role="dialog" aria-modal="true" aria-labelledby="product-library-picker-title">
-        <div className="workspace-modal-header">
-          <div className="workspace-modal-title">
-            <PackageSearch size={18} aria-hidden="true" />
-            <h2 id="product-library-picker-title">商品库选择</h2>
-            <span>{totalCount} 条</span>
-          </div>
-          <button className="icon-button compact-icon-button" type="button" title="关闭" aria-label="关闭商品库选择" onClick={onClose}>
-            <X size={16} aria-hidden="true" />
-          </button>
-        </div>
-
+    <Dialog title="商品库选择" description={`共 ${totalCount} 条商品`} size="full" busy={isBusy} onClose={onClose} closeLabel="关闭商品库选择" initialFocusRef={searchInputRef}>
+      <div className="product-library-dialog">
         <form className="product-library-toolbar" aria-label="商品库选择搜索栏" onSubmit={submitSearch}>
           <label className="product-library-search">
             <span>搜索</span>
@@ -184,9 +165,9 @@ export function ProductLibraryPickerDialog({
             </tbody>
           </table>
         </ResponsiveTableFrame>
-        <ListPaginationControls pageNumber={pageNumber} totalPages={totalPages} totalCount={totalCount} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={isBusy} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
+        <Pagination pageNumber={pageNumber} totalPages={totalPages} totalCount={totalCount} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={isBusy} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
 
-        <div className="workspace-modal-footer">
+        <div data-ui="dialog-footer">
           <span className="product-library-selection">{selectedProduct ? formatProductOptionLabel(selectedProduct) : "未选择商品"}</span>
           <button className="command-button secondary" type="button" onClick={onClose}>
             取消
@@ -197,7 +178,7 @@ export function ProductLibraryPickerDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

@@ -1,92 +1,15 @@
-import { useId, useRef, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { AlertTriangle, X } from "lucide-react";
-import { Button, IconButton } from "./Button.tsx";
-import { useModalDialog } from "./useModalDialog.ts";
+import { useRef, type ReactNode } from "react";
+import { Button } from "./Button.tsx";
+import { Dialog } from "./primitives/Dialog.tsx";
 
-export function ConfirmationDialog({
-  title,
-  description,
-  details,
-  confirmLabel,
-  isBusy = false,
-  tone = "danger",
-  onCancel,
-  onConfirm,
-  children,
-  confirmDisabled = false,
-}: {
-  title: string;
-  description: string;
-  details?: string[];
-  confirmLabel: string;
-  isBusy?: boolean;
-  tone?: "danger" | "warning";
-  onCancel: () => void;
-  onConfirm: () => void;
-  children?: ReactNode;
-  confirmDisabled?: boolean;
+export function ConfirmationDialog({ title, description, details, confirmLabel, isBusy = false, tone = "danger", onCancel, onConfirm, children, confirmDisabled = false }: {
+  title: string; description: string; details?: string[]; confirmLabel: string; isBusy?: boolean; tone?: "danger" | "warning";
+  onCancel: () => void; onConfirm: () => void; children?: ReactNode; confirmDisabled?: boolean;
 }) {
-  const titleId = useId();
-  const descriptionId = useId();
-  const cancelButtonRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useModalDialog<HTMLDivElement>(onCancel, {
-    canClose: !isBusy,
-    initialFocusRef: cancelButtonRef,
-  });
-
-  return createPortal(
-    <div
-      className="confirmation-dialog-backdrop"
-      role="presentation"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !isBusy) {
-          onCancel();
-        }
-      }}
-    >
-      <div
-        ref={dialogRef}
-        className={`confirmation-dialog confirmation-dialog-${tone}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        aria-describedby={descriptionId}
-      >
-        <header className="confirmation-dialog-header">
-          <span className="confirmation-dialog-icon" aria-hidden="true">
-            <AlertTriangle size={20} />
-          </span>
-          <div>
-            <h2 id={titleId}>{title}</h2>
-            <p id={descriptionId}>{description}</p>
-          </div>
-          <IconButton label="关闭确认窗口" disabled={isBusy} onClick={onCancel}>
-            <X size={18} aria-hidden="true" />
-          </IconButton>
-        </header>
-
-        {details?.length ? (
-          <div className="confirmation-dialog-details">
-            {details.map((detail) => (
-              <div key={detail}>{detail}</div>
-            ))}
-          </div>
-        ) : null}
-
-        {children}
-        <footer className="confirmation-dialog-footer">
-          <Button ref={cancelButtonRef} variant="secondary" disabled={isBusy} onClick={onCancel}>取消</Button>
-          <Button
-            variant="primary"
-            className="confirmation-dialog-confirm"
-            disabled={isBusy || confirmDisabled}
-            onClick={onConfirm}
-          >
-            {isBusy ? "处理中…" : confirmLabel}
-          </Button>
-        </footer>
-      </div>
-    </div>, document.body
-  );
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  return <Dialog title={title} description={description} onClose={onCancel} closeLabel="取消确认" purpose="confirmation" busy={isBusy} size="small" initialFocusRef={cancelRef}
+    footer={<><Button ref={cancelRef} variant="secondary" disabled={isBusy} onClick={onCancel}>取消</Button>
+      <Button data-dialog-action="confirm" variant={tone === "danger" ? "danger" : "primary"} disabled={isBusy || confirmDisabled} onClick={onConfirm}>{isBusy ? "处理中…" : confirmLabel}</Button></>}>
+    {details?.length ? <ul>{details.map(detail => <li key={detail}>{detail}</li>)}</ul> : null}{children}
+  </Dialog>;
 }

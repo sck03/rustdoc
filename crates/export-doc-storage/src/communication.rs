@@ -177,6 +177,7 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
         }
     };
     QuerySql {
+        source: crate::query_source::Source::Projected,
         filter,
         order: order.into(),
         values,

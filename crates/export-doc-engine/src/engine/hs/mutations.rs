@@ -11,8 +11,6 @@ pub(super) fn preview_obsolete(tx: &Connection) -> Result<Value> {
             ..Default::default()
         },
         filters: &[("status", "SuspectedObsolete".into())],
-        keyword: "",
-        search_root: None,
         fields: &[
             ("id", "id"),
             ("code", "code"),
@@ -21,8 +19,8 @@ pub(super) fn preview_obsolete(tx: &Connection) -> Result<Value> {
             ("rowVersion", "rowVersion"),
             ("updateTime", "updateTime"),
         ],
-        offset: 0,
         limit: MAX_BATCH as i64,
+        ..Default::default()
     })?;
     for item in &items {
         if item["id"].as_i64().is_none_or(|id| id <= 0) || store::expected(item) <= 0 {

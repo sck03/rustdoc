@@ -473,11 +473,9 @@ fn has_reference(connection: &Connection, kind: &str, field: &str, id: i64) -> R
                 ..Default::default()
             },
             filters: &[(field, id.to_string())],
-            keyword: "",
-            search_root: None,
             fields: &[("id", "id")],
-            offset: 0,
             limit: 1,
+            ..Default::default()
         })?
         .0
         > 0)

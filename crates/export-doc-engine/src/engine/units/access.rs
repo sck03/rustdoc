@@ -8,7 +8,7 @@ pub(in crate::engine) fn directory(
 ) -> Result<Value> {
     store.read(|tx| {
         let actor = auth::refresh_actor_in(tx,actor)?;
-        let target = query.iter().find(|(k,_)| *k == "companyCode").map(|(_,v)| v.as_str()).unwrap_or(&actor.company);
+        let target = crate::engine::request_values::find(query, "companyCode").unwrap_or(&actor.company);
         demand(&actor,target,"organization.roles")?;
         let unit_record=company(tx,target)?;
         let mut items = store::matching(tx,KIND,&[("companyCode",target.into())],&[])?;

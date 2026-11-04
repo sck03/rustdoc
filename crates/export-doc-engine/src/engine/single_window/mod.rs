@@ -93,11 +93,7 @@ pub fn upload(
 }
 pub const BATCHES: &str = "sw-batches";
 pub fn parameter<'a>(values: &'a [(&str, String)], key: &str) -> &'a str {
-    values
-        .iter()
-        .find(|(k, _)| *k == key)
-        .map(|(_, v)| v.as_str())
-        .unwrap_or("")
+    crate::engine::request_values::find(values, key).unwrap_or("")
 }
 pub fn source(tx: &Connection, actor: &Actor, id: i64, action: &str) -> Result<Value> {
     let invoice = store::get(tx, "invoices", id)?;

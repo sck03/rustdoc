@@ -34,29 +34,6 @@ pub(crate) fn select_disaster_recovery_package_file() -> Result<Option<String>, 
 }
 
 #[tauri::command]
-pub(crate) fn select_receipt_file() -> Result<Option<String>, String> {
-    Ok(pick_file(
-        "选择单一窗口回执文件",
-        &[("回执文件", &["xml", "acd"]), ("全部文件", &["*"])],
-    ))
-}
-
-#[tauri::command]
-pub(crate) fn select_receipt_files() -> Result<Vec<String>, String> {
-    let paths = rfd::FileDialog::new()
-        .set_title("选择单一窗口回执文件")
-        .add_filter("回执文件", &["xml", "acd"])
-        .add_filter("全部文件", &["*"])
-        .pick_files()
-        .unwrap_or_default()
-        .into_iter()
-        .map(path_to_string)
-        .collect();
-
-    Ok(paths)
-}
-
-#[tauri::command]
 pub(crate) fn select_pdf_files() -> Result<Vec<String>, String> {
     let paths = rfd::FileDialog::new()
         .set_title("选择 PDF 文件")
@@ -201,102 +178,28 @@ pub(crate) fn select_report_template_file() -> Result<Option<String>, String> {
     ))
 }
 
-#[tauri::command]
-pub(crate) fn select_save_package_path(
-    default_file_name: Option<String>,
-    default_directory: Option<String>,
-) -> Result<Option<String>, String> {
-    Ok(save_file(
-        "选择单一窗口交换包保存位置",
-        "单一窗口交换包",
-        &["swpkg"],
-        default_file_name,
-        default_directory,
-    ))
+// Command declarations share the host adapter; filters remain explicit per operation.
+macro_rules! save_commands {
+    ($($name:ident => ($title:literal, $label:literal, $extensions:expr)),+ $(,)?) => {
+        $(
+            #[tauri::command]
+            pub(crate) fn $name(
+                default_file_name: Option<String>,
+                default_directory: Option<String>,
+            ) -> Result<Option<String>, String> {
+                Ok(save_file($title, $label, $extensions, default_file_name, default_directory))
+            }
+        )+
+    };
 }
-
-#[tauri::command]
-pub(crate) fn select_save_invoice_transfer_package_path(
-    default_file_name: Option<String>,
-    default_directory: Option<String>,
-) -> Result<Option<String>, String> {
-    Ok(save_file(
-        "选择发票单据包保存位置",
-        "发票单据包",
-        &["edpkg"],
-        default_file_name,
-        default_directory,
-    ))
-}
-
-#[tauri::command]
-pub(crate) fn select_save_report_template_package_path(
-    default_file_name: Option<String>,
-    default_directory: Option<String>,
-) -> Result<Option<String>, String> {
-    Ok(save_file(
-        "选择报表模板包保存位置",
-        "报表模板包",
-        &["edtpl", "zip"],
-        default_file_name,
-        default_directory,
-    ))
-}
-
-#[tauri::command]
-pub(crate) fn select_save_report_template_file_path(
-    default_file_name: Option<String>,
-    default_directory: Option<String>,
-) -> Result<Option<String>, String> {
-    Ok(save_file(
-        "选择报表模板文件保存位置",
-        "V3 报表模板",
-        &["dtpl"],
-        default_file_name,
-        default_directory,
-    ))
-}
-
-#[tauri::command]
-pub(crate) fn select_save_pdf_path(
-    default_file_name: Option<String>,
-    default_directory: Option<String>,
-) -> Result<Option<String>, String> {
-    Ok(save_file(
-        "选择 PDF 保存位置",
-        "PDF 文件",
-        &["pdf"],
-        default_file_name,
-        default_directory,
-    ))
-}
-
-#[tauri::command]
-pub(crate) fn select_save_zip_path(
-    default_file_name: Option<String>,
-    default_directory: Option<String>,
-) -> Result<Option<String>, String> {
-    Ok(save_file(
-        "选择 ZIP 保存位置",
-        "ZIP 文件",
-        &["zip"],
-        default_file_name,
-        default_directory,
-    ))
-}
-
-#[tauri::command]
-pub(crate) fn select_save_excel_path(
-    default_file_name: Option<String>,
-    default_directory: Option<String>,
-) -> Result<Option<String>, String> {
-    Ok(save_file(
-        "选择 Excel 保存位置",
-        "Excel 文件",
-        &["xlsx"],
-        default_file_name,
-        default_directory,
-    ))
+save_commands! {
+    select_save_package_path => ("选择单一窗口交换包保存位置", "单一窗口交换包", &["swpkg"]),
+    select_save_invoice_transfer_package_path => ("选择发票单据包保存位置", "发票单据包", &["edpkg"]),
+    select_save_report_template_package_path => ("选择报表模板包保存位置", "报表模板包", &["edtpl", "zip"]),
+    select_save_report_template_file_path => ("选择报表模板文件保存位置", "V3 报表模板", &["dtpl"]),
+    select_save_pdf_path => ("选择 PDF 保存位置", "PDF 文件", &["pdf"]),
+    select_save_zip_path => ("选择 ZIP 保存位置", "ZIP 文件", &["zip"]),
+    select_save_excel_path => ("选择 Excel 保存位置", "Excel 文件", &["xlsx"]),
 }
 
 #[tauri::command]

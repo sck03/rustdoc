@@ -1,6 +1,5 @@
 #![cfg(feature = "mail")]
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod native_fixture;
 #[path = "support/smtp.rs"]
 mod smtp;
@@ -9,7 +8,7 @@ use export_doc_engine::{generated_api::*, invoice::InvoiceDraft};
 pub mod jobs;
 use export_doc_report::Builtin;
 use serde_json::{Value, json};
-use std::{fs, path::PathBuf, sync::atomic::AtomicBool};
+use std::{fs, io::Read, path::PathBuf, sync::atomic::AtomicBool};
 
 fn provision_font(fixture: &native_fixture::Fixture) {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -116,12 +115,6 @@ fn document_packages_preview_export_and_email_share_template_rendering() {
             .status,
         Some(400)
     );
-    let package_pdf = fixture
-        .client()
-        .preview_document_package_pdf(invoice_id, &json!({"items": items.clone()}))
-        .unwrap();
-    assert!(package_pdf.starts_with(b"%PDF-"));
-
     let download = start_job(
         &fixture,
         START_INVOICE_DOCUMENT_PACKAGE_DOWNLOAD_JOB,
@@ -142,6 +135,14 @@ fn document_packages_preview_export_and_email_share_template_rendering() {
         )
         .unwrap();
     assert!(archive.starts_with(b"PK"));
+    let mut package = zip::ZipArchive::new(std::io::Cursor::new(&archive)).unwrap();
+    let mut signature = [0; 5];
+    package
+        .by_name("合并单据.pdf")
+        .unwrap()
+        .read_exact(&mut signature)
+        .unwrap();
+    assert_eq!(&signature, b"%PDF-");
 
     let folder = fixture.root.join("package-folder");
     fs::create_dir_all(&folder).unwrap();

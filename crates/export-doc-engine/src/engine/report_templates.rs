@@ -46,11 +46,7 @@ pub fn report_type(value: &str) -> Result<&'static str> {
     }
 }
 fn query<'a>(values: &'a [(&str, String)], name: &str) -> &'a str {
-    values
-        .iter()
-        .find(|(key, _)| *key == name)
-        .map(|(_, value)| value.as_str())
-        .unwrap_or("")
+    crate::engine::request_values::find(values, name).unwrap_or("")
 }
 pub(super) fn demand_type(actor: &Actor, kind: &str) -> Result<()> {
     auth::authorize(

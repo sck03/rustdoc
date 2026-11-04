@@ -7,12 +7,12 @@
   color: var(--edm-neutral-750);
   background: var(--edm-white);
   border: 1px solid var(--edm-neutral-300);
-  border-radius: 8px;
-  font-size: .8125rem;
+  border-radius: var(--edm-radius-md);
+  font-size: var(--edm-font-size-sm);
   line-height: 1.6;
 }
 .report-designer-v3-quick-start summary { cursor: pointer; font-weight: 700; }
-.report-designer-v3-quick-start ol { margin: 6px 0; padding-left: 24px; }
+.report-designer-v3-quick-start ol { margin: 8px 0; padding-left: 24px; }
 .report-designer-v3-tool-button[aria-pressed="true"] {
   color: var(--edm-primary-850);
   background: var(--edm-primary-75);
@@ -34,17 +34,17 @@
   .report-designer-v3-inspector { grid-column: 1 / -1; max-height: none; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 1180px) {
   .report-designer-v3-compact-tabs {
     display: flex;
-    gap: 6px;
+    gap: 8px;
     margin: 8px 0;
   }
   .report-designer-v3-compact-tabs button {
     flex: 1;
     min-height: 40px;
     border: 1px solid var(--edm-neutral-300);
-    border-radius: 6px;
+    border-radius: var(--edm-radius-sm);
     color: var(--edm-neutral-750);
     background: var(--edm-white);
   }
@@ -53,11 +53,11 @@
     background: var(--edm-primary-650);
   }
   .report-designer-v3-workspace[data-compact-panel="canvas"] .report-designer-v3-sidebar,
-  .report-designer-v3-workspace[data-compact-panel="canvas"] .report-designer-v3-inspector,
-  .report-designer-v3-workspace[data-compact-panel="resources"] .report-designer-v3-inspector,
-  .report-designer-v3-workspace[data-compact-panel="resources"] .report-designer-v3-layout:not(.is-read-only) .report-designer-v3-canvas-column,
-  .report-designer-v3-workspace[data-compact-panel="properties"] .report-designer-v3-sidebar,
-  .report-designer-v3-workspace[data-compact-panel="properties"] .report-designer-v3-layout:not(.is-read-only) .report-designer-v3-canvas-column { display: none; }
+.report-designer-v3-workspace[data-compact-panel="canvas"] .report-designer-v3-inspector,
+.report-designer-v3-workspace[data-compact-panel="resources"] .report-designer-v3-inspector,
+.report-designer-v3-workspace[data-compact-panel="resources"] .report-designer-v3-layout:not(.is-read-only) .report-designer-v3-canvas-column,
+.report-designer-v3-workspace[data-compact-panel="properties"] .report-designer-v3-sidebar,
+.report-designer-v3-workspace[data-compact-panel="properties"] .report-designer-v3-layout:not(.is-read-only) .report-designer-v3-canvas-column { display: none; }
   .report-designer-v3-workspace {
     padding: 8px;
   }
@@ -88,7 +88,7 @@
   }
 
   .report-designer-v3-sidebar,
-  .report-designer-v3-inspector {
+.report-designer-v3-inspector {
     max-height: none;
     overflow: visible;
   }
@@ -100,7 +100,7 @@
 
   .report-designer-v3-canvas-scroll {
     min-height: 460px;
-    padding: 14px;
+    padding: 16px;
     max-height: 75dvh;
   }
 }
@@ -108,14 +108,14 @@
 @media (pointer: coarse) {
   .report-designer-v3-handle { --v3-handle-offset: calc(-18px / var(--v3-zoom)); width: calc(18px / var(--v3-zoom)); height: calc(18px / var(--v3-zoom)); }
   .report-designer-v3-tool-button,
-  .report-designer-v3-layer-elements button,
-  .report-designer-v3-field-list button { min-height: 40px; }
+.report-designer-v3-layer-elements button,
+.report-designer-v3-field-list button { min-height: 40px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .report-designer-v3-page,
-  .report-designer-v3-tool-button,
-  .report-designer-v3-palette-action {
+.report-designer-v3-tool-button,
+.report-designer-v3-palette-action {
     scroll-behavior: auto;
     transition: none;
   }

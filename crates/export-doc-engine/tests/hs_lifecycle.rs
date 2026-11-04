@@ -1,5 +1,4 @@
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod native_fixture;
 use export_doc_engine::{api::ApiError, generated_api::*};
 use export_doc_storage::{Connection, RecordWrite};

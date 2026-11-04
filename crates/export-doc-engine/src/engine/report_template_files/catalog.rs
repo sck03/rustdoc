@@ -42,11 +42,7 @@ pub(super) fn demand_type(actor: &Actor, kind: &str) -> Result<()> {
     )
 }
 pub(super) fn parameter<'a>(values: &'a [(&str, String)], name: &str) -> &'a str {
-    values
-        .iter()
-        .find(|(key, _)| *key == name)
-        .map(|(_, value)| value.as_str())
-        .unwrap_or("")
+    crate::engine::request_values::find(values, name).unwrap_or("")
 }
 pub(super) fn value_of<'a>(
     parameters: &'a [(&str, String)],
@@ -231,13 +227,11 @@ fn resolved_display(paths: &RuntimePaths, raw: &str, absolute: &Path) -> String 
     display_name(raw, absolute)
 }
 pub(super) fn revision(content: &[u8], display: &str) -> String {
-    Sha256::new()
+    let digest = Sha256::new()
         .chain_update(content)
         .chain_update(display.as_bytes())
-        .finalize()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+        .finalize();
+    crate::paths::hex(&digest)
 }
 pub(super) fn validate_revision(path: &Path, display: &str, expected: &str) -> Result<()> {
     let revision = match fs::read(path) {

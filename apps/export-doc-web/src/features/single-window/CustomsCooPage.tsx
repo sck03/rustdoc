@@ -1,3 +1,4 @@
+import { EditorWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { FormEvent, useMemo, useState } from "react";
 import "../../styles/routes/single-window.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -486,7 +487,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
   }
 
   return (
-    <section className="editor-surface customs-coo-surface" aria-label="海关原产地证草稿">
+    <EditorWorkspace className="editor-surface customs-coo-surface" aria-label="海关原产地证草稿">
       <SingleWindowTabs activeKey="customs-coo" />
 
       <SingleWindowDocumentActionBar
@@ -625,6 +626,6 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
           onClose={producerProfiles.close}
         />
       ) : null}
-    </section>
+    </EditorWorkspace>
   );
 }

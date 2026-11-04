@@ -398,15 +398,8 @@ pub(super) fn create_restore_plan(
         sql = quote(&ownership_sql_path.to_string_lossy())
     );
     managed_write(&restore_script_path, script.as_bytes())?;
-    let mut sql = String::from(
-        "-- Maintenance and NOLOGIN ownership remain separate from the business login.\n",
-    );
-    for role in &old_owner_roles {
-        sql.push_str(&format!(
-            "REASSIGN OWNED BY \"{role}\" TO :\"owner_role\";\n"
-        ));
-    }
-    sql.push_str(&format!("SET ROLE :\"owner_role\";\nREVOKE CREATE ON SCHEMA public FROM PUBLIC;\nGRANT USAGE ON SCHEMA public TO \"{application_role}\";\nGRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO \"{application_role}\";\nGRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO \"{application_role}\";\nALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO \"{application_role}\";\nALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO \"{application_role}\";\n"));
+    let sql =
+        export_doc_storage::postgres_privileges::restore_plan(&old_owner_roles, &application_role)?;
     managed_write(&ownership_sql_path, sql.as_bytes())?;
     super::audit(
         &service.store,
@@ -463,7 +456,7 @@ pub(super) fn create_download_ticket(
         "create-postgresql-download-ticket",
         file_name,
     )?;
-    super::issue_download_ticket(file_name.to_string())
+    service.backup_tickets.issue_download(file_name.to_string())
 }
 
 pub(super) fn download_with_ticket(
@@ -477,7 +470,7 @@ pub(in crate::engine) fn prepare_download(
     parameters: &[(&str, String)],
 ) -> Result<crate::engine::backup_io::Download> {
     let token = super::header(parameters, "token");
-    let file_name = super::consume_download_ticket(token)?;
+    let file_name = service.backup_tickets.consume_download(token)?;
     let path = super::managed_file(&postgres_root(&service.paths)?, &file_name, "dump")?;
     crate::engine::backup_io::Download::open(&path, None)
 }

@@ -1,27 +1,11 @@
-use export_doc_engine::{
-    api::ApiError, contracts, engine::NativeService, generated_api::*, paths::nonce,
-};
+use export_doc_engine::{contracts, engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 #[path = "payment_printing_contract.rs"]
 mod payment_printing_contract;
 #[path = "approval_fixture.rs"]
 mod workflow;
 
-fn call(
-    service: &NativeService,
-    token: &str,
-    op: Operation,
-    id: i64,
-    body: Option<Value>,
-) -> Result<Value, ApiError> {
-    let parameters = if id > 0 {
-        vec![("id", id.to_string())]
-    } else {
-        vec![]
-    };
-    let body = body.map(|body| contracts::overlay(contracts::object(op.id, true), &body));
-    Ok(serde_json::from_slice(&service.dispatch(op, &parameters, &[], body, token)?).unwrap())
-}
+use workflow::call;
 fn login(service: &NativeService, username: &str) -> Value {
     call(
         service,

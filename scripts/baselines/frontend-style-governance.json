@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
-  "capturedAt": "2026-08-18",
+  "capturedAt": "2026-11-04",
   "purpose": "Keep all raw CSS colors centralized in the reviewed color token registry; feature styles must consume semantic or palette tokens only.",
   "maximum": {
     "hexColors": 125,
     "rgbColors": 0,
     "featureHexColors": 0,
     "featureRgbColors": 0,
-    "boxShadows": 107,
-    "gradients": 49,
-    "pixelFontSizes": 326,
-    "importantDeclarations": 8
+    "boxShadows": 24,
+    "gradients": 0,
+    "pixelFontSizes": 0,
+    "importantDeclarations": 2
   }
 }

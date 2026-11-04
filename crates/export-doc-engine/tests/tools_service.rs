@@ -1,5 +1,4 @@
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod native_fixture;
 #[path = "support/tools_contract.rs"]
 mod tools_contract;

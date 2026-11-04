@@ -1,71 +1,26 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { X } from "lucide-react";
-import { useModalDialog } from "../../ui/useModalDialog.ts";
-import { InlineNotice, PageState } from "../../ui/PageState.tsx";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { PageState } from "../../ui/PageState.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
+import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
 import type { OfficePage } from "./officeModel.ts";
-import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
-
-export function OfficeDialog({ title, children, onClose, busy = false, error = "", protectChanges = false, hasChanges = false, wide = false }: {
-  title: string; children: ReactNode; onClose: () => void; busy?: boolean; error?: string; protectChanges?: boolean; hasChanges?: boolean; wide?: boolean;
-}) {
-  const titleId = useId();
-  const [dirty, setDirty] = useState(false);
-  const { confirmDiscardChanges } = useUnsavedChangesGuard({ isDirty: protectChanges && (dirty || hasChanges), message: `${title}有尚未保存的内容。` });
-  function close() {
-    if (busy) return;
-    void confirmDiscardChanges("关闭窗口").then((accepted) => { if (accepted) onClose(); });
-  }
-  const ref = useModalDialog(close, { canClose: !busy });
-  useEffect(() => { if (error) ref.current?.querySelectorAll("details").forEach(section => { section.open = true; }); }, [error, ref]);
-  return createPortal(<div className="office-dialog-backdrop" onSubmit={event => event.stopPropagation()}>
-    <div className={`office-dialog${wide ? " office-dialog-wide" : ""}`} ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <header className="office-dialog-header"><h2 id={titleId}>{title}</h2>
-        <button type="button" className="icon-button" aria-label="关闭窗口" disabled={busy} onClick={close}><X size={18} aria-hidden="true" /></button>
-      </header>
-      <div className="office-dialog-body" onChangeCapture={event => {
-        if (!(event.target as HTMLElement).closest('[data-dialog-control]')) setDirty(true);
-      }} onInvalidCapture={event => {
-        let section = (event.target as HTMLElement).closest("details");
-        while (section) { section.open = true; section = section.parentElement?.closest("details") ?? null; }
-      }}>
-        {error && <InlineNotice tone="error" title="操作未完成">{error}</InlineNotice>}
-        {children}
-      </div>
-    </div>
-  </div>, document.body);
-}
-
-export function OfficeField({ label, children, wide = false }: { label: string; children: ReactNode; wide?: boolean }) {
-  return <label className={wide ? "office-field office-field-wide" : "office-field"}><span>{label}</span>{children}</label>;
-}
+export { Dialog as OfficeDialog } from "../../ui/primitives/Dialog.tsx";
+export { Field as OfficeField } from "../../ui/primitives/Field.tsx";
 
 export function OfficeSubmit({ busy, disabled = false, label = "保存" }: { busy: boolean; disabled?: boolean; label?: string }) {
   return <footer className="office-form-actions"><button className="command-button" type="submit" disabled={busy || disabled}>{busy ? "正在处理…" : label}</button></footer>;
 }
-
 export function OfficeQueryState({ query, emptyTitle }: { query: { isPending: boolean; isError: boolean; error: unknown; data?: { items: unknown[] }; refetch: () => unknown }; emptyTitle: string }) {
   if (query.isPending) return <PageState tone="loading" title="正在加载" />;
-  if (query.isError) return <PageState tone="error" title="加载失败" description={readApiError(query.error)}
-    action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新加载</button>} />;
+  if (query.isError) return <PageState tone="error" title="加载失败" description={readApiError(query.error)} action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新加载</button>} />;
   return query.data?.items.length ? null : <PageState title={emptyTitle} />;
 }
-
 export function OfficePager({ page, paging, busy }: {
   page?: OfficePage<unknown>; paging: { pageNumber: number; pageSize: number; setPageNumber: (page: number) => void; changePageSize: (size: number) => void }; busy: boolean;
 }) {
-  return <ListPaginationControls pageNumber={page?.pageNumber ?? paging.pageNumber} totalPages={page?.totalPages ?? 1}
-    totalCount={page?.totalCount ?? 0} pageSize={paging.pageSize} pageSizeOptions={[12, 24, 48, 96]} isBusy={busy}
-    onPageChange={paging.setPageNumber} onPageSizeChange={paging.changePageSize} />;
+  return <Pagination pageNumber={page?.pageNumber ?? paging.pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0}
+    pageSize={paging.pageSize} pageSizeOptions={[12,24,48,96]} isBusy={busy} onPageChange={paging.setPageNumber} onPageSizeChange={paging.changePageSize} />;
 }
-
-export function OfficeTabs({ records, onChange, recordsLabel, resourcesLabel = "资源与申请" }: {
-  records: boolean; onChange: (records: boolean) => void; recordsLabel: string; resourcesLabel?: string;
-}) {
-  return <div className="office-tabs" role="group" aria-label="切换行政工作区">
-    <button type="button" aria-pressed={!records} onClick={() => onChange(false)}>{resourcesLabel}</button>
-    <button type="button" aria-pressed={records} onClick={() => onChange(true)}>{recordsLabel}</button>
-  </div>;
+export function OfficeTabs({ records, onChange, recordsLabel, resourcesLabel = "资源与申请" }: { records: boolean; onChange: (records: boolean) => void; recordsLabel: string; resourcesLabel?: string }) {
+  return <SegmentedNav label="切换行政工作区" value={records ? "records" : "resources"} onChange={value => onChange(value === "records")}
+    items={[{key:"resources",label:resourcesLabel},{key:"records",label:recordsLabel}]} />;
 }

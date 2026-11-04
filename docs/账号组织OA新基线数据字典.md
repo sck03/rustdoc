@@ -1,10 +1,10 @@
 # 账号、组织与 OA 新基线数据字典
 
-核对日期：2026-11-02。本文描述源码中的 schema 12；验收结果见[本轮执行记录](./OA重构验收与功能保留台账.md)。SQLite 桌面与 PostgreSQL 18 团队服务使用同一用例和规则，各自的物理 DDL、模型指纹分别计算。
+核对日期：2026-11-04。本文描述源码中的 schema 13；本批结果见[二期验收记录](./二期重构验收与清理记录.md)，schema 12 的历史结果见[OA 执行记录](./OA重构验收与功能保留台账.md)。SQLite 桌面与 PostgreSQL 18 团队服务使用同一用例和规则，各自的物理 DDL、模型指纹分别计算。
 
 ## 基线与唯一来源
 
-`crates/export-doc-storage/src/schema.rs` 固定 `SCHEMA_VERSION = MIN_SUPPORTED_SCHEMA_VERSION = 12`。完整 DDL 由下列六组文件组合，不能把其中一个增量脚本应用到已有库：
+`crates/export-doc-storage/src/schema.rs` 固定 `SCHEMA_VERSION = 13`，只接受这一版本，已删除无独立含义的 `MIN_SUPPORTED_SCHEMA_VERSION` 别名。完整 DDL 由下列七组文件组合，不能把其中一个脚本应用到已有库：
 
 | 文件前缀 | 内容 |
 | --- | --- |
@@ -14,14 +14,19 @@
 | `permission_versions_` | 不可变权限发布版本、主体版本绑定 |
 | `access_scope_` | 显式限制及单位/部门/项目集合 |
 | `workflow_runtime_` | 不可变申请版本、流程实例、节点任务、实际签署、办理、执行订单和命令回执 |
+| `foreign_key_indexes.sql` | 两库共用的 42 个外键前缀索引，覆盖经核对后仍缺少索引的引用方向 |
 
-后五组分别以 `sqlite.sql` 或 `postgres.sql` 结尾。模型指纹是上述源码按固定顺序、统一 LF 换行、以零字节分隔后的 SHA-256；另记录实际数据库结构指纹。启动和恢复核对版本、模型及实际结构，拒绝旧库、空文件、损坏、缺表、模型不匹配和未知版本，并保留原文件。PostgreSQL 初始化/恢复使用独立维护连接，API 连接没有 DDL 权限。
+身份、人员、权限、限制及流程五组分别以 `sqlite.sql` 或 `postgres.sql` 结尾；外键索引文件由两库共用。模型指纹按 `schema.rs` 中的固定顺序、统一 LF 换行、以零字节分隔后计算 SHA-256；另记录实际数据库结构指纹。启动和恢复核对版本、模型及实际结构，拒绝旧库、空文件、损坏、缺表、模型不匹配和未知版本，并保留原文件。PostgreSQL 初始化/恢复使用独立维护连接，API 连接没有 DDL 权限。
 
 2026-11-01 在同一尚未生产部署的 schema 11 基线中修正未签任务的稳定人员列与回读、签署不可变保护。模型/结构指纹随完整 DDL 改变；此前生成但指纹不同的 schema 11 测试库和备份同样拒绝打开/恢复，使用新的隔离数据根或数据库。没有追加迁移链，也不自动改写或删除原数据。
 
 2026-11-02 高级流程及任职历史使用全新 schema 12。新增字段、关系及输入权限来源检查进入完整基线和指纹；此前 schema 11 或开发期间不同指纹的测试库不能直接打开。新建、打开、备份恢复均只使用当前完整基线；没有旧库转换、旧 API 解析或运行时双写分支。
 
 ## 身份、组织和授权
+
+schema 13 定稿同时统一两库的规范化检索键序与 PostgreSQL 结构化搜索缓存。`exportdoc_record_text` 在建表前定义，`search_document` 与完整检索使用相同紧凑表示；64 KiB 边界和权限来源保留。模型指纹包含这些表达式，同版但不同指纹的开发期数据库/备份同样拒绝打开或恢复。
+
+2026-11-04 二期冻结 schema 13：补齐外键索引、移除恒空的 `history.body` 与无消费者的 `task_decisions` 视图，并统一 SQLite 检索字段的键序。正式历史 `history`、可清理审计 `audit_logs`、不可变流程操作/快照和被外键引用的复合唯一键继续保留。旧 schema 12 数据库及备份拒绝打开/恢复，使用显式新 DataRoot 或新 PostgreSQL 数据库；没有旧库迁移或自动删除。
 
 | 表 / 字段 | 含义和约束 |
 | --- | --- |
@@ -73,7 +78,7 @@
 | `workflow_activations` | 定时发布的固定版本、活动版本及启停状态预期、执行身份、请求摘要、时刻、CAS 版本与 Pending/Applied/Blocked/Cancelled 状态 |
 | `personnel_change_orders` | 冻结的人员变动提交版本、批准执行身份、生效时间及 Pending/Applied/Blocked/Cancelled 状态 |
 | `command_receipts(actor_id,context_id,command_key)` | 当前身份的幂等键、请求摘要、目标、紧凑提交结果及时间；同键同文读取当前合法结果，不同正文冲突；不复制整份审批计划 |
-| `workflow_current_tasks/task_decisions/workflow_plans/record_rows` | 当前运行与完整签署视图；workflow_list_plans/workflow_list_records 提供轻量列表，workflow_record_filters 提供筛选事实 |
+| `workflow_current_tasks/workflow_plans/record_rows` | 当前运行与完整签署投影；workflow_list_plans/workflow_list_records 提供轻量列表，workflow_record_filters 提供筛选事实；实际签署直接来自 workflow_tasks，不保留 task_decisions 重复视图 |
 
 批准/拒绝/退回的任务必须包含实际执行账号、开始和完成时间、耗时及签署；Waiting/Skipped/Cancelled 不能包含实际签署。已签署任务及其跨代引用受数据库不可变保护。指定节点退回保留不受影响的有效签署，重新审核的节点清空原核验值和确认项。
 
@@ -81,7 +86,7 @@
 
 ## 查询、材料及输出边界
 
-容量回归追加 `records.search_document` 受限生成列：正文序列化不超过 64 KiB 时，写事务内生成已规范化的检索文本；超限返回 NULL，查询继续使用原全文规则。普通静态记录的文字搜索复用该列，身份、流程申请及提交档案投影和 PostgreSQL 结构化/转义搜索仍读取当前正文，不缓存权限。提交档案从冻结关系重建申请与运行计划，通用搜索使用相同投影，不依赖已移出原记录正文的材料。删除始终为空的旧 `search_text` 存储列；生成列不出现在 API 材料中。SQLite 的纯 JSON/Unicode 函数在建库及验证前注册，指纹随完整 schema 12 DDL 更新，此前不同指纹测试库须显式新建。
+容量回归追加 `records.search_document` 受限生成列：正文序列化不超过 64 KiB 时，写事务内生成已规范化的检索文本；超限返回 NULL，查询继续使用原全文规则。普通静态记录的文字搜索复用该列，身份、流程申请及提交档案投影和 PostgreSQL 结构化/转义搜索仍读取当前正文，不缓存权限。提交档案从冻结关系重建申请与运行计划，通用搜索使用相同投影，不依赖已移出原记录正文的材料。删除始终为空的旧 `search_text` 存储列；生成列不出现在 API 材料中。SQLite 的纯 JSON/Unicode 函数在建库及验证前注册，指纹随当前完整 schema 13 DDL 更新，此前不同指纹测试库须显式新建。
 
 常用索引覆盖单位/部门/人员关系、职责有效期间、权限版本绑定、主体资源限制、待办账号/状态/期限、实际签署人、实例代次及人员变动到期队列。流程操作的审批候选按账号 ID 游标，每次最多检查 100 个公开账号，再核验当前业务资格；客户端通过 `nextCursor` 加载后续候选。流程设置的人员目录分别返回审批候选和办理候选，办理权限不会隐含授予审批权，保存分工时仍按事项复核查看及办理动作。
 

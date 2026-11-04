@@ -47,11 +47,9 @@ fn categories(tx: &Connection, actor: &Actor, query: &[(&str, String)]) -> Resul
                     ..Default::default()
                 },
                 filters: &[("companyScope", company.clone())],
-                keyword: "",
-                search_root: None,
-                fields: &[],
                 offset: items.len() as i64,
                 limit: 100,
+                ..Default::default()
             },
             RecordOrder::IdAscending,
         )?;
@@ -154,11 +152,9 @@ pub fn handle(
                     ..Default::default()
                 },
                 filters: &[("companyScope", company.clone())],
-                keyword: "",
-                search_root: None,
                 fields: &[("id", "id")],
-                offset: 0,
                 limit: 1,
+                ..Default::default()
             })?;
             if total >= 100 {
                 return Err(conflict("每家公司最多设置 100 个资料分类。"));

@@ -143,7 +143,7 @@ for (const edition of selected) {
     } else if (process.argv.includes('--blank-grid-only')) {
       await verifyDesktopBlankGrid({ run, request, token: login.body.accessToken, businessDate: login.body.user.businessDate, cdp, output });
     } else if (edition === 'Full') {
-      assert(text.includes('人员与组织') && text.includes('申请与资源') && text.includes('公司公告') && text.includes('站内通知'));
+      assert(text.includes('行政与人事') && text.includes('申请与审批') && text.includes('通知与公告'));
       await verifyDesktopMaintenance({run,request,token:login.body.accessToken,businessDate:login.body.user.businessDate,cdp,output});
       await verifyDesktopListPagination({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopDetailDesigner({ run, request, token: login.body.accessToken, cdp, output });
@@ -160,7 +160,7 @@ for (const edition of selected) {
       assert(await run("!!document.querySelector('[aria-label=公司公告]')"), 'Full SQLite announcement page missing');
       await captureScreenshot(cdp, path.join(output, `${edition}-announcements.png`));
       await verifyDesktopOfficePermissions({ run, request, token: login.body.accessToken, cdp, output, edition });
-    } else { assert(!text.includes('人员与组织') && !text.includes('申请与资源') && !text.includes('账号与权限')); }
+    } else { assert(!text.includes('行政与人事') && !text.includes('申请与审批') && !text.includes('账号与权限')); }
     results.push({ edition, home: expectedHome, version: health.body.productVersion, build: health.body.informationalVersion, ocr: marker.ocr, documentResources: marker.documentResources, statuses, screenshot: `${edition}.png` });
     await run("setTimeout(() => window.__TAURI_INTERNALS__.invoke('request_app_exit'), 100); true");
     const exitDeadline = Date.now() + 50000;

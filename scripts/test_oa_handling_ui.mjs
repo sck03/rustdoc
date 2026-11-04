@@ -1,4 +1,4 @@
-import { approvalStage, fulfillNodeInUi, publishDefinitions, approveResourceTask, linkBusinessPerson } from './lib/approval-fixtures.mjs';
+import { approvalStage, fulfillNodeInUi, publishDefinitions, approveResourceTask, linkBusinessPerson, openDefinitionInUi, saveApprovalPartInUi } from './lib/approval-fixtures.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,12 +24,13 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
   assert(candidates.handlers.some(user => user.id === users[2].id), 'A dedicated handler can be assigned without approval permission');
   const admin = await openPage('oa-review', 'Review-2026-Test');
   await admin.goto(`${url}/#/office/approval-settings`);
-  const section = admin.locator('details[data-definition-key="general"]');
-  await section.locator(':scope > summary').click();
+  const section = await openDefinitionInUi(admin, 'general');
   for (const [i, user] of users.slice(0,2).entries()) {
     await section.getByLabel('责任人来源').nth(i).selectOption('Named');
     await section.getByLabel('责任账号（可多选）').nth(i).selectOption([String(user.id)]);
   }
+  await saveApprovalPartInUi(admin, '保存当前流程');
+  await admin.getByRole('tab', { name: '办理分工', exact: true }).click();
   for (const [i,[category,name,handler]] of [['Seal','公章',2],['Seal','合同章',3],['Certificate','在职证明',3],['Supply','日常用品',2],['Supply','服装辅料',3],['Room','会议接待',2]].entries()) {
     await admin.getByRole('button', { name: '添加办理分工', exact: true }).click();
     const group = admin.getByRole('group', { name: `办理分工 ${i+1}`, exact: true });
@@ -44,9 +45,7 @@ await withOfficeUi('oa-handling-ui', async ({ output, require, url, invoke, open
       await secondHandler.selectOption(String(users[3].id));
     }
   }
-  const save = admin.waitForResponse(r => r.url().endsWith('/api/office/approval-settings') && r.request().method() === 'PUT');
-  await admin.getByRole('button', { name: '保存审批设置', exact: true }).click();
-  assert.equal((await save).status(),200);
+  await saveApprovalPartInUi(admin, '保存办理分工');
   await admin.screenshot({ path: path.join(output,'handling-settings.png'),fullPage:true });
   const policy = await invoke('GetOaApprovalSettings',undefined,{},token);
   for (const rule of policy.rules.filter(r => ['room', 'supply'].includes(r.key))) rule.stages = [approvalStage('review', [users[0].id])];

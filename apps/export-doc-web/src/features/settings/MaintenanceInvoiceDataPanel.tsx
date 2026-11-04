@@ -218,7 +218,7 @@ export function InvoiceDataMaintenancePanel({
                 <small>{reason.trim().length}/500；该内容会进入审计日志。</small>
               </label>
               <button
-                className="command-button danger-command"
+                className="command-button danger"
                 type="button"
                 disabled={!canPurge}
                 onClick={() => void handlePurge()}

@@ -56,17 +56,6 @@ impl Resolver for AllowedResolver {
     }
 }
 
-/// Public data sources. Administrator-configured LAN storage uses `storage_agent`.
-pub fn controlled_agent(allow_explicit_loopback: bool, timeout: Duration) -> ureq::Agent {
-    ureq::Agent::with_parts(
-        client_config(timeout, false),
-        ureq::unversioned::transport::DefaultConnector::new(),
-        AllowedResolver {
-            allow_explicit_loopback,
-        },
-    )
-}
-
 fn client_config(timeout: Duration, storage_methods: bool) -> ureq::config::Config {
     ureq::Agent::config_builder()
         .proxy(None)

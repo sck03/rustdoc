@@ -1,4 +1,6 @@
+import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useEffect, useMemo, useRef, useState } from "react";
+import "../../styles/email.css";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Paperclip, RefreshCw, Send, Settings, Trash2 } from "lucide-react";
@@ -163,7 +165,7 @@ export function EmailPage({ client, businessTimeZone }: { client: ExportDocManag
   }
 
   return (
-    <section className="work-surface email-tool-surface" aria-label="邮件中心">
+    <RecordWorkspace className="email-tool-surface" aria-label="邮件中心">
       <div hidden={showDeliveries}>
       <div className="toolbar email-tool-toolbar">
         <div className="toolbar-summary">
@@ -314,7 +316,7 @@ export function EmailPage({ client, businessTimeZone }: { client: ExportDocManag
       {showDeliveries && (deliveryViewPermission.allowed
         ? <EmailDeliveryHistory client={client} businessTimeZone={businessTimeZone} />
         : <PermissionNotice>当前账号没有查看投递记录的权限。</PermissionNotice>)}
-    </section>
+    </RecordWorkspace>
   );
 }
 

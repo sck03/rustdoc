@@ -61,11 +61,7 @@ impl WorkflowFixture for Connection {
         let steps:Vec<_>=tasks.iter().enumerate().map(|(i,t)|json!({"taskKey":t.key,"stage":i,"decision":"All","approverUserId":t.assignee,"approverPersonId":person(self,t.assignee),"approverName":"匿名责任人","approverContext":t.context,"status":t.status,"actedByUserId":t.acted_by,"actedByPersonId":t.acted_by.map(|id|person(self,id)),"verificationValues":{},"confirmedReviewPoints":[],"actedByName":if t.acted_by.is_some(){"匿名签署人"}else{""},"actedByContext":t.acted_by_context,"actedAt":t.acted_at,"note":"","delegationKey":"","sourceGeneration":null})).collect();
         let plan = json!({"definitionKey":"query-fixture","policyVersion":1,"generation":1,"notifyUserIds":[],"calendars":{},"subflows":[],"nodes":nodes,"steps":steps});
         let mut snapshot = json!({"versionNumber":1,"requestId":request,"submissionNumber":revision,"ownerUserId":row["ownerUserId"],"companyScope":row["companyScope"],"departmentId":row["departmentId"],"request":row,"approvalPlan":plan});
-        let archive = self.insert(&RecordWrite {
-            kind: "oa-submission",
-            identity: None,
-            body: &snapshot,
-        })?;
+        let archive = self.insert(&RecordWrite::unkeyed("oa-submission", &snapshot))?;
         snapshot["id"] = json!(archive);
         self.freeze_request_revision(archive, &snapshot)?;
         let active = tasks
@@ -96,11 +92,7 @@ pub fn exercise(tx: &Connection) {
     let account=tx.insert(&RecordWrite{kind:"users",identity:Some("workflow-fixture-account"),body:&json!({"versionNumber":1,"ownerUserId":0,"companyScope":"WORKFLOW-FIXTURE","departmentId":"D","username":"workflow-fixture-account","fullName":"匿名查询账号","role":"OfficeEmployee","isActive":true,"permissionGrants":[]})}).unwrap();
     let mut body = json!({"versionNumber":1,"ownerUserId":7,"companyScope":"WORKFLOW-FIXTURE","departmentId":"D","status":"Pending","submissionNumber":1,"title":"匿名申请"});
     let request = tx
-        .insert(&RecordWrite {
-            kind: "oa-general",
-            identity: None,
-            body: &body,
-        })
+        .insert(&RecordWrite::unkeyed("oa-general", &body))
         .unwrap();
     body["id"] = json!(request);
     tx.set_body(request, &body).unwrap();
@@ -120,6 +112,23 @@ pub fn exercise(tx: &Connection) {
         elapsed_seconds: None,
     };
     tx.publish_workflow(request, 1, &[task]).unwrap();
+    let principals = [export_doc_storage::RecordApprover {
+        restrictions: vec![],
+        user_id: account,
+        context: String::new(),
+    }];
+    let query = export_doc_storage::RecordQuery {
+        kind: "oa-general",
+        company: "WORKFLOW-FIXTURE",
+        approvers: Some(&principals),
+        limit: 20,
+        ..Default::default()
+    };
+    super::query_plans::save(
+        tx,
+        "authority",
+        &json!({"login":tx.explain_query(&export_doc_storage::QueryPlan::Identity {kind:"users",identity:"workflow-fixture-account"}).unwrap(),"approvalInbox":tx.explain_query(&export_doc_storage::QueryPlan::Records(&query)).unwrap(),"workflowSummary":tx.explain_query(&export_doc_storage::QueryPlan::WorkflowSummary(&export_doc_storage::WorkflowSummaryQuery {companies:&["WORKFLOW-FIXTURE".into()],as_of:"2026-11-04T00:00:00Z",completed_since:"2026-11-01T00:00:00Z",offset:0,limit:20})).unwrap()}),
+    );
     for keyword in ["匿名申请", "匿名责任人"] {
         let (count, _) = tx
             .query_generic(&GenericQuery {
@@ -129,12 +138,10 @@ pub fn exercise(tx: &Connection) {
                     company: "WORKFLOW-FIXTURE",
                     ..Default::default()
                 },
-                filters: &[],
                 keyword,
-                search_root: None,
                 fields: &[("id", "id")],
-                offset: 0,
                 limit: 20,
+                ..Default::default()
             })
             .unwrap();
         assert_eq!(

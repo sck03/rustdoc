@@ -1,6 +1,5 @@
 #![cfg(all(feature = "excel", feature = "invoice-transfer"))]
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod native_fixture;
 use export_doc_engine::{generated_api::*, invoice::InvoiceDraft};
 #[path = "support/jobs.rs"]

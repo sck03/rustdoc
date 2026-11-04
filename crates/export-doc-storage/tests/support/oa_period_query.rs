@@ -20,12 +20,7 @@ pub fn exercise(c: &Connection) {
         body.as_object_mut()
             .unwrap()
             .extend(details.as_object().unwrap().clone());
-        c.insert(&RecordWrite {
-            kind,
-            identity: None,
-            body: &body,
-        })
-        .unwrap();
+        c.insert(&RecordWrite::unkeyed(kind, &body)).unwrap();
     }
     for (kind, start, end, count) in [
         ("oa-leave", "2026-10-29", "2026-10-30", 1),

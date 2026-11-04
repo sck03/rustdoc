@@ -153,7 +153,8 @@ pub fn handle(
         })();
         // The attempt marker survives cancellation or an uncertain partial handoff.
         // A subsequent request cannot automatically replay an official submission.
-        let finalize = crate::operation::OperationScope::new(std::time::Duration::from_secs(10));
+        let finalize =
+            crate::operation::OperationScope::detached(std::time::Duration::from_secs(10));
         finalize.run(|| {
             service.store.transaction(|tx| {
                 let mut current = tracking::get(tx, actor, id, "operate")?;

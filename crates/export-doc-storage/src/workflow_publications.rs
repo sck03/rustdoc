@@ -1,13 +1,7 @@
 //! Immutable definition versions and bounded, cancellable activation schedules.
+use crate::sql::object;
 use crate::{Adapter, Error, Result, sql};
 use serde_json::Value;
-fn object(pg: bool) -> &'static str {
-    if pg {
-        "jsonb_build_object"
-    } else {
-        "json_object"
-    }
-}
 fn query(db: &(impl Adapter + ?Sized), select: String, values: Vec<String>) -> Result<Value> {
     db.query_json(
         &if db.provider() == "PostgreSQL" {

@@ -9,7 +9,7 @@ import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { FormGuidance } from "../../ui/PageState.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 
 export function SupplierProductLinksPanel({
@@ -187,7 +187,7 @@ export function SupplierProductLinksPanel({
         {links.map((item) => <tr key={item.id}><td><TablePrimaryText value={item.productNameCN || item.productNameEN || "未命名"} secondary={item.productCode || "无产品货号"} /></td><td><TablePrimaryText value={item.supplierProductCode} /></td><td>{item.currency} {item.referencePrice.toFixed(2)}</td><td>{item.leadTimeDays ? `${item.leadTimeDays} 天` : "未设置"}</td><td><BusinessStatusBadge value={item.status} /></td><td><button className="secondary-button" type="button" onClick={() => void openEditor(item.id)}>{canEdit ? "编辑" : "查看"}</button></td></tr>)}
         {!links.length ? <tr><td className="empty-cell" colSpan={6}><div className="empty-cell-content"><strong>尚未关联供应产品</strong><span>{canEdit ? "需要记录供应商货号、参考价或交期时，再建立供货关系。" : "当前供应商还没有供货关系。"}</span>{canEdit ? <button className="primary-button" type="button" onClick={() => void openEditor(0)}>新增第一条供货关系</button> : null}</div></td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
-      <ListPaginationControls pageNumber={linkPageNumber} totalPages={linkTotalPages} totalCount={linkTotalCount} pageSize={linkPageSize} pageSizeOptions={[20, 50, 100]} isBusy={false} onPageChange={setLinkPageNumber} onPageSizeChange={(value) => { setLinkPageSize(value); setLinkPageNumber(1); }} />
+      <Pagination pageNumber={linkPageNumber} totalPages={linkTotalPages} totalCount={linkTotalCount} pageSize={linkPageSize} pageSizeOptions={[20, 50, 100]} isBusy={false} onPageChange={setLinkPageNumber} onPageSizeChange={(value) => { setLinkPageSize(value); setLinkPageNumber(1); }} />
     </> : null}
     {view === "editor" ? <form className="form-grid" key={`${selected?.id ?? "new"}-${selected?.versionNumber ?? 0}-${supplierId}`} onSubmit={save}>
       <div className="section-heading-row"><h4>{selected ? "编辑供货关系" : "新增供货关系"}</h4><button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回供应产品目录</button></div>

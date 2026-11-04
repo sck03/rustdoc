@@ -2,6 +2,21 @@
 import { randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 
+export async function openDefinitionInUi(page, key, tab = '节点图') {
+  await page.getByRole('tablist', { name: '流程管理分区' }).getByRole('tab', { name: '流程定义', exact: true }).click();
+  await page.locator(`tr[data-definition-key=${JSON.stringify(key)}]`).getByRole('button', { name: '编辑流程', exact: true }).click();
+  const definition = page.locator(`section[data-definition-key=${JSON.stringify(key)}]`);
+  await definition.getByRole('tablist', { name: '流程定义编辑' }).getByRole('tab', { name: tab, exact: true }).click();
+  return definition;
+}
+
+export async function saveApprovalPartInUi(page, label) {
+  const response = page.waitForResponse(response => response.url().endsWith('/api/office/approval-settings') && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: label, exact: true }).click();
+  const saved = await response; assert.equal(saved.status(), 200, await saved.text());
+  await page.waitForFunction(() => !document.querySelector('.oa-workspace fieldset')?.disabled);
+}
+
 export async function fulfillNodeInUi(page, note) {
   await page.getByRole('button', { name: '办理此节点', exact: true }).click();
   const dialog = page.getByRole('dialog');
@@ -11,6 +26,7 @@ export async function fulfillNodeInUi(page, note) {
 }
 
 export async function publishDefinitionInUi(page, definition, applicantName, operations, configureSample, appointmentName) {
+  await definition.getByRole('tablist', { name: '流程定义编辑' }).getByRole('tab', { name: '仿真与发布', exact: true }).click();
   await definition.getByRole('button', { name: '仿真并发布此流程', exact: true }).click();
   const simulation = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: '选择人员任职', exact: true }) });
   assert(await simulation.getByRole('button', { name: '保存并发布此流程', exact: true }).isDisabled());

@@ -50,11 +50,7 @@ pub const OPERATIONS: &[Operation] = &[
     RESET_HS_CODE_REMOTE_CANDIDATES,
 ];
 pub fn read<'a>(query: &'a [(&str, String)], key: &str) -> &'a str {
-    query
-        .iter()
-        .find(|(k, _)| *k == key)
-        .map(|(_, v)| v.as_str())
-        .unwrap_or("")
+    crate::engine::request_values::find(query, key).unwrap_or("")
 }
 pub fn codes(tx: &Connection) -> Result<BTreeMap<String, ApiHsCodeDto>> {
     store::all(tx, CODES)?

@@ -38,6 +38,9 @@ mod resource_query;
 mod workflow_origin;
 pub use generic_query::ScopedQuery;
 pub use related_query::RelatedQuery;
+mod query_diagnostics;
+mod query_source;
+pub use query_diagnostics::QueryPlan;
 mod sql;
 mod template_history_query;
 mod template_query;
@@ -47,8 +50,10 @@ pub mod maintenance;
 pub mod metrics;
 pub mod operation;
 pub mod pool;
+pub mod postgres_privileges;
 pub use template_query::{ReportTemplateQuery, TemplateAudience, TemplateVersionQuery};
 struct QuerySql {
+    source: query_source::Source,
     filter: String,
     order: String,
     values: Vec<String>,
@@ -67,7 +72,7 @@ mod workflow_schedule;
 pub use communication::{CommunicationQuery, CommunicationView, NotificationScope};
 pub use workflow::{WorkflowProgress, WorkflowSummaryQuery, WorkflowTaskQuery};
 mod sqlite;
-pub use schema::{MIN_SUPPORTED_SCHEMA_VERSION, SCHEMA_VERSION};
+pub use schema::SCHEMA_VERSION;
 use serde_json::Value;
 use std::{cell::Cell, path::Path};
 
@@ -126,6 +131,15 @@ pub struct RecordWrite<'a> {
     pub kind: &'a str,
     pub identity: Option<&'a str>,
     pub body: &'a Value,
+}
+impl<'a> RecordWrite<'a> {
+    pub fn unkeyed(kind: &'a str, body: &'a Value) -> Self {
+        Self {
+            kind,
+            identity: None,
+            body,
+        }
+    }
 }
 /// A principal's explicit limits intersect its delegated participation grant.
 pub struct RecordApprover {
@@ -398,6 +412,7 @@ delegate! {
     expired_job_outputs(policy:&JobOutputRetention)->Vec<Value>;
     expired_job_inputs(policy:&JobOutputRetention)->Vec<Value>;
     query_generic(query:&GenericQuery<'_>)->(i64, Vec<Value>);
+    explain_query(query:&QueryPlan<'_>)->Value;
     scan_generic(query:&GenericQuery<'_>,before_id:Option<i64>)->(Option<i64>, Vec<Value>);
     resource_references(kind:&str,offset:i64,limit:i64)->(i64,Vec<Value>);
     query_scoped(query:&ScopedQuery<'_>)->(i64,Vec<Value>);

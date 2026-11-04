@@ -80,13 +80,7 @@ fn instant(value: &str) -> Result<DateTime<FixedOffset>> {
         .map_err(|_| invalid("跟进时间必须包含有效日期、时间和时区。"))
 }
 fn query(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
-    let read = |key: &str| {
-        query
-            .iter()
-            .find(|(name, _)| *name == key)
-            .map(|(_, value)| value.as_str())
-            .unwrap_or("")
-    };
+    let read = |key: &str| crate::engine::request_values::find(query, key).unwrap_or("");
     let filter_id = |key: &str| -> Result<Option<i64>> {
         if read(key).is_empty() {
             return Ok(None);
@@ -280,11 +274,7 @@ fn mutate(
             if !tx.update(
                 record_id,
                 saved["versionNumber"].as_i64().unwrap_or(0),
-                &RecordWrite {
-                    kind: KIND,
-                    identity: None,
-                    body: &saved,
-                },
+                &RecordWrite::unkeyed(KIND, &saved),
             )? {
                 return Err(conflict("跟进归属已变化，请重新读取。"));
             }

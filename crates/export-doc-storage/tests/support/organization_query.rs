@@ -4,13 +4,7 @@ use serde_json::{Value, json};
 fn insert(tx: &Connection, kind: &str, mut body: Value) -> i64 {
     body["versionNumber"] = json!(1);
     body["ownerUserId"] = json!(7);
-    let id = tx
-        .insert(&RecordWrite {
-            kind,
-            identity: None,
-            body: &body,
-        })
-        .unwrap();
+    let id = tx.insert(&RecordWrite::unkeyed(kind, &body)).unwrap();
     body["id"] = json!(id);
     tx.set_body(id, &body).unwrap();
     id

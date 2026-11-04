@@ -152,7 +152,6 @@ CREATE TABLE workflow_activations (
 );
 CREATE INDEX workflow_activations_due ON workflow_activations(state,activate_at,id);
 CREATE VIEW workflow_current_tasks AS SELECT t.* FROM workflow_tasks t JOIN workflow_instances w ON w.request_id=t.request_id AND w.revision=t.submission AND w.generation=t.generation;
-CREATE VIEW task_decisions AS SELECT request_id,submission,generation,task_key,assignee_id,assignee_person_id,context_id,acted_by_id,acted_by_context,status,note,acted_at,delegation_key,signature FROM workflow_tasks WHERE signature IS NOT NULL;
 CREATE FUNCTION exportdoc_immutable_workflow() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_TABLE_NAME='workflow_tasks' THEN

@@ -49,10 +49,10 @@ pub(in crate::engine) fn members(
 ) -> Result<Value> {
     store.read(|tx| {
         let actor = auth::refresh_actor_in(tx,actor)?;
-        let unit = query.iter().find(|(k,_)| *k == "companyCode").map(|(_,v)| v.as_str()).unwrap_or(&actor.company);
+        let unit = crate::engine::request_values::find(query, "companyCode").unwrap_or(&actor.company);
         demand(&actor,unit,"organization.appointments")?;
         let unit_row = company(tx,unit)?;
-        let argument = |key| query.iter().find(|(k,_)| *k == key).map(|(_,v)| v.as_str()).unwrap_or("");
+        let argument = |key| crate::engine::request_values::find(query, key).unwrap_or("");
         let available = argument("includeAvailable") == "true";
         if available && !actor.admin { return Err(error(403,"跨单位人员分配由系统管理员办理。")); }
         let number = argument("pageNumber").parse::<i64>().unwrap_or(1).max(1);

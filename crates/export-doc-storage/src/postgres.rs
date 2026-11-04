@@ -226,6 +226,7 @@ pub fn initialize(connection_string: &str, owner: &str) -> Result<()> {
     transaction.batch_execute(include_str!("personnel_foundation_postgres.sql"))?;
     transaction.batch_execute(include_str!("access_scope_postgres.sql"))?;
     transaction.batch_execute(include_str!("workflow_runtime_postgres.sql"))?;
+    transaction.batch_execute(include_str!("foreign_key_indexes.sql"))?;
     let shape = schema::postgres_shape(&mut transaction)?;
     transaction.execute(
         "INSERT INTO schema_model(version,model,shape) VALUES($1,$2,$3)",
@@ -257,7 +258,7 @@ impl Adapter for Postgres {
             "SELECT {count},COALESCE((SELECT jsonb_agg(page.body) FROM (SELECT {projection} AS body FROM audit_logs r WHERE {filter} ORDER BY {order} LIMIT {limit} OFFSET {offset}) page),'[]'::jsonb)::text",
             filter = sql.filter,
             order = sql.order,
-            limit = query.limit.clamp(1, 200_000),
+            limit = query.limit.clamp(1, 2_000),
             offset = query.offset.max(0)
         );
         let parameters: Vec<&(dyn ::postgres::types::ToSql + Sync)> =
@@ -344,13 +345,7 @@ impl Adapter for Postgres {
     ) -> Result<Vec<Value>> {
         let parameters: Vec<&(dyn ::postgres::types::ToSql + Sync)> =
             sql.values.iter().map(|value| value as _).collect();
-        let query = format!(
-            "SELECT {projection} FROM record_rows r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
-            sql.filter,
-            sql.order,
-            limit.clamp(1, 2000),
-            offset.max(0)
-        );
+        let query = crate::query_source::slice(sql, projection, offset, limit);
         self.client
             .borrow_mut()
             .query(&query, &parameters)?
@@ -377,15 +372,40 @@ impl Adapter for Postgres {
             .iter()
             .map(|v| v as &(dyn ::postgres::types::ToSql + Sync))
             .collect();
-        let query = format!("SELECT (SELECT COUNT(*) FROM record_rows r WHERE {filter}),
-            COALESCE((SELECT jsonb_agg(page.body::jsonb) FROM
-             (SELECT {projection} AS body FROM record_rows r WHERE {filter} ORDER BY {order} LIMIT {limit} OFFSET {offset}) page), '[]'::jsonb)::text",
-            filter=sql.filter, order=sql.order, limit=limit.clamp(1,200), offset=offset.max(0));
+        let query = crate::query_source::page(sql, projection, offset, limit, true);
         let row = client.query_one(&query, &params)?;
         Ok((
             row.try_get(0)?,
             serde_json::from_str(&row.try_get::<_, String>(1)?)?,
         ))
+    }
+    fn explain_statement(&self, sql: &str, values: &[String]) -> Result<Value> {
+        #[derive(Debug)]
+        struct JsonPlan(Value);
+        impl<'a> ::postgres::types::FromSql<'a> for JsonPlan {
+            fn from_sql(
+                _ty: &::postgres::types::Type,
+                raw: &'a [u8],
+            ) -> std::result::Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+                Ok(Self(serde_json::from_slice(raw)?))
+            }
+            fn accepts(ty: &::postgres::types::Type) -> bool {
+                *ty == ::postgres::types::Type::JSON
+            }
+        }
+        let params: Vec<&(dyn ::postgres::types::ToSql + Sync)> =
+            values.iter().map(|v| v as _).collect();
+        let elapsed = crate::query_diagnostics::measure(|| {
+            self.client.borrow_mut().query(sql, &params)?;
+            Ok(())
+        })?;
+        let row = self.client.borrow_mut().query_one(
+            &format!("EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) {sql}"),
+            &params,
+        )?;
+        Ok(
+            json!({"sql":sql,"parameters":values,"plan":row.try_get::<_,JsonPlan>(0)?.0,"elapsedMs":elapsed}),
+        )
     }
     fn provider(&self) -> &'static str {
         "PostgreSQL"
@@ -452,10 +472,7 @@ impl Adapter for Postgres {
     fn find_identity(&self, kind: &str, identity: &str) -> Result<Option<Value>> {
         self.client
             .borrow_mut()
-            .query_opt(
-                "SELECT body::text FROM record_rows WHERE kind=$1 AND identity=$2",
-                &[&kind, &identity],
-            )?
+            .query_opt(&crate::query_source::identity(true), &[&kind, &identity])?
             .map(|row| {
                 let body: String = row.try_get(0)?;
                 serde_json::from_str(&body).map_err(Into::into)
@@ -496,22 +513,24 @@ impl Adapter for Postgres {
             .borrow_mut()
             .query_one("SELECT kind FROM record_rows WHERE id=$1", &[&id])?
             .try_get(0)?;
-        let stored = crate::identity_runtime::document(
-            &kind,
-            &crate::workflow_runtime::document(&kind, body),
-        );
-        let body = &stored;
-        if self.client.borrow_mut().execute(
-            "UPDATE records SET body=$1::text::jsonb WHERE id=$2",
-            &[&serde_json::to_string(body)?, &id],
-        )? != 1
-        {
-            return Err(Error::unavailable("写入记录编号失败。"));
-        }
-        if crate::identity_runtime::supports(&kind) {
-            crate::identity_runtime::project(self, id)?;
-        }
-        Ok(())
+        crate::identity_runtime::atomic(self, &kind, || {
+            let stored = crate::identity_runtime::document(
+                &kind,
+                &crate::workflow_runtime::document(&kind, body),
+            );
+            let body = &stored;
+            if self.client.borrow_mut().execute(
+                "UPDATE records SET body=$1::text::jsonb WHERE id=$2",
+                &[&serde_json::to_string(body)?, &id],
+            )? != 1
+            {
+                return Err(Error::unavailable("写入记录编号失败。"));
+            }
+            if crate::identity_runtime::supports(&kind) {
+                crate::identity_runtime::project(self, id)?;
+            }
+            Ok(())
+        })
     }
     fn delete(&self, kind: &str, id: i64, expected: i64) -> Result<bool> {
         Ok(self.client.borrow_mut().execute(
@@ -520,7 +539,7 @@ impl Adapter for Postgres {
         )? == 1)
     }
     fn append_audit_details(&self, a: &AuditWrite<'_>, details: &Value) -> Result<()> {
-        self.client.borrow_mut().execute("WITH event AS (INSERT INTO history(kind,record_id,version,action,actor_id,occurred_at,note,body) VALUES($1,$2,$3,$4,$5,$6,$7,'{}') RETURNING kind,record_id,version,action,actor_id,occurred_at) INSERT INTO audit_logs(kind,record_id,version,action,actor_id,occurred_at,body) SELECT kind,record_id,version,action,actor_id,occurred_at,$8::text::jsonb FROM event",
+        self.client.borrow_mut().execute("WITH event AS (INSERT INTO history(kind,record_id,version,action,actor_id,occurred_at,note) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING kind,record_id,version,action,actor_id,occurred_at) INSERT INTO audit_logs(kind,record_id,version,action,actor_id,occurred_at,body) SELECT kind,record_id,version,action,actor_id,occurred_at,$8::text::jsonb FROM event",
             &[&a.kind,&a.record_id,&a.version,&a.action,&a.actor_id,&a.occurred_at,&a.note,&serde_json::to_string(details)?])?;
         Ok(())
     }

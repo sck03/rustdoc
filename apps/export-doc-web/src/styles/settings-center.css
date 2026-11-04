@@ -1,7 +1,7 @@
 .settings-section-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: .5rem;
+  gap: 8px;
 }
 
 .settings-category-panel .document-settings-fields {
@@ -15,21 +15,35 @@
 
 .settings-category-item .settings-dirty-marker {
   margin-inline-start: auto;
-  font-size: .75rem;
+  font-size: var(--edm-font-size-xs);
   color: inherit;
 }
 
-.settings-command-heading {
-  min-width: 0;
-  overflow-wrap: anywhere;
+.settings-command-strip > [data-ui="page-header"] {
+  width: 100%;
 }
 
-.settings-command-heading .settings-save-status {
+.settings-save-status {
   color: var(--edm-neutral-650);
 }
 
-.settings-command-heading .settings-save-status[data-dirty="true"] {
+.settings-save-status[data-dirty="true"] {
   color: var(--edm-warning-700);
+}
+.settings-more-actions { position: relative; }
+.settings-more-actions > div {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-start: 100%;
+  display: grid;
+  gap: var(--edm-space-2);
+  padding: var(--edm-space-3);
+  min-width: 12rem;
+  z-index: var(--edm-z-popover);
+  background: var(--edm-bg-surface);
+  border: 1px solid var(--edm-line);
+  border-radius: var(--edm-radius-md);
+  box-shadow: var(--edm-shadow-2);
 }
 
 .maintenance-advanced-details pre {
@@ -46,5 +60,5 @@
 .backup-secret-field {
   display: grid;
   min-width: 0;
-  gap: .5rem;
+  gap: 8px;
 }

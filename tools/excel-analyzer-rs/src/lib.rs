@@ -186,6 +186,3 @@ pub fn analyze_cells(name: &str, cells: &[Vec<String>]) -> SheetAnalysis {
         table,
     }
 }
-pub fn formatted_cell(cell: &Data) -> String {
-    cell_to_string(cell)
-}

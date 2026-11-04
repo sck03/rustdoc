@@ -5,10 +5,11 @@ use super::{
     store::{self, Actor, Store},
 };
 use crate::engine::store::Connection;
-use crate::{contracts, generated_api::Operation, invoice};
+use crate::{contracts, generated_api::Operation};
 use export_doc_storage::AuditWrite;
 use serde_json::{Value, json};
 use unicode_normalization::UnicodeNormalization;
+mod invoice_save;
 mod queries;
 mod references;
 pub use references::check_references;
@@ -78,7 +79,9 @@ pub fn text(body: &Value, path: &str) -> String {
     field(body, path).as_str().unwrap_or("").trim().to_owned()
 }
 pub fn required(body: &Value, path: &str, label: &str, max: usize) -> Result<()> {
-    let text = text(body, path);
+    required_text(&text(body, path), label, max)
+}
+pub(super) fn required_text(text: &str, label: &str, max: usize) -> Result<()> {
     if text.is_empty() || text.chars().count() > max {
         Err(invalid(format!("{label}须为 1–{max} 字。")))
     } else {
@@ -556,44 +559,7 @@ fn validate(
 ) -> Result<()> {
     match resource.key {
         "invoices" => {
-            if id > 0 && previous["status"] != "Draft" {
-                return Err(conflict(
-                    "已核对、出运、结汇或作废的发票不能编辑，请先按业务流程撤销核对。",
-                ));
-            }
-            let mut dto: crate::generated_api::ApiInvoiceDetailDto =
-                serde_json::from_value(value.clone())
-                    .map_err(|error| invalid(format!("发票字段无效：{error}")))?;
-            let draft = invoice::InvoiceDraft::from_dto(dto);
-            dto = draft.build().map_err(invalid)?;
-            dto.status = "Draft".into();
-            let existing: std::collections::BTreeSet<i64> = previous["items"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(|row| row["id"].as_i64())
-                .collect();
-            let mut next = previous["_nextItemId"]
-                .as_i64()
-                .unwrap_or(1)
-                .max(existing.iter().next_back().copied().unwrap_or(0) + 1);
-            let mut assigned = std::collections::BTreeSet::new();
-            for item in &mut dto.items {
-                if id == 0 || item.id == 0 {
-                    item.id = next;
-                    next = next
-                        .checked_add(1)
-                        .ok_or_else(|| unavailable("发票货项编号超出范围。"))?;
-                } else if !existing.contains(&item.id) {
-                    return Err(invalid("货项编号不属于当前发票；新货项编号须为 0。"));
-                }
-                if !assigned.insert(item.id) {
-                    return Err(invalid("发票货项编号不能重复。"));
-                }
-                item.invoice_id = id;
-            }
-            value["_nextItemId"] = json!(next);
-            *value = contracts::overlay(value.clone(), &serde_json::to_value(dto)?);
+            invoice_save::normalize(id, previous, value)?;
             super::report_assets::validate_invoice(connection, actor, value)?;
         }
         "exporters" => super::report_assets::validate_exporter(connection, actor, value)?,

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import "../styles/workspaces.css";
+import "../styles/responsive.css";
 import { PermissionSourceSummary } from "./PermissionSourceSummary.tsx";
 import {
   FileText,

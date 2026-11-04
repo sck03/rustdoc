@@ -4,11 +4,23 @@ use serde_json::Value;
 use std::fmt::Write;
 
 pub fn sheet(columns: &[(&str, &str)], rows: &[Value], check: Check<'_>) -> Result<Vec<u8>> {
-    if columns.is_empty()
-        || columns.len() > 128
-        || rows.len() > 50_000
-        || columns.len().saturating_mul(rows.len()) > 1_000_000
-    {
+    sheet_stream(
+        columns,
+        |emit| {
+            for row in rows {
+                emit(row)?;
+            }
+            Ok(())
+        },
+        check,
+    )
+}
+pub fn sheet_stream(
+    columns: &[(&str, &str)],
+    source: impl FnOnce(&mut dyn FnMut(&Value) -> Result<()>) -> Result<()>,
+    check: Check<'_>,
+) -> Result<Vec<u8>> {
+    if columns.is_empty() || columns.len() > 128 {
         return Err("导出表格超过容量上限。".into());
     }
     let mut xml = String::from(
@@ -61,17 +73,23 @@ pub fn sheet(columns: &[(&str, &str)], rows: &[Value], check: Check<'_>) -> Resu
             .map(|(_, label)| Value::String((*label).into()))
             .collect(),
     )?;
-    for (index, value) in rows.iter().enumerate() {
+    let mut count = 0usize;
+    source(&mut |value| {
+        count += 1;
+        if count > 50_000 || columns.len().saturating_mul(count) > 1_000_000 {
+            return Err("导出表格超过容量上限。".into());
+        }
         row(
-            index as u32 + 2,
+            count as u32 + 1,
             columns.iter().map(|(key, _)| value[*key].clone()).collect(),
         )?;
-    }
+        Ok(())
+    })?;
     xml.push_str("</sheetData>");
     write!(
         &mut xml,
         "<autoFilter ref=\"A1:{}\"/></worksheet>",
-        address(rows.len() as u32 + 1, columns.len() as u32)
+        address(count as u32 + 1, columns.len() as u32)
     )
     .expect("String writer");
     Ok(xml.into_bytes())

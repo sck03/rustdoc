@@ -30,7 +30,6 @@ mod personnel_query;
 #[cfg(feature = "postgres")]
 #[path = "support/pool_recovery.rs"]
 mod pool_recovery;
-#[cfg(feature = "postgres")]
 #[path = "support/query_plans.rs"]
 mod query_plans;
 #[path = "support/related_query.rs"]
@@ -120,6 +119,7 @@ fn sqlite_model_and_structure_validation_preserve_rejected_files() {
 }
 
 fn roundtrip(connection: &Connection) {
+    query_plans::exercise(connection);
     normalized_search::exercise(connection);
     foundation_query::exercise(connection);
     maintenance_query::exercise(connection);
@@ -314,5 +314,4 @@ fn postgres_matches_the_sqlite_contract_and_holds_the_instance_lock() {
     }
     Connection::postgres(&app).unwrap().health().unwrap();
     pool_recovery::exercise(&app, &maintenance);
-    query_plans::exercise(&maintenance);
 }

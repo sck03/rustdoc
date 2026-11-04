@@ -1,3 +1,4 @@
+import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useQuery } from "@tanstack/react-query";
 import { Info } from "lucide-react";
 import type { ApiHealthResponse, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -24,7 +25,7 @@ export function AboutPage({
   const unavailable = healthQuery.isPending ? "读取中…" : "未获取";
 
   return (
-    <section className="work-surface about-surface" aria-label="关于">
+    <RecordWorkspace className="about-surface" aria-label="关于">
       <div className="toolbar about-toolbar">
         <div className="toolbar-summary">
           <strong>{product.displayName}</strong>
@@ -75,7 +76,7 @@ export function AboutPage({
           />
         </div>
       </section>
-    </section>
+    </RecordWorkspace>
   );
 }
 

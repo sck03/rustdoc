@@ -171,7 +171,7 @@ pub(crate) fn resolve_duty(
     let unit = s.number(unit);
     let responsibility = s.number(responsibility);
     let date = s.text(date);
-    let project = s.nullable_number(project.as_ref().map(|id| id.to_string()).as_deref());
+    let project = s.optional_number(project.as_ref().map(|id| id.to_string()).as_deref());
     let kind = s.text(kind);
     let eligible = authority::responsibility(s.pg, ("r", "a", "m"), &project, &kind, &date);
     let obj = object(s.pg);

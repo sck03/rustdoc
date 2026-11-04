@@ -1,0 +1,44 @@
+
+type DomainMethods = Record<string, (...args: unknown[]) => Promise<unknown>>;
+
+/** Each instance owns its transport and loads only the domain actually called. */
+export class ExportDocManagerApiClient extends ApiTransport {
+  constructor(options: ApiClientOptions) {
+    super(options);
+    const session = createSessionApi(this);
+    const pending = new Map<Domain, Promise<DomainMethods>>();
+    const methods = new Map<PropertyKey, unknown>();
+    return new Proxy(this, {
+      get: (target, key) => {
+        if (methods.has(key)) return methods.get(key);
+        const own = Reflect.get(target, key);
+        if (own !== undefined) return typeof own === 'function' ? own.bind(target) : own;
+        if (typeof key !== 'string') return undefined;
+        const sessionMethod = Reflect.get(session, key);
+        if (typeof sessionMethod === 'function') return sessionMethod;
+        const domain = Object.hasOwn(operationDomains, key) ? operationDomains[key] : undefined;
+        if (!domain) return undefined;
+        const method = async (...args: unknown[]) => {
+          const init = args.at(-1) as RequestInit | undefined;
+          const signal = init?.signal;
+          throwIfAborted(signal);
+          let loading = pending.get(domain);
+          if (!loading) {
+            loading = loaders[domain]().then(module => module.default(target) as unknown as DomainMethods);
+            pending.set(domain, loading);
+            void loading.catch(() => { if (pending.get(domain) === loading) pending.delete(domain); });
+          }
+          const api = await awaitWithSignal(loading, signal);
+          throwIfAborted(signal);
+          return api[key](...args);
+        };
+        methods.set(key, method);
+        return method;
+      },
+    });
+  }
+}
+
+export function createExportDocManagerApiClient(options: ApiClientOptions): ExportDocManagerApiClient {
+  return new ExportDocManagerApiClient(options);
+}

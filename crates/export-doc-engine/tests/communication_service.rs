@@ -1,7 +1,6 @@
 #[path = "support/communication_contract.rs"]
 mod communication_contract;
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod native_fixture;
 use export_doc_engine::{engine::NativeService, generated_api::*};
 use serde_json::{Value, json};

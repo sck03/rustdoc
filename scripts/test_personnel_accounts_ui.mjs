@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
+import { approvalStage, linkBusinessPerson, publishDefinitions } from './lib/approval-fixtures.mjs';
 
-await withOfficeUi('personnel-accounts-ui', async ({ output, url, invoke, openPage }) => {
+await withOfficeUi('personnel-accounts-ui', async ({ output, url, invoke, openPage, operations }) => {
   const token = (await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' })).accessToken;
   const person = await invoke('CreatePersonnel', { requestKey: 'identity-ui-person', employeeNumber: 'IDENTITY-UI',
     departmentId: 'GENERAL', jobTitle: '外贸业务主管', employmentType: 'FullTime', hireDate: '2026-09-01',
@@ -113,22 +114,19 @@ await withOfficeUi('personnel-accounts-ui', async ({ output, url, invoke, openPa
   employeeLogin = await invoke('Login', { username: 'identity-ui', password: 'Identity-UI-2026' });
   await invoke('ListLeaveRequest', undefined, {}, employeeLogin.accessToken);
 
-  await invoke('createUserAccount', { username: 'hr-policy-ui', fullName: '人事办理员', role: 'PersonnelManager', companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'HR-Policy-2026' }, {}, token);
-  const hrToken = (await invoke('Login', { username: 'hr-policy-ui', password: 'HR-Policy-2026' })).accessToken;
+  const hrAccount = (await invoke('createUserAccount', { username: 'hr-policy-ui', fullName: '人事办理员', role: 'PersonnelManager', companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'HR-Policy-2026' }, {}, token)).user;
+  await linkBusinessPerson(invoke, token, hrAccount);
+  const reviewer = (await invoke('createUserAccount', { username: 'departure-reviewer', fullName: '离职审批员', role: 'OfficeEmployee', companyScope: 'DEFAULT', departmentId: 'GENERAL', isActive: true, resetPassword: 'Departure-Review-2026', permissionGrants: ['view', 'approve'].map(action => ({ resourceKey: 'office.personnel-changes', action, dataScope: 'company' })) }, {}, token)).user;
+  await linkBusinessPerson(invoke, token, reviewer);
+  const departurePolicy = await invoke('GetOaApprovalSettings', undefined, {}, token);
+  await publishDefinitions(invoke, token, { ...departurePolicy, rules: departurePolicy.rules.map(rule => rule.key === 'personnel:Depart' ? { ...rule, stages: [approvalStage('departure', [reviewer.id])] } : rule) }, ['personnel:Depart']);
   const hr = await openPage('hr-policy-ui', 'HR-Policy-2026');
   await hr.goto(`${url}/#/office/people/${person.employee.id}`);
-  await hr.getByRole('button', { name: '办理离职', exact: true }).waitFor();
-  await admin.goto(`${url}/#/office/approval-settings`);
-  await admin.getByRole('checkbox', { name: '离职须审批', exact: true }).check();
-  const settingsSaved = admin.waitForResponse(response => response.url().endsWith('/api/office/approval-settings') && response.request().method() === 'PUT');
-  await admin.getByRole('button', { name: '保存审批设置', exact: true }).click();
-  assert((await settingsSaved).ok());
-  await hr.reload();
   await hr.getByRole('link', { name: '申请离职', exact: true }).waitFor();
   assert.equal(await hr.getByRole('button', { name: '办理离职', exact: true }).count(), 0);
   await hr.getByRole('link', { name: '申请离职', exact: true }).click();
   await hr.getByRole('textbox', { name: '申请标题', exact: true }).fill('离职制度界面验收');
-  await hr.getByRole('textbox', { name: '申请说明', exact: true }).fill('人事提交，管理员批准后同步停用账号');
+  await hr.getByRole('textbox', { name: '申请说明', exact: true }).fill('人事提交，指定审批人批准后同步停用账号');
   const draftSaved = hr.waitForResponse(response => response.url().endsWith('/api/office/personnel-requests') && response.request().method() === 'POST');
   await hr.getByRole('button', { name: '保存草稿', exact: true }).click();
   const draftResponse = await draftSaved; assert(draftResponse.ok()); const draft = await draftResponse.json();
@@ -138,16 +136,17 @@ await withOfficeUi('personnel-accounts-ui', async ({ output, url, invoke, openPa
   await hr.getByRole('dialog').getByRole('button', { name: '提交审批', exact: true }).click();
   await hr.getByRole('dialog').waitFor({ state: 'hidden' });
   assert.equal((await invoke('GetPersonnel', undefined, { id: person.employee.id }, token)).account.isActive, true);
-  await assert.rejects(() => invoke('DepartPersonnel', { expectedVersion: person.versionNumber, effectiveDate: employeeLogin.user.businessDate, note: '尝试绕过审批' }, { id: person.employee.id }, hrToken), /409/u);
+  assert(!operations.has('DepartPersonnel'), 'The retired direct departure endpoint is not part of the native contract');
   await admin.goto(`${url}/#/office/people/${person.employee.id}`);
-  await admin.getByRole('button', { name: '办理离职', exact: true }).waitFor();
-  await admin.goto(`${url}/#/office/requests/personnel?requestId=${draft.id}`);
-  await admin.getByRole('button', { name: '批准人员变动', exact: true }).click();
-  await admin.getByRole('textbox', { name: '处理说明', exact: true }).fill('核对通过，完成离职');
-  await admin.getByRole('dialog').getByRole('button', { name: '批准人员变动', exact: true }).click();
-  await admin.getByRole('dialog').waitFor({ state: 'hidden' });
-  await admin.getByText('人员变动已生效', { exact: true }).waitFor();
-  await admin.getByRole('link', { name: '查看人员档案', exact: true }).click();
+  assert.equal(await admin.getByRole('button', { name: '办理离职', exact: true }).count(), 0, 'Administrators also use the shared published workflow');
+  const review = await openPage('departure-reviewer', 'Departure-Review-2026');
+  await review.goto(`${url}/#/office/requests/personnel?requestId=${draft.id}`);
+  await review.getByRole('button', { name: '批准人员变动', exact: true }).click();
+  await review.getByRole('textbox', { name: '处理说明', exact: true }).fill('核对通过，完成离职');
+  await review.getByRole('dialog').getByRole('button', { name: '批准人员变动', exact: true }).click();
+  await review.getByRole('dialog').waitFor({ state: 'hidden' });
+  await review.getByText('人员变动已生效', { exact: true }).waitFor();
+  await admin.reload();
   await admin.getByText('identity-ui（停用）', { exact: true }).waitFor();
   assert.equal((await invoke('GetPersonnel', undefined, { id: person.employee.id }, token)).employee.status, 'Departed');
   await admin.screenshot({ path: path.join(output, 'approved-personnel-departure.png'), fullPage: true });

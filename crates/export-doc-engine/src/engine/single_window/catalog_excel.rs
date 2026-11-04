@@ -222,9 +222,7 @@ fn number(values: &Value, name: &str) -> i64 {
         .filter(|value| *value > 0)
         .unwrap_or(0)
 }
-fn text(values: &Value, name: &str) -> String {
-    values[name].as_str().unwrap_or("").trim().to_string()
-}
+use crate::engine::records::text;
 fn normalize_header(value: &str) -> String {
     value
         .chars()

@@ -32,6 +32,7 @@ mod tauri_updater_commands;
 mod tauri_updater_task;
 #[cfg(all(test, windows))]
 mod test_directory_link;
+mod update_installation;
 mod window;
 #[cfg(windows)]
 mod windows_prerequisites;
@@ -95,8 +96,6 @@ fn run_tauri_app() -> tauri::Result<()> {
             desktop_file_dialog_commands::select_single_window_package_file,
             desktop_file_dialog_commands::select_invoice_transfer_package_file,
             desktop_file_dialog_commands::select_disaster_recovery_package_file,
-            desktop_file_dialog_commands::select_receipt_file,
-            desktop_file_dialog_commands::select_receipt_files,
             desktop_file_dialog_commands::select_pdf_files,
             desktop_file_dialog_commands::select_email_attachment_files,
             desktop_file_dialog_commands::select_customs_coo_attachment_files,
@@ -124,18 +123,32 @@ fn run_tauri_app() -> tauri::Result<()> {
             tauri_updater_commands::check_tauri_update,
             tauri_updater_commands::install_tauri_update,
             tauri_updater_commands::cancel_tauri_update,
-            desktop_runtime::get_desktop_runtime_context
+            desktop_runtime::get_desktop_runtime_context,
+            desktop_runtime::restart_after_startup_failure
         ])
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let result: Result<(), Box<dyn std::error::Error>> = (|| {
                 let paths = runtime_paths::prepare_runtime_paths(app)?;
                 set_runtime_diagnostic_log_root(&paths.log_root);
-                runtime_prerequisites::check(&paths)?;
-                let runtime = desktop_runtime::start(&paths)?;
-                app.manage(runtime);
                 app.manage(paths.clone());
                 app.manage(tauri_updater_commands::TauriUpdaterState::default());
+                match runtime_prerequisites::check(&paths)
+                    .and_then(|_| desktop_runtime::start(&paths).map_err(|error| error.to_string()))
+                {
+                    Ok(runtime) => {
+                        app.manage(runtime);
+                    }
+                    Err(error) => {
+                        let message = error.to_string();
+                        let log = write_tauri_error(&message)
+                            .unwrap_or_else(|| paths.log_root.join("tauri-errors.log"));
+                        app.manage(desktop_runtime::StartupFailure {
+                            message,
+                            log_path: log.to_string_lossy().into_owned(),
+                        });
+                    }
+                }
                 window::open_main_window(app, &paths)?;
                 STARTUP_FINISHED.store(true, Ordering::Release);
                 Ok(())

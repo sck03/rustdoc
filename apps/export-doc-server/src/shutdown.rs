@@ -105,25 +105,53 @@ pub async fn serve(
     shutdown: Shutdown,
     signal: impl Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
-    let control = shutdown.clone();
-    let server = axum::serve(listener, router).with_graceful_shutdown(async move {
-        signal.await;
-        control.stop();
-    });
-    let completion = async {
-        server.await?;
-        shutdown.stop();
+    use hyper_util::{
+        rt::{TokioIo, TokioTimer},
+        service::TowerToHyperService,
+    };
+    let mut connections = tokio::task::JoinSet::new();
+    tokio::pin!(signal);
+    let accepted = loop {
+        tokio::select! {
+            _ = &mut signal => { shutdown.stop(); break Ok(()); },
+            _ = shutdown.wait() => break Ok(()),
+            _ = connections.join_next(), if !connections.is_empty() => {},
+            incoming = listener.accept() => {
+                let (stream, peer) = match incoming { Ok(value) => value, Err(cause) => { shutdown.stop(); break Err(cause); } };
+                let route = router.clone().layer(axum::Extension(axum::extract::ConnectInfo(peer)));
+                let control = shutdown.clone();
+                connections.spawn(async move {
+                    let mut builder = hyper::server::conn::http1::Builder::new();
+                    builder.timer(TokioTimer::new()).header_read_timeout(Duration::from_secs(15));
+                    let connection = builder.serve_connection(TokioIo::new(stream), TowerToHyperService::new(route));
+                    tokio::pin!(connection);
+                    tokio::select! {
+                        _ = &mut connection => {},
+                        _ = control.wait() => {
+                            connection.as_mut().graceful_shutdown();
+                            let _ = connection.await;
+                        }
+                    }
+                });
+            }
+        }
+    };
+    drop(listener);
+    let drain = async {
+        while connections.join_next().await.is_some() {}
         shutdown.drained().await;
-        Ok(())
     };
-    let deadline = async {
-        shutdown.wait().await;
-        tokio::time::sleep(Duration::from_secs(35)).await;
-    };
-    tokio::select! {
-        result = completion => result,
-        _ = deadline => Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "HTTP 关闭超过 35 秒时限。")),
+    if tokio::time::timeout(Duration::from_secs(35), drain)
+        .await
+        .is_err()
+    {
+        connections.abort_all();
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::TimedOut,
+            "HTTP 关闭超过 35 秒时限。",
+        ));
     }
+    accepted
 }
 
 #[cfg(test)]

@@ -1,12 +1,31 @@
 use super::{
     NativeService,
-    error::{Result, invalid, unavailable},
+    error::{Result, error, invalid, unavailable},
     settings,
 };
 use crate::{api::ApiError, controlled_process};
 use serde_json::{Value, json};
 use std::{process::Command, time::Duration};
+struct Permit<'a>(&'a std::sync::atomic::AtomicUsize);
+impl Drop for Permit<'_> {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+    }
+}
+fn acquire(budget: &std::sync::atomic::AtomicUsize) -> Result<Permit<'_>> {
+    crate::operation::check()?;
+    budget
+        .compare_exchange(
+            0,
+            1,
+            std::sync::atomic::Ordering::AcqRel,
+            std::sync::atomic::Ordering::Acquire,
+        )
+        .map_err(|_| error(429, "AI 审查正在执行，请稍后重试。"))?;
+    Ok(Permit(budget))
+}
 pub fn review(service: &NativeService, body: &Value) -> Result<Value> {
+    let _permit = acquire(&service.ai_budget)?;
     export_doc_contracts::validation::structure(
         crate::contracts::schema("ApiInvoiceDetailDto"),
         &body["invoice"],
@@ -54,4 +73,25 @@ pub fn review(service: &NativeService, body: &Value) -> Result<Value> {
     Ok(
         json!({"reportText":report,"contextSummary":review.summary,"letterOfCreditContentTruncated":review.truncated,"storagePolicy":"只向系统设置中的 AI 服务提交当前发票／信用证草稿，审查结果不自动写入发票。"}),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn budget_is_instance_scoped_and_released_on_failure_or_cancel() {
+        let budget = Default::default();
+        let permit = acquire(&budget).unwrap();
+        assert_eq!(acquire(&budget).err().unwrap().status, Some(429));
+        assert!(acquire(&Default::default()).is_ok());
+        drop(permit);
+        assert!(acquire(&budget).is_ok());
+        let scope = crate::operation::OperationScope::new(Duration::from_secs(1));
+        scope.cancel();
+        assert_eq!(
+            scope.run(|| acquire(&budget)).err().unwrap().status,
+            Some(504)
+        );
+        assert!(acquire(&budget).is_ok());
+    }
 }

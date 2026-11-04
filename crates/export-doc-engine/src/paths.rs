@@ -74,7 +74,10 @@ impl RuntimePaths {
 pub fn nonce() -> Result<String, String> {
     let mut bytes = [0u8; 16];
     getrandom::fill(&mut bytes).map_err(|error| format!("无法生成安全随机数：{error}"))?;
-    Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+    Ok(hex(&bytes))
+}
+pub(crate) fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 pub fn ensure_safe_absolute(path: &Path) -> Result<(), String> {

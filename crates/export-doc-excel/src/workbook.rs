@@ -187,7 +187,17 @@ pub fn booking_from_invoice(
 
 /// General tabular exports write text as inline strings, never as formulas.
 pub fn table(columns: &[(&str, &str)], rows: &[Value], check: Check<'_>) -> Result<Vec<u8>> {
-    let sheet = crate::tabular::sheet(columns, rows, check)?;
+    table_sheet(crate::tabular::sheet(columns, rows, check)?, check)
+}
+/// Feed one bounded database batch at a time without retaining all source DTOs.
+pub fn table_stream(
+    columns: &[(&str, &str)],
+    source: impl FnOnce(&mut dyn FnMut(&Value) -> Result<()>) -> Result<()>,
+    check: Check<'_>,
+) -> Result<Vec<u8>> {
+    table_sheet(crate::tabular::sheet_stream(columns, source, check)?, check)
+}
+fn table_sheet(sheet: Vec<u8>, check: Check<'_>) -> Result<Vec<u8>> {
     let files = [
         (
             "[Content_Types].xml",

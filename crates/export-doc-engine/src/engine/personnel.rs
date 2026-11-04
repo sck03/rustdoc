@@ -31,11 +31,8 @@ pub(super) fn registration(
                 ..Default::default()
             },
             filters: &[("requestKey", records::text(request, "requestKey"))],
-            keyword: "",
-            search_root: None,
-            fields: &[],
-            offset: 0,
             limit: 1,
+            ..Default::default()
         })?
         .1
         .into_iter()
@@ -233,11 +230,7 @@ pub(super) fn person(
 }
 
 fn image_kind<'a>(parameters: &'a [(&str, String)]) -> Result<&'a str> {
-    let kind = parameters
-        .iter()
-        .find(|(key, _)| *key == "kind")
-        .map(|(_, value)| value.as_str())
-        .unwrap_or("Avatar");
+    let kind = crate::engine::request_values::find(parameters, "kind").unwrap_or("Avatar");
     if !["Avatar", "IdentityFront", "IdentityBack"].contains(&kind) {
         return Err(invalid("人员图片类别无效。"));
     }

@@ -79,7 +79,7 @@ fn update_state(store: &Store, id: Option<&str>, patch: Value) -> Result<()> {
 }
 fn finish_state(store: &Store, id: &str, patch: Value) -> Result<()> {
     // Terminal status must remain observable after cancellation.
-    crate::operation::OperationScope::new(Duration::from_secs(30))
+    crate::operation::OperationScope::detached(Duration::from_secs(30))
         .run(|| update_state(store, Some(id), patch))
 }
 pub(in crate::engine) fn run_now(service: &NativeService, actor: &Actor) -> Result<Value> {
@@ -124,7 +124,7 @@ pub(in crate::engine) fn test_replica(service: &NativeService, actor: &Actor) ->
                 sealed::atomic_write(&path, bytes)?;
                 let (size, digest) = super::super::backup_io::digest_file(&path)?;
                 let uploaded = target.upload(&path, &name, size, &digest, true);
-                let cleanup = crate::operation::OperationScope::new(Duration::from_secs(30))
+                let cleanup = crate::operation::OperationScope::detached(Duration::from_secs(30))
                     .run(|| replica::Target::read(&store, &protector, &saved)?.delete(&name));
                 uploaded?;
                 cleanup?;
@@ -151,7 +151,7 @@ pub(in crate::engine) fn ticket(service: &NativeService, actor: &Actor, id: &str
     if archive.deleting {
         return Err(error(404, "此备份已清理。"));
     }
-    let mut ticket = super::issue_download_ticket(id.into())?;
+    let mut ticket = service.backup_tickets.issue_download(id.into())?;
     ticket["downloadUrl"] = json!(
         DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET
             .path
@@ -165,6 +165,8 @@ pub(in crate::engine) fn download(
     parameters: &[(&str, String)],
 ) -> Result<crate::engine::backup_io::Download> {
     administrator(actor)?;
-    let id = super::consume_download_ticket(super::header(parameters, "token"))?;
+    let id = service
+        .backup_tickets
+        .consume_download(super::header(parameters, "token"))?;
     repository::download(&service.paths, &id)
 }

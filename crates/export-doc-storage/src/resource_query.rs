@@ -63,6 +63,7 @@ pub(crate) fn build(kind: &str, pg: bool) -> Result<(QuerySql, String)> {
     };
     Ok((
         QuerySql {
+            source: crate::query_source::Source::Projected,
             filter,
             order: "r.id DESC".into(),
             values,

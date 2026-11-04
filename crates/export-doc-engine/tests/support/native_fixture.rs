@@ -1,3 +1,5 @@
+// Shared across integration targets; each target uses only its relevant workflows.
+#![allow(dead_code)]
 #[path = "client.rs"]
 mod client;
 pub use client::ApiClient;

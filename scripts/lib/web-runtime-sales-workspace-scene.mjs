@@ -9,7 +9,7 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
     const firstRun = await read(page, `(() => ({
       visible: Boolean(document.querySelector('.sales-first-run')),
       stepCount: document.querySelectorAll('.sales-first-run-steps button').length,
-      metricCount: document.querySelectorAll('button.dashboard-metric').length
+      metricCount: document.querySelectorAll('button[data-ui=kpi]').length
     }))()`);
     if (!firstRun.visible || firstRun.stepCount !== 3 || firstRun.metricCount !== 6) {
       throw new Error(`Sales first-run layout mismatch: ${JSON.stringify(firstRun)}`);
@@ -179,7 +179,7 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
     });
     await navigate(page, buildHashUrl(options.webUrl, "/crm/dashboard"));
     await waitForText(page, ["销售概览", "销售客户"], timeoutMs);
-    await clickButtonByText(page, "销售客户", "button.dashboard-metric");
+    await clickButtonByText(page, "销售客户", "button[data-ui=kpi]");
     await waitForLocation(page, "/crm/follow-ups", "view=directory", timeoutMs);
 
     const longCustomerName = "宁波远洋国际贸易与全球供应链协同服务有限公司 NORTHSTAR INTERNATIONAL SOURCING AND SUPPLY CHAIN";
@@ -458,8 +458,8 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
     })()`);
     if (!cancelledFollowUpDelete) throw new Error("Sales follow-up delete confirmation could not be cancelled.");
     await waitForText(page, ["删除跟进记录", "取消", "确认删除"], timeoutMs);
-    await clickButtonByText(page, "取消", ".confirmation-dialog button");
-    await waitFor(async () => await read(page, "!document.querySelector('.confirmation-dialog')") ? true : null,
+    await clickButtonByText(page, "取消", "[data-dialog-purpose=confirmation] button");
+    await waitFor(async () => await read(page, "!document.querySelector('[data-dialog-purpose=confirmation]')") ? true : null,
       timeoutMs, () => "Timed out waiting for the cancelled follow-up delete dialog to close.");
     const followUpStillVisible = await read(page, `Array.from(document.querySelectorAll('.follow-up-data-table .table-primary-text')).some((item) => item.getAttribute('title') === ${JSON.stringify(longFollowUpSummary)})`);
     if (!followUpStillVisible) throw new Error("Sales follow-up was removed after cancelling delete confirmation.");
@@ -474,7 +474,7 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
     })()`);
     if (!confirmedFollowUpDelete) throw new Error("Sales follow-up delete could not be confirmed.");
     await waitForText(page, ["删除跟进记录", "确认删除"], timeoutMs);
-    await clickButtonByText(page, "确认删除", ".confirmation-dialog button");
+    await clickButtonByText(page, "确认删除", "[data-dialog-purpose=confirmation] button");
     await waitForText(page, ["跟进记录已删除"], timeoutMs);
     await waitFor(async () => await read(page, `!Array.from(document.querySelectorAll('.follow-up-data-table .table-primary-text')).some((item) => item.getAttribute('title') === ${JSON.stringify(longFollowUpSummary)})`) ? true : null,
       timeoutMs, () => "Timed out waiting for the deleted follow-up to disappear.");
@@ -634,7 +634,7 @@ export function createSalesWorkspaceSmokeScene({ evaluate, includesText, waitFor
       timeoutMs, () => "Timed out waiting for the copied template editor before deletion.");
     await clickButtonByText(page, "删除", "form.form-grid button");
     await waitForText(page, ["删除邮件模板", "确认删除"], timeoutMs);
-    await clickButtonByText(page, "确认删除", ".confirmation-dialog button");
+    await clickButtonByText(page, "确认删除", "[data-dialog-purpose=confirmation] button");
     await waitFor(async () => await readSelectedTask(page) === "模板目录" ? true : null,
       timeoutMs, () => "Timed out waiting for the template directory after deletion.");
     await waitForText(page, ["邮件模板已删除", inactiveTemplateName], timeoutMs);

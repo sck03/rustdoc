@@ -1,5 +1,14 @@
 //! Shared SQL primitives; identifiers come from reviewed query models, values bind.
 use crate::{Error, Result};
+mod statement;
+pub(crate) use statement::Statement;
+pub(crate) fn object(pg: bool) -> &'static str {
+    if pg {
+        "jsonb_build_object"
+    } else {
+        "json_object"
+    }
+}
 pub(crate) fn field(path: &str, postgres: bool) -> String {
     if postgres && !path.contains('.') {
         format!("r.body->>'{path}'")
@@ -67,6 +76,21 @@ pub(crate) fn substring(value: &str, keyword: &str, postgres: bool) -> String {
     } else {
         format!("instr({value},{keyword})>0")
     }
+}
+/// A binary range preserves literal prefix matching and allows a B-tree seek.
+pub(crate) fn prefix(value: &str, prefix: &str, values: &mut Vec<String>, pg: bool) -> String {
+    let lower = bind(values, prefix, pg);
+    let collation = if pg { "\"C\"" } else { "BINARY" };
+    let value = format!("({value}) COLLATE {collation}");
+    let mut upper = prefix.to_owned();
+    while let Some(last) = upper.pop() {
+        if let Some(next) = (u32::from(last) + 1..=0x10ffff).find_map(char::from_u32) {
+            upper.push(next);
+            let upper = bind(values, upper, pg);
+            return format!("({value}>={lower} AND {value}<{upper})");
+        }
+    }
+    format!("{value}>={lower}")
 }
 pub(crate) fn valid_path(path: &str) -> Result<()> {
     if path.is_empty()

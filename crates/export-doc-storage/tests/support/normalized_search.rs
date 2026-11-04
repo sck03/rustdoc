@@ -3,14 +3,8 @@ use serde_json::json;
 
 pub fn exercise(db: &Connection) {
     db.begin().unwrap();
-    let mut body = json!({"versionNumber":1,"ownerUserId":1,"companyScope":"SEARCH","departmentId":"D","customerNameEN":"CAFE\u{301}","name":"Original"});
-    let id = db
-        .insert(&RecordWrite {
-            kind: "invoices",
-            identity: None,
-            body: &body,
-        })
-        .unwrap();
+    let mut body = json!({"versionNumber":1,"ownerUserId":1,"companyScope":"SEARCH","departmentId":"D","customerNameEN":"CAFE\u{301}","name":"Original","b":2,"a":1});
+    let id = db.insert(&RecordWrite::unkeyed("invoices", &body)).unwrap();
     body["id"] = json!(id);
     db.set_body(id, &body).unwrap();
     let query = |keyword: &str| {
@@ -21,17 +15,20 @@ pub fn exercise(db: &Connection) {
                 company: "SEARCH",
                 ..Default::default()
             },
-            filters: &[],
             keyword,
-            search_root: None,
             fields: &[("id", "id")],
-            offset: 0,
             limit: 20,
+            ..Default::default()
         })
         .unwrap()
         .0
     };
     assert_eq!(query("café"), 1, "cached words keep NFC/case normalization");
+    assert_eq!(
+        query("\"a\":1,\"b\":2"),
+        1,
+        "cached structured search uses canonical key order"
+    );
     assert_eq!(
         query("\"name\":\"Original\""),
         1,
@@ -44,12 +41,8 @@ pub fn exercise(db: &Connection) {
     let mut large = body.clone();
     large["customerNameEN"] = json!("Large-search-marker");
     large["padding"] = json!("x".repeat(65537));
-    db.insert(&RecordWrite {
-        kind: "invoices",
-        identity: None,
-        body: &large,
-    })
-    .unwrap();
+    db.insert(&RecordWrite::unkeyed("invoices", &large))
+        .unwrap();
     assert_eq!(
         query("Large-search-marker"),
         1,

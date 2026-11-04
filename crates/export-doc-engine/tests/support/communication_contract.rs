@@ -20,11 +20,7 @@ fn call(
     };
     let body = body.map(|v| contracts::overlay(contracts::object(op.id, true), &v));
     let body = workflow::decision_body(service, token, op, id, body);
-    let value: Value =
-        serde_json::from_slice(&service.dispatch(op, &parameters, query, body, token)?).unwrap();
-    export_doc_contracts::validation::response(op.id, &value)
-        .unwrap_or_else(|e| panic!("{}: {e}", op.id));
-    Ok(value)
+    workflow::dispatch(service, token, op, &parameters, query, body)
 }
 fn action(service: &NativeService, token: &str, op: Operation, row: &Value) -> Value {
     call(

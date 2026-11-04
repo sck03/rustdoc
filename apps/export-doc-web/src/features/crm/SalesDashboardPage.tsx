@@ -1,6 +1,7 @@
+import { DashboardWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useState, type KeyboardEvent } from "react";
-import { AlarmClock, ArrowRight, CalendarRange, CircleDollarSign, ContactRound, RefreshCw, TrendingUp, UsersRound } from "lucide-react";
+import { ArrowRight, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
@@ -12,6 +13,7 @@ import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { WorkspaceGuide } from "../../ui/WorkspaceGuide.tsx";
 import { TaskViewPanel, TaskViewTabs } from "../../ui/TaskViewTabs.tsx";
+import { Card, KpiTile } from "../../ui/primitives/Card.tsx";
 
 export function SalesDashboardPage({ businessTimeZone, client }: { businessTimeZone: string; client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
@@ -26,12 +28,12 @@ export function SalesDashboardPage({ businessTimeZone, client }: { businessTimeZ
     .filter((item) => item.stage === "已报价" || item.stage === "谈判中")
     .reduce((total, item) => total + item.count, 0);
   const metrics = [
-    { label: "销售客户", value: dashboard ? dashboard.customerCount : "—", icon: ContactRound, tone: "teal", to: "/crm/follow-ups?view=directory" },
-    { label: "联系人", value: dashboard ? dashboard.contactCount : "—", icon: UsersRound, tone: "blue", to: "/crm/follow-ups?view=profile" },
-    { label: "待跟进", value: dashboard ? dashboard.pendingFollowUpCount : "—", icon: CalendarRange, tone: "amber", to: "/crm/follow-ups?view=followups" },
-    { label: "已逾期", value: dashboard ? dashboard.overdueFollowUpCount : "—", icon: AlarmClock, tone: "violet", to: "/crm/follow-ups?view=followups" },
-    { label: "进行中商机", value: dashboard ? openOpportunityCount : "—", icon: TrendingUp, tone: "teal", to: "/crm/opportunities?view=directory" },
-    { label: "报价/谈判", value: dashboard ? quotedOpportunityCount : "—", icon: CircleDollarSign, tone: "amber", to: "/crm/opportunities?view=directory" },
+    { label: "销售客户", value: dashboard ? dashboard.customerCount : "—", to: "/crm/follow-ups?view=directory" },
+    { label: "联系人", value: dashboard ? dashboard.contactCount : "—", to: "/crm/follow-ups?view=profile" },
+    { label: "待跟进", value: dashboard ? dashboard.pendingFollowUpCount : "—", to: "/crm/follow-ups?view=followups" },
+    { label: "已逾期", value: dashboard ? dashboard.overdueFollowUpCount : "—", to: "/crm/follow-ups?view=followups" },
+    { label: "进行中商机", value: dashboard ? openOpportunityCount : "—", to: "/crm/opportunities?view=directory" },
+    { label: "报价/谈判", value: dashboard ? quotedOpportunityCount : "—", to: "/crm/opportunities?view=directory" },
   ];
   const isFirstRun = Boolean(dashboard)
     && dashboard!.customerCount === 0
@@ -40,7 +42,7 @@ export function SalesDashboardPage({ businessTimeZone, client }: { businessTimeZ
     && openOpportunityCount === 0;
 
   return (
-    <section className="dashboard-page" aria-label="销售概览">
+    <DashboardWorkspace className="dashboard-page" aria-label="销售概览">
       <div className="toolbar">
         <div className="toolbar-summary"><strong>未来七天待跟进：{dashboard?.dueNextSevenDaysCount ?? 0} 项</strong></div>
         <div className="toolbar-actions">
@@ -71,20 +73,13 @@ export function SalesDashboardPage({ businessTimeZone, client }: { businessTimeZ
         </div>
       </section></WorkspaceGuide> : null}
       <div className="dashboard-metric-grid">
-        {metrics.map((metric) => {
-          const Icon = metric.icon;
-          return <button type="button" className={`dashboard-metric dashboard-metric-${metric.tone}`} key={metric.label}
-            aria-label={`${metric.label} ${metric.value}，打开详情`} onClick={() => navigate(metric.to)}>
-            <div className="dashboard-metric-icon"><Icon size={19} aria-hidden="true" /></div>
-            <div><span>{metric.label}</span><strong>{metric.value}</strong></div>
-          </button>;
-        })}
+        {metrics.map(metric => <KpiTile key={metric.label} label={metric.label} value={metric.value} onActivate={() => navigate(metric.to)} />)}
       </div>
 
       <TaskViewTabs idPrefix={tabsId} label="销售概览视图" value={view} onChange={setView} items={[{ id: "work", label: "跟进与成交" }, { id: "analysis", label: "经营分析" }]} />
       <TaskViewPanel idPrefix={tabsId} id="work" active={view === "work"}>
       <div className="dashboard-section-stack">
-      <section className="form-section" aria-label="近期跟进待办">
+      <Card className="form-section" aria-label="近期跟进待办">
         <div className="section-header"><h2>近期跟进待办</h2></div>
         <ResponsiveTableFrame className="summary-table-frame" label="近期跟进待办" mobileLayout="scroll" busy={query.isFetching}>
           <table className="dashboard-recent-table responsive-data-table">
@@ -100,37 +95,37 @@ export function SalesDashboardPage({ businessTimeZone, client }: { businessTimeZ
             </tbody>
           </table>
         </ResponsiveTableFrame>
-      </section>
+      </Card>
 
-      <section className="form-section" aria-label="近期预计成交">
+      <Card className="form-section" aria-label="近期预计成交">
         <div className="section-header"><h2>未来 30 天预计成交</h2></div>
         <ResponsiveTableFrame className="summary-table-frame" label="未来 30 天预计成交" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th data-table-priority="secondary">阶段</th><th>预计金额</th><th data-table-priority="secondary">概率</th><th>预计日期</th></tr></thead><tbody>
           {(dashboard?.upcomingOpportunityClosings ?? []).map((item) => <tr className="clickable-row" key={item.id} tabIndex={0} onClick={() => navigate(`/crm/opportunities?view=editor&opportunityId=${item.id}`)} onKeyDown={(event) => handleRowKeyDown(event, () => navigate(`/crm/opportunities?view=editor&opportunityId=${item.id}`))}><td><TablePrimaryText value={item.title} /></td><td><TablePrimaryText value={item.customerName} /></td><td data-table-priority="secondary"><BusinessStatusBadge value={item.stage} /></td><td>{item.currency} {formatAmount(item.estimatedAmount)}</td><td data-table-priority="secondary">{item.probabilityPercent}%</td><td>{formatDate(item.expectedCloseDate)}</td></tr>)}
           {!query.isFetching && !query.isError && !dashboard?.upcomingOpportunityClosings.length ? <tr><td className="empty-cell" colSpan={6}>未来 30 天暂无预计成交商机。</td></tr> : null}
         </tbody></table></ResponsiveTableFrame>
-      </section>
+      </Card>
       </div>
       </TaskViewPanel>
       <TaskViewPanel idPrefix={tabsId} id="analysis" active={view === "analysis"}>
       <div className="two-column-layout">
-        <section className="form-section" aria-label="商机阶段漏斗">
+        <Card className="form-section" aria-label="商机阶段漏斗">
           <div className="section-header"><h2>商机阶段漏斗</h2></div>
           <ResponsiveTableFrame className="summary-table-frame" label="商机阶段漏斗" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>阶段</th><th>数量</th></tr></thead><tbody>
             {(dashboard?.opportunityStages ?? []).map((item) => <tr className="clickable-row" key={item.stage} tabIndex={0} onClick={() => navigate("/crm/opportunities")} onKeyDown={(event) => handleRowKeyDown(event, () => navigate("/crm/opportunities"))}><td><BusinessStatusBadge value={item.stage} /></td><td>{item.count}</td></tr>)}
             {!query.isFetching && !query.isError && !dashboard?.opportunityStages.length ? <tr><td className="empty-cell" colSpan={2}>暂无商机阶段数据。</td></tr> : null}
           </tbody></table></ResponsiveTableFrame>
-        </section>
-        <section className="form-section" aria-label="商机金额汇总">
+        </Card>
+        <Card className="form-section" aria-label="商机金额汇总">
           <div className="section-header"><h2>进行中商机金额</h2><span>按币种分组</span></div>
           <ResponsiveTableFrame className="summary-table-frame" label="进行中商机金额" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>币种</th><th>商机数</th><th>预计金额</th><th>加权金额</th></tr></thead><tbody>
             {(dashboard?.opportunityCurrencies ?? []).map((item) => <tr key={item.currency}><td>{item.currency}</td><td>{item.count}</td><td>{formatAmount(item.estimatedAmount)}</td><td>{formatAmount(item.weightedAmount)}</td></tr>)}
             {!query.isFetching && !query.isError && !dashboard?.opportunityCurrencies.length ? <tr><td className="empty-cell" colSpan={4}>暂无进行中商机金额。</td></tr> : null}
           </tbody></table></ResponsiveTableFrame>
-        </section>
+        </Card>
       </div>
 
       </TaskViewPanel>
-    </section>
+    </DashboardWorkspace>
   );
 }
 

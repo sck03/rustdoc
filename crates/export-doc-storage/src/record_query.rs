@@ -325,6 +325,7 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
     .filter(&mut values, postgres);
     filter += &format!(" AND ({restricted})");
     QuerySql {
+        source: crate::query_source::Source::Projected,
         filter,
         order: "r.id DESC".into(),
         values,
@@ -335,10 +336,26 @@ pub(crate) fn page(
     q: &RecordQuery<'_>,
 ) -> crate::Result<(i64, Vec<serde_json::Value>)> {
     let pg = db.provider() == "PostgreSQL";
+    if !crate::workflow_runtime::request_kind(q.kind) {
+        let sql = sql(q, pg);
+        let projection = crate::sql::projection(q.fields, pg)?;
+        return db.query_page(&sql, &projection, q.offset, q.limit.clamp(1, 100));
+    }
+    let (statement, values) = statement(q, pg)?;
+    let value = db.query_json(&statement, &values)?;
+    let count = value["count"]
+        .as_i64()
+        .ok_or_else(|| crate::Error::unavailable("申请统计结果无效。"))?;
+    Ok((count, serde_json::from_value(value["items"].clone())?))
+}
+pub(crate) fn statement(q: &RecordQuery<'_>, pg: bool) -> crate::Result<(String, Vec<String>)> {
     let sql = sql(q, pg);
     let projection = crate::sql::projection(q.fields, pg)?;
     if !crate::workflow_runtime::request_kind(q.kind) {
-        return db.query_page(&sql, &projection, q.offset, q.limit.clamp(1, 100));
+        return Ok((
+            crate::query_source::page(&sql, &projection, q.offset, q.limit.clamp(1, 100), pg),
+            sql.values,
+        ));
     }
     let filter = sql.filter;
     let order = sql.order;
@@ -361,11 +378,12 @@ pub(crate) fn page(
         "json_object"
     };
     let cast = if pg { "::text" } else { "" };
-    let value=db.query_json(&format!("SELECT {object}('count',(SELECT COUNT(*) FROM workflow_record_filters r WHERE {filter}),'items',{aggregate}){cast}"),&sql.values)?;
-    let count = value["count"]
-        .as_i64()
-        .ok_or_else(|| crate::Error::unavailable("申请统计结果无效。"))?;
-    Ok((count, serde_json::from_value(value["items"].clone())?))
+    Ok((
+        format!(
+            "SELECT {object}('count',(SELECT COUNT(*) FROM workflow_record_filters r WHERE {filter}),'items',{aggregate}){cast}"
+        ),
+        sql.values,
+    ))
 }
 /// The inbox uses the same submission, context and independent-signature rule
 /// for ordinary OA and resource approvals, before counting or paging.

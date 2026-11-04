@@ -163,6 +163,7 @@ impl DataScope<'_> {
         }
     }
 }
+#[derive(Default)]
 pub struct GenericQuery<'a> {
     pub kind: &'a str,
     pub scope: DataScope<'a>,
@@ -193,6 +194,7 @@ pub(crate) fn scoped(q: &ScopedQuery<'_>, pg: bool) -> Result<(QuerySql, String)
     }
     Ok((
         QuerySql {
+            source: crate::query_source::Source::for_kind(q.kind),
             filter: clauses.join(" AND "),
             order: "r.id DESC".into(),
             values,
@@ -213,8 +215,12 @@ pub(crate) fn build(q: &GenericQuery<'_>, pg: bool) -> Result<(QuerySql, String)
             format!(
                 "CASE json_type(r.body,'$.{name}') WHEN 'true' THEN 'true' WHEN 'false' THEN 'false' ELSE CAST({expression} AS TEXT) END"
             )
-        } else {
+        } else if serde_json::from_str::<serde_json::Value>(value)
+            .is_ok_and(|value| value.is_number())
+        {
             format!("CAST({expression} AS TEXT)")
+        } else {
+            expression
         };
         clauses.push(format!("{expression}={}", bind(&mut values, value, pg)));
     }
@@ -241,11 +247,7 @@ pub(crate) fn build(q: &GenericQuery<'_>, pg: bool) -> Result<(QuerySql, String)
         let keyword = bind(&mut values, q.keyword, pg);
         let cached = q.search_root.is_none()
             && !crate::identity_runtime::supports(q.kind)
-            && !crate::workflow_runtime::projects_body(q.kind)
-            && (!pg
-                || !q
-                    .keyword
-                    .contains(['{', '}', '[', ']', ':', ',', '"', '\\']));
+            && !crate::workflow_runtime::projects_body(q.kind);
         if cached {
             // Generated metadata is bounded and transactionally follows body.
             // Large documents retain the same full search through the fallback.
@@ -257,6 +259,7 @@ pub(crate) fn build(q: &GenericQuery<'_>, pg: bool) -> Result<(QuerySql, String)
     }
     Ok((
         QuerySql {
+            source: crate::query_source::Source::for_kind(q.kind),
             filter: clauses.join(" AND "),
             order: "r.id DESC".into(),
             values,

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { PageState } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
@@ -35,7 +35,7 @@ export function InvoicePicker({ client, userId, onSelect, onClose }: {
             <div><h3>{invoice.invoiceNo}</h3><p>{invoice.type} · {invoice.customerName || "未填写客户"} · {invoice.invoiceDate}</p></div>
             <button type="button" className="command-button secondary" aria-label={`选择 ${invoice.invoiceNo}（${invoice.type}）`} onClick={() => onSelect(invoice.id)}>选择发票</button>
           </li>)}</ul>}
-        <ListPaginationControls pageNumber={pageNumber} pageSize={pageSize} totalCount={query.data.totalCount} totalPages={query.data.totalPages}
+        <Pagination pageNumber={pageNumber} pageSize={pageSize} totalCount={query.data.totalCount} totalPages={query.data.totalPages}
           pageSizeOptions={[20, 50, 100]} isBusy={query.isFetching} onPageChange={setPageNumber} onPageSizeChange={size => { setPageSize(size); setPageNumber(1); }} />
       </>}
   </section>;

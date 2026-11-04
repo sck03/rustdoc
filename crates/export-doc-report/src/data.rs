@@ -215,12 +215,6 @@ impl ReportData {
     pub fn item_text(&self, item: &Value, field: &str) -> String {
         plain(value_at(item, field))
     }
-    pub fn number(&self, path: &str, precision: u32) -> Result<String> {
-        Ok(format_decimal(decimal(self.value(path, None))?, precision))
-    }
-    pub fn item_number(&self, item: &Value, field: &str, precision: u32) -> Result<String> {
-        Ok(format_decimal(decimal(value_at(item, field))?, precision))
-    }
     pub fn items(&self) -> &[Value] {
         self.root["items"]
             .as_array()

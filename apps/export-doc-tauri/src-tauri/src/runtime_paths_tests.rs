@@ -1,39 +1,30 @@
 use super::*;
 
 #[test]
-fn reads_runtime_path_arguments_from_split_values() {
-    let args = vec![
-        OsString::from("--data-root"),
-        OsString::from("D:\\ExportDocManagerData"),
-        OsString::from("--app-root"),
-        OsString::from("D:\\ExportDocManager"),
-    ];
-
-    assert_eq!(
-        runtime_arg_value_from(args.clone(), "--data-root"),
-        Some(PathBuf::from("D:\\ExportDocManagerData"))
-    );
-    assert_eq!(
-        runtime_arg_value_from(args, "--app-root"),
-        Some(PathBuf::from("D:\\ExportDocManager"))
-    );
-}
-
-#[test]
-fn reads_runtime_path_arguments_from_equals_values() {
-    let args = vec![
-        OsString::from("--data-root=D:\\ExportDocManagerData"),
-        OsString::from("--app-root=D:\\ExportDocManager"),
-    ];
-
-    assert_eq!(
-        runtime_arg_value_from(args.clone(), "--data-root"),
-        Some(PathBuf::from("D:\\ExportDocManagerData"))
-    );
-    assert_eq!(
-        runtime_arg_value_from(args, "--app-root"),
-        Some(PathBuf::from("D:\\ExportDocManager"))
-    );
+fn reads_runtime_path_arguments_from_split_and_equals_values() {
+    for values in [
+        vec![
+            "--data-root",
+            "D:\\ExportDocManagerData",
+            "--app-root",
+            "D:\\ExportDocManager",
+        ],
+        vec![
+            "--data-root=D:\\ExportDocManagerData",
+            "--app-root=D:\\ExportDocManager",
+        ],
+    ] {
+        let args: Vec<_> = values.into_iter().map(OsString::from).collect();
+        for (flag, expected) in [
+            ("--data-root", "D:\\ExportDocManagerData"),
+            ("--app-root", "D:\\ExportDocManager"),
+        ] {
+            assert_eq!(
+                runtime_arg_value_from(args.clone(), flag),
+                Some(PathBuf::from(expected))
+            );
+        }
+    }
 }
 
 #[test]
@@ -83,44 +74,28 @@ fn reads_persisted_absolute_runtime_data_root() {
 }
 
 #[test]
-fn rejects_unsupported_runtime_paths_config_schema() {
-    let app_root = fresh_test_dir("unsupported-runtime-paths-schema");
-    let config_root = app_root.join("platform-config");
-    fs::create_dir_all(&config_root).unwrap();
-    fs::write(
-        runtime_paths_config_path(&config_root),
-        r#"{"schemaVersion":2,"dataRoot":"BusinessData"}"#,
-    )
-    .unwrap();
-
-    let error = read_persisted_data_root(&config_root, &app_root)
-        .unwrap_err()
-        .to_string();
-
-    assert!(error.contains("Unsupported runtime paths config schema version 2"));
-}
-
-#[test]
-fn unsupported_schema_does_not_fall_back_to_older_backup() {
-    let app_root = fresh_test_dir("unsupported-runtime-paths-schema-with-backup");
-    let config_root = app_root.join("platform-config");
-    fs::create_dir_all(&config_root).unwrap();
-    fs::write(
-        runtime_paths_config_path(&config_root),
-        r#"{"schemaVersion":2,"dataRoot":"NewBusinessData"}"#,
-    )
-    .unwrap();
-    fs::write(
-        runtime_paths_config_backup_path(&config_root),
-        r#"{"schemaVersion":1,"dataRoot":"OldBusinessData"}"#,
-    )
-    .unwrap();
-
-    let error = read_persisted_data_root(&config_root, &app_root)
-        .unwrap_err()
-        .to_string();
-
-    assert!(error.contains("Unsupported runtime paths config schema version 2"));
+fn rejects_unsupported_schema_even_when_an_older_backup_exists() {
+    for with_backup in [false, true] {
+        let app_root = fresh_test_dir(&format!("unsupported-schema-{with_backup}"));
+        let config_root = app_root.join("platform-config");
+        fs::create_dir_all(&config_root).unwrap();
+        fs::write(
+            runtime_paths_config_path(&config_root),
+            r#"{"schemaVersion":2,"dataRoot":"NewBusinessData"}"#,
+        )
+        .unwrap();
+        if with_backup {
+            fs::write(
+                runtime_paths_config_backup_path(&config_root),
+                r#"{"schemaVersion":1,"dataRoot":"OldBusinessData"}"#,
+            )
+            .unwrap();
+        }
+        let error = read_persisted_data_root(&config_root, &app_root)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("Unsupported runtime paths config schema version 2"));
+    }
 }
 
 #[test]

@@ -7,7 +7,6 @@ mod handling_contract;
 #[path = "support/material_contract.rs"]
 mod material_contract;
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod native_fixture;
 #[path = "support/oa_archive_contract.rs"]
 mod oa_archive_contract;

@@ -1,3 +1,5 @@
+import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
+import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient, PersonnelDepartmentRecord, PersonnelImageKind, PersonnelRecord } from "../../api/index.ts";
@@ -45,10 +47,10 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
   const [unlinking, setUnlinking] = useState<PersonnelRecord | null>(null);
   const record = query.data;
   return <>
-    <section className="work-surface office-workspace personnel-workspace personnel-detail-page" aria-label="人员档案详情">
-      <div className="record-context-heading"><button type="button" className="command-button secondary" disabled={imageOperation.busy}
-        onClick={async () => { if (await confirmDiscardChanges("返回人员目录")) onClose(); }}>返回人员目录</button>
-        <h2 ref={title} tabIndex={-1}>{record ? `${record.employee.fullName} · 人员档案` : "人员档案"}</h2></div>
+    <RecordWorkspace className="office-workspace personnel-workspace personnel-detail-page" aria-label="人员档案详情">
+      <PageHeader title={record ? `${record.employee.fullName} · 人员档案` : "人员档案"} headingRef={title}
+        actions={<button type="button" className="command-button secondary" disabled={imageOperation.busy}
+          onClick={async () => { if (await confirmDiscardChanges("返回人员目录")) onClose(); }}>返回人员目录</button>} />
       {query.isPending ? <PageState tone="loading" title="正在读取人员档案" /> : query.isError ? <PageState tone="error" title="档案加载失败" description={readApiError(query.error)}
         action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新加载</button>} /> : record && <>
         <div className="office-card-heading"><span>{record.employee.employeeNumber} · {record.employee.departmentName} · {record.employee.jobTitle}</span>
@@ -72,7 +74,7 @@ export function PersonnelDetailsPage({ client, user, id, departments, onClose }:
         {tab === "history" && <PersonnelHistory client={client} user={user} id={id} />}
         {tab === "clearance" && <PersonnelClearancePanel client={client} user={user} record={record} />}
       </>}
-    </section>
+    </RecordWorkspace>
     {editing && <PersonnelFormDialog client={client} user={user} departments={departments} record={editing} onClose={() => setEditing(null)} onSaved={() => setEditing(null)} />}
     {linking && record && <PersonnelAccountDialog client={client} user={user} record={record} onClose={() => setLinking(false)} onUnlink={() => { setLinking(false); setUnlinking(record); }} />}
     {unlinking && <PersonnelUnlinkAccountDialog client={client} record={unlinking} onClose={() => setUnlinking(null)} />}

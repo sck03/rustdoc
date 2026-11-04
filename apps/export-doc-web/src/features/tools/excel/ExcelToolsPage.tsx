@@ -1,4 +1,6 @@
+import { RecordWorkspace } from "../../../ui/layout/Workspaces.tsx";
 import { ExportDocManagerApiClient } from "../../../api/index.ts";
+import "../../../styles/jobs-excel.css";
 import { useModulePermission } from "../../../app/PermissionAccessContext.tsx";
 import { ExcelToolsPanel } from "./ExcelToolsPanel.tsx";
 import { PermissionNotice } from "../../../ui/PageState.tsx";
@@ -8,7 +10,7 @@ export function ExcelToolsPage({ client }: { client: ExportDocManagerApiClient }
   const invoicePermission = useModulePermission("document.invoices");
 
   return (
-    <section className="work-surface excel-tools-surface" aria-label="Excel 模板与托单">
+    <RecordWorkspace className="excel-tools-surface" aria-label="Excel 模板与托单">
       {!excelPermission.canOperate ? (
         <PermissionNotice>当前权限模板仅允许查看 Excel 工具说明；模板导出、托单转换和发票托单输出已禁用。</PermissionNotice>
       ) : null}
@@ -17,6 +19,6 @@ export function ExcelToolsPage({ client }: { client: ExportDocManagerApiClient }
         canOperate={excelPermission.canOperate}
         canReadInvoices={invoicePermission.canView}
       />
-    </section>
+    </RecordWorkspace>
   );
 }

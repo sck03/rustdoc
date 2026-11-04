@@ -27,7 +27,7 @@ const configuration = path.join(root, 'Runtime');
 for (const directory of [app, data, configuration]) fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
 const require = createRequire(path.join(repo, 'apps/export-doc-web/package.json'));
 const { chromium } = require('playwright');
-const executable = path.join(cargoArtifactDirectory(repo), 'export-doc-server' + (process.platform === 'win32' ? '.exe' : ''));
+const executable = path.join(cargoArtifactDirectory(repo, process.env, process.env.EXPORTDOC_TEST_CONFIGURATION === 'Release' ? 'release' : 'debug'), 'export-doc-server' + (process.platform === 'win32' ? '.exe' : ''));
 for (const name of ['Templates', 'Resources/Fonts/OpenSource', 'Resources/ExcelTemplates']) {
   fs.cpSync(path.join(repo, name), path.join(app, name), { recursive: true });
 }

@@ -1,6 +1,7 @@
 //! Exceptional operations share the domain graph and ordinary transaction save.
 use super::*;
 use export_doc_domain::approval::{ApprovalStep, RevisionKind};
+use serde::Deserialize;
 
 pub(super) fn actions(tx: &Connection, actor: &Actor, row: &Value) -> Result<Vec<String>> {
     let review = approval::ReviewSnapshot::read(tx, actor, row)?;
@@ -126,10 +127,7 @@ pub(super) fn result(
     row: &Value,
     parameters: &[(&str, String)],
 ) -> Result<Value> {
-    let key = parameters
-        .iter()
-        .find(|(k, _)| *k == "commandKey")
-        .map(|(_, v)| v.as_str())
+    let key = crate::engine::request_values::find(parameters, "commandKey")
         .ok_or_else(|| invalid("操作编号缺失。"))?;
     let receipt = tx
         .command_receipt(actor.id, &actor.context, key)?
@@ -191,15 +189,17 @@ pub(super) fn execute(
     mut row: Value,
     body: &Value,
 ) -> Result<Value> {
-    required(body, "command", "流程操作", 40)?;
-    required(body, "note", "操作原因", 500)?;
-    let command = text(body, "command");
-    let note = text(body, "note");
+    let input = crate::generated_api::OaWorkflowCommandSave::deserialize(body)
+        .map_err(|cause| invalid(format!("流程操作字段无效：{cause}")))?;
+    let command = input.command.trim();
+    let note = input.note.trim();
+    records::required_text(command, "流程操作", 40)?;
+    records::required_text(note, "操作原因", 500)?;
     let mut review = approval::ReviewSnapshot::read(tx, actor, &row)?;
     let review_tasks = review.task_keys();
     if !actions_for(actor, &row, review.plan.as_ref(), &review_tasks)
         .iter()
-        .any(|a| a == &command)
+        .any(|a| a == command)
     {
         return Err(error(403, "当前身份或发布的节点政策没有开放此操作。"));
     }
@@ -208,7 +208,7 @@ pub(super) fn execute(
         .take()
         .ok_or_else(|| conflict("申请没有流程实例。"))?;
     let now = chrono::Utc::now();
-    match command.as_str() {
+    match command {
         "Suspend" => {
             plan.suspended_at = now.to_rfc3339();
             if plan.outcome() == "Pending" {
@@ -322,7 +322,7 @@ pub(super) fn execute(
             }
         }
         "RetryNode" => {
-            let target = text(body, "targetNodeKey");
+            let target = input.target_node_key.as_deref().unwrap_or("").trim();
             let node = plan
                 .nodes
                 .iter_mut()
@@ -345,15 +345,15 @@ pub(super) fn execute(
             plan.refresh_subflows().map_err(invalid)?;
         }
         "CancelSubflow" | "RetrySubflow" | "CompensateSubflow" => {
-            required(body, "subflowKey", "子流程", 180)?;
-            let key = text(body, "subflowKey");
+            let key = input.subflow_key.as_deref().unwrap_or("").trim();
+            records::required_text(key, "子流程", 180)?;
             let child = plan
                 .subflows
                 .iter()
                 .find(|s| s.key == key)
                 .ok_or_else(|| invalid("子流程不存在。"))?
                 .clone();
-            match command.as_str() {
+            match command {
                 "CancelSubflow" => plan.cancel_child(&key).map_err(invalid)?,
                 "RetrySubflow" => {
                     plan.retry_child(
@@ -414,8 +414,8 @@ pub(super) fn execute(
         _ => {
             let revision: RevisionKind =
                 serde_json::from_value(json!(command)).map_err(|_| invalid("未知流程修订。"))?;
-            required(body, "targetNodeKey", "目标节点", 180)?;
-            let target = text(body, "targetNodeKey");
+            let target = input.target_node_key.as_deref().unwrap_or("").trim();
+            records::required_text(target, "目标节点", 180)?;
             let manager =
                 super::super::units::demand(actor, &actor.company, "organization.workflows")
                     .is_ok();
@@ -431,19 +431,10 @@ pub(super) fn execute(
                     "只能调整当前负责的审批节点，或退回其已执行的前置节点。",
                 ));
             }
-            let ids = body["userIds"]
-                .as_array()
-                .map(|ids| {
-                    ids.iter()
-                        .map(|id| {
-                            id.as_i64()
-                                .filter(|id| *id > 0)
-                                .ok_or_else(|| invalid("责任人编号无效。"))
-                        })
-                        .collect::<Result<Vec<_>>>()
-                })
-                .transpose()?
-                .unwrap_or_default();
+            let ids = input.user_ids.as_deref().unwrap_or_default();
+            if ids.iter().any(|id| *id <= 0) {
+                return Err(invalid("责任人编号无效。"));
+            }
             if ids.len() > 50 {
                 return Err(invalid("每次最多选择 50 位责任人。"));
             }
@@ -452,7 +443,7 @@ pub(super) fn execute(
                 revision,
                 RevisionKind::AddBefore | RevisionKind::AddAfter | RevisionKind::AddParallel
             ) {
-                for id in &ids {
+                for id in ids {
                     let target_node = plan
                         .nodes
                         .iter()
@@ -504,8 +495,8 @@ pub(super) fn execute(
     }
     super::live_assignments::check(tx, actor, &row, &mut plan)?;
     row["approvalPlan"] = serde_json::to_value(&plan)?;
-    tx.append_workflow_operation(&json!({"requestId":row["id"],"submissionNumber":row["submissionNumber"],"generation":plan.generation,"actorId":actor.id,"contextId":actor.context,"command":command,"reason":note,"occurredAt":store::timestamp(),"details":{"targetNodeKey":body["targetNodeKey"],"userIds":body["userIds"]}}))?;
-    if matches!(command.as_str(), "RetryNode" | "RetrySubflow") && plan.outcome() == "Approved" {
+    tx.append_workflow_operation(&json!({"requestId":row["id"],"submissionNumber":row["submissionNumber"],"generation":plan.generation,"actorId":actor.id,"contextId":actor.context,"command":command,"reason":note,"occurredAt":store::timestamp(),"details":{"targetNodeKey":input.target_node_key,"userIds":input.user_ids}}))?;
+    if matches!(command, "RetryNode" | "RetrySubflow") && plan.outcome() == "Approved" {
         return super::fulfillment::advance(
             tx,
             actor,

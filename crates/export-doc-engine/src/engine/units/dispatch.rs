@@ -52,11 +52,8 @@ pub(in crate::engine) fn dispatch(
 }
 
 fn managers(store: &store::Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
-    let company = query
-        .iter()
-        .find(|(key, _)| *key == "companyCode")
-        .map(|(_, value)| value.as_str())
-        .unwrap_or(&actor.company);
+    let company =
+        crate::engine::request_values::find(query, "companyCode").unwrap_or(&actor.company);
     auth::authorize(actor, "organization.directory", "view")?;
     if !actor.admin && company != actor.company {
         return Err(error(403, "人员候选超出当前管理单位。"));

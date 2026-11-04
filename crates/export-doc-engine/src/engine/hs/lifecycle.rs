@@ -14,12 +14,9 @@ pub(super) fn preview(service: &NativeService, actor: &Actor) -> Result<Value> {
                         all: true,
                         ..Default::default()
                     },
-                    filters: &[],
-                    keyword: "",
-                    search_root: None,
                     fields: &[("id", "id")],
-                    offset: 0,
                     limit: 1,
+                    ..Default::default()
                 })?
                 .0;
             let fields = [

@@ -10,13 +10,7 @@ fn insert(c: &Connection, kind: &str, mut row: Value) -> i64 {
     if row.get("departmentId").is_none() {
         row["departmentId"] = json!("A");
     }
-    let id = c
-        .insert(&RecordWrite {
-            kind,
-            identity: None,
-            body: &row,
-        })
-        .unwrap();
+    let id = c.insert(&RecordWrite::unkeyed(kind, &row)).unwrap();
     row["id"] = json!(id);
     c.set_body(id, &row).unwrap();
     id

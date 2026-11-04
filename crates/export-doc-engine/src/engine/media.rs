@@ -74,10 +74,7 @@ pub fn document_type(file_name: &str, bytes: &[u8]) -> Result<(String, &'static 
 }
 
 pub fn digest(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+    crate::paths::hex(&Sha256::digest(bytes))
 }
 
 pub fn image_type(bytes: &[u8], max_bytes: usize) -> Result<&'static str> {

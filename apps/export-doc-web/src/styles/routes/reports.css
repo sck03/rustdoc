@@ -1,2 +1,2 @@
 /* Report designer CSS is loaded with the lazy report route. */
-@import "../../reportWorkspace.css" layer(route);
+@import "../report/index.css" layer(route);

@@ -1,3 +1,4 @@
+import { Field } from "../../../ui/primitives/Field.tsx";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileSpreadsheet, Play, Save } from "lucide-react";
@@ -372,8 +373,7 @@ export function ExcelToolsPanel({
             <strong>Excel 转托单</strong>
           </div>
           {!desktopAvailable ? (
-            <label className="inline-filter">
-              <span>选择 Excel</span>
+            <Field label="选择 Excel">
               <input
                 type="file"
                 accept=".xlsx,.xlsm,.xltx,.xltm,.xls"
@@ -385,7 +385,7 @@ export function ExcelToolsPanel({
                   setMessage(null);
                 }}
               />
-            </label>
+            </Field>
           ) : null}
           <button className="command-button secondary" type="button" disabled={!canConvertBooking} onClick={handleConvertBooking}>
             <Play size={16} aria-hidden="true" />

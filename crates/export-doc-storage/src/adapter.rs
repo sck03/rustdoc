@@ -1,74 +1,92 @@
 //! Semantic operations shared by the SQLite and PostgreSQL adapters.
 use super::*;
+// The semantic boundary delegates simple operations to their owning modules.
+macro_rules! semantic_operations {
+    ($($name:ident($($arg:ident: $ty:ty),*) -> $result:ty => $module:ident::$target:ident;)+) => {
+        $(fn $name(&self, $($arg: $ty),*) -> Result<$result> {
+            $module::$target(self, $($arg),*)
+        })+
+    };
+}
+macro_rules! query_operations {
+    ($($name:ident($query:ty) -> $result:ty => $module:ident::$build:ident, $execute:ident;)+) => {
+        $(fn $name(&self, query: $query) -> Result<$result> {
+            let (sql, projection) = $module::$build(query, self.provider() == "PostgreSQL")?;
+            self.$execute(&sql, &projection, query.offset, query.limit)
+        })+
+    };
+}
+macro_rules! unsupported_operations {
+    ($($name:ident($($arg:ident: $ty:ty),*) -> $result:ty => $message:literal;)+) => {
+        $(fn $name(&self, $($arg: $ty),*) -> Result<$result> {
+            Err(Error::new(ErrorKind::Unsupported, $message))
+        })+
+    };
+}
 /// All business operations use this semantic storage boundary, never provider SQL.
 pub(crate) trait Adapter: Send {
-    fn access_restrictions(&self, kind: &str, id: i64, resolved: bool) -> Result<Vec<Value>> {
-        access_scope::list(self, kind, id, resolved)
+    semantic_operations! {
+        access_restrictions(kind: &str, id: i64, resolved: bool) -> Vec<Value> => access_scope::list;
+        save_access_restriction(kind: &str, id: i64, body: &Value) -> Value => access_scope::save;
+        permission_scheme_versions(scheme: i64, offset: i64, limit: i64) -> Value => permission_versions::versions;
+        permission_scheme_version(scheme: i64, version: i64) -> Option<Value> => permission_versions::publication;
+        publish_permission_scheme(scheme: i64, body: &Value, actor: i64, time: &str) -> i64 => permission_versions::publish;
+        foundation_candidates(unit: i64, keyword: &str, date: &str, offset: i64, limit: i64) -> Value => foundation::candidates;
+        foundation_list(kind: &str, unit: i64, scope: &DataScope<'_>, offset: i64, limit: i64) -> Value => foundation::list;
+        foundation_appointment(unit: i64, key: &str) -> Option<Value> => foundation::appointment;
+        foundation_get(kind: &str, unit: i64, id: i64) -> Option<Value> => foundation::get;
+        foundation_save(kind: &str, id: Option<i64>, unit: i64, expected: i64, body: &Value) -> Value => foundation::save;
+        responsibility_appointments(unit: i64, responsibility: i64, project: Option<i64>, kind: &str, date: &str) -> Vec<Value> => foundation::resolve_duty;
+        placement_appointments(unit: i64, source: &str, id: i64, date: &str) -> Vec<Value> => foundation::placement_appointments;
+        workflow_version_next(company: &str, key: &str) -> i64 => workflow_publications::next;
+        workflow_versions(company: &str, key: &str, offset: i64, limit: i64) -> Value => workflow_publications::versions;
+        workflow_activation_save(entry: &Value) -> Value => workflow_publications::save;
+        workflow_activation_list(company: &str, due: Option<&str>) -> Vec<Value> => workflow_publications::list;
+        workflow_activation_state(id: i64, expected: i64, state: &str, error: &str) -> bool => workflow_publications::state;
+        workflow_activation_receipt(actor: i64, context: &str, key: &str) -> Option<Value> => workflow_publications::receipt;
+        foundation_catalog(kind: &str, unit: i64, offset: i64, limit: i64) -> Value => foundation::catalog;
+        foundation_project_options(unit: i64, appointment: &str, day: &str, offset: i64, limit: i64) -> Value => foundation::project_options;
+        due_personnel_orders(now: &str) -> Vec<Value> => workflow_schedule::due;
+        due_workflow_nodes(now: &str) -> Vec<Value> => workflow_schedule::due_nodes;
+        schedule_personnel_order(entry: &Value) -> () => workflow_schedule::schedule;
+        personnel_order_state(id: i64, state: &str, error: &str) -> () => workflow_schedule::state;
+        personnel_order(id: i64) -> Option<Value> => workflow_schedule::order;
+        command_receipt(actor: i64, context: &str, key: &str) -> Option<Value> => command_receipts::get;
+        put_command_receipt(receipt: &Value, result: &Value) -> () => command_receipts::put;
+        append_workflow_operation(entry: &Value) -> () => command_receipts::operation;
+        freeze_request_revision(id: i64, snapshot: &Value) -> () => workflow_runtime::freeze;
+        save_workflow_state(request: i64, revision: i64, progress: &WorkflowProgress<'_>, plan: &Value, active_tasks: &[String]) -> () => workflow_runtime::persist;
+        export_record_page(query: &GenericQuery<'_>, search_fields: &[&str], count: bool) -> (i64, Vec<Value>) => record_export::page;
+        export_primary_contacts(kind: &str, scope: &DataScope<'_>, relation: &str, parents: &[i64]) -> Vec<Value> => record_export::contacts;
     }
-    fn save_access_restriction(&self, kind: &str, id: i64, body: &Value) -> Result<Value> {
-        access_scope::save(self, kind, id, body)
+    query_operations! {
+        query_hs(&HsQuery<'_>) -> Vec<Value> => hs_query::build, query_slice;
+        query_generic(&GenericQuery<'_>) -> (i64, Vec<Value>) => generic_query::build, query_page;
+        query_scoped(&ScopedQuery<'_>) -> (i64, Vec<Value>) => generic_query::scoped, query_page;
+        query_business(&BusinessQuery<'_>) -> (i64, Vec<Value>) => business_query::build, query_page;
+        query_crm(&CrmQuery<'_>) -> (i64, Vec<Value>) => crm_query::build, query_page;
+        query_related(&RelatedQuery<'_>) -> (i64, Vec<Value>) => related_query::build, query_page;
+        query_personnel(&PersonnelQuery<'_>) -> (i64, Vec<Value>) => personnel_query::build, query_page;
     }
-    fn permission_scheme_versions(&self, scheme: i64, offset: i64, limit: i64) -> Result<Value> {
-        permission_versions::versions(self, scheme, offset, limit)
+    unsupported_operations! {
+        query_json(_statement: &str, _values: &[String]) -> Value => "存储适配器不支持专用聚合查询。";
+        query_audits(_query: &AuditQuery<'_>) -> (i64, Vec<Value>) => "存储适配器不支持审计筛选分页。";
+        attachment_category_counts(_company: &str) -> std::collections::BTreeMap<i64, i64> => "存储适配器不支持附件分类统计。";
+        import_preview_usage(_owner: i64) -> ImportPreviewUsage => "存储适配器不支持导入预检容量查询。";
+        query_slice(_sql: &QuerySql, _projection: &str, _offset: i64, _limit: i64) -> Vec<Value> => "存储适配器不支持有界扫描。";
+        job_output_bytes() -> u64 => "存储适配器不支持任务容量查询。";
+        explain_statement(_statement: &str, _values: &[String]) -> Value => "存储适配器不支持查询计划。";
+        blob_info(_record_id: i64, _kind: &str) -> Option<BlobInfo> => "存储适配器不支持文件元数据查询。";
+        backup(_path: &Path) -> () => "该数据库应使用对应的数据库备份模块。";
+        verify_backup(_path: &Path) -> () => "该数据库应使用对应的数据库备份模块。";
+        restore(_path: &Path) -> () => "该数据库应使用对应的数据库恢复模块。";
     }
-    fn permission_scheme_version(&self, scheme: i64, version: i64) -> Result<Option<Value>> {
-        permission_versions::publication(self, scheme, version)
+
+    fn explain_query(&self, query: &QueryPlan<'_>) -> Result<Value> {
+        let (statement, values) = query.statement(self.provider() == "PostgreSQL")?;
+        self.explain_statement(&statement, &values)
     }
-    fn publish_permission_scheme(
-        &self,
-        scheme: i64,
-        body: &Value,
-        actor: i64,
-        time: &str,
-    ) -> Result<i64> {
-        permission_versions::publish(self, scheme, body, actor, time)
-    }
-    fn foundation_candidates(
-        &self,
-        unit: i64,
-        keyword: &str,
-        date: &str,
-        offset: i64,
-        limit: i64,
-    ) -> Result<Value> {
-        foundation::candidates(self, unit, keyword, date, offset, limit)
-    }
-    fn foundation_list(
-        &self,
-        kind: &str,
-        unit: i64,
-        scope: &DataScope<'_>,
-        offset: i64,
-        limit: i64,
-    ) -> Result<Value> {
-        foundation::list(self, kind, unit, scope, offset, limit)
-    }
-    fn foundation_appointment(&self, unit: i64, key: &str) -> Result<Option<Value>> {
-        foundation::appointment(self, unit, key)
-    }
-    fn foundation_get(&self, kind: &str, unit: i64, id: i64) -> Result<Option<Value>> {
-        foundation::get(self, kind, unit, id)
-    }
-    fn foundation_save(
-        &self,
-        kind: &str,
-        id: Option<i64>,
-        unit: i64,
-        expected: i64,
-        body: &Value,
-    ) -> Result<Value> {
-        foundation::save(self, kind, id, unit, expected, body)
-    }
-    fn responsibility_appointments(
-        &self,
-        unit: i64,
-        responsibility: i64,
-        project: Option<i64>,
-        kind: &str,
-        date: &str,
-    ) -> Result<Vec<Value>> {
-        foundation::resolve_duty(self, unit, responsibility, project, kind, date)
-    }
+
     fn records_by_ids(
         &self,
         kind: &str,
@@ -87,6 +105,7 @@ pub(crate) trait Adapter: Send {
                 .collect::<Vec<_>>()
                 .join(",");
             let query = QuerySql {
+                source: crate::query_source::Source::Projected,
                 filter: format!("r.kind={kind} AND r.id IN ({ids})"),
                 order: "r.id DESC".into(),
                 values,
@@ -95,15 +114,7 @@ pub(crate) trait Adapter: Send {
         }
         Ok(result)
     }
-    fn placement_appointments(
-        &self,
-        unit: i64,
-        source: &str,
-        id: i64,
-        date: &str,
-    ) -> Result<Vec<Value>> {
-        foundation::placement_appointments(self, unit, source, id, date)
-    }
+
     fn unit_accounts(&self, company: &str, date: &str, all: bool) -> Result<Vec<Value>> {
         let mut result = vec![];
         let mut cursor = None;
@@ -151,12 +162,7 @@ pub(crate) trait Adapter: Send {
             )?
             .is_empty())
     }
-    fn query_json(&self, _statement: &str, _values: &[String]) -> Result<Value> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "存储适配器不支持专用聚合查询。",
-        ))
-    }
+
     fn supplier_overview(&self, scope: &DataScope<'_>) -> Result<Value> {
         let (statement, values) =
             supplier_overview_query::build(scope, self.provider() == "PostgreSQL");
@@ -170,103 +176,15 @@ pub(crate) trait Adapter: Send {
         Ok(result)
     }
     fn execute_statement(&self, statement: &str, values: &[String]) -> Result<u64>;
-    fn workflow_version_next(&self, company: &str, key: &str) -> Result<i64> {
-        workflow_publications::next(self, company, key)
-    }
-    fn workflow_versions(
-        &self,
-        company: &str,
-        key: &str,
-        offset: i64,
-        limit: i64,
-    ) -> Result<Value> {
-        workflow_publications::versions(self, company, key, offset, limit)
-    }
-    fn workflow_activation_save(&self, entry: &Value) -> Result<Value> {
-        workflow_publications::save(self, entry)
-    }
-    fn workflow_activation_list(&self, company: &str, due: Option<&str>) -> Result<Vec<Value>> {
-        workflow_publications::list(self, company, due)
-    }
-    fn workflow_activation_state(
-        &self,
-        id: i64,
-        expected: i64,
-        state: &str,
-        error: &str,
-    ) -> Result<bool> {
-        workflow_publications::state(self, id, expected, state, error)
-    }
-    fn workflow_activation_receipt(
-        &self,
-        actor: i64,
-        context: &str,
-        key: &str,
-    ) -> Result<Option<Value>> {
-        workflow_publications::receipt(self, actor, context, key)
-    }
-    fn foundation_catalog(&self, kind: &str, unit: i64, offset: i64, limit: i64) -> Result<Value> {
-        foundation::catalog(self, kind, unit, offset, limit)
-    }
-    fn foundation_project_options(
-        &self,
-        unit: i64,
-        appointment: &str,
-        day: &str,
-        offset: i64,
-        limit: i64,
-    ) -> Result<Value> {
-        foundation::project_options(self, unit, appointment, day, offset, limit)
-    }
-    fn due_personnel_orders(&self, now: &str) -> Result<Vec<Value>> {
-        workflow_schedule::due(self, now)
-    }
+
     fn workflow_system_requests(&self, action: &str) -> Result<Vec<Value>> {
         crate::workflow_schedule::systems(self, action)
     }
-    fn due_workflow_nodes(&self, now: &str) -> Result<Vec<Value>> {
-        workflow_schedule::due_nodes(self, now)
-    }
-    fn schedule_personnel_order(&self, entry: &Value) -> Result<()> {
-        workflow_schedule::schedule(self, entry)
-    }
+
     fn workflow_exceptions(&self, company: &str, offset: i64, limit: i64) -> Result<Value> {
         crate::workflow_schedule::exceptions(self, company, offset, limit)
     }
-    fn personnel_order_state(&self, id: i64, state: &str, error: &str) -> Result<()> {
-        workflow_schedule::state(self, id, state, error)
-    }
-    fn personnel_order(&self, id: i64) -> Result<Option<Value>> {
-        workflow_schedule::order(self, id)
-    }
-    fn command_receipt(&self, actor: i64, context: &str, key: &str) -> Result<Option<Value>> {
-        command_receipts::get(self, actor, context, key)
-    }
-    fn put_command_receipt(&self, receipt: &Value, result: &Value) -> Result<()> {
-        command_receipts::put(self, receipt, result)
-    }
-    fn append_workflow_operation(&self, entry: &Value) -> Result<()> {
-        command_receipts::operation(self, entry)
-    }
-    fn freeze_request_revision(&self, id: i64, snapshot: &Value) -> Result<()> {
-        workflow_runtime::freeze(self, id, snapshot)
-    }
-    fn save_workflow_state(
-        &self,
-        request: i64,
-        revision: i64,
-        progress: &WorkflowProgress<'_>,
-        plan: &Value,
-        active_tasks: &[String],
-    ) -> Result<()> {
-        workflow_runtime::persist(self, request, revision, progress, plan, active_tasks)
-    }
-    fn query_audits(&self, _query: &AuditQuery<'_>) -> Result<(i64, Vec<Value>)> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "存储适配器不支持审计筛选分页。",
-        ))
-    }
+
     fn query_ordered_records(
         &self,
         query: &GenericQuery<'_>,
@@ -284,11 +202,9 @@ pub(crate) trait Adapter: Send {
                 ..Default::default()
             },
             filters,
-            keyword: "",
-            search_root: None,
             fields: &[("id", "id")],
-            offset: 0,
             limit: 1,
+            ..Default::default()
         };
         let (sql, projection) = generic_query::build(&query, self.provider() == "PostgreSQL")?;
         Ok(!self.query_slice(&sql, &projection, 0, 1)?.is_empty())
@@ -334,21 +250,7 @@ pub(crate) trait Adapter: Send {
         }
         Ok(result)
     }
-    fn attachment_category_counts(
-        &self,
-        _company: &str,
-    ) -> Result<std::collections::BTreeMap<i64, i64>> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "存储适配器不支持附件分类统计。",
-        ))
-    }
-    fn import_preview_usage(&self, _owner: i64) -> Result<ImportPreviewUsage> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "存储适配器不支持导入预检容量查询。",
-        ))
-    }
+
     fn expired_import_previews(&self, before: &str) -> Result<Vec<Value>> {
         let pg = self.provider() == "PostgreSQL";
         self.query_slice(
@@ -365,22 +267,7 @@ pub(crate) trait Adapter: Send {
             200,
         )
     }
-    fn query_hs(&self, query: &HsQuery<'_>) -> Result<Vec<Value>> {
-        let (sql, projection) = hs_query::build(query, self.provider() == "PostgreSQL")?;
-        self.query_slice(&sql, &projection, query.offset, query.limit)
-    }
-    fn query_slice(
-        &self,
-        _sql: &QuerySql,
-        _projection: &str,
-        _offset: i64,
-        _limit: i64,
-    ) -> Result<Vec<Value>> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "存储适配器不支持有界扫描。",
-        ))
-    }
+
     fn is_closed(&self) -> bool {
         false
     }
@@ -422,16 +309,10 @@ pub(crate) trait Adapter: Send {
         )
     }
     fn job_input_bytes(&self) -> Result<u64>;
-    fn job_output_bytes(&self) -> Result<u64> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "存储适配器不支持任务容量查询。",
-        ))
-    }
-    fn query_generic(&self, query: &GenericQuery<'_>) -> Result<(i64, Vec<Value>)> {
-        let (sql, projection) = generic_query::build(query, self.provider() == "PostgreSQL")?;
-        self.query_page(&sql, &projection, query.offset, query.limit)
-    }
+
+    /// Development diagnostics use the exact production statement and bindings.
+    /// This does not expose arbitrary SQL through any HTTP endpoint.
+
     /// Descending keyset scan without a count. The cursor uses the physical
     /// record id even when the caller projects fields that omit the DTO id.
     fn scan_generic(
@@ -477,22 +358,7 @@ pub(crate) trait Adapter: Send {
         let (sql, projection) = resource_query::build(kind, self.provider() == "PostgreSQL")?;
         self.query_page(&sql, &projection, offset, limit)
     }
-    fn query_scoped(&self, query: &ScopedQuery<'_>) -> Result<(i64, Vec<Value>)> {
-        let (sql, projection) = generic_query::scoped(query, self.provider() == "PostgreSQL")?;
-        self.query_page(&sql, &projection, query.offset, query.limit)
-    }
-    fn query_business(&self, query: &BusinessQuery<'_>) -> Result<(i64, Vec<Value>)> {
-        let (sql, projection) = business_query::build(query, self.provider() == "PostgreSQL")?;
-        self.query_page(&sql, &projection, query.offset, query.limit)
-    }
-    fn query_crm(&self, query: &CrmQuery<'_>) -> Result<(i64, Vec<Value>)> {
-        let (sql, projection) = crm_query::build(query, self.provider() == "PostgreSQL")?;
-        self.query_page(&sql, &projection, query.offset, query.limit)
-    }
-    fn query_related(&self, query: &RelatedQuery<'_>) -> Result<(i64, Vec<Value>)> {
-        let (sql, projection) = related_query::build(query, self.provider() == "PostgreSQL")?;
-        self.query_page(&sql, &projection, query.offset, query.limit)
-    }
+
     fn scan_crm(&self, query: &CrmQuery<'_>, after_id: i64) -> Result<Vec<Value>> {
         let (mut sql, projection) = crm_query::build(query, self.provider() == "PostgreSQL")?;
         let cursor = sql::bind(&mut sql.values, after_id, self.provider() == "PostgreSQL");
@@ -501,10 +367,7 @@ pub(crate) trait Adapter: Send {
         sql.order = "r.id".into();
         self.query_slice(&sql, &projection, 0, query.limit)
     }
-    fn query_personnel(&self, query: &PersonnelQuery<'_>) -> Result<(i64, Vec<Value>)> {
-        let (sql, projection) = personnel_query::build(query, self.provider() == "PostgreSQL")?;
-        self.query_page(&sql, &projection, query.offset, query.limit)
-    }
+
     fn query_office(&self, query: &OfficeQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let pg = self.provider() == "PostgreSQL";
         let projection = if query.fields.is_empty() {
@@ -530,23 +393,7 @@ pub(crate) trait Adapter: Send {
     fn find_identity(&self, kind: &str, identity: &str) -> Result<Option<Value>>;
     fn all(&self, kind: &str) -> Result<Vec<Value>>;
     fn query_records(&self, query: &RecordQuery<'_>) -> Result<(i64, Vec<Value>)>;
-    fn export_record_page(
-        &self,
-        query: &GenericQuery<'_>,
-        search_fields: &[&str],
-        count: bool,
-    ) -> Result<(i64, Vec<Value>)> {
-        record_export::page(self, query, search_fields, count)
-    }
-    fn export_primary_contacts(
-        &self,
-        kind: &str,
-        scope: &DataScope<'_>,
-        relation: &str,
-        parents: &[i64],
-    ) -> Result<Vec<Value>> {
-        record_export::contacts(self, kind, scope, relation, parents)
-    }
+
     fn query_workflow_tasks(&self, query: &WorkflowTaskQuery<'_>) -> Result<(i64, Vec<Value>)>;
     fn workflow_decisions(
         &self,
@@ -579,6 +426,7 @@ pub(crate) trait Adapter: Send {
     fn report_template_metadata(&self, id: i64) -> Result<Option<Value>> {
         let pg = self.provider() == "PostgreSQL";
         let sql = QuerySql {
+            source: crate::query_source::Source::Projected,
             filter: format!("r.kind='report-templates' AND r.id={id}"),
             order: "r.id".into(),
             values: vec![],
@@ -607,10 +455,10 @@ pub(crate) trait Adapter: Send {
     ) -> Result<TemplateHistoryUsage> {
         let (sql, projection) =
             template_history_query::usage(query, keep, self.provider() == "PostgreSQL");
-        let value = self
-            .query_slice(&sql, &projection, 0, 1)?
-            .pop()
-            .ok_or_else(|| Error::unavailable("模板历史容量统计缺失。"))?;
+        let value = self.query_json(
+            &crate::query_source::aggregate(&sql, &projection),
+            &sql.values,
+        )?;
         TemplateHistoryUsage::from_value(&value)
     }
     fn template_history_candidates(&self, query: &TemplateVersionQuery<'_>) -> Result<Vec<Value>> {
@@ -669,30 +517,7 @@ pub(crate) trait Adapter: Send {
     fn attachment_bytes(&self, invoice_id: i64) -> Result<i64>;
     fn insert_blob(&self, blob: &BlobWrite<'_>) -> Result<()>;
     fn blob(&self, record_id: i64, kind: &str) -> Result<Option<Blob>>;
-    fn blob_info(&self, _record_id: i64, _kind: &str) -> Result<Option<BlobInfo>> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "存储适配器不支持文件元数据查询。",
-        ))
-    }
+
     fn delete_blobs(&self, record_id: i64) -> Result<()>;
     fn delete_blob(&self, record_id: i64, kind: &str) -> Result<()>;
-    fn backup(&self, _path: &Path) -> Result<()> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "该数据库应使用对应的数据库备份模块。",
-        ))
-    }
-    fn verify_backup(&self, _path: &Path) -> Result<()> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "该数据库应使用对应的数据库备份模块。",
-        ))
-    }
-    fn restore(&self, _path: &Path) -> Result<()> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "该数据库应使用对应的数据库恢复模块。",
-        ))
-    }
 }

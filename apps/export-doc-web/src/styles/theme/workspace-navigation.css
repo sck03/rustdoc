@@ -2,10 +2,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  padding: 6px;
+  padding: 8px;
   margin-bottom: 12px;
   border: 1px solid var(--edm-neutral-200);
-  border-radius: 10px;
+  border-radius: var(--edm-radius-lg);
   background: var(--edm-neutral-50);
 }
 
@@ -14,9 +14,9 @@
   align-items: center;
   gap: 8px;
   min-height: 40px;
-  padding: 8px 14px;
+  padding: 8px 16px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--edm-radius-sm);
   background: transparent;
   color: var(--edm-neutral-650);
   text-decoration: none;
@@ -32,26 +32,11 @@
 
 .nav-search-location {
   display: block;
-  font-size: 0.6875rem;
+  font-size: var(--edm-font-size-xs);
   line-height: 1.5;
   white-space: normal;
   overflow-wrap: anywhere;
   color: inherit;
-}
-
-.record-context-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  margin-block: 8px 16px;
-  min-width: 0;
-}
-
-.record-context-heading :is(h2, strong) {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: 1.125rem;
 }
 
 .record-detail-content,
@@ -63,8 +48,8 @@
 .permission-navigation-note,
 .permission-resource-location {
   margin: 0;
-  color: var(--edm-neutral-550);
-  font-size: 0.75rem;
+  color: var(--edm-text-secondary);
+  font-size: var(--edm-font-size-xs);
   line-height: 1.6;
 }
 
@@ -76,13 +61,13 @@
   padding-bottom: 8px;
 }
 
-.permission-module-help { margin-bottom: 12px; color: var(--text-secondary); }
+.permission-module-help { margin-bottom: 12px; color: var(--edm-text-secondary); }
 .permission-module-help summary { cursor: pointer; font-size: var(--edm-font-size-sm); }
 .permission-module-help p { margin-top: 8px; }
 
 .knowledge-help {
   border-bottom: 1px solid var(--edm-neutral-200);
-  padding: 10px 0;
+  padding: 12px 0;
   color: var(--edm-neutral-650);
 }
 
@@ -94,7 +79,7 @@
 
 .template-directory-search {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -103,7 +88,6 @@
   min-width: 0;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 680px) {
   .workspace-section-nav :is(a, button) { flex: 1 1 auto; justify-content: center; }
-  .record-context-heading { align-items: flex-start; }
 }

@@ -12,13 +12,7 @@ pub(super) fn rows(
     parameters: &[(&str, String)],
     paginated: bool,
 ) -> Result<(Vec<Value>, usize, usize, usize)> {
-    let parameter = |name| {
-        query
-            .iter()
-            .find(|(key, _)| *key == name)
-            .map(|(_, value)| value.as_str())
-            .unwrap_or("")
-    };
+    let parameter = |name| crate::engine::request_values::find(query, name).unwrap_or("");
     let mut filters = Vec::new();
     for (key, value) in parameters.iter().chain(query.iter()) {
         if !value.is_empty()

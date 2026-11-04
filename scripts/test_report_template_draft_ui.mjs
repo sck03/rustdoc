@@ -110,11 +110,11 @@ try {
   await click("保存"); await waitFor("document.body.innerText.includes('模板版本冲突')");
   assert.equal(await read("window.__calls.find(call=>call.name==='saveUser').input.body.expectedVersion"), 1);
   assert((await read(`document.querySelector(${JSON.stringify(editor)}).textContent`)).includes("LOCAL DRAFT")); await record("save-uses-loaded-version-and-keeps-conflict-draft");
-  await click("重新加载"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("取消", ".confirmation-dialog button");
+  await click("重新加载"); await waitFor("document.querySelector('[data-dialog-purpose=confirmation]')"); await click("取消", "[data-dialog-purpose=confirmation] button");
   assert((await read(`document.querySelector(${JSON.stringify(editor)}).textContent`)).includes("LOCAL DRAFT")); await record("cancel-reload-retains-draft");
-  await read("window.__failReload=true"); await click("重新加载"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("刷新报表模板", ".confirmation-dialog button"); await settle();
+  await read("window.__failReload=true"); await click("重新加载"); await waitFor("document.querySelector('[data-dialog-purpose=confirmation]')"); await click("刷新报表模板", "[data-dialog-purpose=confirmation] button"); await settle();
   assert((await read(`document.querySelector(${JSON.stringify(editor)}).textContent`)).includes("LOCAL DRAFT")); await record("failed-reload-retains-draft");
-  await read("window.__failReload=false"); await click("重新加载"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("刷新报表模板", ".confirmation-dialog button"); await settle();
+  await read("window.__failReload=false"); await click("重新加载"); await waitFor("document.querySelector('[data-dialog-purpose=confirmation]')"); await click("刷新报表模板", "[data-dialog-purpose=confirmation] button"); await settle();
   assert((await read(`document.querySelector(${JSON.stringify(editor)}).textContent`)).includes("REMOTE VERSION")); assert.equal(await read(saveEnabled), false); await record("confirmed-reload-adopts-new-baseline");
   await editText("NEW LOCAL DRAFT"); await waitFor(saveEnabled); await click("保存"); await settle();
   assert.equal(await read("window.__calls.filter(call=>call.name==='saveUser').at(-1).input.body.expectedVersion"), 2); assert.equal(await read(saveEnabled), false); await record("save-after-reload");
@@ -129,7 +129,7 @@ try {
     const savedContent = await read(`window.__calls.filter(call=>call.name===${JSON.stringify(fileTemplate ? "saveFile" : "saveUser")}).at(-1).input.body.${fileTemplate ? "content" : "contentHtml"}`);
     assert(savedContent.includes("尚未确认的中文输入"));
     assert((await read(`document.querySelector(${JSON.stringify(inputSelector)})?.value ?? document.querySelector(${JSON.stringify(editor)})?.textContent`)).includes("尚未确认的中文输入"));
-    await click("返回模板管理"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("取消", ".confirmation-dialog button");
+    await click("返回模板管理"); await waitFor("document.querySelector('[data-dialog-purpose=confirmation]')"); await click("取消", "[data-dialog-purpose=confirmation] button");
     await settle();
     assert((await read(`document.querySelector(${JSON.stringify(inputSelector)})?.value ?? document.querySelector(${JSON.stringify(editor)})?.textContent`)).includes("尚未确认的中文输入"));
     await record(fileTemplate ? "pending-file-text-survives-refresh-save-conflict-and-leave" : "pending-user-text-survives-refresh-save-conflict-and-leave");
@@ -189,10 +189,10 @@ try {
   await read('document.querySelector(".report-designer-v3-toolbar button[aria-label=图片]").click()'); await waitFor("document.querySelector('.report-designer-v3-image-editor select')");
   await input(".report-designer-v3-image-editor select", "Field"); await waitFor("document.querySelectorAll('.report-designer-v3-image-editor select').length===2");
   await input(".report-designer-v3-image-editor label:nth-child(2) select", ""); await waitFor(`!(${saveEnabled})`);
-  await click("返回模板管理"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("取消", ".confirmation-dialog button");
+  await click("返回模板管理"); await waitFor("document.querySelector('[data-dialog-purpose=confirmation]')"); await click("取消", "[data-dialog-purpose=confirmation] button");
   assert((await read("window.__route")).startsWith("/reports/templates?")); assert.equal(await read(saveEnabled), false); await record("invalid-draft-keeps-leave-guard");
   await captureScreenshot(page, path.join(output, "invalid-draft-preserved.png"));
-  await click("返回模板管理"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("返回模板管理", ".confirmation-dialog button"); await waitFor("window.__route.startsWith('/reports/templates/manage')"); await record("confirmed-leave-discards-invalid-draft");
+  await click("返回模板管理"); await waitFor("document.querySelector('[data-dialog-purpose=confirmation]')"); await click("返回模板管理", "[data-dialog-purpose=confirmation] button"); await waitFor("window.__route.startsWith('/reports/templates/manage')"); await record("confirmed-leave-discards-invalid-draft");
 
   await open("file", true); await waitFor(`document.querySelector(${JSON.stringify(editor)})?.textContent.includes('File baseline')`);
   await editText("LOCAL FILE DRAFT"); await waitFor(saveEnabled); await read("window.__remoteRefresh()"); await settle();
@@ -205,7 +205,7 @@ try {
     await read("window.__remoteRemove()"); await settle();
     assert((await read(`document.querySelector(${JSON.stringify(editor)})?.textContent`))?.includes("LOCAL DRAFT RETAINED"));
     if (!fileTemplate) assert.equal(await read(saveEnabled), false);
-    await click("返回模板管理"); await waitFor("document.querySelector('.confirmation-dialog')"); await click("取消", ".confirmation-dialog button");
+    await click("返回模板管理"); await waitFor("document.querySelector('[data-dialog-purpose=confirmation]')"); await click("取消", "[data-dialog-purpose=confirmation] button");
     await record(fileTemplate ? "missing-file-keeps-draft-and-leave-guard" : "missing-database-template-keeps-draft-and-leave-guard");
   }
   fs.writeFileSync(path.join(output, "summary.json"), JSON.stringify({ passed: results.length, results }, null, 2));

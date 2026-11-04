@@ -1,12 +1,14 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { validateDesignValues } from "./lib/frontend-design-values.mjs";
+import { walkSourceFiles } from "./lib/source-files.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sourceRoot = path.join(repositoryRoot, "apps", "export-doc-web", "src");
 const baselinePath = path.join(repositoryRoot, "scripts", "baselines", "frontend-style-governance.json");
-const colorTokenPath = path.join(sourceRoot, "styles", "theme", "color-tokens.css");
-const cssFiles = walk(sourceRoot).filter((file) => file.endsWith(".css"));
+const colorTokenPath = path.join(sourceRoot, "styles", "tokens", "color.css");
+const cssFiles = walkSourceFiles(sourceRoot).filter((file) => file.endsWith(".css"));
 const cssSources = cssFiles.map((file) => ({ file, source: readFileSync(file, "utf8") }));
 const css = cssSources
   .map(({ source }) => source)
@@ -23,8 +25,8 @@ const current = {
   sourceLines: css.split(/\r?\n/u).length,
   hexColors: count(/(?:^|[^\w-])#[0-9a-f]{3,8}\b/giu),
   rgbColors: count(/\brgba?\s*\(/giu),
-  featureHexColors: countIn(featureCss, /(?:^|[^\w-])#[0-9a-f]{3,8}\b/giu),
-  featureRgbColors: countIn(featureCss, /\brgba?\s*\(/giu),
+  featureHexColors: count(/(?:^|[^\w-])#[0-9a-f]{3,8}\b/giu, featureCss),
+  featureRgbColors: count(/\brgba?\s*\(/giu, featureCss),
   boxShadows: count(/\bbox-shadow\s*:/giu),
   gradients: count(/\b(?:linear|radial|conic)-gradient\s*\(/giu),
   pixelFontSizes: count(/\bfont-size\s*:\s*[^;{}]*?\d+(?:\.\d+)?px\b/giu),
@@ -41,7 +43,7 @@ if (!existsSync(baselinePath)) {
 }
 
 const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
-const failures = [];
+const failures = validateDesignValues(cssSources);
 for (const metric of [
   "hexColors",
   "rgbColors",
@@ -69,20 +71,6 @@ if (failures.length > 0) {
 
 process.stdout.write(`Frontend style governance passed: ${JSON.stringify(current)}\n`);
 
-function count(pattern) {
-  return [...css.matchAll(pattern)].length;
-}
-
-function countIn(source, pattern) {
+function count(pattern, source = css) {
   return [...source.matchAll(pattern)].length;
-}
-
-function walk(directory) {
-  const files = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const fullPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...walk(fullPath));
-    else files.push(fullPath);
-  }
-  return files;
 }

@@ -1,8 +1,9 @@
+import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Plus, RefreshCw, Search } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
@@ -36,12 +37,12 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
   const selected = model.details.data;
   const uploadAttachment = uploadMode === "revision" ? selected?.attachment : undefined;
   const uploadInvoiceId = uploadMode === "new" ? invoiceId : uploadAttachment?.invoiceId;
-  return <section className="work-surface business-records" aria-label="业务资料归档">
-    <header className="business-records-heading"><div><h2>{invoiceId ? `${model.invoice.data?.invoiceNo ?? "单据"} · 业务资料` : "业务资料归档"}</h2>
-      <p>上传客户原始文件、确认稿和实际交付文件，并关联对应发票。历史版本完整保留。</p></div>
-      <div className="business-records-actions">{invoiceId && <Link className="command-button secondary" to={`/invoices/${invoiceId}`}>返回单据</Link>}
+  return <ListWorkspace className="business-records" aria-label="业务资料归档"
+    title={invoiceId ? `${model.invoice.data?.invoiceNo ?? "单据"} · 业务资料` : "业务资料归档"}
+    description="上传客户原始文件、确认稿和实际交付文件，并关联对应发票。历史版本完整保留。"
+    actions={<>{invoiceId && <Link className="command-button secondary" to={`/invoices/${invoiceId}`}>返回单据</Link>}
         {catalog?.canManage && <button type="button" className="command-button secondary" disabled={model.busy || editorOpen} onClick={() => setManagingCategories(true)}>管理分类</button>}
-        {data?.canUpload && <button type="button" className="command-button" disabled={model.busy || editorOpen || !catalog} onClick={() => model.setUploadMode("new")}><Plus size={16} aria-hidden="true" />上传资料</button>}</div></header>
+        {data?.canUpload && <button type="button" className="command-button" disabled={model.busy || editorOpen || !catalog} onClick={() => model.setUploadMode("new")}><Plus size={16} aria-hidden="true" />上传资料</button>}</>}>
     {data?.usedBytes != null && <p className="business-records-muted">本单已使用 {fileSizeLabel(data.usedBytes)} / {fileSizeLabel(data.invoiceBytesLimit)}，包含所有历史版本与停用资料。资料随数据库备份保存。</p>}
     {model.error && <InlineNotice tone="error" title="操作未完成">{model.error}</InlineNotice>}
     {model.message && <InlineNotice tone="success">{model.message}</InlineNotice>}
@@ -81,7 +82,7 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
             </tr>)}</tbody>
           </table>
         </ResponsiveTableFrame>}
-        <ListPaginationControls pageNumber={model.pageNumber} pageSize={model.pageSize} totalCount={data?.page.totalCount ?? 0} totalPages={data?.page.totalPages ?? 0}
+        <Pagination pageNumber={model.pageNumber} pageSize={model.pageSize} totalCount={data?.page.totalCount ?? 0} totalPages={data?.page.totalPages ?? 0}
           pageSizeOptions={[20, 50, 100]} isBusy={model.query.isFetching} onPageChange={model.setPageNumber} onPageSizeChange={model.changePageSize} />
       </>}
     </div>
@@ -91,5 +92,5 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
         busy={model.busy || uploadMode !== null || managingCategories || !catalog} timeZone={user.businessTimeZone} onClose={() => model.setSelectedId(null)}
         onEdit={model.editMetadata} onDelete={model.remove} onReplace={() => model.setUploadMode("revision")} onRead={(version, show) => void model.read(version, show)} onUpdate={model.update} />)}
     {preview && <BusinessAttachmentPreview blob={preview.blob} name={preview.name} onClose={() => model.setPreview(null)} />}
-  </section>;
+  </ListWorkspace>;
 }

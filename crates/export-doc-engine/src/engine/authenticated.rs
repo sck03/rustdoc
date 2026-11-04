@@ -52,10 +52,7 @@ impl NativeService {
             }
             GET_REPORT_TEMPLATE_FIELD_CATALOG => {
                 auth::authorize(actor, "document.report-templates", "view")?;
-                let kind = query
-                    .iter()
-                    .find(|(key, _)| *key == "reportType")
-                    .map(|(_, value)| value.as_str())
+                let kind = crate::engine::request_values::find(query, "reportType")
                     .unwrap_or("ExportDocument");
                 report_templates::demand_type(actor, kind)?;
                 serde_json::to_value(report_templates::fields(kind)?).map_err(Into::into)

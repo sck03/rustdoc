@@ -39,45 +39,43 @@ pub(crate) fn resolve_open_path_target(input: &Path) -> Result<(PathBuf, bool), 
     }
 }
 
-#[cfg(windows)]
 fn open_existing_path(path: &Path, reveal_file: bool) -> Result<(), String> {
-    spawn_open_command(build_open_command(path, reveal_file))
-}
-
-#[cfg(target_os = "macos")]
-fn open_existing_path(path: &Path, reveal_file: bool) -> Result<(), String> {
-    spawn_open_command(build_open_command(path, reveal_file))
-}
-
-#[cfg(all(unix, not(target_os = "macos")))]
-fn open_existing_path(path: &Path, reveal_file: bool) -> Result<(), String> {
-    spawn_open_command(build_open_command(path, reveal_file))
+    spawn_open_command(build_open_command(path, reveal_file)?)
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct OpenCommandSpec {
-    pub(crate) program: &'static str,
+    pub(crate) program: PathBuf,
     pub(crate) program_name: &'static str,
     pub(crate) args: Vec<OsString>,
 }
 
 #[cfg(windows)]
-pub(crate) fn build_open_command(path: &Path, reveal_file: bool) -> OpenCommandSpec {
+pub(crate) fn build_open_command(
+    path: &Path,
+    reveal_file: bool,
+) -> Result<OpenCommandSpec, String> {
     let args = if reveal_file {
-        vec![OsString::from(format!("/select,{}", path.display()))]
+        let mut argument = OsString::from("/select,\"");
+        argument.push(path);
+        argument.push("\"");
+        vec![argument]
     } else {
         vec![path.as_os_str().to_owned()]
     };
 
-    OpenCommandSpec {
-        program: "explorer",
+    Ok(OpenCommandSpec {
+        program: crate::platform_process::windows_root()?.join("explorer.exe"),
         program_name: "Windows Explorer",
         args,
-    }
+    })
 }
 
 #[cfg(target_os = "macos")]
-pub(crate) fn build_open_command(path: &Path, reveal_file: bool) -> OpenCommandSpec {
+pub(crate) fn build_open_command(
+    path: &Path,
+    reveal_file: bool,
+) -> Result<OpenCommandSpec, String> {
     let mut args = Vec::new();
     if reveal_file {
         args.push(OsString::from("-R"));
@@ -85,26 +83,29 @@ pub(crate) fn build_open_command(path: &Path, reveal_file: bool) -> OpenCommandS
 
     args.push(path.as_os_str().to_owned());
 
-    OpenCommandSpec {
-        program: "open",
+    Ok(OpenCommandSpec {
+        program: "open".into(),
         program_name: "open",
         args,
-    }
+    })
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
-pub(crate) fn build_open_command(path: &Path, reveal_file: bool) -> OpenCommandSpec {
+pub(crate) fn build_open_command(
+    path: &Path,
+    reveal_file: bool,
+) -> Result<OpenCommandSpec, String> {
     let target = if reveal_file {
         path.parent().unwrap_or(path)
     } else {
         path
     };
 
-    OpenCommandSpec {
-        program: "xdg-open",
+    Ok(OpenCommandSpec {
+        program: "xdg-open".into(),
         program_name: "xdg-open",
         args: vec![target.as_os_str().to_owned()],
-    }
+    })
 }
 
 fn spawn_open_command(spec: OpenCommandSpec) -> Result<(), String> {

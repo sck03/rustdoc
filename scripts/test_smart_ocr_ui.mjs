@@ -20,8 +20,8 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { PermissionAccessProvider } from ${source('app/PermissionAccessContext.tsx')};
   import { SmartOcrPage } from ${source('features/tools/SmartOcrPage.tsx')};
   import { useSmartOcr } from ${source('features/tools/useSmartOcr.ts')};
-  import ${source('styles/cascade.css')};
-  import ${source('styles/foundation.css')};
+
+  import ${source('styles/index.css')};
   import ${source('styles/workspaces.css')};
   import ${source('styles/tools-ocr-exchange.css')};
   window.pending=[]; window.createdUrls=[]; window.revokedUrls=[];

@@ -46,7 +46,7 @@ await withOfficeUi('review-workflows-ui',async({repo,output,require,url,invoke,o
   await page.getByText('已从 V1 恢复，并生成 V3。',{exact:true}).waitFor();
   await page.screenshot({path:path.join(output,'template-history-restored.png'),fullPage:true});
   await page.addScriptTag({path:require.resolve('axe-core/axe.min.js')});
-  assert.deepEqual(await page.evaluate(async()=>(await window.axe.run(document.querySelector('.work-surface'))).violations.filter(v=>['serious','critical'].includes(v.impact)).map(v=>v.id)),[]);
+  assert.deepEqual(await page.evaluate(async()=>(await window.axe.run(document.querySelector('[data-ui=workspace]'))).violations.filter(v=>['serious','critical'].includes(v.impact)).map(v=>v.id)),[]);
   const metrics=await invoke('GetRuntimeMetrics',undefined,{},token);
   assert.equal(metrics.http.downloadCapacity,8);assert('downloads' in metrics.http);
   fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({currencyGroups:['CNY','USD'],templateRestoredVersion:3,httpMetrics:metrics.http},null,2));

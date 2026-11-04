@@ -15,11 +15,7 @@ pub fn exercise(app: &str, maintenance: &str) {
             let c = pool.acquire(|| false).unwrap();
             c.begin().unwrap();
             let id = c
-                .insert(&RecordWrite {
-                    kind: "pool-recovery",
-                    identity: None,
-                    body: &body,
-                })
+                .insert(&RecordWrite::unkeyed("pool-recovery", &body))
                 .unwrap();
             c.commit().unwrap();
             id
@@ -27,11 +23,7 @@ pub fn exercise(app: &str, maintenance: &str) {
         let held = pool.acquire(|| false).unwrap();
         held.begin().unwrap();
         let pending = held
-            .insert(&RecordWrite {
-                kind: "pool-recovery",
-                identity: None,
-                body: &body,
-            })
+            .insert(&RecordWrite::unkeyed("pool-recovery", &body))
             .unwrap();
         let mut admin = postgres::Client::connect(maintenance, postgres::NoTls).unwrap();
         let lock_type = if instance {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 type Row = { id: number; code: string; name: string; updateTime?: string | null };
@@ -30,7 +30,7 @@ export function HsCodeMaintenanceTable({ items, busy, selectedIds, onSelectionCh
         {!items.length && <tr><td colSpan={selectionEnabled ? 4 : 3}>本批没有符合条件的编码。</td></tr>}
       </tbody></table>
     </ResponsiveTableFrame>
-    <ListPaginationControls pageNumber={current} totalPages={pages} totalCount={items.length} pageSize={size} pageSizeOptions={[25, 50, 100]}
+    <Pagination pageNumber={current} totalPages={pages} totalCount={items.length} pageSize={size} pageSizeOptions={[25, 50, 100]}
       isBusy={busy} onPageChange={setPage} onPageSizeChange={next => { setSize(next); setPage(1); }} />
   </div>;
 }

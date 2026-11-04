@@ -6,11 +6,11 @@ import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { OperationFeedback, errorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
-import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
+import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
 
 export function CrmCustomerDirectoryPanel({ client, canCreate, canDeactivate, canExport, canImport, onImport, onCreateCustomer, onSelectCustomer }: {
   client: ExportDocManagerApiClient;
@@ -58,7 +58,7 @@ export function CrmCustomerDirectoryPanel({ client, canCreate, canDeactivate, ca
   }
 
   return <section className="form-section">
-    <ListWorkspaceHeader title="客户目录" description="查找销售客户，打开资料后维护联系人与跟进。" count={page?.totalCount} unit="家" actions={<>
+    <PageHeader title="客户目录" description="查找销售客户，打开资料后维护联系人与跟进。" count={page?.totalCount} unit="家" actions={<>
       {canImport && <button className="secondary-button" type="button" onClick={onImport}>导入客户</button>}
       {canExport && <button className="secondary-button" type="button" onClick={() => void exportRows()}>导出当前筛选</button>}
       {canCreate && <button className="primary-button" type="button" onClick={onCreateCustomer}>新建客户</button>}
@@ -76,7 +76,7 @@ export function CrmCustomerDirectoryPanel({ client, canCreate, canDeactivate, ca
       </select>
       <button className="secondary-button" type="submit">搜索</button>
     </form>
-    </ListWorkspaceHeader>
+    </PageHeader>
     <OperationFeedback feedback={feedback} />
     {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}
     <ResponsiveTableFrame label="CRM 客户目录" mobileLayout="scroll" busy={pageQuery.isFetching}><table className="data-table responsive-data-table"><thead><tr>{canDeactivate ? <th><input type="checkbox" aria-label="选择本页 CRM 客户" checked={(page?.items.length ?? 0) > 0 && page!.items.every((item) => selectedIds.includes(item.id))} onChange={(event) => setSelectedIds(event.target.checked ? Array.from(new Set([...selectedIds, ...(page?.items.map((item) => item.id) ?? [])])) : selectedIds.filter((id) => !page?.items.some((item) => item.id === id)))} /></th> : null}<th>客户</th><th data-table-priority="secondary">国家/地区</th><th>状态</th><th data-table-priority="secondary">来源</th><th /></tr></thead>
@@ -84,6 +84,6 @@ export function CrmCustomerDirectoryPanel({ client, canCreate, canDeactivate, ca
         {!pageQuery.isFetching && !pageQuery.isError && !page?.items.length ? <tr><td className="empty-cell" colSpan={canDeactivate ? 6 : 5}><div className="empty-cell-content"><strong>暂无销售客户</strong><span>{canCreate ? "先建立客户和主要联系人，之后即可记录跟进与商机。" : "当前没有可查看的销售客户。"}</span>{canCreate ? <button className="primary-button" type="button" onClick={onCreateCustomer}>建立第一位客户</button> : null}</div></td></tr> : null}
       </tbody>
     </table></ResponsiveTableFrame>
-    <ListPaginationControls pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />
+    <Pagination pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />
   </section>;
 }

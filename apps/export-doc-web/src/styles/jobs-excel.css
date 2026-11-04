@@ -5,9 +5,9 @@
   text-overflow: ellipsis;
 }
 
-.job-invoice-selection { display: grid; align-content: start; gap: 10px; min-width: 0; }
-.job-invoice-selection-list { display: grid; gap: 6px; max-height: 220px; overflow-y: auto; list-style: none; margin: 0; padding: 0; }
-.job-invoice-selection-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px solid var(--edm-neutral-250); border-radius: var(--edm-radius-sm); }
+.job-invoice-selection { display: grid; align-content: start; gap: 12px; min-width: 0; }
+.job-invoice-selection-list { display: grid; gap: 8px; max-height: 220px; overflow-y: auto; list-style: none; margin: 0; padding: 0; }
+.job-invoice-selection-list li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; border: 1px solid var(--edm-neutral-250); border-radius: var(--edm-radius-sm); }
 .job-invoice-selection-list li > span { display: grid; min-width: 0; overflow-wrap: anywhere; }
 .job-invoice-selection-list small { color: var(--edm-neutral-650); }
 .job-invoice-selection-list button { flex-shrink: 0; }
@@ -47,7 +47,7 @@
 
 .board-panel-header span {
   color: var(--edm-neutral-600);
-  font-size: 13px;
+  font-size: var(--edm-font-size-sm);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -66,7 +66,7 @@
 
 .job-title-cell {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -79,8 +79,8 @@
 }
 
 .job-title-cell span {
-  color: var(--edm-ink-500);
-  font-size: 12px;
+  color: var(--edm-text-secondary);
+  font-size: var(--edm-font-size-xs);
 }
 
 .job-row-focused {
@@ -92,7 +92,7 @@
 .job-row-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .job-output-path-cell .icon-button {
@@ -105,7 +105,7 @@
   display: grid;
   gap: 12px;
   min-width: 0;
-  padding-bottom: 14px;
+  padding-bottom: 16px;
   border-bottom: 1px solid var(--edm-neutral-350);
 }
 
@@ -117,16 +117,16 @@
 
 .job-create-panel details {
   min-width: 0;
-  background: var(--edm-surface);
+  background: var(--edm-bg-surface);
   border: 1px solid var(--edm-neutral-350);
-  border-radius: 8px;
+  border-radius: var(--edm-radius-md);
 }
 
 .job-create-panel summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 12px;
   min-height: 42px;
   padding: 0 12px;
   cursor: pointer;
@@ -136,16 +136,16 @@
   min-width: 0;
   overflow: hidden;
   color: var(--edm-neutral-750);
-  font-size: 14px;
-  font-weight: 800;
+  font-size: var(--edm-font-size-md);
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .job-create-panel summary small {
   flex: 0 0 auto;
-  color: var(--edm-ink-500);
-  font-size: 12px;
+  color: var(--edm-text-secondary);
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -162,13 +162,13 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
 .job-tool-submit-row > span {
-  color: var(--edm-ink-500);
-  font-size: 12px;
+  color: var(--edm-text-secondary);
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -182,21 +182,24 @@
 .job-tool-link-card {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   min-width: 0;
   min-height: 72px;
   padding: 12px;
   color: var(--edm-ink-950);
-  background: var(--edm-surface);
+  background: var(--edm-bg-surface);
   border: 1px solid var(--edm-neutral-350);
-  border-radius: 8px;
+  border-radius: var(--edm-radius-md);
   text-decoration: none;
 }
+
+@media (hover: hover) and (pointer: fine) {
 
 .job-tool-link-card:hover {
   color: var(--edm-primary-600);
   border-color: var(--edm-primary-600);
+}
 }
 
 .job-tool-link-icon {
@@ -207,12 +210,12 @@
   color: var(--edm-primary-600);
   background: var(--edm-primary-75);
   border: 1px solid var(--edm-primary-150);
-  border-radius: 8px;
+  border-radius: var(--edm-radius-md);
 }
 
 .job-tool-link-text {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -226,12 +229,12 @@
 
 .job-tool-link-text strong {
   color: inherit;
-  font-size: 14px;
+  font-size: var(--edm-font-size-md);
 }
 
 .job-tool-link-text small {
-  color: var(--edm-ink-500);
-  font-size: 12px;
+  color: var(--edm-text-secondary);
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -246,15 +249,15 @@
 .tool-panel-heading h2 {
   margin: 0;
   color: var(--edm-ink-950);
-  font-size: 17px;
+  font-size: var(--edm-font-size-lg);
   line-height: 1.25;
 }
 
 .tool-panel-heading span {
   display: block;
-  margin-top: 3px;
-  color: var(--edm-ink-500);
-  font-size: 12px;
+  margin-top: 4px;
+  color: var(--edm-text-secondary);
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -280,16 +283,16 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 8px;
   min-height: 38px;
-  padding: 0 13px;
-  border-radius: 8px;
+  padding: 0 12px;
+  border-radius: var(--edm-radius-md);
   font-weight: 700;
   white-space: nowrap;
 }
 
 .action-button.solid {
-  color: var(--edm-surface);
+  color: var(--edm-bg-surface);
   background: var(--edm-primary-600);
   border: 1px solid var(--edm-primary-600);
 }
@@ -312,9 +315,9 @@
 .job-excel-grid .job-tool-stack {
   align-content: start;
   padding: 12px;
-  background: var(--edm-surface);
+  background: var(--edm-bg-surface);
   border: 1px solid var(--edm-neutral-350);
-  border-radius: 8px;
+  border-radius: var(--edm-radius-md);
 }
 
 .job-excel-grid .job-tool-stack > .command-button {
@@ -341,15 +344,15 @@
 
 .job-tool-stack-primary {
   padding: 12px;
-  background: var(--edm-surface);
+  background: var(--edm-bg-surface);
   border: 1px solid var(--edm-ink-300);
-  border-radius: 8px;
+  border-radius: var(--edm-radius-md);
 }
 
 .job-tool-stack-title {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   min-width: 0;
   color: var(--edm-neutral-750);
 }
@@ -362,15 +365,15 @@
 .job-tool-stack-title strong {
   min-width: 0;
   overflow: hidden;
-  font-size: 14px;
-  font-weight: 800;
+  font-size: var(--edm-font-size-md);
+  font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .job-tool-advanced {
   min-width: 0;
-  padding-top: 2px;
+  padding-top: 4px;
   border-top: 1px dashed var(--edm-neutral-350);
 }
 
@@ -380,8 +383,8 @@
   min-height: 30px;
   color: var(--edm-neutral-650);
   cursor: pointer;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: var(--edm-font-size-xs);
+  font-weight: 700;
 }
 
 .job-tool-advanced-content {
@@ -409,9 +412,9 @@
   gap: 8px;
   min-width: 0;
   margin: 0;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--edm-neutral-350);
-  border-radius: 8px;
+  border-radius: var(--edm-radius-md);
 }
 
 .report-template-checklist-options {
@@ -428,13 +431,13 @@
 .job-excel-preview {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(90px, auto) minmax(120px, auto);
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   min-width: 0;
-  padding: 9px 10px;
+  padding: 8px 12px;
   background: var(--edm-neutral-50);
   border: 1px solid var(--edm-neutral-350);
-  border-radius: 8px;
+  border-radius: var(--edm-radius-md);
 }
 
 .job-excel-preview strong,
@@ -447,23 +450,23 @@
 
 .job-excel-preview strong {
   color: var(--edm-ink-950);
-  font-size: 14px;
+  font-size: var(--edm-font-size-md);
 }
 
 .job-excel-preview span {
-  color: var(--edm-ink-500);
-  font-size: 12px;
+  color: var(--edm-text-secondary);
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
 .job-excel-conflict {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  padding: 10px;
+  padding: 12px;
   background: var(--edm-warning-50);
   border: 1px solid var(--edm-warning-400);
-  border-radius: 8px;
+  border-radius: var(--edm-radius-md);
 }
 
 .job-excel-conflict > div:first-child,
@@ -483,12 +486,12 @@
 
 .job-excel-conflict strong {
   color: var(--edm-ink-950);
-  font-size: 14px;
+  font-size: var(--edm-font-size-md);
 }
 
 .job-excel-conflict span {
-  color: var(--edm-ink-500);
-  font-size: 12px;
+  color: var(--edm-text-secondary);
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -506,11 +509,11 @@
 
 .job-excel-analysis {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--edm-neutral-400);
-  border-radius: 8px;
+  border-radius: var(--edm-radius-md);
   background: var(--edm-neutral-50);
 }
 
@@ -529,15 +532,15 @@
 
 .job-excel-analysis-head strong {
   color: var(--edm-ink-950);
-  font-size: 14px;
+  font-size: var(--edm-font-size-md);
 }
 
 .job-excel-analysis-head span,
 .job-excel-analysis-meta span,
 .job-excel-analysis-fields span,
 .job-excel-analysis-issues span {
-  color: var(--edm-ink-500);
-  font-size: 12px;
+  color: var(--edm-text-secondary);
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -564,17 +567,17 @@
 
 .job-excel-analysis-fields > div {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
-  padding: 7px 8px;
+  padding: 8px 8px;
   border: 1px solid var(--edm-neutral-350);
-  border-radius: 6px;
-  background: var(--edm-surface);
+  border-radius: var(--edm-radius-sm);
+  background: var(--edm-bg-surface);
 }
 
 .job-excel-analysis-fields strong {
   color: var(--edm-ink-950);
-  font-size: 13px;
+  font-size: var(--edm-font-size-sm);
 }
 
 .job-excel-analysis-issues {
@@ -585,32 +588,32 @@
 
 .job-excel-imported-master-data {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
 }
 
 .job-excel-imported-card {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(92px, auto);
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   min-width: 0;
-  padding: 9px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--edm-neutral-350);
-  border-radius: 8px;
-  background: var(--edm-surface);
+  border-radius: var(--edm-radius-md);
+  background: var(--edm-bg-surface);
 }
 
 .job-excel-imported-card > div {
   display: grid;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
 .job-excel-imported-card span,
 .job-excel-imported-card small {
-  color: var(--edm-ink-500);
-  font-size: 12px;
+  color: var(--edm-text-secondary);
+  font-size: var(--edm-font-size-xs);
   font-weight: 700;
 }
 
@@ -624,18 +627,18 @@
 
 .job-excel-imported-card strong {
   color: var(--edm-ink-950);
-  font-size: 14px;
+  font-size: var(--edm-font-size-md);
 }
 
 .job-excel-invoice-export label {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
 .job-excel-invoice-export label span {
   color: var(--edm-neutral-600);
-  font-size: 13px;
+  font-size: var(--edm-font-size-sm);
   font-weight: 700;
 }
 

@@ -35,7 +35,7 @@ export function BackupArchiveRestorePanel({ client, controller: c, disabled, pos
       {postgres && <label><span>管理员当前密码</span><input type="password" autoComplete="current-password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} /></label>}
       <label><span>恢复确认文本</span><input value={confirmation} placeholder={confirm} onChange={(event) => setConfirmation(event.target.value)} /></label>
     </div></fieldset>
-    <button className="command-button danger-command" type="button" disabled={busy || !id || !password || (postgres && !adminPassword) || confirmation !== confirm} onClick={() => restore.mutate()}>校验并安排完整恢复</button>
+    <button className="command-button danger" type="button" disabled={busy || !id || !password || (postgres && !adminPassword) || confirmation !== confirm} onClick={() => restore.mutate()}>校验并安排完整恢复</button>
     <p className="settings-helper-text">{postgres ? "校验任务成功后，管理员停止应用并运行恢复维护命令，再启动应用。普通重启不会执行恢复。" : "校验任务成功后，退出并重新打开桌面程序。"}恢复前会保留原数据副本；旧备份可按受支持的数据库版本逐步升级。</p>
   </section>;
 }

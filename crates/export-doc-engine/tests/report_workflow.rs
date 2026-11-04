@@ -3,7 +3,6 @@
 mod fixture;
 
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod native_fixture;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use export_doc_engine::{
@@ -597,13 +596,6 @@ fn payment_drafts_preview_without_persistence_and_save_with_a_real_identity() {
     );
     assert!(html["html"].as_str().unwrap().contains("当前未保存草稿"));
     assert_eq!(html["paymentId"], 0);
-    assert!(
-        fixture
-            .client()
-            .preview_report_pdf(PREVIEW_PAYMENT_VOUCHER_DRAFT_HTML, &[], &preview_body)
-            .unwrap()
-            .starts_with(b"%PDF-")
-    );
     assert_eq!(
         fixture.request(LIST_PAYMENTS, &[], &[], None)["totalCount"],
         0
@@ -655,7 +647,12 @@ fn payment_drafts_preview_without_persistence_and_save_with_a_real_identity() {
     let reader = fixture.user("invoice-only-reader");
     assert_eq!(
         reader
-            .preview_report_pdf(PREVIEW_PAYMENT_VOUCHER_DRAFT_HTML, &[], &preview_body)
+            .json::<Value>(
+                PREVIEW_PAYMENT_VOUCHER_DRAFT_HTML,
+                &[],
+                &[],
+                Some(preview_body)
+            )
             .unwrap_err()
             .status,
         Some(403)

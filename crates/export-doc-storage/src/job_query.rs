@@ -46,7 +46,8 @@ fn expired_files(policy: &JobOutputRetention, pg: bool, input: bool) -> Result<Q
     } else {
         String::new()
     };
-    Ok(QuerySql { filter: format!("r.kind='background-jobs' AND (r.id IN (
+    Ok(QuerySql { source: crate::query_source::Source::Records,
+filter: format!("r.kind='background-jobs' AND (r.id IN (
         WITH outputs AS (SELECT r.id, r.owner_id, {timestamp} AS completed, SUM({length}) AS bytes
             FROM record_rows r JOIN files f ON f.record_id=r.id AND f.kind='{blob_kind}'
             WHERE r.kind='background-jobs' AND {eligible} GROUP BY r.id, r.owner_id, r.body),
@@ -80,6 +81,7 @@ fn time(pg: bool) -> String {
 }
 pub(crate) fn invalid_times(pg: bool) -> QuerySql {
     QuerySql {
+        source: crate::query_source::Source::Records,
         filter: format!(
             "r.kind='background-jobs' AND NOT ({}) AND ({} IS NULL OR {} IS NULL)",
             active(pg),
@@ -170,6 +172,7 @@ pub(crate) fn build(q: &JobQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
     }
     Ok((
         QuerySql {
+            source: crate::query_source::Source::Records,
             filter: clauses.join(" AND "),
             order: if pg {
                 "r.body->>'createdAt' DESC, r.id DESC"

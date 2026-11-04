@@ -1,11 +1,13 @@
+import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import "../../styles/features/hs-knowledge.css";
 import { Download, RefreshCw, ShieldCheck, Sparkles, Upload } from "lucide-react";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import type { ExportDocManagerApiClient, HsCodeExampleInput } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { dateInputToApiDate, readApiError } from "../../ui/formUtils.ts";
@@ -36,7 +38,7 @@ export function HsCodeKnowledgePage({ businessDate, client }: { businessDate: st
   const selectedSection = hsKnowledgeSections.find((item) => item.key === section);
   if (!selectedSection || section === "catalog") return <Navigate to="/master-data/hs-knowledge/search" replace />;
   if (!permission.canManage && "manage" in selectedSection) return <Navigate to="/master-data/hs-knowledge/search" replace />;
-  return <section className="work-surface hs-knowledge-surface">
+  return <ListWorkspace className="hs-knowledge-surface">
     <HsKnowledgeNavigation activeSection={section} canManage={permission.canManage} />
     <HsKnowledgeWorkflow />
     {!permission.canManage ? <PermissionNotice>当前权限只允许查询和查看；共享知识库导入、确认和编辑需要 HS 编码管理权限。</PermissionNotice> : null}
@@ -46,7 +48,7 @@ export function HsCodeKnowledgePage({ businessDate, client }: { businessDate: st
     {section === "transfer" ? <>{!workspaceDeviceCapabilities.canImportExport ? <WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="知识库迁移属于完整导入导出操作，请使用带鼠标或触控板的电脑。" tablet="连接鼠标或触控板后可在当前设备完成知识库迁移。"/> : null}<KnowledgeTransfer client={client} canImport={permission.canManage && workspaceDeviceCapabilities.canImportExport} canExport={permission.canManage && workspaceDeviceCapabilities.canImportExport}/></> : null}
     {section === "annual" ? <div className="knowledge-task-card knowledge-tool-card">{!workspaceDeviceCapabilities.canImportExport ? <WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="年度税则导入和版本维护请使用带鼠标或触控板的电脑；手机端可继续查询当前有效编码。" tablet="连接鼠标或触控板后可在当前设备导入年度税则；当前仍可查询和现场确认。"/> : null}<p className="knowledge-task-lead">只有年度税则导入和可信知识库迁移可以建立当前有效编码；每条有效编码都必须带来源、年度和验证时间。</p><HsCodeToolsPanel businessYear={businessYear} mode="import" client={client} disabled={!permission.canManage || !workspaceDeviceCapabilities.canImportExport} keyword="" onLocalDataChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["hs-knowledge"] }); }}/></div> : null}
     {section === "online" ? <div className="knowledge-task-card knowledge-tool-card"><WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="可联网搜索并逐条审核候选；批量审核请使用桌面端。" tablet="可联网搜索并逐条审核候选；批量审核请使用桌面端。"/><p className="knowledge-task-lead">联网实例只进入待审核候选池。选择已验证年度税则中的有效编码后，才会加入公司的申报实例库。</p><HsCodeToolsPanel businessYear={businessYear} mode="remote" client={client} disabled={!permission.canManage} keyword="" onLocalDataChanged={async () => undefined} onRemoteCandidatesChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["hs-remote-candidates"] }); }}/><RemoteCandidateReview client={client} canOperate={permission.canManage} canBatchOperate={permission.canManage && workspaceDeviceCapabilities.canUseBatchOperations}/></div> : null}
-  </section>;
+  </ListWorkspace>;
 }
 
 function KnowledgeSearch({ client, canOperate }: { client: ExportDocManagerApiClient; canOperate: boolean }) {
@@ -127,7 +129,7 @@ function ExampleLibrary({ businessYear, client, canOperate, canManage, canBatchM
     {data.isLoading ? <PageState tone="loading" title="正在读取申报实例" description="数据量较多时系统会按页加载，不会一次载入全部记录。" /> : null}{data.isError ? <PageState tone="error" title="申报实例读取失败" description={readApiError(data.error)} /> : null}
     <div className="knowledge-table">{data.data?.items.map(item => <article key={item.id}>{canBatchManage ? <input type="checkbox" aria-label={`选择 ${item.productName}`} checked={selected.has(item.id)} onChange={() => toggle(item.id)}/> : null}<div><strong>{item.productName}</strong><span>{item.rawReportedHsCode}{item.resolvedCurrentHsCode && item.resolvedCurrentHsCode !== item.rawReportedHsCode ? ` → ${item.resolvedCurrentHsCode}` : ""}</span><p>{item.specification || "暂无规格说明"}</p><small>{item.source}{item.sourceYear ? ` · ${item.sourceYear}年` : ""}</small></div><div><span className="status-pill">{knowledgeStatusLabel(item.resolutionStatus)}</span>{canOperate ? <button className="secondary-button" type="button" onClick={() => setEditing({...blank, ...item, resolvedCurrentHsCode:item.resolvedCurrentHsCode ?? "", specification:item.specification ?? ""})}>编辑</button> : null}{canManage ? <button className="text-button danger" type="button" onClick={() => void confirmDelete(item.id, item.productName)}>删除</button> : null}</div></article>)}</div>
     {data.data?.totalCount === 0 ? <PageState title="暂无正式申报实例" description="可从历史资料学习，或在联网候选审核后加入经过确认的公司经验。" /> : null}
-    <ListPaginationControls pageNumber={pageNumber} totalPages={totalPages} totalCount={data.data?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={data.isFetching} onPageChange={setPageNumber} onPageSizeChange={setPageSize}/>
+    <Pagination pageNumber={pageNumber} totalPages={totalPages} totalCount={data.data?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={data.isFetching} onPageChange={setPageNumber} onPageSizeChange={setPageSize}/>
   </div>;
 }
 
@@ -153,7 +155,7 @@ function RemoteCandidateReview({ client, canOperate, canBatchOperate }: { client
     {feedback ? <InlineNotice tone={feedback.tone}>{feedback.message}</InlineNotice> : null}{candidates.isLoading ? <PageState tone="loading" title="正在读取联网候选" /> : null}{candidates.isError ? <InlineNotice tone="error" title="联网候选加载失败">{readApiError(candidates.error)}</InlineNotice> : null}
     <div className="knowledge-table">{candidates.data?.items.map(item => <HsRemoteCandidateCard key={item.id} client={client} candidate={item} status={status} canOperate={canOperate} allowSelection={canBatchOperate} selected={selected.has(item.id)} draft={drafts[item.id] ?? ""} isBusy={review.isPending || batchReview.isPending} onToggle={() => toggle(item.id)} onDraft={value => setDrafts(current => ({...current,[item.id]:value}))} onConfirm={code => review.mutate({id:item.id,code,confirmed:true})} onIgnore={() => review.mutate({id:item.id,code:"",confirmed:false})} onReset={() => reset.mutate([item.id])} />)}</div>
     {candidates.data?.totalCount === 0 ? <PageState title="当前分类暂无记录" description="联网查询获得的申报实例会进入待审核列表。" /> : null}
-    <ListPaginationControls pageNumber={pageNumber} totalPages={totalPages} totalCount={candidates.data?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={candidates.isFetching} onPageChange={setPageNumber} onPageSizeChange={setPageSize}/>
+    <Pagination pageNumber={pageNumber} totalPages={totalPages} totalCount={candidates.data?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={candidates.isFetching} onPageChange={setPageNumber} onPageSizeChange={setPageSize}/>
   </section>;
 }
 
@@ -190,7 +192,7 @@ function HistoryLearning({ businessYear, client, canOperate }: { businessYear: n
       <div className="history-candidate-actions"><span className="status-pill">{knowledgeStatusLabel(item.resolutionStatus)}</span>{canOperate ? <button className="command-button" type="button" disabled={!item.canConfirm || confirm.isPending} onClick={() => confirm.mutate(item)}>{item.canConfirm ? "确认加入" : "需先处理编码"}</button> : null}</div>
     </article>)}</div>
     {candidates.data?.totalCount === 0 ? <PageState title="没有新的待确认资料" description="已确认或重复的历史经验不会再次进入候选列表。" /> : null}
-    <ListPaginationControls pageNumber={pageNumber} totalPages={Math.max(1, Math.ceil((candidates.data?.totalCount ?? 0) / pageSize))} totalCount={candidates.data?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={candidates.isFetching} onPageChange={setPageNumber} onPageSizeChange={setPageSize}/>
+    <Pagination pageNumber={pageNumber} totalPages={Math.max(1, Math.ceil((candidates.data?.totalCount ?? 0) / pageSize))} totalCount={candidates.data?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={candidates.isFetching} onPageChange={setPageNumber} onPageSizeChange={setPageSize}/>
   </div>;
 }
 

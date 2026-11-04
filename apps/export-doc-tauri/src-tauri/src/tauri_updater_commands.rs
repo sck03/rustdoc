@@ -49,7 +49,7 @@ struct TauriUpdaterProgress {
     downloaded_bytes: u64,
     total_bytes: Option<u64>,
     progress_percent: Option<u8>,
-    status_text: &'static str,
+    status_text: String,
 }
 
 pub(crate) use crate::tauri_updater_task::TauriUpdaterState;
@@ -217,12 +217,23 @@ async fn install_tauri_update_core(
     }
 
     emit_updater_progress(&app, "installing", 0, None, "签名校验完成，正在安装更新。");
-    update.install(bytes).map_err(describe_updater_error)?;
+    let installing_app = app.clone();
+    let installed = tauri::async_runtime::spawn_blocking(move || {
+        crate::update_installation::run(
+            || desktop_runtime::stop(&installing_app),
+            || update.install(bytes).map_err(describe_updater_error),
+        )
+    })
+    .await
+    .unwrap_or_else(|_| Err("更新任务异常退出；请重启原程序后核对。".to_owned()));
+    if let Err(cause) = installed {
+        emit_updater_progress(&app, "failed", 0, None, &cause);
+        return Err(cause);
+    }
 
     emit_updater_progress(&app, "restarting", 0, None, "更新安装完成，正在重启程序。");
 
     desktop_commands::confirm_app_exit();
-    desktop_runtime::stop(&app)?;
     app.request_restart();
 
     Ok(TauriUpdaterInstallResult {
@@ -253,7 +264,7 @@ fn emit_updater_progress(
     phase: &'static str,
     downloaded_bytes: u64,
     total_bytes: Option<u64>,
-    status_text: &'static str,
+    status_text: &str,
 ) {
     let progress_percent = total_bytes
         .filter(|total| *total > 0)
@@ -265,7 +276,7 @@ fn emit_updater_progress(
             downloaded_bytes,
             total_bytes,
             progress_percent,
-            status_text,
+            status_text: status_text.to_owned(),
         },
     );
 }
@@ -309,8 +320,10 @@ fn build_tauri_updater(
     let app_for_exit = app.clone();
     builder = builder.on_before_exit(move || {
         desktop_commands::confirm_app_exit();
-        if let Err(error) = desktop_runtime::stop(&app_for_exit) {
-            crate::write_tauri_error(&error);
+        for window in app_for_exit.webview_windows().values() {
+            if let Err(error) = window.destroy() {
+                crate::write_tauri_error(&format!("更新退出时关闭窗口失败：{error}"));
+            }
         }
     });
 

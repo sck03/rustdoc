@@ -1,19 +1,19 @@
 @media (max-width: 680px) {
   :where(.app-shell, .login-screen) :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
-    font-size: 16px !important;
+    font-size: var(--edm-font-size-lg);
   }
 
   .workspace-header {
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
     min-height: 68px;
-    padding: 9px 12px;
+    padding: 8px 12px;
   }
   .session-strip { flex-wrap: wrap; justify-content: flex-start; }
   .session-strip > button { flex-shrink: 0; }
 
   .workspace-title-block h1 {
-    font-size: 21px;
+    font-size: var(--edm-font-size-xl);
   }
 
   .workspace-header .eyebrow {
@@ -25,25 +25,8 @@
     gap: 8px;
   }
 
-  .dashboard-metric {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
-    min-height: 82px;
-    padding: 11px 12px;
-    border-left-width: 3px;
-  }
-
-  .dashboard-metric-icon {
-    display: none;
-  }
-
-  .dashboard-metric strong {
-    margin-top: 4px;
-    font-size: clamp(17px, 5.4vw, 20px);
-  }
-
   .dashboard-table-frame,
-  .dashboard-todo-list {
+.dashboard-todo-list {
     min-height: 0;
   }
 
@@ -71,21 +54,21 @@
     .density-toggle-button
   ) {
     min-width: var(--edm-touch-target);
-    min-height: var(--edm-touch-target) !important;
+    min-height: var(--edm-touch-target);
   }
 
   .login-submit-button,
-  .login-connection-settings summary {
+.login-connection-settings summary {
     min-height: var(--edm-touch-target);
   }
 
   .report-template-sticky-header .segmented-control,
-  .report-template-sticky-header button[type="submit"] {
+.report-template-sticky-header button[type="submit"] {
     display: none;
   }
 }
 
-@media (min-width: 861px) and (max-width: 1180px) {
+@media (min-width: 681px) and (max-width: 1180px) {
   .field-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -103,7 +86,7 @@
   }
 
   .single-window-tool-group,
-  .single-window-section-tools {
+.single-window-section-tools {
     flex-basis: calc(50% - 8px);
   }
 
@@ -118,7 +101,7 @@
   }
 
   .settings-ai-grid,
-  .settings-single-window-grid {
+.settings-single-window-grid {
     grid-template-columns: repeat(2, minmax(180px, 1fr));
   }
 

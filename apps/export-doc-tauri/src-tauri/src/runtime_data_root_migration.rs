@@ -201,7 +201,6 @@ pub(crate) fn apply_pending_data_root_migration(
         journal.source_manifest.verify(&target_root)?;
     } else {
         ensure_data_root_available(&source_root)?;
-        journal.source_manifest.verify(&source_root)?;
         copy_verified_tree(&journal.source_manifest, &source_root, &target_root)?;
         journal.source_manifest.verify(&source_root)?;
         write_marker(

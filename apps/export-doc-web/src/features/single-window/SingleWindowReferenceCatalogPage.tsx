@@ -1,3 +1,4 @@
+import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import "../../styles/routes/single-window.css";
 import {
   ChangeEvent,
@@ -20,7 +21,6 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { useModalDialog } from "../../ui/useModalDialog.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { getClipboardPasteInstruction, readClipboardText } from "../../ui/clipboard.ts";
 import {
@@ -77,10 +77,6 @@ export function SingleWindowReferenceCatalogPage({
   const [contextMenu, setContextMenu] = useState<CatalogContextMenuState | null>(null);
   const [aliasEditor, setAliasEditor] = useState<AliasEditorState | null>(null);
   const aliasEditorInputRef = useRef<HTMLTextAreaElement | null>(null);
-  const aliasDialogRef = useModalDialog<HTMLDivElement>(() => setAliasEditor(null), {
-    active: Boolean(aliasEditor),
-    initialFocusRef: aliasEditorInputRef,
-  });
 
   const catalogQuery = useQuery({
     queryKey: queryKeys.singleWindowReferenceCatalog(),
@@ -539,7 +535,7 @@ export function SingleWindowReferenceCatalogPage({
   }
 
   return (
-    <section className="work-surface single-window-surface single-window-reference-catalog-surface" aria-label="单一窗口申报词典">
+    <ListWorkspace className="single-window-surface single-window-reference-catalog-surface" aria-label="单一窗口申报词典">
       <SingleWindowTabs activeKey="reference-catalog" />
       <input ref={jsonImportInputRef} hidden type="file" accept=".json,application/json" onChange={handleJsonImportFile} />
       <input
@@ -619,14 +615,13 @@ export function SingleWindowReferenceCatalogPage({
         <ReferenceCatalogAliasDialog
           activePage={activePage}
           editor={aliasEditor}
-          dialogRef={aliasDialogRef}
           inputRef={aliasEditorInputRef}
           onClose={() => setAliasEditor(null)}
           onChange={(value) => setAliasEditor((current) => current ? { ...current, value } : current)}
           onApply={applyAliasEditor}
         />
       ) : null}
-    </section>
+    </ListWorkspace>
   );
 }
 

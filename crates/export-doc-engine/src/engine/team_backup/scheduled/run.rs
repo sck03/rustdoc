@@ -137,7 +137,7 @@ pub(super) fn start(
                         archive.message =
                             "本地备份已保存，异机副本未完成；本次未清理旧备份。".into();
                         output.detail = archive.message.clone();
-                        crate::operation::OperationScope::new(Duration::from_secs(30))
+                        crate::operation::OperationScope::detached(Duration::from_secs(30))
                             .run(|| repository::write(&paths, &archive))?;
                         finish_state(
                             &store,
@@ -147,7 +147,8 @@ pub(super) fn start(
                         return Ok(output);
                     }
                 };
-                repository::write(&paths, &archive)?;
+                crate::operation::OperationScope::detached(Duration::from_secs(30))
+                    .run(|| repository::write(&paths, &archive))?;
                 match repository::prune(&paths, &saved.plan, &replica) {
                     Ok(()) => finish_state(
                         &store,

@@ -1,0 +1,8 @@
+:root {
+  --edm-font-sans: "Segoe UI Variable Text", "Segoe UI", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", system-ui, sans-serif;
+  --edm-font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --edm-font-size-xs: 12px; --edm-font-size-sm: 13px; --edm-font-size-md: 14px;
+  --edm-font-size-lg: 16px; --edm-font-size-xl: 20px; --edm-font-size-2xl: 26px;
+  --edm-font-weight-regular: 400; --edm-font-weight-semibold: 600; --edm-font-weight-bold: 700;
+  --edm-line-height-tight: 1.4; --edm-line-height-normal: 1.57; --edm-line-height-relaxed: 1.5;
+}

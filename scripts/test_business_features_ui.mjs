@@ -38,7 +38,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   import { WorklistPage } from ${source("features/worklist/WorklistPage.tsx")};
   import { InvoiceReviewPanel } from ${source("features/invoices/InvoiceReviewPanel.tsx")};
   import { createEmptyInvoice } from ${source("features/invoices/invoiceModel.ts")};
-  import ${source("styles/cascade.css")}; import ${source("styles/foundation.css")};
+   import ${source("styles/index.css")};
   import ${source("styles/workspaces.css")}; import ${source("styles/responsive.css")};
   const params=new URLSearchParams(location.search), mode=params.get('mode')||'attachments';
   const readonly=params.get('role')==='reader';

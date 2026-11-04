@@ -1,24 +1,9 @@
-use export_doc_engine::{
-    api::ApiError, contracts, engine::NativeService, generated_api::*, paths::nonce,
-};
+use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 #[path = "approval_fixture.rs"]
 mod workflow;
 
-fn request(
-    service: &NativeService,
-    token: &str,
-    op: Operation,
-    parameters: &[(&str, String)],
-    query: &[(&str, String)],
-    body: Option<Value>,
-) -> Result<Value, ApiError> {
-    let body = body.map(|value| contracts::overlay(contracts::object(op.id, true), &value));
-    let value =
-        serde_json::from_slice(&service.dispatch(op, parameters, query, body, token)?).unwrap();
-    export_doc_contracts::validation::response(op.id, &value).unwrap();
-    Ok(value)
-}
+use workflow::query as request;
 
 pub fn exercise(service: &NativeService, admin: &str) {
     let suffix = &nonce().unwrap()[..8];

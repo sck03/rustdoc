@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
+import { openDefinitionInUi, saveApprovalPartInUi } from './lib/approval-fixtures.mjs';
 
 await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, openPage }) => {
   const login = await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' });
@@ -37,14 +38,15 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   await invoke('SaveOaApprovalSettings', { ...colored, expectedVersion: initial.versionNumber }, {}, token);
   const page = await openPage('oa-review', 'Review-2026-Test');
   await page.goto(`${url}/#/office/approval-settings`);
-  const rule = page.locator('details[data-definition-key="expense"]');
-  await rule.locator(':scope > summary').click();
+  const rule = await openDefinitionInUi(page, 'expense');
   await rule.getByLabel('遇到申请人本人').first().selectOption('Reject');
   await rule.getByLabel('独立复核').first().selectOption('Reject');
   await rule.getByLabel('通过方式').first().selectOption('Any');
   await rule.getByLabel('责任人来源').first().selectOption('LineManager');
   assert.equal(await rule.getByLabel('通过方式').first().inputValue(), 'Any');
   await rule.getByLabel('责任人来源').first().selectOption('DepartmentManager');
+  await saveApprovalPartInUi(page, '保存当前流程');
+  await page.getByRole('tab', { name: '审批单模板', exact: true }).click();
   await page.getByText('审批单名称与打印模板', { exact: true }).click();
   await page.getByRole('button', { name: '使用黑白打印样式', exact: true }).first().click();
   await page.getByRole('button', { name: '编辑审批单模板', exact: true }).first().click();
@@ -57,8 +59,7 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   await dialog.screenshot({ path: path.join(output, 'sheet-designer.png') });
   await dialog.getByRole('button', { name: '应用到设置草稿', exact: true }).click();
   await dialog.waitFor({ state: 'hidden' });
-  await page.getByRole('button', { name: '保存审批设置', exact: true }).click();
-  await page.getByRole('button', { name: '正在处理…', exact: true }).waitFor({ state: 'hidden' });
+  await saveApprovalPartInUi(page, '保存审批单模板');
   const saved = await invoke('GetOaApprovalSettings', undefined, {}, token);
   assert.equal(saved.sheetTemplates[0].name, '费用报销审批记录');
   assert.equal(JSON.parse(saved.sheetTemplates[0].content).reportType, 'OaApproval');
@@ -70,8 +71,7 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   await page.getByRole('button', { name: '全部恢复默认版式', exact: true }).click();
   // Restoration is a settings draft until explicitly saved.
   assert.equal((await invoke('GetOaApprovalSettings', undefined, {}, token)).versionNumber, saved.versionNumber);
-  await page.getByRole('button', { name: '保存审批设置', exact: true }).click();
-  await page.getByRole('button', { name: '正在处理…', exact: true }).waitFor({ state: 'hidden' });
+  await saveApprovalPartInUi(page, '保存审批单模板');
   const restored = await invoke('GetOaApprovalSettings', undefined, {}, token);
   assert.equal(restored.sheetTemplates[0].name, saved.sheetTemplates[0].name);
   assert(restored.sheetTemplates.every(item => item.content === restored.sheetDefaultContent));

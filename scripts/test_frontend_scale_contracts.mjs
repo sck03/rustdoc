@@ -94,7 +94,7 @@ try {
           await evaluate(page, "document.fonts?.ready ?? Promise.resolve()", false);
           const audit = await evaluate(page, buildAuditExpression(profile.mobile), true);
           const value = audit.value;
-          const expectedFieldGridColumns = profile.width <= 860 ? 1 : profile.width <= 1180 ? 2 : 4;
+          const expectedFieldGridColumns = profile.width <= 680 ? 1 : profile.width <= 1180 ? 2 : 4;
           const passed = !value.horizontalOverflow
             && value.truncatedCriticalText.length === 0
             && value.reportPanelOverlapCount === 0
@@ -179,7 +179,7 @@ function buildAuditExpression(isMobile) {
       : 0;
     const invoicePartyGridLayouts = fieldGridLayouts.filter((layout) => layout.parentClassName.includes("invoice-party-group"));
     const invoicePartyGridContractPassed = invoicePartyGridLayouts.length === 0 || invoicePartyGridLayouts.every((layout) => {
-      const expectedColumns = innerWidth <= 860 ? 1 : 2;
+      const expectedColumns = innerWidth <= 680 ? 1 : 2;
       return layout.display === "grid" && layout.columnCount === expectedColumns;
     });
     const queryFilterContractDetails = (() => {
@@ -204,9 +204,9 @@ function buildAuditExpression(isMobile) {
       const commonGridColumnCount = commonGridStyle.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length;
       const advancedGridColumnCount = advancedGridStyle.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length;
       const dateRangeColumnCount = dateRangeStyle?.gridTemplateColumns.split(/\\s+/u).filter(Boolean).length ?? 0;
-      const expectedCommonGridColumnCount = innerWidth <= 860 ? 1 : 2;
-      const expectedAdvancedGridColumnCount = innerWidth <= 620 ? 1 : innerWidth <= 1180 ? 2 : 4;
-      const expectedDateRangeColumnCount = innerWidth <= 620 ? 1 : 2;
+      const expectedCommonGridColumnCount = innerWidth <= 1180 ? 1 : 2;
+      const expectedAdvancedGridColumnCount = innerWidth <= 680 ? 1 : innerWidth <= 1180 ? 2 : 4;
+      const expectedDateRangeColumnCount = innerWidth <= 680 ? 1 : 2;
       const expectedFieldCount = 7;
       const expectedAdvancedOpen = innerWidth > 1180;
       const advancedSummaryVisible = visible(advancedSummary);
@@ -236,7 +236,7 @@ function buildAuditExpression(isMobile) {
           && Math.min(filterRect.bottom, actionsRect.bottom) - Math.max(filterRect.top, actionsRect.top) > 1
         : true;
       const actionsPlacementMatches = actionsRect
-        ? innerWidth <= 860
+        ? innerWidth <= 1180
           ? actionsRect.top >= filterRect.bottom - 1
           : actionsRect.left >= filterRect.right - 1
         : false;
@@ -278,8 +278,8 @@ function buildAuditExpression(isMobile) {
       ? queryExportSummary.getBoundingClientRect().height
       : null;
     const queryExportSummaryCompact = queryExportSummaryHeight === null || queryExportSummaryHeight <= 36;
-    const contractStyle = (name) => {
-      const element = document.querySelector('[data-style-contract="' + name + '"]');
+    const contractStyle = (name, child = "") => {
+      const element = document.querySelector('[data-style-contract="' + name + '"]' + (child ? " " + child : ""));
       return element ? getComputedStyle(element) : null;
     };
     const contractGridColumnCount = (name) => {
@@ -295,7 +295,7 @@ function buildAuditExpression(isMobile) {
       const headerRect = header.getBoundingClientRect();
       const titleRect = title.getBoundingClientRect();
       const actionRect = action.getBoundingClientRect();
-      const narrow = innerWidth <= 860;
+      const narrow = innerWidth <= 1180;
       return {
         display: style.display,
         justifyContent: style.justifyContent,
@@ -311,8 +311,8 @@ function buildAuditExpression(isMobile) {
       };
     };
     const hiddenStyle = contractStyle("visually-hidden");
-    const expectedFieldGridColumns = innerWidth <= 860 ? 1 : innerWidth <= 1180 ? 2 : 4;
-    const expectedDetailGridColumns = innerWidth <= 860 ? 1 : 4;
+    const expectedFieldGridColumns = innerWidth <= 680 ? 1 : innerWidth <= 1180 ? 2 : 4;
+    const expectedDetailGridColumns = innerWidth <= 1180 ? 1 : 4;
     const textSectionHeader = sectionHeaderContract("section-header-text", "section-header-text-action");
     const iconSectionHeader = sectionHeaderContract("section-header-icon", "section-header-icon-action");
     const globalStyleContractDetails = {
@@ -320,7 +320,7 @@ function buildAuditExpression(isMobile) {
       hiddenWidth: hiddenStyle?.width || null,
       hiddenHeight: hiddenStyle?.height || null,
       filterBarDisplay: contractStyle("filter-bar")?.display || null,
-      inlineFilterDisplay: contractStyle("inline-filter")?.display || null,
+      fieldDisplay: contractStyle("field", '[data-ui="field"]')?.display || null,
       inlineCheckDisplay: contractStyle("inline-check")?.display || null,
       fieldGridColumnCount: contractGridColumnCount("field-grid"),
       expectedFieldGridColumns,
@@ -338,7 +338,7 @@ function buildAuditExpression(isMobile) {
       && Math.round(Number.parseFloat(globalStyleContractDetails.hiddenWidth)) === 1
       && Math.round(Number.parseFloat(globalStyleContractDetails.hiddenHeight)) === 1
       && globalStyleContractDetails.filterBarDisplay === "flex"
-      && globalStyleContractDetails.inlineFilterDisplay === "flex"
+      && globalStyleContractDetails.fieldDisplay === "grid"
       && ["flex", "inline-flex"].includes(globalStyleContractDetails.inlineCheckDisplay)
       && globalStyleContractDetails.fieldGridColumnCount === expectedFieldGridColumns
       && globalStyleContractDetails.detailGridDisplay === "grid"
@@ -380,7 +380,7 @@ function buildAuditExpression(isMobile) {
       queryExportSummaryCompact,
       globalStyleContractPassed,
       globalStyleContractDetails,
-      narrowWorkspaceMediaMatched: matchMedia("(max-width: 860px)").matches,
+      narrowWorkspaceMediaMatched: matchMedia("(max-width: 1180px)").matches,
       mobileInputFontFailures,
       mobileTouchTargetFailures,
       computedBodyFont: getComputedStyle(document.body).fontFamily,

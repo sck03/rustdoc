@@ -1,7 +1,6 @@
 #[path = "support/business_contract.rs"]
 mod business_contract;
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod native_fixture;
 
 #[test]

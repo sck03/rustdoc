@@ -67,7 +67,7 @@ export function DisasterRecoveryPanel({
           <span>确认文本</span>
           <input value={controller.recoveryRestoreConfirmation} disabled={!controller.canManageSettings || controller.isBusy || !controller.recoveryPackagePath} placeholder="RECOVER" onChange={(event) => controller.setRecoveryRestoreConfirmation(event.target.value)} />
         </label>
-        <button className="command-button danger-command" type="button" disabled={!controller.canRestoreRecovery} onClick={controller.restoreRecoveryPackage}>
+        <button className="command-button danger" type="button" disabled={!controller.canRestoreRecovery} onClick={controller.restoreRecoveryPackage}>
           <RotateCcw size={17} aria-hidden="true" />
           <span>安排灾难恢复</span>
         </button>

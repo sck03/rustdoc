@@ -1,6 +1,6 @@
 //! Relational workflow state and immutable submitted material. Application code
 //! supplies a validated graph; this module owns its storage and read projection.
-use crate::{Adapter, Error, ErrorKind, Result, sql};
+use crate::{Adapter, Error, ErrorKind, Result};
 use serde_json::{Value, json};
 mod snapshot;
 mod tasks;
@@ -56,39 +56,7 @@ pub(crate) fn document(kind: &str, body: &Value) -> Value {
     value
 }
 
-struct Statement {
-    pg: bool,
-    values: Vec<String>,
-}
-impl Statement {
-    fn new(db: &(impl Adapter + ?Sized)) -> Self {
-        Self {
-            pg: db.provider() == "PostgreSQL",
-            values: vec![],
-        }
-    }
-    fn text(&mut self, value: impl ToString) -> String {
-        sql::bind(&mut self.values, value, self.pg)
-    }
-    fn number(&mut self, value: impl ToString) -> String {
-        format!("CAST({} AS BIGINT)", self.text(value))
-    }
-    fn json(&mut self, value: &Value) -> Result<String> {
-        let value = self.text(serde_json::to_string(value)?);
-        Ok(if self.pg {
-            format!("CAST({value} AS JSONB)")
-        } else {
-            value
-        })
-    }
-    fn execute(self, db: &(impl Adapter + ?Sized), sql: &str) -> Result<u64> {
-        db.execute_statement(sql, &self.values)
-    }
-    fn query(self, db: &(impl Adapter + ?Sized), sql: &str) -> Result<Value> {
-        db.query_json(sql, &self.values)
-    }
-}
-
+use crate::sql::Statement;
 fn conflict(message: &str) -> Error {
     Error::new(ErrorKind::Conflict, message)
 }

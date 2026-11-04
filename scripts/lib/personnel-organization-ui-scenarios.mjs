@@ -28,7 +28,7 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
       await clickText(page,"展开两级");
       await read(page,"document.querySelector('[data-department-code=AREA-1-TEAM-1] [aria-label=为区域团队1新增下级部门]').click()");
       await input(page,'input[name="code"]',"FRESH-TEAM");await input(page,'input[name="name"]',"新增三级部门");await clickText(page,"保存部门");
-      await waitFor(page,"!document.querySelector('.office-dialog') && document.querySelector('[data-department-code=FRESH-TEAM]')?.dataset.selected==='true'");
+      await waitFor(page,"!document.querySelector('[data-dialog-purpose=content]') && document.querySelector('[data-department-code=FRESH-TEAM]')?.dataset.selected==='true'");
       assert(await read(page,"document.querySelector('.organization-selection-path').textContent.includes('区域团队1 / 新增三级部门')"));
       results.push("organization-save-reveals-descendant");
     }
@@ -51,7 +51,7 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
     await audit(page,`organization-manager-picker-${width}`);
     await read(page,"document.querySelector('.organization-managers button').click()");
     await clickText(page,"保存部门");
-    await waitFor(page,"!document.querySelector('.office-dialog') && document.body.innerText.includes('华东业务组')");
+    await waitFor(page,"!document.querySelector('[data-dialog-purpose=content]') && document.body.innerText.includes('华东业务组')");
     const created=await read(page,"window.__officeCalls.find(item=>item.name==='createDepartment').input.body");
     assert.equal(created.parentCode,"D1");assert.equal(created.managerEmployeeId,1);
     await audit(page,`organization-tree-with-manager-${width}`);
@@ -64,20 +64,20 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
   }
   await open("organization",1024);
   await clickText(page,"编辑公司");await input(page,'input[name="name"]',"实际公司名称");await clickText(page,"保存公司");
-  await waitFor(page,"!document.querySelector('.office-dialog') && document.body.innerText.includes('实际公司名称')");
+  await waitFor(page,"!document.querySelector('[data-dialog-purpose=content]') && document.body.innerText.includes('实际公司名称')");
   assert.equal((await read(page,"window.__officeCalls.find(item=>item.name==='updateCompany').input")).body.expectedVersion,1);
   results.push("organization-company-edit-version");
   await read(page,"document.querySelector('[aria-label=编辑业务部]').click()");
   await clickText(page,"选择负责人");await waitFor(page,"document.querySelector('.organization-managers button')");
   await read(page,"document.querySelector('.organization-managers button').click()");
-  const managerDraft=await read(page,"document.querySelector('.office-dialog-body').innerText");
-  await read(page,"document.querySelector('.office-dialog [aria-label=关闭窗口]').click()");
-  await waitFor(page,"document.querySelector('.confirmation-dialog')?.getAttribute('aria-modal')==='true'");
-  await clickText(page,"取消",".confirmation-dialog button");
-  assert.equal(await read(page,"document.querySelector('.office-dialog-body').innerText"),managerDraft,"cancelling close preserves the selected manager");
-  await read(page,"document.querySelector('.office-dialog [aria-label=关闭窗口]').click()");
-  await clickText(page,"关闭窗口",".confirmation-dialog button");
-  await waitFor(page,"!document.querySelector('.office-dialog, .confirmation-dialog')");
+  const managerDraft=await read(page,"document.querySelector('[data-dialog-purpose=content] [data-ui=dialog-body]').innerText");
+  await read(page,"document.querySelector('[data-dialog-purpose=content] [aria-label=关闭窗口]').click()");
+  await waitFor(page,"document.querySelector('[data-dialog-purpose=confirmation]')?.getAttribute('aria-modal')==='true'");
+  await clickText(page,"取消","[data-dialog-purpose=confirmation] button");
+  assert.equal(await read(page,"document.querySelector('[data-dialog-purpose=content] [data-ui=dialog-body]').innerText"),managerDraft,"cancelling close preserves the selected manager");
+  await read(page,"document.querySelector('[data-dialog-purpose=content] [aria-label=关闭窗口]').click()");
+  await clickText(page,"关闭窗口","[data-dialog-purpose=confirmation] button");
+  await waitFor(page,"!document.querySelector('[data-dialog-purpose=content], [data-dialog-purpose=confirmation]')");
   assert.equal(await read(page,"window.__officeCalls.some(call=>call.name==='updateDepartment')"),false,"discarding the manager draft must not save it");
   results.push("organization-manager-selection-unsaved-guard");
   await open("people",390);
@@ -103,7 +103,7 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
   };
   await chooseFile(0,"#14607a");await waitFor(page,"document.querySelector('.personnel-image-preview img')?.naturalWidth>0");
   await clickText(page,"档案信息");await waitFor(page,"document.body.innerText.includes('放弃未上传的图片')");
-  await clickText(page,"取消",".confirmation-dialog button");
+  await clickText(page,"取消","[data-dialog-purpose=confirmation] button");
   await clickText(page,"上传图片",".personnel-image-card:first-child button");
   await waitFor(page,"window.__officeCalls.some(item=>item.name==='uploadImage') && !document.body.innerText.includes('待保存：')");
   await chooseFile(1,"#b8dbd5");await clickText(page,"上传图片",".personnel-image-card:nth-child(2) button");
@@ -114,17 +114,17 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
   await audit(page,"personnel-three-images-mobile");await captureScreenshot(page,path.join(output,"personnel-three-images-mobile.png"));
   await read(page,"document.querySelector('.personnel-image-preview').click()");await waitFor(page,"document.querySelector('.personnel-image-zoom')");
   await audit(page,"personnel-image-zoom");
-  await read(page,"[...document.querySelectorAll('.office-dialog [aria-label=关闭窗口]')].at(-1).click()");
+  await read(page,"[...document.querySelectorAll('[data-dialog-purpose=content] [aria-label=关闭窗口]')].at(-1).click()");
   await chooseFile(0,"#303f68");await clickText(page,"替换图片",".personnel-image-card:first-child button");
   await waitFor(page,"window.__officeCalls.filter(item=>item.name==='uploadImage').length===4 && !document.body.innerText.includes('待保存：')");
   const uploads=await read(page,"window.__officeCalls.filter(item=>item.name==='uploadImage').map(item=>item.input)");
   assert.deepEqual(uploads.map(item=>item.kind),["Avatar","IdentityFront","IdentityBack","Avatar"]);
   assert(uploads.every((item,index)=>index===0||item.expectedVersion>uploads[index-1].expectedVersion));
   await clickText(page,"移除图片",".personnel-image-card:nth-child(3) button");
-  await waitFor(page,"document.body.innerText.includes('移除身份证国徽面')");await clickText(page,"移除图片",".confirmation-dialog button");
+  await waitFor(page,"document.body.innerText.includes('移除身份证国徽面')");await clickText(page,"移除图片","[data-dialog-purpose=confirmation] button");
   await waitFor(page,"window.__officeCalls.some(item=>item.name==='deleteImage')");results.push("personnel-image-upload-replace-delete-concurrency");
   await clickText(page,"档案信息");await clickText(page,"返回人员目录");
-  await waitFor(page,"!document.querySelector('.office-dialog') && document.querySelector('.personnel-avatar')?.naturalWidth>0");
+  await waitFor(page,"!document.querySelector('[data-dialog-purpose=content]') && document.querySelector('.personnel-avatar')?.naturalWidth>0");
   await audit(page,"personnel-avatar-in-directory");
   await open("people",390,"employee");
   assert.equal(await read(page,"document.body.innerText.includes('身份证') || Boolean(document.querySelector('a[href*=organization]'))"),false);
@@ -132,7 +132,7 @@ export async function runPersonnelOrganizationUi({page,open,read,waitFor,clickTe
   await open("organization",390);await read(page,"document.querySelector('[aria-label=编辑业务部]').click()");
   await clickText(page,"选择负责人");await waitFor(page,"document.querySelector('.organization-managers button')");
   await read(page,"document.querySelector('.organization-managers button').click()");await clickText(page,"保存部门");
-  await waitFor(page,"!document.querySelector('.office-dialog')");await clickText(page,"人员档案","a");
+  await waitFor(page,"!document.querySelector('[data-dialog-purpose=content]')");await clickText(page,"人员档案","a");
   await waitFor(page,"document.querySelector('.personnel-card')");await clickText(page,"人员档案");await waitFor(page,"document.querySelector('.personnel-facts')");
   await read(page,"window.__personnelClear=true");await clickText(page,"交接事项");await waitFor(page,"document.body.innerText.includes('离职前需调整部门负责人')");
   assert(await read(page,"document.querySelector('a[href*=\"change=Depart\"]') !== null"));

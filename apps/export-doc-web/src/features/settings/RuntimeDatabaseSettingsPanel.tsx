@@ -1,14 +1,15 @@
 import type { ApiSettingsSecretsDto } from "../../api/index.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { DirectorySetting, NumberSetting, TextSetting } from "./SettingsFieldControls.tsx";
+import { DirectorySetting, NumberSetting, SecretToggle, TextSetting } from "./SettingsFieldControls.tsx";
 import { systemUpdaterEndpointPath } from "./settingsConfigurationPaths.ts";
 import type { SettingsRecord } from "./settingsTypes.ts";
 
-export default function RuntimeDatabaseSettingsPanel({ settings, secrets, canManageSettings, updateSecrets, isBusy, isDesktopRuntime, databaseProvider, canSelectDesktopDirectory, onChange, onSelectDefaultExportDirectory }: {
+export default function RuntimeDatabaseSettingsPanel({ settings, secrets, canManageSettings, updateSecrets, onUpdateSecrets, isBusy, isDesktopRuntime, databaseProvider, canSelectDesktopDirectory, onChange, onSelectDefaultExportDirectory }: {
   settings: SettingsRecord;
   secrets: ApiSettingsSecretsDto | null;
   canManageSettings: boolean;
   updateSecrets: boolean;
+  onUpdateSecrets: (update: boolean) => void;
   isBusy: boolean;
   isDesktopRuntime: boolean;
   databaseProvider: string | null;
@@ -28,7 +29,8 @@ export default function RuntimeDatabaseSettingsPanel({ settings, secrets, canMan
       </fieldset>
     </section>
     {databaseProvider && <section className="form-section" aria-label="数据库连接">
-      <div className="section-header"><h2>数据库连接</h2><span>当前使用 {databaseProvider === "sqlite" ? "SQLite" : "PostgreSQL"}</span></div>
+      <div className="section-header"><h2>数据库连接</h2><span>当前使用 {databaseProvider === "sqlite" ? "SQLite" : "PostgreSQL"}</span>
+        {databaseProvider === "postgresql" && <SecretToggle checked={updateSecrets} disabled={disabled} onChange={onUpdateSecrets} />}</div>
       <p className="form-field-description">当前数据库由启动配置决定。这里保存的参数不会切换正在使用的连接；服务器地址、账号和文件路径须由部署管理员在启动配置中维护。</p>
       <fieldset className="settings-fieldset" disabled={disabled}>
         <div className="field-grid">

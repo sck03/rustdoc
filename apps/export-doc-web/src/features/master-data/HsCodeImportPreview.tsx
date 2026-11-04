@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ApiHsCodeImportPreviewResponse } from "../../api/index.ts";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 const changes: Record<string, string> = { Add: "新增", Update: "更新", Unchanged: "不变", SuspectedObsolete: "疑似作废", Conflict: "冲突", Invalid: "无效" };
@@ -51,7 +51,7 @@ export function HsCodeImportPreview({ preview, busy, onBack, onCommit }: {
         {!visible.length && <tr><td colSpan={5}>此类别没有变更。</td></tr>}
       </tbody></table>
     </ResponsiveTableFrame>
-    <ListPaginationControls pageNumber={currentPage} totalPages={totalPages} totalCount={rows.length} pageSize={size} pageSizeOptions={[25, 50, 100]}
+    <Pagination pageNumber={currentPage} totalPages={totalPages} totalCount={rows.length} pageSize={size} pageSizeOptions={[25, 50, 100]}
       isBusy={busy} onPageChange={setPage} onPageSizeChange={next => { setSize(next); setPage(1); }} />
     <div className="hs-code-preview-actions">
       <button className="command-button secondary" type="button" disabled={busy} onClick={onBack}>重新选择</button>

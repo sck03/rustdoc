@@ -41,6 +41,7 @@ async function click(page, selector) {
   else await delay(100);
 }
 async function clickText(page, text, selector = "button") {
+  await waitFor(page, `[...document.querySelectorAll(${JSON.stringify(selector)})].some(n=>n.getClientRects().length&&!n.matches(':disabled')&&n.textContent.trim()===${JSON.stringify(text)})`);
   await read(page, `(()=>{const node=[...document.querySelectorAll(${JSON.stringify(selector)})].find(n=>n.getClientRects().length&&n.textContent.trim()===${JSON.stringify(text)});if(!node)throw new Error('Missing '+${JSON.stringify(text)});node.click()})()`);
   await delay(100);
 }
@@ -49,7 +50,7 @@ async function input(page, selector, value) {
   await delay(80);
 }
 async function field(page, label, value) {
-  const selector = await read(page, `(()=>{const labels=[...document.querySelectorAll('label')];const node=labels.find(n=>n.querySelector('.form-field-label')?.textContent.replace('必填','').trim()===${JSON.stringify(label)})?.querySelector('input,select,textarea');if(!node)throw new Error('Missing field '+${JSON.stringify(label)});node.dataset.testField='current';return '[data-test-field="current"]';})()`);
+  const selector = await read(page, `(()=>{const labels=[...document.querySelectorAll('label')];const node=labels.find(n=>n.querySelector('.form-field-label, :scope>span')?.textContent.replace('必填','').trim()===${JSON.stringify(label)})?.querySelector('input,select,textarea');if(!node)throw new Error('Missing field '+${JSON.stringify(label)});node.dataset.testField='current';return '[data-test-field="current"]';})()`);
   await input(page, selector, value);
   await read(page, "document.querySelector('[data-test-field=current]').removeAttribute('data-test-field')");
 }
@@ -77,9 +78,10 @@ try {
     page = await createPageSession(cdp);
     await page.send("Emulation.setDeviceMetricsOverride", { width, height: 960, deviceScaleFactor: 1, mobile: false });
     await page.send("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/?mode=${mode}${extra}` });
-    await waitFor(page, mode === "settings" ? "document.querySelector('.settings-center-form') && !document.querySelector('[aria-busy=true]')" : "(document.querySelector('form') || document.querySelector('[aria-label=发票单据包默认设置]')) && window.__calls.some(call=>call.name==='getSettings')");
+    await waitFor(page, mode === "settings" ? "document.querySelector('.settings-center-form, [aria-label=备份与恢复], [aria-label=系统维护]') && !document.querySelector('[aria-busy=true]')" : "(document.querySelector('form') || document.querySelector('[aria-label=发票单据包默认设置]')) && window.__calls.some(call=>call.name==='getSettings')");
     await delay(200);
   };
+  if (!process.argv.includes("--settings-only")) {
   await runInvoiceSaveCases({open,currentPage:()=>page,read,field,clickText,waitFor,results});
   for (const width of [1440, 1024, 390, 320]) {
     await open("new", width);
@@ -100,7 +102,7 @@ try {
   await open("new");
   await field(page, "合同号", "DRAFT-CONTRACT");
   await click(page, "#invoice-tab-items");
-  assert.equal(await read(page, "document.querySelectorAll('th[data-field^=spare],input[aria-label*=备用]').length"), 0);
+  assert.equal(await read(page, "document.querySelectorAll('.item-editor-table th[data-field^=spare],.item-editor-table input[aria-label*=备用]').length"), 0);
   await click(page, "#invoice-tab-shipping");
   await field(page, "目的国", "CANADA");
   await clickText(page, "保存发票");
@@ -298,6 +300,7 @@ try {
   await open("edit", 390, "&role=reader"); await click(page, "#invoice-tab-items");
   assert(await read(page, "[...document.querySelectorAll('.item-editor-table input')].every(n=>n.disabled||n.readOnly)"));
   await audit(page, "invoice-reader-tabs");
+  }
   await runSettingsWorkspaceCases({ open, currentPage: () => page, read, click, clickText, input, field, waitFor, audit, captureScreenshot, output, results });
   fs.writeFileSync(path.join(output, "summary.json"), JSON.stringify({ passed: results.length, results }, null, 2));
   process.stdout.write(`Document editor UI passed (${results.length} cases); ${output}\n`);

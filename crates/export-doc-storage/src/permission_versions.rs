@@ -1,34 +1,7 @@
 //! Drafts never change published grants. Each identity binds an explicit version.
-use crate::{Adapter, Error, ErrorKind, Result, sql};
+use crate::sql::{Statement, object};
+use crate::{Adapter, Error, ErrorKind, Result};
 use serde_json::{Value, json};
-struct Statement {
-    pg: bool,
-    values: Vec<String>,
-}
-impl Statement {
-    fn new(db: &(impl Adapter + ?Sized)) -> Self {
-        Self {
-            pg: db.provider() == "PostgreSQL",
-            values: vec![],
-        }
-    }
-    fn text(&mut self, value: impl ToString) -> String {
-        sql::bind(&mut self.values, value, self.pg)
-    }
-    fn number(&mut self, value: impl ToString) -> String {
-        format!("CAST({} AS BIGINT)", self.text(value))
-    }
-    fn query(self, db: &(impl Adapter + ?Sized), query: String) -> Result<Value> {
-        db.query_json(&query, &self.values)
-    }
-}
-fn object(pg: bool) -> &'static str {
-    if pg {
-        "jsonb_build_object"
-    } else {
-        "json_object"
-    }
-}
 pub(crate) fn publication(
     db: &(impl Adapter + ?Sized),
     scheme: i64,

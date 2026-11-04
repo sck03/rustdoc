@@ -1,3 +1,4 @@
+import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Boxes } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -45,7 +46,7 @@ export function SingleWindowOperationCenterDetailPage({
       : null;
 
   return (
-    <section className="editor-surface single-window-detail-surface" aria-label="单一窗口批次详情">
+    <RecordWorkspace className="editor-surface single-window-detail-surface" aria-label="单一窗口批次详情">
       <div className="editor-toolbar">
         <button
           className="command-button secondary"
@@ -74,7 +75,7 @@ export function SingleWindowOperationCenterDetailPage({
       ) : null}
 
       {detail ? <OperationCenterDetail detail={detail} /> : null}
-    </section>
+    </RecordWorkspace>
   );
 }
 

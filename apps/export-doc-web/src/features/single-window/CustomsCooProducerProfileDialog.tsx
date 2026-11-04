@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Pencil, Plus, RefreshCw, Save, Search, Trash2, X } from "lucide-react";
+import { Check, Pencil, Plus, RefreshCw, Save, Search, Trash2 } from "lucide-react";
 import {
   ApiCustomsCooProducerProfileDto,
   ApiCustomsCooProducerProfileInputDto,
@@ -13,7 +13,7 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { useModalDialog } from "../../ui/useModalDialog.ts";
+import { Dialog } from "../../ui/primitives/Dialog.tsx";
 
 type ProducerProfileDraft = Required<ApiCustomsCooProducerProfileInputDto> & {
   id: number;
@@ -91,7 +91,6 @@ export function CustomsCooProducerProfileDialog({
 
   const profiles = profilesQuery.data?.items ?? [];
   const isBusy = profilesQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
-  const dialogRef = useModalDialog<HTMLDivElement>(handleClose, { canClose: !isBusy });
   const selectedCount = selectedId ? 1 : 0;
   const isDraftDirty = !producerProfileDraftEquals(draft, cleanDraft);
 
@@ -202,29 +201,8 @@ export function CustomsCooProducerProfileDialog({
   }
 
   return (
-    <div className="workspace-modal-backdrop" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget && !isBusy) {
-        void handleClose();
-      }
-    }}>
-      <div
-        ref={dialogRef}
-        className="workspace-modal-dialog producer-profile-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="producer-profile-title"
-      >
-        <header className="workspace-modal-header producer-profile-header">
-          <div className="workspace-modal-title">
-            <Pencil size={18} aria-hidden="true" />
-            <h2 id="producer-profile-title">生产企业资料</h2>
-            <span>{profiles.length}</span>
-          </div>
-          <button className="icon-button" type="button" title="关闭" aria-label="关闭" onClick={handleClose} disabled={isBusy}>
-            <X size={18} aria-hidden="true" />
-          </button>
-        </header>
-
+    <Dialog title="生产企业资料" description={`共 ${profiles.length} 条资料`} size="full" busy={isBusy} onClose={() => void handleClose()} closeLabel="关闭">
+      <div className="producer-profile-dialog">
         <div className="producer-profile-toolbar">
           <form className="producer-profile-search" onSubmit={handleSearch}>
             <input
@@ -347,7 +325,7 @@ export function CustomsCooProducerProfileDialog({
           </form>
         </div>
 
-        <footer className="workspace-modal-footer producer-profile-footer">
+        <footer data-ui="dialog-footer" className="producer-profile-footer">
           <button className="command-button secondary" type="button" onClick={handleClose} disabled={isBusy}>
             <span>关闭</span>
           </button>
@@ -369,7 +347,7 @@ export function CustomsCooProducerProfileDialog({
           </button>
         </footer>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

@@ -31,13 +31,7 @@ pub(super) fn list_with(
     authority: Option<&super::oa::queue_authority::QueueAuthority>,
     fields: &[(&str, &str)],
 ) -> Result<Value> {
-    let get = |name: &str| {
-        query
-            .iter()
-            .find(|(key, _)| *key == name)
-            .map(|(_, value)| value.as_str())
-            .unwrap_or("")
-    };
+    let get = |name: &str| crate::engine::request_values::find(query, name).unwrap_or("");
     let flag = |name: &str| match get(name) {
         "" | "false" => Ok(false),
         "true" => Ok(true),

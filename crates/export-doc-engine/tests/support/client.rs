@@ -52,24 +52,6 @@ impl ApiClient {
     pub fn supports(&self, operation: Operation) -> bool {
         NativeService::supports(operation)
     }
-    pub fn preview_report_pdf(
-        &self,
-        operation: Operation,
-        parameters: &[(&str, String)],
-        body: &Value,
-    ) -> Result<Vec<u8>, ApiError> {
-        self.native
-            .preview_report_pdf(operation, parameters, body, &self.access_token)
-    }
-    pub fn preview_document_package_pdf(
-        &self,
-        invoice_id: i64,
-        body: &Value,
-    ) -> Result<Vec<u8>, ApiError> {
-        let actor = self.native.session_actor(&self.access_token)?;
-        self.native
-            .document_package_preview_pdf(&actor, invoice_id, body)
-    }
     pub fn upload(
         &self,
         operation: Operation,

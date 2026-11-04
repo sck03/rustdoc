@@ -1,4 +1,6 @@
+import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useEffect, useState } from "react";
+import "../../styles/update-center.css";
 import { useQuery } from "@tanstack/react-query";
 import { Download, RefreshCw, X } from "lucide-react";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
@@ -159,7 +161,7 @@ export function UpdateCenterPage({ client, sessionToken }: { client: ExportDocMa
   }
 
   return (
-    <section className="work-surface" aria-label="软件更新">
+    <RecordWorkspace  aria-label="软件更新">
       <div className="toolbar update-center-toolbar">
         <div className="toolbar-summary">
           <strong>软件更新</strong>
@@ -225,7 +227,7 @@ export function UpdateCenterPage({ client, sessionToken }: { client: ExportDocMa
         </div>
         <div className="update-release-notes">{checkResult?.body?.trim() || "暂无更新日志。"}</div>
       </section>
-    </section>
+    </RecordWorkspace>
   );
 }
 

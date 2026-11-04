@@ -9,11 +9,7 @@ fn insert(connection: &Connection, kind: &str, mut body: Value) -> i64 {
     body["companyScope"] = json!("QUERY");
     body["ownerUserId"] = json!(7);
     let id = connection
-        .insert(&RecordWrite {
-            kind,
-            identity: None,
-            body: &body,
-        })
+        .insert(&RecordWrite::unkeyed(kind, &body))
         .unwrap();
     body["id"] = json!(id);
     connection.set_body(id, &body).unwrap();
@@ -82,11 +78,10 @@ pub fn exercise(connection: &Connection) {
             ("requestId", "99".into()),
             ("requestKind", "bookings".into()),
         ],
-        keyword: "",
-        search_root: None,
         fields: &[("id", "id"), ("marker", "marker")],
         offset: 1,
         limit: 1,
+        ..Default::default()
     };
     let (total, rows) = connection
         .query_ordered_records(&query, RecordOrder::CreatedDescending)
@@ -119,6 +114,7 @@ pub fn exercise(connection: &Connection) {
         offset: 1,
         limit: 3,
         count_all: true,
+        before_id: None,
     };
     let (total, rows) = connection.query_audits(&query).unwrap();
     assert_eq!(total, 150);

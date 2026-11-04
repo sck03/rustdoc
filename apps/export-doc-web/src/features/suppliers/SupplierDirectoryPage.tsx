@@ -1,3 +1,4 @@
+import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useEffect, useState, type FormEvent } from "react";
 import { useVersionedRecordDraft } from "../../ui/useVersionedRecordDraft.ts";
 import { useScopedSave } from "../../ui/useScopedSave.ts";
@@ -20,8 +21,8 @@ import { PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { readRouteChoice, readRouteId } from "../../ui/routeQueryState.ts";
 import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
-import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
 import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { useConfirmUnsavedChanges, useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
@@ -305,7 +306,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
     } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
   }
 
-  return <section className="work-surface">
+  return <ListWorkspace >
     <OperationFeedback feedback={feedback} />
     {(view === "profile" ? supplierDraft : contactDraft).hasPendingServerVersion ? <ServerDraftUpdateNotice
       entityLabel={view === "profile" ? "供应商" : "联系人"}
@@ -322,8 +323,8 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
       : null}
     {view === "directory" || view === "overview" ? <TaskViewTabs idPrefix={supplierTabsId} value={view} label="供应商工作区" onChange={changeView} items={[
       { id: "directory", label: "供应商目录" }, ...(canViewAssessments ? [{ id: "overview" as const, label: "采购概览" }] : []),
-    ]} /> : <div className="record-context-heading"><button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回供应商目录</button>
-      <strong>{newSupplier ? "新建供应商" : view === "import" ? "导入供应商" : selectedSupplier?.name ?? "供应商详情"}</strong></div>}
+    ]} /> : <PageHeader title={newSupplier ? "新建供应商" : view === "import" ? "导入供应商" : selectedSupplier?.name ?? "供应商详情"}
+      actions={<button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回供应商目录</button>} />}
     {supplierId > 0 && !newSupplier && !["directory", "overview", "import"].includes(view) && <TaskViewTabs idPrefix={supplierTabsId} value={view} label="供应商详情" onChange={changeView} items={[
       { id: "profile", label: "基本资料" }, ...(canViewContacts ? [{ id: "contacts" as const, label: "联系人" }] : []),
       ...(canViewProducts ? [{ id: "products" as const, label: "供应产品" }] : []), ...(canViewAssessments ? [{ id: "assessments" as const, label: "评价" }] : []),
@@ -347,7 +348,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
         </tbody></table></ResponsiveTableFrame></> : null}
     </section> : null}
     {view === "directory" ? <section className="form-section" {...getTaskViewPanelProps(supplierTabsId, "directory")}>
-      <ListWorkspaceHeader title="供应商目录" count={page?.totalCount} unit="家" description="查找供货单位，打开资料后维护联系人、供应产品和评价。" actions={<>
+      <PageHeader title="供应商目录" count={page?.totalCount} unit="家" description="查找供货单位，打开资料后维护联系人、供应产品和评价。" actions={<>
         {canImportSupplier && <button className="secondary-button" type="button" onClick={() => void changeView("import")}>导入供应商</button>}
         {canExportSupplier && <button className="secondary-button" type="button" onClick={() => void exportRows()}>导出当前筛选</button>}
         {canCreateSupplier && <button className="primary-button" type="button" onClick={() => void beginNewSupplier()}>新建供应商</button>}
@@ -357,13 +358,13 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
         <select aria-label="供应商状态" value={status} onChange={(event) => { setStatus(event.target.value); setPageNumber(1); }}><option value="">全部状态</option><option>合作中</option><option>考察中</option><option>暂停</option><option>停用</option></select>
         <button className="secondary-button" type="submit">搜索</button>
       </form>
-      </ListWorkspaceHeader>
+      </PageHeader>
       {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}
       <ResponsiveTableFrame label="供应商目录" mobileLayout="scroll" busy={pageQuery.isFetching}><table className="data-table responsive-data-table"><thead><tr><th>供应商</th><th data-table-priority="secondary">分类</th><th data-table-priority="secondary">主要产品</th><th>状态</th><th /></tr></thead><tbody>
         {(page?.items ?? []).map((item) => <tr key={item.id}><td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.category || "-"}</td><td data-table-priority="secondary">{item.mainProducts || "-"}</td><td><BusinessStatusBadge value={item.status} /></td><td><button className="secondary-button" type="button" onClick={() => void openSupplier(item)}>打开</button></td></tr>)}
         {!pageQuery.isFetching && !pageQuery.isError && !page?.items.length ? <tr><td className="empty-cell" colSpan={5}><div className="empty-cell-content"><strong>暂无供应商</strong><span>{canCreateSupplier ? "先建立供应商资料，再按需添加联系人和关联供应产品。" : "当前没有可查看的供应商。"}</span>{canCreateSupplier ? <div className="form-actions"><button className="primary-button" type="button" onClick={() => void beginNewSupplier()}>建立第一家供应商</button>{canImportSupplier ? <button className="secondary-button" type="button" onClick={() => void changeView("import")}>从文件导入</button> : null}</div> : null}</div></td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
-      <ListPaginationControls pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />
+      <Pagination pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />
     </section> : null}
     {view === "profile" && (newSupplier || selectedSupplier) ? <form className="form-grid" onSubmit={saveSupplier} {...(newSupplier ? { "aria-label": "新建供应商" } : getTaskViewPanelProps(supplierTabsId, "profile"))}>
         <div className="section-heading-row"><h3>{newSupplier ? "新建供应商" : canEditSupplier ? "供应商资料" : "查看供应商"}</h3></div>
@@ -383,7 +384,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
           {contacts.map((item) => <tr key={item.id}><td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.title || "-"}</td><td><TablePrimaryText value={item.email} /></td><td data-table-priority="secondary">{item.phone || "-"}</td><td>{item.isPrimary ? <BusinessStatusBadge value="主要联系人" /> : "普通联系人"}</td><td><button className="secondary-button" type="button" onClick={() => void selectContact(item.id)}>{canEditContact ? "编辑" : "查看"}</button></td></tr>)}
           {!contacts.length ? <tr><td className="empty-cell" colSpan={6}><div className="empty-cell-content"><strong>尚未建立供应商联系人</strong><span>{canCreateContact ? "需要记录询价、交期或付款沟通对象时，再添加联系人。" : "当前供应商还没有联系人。"}</span>{canCreateContact ? <button className="primary-button" type="button" onClick={() => void selectContact(0)}>添加第一位联系人</button> : null}</div></td></tr> : null}
         </tbody></table></ResponsiveTableFrame>
-        <ListPaginationControls pageNumber={contactPageNumber} totalPages={contactTotalPages} totalCount={contactTotalCount} pageSize={contactPageSize} pageSizeOptions={[20, 50, 100]} isBusy={false} onPageChange={setContactPageNumber} onPageSizeChange={(value) => { setContactPageSize(value); setContactPageNumber(1); }} />
+        <Pagination pageNumber={contactPageNumber} totalPages={contactTotalPages} totalCount={contactTotalCount} pageSize={contactPageSize} pageSizeOptions={[20, 50, 100]} isBusy={false} onPageChange={setContactPageNumber} onPageSizeChange={(value) => { setContactPageSize(value); setContactPageNumber(1); }} />
       </> : <form className="form-grid" onSubmit={saveContact}>
         <div className="section-heading-row"><h4>{selectedContact ? "编辑联系人资料" : "新增联系人资料"}</h4><button className="secondary-button" type="button" onClick={() => void changeContactView("directory")}>返回联系人目录</button></div>
         <div className="form-field-wide context-strip"><strong>{selectedSupplier.name}</strong><span>联系人只归属当前供应商，不写入客户 CRM。</span></div>
@@ -396,5 +397,5 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
     </section> : null}
     {view === "products" && canViewProducts && selectedSupplier && !newSupplier ? <div {...getTaskViewPanelProps(supplierTabsId, "products")}><SupplierProductLinksPanel client={client} supplierId={selectedSupplier.id} supplierName={selectedSupplier.name} canEdit={canEditProductLink} canDeactivate={canDeactivateProductLink} canDelete={canDeleteProductLink} /></div> : null}
     {view === "assessments" && canViewAssessments && selectedSupplier && !newSupplier ? <div {...getTaskViewPanelProps(supplierTabsId, "assessments")}><SupplierAssessmentsPanel businessDate={businessDate} client={client} supplierId={selectedSupplier.id} supplierName={selectedSupplier.name} canCreate={canCreateAssessment} canEdit={canEditAssessment} canApprove={canApproveAssessment} canDelete={canDeleteAssessment} /></div> : null}
-  </section>;
+  </ListWorkspace>;
 }

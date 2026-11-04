@@ -61,7 +61,14 @@ fn multipart_binary_headers_defaults_and_nullable_items_are_preserved() {
         "enabled?: boolean;",
         "name: \"中文\"",
     ] {
-        assert!(generated.web.contains(expected), "missing {expected}");
+        assert!(
+            generated.web.contains(expected)
+                || generated
+                    .web_modules
+                    .values()
+                    .any(|source| source.contains(expected)),
+            "missing {expected}"
+        );
     }
     assert_eq!(
         typescript::schema_type(
@@ -77,6 +84,17 @@ fn multipart_binary_headers_defaults_and_nullable_items_are_preserved() {
         typescript::schema_type(&json!({"type":"object","additionalProperties":{"type":"string"}})),
         "Record<string, string>"
     );
+}
+
+#[test]
+fn business_paths_are_emitted_only_in_lazy_domains_with_type_only_model_imports() {
+    let generated = generate(&export_doc_contracts::openapi::document()).unwrap();
+    assert!(!generated.web.contains("/api/invoices"));
+    assert!(!generated.web.contains("/api/reports"));
+    assert!(generated.web.contains("() => import('./domains/"));
+    assert!(generated.web_modules["domains/invoices.ts"].contains("/api/invoices"));
+    assert!(generated.web_modules["domains/invoices.ts"].contains("import type {"));
+    assert!(!generated.web_modules["transport.ts"].contains("/api/"));
 }
 
 #[test]

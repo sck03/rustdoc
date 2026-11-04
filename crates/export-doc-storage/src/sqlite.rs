@@ -101,6 +101,7 @@ impl Sqlite {
             transaction.execute_batch(include_str!("personnel_foundation_sqlite.sql"))?;
             transaction.execute_batch(include_str!("access_scope_sqlite.sql"))?;
             transaction.execute_batch(include_str!("workflow_runtime_sqlite.sql"))?;
+            transaction.execute_batch(include_str!("foreign_key_indexes.sql"))?;
             transaction.execute(
                 "INSERT INTO schema_model(version,model,shape) VALUES(?1,?2,?3)",
                 params![
@@ -251,7 +252,7 @@ impl Adapter for Sqlite {
             "SELECT {count},(SELECT json_group_array(json(page.body)) FROM (SELECT {projection} AS body FROM audit_logs r WHERE {filter} ORDER BY {order} LIMIT {limit} OFFSET {offset}) page)",
             filter = sql.filter,
             order = sql.order,
-            limit = query.limit.clamp(1, 200_000),
+            limit = query.limit.clamp(1, 2_000),
             offset = query.offset.max(0)
         );
         let (count, rows): (i64, String) = self.connection.borrow().query_cached(
@@ -371,7 +372,7 @@ impl Adapter for Sqlite {
             .connection
             .borrow()
             .query_cached(
-                "SELECT body FROM record_rows WHERE kind=?1 AND identity=?2",
+                &crate::query_source::identity(false),
                 params![kind, identity],
                 |row| row.get(0),
             )
@@ -408,13 +409,7 @@ impl Adapter for Sqlite {
         limit: i64,
     ) -> Result<Vec<Value>> {
         let connection = self.connection.borrow();
-        let query = format!(
-            "SELECT {projection} FROM record_rows r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
-            sql.filter,
-            sql.order,
-            limit.clamp(1, 2000),
-            offset.max(0)
-        );
+        let query = crate::query_source::slice(sql, projection, offset, limit);
         let mut statement = connection.prepare_cached(&query)?;
         statement
             .query_map(rusqlite::params_from_iter(sql.values.iter()), |row| {
@@ -440,13 +435,28 @@ impl Adapter for Sqlite {
     ) -> Result<(i64, Vec<Value>)> {
         let connection = self.connection.borrow();
         let params = || rusqlite::params_from_iter(sql.values.iter());
-        let query = format!("SELECT (SELECT COUNT(*) FROM record_rows r WHERE {filter}),
-            (SELECT json_group_array(json(page.body)) FROM
-             (SELECT {projection} AS body FROM record_rows r WHERE {filter} ORDER BY {order} LIMIT {limit} OFFSET {offset}) page)",
-            filter=sql.filter, order=sql.order, limit=limit.clamp(1,200), offset=offset.max(0));
+        let query = crate::query_source::page(sql, projection, offset, limit, false);
         let (count, rows): (i64, String) =
             connection.query_cached(&query, params(), |row| Ok((row.get(0)?, row.get(1)?)))?;
         Ok((count, serde_json::from_str(&rows)?))
+    }
+    fn explain_statement(&self, sql: &str, values: &[String]) -> Result<Value> {
+        let connection = self.connection.borrow();
+        let mut query = connection.prepare_cached(sql)?;
+        let elapsed = crate::query_diagnostics::measure(|| {
+            let mut rows = query.query(rusqlite::params_from_iter(values.iter()))?;
+            while rows.next()?.is_some() {}
+            Ok(())
+        })?;
+        let mut statement = connection.prepare(&format!("EXPLAIN QUERY PLAN {sql}"))?;
+        let rows = statement
+            .query_map(rusqlite::params_from_iter(values.iter()), |row| {
+                row.get::<_, String>(3)
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(
+            json!({"sql":sql,"parameters":values,"plan":rows,"elapsedMs":elapsed,"sqliteVersion":rusqlite::version()}),
+        )
     }
     fn insert(&self, r: &RecordWrite<'_>) -> Result<i64> {
         crate::identity_runtime::atomic(self, r.kind, || {
@@ -484,22 +494,24 @@ impl Adapter for Sqlite {
             [id],
             |row| row.get(0),
         )?;
-        let stored = crate::identity_runtime::document(
-            &kind,
-            &crate::workflow_runtime::document(&kind, body),
-        );
-        let body = &stored;
-        if self.connection.borrow().execute(
-            "UPDATE records SET body=?1 WHERE id=?2",
-            params![serde_json::to_string(body)?, id],
-        )? != 1
-        {
-            return Err(Error::unavailable("写入记录编号失败。"));
-        }
-        if crate::identity_runtime::supports(&kind) {
-            crate::identity_runtime::project(self, id)?;
-        }
-        Ok(())
+        crate::identity_runtime::atomic(self, &kind, || {
+            let stored = crate::identity_runtime::document(
+                &kind,
+                &crate::workflow_runtime::document(&kind, body),
+            );
+            let body = &stored;
+            if self.connection.borrow().execute(
+                "UPDATE records SET body=?1 WHERE id=?2",
+                params![serde_json::to_string(body)?, id],
+            )? != 1
+            {
+                return Err(Error::unavailable("写入记录编号失败。"));
+            }
+            if crate::identity_runtime::supports(&kind) {
+                crate::identity_runtime::project(self, id)?;
+            }
+            Ok(())
+        })
     }
     fn delete(&self, kind: &str, id: i64, expected: i64) -> Result<bool> {
         Ok(self.connection.borrow().execute(
@@ -510,7 +522,7 @@ impl Adapter for Sqlite {
     fn append_audit_details(&self, a: &AuditWrite<'_>, details: &Value) -> Result<()> {
         let mut connection = self.connection.borrow_mut();
         let transaction = connection.savepoint()?;
-        transaction.execute("INSERT INTO history(kind,record_id,version,action,actor_id,occurred_at,note,body) VALUES(?1,?2,?3,?4,?5,?6,?7,'{}')",
+        transaction.execute("INSERT INTO history(kind,record_id,version,action,actor_id,occurred_at,note) VALUES(?1,?2,?3,?4,?5,?6,?7)",
             params![a.kind,a.record_id,a.version,a.action,a.actor_id,a.occurred_at,a.note])?;
         transaction.execute("INSERT INTO audit_logs(kind,record_id,version,action,actor_id,occurred_at,body) VALUES(?1,?2,?3,?4,?5,?6,?7)",
             params![a.kind,a.record_id,a.version,a.action,a.actor_id,a.occurred_at,serde_json::to_string(details)?])?;

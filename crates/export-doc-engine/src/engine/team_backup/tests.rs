@@ -1,6 +1,7 @@
 //! 团队备份与灾备：受管路径辅助、密封包格式、一次性票据与状态接口的最小回归。
 use super::sealed::{Entry, ManifestFile, open, seal, unpack, verify_manifest, zip_payload};
 use super::*;
+use std::time::Instant;
 #[cfg(feature = "postgres")]
 mod postgres_recovery;
 mod recovery;
@@ -182,28 +183,56 @@ fn zip_payload_unpack_and_manifest_agree() {
 
 #[test]
 fn sensitive_ticket_binds_actor_and_action() {
+    let tickets = Tickets::default();
     let actor = admin();
-    let (token, _) = issue_sensitive_ticket(&actor, ACTION_RESTORE_DATABASE).unwrap();
+    let (token, _) = tickets
+        .issue_sensitive(&actor, ACTION_RESTORE_DATABASE)
+        .unwrap();
     let parameters: [(&str, String); 1] = [(TICKET_HEADER, token.clone())];
-    assert!(sensitive_ticket(&parameters, &actor, ACTION_RESTORE_DATABASE).is_ok());
+    assert!(
+        Tickets::default()
+            .authorize(&parameters, &actor, ACTION_RESTORE_DATABASE)
+            .is_err()
+    );
+    assert!(
+        tickets
+            .authorize(&parameters, &actor, ACTION_RESTORE_DATABASE)
+            .is_ok()
+    );
     // 票据一次性：再次使用必须失败。
-    assert!(sensitive_ticket(&parameters, &actor, ACTION_RESTORE_DATABASE).is_err());
+    assert!(
+        tickets
+            .authorize(&parameters, &actor, ACTION_RESTORE_DATABASE)
+            .is_err()
+    );
 
-    let (other, _) = issue_sensitive_ticket(&actor, ACTION_RESTORE_SERVER).unwrap();
+    let (other, _) = tickets
+        .issue_sensitive(&actor, ACTION_RESTORE_SERVER)
+        .unwrap();
     let other_parameters: [(&str, String); 1] = [(TICKET_HEADER, other)];
-    assert!(sensitive_ticket(&other_parameters, &actor, ACTION_RESTORE_DATABASE).is_err());
+    assert!(
+        tickets
+            .authorize(&other_parameters, &actor, ACTION_RESTORE_DATABASE)
+            .is_err()
+    );
 
     let empty: [(&str, String); 0] = [];
-    assert!(sensitive_ticket(&empty, &actor, ACTION_RESTORE_DATABASE).is_err());
+    assert!(
+        tickets
+            .authorize(&empty, &actor, ACTION_RESTORE_DATABASE)
+            .is_err()
+    );
 }
 
 #[test]
 fn download_ticket_is_single_use() {
-    let ticket = issue_download_ticket("backup.dump".into()).unwrap();
+    let tickets = Tickets::default();
+    let ticket = tickets.issue_download("backup.dump".into()).unwrap();
     let token = ticket["token"].as_str().unwrap().to_string();
-    assert_eq!(consume_download_ticket(&token).unwrap(), "backup.dump");
-    assert!(consume_download_ticket(&token).is_err());
-    assert!(consume_download_ticket("unknown-token").is_err());
+    assert!(Tickets::default().consume_download(&token).is_err());
+    assert_eq!(tickets.consume_download(&token).unwrap(), "backup.dump");
+    assert!(tickets.consume_download(&token).is_err());
+    assert!(tickets.consume_download("unknown-token").is_err());
 }
 
 #[test]

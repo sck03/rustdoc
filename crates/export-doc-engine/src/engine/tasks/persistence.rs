@@ -59,6 +59,7 @@ fn snapshot(record: &Value) -> Value {
     value["retryRequestJson"] = json!("");
     value["canRetry"] = json!(
         matches!(record["status"].as_str(), Some("Failed" | "Canceled"))
+            && record["_retryConsumedBy"].is_null()
             && retry_operation(record).is_some_and(|operation| super::retry::available(
                 operation,
                 record["_retryInput"] == true
@@ -162,6 +163,10 @@ fn create_in(
     if let Some(replay) = replay {
         replay.persist(connection, &mut saved)?;
         saved = save(connection, actor, saved, "retry-input")?;
+    }
+    super::retry::consume_source(connection, actor, &mut saved)?;
+    if !saved["_retrySourceJobId"].is_null() {
+        saved = save(connection, actor, saved, "retry-receipt")?;
     }
     Ok(snapshot(&saved))
 }

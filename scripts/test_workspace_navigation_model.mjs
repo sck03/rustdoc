@@ -78,16 +78,16 @@ assert(model.findActiveWorkspaceNavGroupKey("/master-data/hs-knowledge/search") 
 assert(model.findActiveWorkspaceNavGroupKey("/business-attachments") === "documents", "business files belong to document work");
 assert(model.findActiveWorkspaceNavGroupKey("/jobs") === "workspace", "file progress is distinct from business entry");
 for (const route of ["/tools/email", "/crm/email-templates"]) {
-  assert(model.findActiveWorkspaceNavGroupKey(route) === "workspace", "mail is shared work, independent of customer management");
-  assert(model.getWorkspaceContext(route).section === "工作台", "mail title follows its navigation group");
+  assert(model.findActiveWorkspaceNavGroupKey(route) === "resources", "mail shares the tools navigation group");
+  assert(model.getWorkspaceContext(route).section === "资料与工具", "mail title follows its navigation group");
 }
-assert(model.workspaceNavGroups.length === 7, "navigation separates personnel from office services");
+assert(model.workspaceNavGroups.length === 6, "navigation groups tasks, business, administration, tools and system maintenance");
 assert(model.createInitialWorkspaceNavGroupState("/settings").size === 1, "only the current group starts expanded");
 assert(model.createInitialWorkspaceNavGroupState("/settings").has("system"), "active group starts expanded");
 const navigationItems = model.workspaceNavGroups.flatMap((group) => group.items);
 const routeItems = model.getWorkspaceRouteItems();
 assert(new Set(navigationItems.map(item => item.to)).size === navigationItems.length, "primary entries have one authoritative navigation location");
-assert(model.findActiveWorkspaceNavGroupKey("/office/requests/personnel") === "office", "personnel applications share the employee application workspace");
+assert(model.findActiveWorkspaceNavGroupKey("/office/requests/personnel") === "workspace", "applications belong to the approval workspace");
 assert(model.findActiveWorkspaceNavGroupKey("/system/organization") === "personnel", "organization and appointments share the people workspace");
 assert(model.findWorkspaceNavItem("/office/approval-settings").unitManagement.includes("workflows"), "flow management retains its own management authorization");
 const allModules = [...new Set(routeItems.flatMap((item) => item.moduleKey ? [item.moduleKey] : []))];
@@ -105,8 +105,10 @@ const salesEditionAdminGroups = model.filterWorkspaceNavGroups({ productEdition:
 const browserAdminGroups = model.filterWorkspaceNavGroups({ productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: false, ...fullNavigationGrants });
 const fullTeamCapabilities = { productEdition: "Full", canManageSettings: true, canManageUsers: true, canUseDocumentWorkspace: true, canUseSalesWorkspace: true, isDesktopRuntime: false, ...fullNavigationGrants };
 const adminGroups = model.filterWorkspaceNavGroups(fullTeamCapabilities);
-assert(adminGroups.find((group) => group.key === "office")?.items.length === 9, "Full team edition groups all seven application categories and two resource workspaces");
-assert(adminGroups.find((group) => group.key === "personnel")?.items.length === 3, "Full team edition groups public directory, private records and organization management");
+assert(!adminGroups.some(group => group.key === "office"), "application categories no longer duplicate the approval centre");
+assert(adminGroups.find((group) => group.key === "personnel")?.items.length === 5, "administration combines people, organization and resources");
+assert(navigationItems.length === 33 && model.workspaceNavGroups.every(group => group.items.length <= 7), "navigation stays within the agreed entry budget");
+assert(navigationItems.flatMap(item => item.children ?? [item]).length === 39, "regular leaves retain the agreed page budget");
 assert(product.getDefaultWorkspaceRoute(fullTeamCapabilities) === "/dashboard", "Full team edition retains its business home");
 for (const item of navigationItems) {
   assert(navigationItems.filter((candidate) => candidate.isActive(item.to)).length === 1, `each route has one navigation owner: ${item.to}`);
@@ -255,7 +257,7 @@ for (const edition of ["Full", "Document", "Sales"]) {
     permissions: resources.flatMap(resource => resource.actions.map(action => permissionGrant(resource.key, action.key, "all"))),
   };
   const groups = model.filterWorkspaceNavGroups(editionCapabilities);
-  assert(groups.find(group => group.key === "workspace")?.items.some(item => item.label === "邮件中心"), `${edition}: email is reachable in the shared workspace`);
+  assert(groups.find(group => group.key === "resources")?.items.some(item => item.label === "邮件中心"), `${edition}: email is reachable in the shared tools`);
   if (edition === "Document") assert(!groups.some(group => group.key === "customers"), "Document has no empty customer group after moving email");
   assert(product.getDefaultWorkspaceRoute(editionCapabilities) === product.getProductEditionPresentation(edition).defaultRoute, `${edition}: fixed home`);
   assert(globalThis.__routeAccess.isRouteAccessAllowed({ pathname: "/", user: { capabilities: editionCapabilities }, canManageSystem: true, isDesktopRuntime: edition !== "Full" }), `${edition}: root is a neutral landing redirect`);
@@ -299,7 +301,7 @@ assert(model.isSystemAdministrationRoute("/audit-logs"), "audit route requires s
 assert(model.isSystemAdministrationRoute("/system/access-control"), "access control route requires system administration capability");
 assert(model.isDesktopOnlyRoute("/system/update"), "updater route requires desktop runtime");
 const routes = model.searchWorkspaceNavGroups("WebDAV", adminGroups).flatMap(group => group.items);
-assert(routes.some(item => item.to === "/settings?section=backupReplica" && item.locationLabel.includes("系统管理 / 系统设置") && item.label === "异机副本"), "search resolves the current replica settings and displays their location");
+assert(routes.some(item => item.to === "/system/backup?section=replica" && item.locationLabel.includes("系统管理 / 备份与恢复") && item.label === "异机副本"), "search resolves the current replica settings and displays their location");
 assert(model.searchWorkspaceNavGroups("WebDAV", salesGroups).length === 0, "feature search preserves administrative boundaries");
 const dictionaryOnly = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: true, ...moduleGrants(["document.declaration-dictionary"]), permissions: [permissionGrant("document.declaration-dictionary", "view")] });
 assert(dictionaryOnly[0].items[0].label === "单一窗口" && dictionaryOnly[0].items[0].to === "/single-window/reference-catalog", "a merged area opens its first authorized destination");
@@ -310,7 +312,7 @@ assert(routeQuery.patchRouteQuery("?page=3&supplierId=135", { supplierId: null }
 for (const value of ["0", "-1", "1.5", "2147483648", "1e2", ""]) assert(routeQuery.readRouteId(value) === null, "invalid route IDs are rejected: " + value);
 assert(routeQuery.readRouteId("135") === 135, "valid records outside the first page remain addressable");
 const mailResources = ["sales.email-templates", "common.email-delivery"].map((key, index) => ({ key, name: index ? "邮件发送与投递" : "邮件模板", group: "邮件", moduleKey: index ? "common.email" : "sales.email-templates", actions: [] }));
-assert(globalThis.__permissionNavigation.filterPermissionResources(mailResources, "工作台", "邮件中心").length === 2, "module search follows the merged page while preserving two resource keys");
+assert(globalThis.__permissionNavigation.filterPermissionResources(mailResources, "资料与工具", "邮件中心").length === 2, "module search follows the merged page while preserving two resource keys");
 const routeAllowed = (pathname, capabilities) => globalThis.__routeAccess.isRouteAccessAllowed({ pathname, user: { capabilities }, canManageSystem: capabilities.canManageSettings === true, isDesktopRuntime: capabilities.isDesktopRuntime === true });
 for (const resource of editionPermissions.resources.filter(resource => !resource.isTechnical && resource.actions.some(action => action.key === "operate"))) {
   for (const actions of [[], ["view"], ["operate"], ["manage"], ["view", "manage"], ["view", "operate", "manage"]]) {

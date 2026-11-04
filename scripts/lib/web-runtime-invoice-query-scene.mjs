@@ -69,8 +69,8 @@ export function createInvoiceQuerySmokeScene(runtime) {
         const state = await evaluate(
           page,
           `(() => {
-            const dialog = document.querySelector('.confirmation-dialog[role="dialog"]');
-            const confirmButton = dialog ? dialog.querySelector('button.confirmation-dialog-confirm') : null;
+            const dialog = document.querySelector('[data-dialog-purpose=confirmation][role="dialog"]');
+            const confirmButton = dialog ? dialog.querySelector('button[data-dialog-action=confirm]') : null;
             const text = dialog ? dialog.innerText || dialog.textContent || '' : '';
             if (!dialog || !confirmButton || confirmButton.disabled || !text.includes('删除发票')) {
               return null;

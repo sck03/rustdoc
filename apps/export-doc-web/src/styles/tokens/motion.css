@@ -1,0 +1,7 @@
+:root {
+  --edm-motion-fast: 120ms; --edm-motion-base: 160ms; --edm-motion-slow: 220ms;
+  --edm-motion-ease: cubic-bezier(0.2, 0, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --edm-motion-fast: 0.01ms; --edm-motion-base: 0.01ms; --edm-motion-slow: 0.01ms; }
+}

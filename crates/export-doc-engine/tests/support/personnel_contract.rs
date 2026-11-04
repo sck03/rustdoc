@@ -1,6 +1,4 @@
-use export_doc_engine::{
-    api::ApiError, contracts, engine::NativeService, generated_api::*, paths::nonce,
-};
+use export_doc_engine::{api::ApiError, engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 #[path = "approval_fixture.rs"]
 mod workflow;
@@ -12,17 +10,13 @@ fn call(
     id: i64,
     body: Option<Value>,
 ) -> Result<Value, ApiError> {
-    let parameters = if id > 0 {
-        vec![("id", id.to_string())]
-    } else {
-        vec![]
-    };
-    let body = workflow::decision_body(service, token, op, id, body);
-    let body = body.map(|value| contracts::overlay(contracts::object(op.id, true), &value));
-    let result =
-        serde_json::from_slice(&service.dispatch(op, &parameters, &[], body, token)?).unwrap();
-    export_doc_contracts::validation::response(op.id, &result).unwrap();
-    Ok(result)
+    workflow::call(
+        service,
+        token,
+        op,
+        id,
+        workflow::decision_body(service, token, op, id, body),
+    )
 }
 
 fn unlink_roundtrip(service: &NativeService, admin: &str, person: Value) -> Value {

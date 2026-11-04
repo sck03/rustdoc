@@ -106,13 +106,8 @@ pub fn history(
         {
             filters.push(("status", status.clone()));
         }
-        let keyword = store::normalize(
-            query
-                .iter()
-                .find(|(key, _)| *key == "keyword")
-                .map(|(_, value)| value.as_str())
-                .unwrap_or(""),
-        );
+        let keyword =
+            store::normalize(crate::engine::request_values::find(query, "keyword").unwrap_or(""));
         let (page, size, offset) = store::page_parameters(query);
         let (total, events) = tx.query_ordered_records(
             &export_doc_storage::GenericQuery {
@@ -127,10 +122,9 @@ pub fn history(
                 },
                 filters: &filters,
                 keyword: &keyword,
-                search_root: None,
-                fields: &[],
                 offset,
                 limit: size as i64,
+                ..Default::default()
             },
             export_doc_storage::RecordOrder::CreatedDescending,
         )?;

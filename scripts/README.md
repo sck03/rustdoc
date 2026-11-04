@@ -93,7 +93,7 @@ pwsh -NoProfile -File scripts/package-native-web-server.ps1 -Version 1.2.3 -NoPa
 
 桌面业务库统一位于 `App_Data/Database/exportdoc-native.db`，实例锁位于 `App_Data/Locks`。旧位置 `App_Data/exportdoc-native.db` 中受支持的数据库会通过 SQLite 快照自动搬入 Database，原文件保留在 `Backups/DatabaseLayout`；新旧两处同时有库则停止并提示核对。不要手工只移动正在使用的主文件：它可能还有未合并的 WAL。WebView 内部数据库保留在 `WebView` profile 中。
 
-便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 12，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
+便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 13，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
 
 Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便携包携带原版固定清单验证的微软离线安装器；缺少 WebView2 时显示安装／退出选择，保留取消、繁忙、超时和需重启处理。构建时核对微软签名、版本、大小和 SHA-256。Windows GNU 构建同时携带 `WebView2Loader.dll`。
 
@@ -195,13 +195,15 @@ Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公
 
 ## 验证和证据
 
+2026-11-04：test-native-postgres.ps1 的 Configuration 用于数据库合同、容量与维护编译；Release 运行优化后的测试程序，Debug 保留原默认。维护 UI 从同次配置的 Cargo 目录读取程序，不会给旧 Debug 程序标为 Release。检索计划回归使用正式 Storage 构造器，EXPORTDOC_QUERY_PLAN_ROWS=10000 可显式运行完整本机样本；选型、读写成本、独立环境与清理回执见二期记录。
+
 `npm --prefix apps/export-doc-web run test:invoice-editing` 读取与 Rust 共用的金额夹具，验证精确运算、TSV 和保存基线，再运行真实 React hook 的延迟、切换、卸载、刷新失败、重复提交与精确商品查询。`test:document-editor-ui` 另检查实际发票页面的新建跳转和二次保存。普通 Rust/Chromium CI 已加入这些回归及 Clippy；Firefox/WebKit 继续保留手动入口。
 
 实际 PDF 页图回归可设置 `EXPORTDOCMANAGER_REVIEW_APP_ROOT` 为本批组装的应用包根，直接复用包内受管 PDFium、字体和模板；`office_review` 的第二个可选参数对应此 AppRoot，第一个参数仍是独立测试 DataRoot，React 静态文件继续来自仓库构建。缺少原生库时专项明确失败。
 
 `test:concurrency-feedback` 另运行客户/供应商与联系人保存的真实 React 回归，覆盖保存期间继续输入、新建编号与并发版本、重复提交、切换/卸载、迟到响应和刷新失败；共用保存 hook 不通过清空草稿规避冲突。导入预检在同一业务库中保留 30 分钟，单次边界保持；待提交内容另限每账号 200 份/128 MiB、全局 2000 份/256 MiB，满额返回 429。提交成功即事务化释放正文，重复提交仍明确拒绝。
 
-开发时通过 `generate-api-client.ps1` 调用 `cargo run --locked -p export-doc-contracts --example generate_clients`，由 Rust 从同一 OpenAPI 文档生成 Rust 与 React 客户端；`-Check` 只校验生成文件。`crates/export-doc-contracts/src/reference_openapi.json` 是保留的官方 .NET 基线，新增能力只修改 Rust 组合器，不能覆盖生成文件或另建前端 URL/schema。`-OpenApiPath` 可指定已审阅的输入，并同时更新两端；不需要 .NET SDK。Rust 生成器回归随 workspace tests 执行，校验完整生成结果、端点策略、上传下载、请求头、默认值和类型投影；请求运行行为由现有 React/API 测试校验。
+开发时通过 `generate-api-client.ps1` 调用 `cargo run --locked -p export-doc-contracts --example generate_clients`，从 `crates/export-doc-contracts/src/native_contract/` 的原生定义生成 OpenAPI、运行契约及 Rust/React 客户端；`-Check` 校验全部生成文件。冻结发布契约仅在 `tests/fixtures/native-contract-baseline.json` 作语义对照，旧 .NET 组合基线已退役。React 生成物按模型、传输、会话和业务域拆分，业务域动态加载；不能手改生成文件或另建 URL/schema。`-OpenApiPath` 仅用于明确审阅的对照输入，正式事实仍由原生定义维护。生成器回归覆盖完整生成结果、策略、上传下载、请求头、默认值和类型；真实请求由 React/Rust HTTP 场景验证，不需要 .NET SDK。
 
 OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --example office_review`，再执行 `npm --prefix apps/export-doc-web run test:oa-ui`。回环测试宿主使用独立 DataRoot，覆盖六类申请、附件、办理记录、窄屏，以及管理员规则设置、多级审批、有效代理、手动催办和财务接收；不代替 PostgreSQL 18 或 Tauri 验收。公告通知与审批界面共用测试宿主/浏览器生命周期，正式业务仍使用同一 Rust 服务。
 

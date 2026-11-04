@@ -25,11 +25,9 @@ use serde_json::{Value, json};
 use sha2::Digest;
 use sha2::Sha256;
 use std::{
-    collections::HashMap,
     fs,
     path::{Path, PathBuf},
-    sync::{LazyLock, Mutex},
-    time::{Duration, Instant},
+    time::Duration,
 };
 use subtle::ConstantTimeEq;
 
@@ -44,7 +42,9 @@ mod restore_files;
 mod s3;
 pub(in crate::engine) mod scheduled;
 mod sealed;
+mod tickets;
 mod transfer;
+pub(super) use tickets::Tickets;
 pub use transfer::UploadAuthorization;
 #[cfg(test)]
 mod tests;
@@ -91,8 +91,6 @@ pub const UPLOADS: &[Operation] = &[
 ];
 
 const CONFIRM_RESTORE_DATABASE: &str = "RESTORE DATABASE";
-const SENSITIVE_TICKET_SECONDS: u64 = 300;
-const DOWNLOAD_TICKET_SECONDS: u64 = 300;
 const CONFIRMATION_HEADER: &str = "X-ExportDocManager-Restore-Confirmation";
 const TICKET_HEADER: &str = "X-ExportDocManager-Sensitive-Operation-Ticket";
 const MIGRATION_PASSWORD_HEADER: &str = "X-ExportDocManager-Migration-Password";
@@ -106,22 +104,6 @@ pub(super) const MIGRATION_STORAGE_POLICY: &str = "服务器迁移包写入运�
 pub(super) const DISASTER_STORAGE_POLICY: &str = "持卡机灾备包默认写入运行数据根 DisasterRecovery/，包含当前 SQLite 数据库快照与本机主密钥，使用密码派生的 AES-256-GCM 密封；包与密码必须分开保管，并至少复制一份到脱机介质。";
 pub(super) const CLOUD_STORAGE_POLICY: &str = "WebDAV 云备份只读取保存在运行数据根配置中的 WebDAV 设置，只上传运行数据根 Backups/ 中当前数据库对应的最新备份；不接受任意本地路径，不读取发票/报关业务表，也不读取付款/报销业务表。";
 pub(super) const OWNERSHIP_STORAGE_POLICY: &str = "共享库归属改派只更新发票、付款报销、客户、出口商、收款人、CRM、供应商、商机、邮件/报表模板和装柜方案的 ownerUserId、departmentId、companyScope 归属字段；关联子记录继续随所属业务聚合访问，不移动附件、不生成导出目录、不读取用户显式导出文件。";
-
-/// 一次性敏感操作票据（恢复数据库／恢复服务器），与重新认证的管理员绑定。
-struct SensitiveTicket {
-    user_id: i64,
-    action: &'static str,
-    expires: Instant,
-}
-static SENSITIVE_TICKETS: LazyLock<Mutex<HashMap<String, SensitiveTicket>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
-/// PostgreSQL 物理备份下载票据。会话与 Cookie 绑定由服务器下载层叠加。
-struct DownloadTicket {
-    file_name: String,
-    expires: Instant,
-}
-static DOWNLOAD_TICKETS: LazyLock<Mutex<HashMap<String, DownloadTicket>>> =
-    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 // --- 受管目录与路径辅助。所有写入必须落在受管根目录内。 ---
 
@@ -172,10 +154,7 @@ pub(super) fn records_text(body: &Value, key: &str) -> String {
 
 /// 取回声明在契约中的请求头参数（服务器已把 in: header 参数放进 parameters）。
 pub(super) fn header<'a>(parameters: &'a [(&str, String)], name: &str) -> &'a str {
-    parameters
-        .iter()
-        .find(|(key, _)| *key == name)
-        .map(|(_, value)| value.as_str())
+    crate::engine::request_values::find(parameters, name)
         .unwrap_or("")
         .trim()
 }
@@ -184,109 +163,6 @@ pub(super) fn confirmation(parameters: &[(&str, String)], expected: &str) -> Res
         return Err(invalid(format!("恢复前需要输入确认文本 {expected}。")));
     }
     Ok(())
-}
-pub(super) fn sensitive_ticket(
-    parameters: &[(&str, String)],
-    actor: &Actor,
-    action: &'static str,
-) -> Result<()> {
-    let token = header(parameters, TICKET_HEADER);
-    if token.is_empty() {
-        return Err(error(401, "敏感操作缺少一次性票据。"));
-    }
-    consume_sensitive_ticket(token, actor, action)
-}
-pub(super) fn issue_sensitive_ticket(
-    actor: &Actor,
-    action: &'static str,
-) -> Result<(String, String)> {
-    let mut tickets = SENSITIVE_TICKETS
-        .lock()
-        .map_err(|_| unavailable("敏感操作票据状态异常。"))?;
-    purge(&mut tickets);
-    if tickets.len() >= 1024 {
-        return Err(error(429, "敏感操作请求过多，请稍后重试。"));
-    }
-    let token = format!(
-        "{}{}",
-        nonce().map_err(unavailable)?,
-        nonce().map_err(unavailable)?
-    );
-    let expires = Instant::now() + Duration::from_secs(SENSITIVE_TICKET_SECONDS);
-    tickets.insert(
-        token.clone(),
-        SensitiveTicket {
-            user_id: actor.id,
-            action,
-            expires,
-        },
-    );
-    let expiry = (chrono::Utc::now() + chrono::Duration::seconds(SENSITIVE_TICKET_SECONDS as i64))
-        .to_rfc3339();
-    Ok((token, expiry))
-}
-fn consume_sensitive_ticket(token: &str, actor: &Actor, action: &'static str) -> Result<()> {
-    let mut tickets = SENSITIVE_TICKETS
-        .lock()
-        .map_err(|_| unavailable("敏感操作票据状态异常。"))?;
-    purge(&mut tickets);
-    match tickets.remove(token) {
-        Some(ticket)
-            if ticket.expires >= Instant::now()
-                && ticket.user_id == actor.id
-                && ticket.action == action =>
-        {
-            Ok(())
-        }
-        _ => Err(error(401, "敏感操作票据已过期或不属于当前管理员。")),
-    }
-}
-fn purge(tickets: &mut HashMap<String, SensitiveTicket>) {
-    tickets.retain(|_, ticket| ticket.expires >= Instant::now());
-}
-pub(super) fn issue_download_ticket(file_name: String) -> Result<Value> {
-    let mut tickets = DOWNLOAD_TICKETS
-        .lock()
-        .map_err(|_| unavailable("下载票据状态异常。"))?;
-    let now = Instant::now();
-    tickets.retain(|_, ticket| ticket.expires >= now);
-    if tickets.len() >= 4096 {
-        return Err(error(429, "下载请求过多，请稍后重试。"));
-    }
-    let token = format!(
-        "{}{}",
-        nonce().map_err(unavailable)?,
-        nonce().map_err(unavailable)?
-    );
-    tickets.insert(
-        token.clone(),
-        DownloadTicket {
-            file_name: file_name.clone(),
-            expires: now + Duration::from_secs(DOWNLOAD_TICKET_SECONDS),
-        },
-    );
-    let expiry = (chrono::Utc::now() + chrono::Duration::seconds(DOWNLOAD_TICKET_SECONDS as i64))
-        .to_rfc3339();
-    let url = DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET
-        .path
-        .replace("{token}", &token);
-    let mut response = contracts::initial(contracts::schema("ApiDownloadTicket"));
-    response["token"] = json!(token);
-    response["downloadUrl"] = json!(url);
-    response["expiresAtUtc"] = json!(expiry);
-    Ok(response)
-}
-pub(super) fn consume_download_ticket(token: &str) -> Result<String> {
-    let mut tickets = DOWNLOAD_TICKETS
-        .lock()
-        .map_err(|_| unavailable("下载票据状态异常。"))?;
-    let now = Instant::now();
-    tickets.retain(|_, ticket| ticket.expires >= now);
-    tickets
-        .remove(token)
-        .filter(|ticket| ticket.expires >= now)
-        .map(|ticket| ticket.file_name)
-        .ok_or_else(|| error(404, "下载票据已过期或不存在。"))
 }
 /// 重新认证当前管理员。密码使用与登录相同的 PBKDF2-HMAC-SHA256 哈希验证。
 pub(super) fn verify_admin_password(store: &Store, actor: &Actor, password: &str) -> Result<()> {
@@ -343,9 +219,7 @@ pub(super) fn sha256_hex(bytes: &[u8]) -> String {
     digest.update(bytes);
     hex(&digest.finalize())
 }
-pub(super) fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
-}
+pub(super) use crate::paths::hex;
 /// 受管目录中最新的本地 SQLite 备份（云备份上传与状态接口使用）。
 pub(super) fn latest_local_backup(paths: &RuntimePaths) -> Result<Option<(String, u64, PathBuf)>> {
     let root = backup_root(paths)?;

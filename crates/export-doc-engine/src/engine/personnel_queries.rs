@@ -129,13 +129,7 @@ pub fn directory(
     query: &[(&str, String)],
 ) -> Result<Value> {
     auth::authorize(actor, "office.people", "view")?;
-    let argument = |name| {
-        query
-            .iter()
-            .find(|(key, _)| *key == name)
-            .map(|(_, value)| value.as_str())
-            .unwrap_or("")
-    };
+    let argument = |name| crate::engine::request_values::find(query, name).unwrap_or("");
     let status = argument("status");
     if !["", "Probation", "Active", "Departed"].contains(&status) {
         return Err(invalid("任职状态无效。"));
@@ -289,11 +283,9 @@ pub fn history(store: &Store, actor: &Actor, id: i64, query: &[(&str, String)]) 
                 ..Default::default()
             },
             filters: &[("employeeId", id.to_string())],
-            keyword: "",
-            search_root: None,
-            fields: &[],
             offset,
             limit: size as i64,
+            ..Default::default()
         })?;
         Ok(contracts::page(events, total as usize, page, size))
     })

@@ -80,11 +80,9 @@ pub fn check_references(connection: &Connection, kind: &str, record: &Value) -> 
                     ..Default::default()
                 },
                 filters: &[(*property, record["id"].to_string())],
-                keyword: "",
-                search_root: None,
                 fields: &[("id", "id")],
-                offset: 0,
                 limit: 1,
+                ..Default::default()
             })?
             .0
             > 0

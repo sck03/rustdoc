@@ -1,3 +1,4 @@
+import { EditorWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useReportTemplateDocument } from "./useReportTemplateDocument.ts";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import "../../styles/routes/reports.css";
@@ -782,7 +783,7 @@ export function ReportTemplateWorkspacePage({
   }
 
   return (
-    <section className="editor-surface report-template-surface" aria-label="报表模板设计">
+    <EditorWorkspace className="editor-surface report-template-surface" aria-label="报表模板设计">
       <form className="report-template-layout" onSubmit={handleSave} onKeyDownCapture={handleEnterAsTabFormKeyDown}>
         <ReportTemplateWorkspaceHeader
           title={currentUserTemplate?.name || currentTemplate?.displayName || "报表模板"}
@@ -848,6 +849,6 @@ export function ReportTemplateWorkspacePage({
           />
         </div>
       </form>
-    </section>
+    </EditorWorkspace>
   );
 }

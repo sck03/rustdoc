@@ -1,7 +1,7 @@
 PRAGMA foreign_keys = ON;
 CREATE TABLE schema_model (version INTEGER PRIMARY KEY,model TEXT NOT NULL,shape TEXT NOT NULL);
-CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 12));
-INSERT INTO schema_version VALUES (12);
+CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 13));
+INSERT INTO schema_version VALUES (13);
 CREATE TABLE records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL,
@@ -73,8 +73,7 @@ CREATE TABLE history (
     action TEXT NOT NULL,
     actor_id INTEGER NOT NULL,
     occurred_at TEXT NOT NULL,
-    note TEXT NOT NULL,
-    body TEXT NOT NULL CHECK(json_valid(body))
+    note TEXT NOT NULL
 );
 CREATE INDEX history_record ON history(kind, record_id, id DESC);
 CREATE TABLE audit_logs (

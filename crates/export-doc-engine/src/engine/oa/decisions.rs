@@ -6,13 +6,7 @@ pub(super) fn list(
     row: &Value,
     query: &[(&str, String)],
 ) -> Result<Value> {
-    let argument = |key| {
-        query
-            .iter()
-            .find(|(k, _)| *k == key)
-            .map(|(_, v)| v.as_str())
-            .unwrap_or("")
-    };
+    let argument = |key| crate::engine::request_values::find(query, key).unwrap_or("");
     let number = |key| {
         argument(key)
             .parse::<i64>()

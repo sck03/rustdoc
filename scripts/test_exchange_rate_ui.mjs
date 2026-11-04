@@ -22,7 +22,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { ConfirmationProvider } from ${source('ui/ConfirmationProvider.tsx')};
   import { UnsavedChangesProvider } from ${source('ui/unsavedChangesGuard.tsx')};
   import { queryKeys } from ${source('api/queryKeys.ts')};
-  import ${source('styles/cascade.css')}; import ${source('styles/foundation.css')};
+   import ${source('styles/index.css')};
   import ${source('styles/workspaces.css')}; import ${source('styles/responsive.css')};
   window.requests = []; window.saved = ${JSON.stringify(defaults)};
   window.saved.revision = 0;

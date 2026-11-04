@@ -161,12 +161,9 @@ pub(super) fn register(
                 all: true,
                 ..Default::default()
             },
-            filters: &[],
-            keyword: "",
-            search_root: None,
             fields: &[("id", "id")],
-            offset: 0,
             limit: 1,
+            ..Default::default()
         })?
         .0
         >= 1000
@@ -215,11 +212,7 @@ pub fn upload(
         });
     }
     let id = super::records::id(parameters)?;
-    let kind = parameters
-        .iter()
-        .find(|(key, _)| *key == "sealType")
-        .map(|(_, v)| v.as_str())
-        .unwrap_or("");
+    let kind = crate::engine::request_values::find(parameters, "sealType").unwrap_or("");
     let field = match kind {
         "document" | "Document" => "docSealPath",
         "customs" | "Customs" => "customsSealPath",
@@ -360,10 +353,7 @@ pub fn handle(
     }
 }
 fn parameter_id<'a>(parameters: &'a [(&str, String)]) -> Result<&'a str> {
-    parameters
-        .iter()
-        .find(|(k, _)| *k == "resourceId")
-        .map(|(_, v)| v.as_str())
+    crate::engine::request_values::find(parameters, "resourceId")
         .ok_or_else(|| invalid("缺少图片编号。"))
 }
 fn stored_id<'a>(path: &'a str, prefix: &str) -> Result<&'a str> {

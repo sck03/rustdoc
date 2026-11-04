@@ -174,9 +174,17 @@ impl Store {
         let _write = self.write_guard()?;
         let connection = self.connection()?;
         connection.begin()?;
-        let result: Result<T> = match operation(&connection)
-            .and_then(|value| crate::operation::check().map(|_| value))
-        {
+        // Catch while the transaction and coordinator are still owned, so a
+        // recoverable use-case panic rolls back instead of poisoning the lock.
+        let execution = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            operation(&connection).and_then(|value| crate::operation::check().map(|_| value))
+        }))
+        .unwrap_or_else(|_| {
+            let mut cause = unavailable("应用操作异常终止，事务已请求回滚。");
+            cause.diagnostic = Some("operation-panic");
+            Err(cause)
+        });
+        let result: Result<T> = match execution {
             Ok(value) => (if commit {
                 connection.commit()
             } else {
@@ -313,10 +321,8 @@ pub fn matching(
                 },
                 filters,
                 fields,
-                keyword: "",
-                search_root: None,
-                offset: 0,
                 limit: 200,
+                ..Default::default()
             },
             before_id,
         )?;
@@ -537,13 +543,7 @@ pub fn history(connection: &Connection, kind: &str, id: i64) -> Result<Vec<Value
 }
 
 pub fn paged(mut items: Vec<Value>, query: &[(&str, String)]) -> Value {
-    let query_value = |name: &str| {
-        query
-            .iter()
-            .find(|(key, _)| *key == name)
-            .map(|(_, value)| value.as_str())
-            .unwrap_or("")
-    };
+    let query_value = |name: &str| crate::engine::request_values::find(query, name).unwrap_or("");
     let keyword = normalize(query_value("keyword"));
     let status = query_value("status");
     items.retain(|item| {
@@ -563,13 +563,7 @@ pub fn page_only(items: Vec<Value>, query: &[(&str, String)]) -> Value {
     )
 }
 pub fn page_parameters(query: &[(&str, String)]) -> (usize, usize, i64) {
-    let query_value = |name: &str| {
-        query
-            .iter()
-            .find(|(key, _)| *key == name)
-            .map(|(_, value)| value.as_str())
-            .unwrap_or("")
-    };
+    let query_value = |name: &str| crate::engine::request_values::find(query, name).unwrap_or("");
     let size = query_value("pageSize")
         .parse::<usize>()
         .unwrap_or(30)
@@ -580,4 +574,9 @@ pub fn page_parameters(query: &[(&str, String)]) -> (usize, usize, i64) {
         .max(1);
     let start = i64::try_from(page.saturating_sub(1).saturating_mul(size)).unwrap_or(i64::MAX);
     (page, size, start)
+}
+/// Persisted instants retain their offset and precision; corrupt data is unavailable.
+pub(super) fn instant(value: &str) -> Result<chrono::DateTime<chrono::FixedOffset>> {
+    chrono::DateTime::parse_from_rfc3339(value)
+        .map_err(|_| unavailable("保存的时间缺少有效日期、时间或时区偏移。"))
 }

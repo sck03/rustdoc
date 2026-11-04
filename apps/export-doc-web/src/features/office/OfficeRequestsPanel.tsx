@@ -1,3 +1,4 @@
+import { Field } from "../../ui/primitives/Field.tsx";
 import { useState, type FormEvent } from "react";
 import { RefreshCw } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -23,8 +24,8 @@ export function OfficeRequestsPanel({ client, user, kind }: { client: ExportDocM
     <div className="office-toolbar">
       {model.access.allows("approve") && <label className="checkbox-field"><input type="checkbox" checked={model.approvalsOnly} onChange={event => model.changeApprovals(event.target.checked)} />待我审批</label>}
       {(model.access.allows("issue") || model.access.allows("return")) && <label className="checkbox-field"><input type="checkbox" checked={model.handlingOnly} onChange={event => model.changeHandling(event.target.checked)} />我负责的交接与归还</label>}
-      <label className="office-filter">申请状态<select value={model.status} onChange={(event) => model.changeStatus(event.target.value)}><option value="">全部状态</option>
-        {statuses.map((status) => <option key={status} value={status}>{status === "Approved" && kind === "rooms" ? "待使用／领钥匙" : officeStatusLabels[status]}</option>)}</select></label>
+      <Field label="申请状态"><select value={model.status} onChange={(event) => model.changeStatus(event.target.value)}><option value="">全部状态</option>
+        {statuses.map((status) => <option key={status} value={status}>{status === "Approved" && kind === "rooms" ? "待使用／领钥匙" : officeStatusLabels[status]}</option>)}</select></Field>
       {model.access.canSeeOthers && <label className="checkbox-field"><input type="checkbox" checked={model.mineOnly} onChange={(event) => model.changeMineOnly(event.target.checked)} />仅我的申请</label>}
       <button type="button" className="icon-button" aria-label="刷新申请记录" disabled={model.query.isFetching} onClick={() => void model.query.refetch()}><RefreshCw size={17} aria-hidden="true" /></button>
     </div>

@@ -44,12 +44,9 @@ pub fn exercise(c: &Connection) {
             department_wide: true,
             ..Default::default()
         },
-        filters: &[],
-        keyword: "",
-        search_root: None,
         fields: &fields,
-        offset: 0,
         limit: 1,
+        ..Default::default()
     };
     let (total, rows) = c.query_generic(&q).unwrap();
     assert_eq!(total, 2);
@@ -129,12 +126,9 @@ fn keyset(c: &Connection) {
             own: true,
             ..Default::default()
         },
-        filters: &[],
-        keyword: "",
-        search_root: None,
         fields: &[("label", "label"), ("amount", "amount")],
-        offset: 0,
         limit: 73,
+        ..Default::default()
     };
     let mut before = None;
     let mut labels = Vec::new();

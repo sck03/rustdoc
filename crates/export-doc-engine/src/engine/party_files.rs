@@ -123,13 +123,7 @@ fn export(
 ) -> Result<Vec<u8>> {
     let supplier = supplier(operation);
     let resource = catalog::resource(kind(supplier)).unwrap();
-    let read = |key: &str| {
-        query
-            .iter()
-            .find(|(name, _)| *name == key)
-            .map(|(_, value)| value.as_str())
-            .unwrap_or("")
-    };
+    let read = |key: &str| crate::engine::request_values::find(query, key).unwrap_or("");
     let keyword = store::normalize(read("keyword"));
     let rows = service
         .store
@@ -153,10 +147,9 @@ fn export(
                 scope: auth::data_scope(actor, resource.permission, "export"),
                 filters: &filters,
                 keyword: &keyword,
-                search_root: None,
-                fields: &[],
                 offset,
                 limit,
+                ..Default::default()
             };
             let count = tx
                 .export_record_page(&selection(i64::MAX, 1), &fields, true)?

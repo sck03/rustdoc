@@ -54,7 +54,7 @@ export function FrontendFatalErrorState({ incidentId, onRetry, onReload }: {
   const description = incidentId
     ? `系统已记录异常编号 ${incidentId}。可先重试当前界面；如果问题持续，请重新加载并把异常编号提供给维护人员。未保存内容可能无法恢复。`
     : "系统正在记录异常。可先重试当前界面；如果问题持续，请重新加载程序界面。未保存内容可能无法恢复。";
-  return <main className="work-surface">
+  return <main data-ui="workspace">
     <PageState
       tone="error"
       title="页面出现异常"

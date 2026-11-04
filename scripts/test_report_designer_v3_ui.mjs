@@ -54,8 +54,8 @@ await esbuild.build({
     import { defaultReportDesigns } from ${JSON.stringify(path.join(repo, "scripts/lib/default-report-designs.mjs").replaceAll("\\", "/"))};
     import { renderReportDesignerLocalPreviewSample } from ${JSON.stringify(path.join(repo, "scripts/lib/report-preview-html-fixture.ts"))};
     import { renderDetailComposite } from ${source("features/report-designer/reportDesignerDetailComposite.ts")};
-    import ${source("styles/cascade.css")};
-    import ${source("styles/foundation.css")};
+
+    import ${source("styles/index.css")};
     import ${source("styles/workspaces.css")};
     import ${source("styles/responsive.css")};
     import ${source("styles/routes/reports.css")};
@@ -335,8 +335,8 @@ try {
   await waitFor(page,`window.__designerSchema.layers.flatMap(layer=>layer.elements).find(element=>element.id==='image-0').resourceId===${JSON.stringify(imageFixtures[1].id)}`);
   assert.equal(await read(page,'document.querySelectorAll(".report-designer-v3-resource-card")[1].querySelectorAll("button").length'),1,'a reused draft image cannot be recycled');
   await read(page,'document.querySelectorAll(".report-designer-v3-resource-card")[2].querySelector(".danger-button").click()');
-  await waitFor(page,'document.querySelector(".confirmation-dialog")');
-  await read(page,'[...document.querySelectorAll(".confirmation-dialog button")].find(button=>button.textContent.trim()==="确认回收").click()');
+  await waitFor(page,'document.querySelector("[data-dialog-purpose=confirmation]")');
+  await read(page,'[...document.querySelectorAll("[data-dialog-purpose=confirmation] button")].find(button=>button.textContent.trim()==="确认回收").click()');
   await waitFor(page,'document.querySelectorAll(".report-designer-v3-resource-card").length===2');
   assert.equal(await read(page,'window.__imageCalls.filter(call=>call.kind==="recycle").length'),1);
   assert.equal(await read(page,'window.__designerErrors.length'),0);

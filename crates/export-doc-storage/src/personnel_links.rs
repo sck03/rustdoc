@@ -37,6 +37,7 @@ pub(crate) fn unit_accounts(
     }
     Ok((
         QuerySql {
+            source: crate::query_source::Source::Projected,
             filter,
             order: "r.id DESC".into(),
             values,
@@ -89,6 +90,7 @@ pub(crate) fn accounts(
 ) -> Result<(QuerySql, String)> {
     let (values, ids) = parameters(ids, pg);
     let query = QuerySql {
+        source: crate::query_source::Source::Projected,
         filter: format!(
             "r.kind='people' AND r.id IN (SELECT a.person_id FROM personnel_accounts a WHERE a.user_id IN ({ids}))"
         ),
@@ -119,6 +121,7 @@ pub(crate) fn appointments(ids: &[i64], pg: bool) -> Result<(QuerySql, String)> 
     };
     let (values, ids) = parameters(ids, pg);
     let query = QuerySql {
+        source: crate::query_source::Source::Projected,
         filter: format!("r.kind='people' AND r.id IN ({ids})"),
         order: "r.id DESC".into(),
         values,

@@ -15,13 +15,36 @@ pub(crate) struct DesktopRuntimeContext {
     product_edition: &'static str,
     platform: &'static str,
     single_window_station_capable: bool,
+    startup_error: Option<String>,
+    log_path: String,
+}
+pub(crate) struct StartupFailure {
+    pub(crate) message: String,
+    pub(crate) log_path: String,
 }
 
 pub(crate) struct DesktopRuntime {
     service: std::sync::Weak<NativeService>,
     context: DesktopRuntimeContext,
-    host: Mutex<Option<DesktopHost>>,
+    host: Mutex<HostState>,
     shutdown: ShutdownState,
+}
+struct HostState {
+    host: Option<DesktopHost>,
+    result: Option<Result<(), String>>,
+}
+impl HostState {
+    fn stop(
+        &mut self,
+        close: impl FnOnce(Option<DesktopHost>) -> Result<(), String>,
+    ) -> Result<(), String> {
+        if let Some(result) = &self.result {
+            return result.clone();
+        }
+        let result = close(self.host.take());
+        self.result = Some(result.clone());
+        result
+    }
 }
 
 #[derive(Default)]
@@ -59,6 +82,11 @@ pub(crate) fn start(
     paths: &crate::runtime_paths::RuntimePaths,
 ) -> Result<DesktopRuntime, Box<dyn std::error::Error>> {
     let paths = RuntimePaths::server(&paths.app_root, &paths.data_root)?;
+    let log_path = paths
+        .log_root
+        .join("tauri-errors.log")
+        .to_string_lossy()
+        .into_owned();
     let retention = export_doc_engine::engine::tasks::retention::Retention::from_lookup(|key| {
         std::env::var(key).ok()
     })?;
@@ -71,10 +99,15 @@ pub(crate) fn start(
             api_base_url: host.api_base_url.clone(),
             desktop_access_token: host.access_token.clone(),
             product_edition: env!("EXPORTDOCMANAGER_PRODUCT_EDITION"),
+            startup_error: None,
+            log_path,
             platform: std::env::consts::OS,
             single_window_station_capable: cfg!(target_os = "windows"),
         },
-        host: Mutex::new(Some(host)),
+        host: Mutex::new(HostState {
+            host: Some(host),
+            result: None,
+        }),
         shutdown: ShutdownState::default(),
     })
 }
@@ -98,9 +131,32 @@ pub(crate) async fn authorize_update(app: &tauri::AppHandle, token: String) -> R
 
 #[tauri::command]
 pub(crate) fn get_desktop_runtime_context(
-    state: tauri::State<'_, DesktopRuntime>,
-) -> DesktopRuntimeContext {
-    state.context.clone()
+    app: tauri::AppHandle,
+) -> Result<DesktopRuntimeContext, String> {
+    if let Some(state) = app.try_state::<DesktopRuntime>() {
+        return Ok(state.context.clone());
+    }
+    let failure = app
+        .try_state::<StartupFailure>()
+        .ok_or_else(|| "桌面服务尚未就绪。".to_owned())?;
+    Ok(DesktopRuntimeContext {
+        api_base_url: String::new(),
+        desktop_access_token: String::new(),
+        product_edition: env!("EXPORTDOCMANAGER_PRODUCT_EDITION"),
+        platform: std::env::consts::OS,
+        single_window_station_capable: false,
+        startup_error: Some(failure.message.clone()),
+        log_path: failure.log_path.clone(),
+    })
+}
+#[tauri::command]
+pub(crate) fn restart_after_startup_failure(app: tauri::AppHandle) -> Result<(), String> {
+    if app.try_state::<StartupFailure>().is_none() {
+        return Err("当前程序不在启动失败状态。".into());
+    }
+    crate::desktop_commands::confirm_app_exit();
+    app.request_restart();
+    Ok(())
 }
 
 pub(crate) fn stop(app: &tauri::AppHandle) -> Result<(), String> {
@@ -112,7 +168,7 @@ pub(crate) fn stop(app: &tauri::AppHandle) -> Result<(), String> {
                 .host
                 .lock()
                 .map_err(|_| "后端生命周期状态异常。".to_owned())?;
-            host.take().map_or(Ok(()), DesktopHost::stop)
+            host.stop(|host| host.map_or(Ok(()), DesktopHost::stop))
         })();
         state.shutdown.complete();
         result?;
@@ -154,6 +210,25 @@ pub(crate) fn begin_graceful_shutdown(app: &tauri::AppHandle) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn overlapping_stop_retains_failure_and_does_not_report_later_success() {
+        let host = Mutex::new(HostState {
+            host: None,
+            result: None,
+        });
+        let first = host
+            .lock()
+            .unwrap()
+            .stop(|_| Err("injected stop timeout".into()));
+        assert!(first.is_err());
+        assert_eq!(
+            host.lock()
+                .unwrap()
+                .stop(|_| panic!("must not retry consumed host")),
+            first
+        );
+    }
 
     #[test]
     fn repeated_exit_requests_wait_until_cleanup_finishes() {

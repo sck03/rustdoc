@@ -1,3 +1,4 @@
+import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { FormEvent, KeyboardEvent, useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Plus, RefreshCw, Search, X } from "lucide-react";
@@ -6,8 +7,8 @@ import { ApiPaymentDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission, usePermission } from "../../app/PermissionAccessContext.tsx";
 import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { ListPaginationControls } from "../../ui/ListPaginationControls.tsx";
-import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
@@ -72,8 +73,8 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
   const isBusy = paymentsQuery.isFetching;
 
   return (
-    <section className="work-surface" aria-label="付款报销列表">
-      <ListWorkspaceHeader title="付款报销打印单" count={payments?.totalCount} actions={<>
+    <ListWorkspace  aria-label="付款报销列表">
+      <PageHeader title="付款报销打印单" count={payments?.totalCount} actions={<>
         <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void paymentsQuery.refetch()}><RefreshCw size={18} aria-hidden="true" /></button>
         {paymentPermission.canOperate && <button className="command-button" type="button" onClick={() => navigate("/payments/new")}><Plus size={17} aria-hidden="true" /><span>新建</span></button>}
       </>}>
@@ -96,7 +97,7 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
             <X size={18} aria-hidden="true" />
           </button>
         </form>
-      </ListWorkspaceHeader>
+      </PageHeader>
 
       <InlineNotice tone="info" action={expensePermission.canView ? <Link to="/office/requests/expense">报销申请与审批</Link> : undefined}>
         填写付款单或报销打印单，保存后选择模板打印或导出 PDF。打印单不代表审批通过或已经付款。
@@ -111,7 +112,7 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
         onOpen={(paymentId) => navigate(`/payments/${paymentId}`)}
       />
 
-      <ListPaginationControls
+      <Pagination
         pageNumber={payments?.pageNumber ?? pageNumber}
         totalPages={Math.max(payments?.totalPages ?? 1, 1)}
         totalCount={payments?.totalCount ?? 0}
@@ -121,7 +122,7 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
         onPageChange={setPageNumber}
         onPageSizeChange={handlePageSizeChange}
       />
-    </section>
+    </ListWorkspace>
   );
 }
 

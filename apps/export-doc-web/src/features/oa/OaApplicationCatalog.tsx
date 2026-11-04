@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ClipboardList } from "lucide-react";
 import type { ApiUserDto } from "../../api/index.ts";
-import { ListWorkspaceHeader } from "../../ui/ListWorkspaceHeader.tsx";
+import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
 import { PageState } from "../../ui/PageState.tsx";
 import { oaAccess, oaKinds, oaModules, type OaKind } from "./oaModel.ts";
 
@@ -30,12 +30,12 @@ export function OaApplicationCatalog({ user, resources }: {
   const visible = entries.filter(item => (!group || item.group === group)
     && (!keyword || `${item.title} ${item.description}`.toLocaleLowerCase().includes(keyword)));
   return <div className="oa-application-catalog">
-    <ListWorkspaceHeader title="选择申请事项" count={visible.length} unit="项">
+    <PageHeader title="选择申请事项" count={visible.length} unit="项">
       <div className="list-workspace-filters" role="search" aria-label="查找申请事项">
         <input type="search" aria-label="查找申请类型" placeholder="查找请假、报销、用印、会议室…" maxLength={100} value={search} onChange={event => setSearch(event.target.value)} />
         <select aria-label="申请分类" value={group} onChange={event => setGroup(event.target.value)}><option value="">全部分类</option>{availableGroups.map(name => <option key={name}>{name}</option>)}</select>
       </div>
-    </ListWorkspaceHeader>
+    </PageHeader>
     {availableGroups.map(name => {
       const items = visible.filter(item => item.group === name);
       return items.length > 0 && <section className="oa-application-group" aria-label={name} key={name}>

@@ -1,0 +1,33 @@
+name: Prepare shared web validation resources
+description: Install the locked frontend, verified fonts and optional Chromium in managed caches.
+inputs:
+  chromium:
+    description: Install Chromium headless shell for UI validation.
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Prepare managed temporary directory
+      shell: pwsh
+      run: |
+        if ($env:TEMP) { New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null }
+    - name: Install locked frontend dependencies
+      shell: pwsh
+      run: |
+        npm --prefix apps/export-doc-web ci
+        exit $LASTEXITCODE
+    - name: Provision and validate report fonts
+      shell: pwsh
+      run: |
+        node scripts/provision-report-fonts.mjs
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        npm --prefix apps/export-doc-web run test:font-policy:release
+        exit $LASTEXITCODE
+    - name: Prepare Chromium
+      if: inputs.chromium == 'true'
+      shell: pwsh
+      run: |
+        $browserArgs = @('apps/export-doc-web/node_modules/playwright/cli.js', 'install', '--only-shell', 'chromium')
+        if ($IsLinux) { $browserArgs += '--with-deps' }
+        node @browserArgs
+        exit $LASTEXITCODE

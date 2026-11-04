@@ -272,8 +272,8 @@ export function createSystemToolsSmokeScene(runtime) {
       const result = await evaluate(
         page,
         `(() => {
-          const dialog = document.querySelector('.confirmation-dialog[role="dialog"]');
-          const confirmButton = dialog?.querySelector('button.confirmation-dialog-confirm');
+          const dialog = document.querySelector('[data-dialog-purpose=confirmation][role="dialog"]');
+          const confirmButton = dialog?.querySelector('button[data-dialog-action=confirm]');
           const text = dialog?.innerText || dialog?.textContent || "";
           if (!dialog || !confirmButton || confirmButton.disabled || !text.includes("下载并安装更新")) {
             return null;

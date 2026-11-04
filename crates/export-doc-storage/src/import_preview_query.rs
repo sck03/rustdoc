@@ -46,6 +46,7 @@ pub(crate) fn expired(before: &str, pg: bool) -> QuerySql {
     let (expires_seconds, expires_nanos) = sql::instant_order(&sql::field("expiresAt", pg), pg);
     let (before_seconds, before_nanos) = sql::instant_order(&before, pg);
     QuerySql {
+        source: crate::query_source::Source::Records,
         filter: format!(
             "r.kind='import-previews' AND ({expires_seconds},{expires_nanos}) <= ({before_seconds},{before_nanos})"
         ),

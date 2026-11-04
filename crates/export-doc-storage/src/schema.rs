@@ -1,8 +1,7 @@
 //! Fresh pre-production baseline. Earlier experimental databases are never opened or rewritten.
 use crate::{Error, Result};
 use sha2::{Digest, Sha256};
-pub const SCHEMA_VERSION: i64 = 12;
-pub const MIN_SUPPORTED_SCHEMA_VERSION: i64 = SCHEMA_VERSION;
+pub const SCHEMA_VERSION: i64 = 13;
 pub(crate) fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
@@ -15,6 +14,7 @@ pub fn model_fingerprint(postgres: bool) -> String {
             include_str!("permission_versions_postgres.sql"),
             include_str!("access_scope_postgres.sql"),
             include_str!("workflow_runtime_postgres.sql"),
+            include_str!("foreign_key_indexes.sql"),
         ]
     } else {
         [
@@ -24,6 +24,7 @@ pub fn model_fingerprint(postgres: bool) -> String {
             include_str!("permission_versions_sqlite.sql"),
             include_str!("access_scope_sqlite.sql"),
             include_str!("workflow_runtime_sqlite.sql"),
+            include_str!("foreign_key_indexes.sql"),
         ]
     };
     let mut digest = Sha256::new();

@@ -19,54 +19,7 @@ pub(crate) fn table(kind: &str) -> Result<&'static str> {
         _ => Err(Error::unavailable("未知人员基础实体。")),
     }
 }
-struct Statement {
-    pg: bool,
-    values: Vec<String>,
-}
-impl Statement {
-    fn new(db: &(impl Adapter + ?Sized)) -> Self {
-        Self {
-            pg: db.provider() == "PostgreSQL",
-            values: vec![],
-        }
-    }
-    fn text(&mut self, value: impl ToString) -> String {
-        sql::bind(&mut self.values, value, self.pg)
-    }
-    fn number(&mut self, value: impl ToString) -> String {
-        format!("CAST({} AS BIGINT)", self.text(value))
-    }
-    fn nullable_number(&mut self, value: Option<&str>) -> String {
-        format!(
-            "CAST(NULLIF({},'') AS BIGINT)",
-            self.text(value.unwrap_or(""))
-        )
-    }
-    fn nullable_text(&mut self, value: Option<&str>) -> String {
-        format!("NULLIF({},'')", self.text(value.unwrap_or("")))
-    }
-    fn json(&mut self, value: &Value) -> Result<String> {
-        let parameter = self.text(serde_json::to_string(value)?);
-        Ok(if self.pg {
-            format!("CAST({parameter} AS JSONB)")
-        } else {
-            parameter
-        })
-    }
-    fn execute(self, db: &(impl Adapter + ?Sized), query: String) -> Result<u64> {
-        db.execute_statement(&query, &self.values)
-    }
-    fn query(self, db: &(impl Adapter + ?Sized), query: String) -> Result<Value> {
-        db.query_json(&query, &self.values)
-    }
-}
-fn object(pg: bool) -> &'static str {
-    if pg {
-        "jsonb_build_object"
-    } else {
-        "json_object"
-    }
-}
+use crate::sql::{Statement, object};
 fn json_value(value: &str, pg: bool) -> String {
     if pg {
         value.into()

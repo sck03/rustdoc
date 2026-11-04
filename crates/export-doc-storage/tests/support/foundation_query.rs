@@ -8,13 +8,7 @@ fn person(
     owner: i64,
 ) -> (i64, Value) {
     let mut body = json!({"versionNumber":1,"companyScope":unit,"departmentId":"D","employeeNumber":number,"status":"Active","employmentType":"FullTime","hireDate":"2020-01-01","jobTitle":"专员","ownerUserId":owner,"profile":{"fullName":"同名人员"},"organization":{"primaryAssignmentId":appointment,"additionalAssignments":[]}});
-    let id = tx
-        .insert(&RecordWrite {
-            kind: "people",
-            identity: None,
-            body: &body,
-        })
-        .unwrap();
+    let id = tx.insert(&RecordWrite::unkeyed("people", &body)).unwrap();
     body["id"] = json!(id);
     tx.set_body(id, &body).unwrap();
     let public = tx.get("people", id).unwrap().unwrap();

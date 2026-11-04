@@ -1,4 +1,6 @@
+import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { RefreshCw, Settings } from "lucide-react";
+import "../../styles/tools-ocr-exchange.css";
 import { Link } from "react-router-dom";
 import type { ApiExchangeRateDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -14,7 +16,7 @@ export function ExchangeRatePage({ client, canManageSettings = false }: { client
   const automatic = result?.autoRefreshEnabled ?? configuration?.autoRefreshEnabled;
   const source = result?.sourceUrl || configuration?.url;
   return (
-    <section className="work-surface exchange-rate-surface" aria-label="今日汇率">
+    <RecordWorkspace className="exchange-rate-surface" aria-label="今日汇率">
       <div className="toolbar exchange-rate-toolbar">
         <div className="toolbar-summary">
           <strong>今日汇率 · {result ? `${rates.length} 种常用货币` : "读取中"}</strong>
@@ -57,7 +59,7 @@ export function ExchangeRatePage({ client, canManageSettings = false }: { client
         {(result?.sourceFormat ?? configuration?.sourceFormat) === "BankOfChinaHtml" && <p className="field-hint">中行牌价仅供参考，实际结购汇以银行交易报价为准。使用前请遵守来源网站规则；未经中国银行许可，不得以商业目的转载其汇率表。</p>}
         <div className="currency-chip-list">{result?.availableCurrencies?.map(currency => <span key={currency}>{currency}</span>)}</div>
       </details>
-    </section>
+    </RecordWorkspace>
   );
 }
 

@@ -9,7 +9,7 @@ import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { backupPlanDraft, validateBackupPlan } from "./backupPlanModel.ts";
 
 export function useBackupPlan(client: ExportDocManagerApiClient, canManage: boolean,
-  onSettingsSaved: (status: ApiBackupPlanStatus, previousRevision: number) => void) {
+  onSettingsSaved?: (status: ApiBackupPlanStatus, previousRevision: number) => void) {
   const queryClient = useQueryClient();
   const run = useAbortableOperation(client);
   const [draft, setDraft] = useState<ApiBackupPlanSaveRequest | null>(null);
@@ -53,7 +53,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
     onSuccess: (response, request) => {
       apply(response); setMessage(null); setSuccess("灾备设置已保存。");
       queryClient.setQueryData(queryKeys.backupPlan(), response);
-      onSettingsSaved(response, request.expectedSettingsRevision);
+      onSettingsSaved?.(response, request.expectedSettingsRevision);
       void queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
     },
     onError: fail,

@@ -3,14 +3,16 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 
-async function verifyOfficeNavigation(page, personnel, administration) {
-  for (const [name, links] of [['人员与组织', personnel.filter(label=>label==='人员档案')], ['申请与资源', [...personnel.filter(label=>label!=='人员档案'),...administration]]]) {
-    if (!links.length) continue;
-    const group = page.locator('nav').getByRole('button', { name, exact: true });
-    await group.waitFor();
-    if (await group.getAttribute('aria-expanded') === 'false') await group.click();
-    for (const label of links) await page.locator('nav').getByRole('link', { name: label, exact: true }).waitFor({ state: 'visible' });
-  }
+async function verifyApprovalNavigation(page, labels) {
+  const group = page.locator('nav').getByRole('button', { name: '工作台', exact: true });
+  if (await group.getAttribute('aria-expanded') === 'false') await group.click();
+  await page.locator('nav').getByRole('link', { name: '申请与审批', exact: true }).click();
+  const hub = page.getByRole('region', { name: '申请与审批中心', exact: true });
+  await hub.waitFor();
+  await page.waitForFunction(() => !document.querySelector('.oa-hub-queue p[role="status"]'));
+  const idle = hub.locator('.oa-hub-idle-categories');
+  if (await idle.count()) await idle.locator('summary').click();
+  for (const label of labels) await hub.getByRole('link', { name: label, exact: true }).waitFor({ state: 'visible' });
 }
 
 await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, openPage, operations, require }) => {
@@ -48,7 +50,7 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   await newSchemeDialog.getByLabel('新建方案起点').selectOption('company');
   await newSchemeDialog.getByRole('button', { name: '建立方案草稿', exact: true }).click();
   assert.equal(await schemes.getByLabel('方案名称', { exact: true }).inputValue(), '公司审批负责人');
-  await schemes.getByLabel('模块分类').selectOption('申请与资源');
+  await schemes.getByLabel('模块分类').selectOption({ label: '工作台' });
   assert.equal(await schemes.getByLabel('员工请假查看数据范围', { exact: true }).inputValue(), 'company');
   assert.equal(await schemes.getByLabel('员工请假任务审批数据范围', { exact: true }).inputValue(), 'company');
   assert.equal(await schemes.getByLabel('人员变动审批快捷设置').inputValue(), 'approve');
@@ -68,7 +70,7 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   await assert.rejects(() => invoke('GetPersonnel', undefined, { id: manager.employee.id }, login.accessToken), /403/u);
   await assert.rejects(() => invoke('ListUsers', undefined, {}, login.accessToken), /403/u);
   const gm = await openPage('approval-gm', 'Approval-Manager-2026');
-  await verifyOfficeNavigation(gm, ['人员变动审批', '员工请假'], ['费用报销', '通用申请']);
+  await verifyApprovalNavigation(gm, ['人员变动审批', '员工请假', '费用报销', '通用申请']);
   assert.equal(await gm.locator('nav').getByRole('link', { name: '人员档案', exact: true, hidden: true }).count(), 0);
   const employee = await invoke('CreatePersonnel', { requestKey: 'approval-worker', employeeNumber: 'APPROVAL-WORKER', departmentId: 'TRADE',
     jobTitle: '普通员工', employmentType: 'FullTime', hireDate: '2026-09-01', onProbation: true, profile: { fullName: '跨部门审批员工' } }, {}, adminToken);
@@ -101,7 +103,7 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   assert.deepEqual((await gm.evaluate(async () => window.axe.run(document.querySelector('main'), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } }))).violations, []);
   // Account restrictions survive changing the fallback role, and close both UI/API access.
   await accounts.locator('summary').filter({ hasText: '账号单独配置与模块权限' }).click();
-  await accounts.getByLabel('模块分类', { exact: true }).selectOption('申请与资源');
+  await accounts.getByLabel('模块分类', { exact: true }).selectOption({ label: '工作台' });
   await accounts.getByLabel('员工请假模块开放', { exact: true }).uncheck();
   await accounts.getByRole('combobox', { name: /^角色/u }).selectOption('Sales');
   assert.equal(await accounts.getByLabel('员工请假模块开放', { exact: true }).isChecked(), false);
@@ -140,6 +142,8 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   assert.equal((await invoke('GetPersonnel', undefined, { id: employee.employee.id }, combinedLogin.accessToken)).employee.status, 'Active');
   await assert.rejects(() => invoke('ListUsers', undefined, {}, combinedLogin.accessToken), /403/u);
   const worker = await openPage('combined-worker', 'Combined-Worker-2026');
-  await verifyOfficeNavigation(worker, ['人员档案'], ['通用申请', '费用报销']);
+  await verifyApprovalNavigation(worker, ['通用申请', '费用报销']);
+  await worker.locator('nav').getByRole('button', { name: '行政与人事', exact: true }).click();
+  await worker.locator('nav').getByRole('link', { name: '人员档案', exact: true }).waitFor({ state: 'visible' });
   await worker.screenshot({ path: path.join(output, 'combined-duties-navigation.png'), fullPage: true });
 });

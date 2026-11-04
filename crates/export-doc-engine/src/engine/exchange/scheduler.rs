@@ -19,6 +19,7 @@ struct Worker {
 pub(in crate::engine) struct Scheduler {
     service: OnceLock<Weak<NativeService>>,
     worker: Mutex<Option<Worker>>,
+    state: crate::engine::scheduler_health::Health,
 }
 impl Scheduler {
     pub(in crate::engine) fn bind(service: &Arc<NativeService>) -> Result<()> {
@@ -73,7 +74,17 @@ impl Scheduler {
                     let Some(service) = service.upgrade() else {
                         break;
                     };
-                    let delay = run(&service, &control).unwrap_or(Duration::from_secs(300));
+                    let delay = service
+                        .exchange_scheduler
+                        .state
+                        .run(
+                            || run(&service, &control),
+                            || service.store.health().is_ok(),
+                        )
+                        .unwrap_or(Duration::from_secs(300));
+                    if service.exchange_scheduler.state.check().is_err() {
+                        break;
+                    }
                     drop(service);
                     let signal = control.0.lock().unwrap_or_else(|e| e.into_inner());
                     drop(control.1.wait_timeout_while(signal, delay, |s| {
@@ -103,6 +114,7 @@ impl Scheduler {
         Ok(())
     }
     pub(in crate::engine) fn health(&self) -> Result<()> {
+        self.state.check()?;
         let worker = self
             .worker
             .lock()
@@ -113,6 +125,15 @@ impl Scheduler {
             ));
         }
         Ok(())
+    }
+    pub(in crate::engine) fn metrics(&self) -> Value {
+        let mut metrics = self.state.metrics();
+        metrics["threadAlive"] = json!(
+            self.worker
+                .lock()
+                .is_ok_and(|worker| worker.as_ref().is_some_and(|w| !w.handle.is_finished()))
+        );
+        metrics
     }
 }
 fn stop_worker(worker: &mut Option<Worker>) -> Result<()> {
@@ -148,15 +169,18 @@ fn run(service: &NativeService, signal: &(Mutex<Signal>, Condvar)) -> Result<Dur
     service.store.health()?;
     super::super::licensing::check_operation(service, LIST_EXCHANGE_RATES)?;
     let now = service.clock.now().map_err(unavailable)?.utc_now;
-    let _ = service.exchange.get(&config, false, true, now, &|| {
-        if signal.0.lock().map_or(true, |s| s.stopped) {
-            return Err(export_doc_exchange::Error::new(
-                export_doc_exchange::ErrorKind::Cancelled,
-                "汇率自动获取已停止。",
-            ));
-        }
-        Ok(())
-    });
+    service
+        .exchange
+        .get(&config, false, true, now, &|| {
+            if signal.0.lock().map_or(true, |s| s.stopped) {
+                return Err(export_doc_exchange::Error::new(
+                    export_doc_exchange::ErrorKind::Cancelled,
+                    "汇率自动获取已停止。",
+                ));
+            }
+            Ok(())
+        })
+        .map_err(map_error)?;
     let now = service.clock.now().map_err(unavailable)?.utc_now;
     let due = service
         .exchange

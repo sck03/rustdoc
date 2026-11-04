@@ -3,13 +3,7 @@ use super::*;
 use export_doc_domain::identity::{EffectivePeriod, StableId};
 
 pub(super) fn options(tx: &Connection, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
-    let argument = |key| {
-        query
-            .iter()
-            .find(|(name, _)| *name == key)
-            .map(|(_, value)| value.as_str())
-            .unwrap_or("")
-    };
+    let argument = |key| crate::engine::request_values::find(query, key).unwrap_or("");
     let kind = argument("kind");
     let resource = approval::resource(kind).ok_or_else(|| invalid("项目申请业务无效。"))?;
     let body = json!({"employeeId":argument("employeeId").parse::<i64>().ok(),"appointmentId":argument("appointmentId"),"departmentId":argument("departmentId")});

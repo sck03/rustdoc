@@ -105,7 +105,8 @@ pub(super) fn catalog(q: &ReportTemplateQuery<'_>, postgres: bool) -> QuerySql {
         });
     }
     QuerySql {
-        filter: clauses.join(" AND "),
+        source: crate::query_source::Source::Records,
+filter: clauses.join(" AND "),
         values,
         order: if postgres {
             "(r.body->>'status'='Published') DESC, (r.body->>'name') COLLATE \"C\", r.id"
@@ -120,6 +121,7 @@ pub(super) fn versions(q: &TemplateVersionQuery<'_>, postgres: bool) -> QuerySql
     let kind = bind(&mut values, q.kind, postgres);
     let id = bind(&mut values, q.template_id, postgres);
     QuerySql {
+        source: crate::query_source::Source::Records,
         filter: format!(
             "r.kind='template-versions' AND {}={kind} AND {}=CAST({id} AS BIGINT)",
             field("templateKind", postgres),

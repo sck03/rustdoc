@@ -4,6 +4,8 @@
 
 ## 产品与代码边界
 
+2026-11-04 二期当前采用 schema 13 和 Rust 原生单一契约定义。运行契约/客户端是生成投影，冻结发布快照只作测试对照；通用记录仍保留 JSON 模型，SQL、受管路径、业务编排和界面保持各自边界。查询、任务/调度、前端及平台的实际完成范围见[二期核对记录](./二期重构验收与清理记录.md)，下面带旧日期的条目不替代当前事实。
+
 | 产品 | 界面与宿主 | 后端 | 数据库 |
 | --- | --- | --- | --- |
 | 桌面 | Tauri 2 + 原版 React | 进程内 Rust HTTP 适配器、共用应用服务 | SQLite |
@@ -21,7 +23,7 @@ Tauri 是桌面宿主；浏览器与 Docker 不运行 Tauri 窗口。Node 只用
 - `apps/export-doc-web`：唯一 React 界面；页面组合、hook 查询与变更、纯 model、平台 bridge 分层。
 - `apps/export-doc-tauri/src-tauri`：Tauri 窗口、文件对话框、WebView 预检、退出、更新、运行目录与迁移。`desktop_runtime` 仅管理共用 Rust 后端生命周期。
 - `apps/export-doc-server`：HTTP 请求、上传下载、认证适配、容量与超时。桌面关闭默认 `postgres` feature，在随机 `127.0.0.1` 端口启动相同 router；团队二进制启用 PostgreSQL。
-- `crates/export-doc-contracts`：Rust OpenAPI 组合器保留原官方导出并组合当前能力，统一生成契约、权限和配置元数据。2026-10-29 授权重构的组织稳定 ID 路由及单位权限声明单独验证，其余 schema/端点/认证/错误继续逐项比较；生成文件不能手改。
+- `crates/export-doc-contracts`：`native_contract` 原生定义统一生成 OpenAPI、运行契约、Rust DTO/权限和 React 按域客户端；冻结发布快照仅作测试对照，已退出旧 .NET 基线组合链。所有明确差异须通过语义、错误、认证、权限和容量元数据回归，生成文件不能手改。
 - `export-doc-domain`：精确金额、数量、日期与纯业务规则，不依赖 UI、HTTP、数据库或宿主文件系统。
 - `export-doc-engine`：应用用例、权限、任务、报表及各可选能力编排；不放 SQL 或 Tauri command。
 - `export-doc-storage`：SQLite／PostgreSQL 18、事务、版本、单实例锁与持久化。
@@ -77,7 +79,7 @@ Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分
 
 桌面令牌由 Rust 宿主生成，仅由主窗口受限 IPC 获取，不写 URL 或日志。随机回环端口、精确 Host／Origin 校验、官方 endpoint policy、登录会话与对象权限共同控制桌面访问。网络服务不安装本机文件／进程能力。
 
-AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，业务 SQLite 在 DataRoot/Database，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。数据库仅接受全新 schema 12（2026-11-02 新基线）；旧测试库和旧 schema 备份拒绝打开或恢复，显式选择新目录/数据库建库，不自动删除原数据。
+AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，业务 SQLite 在 DataRoot/Database，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。数据库仅接受全新 schema 13（2026-11-04 二期新基线）；旧测试库和旧 schema 备份拒绝打开或恢复，显式选择新目录/数据库建库，不自动删除原数据。
 
 2026-10-30 权限目录分别声明单位及动作可授范围、记录范围和流程归属；Contract 编译器把既有注解转换为统一访问规则，Domain 与编译器共用纯动作映射。任职/方案编辑器共用范围模型；独立签署资格同时用于审批与移交。`oa/queue_authority` 只复用本次读取的代理与业务身份，Storage 提供摘要投影、供应商评价聚合、账号批读及资源未结存在判断；Engine 负责当前授权与业务组合。保留原数组接口并在内部按批读取，未引入跨请求权限缓存、运行依赖或数据库迁移。
 
@@ -90,6 +92,8 @@ AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data�
 Tauri 使用 MIT／Apache-2.0 双许可路径，具体传递组件以生成 notices 和依赖治理为准。WebView2／WebKit 是明确采用的平台显示依赖；Slint 许可不再属于交付图。NPOI 2.7.6 仅约束保留的 C# 对照程序。OCR 沿用已有 `ort 2.0.0-rc.12`，官方尚无稳定 2.x；本轮未将它升级到另一个 RC。PDFium／ONNX 原生资源只从通过受管 SHA-512 校验的官方归档抽取本地库，Rust 构建不执行 dotnet restore。
 
 ## 开发与验收
+
+二期收尾的 OA 命令使用生成 DTO，权限选择使用内部类型投影，发票草稿和货项编号规则由独立模块管理。Storage 共用关系参数绑定器和正式查询构造器的只读诊断入口；测试请求、空筛选与无自然键记录构造复用同一实现。Tauri 安装流程先停止后端并统一发布失败状态，迁移复制同时计算源摘要并独立校验目标。各项源码与实跑证据见二期记录，物理数据库版本维持本批 schema 13。
 
 按原版逐页核对界面、后端、权限及操作闭环，积累一批后集中联调，最后统一运行完整门禁。开发中只做必要编译与针对真实失败的回归，不逐模块重复全量构建或测试。功能核对表见《Rust原生功能迁移核对表》，平台验收见《Rust桌面平台适配与验收》。路由存在、编译通过和旧 Slint 截图均不表示当前 Tauri 页面已验收。
 

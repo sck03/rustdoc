@@ -98,12 +98,8 @@ pub fn handle(
                     &export_doc_storage::GenericQuery {
                         kind: PROJECTS,
                         scope: auth::data_scope(actor, PERMISSION, "view"),
-                        filters: &[],
-                        keyword: "",
-                        search_root: None,
-                        fields: &[],
-                        offset: 0,
                         limit: limit as i64,
+                        ..Default::default()
                     },
                     export_doc_storage::RecordOrder::UpdatedDescending,
                 )?;

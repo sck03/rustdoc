@@ -123,7 +123,7 @@ impl RecoveryTarget {
         })();
         if result.is_err() {
             // A canceled job must still remove only its own incomplete object.
-            let cleanup = crate::operation::OperationScope::new(REQUEST_TIMEOUT)
+            let cleanup = crate::operation::OperationScope::detached(REQUEST_TIMEOUT)
                 .run(|| self.delete_url(&pending));
             if cleanup.is_err() {
                 return Err(unavailable(

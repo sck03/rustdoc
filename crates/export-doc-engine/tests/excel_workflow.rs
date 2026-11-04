@@ -1,6 +1,5 @@
 #![cfg(feature = "excel")]
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod native_fixture;
 use export_doc_engine::{
     contracts,

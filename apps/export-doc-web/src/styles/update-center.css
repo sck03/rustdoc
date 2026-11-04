@@ -11,15 +11,15 @@
   gap: 8px;
   margin-top: 12px;
   padding: 12px;
-  background: var(--surface-muted);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  background: var(--edm-bg-muted);
+  border: 1px solid var(--edm-line);
+  border-radius: var(--edm-radius-md);
 }
 
 .update-progress progress {
   width: 100%;
   height: 8px;
-  accent-color: var(--accent-color);
+  accent-color: var(--edm-accent);
 }
 
 .update-center-layout {
@@ -37,13 +37,13 @@
 
 .update-release-notes {
   min-height: 220px;
-  padding: 10px 12px;
+  padding: 12px 12px;
   overflow: auto;
-  color: var(--text-primary);
-  background: var(--surface-muted);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 13px;
+  color: var(--edm-text);
+  background: var(--edm-bg-muted);
+  border: 1px solid var(--edm-line);
+  border-radius: var(--edm-radius-md);
+  font-size: var(--edm-font-size-sm);
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
@@ -58,30 +58,30 @@
 
 .update-install-plan-steps {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   margin: 0;
   padding: 0 0 0 20px;
-  color: var(--text-secondary);
-  font-size: 13px;
+  color: var(--edm-text-secondary);
+  font-size: var(--edm-font-size-sm);
   line-height: 1.45;
 }
 
 .startup-update-banner {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   margin-bottom: 12px;
-  padding: 10px 12px;
+  padding: 12px 12px;
   color: var(--edm-primary-800);
   background: var(--edm-primary-50);
   border: 1px solid var(--edm-primary-200);
-  border-radius: 8px;
+  border-radius: var(--edm-radius-md);
 }
 
 .startup-update-banner > div {
   display: grid;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -111,14 +111,14 @@
 .mandatory-update-notes {
   max-height: 220px;
   margin: 0;
-  padding: 10px 12px;
+  padding: 12px 12px;
   overflow: auto;
-  color: var(--text-primary);
-  background: var(--surface-muted);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  color: var(--edm-text);
+  background: var(--edm-bg-muted);
+  border: 1px solid var(--edm-line);
+  border-radius: var(--edm-radius-md);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--edm-font-size-sm);
   line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;

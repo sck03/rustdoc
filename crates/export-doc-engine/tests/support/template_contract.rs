@@ -1,28 +1,11 @@
-use export_doc_engine::{
-    api::ApiError, contracts, engine::NativeService, generated_api::*, paths::nonce,
-};
+use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 #[path = "template_history_contract.rs"]
 mod history_retention;
 #[path = "approval_fixture.rs"]
 mod workflow;
 
-fn call(
-    service: &NativeService,
-    token: &str,
-    op: Operation,
-    id: i64,
-    body: Option<Value>,
-) -> Result<Value, ApiError> {
-    let parameters = if id > 0 {
-        vec![("id", id.to_string())]
-    } else {
-        vec![]
-    };
-    let body = body.map(|body| contracts::overlay(contracts::object(op.id, true), &body));
-    let bytes = service.dispatch(op, &parameters, &[], body, token)?;
-    Ok(serde_json::from_slice(&bytes).unwrap())
-}
+use workflow::call;
 
 /// Run identical ownership, default and conflict checks on SQLite and PostgreSQL.
 pub fn exercise(service: &NativeService, admin: &str) {

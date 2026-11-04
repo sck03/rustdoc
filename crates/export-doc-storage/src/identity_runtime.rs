@@ -1,6 +1,6 @@
 //! Canonical organization and appointment writes. The records payload contains
 //! display attributes only; relational facts are projected into a read-only view.
-use crate::{Adapter, Error, Result, sql};
+use crate::{Adapter, Error, Result};
 use serde_json::{Value, json};
 
 pub(crate) fn supports(kind: &str) -> bool {
@@ -20,7 +20,7 @@ pub(crate) fn project(db: &(impl Adapter + ?Sized), id: i64) -> Result<()> {
     } else {
         format!("json_set(r.body,'$.permissionSchemeVersion',{version})")
     };
-    s.execute(db,format!("INSERT INTO identity_projection(id,body) SELECT r.id,CASE WHEN r.kind IN('users','unit-access') THEN {body} ELSE r.body END FROM identity_facts r WHERE r.id={id} ON CONFLICT(id) DO UPDATE SET body=excluded.body"))
+    s.execute_unit(db,format!("INSERT INTO identity_projection(id,body) SELECT r.id,CASE WHEN r.kind IN('users','unit-access') THEN {body} ELSE r.body END FROM identity_facts r WHERE r.id={id} ON CONFLICT(id) DO UPDATE SET body=excluded.body"))
 }
 pub(crate) fn atomic<T>(
     db: &(impl Adapter + ?Sized),
@@ -128,40 +128,8 @@ pub(crate) fn document(kind: &str, body: &Value) -> Value {
     }
     body
 }
-struct Write {
-    pg: bool,
-    values: Vec<String>,
-}
+use crate::sql::Statement as Write;
 impl Write {
-    fn new(db: &(impl Adapter + ?Sized)) -> Self {
-        Self {
-            pg: db.provider() == "PostgreSQL",
-            values: vec![],
-        }
-    }
-    fn text(&mut self, v: impl ToString) -> String {
-        sql::bind(&mut self.values, v, self.pg)
-    }
-    fn number(&mut self, v: impl ToString) -> String {
-        format!("CAST({} AS BIGINT)", self.text(v))
-    }
-    fn optional_number(&mut self, v: Option<i64>) -> String {
-        format!(
-            "CAST(NULLIF({},'') AS BIGINT)",
-            self.text(v.map(|v| v.to_string()).unwrap_or_default())
-        )
-    }
-    fn optional_text(&mut self, v: Option<&str>) -> String {
-        format!("NULLIF({},'')", self.text(v.unwrap_or("")))
-    }
-    fn json(&mut self, v: &Value) -> Result<String> {
-        let p = self.text(serde_json::to_string(v)?);
-        Ok(if self.pg {
-            format!("CAST({p} AS JSONB)")
-        } else {
-            p
-        })
-    }
     fn unit(&mut self, code: &str) -> String {
         let code = self.text(code);
         format!("(SELECT id FROM organization_units WHERE code={code})")
@@ -172,10 +140,6 @@ impl Write {
         format!(
             "(SELECT d.id FROM organization_departments d JOIN organization_units u ON u.id=d.unit_id WHERE u.code={c} AND d.code={d})"
         )
-    }
-    fn execute(self, db: &(impl Adapter + ?Sized), statement: String) -> Result<()> {
-        db.execute_statement(&statement, &self.values)?;
-        Ok(())
     }
 }
 fn text<'a>(v: &'a Value, key: &str) -> &'a str {
@@ -195,7 +159,7 @@ fn upsert(
         .map(|c| format!("{c}=excluded.{c}"))
         .collect::<Vec<_>>()
         .join(",");
-    s.execute(
+    s.execute_unit(
         db,
         format!(
             "INSERT INTO {table}({}) VALUES({}) ON CONFLICT({key}) DO UPDATE SET {changes}",
@@ -267,7 +231,7 @@ pub(crate) fn persist(
             )?;
             let mut s = Write::new(db);
             let ident = s.number(id);
-            s.execute(
+            s.execute_unit(
                 db,
                 format!("DELETE FROM organization_duties WHERE organization_id={ident}"),
             )?;
@@ -300,7 +264,7 @@ pub(crate) fn persist(
                     s.text(role),
                     s.json(&kinds)?,
                 ];
-                s.execute(db,format!("INSERT INTO organization_duties(organization_id,appointment_id,duty_kind,workflow_kinds) VALUES({})",p.join(",")))?;
+                s.execute_unit(db,format!("INSERT INTO organization_duties(organization_id,appointment_id,duty_kind,workflow_kinds) VALUES({})",p.join(",")))?;
             }
         }
         "people" => {
@@ -361,13 +325,13 @@ pub(crate) fn persist(
                 .map(|a| s.text(text(a, "id")))
                 .collect::<Vec<_>>()
                 .join(",");
-            s.execute(db,format!("DELETE FROM personnel_memberships WHERE person_id={person} AND id NOT IN ({ids})"))?;
+            s.execute_unit(db,format!("DELETE FROM personnel_memberships WHERE person_id={person} AND id NOT IN ({ids})"))?;
             let mut s = Write::new(db);
             let person = s.number(id);
-            s.execute(db,format!("DELETE FROM reporting_relations WHERE appointment_id IN (SELECT id FROM personnel_memberships WHERE person_id={person})"))?;
+            s.execute_unit(db,format!("DELETE FROM reporting_relations WHERE appointment_id IN (SELECT id FROM personnel_memberships WHERE person_id={person})"))?;
             let mut s = Write::new(db);
             let person = s.number(id);
-            s.execute(db,format!("UPDATE personnel_memberships SET is_primary=0 WHERE person_id={person} AND is_primary=1"))?;
+            s.execute_unit(db,format!("UPDATE personnel_memberships SET is_primary=0 WHERE person_id={person} AND is_primary=1"))?;
             for (index, a) in appointments.iter().enumerate() {
                 crate::operation::check()?;
                 let mut s = Write::new(db);
@@ -431,7 +395,7 @@ pub(crate) fn persist(
                 for (manager, kind) in relations {
                     let mut s = Write::new(db);
                     let p = vec![s.text(text(a, "id")), s.text(manager), s.text(kind)];
-                    s.execute(
+                    s.execute_unit(
                         db,
                         format!("INSERT INTO reporting_relations VALUES({})", p.join(",")),
                     )?;
@@ -439,14 +403,14 @@ pub(crate) fn persist(
             }
             let mut s = Write::new(db);
             let person = s.number(id);
-            s.execute(
+            s.execute_unit(
                 db,
                 format!("DELETE FROM personnel_accounts WHERE person_id={person}"),
             )?;
             if let Some(user) = body["account"]["id"].as_i64() {
                 let mut s = Write::new(db);
                 let p = vec![s.number(id), s.number(user)];
-                s.execute(
+                s.execute_unit(
                     db,
                     format!("INSERT INTO personnel_accounts VALUES({})", p.join(",")),
                 )?;
@@ -487,7 +451,7 @@ pub(crate) fn persist(
             )?;
             let mut s = Write::new(db);
             let account = s.number(id);
-            s.execute(
+            s.execute_unit(
                 db,
                 format!("DELETE FROM account_grants WHERE account_id={account}"),
             )?;
@@ -499,7 +463,7 @@ pub(crate) fn persist(
                     s.text(text(g, "action")),
                     s.text(text(g, "dataScope")),
                 ];
-                s.execute(
+                s.execute_unit(
                     db,
                     format!("INSERT INTO account_grants VALUES({})", p.join(",")),
                 )?;
@@ -562,7 +526,7 @@ pub(crate) fn persist(
             )?;
             let mut s = Write::new(db);
             let role = s.number(id);
-            s.execute(
+            s.execute_unit(
                 db,
                 format!("DELETE FROM unit_access_grants WHERE role_id={role}"),
             )?;
@@ -574,7 +538,7 @@ pub(crate) fn persist(
                     s.text(text(g, "action")),
                     s.text(text(g, "dataScope")),
                 ];
-                s.execute(
+                s.execute_unit(
                     db,
                     format!("INSERT INTO unit_access_grants VALUES({})", p.join(",")),
                 )?;

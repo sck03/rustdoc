@@ -7,13 +7,7 @@ pub(super) fn handle(
     query: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
-    let parameter = |key| {
-        query
-            .iter()
-            .find(|(k, _)| *k == key)
-            .map(|(_, v)| v.as_str())
-            .unwrap_or("")
-    };
+    let parameter = |key| crate::engine::request_values::find(query, key).unwrap_or("");
     let principal = if meta["action"] == "list" {
         parameter("principalKind")
     } else {

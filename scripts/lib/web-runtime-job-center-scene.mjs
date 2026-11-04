@@ -1859,8 +1859,8 @@ export function createJobCenterSmokeScene(runtime) {
       const result = await evaluate(
         page,
         `(() => {
-          const dialog = document.querySelector('.confirmation-dialog[role="dialog"]');
-          const confirmButton = dialog?.querySelector('button.confirmation-dialog-confirm');
+          const dialog = document.querySelector('[data-dialog-purpose=confirmation][role="dialog"]');
+          const confirmButton = dialog?.querySelector('button[data-dialog-action=confirm]');
           const text = dialog ? dialog.innerText || dialog.textContent || "" : "";
           if (!dialog || !confirmButton || confirmButton.disabled || !text.includes("删除装柜方案")) return null;
           confirmButton.click();

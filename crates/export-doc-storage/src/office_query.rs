@@ -252,6 +252,7 @@ pub(crate) fn build(q: &OfficeQuery<'_>, pg: bool) -> Result<QuerySql> {
         "json_extract(r.body,'$.createdAt') DESC, r.id DESC"
     };
     Ok(QuerySql {
+        source: crate::query_source::Source::Projected,
         filter: clauses.join(" AND "),
         order: order.into(),
         values,

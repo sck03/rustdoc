@@ -107,6 +107,14 @@ async fn execute(
         None
     };
     let scope = OperationScope::new(Duration::from_secs(request_seconds(operation)));
+    let scope = if let Some(peer) = request
+        .extensions()
+        .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+    {
+        scope.with_source(peer.0.ip())
+    } else {
+        scope
+    };
     let registration = state.shutdown.register(scope.clone())?;
     let processing = if body::needs_processing_slot(operation) && !body::backup_upload(operation) {
         Some(

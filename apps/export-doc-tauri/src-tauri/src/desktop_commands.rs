@@ -46,7 +46,7 @@ pub(crate) fn get_runtime_storage_context(
 }
 
 #[tauri::command]
-pub(crate) fn schedule_data_root_migration(
+pub(crate) async fn schedule_data_root_migration(
     paths: tauri::State<'_, RuntimePaths>,
 ) -> Result<Option<runtime_paths::DataRootMigrationScheduleResult>, String> {
     if paths.portable {
@@ -56,24 +56,43 @@ pub(crate) fn schedule_data_root_migration(
         );
     }
 
-    let mut dialog =
-        rfd::FileDialog::new().set_title("选择新的业务数据保存位置（程序会创建专用子目录）");
-    if let Some(parent) = paths.data_root.parent().filter(|path| path.is_dir()) {
-        dialog = dialog.set_directory(parent);
-    }
-    let Some(target_parent) = dialog.pick_folder() else {
-        return Ok(None);
-    };
-    let target_root = runtime_paths::runtime_data_root_under(&target_parent);
+    let paths = paths.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut dialog =
+            rfd::FileDialog::new().set_title("选择新的业务数据保存位置（程序会创建专用子目录）");
+        if let Some(parent) = paths.data_root.parent().filter(|path| path.is_dir()) {
+            dialog = dialog.set_directory(parent);
+        }
+        let Some(target_parent) = dialog.pick_folder() else {
+            return Ok(None);
+        };
+        let target_root = runtime_paths::runtime_data_root_under(&target_parent);
 
-    runtime_paths::schedule_data_root_migration(&paths, &target_root)
-        .map(Some)
-        .map_err(|error| error.to_string())
+        runtime_paths::schedule_data_root_migration(&paths, &target_root)
+            .map(Some)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|_| "数据目录迁移准备任务异常退出。".to_owned())?
 }
 
 #[tauri::command]
-pub(crate) fn log_frontend_error(
+pub(crate) async fn log_frontend_error(
     paths: tauri::State<'_, RuntimePaths>,
+    message: String,
+    source: Option<String>,
+    stack: Option<String>,
+    url: Option<String>,
+) -> Result<(), String> {
+    let paths = paths.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        write_frontend_error(&paths, message, source, stack, url)
+    })
+    .await
+    .map_err(|_| "前端日志写入任务异常退出。".to_owned())?
+}
+fn write_frontend_error(
+    paths: &RuntimePaths,
     message: String,
     source: Option<String>,
     stack: Option<String>,
@@ -121,6 +140,11 @@ pub(crate) fn confirm_app_exit() {
 }
 
 fn sanitize_log_field(value: String) -> String {
+    let truncated = value
+        .chars()
+        .take(MAX_FRONTEND_LOG_FIELD_LENGTH + 1)
+        .collect::<String>();
+    let value = truncated;
     let sanitized = HTTP_URL_PATTERN
         .replace_all(&value, |captures: &Captures<'_>| {
             sanitize_http_url(&captures[0])
@@ -165,12 +189,6 @@ fn sanitize_log_field(value: String) -> String {
 }
 
 fn sanitize_log_url(value: String) -> String {
-    let Ok(url) = Url::parse(&value) else {
-        return "[REDACTED_URL]".to_owned();
-    };
-    if !matches!(url.scheme(), "http" | "https") {
-        return "[REDACTED_URL]".to_owned();
-    }
     sanitize_http_url(&value)
 }
 
@@ -379,9 +397,14 @@ mod tests {
     #[test]
     fn windows_open_command_uses_explorer_for_directories() {
         let path = PathBuf::from(r"D:\ExportDocManager\App_Data");
-        let spec = build_open_command(&path, false);
+        let spec = build_open_command(&path, false).unwrap();
 
-        assert_eq!(spec.program, "explorer");
+        assert_eq!(
+            spec.program,
+            crate::platform_process::windows_root()
+                .unwrap()
+                .join("explorer.exe")
+        );
         assert_eq!(spec.program_name, "Windows Explorer");
         assert_eq!(spec.args, vec![path.as_os_str().to_owned()]);
     }
@@ -389,13 +412,18 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn windows_open_command_reveals_files_with_select_argument() {
-        let path = PathBuf::from(r"D:\ExportDocManager\App_Data\Database\data.db");
-        let spec = build_open_command(&path, true);
+        let path = PathBuf::from(r"D:\ExportDocManager\App_Data\报表, 测试\data.pdf");
+        let spec = build_open_command(&path, true).unwrap();
 
-        assert_eq!(spec.program, "explorer");
+        assert_eq!(
+            spec.program,
+            crate::platform_process::windows_root()
+                .unwrap()
+                .join("explorer.exe")
+        );
         assert_eq!(
             spec.args,
-            vec![OsString::from(format!("/select,{}", path.display()))]
+            vec![OsString::from(format!("/select,\"{}\"", path.display()))]
         );
     }
 
@@ -403,7 +431,7 @@ mod tests {
     #[test]
     fn macos_open_command_reveals_files_with_open_reveal_argument() {
         let path = PathBuf::from("/Applications/ExportDocManager/App_Data/Database/data.db");
-        let spec = build_open_command(&path, true);
+        let spec = build_open_command(&path, true).unwrap();
 
         assert_eq!(spec.program, "open");
         assert_eq!(spec.args, vec![OsString::from("-R"), path.into_os_string()]);

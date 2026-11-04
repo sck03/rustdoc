@@ -5,12 +5,12 @@ import { pathToFileURL } from 'node:url';
 export function validationPlan(files, mode = 'quick', force = false) {
   if (!['quick','full'].includes(mode)) throw new Error('Validation mode must be quick or full.');
   const changed=files.map(file=>file.replaceAll('\\','/'));
-  const all=force||mode==='full'||changed.some(file=>['.github/workflows/rust-native-validation.yml','.github/workflows/native-full-validation.yml'].includes(file));
+  const all=force||mode==='full'||changed.some(file=>file.startsWith('.github/actions/')||['.github/workflows/rust-native-validation.yml','.github/workflows/native-full-validation.yml'].includes(file));
   const shared=/^(?:Cargo\.(?:toml|lock)|version\.json|rust-toolchain\.toml|\.cargo\/|crates\/|apps\/export-doc-server\/|tools\/excel-analyzer-rs\/|third_party\/|eng\/native-runtime-packages\.json|Resources\/|Templates\/|OcrModels\/)/u;
   const desktop=/^apps\/export-doc-tauri\//u;
   const rust=all||changed.some(file=>shared.test(file)||desktop.test(file)||/^apps\/exportdoc-ocr-rs\//u.test(file));
   const web=all||changed.some(file=>/^(?:apps\/export-doc-web\/|crates\/export-doc-contracts\/|Resources\/Fonts\/|Templates\/|scripts\/(?:test_[^/]+_ui\.mjs|test_permission_scheme_model\.mjs|test_frontend_|lib\/(?:chromium|web-runtime|child-process)|provision-report-fonts\.mjs))/u.test(file));
-  const office=mode==='full'||changed.some(file=>/^crates\/(?:export-doc-engine\/src\/engine\/(?:oa\/|office|personnel|units|auth|account_permissions)|export-doc-domain\/src\/(?:permissions|units|approval)|export-doc-contracts\/src\/openapi\/(?:office|units|permission_))/u.test(file));
+  const office=all||changed.some(file=>/^crates\/(?:export-doc-engine\/src\/engine\/(?:oa\/|office|personnel|units|auth|account_permissions)|export-doc-domain\/src\/(?:permissions|units|approval)|export-doc-contracts\/src\/native_contract\/)/u.test(file)||/^apps\/export-doc-web\/src\/features\/(?:oa|office|organization|access-control)\//u.test(file));
   return {rust,web,desktop:all||changed.some(file=>desktop.test(file)),desktopCheck:all||changed.some(file=>shared.test(file)||desktop.test(file)),office,full:mode==='full'};
 }
 function git(args) {

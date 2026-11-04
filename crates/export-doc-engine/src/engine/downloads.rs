@@ -2,7 +2,7 @@
 use super::{
     NativeService, backup_io,
     error::{Result, unavailable, unsupported},
-    tasks, team_backup,
+    team_backup,
 };
 use crate::generated_api::{
     DOWNLOAD_JOB_RESULT, DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
@@ -36,9 +36,6 @@ impl NativeService {
             output,
             reservation,
         })
-    }
-    pub fn download_job(&self, job_id: &str, token: &str) -> Result<tasks::FileOutput> {
-        self.prepare_job_download(job_id, token)?.into_memory()
     }
     pub fn prepare_job_download(&self, job_id: &str, token: &str) -> Result<backup_io::Download> {
         let _access = self

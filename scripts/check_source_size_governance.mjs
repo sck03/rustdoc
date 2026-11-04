@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { walkSourceFiles } from "./lib/source-files.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,7 +29,7 @@ for (const rule of baseline.rules ?? []) {
   const relativePathRegex = rule.relativePathPattern ? new RegExp(rule.relativePathPattern, "u") : null;
   const excludeRegex = rule.excludePattern ? new RegExp(rule.excludePattern, "u") : null;
   const files = directories
-    .flatMap((directory) => walk(directory))
+    .flatMap((directory) => walkSourceFiles(directory, ignoredDirectoryNames))
     .filter((file) => regex.test(path.basename(file)))
     .filter((file) => {
       const relativePath = path.relative(repositoryRoot, file).replaceAll(path.sep, "/");
@@ -76,17 +77,6 @@ if (failures.length > 0) {
 }
 
 process.stdout.write(`Source-size governance passed: ${JSON.stringify(report)}\n`);
-
-function walk(directory) {
-  if (!existsSync(directory)) throw new Error(`Governed directory was not found: ${directory}`);
-  const files = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    const fullPath = path.join(directory, entry.name);
-    if (entry.isDirectory() && !ignoredDirectoryNames.has(entry.name)) files.push(...walk(fullPath));
-    else if (entry.isFile()) files.push(fullPath);
-  }
-  return files;
-}
 
 function countSourceLines(source) {
   if (source.length === 0) return 0;

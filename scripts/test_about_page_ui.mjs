@@ -20,7 +20,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { AboutPage } from ${source('features/system/AboutPage.tsx')};
   import { getProductEditionPresentation } from ${source('app/productEdition.ts')};
   import { queryKeys } from ${source('api/queryKeys.ts')};
-  import ${source('styles.css')}; import ${source('theme.css')}; import ${source('responsiveOverrides.css')};
+  import ${source('styles/index.css')}; import ${source('styles/workspaces.css')}; import ${source('styles/responsive.css')};
   window.requests = []; window.commits = 0;
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
   const client = { getHealth: ({ signal }) => new Promise((resolve, reject) => {

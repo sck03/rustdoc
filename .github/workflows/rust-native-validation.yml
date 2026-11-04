@@ -20,6 +20,7 @@ on:
       - scripts/test_*.mjs
       - scripts/lib/**
       - scripts/github/native-validation-plan.mjs
+      - .github/actions/**
       - .github/workflows/rust-native-validation.yml
       - .github/workflows/native-full-validation.yml
   workflow_dispatch:
@@ -73,6 +74,7 @@ on:
       - .dockerignore
       - scripts/verify-native-desktop.mjs
       - scripts/verify-native-docker.mjs
+      - .github/actions/**
       - .github/workflows/rust-native-validation.yml
 
 permissions:
@@ -131,15 +133,12 @@ jobs:
             .codex-runtime/cargo-home/git
             target/debug
           key: native-core-v2-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'Cargo.toml', 'rust-toolchain.toml', '.cargo/config.toml', 'crates/*/Cargo.toml', 'apps/export-doc-server/Cargo.toml', 'apps/export-doc-tauri/src-tauri/Cargo.toml') }}
-      - name: Prepare managed temporary directory
-        run: New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
-      - name: Provision report fonts
-        run: node scripts/provision-report-fonts.mjs
+      - uses: ./.github/actions/prepare-web
+        with:
+          chromium: ${{ needs.changes.outputs.office }}
       - name: Check Rust formatting
         run: cargo fmt --all --check
       # Tauri's all-features check embeds frontendDist via custom-protocol.
-      - name: Install frontend dependencies
-        run: npm --prefix apps/export-doc-web ci
       - name: Build frontend
         run: npm --prefix apps/export-doc-web run build
       - name: Test backend workspace
@@ -164,9 +163,11 @@ jobs:
         run: |
           cargo build --locked -p export-doc-server --example office_review
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node apps/export-doc-web/node_modules/playwright/cli.js install --only-shell chromium
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/test_oa_integration_completion_ui.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test_oa_advanced_ui.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test_permission_navigation_ui.mjs
           exit $LASTEXITCODE
       - name: Trim disposable test binaries before caching compilation inputs
         if: success()
@@ -187,10 +188,10 @@ jobs:
           node-version: 26
           cache: npm
           cache-dependency-path: apps/export-doc-web/package-lock.json
-      - run: npm --prefix apps/export-doc-web ci
-      - run: node scripts/provision-report-fonts.mjs
+      - uses: ./.github/actions/prepare-web
+        with:
+          chromium: 'true'
       - run: npm --prefix apps/export-doc-web run build
-      - run: node apps/export-doc-web/node_modules/playwright/cli.js install --only-shell chromium
       - run: npm --prefix apps/export-doc-web run test:accessibility-contracts
       - run: npm --prefix apps/export-doc-web run test:permission-contracts
       - run: npm --prefix apps/export-doc-web run test:scale-contracts
@@ -222,11 +223,9 @@ jobs:
           node-version: 26
           cache: npm
           cache-dependency-path: apps/export-doc-web/package-lock.json
-      - name: Prepare runtime and npm dependencies
-        run: |
-          mkdir -p "$TEMP"
-          npm --prefix apps/export-doc-web ci
-          node apps/export-doc-web/node_modules/playwright/cli.js install --with-deps --only-shell chromium
+      - uses: ./.github/actions/prepare-web
+        with:
+          chromium: 'true'
       - name: Validate editing, cancellation and request contracts
         run: |
           npm --prefix apps/export-doc-web run test:invoice-editing

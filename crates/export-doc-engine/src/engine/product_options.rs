@@ -21,13 +21,8 @@ fn number(query: &[(&str, String)], name: &str, default: usize) -> usize {
 
 pub fn search(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
     auth::authorize(actor, PERMISSION, "view")?;
-    let keyword = store::normalize(
-        query
-            .iter()
-            .find(|(key, _)| *key == "keyword")
-            .map(|(_, value)| value.as_str())
-            .unwrap_or(""),
-    );
+    let keyword =
+        store::normalize(crate::engine::request_values::find(query, "keyword").unwrap_or(""));
     let page = number(query, "pageNumber", 1);
     let size = number(query, "pageSize", 20).min(MAX_PAGE);
     let start = i64::try_from(page.saturating_sub(1).saturating_mul(size)).unwrap_or(i64::MAX);

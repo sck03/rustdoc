@@ -5,7 +5,7 @@ use crate::api::ApiError;
 use std::{
     cell::RefCell,
     sync::{
-        Arc,
+        Arc, Mutex, Weak,
         atomic::{AtomicBool, Ordering},
     },
     time::{Duration, Instant},
@@ -13,8 +13,47 @@ use std::{
 
 #[derive(Clone)]
 pub struct OperationScope {
-    cancelled: Arc<AtomicBool>,
+    cancelled: Arc<Cancellation>,
     deadline: Instant,
+    parents: Vec<Arc<Cancellation>>,
+    detached: bool,
+    source: Option<std::net::IpAddr>,
+}
+
+#[derive(Default)]
+struct Cancellation {
+    flag: Arc<AtomicBool>,
+    children: Mutex<Vec<Weak<AtomicBool>>>,
+}
+impl Cancellation {
+    fn link(&self, child: &Arc<AtomicBool>) {
+        let mut children = self
+            .children
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        children.retain(|child| child.strong_count() > 0);
+        let child_ref = Arc::downgrade(child);
+        if !children.iter().any(|entry| entry.ptr_eq(&child_ref)) {
+            children.push(child_ref);
+        }
+        if self.flag.load(Ordering::Acquire) {
+            child.store(true, Ordering::Release);
+        }
+    }
+    fn cancel(&self) {
+        self.flag.store(true, Ordering::Release);
+        // Optional libraries and pipe threads receive only an atomic flag. Fan out
+        // synchronously so they observe cancellation without calling `check`.
+        for child in self
+            .children
+            .lock()
+            .unwrap_or_else(|error| error.into_inner())
+            .iter()
+            .filter_map(Weak::upgrade)
+        {
+            child.store(true, Ordering::Release);
+        }
+    }
 }
 
 thread_local! { static CURRENT: RefCell<Option<OperationScope>> = const { RefCell::new(None) }; }
@@ -22,15 +61,30 @@ thread_local! { static CURRENT: RefCell<Option<OperationScope>> = const { RefCel
 impl OperationScope {
     pub fn new(timeout: Duration) -> Self {
         Self {
-            cancelled: Arc::new(AtomicBool::new(false)),
+            cancelled: Arc::new(Cancellation::default()),
             deadline: Instant::now() + timeout,
+            parents: Vec::new(),
+            detached: false,
+            source: None,
         }
     }
+    /// Compensation and durable post-commit cleanup have their own bounded
+    /// lifetime. Ordinary nested work must use `new` instead.
+    pub fn detached(timeout: Duration) -> Self {
+        Self {
+            detached: true,
+            ..Self::new(timeout)
+        }
+    }
+    pub fn with_source(mut self, source: std::net::IpAddr) -> Self {
+        self.source = Some(source);
+        self
+    }
     pub fn cancel(&self) {
-        self.cancelled.store(true, Ordering::Release);
+        self.cancelled.cancel();
     }
     pub fn cancellation_flag(&self) -> Arc<AtomicBool> {
-        Arc::clone(&self.cancelled)
+        Arc::clone(&self.cancelled.flag)
     }
     pub fn run<T>(&self, operation: impl FnOnce() -> T) -> T {
         struct Restore(Option<OperationScope>);
@@ -39,9 +93,36 @@ impl OperationScope {
                 CURRENT.with(|current| *current.borrow_mut() = self.0.take());
             }
         }
-        let restore = Restore(CURRENT.with(|current| current.replace(Some(self.clone()))));
-        let result =
-            export_doc_storage::operation::run(self.cancelled.clone(), self.deadline, operation);
+        let mut scope = self.clone();
+        if !scope.detached {
+            CURRENT.with(|current| {
+                if let Some(parent) = current.borrow().as_ref() {
+                    scope.source = scope.source.or(parent.source);
+                    scope.deadline = scope.deadline.min(parent.deadline);
+                    scope.parents.extend(parent.parents.iter().cloned());
+                    if !Arc::ptr_eq(&scope.cancelled, &parent.cancelled) {
+                        scope.parents.push(parent.cancelled.clone());
+                    }
+                    for ancestor in &scope.parents {
+                        ancestor.link(&scope.cancelled.flag);
+                    }
+                }
+            });
+        }
+        let restore = Restore(CURRENT.with(|current| current.replace(Some(scope.clone()))));
+        let result = if scope.detached {
+            export_doc_storage::operation::run_detached(
+                scope.cancelled.flag.clone(),
+                scope.deadline,
+                operation,
+            )
+        } else {
+            export_doc_storage::operation::run(
+                scope.cancelled.flag.clone(),
+                scope.deadline,
+                operation,
+            )
+        };
         drop(restore);
         result
     }
@@ -64,7 +145,12 @@ impl OperationScope {
 pub fn check() -> Result<(), ApiError> {
     CURRENT.with(|current| {
         if current.borrow().as_ref().is_some_and(|scope| {
-            scope.cancelled.load(Ordering::Acquire) || Instant::now() >= scope.deadline
+            scope.cancelled.flag.load(Ordering::Acquire)
+                || scope
+                    .parents
+                    .iter()
+                    .any(|signal| signal.flag.load(Ordering::Acquire))
+                || Instant::now() >= scope.deadline
         }) {
             return Err(ApiError {
                 status: Some(504),
@@ -85,43 +171,11 @@ pub fn cancellation_flag() -> Arc<AtomicBool> {
             .unwrap_or_else(|| Arc::new(AtomicBool::new(false)))
     })
 }
+/// Actual transport peer supplied by the HTTP host, never a forwarded header.
+pub fn source() -> Option<std::net::IpAddr> {
+    CURRENT.with(|current| current.borrow().as_ref().and_then(|scope| scope.source))
+}
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn result_boundary_preserves_cancellation_after_an_adapter_erases_the_error() {
-        let scope = OperationScope::new(Duration::from_secs(30));
-        let result: Result<(), ApiError> = scope.run_result(|| {
-            scope.cancel();
-            Err(ApiError {
-                status: Some(400),
-                message: "stringified cancellation".into(),
-                diagnostic: None,
-            })
-        });
-        assert_eq!(result.unwrap_err().status, Some(504));
-        check().unwrap(); // The caller's scope is restored on error too.
-    }
-
-    #[test]
-    fn expired_work_does_not_start_and_genuine_validation_errors_keep_their_category() {
-        let mut started = false;
-        let result = OperationScope::new(Duration::ZERO).run_result(|| {
-            started = true;
-            Ok(())
-        });
-        assert!(!started);
-        assert_eq!(result.unwrap_err().status, Some(504));
-        let result: Result<(), ApiError> =
-            OperationScope::new(Duration::from_secs(30)).run_result(|| {
-                Err(ApiError {
-                    status: Some(400),
-                    message: "invalid format".into(),
-                    diagnostic: None,
-                })
-            });
-        assert_eq!(result.unwrap_err().status, Some(400));
-    }
-}
+#[path = "tests/operation.rs"]
+mod tests;

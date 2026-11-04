@@ -1,4 +1,4 @@
-import { settingsCategories, type SettingsCategoryKey } from "./settingsCategoryCatalog.ts";
+import { allSettingsCategories, type SettingsCategoryKey } from "./settingsCategoryCatalog.ts";
 import type { SettingsRecord } from "./settingsTypes.ts";
 
 export function settingsCategoryForPath([root, field = ""]: readonly string[]): SettingsCategoryKey {
@@ -39,7 +39,20 @@ export function changedSettingsCategories(baseline: SettingsRecord | null, draft
       }
     } else changed.add(settingsCategoryForPath([root]));
   }
-  return settingsCategories.filter((category) => changed.has(category.key));
+  return allSettingsCategories.filter((category) => changed.has(category.key));
+}
+export function changedSettingCounts(draft: SettingsRecord | null, baseline: SettingsRecord | null): Partial<Record<SettingsCategoryKey,number>> {
+  const counts: Partial<Record<SettingsCategoryKey,number>> = {};
+  if (!draft || !baseline) return counts;
+  function visit(a: unknown, b: unknown, path: string[]) {
+    if (equalValues(a,b) || path[0] === "revision") return;
+    if (a && b && typeof a === "object" && typeof b === "object") {
+      const before=a as SettingsRecord, after=b as SettingsRecord;
+      for (const key of new Set([...Object.keys(before),...Object.keys(after)])) visit(before[key],after[key],[...path,key]);
+    } else { const category=settingsCategoryForPath(path);counts[category]=(counts[category]??0)+1; }
+  }
+  visit(baseline,draft,[]);
+  return counts;
 }
 
 export function categoryHasSecrets(category: SettingsCategoryKey, databaseProvider?: string | null) {

@@ -1,4 +1,5 @@
 import { settingsCategories } from "./settingsCategoryCatalog.ts";
+import { settingsOperationDestination } from "./systemOperationNavigation.ts";
 
 const sections = [
   ["runtime", "system", "常规与目录", "运行参数 数据目录"],
@@ -23,8 +24,9 @@ const sections = [
 
 export const settingsFeatureLinks = sections.map(([categoryKey, section, label, keywords]) => {
   const category = settingsCategories.find((item) => item.key === categoryKey);
+  const to = settingsOperationDestination(`?section=${section}`) ?? `/settings?section=${section}`;
   return {
-    label, keywords, to: `/settings?section=${section}`, search: `section=${section}`,
+    label, keywords, to, search: to.split("?")[1] ?? "",
     description: `${category?.label ?? label} / ${label}`,
     ...(category?.requiresDocumentWorkspace || section === "invoice-cleanup" ? { workspace: "document" as const } : {}),
     ...(section === "ownership" ? { requiresSystemAdministration: true } : {}),

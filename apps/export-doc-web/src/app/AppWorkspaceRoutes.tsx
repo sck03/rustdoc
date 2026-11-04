@@ -1,3 +1,4 @@
+import { RecordWorkspace } from "../ui/layout/Workspaces.tsx";
 import { type ComponentType, lazy, type LazyExoticComponent, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../api/index.ts";
@@ -70,6 +71,8 @@ const AboutPage = lazyNamed(() => import("../features/system/AboutPage.tsx"), "A
 const AuditLogPage = lazyNamed(() => import("../features/audit-logs/AuditLogPage.tsx"), "AuditLogPage");
 const AccessControlPage = lazyNamed(() => import("../features/access-control/AccessControlPage.tsx"), "AccessControlPage");
 const SettingsPage = lazyNamed(() => import("../features/settings/SettingsPage.tsx"), "SettingsPage");
+const BackupRecoveryPage = lazyNamed(() => import("../features/settings/BackupRecoveryPage.tsx"), "BackupRecoveryPage");
+const SystemMaintenancePage = lazyNamed(() => import("../features/settings/SystemMaintenancePage.tsx"), "SystemMaintenancePage");
 const MeetingRoomsPage = lazyNamed(() => import("../features/office/MeetingRoomsPage.tsx"), "MeetingRoomsPage");
 const OfficeSuppliesPage = lazyNamed(() => import("../features/office/OfficeSuppliesPage.tsx"), "OfficeSuppliesPage");
 const PersonnelPage = lazyNamed(() => import("../features/office/PersonnelPage.tsx"), "PersonnelPage");
@@ -202,6 +205,10 @@ export function AppWorkspaceRoutes({
             />
           }
         />
+        <Route path="/system/backup" element={<BackupRecoveryPage client={client} canManageSettings={user.capabilities.canManageSettings === true} />} />
+        <Route path="/system/maintenance" element={<SystemMaintenancePage client={client}
+          canManageSettings={user.capabilities.canManageSettings === true} canManageUsers={user.capabilities.canManageUsers === true}
+          canUseDocumentWorkspace={user.capabilities.canUseDocumentWorkspace === true} isDesktopRuntime={isDesktopBridgeAvailable()} productName={activeProduct.productName} />} />
         <Route path="*" element={<Navigate to={defaultRoute} replace />} />
       </Routes>
     </Suspense>
@@ -210,17 +217,17 @@ export function AppWorkspaceRoutes({
 
 function RouteLoadingPanel() {
   return (
-    <section className="work-surface">
+    <RecordWorkspace >
       <PageState tone="loading" title="正在加载页面" description="正在准备当前业务模块，请稍候。" />
-    </section>
+    </RecordWorkspace>
   );
 }
 
 function NoModuleAccessPage() {
   return (
-    <section className="work-surface">
+    <RecordWorkspace >
       <PageState tone="permission" title="当前账号没有此页面权限" description="请从导航选择已授权的功能，或联系管理员分配本版本首页权限。" />
-    </section>
+    </RecordWorkspace>
   );
 }
 

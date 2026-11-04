@@ -34,9 +34,9 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { NotificationsPage } from ${source('features/communication/NotificationsPage.tsx')};
   import { ReportImageResourceGallery } from ${source('features/report-designer/ReportImageResourceGallery.tsx')};
   import { useReportTemplateWorkspaceQueries } from ${source('features/reports/useReportTemplateWorkspaceQueries.ts')};
-  import { ListPaginationControls } from ${source('ui/ListPaginationControls.tsx')};
+  import { Pagination } from ${source('ui/primitives/Pagination.tsx')};
   import { getMasterDataConfig } from ${source('features/master-data/masterDataConfigs.ts')};
-  import ${source('styles/cascade.css')}; import ${source('styles/foundation.css')};
+   import ${source('styles/index.css')};
   import ${source('styles/workspaces.css')}; import ${source('styles/responsive.css')};
   const mode = new URLSearchParams(location.search).get('mode');
   window.__requests = []; window.__totalPages = 3; window.__fail = false;
@@ -69,7 +69,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   function Templates() {
     const { userTemplateDirectory: d, userTemplatesQuery: q } = useReportTemplateWorkspaceQueries({ client, reportType: 'ExportDocument', enabled: true,
       includeDesignerData: false, includeArchived: false, canPreviewInvoiceSource: false, canPreviewPaymentSource: false, selectedUserTemplateId: 0, selectedTemplatePath: '' });
-    return <>{q.isError && <p>{q.error.message}</p>}<ListPaginationControls pageNumber={d.pageNumber} pageSize={50} totalPages={d.totalPages} totalCount={d.totalCount}
+    return <>{q.isError && <p>{q.error.message}</p>}<Pagination pageNumber={d.pageNumber} pageSize={50} totalPages={d.totalPages} totalCount={d.totalCount}
       pageSizeOptions={[50]} isBusy={d.loading} onPageChange={d.onPageChange} onPageSizeChange={() => {}} /></>;
   }
   const components = { invoices: InvoiceListPage, payments: PaymentListPage, jobs: JobCenterPage,

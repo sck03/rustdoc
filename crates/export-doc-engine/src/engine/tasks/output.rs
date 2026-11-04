@@ -266,7 +266,7 @@ pub(super) fn publish(store: &Store, id: &str, output: &TaskOutput) -> Result<Op
 
 impl Publication {
     pub(super) fn commit(&mut self) -> Result<()> {
-        crate::operation::OperationScope::new(Duration::from_secs(30))
+        crate::operation::OperationScope::detached(Duration::from_secs(30))
             .run_result(|| self.commit_inner())
     }
     fn commit_inner(&mut self) -> Result<()> {
@@ -279,7 +279,7 @@ impl Publication {
     }
     pub(super) fn rollback(&mut self) -> Result<()> {
         // Compensation must still run after the caller's request was canceled.
-        crate::operation::OperationScope::new(Duration::from_secs(30))
+        crate::operation::OperationScope::detached(Duration::from_secs(30))
             .run_result(|| self.rollback_inner())
     }
     fn rollback_inner(&mut self) -> Result<()> {

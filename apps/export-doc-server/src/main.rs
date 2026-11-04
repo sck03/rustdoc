@@ -76,6 +76,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .build()?;
     let health = service.clone();
     let closing = service.clone();
+    let endpoint_file = configuration.endpoint_file.clone();
     let result = runtime.block_on(async move {
         let listener = tokio::net::TcpListener::bind(configuration.bind).await?;
         let address = listener.local_addr()?;
@@ -108,7 +109,15 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let _ = monitor.await;
         server
     });
-    service.close()?;
+    let closed = service.close();
+    if let Some(path) = endpoint_file {
+        match std::fs::remove_file(path) {
+            Ok(()) => {}
+            Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => {}
+            Err(cause) => return Err(cause.into()),
+        }
+    }
+    closed?;
     result?;
     Ok(())
 }

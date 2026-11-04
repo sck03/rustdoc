@@ -1,0 +1,35 @@
+[data-ui="workspace"] { display: grid; min-width: 0; gap: var(--edm-layout-gap); }
+[data-ui="page-header"] { display: grid; gap: var(--edm-space-3); min-width: 0; }
+[data-ui="page-heading"], [data-ui="page-title"], [data-ui="page-actions"] { display: flex; align-items: center; flex-wrap: wrap; min-width: 0; max-width: 100%; gap: var(--edm-space-3); }
+[data-ui="page-heading"] { justify-content: space-between; flex-wrap: wrap; }
+[data-ui="page-title"] h2 { margin: 0; font-size: var(--edm-font-size-xl); }
+[data-ui="page-heading"] p { margin: var(--edm-space-1) 0 0; color: var(--edm-text-secondary); font-size: var(--edm-font-size-sm); }
+[data-ui="page-selection"], [data-ui="filter-bar"] { display: flex; align-items: end; flex-wrap: wrap; gap: var(--edm-space-3); padding: var(--edm-space-3); border: 1px solid var(--edm-line); border-radius: var(--edm-radius-lg); background: var(--edm-bg-muted); }
+[data-ui="form-grid"] { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--edm-layout-gap); min-width: 0; margin: 0; padding: 0; border: 0; }
+[data-ui="form-grid"][data-columns="1"] { grid-template-columns: minmax(0,1fr); }
+[data-ui="form-grid"][data-columns="3"] { grid-template-columns: repeat(3,minmax(0,1fr)); }
+[data-ui="field"] { display: grid; gap: var(--edm-space-2); min-width: 0; color: var(--edm-text); font-size: var(--edm-font-size-md); }
+[data-ui="field"] > span { display: flex; align-items: center; gap: var(--edm-space-2); font-weight: 600; }
+[data-ui="field"][data-wide="true"] { grid-column: 1 / -1; }
+[data-ui="field"] small { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); }
+[data-ui="field"][data-invalid="true"] small, [data-ui="required"] { color: var(--edm-danger-700); }
+[data-ui="card"], [data-ui="collapsible"], [data-ui="kpi"] { min-width: 0; padding: var(--edm-section-padding); border: 1px solid var(--edm-line); border-radius: var(--edm-radius-lg); background: var(--edm-bg-surface); }
+[data-ui="card"] > header { display: flex; align-items: center; justify-content: space-between; gap: var(--edm-space-3); }
+[data-ui="card"] h3 { font-size: var(--edm-font-size-lg); margin: 0 0 var(--edm-space-3); }
+[data-ui="kpi"] { display: grid; align-content: start; gap: var(--edm-space-2); min-height: 112px; padding: var(--edm-space-4); border-block-start: 2px solid var(--edm-accent); text-align: start; color: var(--edm-text); }
+[data-ui="kpi"] > strong { font-size: var(--edm-font-size-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+[data-ui="kpi"] > span, [data-ui="kpi"] > small { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); }
+[data-ui="kpi"] small, [data-ui="kpi"] small > span { display: flex; align-items: center; gap: var(--edm-space-1); flex-wrap: wrap; }
+button[data-ui="kpi"]:focus-visible { outline: 2px solid var(--edm-accent); outline-offset: 2px; }
+button[data-ui="kpi"]:active:not(:disabled) { background: var(--edm-bg-selected); }
+button[data-ui="kpi"]:disabled { opacity: 0.65; cursor: default; }
+@media (hover: hover) and (pointer: fine) { button[data-ui="kpi"]:hover:not(:disabled) { background: var(--edm-bg-hover); border-color: var(--edm-accent); } }
+[data-ui="collapsible"] > summary { cursor: pointer; font-size: var(--edm-font-size-lg); font-weight: 700; }
+[data-ui="collapsible"] > div { padding-block-start: var(--edm-space-4); }
+[data-ui="status-badge"] { display: inline-flex; min-height: 24px; padding: 0 var(--edm-space-2); align-items: center; border: 1px solid var(--edm-line); border-radius: var(--edm-radius-sm); font-size: var(--edm-font-size-xs); font-weight: 600; color: var(--edm-text-secondary); background: var(--edm-bg-canvas); }
+[data-ui="status-badge"][data-tone="positive"] { color: var(--edm-success-800); background: var(--edm-success-50); border-color: var(--edm-success-200); }
+[data-ui="status-badge"][data-tone="danger"] { color: var(--edm-danger-800); background: var(--edm-danger-50); border-color: var(--edm-danger-200); }
+[data-ui="status-badge"][data-tone="warning"] { color: var(--edm-warning-800); background: var(--edm-warning-50); border-color: var(--edm-warning-300); }
+[data-ui="status-badge"][data-tone="info"] { color: var(--edm-info-800); background: var(--edm-info-50); border-color: var(--edm-info-300); }
+@media (max-width: 1180px) { [data-ui="form-grid"] { grid-template-columns: minmax(0,1fr); } }
+@media (max-width: 680px) { [data-ui="page-heading"], [data-ui="page-actions"] { align-items: stretch; width: 100%; } }

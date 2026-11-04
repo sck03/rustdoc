@@ -135,7 +135,7 @@ fn children(
         let u = s.number(unit);
         let appointment = s.text(text(entry, "appointmentId"));
         let start = s.text(text(&entry["period"], "startsOn"));
-        let end = s.nullable_text(entry["period"]["endsOn"].as_str());
+        let end = s.optional_text(entry["period"]["endsOn"].as_str());
         let mut columns = vec![
             parent_column,
             "unit_id",
@@ -149,7 +149,7 @@ fn children(
             p.push(s.text(text(entry, "role")));
         } else {
             columns.push("project_id");
-            p.push(s.nullable_number(entry["projectId"].as_str()));
+            p.push(s.optional_number(entry["projectId"].as_str()));
         }
         if let Some(current) = entry["id"].as_str() {
             let current = s.number(current);
@@ -190,7 +190,7 @@ pub(crate) fn save(
         "positions" => (
             vec!["department_id", "code", "name", "is_active"],
             vec![
-                s.nullable_number(body["departmentId"].as_str()),
+                s.optional_number(body["departmentId"].as_str()),
                 s.text(text(body, "code")),
                 s.text(text(body, "name")),
                 s.number(i64::from(body["isActive"] == true)),
@@ -213,7 +213,7 @@ pub(crate) fn save(
                 vec![
                     s.number(identity),
                     s.text(text(&body["period"], "startsOn")),
-                    s.nullable_text(body["period"]["endsOn"].as_str()),
+                    s.optional_text(body["period"]["endsOn"].as_str()),
                     s.text(text(body, "stage")),
                 ],
             )
@@ -227,7 +227,7 @@ pub(crate) fn save(
                 "is_active",
             ],
             vec![
-                s.nullable_number(body["departmentId"].as_str()),
+                s.optional_number(body["departmentId"].as_str()),
                 s.text(text(body, "code")),
                 s.text(text(body, "name")),
                 s.json(&body["workflowKinds"])?,
@@ -311,7 +311,7 @@ pub(crate) fn sync_person(db: &(impl Adapter + ?Sized), person: i64, body: &Valu
         let p = vec![
             s.number(identity),
             s.text(date),
-            s.nullable_text(end.as_deref()),
+            s.optional_text(end.as_deref()),
             s.text(stage),
         ];
         write(

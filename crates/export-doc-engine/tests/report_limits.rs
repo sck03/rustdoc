@@ -1,5 +1,4 @@
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod fixture;
 use export_doc_engine::generated_api::*;
 use serde_json::{Value, json};

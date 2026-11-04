@@ -1,7 +1,6 @@
 #[path = "support/document_samples.rs"]
 mod document_samples;
 #[path = "support/native_fixture.rs"]
-#[allow(dead_code)]
 mod native_fixture;
 #[path = "support/approval_fixture.rs"]
 mod workflow;

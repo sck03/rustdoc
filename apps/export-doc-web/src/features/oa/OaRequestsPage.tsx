@@ -1,6 +1,7 @@
+import { EditorWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useState } from "react";
 import { requestPersonLabel } from "../office/requestIdentity.ts";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient, OaRequest } from "../../api/index.ts";
 import { PageState } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -8,20 +9,26 @@ import { OfficeQueryState } from "../office/OfficeUi.tsx";
 import { OaRequestDialog } from "./OaRequestDialog.tsx";
 import { OaRequestDetails } from "./OaRequestDetails.tsx";
 import { OaApprovalVerification } from "./OaApprovalVerification.tsx";
-import { oaAccess, oaModules, oaStatus, oaHandlingLabels, type OaKind } from "./oaModel.ts";
+import { oaAccess, oaKinds, oaModules, oaStatus, oaHandlingLabels, type OaKind } from "./oaModel.ts";
+import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
+import { useConfirmUnsavedChanges } from "../../ui/unsavedChangesGuard.tsx";
 import { useOaRequests } from "./useOaRequests.ts";
 import "../../styles/routes/office.css";
 import "../../styles/routes/oa.css";
 
 export function OaRequestsPage({ client, user, kind }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind }) {
   const model = useOaRequests(client, user, kind);
+  const navigate = useNavigate();
+  const confirmDiscard = useConfirmUnsavedChanges();
   const [params, setParams] = useSearchParams();
   const [editing, setEditing] = useState<OaRequest | "new" | null>(() => (params.get("new") === "true" || kind === "personnel" && params.has("change")) && oaAccess(user, kind, "create") ? "new" : null);
   function closeEditor() { setEditing(null); setParams(current => { const next = new URLSearchParams(current); next.delete("new"); next.delete("change"); next.delete("employeeId"); return next; }); }
   if (!oaAccess(user, kind, "view")) return <PageState tone="permission" title="没有此申请模块的查看权限" />;
   const module = oaModules[kind];
-  return <section className="work-surface office-workspace oa-workspace" aria-label={module.name}>
-    <header className="oa-heading"><h2>{model.selected ? "申请详情" : "申请列表"}</h2><Link to="/office/approvals">申请与审批中心</Link></header>
+  return <EditorWorkspace className="office-workspace oa-workspace" aria-label={module.name} title={model.selected ? "申请详情" : "申请列表"}
+    actions={<Link to="/office/approvals">申请与审批中心</Link>}>
+    <SegmentedNav label="申请类型" value={kind} items={oaKinds.filter(kind => oaAccess(user,kind,"view")).map(key => ({key,label:oaModules[key].name}))}
+      onChange={async kind => { if (await confirmDiscard("切换申请类型")) navigate(`/office/requests/${kind}?view=requests&mineOnly=${model.mineOnly}`); }} />
     {model.selected ? <>
       <button type="button" className="command-button secondary" onClick={() => model.select(0)}>返回申请列表</button>
       {model.detail.isPending ? <PageState tone="loading" title="正在读取申请" /> : model.detail.isError ? <PageState tone="error" title="申请读取失败" description={readApiError(model.detail.error)} action={<button className="command-button" type="button" onClick={() => void model.detail.refetch()}>重新读取</button>} />
@@ -42,5 +49,5 @@ export function OaRequestsPage({ client, user, kind }: { client: ExportDocManage
       {(model.query.data?.totalCount ?? 0) > 0 && <div className="office-card-actions"><button className="command-button secondary" type="button" disabled={model.page <= 1 || model.query.isFetching} onClick={() => model.setPage(model.page - 1)}>上一页</button><span>第 {model.page} 页 · 共 {model.query.data?.totalCount ?? 0} 条</span><button className="command-button secondary" type="button" disabled={model.query.isFetching || model.page * 20 >= (model.query.data?.totalCount ?? 0)} onClick={() => model.setPage(model.page + 1)}>下一页</button></div>}
     </>}
     {editing && <OaRequestDialog client={client} user={user} kind={kind} record={editing === "new" ? undefined : editing} onClose={closeEditor} onSaved={(row) => { setEditing(null); model.select(row.id); }} />}
-  </section>;
+  </EditorWorkspace>;
 }

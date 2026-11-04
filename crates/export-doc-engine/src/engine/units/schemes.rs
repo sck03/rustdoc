@@ -9,11 +9,8 @@ pub(in crate::engine) fn directory(
 ) -> Result<Value> {
     store.read(|tx| {
         let actor = auth::refresh_actor_in(tx, actor)?;
-        let code = query
-            .iter()
-            .find(|(key, _)| *key == "companyCode")
-            .map(|(_, v)| v.as_str())
-            .unwrap_or(&actor.company);
+        let code =
+            crate::engine::request_values::find(query, "companyCode").unwrap_or(&actor.company);
         demand(&actor, code, "organization.roles")?;
         let unit = company(tx, code)?;
         let items = store::matching(

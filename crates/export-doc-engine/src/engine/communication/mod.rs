@@ -98,11 +98,7 @@ pub(super) fn paging(query: &[(&str, String)]) -> Result<(i64, i64)> {
     super::oa::paging(query)
 }
 fn unread(query: &[(&str, String)]) -> Result<bool> {
-    match query
-        .iter()
-        .find(|(k, _)| *k == "unreadOnly")
-        .map(|(_, v)| v.as_str())
-    {
+    match crate::engine::request_values::find(query, "unreadOnly") {
         None | Some("false") => Ok(false),
         Some("true") => Ok(true),
         _ => Err(invalid("未读筛选参数无效。")),

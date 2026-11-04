@@ -30,10 +30,7 @@ fn mutable(row: &Value, actor: &Actor) -> Result<()> {
     Ok(())
 }
 fn attachment(row: &Value, parameters: &[(&str, String)]) -> Result<Value> {
-    let id = parameters
-        .iter()
-        .find(|(key, _)| *key == "attachmentId")
-        .map(|(_, id)| id.as_str())
+    let id = crate::engine::request_values::find(parameters, "attachmentId")
         .ok_or_else(|| invalid("缺少附件编号。"))?;
     documents(row)?
         .into_iter()

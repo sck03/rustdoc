@@ -40,6 +40,8 @@ $environment = @{
 $clusterStarted = $false
 $environment['EXPORTDOC_TEST_PG_BIN'] = $PostgresBin
 $databaseTargets = @()
+[string[]]$cargoProfile = @()
+if ($Configuration -eq 'Release') { $cargoProfile = @('--release') }
 if ($Scope -in @('All', 'Storage', 'Workflows')) { $databaseTargets += ,@('POSTGRES', 'native_storage') }
 if ($Scope -in @('All', 'Engine', 'Workflows')) {
     $databaseTargets += ,@('ENGINE', 'native_engine')
@@ -91,30 +93,30 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SEL
         }
     }
     if ($Scope -in @('All', 'Storage', 'Workflows')) {
-        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'contract', '--', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL storage contract'
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'contract') + $cargoProfile + @('--', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL storage contract'
     }
     if ($Scope -in @('All', 'Engine')) {
-        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--lib', '--', 'postgres', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL recovery and output publication'
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--lib') + $cargoProfile + @('--', 'postgres', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL recovery and output publication'
     }
     if ($Scope -in @('All', 'Engine', 'Workflows')) {
-        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--test', 'team_service', '--', '--ignored', '--test-threads=1') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL team and organization workflows'
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--test', 'team_service') + $cargoProfile + @('--', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL team and organization workflows'
     }
     if ($Scope -eq 'Capacity') {
         $environment['EXPORTDOC_CAPACITY_ISOLATED'] = '1'
         $environment['EXPORTDOC_CAPACITY_CONFIGURATION'] = $Configuration
         $environment['EXPORTDOC_CAPACITY_HISTORY_ROWS'] = "$HistoryRows"
         $environment['EXPORTDOC_CAPACITY_ROUNDS'] = "$Rounds"
-        $buildArguments = @('build', '--locked', '-p', 'export-doc-server')
-        if ($Configuration -eq 'Release') { $buildArguments += '--release' }
+        $buildArguments = @('build', '--locked', '-p', 'export-doc-server') + $cargoProfile
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments $buildArguments -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build the measured Rust HTTP service'
         Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_native_capacity.mjs') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Twenty-session query, approval and PDF capacity comparison'
     }
     if ($Scope -eq 'Maintenance') {
         $environment['EXPORTDOC_MAINTENANCE_ISOLATED'] = '1'
-        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments @('build', '--locked', '-p', 'export-doc-server') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build the Rust maintenance test service'
+        $environment['EXPORTDOC_TEST_CONFIGURATION'] = $Configuration
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('build', '--locked', '-p', 'export-doc-server') + $cargoProfile) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build the Rust maintenance test service'
         Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_postgres_maintenance_ui.mjs') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Real React and PostgreSQL backup, migration and offline recovery'
     }
-    [ordered]@{ schemaVersion = 1; database = 'PostgreSQL 18'; scope = $Scope; succeeded = $true; completedAt = [DateTimeOffset]::UtcNow.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $testRoot 'result.json') -Encoding utf8
+    [ordered]@{ schemaVersion = 1; database = 'PostgreSQL 18'; scope = $Scope; configuration = $Configuration; succeeded = $true; completedAt = [DateTimeOffset]::UtcNow.ToString('o') } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $testRoot 'result.json') -Encoding utf8
     Write-Host "Native PostgreSQL evidence: $testRoot"
 } finally {
     if ($clusterStarted -or (Test-Path -LiteralPath (Join-Path $dataRoot 'postmaster.pid'))) {

@@ -16,11 +16,7 @@ pub(in crate::engine) fn handle(
 ) -> Result<Value> {
     let action = text(meta, "action");
     let scheme = if matches!(action.as_str(), "versions" | "version") {
-        query
-            .iter()
-            .find(|(k, _)| *k == "schemeId")
-            .map(|(_, v)| v.as_str())
-            .unwrap_or("")
+        crate::engine::request_values::find(query, "schemeId").unwrap_or("")
     } else {
         body["schemeId"].as_str().unwrap_or("")
     };

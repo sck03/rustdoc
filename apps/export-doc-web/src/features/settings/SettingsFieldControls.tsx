@@ -102,7 +102,7 @@ export function CheckboxSetting({ settings, path, label, disabled, className, on
 
 export function SecretToggle({ checked, disabled, onChange }: { checked: boolean; disabled?: boolean; onChange: (value: boolean) => void }) {
   return (
-    <label className="inline-check">
+    <label className="inline-check" data-ui="secret-toggle">
       <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
       <span>更新密码或密钥（留空保留）</span>
     </label>

@@ -1,5 +1,6 @@
 import type { BackupPlanController } from "./useBackupPlan.ts";
 import { formatRuntimeDate } from "./settingsFormatters.ts";
+import { CollapsibleSection } from "../../ui/primitives/Card.tsx";
 
 export function BackupSchedulePanel({ controller: c, disabled }: { controller: BackupPlanController; disabled: boolean }) {
   if (!c.draft || !c.status) return null;
@@ -19,13 +20,13 @@ export function BackupSchedulePanel({ controller: c, disabled }: { controller: B
         <label><span>再次输入新密码</span><input type="password" autoComplete="new-password" value={c.confirmation} onChange={(event) => c.setConfirmation(event.target.value)} /></label>
       </div>
       <p className="settings-helper-text">请单独保管密码。旧备份仍须用创建时的密码打开；修改密码不会重新加密旧包。</p>
-      <details className="maintenance-advanced-details"><summary>保留策略</summary>
+      <CollapsibleSection className="maintenance-advanced-details" title="保留策略" error={Boolean(c.message)}>
         <div className="field-grid">
           <label><span>保留最新份数</span><input type="number" min={1} max={365} step={1} value={plan.retentionCount} onChange={(event) => c.updatePlan("retentionCount", Number(event.target.value))} /></label>
           <label><span>保留天数</span><input type="number" min={0} max={3650} step={1} value={plan.retentionDays} onChange={(event) => c.updatePlan("retentionDays", Number(event.target.value))} /><small>0 表示只按份数保留。</small></label>
         </div>
         <p className="settings-helper-text">新备份及所选副本完成后才清理到期或超额备份，至少保留最新一份。只管理本计划创建的文件。S3 开启版本控制时，旧对象版本的保留由存储端生命周期策略控制。</p>
-      </details>
+      </CollapsibleSection>
     </fieldset>
     <div className="detail-grid"><div className="detail-item"><span>下次执行（{c.status.timeZone}）</span><strong>{formatRuntimeDate(c.status.nextRunAt ?? undefined, c.status.timeZone) || "未启用"}</strong></div><div className="detail-item"><span>备份内容</span><strong>完整加密快照</strong></div></div>
     <button className="command-button" type="button" disabled={disabled || c.dirty || c.activeJob || !c.status.encryptionPasswordSet} onClick={() => c.start("backup")}>立即备份一次</button>

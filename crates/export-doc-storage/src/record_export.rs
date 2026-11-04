@@ -12,11 +12,11 @@ pub(crate) fn page(
         kind: query.kind,
         scope: query.scope.clone(),
         filters: query.filters,
-        keyword: "",
         search_root: query.search_root,
         fields: query.fields,
         offset: query.offset,
         limit: query.limit,
+        ..Default::default()
     };
     let (mut statement, projection) = generic_query::build(&selected, pg)?;
     if !query.keyword.is_empty() {

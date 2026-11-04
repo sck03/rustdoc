@@ -11,11 +11,7 @@ pub fn exercise(c: &Connection) {
     ] {
         let mut body = json!({"ownerUserId":owner,"companyScope":"PREVIEW","departmentId":"D","versionNumber":1,"expiresAt":expires,"consumed":consumed});
         let id = c
-            .insert(&RecordWrite {
-                kind: "import-previews",
-                identity: None,
-                body: &body,
-            })
+            .insert(&RecordWrite::unkeyed("import-previews", &body))
             .unwrap();
         body["id"] = json!(id);
         c.set_body(id, &body).unwrap();

@@ -97,8 +97,6 @@ fn query(
             ..Default::default()
         },
         filters,
-        keyword: "",
-        search_root: None,
         fields: &[
             ("code", "code"),
             ("companyCode", "companyCode"),
@@ -109,5 +107,6 @@ fn query(
         ],
         offset,
         limit,
+        ..Default::default()
     })?)
 }

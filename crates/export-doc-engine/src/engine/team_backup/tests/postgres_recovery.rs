@@ -75,7 +75,10 @@ fn postgres_migration_and_physical_restore_preserve_roles_and_reject_live_instan
         .unwrap()
         .set_settings("restore-test", 2, &json!({"value":"after"}))
         .unwrap();
-    let (ticket, _) = issue_sensitive_ticket(&actor, ACTION_RESTORE_SERVER).unwrap();
+    let (ticket, _) = service
+        .backup_tickets
+        .issue_sensitive(&actor, ACTION_RESTORE_SERVER)
+        .unwrap();
     let params = [
         (TICKET_HEADER, ticket),
         (CONFIRMATION_HEADER, "MIGRATE".into()),

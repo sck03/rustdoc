@@ -53,13 +53,6 @@ pub fn escape(value: &str) -> String {
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
 }
-pub fn plain_to_html(value: &str) -> String {
-    format!(
-        "<p>{}</p>",
-        escape(value).replace("\r\n", "\n").replace('\n', "<br>")
-    )
-}
-
 fn visit(
     node: NodeRef<'_, Node>,
     html: &mut String,

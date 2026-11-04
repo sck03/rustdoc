@@ -1,6 +1,5 @@
 /* Layer 2: workspace/page styling. Import order is intentional for existing cascade contracts. */
-@import "../workspaceFeatures.css" layer(workspace);
-@import "../businessFeatures.css" layer(workspace);
-@import "../theme.css" layer(workspace);
-@import "../ui/commercialComponents.css" layer(workspace);
-@import "../features/master-data/hsKnowledge.css" layer(workspace);
+@import "./workspace-features.css" layer(workspace);
+@import "./business/index.css" layer(workspace);
+@import "./theme/index.css" layer(workspace);
+@import "./primitives/feedback-and-tables.css" layer(primitives);

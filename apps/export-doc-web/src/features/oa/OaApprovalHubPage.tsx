@@ -1,32 +1,32 @@
-import { Link, useSearchParams } from "react-router-dom";
+import { DashboardWorkspace } from "../../ui/layout/Workspaces.tsx";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { ArrowRight, CheckCheck, ClipboardList, FilePlus2, Settings2 } from "lucide-react";
 import { requestPersonLabel } from "../office/requestIdentity.ts";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { PageState } from "../../ui/PageState.tsx";
 import { useOaApprovalHub } from "./useOaApprovalHub.ts";
 import { OaApplicationCatalog } from "./OaApplicationCatalog.tsx";
+import { oaKinds, oaAccess } from "./oaModel.ts";
+import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
 import "../../styles/routes/office.css";
 import "../../styles/routes/oa.css";
 
 export function OaApprovalHubPage({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
   const queues = useOaApprovalHub(client, user);
   const [params, setParams] = useSearchParams();
-  const view = params.get("view") === "start" ? "start" : params.get("view") === "handling" ? "handling" : "pending";
+  const view = params.get("view") === "requests" ? "requests" : params.get("view") === "start" ? "start" : params.get("view") === "handling" ? "handling" : "pending";
   const selected = queues.filter(queue => view === "handling" ? queue.handling || queue.finance : !queue.handling && !queue.finance);
   const activeQueues = selected.filter(queue => queue.query.isPending || queue.query.isError || (queue.query.data?.totalCount ?? 0) > 0);
   const emptyQueues = selected.filter(queue => !queue.query.isPending && !queue.query.isError && (queue.query.data?.totalCount ?? 0) === 0);
   const canManage = user.capabilities.canManageUsers || user.capabilities.unitManagement?.workflows;
+  const firstKind = oaKinds.find(kind => oaAccess(user,kind,"view"));
   if (!queues.length) return <PageState tone="permission" title="没有申请模块权限，请联系管理员分配权限方案" />;
-  return <section className="work-surface office-workspace oa-workspace oa-hub" aria-label="申请与审批中心">
-    <header className="oa-hub-header">
-      <div><p className="oa-hub-eyebrow">{user.businessDate} · {user.fullName}</p><h2>申请与审批中心</h2><p className="office-muted">发起申请、跟踪进度，或继续处理分配给你的工作。</p></div>
-      {canManage && <Link className="command-button secondary" to="/office/approval-settings"><Settings2 size={16} aria-hidden="true" />流程管理</Link>}
-    </header>
-    <nav className="office-tabs oa-hub-tabs" aria-label="审批中心工作区">
-      {([{ key: "pending", label: "审批与进度", icon: ClipboardList }, { key: "handling", label: "待我办理", icon: CheckCheck }, { key: "start", label: "发起申请", icon: FilePlus2 }] as const).map(({ key, label, icon: Icon }) =>
-        <button key={key} type="button" aria-pressed={view === key} onClick={() => setParams({ view: key })}><Icon size={17} aria-hidden="true" />{label}</button>)}
-    </nav>
-    {view === "start" ? <OaApplicationCatalog user={user} resources={queues.filter(queue => ["rooms", "supplies"].includes(queue.kind) && !queue.handling)} /> : <>
+  return <DashboardWorkspace className="office-workspace oa-workspace oa-hub" title="申请与审批中心" description="发起申请、跟踪进度，或继续处理分配给你的工作。"
+    actions={canManage && <Link className="command-button secondary" to="/office/approval-settings"><Settings2 size={16} aria-hidden="true" />流程管理</Link>}>
+    <p className="oa-hub-eyebrow">{user.businessDate} · {user.fullName}</p>
+    <SegmentedNav label="审批中心工作区" value={view} onChange={view => setParams({view})}
+      items={[{key:"pending",label:<><ClipboardList size={18} aria-hidden="true" />审批与进度</>},{key:"handling",label:<><CheckCheck size={18} aria-hidden="true" />待我办理</>},{key:"start",label:<><FilePlus2 size={18} aria-hidden="true" />发起申请</>},{key:"requests",label:"我的申请"}]} />
+    {view === "requests" ? firstKind ? <Navigate to={`/office/requests/${firstKind}?view=requests&mineOnly=true`} replace /> : <PageState tone="permission" title="没有申请记录的查看权限" /> : view === "start" ? <OaApplicationCatalog user={user} resources={queues.filter(queue => ["rooms", "supplies"].includes(queue.kind) && !queue.handling)} /> : <>
       <p className="office-muted">{view === "handling" ? "已批准的事项按职责交接、验收或归档。批准与实际办理分别记录。" : "审批人查看当前待签任务；其他员工查看自己申请的审批进度。每类显示最近五项，可进入列表查看全部。"}</p>
       {!selected.length && <PageState tone="empty" title="当前身份没有待办理职责" description="可以在“发起申请”中提交申请，或查看申请记录。" />}
       {selected.length > 0 && !activeQueues.length && <PageState tone="empty" title="当前没有待处理事项" description="可发起新的申请，或展开下方分类查看历史记录。" />}
@@ -40,5 +40,5 @@ export function OaApprovalHubPage({ client, user }: { client: ExportDocManagerAp
         <ul>{emptyQueues.map(queue => <li key={queue.href}><Link to={queue.href}>{queue.title}<ArrowRight size={15} aria-hidden="true" /></Link><span>0 项</span></li>)}</ul>
       </details>}
     </>}
-  </section>;
+  </DashboardWorkspace>;
 }

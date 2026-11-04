@@ -1,3 +1,4 @@
+import { EditorWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ApiCrmCustomerDto, ApiEmailTemplateDto, ApiEmailTemplatePreviewDto, ApiEmailTemplateVariableDto, ApiEmailTemplateVersionDto, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -274,7 +275,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     }
   }
 
-  return <section className="work-surface">
+  return <EditorWorkspace >
     <div className="section-heading-row"><div><h2>邮件模板</h2><p>维护单封业务邮件内容；不包含群发、活动、追踪或自动发送。</p></div></div>
     <OperationFeedback feedback={feedback} />
     {!templateEditPermission.allowed ? <PermissionNotice>当前权限只允许查看和使用邮件模板；正文编辑、发布、共享和归档分别由服务端能力控制。</PermissionNotice> : null}
@@ -359,7 +360,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
         </tbody></table></ResponsiveTableFrame>
         {selectedVersion ? <div className="form-grid"><div className="context-strip form-field-wide"><strong>V{selectedVersion.versionNumber} · {selectedVersion.changeType}</strong><span>{selectedVersion.category} · {emailTemplateStatusLabel(selectedVersion.status)} · {emailTemplateShareScopeLabel(selectedVersion.shareScope)}</span></div><label className="form-field-wide">历史主题<input readOnly value={selectedVersion.subject} /></label><div className="form-field-wide email-rich-text-field"><span className="email-rich-text-field-label">历史正文</span><EmailHtmlPreview html={selectedVersion.bodyHtml} title={`邮件模板 V${selectedVersion.versionNumber} 正文`} /><details className="email-html-advanced"><summary>查看高级 HTML</summary><textarea aria-label="历史邮件正文高级 HTML" rows={8} readOnly value={selectedVersion.bodyHtml} /></details></div><div className="form-actions form-field-wide"><button className="secondary-button" type="button" onClick={() => setView("editor")}>返回模板详情</button>{selectedVersion.canRestore && selectedVersion.versionNumber !== selected?.versionNumber ? <button className="primary-button" type="button" onClick={() => void restoreVersion(selectedVersion)}>恢复此版本</button> : null}</div></div> : null}
       </section> : null}
-  </section>;
+  </EditorWorkspace>;
 }
 
 function emailTemplateStatusLabel(status?: string) {

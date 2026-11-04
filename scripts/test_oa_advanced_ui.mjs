@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { approvalStage, fulfillNodeInUi, linkBusinessPerson } from './lib/approval-fixtures.mjs';
+import { approvalStage, fulfillNodeInUi, linkBusinessPerson, openDefinitionInUi } from './lib/approval-fixtures.mjs';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 
 await withOfficeUi('oa-advanced-ui', async ({ output, url, operations, invoke, openPage }) => {
@@ -43,8 +43,7 @@ await withOfficeUi('oa-advanced-ui', async ({ output, url, operations, invoke, o
 
   const admin = await openPage('oa-review', 'Review-2026-Test');
   await admin.goto(`${url}/#/office/approval-settings`);
-  const definition = admin.locator('details[data-definition-key="general"]');
-  await definition.locator(':scope > summary').click();
+  const definition = await openDefinitionInUi(admin, 'general');
   const first = definition.locator('.oa-stages-editor > fieldset').nth(0);
   const second = definition.locator('.oa-stages-editor > fieldset').nth(1);
   await first.getByLabel('责任人来源').selectOption('Responsibility');
@@ -69,6 +68,7 @@ await withOfficeUi('oa-advanced-ui', async ({ output, url, operations, invoke, o
   await definition.getByRole('button', { name: '移动 职责审核已修改', exact: true }).focus();
   await admin.keyboard.press('ArrowRight');
 
+  await definition.getByRole('tab', { name: '仿真与发布', exact: true }).click();
   await definition.getByRole('button', { name: '仿真并发布此流程', exact: true }).click();
   const simulation = admin.getByRole('dialog').filter({ has: admin.getByRole('button', { name: '选择人员任职', exact: true }) });
   assert(await simulation.getByRole('button', { name: '保存并发布此流程', exact: true }).isDisabled());

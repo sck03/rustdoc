@@ -5,8 +5,6 @@ commands.allow = [
   "select_single_window_package_file",
   "select_invoice_transfer_package_file",
   "select_disaster_recovery_package_file",
-  "select_receipt_file",
-  "select_receipt_files",
   "select_pdf_files",
   "select_email_attachment_files",
   "select_customs_coo_attachment_files",
@@ -35,4 +33,5 @@ commands.allow = [
   "install_tauri_update",
   "cancel_tauri_update",
   "get_desktop_runtime_context",
+  "restart_after_startup_failure",
 ]

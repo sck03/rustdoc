@@ -1,3 +1,5 @@
+import { Field } from "../../ui/primitives/Field.tsx";
+import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Mail, MapPin, Phone, Plus, RefreshCw, Search } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient, PersonnelDirectoryRecord } from "../../api/index.ts";
@@ -27,29 +29,28 @@ export function PersonnelPage({ client, user, directoryOnly = false }: { client:
   if (route.employeeId) return selectedId && canViewDetails ? <PersonnelDetailsPage key={selectedId} client={client} user={user} id={selectedId}
     departments={model.options.data?.departments ?? []} onClose={() => navigate({ pathname: "/office/people", search: patchRouteQuery(location.search, { tab: null }) })} />
     : <PageState tone="permission" title="无法打开人员档案" description="请从有权访问的人员目录选择档案。" />;
-  return <section className="work-surface office-workspace personnel-workspace" aria-label="人员信息管理">
-    <div className="personnel-heading"><div><h2>{directoryOnly ? "公司通讯录" : "人员档案"}</h2>
-      <p className="office-muted">{directoryOnly ? "按部门查找同事，查看工作邮箱、电话和办公地点。" : "维护人员档案，办理入职、转正、调岗和离职，留存任职记录。"}</p></div>
-      <div className="office-card-actions">{!directoryOnly && <Link className="command-button secondary" to="/office/directory">公司通讯录</Link>}
+  return <ListWorkspace className="office-workspace personnel-workspace" aria-label="人员信息管理"
+    title={directoryOnly ? "公司通讯录" : "人员档案"}
+    description={directoryOnly ? "按部门查找同事，查看工作邮箱、电话和办公地点。" : "维护人员档案，办理入职、转正、调岗和离职，留存任职记录。"}
+    actions={<>{!directoryOnly && <Link className="command-button secondary" to="/office/directory">公司通讯录</Link>}
         {directoryOnly && canViewPersonnelDetails(user) && <Link className="command-button secondary" to="/office/people">人员档案</Link>}
         {!directoryOnly && user.capabilities.canManageUsers && <Link className="command-button secondary" to="/system/organization">组织架构</Link>}
         {!directoryOnly && oaAccess(user, "personnel", "view") && <Link className="command-button secondary" to="/office/requests/personnel">人员变动审批</Link>}
         {!directoryOnly && model.options.data?.canCreate && (model.options.data.approvalRequiredActions?.includes("Hire")
           ? oaAccess(user, "personnel", "create") && <Link className="command-button" to="/office/requests/personnel?change=Hire"><Plus size={17} aria-hidden="true" />入职申请</Link>
-          : <button type="button" className="command-button" onClick={() => setCreating(true)}><Plus size={17} aria-hidden="true" />入职登记</button>)}</div>
-    </div>
+          : <button type="button" className="command-button" onClick={() => setCreating(true)}><Plus size={17} aria-hidden="true" />入职登记</button>)}</>}>
     <div className="office-toolbar">
       <form className="office-search" onSubmit={(event) => { event.preventDefault(); model.search(); }}>
         <input aria-label="搜索人员" placeholder="姓名、工号、岗位或工作邮箱" value={model.keyword} maxLength={100} onChange={(event) => model.changeKeyword(event.target.value)} />
         <button type="submit" className="command-button secondary"><Search size={16} aria-hidden="true" />搜索</button>
       </form>
-      <label className="office-filter">部门<select value={model.departmentId} onChange={(event) => model.changeDepartment(event.target.value)}>
+      <Field label="部门"><select value={model.departmentId} onChange={(event) => model.changeDepartment(event.target.value)}>
         <option value="">全部部门</option>{departmentOptions(model.options.data?.departments ?? []).map((item) => <option key={item.code} value={item.code}>{item.label}{item.isActive ? "" : "（停用）"}</option>)}
-      </select></label>
-      {!directoryOnly && <label className="office-filter">任职状态<select value={model.status} onChange={(event) => model.changeStatus(event.target.value)}>
+      </select></Field>
+      {!directoryOnly && <Field label="任职状态"><select value={model.status} onChange={(event) => model.changeStatus(event.target.value)}>
         <option value="">全部在职</option><option value="Probation">试用期</option><option value="Active">正式在职</option>
         {canViewDetails && <option value="Departed">已离职</option>}
-      </select></label>}
+      </select></Field>}
       <button type="button" className="icon-button" aria-label="刷新通讯录" disabled={model.query.isFetching} onClick={() => void model.query.refetch()}><RefreshCw size={17} aria-hidden="true" /></button>
     </div>
     {canViewDetails && <label className="checkbox-field personnel-attention"><input type="checkbox" checked={model.attentionOnly} onChange={(event) => model.changeAttention(event.target.checked)} />仅看试用／合同／身份证已到期或 30 天内到期的人员</label>}
@@ -60,7 +61,7 @@ export function PersonnelPage({ client, user, directoryOnly = false }: { client:
       <PersonnelCard key={employee.id} client={client} employee={employee} showDetails={!directoryOnly} onOpen={() => openPerson(employee.id)} />)}</div>}
     <OfficePager page={model.query.data} paging={model.paging} busy={model.query.isFetching} />
     {creating && <PersonnelFormDialog client={client} user={user} departments={model.options.data?.departments ?? []} onClose={() => setCreating(false)} onSaved={record => { setCreating(false); openPerson(record.employee.id); }} />}
-  </section>;
+  </ListWorkspace>;
 }
 
 function PersonnelCard({ client, employee, showDetails, onOpen }: { client: ExportDocManagerApiClient; employee: PersonnelDirectoryRecord; showDetails: boolean; onOpen: () => void }) {

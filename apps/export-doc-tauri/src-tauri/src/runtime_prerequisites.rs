@@ -13,6 +13,8 @@ struct Package {
     backend: String,
     frontend: String,
     ocr: bool,
+    purpose: String,
+    version: String,
 }
 
 pub(crate) fn check(paths: &RuntimePaths) -> Result<(), String> {
@@ -34,7 +36,12 @@ pub(crate) fn check(paths: &RuntimePaths) -> Result<(), String> {
     let bytes = fs::read(&marker).map_err(|error| format!("无法读取运行资源清单：{error}"))?;
     let package: Package =
         serde_json::from_slice(&bytes).map_err(|e| format!("运行资源清单无效：{e}"))?;
-    if package.schema_version != 1 || package.backend != "Rust" || package.frontend != "Tauri" {
+    if package.schema_version != 1
+        || package.backend != "Rust"
+        || package.frontend != "Tauri"
+        || package.purpose != "rust-native-application"
+        || package.version != env!("CARGO_PKG_VERSION")
+    {
         return Err("这不是 Tauri + Rust 程序资源包，请使用匹配的安装包。".into());
     }
     if package.edition.as_deref().unwrap_or("Full") != env!("EXPORTDOCMANAGER_PRODUCT_EDITION") {

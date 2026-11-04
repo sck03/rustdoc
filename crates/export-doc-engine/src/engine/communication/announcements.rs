@@ -3,11 +3,13 @@ const RESOURCE: &str = "office.announcements";
 
 fn readable(actor: &Actor, row: &Value) -> Result<()> {
     auth::authorize(actor, RESOURCE, "view")?;
-    let now = store::timestamp();
+    let now = chrono::Utc::now();
+    let starts = store::instant(&text(row, "startsAt"))?;
+    let expires = store::instant(&text(row, "expiresAt"))?;
     if row["companyScope"] != actor.company
         || row["status"] != "Published"
-        || text(row, "startsAt") > now
-        || text(row, "expiresAt") <= now
+        || starts > now
+        || expires <= now
         || (!text(row, "audienceDepartment").is_empty()
             && !actor
                 .departments

@@ -1,3 +1,4 @@
+import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Building2, Plus, RefreshCw, Search } from "lucide-react";
@@ -15,7 +16,7 @@ import "../../styles/routes/organization.css";
 
 export function OrganizationDirectoryPage({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
   return user.capabilities.canManageUsers || user.capabilities.unitManagement?.organization ? <DirectoryWorkspace client={client} user={user} />
-    : <section className="work-surface office-workspace organization-workspace" aria-label="单位管理"><OrganizationUnitWorkspace key={user.companyScope} client={client} user={user} company={user.companyScope} /></section>;
+    : <ListWorkspace className="office-workspace organization-workspace" aria-label="单位管理"><OrganizationUnitWorkspace key={user.companyScope} client={client} user={user} company={user.companyScope} /></ListWorkspace>;
 }
 
 function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
@@ -30,11 +31,10 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
   const companies = query.data?.companies ?? [];
   const company = companies.find((item) => item.code === companyCode) ?? companies.find((item) => item.isActive) ?? companies[0];
   const departments = (query.data?.departments ?? []).filter((item) => item.companyCode === company?.code);
-  return <section className="work-surface office-workspace organization-workspace" aria-label="组织架构管理">
-    <div className="organization-heading"><div><h2>组织与任职</h2><p className="office-muted">先选择单位，再维护部门、任职或授权。</p></div>
-      <div className="organization-actions">{user.capabilities.enabledModules?.includes("office.people") && <Link className="command-button secondary" to="/office/people">人员档案</Link>}
+  return <ListWorkspace className="office-workspace organization-workspace" aria-label="组织架构管理" title="组织与任职" description="先选择单位，再维护部门、任职或授权。"
+    actions={<>{user.capabilities.enabledModules?.includes("office.people") && <Link className="command-button secondary" to="/office/people">人员档案</Link>}
         {user.capabilities.canManageUsers && <Link className="command-button secondary" to="/system/access-control">账号与权限</Link>}
-        {user.capabilities.canManageUsers && <button type="button" className="command-button secondary" onClick={() => setCompanyEditor({})}><Plus size={16} aria-hidden="true" />新增公司</button>}</div></div>
+        {user.capabilities.canManageUsers && <button type="button" className="command-button secondary" onClick={() => setCompanyEditor({})}><Plus size={16} aria-hidden="true" />新增公司</button>}</>}>
     <details><summary>公司、职位与审批如何设置</summary><p className="office-muted">公司下建立实际部门，并在公司信息中指定公司领导审批负责人，可以是董事长、总经理、分管副总等。人员档案维护主职、兼职和直属/职能汇报，审批规则可组合部门负责人、公司领导及指定人员会签。负责人须关联启用账号并取得对应查看、审批范围；组织层级和职位名称不自动授予权限。</p></details>
     {query.isPending ? <PageState tone="loading" title="正在加载组织架构" /> : query.isError ? <PageState tone="error" title="组织架构加载失败" description={readApiError(query.error)}
       action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新加载</button>} /> : !company ? <PageState title="尚未设置公司" description="先新增公司，再在公司下建立部门。" /> : <>
@@ -72,5 +72,5 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
       onDelete={(body, signal) => deleting.kind === "company" ? client.deleteOrganizationCompany({ id: deleting.record.id, body }, { signal })
         : client.deleteOrganizationDepartment({ id: deleting.record.id, body }, { signal })}
       onClose={() => setDeleting(null)} onDeleted={() => setDeleting(null)} />}
-  </section>;
+  </ListWorkspace>;
 }

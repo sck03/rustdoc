@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import { Circle, Diamond, Eraser, Minus, MousePointer2, Save, Square, Trash2, Triangle, Type, X } from "lucide-react";
+import { Circle, Diamond, Eraser, Minus, MousePointer2, Save, Square, Trash2, Triangle, Type } from "lucide-react";
 import { buildPortableCanvasFont } from "../../app/typographyPolicy.ts";
-import { useModalDialog } from "../../ui/useModalDialog.ts";
+import { Dialog } from "../../ui/primitives/Dialog.tsx";
 
 type ShippingMarkTool = "select" | "text" | "line" | "rectangle" | "diamond" | "triangle" | "circle";
 type DrawableShippingMarkTool = Exclude<ShippingMarkTool, "select">;
@@ -74,7 +74,6 @@ export function ShippingMarkEditorDialog({
   const [shapes, setShapes] = useState<ShippingMarkShape[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
-  const dialogRef = useModalDialog<HTMLDivElement>(onClose, { canClose: !isSaving });
 
   const selectedShape = useMemo(
     () => shapes.find((shape) => shape.id === selectedId) ?? null,
@@ -301,22 +300,8 @@ export function ShippingMarkEditorDialog({
   }
 
   return (
-    <div className="workspace-modal-backdrop shipping-mark-backdrop" onMouseDown={(event) => {
-      if (event.target === event.currentTarget && !isSaving) {
-        onClose();
-      }
-    }}>
-      <div ref={dialogRef} className="workspace-modal-dialog shipping-mark-dialog" role="dialog" aria-modal="true" aria-labelledby="shipping-mark-editor-title">
-        <div className="workspace-modal-header">
-          <div className="workspace-modal-title">
-            <Square size={18} aria-hidden="true" />
-            <h2 id="shipping-mark-editor-title">唛头图片</h2>
-          </div>
-          <button className="icon-button" type="button" title="关闭" aria-label="关闭" onClick={onClose} disabled={isSaving}>
-            <X size={17} aria-hidden="true" />
-          </button>
-        </div>
-
+    <Dialog title="唛头图片" size="full" busy={isSaving} onClose={onClose} closeLabel="关闭">
+      <div className="shipping-mark-dialog">
         <div className="shipping-mark-toolbar">
           <div className="shipping-mark-tool-grid" role="toolbar" aria-label="唛头绘图工具">
             {toolButtons.map(({ tool: itemTool, title, icon: Icon }) => (
@@ -386,7 +371,7 @@ export function ShippingMarkEditorDialog({
           />
         </div>
 
-        <div className="workspace-modal-footer shipping-mark-footer">
+        <div data-ui="dialog-footer" className="shipping-mark-footer">
           <button className="command-button secondary" type="button" onClick={onClose} disabled={isSaving}>
             取消
           </button>
@@ -396,7 +381,7 @@ export function ShippingMarkEditorDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Dialog>
   );
 }
 

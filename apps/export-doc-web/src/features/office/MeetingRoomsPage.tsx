@@ -1,3 +1,4 @@
+import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useState } from "react";
 import { CalendarDays, MapPin, Plus, RefreshCw, UsersRound } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient, MeetingRoomRecord } from "../../api/index.ts";
@@ -13,11 +14,11 @@ import "../../styles/routes/office.css";
 export function MeetingRoomsPage({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
   const { records, setRecords } = useOfficeView();
   if (!user.companyScope) return <PageState tone="permission" title="请先设置所属公司" description="请管理员在账号与权限中为当前账号选择所属公司。" />;
-  return <section className="work-surface office-workspace" aria-label="会议室预约工作区">
+  return <RecordWorkspace className="office-workspace" aria-label="会议室预约工作区">
     <OfficeTabs records={records} onChange={setRecords}
       recordsLabel="预约记录与审批" />
     {records ? <OfficeRequestsPanel client={client} user={user} kind="rooms" /> : <MeetingRoomsDirectory client={client} user={user} />}
-  </section>;
+  </RecordWorkspace>;
 }
 
 function MeetingRoomsDirectory({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {

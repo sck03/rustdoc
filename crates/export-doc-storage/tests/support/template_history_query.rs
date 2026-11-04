@@ -5,11 +5,7 @@ fn insert(tx: &Connection, kind: &str, template: i64, number: i64, content: &str
     let mut body = json!({"templateKind":kind,"templateId":template,"versionNumber":1,"ownerUserId":7,
         "content":{"versionNumber":number,"name":"快照","contentHtml":content}});
     let id = tx
-        .insert(&RecordWrite {
-            kind: "template-versions",
-            identity: None,
-            body: &body,
-        })
+        .insert(&RecordWrite::unkeyed("template-versions", &body))
         .unwrap();
     body["id"] = json!(id);
     tx.set_body(id, &body).unwrap();

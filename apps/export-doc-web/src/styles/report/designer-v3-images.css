@@ -9,14 +9,14 @@
 
 .report-designer-v3-resource-gallery {
   min-width: 0;
-  margin-block: 0.5rem;
+  margin-block: 8px;
 }
 
 .report-designer-v3-resource-card {
   display: grid;
-  gap: 0.5rem;
-  padding-block: 0.75rem;
-  border-bottom: 1px solid var(--border-color);
+  gap: 8px;
+  padding-block: 12px;
+  border-bottom: 1px solid var(--edm-line);
 }
 
 .report-designer-v3-resource-thumbnail {
@@ -28,5 +28,5 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 8px;
 }

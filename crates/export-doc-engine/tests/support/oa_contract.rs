@@ -28,11 +28,7 @@ pub fn call(
         vec![]
     };
     let body = workflow::decision_body(service, token, op, id, body);
-    let result: Value =
-        serde_json::from_slice(&service.dispatch(op, &parameters, &[], body, token)?).unwrap();
-    export_doc_contracts::validation::response(op.id, &result)
-        .unwrap_or_else(|cause| panic!("{} response: {cause}", op.id));
-    Ok(result)
+    workflow::dispatch(service, token, op, &parameters, &[], body)
 }
 fn act(service: &NativeService, token: &str, kind: &str, action: &str, row: &Value) -> Value {
     call(

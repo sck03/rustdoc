@@ -350,13 +350,7 @@ pub fn query(
     clock: &BusinessClock,
     query: &[(&str, String)],
 ) -> Result<Value> {
-    let parameter = |key: &str| {
-        query
-            .iter()
-            .find(|(k, _)| *k == key)
-            .map(|(_, v)| v.as_str())
-            .unwrap_or("")
-    };
+    let parameter = |key: &str| crate::engine::request_values::find(query, key).unwrap_or("");
     let number = |key: &str, default: usize, max: usize| -> Result<usize> {
         let text = parameter(key);
         let value = if text.is_empty() {
