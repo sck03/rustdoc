@@ -1,3 +1,4 @@
+@layer route {
 .dashboard-page {
   display: grid;
   gap: 16px;
@@ -400,5 +401,6 @@
 .page-jump-control button:hover:not(:disabled) {
   color: var(--edm-primary-650);
   border-color: var(--edm-primary-650);
+}
 }
 }

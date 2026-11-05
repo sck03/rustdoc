@@ -372,10 +372,6 @@ html[data-interface-density="compact"] :where(th, td) {
   content: "";
 }
 
-.toolbar-actions {
-  flex-wrap: wrap;
-}
-
 .invoice-status-field-value {
   display: flex;
   min-height: 42px;
@@ -667,11 +663,6 @@ dialog::backdrop {
 
   .toolbar {
     align-items: stretch;
-  }
-
-  .toolbar,
-.toolbar-actions {
-    flex-wrap: wrap;
   }
 
   .toolbar-actions,

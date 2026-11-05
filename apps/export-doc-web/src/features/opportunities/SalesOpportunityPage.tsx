@@ -1,4 +1,5 @@
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
+import { FilterBar } from "../../ui/primitives/Field.tsx";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
@@ -207,11 +208,11 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
     {view === "directory" ? <section className="form-section" aria-label="商机目录">
       <PageHeader title="商机目录" count={page?.totalCount} unit="项" description="按客户、阶段和报价编号查找商机，打开后维护资料及报价历史。"
         actions={canCreateOpportunity ? <button className="primary-button" type="button" onClick={() => { setSelected(null); changeView("editor"); }}>新建商机</button> : null}>
-      <form className="list-workspace-filters" role="search" aria-label="筛选商机目录" onSubmit={(event) => { event.preventDefault(); setKeyword(keywordInput.trim()); setPageNumber(1); }}>
+      <FilterBar className="list-workspace-filters" label="筛选商机目录" onSubmit={(event) => { event.preventDefault(); setKeyword(keywordInput.trim()); setPageNumber(1); }}>
         <input aria-label="搜索商机目录" value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="搜索商机、客户、产品或报价编号" />
         <select aria-label="商机阶段" value={stage} onChange={(event) => { setStage(event.target.value); setPageNumber(1); }}><option value="">全部阶段</option>{stages.map((item) => <option key={item}>{item}</option>)}</select>
         <button className="secondary-button" type="submit">搜索</button>
-      </form>
+      </FilterBar>
       </PageHeader>
       {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}
       <ResponsiveTableFrame label="销售商机列表" mobileLayout="scroll" busy={pageQuery.isFetching}><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th data-table-priority="secondary">产品</th><th>金额</th><th data-table-priority="secondary">概率</th><th>阶段</th><th /></tr></thead><tbody>

@@ -1,5 +1,6 @@
 import { Eye, Save } from "lucide-react";
 import { SelectField } from "../../ui/FormFields.tsx";
+import { FilterBar } from "../../ui/primitives/Field.tsx";
 import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
 import { type ReportDesignerPreviewSampleProfile } from "../report-designer/reportDesignerPreviewSamples.ts";
 import { type TemplatePreviewMode } from "./reportTemplateDesignerModel.ts";
@@ -37,7 +38,7 @@ export function ReportTemplatePreviewWorkspace({
 }) {
   return (
     <div className="report-template-preview-workspace">
-      <div className="report-template-preview-toolbar">
+      <FilterBar className="report-template-preview-toolbar" label="模板预览条件">
         <SelectField label="预览方式" value={pdf.format} disabled={isBusy} options={[{ value: "Svg", label: "矢量排版" }, { value: "PdfPage", label: "实际 PDF 页图" }]} onChange={value => pdf.onFormatChange(value === "PdfPage" ? "PdfPage" : "Svg")} />
         <div className="report-template-preview-mode-tabs">
           <SegmentedNav label="模板预览数据" value={mode} onChange={onModeChange} items={[{ key: "sample", label: "样例数据" }, { key: "savedSource", label: "当前单据" }]} />
@@ -70,7 +71,7 @@ export function ReportTemplatePreviewWorkspace({
             <span>保存</span>
           </button>
         </div>
-      </div>
+      </FilterBar>
       <div className="report-template-preview report-template-preview-full">
         {pdf.format === "PdfPage" && pdf.pageCount > 0 ? <div className="report-template-preview-pagination" role="group" aria-label="PDF 预览翻页">
           <button type="button" className="command-button secondary" disabled={isBusy || pdf.pageIndex <= 0} onClick={() => pdf.onPageChange(pdf.pageIndex - 1)}>上一页</button>

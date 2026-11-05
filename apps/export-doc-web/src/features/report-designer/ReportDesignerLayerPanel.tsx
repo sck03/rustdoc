@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Eye, EyeOff, Layers3, Lock, Unlock } from "lucide-react";
+import { Field } from "../../ui/primitives/Field.tsx";
 import { CommitTextField, DesignerCheckbox as CheckRow } from "./ReportDesignerPropertyControls.tsx";
 import { NumberField, SelectField, focusDesignerNode } from "./ReportDesignerV3InspectorControls.tsx";
 import { reportDesignerLayerHeight, resolveReportDesignerLayerBands, setReportDesignerLayerHeight } from "./reportDesignerLayerBands.ts";
@@ -24,7 +25,7 @@ export function LayerPanel({ state, onSelect, onCommit, canEdit = true, multiSel
   return (
     <div className="report-designer-v3-panel-content report-designer-v3-layer-list" hidden={hidden}>
       <div className="report-designer-v3-panel-caption"><Layers3 size={15} aria-hidden="true" /><span>图层与元素</span></div>
-      <label className="report-designer-v3-field-search"><span>搜索已放置的内容</span><input aria-label="搜索已放置的内容" value={query} onChange={event => setQuery(event.target.value)} placeholder="标题、货名、金额…" /></label>
+      <Field inline className="report-designer-v3-field-search" label="查找内容"><input aria-label="搜索已放置的内容" value={query} onChange={event => setQuery(event.target.value)} placeholder="标题、货名、金额…" /></Field>
       <p className="report-designer-v3-layer-help">{multiSelect ? "多选已开启：点击列表逐项选择，再统一对齐或调整大小。" : "点击列表定位内容；打开工具栏“多选”可批量排版。隐藏图层不输出，锁定防止误改。"}</p>
       <details className="report-designer-layer-settings">
         <summary>新增图层 <small>{state.schema.layers.length} / {REPORT_DESIGNER_V3_MAX_LAYER_COUNT}</small></summary>

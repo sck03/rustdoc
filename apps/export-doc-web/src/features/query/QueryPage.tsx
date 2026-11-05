@@ -1,4 +1,4 @@
-import { Field } from "../../ui/primitives/Field.tsx";
+import { Field, FilterBar } from "../../ui/primitives/Field.tsx";
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { FocusEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import "../../styles/audit-query.css";
@@ -232,32 +232,29 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
 
   return (
     <ListWorkspace className="query-surface" aria-label="单据查询">
-      <form className="toolbar query-toolbar" onSubmit={handleSearch} onKeyDown={handleQueryFormKeyDown}>
+      <FilterBar label="单据查询筛选" className="toolbar query-toolbar" onSubmit={handleSearch} onKeyDown={handleQueryFormKeyDown}>
         <div className="query-filter-stack">
           <span className="query-filter-section-label">常用条件</span>
           <div className="query-filter-grid query-common-filter-grid">
             <div className="query-date-range" role="group" aria-label="日期范围">
-              <label className="query-filter-field query-date-filter">
-                <span>开始日期</span>
+              <Field label="开始日期" className="query-filter-field query-date-filter">
                 <input
                   type="date"
                   data-query-filter="startDate"
                   value={filters.startDate}
                   onChange={(event) => updateFilter("startDate", event.target.value)}
                 />
-              </label>
-              <label className="query-filter-field query-date-filter">
-                <span>结束日期</span>
+              </Field>
+              <Field label="结束日期" className="query-filter-field query-date-filter">
                 <input
                   type="date"
                   data-query-filter="endDate"
                   value={filters.endDate}
                   onChange={(event) => updateFilter("endDate", event.target.value)}
                 />
-              </label>
+              </Field>
             </div>
-            <label className="query-filter-field query-keyword-filter">
-              <span>关键字</span>
+            <Field label="关键字" className="query-filter-field query-keyword-filter">
               <input
                 ref={keywordInputRef}
                 data-query-filter="keyword"
@@ -266,7 +263,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
                 onFocus={handleTextInputFocus}
                 onChange={(event) => updateFilter("keyword", event.target.value)}
               />
-            </label>
+            </Field>
           </div>
           <details
             className="query-advanced-filters"
@@ -320,8 +317,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
                 dataQueryFilter="exporterId"
                 onChange={(exporter) => updateFilter("exporterId", exporter ? String(exporter.id) : "0")}
               />
-              <label className="query-filter-field query-type-filter">
-                <span>业务类型</span>
+              <Field label="业务类型" className="query-filter-field query-type-filter">
                 <select
                   data-query-filter="invoiceType"
                   value={filters.invoiceType}
@@ -332,9 +328,8 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
                     <option key={value} value={value}>{value}</option>
                   ))}
                 </select>
-              </label>
-              <label className="query-filter-field query-transport-filter">
-                <span>运输方式</span>
+              </Field>
+              <Field label="运输方式" className="query-filter-field query-transport-filter">
                 <select
                   data-query-filter="transportMode"
                   value={filters.transportMode}
@@ -345,7 +340,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
                     <option key={value} value={value}>{value}</option>
                   ))}
                 </select>
-              </label>
+              </Field>
             </div>
           </details>
         </div>
@@ -357,7 +352,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
             <Search size={18} aria-hidden="true" />
           </button>
         </div>
-      </form>
+      </FilterBar>
 
       {queryPermission.canOperate ? <details className="form-section query-export-panel" aria-label="查询结果导出">
         <summary className="query-export-summary">

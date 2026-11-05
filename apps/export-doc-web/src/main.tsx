@@ -10,7 +10,9 @@ import { FrontendErrorBoundary } from "./ui/FrontendErrorBoundary.tsx";
 import { UnsavedChangesProvider } from "./ui/unsavedChangesGuard.tsx";
 import { ConfirmationProvider } from "./ui/ConfirmationProvider.tsx";
 import { applyInterfaceDensity, readInterfaceDensity } from "./app/interfaceDensity.ts";
+import { installPortableFonts } from "./app/typographyPolicy.ts";
 
+installPortableFonts();
 installFrontendErrorLogger();
 applyInterfaceDensity(readInterfaceDensity());
 

@@ -54,6 +54,7 @@
     "test:service-availability-model": "node ../../scripts/test_service_availability_model.mjs",
     "test:accessibility-contracts": "node ../../scripts/test_frontend_accessibility_scanner.mjs && node ../../scripts/test_frontend_accessibility_contracts.mjs",
     "test:font-policy": "node ../../scripts/verify-font-license-policy.mjs",
+    "test:filter-typography-ui": "node tests/ui/filter-typography-ui.mjs",
     "test:font-policy:release": "node ../../scripts/verify-font-license-policy.mjs --require-files",
     "test:visual-baselines": "node ../../scripts/test_frontend_visual_baselines.mjs",
     "test:visual-baselines:update": "node ../../scripts/update_frontend_visual_baselines.mjs",

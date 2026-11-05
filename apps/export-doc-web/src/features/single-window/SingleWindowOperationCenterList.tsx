@@ -39,7 +39,7 @@ export function FilterSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <Field label={label}>
+    <Field label={label} inline>
       <select value={value} onChange={(event) => onChange(event.target.value)}>
         <option value="">全部</option>
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}

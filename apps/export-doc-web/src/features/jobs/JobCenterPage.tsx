@@ -1,4 +1,4 @@
-import { Field } from "../../ui/primitives/Field.tsx";
+import { Field, FilterBar } from "../../ui/primitives/Field.tsx";
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { type FormEvent, useEffect, useState } from "react";
 import "../../styles/jobs-excel.css";
@@ -197,13 +197,13 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
           </button>
           {jobPermission.canOperate && workspaceDeviceCapabilities.canImportExport && <button className="command-button" type="button" aria-expanded={createToolsOpen} aria-controls="job-creation-tools" onClick={() => setCreateToolsOpen(value => !value)}>{createToolsOpen ? "收起新建任务" : "新建文件任务"}</button>}
       </>}>
-        <form className="list-workspace-filters" role="search" aria-label="筛选文件任务" onSubmit={handleSearch}>
+        <FilterBar className="list-workspace-filters" label="筛选文件任务" onSubmit={handleSearch}>
           <Search size={17} aria-hidden="true" />
           <input aria-label="搜索任务" value={keyword} onChange={(event) => handleKeywordChange(event.target.value)} placeholder="任务号、标题、输出文件、错误" />
           <Field label="状态"><select value={status} onChange={(event) => changeStatus(event.target.value)}><option value="">全部</option>{jobStatusOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>
           <button className="command-button secondary" type="submit" disabled={jobsQuery.isFetching || operations.isBusy}>搜索</button>
           <button className="icon-button" type="button" title="清除搜索" aria-label="清除搜索" disabled={jobsQuery.isFetching || operations.isBusy || (!keyword && !committedKeyword && !focusedJobId)} onClick={() => applyFilters("")}><X size={18} aria-hidden="true" /></button>
-        </form>
+        </FilterBar>
       </PageHeader>
       {jobPermission.canOperate && workspaceDeviceCapabilities.canImportExport ? (
         <div id="job-creation-tools" hidden={!createToolsOpen}><section className="job-create-panel" aria-label="新建任务">

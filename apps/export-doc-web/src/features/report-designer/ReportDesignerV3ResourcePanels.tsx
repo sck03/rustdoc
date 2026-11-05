@@ -3,6 +3,7 @@ import { Columns3, FilePlus2, Hash, Image as ImageIcon, ListFilter, Pilcrow, Tab
 import type { ReportDesignerFieldGroup } from "./reportDesignerFields.ts";
 import type { ReportDesignerReportType } from "./reportDesignerSchema.ts";
 import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
+import { Field } from "../../ui/primitives/Field.tsx";
 
 export type PaletteActions = {
   text: () => void;
@@ -99,10 +100,9 @@ export function FieldPanel({
         <span>{productFields ? "商品明细字段" : "普通字段"}</span>
         <small role="status">{fieldCount} 个{query.trim() ? "匹配" : "可用"}字段</small>
       </div>
-      <label className="report-designer-v3-field-search">
-        <span>搜索字段</span>
+      <Field label="搜索字段" inline className="report-designer-v3-field-search">
         <input ref={searchRef} aria-label="搜索字段" value={query} placeholder={reportType === "PaymentVoucher" ? "付款单号、收款方、金额..." : "发票号、客户、金额..."} onChange={(event) => onQueryChange(event.target.value)} />
-      </label>
+      </Field>
       <p className="report-designer-v3-help">{reportType === "PaymentVoucher" ? "把付款单号、收款方、费用和金额等字段拖到纸上，调整位置后保存即可打印。" : productFields ? "把商品字段拖到明细行，各字段可单独移动。只设计一行，打印时按商品逐件重复。" : "把字段拖到纸上即可。发票号、唛头和合计等普通字段不随商品重复。"}</p>
       {groups.length === 0 ? <div className="report-designer-v3-help">
         <p>{query.trim() ? "没有找到匹配字段，请换个名称或清空搜索。" : "暂无可用字段"}</p>

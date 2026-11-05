@@ -1,4 +1,5 @@
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
+import { FilterBar } from "../../ui/primitives/Field.tsx";
 import { FormEvent, KeyboardEvent, useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Plus, RefreshCw, Search, X } from "lucide-react";
@@ -78,7 +79,7 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
         <button className="icon-button" type="button" title="刷新" aria-label="刷新" disabled={isBusy} onClick={() => void paymentsQuery.refetch()}><RefreshCw size={18} aria-hidden="true" /></button>
         {paymentPermission.canOperate && <button className="command-button" type="button" onClick={() => navigate("/payments/new")}><Plus size={17} aria-hidden="true" /><span>新建</span></button>}
       </>}>
-        <form className="list-workspace-filters" role="search" aria-label="筛选付款报销" onSubmit={handleSearch}>
+        <FilterBar className="list-workspace-filters" label="筛选付款报销" onSubmit={handleSearch}>
           <Search size={17} aria-hidden="true" />
           <input
             aria-label="搜索付款报销"
@@ -96,7 +97,7 @@ export function PaymentListPage({ client }: { client: ExportDocManagerApiClient 
           >
             <X size={18} aria-hidden="true" />
           </button>
-        </form>
+        </FilterBar>
       </PageHeader>
 
       <InlineNotice tone="info" action={expensePermission.canView ? <Link to="/office/requests/expense">报销申请与审批</Link> : undefined}>

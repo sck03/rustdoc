@@ -1,5 +1,5 @@
 import { Card, KpiTile } from "../../src/ui/primitives/Card.tsx";
-import { Field } from "../../src/ui/primitives/Field.tsx";
+import { Field, FilterBar } from "../../src/ui/primitives/Field.tsx";
 import { RecordWorkspace } from "../../src/ui/layout/Workspaces.tsx";
 import "./visual-baseline.css";
 // Representative fixtures consume the same lazy feature styles as the real pages.
@@ -9,11 +9,8 @@ import "../../src/styles/master-data.css";
 import "../../src/styles/features/hs-knowledge.css";
 import "../../src/styles/jobs-excel.css";
 import "../../src/styles/tools-ocr-exchange.css";
-import "../../src/styles/single-window-core.css";
-import "../../src/styles/single-window-runtime.css";
-import "../../src/styles/single-window-documents.css";
-import "../../src/styles/coo-review.css";
-import "../../src/styles/report/index.css";
+import "../../src/styles/routes/single-window.css";
+import "../../src/styles/routes/reports.css";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -125,29 +122,27 @@ function QueryBaseline() {
   const isDesktop = useWorkspaceDeviceMode() === "desktop";
   return (
     <RecordWorkspace className="query-surface" aria-label="单据查询视觉基准">
-      <form className="toolbar query-toolbar">
+      <FilterBar label="单据查询筛选" className="toolbar query-toolbar" onSubmit={event => event.preventDefault()}>
         <div className="query-filter-stack">
           <span className="query-filter-section-label">常用条件</span>
           <div className="query-filter-grid query-common-filter-grid">
             <div className="query-date-range" role="group" aria-label="日期范围">
-              <label className="query-filter-field query-date-filter"><span>开始日期</span><input type="date" defaultValue="2026-08-01" /></label>
-              <label className="query-filter-field query-date-filter"><span>结束日期</span><input type="date" defaultValue="2026-08-10" /></label>
+              <Field label="开始日期" className="query-filter-field query-date-filter"><input type="date" defaultValue="2026-08-01" /></Field>
+              <Field label="结束日期" className="query-filter-field query-date-filter"><input type="date" defaultValue="2026-08-10" /></Field>
             </div>
-            <label className="query-filter-field query-keyword-filter"><span>关键字</span><input placeholder="发票号、合同号、客户等" /></label>
+            <Field label="关键字" className="query-filter-field query-keyword-filter"><input placeholder="发票号、合同号、客户等" /></Field>
           </div>
           <details className="query-advanced-filters" open={isDesktop}>
             <summary className="query-advanced-filter-summary"><span>高级筛选</span><small>客户、出口商、类型与运输方式</small></summary>
             <div className="query-filter-grid query-advanced-filter-grid">
-              <div className="remote-select-field query-filter-field query-party-filter query-customer-filter">
-                <span className="form-field-label"><span>客户</span></span>
+              <Field label="客户" className="remote-select-field query-filter-field query-party-filter query-customer-filter">
                 <div className="remote-select-controls"><input type="search" aria-label="客户检索" placeholder="搜索客户" /><select aria-label="客户"><option>全部</option></select></div>
-              </div>
-              <div className="remote-select-field query-filter-field query-party-filter query-exporter-filter">
-                <span className="form-field-label"><span>出口商</span></span>
+              </Field>
+              <Field label="出口商" className="remote-select-field query-filter-field query-party-filter query-exporter-filter">
                 <div className="remote-select-controls"><input type="search" aria-label="出口商检索" placeholder="搜索出口商" /><select aria-label="出口商"><option>全部</option></select></div>
-              </div>
-              <label className="query-filter-field query-type-filter"><span>业务类型</span><select defaultValue=""><option value="">全部</option><option>实际数据</option></select></label>
-              <label className="query-filter-field query-transport-filter"><span>运输方式</span><select defaultValue=""><option value="">全部</option><option>BY SEA</option></select></label>
+              </Field>
+              <Field label="业务类型" className="query-filter-field query-type-filter"><select defaultValue=""><option value="">全部</option><option>实际数据</option></select></Field>
+              <Field label="运输方式" className="query-filter-field query-transport-filter"><select defaultValue=""><option value="">全部</option><option>BY SEA</option></select></Field>
             </div>
           </details>
         </div>
@@ -155,7 +150,7 @@ function QueryBaseline() {
           <button className="icon-button" type="button" title="刷新" aria-label="刷新"><RefreshCw size={18} aria-hidden="true" /></button>
           <button className="icon-button solid" type="submit" title="查询" aria-label="查询"><Search size={18} aria-hidden="true" /></button>
         </div>
-      </form>
+      </FilterBar>
       <details className="form-section query-export-panel" aria-label="查询结果导出">
         <summary className="query-export-summary"><span>导出查询结果</span><small>0 条当前结果</small></summary>
         <div className="query-export-grid">

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import type { ApiHsCodeImportPreviewResponse } from "../../api/index.ts";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import { Field } from "../../ui/primitives/Field.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 
 const changes: Record<string, string> = { Add: "新增", Update: "更新", Unchanged: "不变", SuspectedObsolete: "疑似作废", Conflict: "冲突", Invalid: "无效" };
@@ -38,9 +39,9 @@ export function HsCodeImportPreview({ preview, busy, onBack, onCommit }: {
     </div>
     {preview.warnings.map(warning => <div className="warning-note" key={warning}>{warning}</div>)}
     <details className="hs-code-column-mapping"><summary>查看识别到的字段映射</summary><div>{preview.columns.map(column => <span key={column.field}>{column.header} → {fields[column.field] ?? column.field}（{column.confidence}%）</span>)}</div></details>
-    <label><span>变更类别</span><select aria-label="筛选导入变更" value={filter} onChange={event => { setFilter(event.target.value); setPage(1); }}>
+    <Field label="变更类别" inline><select aria-label="筛选导入变更" value={filter} onChange={event => { setFilter(event.target.value); setPage(1); }}>
       <option value="">全部变更</option>{Object.entries(changes).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-    </select></label>
+    </select></Field>
     <ResponsiveTableFrame label="HS 编码导入预览" className="hs-code-preview-table-frame" mobileLayout="scroll">
       <table><thead><tr><th>处理</th><th>Excel 行</th><th>编码</th><th>名称</th><th>说明</th></tr></thead><tbody>
         {visible.map((row, index) => <tr key={`${row.changeType}-${row.item.code}-${row.rowNumber}-${index}`}>

@@ -1,3 +1,4 @@
+@layer route {
 .master-data-surface {
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
 }
@@ -348,4 +349,5 @@
   .hs-code-workspace {
     width: 100%;
   }
+}
 }

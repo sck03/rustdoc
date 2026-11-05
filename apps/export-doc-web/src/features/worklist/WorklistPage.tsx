@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import { Field, FilterBar } from "../../ui/primitives/Field.tsx";
 import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
 import { PageState } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -17,15 +18,15 @@ export function WorklistPage({ client, user }: { client: ExportDocManagerApiClie
   return <ListWorkspace className="business-records" aria-label="我的待办">
     <PageHeader title="待办清单" count={data?.page.totalCount} description="按来源和到期时间查找，进入原业务处理后自动更新。" actions={
       <button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => void query.refetch()}><RefreshCw size={16} aria-hidden="true" />刷新</button>}>
-    <div className="list-workspace-filters">
-      <label>事项来源<select value={model.source} onChange={(event) => model.changeSource(event.target.value)}>
+    <FilterBar className="list-workspace-filters" label="待办筛选">
+      <Field label="事项来源"><select value={model.source} onChange={(event) => model.changeSource(event.target.value)}>
         <option value="">全部来源</option>{data?.sources.map((source) => <option key={source.key} value={source.key}>{source.name}（{source.count}）</option>)}
-      </select></label>
-      <label>到期筛选<select value={model.due} onChange={(event) => {
+      </select></Field>
+      <Field label="到期筛选"><select value={model.due} onChange={(event) => {
         const option = worklistDueOptions.find((item) => item.value === event.target.value);
         if (option) model.changeDue(option.value);
-      }}>{worklistDueOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-    </div>
+      }}>{worklistDueOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>
+    </FilterBar>
     </PageHeader>
     {query.isPending ? <PageState tone="loading" title="正在读取待办" /> : query.isError ?
       <PageState tone="error" title="待办加载失败" description={readApiError(query.error)} /> : <>

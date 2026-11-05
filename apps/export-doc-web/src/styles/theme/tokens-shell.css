@@ -146,15 +146,7 @@ html[data-interface-density="compact"] body {
   border-radius: var(--edm-radius-sm);
 }
 
-.nav-search input {
-  min-width: 0;
-  width: 100%;
-  padding: 8px 0;
-  color: inherit;
-  background: transparent;
-  border: 0;
-  font-size: var(--edm-font-size-sm);
-}
+.nav-search input { width: 100%; font-size: var(--edm-font-size-sm); }
 
 .nav-search input::placeholder { color: var(--edm-primary-150); }
 .nav-search input::-webkit-search-cancel-button { appearance: none; }

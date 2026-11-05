@@ -11,6 +11,7 @@ import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
 import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
+import { FilterBar } from "../../ui/primitives/Field.tsx";
 
 export function CrmCustomerDirectoryPanel({ client, canCreate, canDeactivate, canExport, canImport, onImport, onCreateCustomer, onSelectCustomer }: {
   client: ExportDocManagerApiClient;
@@ -69,13 +70,13 @@ export function CrmCustomerDirectoryPanel({ client, canCreate, canDeactivate, ca
       </select>
       <button className="secondary-button" type="button" onClick={() => setSelectedIds([])}>取消选择</button>
     </> : undefined}>
-    <form className="list-workspace-filters" role="search" aria-label="筛选客户目录" onSubmit={search}>
+    <FilterBar className="list-workspace-filters" label="筛选客户目录" onSubmit={search}>
       <input aria-label="搜索客户目录" value={inputKeyword} onChange={(event) => setInputKeyword(event.target.value)} placeholder="搜索名称、国家、网站、来源或备注" />
       <select aria-label="客户状态" value={status} onChange={(event) => { setStatus(event.target.value); setPageNumber(1); }}>
         <option value="">全部状态</option><option>潜在客户</option><option>跟进中</option><option>已成交</option><option>暂停</option><option>已流失</option>
       </select>
       <button className="secondary-button" type="submit">搜索</button>
-    </form>
+    </FilterBar>
     </PageHeader>
     <OperationFeedback feedback={feedback} />
     {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}

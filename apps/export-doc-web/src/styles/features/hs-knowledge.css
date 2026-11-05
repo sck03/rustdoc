@@ -1,3 +1,4 @@
+@layer route {
 /* HS knowledge and classification controls load with their domain. */
 .hs-knowledge-entry,
 .hs-knowledge-nav,
@@ -652,4 +653,5 @@
   .invoice-hs-result-action {
     justify-items: start;
   }
+}
 }

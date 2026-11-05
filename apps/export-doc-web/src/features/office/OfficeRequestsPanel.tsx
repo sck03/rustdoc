@@ -1,4 +1,4 @@
-import { Field } from "../../ui/primitives/Field.tsx";
+import { Field, FilterBar } from "../../ui/primitives/Field.tsx";
 import { useState, type FormEvent } from "react";
 import { RefreshCw } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -21,14 +21,14 @@ export function OfficeRequestsPanel({ client, user, kind }: { client: ExportDocM
   return <>
     {model.focused && <div className="office-toolbar"><p>正在查看{model.focus.requestId ? `申请 #${model.focus.requestId}` : "所选人员的申请记录"}</p>
       <button type="button" className="command-button secondary" onClick={model.clearFocus}>显示全部记录</button></div>}
-    <div className="office-toolbar">
+    <FilterBar className="office-toolbar" label="资源申请筛选">
       {model.access.allows("approve") && <label className="checkbox-field"><input type="checkbox" checked={model.approvalsOnly} onChange={event => model.changeApprovals(event.target.checked)} />待我审批</label>}
       {(model.access.allows("issue") || model.access.allows("return")) && <label className="checkbox-field"><input type="checkbox" checked={model.handlingOnly} onChange={event => model.changeHandling(event.target.checked)} />我负责的交接与归还</label>}
       <Field label="申请状态"><select value={model.status} onChange={(event) => model.changeStatus(event.target.value)}><option value="">全部状态</option>
         {statuses.map((status) => <option key={status} value={status}>{status === "Approved" && kind === "rooms" ? "待使用／领钥匙" : officeStatusLabels[status]}</option>)}</select></Field>
       {model.access.canSeeOthers && <label className="checkbox-field"><input type="checkbox" checked={model.mineOnly} onChange={(event) => model.changeMineOnly(event.target.checked)} />仅我的申请</label>}
       <button type="button" className="icon-button" aria-label="刷新申请记录" disabled={model.query.isFetching} onClick={() => void model.query.refetch()}><RefreshCw size={17} aria-hidden="true" /></button>
-    </div>
+    </FilterBar>
     <p className="office-muted">提交内容已冻结。需要修改请取消后重新申请；取消后释放时段或预留库存，处理记录继续保留。</p>
     <OfficeQueryState query={model.query} emptyTitle="当前条件下没有申请记录" />
     {!model.query.isError && <div className="office-request-list">{model.query.data?.items.map((row) => <article key={row.id} className="office-request-card">

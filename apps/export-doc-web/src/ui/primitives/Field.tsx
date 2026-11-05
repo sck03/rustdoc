@@ -1,4 +1,4 @@
-import { Children, cloneElement, isValidElement, useId, type AriaAttributes, type FormEventHandler, type ReactNode } from "react";
+import { Children, cloneElement, isValidElement, useId, type AriaAttributes, type FormEventHandler, type KeyboardEventHandler, type ReactNode } from "react";
 
 export function Field({ label, children, wide = false, inline = false, required = false, error, description, className }: {
   label: string; children: ReactNode | ((descriptionId?: string) => ReactNode); wide?: boolean; inline?: boolean; required?: boolean; error?: string; description?: string; className?: string;
@@ -28,7 +28,7 @@ export function FormGrid({ children, columns = 2, disabled, className }: { child
   const props = { className, "data-ui": "form-grid", "data-columns": columns };
   return disabled === undefined ? <div {...props}>{children}</div> : <fieldset {...props} disabled={disabled}>{children}</fieldset>;
 }
-export function FilterBar({ children, label = "筛选条件", className, onSubmit }: { children: ReactNode; label?: string; className?: string; onSubmit?: FormEventHandler<HTMLFormElement> }) {
+export function FilterBar({ children, label = "筛选条件", className, onSubmit, onKeyDown }: { children: ReactNode; label?: string; className?: string; onSubmit?: FormEventHandler<HTMLFormElement>; onKeyDown?: KeyboardEventHandler<HTMLFormElement> }) {
   const props = { className, "data-ui": "filter-bar", "aria-label": label };
-  return onSubmit ? <form {...props} role="search" onSubmit={onSubmit}>{children}</form> : <div {...props} role="group">{children}</div>;
+  return onSubmit ? <form {...props} role="search" onSubmit={onSubmit} onKeyDown={onKeyDown}>{children}</form> : <div {...props} role="group">{children}</div>;
 }

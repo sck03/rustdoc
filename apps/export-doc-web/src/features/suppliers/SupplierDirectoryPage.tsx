@@ -1,4 +1,5 @@
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
+import { FilterBar } from "../../ui/primitives/Field.tsx";
 import { useEffect, useState, type FormEvent } from "react";
 import { useVersionedRecordDraft } from "../../ui/useVersionedRecordDraft.ts";
 import { useScopedSave } from "../../ui/useScopedSave.ts";
@@ -353,11 +354,11 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
         {canExportSupplier && <button className="secondary-button" type="button" onClick={() => void exportRows()}>导出当前筛选</button>}
         {canCreateSupplier && <button className="primary-button" type="button" onClick={() => void beginNewSupplier()}>新建供应商</button>}
       </>}>
-      <form className="list-workspace-filters" role="search" aria-label="筛选供应商目录" onSubmit={(event) => { event.preventDefault(); setKeyword(keywordInput.trim()); setPageNumber(1); }}>
+      <FilterBar className="list-workspace-filters" label="筛选供应商目录" onSubmit={(event) => { event.preventDefault(); setKeyword(keywordInput.trim()); setPageNumber(1); }}>
         <input aria-label="搜索供应商目录" value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="搜索名称、分类、产品或国家" />
         <select aria-label="供应商状态" value={status} onChange={(event) => { setStatus(event.target.value); setPageNumber(1); }}><option value="">全部状态</option><option>合作中</option><option>考察中</option><option>暂停</option><option>停用</option></select>
         <button className="secondary-button" type="submit">搜索</button>
-      </form>
+      </FilterBar>
       </PageHeader>
       {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}
       <ResponsiveTableFrame label="供应商目录" mobileLayout="scroll" busy={pageQuery.isFetching}><table className="data-table responsive-data-table"><thead><tr><th>供应商</th><th data-table-priority="secondary">分类</th><th data-table-priority="secondary">主要产品</th><th>状态</th><th /></tr></thead><tbody>

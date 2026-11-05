@@ -5,6 +5,7 @@ import { InlineNotice } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { OfficeField } from "../office/OfficeUi.tsx";
+import { FilterBar } from "../../ui/primitives/Field.tsx";
 import { oaStatus } from "./oaModel.ts";
 
 export function OaApprovalVerification({ client, user, onOpen }: { client: ExportDocManagerApiClient; user: ApiUserDto; onOpen: (id: number) => void }) {
@@ -19,11 +20,11 @@ export function OaApprovalVerification({ client, user, onOpen }: { client: Expor
   return <section className="office-resource-card" aria-label="核对纸质审批单">
     <h3>核对纸质审批单</h3>
     <p className="office-muted">输入纸单上的申请编号和提交版本，核对申请人、金额和批准状态，再打开原审批单及附件比对。已接收的单据会显示交接状态。</p>
-    <form className="office-toolbar" onSubmit={event => { event.preventDefault(); const next = { id: Number(id), submissionNumber: Number(number) }; if (reference?.id === next.id && reference.submissionNumber === next.submissionNumber) void query.refetch(); else setReference(next); }}>
+    <FilterBar label="核对纸质审批单条件" className="office-toolbar" onSubmit={event => { event.preventDefault(); const next = { id: Number(id), submissionNumber: Number(number) }; if (reference?.id === next.id && reference.submissionNumber === next.submissionNumber) void query.refetch(); else setReference(next); }}>
       <OfficeField label="纸单申请编号"><input required type="number" min="1" max={Number.MAX_SAFE_INTEGER} step="1" value={id} onChange={event => { setId(event.target.value); setReference(null); }} /></OfficeField>
       <OfficeField label="纸单提交版本"><input required type="number" min="1" max={Number.MAX_SAFE_INTEGER} step="1" value={number} onChange={event => { setNumber(event.target.value); setReference(null); }} /></OfficeField>
       <button className="command-button" type="submit" disabled={query.isFetching}>{query.isFetching ? "正在核对…" : "核对审批单"}</button>
-    </form>
+    </FilterBar>
     {reference && query.isError && <InlineNotice tone="error">核对未完成：{readApiError(query.error)}。请核对编号、版本及账号权限，勿据此办理接收。</InlineNotice>}
     {result && !query.isError && !query.isFetching && <>
       <InlineNotice tone={result.isValid ? "success" : "warning"} title={result.isValid ? (result.requestStatus === "HandedOff" ? "有效审批记录 · 已登记财务接收" : "有效审批记录 · 待财务接收") : "此纸单版本不能作为有效批准凭据"}>

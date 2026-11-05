@@ -1,5 +1,6 @@
 import { ApiReportTemplateDto, UserReportTemplateSummaryRecord } from "../../api/index.ts";
 import { SelectField } from "../../ui/FormFields.tsx";
+import { Field, FilterBar } from "../../ui/primitives/Field.tsx";
 import { fileNameFromPath, matchesTemplatePath, type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
 import { CircleCheckBig } from "lucide-react";
 
@@ -49,7 +50,7 @@ export function ReportTemplateSelectionPanel({
   const options = entries.filter((item) => item.value === selectedValue || item.label.normalize("NFKC").toLowerCase().includes(search.normalize("NFKC").trim().toLowerCase()));
 
   return (
-    <div className="template-selection-panel">
+    <FilterBar className="template-selection-panel" label="模板筛选与选择">
       <SelectField
         label="类型"
         className="template-type-field"
@@ -58,7 +59,7 @@ export function ReportTemplateSelectionPanel({
         options={reportTypeOptions}
         onChange={onReportTypeChange}
       />
-      <label className="template-directory-search">查找模板<input type="search" aria-label="搜索模板目录" placeholder="按模板名称查找" value={search} maxLength={100} onChange={(event) => directory.onSearchChange(event.target.value)} /></label>
+      <Field label="查找模板" className="template-directory-search"><input type="search" aria-label="搜索模板目录" placeholder="按模板名称查找" value={search} maxLength={100} onChange={(event) => directory.onSearchChange(event.target.value)} /></Field>
       <div className="template-default-selection">
         <SelectField
           label="模板目录"
@@ -84,6 +85,6 @@ export function ReportTemplateSelectionPanel({
         <small>用户模板 {directory.pageNumber} / {directory.totalPages} 页 · 共 {directory.totalCount} 个</small>
         <button className="command-button secondary compact-button" type="button" disabled={directory.pageNumber >= directory.totalPages || directory.loading} onClick={() => directory.onPageChange(directory.pageNumber + 1)}>下一页</button>
       </div> : null}
-    </div>
+    </FilterBar>
   );
 }

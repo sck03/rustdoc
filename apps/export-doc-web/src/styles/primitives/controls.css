@@ -3,7 +3,7 @@
 html, body, #root { min-height: 100%; margin: 0; }
 body { font-size: var(--edm-body-size); line-height: var(--edm-line-height-normal); }
 button, input, select, textarea { font: inherit; }
-code, pre, kbd, samp { font-family: var(--edm-font-mono); }
+code, pre, kbd, samp { font-family: var(--edm-font-mono); font-variant-numeric: tabular-nums; }
 button { cursor: pointer; }
 .command-button, [data-ui="button"], .icon-button, .text-button {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--edm-space-2);
@@ -32,6 +32,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--edm-accent); box
 input[readonly], textarea[readonly] { background: var(--edm-neutral-50); color: var(--edm-text-secondary); border-color: var(--edm-line); }
 input:disabled, select:disabled, textarea:disabled { background: var(--edm-bg-disabled); color: var(--edm-text-disabled); border-color: var(--edm-line); cursor: not-allowed; }
 input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--edm-danger-500); box-shadow: var(--edm-shadow-error); }
+.nav-search input[type="search"] { color: inherit; background: transparent; border: 0; border-radius: 0; padding: var(--edm-space-2) 0; box-shadow: none; }
+.nav-search:focus-within { border-color: var(--edm-primary-150); outline: 2px solid var(--edm-primary-150); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) {
   .command-button:hover:not(:disabled), [data-ui="button"]:hover:not(:disabled) { background: var(--edm-accent-hover); }
   .command-button.secondary:hover:not(:disabled), .icon-button:hover:not(:disabled), [data-ui="button"][data-variant="secondary"]:hover:not(:disabled) { color: var(--edm-primary-700); background: var(--edm-bg-hover); border-color: var(--edm-primary-300); }

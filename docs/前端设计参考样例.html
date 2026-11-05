@@ -32,14 +32,19 @@
   --edm-z-sticky:10;--edm-z-header:20;--edm-z-popover:100;--edm-z-drawer:300;--edm-z-modal:400;--edm-z-toast:500;--edm-z-skip-link:1000;
   --edm-motion-fast:120ms;--edm-motion-base:160ms;--edm-motion-slow:220ms;--edm-ease:cubic-bezier(.2,0,0,1);
   /* 字阶 */
-  --edm-font-sans:"Segoe UI Variable Text","Segoe UI","SF Pro Text","PingFang SC","Hiragino Sans GB","Microsoft YaHei UI","Microsoft YaHei","Noto Sans CJK SC",system-ui,sans-serif;
-  --edm-font-mono:"Cascadia Mono","SFMono-Regular",Consolas,monospace;
+  --edm-font-sans:"Noto Sans CJK SC",sans-serif;
+  --edm-font-serif:"Noto Serif CJK SC",serif;
+  --edm-font-mono:var(--edm-font-sans);
   --edm-fs-caption:12px;--edm-lh-caption:18px;--edm-fs-dense:13px;--edm-lh-dense:20px;--edm-fs-body:14px;--edm-lh-body:22px;--edm-fs-h3:14px;--edm-lh-h3:22px;--edm-fs-h2:16px;--edm-lh-h2:24px;--edm-fs-h1:20px;--edm-lh-h1:28px;--edm-fs-display:26px;--edm-lh-display:34px;
   /* 密度（舒适） */
   --edm-control-height:40px;--edm-control-height-sm:32px;--edm-touch-target:44px;--edm-page-padding-x:24px;--edm-page-padding-y:20px;--edm-section-padding:16px;--edm-layout-gap:16px;--edm-cell-py:10px;--edm-cell-px:12px;--edm-tab-height:36px;--edm-header-height:64px;
 }
 html[data-density="compact"]{--edm-control-height:34px;--edm-control-height-sm:28px;--edm-page-padding-x:16px;--edm-page-padding-y:12px;--edm-section-padding:12px;--edm-layout-gap:12px;--edm-cell-py:7px;--edm-cell-px:10px;--edm-fs-body:13px;--edm-tab-height:32px;--edm-header-height:60px;}
 
+/* 与正式应用共用三份已核验的 OFL 字体，不读取宿主专有字体。 */
+@font-face{font-family:"Noto Sans CJK SC";src:url("../Resources/Fonts/OpenSource/NotoSansCJKsc-Regular.otf") format("opentype");font-style:normal;font-weight:400;font-display:swap}
+@font-face{font-family:"Noto Sans CJK SC";src:url("../Resources/Fonts/OpenSource/NotoSansCJKsc-Bold.otf") format("opentype");font-style:normal;font-weight:700;font-display:swap}
+@font-face{font-family:"Noto Serif CJK SC";src:url("../Resources/Fonts/OpenSource/NotoSerifCJKsc-Regular.otf") format("opentype");font-style:normal;font-weight:400;font-display:swap}
 /* ===== 2. 基础 ===== */
 *{box-sizing:border-box}
 html,body{margin:0}
@@ -241,7 +246,11 @@ td.amount,th.amount{text-align:right}
 .pager select,.pager input{min-height:32px;padding:0 var(--edm-space-2);border:1px solid var(--edm-line-strong);border-radius:var(--edm-radius-md);background:var(--edm-white)}
 .pager input{width:56px}
 .filter{display:flex;flex-wrap:wrap;align-items:center;gap:var(--edm-space-2);padding:var(--edm-space-3);background:var(--edm-bg-muted);border:1px solid var(--edm-line);border-radius:var(--edm-radius-lg)}
-.filter .input{flex:1 1 260px;width:auto}
+.filter .field{flex:1 1 260px;min-width:0;grid-template-columns:auto minmax(0,1fr);align-items:center;max-width:100%}
+.filter .field-select{flex:0 1 220px}
+.filter .input{width:100%;min-width:0}
+.filter .field>span{white-space:nowrap}
+.filter .field small{grid-column:1/-1}
 .page-header{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:var(--edm-space-3)}
 .page-header .meta{display:flex;align-items:baseline;flex-wrap:wrap;gap:var(--edm-space-3)}
 .page-header .count{font-size:var(--edm-fs-dense);color:var(--edm-text-secondary)}
@@ -490,7 +499,7 @@ td.amount,th.amount{text-align:right}
       <div><p class="label" style="margin-bottom:8px">分段导航（视图切换）</p>
         <div class="seg" role="group"><button type="button" aria-pressed="true">审批与进度</button><button type="button" aria-pressed="false">待我办理</button><button type="button" aria-pressed="false">发起申请</button></div></div>
       <div><p class="label" style="margin-bottom:8px">筛选条（三层：搜索 / 筛选 / 所选操作）</p>
-        <div class="filter"><input class="input" placeholder="发票号、合同号、客户、港口"><select class="input" style="width:auto;flex:0 1 160px"><option>全部状态</option></select><button class="btn btn-secondary">搜索</button><button class="icon-btn" aria-label="重置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div>
+        <div class="filter"><label class="field"><span>关键字</span><input class="input" placeholder="发票号、合同号、客户、港口"></label><label class="field field-select"><span>状态</span><select class="input"><option>全部状态</option></select></label><button class="btn btn-secondary">搜索</button><button class="icon-btn" aria-label="重置"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div></div>
     </div>
     <nav class="nav" aria-label="主导航样例">
       <div class="brand"><i><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg></i><div><strong>外贸单证管理</strong><small>单证版</small></div></div>
@@ -567,7 +576,7 @@ td.amount,th.amount{text-align:right}
         <div><div class="meta"><h2 class="t-h2">发票目录</h2><span class="count num">共 1,234 条</span></div><p>查找单据、继续制单，或勾选发票批量输出。</p></div>
         <div class="actions"><button class="btn btn-secondary">导入 Excel</button><button class="btn btn-secondary">导入单据包</button><button class="icon-btn" aria-label="刷新" style="width:40px;height:40px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button><button class="btn btn-primary">＋ 新建</button></div>
       </div>
-      <div class="filter"><input class="input" placeholder="发票号、合同号、客户、港口"><select class="input" style="width:auto;flex:0 1 160px"><option>全部状态</option></select><button class="btn btn-secondary">搜索</button></div>
+      <div class="filter"><label class="field"><span>关键字</span><input class="input" placeholder="发票号、合同号、客户、港口"></label><label class="field field-select"><span>状态</span><select class="input"><option>全部状态</option></select></label><button class="btn btn-secondary">搜索</button></div>
       <div class="table-frame"><table>
         <thead><tr><th style="width:36px"></th><th>发票号 / 合同号</th><th>状态</th><th>客户</th><th>日期</th><th class="amount">金额</th></tr></thead>
         <tbody>

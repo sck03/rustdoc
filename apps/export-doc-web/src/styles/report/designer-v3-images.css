@@ -1,3 +1,4 @@
+@layer route {
 .report-designer-v3-resource-image {
   display: block;
   width: 100%;
@@ -29,4 +30,5 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+}
 }

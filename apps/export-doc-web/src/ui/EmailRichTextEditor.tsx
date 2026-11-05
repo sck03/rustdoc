@@ -1,5 +1,6 @@
 import { Bold, Italic, Link2, List, ListOrdered, RemoveFormatting, Underline } from "lucide-react";
 import { useEffect, useRef, useState, type ClipboardEvent, type ReactNode } from "react";
+import { portableReportSansFontFamily, sharePortableFonts } from "../app/typographyPolicy.ts";
 
 export function EmailRichTextEditor({
   value,
@@ -137,8 +138,11 @@ export function EmailRichTextEditor({
 
 export function EmailHtmlPreview({ html, title }: { html: string; title: string }) {
   const safeHtml = sanitizeEmailHtml(html);
-  const previewDocument = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:18px;color:#24302f;background:#fff;font:14px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif;overflow-wrap:anywhere}h1,h2,h3,h4{line-height:1.3}table{width:100%;border-collapse:collapse}td,th{padding:7px 9px;border:1px solid #dce4e2;text-align:left}blockquote{margin:12px 0;padding:8px 12px;border-left:3px solid #8bb8ad;background:#f5faf8}a{color:#176b5b}</style></head><body>${safeHtml}</body></html>`;
-  return <iframe className="email-html-preview-frame" title={title} sandbox="" referrerPolicy="no-referrer" srcDoc={previewDocument} />;
+  const previewDocument = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:18px;color:#24302f;background:#fff;font:14px/1.65 "${portableReportSansFontFamily}",sans-serif;overflow-wrap:anywhere}h1,h2,h3,h4{line-height:1.3}table{width:100%;border-collapse:collapse}td,th{padding:7px 9px;border:1px solid #dce4e2;text-align:left}blockquote{margin:12px 0;padding:8px 12px;border-left:3px solid #8bb8ad;background:#f5faf8}a{color:#176b5b}</style></head><body>${safeHtml}</body></html>`;
+  // Same-origin access lets the host share loaded FontFace objects; scripts,
+  // forms, popups and top navigation remain disabled by the sandbox.
+  return <iframe className="email-html-preview-frame" title={title} sandbox="allow-same-origin" referrerPolicy="no-referrer" srcDoc={previewDocument}
+    onLoad={event => { const fonts = event.currentTarget.contentDocument?.fonts; if (fonts) sharePortableFonts(fonts); }} />;
 }
 
 function FormatButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {

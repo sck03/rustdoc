@@ -1,3 +1,4 @@
+@layer route {
 .smart-ocr-surface {
   grid-template-rows: auto auto auto minmax(0, 1fr);
 }
@@ -232,4 +233,5 @@
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-xs);
   line-height: 1.2;
+}
 }

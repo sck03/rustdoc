@@ -4,6 +4,7 @@ import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
+import { FilterBar } from "../../ui/primitives/Field.tsx";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { listPageSizeOptions } from "../../ui/listViewState.ts";
@@ -86,12 +87,12 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
             <span>新建</span>
           </button> : null}
       </>}>
-        <form className="list-workspace-filters" role="search" aria-label="筛选发票" onSubmit={handleSearch}>
+        <FilterBar className="list-workspace-filters" label="筛选发票" onSubmit={handleSearch}>
           <Search size={17} aria-hidden="true" />
           <input aria-label="搜索发票" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="发票号、合同号、客户、港口" />
           <button className="command-button secondary" type="submit" disabled={isBusy}>搜索</button>
           <button className="icon-button" type="button" title="重置搜索" aria-label="重置搜索" disabled={isBusy || (!keyword && !committedKeyword)} onClick={handleResetSearch}><X size={18} aria-hidden="true" /></button>
-        </form>
+        </FilterBar>
       </PageHeader>
 
       {message ? <InlineNotice tone="error" title="发票操作未完成">{message}</InlineNotice> : null}

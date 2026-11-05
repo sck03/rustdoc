@@ -5,6 +5,7 @@ import type { ApiUserDto, ExportDocManagerApiClient, OaApprovalSettings, OaAppro
 import { ApprovalSimulationDialog } from "./ApprovalSimulationDialog.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
@@ -61,12 +62,12 @@ function ApprovalSettingsEditor({ client, user, initial, accounts, handlers, uni
     {view !== "runtime" && <form ref={formRef} onInvalidCapture={event => { const section=(event.target as HTMLElement).closest("details");if(section)section.open=true; }} onSubmit={event => {event.preventDefault();void save(section, rule?.key);}}>
       <fieldset disabled={operation.busy} className="office-form-grid">
         <legend>{views.find(item => item.key === view)?.label}</legend>
-        {view === "definitions" && !rule && <table aria-label="流程定义列表"><thead><tr><th>名称</th><th>类型</th><th>当前版本</th><th>启用状态</th><th>操作</th></tr></thead><tbody>
+        {view === "definitions" && !rule && <ResponsiveTableFrame className="office-field-wide" mobileLayout="cards"><table aria-label="流程定义列表"><thead><tr><th>名称</th><th>类型</th><th>当前版本</th><th>启用状态</th><th>操作</th></tr></thead><tbody>
           {draft.rules.map(rule => { const published=draft.publications.find(item => item.key===rule.key);return <tr key={rule.key} data-definition-key={rule.key}>
-            <td>{rule.name}</td><td>{ruleLabel(rule)}</td><td>{published?.version ?? "尚未发布"}</td><td>{published?.enabled ? "已启用" : "未启用"}</td>
-            <td><button type="button" className="command-button secondary" onClick={() => update({definition:rule.key,tab:"basic"})}>编辑流程</button></td>
+            <td data-label="名称">{rule.name}</td><td data-label="类型">{ruleLabel(rule)}</td><td data-label="当前版本">{published?.version ?? "尚未发布"}</td><td data-label="启用状态">{published?.enabled ? "已启用" : "未启用"}</td>
+            <td data-label="操作"><button type="button" className="command-button secondary" onClick={() => update({definition:rule.key,tab:"basic"})}>编辑流程</button></td>
           </tr>; })}
-        </tbody></table>}
+        </tbody></table></ResponsiveTableFrame>}
         {view === "definitions" && rule && <section className="office-field-wide" data-definition-key={rule.key} aria-label={ruleLabel(rule)}>
           <div className="section-header"><h2>{ruleLabel(rule)}</h2><button type="button" className="command-button secondary" onClick={() => update({definition:null,tab:null})}>返回定义列表</button></div>
           <SegmentedNav label="流程定义编辑" value={tab} items={editorTabs} onChange={tab => update({tab})} />

@@ -1,3 +1,4 @@
+@layer route {
 .path-cell,
 .message-cell {
   max-width: 360px;
@@ -644,4 +645,5 @@
 
 .job-excel-invoice-export label input {
   min-width: 0;
+}
 }
