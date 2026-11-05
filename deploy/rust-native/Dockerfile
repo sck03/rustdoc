@@ -5,10 +5,10 @@ ENV npm_config_cache=/workspace/.cache/npm
 COPY apps/export-doc-web/package.json apps/export-doc-web/package-lock.json apps/export-doc-web/
 RUN npm --prefix apps/export-doc-web ci
 COPY apps/export-doc-web/ apps/export-doc-web/
-RUN npm --prefix apps/export-doc-web run build
 COPY scripts/provision-report-fonts.mjs scripts/verify-font-license-policy.mjs scripts/
+COPY scripts/lib/verified-download.mjs scripts/lib/
 COPY Resources/Fonts/OpenSource/font-manifest.json Resources/Fonts/OpenSource/OFL-Noto-CJK.txt Resources/Fonts/OpenSource/README.md Resources/Fonts/OpenSource/
-RUN node scripts/provision-report-fonts.mjs && node scripts/verify-font-license-policy.mjs --require-files
+RUN npm --prefix apps/export-doc-web run build && node scripts/verify-font-license-policy.mjs --require-files
 
 FROM web AS ocr-assets
 ARG TARGETARCH

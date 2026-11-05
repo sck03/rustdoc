@@ -228,6 +228,7 @@ jobs:
           chromium: 'true'
       - name: Validate editing, cancellation and request contracts
         run: |
+          npm --prefix apps/export-doc-web run test:font-build
           npm --prefix apps/export-doc-web run test:invoice-editing
           npm --prefix apps/export-doc-web run test:document-editor-ui
           npm --prefix apps/export-doc-web run test:report-designer-v3

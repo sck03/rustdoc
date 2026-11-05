@@ -50,6 +50,7 @@
 !scripts/prepare-native-ocr-runtime.mjs
 !scripts/lib/
 !scripts/lib/child-process-tree.mjs
+!scripts/lib/verified-download.mjs
 !scripts/lib/copy-postgresql-client.sh
 !THIRD_PARTY_NOTICES.md
 !THIRD_PARTY_DEPENDENCIES.md
