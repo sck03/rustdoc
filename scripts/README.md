@@ -38,7 +38,7 @@
 
 `build-native.ps1 -PreflightOnly -NoPause` 只检查 Rust、Node、curl 等构建工具。`-Configuration Debug` 用于联调，默认 Release。`-RustTarget` 明确目标架构；`-Bundles nsis`、`-Bundles deb,appimage` 或 `-Bundles app,dmg` 生成对应平台安装／应用包。安装器需要对应平台工具链。
 
-`-SkipBuild` 只整理已经构建好的相同 profile／target 二进制与资源。Document 正式包默认包含 OCR；`-WithoutOcr` 仅生成明确不提供文字识别的轻量验收包，不能用它代替完整单证版验收。网页/Docker Full 继续包含 OCR。
+`-SkipBuild` 只整理已经构建好的相同 profile／target 二进制与资源；Tauri 前端内嵌在 EXE 中，前端变更必须重新 locked 构建宿主，重新整理目录不会更新内嵌界面。Document 正式包默认包含 OCR；`-WithoutOcr` 仅生成明确不提供文字识别的轻量验收包，不能用它代替完整单证版验收。网页/Docker Full 继续包含 OCR。
 
 便携/Web 组包写入 `exportdoc-package-files.json`，登记受控程序路径和 SHA-256。同目录重打包只移除已退出新清单且归属/摘要仍匹配的程序资源，清除旧 OCR 与 Web hash 文件；`App_Data`、DataRoot 用户模板、备份及私有文件不进入此清单。已修改的程序资源或模板、损坏清单、链接、嵌套 Git 和 Windows 路径别名会在复制前报错，先另存冲突内容或选择新包目录。旧无清单包只识别明确的只读运行资源树；首次遇到不同内容的模板不猜测覆盖。
 
@@ -107,7 +107,7 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 字体准备复用 `lib/verified-download.mjs`：流式下载并核对 SHA-256，单文件最多 32 MiB、总时限 120 秒，支持取消和并行独立临时文件；坏摘要、超限、超时或取消均保留原字体并清理本次临时文件。`node scripts/test_verified_download.mjs` 验证这些边界，随脚本套件执行。
 
-生产 UI 与前端视觉/缩放夹具使用同一份已核验的 Noto Sans 常规/粗体文件，生产构建还发布项目内 Noto Serif 常规以供报表选择；不另外引入字体。首次运行视觉、缩放或构建前，先执行 `node scripts/provision-report-fonts.mjs`；视觉检查固定 `zh-CN` 与 `Asia/Shanghai`，字体加载失败直接报错。夹具必须使用正式 route 样式入口，更新参考图须检查布局和文字，不能放宽像素阈值消除失败。
+生产 UI 与前端视觉/缩放夹具使用同一份已核验的 Noto Sans 常规/粗体文件，生产构建还发布项目内 Noto Serif 常规以供报表选择；不另外引入字体。`npm --prefix apps/export-doc-web run build` 通过 prebuild 自动准备并校验字体，首次克隆、桌面和 Docker 共用同一入口；Docker 构建前复制准备脚本、下载器与字体清单。单独首次运行视觉或缩放检查仍先执行 `node scripts/provision-report-fonts.mjs`。`test:font-build` 验证首次准备、缓存复用、坏摘要阻止编译和 Docker 输入契约；真实镜像构建仍须 Docker 环境。视觉检查固定 `zh-CN` 与 `Asia/Shanghai`，字体加载失败直接报错；夹具使用正式 route 样式入口，更新参考图检查布局和文字，不放宽像素阈值。
 
 `npm --prefix apps/export-doc-web run test:filter-typography-ui` 要求先完成 React build 与 `office_review` locked 构建；复用隔离的真实 Rust HTTP/React 宿主，在 390/1024/1440 检查授权导航及流程分区的筛选同行、溢出、透明查找框和实际 Noto 字形，并验证三份发布字体摘要。输出写入 `artifacts/frontend-filter-typography-ui`；此回归不替代系统 IME/DPI 或全部业务编辑状态验收。
 

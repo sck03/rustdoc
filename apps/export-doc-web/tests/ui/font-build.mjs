@@ -17,6 +17,7 @@ for (const required of ['scripts/provision-report-fonts.mjs', 'scripts/lib/verif
   assert(dockerfile.indexOf(`COPY ${required}`) >= 0 && dockerfile.indexOf(`COPY ${required}`) < buildIndex, `${required}: available before the Docker frontend build`);
   assert(ignore.split(/\r?\n/u).includes(`!${required}`), `${required}: included in the build context`);
 }
+await fs.mkdir(path.join(repo, '.codex-runtime'), { recursive: true });
 const root = await fs.mkdtemp(path.join(repo, '.codex-runtime/font-build-'));
 const packageRoot = path.join(root, 'apps/export-doc-web');
 const fontRoot = path.join(root, 'Resources/Fonts/OpenSource');
