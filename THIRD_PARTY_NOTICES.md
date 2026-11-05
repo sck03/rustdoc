@@ -19,7 +19,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | arrayvec | 0.7.8 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | async-broadcast | 0.7.2 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | async-channel | 2.5.0 | Apache-2.0 OR MIT | rust-workspace |
-| cargo | async-executor | 1.14.0 | Apache-2.0 OR MIT | rust-workspace |
+| cargo | async-executor | 1.14.1 | Apache-2.0 OR MIT | rust-workspace |
 | cargo | async-io | 2.6.0 | Apache-2.0 OR MIT | rust-workspace |
 | cargo | async-lock | 3.4.2 | Apache-2.0 OR MIT | rust-workspace |
 | cargo | async-process | 2.5.0 | Apache-2.0 OR MIT | rust-workspace |
