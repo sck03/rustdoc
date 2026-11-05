@@ -44,10 +44,10 @@ export function PersonnelPage({ client, user, directoryOnly = false }: { client:
         <input aria-label="搜索人员" placeholder="姓名、工号、岗位或工作邮箱" value={model.keyword} maxLength={100} onChange={(event) => model.changeKeyword(event.target.value)} />
         <button type="submit" className="command-button secondary"><Search size={16} aria-hidden="true" />搜索</button>
       </form>
-      <Field label="部门"><select value={model.departmentId} onChange={(event) => model.changeDepartment(event.target.value)}>
+      <Field label="部门" inline className="personnel-filter"><select value={model.departmentId} onChange={(event) => model.changeDepartment(event.target.value)}>
         <option value="">全部部门</option>{departmentOptions(model.options.data?.departments ?? []).map((item) => <option key={item.code} value={item.code}>{item.label}{item.isActive ? "" : "（停用）"}</option>)}
       </select></Field>
-      {!directoryOnly && <Field label="任职状态"><select value={model.status} onChange={(event) => model.changeStatus(event.target.value)}>
+      {!directoryOnly && <Field label="任职状态" inline className="personnel-filter"><select value={model.status} onChange={(event) => model.changeStatus(event.target.value)}>
         <option value="">全部在职</option><option value="Probation">试用期</option><option value="Active">正式在职</option>
         {canViewDetails && <option value="Departed">已离职</option>}
       </select></Field>}

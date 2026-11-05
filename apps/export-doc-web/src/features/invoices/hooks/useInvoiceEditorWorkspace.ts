@@ -534,7 +534,6 @@ export function useInvoiceEditorWorkspace({ businessDate, client, mode }: {
     const nextSearchParams = new URLSearchParams(searchParams);
     nextSearchParams.set("section", sectionId);
     setSearchParams(nextSearchParams, { replace: true });
-    window.requestAnimationFrame(() => document.getElementById("invoice-editor-navigation")?.scrollIntoView({ block: "start" }));
   }
   return {
     masterDataPermission, reportDesignPermission, navigate, formRef,

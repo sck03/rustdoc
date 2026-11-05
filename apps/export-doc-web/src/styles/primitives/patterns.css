@@ -10,6 +10,9 @@
 [data-ui="form-grid"][data-columns="3"] { grid-template-columns: repeat(3,minmax(0,1fr)); }
 [data-ui="field"] { display: grid; gap: var(--edm-space-2); min-width: 0; color: var(--edm-text); font-size: var(--edm-font-size-md); }
 [data-ui="field"] > span { display: flex; align-items: center; gap: var(--edm-space-2); font-weight: 600; }
+[data-ui="field"][data-inline="true"] { grid-template-columns: auto minmax(0,1fr); align-items: center; }
+[data-ui="field"][data-inline="true"] > span { white-space: nowrap; }
+[data-ui="field"][data-inline="true"] > small { grid-column: 1 / -1; }
 [data-ui="field"][data-wide="true"] { grid-column: 1 / -1; }
 [data-ui="field"] small { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); }
 [data-ui="field"][data-invalid="true"] small, [data-ui="required"] { color: var(--edm-danger-700); }

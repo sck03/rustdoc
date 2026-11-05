@@ -64,13 +64,13 @@ assert(navigation.readSettingsCategoryFromSearch("?section=updater") === "runtim
 assert(navigation.readSettingsPanelLabelFromSearch("?section=updater") === "软件更新", "updater panel deep link");
 assert(navigation.readSettingsPanelLabelFromSearch("?section=unknown") === null, "unknown panel");
 const salesEditionCategories = categoryCatalog.filterSettingsCategories({ canUseDocumentWorkspace: false });
-assert(JSON.stringify(salesEditionCategories.map((item) => item.key)) === JSON.stringify(["runtime", "exchange-rate", "communication", "backup", "maintenance"]), "sales edition settings are focused on common runtime tasks");
+assert(JSON.stringify(salesEditionCategories.map((item) => item.key)) === JSON.stringify(["runtime", "exchange-rate", "communication"]), "sales edition settings are focused on common runtime tasks");
 const documentEditionCategories = categoryCatalog.filterSettingsCategories({ canUseDocumentWorkspace: true });
+assert(documentEditionCategories.every(item => navigation.readSettingsPanelLabelFromSearch(`?section=${item.section}`) === null), "category navigation preserves the viewport while precise panel deep links remain available");
 assert(!documentEditionCategories.some((item) => item.key === "report-output"), "settings center no longer exposes report and output settings");
 assert(!documentEditionCategories.some((item) => item.key === "users"), "single-role edition hides user management");
 assert(navigation.readSettingsCategoryFromSearch("?section=singleWindow", salesEditionCategories.map((item) => item.key)) === "runtime", "sales edition deep link falls back from document settings");
 assert(updaterEndpointModel.readUpdaterEndpoint({ system: { updaterEndpoint: " http://updates.internal/latest.json " } }) === "http://updates.internal/latest.json", "updater endpoint normalization");
-
 const separateNotifyParty = masterDataModel.normalizeCustomerRecord({
   id: 7,
   notifyPartyMode: "Separate",

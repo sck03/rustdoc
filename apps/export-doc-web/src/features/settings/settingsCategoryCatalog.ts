@@ -15,7 +15,7 @@ export type SettingsCategoryCapabilities = {
 
 export const settingsCategories: SettingsCategoryConfig[] = [
   { key: "runtime", label: "运行与数据库", section: "system", icon: Database },
-  { key: "documents", label: "单据设置", section: "documentDefaults", icon: FileSliders, requiresDocumentWorkspace: true },
+  { key: "documents", label: "单据设置", section: "documents", icon: FileSliders, requiresDocumentWorkspace: true },
   { key: "excel-import", label: "Excel 导入", section: "excelImport", icon: FileSpreadsheet, requiresDocumentWorkspace: true },
   { key: "exchange-rate", label: "汇率与币制", section: "exchangeRate", icon: Coins },
   { key: "communication", label: "邮件设置", section: "email", icon: Mail },

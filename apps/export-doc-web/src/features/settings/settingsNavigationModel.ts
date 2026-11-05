@@ -61,19 +61,13 @@ export function readSettingsCategoryFromSearch(
 
 export function readSettingsPanelLabelFromSearch(search: string) {
   switch (readSettingsSection(search)) {
-    case "documents":
     case "documentDefaults":
       return "发票录入默认值";
     case "documentFields":
       return "单据字段名称";
-    case "excelImport":
-      return "Excel 导入方案";
-    case "exchangeRate":
     case "currency":
     case "currencies":
       return "汇率与币制";
-    case "email":
-      return "邮件设置";
     case "webDav":
     case "backupReplica":
       return "异机副本";
@@ -87,8 +81,6 @@ export function readSettingsPanelLabelFromSearch(search: string) {
       return "数据备份与还原";
     case "singleWindow":
       return "申报默认值";
-    case "ai":
-      return "AI 服务";
     case "postgresql":
       return "PostgreSQL 团队库维护";
     case "logs":
@@ -103,8 +95,6 @@ export function readSettingsPanelLabelFromSearch(search: string) {
       return "发票清理";
     case "database":
       return "数据库连接";
-    case "system":
-      return "常规与目录";
     case "updater":
       return "软件更新";
     default:

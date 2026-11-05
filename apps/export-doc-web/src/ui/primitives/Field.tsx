@@ -1,7 +1,7 @@
 import { Children, cloneElement, isValidElement, useId, type AriaAttributes, type FormEventHandler, type ReactNode } from "react";
 
-export function Field({ label, children, wide = false, required = false, error, description, className }: {
-  label: string; children: ReactNode | ((descriptionId?: string) => ReactNode); wide?: boolean; required?: boolean; error?: string; description?: string; className?: string;
+export function Field({ label, children, wide = false, inline = false, required = false, error, description, className }: {
+  label: string; children: ReactNode | ((descriptionId?: string) => ReactNode); wide?: boolean; inline?: boolean; required?: boolean; error?: string; description?: string; className?: string;
 }) {
   const hintId = useId();
   const content = typeof children === "function" ? children(error || description ? hintId : undefined) : children;
@@ -19,7 +19,7 @@ export function Field({ label, children, wide = false, required = false, error, 
       "aria-required": mandatory || child.props["aria-required"] || undefined,
     });
   });
-  return <label className={className} data-ui="field" data-wide={wide || undefined} data-invalid={Boolean(error) || undefined}>
+  return <label className={className} data-ui="field" data-wide={wide || undefined} data-inline={inline || undefined} data-invalid={Boolean(error) || undefined}>
     <span className="form-field-label"><span>{label}</span>{mandatory && <small data-ui="required" aria-hidden="true">必填</small>}</span>{controls}
     {error ? <small id={hintId} role="alert">{error}</small> : description ? <small id={hintId} className="form-field-description">{description}</small> : null}
   </label>;
