@@ -54,7 +54,7 @@
 .office-field textarea { width: 100%; min-width: 0; min-height: 40px; box-sizing: border-box; }
   .office-field textarea { resize: vertical; }
   .office-field-wide { grid-column: 1 / -1; }
-  .office-form-actions { display: flex; justify-content: flex-end; gap: 12px; padding-top: 20px; }
+  .office-form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; padding-top: 20px; }
   .office-availability { padding: 16px; background: var(--edm-neutral-50); border-radius: var(--edm-radius-lg); border: 1px solid var(--edm-neutral-200); }
   .office-availability h3 { margin: 0 0 12px; font-size: var(--edm-font-size-lg); }
   .office-slot-list,

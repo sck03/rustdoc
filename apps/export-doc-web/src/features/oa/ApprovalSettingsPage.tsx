@@ -80,21 +80,24 @@ function ApprovalSettingsEditor({ client, user, initial, accounts, handlers, uni
         {view === "calendar" && <BusinessCalendarEditor dateInputs={calendarInputs} onDateInput={changeCalendarInput} disabled={operation.busy} value={draft.calendar} onChange={calendar => setDraft(value => ({...value,calendar}))} />}
         {view === "handling" && <HandlingServicesEditor services={draft.handlingServices ?? []} accounts={handlers} disabled={operation.busy} onChange={handlingServices => setDraft(value => ({...value,handlingServices}))} />}
         {view === "templates" && <ApprovalSheetTemplates client={client} settings={draft} disabled={operation.busy} onChange={sheetTemplates => setDraft(value => ({...value,sheetTemplates}))} />}
-        {view === "delegations" && <>
-          <p className="office-muted office-field-wide">代理仅在有效期内生效；每个节点分别签署并记录实际办理人。</p>
+        {view === "delegations" && <section className="oa-settings-section">
+          <p className="office-muted">代理仅在有效期内生效；每个节点分别签署并记录实际办理人。</p>
+          <div className="office-resource-grid">
           {draft.delegations.map((item,index) => <section className="office-resource-card" key={item.key} aria-label={`代理 ${index+1}`}>
             <OfficeField label="原审批人"><select value={item.principalUserId} onChange={event => changeDelegate(index,{principalUserId:Number(event.target.value)})}>{accountOptions}</select></OfficeField>
             <OfficeField label="代理人"><select value={item.delegateUserId} onChange={event => changeDelegate(index,{delegateUserId:Number(event.target.value)})}>{accountOptions}</select></OfficeField>
             {(["startsAt","endsAt"] as const).map(key => <OfficeField key={key} label={key === "startsAt" ? "代理开始时间" : "代理结束时间"}><input type="datetime-local" required value={toBusinessDateTimeLocalInput(item[key],user.businessTimeZone)} onChange={event => { try { changeDelegate(index,{[key]:businessDateTimeLocalInputToIso(event.target.value,user.businessTimeZone) ?? ""}); } catch(error) { event.target.setCustomValidity(readApiError(error));event.target.reportValidity(); } }} onInput={event => event.currentTarget.setCustomValidity("")} /></OfficeField>)}
             <label className="checkbox-field"><input type="checkbox" checked={item.isActive} onChange={event => changeDelegate(index,{isActive:event.target.checked})} />启用代理</label>
-            <button className="command-button secondary" type="button" onClick={() => setDraft(value => ({...value,delegations:value.delegations.filter((_,i) => i!==index)}))}>移除代理设置</button>
+            <div className="office-card-actions"><button className="command-button secondary" type="button" onClick={() => setDraft(value => ({...value,delegations:value.delegations.filter((_,i) => i!==index)}))}>移除代理设置</button></div>
           </section>)}
-          <button className="command-button secondary" type="button" disabled={draft.delegations.length >= 50} onClick={() => setDraft(value => ({...value,delegations:[...value.delegations,{key:createRequestKey(),principalUserId:0,delegateUserId:0,startsAt:new Date().toISOString(),endsAt:new Date(Date.now()+86400000).toISOString(),isActive:true}]}))}>添加代理</button>
-        </>}
+          </div>
+          <div className="office-card-actions"><button className="command-button secondary" type="button" disabled={draft.delegations.length >= 50} onClick={() => setDraft(value => ({...value,delegations:[...value.delegations,{key:createRequestKey(),principalUserId:0,delegateUserId:0,startsAt:new Date().toISOString(),endsAt:new Date(Date.now()+86400000).toISOString(),isActive:true}]}))}>添加代理</button></div>
+        </section>}
       </fieldset>
       {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
-      <OfficeSubmit busy={operation.busy} label={view === "definitions" ? rule ? "保存当前流程" : "保存全部流程定义" : `保存${views.find(item => item.key === view)?.label}`} />
-      <button className="command-button secondary" type="button" disabled={operation.busy} onClick={() => void reload()}>重新载入审批设置</button>
+      <OfficeSubmit busy={operation.busy} label={view === "definitions" ? rule ? "保存当前流程" : "保存全部流程定义" : `保存${views.find(item => item.key === view)?.label}`}>
+        <button className="command-button secondary" type="button" disabled={operation.busy} onClick={() => void reload()}>重新载入审批设置</button>
+      </OfficeSubmit>
     </form>}
     {view === "runtime" && <>
       <UnitWorkflowTasksPanel client={client} user={user} accounts={accounts} /><WorkflowExceptionsPanel client={client} />

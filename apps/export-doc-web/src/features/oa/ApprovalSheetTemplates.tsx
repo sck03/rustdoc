@@ -21,10 +21,15 @@ export function ApprovalSheetTemplates({ client, settings, disabled, onChange }:
         property === "backgroundColor" ? "#ffffff" : property === "color" || property === "borderColor" ? "#000000" : value)),
     }));
   }
-  return <details><summary>审批单名称与打印模板</summary>
+  return <details className="oa-settings-section"><summary>审批单名称与打印模板</summary>
     <p className="office-muted">默认 A4 白底黑字，按审批节点显示审批人、处理结果、意见及时间，长流程自动续页。恢复默认版式保留表单名称；修改先进入草稿，保存后用于后续提交版本。</p>
-    <button className="command-button secondary" type="button" disabled={disabled || !settings.sheetDefaultContent} onClick={() => restoreDefault()}>全部恢复默认版式</button>
-    <ul>{settings.sheetTemplates?.map(template => <li key={template.key}>{template.name} <button className="command-button secondary" type="button" disabled={disabled} onClick={() => setSelected(template)}>编辑审批单模板</button> <button className="command-button secondary" type="button" disabled={disabled} onClick={() => applyMonochrome(template.key)}>使用黑白打印样式</button> <button className="command-button secondary" type="button" disabled={disabled || !settings.sheetDefaultContent} onClick={() => restoreDefault(template.key)}>恢复默认版式</button></li>)}</ul>
+    <div className="office-card-actions"><button className="command-button secondary" type="button" disabled={disabled || !settings.sheetDefaultContent} onClick={() => restoreDefault()}>全部恢复默认版式</button></div>
+    <ul className="oa-template-list">{settings.sheetTemplates?.map(template => <li key={template.key}>
+      <span>{template.name}</span><div className="office-toolbar">
+        <button className="command-button secondary" type="button" disabled={disabled} onClick={() => setSelected(template)}>编辑审批单模板</button>
+        <button className="command-button secondary" type="button" disabled={disabled} onClick={() => applyMonochrome(template.key)}>使用黑白打印样式</button>
+        <button className="command-button secondary" type="button" disabled={disabled || !settings.sheetDefaultContent} onClick={() => restoreDefault(template.key)}>恢复默认版式</button>
+      </div></li>)}</ul>
     {selected && <SheetEditor key={selected.key} client={client} template={selected} catalog={settings.sheetFieldCatalog} onClose={() => setSelected(null)} onApply={template => {
       onChange((settings.sheetTemplates ?? []).map(item => item.key === template.key ? template : item)); setSelected(null);
     }} />}

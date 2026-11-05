@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { PageState } from "../../ui/PageState.tsx";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -6,8 +7,8 @@ import type { OfficePage } from "./officeModel.ts";
 export { Dialog as OfficeDialog } from "../../ui/primitives/Dialog.tsx";
 export { Field as OfficeField } from "../../ui/primitives/Field.tsx";
 
-export function OfficeSubmit({ busy, disabled = false, label = "保存" }: { busy: boolean; disabled?: boolean; label?: string }) {
-  return <footer className="office-form-actions"><button className="command-button" type="submit" disabled={busy || disabled}>{busy ? "正在处理…" : label}</button></footer>;
+export function OfficeSubmit({ busy, disabled = false, label = "保存", children }: { busy: boolean; disabled?: boolean; label?: string; children?: ReactNode }) {
+  return <footer className="office-form-actions">{children}<button className="command-button" type="submit" disabled={busy || disabled}>{busy ? "正在处理…" : label}</button></footer>;
 }
 export function OfficeQueryState({ query, emptyTitle }: { query: { isPending: boolean; isError: boolean; error: unknown; data?: { items: unknown[] }; refetch: () => unknown }; emptyTitle: string }) {
   if (query.isPending) return <PageState tone="loading" title="正在加载" />;

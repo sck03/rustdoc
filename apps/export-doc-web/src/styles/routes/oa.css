@@ -6,6 +6,15 @@
 .oa-workspace a:not(.command-button):hover { text-decoration: underline; }
 }
 .oa-workspace > .command-button { justify-self: start; }
+.oa-settings-section { grid-column: 1 / -1; min-width: 0; container: approval-settings / inline-size; }
+.oa-settings-section > :not(summary) { margin-top: 12px; }
+.oa-settings-section > summary { cursor: pointer; font-weight: 600; }
+.oa-template-list { padding: 0; list-style: none; }
+.oa-template-list li { display: grid; grid-template-columns: minmax(12rem, 1fr) auto; align-items: center; gap: 16px; padding-block: 12px; border-bottom: 1px solid var(--edm-neutral-200); }
+.oa-template-list li > span { min-width: 0; overflow-wrap: anywhere; }
+@container approval-settings (max-width: 680px) {
+.oa-template-list li { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+}
 .oa-toolbar .office-field { display: flex; align-items: center; gap: calc(2 * 4px); }
 .oa-toolbar .office-field > span { white-space: nowrap; }
 .oa-toolbar .office-field select { width: auto; min-width: 8rem; }
