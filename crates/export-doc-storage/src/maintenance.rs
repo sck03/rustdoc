@@ -38,17 +38,7 @@ mod tests {
 
     #[test]
     fn any_maintenance_marker_fails_closed_even_when_its_contents_are_damaged() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../.codex-runtime/maintenance-marker-tests")
-            .join(format!(
-                "{}-{}",
-                std::process::id(),
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos()
-            ));
-        fs::create_dir_all(&root).unwrap();
+        let root = crate::test_workspace::create("maintenance-marker-tests");
         for name in [
             DATA_ROOT_MIGRATION_PENDING_FILE,
             DATA_ROOT_MIGRATION_REDIRECT_FILE,
@@ -62,6 +52,6 @@ mod tests {
             fs::remove_dir(&marker).unwrap();
         }
         assert!(ensure_data_root_available(&root).is_ok());
-        fs::remove_dir_all(root).unwrap();
+        crate::test_workspace::remove(&root).unwrap();
     }
 }

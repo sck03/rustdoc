@@ -44,38 +44,16 @@ mod supplier_overview_query;
 mod template_history_query;
 #[path = "support/template_query.rs"]
 mod template_query;
+#[path = "support/workspace.rs"]
+mod test_workspace;
 #[path = "support/workflow_fixture.rs"]
 mod workflow_fixture;
 use serde_json::json;
-use std::{
-    fs,
-    path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
-};
-
-fn scratch() -> PathBuf {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(".codex-runtime")
-        .join("storage-tests")
-        .join(format!(
-            "{}-{}",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-    fs::create_dir_all(&root).unwrap();
-    root
-}
+use std::fs;
 
 #[test]
 fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
-    let root = scratch();
+    let root = test_workspace::create("storage-tests");
     for (name, versions) in [
         ("earlier", vec![1_i64]),
         ("previous", vec![export_doc_storage::SCHEMA_VERSION - 1]),
@@ -93,11 +71,11 @@ fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
         let result = Connection::sqlite(&file);
         assert!(matches!(result,Err(ref cause) if cause.kind==ErrorKind::Unavailable));
     }
-    fs::remove_dir_all(root).unwrap();
+    test_workspace::remove(&root).unwrap();
 }
 #[test]
 fn sqlite_model_and_structure_validation_preserve_rejected_files() {
-    let root = scratch();
+    let root = test_workspace::create("storage-tests");
     for (name, statement) in [
         ("model", "UPDATE schema_model SET model='unknown-baseline'"),
         ("structure", "DROP INDEX positions_name"),
@@ -115,7 +93,7 @@ fn sqlite_model_and_structure_validation_preserve_rejected_files() {
             "rejection must not rewrite a database"
         );
     }
-    fs::remove_dir_all(root).unwrap();
+    test_workspace::remove(&root).unwrap();
 }
 
 fn roundtrip(connection: &Connection) {
@@ -261,7 +239,7 @@ fn roundtrip(connection: &Connection) {
 
 #[test]
 fn sqlite_transactions_blobs_and_backup_use_one_database() {
-    let root = scratch();
+    let root = test_workspace::create("storage-tests");
     {
         let connection = Connection::sqlite(&root.join("data.db")).unwrap();
         roundtrip(&connection);
@@ -281,7 +259,38 @@ fn sqlite_transactions_blobs_and_backup_use_one_database() {
         assert!(connection.verify_backup(&missing).is_err());
         assert!(!missing.exists());
     }
-    fs::remove_dir_all(root).unwrap();
+    test_workspace::remove(&root).unwrap();
+}
+
+#[cfg(windows)]
+#[test]
+fn test_directory_cleanup_retries_transient_handles_and_reports_persistent_locks() {
+    use std::{os::windows::fs::OpenOptionsExt, time::Duration};
+
+    for transient in [true, false] {
+        let root = test_workspace::create("storage-tests");
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .share_mode(0)
+            .open(root.join("scanner-held.db"))
+            .unwrap();
+        if transient {
+            let released = std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(100));
+                drop(file);
+            });
+            test_workspace::remove(&root).unwrap();
+            released.join().unwrap();
+        } else {
+            let error = test_workspace::remove(&root).unwrap_err();
+            assert_eq!(error.raw_os_error(), Some(32));
+            assert!(root.exists());
+            drop(file);
+            test_workspace::remove(&root).unwrap();
+        }
+        assert!(!root.exists());
+    }
 }
 
 #[cfg(feature = "postgres")]

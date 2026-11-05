@@ -4,23 +4,11 @@ use export_doc_storage::{
     TemplateVersionQuery,
 };
 use serde_json::{Value, json};
-use std::{
-    path::PathBuf,
-    time::{Instant, SystemTime, UNIX_EPOCH},
-};
+use std::time::Instant;
 
 pub fn save(c: &Connection, name: &str, evidence: &Value) {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.codex-runtime/query-plans");
-    std::fs::create_dir_all(&root).unwrap();
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let file = root.join(format!(
-        "{}-{name}-{}-{stamp}.json",
-        c.provider(),
-        std::process::id()
-    ));
+    let file =
+        crate::test_workspace::create("query-plans").join(format!("{}-{name}.json", c.provider()));
     std::fs::write(&file, serde_json::to_vec_pretty(evidence).unwrap()).unwrap();
     println!("Production query evidence: {}", file.display());
 }

@@ -128,16 +128,8 @@ pub fn exercise(tx: &Connection) {
     let mut leaked = public;
     leaked["profile"]["personalPhone"] = json!("must-stay-private");
     assert!(
-        tx.update(
-            person,
-            1,
-            &RecordWrite {
-                kind: "people",
-                identity: None,
-                body: &leaked
-            }
-        )
-        .is_err(),
+        tx.update(person, 1, &RecordWrite::unkeyed("people", &leaked))
+            .is_err(),
         "database rejects private fields in public personnel records"
     );
     tx.rollback().unwrap();

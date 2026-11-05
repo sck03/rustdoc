@@ -1,28 +1,10 @@
 use super::*;
 use serde_json::json;
-use std::{
-    path::PathBuf,
-    sync::atomic::AtomicBool,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::sync::atomic::AtomicBool;
 
 #[test]
 fn bounded_wait_cancellation_and_abandoned_transactions_are_observable() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(".codex-runtime/pool-tests")
-        .join(format!(
-            "{}-{}",
-            std::process::id(),
-            SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos()
-        ));
-    std::fs::create_dir_all(&root).unwrap();
+    let root = crate::test_workspace::create("pool-tests");
     let pool = Arc::new(Pool::new(
         vec![Connection::sqlite(&root.join("pool.db")).unwrap()],
         PoolOptions {
@@ -72,5 +54,5 @@ fn bounded_wait_cancellation_and_abandoned_transactions_are_observable() {
             .is_null()
     );
     drop(pool);
-    std::fs::remove_dir_all(root).unwrap();
+    crate::test_workspace::remove(&root).unwrap();
 }

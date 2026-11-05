@@ -1,24 +1,12 @@
 //! Fresh baseline and rejection of experimental schemas; no legacy upgrade path.
 use export_doc_storage::{Connection, SCHEMA_VERSION};
-use std::{
-    fs,
-    path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
-};
+#[path = "support/workspace.rs"]
+mod test_workspace;
+use std::{fs, path::PathBuf};
 struct Database(PathBuf);
 impl Database {
     fn fresh() -> Self {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../.codex-runtime/schema-baseline")
-            .join(format!(
-                "{}-{}",
-                std::process::id(),
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos()
-            ));
-        fs::create_dir_all(&root).unwrap();
+        let root = test_workspace::create("schema-baseline");
         let result = Self(root.join("data.db"));
         let db = Connection::sqlite(&result.0).unwrap();
         db.set_settings(
@@ -37,7 +25,7 @@ impl Database {
 }
 impl Drop for Database {
     fn drop(&mut self) {
-        fs::remove_dir_all(self.0.parent().unwrap()).unwrap();
+        test_workspace::remove(self.0.parent().unwrap()).unwrap();
     }
 }
 #[test]

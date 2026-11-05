@@ -1,5 +1,8 @@
 #[cfg(feature = "postgres")]
 mod postgres;
+#[cfg(test)]
+#[path = "../tests/support/workspace.rs"]
+mod test_workspace;
 #[cfg(feature = "postgres")]
 pub use postgres::tools::{
     ClientParameters as PostgresClientParameters, MaintenanceLease as PostgresMaintenanceLease,

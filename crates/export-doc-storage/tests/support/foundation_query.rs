@@ -38,32 +38,16 @@ pub fn exercise(tx: &Connection) {
     body["departedOn"] = json!("2024-06-30");
     body["versionNumber"] = json!(2);
     assert!(
-        tx.update(
-            person_id,
-            1,
-            &RecordWrite {
-                kind: "people",
-                identity: None,
-                body: &body
-            }
-        )
-        .unwrap()
+        tx.update(person_id, 1, &RecordWrite::unkeyed("people", &body))
+            .unwrap()
     );
     body["status"] = json!("Active");
     body["departedOn"] = Value::Null;
     body["hireDate"] = json!("2026-10-01");
     body["versionNumber"] = json!(3);
     assert!(
-        tx.update(
-            person_id,
-            2,
-            &RecordWrite {
-                kind: "people",
-                identity: None,
-                body: &body
-            }
-        )
-        .unwrap()
+        tx.update(person_id, 2, &RecordWrite::unkeyed("people", &body))
+            .unwrap()
     );
     let periods = tx
         .foundation_list("employments", unit, &all, 0, 20)

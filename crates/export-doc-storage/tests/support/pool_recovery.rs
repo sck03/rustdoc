@@ -1,9 +1,6 @@
 use export_doc_storage::{Connection, ErrorKind, RecordWrite, pool::Pool};
 use serde_json::json;
-use std::{
-    path::PathBuf,
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
-};
+use std::time::{Duration, Instant};
 
 pub fn exercise(app: &str, maintenance: &str) {
     let mut results = vec![];
@@ -73,17 +70,7 @@ pub fn exercise(app: &str, maintenance: &str) {
         assert!(c.get("pool-recovery", pending).unwrap().is_none());
         results.push(json!({"scenario":if instance {"instance-lock-loss"}else{"business-connection-loss"},"lostCommittedRecords":0,"uncommittedWriteRolledBack":true,"recoveryMilliseconds":failure.elapsed().as_millis() as u64}));
     }
-    let output =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../.codex-runtime/pool-recovery");
-    std::fs::create_dir_all(&output).unwrap();
-    let file = output.join(format!(
-        "{}-{}.json",
-        std::process::id(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos()
-    ));
+    let file = crate::test_workspace::create("pool-recovery").join("recovery.json");
     std::fs::write(&file, serde_json::to_vec_pretty(&results).unwrap()).unwrap();
     println!(
         "PostgreSQL connection recovery evidence: {}",
