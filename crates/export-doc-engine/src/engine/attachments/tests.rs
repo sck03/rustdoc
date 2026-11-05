@@ -1,58 +1,31 @@
 use super::*;
+use crate::engine::test_support::{ScratchDirectory, workspace_root};
 use crate::paths::RuntimePaths;
 use export_doc_domain::permissions::ProductEdition;
-use std::{fs, path::PathBuf};
-
-struct OwnedRoot {
-    path: PathBuf,
-    parent: PathBuf,
-}
-impl Drop for OwnedRoot {
-    fn drop(&mut self) {
-        let result = (|| -> std::result::Result<(), String> {
-            paths::ensure_safe_absolute(&self.path)?;
-            let resolved = self
-                .path
-                .canonicalize()
-                .map_err(|error| error.to_string())?;
-            if resolved.parent() != Some(self.parent.as_path()) || resolved.join(".git").exists() {
-                return Err("测试目录边界已变化，拒绝清理。".into());
-            }
-            fs::remove_dir_all(resolved).map_err(|error| error.to_string())
-        })();
-        if let Err(error) = result {
-            if std::thread::panicking() {
-                eprintln!("附件测试清理失败：{error}");
-            } else {
-                panic!("附件测试清理失败：{error}");
-            }
-        }
-    }
-}
+use std::fs;
 struct Fixture {
     store: Store,
     actor: Actor,
     id: i64,
-    root: OwnedRoot,
+    root: ScratchDirectory,
+}
+impl Fixture {
+    fn invoke_json(&self, operation: Operation, body: Value) -> Result<Value> {
+        let bytes = handle(
+            &self.store,
+            &self.actor,
+            operation,
+            &[("id", self.id.to_string())],
+            &[],
+            body,
+        )?;
+        Ok(serde_json::from_slice(&bytes)?)
+    }
 }
 fn fixture() -> Fixture {
-    let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .canonicalize()
-        .unwrap();
-    let parent = repo.join(".codex-runtime/attachment-read-tests");
-    paths::ensure_safe_absolute(&parent).unwrap();
-    fs::create_dir_all(&parent).unwrap();
-    let parent = parent.canonicalize().unwrap();
-    let root = OwnedRoot {
-        path: parent.join(paths::nonce().unwrap()),
-        parent,
-    };
-    fs::create_dir(&root.path).unwrap();
-    let mut store = Store::open(&RuntimePaths::server(&repo, &root.path).unwrap()).unwrap();
+    let root = ScratchDirectory::new();
+    let mut store =
+        Store::open(&RuntimePaths::server(&workspace_root(), &root.0).unwrap()).unwrap();
     store.edition = ProductEdition::Full;
     auth::seed(&store).unwrap();
     let actor =
@@ -113,12 +86,9 @@ fn attachment_reads_reject_a_stale_actor_after_account_deactivation() {
             Ok(())
         })
         .unwrap();
-    let parameters = [("id", f.id.to_string())];
     for operation in [LIST_BUSINESS_ATTACHMENTS, GET_BUSINESS_ATTACHMENT] {
         assert_eq!(
-            handle(&f.store, &f.actor, operation, &parameters, &[], Value::Null)
-                .unwrap_err()
-                .status,
+            f.invoke_json(operation, Value::Null).unwrap_err().status,
             Some(403)
         );
     }
@@ -133,7 +103,7 @@ fn attachment_reads_reject_a_stale_actor_after_account_deactivation() {
 #[test]
 fn oversized_stored_attachment_is_rejected_and_extension_case_is_preserved() {
     let f = fixture();
-    let destination = f.root.path.join("copy.BIN");
+    let destination = f.root.0.join("copy.BIN");
     handle(
         &f.store,
         &f.actor,
@@ -170,35 +140,16 @@ fn oversized_stored_attachment_is_rejected_and_extension_case_is_preserved() {
 #[test]
 fn a_new_attachment_has_an_empty_event_history_and_can_be_archived() {
     let f = fixture();
-    let parameters = [("id", f.id.to_string())];
-    let details = || -> Value {
-        serde_json::from_slice(
-            &handle(
-                &f.store,
-                &f.actor,
-                GET_BUSINESS_ATTACHMENT,
-                &parameters,
-                &[],
-                Value::Null,
-            )
-            .unwrap(),
-        )
-        .unwrap()
-    };
-    let initial = details();
+    let initial = f.invoke_json(GET_BUSINESS_ATTACHMENT, Value::Null).unwrap();
     assert_eq!(initial["eventCount"], 0);
     assert_eq!(initial["events"], json!([]));
     assert_eq!(initial["revisions"].as_array().unwrap().len(), 1);
-    handle(
-        &f.store,
-        &f.actor,
+    f.invoke_json(
         UPDATE_BUSINESS_ATTACHMENT,
-        &parameters,
-        &[],
         json!({"versionNumber":initial["attachment"]["versionNumber"],"currentRevision":1,"isArchived":true,"note":"归档测试"}),
     )
     .unwrap();
-    let archived = details();
+    let archived = f.invoke_json(GET_BUSINESS_ATTACHMENT, Value::Null).unwrap();
     assert_eq!(archived["eventCount"], 1);
     assert_eq!(archived["events"][0]["action"], "Archive");
     assert_eq!(archived["attachment"]["isArchived"], true);
@@ -216,26 +167,15 @@ fn corrupt_attachment_events_are_not_reported_as_an_empty_history() {
         })
         .unwrap();
     assert_eq!(
-        handle(
-            &f.store,
-            &f.actor,
-            GET_BUSINESS_ATTACHMENT,
-            &[("id", f.id.to_string())],
-            &[],
-            Value::Null
-        )
-        .unwrap_err()
-        .status,
+        f.invoke_json(GET_BUSINESS_ATTACHMENT, Value::Null)
+            .unwrap_err()
+            .status,
         Some(503)
     );
     let before = store::get(&f.store.connection().unwrap(), "attachments", f.id).unwrap();
     assert_eq!(
-        handle(
-            &f.store,
-            &f.actor,
+        f.invoke_json(
             UPDATE_BUSINESS_ATTACHMENT,
-            &[("id", f.id.to_string())],
-            &[],
             json!({"versionNumber":before["versionNumber"],"currentRevision":1,"isArchived":true,"note":"不得覆盖损坏历史"}),
         )
         .unwrap_err()

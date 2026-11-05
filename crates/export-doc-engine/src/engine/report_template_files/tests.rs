@@ -1,57 +1,23 @@
 use super::*;
-use crate::paths::{RuntimePaths, nonce};
+use crate::engine::test_support::{ScratchDirectory, administrator as admin};
+use crate::paths::RuntimePaths;
 use std::{fs, path::PathBuf, sync::Arc};
 mod storage_safety;
+use crate::engine::test_support::TestService;
 
-struct Workspace(PathBuf);
+struct Workspace(ScratchDirectory);
 impl Workspace {
     fn new() -> Self {
-        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .to_path_buf();
-        let root = workspace
-            .join(".codex-runtime")
-            .join("template-file-tests")
-            .join(nonce().unwrap());
-        fs::create_dir_all(root.join("Cache")).unwrap();
-        fs::create_dir_all(root.join("Logs")).unwrap();
-        Self(root)
+        Self(ScratchDirectory::new())
     }
     fn paths(&self) -> RuntimePaths {
-        RuntimePaths {
-            app_root: self.0.join("App"),
-            data_root: self.0.clone(),
-            cache_root: self.0.join("Cache"),
-            log_root: self.0.join("Logs"),
-            font_path: self.0.join("font.otf"),
-        }
+        let mut paths = self.0.paths();
+        paths.app_root = self.0.0.join("App");
+        paths
     }
 }
-impl Drop for Workspace {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-fn open(workspace: &Workspace) -> Arc<NativeService> {
-    NativeService::open(workspace.paths()).unwrap()
-}
-fn admin() -> Actor {
-    Actor {
-        scope_rules: vec![],
-        context: String::new(),
-        edition: Default::default(),
-        id: 1,
-        name: "系统管理员".into(),
-        company: "DEFAULT".into(),
-        department: "GENERAL".into(),
-        admin: true,
-        grants: vec![],
-        departments: vec![],
-        oa_assigned_only: false,
-    }
+fn open(workspace: &Workspace) -> TestService {
+    TestService::open(workspace.paths())
 }
 
 #[test]
@@ -470,7 +436,7 @@ fn managed_file_template_is_published_to_the_report_catalog_and_preview() {
     let mut paths = workspace.paths();
     paths.font_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../Resources/Fonts/OpenSource/NotoSansCJKsc-Regular.otf");
-    let service = NativeService::open(paths).unwrap();
+    let service = TestService::open(paths);
     let created = handle(
         &service,
         &admin(),

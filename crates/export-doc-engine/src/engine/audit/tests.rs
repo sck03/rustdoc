@@ -1,26 +1,9 @@
 use super::*;
-use crate::paths::{RuntimePaths, nonce};
 #[test]
 fn queued_audit_deletion_rechecks_the_current_grants_and_preserves_the_events() {
-    let workspace = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_owned();
-    let root = workspace
-        .join(".codex-runtime/authorization-tests")
-        .join(nonce().unwrap());
-    std::fs::create_dir_all(&root).unwrap();
-    let _cleanup = crate::test_support::ScratchDirectory(root.clone());
-    let service =
-        NativeService::open(RuntimePaths::server(&root, &root.join("Data")).unwrap()).unwrap();
-    let actor = auth::current_actor_in(
-        &service.store.connection().unwrap(),
-        1,
-        service.store.edition,
-    )
-    .unwrap();
+    let directory = crate::engine::test_support::ScratchDirectory::new();
+    let service = directory.service();
+    let actor = auth::current_actor(&service.store, 1).unwrap();
     service
         .store
         .transaction(|tx| {
@@ -77,5 +60,4 @@ fn queued_audit_deletion_rechecks_the_current_grants_and_preserves_the_events() 
             .iter()
             .any(|row| row["kind"] == "authorization-canary")
     );
-    service.close().unwrap();
 }

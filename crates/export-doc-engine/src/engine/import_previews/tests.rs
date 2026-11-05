@@ -2,30 +2,18 @@ use super::*;
 
 #[test]
 fn previews_are_bounded_single_use_and_release_payloads_transactionally() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../.codex-runtime/import-preview-tests");
-    std::fs::create_dir_all(&root).unwrap();
-    let path = root
-        .canonicalize()
-        .unwrap()
-        .join(format!("{}.db", nonce().unwrap()));
+    let directory = crate::engine::test_support::ScratchDirectory::new();
+    let path = directory.0.join("preview.db");
     let pool = export_doc_storage::pool::Pool::single(
         export_doc_storage::Connection::sqlite(&path).unwrap(),
     );
     let clock = BusinessClock::default();
     let tx = Connection::new(pool.acquire(|| false).unwrap(), &clock);
     let actor = Actor {
-        scope_rules: vec![],
-        context: String::new(),
-        edition: Default::default(),
-        id: 1,
-        name: "test".into(),
         company: "TEST".into(),
         department: "D".into(),
-        departments: vec![],
-        oa_assigned_only: false,
         admin: true,
-        grants: vec![],
+        ..crate::engine::test_support::actor("test")
     };
     let rows = vec![json!({"name":"测试"})];
     tx.begin().unwrap();

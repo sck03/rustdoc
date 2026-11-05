@@ -181,41 +181,22 @@ fn delete_workspace(transaction: &Connection, invoice_id: i64) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::paths::{RuntimePaths, nonce};
-    use std::fs;
+    use crate::paths::RuntimePaths;
 
     struct Fixture {
         store: Store,
         actor: Actor,
         invoice_id: i64,
-        _root: crate::test_support::ScratchDirectory,
+        _root: crate::engine::test_support::ScratchDirectory,
     }
     impl Fixture {
         fn new() -> Self {
-            let workspace = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-                .parent()
-                .unwrap()
-                .parent()
-                .unwrap()
-                .to_path_buf();
-            let root = workspace
-                .join(".codex-runtime/maintenance-tests")
-                .join(nonce().unwrap());
-            fs::create_dir_all(&root).unwrap();
-            let paths = RuntimePaths::server(&root, &root.join("Data")).unwrap();
+            let root = crate::engine::test_support::ScratchDirectory::new();
+            let paths = RuntimePaths::server(&root.0, &root.0.join("Data")).unwrap();
             let store = Store::open(&paths).unwrap();
             let actor = Actor {
-                scope_rules: vec![],
-                context: String::new(),
-                edition: Default::default(),
-                id: 1,
-                name: "管理员".into(),
-                company: "DEFAULT".into(),
-                department: "GENERAL".into(),
                 admin: true,
-                grants: vec![],
-                departments: vec![],
-                oa_assigned_only: false,
+                ..crate::engine::test_support::actor("管理员")
             };
             let mut user = contracts::initial(contracts::schema("ApiUserAccountDto"));
             user["username"] = json!("admin");
@@ -252,7 +233,7 @@ mod tests {
                 store,
                 actor,
                 invoice_id: saved["id"].as_i64().unwrap(),
-                _root: crate::test_support::ScratchDirectory(root),
+                _root: root,
             }
         }
     }

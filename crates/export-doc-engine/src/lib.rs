@@ -13,8 +13,6 @@ pub use export_doc_storage::maintenance;
 pub mod operation;
 pub mod paths;
 pub mod pdf;
-#[cfg(test)]
-mod test_support;
 
 pub mod secrets;
 

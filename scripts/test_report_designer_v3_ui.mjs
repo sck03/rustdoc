@@ -151,6 +151,7 @@ const read = async (page, expression) => (await evaluate(page, expression, true)
 async function waitFor(page, expression) {
   const limit = Date.now() + 20000;
   while (Date.now() < limit) { if (await read(page, `Boolean(${expression})`)) return; await delay(50); }
+  await captureScreenshot(page, path.join(output, "wait-failed.png"), { captureBeyondViewport: false });
   throw new Error(`Timed out: ${expression}; ${await read(page, "document.body.innerText.slice(0,1600)")}`);
 }
 async function click(page, selector) { await read(page, `document.querySelector(${JSON.stringify(selector)}).click()`); await delay(70); }
@@ -187,13 +188,7 @@ try {
     await read(page, `document.querySelector('[data-v3-element-id="review-grid"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:77,clientX:0,clientY:0}));window.dispatchEvent(new PointerEvent('pointercancel',{pointerId:77}));`);
     await waitFor(page, 'document.querySelector(".report-designer-property-tabs [role=tab][aria-selected=true]")?.textContent === "单元格"');
     if (await read(page, "Boolean(document.querySelector('.report-designer-v3-compact-tabs')?.getClientRects().length)")) await click(page,'.report-designer-v3-compact-tabs button:nth-child(3)');
-    try {
-      await waitFor(page, "[...document.querySelectorAll('.report-designer-v3-inspector input[type=checkbox]')].filter(input=>input.getClientRects().length).length >= 5");
-    } catch (error) {
-      await captureScreenshot(page,path.join(output,`inspector-failed-${width}.png`),{captureBeyondViewport:false});
-      const context = await read(page, "({width:innerWidth,panel:document.querySelector('.report-designer-v3-workspace')?.dataset.compactPanel,inspector:document.querySelector('.report-designer-v3-inspector')?.innerText,selectedTab:document.querySelector('.report-designer-property-tabs [role=tab][aria-selected=true]')?.textContent})");
-      throw new Error(`Inspector did not render at ${width}: ${JSON.stringify(context)}`, { cause: error });
-    }
+    await waitFor(page, "[...document.querySelectorAll('.report-designer-v3-inspector input[type=checkbox]')].filter(input=>input.getClientRects().length).length >= 5");
     const controls = await read(page, `Array.from(document.querySelectorAll('.report-designer-v3-inspector input[type=checkbox]')).filter(input=>input.getClientRects().length).map(input=>{const r=input.getBoundingClientRect();return {width:r.width,height:r.height}})`);
     assert(controls.length >= 5 && controls.every(control=>control.width>=14&&control.width<=18&&control.height>=14&&control.height<=18), JSON.stringify(controls));
     await click(page,'.report-designer-property-tabs [role=tab]:nth-child(2)');

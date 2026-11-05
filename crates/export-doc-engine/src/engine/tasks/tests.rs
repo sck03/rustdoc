@@ -1,44 +1,23 @@
 use super::*;
 use crate::contracts;
-use crate::paths::{RuntimePaths, nonce};
-use std::{fs, path::PathBuf, sync::mpsc, time::Instant};
+use crate::paths::RuntimePaths;
+use std::{fs, sync::mpsc, time::Instant};
 mod completion;
 mod publication;
 
 struct Fixture {
-    root: PathBuf,
+    root: crate::engine::test_support::ScratchDirectory,
     paths: RuntimePaths,
     actor: Actor,
 }
 impl Fixture {
     fn new() -> Self {
-        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .to_path_buf();
-        let root = workspace
-            .join(".codex-runtime/task-tests")
-            .join(nonce().unwrap());
-        fs::create_dir_all(&root).unwrap();
-        let paths = RuntimePaths::server(&root, &root.join("Data")).unwrap();
+        let root = crate::engine::test_support::ScratchDirectory::new();
+        let paths = RuntimePaths::server(&root.0, &root.0.join("Data")).unwrap();
         Self {
             root,
             paths,
-            actor: Actor {
-                scope_rules: vec![],
-                context: String::new(),
-                edition: Default::default(),
-                id: 1,
-                name: "任务用户".into(),
-                company: "DEFAULT".into(),
-                department: "GENERAL".into(),
-                admin: false,
-                grants: vec![],
-                departments: vec![],
-                oa_assigned_only: false,
-            },
+            actor: crate::engine::test_support::actor("任务用户"),
         }
     }
     fn open(&self) -> (Arc<Store>, Jobs) {
@@ -58,11 +37,6 @@ impl Fixture {
             Ok(())
         }).unwrap();
         store
-    }
-}
-impl Drop for Fixture {
-    fn drop(&mut self) {
-        fs::remove_dir_all(&self.root).unwrap();
     }
 }
 fn wait(jobs: &Jobs, actor: &Actor, id: &str) -> Value {
@@ -581,14 +555,9 @@ fn reclaimed_retry_input_is_a_conflict_inside_the_read_snapshot() {
 fn retry_survives_restart_reauthorizes_and_keeps_private_requests_off_the_wire() {
     use crate::engine::NativeService;
     let fixture = Fixture::new();
-    let template_root = fixture.root.join("Resources/ExcelTemplates");
+    let template_root = fixture.root.0.join("Resources/ExcelTemplates");
     fs::create_dir_all(&template_root).unwrap();
-    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_owned();
+    let workspace = crate::engine::test_support::workspace_root();
     fs::copy(
         workspace.join("Resources/ExcelTemplates/invoice-import-template.xlsx"),
         template_root.join("invoice-import-template.xlsx"),

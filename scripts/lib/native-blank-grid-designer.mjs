@@ -19,8 +19,7 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key, modifiers });
   };
   const button = async (label, scope = '.report-designer-v3-inspector') => {
-    await run(`[...document.querySelectorAll(${JSON.stringify(scope + ' button')})].find(node=>node.textContent.trim()===${JSON.stringify(label)}).click(); true`);
-    await run('new Promise(resolve=>requestAnimationFrame(resolve))');
+    await run(`[...document.querySelectorAll(${JSON.stringify(scope + ' button')})].find(node=>node.textContent.trim()===${JSON.stringify(label)}).click(); new Promise(resolve=>requestAnimationFrame(resolve))`);
   };
   const select = async (label, value) => {
     await wait(`[...${control(label)}.options].some(option=>option.value===${JSON.stringify(value)})`);
@@ -28,7 +27,7 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
     await run('new Promise(resolve=>requestAnimationFrame(resolve))');
   };
   const fill = async (label, value, multiline = false) => {
-    await run(`(()=>{const node=${control(label)};node.focus();node.select();})()`);
+    await run(`(()=>{const node=${control(label)};if(node.closest('details'))node.closest('details').open=true;node.focus();node.select();})()`);
     await cdp.send('Input.insertText', { text: String(value) });
     await wait(`${control(label)}.value===${JSON.stringify(String(value))}`);
     await run('new Promise(resolve=>requestAnimationFrame(resolve))');
@@ -150,14 +149,15 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   await waitFor(() => fs.existsSync(pdf), 30000, 'Blank grid PDF did not complete');
   assert.equal(fs.readFileSync(pdf).subarray(0, 5).toString(), '%PDF-');
   await run("[...document.querySelectorAll('[role=tab]')].find(node=>node.textContent.trim()==='可视化设计').click(); true");
+  await fill('宽 (mm)', 60);
   await button('页面设置', '.report-designer-v3-header');
   await select('纸张', 'Custom');
   await fill('纸张宽度 (mm)', 80.15); await fill('纸张高度 (mm)', 180.25);
   await button('保存', 'body');
   await wait("document.body.innerText.includes('私人模板已保存')");
   const custom = await request('GetUserReportTemplate', token, undefined, { id: created.body.id });
-  const customPage = JSON.parse(custom.body.contentHtml).page;
-  assert.equal(customPage.size, 'Custom');
+  const customDesign = JSON.parse(custom.body.contentHtml), customPage = customDesign.page;
+  assert.equal(customPage.size, 'Custom'); assert(customDesign.layers.flatMap(layer=>layer.elements).every(element=>element.xHundredthMm+element.widthHundredthMm<=customPage.widthHundredthMm&&element.yHundredthMm+element.heightHundredthMm<=customPage.heightHundredthMm), 'small paper design must fit before PDF output');
   assert.equal(customPage.widthHundredthMm, 8015); assert.equal(customPage.heightHundredthMm, 18025);
   await captureScreenshot(cdp, path.join(output, 'Full-custom-paper-designer.png'), { captureBeyondViewport: false });
   const customPdf = path.join(output, 'desktop-custom-paper.pdf');

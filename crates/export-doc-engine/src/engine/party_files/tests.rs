@@ -2,17 +2,8 @@ use super::*;
 
 #[test]
 fn exports_refresh_permissions_and_only_include_contacts_in_their_independent_scope() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(".codex-runtime/party-export-tests")
-        .join(crate::paths::nonce().unwrap());
-    std::fs::create_dir_all(&root).unwrap();
-    let service =
-        NativeService::open(crate::paths::RuntimePaths::server(&root, &root.join("Data")).unwrap())
-            .unwrap();
+    let directory = crate::engine::test_support::ScratchDirectory::new();
+    let service = directory.service();
     let id = service.store.all("users").unwrap()[0]["id"]
         .as_i64()
         .unwrap();
@@ -73,7 +64,4 @@ fn exports_refresh_permissions_and_only_include_contacts_in_their_independent_sc
             .status,
         Some(403)
     );
-    service.close().unwrap();
-    drop(service);
-    std::fs::remove_dir_all(root).unwrap();
 }

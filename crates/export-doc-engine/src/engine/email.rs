@@ -545,18 +545,8 @@ mod authorization_tests {
     use super::*;
     #[test]
     fn revoked_actor_cannot_start_a_smtp_attempt() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join(".codex-runtime/mail-authorization-tests")
-            .join(paths::nonce().unwrap());
-        std::fs::create_dir_all(&root).unwrap();
-        let service = NativeService::open(
-            crate::paths::RuntimePaths::server(&root, &root.join("Data")).unwrap(),
-        )
-        .unwrap();
+        let directory = crate::engine::test_support::ScratchDirectory::new();
+        let service = directory.service();
         let mut user = service.store.all("users").unwrap().remove(0);
         let id = user["id"].as_i64().unwrap();
         let stale = auth::current_actor(&service.store, id).unwrap();
@@ -591,7 +581,6 @@ mod authorization_tests {
         assert!(service.store.all(KIND).unwrap().is_empty());
         service.close().unwrap();
         drop(service);
-        std::fs::remove_dir_all(root).unwrap();
     }
 }
 pub fn recover(store: &Store) -> Result<()> {

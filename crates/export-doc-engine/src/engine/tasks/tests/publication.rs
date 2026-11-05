@@ -161,7 +161,7 @@ fn business_archive_is_atomic_cancelable_and_survives_task_cleanup() {
 fn saved_location_keeps_the_selected_name_and_survives_download_copy_expiry() {
     let fixture = Fixture::new();
     let (store, jobs) = fixture.open();
-    let target = fixture.root.join("custom-name.pdf");
+    let target = fixture.root.0.join("custom-name.pdf");
     let job = persistence::create(&store, &fixture.actor, "Export", "保存到所选文件").unwrap();
     let id = job["jobId"].as_str().unwrap();
     persistence::finish(
@@ -205,7 +205,7 @@ fn saved_location_keeps_the_selected_name_and_survives_download_copy_expiry() {
 fn metadata_write_failure_restores_a_preexisting_selected_file() {
     let fixture = Fixture::new();
     let store = fixture.store();
-    let target = fixture.root.join("existing.pdf");
+    let target = fixture.root.0.join("existing.pdf");
     fs::write(&target, b"original user output").unwrap();
     let job = persistence::create(&store, &fixture.actor, "Export", "保存冲突").unwrap();
     let id = job["jobId"].as_str().unwrap();
@@ -246,7 +246,7 @@ fn metadata_write_failure_restores_a_preexisting_selected_file() {
 fn recovery_uses_the_database_receipt_to_restore_or_keep_a_published_file() {
     let fixture = Fixture::new();
     let store = fixture.store();
-    let target = fixture.root.join("selected.pdf");
+    let target = fixture.root.0.join("selected.pdf");
     fs::write(&target, b"old").unwrap();
     let job = persistence::create(&store, &fixture.actor, "Export", "中断输出").unwrap();
     let id = job["jobId"].as_str().unwrap();
@@ -283,7 +283,7 @@ fn recovery_uses_the_database_receipt_to_restore_or_keep_a_published_file() {
 fn directory_publication_records_its_location_and_keeps_unexpected_changes() {
     let fixture = Fixture::new();
     let store = fixture.store();
-    let target = fixture.root.join("selected-folder");
+    let target = fixture.root.0.join("selected-folder");
     let job = persistence::create(&store, &fixture.actor, "Export", "文件夹输出").unwrap();
     let id = job["jobId"].as_str().unwrap();
     let make = || TaskOutput {
@@ -325,7 +325,7 @@ fn directory_publication_records_its_location_and_keeps_unexpected_changes() {
 fn queued_finalization_rechecks_account_status_before_publishing() {
     let fixture = Fixture::new();
     let store = fixture.store();
-    let target = fixture.root.join("denied.pdf");
+    let target = fixture.root.0.join("denied.pdf");
     let job = persistence::create(&store, &fixture.actor, "Export", "等待发布").unwrap();
     let id = job["jobId"].as_str().unwrap().to_owned();
     let (started, entered) = mpsc::channel();
@@ -371,7 +371,7 @@ fn queued_finalization_rechecks_account_status_before_publishing() {
 fn recovery_finishes_partial_cleanup_and_compensation_ignores_request_cancellation() {
     let fixture = Fixture::new();
     let store = fixture.store();
-    let target = fixture.root.join("same.pdf");
+    let target = fixture.root.0.join("same.pdf");
     fs::write(&target, b"%PDF-identical").unwrap();
     let job = persistence::create(&store, &fixture.actor, "Export", "恢复清理").unwrap();
     let id = job["jobId"].as_str().unwrap();
@@ -389,7 +389,7 @@ fn recovery_finishes_partial_cleanup_and_compensation_ignores_request_cancellati
     fs::create_dir(&journal).unwrap(); // Exit after removing the last manifest.
     output::recover(&store).unwrap();
     assert!(!journal.exists());
-    let folder = fixture.root.join("partial-folder");
+    let folder = fixture.root.0.join("partial-folder");
     let output = TaskOutput {
         file: None,
         managed_file: None,
@@ -428,15 +428,10 @@ fn postgres_publication_recovery_snapshot_and_final_authorization_share_the_same
     let app = std::env::var("EXPORTDOC_TEST_PUBLICATION_APP").unwrap();
     export_doc_storage::Connection::initialize_postgres(&maintenance, "native_owner").unwrap();
     let mut fixture = Fixture::new();
-    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .to_owned();
-    fixture.paths = RuntimePaths::server(&workspace, &fixture.root.join("Data")).unwrap();
+    let workspace = crate::engine::test_support::workspace_root();
+    fixture.paths = RuntimePaths::server(&workspace, &fixture.root.0.join("Data")).unwrap();
     let store = Store::open_postgres(&fixture.paths, &app).unwrap();
-    let bootstrap = nonce().unwrap();
+    let bootstrap = crate::paths::nonce().unwrap();
     crate::engine::auth::bootstrap(
         &store,
         "admin",
@@ -450,7 +445,7 @@ fn postgres_publication_recovery_snapshot_and_final_authorization_share_the_same
         store.all("users").unwrap()[0]["id"].as_i64().unwrap(),
     )
     .unwrap();
-    let target = fixture.root.join("selected.pdf");
+    let target = fixture.root.0.join("selected.pdf");
     fs::write(&target, b"previous user file").unwrap();
     let job = persistence::create(&store, &actor, "Export", "数据库失败恢复").unwrap();
     let id = job["jobId"].as_str().unwrap();
@@ -557,7 +552,7 @@ fn postgres_publication_recovery_snapshot_and_final_authorization_share_the_same
 fn conflicting_output_sources_fail_without_creating_a_directory_or_file() {
     let fixture = Fixture::new();
     let store = fixture.store();
-    let target = fixture.root.join("must-not-exist");
+    let target = fixture.root.0.join("must-not-exist");
     for no_file in [false, true] {
         let job = persistence::create(&store, &fixture.actor, "Export", "无效输出来源").unwrap();
         let id = job["jobId"].as_str().unwrap();
@@ -590,7 +585,7 @@ fn publication_recovery_honors_the_injected_runtime_cache_root() {
     let mut fixture = Fixture::new();
     fixture.paths.cache_root = fixture.paths.data_root.join("Cache/Alternative");
     let store = fixture.store();
-    let target = fixture.root.join("selected.pdf");
+    let target = fixture.root.0.join("selected.pdf");
     fs::write(&target, b"old").unwrap();
     let job = persistence::create(&store, &fixture.actor, "Export", "显式缓存根").unwrap();
     let id = job["jobId"].as_str().unwrap();
@@ -675,7 +670,7 @@ fn excel_exports_recheck_narrowed_data_scope_in_the_final_transaction() {
     ]);
     crate::engine::accounts::save(&store, &admin, reader.id, account).unwrap();
     for (index, (id, check)) in jobs.into_iter().enumerate() {
-        let target = fixture.root.join(format!("denied-{index}.xlsx"));
+        let target = fixture.root.0.join(format!("denied-{index}.xlsx"));
         persistence::finish(
             &store,
             &reader,

@@ -4,17 +4,8 @@ mod fixture;
 
 #[test]
 fn complete_download_rechecks_private_material_after_the_preparation_snapshot() {
-    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(".codex-runtime/oa-download-tests")
-        .join(crate::paths::nonce().unwrap());
-    std::fs::create_dir_all(&root).unwrap();
-    let _cleanup = crate::test_support::ScratchDirectory(root.clone());
-    let paths = crate::paths::RuntimePaths::server(&root, &root.join("Data")).unwrap();
-    let service = NativeService::open(paths).unwrap();
+    let directory = crate::engine::test_support::ScratchDirectory::new();
+    let service = directory.service();
     let login = fixture::request(
         &service,
         "",

@@ -2,6 +2,10 @@
 
 use super::p256::*;
 use super::*;
+#[cfg(test)]
+use crate::engine::test_support::{
+    ScratchDirectory as Workspace, TestService, administrator as admin,
+};
 use crate::paths::{RuntimePaths, nonce};
 use std::sync::Arc;
 use zip::ZipArchive;
@@ -11,52 +15,9 @@ const TEST_PUBLIC_KEY: &str = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAExmev74ezFtXdB
 const EXPIRING_KEY: &str = "EDM2-eyJ2IjoyLCJtaWQiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiZXhwIjoxOTAwMDAwMDAwfQ.MEUCIQDrRocmME_GTmL7YWYgexFWJAY69hx3Qj7ip0lEJkb-9QIgcRl9Baf4KJww7M9tdoIGvpDub7C7X5zo5b5o4lFhfJs";
 const LIFETIME_KEY: &str = "EDM2-eyJ2IjoyLCJtaWQiOiJhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhIiwiZXhwIjotMX0.MEUCIH4T0GLIyWQFDCXfkHLYyBHaBt6IVRe01Qckr0EaIhvaAiEAtzKoD_FPeRgnt3Nfrdgd4qXOvaOB8Zp1-X2bva-3h3w";
 
-struct Workspace(PathBuf);
-impl Workspace {
-    fn new() -> Self {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join(".codex-runtime")
-            .join("licensing-tests")
-            .join(nonce().unwrap());
-        fs::create_dir_all(root.join("Logs")).unwrap();
-        Self(root)
-    }
-    fn paths(&self) -> RuntimePaths {
-        RuntimePaths {
-            app_root: self.0.clone(),
-            data_root: self.0.clone(),
-            cache_root: self.0.join("Cache"),
-            log_root: self.0.join("Logs"),
-            font_path: self.0.join("font.otf"),
-        }
-    }
-}
-impl Drop for Workspace {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-fn open(workspace: &Workspace) -> Arc<NativeService> {
-    NativeService::open(workspace.paths()).unwrap()
-}
-fn admin() -> Actor {
-    Actor {
-        scope_rules: vec![],
-        context: String::new(),
-        edition: Default::default(),
-        id: 1,
-        name: "系统管理员".into(),
-        company: "DEFAULT".into(),
-        department: "GENERAL".into(),
-        admin: true,
-        grants: vec![],
-        departments: vec![],
-        oa_assigned_only: false,
-    }
+#[cfg(test)]
+fn open(workspace: &Workspace) -> TestService {
+    TestService::open(workspace.paths())
 }
 struct TestVerifier;
 impl SignatureVerifier for TestVerifier {

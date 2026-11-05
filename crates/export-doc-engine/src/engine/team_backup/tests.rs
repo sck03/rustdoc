@@ -6,58 +6,15 @@ use std::time::Instant;
 mod postgres_recovery;
 mod recovery;
 mod replica_protocol;
+pub(super) use crate::engine::test_support::TestService;
+pub(super) use crate::engine::test_support::{
+    ScratchDirectory as Workspace, administrator as admin,
+};
 use crate::paths::nonce;
 use std::{fs, path::PathBuf, sync::Arc};
 
-pub(super) struct Workspace(pub(super) PathBuf);
-impl Workspace {
-    pub(super) fn new() -> Self {
-        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .to_path_buf();
-        let root = workspace
-            .join(".codex-runtime")
-            .join("team-backup-tests")
-            .join(nonce().unwrap());
-        fs::create_dir_all(root.join("Cache")).unwrap();
-        fs::create_dir_all(root.join("Logs")).unwrap();
-        Self(root)
-    }
-    fn paths(&self) -> RuntimePaths {
-        RuntimePaths {
-            app_root: self.0.clone(),
-            data_root: self.0.clone(),
-            cache_root: self.0.join("Cache"),
-            log_root: self.0.join("Logs"),
-            font_path: self.0.join("font.otf"),
-        }
-    }
-}
-impl Drop for Workspace {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-pub(super) fn open_service(workspace: &Workspace) -> Arc<NativeService> {
-    NativeService::open(workspace.paths()).unwrap()
-}
-pub(super) fn admin() -> Actor {
-    Actor {
-        scope_rules: vec![],
-        context: String::new(),
-        edition: Default::default(),
-        id: 1,
-        name: "系统管理员".into(),
-        company: "DEFAULT".into(),
-        department: "GENERAL".into(),
-        admin: true,
-        grants: vec![],
-        departments: vec![],
-        oa_assigned_only: false,
-    }
+pub(super) fn open_service(workspace: &Workspace) -> TestService {
+    TestService::open(workspace.paths())
 }
 
 #[test]

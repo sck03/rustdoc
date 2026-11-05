@@ -45,19 +45,16 @@ pub fn exercise(c: &Connection) {
     assert_eq!(rows[0]["id"], expected[0]);
     assert_eq!(rows[1]["id"], *expected.last().unwrap());
     assert!(rows.iter().all(|row| row.get("privateMarker").is_none()));
-    let mut lookup_ids = expected.clone();
-    lookup_ids.extend_from_slice(&expected);
+    let mut lookup_ids = [expected.as_slice(), expected.as_slice()].concat();
     lookup_ids.push(i64::MAX);
     let indexed = c
         .records_by_ids("crm-contacts", &lookup_ids, &fields)
         .unwrap();
-    assert_eq!(indexed.len(), expected.len());
-    assert_eq!(
+    assert!(
         indexed
             .iter()
             .map(|row| row["id"].as_i64().unwrap())
-            .collect::<Vec<_>>(),
-        expected.iter().rev().copied().collect::<Vec<_>>()
+            .eq(expected.iter().rev().copied())
     );
     assert!(indexed.iter().all(|row| row.get("privateMarker").is_none()));
     let (_, next) = c
@@ -75,12 +72,8 @@ pub fn exercise(c: &Connection) {
     }
     let assessments = RelatedQuery {
         kind: "supplier-assessments",
-        parent_id: 7001,
-        include_other_drafts: false,
-        user_id: 1,
-        fields: &fields,
-        offset: 0,
         limit: 200,
+        ..query
     };
     assert_eq!(c.query_related(&assessments).unwrap().0, 2);
     assert_eq!(

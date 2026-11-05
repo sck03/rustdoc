@@ -1,15 +1,11 @@
 use super::*;
+use crate::engine::test_support::ScratchDirectory;
+use crate::engine::test_support::TestService;
 
 #[test]
 fn migration_fences_block_store_open_before_database_initialization() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(".codex-runtime/authorization-tests")
-        .join(crate::paths::nonce().unwrap());
-    std::fs::create_dir_all(&root).unwrap();
+    let directory = ScratchDirectory::new();
+    let root = &directory.0;
     for (index, marker) in [
         export_doc_storage::maintenance::DATA_ROOT_MIGRATION_PENDING_FILE,
         export_doc_storage::maintenance::DATA_ROOT_MIGRATION_REDIRECT_FILE,
@@ -26,30 +22,18 @@ fn migration_fences_block_store_open_before_database_initialization() {
         assert_eq!(store::Store::open(&paths).err().unwrap().status, Some(503));
         assert!(!paths.sqlite_database_path().exists());
     }
-    std::fs::remove_dir_all(root).unwrap();
 }
 
-fn fixture() -> (std::path::PathBuf, Arc<NativeService>, store::Actor) {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(".codex-runtime/authorization-tests")
-        .join(crate::paths::nonce().unwrap());
-    std::fs::create_dir_all(&root).unwrap();
-    let service =
-        NativeService::open(RuntimePaths::server(&root, &root.join("Data")).unwrap()).unwrap();
-    let admin_id = service.store.all("users").unwrap()[0]["id"]
-        .as_i64()
-        .unwrap();
-    let admin = auth::current_actor(&service.store, admin_id).unwrap();
+fn fixture() -> (ScratchDirectory, TestService, store::Actor) {
+    let root = ScratchDirectory::new();
+    let service = root.service();
+    let admin = auth::current_actor(&service.store, 1).unwrap();
     (root, service, admin)
 }
 
 #[test]
 fn supplier_overview_refreshes_scope_and_revocation_inside_the_read_snapshot() {
-    let (root, service, admin) = fixture();
+    let (_root, service, admin) = fixture();
     service
         .store
         .transaction(|tx| {
@@ -81,14 +65,11 @@ fn supplier_overview_refreshes_scope_and_revocation_inside_the_read_snapshot() {
             .status,
         Some(403)
     );
-    service.close().unwrap();
-    drop(service);
-    std::fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
 fn exact_product_lookup_is_independent_of_fuzzy_pages_and_keeps_visibility() {
-    let (root, service, admin) = fixture();
+    let (_root, service, admin) = fixture();
     service
         .store
         .transaction(|tx| {
@@ -174,14 +155,11 @@ fn exact_product_lookup_is_independent_of_fuzzy_pages_and_keeps_visibility() {
         .status,
         Some(403)
     );
-    service.close().unwrap();
-    drop(service);
-    std::fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
 fn queued_writes_refresh_permissions_before_the_transaction() {
-    let (root, service, admin) = fixture();
+    let (_root, service, admin) = fixture();
     let saved = accounts::save(&service.store, &admin, 0, json!({"username":"revoked","fullName":"待停用账号","role":"Admin","companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Revocation-Test-2026"})).unwrap();
     let mut account = saved["user"].clone();
     let id = account["id"].as_i64().unwrap();
@@ -343,14 +321,11 @@ fn queued_writes_refresh_permissions_before_the_transaction() {
         .status,
         Some(403)
     );
-    service.close().unwrap();
-    drop(service);
-    std::fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
 fn existing_dangling_opportunity_product_links_fail_instead_of_returning_empty_product_data() {
-    let (root, service, admin) = fixture();
+    let (_root, service, admin) = fixture();
     service
         .store
         .transaction(|tx| {
@@ -391,7 +366,4 @@ fn existing_dangling_opportunity_product_links_fail_instead_of_returning_empty_p
             .status,
         Some(404)
     );
-    service.close().unwrap();
-    drop(service);
-    std::fs::remove_dir_all(root).unwrap();
 }

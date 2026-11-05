@@ -1,24 +1,9 @@
 use super::*;
-use crate::paths::RuntimePaths;
 
 #[test]
 fn settings_wake_one_worker_and_disabling_or_closing_joins_it() {
-    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(".codex-runtime/exchange-tests")
-        .join(crate::paths::nonce().unwrap());
-    std::fs::create_dir_all(&root).unwrap();
-    let service = NativeService::open(RuntimePaths {
-        app_root: root.clone(),
-        data_root: root.clone(),
-        cache_root: root.join("Cache"),
-        log_root: root.join("Logs"),
-        font_path: root.join("font.otf"),
-    })
-    .unwrap();
+    let directory = crate::engine::test_support::ScratchDirectory::new();
+    let service = crate::engine::test_support::TestService::open(directory.paths());
     let scheduler = &service.exchange_scheduler;
     assert!(scheduler.worker.lock().unwrap().is_none());
     // Maintenance defers the worker before any network request. This exercises
@@ -70,5 +55,4 @@ fn settings_wake_one_worker_and_disabling_or_closing_joins_it() {
     service.close().unwrap();
     drop(maintenance);
     drop(service);
-    std::fs::remove_dir_all(root).unwrap();
 }

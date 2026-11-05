@@ -2,9 +2,9 @@ use super::*;
 #[path = "../../../tests/support/approval_fixture.rs"]
 mod workflow;
 use crate::{
+    engine::test_support::ScratchDirectory,
     generated_api::*,
     paths::{RuntimePaths, nonce},
-    test_support::ScratchDirectory,
 };
 
 fn login(service: &NativeService) -> Value {
@@ -33,15 +33,8 @@ fn command(service: &NativeService, token: &str, op: Operation, row: &Value) -> 
 }
 #[test]
 fn future_personnel_changes_and_reminders_survive_restart_without_duplicates() {
-    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(".codex-runtime/workflow-runtime-tests")
-        .join(nonce().unwrap());
-    std::fs::create_dir_all(&root).unwrap();
-    let _cleanup = ScratchDirectory(root.clone());
+    let directory = ScratchDirectory::new();
+    let root = &directory.0;
     let paths = RuntimePaths::server(&root, &root.join("Data")).unwrap();
     let service = NativeService::open(paths.clone()).unwrap();
     let session = login(&service);
@@ -280,15 +273,8 @@ fn future_personnel_changes_and_reminders_survive_restart_without_duplicates() {
 }
 #[test]
 fn scheduled_publication_and_hierarchical_escalation_are_durable_and_never_sign() {
-    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .join(".codex-runtime/workflow-runtime-tests")
-        .join(nonce().unwrap());
-    std::fs::create_dir_all(&root).unwrap();
-    let _cleanup = ScratchDirectory(root.clone());
+    let directory = ScratchDirectory::new();
+    let root = &directory.0;
     let paths = RuntimePaths::server(&root, &root.join("Data")).unwrap();
     let service = NativeService::open(paths.clone()).unwrap();
     let session = login(&service);

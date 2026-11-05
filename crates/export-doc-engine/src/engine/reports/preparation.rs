@@ -13,17 +13,12 @@ mod tests {
     use super::*;
     #[test]
     fn all_templates_keep_the_same_source_after_the_saved_invoice_changes() {
-        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .to_path_buf();
-        let root = workspace
-            .join(".codex-runtime/report-snapshot-tests")
-            .join(paths::nonce().unwrap());
-        std::fs::create_dir_all(&root).unwrap();
-        let paths = crate::paths::RuntimePaths::server(&workspace, &root.join("Data")).unwrap();
+        let directory = crate::engine::test_support::ScratchDirectory::new();
+        let paths = crate::paths::RuntimePaths::server(
+            &crate::engine::test_support::workspace_root(),
+            &directory.0.join("Data"),
+        )
+        .unwrap();
         let store = Store::open(&paths).unwrap();
         auth::seed(&store).unwrap();
         let actor = auth::current_actor(&store, 1).unwrap();
@@ -78,7 +73,6 @@ mod tests {
             assert!(!svg.contains("SNAPSHOT-NEW"));
         }
         drop(store);
-        std::fs::remove_dir_all(root).unwrap();
     }
 }
 impl PreparedReport {
