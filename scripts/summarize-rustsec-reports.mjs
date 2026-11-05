@@ -9,5 +9,9 @@ for (const file of reports) {
   for (const finding of report.vulnerabilities.list) {
     console.log(`  ${finding.advisory.id}: ${finding.package.name} ${finding.package.version}: ${finding.advisory.title}; patched ${finding.versions.patched.join(", ") || "none"}.`);
   }
-  for (const finding of report.warnings?.unsound || []) console.log(`  unsound: ${finding.advisory.id}: ${finding.package.name} ${finding.package.version}.`);
+  for (const [kind, findings] of Object.entries(report.warnings ?? {})) {
+    for (const finding of findings) {
+      console.log(`  ${kind}: ${finding.package.name} ${finding.package.version}${finding.advisory ? `: ${finding.advisory.id}: ${finding.advisory.title}` : ""}.`);
+    }
+  }
 }

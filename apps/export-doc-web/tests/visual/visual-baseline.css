@@ -1,6 +1,10 @@
 /* Visual acceptance uses the same named cascade order as the application. */
 @import "../../src/styles/index.css";
 
+:root {
+  --edm-font-sans: "ExportDoc Visual Sans", sans-serif;
+}
+
 /* Keep screenshot glyphs independent of fonts installed on the test host.
    These OFL faces come from the existing, checksum-verified resource manifest. */
 @font-face {
