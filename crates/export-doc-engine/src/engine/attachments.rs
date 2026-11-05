@@ -179,7 +179,11 @@ pub fn handle(
             set_permissions(&mut record, actor, &parent);
             let category_id = record["categoryId"].as_i64().ok_or_else(|| unavailable("资料分类编号无效。"))?;
             record["categoryName"] = store::get(tx, "attachment-categories", category_id)?["name"].clone();
-            let events = record["events"].as_array().ok_or_else(|| unavailable("资料事件历史无效。"))?.clone();
+            let events = match record.get("events") {
+                None => &[][..],
+                Some(Value::Array(events)) => events.as_slice(),
+                _ => return Err(unavailable("资料事件历史无效。")),
+            };
             Ok(json!({"attachment":record,"revisions":record["revisions"],"eventCount":events.len(),"events":events}))
         })?
     } else if operation == DOWNLOAD_BUSINESS_ATTACHMENT
@@ -262,7 +266,7 @@ pub fn handle(
                         } else {
                             "Confirm"
                         };
-                        append_event(&mut record, actor, event_action, &body);
+                        append_event(&mut record, actor, event_action, &body)?;
                         record["currentRevision"] = body["currentRevision"].clone();
                         record["isArchived"] = body["isArchived"].clone();
                     } else {
@@ -279,7 +283,7 @@ pub fn handle(
                             record[key] = body[key].clone();
                         }
                         record["categoryName"] = category["name"].clone();
-                        append_event(&mut record, actor, "Edit", &body);
+                        append_event(&mut record, actor, "Edit", &body)?;
                     }
                     store::save(
                         transaction,
@@ -337,11 +341,16 @@ fn indexed_records(
         })
         .collect()
 }
-fn append_event(record: &mut Value, actor: &Actor, action: &str, body: &Value) {
-    if !record["events"].is_array() {
-        record["events"] = json!([]);
-    }
-    record["events"].as_array_mut().unwrap().push(json!({"action":action,"revision":body["currentRevision"],"actorName":actor.name,"note":text(body,"note"),"createdAt":store::timestamp()}));
+fn append_event(record: &mut Value, actor: &Actor, action: &str, body: &Value) -> Result<()> {
+    let events = record
+        .as_object_mut()
+        .ok_or_else(|| unavailable("资料记录格式无效。"))?
+        .entry("events")
+        .or_insert_with(|| json!([]))
+        .as_array_mut()
+        .ok_or_else(|| unavailable("资料事件历史无效。"))?;
+    events.push(json!({"action":action,"revision":body["currentRevision"],"actorName":actor.name,"note":text(body,"note"),"createdAt":store::timestamp()}));
+    Ok(())
 }
 #[cfg(test)]
 mod tests;

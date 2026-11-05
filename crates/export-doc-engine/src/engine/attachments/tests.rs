@@ -168,6 +168,43 @@ fn oversized_stored_attachment_is_rejected_and_extension_case_is_preserved() {
 }
 
 #[test]
+fn a_new_attachment_has_an_empty_event_history_and_can_be_archived() {
+    let f = fixture();
+    let parameters = [("id", f.id.to_string())];
+    let details = || -> Value {
+        serde_json::from_slice(
+            &handle(
+                &f.store,
+                &f.actor,
+                GET_BUSINESS_ATTACHMENT,
+                &parameters,
+                &[],
+                Value::Null,
+            )
+            .unwrap(),
+        )
+        .unwrap()
+    };
+    let initial = details();
+    assert_eq!(initial["eventCount"], 0);
+    assert_eq!(initial["events"], json!([]));
+    assert_eq!(initial["revisions"].as_array().unwrap().len(), 1);
+    handle(
+        &f.store,
+        &f.actor,
+        UPDATE_BUSINESS_ATTACHMENT,
+        &parameters,
+        &[],
+        json!({"versionNumber":initial["attachment"]["versionNumber"],"currentRevision":1,"isArchived":true,"note":"归档测试"}),
+    )
+    .unwrap();
+    let archived = details();
+    assert_eq!(archived["eventCount"], 1);
+    assert_eq!(archived["events"][0]["action"], "Archive");
+    assert_eq!(archived["attachment"]["isArchived"], true);
+}
+
+#[test]
 fn corrupt_attachment_events_are_not_reported_as_an_empty_history() {
     let f = fixture();
     f.store
@@ -191,4 +228,22 @@ fn corrupt_attachment_events_are_not_reported_as_an_empty_history() {
         .status,
         Some(503)
     );
+    let before = store::get(&f.store.connection().unwrap(), "attachments", f.id).unwrap();
+    assert_eq!(
+        handle(
+            &f.store,
+            &f.actor,
+            UPDATE_BUSINESS_ATTACHMENT,
+            &[("id", f.id.to_string())],
+            &[],
+            json!({"versionNumber":before["versionNumber"],"currentRevision":1,"isArchived":true,"note":"不得覆盖损坏历史"}),
+        )
+        .unwrap_err()
+        .status,
+        Some(503)
+    );
+    let saved = store::get(&f.store.connection().unwrap(), "attachments", f.id).unwrap();
+    assert_eq!(saved["events"], "corrupted");
+    assert_eq!(saved["isArchived"], false);
+    assert_eq!(saved["versionNumber"], before["versionNumber"]);
 }
