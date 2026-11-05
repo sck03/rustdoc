@@ -46,7 +46,7 @@ export async function verifyDesktopOfficePermissions({ run, request, token, cdp,
     { ...identity, resetPassword: '', expectedVersion: person.account.versionNumber, permissionGrants }, { id: account.body.user.id });
   assert.equal(updated.status, 200);
   // A permission change revokes the old session; reload and authenticate afresh.
-  await run('location.reload(); true');
+  await cdp.send('Page.reload');
   await signIn();
   await run("location.hash='#/reports/templates/manage'; true");
   const templateDeadline = Date.now() + 30000;

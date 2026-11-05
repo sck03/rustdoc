@@ -65,7 +65,7 @@ export async function verifyDesktopEntryRows({ run, request, token, cdp, output 
   ]);
   assert.equal(saved.totalAmount, 114142);
   assert.equal(saved.totalCartons, 516);
-  await run('location.reload(); true');
+  await cdp.send('Page.reload');
   await wait("document.querySelector('[aria-label=\"按录入行打印明细\"]')");
   assert.equal(await run("document.querySelectorAll('[aria-label=\"按录入行打印明细\"] tbody tr').length"), 4);
   await run("document.querySelector('[aria-label=\"打印第 4 行描述\"]').focus(); true");
