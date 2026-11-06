@@ -73,6 +73,7 @@ fn positive(value: &Value, key: &str) -> Result<i64> {
 }
 
 pub(crate) fn freeze(db: &(impl Adapter + ?Sized), id: i64, snapshot: &Value) -> Result<()> {
+    let archive_id = id;
     let request = positive(snapshot, "requestId")?;
     let revision = positive(snapshot, "submissionNumber")?;
     let mut owner = Statement::new(db);
@@ -126,7 +127,7 @@ pub(crate) fn freeze(db: &(impl Adapter + ?Sized), id: i64, snapshot: &Value) ->
     let count = s.execute(db, &format!("INSERT INTO request_revisions(id,request_id,revision,body) VALUES({id},{request},{revision},{body}) ON CONFLICT(id) DO NOTHING"))?;
     if count == 0 {
         let mut s = Statement::new(db);
-        let id = s.number(snapshot["id"].as_i64().unwrap_or(0));
+        let id = s.number(archive_id);
         let result = s.query(
             db,
             &format!(

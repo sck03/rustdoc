@@ -47,14 +47,15 @@
   margin: 0;
   color: var(--edm-neutral-750);
   font-size: var(--edm-font-size-md);
-  font-weight: 700;
+  line-height: var(--edm-line-height-md);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .agent-consignment-card-header span {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
-  line-height: 1.45;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .agent-consignment-compact-grid {
@@ -97,7 +98,8 @@
 .agent-consignment-receipt-card span {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .agent-consignment-receipt-card strong {
@@ -105,6 +107,7 @@
   overflow: hidden;
   color: var(--edm-neutral-800);
   font-size: var(--edm-font-size-lg);
+  line-height: var(--edm-line-height-lg);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -118,7 +121,8 @@
   border: 1px dashed var(--edm-neutral-400);
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .coo-items-workbench {
@@ -153,13 +157,15 @@
 .coo-items-rail-header strong {
   color: var(--edm-neutral-750);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .coo-items-rail-header span {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .coo-items-list {
@@ -212,7 +218,8 @@
   border: 1px solid var(--edm-primary-150);
   border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .coo-item-row-card-main,
@@ -225,14 +232,16 @@
 
 .coo-item-row-card-main {
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .coo-item-row-card-meta {
   grid-column: 2;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .coo-item-detail-panel {
@@ -263,7 +272,8 @@
 .coo-item-detail-title span {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .coo-item-detail-title strong {
@@ -271,6 +281,7 @@
   overflow: hidden;
   color: var(--edm-neutral-800);
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -306,6 +317,7 @@
   margin: 0;
   color: var(--edm-neutral-750);
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
 }
 
 .coo-item-field-grid {
@@ -460,7 +472,7 @@
 
 .single-window-review-source-diff summary {
   cursor: pointer;
-  font-weight: 700;
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .single-window-review-source-diff pre {
@@ -544,6 +556,7 @@
   margin: 0;
   color: var(--edm-neutral-800);
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
 }
 
 .receipt-package-keep {

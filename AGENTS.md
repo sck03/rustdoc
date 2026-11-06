@@ -1,6 +1,8 @@
-# ExportDocManager Tauri + React + Rust 重构协作与工程规则
+# ExportDocManager Tauri + React + Rust 协作与工程规则
 
-本文件适用于 Rust 重构分支及其 worktree。用户于 2026-09-20 明确调整为 Tauri 2 最新稳定版 + React + Rust：桌面使用 Tauri + React + SQLite，网页／Docker 使用同一 React 前端 + Rust HTTP 服务 + PostgreSQL 18。直接复用原 C# 项目的前端（只读对照来源为 `ba9dbdca72590b06c5f32740e4cd58d3027578da` 与 Git 历史），后端统一 Rust，停用并删除 Slint／egui 客户端。Tauri 只负责桌面宿主，不在浏览器或容器中运行桌面壳。本文描述修改、验证和交付规则，不表示全部迁移已完成。用户明确指令优先；当前进度以源码、`docs/当前架构事实.md` 和 `docs/Rust原生架构与选型.md` 为准。
+本文件适用于当前仓库及其 worktree，按 2026-11-06 的项目状态维护。桌面使用 Tauri 2 + React 19 + Rust + SQLite；网页／Docker 使用同一 React 前端 + Rust HTTP 服务 + PostgreSQL 18。Tauri 只负责桌面宿主。用户明确指令优先；当前实现与验收范围以源码、`docs/当前架构事实.md` 和对应验收记录为准。
+
+旧 C#/.NET 源码、测试、工程、SDK 配置及部署链已清理，Slint／egui 客户端也已删除。日常开发、构建和验收围绕现有 Rust/React 实现，不恢复这些退役工程或运行依赖。历史行为只在任务需要时从 Git 追溯；仍被当前测试使用的冻结契约、参考数据和夹具继续保留。
 
 ## 1. 开始工作前
 
@@ -12,35 +14,35 @@
    git fetch origin main
    ```
 
-2. 先读以下事实源，再决定修改位置：
+2. 先读 `docs/当前架构事实.md` 和 `docs/Rust原生架构与选型.md` 中与任务相关的内容，再决定修改位置。其余资料按改动范围查阅；同一会话已读且未变化的内容不重复通读：
 
    - `docs/当前架构事实.md`：当前部署、目录、数据库、API 和模块边界的唯一事实源。
-   - `docs/Rust原生架构与选型.md`：本分支的 Rust 实现、未完成项目、许可与原生验收边界；区分重构事实和保留的 C# 对照基线。
+   - `docs/Rust原生架构与选型.md`：当前实现、选型、许可与未完成验收边界。
    - `docs/Rust桌面平台适配与验收.md`：Tauri 稳定版本证据、跨平台适配边界，以及各 OS／架构分别完成的检查。
    - `docs/产品架构与文档总览.md`：产品形态、运行方式和门禁总览。
    - `docs/程序改进重构进度文档.md`：按日期保存的实施证据；旧条目只用于追溯，不能当作当前契约。
    - `docs/运行目录与路径存储审查清单.md`：路径、缓存、临时文件和系统目录审查规则。
    - `docs/多平台与多架构支持矩阵.md`：RID、平台、架构和真机验收边界。
-   - `scripts/README.md` 与 `scripts/clean-generated-artifacts.ps1`：脚本入口和空间清理边界。
+   - `scripts/README.md`：构建、运行与验证入口；执行空间清理前另读 `scripts/clean-generated-artifacts.ps1`。
 
 3. 如果工作树已有修改，必须保留并避开无关文件；不要用 `git reset --hard`、`git checkout --`、广泛 `Remove-Item` 或其它不可逆操作覆盖用户工作。
 
 ## 2. 项目形态与目录边界
 
-- 2026-09-30 产品定位：正式桌面交付 Document 单证版与 Sales 业务员版，单证版为主力，Sales 定位个人外贸工作台；网页/Docker 多用户 Full 保留完整功能。按用户本日明确要求，本地脚本另支持显式 `-Edition Full` 生成 **Full + SQLite 单机测试便携包**，用于完整界面布局、公告通知与 OA 登记流程测试，使用独立 Full 目录和测试包身份。默认单版仍为 Document，批量 All/正式发布/安装器仍只生成 Document、Sales；不恢复 Administration 单机包，不删除共享实现或已有数据。Full SQLite 测试不替代 PostgreSQL 多用户权限、并发和部署验收。
+- 正式桌面交付 Document 单证版与 Sales 业务员版，单证版为主力，Sales 定位个人外贸工作台；网页/Docker 多用户 Full 保留完整功能。本地脚本支持显式 `-Edition Full` 生成 **Full + SQLite 单机测试便携包**，用于完整界面、公告通知与 OA 流程测试，使用独立 Full 目录和测试包身份。默认单版为 Document，批量 All/正式发布/安装器只生成 Document、Sales；活动产品目录不含 Administration。Full SQLite 测试不替代 PostgreSQL 多用户权限、并发和部署验收。
 
-- 正式桌面为 `apps/export-doc-tauri`，复用 `apps/export-doc-web` 的原版 React 界面；Tauri 在进程内托管共用 Rust HTTP 适配器与 SQLite 应用服务，不启动 .NET sidecar。Node 仅用于构建，WebView 是明确采用的桌面显示组件。
-- 网页前端继续位于 `apps/export-doc-web`，保留 React 19、原布局和操作；`apps/export-doc-server` 是 Rust HTTP 组合根，团队及 Docker 使用 PostgreSQL 18，不能改用 SQLite 或把数据库账号交给前端。
+- 正式桌面为 `apps/export-doc-tauri`，复用 `apps/export-doc-web` 的 React 界面；Tauri 在进程内托管共用 Rust HTTP 适配器与 SQLite 应用服务。Node 仅用于构建和开发验证，WebView 是桌面显示组件。
+- `apps/export-doc-web` 是唯一 React 前端，保留已确认的业务结构与操作习惯；`apps/export-doc-server` 是 Rust HTTP 组合根，团队及 Docker 使用 PostgreSQL 18，不能改用 SQLite 或把数据库账号交给前端。
 - `crates/export-doc-contracts` 管理生成的 API 契约；`export-doc-domain` 放纯业务规则；`export-doc-engine` 编排用例；`export-doc-storage` 提供存储边界与 SQLite／PostgreSQL 适配。数据库 SQL 不进入 UI 或用例协调器，Domain 不引用 GUI、HTTP、数据库、进程或宿主文件系统。
 - UI 状态／事件、应用用例、业务校验、存储、文件、报表／PDF、Excel、OCR、邮件和系统集成须按职责分模块。能力依赖按 Cargo feature 或独立 crate 裁剪，核心不得为了单一可选功能拉入整套浏览器实现。
 - Excel 能力位于 `crates/export-doc-excel`，由组合根显式启用 `excel` feature；现有 `tools/excel-analyzer-rs` 同时提供库和对照 CLI，禁止复制第二套表头／字段识别器。文件任务位于 `engine::tasks`，状态和结果事务化发布，文件预览不得隐式写入正式业务数据。
 - Windows、Linux、macOS 桌面共同维护一套 Tauri 2 + React + Rust + SQLite 源码；Windows 在当前宿主优先运行验证，其它目标在对应 runner／设备验收。原生窗口句柄、对话框、剪贴板、打印、进程树和安装包进入平台适配边界，禁止把 Windows 路径、COM／Win32 或 Linux／macOS 命令散入业务层。每个平台分别记录编译、运行和功能证据，预留接口不等于已支持。
-- `ba9dbdca72590b06c5f32740e4cd58d3027578da` 与 Git 历史只读作为界面、后端和操作流程基线。2026-10-02 起 Rust 仓库使用自身 `.git`，旧 C# 目录已退出工作流程；原数据及私有资料另存本地备份，不再依赖相邻工作树。按用户 2026-09-28 清理要求，本分支删除已退役的 C# 源码、测试、工程和部署文件；只保留仍被 Rust 使用的冻结契约、参考数据和跨实现夹具。Slint／egui 已删除，不维护第二套桌面界面；清理旧源码不代表剩余迁移差距已验收。
-- 不以通用 JSON 表单或同名路由代替原有完整业务。逐项对照主导航、页签、表单顺序、表格编辑、键盘／中文 IME、权限、并发、导入导出、报表和维护流程；未完成或未验收的能力须明确记录。
-- 按用户 2026-09-20 的要求，优先逐页完成原版界面、后端用例和操作衔接，积累一批后集中联调，最后统一执行完整门禁。开发中只做必要的快速编译和针对实际失败的回归，不在每个模块后重复全量构建／测试；已经通过且未受后续修改影响的检查不重复运行。
+- 历史行为对照来源为 Git 提交 `ba9dbdca72590b06c5f32740e4cd58d3027578da` 及后续历史，不依赖相邻旧目录或备份工作树。当前源码、正式契约及用户已确认的变更优先，不按旧截图或旧接口回退现有设计。
+- 不以通用 JSON 表单或同名路由代替完整业务。涉及功能调整时核对导航、页签、表单、表格编辑、键盘／中文 IME、权限、并发、导入导出、报表和维护流程；未完成或未验收的能力须明确记录。
+- 按批次完成界面、后端用例和操作衔接，集中联调后统一执行完整门禁。开发中只做必要的快速编译和针对实际失败的回归，不在每个模块后重复全量构建／测试；已经通过且未受后续修改影响的检查不重复运行。
 - 原生界面统一提供可折叠分区：常用内容默认展开，地址／银行明细、备用字段、信用证、高级设置等低频内容默认收起。展开状态保存在当前界面会话内；收起不丢失草稿、已保存数据或校验，出错时自动展开对应分区。
 - `src`、`crates`、`apps`、`tests`、`tools` 中的 `bin/`、`obj/`、`dist/`、`target/`、`node_modules/`，以及根 `target/`、`artifacts/`、`TestResults/`、`.codex-runtime/` 都是生成或本地工作区，不得提交到 Git。
-- 原生迁移必须按功能、权限、数据、界面和交付分别验证；创建窗口、生成 API 路由或通过编译不代表功能等价。原版行为从只读备份分支和 Git 历史追溯，仍参与验证的冻结契约、参考数据与有效夹具继续保留。不能把原版测试结果写成 Rust 已通过；清理无调用的旧实现前须核对生产引用和当前验收范围。
+- 验收必须按功能、权限、数据、界面和交付分别记录；创建窗口、生成 API 路由或通过编译不代表功能完整。历史测试结果不作为当前实现通过的证据；清理无调用实现或测试夹具前须核对生产引用和当前验收范围。
 
 ## 3. 架构不变量
 
@@ -49,7 +51,7 @@
 - 所有持久化路径由启动组合根显式注入 `AppRoot`/`DataRoot`，使用 `RuntimePaths`／受管路径接口；服务不得自行构造全局路径提供器，也不得在静态字段中缓存宿主路径。
 - 数据库、配置、日志、备份、模板、缓存、浏览器 profile、PostgreSQL 客户端、OCR/浏览器资源和随包工具必须落在运行目录或明确职责的容器层；不要默认写入 `C:\Users\...\AppData`、系统 TEMP、ProgramData 或系统级工具缓存。
 - 配置中保存相对路径；写入、读取、迁移前后都必须验证仍在受管根目录内，并拒绝符号链接、联接点、路径穿越、磁盘根和不可写目录。
-- SQLite 仅用于桌面单机；团队/服务器/容器模式使用 PostgreSQL 18。按用户尚未生产部署且不保留旧库兼容的授权，二期于 2026-11-04 冻结全新 schema 13；schema 12 是 2026-11-02 的历史基线。只接受 schema 13；旧库、空文件、损坏库、版本不明或超前版本报错，不自动删除或覆盖。只有确认数据库不存在才能初始化，重建使用显式新 DataRoot 或新 PostgreSQL 数据库；备份恢复同样拒绝旧 schema。SQLite 业务库统一在 DataRoot/Database；PostgreSQL 初始化与恢复使用独立维护账号，普通 API 不获得 DDL 权限。Full SQLite 与 PostgreSQL 共用人员身份、发布流程、审批任务和权限规则，不保留单机直接登记审批分支。
+- SQLite 仅用于桌面单机；团队/服务器/容器模式使用 PostgreSQL 18。当前只接受全新 schema 14；按用户授权不维护旧库兼容链。旧库、空文件、损坏库、版本不明或超前版本报错，不自动删除或覆盖。只有确认数据库不存在才能初始化，重建使用显式新 DataRoot 或新 PostgreSQL 数据库；备份恢复同样拒绝旧 schema。SQLite 业务库统一在 DataRoot/Database；PostgreSQL 初始化与恢复使用独立维护账号，普通 API 不获得 DDL 权限。Full SQLite 与 PostgreSQL 共用人员身份、发布流程、审批任务和权限规则，不保留单机直接登记审批分支。
 - 单 API 实例锁、后台任务、恢复和迁移必须保持 fail-closed；不能把数据库/文件系统故障伪装成空列表或普通业务冲突。
 
 ### 3.2 跨平台路径、文件名和时间
@@ -61,7 +63,7 @@
 
 ### 3.3 API、错误和契约
 
-- `/openapi/v1.json` 是唯一对外 API 契约事实源。`export-doc-contracts::native_contract` 提供原生定义，`openapi` 和生成器从该定义投影 OpenAPI、运行契约、Rust DTO/路由/权限元数据及 React 按域客户端。旧冻结 .NET 组合链已退役，已审阅的发布契约只保留在测试夹具中作语义/元数据对照。按用户明确授权，OA/组织新模型不兼容旧接口；组织编辑/删除使用稳定 ID，旧代码路由退役。回归须逐项证明明确变更，其余端点、schema、认证、错误和权限继续保留验证。禁止手改生成文件或建立第二套 endpoint/schema；修改原生定义或生成器时须验证 schema、错误、认证、权限和容量元数据，不能静默变更契约。
+- `/openapi/v1.json` 是唯一对外 API 契约事实源。`export-doc-contracts::native_contract` 提供原生定义，`openapi` 和生成器从该定义投影 OpenAPI、运行契约、Rust DTO/路由/权限元数据及 React 按域客户端。冻结发布契约只在测试夹具中作语义/元数据对照。OA/组织使用现行模型，组织编辑/删除使用稳定 ID，不恢复旧代码路由。回归须逐项证明明确变更，其余端点、schema、认证、错误和权限继续保留验证。禁止手改生成文件或建立第二套 endpoint/schema；修改原生定义或生成器时须验证 schema、错误、认证、权限和容量元数据，不能静默变更契约。
 - 端点认证、桌面令牌和许可证要求使用 endpoint metadata；不要按 `/api` 前缀、路径白名单或前端路由猜测授权。
 - 业务错误按现有分类映射：校验 400、权限 403、明确资源不存在 404、冲突 409、繁忙 429、依赖不可用 503、超时 504；不要把数据库、文件或外部工具故障包装成 404/409。
 - 所有异步公共操作都要有明确取消边界、超时和资源清理；后台任务完成、失败、取消和输出清理必须可观察且幂等。
@@ -76,46 +78,48 @@
 
 ## 4. 依赖与许可证策略（硬约束）
 
-当前交付依赖以 Cargo workspace 的 `Cargo.toml`／`Cargo.lock`、React／Tauri 的 `package.json`／`package-lock.json` 和 `eng/native-runtime-packages.json` 为准。升级后同步 notices、锁文件和治理证据。本分支不再保留 .NET 工程与 SDK 配置，API 契约与两端客户端统一由 Rust 生成；Node 用于前端构建与开发验证。
+当前交付依赖以 Cargo workspace 的 `Cargo.toml`／`Cargo.lock`、React／Tauri 的 `package.json`／`package-lock.json` 和 `eng/native-runtime-packages.json` 为准。升级后同步 notices、锁文件和治理证据。
 
 普通依赖的精确版本以中央清单和锁文件为准，不在本规范复制容易过期的版本表。根 Cargo workspace 集中管理 Rust 基线及共享依赖；前端保持 React 19，不把无关升级混入业务修复。
 
 - 发布包默认包含对应产品已实现的 OCR 资源；`-WithoutOcr` 只用于明确不提供识别的轻量校验包，不能冒充 Full 发布。启动时核查系统 WebView 和已声明的原生资源。
 - Tauri 核心、构建工具、前端 API 和插件采用查询时官方最新稳定 2.x，并在 Cargo/npm 清单与锁文件精确固定；核对 MIT／Apache-2.0 等实际许可，生成 notices 与依赖治理证据，不把“2.0”理解为锁回初始 2.0.0。
-- 桌面交付依赖树必须包含 Tauri／平台 WebView 和 SQLite，排除 Slint／egui、PostgreSQL 服务端适配器、Node 与 .NET 运行依赖。网页／容器不引入桌面 Tauri 库；可选受控工具单独声明用途、来源、许可和真实功能边界。
+- 桌面交付依赖树必须包含 Tauri／平台 WebView 和 SQLite，排除 PostgreSQL 服务端适配器及构建工具运行依赖。网页／容器不引入桌面 Tauri 库；可选受控工具单独声明用途、来源、许可和真实功能边界。
 
-### Rust 交付与原 C# 对照边界
+### 原生资源与交付清单
 
-业务后端与桌面宿主使用 Rust、三端界面使用同一 React；Excel／报表分别由 `export-doc-excel`／`export-doc-report` 承担。Rust 交付不包含 NPOI、托管程序集或 .NET Runtime，构建及部署不调用 dotnet restore/publish。PDFium／ONNX 可以从已核验的 NuGet 原生归档抽取库文件与许可原文，这不引入 NuGet 客户端或 .NET 运行依赖。
+Excel／报表分别由 `export-doc-excel`／`export-doc-report` 承担。PDFium／ONNX 仍从已核验的 NuGet 原生归档抽取库文件与许可原文；NuGet 是归档来源，不需要 NuGet 客户端或 .NET SDK／Runtime。不得把这些有效原生资源当作退役工程残留删除。
 
-只读 C# 基线的 NPOI `2.7.6`、.NET 10 与 xUnit v3 仅用于历史对照，不在当前仓库维护其 SDK、工程或锁图；NPOI `2.8.0` 的额外维护费用条款不属于批准的依赖路线。Rust notices／SBOM 只采集 npm、Cargo 和受管原生资源，不能把历史对照依赖写成当前交付依赖。
+notices／SBOM 只采集当前 npm、Cargo 和受管原生资源；历史依赖版本与许可争议留在历史记录，不作为当前安装、升级或治理清单。
 
 其它依赖规则：
 
 - 优先免费开源、许可证清晰、维护活跃、能离线/受控打包的库；禁止商业格式锁定、未审查二进制和不明来源下载。
 - 依赖升级必须是独立、可审计的变更；不要把 React、lucide 等大版本迁移与无关业务修复混在同一未说明的补丁中。
 - 依赖校验和治理门禁也必须遵守精简原则：共享解析、版本判定和错误格式化逻辑，避免同一规则在多个脚本中复制；不要为旧版本、旧锁文件或历史生成物增加兼容分支，规则变化时直接更新正式契约、锁文件和最小回归测试。
-- 运行时浏览器、Cargo、NuGet、npm 缓存应定向到仓库运行目录或 CI workspace，避免写系统 C 盘；清理缓存前必须确认可重新获得且用户接受重新下载。
+- 浏览器、Cargo、npm 和原生资源下载缓存应定向到仓库运行目录或 CI workspace，避免写系统 C 盘；清理缓存前必须确认可重新获得且用户接受重新下载。
 - 同一批次的手工 Cargo 检查和打包命令显式使用相同的仓库 `CARGO_HOME`；公开构建脚本会保留已设置的环境值，不能让继承的全局缓存路径与仓库缓存交替使用而触发重复编译。
 - 共用同一个 `target/` 的 Cargo build/check/test 串行执行，必须等测试及 doc-test 全部退出后再启动另一项 Cargo 编译；不能依赖构建文件锁隔离测试运行期间的产物改写。已复制到独立目录的桌面程序验收可与编译并行。
 - 运行 `node scripts/generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository`，结果必须 `unresolved=0`、`disallowed=0`。
 
 ## 5. 前端、桌面和资源规范
 
+- **UI 文案精简：UI 只保留帮助用户理解、判断或完成操作的必要文案，删除重复说明和装饰性文字。Avoid unnecessary secondary labels and descriptions. Let the layout do the explaining.** 此规则适用于页面、表单、弹窗、工作台和设计器；优先用分组、对齐、间距、层级及控件状态表达关系，不为每个标题、分区或按钮附加副标题、解释段落或技术实现说明。
+- 保留明确字段标签、必要单位/格式、校验错误、操作结果、权限/风险提示及无障碍名称。只有确实影响用户判断或完成操作时才增加辅助说明；精简文案不能删除这些必要信息，也不能用占位符代替字段标签。
 - React 19 使用公开 API；不得读取 `__reactProps$` 等私有字段，不得用兼容层掩盖类型或生命周期问题。
 - React 页面负责展示和组合，hook/model/service 管理草稿、查询、变更、轮询及导出；Tauri command 只适配窗口、对话框、更新和受控平台操作，业务使用共用 Rust 应用服务。HTTP 与 IPC 不重复实现业务；阻塞数据库、报表及进程操作不在 UI 线程执行。保存路径来自用户显式选择。
 - 桌面与服务器复用 Rust 报表模型和受控 PDF 输出；优先原生排版／PDF 能力。旧模板逐类对照实际输出，不能默默退成简化表格，也不恢复 DOM 截图、Base64 写盘、`html2canvas`/`jsPDF` 等重复链路。
 - 内置 `.dtpl` 模板与空白设计使用相同组件、属性和 Rust 排版规则。新增默认样式时同步提供可视化设置入口，覆盖图层打印、字体、线条、表格和字段配置；不能只在生成脚本中加入用户无法编辑的专用票面。验收包括从空白组合关键结构、撤销、保存回读及真实预览/PDF；编辑画布显示不等于正式输出已验证。
 - Firefox/WebKit 桌面/移动重型验收只在 `.github/workflows/browser-compatibility.yml` 通过 `workflow_dispatch` 手动触发，不加入每次提交的普通 Quality Gate。
-- 不做 Windows Authenticode、macOS Developer ID 或 Apple 公证；保留 Tauri updater 的签名／公钥信任合同；Rust 包完成独立更新验收前不得宣称旧 .NET 发布资产可直接升级为 Rust 版。
+- 不做 Windows Authenticode、macOS Developer ID 或 Apple 公证；保留 Tauri updater 的签名／公钥信任合同。每条更新路径须完成独立验收后才能声明可用。
 
 ## 6. 测试与质量门禁
 
-改动范围决定验证深度；涉及依赖、路径、打包、API 或基础设施时不得只跑单元测试。
+改动范围决定验证深度；涉及依赖、路径、打包、API 或基础设施时不得只跑单元测试。纯文档修改核对事实、引用和 `git diff --check`，无需触发未受影响的全量编译与测试。
 
 批次实现和集中联调完成后统一执行最终门禁，开发中只做必要编译与针对失败的回归，不逐模块重复全量验证。最终 Rust 主工作区至少执行 `cargo fmt --all --check`、`cargo test --locked --workspace` 和 `cargo check --locked --workspace --all-features`。数据库变更须用隔离的真实 PostgreSQL 18 与 SQLite 验证同一业务契约；忽略的实库测试不算通过。HTTP 变更须验证真实 React 请求、认证、授权、错误、上传下载和会话；桌面界面须启动 Tauri + React，检查截图、表格滚动／编辑、中文输入及实际 PDF。发布时执行对应平台 locked build 和包内依赖审查。
 
-前端与工程门禁如下；C# 对照通过只读备份分支和 Git 历史追溯，旧测试结果不作为 Rust 验收：
+前端与工程门禁如下，按受影响范围和最终交付批次执行：
 
 ```powershell
 # Web
@@ -133,7 +137,7 @@ pwsh -NoProfile -File scripts/github/verify-public-source.ps1
 git diff --check
 ```
 
-Rust 修改必须至少执行对应工程的 `cargo fmt --check` 和 `cargo test --locked`；发布/RID 修改还要执行相应 locked restore/build。Firefox/WebKit、真实 Docker/PostgreSQL、ARM64/macOS 真机属于独立手动/CI 验收，不能在本机结果中虚报为已完成。
+Rust 修改必须至少执行对应工程的 `cargo fmt --check` 和 `cargo test --locked`；发布/RID 修改还要执行对应 target 的 `cargo build --locked` 及打包检查。Firefox/WebKit、真实 Docker/PostgreSQL、ARM64/macOS 真机属于独立手动/CI 验收，不能在本机结果中虚报为已完成。
 
 ## 7. 脚本、文件和文档规范
 
@@ -147,7 +151,7 @@ Rust 修改必须至少执行对应工程的 `cargo fmt --check` 和 `cargo test
 
 - 默认从 `codex/` 前缀分支工作；不要未经明确要求直接改写远端历史或强制推送。
 - 提交前检查 `git status`、`git diff --stat`、`git diff --check`、暂存区内容和生成物；只提交与任务相关的文件。
-- 依赖升级提交应说明实际变更的 Cargo/npm/原生资源版本、许可证/商业策略和已执行的治理门禁；历史 .NET 依赖不混入 Rust 交付说明。
+- 依赖升级提交应说明实际变更的 Cargo/npm/原生资源版本、许可证/商业策略和已执行的治理门禁。
 - 推送前重新获取并确认 `origin/main` 没有未审查漂移；用户明确要求推送 `main` 或发布时，完成验证后以普通快进方式交付，不强制覆盖远端历史。
 
 ## 9. 工作区空间清理规则
@@ -164,7 +168,7 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntime
 清理脚本默认只删除可重建的 `artifacts/`、`bin/`、`obj/`、`dist/`、`target/`、`TestResults/` 和一次性测试工作区，并保留交付输出及可复用依赖/浏览器缓存。只有用户明确确认后，才使用：
 
 - `-IncludeNodeModules`：删除 npm 安装树；
-- `-IncludePackageCaches`：删除 NuGet/npm/Cargo 审计缓存；
+- `-IncludePackageCaches`：删除脚本列出的依赖/审计缓存（包括 npm/Cargo、NuGet 归档及历史缓存路径）；
 - `-IncludeCodexRuntime`：删除整个本地代理运行缓存；
 - `-IncludeReleaseOutputs`：删除便携包、安装器或注册机输出；
 

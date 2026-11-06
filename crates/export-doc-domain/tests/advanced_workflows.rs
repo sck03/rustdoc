@@ -173,11 +173,23 @@ fn exclusive_money_branches_have_an_explicit_currency_boundary_and_default_path(
         currency: "CNY".into(),
         ..Default::default()
     };
-    assert!(r.routed_exclusions(&c).unwrap().contains("large"));
+    assert!(
+        r.routed_exclusions_in(&c, &std::collections::BTreeMap::new())
+            .unwrap()
+            .contains("large")
+    );
     c.amount = Some("100.0001".parse().unwrap());
-    assert!(r.routed_exclusions(&c).unwrap().contains("normal"));
+    assert!(
+        r.routed_exclusions_in(&c, &std::collections::BTreeMap::new())
+            .unwrap()
+            .contains("normal")
+    );
     c.currency = "USD".into();
-    assert!(r.routed_exclusions(&c).unwrap().contains("large"));
+    assert!(
+        r.routed_exclusions_in(&c, &std::collections::BTreeMap::new())
+            .unwrap()
+            .contains("large")
+    );
 }
 #[test]
 fn overlapping_exclusive_paths_are_rejected_by_publication_and_runtime() {
@@ -191,7 +203,10 @@ fn overlapping_exclusive_paths_are_rejected_by_publication_and_runtime() {
         currency: "CNY".into(),
         ..Default::default()
     };
-    assert!(r.routed_exclusions(&c).is_err());
+    assert!(
+        r.routed_exclusions_in(&c, &std::collections::BTreeMap::new())
+            .is_err()
+    );
 }
 #[test]
 fn partial_handling_history_keeps_every_actual_person_out_of_independent_acceptance() {

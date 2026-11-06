@@ -172,6 +172,7 @@ impl NativeService {
         })
     }
     pub fn health(&self) -> Result<()> {
+        self.backup_scheduler.health()?;
         self.workflow_scheduler.health()?;
         #[cfg(feature = "exchange-rates")]
         self.exchange_scheduler.health()?;

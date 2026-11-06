@@ -18,7 +18,8 @@
   min-width: 0;
   color: var(--edm-neutral-700);
   font-size: var(--edm-font-size-md);
-  font-weight: 700;
+  line-height: var(--edm-line-height-md);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .editor-title span {
@@ -91,7 +92,8 @@
   color: var(--edm-neutral-700);
   cursor: pointer;
   font-size: var(--edm-font-size-md);
-  font-weight: 700;
+  line-height: var(--edm-line-height-md);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .invoice-new-optional-section .form-section {
@@ -111,7 +113,8 @@
   color: var(--edm-neutral-700);
   cursor: pointer;
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .invoice-inline-details-grid {
@@ -160,8 +163,8 @@
 .invoice-new-optional-section summary small {
   color: var(--edm-ink-500);
   font-size: var(--edm-font-size-xs);
-  font-weight: var(--edm-font-weight-semibold);
-  line-height: var(--edm-line-height-normal);
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .invoice-new-optional-section .invoice-extended-fields-section > .section-header {
@@ -198,6 +201,7 @@
   min-width: 0;
   color: var(--edm-neutral-650);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .letter-of-credit-review-meta span {
@@ -209,14 +213,15 @@
   flex: 0 0 auto;
   color: var(--edm-warning-900);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .letter-of-credit-review-result textarea {
   min-height: 210px;
   resize: vertical;
   font-family: var(--edm-font-mono);
-  line-height: 1.55;
+  line-height: inherit;
 }
 
 .report-preview-controls {
@@ -244,7 +249,8 @@
   min-width: 0;
   color: var(--edm-neutral-700);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .report-template-inline-field > span {
@@ -328,13 +334,15 @@
   gap: 8px;
   min-width: 0;
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .report-export-advanced summary small {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -373,7 +381,8 @@
   padding: 12px 12px;
   color: var(--edm-neutral-700);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
   cursor: pointer;
 }
 
@@ -409,12 +418,14 @@
   margin: 0;
   color: var(--edm-neutral-800);
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
 }
 
 .document-package-heading span {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -444,7 +455,8 @@
   min-width: 0;
   color: var(--edm-neutral-700);
   font-size: var(--edm-font-size-sm);
-  font-weight: 600;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .document-package-template-check span {
@@ -469,6 +481,7 @@
   min-height: 36px;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .document-email-panel {
@@ -571,6 +584,7 @@
   overflow: hidden;
   color: var(--edm-neutral-800);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -579,7 +593,8 @@
   flex: 0 0 auto;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .document-package-preview-frame {
@@ -594,5 +609,6 @@
   min-height: 420px;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 

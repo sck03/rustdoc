@@ -480,6 +480,13 @@ fn pages_data(
         .copied()
         .filter(|element| element.y_hundredth_mm < table.y_hundredth_mm)
         .collect();
+    // Ordinary following blocks keep their authored position on the final page.
+    // Reserve that region before pagination instead of detecting overlap after
+    // filling the detail page. Earlier pages retain their full detail capacity.
+    let following_top = following_flows
+        .iter()
+        .map(|element| element.y_hundredth_mm as f32 / 100.)
+        .fold(footer, f32::min);
     return detail::render(
         detail::DetailLayout {
             table: block,
@@ -504,8 +511,8 @@ fn pages_data(
             bottoms: detail::PageBottoms {
                 first: footer_top_for(design, height, 0, false),
                 continuation: footer_top_for(design, height, 1, false),
-                last: footer_top_for(design, height, 1, true),
-                single: footer,
+                last: footer_top_for(design, height, 1, true).min(following_top),
+                single: footer.min(following_top),
             },
             width: table_width,
             page_width: width,

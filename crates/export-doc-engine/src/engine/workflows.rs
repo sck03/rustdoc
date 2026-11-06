@@ -61,6 +61,7 @@ pub fn review(body: &Value) -> Result<Value> {
 }
 
 pub fn profit(body: &Value) -> Result<Value> {
+    use export_doc_domain::number::format_decimal;
     use rust_decimal::Decimal;
     let dto: ApiInvoiceDetailDto = serde_json::from_value(body["invoice"].clone())
         .map_err(|cause| invalid(cause.to_string()))?;
@@ -96,7 +97,7 @@ pub fn profit(body: &Value) -> Result<Value> {
         .checked_mul(Decimal::from(100))
         .ok_or_else(|| invalid("利润率显示超出范围。"))?;
     Ok(
-        json!({"currency":invoice.currency,"salesTotal":invoice.total_amount,"exchangeRate":rate,"salesRmb":sales_rmb,"purchaseCost":invoice.total_purchase_amount,"taxRefund":invoice.total_tax_refund_amount,"grossProfit":profit,"margin":margin,"salesTotalText":format!("{} {:.2}",invoice.currency,invoice.total_amount),"exchangeRateText":rate.map(|rate|format!("{rate:.4}")).unwrap_or("未设置".into()),"salesRmbText":format!("¥ {sales_rmb:.2}"),"purchaseCostText":format!("- ¥ {:.2}",invoice.total_purchase_amount),"taxRefundText":format!("+ ¥ {:.2}",invoice.total_tax_refund_amount),"grossProfitText":format!("¥ {profit:.2}"),"marginText":format!("{percent:.2}%"),"storagePolicy":"本机数据"}),
+        json!({"currency":invoice.currency,"salesTotal":invoice.total_amount,"exchangeRate":rate,"salesRmb":sales_rmb,"purchaseCost":invoice.total_purchase_amount,"taxRefund":invoice.total_tax_refund_amount,"grossProfit":profit,"margin":margin,"salesTotalText":format!("{} {}",invoice.currency,format_decimal(invoice.total_amount,2)),"exchangeRateText":rate.map(|rate|format_decimal(rate,4)).unwrap_or("未设置".into()),"salesRmbText":format!("¥ {}",format_decimal(sales_rmb,2)),"purchaseCostText":format!("- ¥ {}",format_decimal(invoice.total_purchase_amount,2)),"taxRefundText":format!("+ ¥ {}",format_decimal(invoice.total_tax_refund_amount,2)),"grossProfitText":format!("¥ {}",format_decimal(profit,2)),"marginText":format!("{}%",format_decimal(percent,2)),"storagePolicy":"本机数据"}),
     )
 }
 

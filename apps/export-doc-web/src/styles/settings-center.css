@@ -17,6 +17,7 @@
 .settings-category-item .settings-dirty-marker {
   margin-inline-start: auto;
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   color: inherit;
 }
 

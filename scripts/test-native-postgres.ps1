@@ -93,13 +93,14 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SEL
         }
     }
     if ($Scope -in @('All', 'Storage', 'Workflows')) {
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--lib') + $cargoProfile + @('--', 'workflow_constraints_tests::postgres', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL workflow constraints'
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'contract') + $cargoProfile + @('--', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL storage contract'
     }
     if ($Scope -in @('All', 'Engine')) {
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--lib') + $cargoProfile + @('--', 'postgres', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL recovery and output publication'
     }
     if ($Scope -in @('All', 'Engine', 'Workflows')) {
-        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--test', 'team_service') + $cargoProfile + @('--', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL team and organization workflows'
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--test', 'team_service') + $cargoProfile + @('--', '--ignored', '--test-threads=1', '--nocapture')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL team and organization workflows'
     }
     if ($Scope -eq 'Capacity') {
         $environment['EXPORTDOC_CAPACITY_ISOLATED'] = '1'

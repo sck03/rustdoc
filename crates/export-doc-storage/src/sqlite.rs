@@ -45,7 +45,7 @@ impl From<rusqlite::Error> for Error {
             ) {
                 return Self::new(ErrorKind::Busy, "数据库繁忙，请稍后重试。");
             }
-            if [1555, 2067, 787, 1811].contains(&failure.extended_code) {
+            if [1555, 2067, 787, 1811, 275].contains(&failure.extended_code) {
                 return Self::new(ErrorKind::Conflict, "记录重复或仍被其他业务引用。");
             }
         }
@@ -633,7 +633,7 @@ impl Adapter for Sqlite {
         Ok(())
     }
     fn attachment_bytes(&self, invoice_id: i64) -> Result<i64> {
-        Ok(self.connection.borrow().query_cached("SELECT COALESCE(SUM(length(f.content)),0) FROM files f JOIN record_rows r ON r.id=f.record_id WHERE r.kind='attachments' AND json_extract(r.body,'$.invoiceId')=?1",[invoice_id],|r|r.get(0))?)
+        Ok(self.connection.borrow().query_cached("SELECT COALESCE(SUM(length(f.content)),0) FROM files f JOIN records r ON r.id=f.record_id WHERE r.kind='attachments' AND json_extract(r.body,'$.invoiceId')=?1",[invoice_id],|r|r.get(0))?)
     }
     fn insert_blob(&self, b: &BlobWrite<'_>) -> Result<()> {
         self.connection.borrow().execute("INSERT INTO files(kind,record_id,file_name,media_type,digest,content,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![b.kind,b.record_id,b.file_name,b.media_type,b.digest,b.content,b.created_at])?;

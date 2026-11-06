@@ -1,10 +1,10 @@
 [data-ui="tab-panel"] { min-width: 0; }
 [data-ui="tabs"] { min-width: 0; display: flex; gap: var(--edm-space-2); overflow-x: auto; flex-wrap: nowrap; padding: var(--edm-space-1); }
-[data-ui="tabs"] [role="tab"] { flex: 0 0 auto; display: inline-flex; align-items: center; gap: var(--edm-space-2); min-height: var(--edm-tab-height); padding: 0 var(--edm-space-3); border: 1px solid var(--edm-line-strong); border-radius: var(--edm-radius-md); color: var(--edm-ink-700); background: var(--edm-bg-surface); font-size: var(--edm-font-size-md); }
+[data-ui="tabs"] [role="tab"] { flex: 0 0 auto; display: inline-flex; align-items: center; gap: var(--edm-space-2); min-height: var(--edm-tab-height); padding: 0 var(--edm-space-3); border: 1px solid var(--edm-line-strong); border-radius: var(--edm-radius-md); color: var(--edm-ink-700); background: var(--edm-bg-surface); font-size: var(--edm-font-size-md); line-height: var(--edm-line-height-md); }
 [data-ui="tabs"] [role="tab"][aria-selected="true"] { color: var(--edm-text-inverse); background: var(--edm-accent); border-color: var(--edm-accent); }
 [data-ui="tabs"][data-variant="segmented"] { background: var(--edm-neutral-100); border-radius: var(--edm-radius-lg); }
 [data-ui="tabs"][data-variant="segmented"] [role="tab"] { min-height: 32px; border-color: transparent; background: transparent; color: var(--edm-text-secondary); }
-[data-ui="tabs"][data-variant="segmented"] [role="tab"][aria-selected="true"] { color: var(--edm-ink-900); background: var(--edm-bg-surface); font-weight: 600; border-radius: var(--edm-radius-sm); box-shadow: var(--edm-shadow-1); }
+[data-ui="tabs"][data-variant="segmented"] [role="tab"][aria-selected="true"] { color: var(--edm-ink-900); background: var(--edm-bg-surface); font-weight: var(--edm-font-weight-medium); border-radius: var(--edm-radius-sm); box-shadow: var(--edm-shadow-1); }
 [data-ui="tabs"] [role="tab"]:disabled { color: var(--edm-text-disabled); background: var(--edm-bg-disabled); }
 @media (hover: hover) and (pointer: fine) { [data-ui="tabs"] [role="tab"]:hover:not(:disabled):not([aria-selected="true"]) { color: var(--edm-primary-700); border-color: var(--edm-primary-300); } }
 [data-ui="tabs"] [role="tab"]:active:not(:disabled):not([aria-selected="true"]) { color: var(--edm-primary-700); border-color: var(--edm-primary-300); }

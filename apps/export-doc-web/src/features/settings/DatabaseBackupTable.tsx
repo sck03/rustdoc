@@ -17,8 +17,7 @@ export function DatabaseBackupTable({
           <tr>
             <th>文件</th>
             <th>大小</th>
-            <th>创建时间</th>
-            <th>更新时间</th>
+            <th>文件修改时间</th>
             <th>路径</th>
           </tr>
         </thead>
@@ -28,7 +27,6 @@ export function DatabaseBackupTable({
               <tr key={backup.fullPath || backup.fileName}>
                 <td>{backup.fileName}</td>
                 <td>{formatBytes(backup.sizeBytes)}</td>
-                <td>{formatRuntimeDate(backup.createdAt)}</td>
                 <td>{formatRuntimeDate(backup.lastWriteTime)}</td>
                 <td>
                   <div className="table-path-cell">
@@ -40,7 +38,7 @@ export function DatabaseBackupTable({
             ))
           ) : (
             <tr>
-              <td className="empty-cell" colSpan={5}>
+              <td className="empty-cell" colSpan={4}>
                 {controller.canManageSettings ? (controller.backupLoading ? "加载中" : "暂无备份") : "无权限"}
               </td>
             </tr>

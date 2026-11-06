@@ -28,11 +28,10 @@ pub struct CrmQuery<'a> {
 
 fn related(kind: &str, relation: &str, path: &str, json: bool, pg: bool) -> String {
     let value = if json {
-        sql::json_field(path, pg)
+        sql::json_field_from("related.body", path, pg)
     } else {
-        sql::field(path, pg)
-    }
-    .replace("r.body", "related.body");
+        sql::field_from("related.body", path, pg)
+    };
     format!(
         "(SELECT {value} FROM record_rows related WHERE related.kind='{kind}' AND related.id=CAST({} AS BIGINT))",
         sql::field(relation, pg)
@@ -112,10 +111,7 @@ pub(crate) fn build(q: &CrmQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
             },
         ),
     };
-    let parent_scope = q
-        .customer_scope
-        .filter(&mut values, pg)
-        .replace("r.", "customer.");
+    let parent_scope = q.customer_scope.filter_for(&mut values, pg, "customer");
     let mut clauses = vec![
         format!("r.kind='{kind}'"),
         q.scope.filter(&mut values, pg),

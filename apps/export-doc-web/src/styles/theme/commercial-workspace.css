@@ -17,7 +17,7 @@
   border-left: 3px solid var(--edm-primary-500);
   border-radius: var(--edm-radius-sm);
   font-size: var(--edm-font-size-sm);
-  line-height: var(--edm-line-height-relaxed);
+  line-height: var(--edm-line-height-sm);
 }
 
 html[data-interface-density="compact"] .workspace-header {
@@ -165,7 +165,8 @@ html[data-interface-density="compact"] :where(th, td) {
   border: 1px solid color-mix(in srgb, var(--edm-white) 7%, transparent);
   border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   letter-spacing: 0.025em;
 }
 
@@ -207,7 +208,8 @@ html[data-interface-density="compact"] :where(th, td) {
   border: 1px solid var(--edm-line);
   border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -229,7 +231,8 @@ html[data-interface-density="compact"] :where(th, td) {
   border: 1px solid var(--edm-line);
   border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .editor-save-state[data-state="dirty"] {
@@ -286,6 +289,7 @@ html[data-interface-density="compact"] :where(th, td) {
 .document-editor-sticky-actions > div > span {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .document-editor-sticky-actions .command-button:disabled {
@@ -324,7 +328,8 @@ html[data-interface-density="compact"] :where(th, td) {
   border: 1px solid transparent;
   border-radius: var(--edm-radius-sm);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .single-window-view-mode button.active {
@@ -387,6 +392,7 @@ html[data-interface-density="compact"] :where(th, td) {
 .invoice-status-field-value small {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   text-align: right;
 }
 
@@ -402,7 +408,8 @@ html[data-interface-density="compact"] :where(th, td) {
   padding: 12px 12px;
   color: var(--edm-ink-700);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
   cursor: pointer;
   user-select: none;
 }
@@ -446,13 +453,14 @@ html[data-interface-density="compact"] :where(th, td) {
 .invoice-status-history-list strong {
   color: var(--edm-ink-800);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .invoice-status-history-list span,
 .invoice-status-history-list small {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.5;
+  line-height: var(--edm-line-height-xs);
 }
 
 .invoice-status-history-list small {
@@ -468,13 +476,15 @@ html[data-interface-density="compact"] :where(th, td) {
 .invoice-status-reason-field > span {
   color: var(--edm-ink-700);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .invoice-status-reason-field > span strong {
   margin-left: 4px;
   color: var(--edm-danger-700);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .invoice-status-reason-field textarea {
@@ -485,6 +495,7 @@ html[data-interface-density="compact"] :where(th, td) {
 .invoice-status-reason-field small {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   text-align: right;
 }
 
@@ -684,6 +695,7 @@ dialog::backdrop {
 
   .app-shell :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
     font-size: var(--edm-font-size-lg);
+    line-height: var(--edm-line-height-lg);
   }
 
   .app-shell :where(

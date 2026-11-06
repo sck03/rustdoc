@@ -1,7 +1,10 @@
 use axum::{body::Body, http::Request};
 use export_doc_engine::{
     engine::NativeService,
-    generated_api::{LOGIN, PREVIEW_CRM_CUSTOMER_IMPORT, UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB},
+    generated_api::{
+        LOGIN, PREVIEW_CRM_CUSTOMER_IMPORT, UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB,
+        UPLOAD_BUSINESS_ATTACHMENT,
+    },
     paths::{RuntimePaths, nonce},
 };
 use std::{
@@ -134,8 +137,20 @@ fn unfinished_upload(
     stream.set_read_timeout(timeout).unwrap();
     stream.set_write_timeout(timeout).unwrap();
     write!(stream, "POST {path} HTTP/1.1\r\nHost: {address}\r\nAuthorization: Bearer {token}\r\nContent-Type: {content}\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n{:x}\r\n", prefix.len()).unwrap();
-    stream.write_all(prefix).unwrap();
-    stream.write_all(b"\r\n").unwrap();
+    let mut chunk = Vec::with_capacity(prefix.len() + 2);
+    chunk.extend_from_slice(prefix);
+    chunk.extend_from_slice(b"\r\n");
+    // A bounded reader can reject this chunk before the client finishes sending.
+    // Preserve that response; the status assertion below still requires HTTP.
+    if let Err(error) = stream.write_all(&chunk) {
+        assert!(
+            matches!(
+                error.kind(),
+                std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::BrokenPipe
+            ),
+            "upload write failed: {error}"
+        );
+    }
     if eof {
         stream.shutdown(Shutdown::Write).unwrap();
     }
@@ -163,6 +178,8 @@ async fn uploads_reject_oversized_fields_before_consuming_the_rest_of_the_reques
     let login = service.dispatch(LOGIN, &[], &[], credentials, "").unwrap();
     let login: serde_json::Value = serde_json::from_slice(&login).unwrap();
     let token = login["accessToken"].as_str().unwrap().to_owned();
+    // Exercise a declared multipart endpoint. CRM import accepts a raw file body.
+    let attachment_path = UPLOAD_BUSINESS_ATTACHMENT.path.replace("{invoiceId}", "1");
     let mut bytes =
         b"--test\r\nContent-Disposition: form-data; name=file; filename=huge.csv\r\n\r\n".to_vec();
     bytes.resize(34 * 1024 * 1024, b'x');
@@ -172,7 +189,7 @@ async fn uploads_reject_oversized_fields_before_consuming_the_rest_of_the_reques
         .oneshot(
             Request::builder()
                 .method("POST")
-                .uri(PREVIEW_CRM_CUSTOMER_IMPORT.path)
+                .uri(&attachment_path)
                 .header("authorization", format!("Bearer {token}"))
                 .header("content-type", "multipart/form-data; boundary=test")
                 .body(Body::from(bytes))
@@ -195,10 +212,10 @@ async fn uploads_reject_oversized_fields_before_consuming_the_rest_of_the_reques
     let responses = tokio::task::spawn_blocking(move || {
         let mut field = b"--test\r\nContent-Disposition: form-data; name=note\r\n\r\n".to_vec();
         field.resize(field.len() + 65536 + 128, b'x');
-        let metadata = unfinished_upload(address, &token, PREVIEW_CRM_CUSTOMER_IMPORT.path, "multipart/form-data; boundary=test", &field, false);
+        let metadata = unfinished_upload(address, &token, &attachment_path, "multipart/form-data; boundary=test", &field, false);
         let mut file = b"--test\r\nContent-Disposition: form-data; name=file; filename=huge.csv\r\n\r\n".to_vec();
         file.resize(file.len() + 16 * 1024 * 1024 + 128, b'x');
-        let oversized = unfinished_upload(address, &token, PREVIEW_CRM_CUSTOMER_IMPORT.path, "multipart/form-data; boundary=test", &file, false);
+        let oversized = unfinished_upload(address, &token, &attachment_path, "multipart/form-data; boundary=test", &file, false);
         let mut files = Vec::new();
         for _ in 0..101 {
             files.extend_from_slice(b"--test\r\nContent-Disposition: form-data; name=files; filename=a.pdf\r\n\r\n%PDF-\r\n");

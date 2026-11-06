@@ -110,14 +110,28 @@ pub async fn serve(
         service::TowerToHyperService,
     };
     let mut connections = tokio::task::JoinSet::new();
+    let mut accept_failures = 0u32;
     tokio::pin!(signal);
     let accepted = loop {
         tokio::select! {
             _ = &mut signal => { shutdown.stop(); break Ok(()); },
             _ = shutdown.wait() => break Ok(()),
             _ = connections.join_next(), if !connections.is_empty() => {},
-            incoming = listener.accept() => {
-                let (stream, peer) = match incoming { Ok(value) => value, Err(cause) => { shutdown.stop(); break Err(cause); } };
+            incoming = listener.accept(), if connections.len() < 256 => {
+                let (stream, peer) = match incoming {
+                    Ok(value) => { accept_failures = 0; value },
+                    Err(cause) if retryable_accept(&cause) && accept_failures < 8 => {
+                        accept_failures += 1;
+                        eprintln!("HTTP accept temporarily unavailable (attempt {accept_failures}, kind {:?})", cause.kind());
+                        tokio::select! {
+                            _ = &mut signal => { shutdown.stop(); break Ok(()); },
+                            _ = shutdown.wait() => break Ok(()),
+                            _ = tokio::time::sleep(Duration::from_millis(100 * u64::from(accept_failures))) => {},
+                        }
+                        continue;
+                    },
+                    Err(cause) => { shutdown.stop(); break Err(cause); }
+                };
                 let route = router.clone().layer(axum::Extension(axum::extract::ConnectInfo(peer)));
                 let control = shutdown.clone();
                 connections.spawn(async move {
@@ -152,6 +166,14 @@ pub async fn serve(
         ));
     }
     accepted
+}
+
+fn retryable_accept(cause: &std::io::Error) -> bool {
+    use std::io::ErrorKind::*;
+    matches!(
+        cause.kind(),
+        Interrupted | WouldBlock | ConnectionAborted | ConnectionReset
+    ) || matches!(cause.raw_os_error(), Some(23 | 24 | 10024))
 }
 
 #[cfg(test)]

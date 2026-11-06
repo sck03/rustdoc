@@ -70,7 +70,7 @@ await withOfficeUi('account-permissions-ui', async ({ output, url, invoke, openP
   assert.equal(await form.getByLabel('姓名', { exact: true }).inputValue(), '保留冲突草稿');
   await admin.screenshot({ path: path.join(output, 'account-permissions.png'), fullPage: true });
   const axe = require('axe-core');
-  await admin.addScriptTag({ content: axe.source });
+  await admin.evaluate(axe.source);
   const scan = await admin.evaluate(async () => window.axe.run(document.querySelector('.user-management-section'), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } }));
   assert.deepEqual(scan.violations, [], 'Account permission editor accessibility');
   await admin.setViewportSize({ width: 390, height: 844 });

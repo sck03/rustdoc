@@ -110,6 +110,9 @@ pub fn exercise(c: &Connection) {
         ids[..2]
     );
     assert_eq!(c.job_output_bytes().unwrap(), 30);
+    let mut ownership = c.ownership_counts(&["background-jobs"]).unwrap();
+    ownership.sort();
+    assert_eq!(ownership, vec![(Some(1), 3), (Some(2), 2)]);
     for row in expired {
         c.delete_blob(row["id"].as_i64().unwrap(), "job-output")
             .unwrap();

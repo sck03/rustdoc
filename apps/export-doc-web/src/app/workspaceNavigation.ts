@@ -58,11 +58,6 @@ export function findWorkspaceNavItem(pathname: string) {
     ?? routes.find((item) => item.isActive(pathname));
 }
 
-export function hasWorkspacePathPermission(pathname: string, permissions: WorkspacePermissionGrant[] | undefined) {
-  const item = findWorkspaceNavItem(pathname);
-  return !item || hasWorkspaceNavItemPermission(item, permissions);
-}
-
 export function hasWorkspaceNavItemPermission(item: WorkspaceNavItem, permissions: WorkspacePermissionGrant[] | undefined) {
   return hasWorkspaceItemPermission(item, permissions);
 }
@@ -93,21 +88,8 @@ export function getWorkspaceContext(pathname: string, groups: WorkspaceNavGroupC
   return context;
 }
 
-export function getRequiredWorkspace(pathname: string): "document" | "sales" | null {
-  const workspace = findWorkspaceNavItem(pathname)?.workspace;
-  return workspace === "document" || workspace === "sales" ? workspace : null;
-}
-
-export function getRequiredModule(pathname: string): string | null {
-  return findWorkspaceNavItem(pathname)?.moduleKey ?? null;
-}
-
 export function getRequiredRouteAccessLevel(pathname: string): "view" | "operate" {
   return pathname === "/payments/new" || pathname === "/invoices/new" ||
     /^\/master-data\/[^/]+\/new$/.test(pathname) || /^\/single-window\/(coo|acd)\/[^/]+$/.test(pathname)
     ? "operate" : "view";
 }
-
-export function isAdminOnlyRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.requiresAdmin === true; }
-export function isSystemAdministrationRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.requiresSystemAdministration === true; }
-export function isDesktopOnlyRoute(pathname: string) { return findWorkspaceNavItem(pathname)?.desktopOnly === true; }

@@ -47,6 +47,7 @@ pub(crate) fn get_runtime_storage_context(
 
 #[tauri::command]
 pub(crate) async fn schedule_data_root_migration(
+    window: tauri::WebviewWindow,
     paths: tauri::State<'_, RuntimePaths>,
 ) -> Result<Option<runtime_paths::DataRootMigrationScheduleResult>, String> {
     if paths.portable {
@@ -57,16 +58,21 @@ pub(crate) async fn schedule_data_root_migration(
     }
 
     let paths = paths.inner().clone();
+    let parent = paths.data_root.parent().map(std::path::Path::to_path_buf);
+    let parent = tauri::async_runtime::spawn_blocking(move || parent.filter(|path| path.is_dir()))
+        .await
+        .map_err(|_| "数据目录检查任务异常退出。".to_owned())?;
+    let mut dialog = rfd::AsyncFileDialog::new()
+        .set_parent(&window)
+        .set_title("选择新的业务数据保存位置（程序会创建专用子目录）");
+    if let Some(parent) = parent {
+        dialog = dialog.set_directory(parent);
+    }
+    let Some(target_parent) = dialog.pick_folder().await else {
+        return Ok(None);
+    };
     tauri::async_runtime::spawn_blocking(move || {
-        let mut dialog =
-            rfd::FileDialog::new().set_title("选择新的业务数据保存位置（程序会创建专用子目录）");
-        if let Some(parent) = paths.data_root.parent().filter(|path| path.is_dir()) {
-            dialog = dialog.set_directory(parent);
-        }
-        let Some(target_parent) = dialog.pick_folder() else {
-            return Ok(None);
-        };
-        let target_root = runtime_paths::runtime_data_root_under(&target_parent);
+        let target_root = runtime_paths::runtime_data_root_under(target_parent.path());
 
         runtime_paths::schedule_data_root_migration(&paths, &target_root)
             .map(Some)
@@ -233,7 +239,9 @@ mod tests {
     use crate::desktop_file_dialog_commands::{
         MAX_EXPORTER_SEAL_IMAGE_BYTES, is_existing_directory_candidate, read_seal_image_file,
     };
-    use crate::desktop_open_commands::{build_open_command, open_path, resolve_open_path_target};
+    use crate::desktop_open_commands::{
+        build_open_command, open_path_sync as open_path, resolve_open_path_target,
+    };
     use base64::{Engine as _, engine::general_purpose::STANDARD};
     use std::ffi::OsString;
     use std::path::PathBuf;

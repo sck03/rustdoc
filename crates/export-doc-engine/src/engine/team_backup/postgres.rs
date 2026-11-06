@@ -221,7 +221,6 @@ fn list_backups(paths: &RuntimePaths) -> Result<Vec<Value>> {
         item["fileName"] = json!(name);
         item["fullPath"] = json!(path);
         item["sizeBytes"] = json!(metadata.len());
-        item["createdAt"] = json!(stamp);
         item["lastWriteTime"] = json!(stamp);
         backups.push(item);
     }
@@ -459,12 +458,6 @@ pub(super) fn create_download_ticket(
     service.backup_tickets.issue_download(file_name.to_string())
 }
 
-pub(super) fn download_with_ticket(
-    service: &NativeService,
-    parameters: &[(&str, String)],
-) -> Result<tasks::FileOutput> {
-    prepare_download(service, parameters)?.into_memory()
-}
 pub(in crate::engine) fn prepare_download(
     service: &NativeService,
     parameters: &[(&str, String)],

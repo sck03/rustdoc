@@ -67,7 +67,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
       pageSize,
     }, { signal }),
     placeholderData: keepPreviousData,
-    refetchInterval: (query) => hasActiveJobs(query.state.data?.items) ? 2_000 : false,
+    refetchInterval: (query) => !query.state.error && hasActiveJobs(query.state.data?.items) ? 2_000 : false,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });

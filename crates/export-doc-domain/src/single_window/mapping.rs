@@ -10,24 +10,47 @@ fn first<'a>(values: &[&'a str]) -> &'a str {
         .unwrap_or("")
         .trim()
 }
-pub fn decimal(value: &Value, digits: u32) -> String {
+pub fn decimal(value: &Value, digits: u32) -> Result<String, String> {
+    if value.is_null() || value.as_str().is_some_and(|text| text.trim().is_empty()) {
+        return Ok(String::new());
+    }
     let number = value
         .as_str()
         .map(str::to_owned)
         .unwrap_or_else(|| value.to_string())
         .parse::<Decimal>()
-        .unwrap_or_default();
-    if number.is_zero() {
+        .map_err(|_| "单一窗口来源金额或数量不是有效十进制数。".to_owned())?;
+    Ok(if number.is_zero() {
         String::new()
     } else {
-        number.round_dp(digits).normalize().to_string()
-    }
+        number
+            .round_dp_with_strategy(digits, rust_decimal::RoundingStrategy::MidpointAwayFromZero)
+            .normalize()
+            .to_string()
+    })
 }
 fn phone(value: &str) -> String {
     value
         .chars()
         .filter(|c| c.is_alphanumeric() || matches!(c, '+' | '-' | '(' | ')' | '#'))
         .collect()
+}
+
+#[cfg(test)]
+mod numeric_tests {
+    use super::*;
+    #[test]
+    fn midpoint_rounding_and_invalid_values_remain_distinct_from_blank_zero() {
+        for (input, expected) in [("1.125", "1.13"), ("12.345", "12.35"), ("-1.125", "-1.13")] {
+            assert_eq!(decimal(&json!(input), 2).unwrap(), expected);
+        }
+        for input in [Value::Null, json!(""), json!(0)] {
+            assert_eq!(decimal(&input, 2).unwrap(), "");
+        }
+        for input in [json!("bad"), json!(false), json!({})] {
+            assert!(decimal(&input, 2).is_err());
+        }
+    }
 }
 pub fn unit(value: &str, english: bool) -> String {
     let key: String = value
@@ -166,7 +189,7 @@ pub fn defaults(
     catalog: &Value,
     preferences: &Value,
     today: &str,
-) -> Value {
+) -> Result<Value, String> {
     let mut out = business.blank();
     out["sourceInvoiceId"] = invoice["id"].clone();
     out["invoiceNo"] = invoice["invoiceNo"].clone();
@@ -174,8 +197,8 @@ pub fn defaults(
     out["status"] = json!("Draft");
     out["lastGeneratedAt"] = Value::Null;
     if business == Business::Acd {
-        acd(&mut out, invoice, exporter, catalog, today);
-        return out;
+        acd(&mut out, invoice, exporter, catalog, today)?;
+        return Ok(out);
     }
     for (key, value) in [
         ("applyType", "0"),
@@ -199,7 +222,7 @@ pub fn defaults(
         out[key] = json!(text(invoice, source));
     }
     out["aplDate"] = json!(today);
-    out["fobValue"] = json!(decimal(&invoice["totalAmount"], 2));
+    out["fobValue"] = json!(decimal(&invoice["totalAmount"], 2)?);
     out["totalAmt"] = out["fobValue"].clone();
     let credit = first(&[
         text(invoice, "exporterCreditCode"),
@@ -360,11 +383,17 @@ pub fn defaults(
             .flatten()
             .enumerate()
             .map(|(i, item)| goods(item, invoice, exporter, catalog, i + 1))
-            .collect::<Vec<_>>()
+            .collect::<Result<Vec<_>, _>>()?
     );
-    out
+    Ok(out)
 }
-fn acd(out: &mut Value, invoice: &Value, exporter: &Value, catalog: &Value, today: &str) {
+fn acd(
+    out: &mut Value,
+    invoice: &Value,
+    exporter: &Value,
+    catalog: &Value,
+    today: &str,
+) -> Result<(), String> {
     let item = &invoice["items"][0];
     let customs = first(&[
         customs_code(text(invoice, "exporterCustomsCode")),
@@ -376,7 +405,7 @@ fn acd(out: &mut Value, invoice: &Value, exporter: &Value, catalog: &Value, toda
     out["agentCode"] = json!(customs_code(text(invoice, "customsBrokerCode")));
     out["gName"] = json!(first(&[text(item, "styleNameCN"), text(item, "styleName")]));
     out["codeTS"] = json!(text(item, "hsCode"));
-    out["declTotal"] = json!(decimal(&invoice["totalAmount"], 4));
+    out["declTotal"] = json!(decimal(&invoice["totalAmount"], 4)?);
     out["ieDate"] = json!(
         first(&[text(invoice, "shipmentDate"), text(invoice, "invoiceDate")]).replace('-', "")
     );
@@ -405,14 +434,21 @@ fn acd(out: &mut Value, invoice: &Value, exporter: &Value, catalog: &Value, toda
         "acdCode"
     ));
     out["qtyOrWeight"] = json!(first(&[
-        &decimal(&invoice["totalGrossWeight"], 2),
-        &decimal(&invoice["totalQuantity"], 2)
+        &decimal(&invoice["totalGrossWeight"], 2)?,
+        &decimal(&invoice["totalQuantity"], 2)?
     ]));
     out["packingCondition"] = json!(text(invoice, "specialTerms"));
     out["otherNote"] = out["packingCondition"].clone();
     out["consignTele"] = json!(phone(text(exporter, "phone")));
+    Ok(())
 }
-fn goods(item: &Value, invoice: &Value, exporter: &Value, catalog: &Value, index: usize) -> Value {
+fn goods(
+    item: &Value,
+    invoice: &Value,
+    exporter: &Value,
+    catalog: &Value,
+    index: usize,
+) -> Result<Value, String> {
     let mut row = contracts::initial(contracts::schema("ApiCustomsCooItemDto"));
     row["sourceItemId"] = item["id"].clone();
     row["sourceStyleNo"] = json!(text(item, "styleNo"));
@@ -434,9 +470,12 @@ fn goods(item: &Value, invoice: &Value, exporter: &Value, catalog: &Value, index
         ("invValue", "totalPrice"),
         ("fobValue", "totalPrice"),
     ] {
-        row[key] = json!(decimal(&item[source], 2));
+        row[key] = json!(decimal(&item[source], 2)?);
     }
-    row["invPrice"] = json!(decimal(&item["unitPrice"], 5));
+    row["invPrice"] = json!(decimal(
+        &item["unitPrice"],
+        crate::invoice_calculation::UNIT_PRICE_SCALE
+    )?);
     row["goodsItemFlag"] = json!("N");
     row["packType"] = json!("1");
     row["wtUnit"] = json!("KGS");
@@ -468,7 +507,7 @@ fn goods(item: &Value, invoice: &Value, exporter: &Value, catalog: &Value, index
     row["prdcEtpsTel"] = json!(phone(text(exporter, "phone")));
     row["invNo"] = json!(text(invoice, "invoiceNo"));
     row["goodsDesc"] = json!(goods_description(&row));
-    row
+    Ok(row)
 }
 pub fn goods_description(row: &Value) -> String {
     let quantity = text(row, "packQty");

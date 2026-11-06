@@ -247,21 +247,6 @@ pub fn service_action<'a>(key: &str, action: &'a str) -> &'a str {
 
 /// Shared by application authorization and native action visibility. A missing
 /// policy or grant always denies access; path names never imply permissions.
-pub fn allows_operation(
-    grants: &[Grant],
-    administrator: bool,
-    operation: crate::generated_api::Operation,
-    query: &[(&str, String)],
-) -> bool {
-    allows_edition_operation(
-        grants,
-        administrator,
-        ProductEdition::Full,
-        operation,
-        query,
-    )
-}
-
 pub fn allows_edition_operation(
     grants: &[Grant],
     administrator: bool,
@@ -339,13 +324,38 @@ mod tests {
     fn operation_visibility_uses_the_same_generated_policy_as_the_service() {
         use crate::generated_api::*;
         let grants = effective(&[grant("office.people", "view", "company")]).unwrap();
-        assert!(allows_operation(&grants, false, LIST_PERSONNEL, &[]));
-        assert!(!allows_operation(&grants, false, GET_PERSONNEL, &[]));
-        assert!(!allows_operation(&grants, false, UPDATE_SETTINGS, &[]));
-        assert!(allows_operation(&[], true, UPDATE_SETTINGS, &[]));
-        assert!(!allows_operation(
+        assert!(allows_edition_operation(
+            &grants,
+            false,
+            ProductEdition::Full,
+            LIST_PERSONNEL,
+            &[]
+        ));
+        assert!(!allows_edition_operation(
+            &grants,
+            false,
+            ProductEdition::Full,
+            GET_PERSONNEL,
+            &[]
+        ));
+        assert!(!allows_edition_operation(
+            &grants,
+            false,
+            ProductEdition::Full,
+            UPDATE_SETTINGS,
+            &[]
+        ));
+        assert!(allows_edition_operation(
             &[],
             true,
+            ProductEdition::Full,
+            UPDATE_SETTINGS,
+            &[]
+        ));
+        assert!(!allows_edition_operation(
+            &[],
+            true,
+            ProductEdition::Full,
             Operation {
                 id: "Unknown",
                 method: "GET",
@@ -366,9 +376,10 @@ mod tests {
         );
         assert_eq!(module_access(&grants)["sales.crm"], "operate");
         let grants = effective(&[grant("document.payments", "view", "own")]).unwrap();
-        assert!(allows_operation(
+        assert!(allows_edition_operation(
             &grants,
             false,
+            ProductEdition::Full,
             crate::generated_api::LIST_CUSTOM_OPTIONS,
             &[]
         ));
@@ -400,7 +411,13 @@ mod tests {
             START_PAYMENT_VOUCHER_PDF_DOWNLOAD_JOB,
             LIST_INVOICES,
         ] {
-            assert!(!allows_operation(&employee, false, operation, &[]));
+            assert!(!allows_edition_operation(
+                &employee,
+                false,
+                ProductEdition::Full,
+                operation,
+                &[]
+            ));
         }
         for role in [
             "Sales",
@@ -411,16 +428,25 @@ mod tests {
         ] {
             let grants = role_grants(role).unwrap();
             assert!(
-                allows_operation(&grants, false, CREATE_PAYMENT, &[]),
+                allows_edition_operation(&grants, false, ProductEdition::Full, CREATE_PAYMENT, &[]),
                 "{role}"
             );
             assert!(
-                allows_operation(&grants, false, START_PAYMENT_VOUCHER_PDF_DOWNLOAD_JOB, &[]),
+                allows_edition_operation(
+                    &grants,
+                    false,
+                    ProductEdition::Full,
+                    START_PAYMENT_VOUCHER_PDF_DOWNLOAD_JOB,
+                    &[]
+                ),
                 "{role}"
             );
-            assert!(allows_operation(&grants, false, LIST_JOBS, &[]), "{role}");
             assert!(
-                !allows_operation(&grants, false, LIST_INVOICES, &[]),
+                allows_edition_operation(&grants, false, ProductEdition::Full, LIST_JOBS, &[]),
+                "{role}"
+            );
+            assert!(
+                !allows_edition_operation(&grants, false, ProductEdition::Full, LIST_INVOICES, &[]),
                 "{role}"
             );
         }
@@ -432,8 +458,26 @@ mod tests {
                 .iter()
                 .any(|g| g.resource_key == "document.report-templates")
         );
-        assert!(!allows_operation(&grants, false, SAVE_CUSTOM_OPTION, &[]));
-        assert!(!allows_operation(&grants, false, CREATE_PAYMENT, &[]));
-        assert!(allows_operation(&grants, false, LIST_REPORT_TEMPLATES, &[]));
+        assert!(!allows_edition_operation(
+            &grants,
+            false,
+            ProductEdition::Full,
+            SAVE_CUSTOM_OPTION,
+            &[]
+        ));
+        assert!(!allows_edition_operation(
+            &grants,
+            false,
+            ProductEdition::Full,
+            CREATE_PAYMENT,
+            &[]
+        ));
+        assert!(allows_edition_operation(
+            &grants,
+            false,
+            ProductEdition::Full,
+            LIST_REPORT_TEMPLATES,
+            &[]
+        ));
     }
 }

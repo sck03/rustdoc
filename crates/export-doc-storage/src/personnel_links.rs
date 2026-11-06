@@ -106,9 +106,9 @@ pub(crate) fn appointments(ids: &[i64], pg: bool) -> Result<(QuerySql, String)> 
         "(SELECT COUNT(*) FROM reporting_relations a WHERE a.manager_appointment_id=m.id)";
     let duty = "(SELECT COUNT(*) FROM organization_duties a WHERE a.appointment_id=m.id)";
     let history = if pg {
-        "(SELECT COUNT(*) FROM record_rows a WHERE a.kind='oa-submission' AND a.body #>> '{appointment,id}'=m.id)"
+        "(SELECT COUNT(*) FROM request_revisions a WHERE a.body #>> '{appointment,id}'=m.id)"
     } else {
-        "(SELECT COUNT(*) FROM record_rows a WHERE a.kind='oa-submission' AND json_extract(a.body,'$.appointment.id')=m.id)"
+        "(SELECT COUNT(*) FROM request_revisions a WHERE json_extract(a.body,'$.appointment.id')=m.id)"
     };
     let items = if pg {
         format!(

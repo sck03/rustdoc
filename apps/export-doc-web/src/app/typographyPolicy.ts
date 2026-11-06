@@ -1,5 +1,5 @@
 // Interface and report families match Resources/Fonts/OpenSource/font-manifest.json.
-// Sans has real 400/700 faces; Serif has only the bundled 400 face.
+// Sans has real 400/500/700 faces; Serif has only the bundled 400 face.
 export const portableReportSansFontFamily = "Noto Sans CJK SC";
 
 export const portableReportSerifFontFamily = "Noto Serif CJK SC";
@@ -12,9 +12,10 @@ export const portableReportFontFaces = [
 
 export function installPortableFonts() {
   const sources = [
-    [portableReportSansFontFamily, new URL("../../../../Resources/Fonts/OpenSource/NotoSansCJKsc-Regular.otf", import.meta.url).href, "400"],
-    [portableReportSansFontFamily, new URL("../../../../Resources/Fonts/OpenSource/NotoSansCJKsc-Bold.otf", import.meta.url).href, "700"],
-    [portableReportSerifFontFamily, new URL("../../../../Resources/Fonts/OpenSource/NotoSerifCJKsc-Regular.otf", import.meta.url).href, "400"],
+    [portableReportSansFontFamily, new URL("../../../../Resources/Fonts/OpenSource/NotoSansCJKsc-Regular.woff2", import.meta.url).href, "400"],
+    [portableReportSansFontFamily, new URL("../../../../Resources/Fonts/OpenSource/NotoSansCJKsc-Medium.woff2", import.meta.url).href, "500"],
+    [portableReportSansFontFamily, new URL("../../../../Resources/Fonts/OpenSource/NotoSansCJKsc-Bold.woff2", import.meta.url).href, "700"],
+    [portableReportSerifFontFamily, new URL("../../../../Resources/Fonts/OpenSource/NotoSerifCJKsc-Regular.woff2", import.meta.url).href, "400"],
   ] as const;
   for (const [family, source, weight] of sources) {
     document.fonts.add(new FontFace(family, `url("${source}")`, { weight, style: "normal", display: "swap" }));

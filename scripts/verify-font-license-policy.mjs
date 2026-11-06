@@ -9,7 +9,7 @@ const scanRoot = path.resolve(argumentsMap.root || repositoryRoot);
 const requireFiles = argumentsMap.requireFiles === true;
 const sourceFontRoot = path.join(repositoryRoot, "Resources", "Fonts", "OpenSource");
 const manifest = JSON.parse(readFileSync(path.join(sourceFontRoot, "font-manifest.json"), "utf8"));
-const expected = new Map(manifest.fonts.map((font) => [font.fileName.toLowerCase(), font]));
+const expected = new Map(manifest.fonts.flatMap(font => [font, ...(font.web ? [font.web] : [])]).map(font => [font.fileName.toLowerCase(), font]));
 const fontExtensions = new Set([".ttf", ".otf", ".ttc", ".woff", ".woff2", ".eot"]);
 const ignoredDirectoryNames = new Set([".git", ".codex-runtime", "artifacts", "bin", "obj", "node_modules", "target", "dist"]);
 const forbiddenNamePattern = /(msyh|microsoft\s*yahei|simsun|simhei|segoe|arial|times\s*new\s*roman|sf\s*pro|pingfang|hiragino|consolas)/i;

@@ -7,9 +7,10 @@ pub(crate) fn filter(
     company: &str,
     departments: Option<&str>,
     date: Option<&str>,
+    record: &'static str,
 ) -> String {
     let mut clauses = vec![
-        "m.person_id=r.id".to_owned(),
+        format!("m.person_id={record}.id"),
         format!("m.company={company}"),
     ];
     if let Some(departments) = departments {

@@ -1,3 +1,4 @@
+import { ExternalAnchor } from "../../ui/ExternalAnchor.tsx";
 import { useMutation } from "@tanstack/react-query";
 import { Eye,ExternalLink,FileSpreadsheet,Globe2,RefreshCw,Save,Search,Trash2,Upload,X } from "lucide-react";
 import { ChangeEvent,FormEvent,Fragment,useEffect,useRef,useState } from "react";
@@ -503,8 +504,8 @@ function HsCodeRemoteDetail({ item }: { item: ApiHsCodeDto }) {
         <div><span>观察时间</span><strong>{formatObservedAt(item.observedAt)}</strong></div>
         {item.personalPostalTaxCode ? <div><span>个人行邮税号</span><strong>{item.personalPostalTaxCode}</strong></div> : null}
         <div className="hs-code-evidence-links">
-          {item.evidenceUrl ? <a href={item.evidenceUrl} target="_blank" rel="noreferrer">来源详情<ExternalLink size={14} /></a> : null}
-          {item.summaryUrl ? <a href={item.summaryUrl} target="_blank" rel="noreferrer">实例汇总<ExternalLink size={14} /></a> : null}
+          {item.evidenceUrl ? <ExternalAnchor href={item.evidenceUrl} >来源详情<ExternalLink size={14} /></ExternalAnchor> : null}
+          {item.summaryUrl ? <ExternalAnchor href={item.summaryUrl} >实例汇总<ExternalLink size={14} /></ExternalAnchor> : null}
         </div>
       </div>
       {item.ciqEntries?.length ? <ReferenceList label="CIQ分类" entries={item.ciqEntries.map(entry => `${entry.code} ${entry.name}`)} /> : null}

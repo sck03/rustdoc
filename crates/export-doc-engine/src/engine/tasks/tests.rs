@@ -22,7 +22,7 @@ impl Fixture {
     }
     fn open(&self) -> (Arc<Store>, Jobs) {
         let store = self.store();
-        let jobs = Jobs::open(store.clone()).unwrap();
+        let jobs = Jobs::with_retention(store.clone(), Default::default()).unwrap();
         (store, jobs)
     }
     fn store(&self) -> Arc<Store> {

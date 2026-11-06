@@ -74,13 +74,13 @@ export function MaintenanceDatabaseBackupPanel({
       </div></details>
       <ResponsiveTableFrame className="backup-table-frame" label="PostgreSQL 团队库备份列表">
         <table className="backup-table" aria-label="PostgreSQL 团队库备份列表">
-          <thead><tr><th>文件</th><th>大小</th><th>创建时间</th><th>操作</th></tr></thead>
+          <thead><tr><th>文件</th><th>大小</th><th>文件修改时间</th><th>操作</th></tr></thead>
           <tbody>
             {backups.length > 0 ? backups.map((backup) => (
               <tr key={backup.fullPath || backup.fileName}>
                 <td><TablePrimaryText value={backup.fileName} /></td>
                 <td>{formatBytes(backup.sizeBytes)}</td>
-                <td>{formatRuntimeDate(backup.createdAt)}</td>
+                <td>{formatRuntimeDate(backup.lastWriteTime)}</td>
                 <td><button className="command-button secondary" type="button" disabled={!canManageSettings || busy} aria-label={"下载 " + backup.fileName} onClick={() => onDownload(backup.fileName)}><Download size={17} aria-hidden="true" /><span>下载</span></button></td>
               </tr>
             )) : <tr><td className="empty-cell" colSpan={4}>{isLoading ? "加载中" : "暂无 PostgreSQL 备份"}</td></tr>}

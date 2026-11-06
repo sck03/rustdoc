@@ -188,7 +188,13 @@ impl ReportData {
         }
         if value.is_number() && name == "UnitPrice" {
             return decimal(value)
-                .map(|v| format_decimal(v, v.scale().clamp(2, 4)))
+                .map(|v| {
+                    format_decimal(
+                        v,
+                        v.scale()
+                            .clamp(2, export_doc_domain::invoice_calculation::UNIT_PRICE_SCALE),
+                    )
+                })
                 .unwrap_or_else(|_| plain(value));
         }
         plain(value)
@@ -272,16 +278,7 @@ pub(crate) fn decimal(value: &Value) -> Result<Decimal> {
     }
     serde_json::from_value(value.clone()).map_err(|_| invalid("报表金额或数量不是有效十进制数。"))
 }
-pub(crate) fn format_decimal(value: Decimal, precision: u32) -> String {
-    format!(
-        "{:.*}",
-        precision as usize,
-        value.round_dp_with_strategy(
-            precision,
-            rust_decimal::RoundingStrategy::MidpointAwayFromZero
-        )
-    )
-}
+pub(crate) use export_doc_domain::number::format_decimal;
 
 pub fn english_money(value: Decimal) -> Result<String> {
     use export_doc_domain::number::english_integer as whole;
@@ -392,6 +389,25 @@ pub fn chinese_money(value: Decimal) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn report_precision_preserves_fifth_price_digit_and_rounds_weight_explicitly() {
+        let data = ReportData {
+            report_type: "ExportDocument",
+            root: json!({}),
+            images: BTreeMap::new(),
+        };
+        assert_eq!(
+            data.display("item.UnitPrice", Some(&json!({"unitPrice": 0.12345}))),
+            "0.12345"
+        );
+        for (input, expected) in [
+            ("1234.567", "1234.57"),
+            ("1.125", "1.13"),
+            ("-12.345", "-12.35"),
+        ] {
+            assert_eq!(format_decimal(input.parse().unwrap(), 2), expected);
+        }
+    }
     #[test]
     fn written_amounts_keep_group_zeroes_and_round_without_float() {
         for (input, expected) in [

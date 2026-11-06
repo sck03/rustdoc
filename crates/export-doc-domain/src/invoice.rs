@@ -229,6 +229,43 @@ pub fn parse_number(value: &str) -> Result<Decimal, String> {
 mod tests {
     use super::*;
     #[test]
+    fn refund_total_rounds_only_after_exact_line_accumulation() {
+        let mut draft = InvoiceDraft::new("2026-11-06");
+        draft.header.invoice_no = "REFUND-ROUNDING".into();
+        draft.header.currency = "CNY".into();
+        let mut row = ItemRow::blank();
+        row.cells[2] = "SAMPLE".into();
+        row.cells[8] = "1".into();
+        row.cells[23] = "1".into();
+        row.cells[25] = "0.05".into();
+        row.cells[27] = "13".into();
+        row.recalculate(&[8, 23, 25, 27]).unwrap();
+        draft.rows = vec![row.clone(), row];
+        let invoice = draft.build().unwrap();
+        assert_eq!(invoice.total_tax_refund_amount, Decimal::new(1, 2));
+        assert_eq!(
+            invoice
+                .items
+                .iter()
+                .map(|item| money(item.tax_refund_amount))
+                .sum::<Decimal>(),
+            Decimal::new(2, 2)
+        );
+        assert_eq!(invoice.total_profit, Decimal::new(191, 2));
+        let saved: ApiInvoiceDetailDto =
+            serde_json::from_slice(&serde_json::to_vec(&invoice).unwrap()).unwrap();
+        assert_eq!(InvoiceDraft::from_dto(saved).build().unwrap(), invoice);
+    }
+    #[test]
+    fn document_text_rejects_controls_before_normalization_and_keeps_line_breaks() {
+        let mut row = ItemRow::blank();
+        row.cells[2] = "\u{b}product".into();
+        assert!(row.recalculate(&[]).is_err());
+        assert!(row.to_dto().is_err());
+        row.cells[2] = "line one\r\nline two\tvalue".into();
+        assert_eq!(row.to_dto().unwrap().style_name, row.cells[2]);
+    }
+    #[test]
     fn exact_decimal_roundtrip_and_rounding_match_invoice_boundary() {
         assert_eq!(
             money(Decimal::from_str("1.005").unwrap()).to_string(),

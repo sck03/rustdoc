@@ -214,30 +214,10 @@
     width: 100%;
   }
 
-  .new-report-designer {
-    min-height: auto;
-    padding: 12px;
-  }
 
-  .new-report-designer-header {
-    grid-template-columns: 1fr;
-  }
 
-  .new-report-designer-grid {
-    grid-template-columns: 1fr;
-    height: auto;
-  }
 
-  .new-report-designer-sidebar,
-.new-report-designer-right-rail {
-    height: auto;
-    max-height: none;
-    overflow: visible;
-  }
 
-  .new-report-designer-canvas {
-    min-height: 480px;
-  }
 
   .section-header {
     align-items: stretch;

@@ -41,6 +41,7 @@ mod restore_files;
 #[cfg(feature = "s3-backup")]
 mod s3;
 pub(in crate::engine) mod scheduled;
+mod scratch;
 mod sealed;
 mod tickets;
 mod transfer;
@@ -292,24 +293,6 @@ pub fn handle(
         AUTHORIZE_SERVER_MIGRATION_OPERATION => migration::authorize(service, actor, body),
         _ => Err(unsupported(format!(
             "此项原生操作尚未接入：{}。",
-            operation.id
-        ))),
-    }
-}
-
-/// 受控文件下载。下载票据由本模块签发；服务器下载层可叠加会话与 Cookie 绑定。
-pub fn download(
-    service: &NativeService,
-    _actor: &Actor,
-    operation: Operation,
-    parameters: &[(&str, String)],
-) -> Result<tasks::FileOutput> {
-    match operation {
-        DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET => {
-            postgres::download_with_ticket(service, parameters)
-        }
-        _ => Err(unsupported(format!(
-            "此项下载尚未完成原生迁移：{}。",
             operation.id
         ))),
     }

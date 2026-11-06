@@ -6,7 +6,7 @@ import { encodeHeaderText } from "../../api/headerText.ts";
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { downloadJobResultWhenReady, startDownloadFromTicket, waitForJobCompletion } from "../../ui/downloadJobResult.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { readApiError } from "../../ui/formUtils.ts";
+import { currentLocalDateInputValue, readApiError } from "../../ui/formUtils.ts";
 import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { parseStringArray } from "./settingsValueUtils.ts";
 import { MaintenanceBackgroundTaskStatusPanel } from "./MaintenanceBackgroundTaskStatusPanel.tsx";
@@ -105,7 +105,7 @@ export function PostgreSqlMaintenancePanel({
   const downloadMigrationMutation = useMutation({
     mutationFn: () => runAbortableOperation(async (signal) => {
       const job = await client.createServerMigrationPackage({ body: { password: migrationPassword, adminPassword: migrationAdminPassword, confirmationText: migrationCreateConfirmation.trim() } }, { signal });
-      return downloadJobResultWhenReady(client, job, `export-doc-manager-server-migration-${new Date().toISOString().slice(0, 10)}.edmmigration`, { timeoutMs: 60 * 60 * 1000, pollIntervalMs: 2_000, signal });
+      return downloadJobResultWhenReady(client, job, `export-doc-manager-server-migration-${currentLocalDateInputValue()}.edmmigration`, { timeoutMs: 60 * 60 * 1000, pollIntervalMs: 2_000, signal });
     }),
     onSuccess: () => { setMigrationPassword(""); setMigrationPasswordConfirmation(""); setMigrationAdminPassword(""); setMigrationCreateConfirmation(""); setMessage(null); setSuccessMessage("完整服务器迁移包已交给浏览器下载，请将密码单独保管。"); },
     onError: (error) => { setMigrationPassword(""); setMigrationPasswordConfirmation(""); setMigrationAdminPassword(""); setMigrationCreateConfirmation(""); failMigration(error); },

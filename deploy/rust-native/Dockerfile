@@ -56,7 +56,7 @@ COPY --from=ocr-assets /workspace/artifacts/ocr-runtime/pdf/ ./Resources/Pdf/
 COPY OcrModels/PaddleOCR/V6/ ./OcrModels/PaddleOCR/V6/
 COPY apps/exportdoc-ocr-rs/README.md ./sidecar/ocr/README.md
 COPY --from=web /workspace/apps/export-doc-web/dist/ ./Web/
-COPY --from=web /workspace/Resources/Fonts/OpenSource/ ./Resources/Fonts/OpenSource/
+COPY --from=web /workspace/Resources/Fonts/OpenSource/*.otf /workspace/Resources/Fonts/OpenSource/*.txt /workspace/Resources/Fonts/OpenSource/*.md /workspace/Resources/Fonts/OpenSource/font-manifest.json ./Resources/Fonts/OpenSource/
 COPY Resources/ExcelTemplates/ ./Resources/ExcelTemplates/
 COPY Templates/ ./Templates/
 COPY THIRD_PARTY_NOTICES.md THIRD_PARTY_DEPENDENCIES.md ./

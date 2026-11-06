@@ -222,9 +222,6 @@ impl NativeService {
                 report_template_files::download(self, &actor, operation, parameters)
             }
             DOWNLOAD_SUPPORT_PACKAGE => licensing::download(self, &actor, operation, parameters),
-            DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET => {
-                team_backup::download(self, &actor, operation, parameters)
-            }
             _ => Err(unsupported("此下载尚未完成原生迁移。")),
         }
     }
@@ -257,6 +254,15 @@ impl NativeService {
         body: Option<Value>,
         token: &str,
     ) -> Result<Vec<u8>> {
+        if operation == RESTORE_DATABASE_BACKUP {
+            let actor = self.session_actor_for_operation(token, operation)?;
+            self.authorize_operation(&actor, operation, query)?;
+            if self.provider()? != "SQLite" {
+                return Err(unsupported(
+                    "此恢复入口仅支持 SQLite；PostgreSQL 请使用独立维护恢复。",
+                ));
+            }
+        }
         let _read = if operation != RESTORE_DATABASE_BACKUP {
             Some(
                 self.maintenance
@@ -267,11 +273,7 @@ impl NativeService {
             None
         };
         let _write = if operation == RESTORE_DATABASE_BACKUP {
-            Some(
-                self.maintenance
-                    .write()
-                    .map_err(|_| unavailable("数据库维护状态异常。"))?,
-            )
+            Some(maintenance::acquire(&self.maintenance)?)
         } else {
             None
         };

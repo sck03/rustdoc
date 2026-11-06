@@ -179,6 +179,6 @@ assert(draft.changedSettingsCategories(before, after).length === 0, "undo clears
 assert(draft.settingsCategoryForPath(["system", "defaultTemplateExporterNameCn"]) === "excel-import", "exporter default belongs to Excel");
 assert(draft.settingsCategoryForPath(["system", "postgreSqlAutoBackupTime"]) === "backup", "backup schedule ownership");
 assert(draft.settingsCategoryForPath(["system", "auditLogRetentionDays"]) === "maintenance", "audit retention ownership");
-assert(!draft.categoryHasSecrets("documents", "postgresql") && !draft.categoryHasSecrets("runtime", "sqlite"), "no unrelated secret toggle");
-assert(draft.categoryHasSecrets("runtime", "postgresql") && !draft.categoryHasSecrets("backup"), "backup credentials have dedicated save controls");
+// Secret-control visibility is exercised on the production settings panels in
+// settings-workspace-ui-cases.mjs; it is not duplicated in a model-only wrapper.
 process.stdout.write("settings-model tests passed\n");

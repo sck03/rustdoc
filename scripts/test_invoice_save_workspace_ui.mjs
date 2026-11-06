@@ -21,6 +21,7 @@ import {useInvoiceItemsWorkspace} from ${source("features/invoices/useInvoiceIte
 import {createEmptyInvoice} from ${source("features/invoices/invoiceModel.ts")};
 import {createEmptyInvoiceItem} from ${source("features/invoices/invoiceItemsEditorModel.ts")};
 import {InvoiceItemsEditor} from ${source("features/invoices/InvoiceItemsEditor.tsx")};
+import {NumberField} from ${source("ui/FormFields.tsx")};
 import {ConfirmationProvider} from ${source("ui/ConfirmationProvider.tsx")};
 window.requests=[]; window.resets=0; window.productWrites=[];
 const queryClient=new QueryClient({defaultOptions:{queries:{staleTime:30000,retry:false},mutations:{retry:false}}});
@@ -39,6 +40,7 @@ return shown?<Editor key={id} id={id}/>:<div>unmounted</div>;
 function Editor({id}){
 const [invoice,setInvoice]=useState(()=>({...createEmptyInvoice("2026-10-25"),id,invoiceNo:"before-save",rowVersion:"native:1",items:Array.from({length:window.initialRows??1},(_,index)=>({...createEmptyInvoiceItem(id),poNumber:"PO-"+index,styleNo:"ZZ-1",styleName:"item",quantity:1,unitPrice:1}))}));
 const [message,setMessage]=useState(null),[success,setSuccessMessage]=useState(null),[baseline,setPersistedInvoiceDraft]=useState(null);
+const [number,setNumber]=useState(0);window.number=number;
 const [feedback,setPendingHsFeedback]=useState([]);const location=useLocation();window.locationState=location.state;window.currentRoute=location.pathname;
 const mutations=useInvoicePersistenceOperations({client,invoice,invoiceId:id,isNew:id===0,pendingHsFeedback:feedback,resetItemEditHistory:()=>window.resets++,
 setConcurrencyMessage:setMessage,setInvoice,setMessage,setPendingHsFeedback,setPersistedInvoiceDraft,setPersistedInvoiceStatus:()=>{},setSuccessMessage});
@@ -59,7 +61,7 @@ onUndoItemEdit={items.undoItemEdit} productLibraryMessage={null} productLibraryP
 productLibraryPageNumber={1} productLibraryPageSize={30} productLibraryTotalCount={0} productLibraryTotalPages={1}
 onProductLibraryPageChange={items.setProductLibraryPageNumber} onProductLibraryPageSizeChange={items.changeProductLibraryPageSize}
 onHsKnowledgeFeedback={()=>{}} unitOptions={[]}/>:null;
-return <div><input aria-label="invoice-number" value={invoice.invoiceNo} onChange={e=>setInvoice(current=>({...current,invoiceNo:e.target.value}))}/>
+return <div><NumberField label="rate" value={number} onChange={setNumber}/><input aria-label="invoice-number" value={invoice.invoiceNo} onChange={e=>setInvoice(current=>({...current,invoiceNo:e.target.value}))}/>
 <button onClick={window.actions.save}>save</button><button onClick={window.actions.product}>product</button><button onClick={window.actions.paste}>paste</button>
 <output data-message>{message}</output><output data-success>{success}</output><output data-product>{items.productLibraryMessage}</output>{grid}</div>;
 }

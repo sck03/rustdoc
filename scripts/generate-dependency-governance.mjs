@@ -41,6 +41,9 @@ const approvedLicenseIdentifiers = new Set([
   "NCSA",
   "OpenSSL",
   "PostgreSQL",
+  // argparse (build-only wawoff2 CLI dependency): permissive PSF/BeOpen/CNRI/CWI
+  // terms reviewed in docs/2026-11-06重构实施与验收记录.md; retain notices.
+  "Python-2.0",
   "Unicode-3.0",
   "Unicode-DFS-2016",
   "Unlicense",

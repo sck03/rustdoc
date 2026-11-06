@@ -109,7 +109,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         let _ = monitor.await;
         server
     });
-    let closed = service.close();
+    let closed = export_doc_server::close_service(service);
+    runtime.shutdown_timeout(Duration::from_secs(5));
     if let Some(path) = endpoint_file {
         match std::fs::remove_file(path) {
             Ok(()) => {}

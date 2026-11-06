@@ -28,7 +28,13 @@ macro_rules! cell_text {
 }
 macro_rules! cell_value {
     (text, $value:expr) => {
-        normalize($value)
+        {
+            let text = $value;
+            if !crate::document_text::is_valid(text) {
+                return Err("商品文字含不支持的控制字符，请删除该字符后重试。".into());
+            }
+            normalize(text)
+        }
     };
     (number, $value:expr) => {
         parse_number($value)?
@@ -125,6 +131,12 @@ impl ItemRow {
     pub fn to_dto(&self) -> Result<ApiInvoiceItemDto, String> {
         let mut item = self.original.clone();
         for (index, value) in self.cells.iter().enumerate() {
+            if !crate::document_text::is_valid(value) {
+                return Err(format!(
+                    "{}含不支持的控制字符，请删除该字符后重试。",
+                    COLUMNS[index]
+                ));
+            }
             if value.chars().count() > 500 {
                 return Err(format!("{}最多 500 字。", COLUMNS[index]));
             }

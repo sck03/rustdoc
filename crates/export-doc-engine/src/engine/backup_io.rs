@@ -40,7 +40,9 @@ impl Download {
         })?;
         let metadata = file.metadata()?;
         if !metadata.is_file() || metadata.len() == 0 {
-            return Err(invalid("备份文件为空、类型无效或超过可表示的文件大小。"));
+            return Err(unavailable(
+                "已登记备份文件为空或类型无效，请检查备份目录。",
+            ));
         }
         if let Some((size, hash)) = expected {
             if metadata.len() != size

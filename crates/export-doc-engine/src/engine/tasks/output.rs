@@ -462,9 +462,23 @@ pub(super) fn recover(store: &Store) -> Result<()> {
         }
         let path = directory.join("manifest.json");
         paths::ensure_safe_absolute(&path).map_err(unavailable)?;
-        if !path.try_exists()? && fs::read_dir(&directory)?.next().is_none() {
-            // The manifest is removed last; an empty receipt directory is safe
-            // after either initial creation or completed cleanup.
+        if !path.try_exists()? {
+            let temporary = fs::read_dir(&directory)?.collect::<std::io::Result<Vec<_>>>()?;
+            // No target can have been published before its durable manifest.
+            // Verify the complete directory before deleting even one entry.
+            for file in &temporary {
+                paths::ensure_safe_absolute(&file.path()).map_err(unavailable)?;
+                if !file.file_type()?.is_file()
+                    || !file.file_name().to_str().is_some_and(native_temporary)
+                {
+                    return Err(unavailable(
+                        "输出恢复目录缺少清单且含未知内容，已保留现场。",
+                    ));
+                }
+            }
+            for file in temporary {
+                fs::remove_file(file.path())?;
+            }
             remove_journal_directory(&directory)?;
             continue;
         }

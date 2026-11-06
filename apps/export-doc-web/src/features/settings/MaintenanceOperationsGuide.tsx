@@ -1,3 +1,4 @@
+import { ExternalAnchor } from "../../ui/ExternalAnchor.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 
 const documentationRoot = "https://github.com/sck03/rustdoc/blob/main/docs/";
@@ -26,8 +27,8 @@ export function MaintenanceOperationsGuide({ pending }: { pending: boolean }) {
       <pre className="settings-helper-text">{"docker compose pull\ndocker compose down\ndocker compose up -d --wait"}</pre>
       <p>逐条确认成功，拉取失败时原服务继续运行。数据与配置使用原目录，停止时保留数据库卷。</p>
       <div className="toolbar-actions">
-        <a className="command-button secondary" href={documentationRoot + encodeURIComponent("Docker容器部署与启动指南.md")} target="_blank" rel="noreferrer">查看 Linux Docker 部署说明</a>
-        <a className="command-button secondary" href={documentationRoot + encodeURIComponent("服务器备份迁移与恢复指南.md")} target="_blank" rel="noreferrer">查看备份、迁移与恢复教程</a>
+        <ExternalAnchor className="command-button secondary" href={documentationRoot + encodeURIComponent("Docker容器部署与启动指南.md")} >查看 Linux Docker 部署说明</ExternalAnchor>
+        <ExternalAnchor className="command-button secondary" href={documentationRoot + encodeURIComponent("服务器备份迁移与恢复指南.md")} >查看备份、迁移与恢复教程</ExternalAnchor>
       </div>
     </details>
   );

@@ -177,9 +177,6 @@ impl ApprovalRule {
         }
         Ok(())
     }
-    pub fn routed_exclusions(&self, context: &ConditionContext) -> Result<HashSet<String>, String> {
-        self.routed_exclusions_in(context, &std::collections::BTreeMap::new())
-    }
     pub fn routed_exclusions_in(
         &self,
         context: &ConditionContext,

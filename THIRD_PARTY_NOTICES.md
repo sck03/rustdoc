@@ -798,6 +798,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | @typescript/typescript-win32-arm64 | 7.0.2 | Apache-2.0 | web |
 | npm | @typescript/typescript-win32-x64 | 7.0.2 | Apache-2.0 | web |
 | npm | @vitejs/plugin-react | 6.1.2 | MIT | web |
+| npm | argparse | 2.0.1 | Python-2.0 | web |
 | npm | axe-core | 4.14.0 | MPL-2.0 | web |
 | npm | cookie | 1.1.1 | MIT | web |
 | npm | csstype | 3.2.3 | MIT | web |
@@ -841,6 +842,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | npm | typescript | 7.0.2 | Apache-2.0 | web |
 | npm | undici-types | 8.9.0 | MIT | web |
 | npm | vite | 8.3.5 | MIT | web |
+| npm | wawoff2 | 2.0.1 | MIT | web |
 
 ## Reviewed source patch
 

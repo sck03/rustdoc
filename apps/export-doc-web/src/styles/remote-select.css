@@ -20,8 +20,8 @@
 .remote-select-status {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 600;
-  line-height: 1.35;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .remote-select-status.error {

@@ -1,4 +1,4 @@
--- Part of the complete schema 12 baseline; never applied to an existing database.
+-- Part of the complete schema 14 baseline; never applied to an existing database.
 CREATE TABLE request_revisions (
     id BIGINT PRIMARY KEY REFERENCES records(id) ON DELETE RESTRICT,
     request_id BIGINT NOT NULL REFERENCES records(id) ON DELETE RESTRICT,
@@ -6,6 +6,7 @@ CREATE TABLE request_revisions (
     body JSONB NOT NULL,
     UNIQUE(request_id,revision)
 );
+CREATE INDEX request_revisions_appointment ON request_revisions((body #>> '{appointment,id}'));
 CREATE TABLE workflow_instances (
     id TEXT PRIMARY KEY,
     request_id BIGINT NOT NULL,
@@ -167,6 +168,15 @@ END $$;
 CREATE TRIGGER workflow_signature_immutable BEFORE UPDATE OR DELETE ON workflow_tasks FOR EACH ROW EXECUTE FUNCTION exportdoc_immutable_workflow();
 CREATE TRIGGER request_revision_immutable BEFORE UPDATE OR DELETE ON request_revisions FOR EACH ROW EXECUTE FUNCTION exportdoc_immutable_workflow();
 CREATE TRIGGER workflow_operation_immutable BEFORE UPDATE OR DELETE ON workflow_operations FOR EACH ROW EXECUTE FUNCTION exportdoc_immutable_workflow();
+CREATE FUNCTION exportdoc_immutable_subflow_binding() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF ROW(OLD.id,OLD.parent_instance_id,OLD.definition_id,OLD.definition_version,OLD.submission_id,OLD.subflow_key,OLD.node_keys,OLD.input_snapshot)
+       IS DISTINCT FROM ROW(NEW.id,NEW.parent_instance_id,NEW.definition_id,NEW.definition_version,NEW.submission_id,NEW.subflow_key,NEW.node_keys,NEW.input_snapshot) THEN
+        RAISE EXCEPTION 'Immutable subflow binding' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER subinstance_binding_update BEFORE UPDATE ON workflow_subinstances FOR EACH ROW EXECUTE FUNCTION exportdoc_immutable_subflow_binding();
 CREATE VIEW workflow_plans AS SELECT w.id,w.definition || jsonb_build_object('participants',w.participants,'subflowProgress',COALESCE((SELECT jsonb_object_agg(s.subflow_key,jsonb_build_object('state',s.state,'outcome',s.outcome,'outputs',s.outputs,'errorCode',s.error_code,'controlOutcome',s.control_outcome,'compensationCompleted',(s.compensation_completed=1))) FROM workflow_subinstances s WHERE s.parent_instance_id=w.id),'{}'::jsonb),'suspendedAt',w.suspended_at,'pausedSeconds',w.paused_seconds,'generation',w.generation,'nodes',COALESCE((SELECT jsonb_agg(value) FROM (SELECT n.definition || jsonb_build_object('startedAt',n.started_at,'dueAt',n.due_at,'state',n.execution_state,'execution',n.execution,'errorCode',n.error_code,'escalationCursor',n.escalation_cursor,'reminderLevel',n.reminder_level,'nextEscalationAt',n.next_escalation_at) AS value FROM node_instances n WHERE n.instance_id=w.id AND n.generation=w.generation ORDER BY n.position) q),'[]'::jsonb),'steps',COALESCE((SELECT jsonb_agg(value) FROM (SELECT COALESCE(t.signature,(s.signature || jsonb_build_object('sourceGeneration',t.source_generation)),jsonb_build_object('taskKey',t.task_key,'stage',t.stage,'decision',t.decision,'approverUserId',t.assignee_id,'approverPersonId',t.assignee_person_id,'origin',t.origin,'actedByPersonId',t.acted_by_person_id,'verificationValues',jsonb_build_object(),'confirmedReviewPoints',jsonb_build_array(),'approverName',t.assignee_name,'approverContext',t.context_id,'mandatory',(t.mandatory=1),'status',t.status,'actedByUserId',t.acted_by_id,'actedByName',t.acted_by_name,'actedByContext',t.acted_by_context,'actedAt',t.acted_at,'note',t.note,'delegationKey',t.delegation_key,'sourceGeneration',t.source_generation)) AS value FROM workflow_tasks t LEFT JOIN workflow_tasks s ON s.request_id=t.request_id AND s.submission=t.submission AND s.generation=t.source_generation AND s.task_key=t.task_key WHERE t.request_id=w.request_id AND t.submission=w.revision AND t.generation=w.generation ORDER BY t.stage,t.task_key) q),'[]'::jsonb)) AS body FROM workflow_instances w;
 CREATE VIEW record_rows AS
 SELECT r.id,r.kind,r.identity,r.version,r.owner_id,r.company,r.department,r.search_document,

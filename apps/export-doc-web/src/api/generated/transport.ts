@@ -8,7 +8,7 @@ const desktopAccessTokenHeaderName = "X-ExportDocManager-Desktop-Token";
 
 export interface ApiClientOptions {
   baseUrl: string;
-  onAuthenticationFailure?: (error: ApiError) => void;
+  onAuthenticationFailure?: (error: ApiError, requestToken?: string) => void;
   accessToken?: AccessTokenProvider;
   desktopAccessToken?: AccessTokenProvider;
   defaultTimeoutMs?: number;
@@ -32,7 +32,7 @@ export class ApiTransport {
   private readonly desktopAccessToken?: AccessTokenProvider;
   private readonly defaultTimeoutMs: number;
   private readonly fetchImpl: typeof globalThis.fetch;
-  private readonly onAuthenticationFailure?: (error: ApiError) => void;
+  private readonly onAuthenticationFailure?: (error: ApiError, requestToken?: string) => void;
 
   constructor(options: ApiClientOptions) {
     this.onAuthenticationFailure = options.onAuthenticationFailure;
@@ -53,11 +53,11 @@ export class ApiTransport {
     return new URL(path, this.baseUrl).toString();
   }
 
-  private responseError(response: Response, text: string, signal?: AbortSignal): ApiError {
+  private responseError(response: Response, text: string, signal?: AbortSignal, requestToken?: string): ApiError {
     const error = new ApiError(response.status, response.statusText, text);
     if (error.status === 401 && !signal?.aborted && this.onAuthenticationFailure) {
       const report = this.onAuthenticationFailure;
-      queueMicrotask(() => { if (!signal?.aborted) report(error); });
+      queueMicrotask(() => { if (!signal?.aborted) report(error, requestToken); });
     }
     return error;
   }
@@ -132,7 +132,7 @@ export class ApiTransport {
         contentType.includes("application/octet-stream") || contentDisposition.toLowerCase().includes("attachment");
       if (isBinaryResponse) {
         if (!response.ok) {
-          throw this.responseError(response, await response.text(), requestSignal);
+          throw this.responseError(response, await response.text(), requestSignal, token);
         }
 
         return await response.blob() as T;
@@ -140,7 +140,7 @@ export class ApiTransport {
 
       const responseText = await response.text();
       if (!response.ok) {
-        throw this.responseError(response, responseText, requestSignal);
+        throw this.responseError(response, responseText, requestSignal, token);
       }
 
       if (!responseText) {

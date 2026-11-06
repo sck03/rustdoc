@@ -151,14 +151,16 @@ pub(super) fn prune(
     replica: &replica::Target,
 ) -> Result<()> {
     let now = chrono::Utc::now();
-    for (index, mut archive) in list(paths)?.into_iter().enumerate() {
-        if index == 0
-            || (!archive.deleting
-                && index < plan.retention_count
-                && (plan.retention_days == 0
-                    || archive.created_at
-                        >= now - chrono::Duration::days(i64::from(plan.retention_days))))
+    let mut retained = 0;
+    for mut archive in list(paths)? {
+        if !archive.deleting
+            && (retained == 0
+                || (retained < plan.retention_count
+                    && (plan.retention_days == 0
+                        || archive.created_at
+                            >= now - chrono::Duration::days(i64::from(plan.retention_days)))))
         {
+            retained += 1;
             continue;
         }
         let path = root(paths).join(&archive.file_name);

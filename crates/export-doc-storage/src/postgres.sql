@@ -1,6 +1,6 @@
 CREATE TABLE schema_model (version BIGINT PRIMARY KEY,model TEXT NOT NULL,shape TEXT NOT NULL);
-CREATE TABLE schema_version (version BIGINT PRIMARY KEY CHECK(version = 13));
-INSERT INTO schema_version VALUES (13);
+CREATE TABLE schema_version (version BIGINT PRIMARY KEY CHECK(version = 14));
+INSERT INTO schema_version VALUES (14);
 -- The same compact, UTF-8 key order supplies bounded search metadata and fallback reads.
 CREATE FUNCTION exportdoc_record_text(value jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
@@ -24,6 +24,7 @@ CREATE TABLE records (
         THEN lower(normalize(exportdoc_record_text(body),NFC) COLLATE pg_unicode_fast) ELSE NULL END
     ) STORED,
     UNIQUE(kind, identity),
+    CHECK(kind<>'attachments' OR COALESCE(CASE WHEN jsonb_typeof(body->'invoiceId')='number' AND (body->>'invoiceId') ~ '^[1-9][0-9]*$' THEN (body->>'invoiceId')::numeric<=9223372036854775807 ELSE false END,false)),
     CHECK(kind<>'people' OR (COALESCE(NULLIF(body->'profile','null'::jsonb),'{}'::jsonb)-ARRAY['fullName','workEmail','workPhone','workLocation'])='{}'::jsonb)
 );
 CREATE TABLE personnel_private_profiles (
@@ -31,6 +32,7 @@ CREATE TABLE personnel_private_profiles (
     body JSONB NOT NULL CHECK(jsonb_typeof(body)='object')
 );
 CREATE INDEX records_kind_id ON records(kind, id DESC);
+CREATE INDEX attachment_invoice ON records((body->'invoiceId')) WHERE kind='attachments';
 CREATE INDEX records_scope ON records(kind, company, department, owner_id);
 CREATE INDEX records_company_page ON records(kind, company, id DESC);
 CREATE TABLE organization_units (

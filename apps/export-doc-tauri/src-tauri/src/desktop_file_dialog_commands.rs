@@ -7,50 +7,67 @@ use std::{
 pub(crate) const MAX_EXPORTER_SEAL_IMAGE_BYTES: u64 = export_doc_engine::engine::SEAL_LIMIT as u64;
 
 #[tauri::command]
-pub(crate) fn select_single_window_package_file() -> Result<Option<String>, String> {
+pub(crate) async fn select_single_window_package_file(
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
     Ok(pick_file(
+        &window,
         "选择单一窗口交换包",
         &[
             ("单一窗口交换包", &["swpkg", "edpkg"]),
             ("全部文件", &["*"]),
         ],
-    ))
+    )
+    .await)
 }
 
 #[tauri::command]
-pub(crate) fn select_invoice_transfer_package_file() -> Result<Option<String>, String> {
+pub(crate) async fn select_invoice_transfer_package_file(
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
     Ok(pick_file(
+        &window,
         "选择发票单据包",
         &[("发票单据包", &["edpkg"]), ("全部文件", &["*"])],
-    ))
+    )
+    .await)
 }
 
 #[tauri::command]
-pub(crate) fn select_disaster_recovery_package_file() -> Result<Option<String>, String> {
+pub(crate) async fn select_disaster_recovery_package_file(
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
     Ok(pick_file(
+        &window,
         "选择持卡机灾难恢复包",
         &[("持卡机灾难恢复包", &["edmrecovery"]), ("全部文件", &["*"])],
-    ))
+    )
+    .await)
 }
 
 #[tauri::command]
-pub(crate) fn select_pdf_files() -> Result<Vec<String>, String> {
-    let paths = rfd::FileDialog::new()
+pub(crate) async fn select_pdf_files(window: tauri::WebviewWindow) -> Result<Vec<String>, String> {
+    let paths = rfd::AsyncFileDialog::new()
+        .set_parent(&window)
         .set_title("选择 PDF 文件")
         .add_filter("PDF 文件", &["pdf"])
         .add_filter("全部文件", &["*"])
         .pick_files()
+        .await
         .unwrap_or_default()
         .into_iter()
-        .map(path_to_string)
+        .map(|file| path_to_string(file.path().to_owned()))
         .collect();
 
     Ok(paths)
 }
 
 #[tauri::command]
-pub(crate) fn select_email_attachment_files() -> Result<Vec<String>, String> {
-    let paths = rfd::FileDialog::new()
+pub(crate) async fn select_email_attachment_files(
+    window: tauri::WebviewWindow,
+) -> Result<Vec<String>, String> {
+    let paths = rfd::AsyncFileDialog::new()
+        .set_parent(&window)
         .set_title("选择邮件附件")
         .add_filter(
             "常用附件",
@@ -58,32 +75,40 @@ pub(crate) fn select_email_attachment_files() -> Result<Vec<String>, String> {
         )
         .add_filter("全部文件", &["*"])
         .pick_files()
+        .await
         .unwrap_or_default()
         .into_iter()
-        .map(path_to_string)
+        .map(|file| path_to_string(file.path().to_owned()))
         .collect();
 
     Ok(paths)
 }
 
 #[tauri::command]
-pub(crate) fn select_customs_coo_attachment_files() -> Result<Vec<String>, String> {
-    let paths = rfd::FileDialog::new()
+pub(crate) async fn select_customs_coo_attachment_files(
+    window: tauri::WebviewWindow,
+) -> Result<Vec<String>, String> {
+    let paths = rfd::AsyncFileDialog::new()
+        .set_parent(&window)
         .set_title("选择原产地证附件")
         .add_filter("常用文件", &["pdf", "jpg", "jpeg", "png", "doc", "docx"])
         .add_filter("全部文件", &["*"])
         .pick_files()
+        .await
         .unwrap_or_default()
         .into_iter()
-        .map(path_to_string)
+        .map(|file| path_to_string(file.path().to_owned()))
         .collect();
 
     Ok(paths)
 }
 
 #[tauri::command]
-pub(crate) fn select_letter_of_credit_file() -> Result<Option<String>, String> {
+pub(crate) async fn select_letter_of_credit_file(
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
     Ok(pick_file(
+        &window,
         "选择信用证文件",
         &[
             (
@@ -95,12 +120,16 @@ pub(crate) fn select_letter_of_credit_file() -> Result<Option<String>, String> {
             ),
             ("全部文件", &["*"]),
         ],
-    ))
+    )
+    .await)
 }
 
 #[tauri::command]
-pub(crate) fn select_ocr_image_file() -> Result<Option<String>, String> {
+pub(crate) async fn select_ocr_image_file(
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
     Ok(pick_file(
+        &window,
         "选择 OCR 图片",
         &[
             (
@@ -109,15 +138,20 @@ pub(crate) fn select_ocr_image_file() -> Result<Option<String>, String> {
             ),
             ("全部文件", &["*"]),
         ],
-    ))
+    )
+    .await)
 }
 
 #[tauri::command]
-pub(crate) fn select_exporter_seal_image_file() -> Result<Option<String>, String> {
+pub(crate) async fn select_exporter_seal_image_file(
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
     Ok(pick_file(
+        &window,
         "选择印章图片",
         &[("图片文件", &["png", "jpg", "jpeg"]), ("全部文件", &["*"])],
-    ))
+    )
+    .await)
 }
 
 #[tauri::command]
@@ -140,42 +174,59 @@ pub(crate) fn read_seal_image_file(path: String) -> Result<Vec<u8>, String> {
 }
 
 #[tauri::command]
-pub(crate) fn select_excel_file() -> Result<Option<String>, String> {
+pub(crate) async fn select_excel_file(
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
     Ok(pick_file(
+        &window,
         "选择 Excel 文件",
         &[
             ("Excel 文件", &["xlsx", "xlsm", "xltx", "xltm", "xls"]),
             ("全部文件", &["*"]),
         ],
-    ))
+    )
+    .await)
 }
 
 #[tauri::command]
-pub(crate) fn select_directory(
+pub(crate) async fn select_directory(
+    window: tauri::WebviewWindow,
     default_directory: Option<String>,
 ) -> Result<Option<String>, String> {
     Ok(apply_default_directory(
-        rfd::FileDialog::new().set_title("选择目录"),
+        rfd::AsyncFileDialog::new()
+            .set_parent(&window)
+            .set_title("选择目录"),
         default_directory,
     )
+    .await?
     .pick_folder()
-    .map(path_to_string))
+    .await
+    .map(|file| path_to_string(file.path().to_owned())))
 }
 
 #[tauri::command]
-pub(crate) fn select_report_template_package_file() -> Result<Option<String>, String> {
+pub(crate) async fn select_report_template_package_file(
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
     Ok(pick_file(
+        &window,
         "选择报表模板包",
         &[("报表模板包", &["edtpl", "zip"]), ("全部文件", &["*"])],
-    ))
+    )
+    .await)
 }
 
 #[tauri::command]
-pub(crate) fn select_report_template_file() -> Result<Option<String>, String> {
+pub(crate) async fn select_report_template_file(
+    window: tauri::WebviewWindow,
+) -> Result<Option<String>, String> {
     Ok(pick_file(
+        &window,
         "选择报表模板文件",
         &[("V3 报表模板", &["dtpl"]), ("全部文件", &["*"])],
-    ))
+    )
+    .await)
 }
 
 // Command declarations share the host adapter; filters remain explicit per operation.
@@ -183,11 +234,12 @@ macro_rules! save_commands {
     ($($name:ident => ($title:literal, $label:literal, $extensions:expr)),+ $(,)?) => {
         $(
             #[tauri::command]
-            pub(crate) fn $name(
+            pub(crate) async fn $name(
+                window: tauri::WebviewWindow,
                 default_file_name: Option<String>,
                 default_directory: Option<String>,
             ) -> Result<Option<String>, String> {
-                Ok(save_file($title, $label, $extensions, default_file_name, default_directory))
+                save_file(&window, $title, $label, $extensions, default_file_name, default_directory).await
             }
         )+
     };
@@ -203,13 +255,17 @@ save_commands! {
 }
 
 #[tauri::command]
-pub(crate) fn select_save_file_path(default_file_name: String) -> Result<Option<String>, String> {
+pub(crate) async fn select_save_file_path(
+    window: tauri::WebviewWindow,
+    default_file_name: String,
+) -> Result<Option<String>, String> {
     let file_name = Path::new(&default_file_name)
         .file_name()
         .and_then(|value| value.to_str())
         .filter(|value| !value.is_empty())
         .ok_or_else(|| "文件名无效。".to_owned())?;
-    let mut dialog = rfd::FileDialog::new()
+    let mut dialog = rfd::AsyncFileDialog::new()
+        .set_parent(&window)
         .set_title("选择文件保存位置")
         .set_file_name(file_name);
     if let Some(extension) = Path::new(file_name)
@@ -218,17 +274,22 @@ pub(crate) fn select_save_file_path(default_file_name: String) -> Result<Option<
     {
         dialog = dialog.add_filter("原文件类型", &[extension]);
     }
-    Ok(dialog.save_file().map(path_to_string))
+    Ok(dialog
+        .save_file()
+        .await
+        .map(|file| path_to_string(file.path().to_owned())))
 }
 
-fn save_file(
+async fn save_file(
+    window: &tauri::WebviewWindow,
     title: &str,
     label: &str,
     extensions: &[&str],
     default_file_name: Option<String>,
     default_directory: Option<String>,
-) -> Option<String> {
-    let mut dialog = rfd::FileDialog::new()
+) -> Result<Option<String>, String> {
+    let mut dialog = rfd::AsyncFileDialog::new()
+        .set_parent(&window)
         .set_title(title)
         .add_filter(label, extensions);
     if let Some(file_name) = default_file_name
@@ -237,29 +298,45 @@ fn save_file(
     {
         dialog = dialog.set_file_name(file_name);
     }
-    apply_default_directory(dialog, default_directory)
+    Ok(apply_default_directory(dialog, default_directory)
+        .await?
         .save_file()
-        .map(path_to_string)
+        .await
+        .map(|file| path_to_string(file.path().to_owned())))
 }
 
-fn pick_file(title: &str, filters: &[(&str, &[&str])]) -> Option<String> {
-    let mut dialog = rfd::FileDialog::new().set_title(title);
+async fn pick_file(
+    window: &tauri::WebviewWindow,
+    title: &str,
+    filters: &[(&str, &[&str])],
+) -> Option<String> {
+    let mut dialog = rfd::AsyncFileDialog::new()
+        .set_parent(&window)
+        .set_title(title);
     for (name, extensions) in filters {
         dialog = dialog.add_filter(*name, extensions);
     }
 
-    dialog.pick_file().map(path_to_string)
+    dialog
+        .pick_file()
+        .await
+        .map(|file| path_to_string(file.path().to_owned()))
 }
 
-fn apply_default_directory(
-    dialog: rfd::FileDialog,
+async fn apply_default_directory(
+    dialog: rfd::AsyncFileDialog,
     default_directory: Option<String>,
-) -> rfd::FileDialog {
-    if let Some(path) = resolve_existing_directory_candidate(default_directory) {
+) -> Result<rfd::AsyncFileDialog, String> {
+    let path = tauri::async_runtime::spawn_blocking(move || {
+        resolve_existing_directory_candidate(default_directory)
+    })
+    .await
+    .map_err(|_| "默认目录检查未完成。".to_owned())?;
+    Ok(if let Some(path) = path {
         dialog.set_directory(path)
     } else {
         dialog
-    }
+    })
 }
 
 fn resolve_existing_directory_candidate(default_directory: Option<String>) -> Option<PathBuf> {

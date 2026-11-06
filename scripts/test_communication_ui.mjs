@@ -100,7 +100,7 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   await page.screenshot({ path: path.join(output, 'notification-inbox.png'), fullPage: true });
   for (const route of ['/office/notifications', `/office/announcements?announcementId=${id}`]) {
     await navigate(route); await page.locator('.oa-workspace').waitFor();
-    await page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
+    await page.evaluate(require('axe-core').source);
     const violations = await page.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)));
     assert.deepEqual(violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.target) })), []);
   }
@@ -148,7 +148,7 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   await financePage.locator('details.oa-detail-history > summary').click();
   await financePage.getByText('凭证已核对，财务接收编号 FIN-UI-001', { exact: true }).waitFor();
   await financePage.screenshot({ path: path.join(output, 'finance-received.png'), fullPage: true });
-  await financePage.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
+  await financePage.evaluate(require('axe-core').source);
   assert.deepEqual(await financePage.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => v.id)), []);
   await financePage.goto(`${url}/#/office/approvals?view=handling`);
   await financePage.getByText('当前没有待处理事项', { exact: true }).waitFor();

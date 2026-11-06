@@ -1,7 +1,7 @@
 // Test-only structural HTML fixture. Production document output is owned by Rust.
 import { portableReportSansFontFamily } from "../../apps/export-doc-web/src/app/typographyPolicy.ts";
 import type { ReportBlock } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerSchema.ts";
-import { renderReportDesignerBlockToHtml } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerBlockRenderer.ts";
+import { renderReportDesignerBlockPreviewToHtml } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerBlockRenderer.ts";
 import { renderReportField } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerFieldRendering.ts";
 import {
   hundredthMmToMm,
@@ -283,7 +283,7 @@ function renderElementContent(element: ReportDesignerV3Element) {
       case "Line":
         return `<div class="edm-v3-line edm-v3-line-${element.direction.toLowerCase()}" style="${renderLineStyle(element)}"></div>`;
       case "Flow":
-        return `<div class="edm-v3-flow" style="--edm-field-image-height:${hundredthMmToMm(element.heightHundredthMm)}mm">${renderReportDesignerBlockToHtml(element.block as ReportBlock)}</div>`;
+        return `<div class="edm-v3-flow" style="--edm-field-image-height:${hundredthMmToMm(element.heightHundredthMm)}mm">${renderReportDesignerBlockPreviewToHtml(element.block as ReportBlock)}</div>`;
     }
   })();
 }

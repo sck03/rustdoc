@@ -10,8 +10,8 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["success","message","backups","backupRoot","storagePolicy"])),
     ("ApiBackupItemDto",o(vec![
         ("fileName",s()),("fullPath",s()),("sizeBytes",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int64").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("createdAt",s().format("date-time")),("lastWriteTime",s().format("date-time"))
-    ]).required(vec!["fileName","fullPath","sizeBytes","createdAt","lastWriteTime"])),
+        ("lastWriteTime",s().format("date-time"))
+    ]).required(vec!["fileName","fullPath","sizeBytes","lastWriteTime"])),
     ("ApiBackupListResponse",o(vec![("backups",a(r("ApiBackupItemDto"))),("backupRoot",s()),("storagePolicy",s())]).required(vec!["backups","backupRoot","storagePolicy"])),
     ("ApiBackupRestoreRequest",o(vec![("backupFileName",s()),("confirmationText",s())]).required(vec!["backupFileName","confirmationText"])),
     ("ApiCloudBackupCommandResponse",o(vec![
@@ -58,8 +58,8 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["supported","postgreSqlConfigured","toolsReady","pendingRestore","packageRoot","message","storagePolicy","restorePhase","restoreDetail"])),
     ("ApiSharedDatabaseBackupItemDto",o(vec![
         ("fileName",s()),("fullPath",s()),("sizeBytes",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int64").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("createdAt",s().format("date-time")),("lastWriteTime",s().format("date-time"))
-    ]).required(vec!["fileName","fullPath","sizeBytes","createdAt","lastWriteTime"])),
+        ("lastWriteTime",s().format("date-time"))
+    ]).required(vec!["fileName","fullPath","sizeBytes","lastWriteTime"])),
     ("ApiBackupPlan",o(vec![
         ("enabled",b().default_value(serde_json::json!(false))),("frequency",s().default_value(serde_json::json!("Daily")).enumeration(Enumeration::Values(vec![serde_json::json!("Daily"),serde_json::json!("Weekly")]))),("time",s().default_value(serde_json::json!("02:00")).pattern("^([01][0-9]|2[0-3]):[0-5][0-9]$")),
         ("weekday",i().default_value(serde_json::json!(num("1"))).minimum(num("0")).maximum(num("6"))),("retentionCount",i().default_value(serde_json::json!(num("14"))).minimum(num("1")).maximum(num("365"))),("retentionDays",i().default_value(serde_json::json!(num("0"))).minimum(num("0")).maximum(num("3650"))),

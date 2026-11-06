@@ -24,6 +24,9 @@ const MAX_SVG_PAGE: usize = 64 * 1024 * 1024;
 const MAX_SVG_DOCUMENT: usize = 128 * 1024 * 1024;
 const MAX_HTML: usize = 96 * 1024 * 1024;
 pub(crate) fn check_svg_size(svg: &str) -> Result<()> {
+    if !export_doc_domain::document_text::is_valid(svg) {
+        return Err(invalid("报表文字含不支持的控制字符，请检查单据与模板。"));
+    }
     if svg.len() > MAX_SVG_PAGE {
         return Err(invalid("报表单页 SVG 超过 64 MiB。"));
     }

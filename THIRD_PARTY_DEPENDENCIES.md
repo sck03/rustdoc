@@ -5,7 +5,7 @@ Generated from committed npm/Cargo lock files, Cargo metadata and signed native-
 Runtime image boundary: PostgreSQL client tools and their native library closure ship in web/server packages under Tools/PostgreSQL with license texts. The database server remains a separate OS/container input. Rust containers do not include .NET or a browser rendering service.
 The rust-workspace scope covers the complete locked desktop/server/build/test graph across supported platforms. It is not a desktop runtime inventory; the desktop feature closure is checked separately by verify-native-desktop.mjs.
 
-## npm (131)
+## npm (133)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -97,6 +97,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | @typescript/typescript-win32-arm64 | 7.0.2 | Apache-2.0 | web |
 | @typescript/typescript-win32-x64 | 7.0.2 | Apache-2.0 | web |
 | @vitejs/plugin-react | 6.1.2 | MIT | web |
+| argparse | 2.0.1 | Python-2.0 | web |
 | axe-core | 4.14.0 | MPL-2.0 | web |
 | cookie | 1.1.1 | MIT | web |
 | csstype | 3.2.3 | MIT | web |
@@ -140,6 +141,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | typescript | 7.0.2 | Apache-2.0 | web |
 | undici-types | 8.9.0 | MIT | web |
 | vite | 8.3.5 | MIT | web |
+| wawoff2 | 2.0.1 | MIT | web |
 
 ## cargo (699)
 

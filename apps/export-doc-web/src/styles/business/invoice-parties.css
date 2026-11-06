@@ -36,7 +36,7 @@
 }
 
 .invoice-party-details { margin-top: 16px; padding-top: 12px; }
-.invoice-party-details summary small { margin-left: 8px; color: var(--edm-text-secondary); font-weight: var(--edm-font-weight-semibold); font-size: var(--edm-font-size-xs); }
+.invoice-party-details summary small { margin-left: 8px; color: var(--edm-text-secondary); font-weight: var(--edm-font-weight-medium); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
 
 .invoice-party-group-heading {
   display: grid;
@@ -63,8 +63,8 @@
   gap: 4px;
 }
 
-.invoice-party-group-heading strong { color: var(--edm-text); font-size: var(--edm-font-size-md); }
-.invoice-party-group-heading span { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); }
+.invoice-party-group-heading strong { color: var(--edm-text); font-size: var(--edm-font-size-md); line-height: var(--edm-line-height-md); }
+.invoice-party-group-heading span { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
 
 .invoice-party-group-heading small {
   padding: 4px 8px;
@@ -73,7 +73,8 @@
   border: 1px solid var(--edm-line);
   border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -85,7 +86,7 @@
 
 .invoice-party-address-field textarea {
   min-height: 68px;
-  line-height: 1.5;
+  line-height: inherit;
   resize: vertical;
 }
 

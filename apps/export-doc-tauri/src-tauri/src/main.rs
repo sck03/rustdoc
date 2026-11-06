@@ -116,6 +116,7 @@ fn run_tauri_app() -> tauri::Result<()> {
             desktop_file_dialog_commands::select_save_excel_path,
             desktop_file_dialog_commands::select_save_file_path,
             desktop_open_commands::open_path,
+            desktop_open_commands::open_external_url,
             desktop_commands::get_runtime_storage_context,
             desktop_commands::schedule_data_root_migration,
             desktop_commands::log_frontend_error,
@@ -133,9 +134,10 @@ fn run_tauri_app() -> tauri::Result<()> {
                 set_runtime_diagnostic_log_root(&paths.log_root);
                 app.manage(paths.clone());
                 app.manage(tauri_updater_commands::TauriUpdaterState::default());
-                match runtime_prerequisites::check(&paths)
-                    .and_then(|_| desktop_runtime::start(&paths).map_err(|error| error.to_string()))
-                {
+                match runtime_prerequisites::check(&paths).and_then(|_| {
+                    desktop_runtime::start(&paths, app.handle().clone())
+                        .map_err(|error| error.to_string())
+                }) {
                     Ok(runtime) => {
                         app.manage(runtime);
                     }

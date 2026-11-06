@@ -345,7 +345,10 @@ fn decimal(value: &Value) -> Result<Decimal> {
 }
 
 fn format_decimal(value: &Decimal) -> String {
-    value.round_dp(2).normalize().to_string()
+    value
+        .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointAwayFromZero)
+        .normalize()
+        .to_string()
 }
 
 fn empty_group_sums(table: &DetailTable) -> BTreeMap<String, Decimal> {

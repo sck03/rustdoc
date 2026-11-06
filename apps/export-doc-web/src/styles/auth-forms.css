@@ -9,7 +9,8 @@ label {
   min-width: 0;
   color: var(--edm-neutral-650);
   font-size: var(--edm-font-size-sm);
-  font-weight: 600;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .form-field-label {
@@ -38,8 +39,8 @@ label {
 .form-field-description {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 600;
-  line-height: 1.45;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 label input,
@@ -93,7 +94,8 @@ label textarea {
   min-width: 0;
   color: var(--edm-neutral-650);
   font-size: var(--edm-font-size-sm);
-  font-weight: 600;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .path-field-label {

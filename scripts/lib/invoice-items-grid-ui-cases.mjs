@@ -4,6 +4,58 @@ const cell = (row, field) => `input[data-invoice-item-row="${row}"][data-invoice
 
 export async function runInvoiceItemsGridCases(scenario) {
   await scenario(async page => {
+    const input = page.getByLabel("rate", { exact:true });
+    for (const text of ["1.05", "0.05", "100.05", "-1.125"]) {
+      await input.click(); await input.press("ControlOrMeta+A"); await input.press("Backspace");
+      await input.pressSequentially(text);
+      assert.equal(await input.inputValue(), text);
+      assert.equal(await page.evaluate(() => window.number), Number(text));
+    }
+    await input.fill("12.345");
+    assert.equal(await page.evaluate(() => window.number), 12.345);
+    await input.fill("-");
+    assert.equal(await input.inputValue(), "-");
+    await input.blur();
+    assert.equal(Number(await input.inputValue()), 12.345);
+    await input.focus();
+    await input.evaluate(input => {
+      input.dispatchEvent(new CompositionEvent("compositionstart", {bubbles:true}));
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, "１.０５");
+      input.dispatchEvent(new InputEvent("input", {bubbles:true, isComposing:true}));
+      input.dispatchEvent(new CompositionEvent("compositionend", {bubbles:true, data:"１.０５"}));
+    });
+    assert.equal(await page.evaluate(() => window.number), 1.05);
+  });
+  await scenario(async page => {
+    for (const field of ["quantity", "purchasePrice", "unitPrice"]) {
+      const input = page.locator(cell(0, field));
+      for (const text of ["1.05", "0.05", "100.05"]) {
+        await input.click();
+        await input.press("ControlOrMeta+A");
+        await input.press("Backspace");
+        assert.equal(await input.inputValue(), "", `${field}: clear`);
+        await input.pressSequentially(text);
+        assert.equal(await input.inputValue(), text, `${field}: ${text}`);
+        assert.equal(await page.evaluate(field => window.invoice.items[0][field], field), Number(text));
+      }
+    }
+    await page.getByRole("button", {name:"save", exact:true}).click();
+    await page.waitForFunction(() => window.requests.length === 1);
+    assert.equal(await page.evaluate(() => window.requests[0].request.body.items[0].unitPrice), 100.05);
+    await page.evaluate(() => window.finish());
+    const input = page.locator(cell(0, "unitPrice"));
+    await input.click(); await input.press("ControlOrMeta+A"); await input.pressSequentially("-1.125");
+    assert.equal(await page.evaluate(() => window.invoice.items[0].unitPrice), -1.125);
+    await input.press("ControlOrMeta+z");
+    assert.equal(Number(await input.inputValue()), -1.12);
+    await input.press("ControlOrMeta+y");
+    assert.equal(Number(await input.inputValue()), -1.125);
+    await page.evaluate(() => window.switchSource(8));
+    await page.waitForFunction(() => window.invoice.id === 8);
+    assert.equal(Number(await input.inputValue()), 1);
+  }, { gridMode:true });
+
+  await scenario(async page => {
     await page.locator(cell(0, "styleNo")).focus();
     await page.evaluate(selector => {
       const data = new DataTransfer();

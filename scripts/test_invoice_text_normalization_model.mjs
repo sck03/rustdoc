@@ -29,7 +29,7 @@ const formUtilsPath = path
 const draftEqualityPath = path
   .join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceDraftEquality.ts")
   .replaceAll("\\", "/");
-const invoiceEditorSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "InvoiceEditorPage.tsx"), "utf8");
+const invoiceEditorSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "hooks", "useInvoiceEditorWorkspace.ts"), "utf8");
 const paymentEditorSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "payments", "PaymentEditorPage.tsx"), "utf8");
 fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as hsModel from ${JSON.stringify(hsModelPath)}; import * as itemModel from ${JSON.stringify(itemModelPath)}; import * as productLibrary from ${JSON.stringify(productLibraryPath)}; import * as formUtils from ${JSON.stringify(formUtilsPath)}; import * as draftEquality from ${JSON.stringify(draftEqualityPath)}; globalThis.__model = model; globalThis.__hsModel = hsModel; globalThis.__itemModel = itemModel; globalThis.__productLibrary = productLibrary; globalThis.__formUtils = formUtils; globalThis.__draftEquality = draftEquality;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
@@ -192,4 +192,10 @@ assert(updatedProductDraft.rowVersion === "concurrency-token-42", "existing prod
 const newProductDraft = productLibrary.createProductDraftFromInvoiceItem(productSourceItem);
 assert(newProductDraft.id === 0, "new product draft uses zero id");
 assert(newProductDraft.rowVersion === "", "new product draft starts without a row version");
+const libraryProduct = { ...newProductDraft, productCode: " P-001 ", nameEN: "Cotton coat", nameCN: "棉外套", material: "Cotton", defaultPrice: 123.45678, packageUnitEN: "CTNS", rowVersion: "native:2", description: "Master description" };
+const libraryItem = productLibrary.createInvoiceItemFromProduct(libraryProduct, 123);
+assert(libraryItem.styleNo === "P-001" && libraryItem.styleNameCN === "棉外套" && libraryItem.ctnUnitEN === "CTNS", "production product mapping preserves normalized names and packaging");
+assert(libraryItem.unitPrice === 123.45678, "production product mapping retains five-decimal unit price");
+const roundTripProduct = productLibrary.createProductDraftFromInvoiceItem(libraryItem, libraryProduct);
+assert(roundTripProduct.rowVersion === "native:2" && roundTripProduct.description === "Master description" && roundTripProduct.defaultPrice === libraryItem.unitPrice, "production product round trip preserves concurrency, description and price");
 process.stdout.write("invoice-text-normalization model tests passed\n");

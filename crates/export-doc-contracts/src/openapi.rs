@@ -47,6 +47,24 @@ mod tests {
             "../tests/fixtures/native-contract-baseline.json"
         ))
         .unwrap();
+        let login = &mut baseline["paths"]["/api/auth/login"]["post"];
+        login["requestBody"]["x-exportdoc-max-bytes"] = serde_json::json!(4096);
+        login["responses"]["413"] = serde_json::json!({
+            "description":"Payload Too Large",
+            "content":{"application/json":{"schema":{"$ref":"#/components/schemas/ApiErrorResponse"}}}
+        });
+        // Ordinary backup directories only know file modification time, not snapshot time.
+        for name in ["ApiBackupItemDto", "ApiSharedDatabaseBackupItemDto"] {
+            let schema = &mut baseline["components"]["schemas"][name];
+            schema["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("createdAt");
+            schema["required"]
+                .as_array_mut()
+                .unwrap()
+                .retain(|field| field != "createdAt");
+        }
         // Declared metadata corrections and additive schedule observability.
         baseline["info"]["description"] =
             serde_json::json!("Shared Rust API for ExportDocManager desktop and browser clients.");

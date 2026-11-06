@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "236f1ddae394aed31fa15bb6c36564063e5b7ca080d500cab061f3fde059e995",
+  "digest": "2f576948617a02e26de8434df0d7702e57009808ee72bc20ae40ffd34e542d24",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -61086,7 +61086,8 @@
               "$ref": "#/components/schemas/ApiLoginRequest"
             }
           }
-        }
+        },
+        "x-exportdoc-max-bytes": 4096
       },
       "responses": {
         "200": {
@@ -61111,6 +61112,16 @@
         },
         "401": {
           "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "413": {
+          "description": "Payload Too Large",
           "content": {
             "application/json": {
               "schema": {
@@ -93582,10 +93593,6 @@
     "ApiBackupItemDto": {
       "type": "object",
       "properties": {
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
         "fileName": {
           "type": "string"
         },
@@ -93609,7 +93616,6 @@
         "fileName",
         "fullPath",
         "sizeBytes",
-        "createdAt",
         "lastWriteTime"
       ]
     },
@@ -107345,10 +107351,6 @@
     "ApiSharedDatabaseBackupItemDto": {
       "type": "object",
       "properties": {
-        "createdAt": {
-          "type": "string",
-          "format": "date-time"
-        },
         "fileName": {
           "type": "string"
         },
@@ -107372,7 +107374,6 @@
         "fileName",
         "fullPath",
         "sizeBytes",
-        "createdAt",
         "lastWriteTime"
       ]
     },

@@ -15,6 +15,7 @@ import {
   subscribeToAppExitRequests,
   showReadyDesktopWindow,
   restartFailedDesktopStartup,
+  subscribeToBackendStopped,
 } from "./desktop/desktopBridge.ts";
 import { LoginPage } from "./features/auth/LoginPage.tsx";
 import { PageState } from "./ui/PageState.tsx";
@@ -58,6 +59,7 @@ function App() {
   const [startupAttempt,setStartupAttempt] = useState(0);
   const [startupLog,setStartupLog] = useState<string | undefined>();
   const [restartStartup,setRestartStartup] = useState(false);
+  const [backendStopped, setBackendStopped] = useState<string | null>(null);
   const [username, setUsername] = useState(() => isDesktopBridgeAvailable() ? "admin" : "");
   const [password, setPassword] = useState("");
   const [bootstrapToken, setBootstrapToken] = useState("");
@@ -79,6 +81,7 @@ function App() {
   const validatedUserTokenRef = useRef<string | undefined>(undefined);
   const sessionActionRef = useRef<symbol | null>(null);
   const unitTransitionRef = useRef(false);
+  const sessionAttentionRef = useRef<"expired" | null>(null);
   const allowAuthenticationFailure = useCallback(() => !sessionActionRef.current && !unitTransitionRef.current, []);
   const apiBaseUrlRef = useRef(apiBaseUrl);
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
@@ -90,6 +93,8 @@ function App() {
     else clearStoredSession();
   }, []);
   const resetSessionAttention = useCallback((state: "expired" | null = null) => {
+    if (state === "expired" && sessionAttentionRef.current === state) return;
+    sessionAttentionRef.current = state;
     setSessionAttentionState(state);
     setSessionActionError(null);
     setSessionActionBusy(false);
@@ -98,6 +103,17 @@ function App() {
   apiBaseUrlRef.current = apiBaseUrl;
   hasUnsavedChangesRef.current = hasUnsavedChanges;
   const isDesktopRuntime = isDesktopBridgeAvailable();
+  useEffect(() => {
+    let disposed = false;
+    let unsubscribe: (() => void) | undefined;
+    void subscribeToBackendStopped(message => {
+      if (disposed) return;
+      setBackendStopped(message);
+      if (!sessionRef.current) { setStartupError(message); setRestartStartup(true); }
+      void queryClient.cancelQueries();
+    }).then(stop => { if (disposed) stop(); else unsubscribe = stop; });
+    return () => { disposed = true; unsubscribe?.(); };
+  }, [queryClient]);
   useEffect(() => { void showReadyDesktopWindow().catch(error => console.error("Unable to show the prepared window",error)); }, []);
   const sessionAccessToken = session?.accessToken;
   const sessionApiBaseUrl = session?.apiBaseUrl;
@@ -168,11 +184,13 @@ function App() {
   }, [navigate, queryClient, resetSessionAttention, setSession]);
 
   const expireSession = useCallback((reason: string) => {
+    if (sessionAttentionRef.current === "expired") return;
     const currentSession = sessionRef.current;
     if (currentSession && hasUnsavedChangesRef.current) {
       clearStoredSession();
       setWorkspaceNotice(null);
       resetSessionAttention("expired");
+      void queryClient.cancelQueries();
       sessionChannelRef.current?.post({
         type: "session-expired",
         apiBaseUrl: currentSession.apiBaseUrl,
@@ -183,7 +201,7 @@ function App() {
     }
 
     endSession(reason);
-  }, [endSession, resetSessionAttention]);
+  }, [endSession, queryClient, resetSessionAttention]);
 
   useEffect(() => {
     const channel = openSessionChannel((event: SessionChannelMessage) => {
@@ -238,14 +256,22 @@ function App() {
     };
   }, [endSession, navigate, queryClient, resetSessionAttention, setSession]);
 
+  const sessionIdentity = session ? `${session.user.id}:${session.user.contextId ?? ""}` : null;
   const client = useMemo(
     () =>
       createSessionApiClient({
         baseUrl: sessionApiBaseUrl ?? apiBaseUrl,
-        accessToken: () => sessionAccessToken,
+        accessToken: () => {
+          const current = sessionRef.current;
+          const identity = current ? `${current.user.id}:${current.user.contextId ?? ""}` : null;
+          if (identity !== sessionIdentity || sessionAttentionRef.current === "expired") {
+            throw new DOMException("会话已暂停或身份已切换。", "AbortError");
+          }
+          return current?.accessToken;
+        },
         desktopAccessToken: () => desktopAccessToken,
-      }, () => !sessionActionRef.current && !unitTransitionRef.current && sessionRef.current?.accessToken === sessionAccessToken && sessionRef.current?.apiBaseUrl === (sessionApiBaseUrl ?? apiBaseUrl)),
-    [apiBaseUrl, desktopAccessToken, sessionAccessToken, sessionApiBaseUrl],
+      }, requestToken => !sessionActionRef.current && !unitTransitionRef.current && sessionRef.current?.accessToken === requestToken && sessionRef.current?.apiBaseUrl === (sessionApiBaseUrl ?? apiBaseUrl)),
+    [apiBaseUrl, desktopAccessToken, sessionIdentity, sessionApiBaseUrl],
   );
   const unitContext = useUnitContextSwitch(client, session, (next, previous) => {
     setSession(next);
@@ -623,6 +649,12 @@ function App() {
     <Suspense fallback={<PageState tone="loading" title="正在准备工作空间" />}>
       <AuthenticatedWorkspace key={`${session.user.id}:${session.user.contextId ?? ""}`}
         shell={{ pathname:workspacePathname, apiBaseUrl:session.apiBaseUrl ?? apiBaseUrl,
+          backendStopped: backendStopped ? { message: backendStopped, onRestart: async () => {
+            if (await confirmDiscardChanges("重启程序")) {
+              try { await restartFailedDesktopStartup(); }
+              catch (error) { setBackendStopped(readDesktopError(error)); }
+            }
+          } } : undefined,
           isDesktopRuntime, user:session.user, onLogout:handleLogout, unitContext, notice:workspaceNotice,
           onDismissNotice:()=>setWorkspaceNotice(null), sessionAttention }}
         routes={{ sessionToken:session.accessToken, activeProduct, canManageAuditLogs, client, routeAccessAllowed, user:session.user }} />

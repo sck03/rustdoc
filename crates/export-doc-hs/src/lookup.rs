@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 
 const MAX_DETAIL_LOOKUPS: usize = 12;
 const MAX_RECOMMENDATION_DEPTH: usize = 3;
+const MAX_SEARCH_LOOKUPS: usize = 16;
 
 pub trait Source {
     fn search(&mut self, keyword: &str) -> Result<SearchBundle, String>;
@@ -38,6 +39,7 @@ pub fn search(
         queries: BTreeSet::from([identity(keyword)]),
         details: BTreeSet::new(),
         remaining_details: MAX_DETAIL_LOOKUPS,
+        remaining_searches: MAX_SEARCH_LOOKUPS - 1,
     };
     traversal.resolve(initial, 0)?;
     let mut result = traversal.result;
@@ -80,6 +82,7 @@ struct Traversal<'a, S> {
     queries: BTreeSet<String>,
     details: BTreeSet<String>,
     remaining_details: usize,
+    remaining_searches: usize,
 }
 
 impl<S: Source> Traversal<'_, S> {
@@ -145,9 +148,13 @@ impl<S: Source> Traversal<'_, S> {
         }
         for keyword in recommendations {
             (self.check)()?;
+            if self.remaining_searches == 0 {
+                break;
+            }
             if !self.queries.insert(identity(&keyword)) {
                 continue;
             }
+            self.remaining_searches -= 1;
             let nested = self.source.search(&keyword);
             (self.check)()?;
             if let Ok(nested) = nested {

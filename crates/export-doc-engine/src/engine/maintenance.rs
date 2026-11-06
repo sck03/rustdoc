@@ -13,6 +13,25 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub(super) fn acquire(lock: &std::sync::RwLock<()>) -> Result<std::sync::RwLockWriteGuard<'_, ()>> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    loop {
+        crate::operation::check()?;
+        match lock.try_write() {
+            Ok(guard) => return Ok(guard),
+            Err(std::sync::TryLockError::Poisoned(_)) => {
+                return Err(unavailable("数据库维护状态异常。"));
+            }
+            Err(std::sync::TryLockError::WouldBlock) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            Err(std::sync::TryLockError::WouldBlock) => {
+                return Err(super::error::error(504, "等待数据库维护超时，请稍后重试。"));
+            }
+        }
+    }
+}
+
 pub fn root(paths: &RuntimePaths) -> Result<PathBuf> {
     let root = paths.data_root.join("Backups");
     paths::ensure_safe_absolute(&root).map_err(invalid)?;
@@ -45,7 +64,6 @@ pub fn list(store: &Store, paths: &RuntimePaths, actor: &Actor) -> Result<Value>
             ("fullPath", json!(path)),
             ("sizeBytes", json!(metadata.len())),
             ("length", json!(metadata.len())),
-            ("createdAt", json!(created)),
             ("lastWriteTime", json!(created)),
         ] {
             item[key] = value;

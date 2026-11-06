@@ -220,7 +220,7 @@ await withOfficeUi('organization-workflow-ui', async ({ output, url, operations,
   await first.getByRole('heading', { name: row.title, exact: true }).waitFor();
   await first.setViewportSize({ width: 390, height: 844 });
   assert(await first.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
-  const axe = require('axe-core'); await first.addScriptTag({ content: axe.source });
+  const axe = require('axe-core'); await first.evaluate(axe.source);
   assert.deepEqual((await first.evaluate(() => window.axe.run(document.querySelector('main'), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } }))).violations, []);
   await first.screenshot({ path: path.join(output, 'countersign-completed-mobile.png'), fullPage: true });
 });

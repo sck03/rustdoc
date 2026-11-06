@@ -621,7 +621,7 @@ impl Adapter for Postgres {
         Ok(())
     }
     fn attachment_bytes(&self, invoice_id: i64) -> Result<i64> {
-        Ok(self.client.borrow_mut().query_one("SELECT COALESCE(SUM(octet_length(f.content)),0)::bigint FROM files f JOIN record_rows r ON r.id=f.record_id WHERE r.kind='attachments' AND (r.body->>'invoiceId')::bigint=$1",&[&invoice_id])?.try_get(0)?)
+        Ok(self.client.borrow_mut().query_one("SELECT COALESCE(SUM(octet_length(f.content)),0)::bigint FROM files f JOIN records r ON r.id=f.record_id WHERE r.kind='attachments' AND r.body->'invoiceId'=to_jsonb($1::bigint)",&[&invoice_id])?.try_get(0)?)
     }
     fn insert_blob(&self, b: &BlobWrite<'_>) -> Result<()> {
         self.client.borrow_mut().execute("INSERT INTO files(kind,record_id,file_name,media_type,digest,content,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)",&[&b.kind,&b.record_id,&b.file_name,&b.media_type,&b.digest,&b.content,&b.created_at])?;

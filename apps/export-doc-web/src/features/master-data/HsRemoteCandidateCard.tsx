@@ -1,3 +1,4 @@
+import { ExternalAnchor } from "../../ui/ExternalAnchor.tsx";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 import type { ExportDocManagerApiClient, HsCodeRemoteCandidate } from "../../api/index.ts";
@@ -45,7 +46,7 @@ export function HsRemoteCandidateCard({
       </div>
       <p>{candidate.specification || "暂无规格与申报要素"}</p>
       <div className="remote-candidate-meta"><small>查询词：{candidate.queryText}</small><small>网页出现 {candidate.seenCount} 次</small><small>来源：{candidate.source}</small>{candidate.reviewedAt ? <small>审核：{formatHsKnowledgeVerifiedAt(candidate.reviewedAt).replace("验证于 ", "")}</small> : null}</div>
-      {candidate.sourceUrl ? <a className="knowledge-source-link" href={candidate.sourceUrl} target="_blank" rel="noreferrer">查看网页证据<ExternalLink size={13} aria-hidden="true" /></a> : null}
+      {candidate.sourceUrl ? <ExternalAnchor className="knowledge-source-link" href={candidate.sourceUrl} >查看网页证据<ExternalLink size={13} aria-hidden="true" /></ExternalAnchor> : null}
     </div>
     <div className="remote-candidate-actions">
       {status === "Pending" && canOperate ? <>

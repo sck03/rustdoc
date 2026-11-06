@@ -127,7 +127,8 @@ impl Fetch for Https {
                                         .ok()
                                 })
                         })
-                    });
+                    })
+                    .map(|delay| delay.min(Duration::from_secs(24 * 60 * 60)));
                 return Err(cause);
             }
             let mut bytes = vec![];

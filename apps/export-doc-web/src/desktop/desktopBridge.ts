@@ -271,6 +271,11 @@ export async function openPath(path: string) {
   return true;
 }
 
+export async function openExternalUrl(url: string) {
+  const call = getInvoke();
+  if (call) await call<void>("open_external_url", { url });
+}
+
 export async function getRuntimeStorageContext() {
   const invoke = getInvoke();
   if (!invoke) {
@@ -368,6 +373,11 @@ export async function subscribeToAppExitRequests(handler: () => void | Promise<v
   return listen("exportdoc://exit-requested", () => {
     void handler();
   });
+}
+
+export async function subscribeToBackendStopped(handler: (message: string) => void) {
+  if (!getInvoke()) return () => undefined;
+  return listen<string>("exportdoc://backend-stopped", event => handler(event.payload));
 }
 
 async function invokeOptionalPath(command: string) {

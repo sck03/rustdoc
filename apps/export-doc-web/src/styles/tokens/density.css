@@ -4,10 +4,12 @@
   --edm-touch-target: 44px;
   --edm-page-padding-x: 24px; --edm-page-padding-y: 20px; --edm-section-padding: 16px;
   --edm-layout-gap: 16px; --edm-table-padding-y: 10px; --edm-table-padding-x: 12px; --edm-body-size: 14px;
+  --edm-body-line-height: var(--edm-line-height-md);
 }
 html[data-interface-density="compact"] {
   --edm-control-height: 34px; --edm-control-height-sm: 28px;
   --edm-tab-height: 32px;
   --edm-page-padding-x: 16px; --edm-page-padding-y: 12px; --edm-section-padding: 12px;
   --edm-layout-gap: 12px; --edm-table-padding-y: 7px; --edm-table-padding-x: 10px; --edm-body-size: 13px;
+  --edm-body-line-height: var(--edm-line-height-sm);
 }

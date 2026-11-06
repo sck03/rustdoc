@@ -22,6 +22,36 @@ fn data() -> ReportData {
     .unwrap()
 }
 
+#[test]
+fn conditional_fields_use_native_visibility_and_fallback_rules() {
+    let mut design = grid();
+    design.layers[1].elements[0].kind = Kind::Flow {
+        flow_kind: "Conditional".into(),
+        block: serde_json::from_value(json!({
+            "id":"conditional", "type":"Conditional", "style":{},
+            "condition":{"fieldPath":"Invoice.SpecialTerms","operator":"HasValue","value":""},
+            "content":{"kind":"Field","fieldPath":"Invoice.ContractNo","label":"Contract","fallbackText":"NO-CONTRACT","text":""}
+        })).unwrap(),
+    };
+    let mut data = data();
+    data.root["Invoice"]["specialTerms"] = json!("");
+    data.root["Invoice"]["contractNo"] = json!("");
+    let render = |data: &ReportData| {
+        render_design(data, &design, &AtomicBool::new(false))
+            .unwrap()
+            .pages[0]
+            .svg
+            .clone()
+    };
+    assert!(!render(&data).contains("NO-CONTRACT"));
+    data.root["Invoice"]["specialTerms"] = json!("Enabled");
+    assert!(render(&data).contains("NO-CONTRACT"));
+    data.root["Invoice"]["contractNo"] = json!("CONTRACT-123");
+    let svg = render(&data);
+    assert!(svg.contains("CONTRACT-123"));
+    assert!(!svg.contains("NO-CONTRACT"));
+}
+
 fn grid() -> Design {
     let mut design = fixture::invoice();
     let mut element = design.layers[0].elements[0].clone();
@@ -391,10 +421,39 @@ fn detail_table_allows_ordinary_flows_before_and_after_it() {
 }
 
 #[test]
-fn detail_table_rejects_overlapping_following_flow() {
+fn detail_table_rejects_following_flow_beyond_footer() {
     let mut design = detail_with_surrounding_flows();
-    design.layers[1].elements.last_mut().unwrap().y_hundredth_mm = 7001;
+    design.layers[1].elements.last_mut().unwrap().y_hundredth_mm = 29000;
     assert!(render_design(&data(), &design, &AtomicBool::new(false)).is_err());
+}
+
+#[test]
+fn long_detail_reserves_following_blocks_on_the_last_page_only() {
+    let design = detail_with_surrounding_flows();
+    let mut draft = InvoiceDraft::demo("2026-09-21", "LONG-DETAIL");
+    let seed = draft.rows[0].clone();
+    draft.rows = (0..60)
+        .map(|index| {
+            let mut row = seed.clone();
+            row.cells[1] = format!("ITEM-{index:03}");
+            row
+        })
+        .collect();
+    let data = ReportData::invoice(&draft.build().unwrap(), json!({}), json!({}), false).unwrap();
+    let result = render_design(&data, &design, &AtomicBool::new(false)).unwrap();
+    assert!(result.pages.len() > 1);
+    for page in &result.pages[..result.pages.len() - 1] {
+        assert!(!page.svg.contains("AFTER DETAIL"));
+    }
+    assert!(result.pages.last().unwrap().svg.contains("AFTER DETAIL"));
+    let all = result
+        .pages
+        .iter()
+        .map(|page| page.svg.as_str())
+        .collect::<String>();
+    for index in 0..60 {
+        assert_eq!(all.matches(&format!("ITEM-{index:03}")).count(), 1);
+    }
 }
 
 #[test]

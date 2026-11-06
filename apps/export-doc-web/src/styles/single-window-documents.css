@@ -71,7 +71,8 @@
   min-height: 30px;
   color: var(--edm-neutral-650);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -81,6 +82,7 @@
   min-height: 34px;
   padding: 0 12px;
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .single-window-tool-group .icon-button {
@@ -102,6 +104,7 @@
   min-height: 38px;
   padding: 0 16px;
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .customs-coo-form,
@@ -121,7 +124,8 @@
   border: 1px solid var(--edm-neutral-400);
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .single-window-scope-select:focus {
@@ -158,7 +162,8 @@
   border: 1px solid var(--edm-neutral-350);
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -181,7 +186,8 @@
   border: 1px solid var(--edm-primary-150);
   border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -256,6 +262,7 @@
   min-width: 0;
   color: var(--edm-neutral-600);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .producer-profile-target strong {
@@ -318,6 +325,7 @@
   gap: 8px;
   min-height: 32px;
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .producer-profile-editor-grid {
@@ -335,7 +343,8 @@
   min-width: 0;
   color: var(--edm-neutral-650);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .producer-profile-editor-grid input,
@@ -369,7 +378,7 @@
   margin: 8px 0 0;
   color: var(--edm-neutral-600);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.5;
+  line-height: var(--edm-line-height-xs);
 }
 
 .producer-profile-footer {

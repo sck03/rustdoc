@@ -133,23 +133,26 @@ fn percent_encode(value: &str) -> String {
     output
 }
 
-fn percent_decode(value: &str) -> String {
+fn percent_decode(value: &str) -> Result<String> {
     let bytes = value.as_bytes();
     let mut output = Vec::with_capacity(bytes.len());
     let mut index = 0;
     while index < bytes.len() {
-        if bytes[index] == b'%' && index + 2 < bytes.len() {
-            let hex = String::from_utf8_lossy(&bytes[index + 1..index + 3]);
-            if let Ok(byte) = u8::from_str_radix(&hex, 16) {
-                output.push(byte);
-                index += 3;
-                continue;
-            }
+        if bytes[index] == b'%' {
+            let hex = value
+                .get(index + 1..index + 3)
+                .ok_or_else(|| unavailable("WebDAV 文件地址编码不完整。"))?;
+            output.push(
+                u8::from_str_radix(hex, 16)
+                    .map_err(|_| unavailable("WebDAV 文件地址编码无效。"))?,
+            );
+            index += 3;
+            continue;
         }
         output.push(bytes[index]);
         index += 1;
     }
-    String::from_utf8_lossy(&output).into_owned()
+    String::from_utf8(output).map_err(|_| unavailable("WebDAV 文件名不是有效 UTF-8。"))
 }
 
 fn authorization(config: &Config) -> (String, String) {
@@ -267,18 +270,21 @@ fn propfind(config: &Config) -> Result<Vec<CloudItem>> {
     if !(200..300).contains(&response.status) {
         return Err(failure(response.status, &response.body));
     }
-    parse_propfind(&String::from_utf8_lossy(&response.body))
+    parse_propfind(
+        std::str::from_utf8(&response.body)
+            .map_err(|_| unavailable("WebDAV 响应不是有效 UTF-8。"))?,
+        &endpoint,
+    )
 }
 
-/// 只解析 displayname / getcontentlength / getlastmodified / resourcetype 四个本地名,
+/// 依据 href 而非展示名定位文件，解析大小、时间与目录标记；
 /// 命名空间前缀(d:、D: 或默认)不影响匹配。
-fn parse_propfind(xml: &str) -> Result<Vec<CloudItem>> {
+fn parse_propfind(xml: &str, endpoint: &Endpoint) -> Result<Vec<CloudItem>> {
     use quick_xml::Reader;
     use quick_xml::events::Event;
 
     #[derive(Default)]
     struct Pending {
-        display_name: String,
         href: String,
         size_bytes: u64,
         last_modified: String,
@@ -290,9 +296,9 @@ fn parse_propfind(xml: &str) -> Result<Vec<CloudItem>> {
     }
 
     let mut reader = Reader::from_str(xml);
-    reader.config_mut().trim_text(true);
     let mut response: Option<Pending> = None;
     let mut text_target: Option<String> = None;
+    let mut text_buffer = String::new();
     let mut items = Vec::new();
     loop {
         match reader
@@ -304,17 +310,19 @@ fn parse_propfind(xml: &str) -> Result<Vec<CloudItem>> {
                 if name == "response" {
                     response = Some(Pending::default());
                 }
+                if name == "collection" {
+                    if let Some(pending) = response.as_mut() {
+                        pending.collection = true;
+                    }
+                }
                 if response.is_some()
                     && matches!(
                         name.as_str(),
-                        "displayname"
-                            | "href"
-                            | "getcontentlength"
-                            | "getlastmodified"
-                            | "resourcetype"
+                        "href" | "getcontentlength" | "getlastmodified" | "resourcetype"
                     )
                 {
                     text_target = Some(name);
+                    text_buffer.clear();
                 }
             }
             Event::Empty(event) => {
@@ -327,40 +335,45 @@ fn parse_propfind(xml: &str) -> Result<Vec<CloudItem>> {
                 }
             }
             Event::Text(event) => {
-                let Some(target) = text_target.as_deref() else {
-                    continue;
-                };
-                let value = event.as_ref().trim().to_string();
-                if let Some(pending) = response.as_mut() {
-                    match target {
-                        "displayname" => pending.display_name = value,
-                        "href" => pending.href = value,
-                        "getcontentlength" => {
-                            pending.size_bytes = value.parse().unwrap_or(0);
-                        }
-                        "getlastmodified" => {
-                            pending.last_modified = chrono::DateTime::parse_from_rfc2822(&value)
-                                .map(|time| time.with_timezone(&chrono::Utc).to_rfc3339())
-                                .unwrap_or_default();
-                        }
-                        "resourcetype" if value.contains("collection") => {
-                            pending.collection = true;
-                        }
-                        _ => {}
-                    }
+                if text_target.is_some() {
+                    text_buffer.push_str(event.as_ref());
                 }
             }
+            Event::CData(event) => {
+                if text_target.is_some() {
+                    text_buffer.push_str(event.as_ref());
+                }
+            }
+            Event::GeneralRef(event) => {
+                let escaped = format!("&{};", event.as_ref());
+                let decoded = quick_xml::escape::unescape(&escaped)
+                    .map_err(|_| unavailable("WebDAV XML 含未知实体。"))?;
+                if text_target.is_some() {
+                    text_buffer.push_str(&decoded);
+                }
+            }
+            Event::DocType(_) => return Err(unavailable("WebDAV XML 不允许外部实体声明。")),
             Event::End(event) => {
                 let qualified = event.name();
                 let name = local_name(qualified.as_ref());
-                if matches!(
-                    name,
-                    "displayname"
-                        | "href"
-                        | "getcontentlength"
-                        | "getlastmodified"
-                        | "resourcetype"
-                ) {
+                if text_target.as_deref() == Some(name) {
+                    let value = text_buffer.trim();
+                    if let Some(pending) = response.as_mut() {
+                        match name {
+                            "href" => pending.href = value.into(),
+                            "getcontentlength" => {
+                                pending.size_bytes = value
+                                    .parse()
+                                    .map_err(|_| unavailable("WebDAV 返回无效文件大小。"))?
+                            }
+                            "getlastmodified" => {
+                                pending.last_modified = chrono::DateTime::parse_from_rfc2822(value)
+                                    .map(|time| time.with_timezone(&chrono::Utc).to_rfc3339())
+                                    .unwrap_or_default()
+                            }
+                            _ => {}
+                        }
+                    }
                     text_target = None;
                 }
                 if name == "response" {
@@ -370,11 +383,26 @@ fn parse_propfind(xml: &str) -> Result<Vec<CloudItem>> {
                     if pending.collection {
                         continue;
                     }
-                    let file_name = if !pending.display_name.trim().is_empty() {
-                        pending.display_name.trim().to_string()
-                    } else {
-                        percent_decode(pending.href.trim())
+                    let base = url::Url::parse(&endpoint.propfind_url())
+                        .map_err(|_| invalid("WebDAV 目录无效。"))?;
+                    let href = base
+                        .join(pending.href.trim())
+                        .map_err(|_| unavailable("WebDAV 返回无效文件地址。"))?;
+                    let Some(relative) = href.path().strip_prefix(base.path()) else {
+                        continue;
                     };
+                    if href.origin() != base.origin()
+                        || href.query().is_some()
+                        || href.fragment().is_some()
+                        || relative.is_empty()
+                        || relative.contains('/')
+                    {
+                        continue;
+                    }
+                    let file_name = percent_decode(relative)?;
+                    if !crate::paths::valid_file_name(&file_name) {
+                        return Err(unavailable("WebDAV 返回无效备份文件名。"));
+                    }
                     if file_name.is_empty() || !file_name.ends_with(".sqlite3") {
                         continue;
                     }
@@ -571,6 +599,46 @@ mod tests {
     use super::*;
 
     #[test]
+    fn dav_hrefs_use_only_direct_children_and_decode_xml_and_url_independently() {
+        let endpoint = parse_url("https://dav.example.invalid/team/backups/").unwrap();
+        let xml = r#"<multistatus xmlns="DAV:">
+          <response><href>https://dav.example.invalid/team/backups/%E5%A4%87%E4%BB%BD&amp;1.sqlite3</href><displayname>misleading.sqlite3</displayname></response>
+          <response><href>relative.sqlite3</href></response>
+          <response><href>/elsewhere/foreign.sqlite3</href></response>
+          <response><href>https://other.invalid/team/backups/foreign.sqlite3</href></response>
+          <response><href>nested/foreign.sqlite3</href></response>
+          <response><href>directory.sqlite3</href><resourcetype><collection></collection></resourcetype></response>
+        </multistatus>"#;
+        let mut names = parse_propfind(xml, &endpoint)
+            .unwrap()
+            .into_iter()
+            .map(|item| item.file_name)
+            .collect::<Vec<_>>();
+        names.sort();
+        assert_eq!(names, vec!["relative.sqlite3", "备份&1.sqlite3"]);
+        for href in [
+            "bad%FF.sqlite3",
+            "bad%GG.sqlite3",
+            "nested%2Fescape.sqlite3",
+        ] {
+            assert!(
+                parse_propfind(
+                    &format!("<multistatus><response><href>{href}</href></response></multistatus>"),
+                    &endpoint
+                )
+                .is_err()
+            );
+        }
+        assert!(
+            parse_propfind(
+                "<!DOCTYPE a [<!ENTITY secret SYSTEM 'file:///key'>]><a/>",
+                &endpoint
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
     fn https_paths_namespaced_dav_xml_and_size_limits_are_enforced() {
         let endpoint = parse_url("https://dav.example.invalid/team/backups").unwrap();
         assert_eq!(
@@ -585,7 +653,7 @@ mod tests {
         assert!(parse_url("https://user:secret@dav.example.invalid/backups").is_err());
         assert!(remote_path(&endpoint, "../escape.sqlite3").is_err());
         let xml = r#"<D:multistatus xmlns:D="DAV:"><D:response><D:href>/team/backups/2026-09-20.sqlite3</D:href><D:propstat><D:prop><D:displayname>2026-09-20.sqlite3</D:displayname><D:getcontentlength>4096</D:getcontentlength><D:getlastmodified>Sun, 20 Sep 2026 08:00:00 GMT</D:getlastmodified></D:prop></D:propstat></D:response><D:response><D:resourcetype><D:collection/></D:resourcetype></D:response></D:multistatus>"#;
-        let items = parse_propfind(xml).unwrap();
+        let items = parse_propfind(xml, &endpoint).unwrap();
         assert_eq!(items.len(), 1);
         assert_eq!(
             (

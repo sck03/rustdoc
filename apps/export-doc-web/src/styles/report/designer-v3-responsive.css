@@ -9,9 +9,9 @@
   border: 1px solid var(--edm-neutral-300);
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-sm);
-  line-height: 1.6;
+  line-height: var(--edm-line-height-sm);
 }
-.report-designer-v3-quick-start summary { cursor: pointer; font-weight: 700; }
+.report-designer-v3-quick-start summary { cursor: pointer; font-weight: var(--edm-font-weight-medium); }
 .report-designer-v3-quick-start ol { margin: 8px 0; padding-left: 24px; }
 .report-designer-v3-tool-button[aria-pressed="true"] {
   color: var(--edm-primary-850);

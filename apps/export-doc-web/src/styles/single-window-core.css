@@ -35,12 +35,13 @@
 
 .single-window-mode-banner strong {
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
 }
 
 .single-window-mode-banner span {
   color: var(--edm-ink-600);
   font-size: var(--edm-font-size-sm);
-  line-height: 1.5;
+  line-height: var(--edm-line-height-sm);
 }
 
 .single-window-station-profile,
@@ -68,7 +69,8 @@
   border: 1px solid var(--edm-primary-200);
   border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -124,14 +126,15 @@
 
 .single-window-capability-card strong {
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .single-window-capability-card small,
 .path-field > .form-field-description {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   font-weight: 400;
-  line-height: 1.45;
 }
 
 .single-window-import-summary {
@@ -164,7 +167,8 @@
   border: 1px solid var(--edm-neutral-400);
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
   text-decoration: none;
   white-space: nowrap;
 }
@@ -221,7 +225,8 @@
   border: 1px solid var(--edm-neutral-400);
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .reference-catalog-tab-active {
@@ -263,11 +268,13 @@
 .reference-catalog-excel-header strong {
   color: var(--edm-neutral-800);
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
 }
 
 .reference-catalog-excel-header span {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .reference-catalog-excel-grid {
@@ -285,7 +292,8 @@
 .reference-catalog-excel-grid label span {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .reference-catalog-excel-grid input,
@@ -359,7 +367,8 @@
   border: 0;
   border-radius: var(--edm-radius-sm);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
   text-align: left;
 }
 

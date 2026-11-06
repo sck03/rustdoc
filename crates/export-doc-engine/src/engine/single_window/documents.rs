@@ -56,7 +56,8 @@ pub fn load(
         &catalog,
         &preferences,
         &today,
-    );
+    )
+    .map_err(unavailable)?;
     let stored = tx.find_identity(business.kind(), &id.to_string())?;
     let mut current = defaults.clone();
     let mut locks = BTreeSet::new();

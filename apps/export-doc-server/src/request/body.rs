@@ -7,7 +7,15 @@ use axum::{
 use export_doc_contracts::{contracts, generated_api::*};
 use export_doc_engine::{api::ApiError, engine::tasks::FileOutput};
 use serde_json::{Map, Value};
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock},
+};
+
+// The blocking worker owns this slot through completion, including after a
+// disconnected caller drops its future. New bodies cannot accumulate behind it.
+static JSON_PARSERS: LazyLock<Arc<tokio::sync::Semaphore>> =
+    LazyLock::new(|| Arc::new(tokio::sync::Semaphore::new(4)));
 
 const MIB: usize = 1024 * 1024;
 const MAX_FIELD: usize = 65536;
@@ -110,6 +118,13 @@ pub(super) async fn parse(
         .and_then(|v| v.to_str().ok())
         .is_some_and(|v| v.starts_with("multipart/form-data"));
     let contract = &contracts::contract()["operations"][operation.id];
+    if multipart
+        && contract["requestBody"]["content"]
+            .get("multipart/form-data")
+            .is_none()
+    {
+        return Err(error(400, "此操作不接受上传表单。"));
+    }
     let binary = contract["requestBody"]["content"]
         .get("application/octet-stream")
         .is_some();
@@ -202,12 +217,63 @@ pub(super) async fn parse(
         }
         result.body = Some(Value::Object(metadata));
     } else {
-        let bytes = bytes(request.into_body(), 16 * MIB).await?;
+        let permit = JSON_PARSERS
+            .clone()
+            .try_acquire_owned()
+            .map_err(|_| error(429, "请求解析繁忙，请稍后重试。"))?;
+        let limit = contract["requestBody"]["x-exportdoc-max-bytes"]
+            .as_u64()
+            .and_then(|value| usize::try_from(value).ok())
+            .unwrap_or(16 * MIB);
+        let bytes = bytes(request.into_body(), limit).await?;
         if !bytes.is_empty() {
             result.body = Some(
-                serde_json::from_slice(&bytes).map_err(|_| error(400, "请求必须是有效 JSON。"))?,
+                tokio::task::spawn_blocking(move || {
+                    let _permit = permit;
+                    serde_json::from_slice(&bytes).map_err(|_| error(400, "请求必须是有效 JSON。"))
+                })
+                .await
+                .map_err(|_| error(503, "请求解析未完成。"))??,
             );
         }
     }
     Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn login_body_limit_cannot_be_bypassed_by_multipart_and_other_json_keeps_its_capacity() {
+        let parameters = HashMap::new();
+        let request = |content: String| Request::new(Body::from(content));
+        let oversized = parse(LOGIN, request(" ".repeat(4097)), &parameters, &[]).await;
+        assert_eq!(oversized.err().unwrap().status, Some(413));
+        let invalid = parse(LOGIN, request("{".into()), &parameters, &[]).await;
+        assert_eq!(invalid.err().unwrap().status, Some(400));
+        let mut form = request(String::new());
+        form.headers_mut().insert(
+            "content-type",
+            "multipart/form-data; boundary=test".parse().unwrap(),
+        );
+        assert_eq!(
+            parse(LOGIN, form, &parameters, &[])
+                .await
+                .err()
+                .unwrap()
+                .status,
+            Some(400)
+        );
+        let large = serde_json::json!({"text": "中".repeat(4096)}).to_string();
+        assert!(
+            parse(CREATE_INVOICE, request(large), &parameters, &[])
+                .await
+                .is_ok()
+        );
+        assert!(
+            parse(LOGIN, request("{}".into()), &parameters, &[])
+                .await
+                .is_ok()
+        );
+    }
 }

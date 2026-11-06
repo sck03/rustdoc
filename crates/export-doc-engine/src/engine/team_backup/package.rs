@@ -40,6 +40,7 @@ pub(super) fn lock(paths: &RuntimePaths) -> Result<fs::File> {
             unavailable(e.to_string())
         }
     })?;
+    super::scratch::recover(paths)?;
     Ok(file)
 }
 pub(super) fn private_directory(path: &Path) -> Result<()> {
@@ -157,8 +158,7 @@ pub(super) fn stage(
         return Err(error(409, "已有恢复等待处理，不能覆盖。"));
     }
     let root = marker.parent().ok_or_else(|| invalid("恢复目录无效。"))?;
-    let staging = root.join(format!("pending-{}", paths::nonce().map_err(unavailable)?));
-    private_directory(&staging)?;
+    let staging = super::scratch::create(root, "pending-")?;
     let result = (|| {
         let archive_path = staging.join(".payload.zip");
         let mut archive = fs::OpenOptions::new()

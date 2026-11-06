@@ -53,7 +53,24 @@ pub(in crate::engine) struct Scheduler {
     pub(super) gate: Mutex<()>,
 }
 impl Scheduler {
+    pub(in crate::engine) fn health(&self) -> Result<()> {
+        let worker = self
+            .worker
+            .lock()
+            .map_err(|_| unavailable("灾备调度器状态异常。"))?;
+        if worker
+            .as_ref()
+            .is_some_and(|worker| worker.handle.is_finished())
+        {
+            return Err(unavailable(
+                "灾备调度线程已异常退出，请检查日志并重启服务。",
+            ));
+        }
+        Ok(())
+    }
+
     pub(in crate::engine) fn bind(service: &Arc<NativeService>) -> Result<()> {
+        drop(package::lock(&service.paths)?);
         let _ = service
             .backup_scheduler
             .service
@@ -114,13 +131,19 @@ impl Scheduler {
                         break;
                     };
                     if let Ok(_access) = service.maintenance.try_read() {
-                        if let Err(cause) = service.backup_scheduler.run(&service, None, Utc::now())
-                        {
-                            let _ = update_state(
-                                &service.store,
-                                None,
-                                json!({"lastResult":"Failed", "lastError":cause.message}),
-                            );
+                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(||
+                            service.backup_scheduler.run(&service, None, Utc::now())));
+                        match result {
+                            Ok(Ok(_)) => {},
+                            Ok(Err(cause)) => {
+                                let _ = update_state(&service.store, None,
+                                    json!({"lastResult":"Failed", "lastError":cause.message}));
+                            },
+                            Err(_) => {
+                                let _ = update_state(&service.store, None,
+                                    json!({"lastResult":"Failed", "lastError":"灾备调度线程异常退出，请重启服务。"}));
+                                break;
+                            }
                         }
                     }
                     drop(service);
@@ -137,19 +160,28 @@ impl Scheduler {
         Ok(())
     }
     pub(in crate::engine) fn stop(&self) -> Result<()> {
-        let worker = self
+        let mut worker = self
             .worker
             .lock()
-            .map_err(|_| unavailable("灾备调度器状态异常。"))?
-            .take();
-        if let Some(worker) = worker {
-            signal(&worker)?;
-            if worker.handle.thread().id() != std::thread::current().id() {
-                worker
-                    .handle
-                    .join()
-                    .map_err(|_| unavailable("灾备调度线程异常退出。"))?;
+            .map_err(|_| unavailable("灾备调度器状态异常。"))?;
+        if let Some(active) = worker.as_ref() {
+            signal(active)?;
+            if active.handle.thread().id() == std::thread::current().id() {
+                return Ok(());
             }
+            let deadline = std::time::Instant::now() + Duration::from_secs(10);
+            while !active.handle.is_finished() {
+                if std::time::Instant::now() >= deadline {
+                    return Err(unavailable("灾备调度线程未在关闭时限内退出。"));
+                }
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
+        if let Some(finished) = worker.take() {
+            finished
+                .handle
+                .join()
+                .map_err(|_| unavailable("灾备调度线程异常退出。"))?;
         }
         Ok(())
     }

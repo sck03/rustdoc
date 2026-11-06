@@ -1,3 +1,15 @@
+/// Decimal display rounds explicitly before applying a fixed-width format.
+pub fn format_decimal(value: rust_decimal::Decimal, precision: u32) -> String {
+    format!(
+        "{:.*}",
+        precision as usize,
+        value.round_dp_with_strategy(
+            precision,
+            rust_decimal::RoundingStrategy::MidpointAwayFromZero
+        )
+    )
+}
+
 const ONES: [&str; 20] = [
     "",
     "ONE",

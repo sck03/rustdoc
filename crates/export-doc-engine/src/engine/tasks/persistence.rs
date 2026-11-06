@@ -135,8 +135,20 @@ pub(super) fn create_completed(
     actor: &Actor,
     kind: &str,
     title: &str,
+    detail: &str,
 ) -> Result<Value> {
-    store.transaction(|tx| create_in(tx, actor, kind, title, None, None))
+    store.transaction(|tx| {
+        let current = crate::engine::auth::refresh_actor_in(tx, actor)?;
+        let created = create_in(tx, &current, kind, title, None, None)?;
+        let mut job = checked(tx, &current, text(&created, "jobId").as_str())?;
+        job["status"] = json!("Succeeded");
+        job["statusText"] = json!("已完成");
+        job["detailText"] = json!(detail);
+        job["progressPercent"] = json!(100);
+        job["canCancel"] = json!(false);
+        job["completedAt"] = json!(store::timestamp());
+        Ok(snapshot(&save(tx, &current, job, "finish")?))
+    })
 }
 fn create_in(
     connection: &Connection,

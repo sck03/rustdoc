@@ -155,7 +155,7 @@ function Add-ExportDocRustPackageResources {
     if (-not $WithoutOcr) {
         Add-ExportDocNativeOcrResources -RepositoryRoot $repositoryRoot -Configuration $Configuration -Copies $copies -OnnxRuntimePath $OnnxRuntimePath -RustTarget $RustTarget -SkipBuild:$SkipBuild
     }
-    foreach ($name in @('NotoSansCJKsc-Regular.otf', 'NotoSansCJKsc-Bold.otf', 'NotoSerifCJKsc-Regular.otf', 'OFL-Noto-CJK.txt', 'font-manifest.json')) {
+    foreach ($name in @('NotoSansCJKsc-Regular.otf', 'NotoSansCJKsc-Medium.otf', 'NotoSansCJKsc-Bold.otf', 'NotoSerifCJKsc-Regular.otf', 'OFL-Noto-CJK.txt', 'font-manifest.json')) {
         $copies[(Join-Path $repositoryRoot "Resources/Fonts/OpenSource/$name")] = "Resources/Fonts/OpenSource/$name"
     }
     if ($DocumentResources) { $copies[(Join-Path $repositoryRoot 'Resources/ExcelTemplates/invoice-import-template.xlsx')] = 'Resources/ExcelTemplates/invoice-import-template.xlsx' }

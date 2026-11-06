@@ -21,7 +21,7 @@
   color: var(--edm-neutral-650);
   text-decoration: none;
   font: inherit;
-  font-weight: 600;
+  font-weight: var(--edm-font-weight-medium);
   cursor: pointer;
 }
 
@@ -33,7 +33,7 @@
 .nav-search-location {
   display: block;
   font-size: var(--edm-font-size-xs);
-  line-height: 1.5;
+  line-height: var(--edm-line-height-xs);
   white-space: normal;
   overflow-wrap: anywhere;
   color: inherit;
@@ -50,7 +50,7 @@
   margin: 0;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.6;
+  line-height: var(--edm-line-height-xs);
 }
 
 .permission-resource-location {
@@ -62,7 +62,7 @@
 }
 
 .permission-module-help { margin-bottom: 12px; color: var(--edm-text-secondary); }
-.permission-module-help summary { cursor: pointer; font-size: var(--edm-font-size-sm); }
+.permission-module-help summary { cursor: pointer; font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
 .permission-module-help p { margin-top: 8px; }
 
 .knowledge-help {
@@ -74,7 +74,7 @@
 .knowledge-help summary,
 .email-service-details summary {
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .template-directory-search {

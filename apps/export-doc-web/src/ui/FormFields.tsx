@@ -1,5 +1,6 @@
 import { type ReactNode, useId } from "react";
-import { dateInputToApiDate, numberInputValue, readNumber, toDateInputValue } from "./formUtils.ts";
+import { dateInputToApiDate, numberInputValue, toDateInputValue } from "./formUtils.ts";
+import { useNumberInputDraft } from "./useNumberInputDraft.ts";
 import { Field } from "./primitives/Field.tsx";
 
 type FieldShellProps = {
@@ -233,17 +234,22 @@ export function NumberField({
   formatValue?: (value?: number) => string;
   onChange: (value: number) => void;
 }) {
+  const input = useNumberInputDraft(value, formatValue ? formatValue(value) : numberInputValue(value), next => onChange(next ?? 0), 0);
   return (
     <FieldShell label={label} required={required} disabled={disabled} className={className} description={description}>
       {(descriptionId) => (
       <input
-        type="number"
-        step={step}
-        value={formatValue ? formatValue(value) : numberInputValue(value)}
+        type="text"
+        inputMode={step === "1" ? "numeric" : "decimal"}
+        value={input.value}
         required={required}
         disabled={disabled}
         aria-describedby={descriptionId}
-        onChange={(event) => onChange(readNumber(event.target.value))}
+        onChange={(event) => input.change(event.target.value)}
+        onCompositionStart={input.onCompositionStart}
+        onCompositionEnd={input.onCompositionEnd}
+        onBlur={input.reset}
+        onKeyDown={(event) => { if (!event.nativeEvent.isComposing && event.key === "Enter") event.currentTarget.blur(); }}
       />
       )}
     </FieldShell>

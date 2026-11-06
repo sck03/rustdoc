@@ -63,7 +63,8 @@
   .responsive-table-frame[data-mobile-layout="cards"] tbody td::before {
     color: var(--edm-text-secondary);
     font-size: var(--edm-font-size-xs);
-    font-weight: 700;
+    line-height: var(--edm-line-height-xs);
+    font-weight: var(--edm-font-weight-medium);
     content: attr(data-label);
   }
 
@@ -113,8 +114,8 @@
 .inline-notice[data-tone="info"] { border-color: var(--edm-info-200); background: var(--edm-neutral-100); color: var(--edm-info-800); }
 
 .inline-notice-content { display: grid; gap: 4px; min-width: 0; }
-.inline-notice-content strong { color: currentColor; font-size: var(--edm-font-size-sm); font-weight: 700; }
-.inline-notice-message { min-width: 0; font-size: var(--edm-font-size-sm); line-height: 1.55; overflow-wrap: anywhere; }
+.inline-notice-content strong { color: currentColor; font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); font-weight: var(--edm-font-weight-medium); }
+.inline-notice-message { min-width: 0; font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); overflow-wrap: anywhere; }
 .inline-notice-action { align-self: center; }
 
 .workspace-device-notice {

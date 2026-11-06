@@ -97,19 +97,27 @@ pub(crate) fn restriction_condition(
 }
 impl DataScope<'_> {
     pub(crate) fn filter(&self, values: &mut Vec<String>, pg: bool) -> String {
-        let base = self.base_filter(values, pg);
+        self.filter_for(values, pg, "r")
+    }
+    pub(crate) fn filter_for(
+        &self,
+        values: &mut Vec<String>,
+        pg: bool,
+        record: &'static str,
+    ) -> String {
+        let base = self.base_filter(values, pg, record);
         let mut clauses = vec![format!("({base})")];
         if !self.restrictions.is_empty() {
             clauses.push(restriction_condition(
                 &self.restrictions,
-                "r",
+                record,
                 pg,
                 &mut |v| bind(values, v, pg),
             ));
         }
         clauses.join(" AND ")
     }
-    fn base_filter(&self, values: &mut Vec<String>, pg: bool) -> String {
+    fn base_filter(&self, values: &mut Vec<String>, pg: bool, record: &'static str) -> String {
         if self.all {
             return "1=1".into();
         }
@@ -126,9 +134,10 @@ impl DataScope<'_> {
                     &company,
                     None,
                     self.personnel_date,
+                    record,
                 )
             } else {
-                format!("r.company={company}")
+                format!("{record}.company={company}")
             });
         }
         if self.department_wide {
@@ -144,16 +153,17 @@ impl DataScope<'_> {
                     &company,
                     Some(&departments),
                     self.personnel_date,
+                    record,
                 )
             } else {
-                format!("r.company={company} AND r.department IN ({departments})")
+                format!("{record}.company={company} AND {record}.department IN ({departments})")
             };
             alternatives.push(format!("({membership})"));
         }
         if self.own {
             let owner = bind(values, self.user_id, pg);
             alternatives.push(format!(
-                "(r.company={company} AND r.owner_id=CAST({owner} AS BIGINT))"
+                "({record}.company={company} AND {record}.owner_id=CAST({owner} AS BIGINT))"
             ));
         }
         if alternatives.is_empty() {

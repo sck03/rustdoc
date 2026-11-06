@@ -1,7 +1,7 @@
 // Test-only expansion of exported HTML; product previews are rendered by Rust.
 import type { ReportDesignerReportType } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerSchema.ts";
 import { documentSpareKeys } from "../../apps/export-doc-web/src/ui/documentSpareFields.ts";
-import { isShippingMarksField } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerFieldRendering.ts";
+import { isShippingMarksField, shippingMarksPreviewText, shippingMarksFieldPath } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerFieldRendering.ts";
 import { parseReportDesignerV3Source, hasValidReportDesignerV3Schema } from "../../apps/export-doc-web/src/features/report-designer/reportDesignerV3TemplateParser.ts";
 import { renderReportDesignerV3HtmlFixture } from "./report-designer-v3-html-fixture.ts";
 
@@ -60,7 +60,8 @@ export function renderReportDesignerLocalPreviewSample(
   const parsed = parseReportDesignerV3Source(source, kind);
   if (parsed.issues.some(issue => issue.severity === "error")) return "";
   const sourceHtml = renderReportDesignerV3HtmlFixture(parsed.schema, kind)
-    .replace(/<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA[\s\S]*?-->/, "");
+    .replace(/<!-- EXPORTDOC_REPORT_DESIGNER_SCHEMA[\s\S]*?-->/, "")
+    .split(shippingMarksPreviewText).join(`{{ ${shippingMarksFieldPath} }}`);
   const data = createPreviewSampleData(profile);
   const expandedLoops = expandInvoiceItemLoops(sourceHtml, data);
   const evaluatedConditionals = evaluateSimpleScribanConditionals(expandedLoops, data, {});

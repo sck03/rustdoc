@@ -242,6 +242,7 @@ export function InvoiceItemsEditor({
   }, [items, readOnly, visibleColumns]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.nativeEvent.isComposing) return;
     const primaryModifier = event.ctrlKey || event.metaKey;
     if (primaryModifier && !event.shiftKey && event.key.toLowerCase() === "c" && selectedCellCount > 1) {
       event.preventDefault();

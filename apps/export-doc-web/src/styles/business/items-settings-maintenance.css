@@ -19,6 +19,7 @@
   border: 1px solid var(--edm-neutral-300);
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .item-unit-candidate-panel {
@@ -42,11 +43,12 @@
   min-width: 0;
   color: var(--edm-earth-800);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .item-unit-candidate-title strong {
   color: var(--edm-warning-800);
-  font-weight: 700;
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .item-unit-candidate-options {
@@ -180,7 +182,8 @@
   border-radius: var(--edm-radius-sm);
   cursor: pointer;
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -203,6 +206,7 @@
   align-items: center;
   color: var(--edm-neutral-650);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .item-summary-bar span {
@@ -285,7 +289,8 @@
   background: transparent;
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
   text-align: left;
 }
 
@@ -428,8 +433,8 @@
 .maintenance-technical-nav > summary > span { display: grid; gap: 4px; min-width: 0; }
 .maintenance-technical-nav > summary strong,
 .maintenance-technical-nav > summary small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.maintenance-technical-nav > summary strong { font-size: var(--edm-font-size-sm); }
-.maintenance-technical-nav > summary small { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); }
+.maintenance-technical-nav > summary strong { font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
+.maintenance-technical-nav > summary small { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
 .maintenance-technical-nav-items { display: grid; gap: 8px; padding-top: 8px; }
 .maintenance-technical-nav-items .maintenance-section-tab { min-height: 54px; }
 
@@ -475,12 +480,14 @@
 
 .maintenance-section-tab strong {
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .maintenance-section-tab small {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 600;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -530,14 +537,15 @@
 .invoice-maintenance-danger-zone > label > span {
   color: var(--edm-ink-800);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .invoice-maintenance-danger-zone > label > small,
 .settings-helper-text {
   color: var(--edm-ink-600);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.55;
+  line-height: var(--edm-line-height-xs);
 }
 
 .invoice-maintenance-danger-zone > .command-button {
@@ -563,7 +571,8 @@
 .maintenance-advanced-details summary {
   color: var(--edm-neutral-600);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   cursor: pointer;
 }
 
@@ -574,6 +583,7 @@
 .maintenance-advanced-details small {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   font-weight: 400;
 }
 
@@ -596,7 +606,8 @@
   min-height: 28px;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .exchange-currency-settings-panel {
@@ -635,4 +646,5 @@
   min-width: 0;
   color: var(--edm-neutral-650);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }

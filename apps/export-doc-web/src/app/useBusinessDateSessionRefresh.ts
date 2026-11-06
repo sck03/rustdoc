@@ -47,8 +47,9 @@ export function useBusinessDateSessionRefresh({
         if (JSON.stringify(currentSession.user.capabilities) !== JSON.stringify(user.capabilities)) {
           queryClient.clear();
         }
-        const nextSession = { ...currentSession, user };
-        setSession(nextSession);
+        if (JSON.stringify(currentSession.user) !== JSON.stringify(user)) {
+          setSession({ ...currentSession, user });
+        }
       })
       .catch((error) => {
         if (sessionRef.current?.accessToken === accessToken && (allowAuthenticationFailure?.() ?? true)) notifyAuthenticationFailure(error);

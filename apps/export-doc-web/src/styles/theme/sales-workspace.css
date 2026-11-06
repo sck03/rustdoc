@@ -19,11 +19,13 @@
 .section-heading-row h2 {
   color: var(--edm-ink-950);
   font-size: var(--edm-font-size-xl);
+  line-height: var(--edm-line-height-xl);
 }
 
 .section-heading-row h3 {
   color: var(--edm-ink-800);
   font-size: var(--edm-font-size-lg);
+  line-height: var(--edm-line-height-lg);
 }
 
 .section-heading-row p {
@@ -31,6 +33,7 @@
   margin-top: 4px;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .status-banner {
@@ -40,7 +43,7 @@
   border: 1px solid var(--edm-primary-100);
   border-radius: var(--edm-radius-lg);
   font-size: var(--edm-font-size-sm);
-  line-height: 1.45;
+  line-height: var(--edm-line-height-sm);
 }
 
 .page-state {
@@ -59,11 +62,12 @@
 .page-state strong {
   color: var(--edm-ink-800);
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
 }
 
 .page-state span {
   max-width: 560px;
-  line-height: 1.55;
+  line-height: inherit;
 }
 
 .page-state[data-tone="error"] svg {
@@ -129,12 +133,13 @@
   padding-top: 4px;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .login-connection-settings summary {
   width: fit-content;
   cursor: pointer;
-  font-weight: 700;
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .login-connection-settings[open] {
@@ -147,7 +152,7 @@
 }
 
 .login-connection-settings small {
-  line-height: 1.45;
+  line-height: inherit;
 }
 
 .form-grid,
@@ -216,8 +221,8 @@
   border: 1px solid transparent;
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
-  line-height: 1.2;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -348,13 +353,14 @@
 .empty-cell-content strong {
   color: var(--edm-ink-800);
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
 }
 
 .empty-guidance span,
 .empty-cell-content span,
 .section-description {
   color: var(--edm-text-secondary);
-  line-height: 1.55;
+  line-height: inherit;
 }
 
 .empty-guidance .primary-button,
@@ -404,7 +410,8 @@
   padding: 0 8px;
   color: var(--edm-primary-800);
   font-size: var(--edm-font-size-md);
-  font-weight: 700;
+  line-height: var(--edm-line-height-md);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .optional-form-details {
@@ -416,7 +423,7 @@
 
 .optional-form-details summary {
   color: var(--edm-ink-700);
-  font-weight: 700;
+  font-weight: var(--edm-font-weight-medium);
   cursor: pointer;
 }
 
@@ -437,7 +444,8 @@
 .field-hint {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 600;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   overflow-wrap: anywhere;
 }
 
@@ -453,7 +461,8 @@
 .sales-first-run-heading span {
   color: var(--edm-primary-700);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   letter-spacing: 0.08em;
 }
 
@@ -465,12 +474,14 @@
 .sales-first-run-heading h2 {
   margin-top: 4px;
   font-size: var(--edm-font-size-lg);
+  line-height: var(--edm-line-height-lg);
 }
 
 .sales-first-run-heading p {
   margin-top: 4px;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .sales-first-run-steps {
@@ -512,6 +523,7 @@
   align-items: center;
   gap: 8px;
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .sales-first-run-steps strong span {
@@ -524,12 +536,14 @@
   background: var(--edm-primary-600);
   border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .sales-first-run-steps small {
   grid-column: 1;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .sales-first-run-steps svg {
@@ -574,6 +588,7 @@
 
   .section-heading-row h2 {
     font-size: var(--edm-font-size-lg);
+    line-height: var(--edm-line-height-lg);
   }
 
 

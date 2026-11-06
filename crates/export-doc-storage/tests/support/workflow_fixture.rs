@@ -64,6 +64,7 @@ impl WorkflowFixture for Connection {
         let archive = self.insert(&RecordWrite::unkeyed("oa-submission", &snapshot))?;
         snapshot["id"] = json!(archive);
         self.freeze_request_revision(archive, &snapshot)?;
+        self.freeze_request_revision(archive, &snapshot)?;
         let active = tasks
             .iter()
             .filter(|t| t.active)
@@ -195,6 +196,13 @@ pub fn exercise(tx: &Connection) {
             );
         }
     }
+    // Retry uses the separately supplied id even before a DTO id is assigned.
+    let snapshot = json!({"requestId":request,"submissionNumber":2,"versionNumber":1,"ownerUserId":7,"companyScope":"WORKFLOW-FIXTURE","departmentId":"D","request":body});
+    let archive = tx
+        .insert(&RecordWrite::unkeyed("oa-submission", &snapshot))
+        .unwrap();
+    tx.freeze_request_revision(archive, &snapshot).unwrap();
+    tx.freeze_request_revision(archive, &snapshot).unwrap();
     assert!(
         tx.delete("oa-general", request, 1).is_err(),
         "submitted material protects its parent"

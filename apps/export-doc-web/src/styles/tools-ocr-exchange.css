@@ -42,6 +42,7 @@
   overflow: hidden;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -64,7 +65,8 @@
   border: 1px solid var(--edm-neutral-300);
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .smart-ocr-preview-viewport {
@@ -119,6 +121,7 @@
   min-height: 420px;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .smart-ocr-side-panel {
@@ -145,7 +148,7 @@
   border-radius: var(--edm-radius-md);
   font-family: var(--edm-font-mono);
   font-size: var(--edm-font-size-sm);
-  line-height: 1.55;
+  line-height: var(--edm-line-height-sm);
 }
 
 .exchange-rate-surface {
@@ -167,6 +170,7 @@
 .toolbar-summary strong {
   color: var(--edm-neutral-800);
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
 }
 
 .toolbar-summary span {
@@ -174,6 +178,7 @@
   overflow: hidden;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -232,6 +237,6 @@
   border: 1px solid var(--edm-primary-150);
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.2;
+  line-height: var(--edm-line-height-xs);
 }
 }

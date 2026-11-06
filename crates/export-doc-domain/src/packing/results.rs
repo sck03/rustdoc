@@ -160,6 +160,7 @@ mod tests {
                 length: Some(20),
                 width: Some(20),
                 height: Some(30),
+                volume: Some(D::new(12, 3)),
                 max_weight: Some(100.into()),
                 ..Default::default()
             }),

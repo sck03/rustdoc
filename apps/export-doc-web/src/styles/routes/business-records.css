@@ -9,18 +9,18 @@
   .business-records h2,
 .business-records h3,
 .business-records p { margin: 0; overflow-wrap: anywhere; }
-  .business-records h2 { font-size: var(--edm-font-size-xl); }
-  .business-records h3 { font-size: var(--edm-font-size-lg); margin: 4px 0; }
+  .business-records h2 { font-size: var(--edm-font-size-xl); line-height: var(--edm-line-height-xl); }
+  .business-records h3 { font-size: var(--edm-font-size-lg); line-height: var(--edm-line-height-lg); margin: 4px 0; }
   .business-records-heading p,
-.business-records-muted { color: var(--edm-ink-600); font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-relaxed); }
+.business-records-muted { color: var(--edm-ink-600); font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
   .business-records-list { display: grid; gap: var(--edm-layout-gap); padding: 0; margin: 0; list-style: none; }
   .business-records-card,
 .business-records-form,
 .attachment-version { min-width: 0; padding: var(--edm-section-padding); border: 1px solid var(--edm-line); border-radius: var(--edm-radius-md); background: var(--edm-bg-surface); }
   .business-records-card { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
   .business-records-card > div { min-width: 0; }
-  .business-records-due { color: var(--edm-neutral-650); font-size: var(--edm-font-size-md); }
-  .business-records-due[data-overdue="true"] { color: var(--edm-danger-700); font-weight: 600; }
+  .business-records-due { color: var(--edm-neutral-650); font-size: var(--edm-font-size-md); line-height: var(--edm-line-height-md); }
+  .business-records-due[data-overdue="true"] { color: var(--edm-danger-700); font-weight: var(--edm-font-weight-medium); }
   .business-records-actions { flex-shrink: 1; min-width: 0; max-width: 100%; }
   .business-records-actions > label { flex: 1 1 260px; }
   .business-records-form { display: grid; gap: var(--edm-layout-gap); }

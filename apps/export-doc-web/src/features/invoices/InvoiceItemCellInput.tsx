@@ -9,6 +9,7 @@ import {
   readInvoiceItemNumberInput,
 } from "./invoiceItemsEditorModel.ts";
 import { normalizeText } from "../../ui/formUtils.ts";
+import { useNumberInputDraft } from "../../ui/useNumberInputDraft.ts";
 import { filterInvoiceItemHistoryOptionsByPrefix } from "./invoiceItemHistory.ts";
 
 export type InvoiceItemCellInputProps = {
@@ -42,10 +43,11 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [activeOptionIndex, setActiveOptionIndex] = useState(0);
   const currentNumberValue = column.kind === "number" ? readItemNumberValue(item, column.field) : undefined;
-  const currentInputText = column.kind === "number"
-    ? !isFocused
+  const numberInput = useNumberInputDraft(column.kind === "number" ? Number(item[column.field] ?? 0) : undefined, !isFocused
       ? invoiceItemNumberDisplayValue(column.field, currentNumberValue)
-      : invoiceItemNumberInputValue(currentNumberValue)
+      : invoiceItemNumberInputValue(currentNumberValue), onChange, 0);
+  const currentInputText = column.kind === "number"
+    ? numberInput.value
     : readItemTextValue(item, column.field);
   const inlineOptions = filterInvoiceItemHistoryOptionsByPrefix(options ?? [], currentInputText).slice(0, 6);
   const canShowInlineOptions = isFocused && isHistoryOpen && !disabled && inlineOptions.length > 0;
@@ -84,6 +86,7 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
   }
 
   function applyInlineOption(option: string) {
+    numberInput.reset();
     onChange(column.kind === "number" ? readInvoiceItemNumberInput(option) : option);
     setIsHistoryOpen(false);
   }
@@ -113,7 +116,8 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
     }
 
     setIsHistoryOpen(matchingOptions.length > 0);
-    onChange(column.kind === "number" ? readInvoiceItemNumberInput(rawValue) : rawValue);
+    if (column.kind === "number") numberInput.change(rawValue);
+    else onChange(rawValue);
   }
 
   function handleOptionKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -199,20 +203,17 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
   if (column.kind === "number") {
     return (
       <div className="item-cell-editor" onBlur={() => {
+        numberInput.reset();
         setIsFocused(false);
         setIsHistoryOpen(false);
       }}>
         <input
           ref={inputRef}
           className={`item-cell-input item-number-input${selected ? " item-cell-selected" : ""}`}
-          type="number"
-          step={column.field === "unitPrice"
-            ? "0.00001"
-            : column.field === "purchasePrice"
-              ? "0.0001"
-              : column.field === "volume"
-                ? "0.001"
-                : "0.01"}
+          type="text"
+          inputMode="decimal"
+          onCompositionStart={numberInput.onCompositionStart}
+          onCompositionEnd={numberInput.onCompositionEnd}
           title={column.field === "unitPrice"
             ? item.priceCalculationMode === "LineAmountDriven"
               ? "当前行以金额为准；修改单价后将切换为单价核算并重算金额"

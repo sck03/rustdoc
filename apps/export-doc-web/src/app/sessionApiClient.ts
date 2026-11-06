@@ -2,9 +2,9 @@ import { createExportDocManagerApiClient, type ApiClientOptions } from "../api/i
 import { notifyAuthenticationFailure } from "../api/authenticationFailureEvents.ts";
 
 /** Authentication failures belong to the identity that sent the HTTP request. */
-export function createSessionApiClient(options: ApiClientOptions, isCurrent: () => boolean) {
+export function createSessionApiClient(options: ApiClientOptions, isCurrent: (requestToken?: string) => boolean) {
   return createExportDocManagerApiClient({
     ...options,
-    onAuthenticationFailure: error => { if (isCurrent()) notifyAuthenticationFailure(error); },
+    onAuthenticationFailure: (error, requestToken) => { if (isCurrent(requestToken)) notifyAuthenticationFailure(error); },
   });
 }

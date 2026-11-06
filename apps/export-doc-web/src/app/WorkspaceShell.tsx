@@ -73,6 +73,7 @@ type WorkspaceShellProps = {
   notice?: WorkspaceNotice | null;
   onDismissNotice?: () => void;
   sessionAttention?: WorkspaceSessionAttention | null;
+  backendStopped?: { message: string; onRestart: () => void };
 };
 
 export function WorkspaceShell({
@@ -88,6 +89,7 @@ export function WorkspaceShell({
   notice,
   onDismissNotice,
   sessionAttention,
+  backendStopped,
 }: WorkspaceShellProps) {
   const location = useLocation();
   const [isNavCollapsed, setIsNavCollapsed] = useState(false);
@@ -351,7 +353,6 @@ export function WorkspaceShell({
             <div className="workspace-title-block">
               <p className="eyebrow">{context.section}</p>
               <h1 ref={workspaceTitleRef} tabIndex={-1}>{context.title}</h1>
-              <p className="workspace-description">{context.description}</p>
             </div>
           </div>
           <div className="session-strip">
@@ -401,7 +402,11 @@ export function WorkspaceShell({
           </div>
         </div> : null}
 
-        {showServiceUnavailableNotice ? <div className="workspace-service-notice" role="alert" aria-live="assertive">
+        {backendStopped ? <div className="workspace-service-notice" role="alert">
+          <ServerOff size={18} aria-hidden="true" />
+          <div><strong>桌面后端已停止</strong><span>{backendStopped.message}</span></div>
+          <Button variant="secondary" onClick={backendStopped.onRestart}>重启程序</Button>
+        </div> : showServiceUnavailableNotice ? <div className="workspace-service-notice" role="alert" aria-live="assertive">
           <ServerOff size={18} aria-hidden="true" />
           <div>
             <strong>业务服务暂不可达</strong>

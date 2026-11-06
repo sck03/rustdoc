@@ -11,11 +11,6 @@ import { detailSpanBorder, renderDetailFixedRow } from "./reportDesignerDetailFi
 import { renderDetailComposite } from "./reportDesignerDetailComposite.ts";
 import { designerSampleValue } from "./reportDesignerCanvasSamples.ts";
 
-/** Structured HTML for editor/reference fixtures; final document output runs in Rust. */
-export function renderReportDesignerBlockToHtml(block: ReportBlock) {
-  return renderBlock(block);
-}
-
 /**
  * Render synthetic examples directly from the AST for visual editing.
  * No business data is evaluated or persisted; final output runs in Rust.
@@ -23,7 +18,7 @@ export function renderReportDesignerBlockToHtml(block: ReportBlock) {
 export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock, heightMm?: number, widthMm?: number, mode: "products" | "entries" = "products", labels: ReadonlyMap<string, string> = new Map()) {
   if (block.type === "DetailTable") return renderDetailTable(block, heightMm, { widthMm, mode, labels });
   // Keep one representative field value, without also showing its fallback.
-  let html = renderBlock(block, true, heightMm).replace(
+  let html = renderBlock(block).replace(
     /\{\{ if ([A-Za-z_][A-Za-z0-9_.]*) \}\}(\{\{ \1 \}\})\{\{ else \}\}[\s\S]*?\{\{ end \}\}/g, "$2");
   html = html.replace(/\{\{\s*(?:if|else|end|capture|assign|while|case|when)[\s\S]*?\}\}/gi, "");
   html = html.replace(/\{\{\s*\$?[A-Za-z_][A-Za-z0-9_]*\s*=\s*[\s\S]*?\}\}/g, "");
@@ -31,7 +26,7 @@ export function renderReportDesignerBlockPreviewToHtml(block: ReportBlock, heigh
   return html;
 }
 
-function renderBlock(block: ReportBlock, preview = false, heightMm?: number) {
+function renderBlock(block: Exclude<ReportBlock, { type: "DetailTable" }>) {
   switch (block.type) {
     case "Text":
       return `<div style="${renderBoxStyle(block.style, block.border)}">${escapeHtml(block.text)}</div>`;
@@ -40,19 +35,17 @@ function renderBlock(block: ReportBlock, preview = false, heightMm?: number) {
     case "Row":
       return renderRowBlock(block);
     case "Grid":
-      return renderGridBlock(block, preview);
+      return renderGridBlock(block);
     case "Conditional":
-      return renderConditionalBlock(block, preview);
+      return renderConditionalBlock(block);
     case "Image":
       return renderImageBlock(block);
-    case "DetailTable":
-      return renderDetailTable(block, heightMm);
     case "PageBreak":
       return `<div class="report-page-break-row"></div>`;
   }
 }
 
-function renderGridBlock(block: Extract<ReportBlock, { type: "Grid" }>, preview: boolean) {
+function renderGridBlock(block: Extract<ReportBlock, { type: "Grid" }>) {
   const columnWidthTotal = block.columns.reduce((sum, column) => sum + Math.max(1, column.widthPercent), 0);
   const colgroup = `<colgroup>${block.columns.map((column) => {
     const width = Math.max(1, column.widthPercent) / columnWidthTotal * 100;
@@ -62,9 +55,7 @@ function renderGridBlock(block: Extract<ReportBlock, { type: "Grid" }>, preview:
     const colSpan = Math.max(1, Math.floor(cell.colSpan ?? 1));
     const rowSpan = Math.max(1, Math.floor(cell.rowSpan ?? 1));
     const spanAttributes = `${colSpan > 1 ? ` colspan="${colSpan}"` : ""}${rowSpan > 1 ? ` rowspan="${rowSpan}"` : ""}`;
-    const previewAttributes = preview
-      ? ` data-report-grid-cell-id="${escapeHtml(cell.id)}"`
-      : "";
+    const previewAttributes = ` data-report-grid-cell-id="${escapeHtml(cell.id)}"`;
     const spannedRows = block.rows.slice(rowIndex, rowIndex + rowSpan);
     const style = { ...block.defaultCellStyle, ...cell.style };
     const imageHeightMm = spannedRows.every((item) => item.heightMm)
@@ -190,45 +181,22 @@ function renderImageStyle(block: Extract<ReportBlock, { type: "Image" }>) {
   ].filter(Boolean).join("; ");
 }
 
-function renderConditionalBlock(block: Extract<ReportBlock, { type: "Conditional" }>, preview: boolean) {
+function renderConditionalBlock(block: Extract<ReportBlock, { type: "Conditional" }>) {
   const content = block.content.kind === "Field"
     ? `${block.content.label ? `${escapeHtml(block.content.label)}: ` : ""}<span>${renderFieldExpression(block.content.fieldPath, block.content.fallbackText)}</span>`
     : escapeHtml(block.content.text);
 
-  const body = `<div class="edm-conditional-block" style="${renderBoxStyle(block.style, block.border)}">${content}</div>`;
-  // The canvas always shows editable content. Actual conditions run in Rust;
-  // the legacy HTML fixture supports only its original reference scenarios.
-  if (preview) return body;
-  const condition = renderConditionalExpression(block);
-  return condition ? `{{ if ${condition} }}${body}{{ end }}` : "";
+  // The canvas always shows editable content. Actual conditions run in Rust.
+  return `<div class="edm-conditional-block" style="${renderBoxStyle(block.style, block.border)}">${content}</div>`;
 }
 
-function renderConditionalExpression(block: Extract<ReportBlock, { type: "Conditional" }>) {
-  if (block.additionalConditions?.length || (block.condition.comparisonType ?? "Text") !== "Text" || block.condition.ignoreCase) {
-    throw new Error("组合或类型条件请使用原生预览，旧 HTML 夹具不执行这些规则。");
-  }
-  const fieldPath = block.condition.fieldPath.trim();
-  if (!isReportDesignerFieldPath(fieldPath)) {
-    return "";
-  }
-
-  switch (block.condition.operator) {
-    case "Equals":
-      return `${fieldPath} == ${renderScribanStringLiteral(block.condition.value)}`;
-    case "NotEquals":
-      return `${fieldPath} != ${renderScribanStringLiteral(block.condition.value)}`;
-    case "HasValue":
-      return fieldPath;
-    default:
-      throw new Error("扩展条件请使用原生预览，旧 HTML 夹具不执行这些规则。");
-  }
-}
-
-function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>, heightMm?: number, preview?: { widthMm?: number; mode: "products" | "entries"; labels: ReadonlyMap<string, string> }) {
+function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>, heightMm: number | undefined, preview: { widthMm?: number; mode: "products" | "entries"; labels: ReadonlyMap<string, string> }) {
   const fillHeight = block.print.fillHeight && heightMm !== undefined && Number.isFinite(heightMm) && heightMm > 0;
   const fillRow = fillHeight ? `<tr class="edm-detail-fill-row" style="height:100%">${block.columns.map(column => `<td style="${renderDetailCellStyle({}, { ...(column.border ?? block.border), top: false, bottom: false }, column.align)}"></td>`).join("")}</tr>` : "";
-  const sample = (path: string, index = 0) => escapeHtml(path === shippingMarksFieldPath ? shippingMarksPreviewText : designerSampleValue(path, index, preview?.labels ?? new Map()));
-  const renderers = { style: renderDetailCellStyle, field: preview ? sample : renderFieldExpression, text: escapeHtml };
+  const sample = (path: string, index = 0) => path === shippingMarksFieldPath
+    ? renderFieldExpression(path).replace(`{{ ${path} }}`, shippingMarksPreviewText)
+    : escapeHtml(designerSampleValue(path, index, preview.labels));
+  const renderers = { style: renderDetailCellStyle, field: sample, text: escapeHtml };
   const summaryRow = renderDetailFixedRow(block, block.summaryRow, renderers);
   const adjustmentRow = block.adjustments ? `<tr>${block.columns.map(column => `<td style="${renderDetailCellStyle(block.bodyStyle, { ...(column.border ?? block.border), top: false, bottom: false }, column.align)}">${column.id === block.adjustments!.descriptionColumnId ? "金额调整说明（有数据时显示）" : column.id === block.adjustments!.amountColumnId ? "增减金额" : ""}</td>`).join("")}</tr>` : "";
   const detailPrintClasses = renderDetailPrintClassNames(block);
@@ -237,12 +205,12 @@ function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>,
       const border = column.border ?? block.border;
       const content = entry && column.id === block.entryDescriptionColumnId
         ? entry === "blank" ? "<br>" : entry === "note" ? "按录入顺序打印的说明文字" : sample("item.StyleName", index)
-        : entry && entry !== "item" ? "" : renderDetailCellContent(column, block.bodyStyle.verticalAlign, preview ? path => sample(path, index) : undefined);
-      return `<td${preview ? ` data-report-detail-column-id="${escapeHtmlAttribute(column.id)}"` : ""} style="${renderDetailCellStyle(block.bodyStyle, block.rowSeparators === false ? { ...border, top: false, bottom: false } : border, column.align)}">${content}</td>`;
+        : entry && entry !== "item" ? "" : renderDetailCellContent(column, block.bodyStyle.verticalAlign, path => sample(path, index));
+      return `<td data-report-detail-column-id="${escapeHtmlAttribute(column.id)}" style="${renderDetailCellStyle(block.bodyStyle, block.rowSeparators === false ? { ...border, top: false, bottom: false } : border, column.align)}">${content}</td>`;
     })
     .join("")}</tr>`;
   const entryMode = preview?.mode === "entries" && block.entryDescriptionColumnId;
-  const rows = preview ? entryMode ? makeRow(0, "note") + makeRow(0, "blank") + makeRow(0, "item") + makeRow(1, "item") : makeRow(0) + makeRow(1) : renderDetailTableRows(block, makeRow(0));
+  const rows = entryMode ? makeRow(0, "note") + makeRow(0, "blank") + makeRow(0, "item") + makeRow(1, "item") : makeRow(0) + makeRow(1);
   const introRow = renderDetailFixedRow(block, block.introRow, renderers);
   const columns = renderProportionalColumns(block.columns.map(column => column.widthMm));
   const header = `<thead>${renderDetailTableHeaderRows(block)}</thead>`;
@@ -253,7 +221,7 @@ function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>,
   }
 
   const sideContent = block.sideBand.contentKind === "Field"
-    ? preview ? sample(block.sideBand.fieldPath) : renderFieldExpression(block.sideBand.fieldPath)
+    ? sample(block.sideBand.fieldPath)
     : escapeHtml(block.sideBand.text);
 
   return `<table class="edm-detail-layout ${renderDetailHeaderRepeatClassName(block)}"${fillHeight ? ` style="height:${heightMm}mm"` : ""}>
@@ -271,56 +239,6 @@ function renderDetailTable(block: Extract<ReportBlock, { type: "DetailTable" }>,
     </tr>
   </tbody>
 </table>`;
-}
-
-function renderDetailTableRows(
-  block: Extract<ReportBlock, { type: "DetailTable" }>,
-  detailRow: string,
-) {
-  if (!block.grouping?.footer) {
-    if (block.grouping?.pageBreakBefore) {
-      return renderDetailTableRowsWithGroupPageBreaks(block, detailRow);
-    }
-
-    const groupPrefix = renderDetailTableGroupPrefix(block);
-    const groupRow = renderDetailTableGroupRow(block);
-    return `${groupPrefix}{{ for item in Invoice.Items }}${groupRow}${detailRow}{{ end }}`;
-  }
-
-  const groupField = renderDetailItemValueReference(block.grouping.fieldPath);
-  if (!groupField) {
-    return `{{ for item in Invoice.Items }}${detailRow}{{ end }}`;
-  }
-
-  const groupVariable = renderScribanVariableName(block.id, "group");
-  const currentVariable = renderScribanVariableName(block.id, "current_group");
-  const startedVariable = renderScribanVariableName(block.id, "group_started");
-  const prefix = renderDetailTableGroupFooterPrefix(block);
-  const boundary = renderDetailTableGroupBoundary(block, groupField, groupVariable, currentVariable, startedVariable);
-  const accumulators = renderDetailTableGroupFooterAccumulators(block);
-  const finalFooter = `{{ if ${startedVariable} }}${renderDetailTableGroupFooterRow(block)}{{ end }}`;
-
-  return `${prefix}{{ for item in Invoice.Items }}${boundary}${detailRow}${accumulators}{{ end }}${finalFooter}`;
-}
-
-function renderDetailTableRowsWithGroupPageBreaks(
-  block: Extract<ReportBlock, { type: "DetailTable" }>,
-  detailRow: string,
-) {
-  const groupField = block.grouping ? renderDetailItemValueReference(block.grouping.fieldPath) : "";
-  if (!block.grouping || !groupField) {
-    return `{{ for item in Invoice.Items }}${detailRow}{{ end }}`;
-  }
-
-  const groupVariable = renderScribanVariableName(block.id, "group");
-  const currentVariable = renderScribanVariableName(block.id, "current_group");
-  const startedVariable = renderScribanVariableName(block.id, "group_started");
-  const prefix = `{{ ${groupVariable} = "" }}{{ ${startedVariable} = false }}`;
-  const firstGroupOpen = renderDetailTableGroupOpen(block, groupVariable, currentVariable, startedVariable, false);
-  const nextGroupOpen = renderDetailTableGroupOpen(block, groupVariable, currentVariable, startedVariable, true);
-  const boundary = `{{ ${currentVariable} = ${groupField} }}{{ if ${startedVariable} == false }}${firstGroupOpen}{{ else }}{{ if ${currentVariable} != ${groupVariable} }}${nextGroupOpen}{{ end }}{{ end }}`;
-
-  return `${prefix}{{ for item in Invoice.Items }}${boundary}${detailRow}{{ end }}`;
 }
 
 function renderDetailTableHeaderRows(block: Extract<ReportBlock, { type: "DetailTable" }>) {
@@ -349,162 +267,6 @@ function renderDetailTableHeaderGroupRow(block: Extract<ReportBlock, { type: "De
   }
 
   return `<tr class="edm-detail-header-group-row">${cells.join("")}</tr>`;
-}
-
-function renderDetailTableGroupPrefix(block: Extract<ReportBlock, { type: "DetailTable" }>) {
-  if (!block.grouping || !renderDetailItemValueReference(block.grouping.fieldPath)) {
-    return "";
-  }
-
-  const groupVariable = renderScribanVariableName(block.id, "group");
-  return `{{ ${groupVariable} = "" }}`;
-}
-
-function renderDetailTableGroupRow(block: Extract<ReportBlock, { type: "DetailTable" }>) {
-  if (!block.grouping) {
-    return "";
-  }
-
-  const groupField = renderDetailItemValueReference(block.grouping.fieldPath);
-  if (!groupField) {
-    return "";
-  }
-
-  const groupVariable = renderScribanVariableName(block.id, "group");
-  const currentVariable = renderScribanVariableName(block.id, "current_group");
-  const className = [
-    "edm-detail-group-row",
-    block.grouping.keepTogether ? "edm-detail-group-keep" : "",
-  ].filter(Boolean).join(" ");
-  const label = escapeHtml(block.grouping.label);
-  const value = block.grouping.showFieldValue ? ` <span>{{ ${currentVariable} }}</span>` : "";
-
-  return `{{ ${currentVariable} = ${groupField} }}{{ if ${currentVariable} != ${groupVariable} }}<tr class="${className}"><td colspan="${Math.max(1, block.columns.length)}" style="${renderDetailCellStyle(block.grouping.style, block.border, block.grouping.style.align ?? "Left")}">${label}${value}</td></tr>{{ ${groupVariable} = ${currentVariable} }}{{ end }}`;
-}
-
-function renderDetailTableGroupFooterPrefix(block: Extract<ReportBlock, { type: "DetailTable" }>) {
-  const groupVariable = renderScribanVariableName(block.id, "group");
-  const startedVariable = renderScribanVariableName(block.id, "group_started");
-  const countVariable = renderScribanVariableName(block.id, "group_count");
-  const sumInitializers = collectGroupFooterSumCells(block)
-    .map((cell) => `{{ ${renderGroupFooterSumVariable(block.id, cell.columnId)} = 0 }}`)
-    .join("");
-
-  return `{{ ${groupVariable} = "" }}{{ ${startedVariable} = false }}{{ ${countVariable} = 0 }}${sumInitializers}`;
-}
-
-function renderDetailTableGroupBoundary(
-  block: Extract<ReportBlock, { type: "DetailTable" }>,
-  groupField: string,
-  groupVariable: string,
-  currentVariable: string,
-  startedVariable: string,
-) {
-  const firstGroupOpen = renderDetailTableGroupOpen(block, groupVariable, currentVariable, startedVariable, false);
-  const nextGroupOpen = renderDetailTableGroupOpen(block, groupVariable, currentVariable, startedVariable, Boolean(block.grouping?.pageBreakBefore));
-  const groupFooter = renderDetailTableGroupFooterRow(block);
-  const reset = renderDetailTableGroupFooterReset(block);
-
-  return `{{ ${currentVariable} = ${groupField} }}{{ if ${startedVariable} == false }}${firstGroupOpen}{{ else }}{{ if ${currentVariable} != ${groupVariable} }}${groupFooter}${reset}${nextGroupOpen}{{ end }}{{ end }}`;
-}
-
-function renderDetailTableGroupOpen(
-  block: Extract<ReportBlock, { type: "DetailTable" }>,
-  groupVariable: string,
-  currentVariable: string,
-  startedVariable: string,
-  pageBreakBefore = false,
-) {
-  const headerRow = renderDetailTableGroupHeaderRow(block, currentVariable, pageBreakBefore);
-  return `${headerRow}{{ ${groupVariable} = ${currentVariable} }}{{ ${startedVariable} = true }}`;
-}
-
-function renderDetailTableGroupHeaderRow(
-  block: Extract<ReportBlock, { type: "DetailTable" }>,
-  currentVariable: string,
-  pageBreakBefore = false,
-) {
-  if (!block.grouping) {
-    return "";
-  }
-
-  const className = [
-    "edm-detail-group-row",
-    block.grouping.keepTogether ? "edm-detail-group-keep" : "",
-    pageBreakBefore ? "edm-detail-group-page-break" : "",
-  ].filter(Boolean).join(" ");
-  const label = escapeHtml(block.grouping.label);
-  const value = block.grouping.showFieldValue ? ` <span>{{ ${currentVariable} }}</span>` : "";
-
-  return `<tr class="${className}"><td colspan="${Math.max(1, block.columns.length)}" style="${renderDetailCellStyle(block.grouping.style, block.border, block.grouping.style.align ?? "Left")}">${label}${value}</td></tr>`;
-}
-
-function renderDetailTableGroupFooterReset(block: Extract<ReportBlock, { type: "DetailTable" }>) {
-  const countVariable = renderScribanVariableName(block.id, "group_count");
-  const sumResets = collectGroupFooterSumCells(block)
-    .map((cell) => `{{ ${renderGroupFooterSumVariable(block.id, cell.columnId)} = 0 }}`)
-    .join("");
-
-  return `{{ ${countVariable} = 0 }}${sumResets}`;
-}
-
-function renderDetailTableGroupFooterAccumulators(block: Extract<ReportBlock, { type: "DetailTable" }>) {
-  const countVariable = renderScribanVariableName(block.id, "group_count");
-  const sumAccumulators = collectGroupFooterSumCells(block)
-    .map((cell) => {
-      const fieldReference = renderDetailItemValueReference(cell.fieldPath);
-      if (!fieldReference) {
-        return "";
-      }
-
-      const sumVariable = renderGroupFooterSumVariable(block.id, cell.columnId);
-      return `{{ ${sumVariable} = ${sumVariable} + ${fieldReference} }}`;
-    })
-    .filter(Boolean)
-    .join("");
-
-  return `{{ ${countVariable} = ${countVariable} + 1 }}${sumAccumulators}`;
-}
-
-function renderDetailTableGroupFooterRow(block: Extract<ReportBlock, { type: "DetailTable" }>) {
-  if (!block.grouping?.footer) {
-    return "";
-  }
-
-  const footer = block.grouping.footer;
-  const labelColumnSpan = Math.min(block.columns.length, Math.max(1, Math.floor(footer.labelColumnSpan)));
-  const cellsByColumnId = new Map(footer.cells.map((cell) => [cell.columnId, cell]));
-  const valueCells = block.columns.slice(labelColumnSpan).map((column) => {
-    const cell = cellsByColumnId.get(column.id);
-    const content = cell ? renderGroupFooterCellContent(block, cell) : "";
-
-    return `<td style="${renderDetailCellStyle(footer.style, column.border ?? block.border, footer.style.align ?? column.align)}">${content}</td>`;
-  }).join("");
-
-  const label = [escapeHtml(footer.label), ...block.columns.slice(0, labelColumnSpan).map(column => {
-    const cell = cellsByColumnId.get(column.id); return cell ? renderGroupFooterCellContent(block, cell) : "";
-  })].filter(Boolean).join("<br>");
-  return `<tr class="edm-detail-group-footer-row"><td colspan="${labelColumnSpan}" style="${renderDetailCellStyle(footer.style, detailSpanBorder(block, 0, labelColumnSpan), footer.style.align ?? "Right")}">${label}</td>${valueCells}</tr>`;
-}
-
-function renderGroupFooterCellContent(
-  block: Extract<ReportBlock, { type: "DetailTable" }>,
-  cell: NonNullable<NonNullable<Extract<ReportBlock, { type: "DetailTable" }>["grouping"]>["footer"]>["cells"][number],
-) {
-  switch (cell.contentKind) {
-    case "Sum":
-      return renderDetailItemValueReference(cell.fieldPath) ? `{{ ${renderGroupFooterSumVariable(block.id, cell.columnId)} }}` : "";
-    case "Count":
-      return `{{ ${renderScribanVariableName(block.id, "group_count")} }}`;
-    case "Text":
-      return escapeHtml(cell.text);
-    case "Empty":
-      return "";
-  }
-}
-
-function collectGroupFooterSumCells(block: Extract<ReportBlock, { type: "DetailTable" }>) {
-  return block.grouping?.footer?.cells.filter((cell) => cell.contentKind === "Sum" && renderDetailItemValueReference(cell.fieldPath)) ?? [];
 }
 
 function renderDetailPrintClassNames(block: Extract<ReportBlock, { type: "DetailTable" }>) {
@@ -680,16 +442,4 @@ function renderScribanStringLiteral(value: string) {
     .replace(/"/g, "\\\"")
     .replace(/\r/g, "\\r")
     .replace(/\n/g, "\\n")}"`;
-}
-
-function renderScribanVariableName(blockId: string, suffix: string) {
-  return `edm_${suffix}_${renderScribanSafeIdentifier(blockId)}`;
-}
-
-function renderGroupFooterSumVariable(blockId: string, columnId: string) {
-  return `edm_group_sum_${renderScribanSafeIdentifier(blockId)}_${renderScribanSafeIdentifier(columnId)}`;
-}
-
-function renderScribanSafeIdentifier(value: string) {
-  return value.replace(/[^A-Za-z0-9_]/g, "_").replace(/^([^A-Za-z_])/, "_$1");
 }

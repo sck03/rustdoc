@@ -27,6 +27,7 @@ export function ApprovalDocument({api,user,row,scope,submissionId = row.submissi
   const available=document?.documentStatus==="Ready"||partial&&Boolean(document)&&!["Voided","NotApproved"].includes(document?.documentStatus??"");
   const name = `审批单-${row.id}-v${document?.submissionNumber ?? 1}.pdf`;
   return <section className="oa-detail-content" aria-label="审批单"><h3>审批单{document ? ` · 提交版本 ${document.submissionNumber}` : ""}</h3>
+    {query.isPending && <p role="status">正在加载审批单…</p>}
     {query.isError && <InlineNotice tone="error">{readApiError(query.error)}</InlineNotice>}
     {partial&&<p>本节点仅展示获准材料。下载的审批单会标明材料范围，完整原件由具备完整权限的人员核验。</p>}
     {document?.documentStatus === "Running" && <p role="status">正在生成审批单 PDF…</p>}

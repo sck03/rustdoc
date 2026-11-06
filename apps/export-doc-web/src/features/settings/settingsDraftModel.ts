@@ -54,8 +54,3 @@ export function changedSettingCounts(draft: SettingsRecord | null, baseline: Set
   visit(baseline,draft,[]);
   return counts;
 }
-
-export function categoryHasSecrets(category: SettingsCategoryKey, databaseProvider?: string | null) {
-  return category === "communication" || category === "ai"
-    || (category === "runtime" && databaseProvider === "postgresql");
-}

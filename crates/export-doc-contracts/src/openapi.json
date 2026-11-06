@@ -1192,10 +1192,6 @@
       "ApiBackupItemDto": {
         "type": "object",
         "properties": {
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
           "fileName": {
             "type": "string"
           },
@@ -1219,7 +1215,6 @@
           "fileName",
           "fullPath",
           "sizeBytes",
-          "createdAt",
           "lastWriteTime"
         ]
       },
@@ -14969,10 +14964,6 @@
       "ApiSharedDatabaseBackupItemDto": {
         "type": "object",
         "properties": {
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
           "fileName": {
             "type": "string"
           },
@@ -14996,7 +14987,6 @@
           "fileName",
           "fullPath",
           "sizeBytes",
-          "createdAt",
           "lastWriteTime"
         ]
       },
@@ -40891,6 +40881,16 @@
               }
             }
           },
+          "413": {
+            "description": "Payload Too Large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Too Many Requests",
             "content": {
@@ -40945,7 +40945,8 @@
                 "$ref": "#/components/schemas/ApiLoginRequest"
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 4096
         }
       }
     },

@@ -1,4 +1,4 @@
--- Part of the complete schema 12 baseline; never applied to an existing database.
+-- Part of the complete schema 14 baseline; never applied to an existing database.
 CREATE TABLE request_revisions (
     id INTEGER PRIMARY KEY REFERENCES records(id) ON DELETE RESTRICT,
     request_id INTEGER NOT NULL REFERENCES records(id) ON DELETE RESTRICT,
@@ -6,6 +6,7 @@ CREATE TABLE request_revisions (
     body TEXT NOT NULL,
     UNIQUE(request_id,revision)
 );
+CREATE INDEX request_revisions_appointment ON request_revisions(json_extract(body,'$.appointment.id'));
 CREATE TABLE workflow_instances (
     id TEXT PRIMARY KEY,
     request_id INTEGER NOT NULL,
@@ -30,7 +31,12 @@ CREATE TABLE workflow_subinstances (
  node_keys TEXT NOT NULL,input_snapshot TEXT NOT NULL CHECK(COALESCE(json_type(input_snapshot,'$.sources'),'')='object'),
  UNIQUE(parent_instance_id,subflow_key)
 );
-CREATE TRIGGER subinstance_binding_update BEFORE UPDATE OF parent_instance_id,definition_id,definition_version,submission_id,subflow_key,node_keys,input_snapshot ON workflow_subinstances BEGIN SELECT RAISE(ABORT,'Immutable subflow binding'); END;
+CREATE TRIGGER subinstance_binding_update BEFORE UPDATE ON workflow_subinstances
+WHEN OLD.id IS NOT NEW.id OR OLD.parent_instance_id IS NOT NEW.parent_instance_id
+ OR OLD.definition_id IS NOT NEW.definition_id OR OLD.definition_version IS NOT NEW.definition_version
+ OR OLD.submission_id IS NOT NEW.submission_id OR OLD.subflow_key IS NOT NEW.subflow_key
+ OR OLD.node_keys IS NOT NEW.node_keys OR OLD.input_snapshot IS NOT NEW.input_snapshot
+BEGIN SELECT RAISE(ABORT,'Immutable subflow binding'); END;
 CREATE INDEX workflow_instances_state ON workflow_instances(state,request_id,revision);
 CREATE TABLE handling_tasks (
     request_id INTEGER NOT NULL,
@@ -155,7 +161,36 @@ CREATE INDEX workflow_activations_due ON workflow_activations(state,activate_at,
 CREATE VIEW workflow_current_tasks AS SELECT t.* FROM workflow_tasks t JOIN workflow_instances w ON w.request_id=t.request_id AND w.revision=t.submission AND w.generation=t.generation;
 CREATE TRIGGER request_revision_update BEFORE UPDATE ON request_revisions BEGIN SELECT RAISE(ABORT,'Immutable submitted material'); END;
 CREATE TRIGGER request_revision_delete BEFORE DELETE ON request_revisions BEGIN SELECT RAISE(ABORT,'Immutable submitted material'); END;
-CREATE TRIGGER workflow_signature_update BEFORE UPDATE OF request_id,submission,generation,task_key,node_key,stage,assignee_id,assignee_person_id,origin,assignee_name,context_id,acted_by_context,acted_by_id,acted_by_person_id,status,independent,mandatory,due_at,started_at,acted_at,elapsed_seconds,note,acted_by_name,delegation_key,decision,signature,source_generation ON workflow_tasks WHEN OLD.signature IS NOT NULL OR OLD.source_generation IS NOT NULL BEGIN SELECT RAISE(ABORT,'Immutable workflow signature'); END;
+CREATE TRIGGER workflow_signature_update BEFORE UPDATE ON workflow_tasks
+WHEN (OLD.signature IS NOT NULL OR OLD.source_generation IS NOT NULL)
+ AND (OLD.request_id IS NOT NEW.request_id
+ OR OLD.submission IS NOT NEW.submission
+ OR OLD.generation IS NOT NEW.generation
+ OR OLD.task_key IS NOT NEW.task_key
+ OR OLD.node_key IS NOT NEW.node_key
+ OR OLD.stage IS NOT NEW.stage
+ OR OLD.assignee_id IS NOT NEW.assignee_id
+ OR OLD.assignee_person_id IS NOT NEW.assignee_person_id
+ OR OLD.origin IS NOT NEW.origin
+ OR OLD.assignee_name IS NOT NEW.assignee_name
+ OR OLD.context_id IS NOT NEW.context_id
+ OR OLD.acted_by_context IS NOT NEW.acted_by_context
+ OR OLD.acted_by_id IS NOT NEW.acted_by_id
+ OR OLD.acted_by_person_id IS NOT NEW.acted_by_person_id
+ OR OLD.status IS NOT NEW.status
+ OR OLD.independent IS NOT NEW.independent
+ OR OLD.mandatory IS NOT NEW.mandatory
+ OR OLD.due_at IS NOT NEW.due_at
+ OR OLD.started_at IS NOT NEW.started_at
+ OR OLD.acted_at IS NOT NEW.acted_at
+ OR OLD.elapsed_seconds IS NOT NEW.elapsed_seconds
+ OR OLD.note IS NOT NEW.note
+ OR OLD.acted_by_name IS NOT NEW.acted_by_name
+ OR OLD.delegation_key IS NOT NEW.delegation_key
+ OR OLD.decision IS NOT NEW.decision
+ OR OLD.signature IS NOT NEW.signature
+ OR OLD.source_generation IS NOT NEW.source_generation)
+BEGIN SELECT RAISE(ABORT,'Immutable workflow signature'); END;
 CREATE TRIGGER workflow_signature_delete BEFORE DELETE ON workflow_tasks WHEN OLD.signature IS NOT NULL OR OLD.source_generation IS NOT NULL BEGIN SELECT RAISE(ABORT,'Immutable workflow signature'); END;
 CREATE TRIGGER workflow_operation_update BEFORE UPDATE ON workflow_operations BEGIN SELECT RAISE(ABORT,'Immutable workflow operation'); END;
 CREATE TRIGGER workflow_operation_delete BEFORE DELETE ON workflow_operations BEGIN SELECT RAISE(ABORT,'Immutable workflow operation'); END;

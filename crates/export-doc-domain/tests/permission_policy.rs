@@ -196,21 +196,24 @@ fn public_directory_view_does_not_allow_organization_mutations() {
         action: "view".into(),
         data_scope: "company".into(),
     }];
-    assert!(permissions::allows_operation(
+    assert!(permissions::allows_edition_operation(
         &grants,
         false,
+        ProductEdition::Full,
         LIST_ORGANIZATION_MANAGERS,
         &[]
     ));
-    assert!(!permissions::allows_operation(
+    assert!(!permissions::allows_edition_operation(
         &grants,
         false,
+        ProductEdition::Full,
         CREATE_ORGANIZATION_COMPANY,
         &[]
     ));
-    assert!(!permissions::allows_operation(
+    assert!(!permissions::allows_edition_operation(
         &grants,
         false,
+        ProductEdition::Full,
         DELETE_ORGANIZATION_DEPARTMENT,
         &[]
     ));

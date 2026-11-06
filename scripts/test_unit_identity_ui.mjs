@@ -82,7 +82,7 @@ await withOfficeUi('unit-identity-ui', async ({ output, url, operations, invoke,
   await manager.reload();
   await manager.locator('summary').filter({ hasText:'本单位权限方案' }).click();
   await manager.getByText('启用 · 1 个单位身份引用',{ exact:true }).waitFor();
-  const axe = require('axe-core'); await manager.addScriptTag({ content:axe.source });
+  const axe = require('axe-core'); await manager.evaluate(axe.source);
   assert.deepEqual((await manager.evaluate(()=>window.axe.run(document.querySelector('main'),{ runOnly:{ type:'tag',values:['wcag2a','wcag2aa'] } }))).violations,[]);
   await manager.screenshot({ path:path.join(output,'unit-scheme-management.png'),fullPage:true });
 });

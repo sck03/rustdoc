@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "policy": "Report templates and formal PDF output use only the three font files listed in this manifest: Noto Sans CJK SC Regular/Bold and Noto Serif CJK SC Regular. Use the bundled Sans Bold face for bold text. Do not add report font dependencies on operating-system fonts or copy unlisted font binaries into a package.",
+  "policy": "UI uses real Sans 400/500/700 and Serif 400 faces as full-glyph WOFF2, losslessly compressed from the pinned OTF by wawoff2 2.0.1. PDF uses the original Sans Regular/Bold and Serif Regular OTF. Do not add report font dependencies on operating-system fonts or copy unlisted font binaries into a package.",
   "sourceRepository": "https://github.com/notofonts/noto-cjk",
   "sourceCommit": "f8d157532fbfaeda587e826d4cd5b21a49186f7c",
   "license": "SIL Open Font License 1.1",
@@ -10,6 +10,7 @@
     {
       "family": "Noto Sans CJK SC",
       "fileName": "NotoSansCJKsc-Regular.otf",
+      "web": { "fileName": "NotoSansCJKsc-Regular.woff2", "sha256": "264ED9286FAF7D057E44574C98BB7EA566D337095474FADB1E6FE3BCAD2D982B" },
       "weight": 400,
       "style": "normal",
       "sha256": "2C76254F6FC379FDDFCE0A7E84FB5385BB135D3E399294F6EEB6680D0365B74B",
@@ -17,7 +18,17 @@
     },
     {
       "family": "Noto Sans CJK SC",
+      "fileName": "NotoSansCJKsc-Medium.otf",
+      "web": { "fileName": "NotoSansCJKsc-Medium.woff2", "sha256": "F91A90900ADA36F34835B71964CC00422B6318D730D52AA518574463E348C979" },
+      "weight": 500,
+      "style": "normal",
+      "sha256": "CA094F6B0001FB048CA39DDD797A0CDB0179E1E55C6561E111C49C3E6A61D7B7",
+      "url": "https://raw.githubusercontent.com/notofonts/noto-cjk/f8d157532fbfaeda587e826d4cd5b21a49186f7c/Sans/OTF/SimplifiedChinese/NotoSansCJKsc-Medium.otf"
+    },
+    {
+      "family": "Noto Sans CJK SC",
       "fileName": "NotoSansCJKsc-Bold.otf",
+      "web": { "fileName": "NotoSansCJKsc-Bold.woff2", "sha256": "1D64728C03DA15A5462DFE8FDF6AACBAD07150DA851950CA0B712E32D18AD108" },
       "weight": 700,
       "style": "normal",
       "sha256": "B5F0D1A190A7F9B43C310A8850630AF12553DF32C4C050543F9059732D9B4C0A",
@@ -26,6 +37,7 @@
     {
       "family": "Noto Serif CJK SC",
       "fileName": "NotoSerifCJKsc-Regular.otf",
+      "web": { "fileName": "NotoSerifCJKsc-Regular.woff2", "sha256": "104465AB02EBEA41AABFC2E4836B675416053386AB6282144C8B9C9871FC0133" },
       "weight": 400,
       "style": "normal",
       "sha256": "2A2EAE2628DF83556C54018C41E20FA532C1B862C5256AE8B3F23FEB918D12CA",

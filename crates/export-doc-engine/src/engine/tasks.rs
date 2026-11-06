@@ -152,9 +152,6 @@ impl Jobs {
             "persistedCounts":self.store.connection()?.job_counts()?,"retainedOutputBytes":self.store.connection()?.job_output_bytes()?,"retainedInputBytes":self.store.connection()?.job_input_bytes()?,"downloadMemory":self.download_budget.snapshot()}),
         )
     }
-    pub fn open(store: Arc<Store>) -> Result<Self> {
-        Self::with_retention(store, Default::default())
-    }
     pub fn with_retention(store: Arc<Store>, retention: retention::Retention) -> Result<Self> {
         let retention = retention.validate()?;
         output::recover(&store)?;
@@ -178,7 +175,8 @@ impl Jobs {
         if let Some(failure) = &runtime.failure {
             return Err(unavailable(failure.clone()));
         }
-        Ok(())
+        drop(runtime);
+        self.completion.health()
     }
 
     pub fn start(
@@ -346,24 +344,10 @@ impl Jobs {
 
     pub fn completed(&self, actor: &Actor, kind: &str, title: &str, detail: &str) -> Result<Value> {
         self.health()?;
-        let job = persistence::create_completed(&self.store, actor, kind, title)?;
+        let job = persistence::create_completed(&self.store, actor, kind, title, detail)?;
         let id = job["jobId"]
             .as_str()
             .ok_or_else(|| unavailable("任务编号缺失。"))?;
-        persistence::finish(
-            &self.store,
-            actor,
-            id,
-            Ok(TaskOutput {
-                file: None,
-                detail: detail.into(),
-                destination: None,
-                directory: None,
-                managed_file: None,
-                publication: None,
-                archive: None,
-            }),
-        )?;
         retention::prune(&self.store, self.retention, chrono::Utc::now())?;
         self.get(actor, id)
     }
@@ -482,15 +466,17 @@ impl Jobs {
                 return Err(error(409, "请先停止任务，再核验输出恢复状态。"));
             }
         }
-        self.store.health()?;
-        output::recover(&self.store)?;
-        persistence::recover(&self.store)?;
-        retention::prune(&self.store, self.retention, chrono::Utc::now())?;
-        self.runtime
-            .lock()
-            .map_err(|_| unavailable("文件任务状态异常。"))?
-            .failure = None;
-        Ok(())
+        self.completion.recover(|| {
+            self.store.health()?;
+            output::recover(&self.store)?;
+            persistence::recover(&self.store)?;
+            retention::prune(&self.store, self.retention, chrono::Utc::now())?;
+            self.runtime
+                .lock()
+                .map_err(|_| unavailable("文件任务状态异常。"))?
+                .failure = None;
+            Ok(())
+        })
     }
 
     pub fn close(&self) -> Result<()> {

@@ -21,7 +21,7 @@ export async function verifyBusinessWorkspaceLayouts({ page, invoke, token, url,
       await page.screenshot({ path: path.join(output, `layout-${name}-${width}.png`), fullPage: true });
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
+    await page.evaluate(require('axe-core').source);
     const violations = await page.evaluate(async () => (await window.axe.run(document.querySelector('main'))).violations.filter(item => ['serious', 'critical'].includes(item.impact)).map(item => ({ id: item.id, targets: item.nodes.map(node => node.target) })));
     assert.deepEqual(violations, [], `${name}: accessibility`);
   };

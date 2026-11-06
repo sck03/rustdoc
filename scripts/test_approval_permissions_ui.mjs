@@ -99,7 +99,7 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   await gm.setViewportSize({ width: 390, height: 844 });
   assert(await gm.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   await gm.screenshot({ path: path.join(output, 'manager-approval-mobile.png'), fullPage: true });
-  const axe = require('axe-core'); await gm.addScriptTag({ content: axe.source });
+  const axe = require('axe-core'); await gm.evaluate(axe.source);
   assert.deepEqual((await gm.evaluate(async () => window.axe.run(document.querySelector('main'), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } }))).violations, []);
   // Account restrictions survive changing the fallback role, and close both UI/API access.
   await accounts.locator('summary').filter({ hasText: '账号单独配置与模块权限' }).click();

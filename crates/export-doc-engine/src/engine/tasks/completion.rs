@@ -7,6 +7,28 @@ use std::time::{Duration, Instant};
 pub(super) struct Completion(RwLock<Option<String>>);
 
 impl Completion {
+    pub(super) fn health(&self) -> Result<()> {
+        match self.0.try_read() {
+            Ok(guard) => match guard.as_ref() {
+                Some(failure) => Err(unavailable(failure.clone())),
+                None => Ok(()),
+            },
+            Err(TryLockError::WouldBlock) => Ok(()),
+            Err(TryLockError::Poisoned(_)) => Err(unavailable("任务发布状态异常。")),
+        }
+    }
+
+    pub(super) fn recover(&self, work: impl FnOnce() -> Result<()>) -> Result<()> {
+        let mut failure = self
+            .0
+            .write()
+            .map_err(|_| unavailable("任务发布状态异常。"))?;
+        // Only a fully verified recovery may clear the publication latch.
+        work()?;
+        *failure = None;
+        Ok(())
+    }
+
     pub(super) fn finish(&self, work: impl FnOnce() -> Result<()>) -> Result<()> {
         let mut failure = self
             .0
@@ -39,5 +61,33 @@ impl Completion {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_successful_recovery_reopens_publication() {
+        let completion = Completion::default();
+        assert!(
+            completion
+                .finish(|| Err(unavailable("cleanup failed")))
+                .is_err()
+        );
+        assert!(completion.health().is_err());
+        assert!(completion.read().is_err());
+        completion.finish(|| Ok(())).unwrap();
+        assert!(completion.read().is_err());
+        assert!(
+            completion
+                .recover(|| Err(unavailable("still damaged")))
+                .is_err()
+        );
+        assert!(completion.health().is_err());
+        completion.recover(|| Ok(())).unwrap();
+        completion.health().unwrap();
+        drop(completion.read().unwrap());
     }
 }

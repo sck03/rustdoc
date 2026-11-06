@@ -11,6 +11,50 @@ use serde_json::{Value, json};
 use std::{collections::BTreeMap, str::FromStr};
 use unicode_normalization::UnicodeNormalization;
 
+fn import_date(raw: &str) -> Option<chrono::NaiveDate> {
+    // Require a four-digit year before chrono parsing, whose %Y is permissive.
+    let separator = ['-', '/', '.'].into_iter().find(|c| raw.contains(*c))?;
+    let parts: Vec<_> = raw.split(separator).collect();
+    if parts.len() != 3
+        || parts
+            .iter()
+            .any(|p| p.is_empty() || !p.bytes().all(|b| b.is_ascii_digit()))
+    {
+        return None;
+    }
+    let (year, month, day) = if parts[0].len() == 4 {
+        (parts[0], parts[1], parts[2])
+    } else if separator == '/' && parts[2].len() == 4 && parts[0].parse::<u32>().ok()? > 12 {
+        // Unambiguous day-first input; 03/04/2026 requires the source to clarify.
+        (parts[2], parts[1], parts[0])
+    } else {
+        return None;
+    };
+    if month.len() > 2 || day.len() > 2 || year == "0000" {
+        return None;
+    }
+    chrono::NaiveDate::from_ymd_opt(year.parse().ok()?, month.parse().ok()?, day.parse().ok()?)
+}
+
+#[cfg(test)]
+mod date_tests {
+    #[test]
+    fn requires_an_unambiguous_four_digit_year() {
+        for value in [
+            "03/04/26",
+            "03/04/2026",
+            "2026-02-29",
+            "0000-01-01",
+            "+2026-01-01",
+        ] {
+            assert!(super::import_date(value).is_none(), "{value}");
+        }
+        for value in ["2026-04-13", "2026/4/13", "2026.04.13", "13/04/2026"] {
+            assert_eq!(super::import_date(value).unwrap().to_string(), "2026-04-13");
+        }
+    }
+}
+
 fn text(cell: Option<&Data>) -> String {
     match cell {
         // Excel stores numeric cells with 15 significant decimal digits. Drop
@@ -90,6 +134,14 @@ fn content_range(range: Range<Data>, total: &mut usize, check: Check<'_>) -> Res
             continue;
         }
         for (col, cell) in cells.iter().enumerate() {
+            if matches!(cell, Data::String(value) if !export_doc_domain::document_text::is_valid(value))
+            {
+                return Err(format!(
+                    "Excel 第 {} 行、第 {} 列含不支持的控制字符，请修正后重试。",
+                    row_offset as usize + row + 1,
+                    col_offset as usize + col + 1
+                ));
+            }
             let value = text(Some(cell));
             if value.is_empty() {
                 continue;
@@ -276,9 +328,7 @@ pub fn preview(
     for key in ["invoiceDate", "shipmentDate"] {
         let raw = header[key].as_str().unwrap_or("").to_owned();
         if !raw.is_empty() {
-            let date = ["%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%d/%m/%Y"]
-                .iter()
-                .find_map(|format| chrono::NaiveDate::parse_from_str(&raw, format).ok());
+            let date = import_date(&raw);
             if let Some(date) = date {
                 header[key] = json!(date.format("%Y-%m-%d").to_string());
             } else {

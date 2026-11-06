@@ -4,6 +4,7 @@
   --edm-font-mono: var(--edm-font-sans);
   --edm-font-size-xs: 12px; --edm-font-size-sm: 13px; --edm-font-size-md: 14px;
   --edm-font-size-lg: 16px; --edm-font-size-xl: 20px; --edm-font-size-2xl: 26px;
-  --edm-font-weight-regular: 400; --edm-font-weight-semibold: 600; --edm-font-weight-bold: 700;
-  --edm-line-height-tight: 1.4; --edm-line-height-normal: 1.57; --edm-line-height-relaxed: 1.5;
+  --edm-font-weight-regular: 400; --edm-font-weight-medium: 500; --edm-font-weight-bold: 700;
+  --edm-line-height-xs: 18px; --edm-line-height-sm: 20px; --edm-line-height-md: 22px;
+  --edm-line-height-lg: 24px; --edm-line-height-xl: 28px; --edm-line-height-2xl: 34px;
 }

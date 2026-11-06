@@ -1,7 +1,7 @@
 :root { color-scheme: light; font-family: var(--edm-font-sans); color: var(--edm-text); background: var(--edm-bg-canvas); font-synthesis: none; }
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; margin: 0; }
-body { font-size: var(--edm-body-size); line-height: var(--edm-line-height-normal); }
+body { font-size: var(--edm-body-size); line-height: var(--edm-body-line-height); }
 button, input, select, textarea { font: inherit; }
 code, pre, kbd, samp { font-family: var(--edm-font-mono); font-variant-numeric: tabular-nums; }
 button { cursor: pointer; }
@@ -9,7 +9,7 @@ button { cursor: pointer; }
   display: inline-flex; align-items: center; justify-content: center; gap: var(--edm-space-2);
   min-height: var(--edm-control-height); padding: 0 var(--edm-space-4);
   border: 1px solid var(--edm-accent); border-radius: var(--edm-radius-md);
-  color: var(--edm-text-inverse); background: var(--edm-accent); font-weight: 600;
+  color: var(--edm-text-inverse); background: var(--edm-accent); font-weight: var(--edm-font-weight-medium);
   text-decoration: none; transition: color var(--edm-motion-fast), background-color var(--edm-motion-fast), border-color var(--edm-motion-fast);
 }
 .command-button.secondary, [data-ui="button"][data-variant="secondary"], .icon-button {
@@ -58,6 +58,6 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 @media (prefers-reduced-motion: reduce) { [aria-busy="true"] > [data-ui="button-indicator"] > svg { animation: none; } }
 @media (max-width: 680px) {
   button, .command-button, .icon-button { min-height: var(--edm-touch-target); min-width: var(--edm-touch-target); }
-  input, select, textarea { font-size: var(--edm-font-size-lg); }
+  input, select, textarea { font-size: var(--edm-font-size-lg); line-height: var(--edm-line-height-lg); }
 }
 @media (forced-colors: active) { :where(button,a,input,select,textarea):focus-visible { outline-color: Highlight; } }

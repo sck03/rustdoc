@@ -88,7 +88,7 @@ try {
       await page.send("Page.navigate", { url });
       await waitForReady(page);
       const fonts = await evaluate(page, `(async () => {
-        const faces = await Promise.all([400, 700].map(weight =>
+        const faces = await Promise.all([400, 500, 700].map(weight =>
           document.fonts.load(weight + ' 14px "ExportDoc Visual Sans"', '中文 Aa0123')));
         return faces.every(matches => matches.length === 1 && matches[0].status === "loaded")
           && getComputedStyle(document.body).fontFamily.startsWith('"ExportDoc Visual Sans"');

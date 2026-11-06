@@ -34,7 +34,7 @@
 .supplier-assessment-summary[data-tone="warning"] { border-top-color: var(--edm-warning); }
 .supplier-assessment-summary > span,
 .supplier-assessment-summary small { color: var(--edm-ink-600); }
-.supplier-assessment-summary strong { color: var(--edm-ink-950); font-size: var(--edm-font-size-2xl); }
+.supplier-assessment-summary strong { color: var(--edm-ink-950); font-size: var(--edm-font-size-2xl); line-height: var(--edm-line-height-2xl); }
 
 .supplier-assessment-analysis-grid {
   display: grid;
@@ -60,7 +60,7 @@
 
 .supplier-analysis-card-header h4,
 .supplier-analysis-card-header p { margin: 0; }
-.supplier-analysis-card-header p { margin-top: 4px; color: var(--edm-ink-600); font-size: var(--edm-font-size-md); }
+.supplier-analysis-card-header p { margin-top: 4px; color: var(--edm-ink-600); font-size: var(--edm-font-size-md); line-height: var(--edm-line-height-md); }
 
 .supplier-dimension-list,
 .supplier-conclusion-list { display: grid; gap: 12px; }
@@ -99,13 +99,13 @@
 .supplier-latest-conclusion { display: flex; gap: 8px; align-items: center; color: var(--edm-ink-600); }
 .supplier-trend-chart { overflow-x: auto; }
 .supplier-trend-chart svg { display: block; width: 100%; min-width: 560px; height: 230px; }
-.supplier-trend-chart text { fill: var(--edm-ink-500); font-size: var(--edm-font-size-xs); }
+.supplier-trend-chart text { fill: var(--edm-ink-500); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
 .supplier-trend-grid-line { stroke: var(--edm-line); stroke-dasharray: 4 5; stroke-width: 1; }
 .supplier-trend-line { fill: none; stroke: var(--edm-primary-600); stroke-linecap: round; stroke-linejoin: round; stroke-width: 3; }
 .supplier-trend-point { fill: var(--edm-bg-surface); stroke: var(--edm-primary-600); stroke-width: 3; }
-.supplier-trend-labels { display: flex; justify-content: space-between; color: var(--edm-ink-600); font-size: var(--edm-font-size-sm); }
+.supplier-trend-labels { display: flex; justify-content: space-between; color: var(--edm-ink-600); font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
 .supplier-single-trend { display: flex; gap: 12px; align-items: baseline; padding: 28px 8px; }
-.supplier-single-trend strong { color: var(--edm-primary-700); font-size: var(--edm-font-size-2xl); }
+.supplier-single-trend strong { color: var(--edm-primary-700); font-size: var(--edm-font-size-2xl); line-height: var(--edm-line-height-2xl); }
 .supplier-single-trend span { color: var(--edm-ink-600); }
 .supplier-assessment-analysis-empty { min-height: 250px; justify-content: center; }
 

@@ -22,13 +22,14 @@ impl References {
             ("report-templates", "document.report-templates"),
             ("template-versions", ""),
         ] {
-            let mut offset = 0;
+            let mut cursor = None;
             loop {
-                let (total, rows) = tx.resource_references(kind, offset, 200)?;
+                let (next, rows) = tx.resource_references(kind, cursor, 200)?;
                 if rows.is_empty() {
                     break;
                 }
-                offset += rows.len() as i64;
+                cursor = next;
+                let last = rows.len() < 200;
                 for record in rows {
                     crate::operation::check()?;
                     let visible = if kind == "report-templates" {
@@ -57,7 +58,7 @@ impl References {
                     }
                     index.all.extend(ids);
                 }
-                if offset >= total {
+                if last {
                     break;
                 }
             }

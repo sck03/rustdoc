@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "prebuild": "node ../../scripts/provision-report-fonts.mjs",
+    "predev": "node ../../scripts/provision-report-fonts.mjs --web",
+    "prebuild": "node ../../scripts/provision-report-fonts.mjs --web",
     "build": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.node.json --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "generate:api": "pwsh -ExecutionPolicy Bypass -File ../../scripts/generate-api-client.ps1",
@@ -56,6 +57,7 @@
     "test:accessibility-contracts": "node ../../scripts/test_frontend_accessibility_scanner.mjs && node ../../scripts/test_frontend_accessibility_contracts.mjs",
     "test:font-policy": "node ../../scripts/verify-font-license-policy.mjs",
     "test:font-build": "node tests/ui/font-build.mjs",
+    "test:web-fonts": "node ../../scripts/test_web_fonts.mjs",
     "test:filter-typography-ui": "node tests/ui/filter-typography-ui.mjs",
     "test:font-policy:release": "node ../../scripts/verify-font-license-policy.mjs --require-files",
     "test:visual-baselines": "node ../../scripts/test_frontend_visual_baselines.mjs",
@@ -100,7 +102,8 @@
     "playwright": "1.64.1",
     "pngjs": "^7.0.0",
     "typescript": "7.0.2",
-    "vite": "8.3.5"
+    "vite": "8.3.5",
+    "wawoff2": "2.0.1"
   },
   "allowScripts": {
     "esbuild@0.28.2": true

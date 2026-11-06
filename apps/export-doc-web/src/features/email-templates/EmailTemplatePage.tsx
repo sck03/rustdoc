@@ -276,7 +276,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
   }
 
   return <EditorWorkspace >
-    <div className="section-heading-row"><div><h2>邮件模板</h2><p>维护单封业务邮件内容；不包含群发、活动、追踪或自动发送。</p></div></div>
+    <div className="section-heading-row"><h2>邮件模板</h2></div>
     <OperationFeedback feedback={feedback} />
     {!templateEditPermission.allowed ? <PermissionNotice>当前权限只允许查看和使用邮件模板；正文编辑、发布、共享和归档分别由服务端能力控制。</PermissionNotice> : null}
     <TaskViewTabs idPrefix={emailTemplateTabsId} value={view} label="邮件模板工作区" onChange={changeView} items={[
@@ -284,7 +284,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
       { id: "variables", label: "变量设置", disabled: !templateViewPermission.allowed }, { id: "preview", label: "预览与套用", disabled: !templateViewPermission.allowed },
       { id: "history", label: "版本历史" },
     ]} />
-    {view === "directory" ? <section className="form-section" {...getTaskViewPanelProps(emailTemplateTabsId, "directory")}><div className="section-header"><div><h3>模板目录</h3><p className="section-description">维护常用的单封业务邮件，不包含群发活动。</p></div><div className="section-header-actions"><span>{visibleTemplates.length} 个</span>{templateEditPermission.allowed ? <button className="primary-button" type="button" onClick={startNewTemplate}>新建模板</button> : null}</div></div>
+    {view === "directory" ? <section className="form-section" {...getTaskViewPanelProps(emailTemplateTabsId, "directory")}><div className="section-header"><h3>模板目录</h3><div className="section-header-actions"><span>{visibleTemplates.length} 个</span>{templateEditPermission.allowed ? <button className="primary-button" type="button" onClick={startNewTemplate}>新建模板</button> : null}</div></div>
       <form className="toolbar" onSubmit={(event) => {
         event.preventDefault();
         void loadTemplates().catch((error) => {
@@ -298,7 +298,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
       </form>
       <ResponsiveTableFrame label="邮件模板列表" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>名称</th><th data-table-priority="secondary">分类</th><th>主题</th><th data-table-priority="secondary">状态与范围</th><th /></tr></thead><tbody>
         {visibleTemplates.map((item) => <tr key={item.id}><td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.category}</td><td><TablePrimaryText value={item.subject} /></td><td data-table-priority="secondary"><div className="table-row-actions"><BusinessStatusBadge value={emailTemplateStatusLabel(item.status)} />{item.shareScope !== "Private" ? <BusinessStatusBadge value={emailTemplateShareScopeLabel(item.shareScope)} /> : null}</div></td><td><button className="secondary-button" type="button" onClick={() => openTemplate(item)}>{item.canEdit ? "编辑" : "查看"}</button></td></tr>)}
-        {!visibleTemplates.length ? <tr><td className="empty-cell" colSpan={5}><div className="empty-cell-content"><strong>{templates.length ? "当前范围没有模板" : "暂无邮件模板"}</strong><span>{templates.length ? "可切换模板范围，或调整搜索和归档状态条件。" : templateEditPermission.allowed ? "先建立一封常用询价、报价或跟进邮件，之后可载入客户变量快速套用。" : "当前没有可查看的邮件模板。"}</span>{!templates.length && templateEditPermission.allowed ? <button className="primary-button" type="button" onClick={startNewTemplate}>建立第一个模板</button> : null}</div></td></tr> : null}
+        {!visibleTemplates.length ? <tr><td className="empty-cell" colSpan={5}><div className="empty-cell-content"><strong>{templates.length ? "当前范围没有模板" : "暂无邮件模板"}</strong>{templates.length ? <span>可切换模板范围，或调整搜索和归档状态条件。</span> : null}</div></td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
     </section> : null}
     {view === "editor" ? <form className="form-grid" onSubmit={save} {...getTaskViewPanelProps(emailTemplateTabsId, "editor")}>

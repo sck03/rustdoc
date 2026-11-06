@@ -167,7 +167,7 @@ await withOfficeUi('oa-completion-ui', async ({output,url,invoke,openPage,requir
   fs.writeFileSync(path.join(output,'header-geometry.json'),JSON.stringify(geometry,null,2));
   assert(geometry.area.width>=160&&geometry.title.left>=geometry.area.left-1&&geometry.title.right<=geometry.area.right+1&&geometry.title.bottom<=geometry.session.top+1,'mobile title and session controls retain separate readable rows');
   assert(await successor.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1));
-  const axe=require('axe-core');await successor.addScriptTag({content:axe.source});
+  const axe=require('axe-core');await successor.evaluate(axe.source);
   assert.deepEqual((await successor.evaluate(()=>window.axe.run(document.querySelector('main'),{runOnly:{type:'tag',values:['wcag2a','wcag2aa']}}))).violations,[]);
   await successor.screenshot({path:path.join(output,'resource-documents-mobile.png'),fullPage:true});
   fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({layouts,hubRequests:hubReads,resources:[roomRequest.id,supplyRequest.id],pdfs:2,success:true},null,2));

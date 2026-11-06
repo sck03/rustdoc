@@ -5,8 +5,64 @@ use std::{
     process::{Child, Command, Stdio},
 };
 
+fn external_url(value: &str) -> Result<url::Url, String> {
+    if value.len() > 8192 || value.chars().any(char::is_control) {
+        return Err("外部链接无效。".into());
+    }
+    let url = url::Url::parse(value).map_err(|_| "外部链接无效。".to_owned())?;
+    if !matches!(url.scheme(), "http" | "https")
+        || url.host_str().is_none()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
+        return Err("只允许不含账号密码的 HTTP 或 HTTPS 链接。".into());
+    }
+    Ok(url)
+}
+
 #[tauri::command]
-pub(crate) fn open_path(path: String) -> Result<(), String> {
+pub(crate) async fn open_external_url(url: String) -> Result<(), String> {
+    let url = external_url(&url)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(windows)]
+        let mut command =
+            Command::new(crate::platform_process::windows_root()?.join("explorer.exe"));
+        #[cfg(target_os = "macos")]
+        let mut command = Command::new("open");
+        #[cfg(all(unix, not(target_os = "macos")))]
+        let mut command = Command::new("xdg-open");
+        command.arg(url.as_str());
+        spawn_detached(command, "系统浏览器")
+    })
+    .await
+    .map_err(|_| "打开外部链接任务未完成。".to_owned())?
+}
+
+#[cfg(test)]
+mod external_tests {
+    use super::external_url;
+    #[test]
+    fn only_web_urls_without_credentials_are_opened() {
+        assert!(external_url("https://example.com/docs?q=中文").is_ok());
+        for invalid in [
+            "file:///secret",
+            "javascript:alert(1)",
+            "https://u:p@example.com",
+            "https://example.com\n",
+        ] {
+            assert!(external_url(invalid).is_err());
+        }
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn open_path(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || open_path_sync(path))
+        .await
+        .map_err(|_| "打开路径任务未完成。".to_owned())?
+}
+
+pub(crate) fn open_path_sync(path: String) -> Result<(), String> {
     let trimmed = path.trim();
     if trimmed.is_empty() {
         return Err("路径不能为空。".to_owned());

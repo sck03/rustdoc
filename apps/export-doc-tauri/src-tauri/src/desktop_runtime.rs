@@ -3,9 +3,9 @@ use export_doc_engine::{engine::NativeService, paths::RuntimePaths};
 use export_doc_server::desktop::DesktopHost;
 use std::sync::{
     Mutex,
-    atomic::{AtomicU8, Ordering},
+    atomic::{AtomicBool, AtomicU8, Ordering},
 };
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,6 +28,7 @@ pub(crate) struct DesktopRuntime {
     context: DesktopRuntimeContext,
     host: Mutex<HostState>,
     shutdown: ShutdownState,
+    failed: std::sync::Arc<AtomicBool>,
 }
 struct HostState {
     host: Option<DesktopHost>,
@@ -80,6 +81,7 @@ impl ShutdownState {
 
 pub(crate) fn start(
     paths: &crate::runtime_paths::RuntimePaths,
+    app: tauri::AppHandle,
 ) -> Result<DesktopRuntime, Box<dyn std::error::Error>> {
     let paths = RuntimePaths::server(&paths.app_root, &paths.data_root)?;
     let log_path = paths
@@ -92,7 +94,15 @@ pub(crate) fn start(
     })?;
     let service =
         NativeService::open_desktop(paths, retention, env!("EXPORTDOCMANAGER_PRODUCT_EDITION"))?;
-    let host = DesktopHost::start(service.clone(), !cfg!(feature = "custom-protocol"))?;
+    let host = DesktopHost::start(
+        service.clone(),
+        !cfg!(feature = "custom-protocol"),
+        move |message| {
+            crate::write_tauri_error(message);
+            let _ = app.emit("exportdoc://backend-stopped", message);
+        },
+    )?;
+    let failed = host.failed.clone();
     Ok(DesktopRuntime {
         service: std::sync::Arc::downgrade(&service),
         context: DesktopRuntimeContext {
@@ -109,6 +119,7 @@ pub(crate) fn start(
             result: None,
         }),
         shutdown: ShutdownState::default(),
+        failed,
     })
 }
 pub(crate) async fn authorize_update(app: &tauri::AppHandle, token: String) -> Result<(), String> {
@@ -134,7 +145,11 @@ pub(crate) fn get_desktop_runtime_context(
     app: tauri::AppHandle,
 ) -> Result<DesktopRuntimeContext, String> {
     if let Some(state) = app.try_state::<DesktopRuntime>() {
-        return Ok(state.context.clone());
+        let mut context = state.context.clone();
+        if state.failed.load(Ordering::Acquire) {
+            context.startup_error = Some("桌面后端异常停止，请重启程序。".into());
+        }
+        return Ok(context);
     }
     let failure = app
         .try_state::<StartupFailure>()
@@ -151,7 +166,11 @@ pub(crate) fn get_desktop_runtime_context(
 }
 #[tauri::command]
 pub(crate) fn restart_after_startup_failure(app: tauri::AppHandle) -> Result<(), String> {
-    if app.try_state::<StartupFailure>().is_none() {
+    if app.try_state::<StartupFailure>().is_none()
+        && !app
+            .try_state::<DesktopRuntime>()
+            .is_some_and(|state| state.failed.load(Ordering::Acquire))
+    {
         return Err("当前程序不在启动失败状态。".into());
     }
     crate::desktop_commands::confirm_app_exit();

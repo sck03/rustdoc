@@ -89,15 +89,6 @@ export function canFillDownSelectedCells(cells: InvoiceItemCellSelection[]) {
   return Array.from(rowsByField.values()).some((rows) => rows.size >= 2);
 }
 
-export function compareInvoiceItemCells(
-  left: InvoiceItemCellSelection,
-  right: InvoiceItemCellSelection,
-  columns = invoiceItemEditableColumns,
-) {
-  const rowDelta = left.rowIndex - right.rowIndex;
-  return rowDelta !== 0 ? rowDelta : getInvoiceItemColumnIndex(left.field, columns) - getInvoiceItemColumnIndex(right.field, columns);
-}
-
 export function buildCellRangeKeys(anchor: InvoiceItemCellSelection, target: InvoiceItemCellSelection, columns = invoiceItemEditableColumns) {
   const anchorColumnIndex = getInvoiceItemColumnIndex(anchor.field, columns);
   const targetColumnIndex = getInvoiceItemColumnIndex(target.field, columns);

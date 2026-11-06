@@ -5,6 +5,7 @@
   border-collapse: collapse;
   table-layout: fixed;
   font-size: inherit;
+  line-height: inherit;
 }
 
 .report-designer-v3-preview-flow-content th {
@@ -68,7 +69,7 @@
   position: absolute;
   z-index: var(--edm-z-sticky);
   font-size: inherit;
-  line-height: 1.25;
+  line-height: inherit;
 }
 
 .report-designer-v3-preview-flow-content .edm-report-grid-diagonal-upper-left {
@@ -105,7 +106,7 @@
   background: var(--edm-white);
   border: 2px solid var(--edm-primary-600);
   border-radius: var(--edm-radius-xs);
-  line-height: 1.5;
+  line-height: inherit;
   outline: none;
 }
 
@@ -115,7 +116,7 @@
 .edm-detail-omit-empty-lines > .edm-detail-composite-line:not(:has(span:not(:empty))) { display: none; }
 .report-designer-product-guides { position: absolute; inset: 0; pointer-events: none; }
 .report-designer-product-row-end { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--edm-primary-650); }
-.report-designer-product-row-label { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--edm-primary-650); color: var(--edm-primary-650); font-size: var(--edm-font-size-xs); transform: translateY(-100%); }
+.report-designer-product-row-label { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--edm-primary-650); color: var(--edm-primary-650); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); transform: translateY(-100%); }
 .report-designer-v3-element.is-product-field { outline: 1px dashed var(--edm-primary-650); }
 .report-designer-v3-advanced-tools { position: relative; }
 .report-designer-v3-advanced-tools > summary { cursor: pointer; padding: 8px 12px; }

@@ -297,14 +297,7 @@ pub(super) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 /// 生成临时工作目录（随调用方清理）。
 pub(super) fn working_directory(parent: &Path) -> Result<PathBuf> {
-    crate::paths::ensure_safe_absolute(parent).map_err(invalid)?;
-    let directory = parent.join(format!(
-        ".work-{}",
-        crate::paths::nonce().map_err(|cause| unavailable(cause))?
-    ));
-    fs::create_dir_all(&directory)?;
-    crate::paths::ensure_safe_absolute(&directory).map_err(invalid)?;
-    Ok(directory)
+    super::scratch::create(parent, ".work-")
 }
 
 #[cfg(test)]

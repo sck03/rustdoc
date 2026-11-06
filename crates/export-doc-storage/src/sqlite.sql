@@ -1,7 +1,7 @@
 PRAGMA foreign_keys = ON;
 CREATE TABLE schema_model (version INTEGER PRIMARY KEY,model TEXT NOT NULL,shape TEXT NOT NULL);
-CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 13));
-INSERT INTO schema_version VALUES (13);
+CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 14));
+INSERT INTO schema_version VALUES (14);
 CREATE TABLE records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL,
@@ -16,6 +16,7 @@ CREATE TABLE records (
         THEN template_normalize(record_json(body)) ELSE NULL END
     ) STORED,
     UNIQUE(kind, identity),
+    CHECK(kind<>'attachments' OR COALESCE(json_type(body,'$.invoiceId')='integer' AND typeof(json_extract(body,'$.invoiceId'))='integer' AND json_extract(body,'$.invoiceId')>0,0)),
     CHECK(kind<>'people' OR json_remove(COALESCE(body->>'profile','{}'),'$.fullName','$.workEmail','$.workPhone','$.workLocation')='{}')
 );
 CREATE TABLE personnel_private_profiles (
@@ -23,6 +24,7 @@ CREATE TABLE personnel_private_profiles (
     body TEXT NOT NULL CHECK(json_valid(body) AND json_type(body)='object')
 );
 CREATE INDEX records_kind_id ON records(kind, id DESC);
+CREATE INDEX attachment_invoice ON records(json_extract(body,'$.invoiceId')) WHERE kind='attachments';
 CREATE INDEX records_scope ON records(kind, company, department, owner_id);
 CREATE INDEX records_company_page ON records(kind, company, id DESC);
 CREATE TABLE organization_units (

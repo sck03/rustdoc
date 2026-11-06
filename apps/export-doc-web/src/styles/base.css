@@ -81,7 +81,8 @@ samp {
   min-height: 42px;
   padding: 0 12px;
   font-size: var(--edm-font-size-md);
-  font-weight: 700;
+  line-height: var(--edm-line-height-md);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .nav-list {
@@ -111,7 +112,8 @@ samp {
   min-height: 38px;
   padding: 0 12px;
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .nav-item {
@@ -120,6 +122,7 @@ samp {
   min-height: 34px;
   padding: 0 12px;
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -175,21 +178,24 @@ samp {
   margin: 0 0 4px;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 h1,
 h2 {
   margin: 0;
   color: var(--edm-ink-950);
-  font-weight: 700;
+  font-weight: var(--edm-font-weight-medium);
 }
 
 h1 {
   font-size: var(--edm-font-size-xl);
+  line-height: var(--edm-line-height-xl);
 }
 
 h2 {
   font-size: var(--edm-font-size-lg);
+  line-height: var(--edm-line-height-lg);
 }
 
 .session-strip {
@@ -197,6 +203,7 @@ h2 {
   min-width: 0;
   color: var(--edm-neutral-600);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .api-base {
@@ -262,7 +269,8 @@ h2 {
   border: 0;
   border-radius: 0;
   font-size: var(--edm-font-size-sm);
-  font-weight: 600;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .segmented-control button + button {
@@ -300,6 +308,7 @@ h2 {
   padding: 0 12px;
   border-radius: var(--edm-radius-sm);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .table-frame {
@@ -334,12 +343,14 @@ th {
   color: var(--edm-neutral-650);
   background: var(--edm-neutral-100);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 td {
   color: var(--edm-neutral-850);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -359,7 +370,7 @@ tbody tr:hover {
 }
 
 .strong-cell {
-  font-weight: 700;
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .amount-cell {

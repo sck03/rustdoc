@@ -278,7 +278,6 @@ export interface ApiBackupCreateResponse {
 }
 
 export interface ApiBackupItemDto {
-  createdAt: string;
   fileName: string;
   fullPath: string;
   lastWriteTime: string;
@@ -3245,7 +3244,6 @@ export interface ApiSettingsValidationResponse {
 }
 
 export interface ApiSharedDatabaseBackupItemDto {
-  createdAt: string;
   fileName: string;
   fullPath: string;
   lastWriteTime: string;

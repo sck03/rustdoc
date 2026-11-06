@@ -62,6 +62,7 @@
   margin: 0;
   color: var(--edm-neutral-850);
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
 }
 
 .audit-log-maintenance-card-heading p,
@@ -69,7 +70,7 @@
   margin: 4px 0 0;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.55;
+  line-height: var(--edm-line-height-xs);
 }
 
 .audit-log-export-path-filter input {
@@ -97,7 +98,7 @@
   margin: 0;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.55;
+  line-height: var(--edm-line-height-xs);
 }
 
 .audit-log-retention-filter {
@@ -119,7 +120,8 @@
 .audit-log-number-field > span {
   color: var(--edm-neutral-600);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .audit-log-advanced-maintenance {
@@ -138,7 +140,8 @@
   color: var(--edm-earth-700);
   cursor: pointer;
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .audit-log-advanced-maintenance-content {
@@ -157,6 +160,7 @@
 .audit-log-advanced-maintenance-content strong {
   color: var(--edm-earth-900);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .audit-log-advanced-maintenance-content ul {
@@ -177,6 +181,7 @@
   border: 1px solid var(--edm-danger-100);
   border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .audit-log-filter-hint {
@@ -193,7 +198,7 @@
   border: 1px solid var(--edm-neutral-250);
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.5;
+  line-height: var(--edm-line-height-xs);
   max-height: min(44vh, 320px);
   overflow: auto;
   overscroll-behavior: contain;
@@ -244,6 +249,7 @@
 .audit-log-detail h2 {
   margin: 0;
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
 }
 
 .audit-log-detail span {
@@ -251,6 +257,7 @@
   margin-top: 4px;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .audit-log-detail pre {
@@ -262,7 +269,7 @@
   background: var(--edm-neutral-25);
   font-family: var(--edm-font-mono);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.55;
+  line-height: var(--edm-line-height-xs);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -377,7 +384,8 @@
     display: block;
     color: var(--edm-ink-700);
     font-size: var(--edm-font-size-sm);
-    font-weight: 700;
+    line-height: var(--edm-line-height-sm);
+    font-weight: var(--edm-font-weight-medium);
   }
 
   .query-advanced-filters {
@@ -407,6 +415,7 @@
     content: "›";
     color: var(--edm-text-secondary);
     font-size: var(--edm-font-size-xl);
+    line-height: var(--edm-line-height-xl);
     transition: transform 140ms ease;
   }
 
@@ -416,14 +425,16 @@
 
   .query-advanced-filter-summary span {
     font-size: var(--edm-font-size-sm);
-    font-weight: 700;
+    line-height: var(--edm-line-height-sm);
+    font-weight: var(--edm-font-weight-medium);
   }
 
   .query-advanced-filter-summary small {
     margin-left: auto;
     color: var(--edm-text-secondary);
     font-size: var(--edm-font-size-xs);
-    font-weight: 600;
+    line-height: var(--edm-line-height-xs);
+    font-weight: var(--edm-font-weight-medium);
   }
 
   .query-advanced-filter-grid {
@@ -478,7 +489,8 @@
   padding: 4px 12px;
   color: var(--edm-ink-800);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
   cursor: pointer;
   list-style: none;
   user-select: none;
@@ -493,7 +505,7 @@
   flex: 0 0 auto;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-lg);
-  line-height: 1;
+  line-height: var(--edm-line-height-lg);
   transform: rotate(0deg);
   transition: transform 140ms ease;
 }
@@ -506,6 +518,7 @@
   margin-left: auto;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   font-weight: 400;
 }
 

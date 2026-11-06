@@ -1,3 +1,4 @@
+import { ExternalAnchor } from "../../ui/ExternalAnchor.tsx";
 import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { RefreshCw, Settings } from "lucide-react";
 import "../../styles/tools-ocr-exchange.css";
@@ -55,7 +56,7 @@ export function ExchangeRatePage({ client, canManageSettings = false }: { client
       </section>
       <details className="form-section"><summary>来源说明与可用货币</summary>
         <p className="field-hint">{result?.storagePolicy || "报价不自动改写已保存单据中的汇率。"}</p>
-        {source && <p><a href={source} target="_blank" rel="noreferrer">查看原始来源</a></p>}
+        {source && <p><ExternalAnchor href={source} >查看原始来源</ExternalAnchor></p>}
         {(result?.sourceFormat ?? configuration?.sourceFormat) === "BankOfChinaHtml" && <p className="field-hint">中行牌价仅供参考，实际结购汇以银行交易报价为准。使用前请遵守来源网站规则；未经中国银行许可，不得以商业目的转载其汇率表。</p>}
         <div className="currency-chip-list">{result?.availableCurrencies?.map(currency => <span key={currency}>{currency}</span>)}</div>
       </details>

@@ -315,9 +315,6 @@ impl ApprovalPlan {
     }
     /// A delegated signature counts as the actual person's signature when
     /// deciding both new assignments and whether a waiting task is actionable.
-    pub fn independent_signer_conflict(&self, node: usize, user: i64) -> bool {
-        self.signer_conflict(node, user, None)
-    }
     pub fn signer_conflict(&self, node: usize, user: i64, person: Option<i64>) -> bool {
         self.steps.iter().any(|step| {
             (step.acted_by_user_id == Some(user)

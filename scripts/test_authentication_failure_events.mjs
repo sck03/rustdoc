@@ -55,5 +55,23 @@ const abortedRequest=abortedClient.getCurrentUser({signal:abort.signal}).catch((
 await requestStarted;
 abort.abort();resolveResponse(unauthorized());await abortedRequest;await new Promise(resolve=>setTimeout(resolve,0));
 assert(failures===1,"an aborted request must not invalidate an active session");
+let token = "before-renewal", sentAuthorization;
+requestStarted = new Promise(resolve => { signalStarted = resolve; });
+const renewingClient = createSessionApiClient({ baseUrl: "http://localhost", accessToken: () => token,
+  fetch: (input, init) => { sentAuthorization = new Headers(init.headers).get("authorization"); return delayedFetch(); }
+}, requestToken => requestToken === token);
+const renewingRequest = renewingClient.getCurrentUser().catch(() => {});
+await requestStarted;
+assert(sentAuthorization === "Bearer before-renewal", "request must bind the token actually sent");
+token = "after-renewal";
+resolveResponse(unauthorized());
+await renewingRequest; await new Promise(resolve => setTimeout(resolve, 0));
+assert(failures === 1, "a delayed 401 must not expire a renewed token on the same client");
+requestStarted = new Promise(resolve => { signalStarted = resolve; });
+const nextRequest = renewingClient.getCurrentUser().catch(() => {});
+await requestStarted;
+assert(sentAuthorization === "Bearer after-renewal", "the stable client must send the renewed token");
+resolveResponse(unauthorized()); await nextRequest; await new Promise(resolve => setTimeout(resolve, 0));
+assert(failures === 2, "a 401 for the renewed token still expires the current session");
 releaseListener();
 process.stdout.write("authentication failure event tests passed\n");

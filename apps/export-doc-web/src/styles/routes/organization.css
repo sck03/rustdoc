@@ -6,9 +6,9 @@
   .organization-section .text-button { justify-self: start; }
   .organization-heading,
 .organization-company-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-  .organization-heading h2 { margin: 0 0 4px; font-size: var(--edm-font-size-lg); }
+  .organization-heading h2 { margin: 0 0 4px; font-size: var(--edm-font-size-lg); line-height: var(--edm-line-height-lg); }
   .organization-heading h3,
-.organization-company-title h3 { margin: 0; font-size: var(--edm-font-size-md); }
+.organization-company-title h3 { margin: 0; font-size: var(--edm-font-size-md); line-height: var(--edm-line-height-md); }
   .organization-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
   .organization-workspace .text-button { min-height: 30px; padding: 4px 8px; border: 0; border-radius: var(--edm-radius-xs); background: transparent; color: var(--edm-primary-750); font: inherit; cursor: pointer; }
   @media (hover: hover) and (pointer: fine) {
@@ -20,7 +20,7 @@
 .organization-departments { min-width: 0; border: 1px solid var(--edm-line); border-radius: var(--edm-radius-lg); background: var(--edm-bg-surface); }
   .organization-company-directory { display: grid; gap: 12px; padding: 12px; }
   .organization-company-directory-title { display: flex; justify-content: space-between; align-items: center; color: var(--edm-text-secondary); }
-  .organization-company-directory input { min-width: 0; width: 100%; min-height: 34px; padding: 8px 8px; border: 1px solid var(--edm-line); border-radius: var(--edm-radius-sm); background: var(--edm-bg-muted); font-size: var(--edm-font-size-sm); }
+  .organization-company-directory input { min-width: 0; width: 100%; min-height: 34px; padding: 8px 8px; border: 1px solid var(--edm-line); border-radius: var(--edm-radius-sm); background: var(--edm-bg-muted); font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
   .organization-company-list { display: grid; align-content: start; gap: 4px; max-height: 65dvh; overflow-y: auto; list-style: none; padding: 0; margin: 0; }
   .organization-company-list button { display: flex; gap: 8px; align-items: center; width: 100%; min-width: 0; padding: 8px 8px; text-align: start; color: var(--edm-text); border: 1px solid transparent; border-radius: var(--edm-radius-sm); background: transparent; }
   .organization-company-list button[aria-pressed="true"] { color: var(--edm-primary-750); background: var(--edm-primary-50); border-color: var(--edm-primary-200); }
@@ -29,11 +29,11 @@
   }
   .organization-company-list button > span { display: grid; flex: 1; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
   .organization-company-list button > svg { flex-shrink: 0; }
-  .organization-company-list small { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); }
+  .organization-company-list small { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
   .organization-company-switch { display: none; }
   .organization-departments { display: grid; align-content: start; gap: 12px; padding: 16px; }
   .organization-company-summary { padding-bottom: 12px; border-bottom: 1px solid var(--edm-line); }
-  .organization-company-summary > p { flex-basis: 100%; font-size: var(--edm-font-size-xs); }
+  .organization-company-summary > p { flex-basis: 100%; font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
   .organization-company-title { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
   .organization-company-title h3 { overflow-wrap: anywhere; }
   .organization-company-title > svg { color: var(--edm-primary-650); flex-shrink: 0; }
@@ -41,14 +41,14 @@
   .organization-search > svg { flex-shrink: 0; color: var(--edm-text-secondary); }
   .organization-search input { flex: 1; min-width: 0; border: 0; background: transparent; }
   .organization-tree-workspace { display: grid; gap: 8px; min-width: 0; }
-  .organization-tree-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: var(--edm-font-size-xs); }
-  .organization-tree-toolbar .text-button { padding: 4px 4px; font-size: var(--edm-font-size-xs); }
+  .organization-tree-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
+  .organization-tree-toolbar .text-button { padding: 4px 4px; font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
   .organization-tree-scroll { min-width: 0; max-height: 65dvh; overflow: auto; border: 1px solid var(--edm-line); border-radius: var(--edm-radius-sm); }
-  .organization-tree-table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; font-size: var(--edm-font-size-sm); }
+  .organization-tree-table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
   .organization-manager-column { width: 7rem; }
   .organization-status-column { width: 3.7rem; }
   .organization-actions-column { width: 7.2rem; }
-  .organization-tree-table th { position: sticky; top: 0; z-index: var(--edm-z-sticky); padding: 8px 8px; text-align: start; background: var(--edm-bg-muted); color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); }
+  .organization-tree-table th { position: sticky; top: 0; z-index: var(--edm-z-sticky); padding: 8px 8px; text-align: start; background: var(--edm-bg-muted); color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
   .organization-tree-table td { padding: 4px 8px; border-bottom: 1px solid var(--edm-line); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .organization-tree-table tr:last-child td { border-bottom: 0; }
   @media (hover: hover) and (pointer: fine) {
@@ -59,18 +59,18 @@
   .organization-node-name { flex: 1; min-width: 0; min-height: 32px; padding: 0; border: 0; background: transparent; color: var(--edm-text); text-align: start; }
   .organization-node-name strong,
 .organization-node-name small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .organization-node-name strong { font-size: var(--edm-font-size-sm); font-weight: var(--edm-font-weight-bold); line-height: 1.35; }
+  .organization-node-name strong { font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); font-weight: var(--edm-font-weight-medium); }
   .organization-node-name small,
-.organization-child-count { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); line-height: 1.25; }
+.organization-child-count { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
   .organization-row-actions { display: flex; gap: 4px; }
   .organization-row-actions .icon-button,
 .organization-expand { width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 4px; }
   .organization-expand { flex: 0 0 32px; border-color: transparent; background: transparent; }
   .organization-leaf { flex: 0 0 32px; }
-  .organization-state { display: inline-flex; padding: 4px 4px; border-radius: var(--edm-radius-xs); font-size: var(--edm-font-size-xs); color: var(--edm-text-secondary); background: var(--edm-bg-muted); }
+  .organization-state { display: inline-flex; padding: 4px 4px; border-radius: var(--edm-radius-xs); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); color: var(--edm-text-secondary); background: var(--edm-bg-muted); }
   .organization-state[data-active="true"] { color: var(--edm-primary-750); background: var(--edm-primary-50); }
-  .organization-selection-path { display: grid; gap: 4px; min-width: 0; padding: 8px 0; color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); overflow-wrap: anywhere; }
-  .organization-selection-path strong { color: var(--edm-text); font-weight: var(--edm-font-weight-semibold); }
+  .organization-selection-path { display: grid; gap: 4px; min-width: 0; padding: 8px 0; color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); overflow-wrap: anywhere; }
+  .organization-selection-path strong { color: var(--edm-text); font-weight: var(--edm-font-weight-medium); }
   .organization-managers { display: grid; gap: 12px; margin-block: 16px; padding: 0; list-style: none; }
   .organization-managers button { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; width: 100%; text-align: start; }
   @media (max-width: 1180px) {

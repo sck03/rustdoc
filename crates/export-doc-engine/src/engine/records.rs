@@ -528,6 +528,9 @@ pub(super) fn normalize(value: &mut Value, depth: usize) -> Result<()> {
             if text.len() > 2 * 1024 * 1024 {
                 return Err(invalid("单个字段超出容量。"));
             }
+            if !export_doc_domain::document_text::is_valid(text) {
+                return Err(invalid("文本包含不支持的控制字符，请删除后重试。"));
+            }
             *text = text.nfc().collect::<String>().trim().to_owned();
         }
         Value::Array(values) => {

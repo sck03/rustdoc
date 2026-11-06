@@ -47,12 +47,7 @@ fn any_text(
     let tests = paths
         .iter()
         .map(|path| {
-            let expression = field(path, pg);
-            let expression = if item {
-                expression.replace("r.body", "item.value")
-            } else {
-                expression
-            };
+            let expression = sql::field_from(if item { "item.value" } else { "r.body" }, path, pg);
             if prefix {
                 let expression = sql::normalized(&format!("COALESCE({expression},'')"), pg);
                 format!("substr({expression},1,length({parameter}))={parameter}")
@@ -74,7 +69,12 @@ fn items(test: String, pg: bool) -> String {
 }
 pub(crate) fn build(q: &BusinessQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
     let mut values = Vec::new();
-    let scope = q.scope.filter(&mut values, pg);
+    let record = if matches!(q.list, BusinessList::Attachments { .. }) {
+        "invoice"
+    } else {
+        "r"
+    };
+    let scope = q.scope.filter_for(&mut values, pg, record);
     let mut clauses = vec![];
     let order;
     match &q.list {
@@ -130,7 +130,7 @@ pub(crate) fn build(q: &BusinessQuery<'_>, pg: bool) -> Result<(QuerySql, String
         } => {
             clauses.push("r.kind='attachments'".into());
             // Apply invoice scope inside the correlated lookup, before count/page.
-            let invoice_scope = scope.replace("r.", "invoice.");
+            let invoice_scope = scope;
             clauses.push(format!("EXISTS (SELECT 1 FROM record_rows invoice WHERE invoice.kind='invoices' AND invoice.id=CAST({} AS BIGINT) AND {invoice_scope})",field("invoiceId",pg)));
             for (path, id) in [("invoiceId", invoice_id), ("categoryId", category_id)] {
                 if let Some(id) = id {

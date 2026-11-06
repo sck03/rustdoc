@@ -193,7 +193,7 @@ async fn desktop_http_preserves_original_login_and_rejects_untrusted_callers() {
 #[test]
 fn desktop_host_binds_loopback_and_stops_the_listener() {
     let fixture = Fixture::new();
-    let host = DesktopHost::start(fixture.service.clone(), false).unwrap();
+    let host = DesktopHost::start(fixture.service.clone(), false, |_| {}).unwrap();
     let address: std::net::SocketAddr = host
         .api_base_url
         .strip_prefix("http://")

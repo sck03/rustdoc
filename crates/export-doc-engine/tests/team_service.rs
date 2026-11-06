@@ -64,6 +64,17 @@ use std::{path::PathBuf, sync::Arc};
 
 use oa_contract::call;
 
+fn phase<T>(name: &str, run: impl FnOnce() -> T) -> T {
+    let start = std::time::Instant::now();
+    eprintln!("PostgreSQL workflow phase: {name}");
+    let result = run();
+    eprintln!(
+        "PostgreSQL workflow phase complete: {name} ({:.1}s)",
+        start.elapsed().as_secs_f64()
+    );
+    result
+}
+
 #[test]
 #[ignore = "requires an isolated PostgreSQL 18 database"]
 fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
@@ -108,11 +119,21 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
             .is_none()
     );
     let token = admin["accessToken"].as_str().unwrap();
-    advanced_workflow_contract::exercise(&service, token);
-    oa_review_contract::exercise(&service, token);
-    material_contract::exercise(&service, token);
-    workflow_operations_contract::exercise(&service, token);
-    permission_identity_contract::exercise(&service, token);
+    phase("advanced_workflow_contract::exercise", || {
+        advanced_workflow_contract::exercise(&service, token)
+    });
+    phase("oa_review_contract::exercise", || {
+        oa_review_contract::exercise(&service, token)
+    });
+    phase("material_contract::exercise", || {
+        material_contract::exercise(&service, token)
+    });
+    phase("workflow_operations_contract::exercise", || {
+        workflow_operations_contract::exercise(&service, token)
+    });
+    phase("permission_identity_contract::exercise", || {
+        permission_identity_contract::exercise(&service, token)
+    });
     invoice_clone_contract::exercise(&|operation, parameters, query, body| {
         let bytes = service.dispatch(operation, parameters, query, body, token)?;
         Ok(serde_json::from_slice(&bytes).unwrap())
@@ -313,23 +334,57 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
         &|op, id, query, body| request(staff_token, op, id, query, body),
         &|op, id, query, body| request(&reviewer_token, op, id, query, body),
     );
-    oa_contract::exercise(&service, admin_token, staff_token, None);
-    oa_archive_contract::exercise(&service, admin_token, staff_token, None);
-    approval_contract::exercise(&service, admin_token);
-    organization_workflow_contract::exercise(&service, admin_token);
-    oa_integration_contract::exercise(&service, admin_token);
-    organization_workflow_contract::exercise_nodes(&service, admin_token);
-    personnel_scope_contract::exercise(&service, admin_token);
-    handling_contract::exercise(&service, admin_token);
-    communication_contract::exercise(&service, admin_token);
-    account_scope::exercise(&service, admin_token);
-    template_contract::exercise(&service, admin_token);
-    account_permissions::exercise(&service, admin_token);
-    personnel_contract::exercise(&service, admin_token);
-    identity_contract::exercise(&service, admin_token);
-    personnel_policy_contract::exercise(&service, admin_token);
-    appointment_contract::exercise(&service, admin_token);
-    unit_contract::exercise(&service, admin_token);
+    phase("oa_contract::exercise", || {
+        oa_contract::exercise(&service, admin_token, staff_token, None)
+    });
+    phase("oa_archive_contract::exercise", || {
+        oa_archive_contract::exercise(&service, admin_token, staff_token, None)
+    });
+    phase("approval_contract::exercise", || {
+        approval_contract::exercise(&service, admin_token)
+    });
+    phase("organization_workflow_contract::exercise", || {
+        organization_workflow_contract::exercise(&service, admin_token)
+    });
+    phase("oa_integration_contract::exercise", || {
+        oa_integration_contract::exercise(&service, admin_token)
+    });
+    phase("organization_workflow_contract::exercise_nodes", || {
+        organization_workflow_contract::exercise_nodes(&service, admin_token)
+    });
+    phase("personnel_scope_contract::exercise", || {
+        personnel_scope_contract::exercise(&service, admin_token)
+    });
+    phase("handling_contract::exercise", || {
+        handling_contract::exercise(&service, admin_token)
+    });
+    phase("communication_contract::exercise", || {
+        communication_contract::exercise(&service, admin_token)
+    });
+    phase("account_scope::exercise", || {
+        account_scope::exercise(&service, admin_token)
+    });
+    phase("template_contract::exercise", || {
+        template_contract::exercise(&service, admin_token)
+    });
+    phase("account_permissions::exercise", || {
+        account_permissions::exercise(&service, admin_token)
+    });
+    phase("personnel_contract::exercise", || {
+        personnel_contract::exercise(&service, admin_token)
+    });
+    phase("identity_contract::exercise", || {
+        identity_contract::exercise(&service, admin_token)
+    });
+    phase("personnel_policy_contract::exercise", || {
+        personnel_policy_contract::exercise(&service, admin_token)
+    });
+    phase("appointment_contract::exercise", || {
+        appointment_contract::exercise(&service, admin_token)
+    });
+    phase("unit_contract::exercise", || {
+        unit_contract::exercise(&service, admin_token)
+    });
     service.close().unwrap();
     drop(Arc::clone(&service));
     drop(service);

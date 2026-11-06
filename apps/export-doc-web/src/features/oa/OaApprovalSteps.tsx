@@ -5,7 +5,7 @@ export function OaApprovalSteps({plan,notes,user}:{plan?:OaApprovalPlan;notes?:s
   return <>
     {Boolean(notes?.length)&&<section className="oa-detail-content" aria-label="审批路由说明"><h3>审批路由说明</h3><ul>{notes!.map((n,i)=><li key={i}>{n}</li>)}</ul></section>}
     {plan&&<section className="oa-detail-content" aria-label="审批步骤"><h3>审批流程 · {plan.policyVersion === 0 ? "草稿模拟" : `版本 ${plan.policyVersion}`}</h3>
-      <ol className="oa-history">{plan.nodes.map((node,index)=><li key={node.key}><strong>{node.name}</strong> · {node.phase==="Fulfillment"?"获批办理":"审批决定"} · {workflowKinds[node.kind??"Approval"]}
+      <ol className="oa-history oa-approval-timeline" role="list">{plan.nodes.map((node,index)=><li key={node.key}><strong>{node.name}</strong> · {node.phase==="Fulfillment"?"获批办理":"审批决定"} · {workflowKinds[node.kind??"Approval"]}
         {Boolean(node.reviewPoints?.length) && <div><span>审批要点</span><ul>{node.reviewPoints?.map((point,i)=><li key={i}>{point}</li>)}</ul></div>}
         {node.skipped?<p>已回避或条件不满足，跳过此节点。</p>:<><p>{node.startedAt?`开始：${formatBusinessDateTime(node.startedAt,user.businessTimeZone)}；期限：${formatBusinessDateTime(node.dueAt,user.businessTimeZone)}`:"等待前置节点完成"}</p>
           {(node.escalationCursor??0)>0&&<p>已执行 {node.escalationCursor} 级超时处置{node.nextEscalationAt?`；下次处置：${formatBusinessDateTime(node.nextEscalationAt,user.businessTimeZone)}`:""}</p>}

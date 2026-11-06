@@ -5,6 +5,8 @@ use crate::{
 };
 use rust_decimal::{Decimal, RoundingStrategy};
 
+pub const UNIT_PRICE_SCALE: u32 = 5;
+
 fn round(value: Decimal, digits: u32) -> Decimal {
     value.round_dp_with_strategy(digits, RoundingStrategy::MidpointAwayFromZero)
 }
@@ -19,7 +21,7 @@ pub fn normalize_item(item: &mut ApiInvoiceItemDto) -> Result<(), String> {
     match item.price_calculation_mode.as_str() {
         "" | "UnitPriceDriven" => {
             item.price_calculation_mode = "UnitPriceDriven".into();
-            item.unit_price = round(item.unit_price, 5);
+            item.unit_price = round(item.unit_price, UNIT_PRICE_SCALE);
             item.total_price = money(multiply(item.quantity, item.unit_price)?);
         }
         "LineAmountDriven" => {
@@ -29,7 +31,7 @@ pub fn normalize_item(item: &mut ApiInvoiceItemDto) -> Result<(), String> {
                     item.total_price
                         .checked_div(item.quantity)
                         .ok_or("单价计算超出范围。")?,
-                    5,
+                    UNIT_PRICE_SCALE,
                 )
             } else {
                 Decimal::ZERO

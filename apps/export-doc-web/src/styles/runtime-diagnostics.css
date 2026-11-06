@@ -42,13 +42,14 @@
 .runtime-dependency-card p {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-sm);
-  line-height: 1.55;
+  line-height: var(--edm-line-height-sm);
 }
 
 .runtime-dependency-heading > span {
   color: var(--edm-neutral-600);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -80,7 +81,8 @@
   min-height: 24px;
   padding: 0 8px;
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   white-space: nowrap;
   border-radius: var(--edm-radius-full);
 }
@@ -107,6 +109,7 @@
   color: var(--edm-neutral-700);
   font-family: var(--edm-font-mono);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -124,13 +127,15 @@
 .runtime-overview-item span {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .runtime-overview-item strong {
   overflow: hidden;
   color: var(--edm-neutral-750);
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -195,13 +200,14 @@
 .runtime-path-group-title h3 {
   color: var(--edm-neutral-750);
   font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
 }
 
 .runtime-path-group-title p {
   margin-top: 4px;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.5;
+  line-height: var(--edm-line-height-xs);
 }
 
 .runtime-path-group-count {
@@ -211,7 +217,8 @@
   background: var(--edm-ink-100);
   border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .runtime-path-list {
@@ -242,12 +249,13 @@
 .runtime-path-name strong {
   color: var(--edm-neutral-750);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .runtime-path-name span {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.45;
+  line-height: var(--edm-line-height-xs);
 }
 
 .runtime-path-value {
@@ -256,6 +264,7 @@
   color: var(--edm-neutral-700);
   font-family: var(--edm-font-mono);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -277,7 +286,8 @@
   padding: 0 8px;
   border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -335,10 +345,11 @@
 
 .runtime-template-storage-result strong {
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .runtime-template-storage-result span {
-  line-height: 1.5;
+  line-height: inherit;
 }
 
 .runtime-template-storage-path {
@@ -352,6 +363,7 @@
   max-width: 420px;
   overflow: hidden;
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

@@ -232,6 +232,11 @@ impl Parameter {
 pub struct RequestBody {
     pub required: bool,
     pub content: Content,
+    #[serde(
+        rename = "x-exportdoc-max-bytes",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub max_bytes: Option<usize>,
 }
 #[derive(Clone, Serialize)]
 pub struct Capability {
@@ -315,7 +320,19 @@ impl Endpoint {
         self
     }
     pub fn body(mut self, required: bool, content: Content) -> Self {
-        self.operation.body = Some(RequestBody { required, content });
+        self.operation.body = Some(RequestBody {
+            required,
+            content,
+            max_bytes: None,
+        });
+        self
+    }
+    pub fn body_limit(mut self, bytes: usize) -> Self {
+        self.operation
+            .body
+            .as_mut()
+            .expect("body limit requires a body")
+            .max_bytes = Some(bytes);
         self
     }
     pub fn office(
@@ -372,6 +389,7 @@ pub fn route(
     endpoint.operation.body = body.map(|schema| RequestBody {
         required: true,
         content: BTreeMap::from([("application/json", Media { schema })]),
+        max_bytes: None,
     });
     endpoint
 }

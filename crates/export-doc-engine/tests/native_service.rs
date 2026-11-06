@@ -9,6 +9,65 @@ fn resource_reviewer(fixture: &Fixture) -> ApiClient {
 }
 
 #[test]
+fn profit_display_rounds_midpoints_without_truncating() {
+    let fixture = Fixture::new();
+    let mut invoice = serde_json::to_value(
+        InvoiceDraft::demo("2026-11-06", "ROUND-PROFIT")
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+    invoice["items"].as_array_mut().unwrap().truncate(1);
+    invoice["items"][0]["quantity"] = json!(1);
+    invoice["items"][0]["unitPrice"] = json!(1);
+    invoice["items"][0]["amount"] = json!(1);
+    invoice["items"][0]["purchaseAmount"] = json!(0);
+    invoice["exchangeRate"] = json!(1.12505);
+    let result = fixture.request(
+        ANALYZE_INVOICE_PROFIT,
+        None,
+        Some(json!({"invoice":invoice})),
+    );
+    assert_eq!(result["salesRmbText"], "¥ 1.13");
+    assert_eq!(result["exchangeRateText"], "1.1251");
+}
+
+#[test]
+fn invoice_save_rejects_control_characters_before_trimming() {
+    let fixture = Fixture::new();
+    let original = serde_json::to_value(
+        InvoiceDraft::demo("2026-11-06", "INVALID-TEXT")
+            .build()
+            .unwrap(),
+    )
+    .unwrap();
+    for text in [
+        "\u{b}product",
+        "product\u{b}",
+        "pro\u{b}duct",
+        "product\u{fffe}",
+    ] {
+        let mut invoice = original.clone();
+        invoice["items"][0]["styleName"] = json!(text);
+        let result: Result<Value, _> =
+            fixture
+                .client()
+                .json(CREATE_INVOICE, &[], &[], Some(invoice));
+        assert_eq!(result.unwrap_err().status, Some(400));
+    }
+    let mut valid = original;
+    valid["items"][0]["styleName"] = json!("product\r\nwith\ttab");
+    let saved: Value = fixture
+        .client()
+        .json(CREATE_INVOICE, &[], &[], Some(valid))
+        .unwrap();
+    assert_eq!(
+        saved["invoice"]["items"][0]["styleName"],
+        "product\r\nwith\ttab"
+    );
+}
+
+#[test]
 fn personnel_directory_images_and_employment_events_use_the_public_contract() {
     let fixture = Fixture::new();
     let mut person=fixture.create(CREATE_PERSONNEL,json!({"requestKey":nonce().unwrap(),"employeeNumber":"HR-001","departmentId":"GENERAL","jobTitle":"业务助理","employmentType":"FullTime","hireDate":"2026-09-01","onProbation":true,"profile":{"fullName":"档案测试人员","personalPhone":"private-phone-canary","workEmail":"native@example.invalid"}}));

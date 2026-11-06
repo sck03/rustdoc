@@ -68,11 +68,11 @@ assert(model.getWorkspaceContext("/crm/email-templates").title === "邮件中心
 assert(model.getWorkspaceContext("/crm/opportunities").title === "商机与报价", "sales opportunity context");
 assert(model.getWorkspaceContext("/suppliers").title === "供应商管理", "supplier workspace context");
 assert(model.getWorkspaceContext("/system/access-control").title === "账号与权限", "access control context");
-assert(model.getRequiredWorkspace("/crm/follow-ups") === "sales", "sales route access model");
-assert(model.getRequiredWorkspace("/suppliers") === "sales", "supplier route access model");
-assert(model.getRequiredWorkspace("/crm/email-templates") === "sales", "email template route access model");
-assert(model.getRequiredWorkspace("/crm/opportunities") === "sales", "sales opportunity route access model");
-assert(model.getRequiredWorkspace("/invoices/12") === "document", "document route access model");
+assert(model.findWorkspaceNavItem("/crm/follow-ups")?.workspace === "sales", "sales route access model");
+assert(model.findWorkspaceNavItem("/suppliers")?.workspace === "sales", "supplier route access model");
+assert(model.findWorkspaceNavItem("/crm/email-templates")?.workspace === "sales", "email template route access model");
+assert(model.findWorkspaceNavItem("/crm/opportunities")?.workspace === "sales", "sales opportunity route access model");
+assert(model.findWorkspaceNavItem("/invoices/12")?.workspace === "document", "document route access model");
 assert(model.findActiveWorkspaceNavGroupKey("/tools/ocr") === "resources", "tools navigation group");
 assert(model.findActiveWorkspaceNavGroupKey("/master-data/hs-knowledge/search") === "documents", "classification belongs to document work");
 assert(model.findActiveWorkspaceNavGroupKey("/business-attachments") === "documents", "business files belong to document work");
@@ -112,7 +112,7 @@ assert(navigationItems.flatMap(item => item.children ?? [item]).length === 39, "
 assert(product.getDefaultWorkspaceRoute(fullTeamCapabilities) === "/dashboard", "Full team edition retains its business home");
 for (const item of navigationItems) {
   assert(navigationItems.filter((candidate) => candidate.isActive(item.to)).length === 1, `each route has one navigation owner: ${item.to}`);
-  for (const route of item.children ?? [item]) assert(model.getRequiredModule(route.to) === (route.moduleKey ?? null), `leaf route keeps its permission module: ${route.to}`);
+  for (const route of item.children ?? [item]) assert((model.findWorkspaceNavItem(route.to)?.moduleKey ?? null) === (route.moduleKey ?? null), `leaf route keeps its permission module: ${route.to}`);
   assert(model.getWorkspaceContext(item.to).title === item.label, `page and menu use the same name: ${item.to}`);
 }
 assert(model.findActiveWorkspaceNavGroupKey("/master-data/hs-codes") === "documents", "HS catalogue must not activate basic data navigation");
@@ -206,16 +206,16 @@ assert(partialCrmGroups.flatMap((group) => group.items.flatMap((item) => item.ch
 assert(sendOnlyEmailRoutes.includes("/tools/email"), "email send capability exposes the email page");
 assert(deliveryOnlyEmailRoutes.includes("/tools/email"), "delivery-history capability exposes the email page");
 assert(!noEmailCapabilityRoutes.includes("/tools/email"), "legacy email module alone cannot expose the email page");
-assert(model.hasWorkspacePathPermission("/tools/email", [permissionGrant("common.email-delivery", "send")]), "direct email URL accepts send capability");
-assert(model.hasWorkspacePathPermission("/tools/email", [permissionGrant("common.email-delivery", "view-delivery")]), "direct email URL accepts delivery-history capability");
-assert(!model.hasWorkspacePathPermission("/tools/email", []), "direct email URL fails closed without a capability");
-assert(model.hasWorkspacePathPermission("/crm/follow-ups", [permissionGrant("sales.customers", "view")]), "customer directory needs its own view capability");
-assert(!model.hasWorkspacePathPermission("/crm/follow-ups", []), "customer route denies absent capabilities");
-assert(model.hasWorkspacePathPermission("/crm/follow-ups", [permissionGrant("sales.customers", "view"), permissionGrant("sales.follow-ups", "view")]), "direct URL accepts complete page capabilities");
-assert(model.getRequiredModule("/payments/8") === "document.payments", "payment route module guard");
-assert(model.getRequiredModule("/crm/follow-ups") === "sales.crm", "sales route module guard");
-assert(model.getRequiredModule("/master-data/hs-knowledge/search") === "document.hs-knowledge", "HS knowledge uses its own route guard");
-assert(model.getRequiredModule("/master-data/hs-codes") === "document.hs-knowledge", "HS catalogue uses its own route guard");
+assert(model.hasWorkspaceNavItemPermission(model.findWorkspaceNavItem("/tools/email"), [permissionGrant("common.email-delivery", "send")]), "direct email URL accepts send capability");
+assert(model.hasWorkspaceNavItemPermission(model.findWorkspaceNavItem("/tools/email"), [permissionGrant("common.email-delivery", "view-delivery")]), "direct email URL accepts delivery-history capability");
+assert(!model.hasWorkspaceNavItemPermission(model.findWorkspaceNavItem("/tools/email"), []), "direct email URL fails closed without a capability");
+assert(model.hasWorkspaceNavItemPermission(model.findWorkspaceNavItem("/crm/follow-ups"), [permissionGrant("sales.customers", "view")]), "customer directory needs its own view capability");
+assert(!model.hasWorkspaceNavItemPermission(model.findWorkspaceNavItem("/crm/follow-ups"), []), "customer route denies absent capabilities");
+assert(model.hasWorkspaceNavItemPermission(model.findWorkspaceNavItem("/crm/follow-ups"), [permissionGrant("sales.customers", "view"), permissionGrant("sales.follow-ups", "view")]), "direct URL accepts complete page capabilities");
+assert((model.findWorkspaceNavItem("/payments/8")?.moduleKey ?? null) === "document.payments", "payment route module guard");
+assert((model.findWorkspaceNavItem("/crm/follow-ups")?.moduleKey ?? null) === "sales.crm", "sales route module guard");
+assert((model.findWorkspaceNavItem("/master-data/hs-knowledge/search")?.moduleKey ?? null) === "document.hs-knowledge", "HS knowledge uses its own route guard");
+assert((model.findWorkspaceNavItem("/master-data/hs-codes")?.moduleKey ?? null) === "document.hs-knowledge", "HS catalogue uses its own route guard");
 assert(model.getRequiredRouteAccessLevel("/invoices/new") === "operate", "new invoice route requires operate");
 assert(model.getRequiredRouteAccessLevel("/master-data/products/new") === "operate", "new master-data route requires operate");
 assert(model.getRequiredRouteAccessLevel("/single-window/coo/8") === "operate", "COO editor route requires operate");
@@ -294,18 +294,18 @@ for (const level of ["view", "operate", "manage"]) {
   assert(!permission.hasRouteModulePermission(undefined, ["document.payments"], "document.payments", level), "enabled modules alone cannot grant " + level);
   assert(!permission.hasRouteModulePermission([], ["document.payments"], "document.payments", level), "empty module grants cannot grant " + level);
 }
-assert(model.isAdminOnlyRoute("/settings"), "settings route requires administrator");
-assert(model.isAdminOnlyRoute("/system/access-control"), "access control route requires administrator");
-assert(model.isAdminOnlyRoute("/system/license"), "license registration route requires administrator");
-assert(model.isSystemAdministrationRoute("/audit-logs"), "audit route requires system administration capability");
-assert(model.isSystemAdministrationRoute("/system/access-control"), "access control route requires system administration capability");
-assert(model.isDesktopOnlyRoute("/system/update"), "updater route requires desktop runtime");
+assert(model.findWorkspaceNavItem("/settings")?.requiresAdmin === true, "settings route requires administrator");
+assert(model.findWorkspaceNavItem("/system/access-control")?.requiresAdmin === true, "access control route requires administrator");
+assert(model.findWorkspaceNavItem("/system/license")?.requiresAdmin === true, "license registration route requires administrator");
+assert(model.findWorkspaceNavItem("/audit-logs")?.requiresSystemAdministration === true, "audit route requires system administration capability");
+assert(model.findWorkspaceNavItem("/system/access-control")?.requiresSystemAdministration === true, "access control route requires system administration capability");
+assert(model.findWorkspaceNavItem("/system/update")?.desktopOnly === true, "updater route requires desktop runtime");
 const routes = model.searchWorkspaceNavGroups("WebDAV", adminGroups).flatMap(group => group.items);
 assert(routes.some(item => item.to === "/system/backup?section=replica" && item.locationLabel.includes("系统管理 / 备份与恢复") && item.label === "异机副本"), "search resolves the current replica settings and displays their location");
 assert(model.searchWorkspaceNavGroups("WebDAV", salesGroups).length === 0, "feature search preserves administrative boundaries");
 const dictionaryOnly = model.filterWorkspaceNavGroups({ canUseDocumentWorkspace: true, ...moduleGrants(["document.declaration-dictionary"]), permissions: [permissionGrant("document.declaration-dictionary", "view")] });
 assert(dictionaryOnly[0].items[0].label === "单一窗口" && dictionaryOnly[0].items[0].to === "/single-window/reference-catalog", "a merged area opens its first authorized destination");
-assert(model.getRequiredModule("/single-window/reference-catalog") === "document.declaration-dictionary", "merging navigation never merges dictionary permissions");
+assert((model.findWorkspaceNavItem("/single-window/reference-catalog")?.moduleKey ?? null) === "document.declaration-dictionary", "merging navigation never merges dictionary permissions");
 const routeQuery = globalThis.__routeQuery;
 assert(routeQuery.patchRouteQuery("?page=3&keyword=ACME", { supplierId: 135, view: "profile" }) === "?page=3&keyword=ACME&supplierId=135&view=profile", "opening a record retains the list location");
 assert(routeQuery.patchRouteQuery("?page=3&supplierId=135", { supplierId: null }) === "?page=3", "returning removes only the record selection");

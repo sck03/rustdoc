@@ -16,6 +16,29 @@ fn insert(connection: &Connection, kind: &str, mut body: Value) -> i64 {
     id
 }
 pub fn exercise(connection: &Connection) {
+    for invoice in [
+        json!(null),
+        json!("bad"),
+        json!("991"),
+        json!(0),
+        json!(-1),
+        json!(1.5),
+        json!(9223372036854775808_u64),
+    ] {
+        connection.begin().unwrap();
+        let failure = connection
+            .insert(&RecordWrite::unkeyed(
+                "attachments",
+                &json!({"invoiceId":invoice,"versionNumber":1,"ownerUserId":7,"companyScope":"QUERY"}),
+            ))
+            .unwrap_err();
+        connection.rollback().unwrap();
+        assert_eq!(
+            failure.kind,
+            ErrorKind::Conflict,
+            "invoiceId={invoice}: {failure:?}"
+        );
+    }
     connection.begin().unwrap();
     let category = insert(
         connection,

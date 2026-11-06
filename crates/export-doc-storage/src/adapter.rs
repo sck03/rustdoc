@@ -329,7 +329,17 @@ pub(crate) trait Adapter: Send {
         before_id: Option<i64>,
     ) -> Result<(Option<i64>, Vec<Value>)> {
         let pg = self.provider() == "PostgreSQL";
-        let (mut sql, projection) = generic_query::build(query, pg)?;
+        let (sql, projection) = generic_query::build(query, pg)?;
+        self.scan_page(sql, &projection, before_id, query.limit)
+    }
+    fn scan_page(
+        &self,
+        mut sql: QuerySql,
+        projection: &str,
+        before_id: Option<i64>,
+        limit: i64,
+    ) -> Result<(Option<i64>, Vec<Value>)> {
+        let pg = self.provider() == "PostgreSQL";
         if let Some(id) = before_id {
             let cursor = sql::bind(&mut sql.values, id, pg);
             sql.filter
@@ -343,7 +353,7 @@ pub(crate) trait Adapter: Send {
         };
         let mut cursor = before_id;
         let mut rows = Vec::new();
-        for mut row in self.query_slice(&sql, &projection, 0, query.limit)? {
+        for mut row in self.query_slice(&sql, &projection, 0, limit)? {
             let parts = row
                 .as_array_mut()
                 .filter(|parts| parts.len() == 2)
@@ -360,11 +370,14 @@ pub(crate) trait Adapter: Send {
     fn resource_references(
         &self,
         kind: &str,
-        offset: i64,
+        before_id: Option<i64>,
         limit: i64,
-    ) -> Result<(i64, Vec<Value>)> {
+    ) -> Result<(Option<i64>, Vec<Value>)> {
         let (sql, projection) = resource_query::build(kind, self.provider() == "PostgreSQL")?;
-        self.query_page(&sql, &projection, offset, limit)
+        self.scan_page(sql, &projection, before_id, limit.clamp(1, 200))
+    }
+    fn ownership_counts(&self, kinds: &[&str]) -> Result<Vec<(Option<i64>, i64)>> {
+        crate::ownership_query::counts(self, kinds)
     }
 
     fn scan_crm(&self, query: &CrmQuery<'_>, after_id: i64) -> Result<Vec<Value>> {

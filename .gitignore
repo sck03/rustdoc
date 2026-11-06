@@ -21,6 +21,7 @@ apps/export-doc-web/vite.config.js
 apps/export-doc-web/vite.config.d.ts
 Browsers/**
 Resources/Fonts/OpenSource/*.otf
+Resources/Fonts/OpenSource/*.woff2
 WebView2Runtime/**
 !WebView2Runtime/
 !WebView2Runtime/README.md

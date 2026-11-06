@@ -6,7 +6,8 @@ export function validateDesignValues(sources) {
   const failures = [];
   const rules = {
     "font-size": /^(?:inherit|var\(--edm-(?:font-size-(?:xs|sm|md|lg|xl|2xl)|body-size)\))$/u,
-    "font-weight": /^(?:inherit|400|600|700|var\(--edm-font-weight-(?:regular|semibold|bold)\))$/u,
+    "font-weight": /^(?:inherit|400|500|700|var\(--edm-font-weight-(?:regular|medium|bold)\))$/u,
+    "line-height": /^(?:inherit|1|var\(--edm-(?:line-height-(?:xs|sm|md|lg|xl|2xl)|body-line-height)\))$/u,
     "z-index": /^(?:auto|var\(--edm-z-[a-z-]+\))$/u,
     "border-radius": /^(?:inherit|(?:0|var\(--edm-radius-(?:xs|sm|md|lg|xl|2xl|full)\))(?: (?:0|var\(--edm-radius-(?:xs|sm|md|lg|xl|2xl|full)\)))*)$/u,
   };

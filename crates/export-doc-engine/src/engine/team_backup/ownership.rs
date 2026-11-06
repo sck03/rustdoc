@@ -116,16 +116,11 @@ fn counts(store: &Store, kinds: &[&str]) -> Result<(i64, i64, Vec<(i64, i64)>)> 
     let mut total = 0i64;
     let mut unassigned = 0i64;
     let mut per_owner: Vec<(i64, i64)> = Vec::new();
-    for kind in kinds {
-        for record in connection.all(kind)? {
-            total += 1;
-            match owner_of(&record) {
-                Some(owner) => match per_owner.iter_mut().find(|(key, _)| *key == owner) {
-                    Some((_, count)) => *count += 1,
-                    None => per_owner.push((owner, 1)),
-                },
-                None => unassigned += 1,
-            }
+    for (owner, count) in connection.ownership_counts(kinds)? {
+        total += count;
+        match owner {
+            Some(owner) => per_owner.push((owner, count)),
+            None => unassigned += count,
         }
     }
     Ok((total, unassigned, per_owner))
@@ -213,7 +208,19 @@ pub(super) fn transfer(service: &NativeService, actor: &Actor, body: &Value) -> 
         let only_unassigned = request.only_unassigned;
         let mut updated = [0i64; 3];
         for kind in &kinds {
-            for record in connection.all(kind)? {
+            let mut cursor = None;
+            let filters = if let Some(owner) = from_user_id.filter(|_| !only_unassigned) {
+                vec![("ownerUserId", owner.to_string())]
+            } else { vec![] };
+            loop {
+            crate::operation::check()?;
+            let (next, rows) = connection.scan_generic(&export_doc_storage::GenericQuery {
+                kind, scope: export_doc_storage::DataScope { all: true, ..Default::default() },
+                filters: &filters, limit: 100, ..Default::default()
+            }, cursor)?;
+            if rows.is_empty() { break; }
+            cursor = next;
+            for record in rows {
                 let owner = owner_of(&record);
                 let matches = if only_unassigned {
                     owner.is_none()
@@ -236,6 +243,7 @@ pub(super) fn transfer(service: &NativeService, actor: &Actor, body: &Value) -> 
                     PAYMENT_KIND => 1,
                     _ => 2,
                 }] += 1;
+            }
             }
         }
         let [invoice_count, payment_count, other_count] = updated;

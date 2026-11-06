@@ -19,7 +19,7 @@ pub(crate) fn build(q: &PersonnelQuery<'_>, pg: bool) -> Result<(QuerySql, Strin
     let mut values = Vec::new();
     let company = sql::bind(&mut values, q.company, pg);
     let membership =
-        crate::personnel_memberships::filter(&mut values, pg, &company, None, Some(q.as_of));
+        crate::personnel_memberships::filter(&mut values, pg, &company, None, Some(q.as_of), "r");
     let mut clauses = vec![format!("r.kind='people' AND ({membership})")];
     for scope in q.scopes {
         clauses.push(scope.filter(&mut values, pg));
@@ -32,6 +32,7 @@ pub(crate) fn build(q: &PersonnelQuery<'_>, pg: bool) -> Result<(QuerySql, Strin
             &company,
             Some(&department),
             Some(q.as_of),
+            "r",
         ));
     }
     let status = sql::field("status", pg);

@@ -2,6 +2,6 @@
 .communication-body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  line-height: 1.8;
+  line-height: inherit;
 }
 }

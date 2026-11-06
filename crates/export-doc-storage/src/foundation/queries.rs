@@ -79,7 +79,7 @@ pub(crate) fn list(
     let limit = limit.clamp(1, 100);
     let mut filter = format!("r.unit_id={unit}");
     if kind == "employments" {
-        let permitted = scope.filter(&mut s.values, s.pg).replace("r.", "p.");
+        let permitted = scope.filter_for(&mut s.values, s.pg, "p");
         filter += &format!(
             " AND EXISTS(SELECT 1 FROM employee_identities i JOIN records p ON p.id=i.person_id WHERE i.id=r.identity_id AND p.kind='people' AND {permitted})"
         );

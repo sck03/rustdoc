@@ -63,12 +63,12 @@
 
 .form-field-label {
   color: var(--edm-ink-800);
-  font-weight: 700;
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .form-field-description {
   color: var(--edm-text-secondary);
-  line-height: 1.45;
+  line-height: inherit;
 }
 
 .table-frame {
@@ -121,7 +121,8 @@ tbody tr:hover {
   padding-inline: 8px;
   border-radius: var(--edm-radius-full);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .business-status-badge {
@@ -169,7 +170,7 @@ tbody tr:hover {
   display: block;
   overflow: hidden;
   color: var(--edm-ink-900);
-  font-weight: 600;
+  font-weight: var(--edm-font-weight-medium);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -180,6 +181,7 @@ tbody tr:hover {
   overflow: hidden;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -341,9 +343,6 @@ tbody tr:hover {
     max-width: 90px;
   }
 
-  .workspace-description {
-    display: none;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

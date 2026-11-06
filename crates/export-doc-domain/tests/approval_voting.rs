@@ -75,7 +75,7 @@ fn immediate_veto_cancels_without_fabricating_consent_and_threshold_can_be_unrea
 fn enough_votes_skip_unsigned_people_and_one_actual_person_cannot_vote_twice_via_delegation() {
     let mut p = plan(RejectionPolicy::Collect, 50);
     sign(&mut p, 0, true);
-    assert!(p.independent_signer_conflict(0, 2));
+    assert!(p.signer_conflict(0, 2, None));
     sign(&mut p, 1, true);
     assert_eq!(p.outcome(), "Approved");
     assert_eq!(p.steps[2].status, "Skipped");

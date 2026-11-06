@@ -50,15 +50,14 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
     <PersonnelExecutionNotice client={client} user={user} row={row} />
     {row.status === "HandedOff" && <InlineNotice tone="success" title="财务交接已登记">此状态仅记录资料交接，不代表已记账或已付款；办理人、时间和说明见审批与办理记录。</InlineNotice>}
     </header>
+    <div className="oa-detail-columns">
+    <div className="oa-detail-main">
     <OaApprovalDocument key={row.submissionId} client={client} user={user} row={row} />
-    {user.capabilities.canManageUsers && row.status === "Pending" && Boolean(row.approvalPlan?.steps.some(step => step.status === "Waiting")) && <button type="button" className="command-button secondary" onClick={() => setReassigning(true)}>移交未完成审批</button>}
-    <OaApprovalSteps plan={row.approvalPlan} notes={row.approvalRoutingNotes} user={user} />
-    <WorkflowOperations client={client} row={row}/>
-    <WorkflowFulfillmentPanel client={client} user={user} row={row}/>
     <OaRequestContent row={row} user={user} />
     {row.materialAccess?.isPartial && <InlineNotice tone="info">当前身份仅可查看部分申请材料。编辑完整草稿和下载全部原件需要完整材料权限。</InlineNotice>}
     <section className="oa-attachments" aria-label="申请附件"><h3>{row.kind === "expense" ? "报销凭证" : "申请附件"}</h3>
-      <p className="office-muted">{documentDescription}{row.kind === "expense" && "提交报销前至少上传一份凭证。"}</p>
+      {!editable && <p className="office-muted">{documentDescription}</p>}
+      {editable && row.kind === "expense" && <p className="office-muted">提交报销前至少上传一份凭证。</p>}
       {editable && <><label>本批附件用途<select value={purpose} onChange={event=>setPurpose(event.target.value)}><option value="ReimbursementForm">报销单</option><option value="Voucher">发票／其他凭证</option><option value="Supporting">补充资料</option></select></label><AttachmentUploadPanel key={`${row.kind}-${row.id}`} record={row} operation={operation} upload={(current, body, signal) => { body.set("purpose",purpose); return api.upload(current.id, body, { signal }); }} /></>}
       {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
       {!row.attachments.length && <p className="office-muted">尚未上传附件。</p>}
@@ -67,7 +66,15 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
         {editable && <button className="command-button secondary" type="button" disabled={operation.busy} onClick={() => setAction(file.id)}>移除</button>}
       </li>)}</ul>
     </section>
+    </div>
+    <aside className="oa-detail-sidebar" aria-label="审批流程与办理">
+    {user.capabilities.canManageUsers && row.status === "Pending" && Boolean(row.approvalPlan?.steps.some(step => step.status === "Waiting")) && <button type="button" className="command-button secondary" onClick={() => setReassigning(true)}>移交未完成审批</button>}
+    <OaApprovalSteps plan={row.approvalPlan} notes={row.approvalRoutingNotes} user={user} />
+    <WorkflowOperations client={client} row={row}/>
+    <WorkflowFulfillmentPanel client={client} user={user} row={row}/>
     <details className="oa-detail-history" onToggle={event => setHistoryOpened(event.currentTarget.open)}><summary>审批与办理记录、提交版本</summary>{historyOpened && <><OaHistory client={client} user={user} row={row} /><WorkflowDecisionHistory client={client} user={user} row={row}/><OaSubmissionHistory client={client} user={user} row={row} /></>}</details>
+    </aside>
+    </div>
     {action !== null && <OaActionDialog client={client} user={user} row={row} action={action} onClose={() => setAction(null)} />}
     {reassigning && <ApprovalReassignDialog client={client} row={row} onClose={() => setReassigning(false)} />}
     {previewing && <OaApprovalPreview client={client} user={user} row={row} onClose={() => setPreviewing(false)} />}

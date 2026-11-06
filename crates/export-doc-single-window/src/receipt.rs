@@ -57,7 +57,9 @@ pub fn parse(business: Business, bytes: &[u8], name: &str) -> Result<(Value, Opt
             get("ConsignNo"),
             get("ResponseCode"),
             get("ResponseMessage"),
-            if get("ResponseCode") == "0" {
+            if get("ResponseCode").is_empty() {
+                "Unknown"
+            } else if get("ResponseCode") == "0" {
                 "Accepted"
             } else {
                 "Rejected"
@@ -69,7 +71,9 @@ pub fn parse(business: Business, bytes: &[u8], name: &str) -> Result<(Value, Opt
             get("CONSIGN_NO"),
             get("PROC_RESULT"),
             get("PROC_DESC"),
-            if get("PROC_RESULT").eq_ignore_ascii_case("S") {
+            if get("PROC_RESULT").is_empty() {
+                "Unknown"
+            } else if get("PROC_RESULT").eq_ignore_ascii_case("S") {
                 "Accepted"
             } else {
                 "Rejected"

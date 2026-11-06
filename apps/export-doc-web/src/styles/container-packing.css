@@ -9,7 +9,7 @@
 
 .packing-view-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .packing-view-switch [aria-pressed="true"] { color: var(--edm-primary-850); background: var(--edm-primary-75); border-color: var(--edm-ink-300); }
-.packing-view-switch > span { margin-left: auto; color: var(--edm-neutral-600); font-size: var(--edm-font-size-xs); }
+.packing-view-switch > span { margin-left: auto; color: var(--edm-neutral-600); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
 .container-packing-result .packing-summary-grid { padding: 16px; gap: 12px; border-radius: var(--edm-radius-xl); background: var(--edm-neutral-50); border: 1px solid var(--edm-neutral-150); }
 
 .container-packing-surface .job-tool-panel {
@@ -41,7 +41,8 @@
   margin-top: 0;
   color: var(--edm-neutral-600);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -69,7 +70,8 @@
   margin-top: 0;
   color: var(--edm-neutral-700);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
   white-space: nowrap;
 }
 
@@ -84,8 +86,8 @@
   border: 1px solid var(--edm-neutral-350);
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
-  line-height: 1.45;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .container-packing-status-bar[data-auto-refresh-state="running"],
@@ -114,7 +116,8 @@
 .container-packing-project-panel label span {
   color: var(--edm-neutral-600);
   font-size: var(--edm-font-size-sm);
-  font-weight: 700;
+  line-height: var(--edm-line-height-sm);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .container-packing-project-actions,
@@ -264,6 +267,7 @@
 .container-packing-3d-status {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .container-packing-3d-toolbar {
@@ -336,6 +340,7 @@
   background: var(--edm-neutral-50);
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .container-packing-visualization {
@@ -369,6 +374,7 @@
 .container-packing-visual-header span {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .container-packing-pseudo3d-svg {
@@ -439,7 +445,8 @@
 .container-packing-empty-label {
   fill: var(--edm-neutral-550);
   font-size: var(--edm-font-size-md);
-  font-weight: 700;
+  line-height: var(--edm-line-height-md);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .container-packing-visual-grid {
@@ -470,6 +477,7 @@
 .container-packing-projection-header strong {
   color: var(--edm-neutral-750);
   font-size: var(--edm-font-size-sm);
+  line-height: var(--edm-line-height-sm);
 }
 
 .container-packing-projection-header span {
@@ -477,6 +485,7 @@
   overflow: hidden;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -506,7 +515,8 @@
 .container-packing-axis-label {
   fill: var(--edm-neutral-600);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .container-packing-item-rect {
@@ -525,7 +535,8 @@
 .container-packing-item-label {
   fill: var(--edm-white);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
   paint-order: stroke;
   pointer-events: none;
   stroke: color-mix(in srgb, var(--edm-neutral-900) 55%, transparent);
@@ -558,6 +569,7 @@
   gap: 8px;
   color: var(--edm-neutral-700);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .container-packing-legend-item span:last-child {

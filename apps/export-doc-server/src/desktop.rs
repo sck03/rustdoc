@@ -10,7 +10,11 @@ use axum::{
 use export_doc_engine::{engine::NativeService, paths::nonce};
 use std::{
     net::TcpListener,
-    sync::{Arc, mpsc},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
     thread,
     time::Duration,
 };
@@ -22,10 +26,16 @@ pub struct DesktopHost {
     shutdown: Option<tokio::sync::oneshot::Sender<()>>,
     finished: mpsc::Receiver<Result<(), String>>,
     worker: Option<thread::JoinHandle<()>>,
+    pub failed: Arc<AtomicBool>,
+    stopping: Arc<AtomicBool>,
 }
 
 impl DesktopHost {
-    pub fn start(service: Arc<NativeService>, development: bool) -> Result<Self, String> {
+    pub fn start(
+        service: Arc<NativeService>,
+        development: bool,
+        on_failure: impl Fn(&str) + Send + Sync + 'static,
+    ) -> Result<Self, String> {
         if service.provider().map_err(|e| e.to_string())? != "SQLite" {
             return Err("桌面宿主只允许 SQLite；团队连接由独立 Rust 服务管理。".into());
         }
@@ -47,12 +57,22 @@ impl DesktopHost {
             .map_err(|e| e.to_string())?;
         let (shutdown, stopping) = tokio::sync::oneshot::channel();
         let (completed, finished) = mpsc::sync_channel(1);
+        let failed = Arc::new(AtomicBool::new(false));
+        let failure = failed.clone();
+        let stopping_state = Arc::new(AtomicBool::new(false));
+        let stop_requested = stopping_state.clone();
         let worker = thread::Builder::new().name("desktop-rust-api".into()).spawn(move || {
-            let result = runtime.block_on(async {
+            let report = Arc::new(move || {
+                if !stop_requested.load(Ordering::Acquire) && !failure.swap(true, Ordering::AcqRel) {
+                    on_failure("桌面后端异常停止，请保存可复制的草稿内容后重启程序。");
+                }
+            });
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| runtime.block_on(async {
                 let listener = tokio::net::TcpListener::from_std(listener)
                     .map_err(|e| e.to_string())?;
                 let health = service.clone();
                 let closing = service.clone();
+                let report = report.clone();
                 crate::serve(listener, routes, control, async move {
                     tokio::pin!(stopping);
                     let mut interval = tokio::time::interval(Duration::from_secs(2));
@@ -62,7 +82,7 @@ impl DesktopHost {
                             _ = interval.tick() => {
                                 let health = health.clone();
                                 if !matches!(tokio::task::spawn_blocking(move || health.health()).await, Ok(Ok(()))) {
-                                    eprintln!("桌面数据库不可用，Rust API 已停止接收请求。");
+                                    report();
                                     break;
                                 }
                             }
@@ -70,8 +90,9 @@ impl DesktopHost {
                     }
                     let _ = closing.request_shutdown();
                 }).await.map_err(|e| e.to_string())
-            });
-            let closed = service.close().map_err(|e| e.to_string());
+            }))).unwrap_or_else(|_| Err("桌面后端线程异常退出。".into()));
+            report();
+            let closed = crate::close_service(service);
             runtime.shutdown_timeout(Duration::from_secs(5));
             let _ = completed.send(result.and(closed));
         }).map_err(|e| e.to_string())?;
@@ -81,6 +102,8 @@ impl DesktopHost {
             shutdown: Some(shutdown),
             finished,
             worker: Some(worker),
+            failed,
+            stopping: stopping_state,
         })
     }
 
@@ -90,7 +113,7 @@ impl DesktopHost {
         self.signal_stop();
         let result = self
             .finished
-            .recv_timeout(Duration::from_secs(45))
+            .recv_timeout(Duration::from_secs(55))
             .map_err(|_| "Rust 后端关闭超过时限。".to_owned())?;
         if let Some(worker) = self.worker.take() {
             worker
@@ -101,6 +124,7 @@ impl DesktopHost {
     }
 
     fn signal_stop(&mut self) {
+        self.stopping.store(true, Ordering::Release);
         if let Some(shutdown) = self.shutdown.take() {
             let _ = shutdown.send(());
         }

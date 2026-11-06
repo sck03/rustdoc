@@ -45,7 +45,7 @@
   border: 1px solid var(--edm-line);
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-sm);
-  line-height: 1.55;
+  line-height: var(--edm-line-height-sm);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -65,7 +65,7 @@
   padding: 0 0 0 20px;
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-sm);
-  line-height: 1.45;
+  line-height: var(--edm-line-height-sm);
 }
 
 .startup-update-banner {
@@ -121,7 +121,7 @@
   border-radius: var(--edm-radius-md);
   font: inherit;
   font-size: var(--edm-font-size-sm);
-  line-height: 1.55;
+  line-height: var(--edm-line-height-sm);
   white-space: pre-wrap;
   word-break: break-word;
 }

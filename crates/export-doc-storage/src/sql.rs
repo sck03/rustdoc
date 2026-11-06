@@ -10,19 +10,25 @@ pub(crate) fn object(pg: bool) -> &'static str {
     }
 }
 pub(crate) fn field(path: &str, postgres: bool) -> String {
+    field_from("r.body", path, postgres)
+}
+pub(crate) fn field_from(source: &'static str, path: &str, postgres: bool) -> String {
     if postgres && !path.contains('.') {
-        format!("r.body->>'{path}'")
+        format!("{source}->>'{path}'")
     } else if postgres {
-        format!("r.body #>> '{{{}}}'", path.replace('.', ","))
+        format!("{source} #>> '{{{}}}'", path.replace('.', ","))
     } else {
-        format!("json_extract(r.body,'$.{path}')")
+        format!("json_extract({source},'$.{path}')")
     }
 }
 pub(crate) fn json_field(path: &str, postgres: bool) -> String {
+    json_field_from("r.body", path, postgres)
+}
+pub(crate) fn json_field_from(source: &'static str, path: &str, postgres: bool) -> String {
     if postgres {
-        format!("r.body #> '{{{}}}'", path.replace('.', ","))
+        format!("{source} #> '{{{}}}'", path.replace('.', ","))
     } else {
-        format!("json(r.body -> '$.{path}')")
+        format!("json({source} -> '$.{path}')")
     }
 }
 pub(crate) fn bind(values: &mut Vec<String>, value: impl ToString, postgres: bool) -> String {

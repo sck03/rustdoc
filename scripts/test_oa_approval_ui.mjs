@@ -81,7 +81,7 @@ await withOfficeUi('approval-ui', async ({ output, require, url, operations, inv
   await admin.getByRole('dialog').getByRole('button', { name: '重新载入审批设置', exact: true }).click();
   await admin.getByText('设置已被其他管理员修改。当前草稿已保留，请核对后重新载入最新设置。', { exact: true }).waitFor({ state: 'hidden' });
   assert.equal(await generalRule.getByLabel('流程名称', { exact: true }).inputValue(), concurrent.rules.find(r => r.key === 'general').name);
-  await admin.addScriptTag({ path: require.resolve('axe-core/axe.min.js') });
+  await admin.evaluate(require('axe-core').source);
   assert.deepEqual(await admin.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => ({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))), []);
   await admin.screenshot({ path: path.join(output, 'approval-settings.png'), fullPage: true });
   await admin.goto(`${url}/#/office/requests/expense`);

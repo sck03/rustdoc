@@ -1,5 +1,5 @@
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
-use serde_json::{Value, json};
+use serde_json::json;
 #[path = "template_history_contract.rs"]
 mod history_retention;
 #[path = "approval_fixture.rs"]

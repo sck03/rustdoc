@@ -209,8 +209,8 @@ impl Request {
             .map(|i| i.length * i.width * i.height * D::from(i.count) / D::from(1_000_000))
             .sum();
         let weight: D = items.iter().map(|i| i.weight * D::from(i.count)).sum();
-        let volume_count = needed(volume, container.volume)?;
-        let weight_count = needed(weight, container.max_weight)?;
+        let volume_count = needed(volume, container.volume, "集装箱体积")?;
+        let weight_count = needed(weight, container.max_weight, "最大载重")?;
         Ok(Self {
             container,
             rules,
@@ -220,15 +220,36 @@ impl Request {
         })
     }
 }
-fn needed(total: D, capacity: D) -> Result<i64, String> {
+fn needed(total: D, capacity: D, label: &str) -> Result<i64, String> {
     if capacity == D::ZERO {
-        return Ok(0);
+        return if total == D::ZERO {
+            Ok(0)
+        } else {
+            Err(format!("{label}为 0，无法容纳当前货物；请填写有效容量。"))
+        };
     }
     total
         .checked_div(capacity)
         .and_then(|n| n.ceil().to_i64())
         .filter(|n| *n <= i32::MAX as i64)
         .ok_or_else(|| "柜型容量过小，预计柜数超出范围。".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zero_capacity_cannot_estimate_positive_cargo_as_zero_containers() {
+        assert_eq!(needed(D::ZERO, D::ZERO, "最大载重").unwrap(), 0);
+        assert!(
+            needed(D::ONE, D::ZERO, "最大载重")
+                .unwrap_err()
+                .contains("最大载重为 0")
+        );
+        assert_eq!(needed(D::from(11), D::from(10), "最大载重").unwrap(), 2);
+        assert_eq!(needed(D::ZERO, D::from(10), "最大载重").unwrap(), 0);
+    }
 }
 fn dimension(value: D, label: &str) -> Result<(), String> {
     if value <= D::ZERO || value > D::from(100_000) {

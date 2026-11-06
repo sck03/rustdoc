@@ -74,7 +74,10 @@ mod workflow_runtime;
 mod workflow_schedule;
 pub use communication::{CommunicationQuery, CommunicationView, NotificationScope};
 pub use workflow::{WorkflowProgress, WorkflowSummaryQuery, WorkflowTaskQuery};
+mod ownership_query;
 mod sqlite;
+#[cfg(test)]
+mod workflow_constraints_tests;
 pub use schema::SCHEMA_VERSION;
 use serde_json::Value;
 use std::{cell::Cell, path::Path};
@@ -417,7 +420,8 @@ delegate! {
     query_generic(query:&GenericQuery<'_>)->(i64, Vec<Value>);
     explain_query(query:&QueryPlan<'_>)->Value;
     scan_generic(query:&GenericQuery<'_>,before_id:Option<i64>)->(Option<i64>, Vec<Value>);
-    resource_references(kind:&str,offset:i64,limit:i64)->(i64,Vec<Value>);
+    resource_references(kind:&str,before_id:Option<i64>,limit:i64)->(Option<i64>,Vec<Value>);
+    ownership_counts(kinds:&[&str])->Vec<(Option<i64>,i64)>;
     query_scoped(query:&ScopedQuery<'_>)->(i64,Vec<Value>);
     query_business(query:&BusinessQuery<'_>)->(i64, Vec<Value>);
     query_crm(query:&CrmQuery<'_>)->(i64, Vec<Value>);

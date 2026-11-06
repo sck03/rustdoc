@@ -19,7 +19,8 @@
 .new-report-property-readout span {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .new-report-property-grid select,
@@ -71,7 +72,8 @@
   color: var(--edm-neutral-650);
   cursor: pointer;
   font-size: var(--edm-font-size-xs);
-  font-weight: 700;
+  line-height: var(--edm-line-height-xs);
+  font-weight: var(--edm-font-weight-medium);
 }
 
 .new-report-detail-style-group[open] {
@@ -93,6 +95,7 @@
   overflow-wrap: anywhere;
   color: var(--edm-neutral-750);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .new-report-style-grid {
@@ -112,7 +115,7 @@
   overflow-wrap: anywhere;
   color: var(--edm-neutral-750);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.45;
+  line-height: var(--edm-line-height-xs);
 }
 
 .new-report-detail-properties {
@@ -166,6 +169,7 @@
 .new-report-detail-column-title strong {
   color: var(--edm-neutral-750);
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .new-report-detail-parts {
@@ -245,7 +249,7 @@
   background: var(--edm-neutral-50);
   border-right: 1px solid var(--edm-neutral-350);
   font-size: var(--edm-font-size-xs);
-  line-height: 1.2;
+  line-height: var(--edm-line-height-xs);
   overflow: hidden;
   white-space: nowrap;
 }
@@ -267,6 +271,7 @@
 
 .new-report-column-width-segment strong {
   font-size: var(--edm-font-size-xs);
+  line-height: var(--edm-line-height-xs);
 }
 
 .new-report-column-width-handle {

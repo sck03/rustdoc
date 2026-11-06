@@ -59,11 +59,11 @@ pub(super) fn document(request: &ApiContainerPackingPdfRequest) -> Result<Docume
             "left",
         ) + 3.;
     let summary = format!(
-        "装入 {} 件  |  未装 {} 件  |  托盘 {} 个  |  总重 {:.2} kg  |  柜内 {} × {} × {} cm",
+        "装入 {} 件  |  未装 {} 件  |  托盘 {} 个  |  总重 {} kg  |  柜内 {} × {} × {} cm",
         analysis.packed_packages,
         analysis.unpacked_packages,
         analysis.packed_pallets,
-        analysis.packed_weight,
+        crate::data::format_decimal(analysis.packed_weight, 2),
         dimensions.length.normalize(),
         dimensions.width.normalize(),
         dimensions.height.normalize()

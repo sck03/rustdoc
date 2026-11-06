@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-11-02",
-  "reviewNotes": "2026-11-02: explicit T17/T27/T29/T33 scope adds the shared workflow graph, actor binding, subflow and scheduled-operation modules plus real regression scenarios. Rebaseline measured aggregate totals after module review; retain every existing per-file limit and aggregate growth allowance. Office growth covers project/appointment selection and node verification in the existing resource forms.",
+  "updatedAt": "2026-11-06",
+  "reviewNotes": "2026-11-06: reviewed D/A/L correctness and lifecycle changes, explicit shutdown and backup scratch modules, shared decimal/text/input boundaries, WOFF2 build validation and regression scenarios. Rebaseline these measured aggregates for this authorized batch; retain per-file limits and existing growth allowances. Remove retired wrappers, duplicate report HTML generation and unused designer styles.",
   "rules": [
     {
       "name": "repository web production default",
@@ -24,9 +24,9 @@
       ],
       "filePattern": "^.+\\.rs$",
       "maximumLines": 1000,
-      "baselineAggregateLines": 9942,
+      "baselineAggregateLines": 10179,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 10017,
+      "maximumAggregateLines": 10254,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 99301,
+      "baselineAggregateLines": 100332,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 99376,
+      "maximumAggregateLines": 100407,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 28830,
+      "baselineAggregateLines": 29179,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 28950,
+      "maximumAggregateLines": 29299,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 39649,
+      "baselineAggregateLines": 39948,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 39799,
+      "maximumAggregateLines": 40098,
       "reportFiles": false
     },
     {

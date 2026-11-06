@@ -25,6 +25,7 @@ commands.allow = [
   "select_save_excel_path",
   "select_save_file_path",
   "open_path",
+  "open_external_url",
   "get_runtime_storage_context",
   "schedule_data_root_migration",
   "log_frontend_error",

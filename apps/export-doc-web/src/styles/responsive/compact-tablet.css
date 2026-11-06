@@ -1,6 +1,7 @@
 @media (max-width: 680px) {
   :where(.app-shell, .login-screen) :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
     font-size: var(--edm-font-size-lg);
+    line-height: var(--edm-line-height-lg);
   }
 
   .workspace-header {
@@ -14,6 +15,7 @@
 
   .workspace-title-block h1 {
     font-size: var(--edm-font-size-xl);
+    line-height: var(--edm-line-height-xl);
   }
 
   .workspace-header .eyebrow {
@@ -129,17 +131,7 @@
     justify-content: flex-end;
   }
 
-  .new-report-designer-grid {
-    grid-template-columns: 230px minmax(620px, 1fr);
-    height: auto;
-  }
 
-  .new-report-designer-right-rail {
-    grid-column: 1 / -1;
-    height: auto;
-    max-height: none;
-    overflow: visible;
-  }
 
   .single-window-board-grid {
     grid-template-columns: 1fr;

@@ -21,7 +21,7 @@ pub fn exercise(c: &Connection) {
         body["ownerUserId"] = json!(1);
         body["departmentId"] = json!("A");
         c.insert(&RecordWrite::unkeyed(kind, &body)).unwrap();
-        let (_, rows) = c.resource_references(kind, 0, 200).unwrap();
+        let (_, rows) = c.resource_references(kind, None, 200).unwrap();
         let row = rows.iter().find(|row| row["id"] == body["id"]).unwrap();
         assert!(!row.to_string().contains("private-body"));
         if kind != "invoices" {
@@ -35,10 +35,40 @@ pub fn exercise(c: &Connection) {
         .unwrap();
     malformed["id"] = json!(id);
     c.set_body(id, &malformed).unwrap();
-    let (_, rows) = c.resource_references("report-templates", 0, 200).unwrap();
+    let (_, rows) = c
+        .resource_references("report-templates", None, 200)
+        .unwrap();
     assert_eq!(
         rows.iter().find(|row| row["id"] == id).unwrap()["validDocument"],
         false
+    );
+    let mut expected = Vec::new();
+    for i in 0..451 {
+        let id = c.insert(&RecordWrite::unkeyed("exporters", &json!({"id":-1,"versionNumber":1,"companyScope":"REF-Q","departmentId":"A","ownerUserId":1,"docSealPath":format!("Files/Seals/img-{i}.png")}))).unwrap();
+        expected.push(id);
+    }
+    let started = std::time::Instant::now();
+    let mut cursor = None;
+    let mut count = 0;
+    loop {
+        let (next, rows) = c.resource_references("exporters", cursor, 200).unwrap();
+        if rows.is_empty() {
+            break;
+        }
+        assert!(rows.len() <= 200);
+        assert_eq!(next, Some(expected[expected.len() - count - rows.len()]));
+        assert!(
+            rows.iter().all(|row| row["id"] == -1),
+            "DTO ids do not control the physical cursor"
+        );
+        cursor = next;
+        count += rows.len();
+    }
+    assert_eq!(count, 451);
+    println!(
+        "{} resource keyset: {count} references in {:?}",
+        c.provider(),
+        started.elapsed()
     );
     c.rollback().unwrap();
 }

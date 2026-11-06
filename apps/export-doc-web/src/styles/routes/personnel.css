@@ -5,43 +5,43 @@
   .personnel-directory { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr)); gap: 16px; }
   .personnel-card { display: grid; align-content: start; gap: 12px; padding: 20px; background: var(--edm-white); border: 1px solid var(--edm-neutral-250); border-radius: var(--edm-radius-xl); min-width: 0; }
   .personnel-card header > div { flex: 1; min-width: 0; }
-  .personnel-card h3 { margin: 0 0 4px; font-size: var(--edm-font-size-lg); overflow-wrap: anywhere; }
-  .personnel-initial { display: grid; place-items: center; flex: 0 0 40px; height: 40px; border-radius: var(--edm-radius-full); color: var(--edm-primary-700); background: var(--edm-primary-50); font-weight: 600; }
+  .personnel-card h3 { margin: 0 0 4px; font-size: var(--edm-font-size-lg); line-height: var(--edm-line-height-lg); overflow-wrap: anywhere; }
+  .personnel-initial { display: grid; place-items: center; flex: 0 0 40px; height: 40px; border-radius: var(--edm-radius-full); color: var(--edm-primary-700); background: var(--edm-primary-50); font-weight: var(--edm-font-weight-medium); }
   .personnel-avatar { flex: 0 0 40px; width: 40px; height: 40px; object-fit: cover; border-radius: var(--edm-radius-full); }
   .personnel-avatar-retry { border: 1px solid var(--edm-neutral-250); cursor: pointer; }
   .personnel-images { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 16px; }
   .personnel-image-card { display: grid; align-content: start; gap: 12px; min-width: 0; padding: 16px; border: 1px solid var(--edm-neutral-250); border-radius: var(--edm-radius-lg); }
-  .personnel-image-card h3 { margin: 0; font-size: var(--edm-font-size-lg); }
+  .personnel-image-card h3 { margin: 0; font-size: var(--edm-font-size-lg); line-height: var(--edm-line-height-lg); }
   .personnel-image-card p { overflow-wrap: anywhere; margin: 0; }
   .personnel-image-preview { width: 100%; height: 180px; padding: 0; overflow: hidden; border: 1px solid var(--edm-neutral-250); background: var(--edm-neutral-50); cursor: zoom-in; }
   .personnel-image-preview img { width: 100%; height: 100%; object-fit: contain; }
   .personnel-image-empty { display: grid; place-items: center; height: 180px; color: var(--edm-neutral-650); background: var(--edm-neutral-50); text-align: center; }
   .personnel-image-zoom { display: block; max-width: 100%; max-height: 75dvh; margin-inline: auto; object-fit: contain; }
-  .personnel-contact { display: flex; align-items: baseline; gap: 8px; min-width: 0; overflow-wrap: anywhere; font-size: var(--edm-font-size-md); }
+  .personnel-contact { display: flex; align-items: baseline; gap: 8px; min-width: 0; overflow-wrap: anywhere; font-size: var(--edm-font-size-md); line-height: var(--edm-line-height-md); }
   .personnel-contact svg { flex: 0 0 15px; }
   .personnel-contact a { min-width: 0; color: var(--edm-primary-700); text-underline-offset: 3px; }
   .personnel-card > button { justify-self: start; margin-top: 4px; }
-  .personnel-attention { margin: 0; font-size: var(--edm-font-size-md); }
+  .personnel-attention { margin: 0; font-size: var(--edm-font-size-md); line-height: var(--edm-line-height-md); }
   .personnel-detail-page { color: var(--edm-neutral-850); max-width: 1200px; margin-inline: auto; }
   .personnel-detail-page > .office-card-heading { padding: 16px 20px; background: var(--edm-white); border: 1px solid var(--edm-neutral-250); border-radius: var(--edm-radius-md); }
   .personnel-fact-section { padding: 20px; background: var(--edm-white); border: 1px solid var(--edm-neutral-250); border-radius: var(--edm-radius-md); min-width: 0; }
-  .personnel-fact-section h3 { font-size: var(--edm-font-size-lg); margin: 0 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--edm-neutral-200); }
-  .personnel-fact-section summary { cursor: pointer; font-weight: 600; }
-  .personnel-fact-section summary span { margin-left: 12px; color: var(--edm-neutral-650); font-size: var(--edm-font-size-md); font-weight: 400; }
+  .personnel-fact-section h3 { font-size: var(--edm-font-size-lg); line-height: var(--edm-line-height-lg); margin: 0 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--edm-neutral-200); }
+  .personnel-fact-section summary { cursor: pointer; font-weight: var(--edm-font-weight-medium); }
+  .personnel-fact-section summary span { margin-left: 12px; color: var(--edm-neutral-650); font-size: var(--edm-font-size-md); line-height: var(--edm-line-height-md); font-weight: 400; }
   .personnel-fact-section[open] summary { margin-bottom: 20px; }
   .personnel-fact-section .personnel-facts + .personnel-facts { margin-top: 20px; }
   .personnel-notes { white-space: pre-wrap; overflow-wrap: anywhere; }
   .personnel-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 20px 28px; margin: 0; }
   .personnel-facts > div { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
-  .personnel-facts dt { color: var(--edm-neutral-650); font-size: var(--edm-font-size-md); }
+  .personnel-facts dt { color: var(--edm-neutral-650); font-size: var(--edm-font-size-md); line-height: var(--edm-line-height-md); }
   .personnel-facts dd { margin: 0; white-space: pre-wrap; }
   .personnel-facts dd[data-empty="true"] { color: var(--edm-neutral-650); }
   .personnel-facts .personnel-wide { grid-column: 1 / -1; }
   .personnel-private-fields { margin: 16px 0; border-block: 1px solid var(--edm-neutral-250); padding: 12px 0; }
-  .personnel-private-fields summary { cursor: pointer; font-weight: 600; line-height: 1.5; }
+  .personnel-private-fields summary { cursor: pointer; font-weight: var(--edm-font-weight-medium); line-height: inherit; }
   .personnel-private-fields[open] summary { margin-bottom: 16px; }
   .personnel-private-fields fieldset { margin-bottom: 0; }
-  .personnel-form .office-form-grid legend { font-weight: 600; padding-block: 8px; }
+  .personnel-form .office-form-grid legend { font-weight: var(--edm-font-weight-medium); padding-block: 8px; }
   .personnel-detail-stack,
 .personnel-clearance { display: grid; gap: 16px; }
   .personnel-clearance ul { padding-left: 24px; display: grid; gap: 12px; margin: 0; }

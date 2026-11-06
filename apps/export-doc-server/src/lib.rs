@@ -6,9 +6,12 @@ mod download_body;
 mod downloads;
 mod request;
 mod response;
+mod service_shutdown;
 mod shutdown;
+pub use service_shutdown::close_service;
 pub use shutdown::{Shutdown, serve};
 mod telemetry;
+mod web;
 const MAX_REQUESTS: usize = 16;
 const MAX_QUEUED_REQUESTS: usize = 16;
 const MAX_BULK_UPLOADS: usize = 2;
@@ -108,9 +111,12 @@ fn compose_router(
         );
     }
     if let Some(root) = web_root {
-        router = router.fallback_service(
-            ServeDir::new(root).not_found_service(ServeFile::new(root.join("index.html"))),
-        );
+        let static_files = Router::new()
+            .fallback_service(
+                ServeDir::new(root).not_found_service(ServeFile::new(root.join("index.html"))),
+            )
+            .layer(axum::middleware::from_fn(web::policy));
+        router = router.fallback_service(static_files);
     }
     (router.with_state(state), shutdown)
 }
