@@ -92,6 +92,7 @@ async function start(name, dataRoot = path.join(output, name)) {
   }
   assert(await run(session, "!!document.querySelector('input[autocomplete=username]')"), "React login did not render");
   session.address = await run(session, "window.__TAURI_INTERNALS__.invoke('get_desktop_runtime_context').then(context => context.apiBaseUrl)");
+  assert(await run(session, "window.__TAURI_INTERNALS__.invoke('plugin:event|emit',{event:'exportdoc://test-event',payload:null}).then(()=>false,()=>true)"), "The WebView must not gain generic event emission permission");
   session.before = await processes(session);
   assert(session.before.some(entry => entry.Name === "msedgewebview2.exe"), "No owned WebView2 processes observed");
   await captureScreenshot(session.cdp, path.join(output, `${name}.png`));
@@ -117,7 +118,7 @@ async function close(session, mode) {
   } else {
     const expression = mode === "repeat"
       ? "for(let i=0;i<12;i++) void window.__TAURI_INTERNALS__.invoke('request_app_exit');"
-      : "void window.__TAURI_INTERNALS__.invoke('plugin:event|emit', {event:'exportdoc://exit-requested',payload:null});";
+      : "void window.__TAURI_INTERNALS__.invoke('request_app_exit');";
     await run(session, `setTimeout(() => { ${expression} }, 100); true`);
   }
   while (!session.exit && Date.now() - started < 50000) await delay(100);
