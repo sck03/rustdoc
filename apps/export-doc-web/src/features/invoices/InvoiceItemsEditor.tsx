@@ -18,6 +18,7 @@ import { InvoiceItemsTable } from "./InvoiceItemsTable.tsx";
 import { InvoiceItemsEditorDialogs } from "./InvoiceItemsEditorDialogs.tsx";
 import { useInvoiceItemsEditorInteraction } from "./useInvoiceItemsEditorInteraction.ts";
 import { invoiceItemUnitLookupTargets, isInvoiceItemArrowNavigationKey, isInvoiceItemCellInputTarget, isInvoiceItemVerticalNavigationKey, shouldMoveInvoiceItemCellByArrow } from "./invoiceItemsEditorInteraction.ts";
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { isUnitLookupSourceField, buildUnitCandidateLookup, findChineseUnitCandidates, normalizeUnitEnglishKey, canFillDownSelectedCells, normalizeInvoiceItemBlankRowCount, buildSelectedCellsClipboardText, getInvoiceItemSelectionBounds, calculateInvoiceItemTableMinWidth, readItemTextValue, parseInvoiceItemClipboardRows, createEmptyInvoiceItem, isMeaningfulInvoiceItem } from "./invoiceItemsEditorModel.ts";
 import {
   EditableInvoiceItemField,
@@ -242,7 +243,7 @@ export function InvoiceItemsEditor({
   }, [items, readOnly, visibleColumns]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.nativeEvent.isComposing) return;
+    if (isComposingKey(event.nativeEvent)) return;
     const primaryModifier = event.ctrlKey || event.metaKey;
     if (primaryModifier && !event.shiftKey && event.key.toLowerCase() === "c" && selectedCellCount > 1) {
       event.preventDefault();

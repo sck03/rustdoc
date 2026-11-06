@@ -321,6 +321,7 @@ function Get-GeneratedArtifactCleanupPlan {
             "nuget-packages",
             "playwright-browsers",
             "rustup-home",
+            "rustsec-advisory-db",
             "tools"
         )
 

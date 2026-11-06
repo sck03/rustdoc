@@ -1,8 +1,10 @@
 import { type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { isComposingKey } from "./keyboardEvent.ts";
 
 export function handleEnterAsTabFormKeyDown(event: ReactKeyboardEvent<HTMLFormElement>) {
   if (
     event.defaultPrevented ||
+    isComposingKey(event.nativeEvent) ||
     !["Enter", "ArrowDown", "ArrowUp"].includes(event.key) ||
     event.ctrlKey ||
     event.metaKey ||

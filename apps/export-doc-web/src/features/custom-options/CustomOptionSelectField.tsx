@@ -1,3 +1,4 @@
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { Plus } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
@@ -37,7 +38,7 @@ export function CustomOptionSelectField({ client, optionType, label, value, opti
         {(descriptionId) => <input autoFocus value={creation.draft} maxLength={maxLength} disabled={disabled || creation.busy}
           aria-describedby={descriptionId} onChange={(event) => creation.setDraft(event.target.value)}
           onKeyDown={(event) => {
-            if (event.nativeEvent.isComposing) return;
+            if (isComposingKey(event.nativeEvent)) return;
             if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); if (!disabled) void creation.save(); }
             if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); creation.close(); }
           }} />}

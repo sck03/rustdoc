@@ -7,14 +7,14 @@ $fixture = Join-Path $fixtureRoot ("cleanup-policy-" + [Guid]::NewGuid().ToStrin
 New-Item -ItemType Directory -Path $fixture -Force | Out-Null
 try {
     if (Test-ExportDocProtectedArtifact $fixture) { throw "Empty generated directory should be cleanable" }
-    foreach ($name in @("App_Data", "Backups", "Templates", "Resources", "Database", "KEY", "TaskPublications")) {
+    foreach ($name in @("App_Data", "Backups", "private-backups", "continuation-user-backup", "Templates", "Resources", "Database", "KEY", "TaskPublications")) {
         $child = Join-Path $fixture $name
         New-Item -ItemType Directory -Path $child | Out-Null
         if (-not (Test-ExportDocProtectedArtifact $fixture)) { throw "Failed to protect $name" }
         if (-not (Test-ExportDocProtectedArtifact $child -IncludeReleaseOutputs)) { throw "Explicit release cleanup must still protect $name" }
         Remove-Item -LiteralPath $child
     }
-    foreach ($name in @(".git", "business.db", "business.db-journal", "business.sqlite-wal", "backup.edmrecovery", "server.dump", "PG_VERSION")) {
+    foreach ($name in @(".git", "business.db", "business.db-journal", "business.sqlite-wal", "backup.edmrecovery", "server.dump", "PG_VERSION", "starting-worktree.patch", "uncommitted.diff")) {
         $child = Join-Path $fixture $name
         [System.IO.File]::WriteAllText($child, "test fixture")
         # Unix marks dotfiles hidden; exercise the same provider behavior on Windows.
@@ -116,6 +116,10 @@ function Test-ExportDocProtectedArtifact {
         'crates/nested/.git/HEAD',
         'crates/nested/target/source.rs',
         '.codex-runtime/notes.txt',
+        '.codex-runtime/private-backups/source.txt',
+        'artifacts/continuation-user-backup/before.json',
+        '.codex-runtime/review-session/starting-worktree.patch',
+        '.codex-runtime/rustsec-advisory-db/advisory.toml',
         '.codex-runtime/pip-cache/install.log'
     )) {
         $file = Join-Path $planRoot $path

@@ -139,7 +139,7 @@ try {
     await page.getByText("still referenced", { exact: false }).waitFor(); assert.equal(await page.getByRole("dialog").count(), 0);
   });
   await scenario("numeric", "/", async page => {
-    const input = page.getByRole("spinbutton"); await input.fill("1"); await input.press("Tab");
+    const input = page.getByRole("textbox", { name: "第 2 行数量", exact: true }); await input.fill("1"); await input.press("Tab");
     assert.equal(await input.inputValue(), "1");
     await input.fill("12"); assert.equal(await input.inputValue(), "12");
     await input.fill("1"); await page.getByRole("option", { name: "100", exact: true }).click(); assert.equal(await input.inputValue(), "100");

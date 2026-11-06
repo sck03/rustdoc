@@ -192,6 +192,7 @@ jobs:
         with:
           chromium: 'true'
       - run: npm --prefix apps/export-doc-web run build
+      - run: npm --prefix apps/export-doc-web run test:style-governance
       - run: npm --prefix apps/export-doc-web run test:accessibility-contracts
       - run: npm --prefix apps/export-doc-web run test:permission-contracts
       - run: npm --prefix apps/export-doc-web run test:scale-contracts

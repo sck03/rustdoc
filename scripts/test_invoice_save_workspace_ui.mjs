@@ -22,6 +22,7 @@ import {createEmptyInvoice} from ${source("features/invoices/invoiceModel.ts")};
 import {createEmptyInvoiceItem} from ${source("features/invoices/invoiceItemsEditorModel.ts")};
 import {InvoiceItemsEditor} from ${source("features/invoices/InvoiceItemsEditor.tsx")};
 import {NumberField} from ${source("ui/FormFields.tsx")};
+import {handleEnterAsTabFormKeyDown} from ${source("ui/formKeyboard.ts")};
 import {ConfirmationProvider} from ${source("ui/ConfirmationProvider.tsx")};
 window.requests=[]; window.resets=0; window.productWrites=[];
 const queryClient=new QueryClient({defaultOptions:{queries:{staleTime:30000,retry:false},mutations:{retry:false}}});
@@ -61,7 +62,7 @@ onUndoItemEdit={items.undoItemEdit} productLibraryMessage={null} productLibraryP
 productLibraryPageNumber={1} productLibraryPageSize={30} productLibraryTotalCount={0} productLibraryTotalPages={1}
 onProductLibraryPageChange={items.setProductLibraryPageNumber} onProductLibraryPageSizeChange={items.changeProductLibraryPageSize}
 onHsKnowledgeFeedback={()=>{}} unitOptions={[]}/>:null;
-return <div><NumberField label="rate" value={number} onChange={setNumber}/><input aria-label="invoice-number" value={invoice.invoiceNo} onChange={e=>setInvoice(current=>({...current,invoiceNo:e.target.value}))}/>
+return <div><form onKeyDownCapture={handleEnterAsTabFormKeyDown} onSubmit={event=>event.preventDefault()}><NumberField label="rate" value={number} onChange={setNumber}/><input aria-label="invoice-number" value={invoice.invoiceNo} onChange={e=>setInvoice(current=>({...current,invoiceNo:e.target.value}))}/></form>
 <button onClick={window.actions.save}>save</button><button onClick={window.actions.product}>product</button><button onClick={window.actions.paste}>paste</button>
 <output data-message>{message}</output><output data-success>{success}</output><output data-product>{items.productLibraryMessage}</output>{grid}</div>;
 }

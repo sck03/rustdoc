@@ -54,7 +54,7 @@
 .oa-approval-timeline { list-style: none; padding: 0; margin: 0; counter-reset: approval-step; }
 .oa-approval-timeline > li { position: relative; padding: 0 0 0 36px; counter-increment: approval-step; }
 .oa-approval-timeline > li + li { margin-top: 16px; }
-.oa-approval-timeline > li::before { content: counter(approval-step); position: absolute; top: 0; left: 0; width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid var(--edm-line); border-radius: 50%; color: var(--edm-primary-750); background: var(--edm-white); font-weight: var(--edm-font-weight-medium); }
+.oa-approval-timeline > li::before { content: counter(approval-step); position: absolute; top: 0; left: 0; width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid var(--edm-line); border-radius: var(--edm-radius-full); color: var(--edm-primary-750); background: var(--edm-white); font-weight: var(--edm-font-weight-medium); }
 .oa-approval-timeline > li:not(:last-child)::after { content: ""; position: absolute; left: 12px; top: 24px; bottom: -16px; border-left: 1px solid var(--edm-line); }
 .oa-attachments ul { padding: 0; list-style: none; }
 .oa-attachments li { margin-block: calc(2 * 4px); overflow-wrap: anywhere; }

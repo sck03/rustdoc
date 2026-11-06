@@ -4,7 +4,40 @@ const cell = (row, field) => `input[data-invoice-item-row="${row}"][data-invoice
 
 export async function runInvoiceItemsGridCases(scenario) {
   await scenario(async page => {
+    await page.locator(cell(0, "styleNo")).fill("ni-history");
+    const input = page.locator(cell(1, "styleNo"));
+    await input.fill("");
+    const cdp = await page.context().newCDPSession(page);
+    try {
+      for (const text of ["n", "ni"]) {
+        await cdp.send("Input.imeSetComposition", { text, selectionStart:text.length, selectionEnd:text.length });
+        assert.equal(await input.inputValue(), text, "History must not replace an active IME composition");
+        assert.equal(await input.evaluate(node => node === document.activeElement), true);
+      }
+      await cdp.send("Input.insertText", { text:"你" });
+      assert.equal(await input.inputValue(), "你");
+      assert.equal(await page.evaluate(() => window.invoice.items[1].styleNo), "你");
+      // WebKit/IME confirmation can report keyCode 229 without isComposing.
+      await input.evaluate(node => node.dispatchEvent(new KeyboardEvent("keydown", { key:"Enter", keyCode:229, bubbles:true, cancelable:true })));
+      assert.equal(await input.evaluate(node => node === document.activeElement), true, "IME confirmation must not move to another row");
+    } finally { await cdp.detach(); }
+    await input.fill("");
+    await input.pressSequentially("n");
+    assert.equal(await input.inputValue(), "ni-history", "Ordinary prefix completion remains available");
+  }, { gridMode:true, initialRows:2 });
+
+  await scenario(async page => {
     const input = page.getByLabel("rate", { exact:true });
+    await input.focus();
+    for (const key of ["Enter", "ArrowDown", "ArrowUp"]) {
+      for (const composition of [{isComposing:true}, {keyCode:229}]) {
+        const prevented = await input.evaluate((node, {key, composition}) => !node.dispatchEvent(new KeyboardEvent("keydown", { key, ...composition, bubbles:true, cancelable:true })), {key, composition});
+        assert.equal(prevented, false, "IME keys belong to the input method");
+        assert.equal(await input.evaluate(node => node === document.activeElement), true, "Form capture must preserve IME focus");
+      }
+    }
+    await input.press("Enter");
+    assert.equal(await page.getByLabel("invoice-number").evaluate(node => node === document.activeElement), true, "Ordinary Enter still navigates");
     for (const text of ["1.05", "0.05", "100.05", "-1.125"]) {
       await input.click(); await input.press("ControlOrMeta+A"); await input.press("Backspace");
       await input.pressSequentially(text);

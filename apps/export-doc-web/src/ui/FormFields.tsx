@@ -1,6 +1,7 @@
 import { type ReactNode, useId } from "react";
 import { dateInputToApiDate, numberInputValue, toDateInputValue } from "./formUtils.ts";
 import { useNumberInputDraft } from "./useNumberInputDraft.ts";
+import { isComposingKey } from "./keyboardEvent.ts";
 import { Field } from "./primitives/Field.tsx";
 
 type FieldShellProps = {
@@ -160,7 +161,7 @@ export function EditableComboField({
         onBlur={commitCurrentValue}
         onChange={(event) => onChange(transformValue ? transformValue(event.target.value) : event.target.value)}
         onKeyDown={(event) => {
-          if (event.key === "Enter") {
+          if (!isComposingKey(event.nativeEvent) && event.key === "Enter") {
             event.preventDefault();
             commitCurrentValue();
             event.currentTarget.blur();
@@ -249,7 +250,7 @@ export function NumberField({
         onCompositionStart={input.onCompositionStart}
         onCompositionEnd={input.onCompositionEnd}
         onBlur={input.reset}
-        onKeyDown={(event) => { if (!event.nativeEvent.isComposing && event.key === "Enter") event.currentTarget.blur(); }}
+        onKeyDown={(event) => { if (!isComposingKey(event.nativeEvent) && event.key === "Enter") event.currentTarget.blur(); }}
       />
       )}
     </FieldShell>

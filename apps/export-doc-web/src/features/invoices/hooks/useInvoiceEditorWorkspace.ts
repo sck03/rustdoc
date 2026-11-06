@@ -7,6 +7,7 @@ import { useWorkspaceDeviceProfile } from "../../../app/workspaceDevice.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
 import { normalizeText, readApiError, readRouteSuccessMessage } from "../../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../../ui/unsavedChangesGuard.tsx";
+import { isComposingKey } from "../../../ui/keyboardEvent.ts";
 import { useServerDraftSync } from "../../../ui/serverDraftSync.tsx";
 import { useConfirmation } from "../../../ui/ConfirmationProvider.tsx";
 import { hasCustomOptionValue } from "../../custom-options/customOptionModel.ts";
@@ -337,7 +338,7 @@ export function useInvoiceEditorWorkspace({ businessDate, client, mode }: {
 
   useEffect(() => {
     function handleDocumentKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.isComposing || !(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== "s") {
+      if (isComposingKey(event) || !(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== "s") {
         return;
       }
 

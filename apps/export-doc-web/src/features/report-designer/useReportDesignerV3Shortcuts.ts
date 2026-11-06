@@ -1,3 +1,4 @@
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { useEffect, useEffectEvent, type RefObject } from "react";
 import { deleteSelectedV3Elements, moveSelectedV3Elements, selectAllV3Elements, type ReportDesignerV3DocumentState } from "./reportDesignerV3Mutations.ts";
 import type { useReportDesignerV3History } from "./reportDesignerV3History.ts";
@@ -9,7 +10,7 @@ export function useReportDesignerV3Shortcuts({ workspaceRef, history, editable, 
   copySelection: () => void; pasteClipboard: () => void; duplicateSelection: () => void; clearSelection: () => void;
 }) {
   const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
-    if (event.defaultPrevented || event.altKey || event.isComposing || isEditableTarget(event.target)) return;
+    if (event.defaultPrevented || event.altKey || isComposingKey(event) || isEditableTarget(event.target)) return;
     // Native workspace listeners run before React's delegated control handlers.
     // Interactive controls own their arrows (resize, column widths, sliders).
     if (event.key.startsWith("Arrow") && event.target instanceof Element && event.target.closest('button,[role="slider"],[role="separator"]')) return;

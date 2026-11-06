@@ -1,3 +1,4 @@
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import type { ApiUserDto, ExportDocManagerApiClient, PersonnelDirectoryRecord } from "../../api/index.ts";
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, ChevronDown, Search } from "lucide-react";
@@ -35,7 +36,7 @@ export function OfficeEmployeePicker({ client, user, value, onChange, disabled }
         onFocus={show} onClick={show} onChange={e => { m.setKeyword(e.target.value); setActive(-1); setOpen(true); }}
         onCompositionStart={() => m.setComposing(true)} onCompositionEnd={() => m.setComposing(false)}
         onKeyDown={e => {
-          if (e.nativeEvent.isComposing || m.composing) return;
+          if (isComposingKey(e.nativeEvent) || m.composing) return;
           if (e.key === "Escape" && expanded) { e.preventDefault(); e.stopPropagation(); setOpen(false); }
           if (e.key === "ArrowDown" || e.key === "ArrowUp") {
             e.preventDefault(); show(); setActive(a => !m.items.length ? -1 : a < 0 ? (e.key === "ArrowDown" ? 0 : m.items.length - 1) : (a + (e.key === "ArrowDown" ? 1 : -1) + m.items.length) % m.items.length);

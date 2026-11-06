@@ -1,3 +1,4 @@
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { useEffect, useRef, useState } from "react";
 import { ensureCurrentSelectOption, type SelectOption } from "./ReportDesignerPropertyControls.tsx";
 import { formatNumber } from "./reportDesignerV3WorkspaceHelpers.tsx";
@@ -47,7 +48,7 @@ export function NumberField(props: NumberFieldProps) {
   // Native validation sees the displayed precision; the model retains exact bounds.
   const displayMin = Number(formatNumber(min, precision));
   const displayMax = Number(formatNumber(max, precision));
-  return <label><span>{label}</span><input type="number" inputMode={step === 1 ? "numeric" : "decimal"} placeholder={props.optional ? "自动" : undefined} step={step === 1 ? 1 : "any"} min={displayMin} max={displayMax} disabled={disabled} value={focused ? draft : formatted} onFocus={() => { if (!focused) setDraft(formatted); setFocused(true); }} onChange={(event) => setDraft(event.target.value)} onBlur={() => { if (!disabled) { setFocused(false); commit(); } }} onKeyDown={(event) => { if (event.nativeEvent.isComposing) return; if (event.key === "Escape") { event.preventDefault(); cancelOnBlur.current = true; setDraft(formatted); event.currentTarget.blur(); } else if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} /></label>;
+  return <label><span>{label}</span><input type="number" inputMode={step === 1 ? "numeric" : "decimal"} placeholder={props.optional ? "自动" : undefined} step={step === 1 ? 1 : "any"} min={displayMin} max={displayMax} disabled={disabled} value={focused ? draft : formatted} onFocus={() => { if (!focused) setDraft(formatted); setFocused(true); }} onChange={(event) => setDraft(event.target.value)} onBlur={() => { if (!disabled) { setFocused(false); commit(); } }} onKeyDown={(event) => { if (isComposingKey(event.nativeEvent)) return; if (event.key === "Escape") { event.preventDefault(); cancelOnBlur.current = true; setDraft(formatted); event.currentTarget.blur(); } else if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); } }} /></label>;
 }
 
 export function focusDesignerNode(selector: string) {

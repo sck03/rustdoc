@@ -1,3 +1,4 @@
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 
 type PointerPoint = { x: number; y: number };
@@ -43,7 +44,7 @@ export function useReportDesignerPointerGesture() {
       finish(event.type === "pointercancel");
     }
     function keyDown(event: KeyboardEvent) {
-      if (event.key !== "Escape" || event.isComposing) return;
+      if (event.key !== "Escape" || isComposingKey(event)) return;
       event.preventDefault();
       event.stopPropagation();
       finish(true);

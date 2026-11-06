@@ -3,6 +3,7 @@ import type { ApiInvoiceItemDto } from "../../api/index.ts";
 import { InvoiceItemCellInput } from "./InvoiceItemCellInput.tsx";
 import { canMovePrintRow, changePrintRow, flattenPrintRows, insertPrintNotes, itemPrintRows, maxItemPrintRows, movePrintRow, resolvePrintRowSelection, type PrintRowSelection } from "./invoicePrintRows.ts";
 import { usePrintRowColumns } from "./InvoicePrintRowsColumns.tsx";
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 
 const pageSize = 50;
 export type EditInvoiceItems = (update: (items: ApiInvoiceItemDto[]) => ApiInvoiceItemDto[]) => void;
@@ -74,7 +75,7 @@ export function InvoicePrintRowsEditor({ items, readOnly, onChangeItem, onEditIt
     } catch (error) { setMessage(error instanceof Error ? error.message : "无法插入文字。"); }
   }
   function keyDown(event: KeyboardEvent) {
-    if (readOnly || event.nativeEvent.isComposing || event.keyCode === 229) return;
+    if (readOnly || isComposingKey(event.nativeEvent)) return;
     if ((event.ctrlKey || event.metaKey) && !event.altKey && ["z", "y"].includes(event.key.toLowerCase())) {
       event.preventDefault();
       const redo = event.shiftKey || event.key.toLowerCase() === "y";

@@ -1,3 +1,4 @@
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { useEffect, useRef } from "react";
 import type { ReportDesignerTextTarget } from "./reportDesignerCanvasText.ts";
 
@@ -28,7 +29,7 @@ export function ReportDesignerCanvasTextEditor({ edit, zoom, readOnly = false, o
   }
   return <div className="report-designer-canvas-text-editor" style={{ left: edit.left, top: edit.top, width: edit.width, height: edit.height }} onPointerDown={(event) => event.stopPropagation()}>
     <textarea ref={ref} readOnly={readOnly} aria-label={edit.kind === "GridCell" ? "在画布编辑单元格文字" : edit.kind === "DetailHeader" ? "在画布编辑表头文字" : "在画布编辑文字"} title="Ctrl+Enter 确认，Esc 取消；点击画布其他位置也可确认" defaultValue={edit.text} onChange={event => onChange(event.currentTarget.value)} style={{ fontSize: `${12 / zoom}px` }} onBlur={(event) => finish(event.currentTarget.value)} onKeyDown={(event) => {
-      if (event.nativeEvent.isComposing) return;
+      if (isComposingKey(event.nativeEvent)) return;
       event.stopPropagation();
       if (event.key === "Escape") { event.preventDefault(); finish(event.currentTarget.value, true); }
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) { event.preventDefault(); finish(event.currentTarget.value); }

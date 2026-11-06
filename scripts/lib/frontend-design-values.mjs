@@ -12,6 +12,8 @@ export function validateDesignValues(sources) {
     "border-radius": /^(?:inherit|(?:0|var\(--edm-radius-(?:xs|sm|md|lg|xl|2xl|full)\))(?: (?:0|var\(--edm-radius-(?:xs|sm|md|lg|xl|2xl|full)\)))*)$/u,
   };
   const tokenValues = new Map();
+  const declaredTokens = new Set();
+  const tokenReferences = [];
   for (const {file, source} of sources) {
     const sheet=postcss.parse(source, {from:file});
     sheet.walkAtRules("media",rule=>{
@@ -22,6 +24,10 @@ export function validateDesignValues(sources) {
     });
     sheet.walkDecls(decl => {
       const fail = message => failures.push(`${file}:${decl.source.start.line}: ${message}`);
+      if (decl.prop.startsWith("--edm-")) declaredTokens.add(decl.prop);
+      for (const [,token] of decl.value.matchAll(/var\(\s*(--edm-[\w-]+)/gu)) {
+        tokenReferences.push({token, fail});
+      }
       if (/[/\\]tokens[/\\]/u.test(file)) {
         tokenValues.set(decl.prop, decl.value);
         if (decl.prop.startsWith("--edm-font-size-") && !/^(?:12|13|14|16|20|26)px$/u.test(decl.value)) fail(`字号令牌不在六档字阶：${decl.value}`);
@@ -34,10 +40,10 @@ export function validateDesignValues(sources) {
           if(size!==1&&size!==7&&size%4!==0) fail(`间距须为 4px 的倍数（1px/7px 边界除外）：${decl.value}`);
         }
       }
-      for (const [,token] of decl.value.matchAll(/var\((--edm-z-[a-z-]+)/gu)) {
-        if (!sources.some(entry => entry.source.includes(`${token}:`))) fail(`未声明的层级令牌：${token}`);
-      }
     });
+  }
+  for (const {token, fail} of tokenReferences) {
+    if (!declaredTokens.has(token)) fail(`未声明的设计令牌：${token}`);
   }
   const levels=[...tokenValues].filter(([key])=>key.startsWith("--edm-z-"));
   if(new Set(levels.map(([,value])=>value)).size>8) failures.push("层级令牌超过八档。");

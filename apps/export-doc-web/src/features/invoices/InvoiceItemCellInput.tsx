@@ -10,6 +10,7 @@ import {
 } from "./invoiceItemsEditorModel.ts";
 import { normalizeText } from "../../ui/formUtils.ts";
 import { useNumberInputDraft } from "../../ui/useNumberInputDraft.ts";
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { filterInvoiceItemHistoryOptionsByPrefix } from "./invoiceItemHistory.ts";
 
 export type InvoiceItemCellInputProps = {
@@ -38,6 +39,7 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
   const ariaLabel = `第 ${index + 1} 行${column.ariaName}`;
   const historyPanelId = `invoice-item-history-${useId().replace(/:/g, "-")}`;
   const inputRef = useRef<HTMLInputElement>(null);
+  const composingText = useRef(false);
   const pendingAutocompleteSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -99,6 +101,12 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
   }
 
   function handleInputChange(rawValue: string) {
+    if (composingText.current) {
+      pendingAutocompleteSelectionRef.current = null;
+      setIsHistoryOpen(false);
+      onChange(rawValue);
+      return;
+    }
     const previousPrefix = normalizeText(currentInputText);
     const nextPrefix = normalizeText(rawValue);
     const isForwardTyping = nextPrefix.length > previousPrefix.length;
@@ -122,7 +130,7 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
 
   function handleOptionKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     const nativeEvent = event.nativeEvent as globalThis.KeyboardEvent;
-    if (nativeEvent.isComposing || event.altKey || event.metaKey || inlineOptions.length === 0) {
+    if (composingText.current || isComposingKey(nativeEvent) || event.altKey || event.metaKey || inlineOptions.length === 0) {
       return;
     }
 
@@ -243,6 +251,7 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
 
   return (
     <div className="item-cell-editor" onBlur={() => {
+      composingText.current = false;
       setIsFocused(false);
       setIsHistoryOpen(false);
     }}>
@@ -262,6 +271,8 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
         onFocus={handleFocus}
         onMouseDown={onMouseDown}
         onKeyDown={handleOptionKeyDown}
+        onCompositionStart={() => { composingText.current = true; pendingAutocompleteSelectionRef.current = null; setIsHistoryOpen(false); }}
+        onCompositionEnd={() => { composingText.current = false; }}
         onChange={(event) => {
           handleInputChange(event.target.value);
         }}

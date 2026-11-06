@@ -1,3 +1,4 @@
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { type ChangeEvent as ReactChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useReportDesignerPointerGesture } from "./useReportDesignerPointerGesture.ts";
 import { Tabs } from "../../ui/primitives/Tabs.tsx";
@@ -120,7 +121,7 @@ export function CommitTextField({
   }
   const onChange = (event: ReactChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDraft(event.target.value);
   const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (event.nativeEvent.isComposing) return;
+    if (isComposingKey(event.nativeEvent)) return;
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();

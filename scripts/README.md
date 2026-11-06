@@ -127,9 +127,9 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 源码脚本的启动／更新经过：准备镜像 → 停 API → 等数据库就绪 → 独立维护容器初始化/逐版升级 → 启 API 并检查就绪。构建及缺失镜像取得在停 API 前完成，失败不打断原应用；已有/离线镜像按 missing 策略复用。原 `compose.yml` 的维护服务仍由脚本显式运行，`-SkipBuild` 复用已有镜像。新版 `compose.image.yml` 则声明初始化完成依赖，支持直接 Compose 启动；升级时先 pull，再 down（不删卷）及 up。两种入口的恢复失败均保留 API 停止状态。
 
-应用 schema 与 PostgreSQL 软件主版本是两件事：当前只支持全新 schema 9，不迁移旧试验库。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。维护前保留需要的备份/完整迁移包。
+应用 schema 与 PostgreSQL 软件主版本是两件事：当前只支持全新 schema 14，不迁移旧试验库。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。维护前保留需要的备份/完整迁移包。
 
-首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接供初始化/恢复使用。桌面 SQLite 新库仍为 admin 空密码；当前仅支持全新 schema 9，不兼容此前试验库。
+首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接供初始化/恢复使用。桌面 SQLite 新库仍为 admin 空密码；当前仅支持全新 schema 14，不兼容此前试验库。
 
 ## 远端入口
 
@@ -285,7 +285,7 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -ListOnly -IncludeCo
 pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntimeWorkspaces
 ```
 
-扫描源码树时直接跳过依赖、受保护数据/资源、私有 `KEY`、链接、本地运行目录和嵌套 Git 仓库，生成目录只作为整体候选，不继续扫描其内部。`.git` 目录与 worktree/submodule 的 `.git` 文件都受保护，其内部构建目录不能作为独立目标绕过保护。任何候选含业务库、备份、私有材料或链接都保留；即使显式清理发布输出，也不放行业务数据、Git 工作树或私有目录。
+扫描源码树时直接跳过依赖、受保护数据/资源、私有 `KEY`、链接、本地运行目录和嵌套 Git 仓库，生成目录只作为整体候选，不继续扫描其内部。`.git` 目录与 worktree/submodule 的 `.git` 文件都受保护，其内部构建目录不能作为独立目标绕过保护。任何候选含业务库、备份、私有材料或链接都保留；`private-backups`、`continuation-user-backup` 和任意位置的 `.patch`/`.diff` 同样保护，避免把未提交源码快照误当测试产物。即使显式清理发布输出，也不放行业务数据、Git 工作树或私有目录；RustSec 下载缓存继续保留。
 
 清理前结束构建、测试及写日志的进程，并把需要保留的验收结论写入进度文档。根部开发/测试日志与一次性目录使用同一盘点、路径保护和 `-WhatIf` 流程；不会顺带清除包内 `App_Data/Logs`、缓存目录内的日志或根部其它文件。Git worktree 仍须检查提交状态后通过 Git 命令单独移除。
 

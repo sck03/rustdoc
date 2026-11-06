@@ -8,6 +8,7 @@ import type {
 } from "../../api/index.ts";
 import { normalizeText, readApiError } from "../../ui/formUtils.ts";
 import { Drawer } from "../../ui/primitives/Dialog.tsx";
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { buildInvoiceHsFeedbackContext, buildInvoiceHsQuery } from "./invoiceHsKnowledgeModel.ts";
 
 export function InvoiceHsKnowledgePanel({
@@ -55,7 +56,7 @@ export function InvoiceHsKnowledgePanel({
   }
 
   function handleSearchKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.nativeEvent.isComposing || event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
+    if (isComposingKey(event.nativeEvent) || event.key !== "Enter" || !(event.ctrlKey || event.metaKey)) return;
     event.preventDefault();
     void search();
   }

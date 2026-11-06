@@ -1,4 +1,5 @@
 import type { KeyboardEvent } from "react";
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 
 export const invoiceItemHeaderHeightPx = 42;
 export const invoiceItemRowHeightPx = 42;
@@ -22,7 +23,7 @@ const arrowNavigationKeys = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "Arrow
 
 export function isInvoiceItemVerticalNavigationKey(event: KeyboardEvent<HTMLElement>) {
   const nativeEvent = event.nativeEvent as globalThis.KeyboardEvent;
-  if (nativeEvent.isComposing || event.ctrlKey || event.altKey || event.metaKey) return false;
+  if (isComposingKey(nativeEvent) || event.ctrlKey || event.altKey || event.metaKey) return false;
   return event.key === "Enter" || event.key === "Tab";
 }
 
@@ -32,7 +33,7 @@ export function isInvoiceItemCellInputTarget(target: EventTarget | null): target
 
 export function isInvoiceItemArrowNavigationKey(event: KeyboardEvent<HTMLElement>) {
   const nativeEvent = event.nativeEvent as globalThis.KeyboardEvent;
-  if (nativeEvent.isComposing || event.ctrlKey || event.altKey || event.metaKey) return false;
+  if (isComposingKey(nativeEvent) || event.ctrlKey || event.altKey || event.metaKey) return false;
   return arrowNavigationKeys.has(event.key);
 }
 

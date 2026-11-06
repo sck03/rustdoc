@@ -12,11 +12,13 @@ function Test-ExportDocProtectedArtifact {
     param([Parameter(Mandatory = $true)][string]$Path, [switch]$IncludeReleaseOutputs)
     $root = [System.IO.Path]::GetFullPath($Path)
     $workspace = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+    $protectedNames = @('.git', 'App_Data', 'Database', 'Backups', 'private-backups', 'continuation-user-backup', 'Security', 'KEY', 'TaskPublications')
     $insideWorkspace = $true
     for ($ancestor = [System.IO.Path]::GetFullPath($Path); $ancestor; $ancestor = [System.IO.Path]::GetDirectoryName($ancestor)) {
         $item = Get-Item -LiteralPath $ancestor -Force -ErrorAction Stop
         if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { return $true }
-        if ($item.Name -in @(".git", "App_Data", "Database", "Backups", "Templates", "OcrModels", "Resources", "Security", "KEY", "TaskPublications")) { return $true }
+        if ($item.Name -in $protectedNames -or $item.Name -in @('Templates', 'OcrModels', 'Resources')) { return $true }
+        if (-not $item.PSIsContainer -and $item.Extension -in @('.patch', '.diff')) { return $true }
         if ([System.IO.Path]::GetRelativePath($workspace, $ancestor) -eq '.') { $insideWorkspace = $false }
         if ($insideWorkspace -and (Test-Path -LiteralPath (Join-Path $ancestor '.git'))) { return $true }
     }
@@ -26,7 +28,7 @@ function Test-ExportDocProtectedArtifact {
     while ($pending.Count -gt 0) {
         $directory = Get-Item -LiteralPath $pending.Pop() -Force -ErrorAction Stop
         if ($directory.Attributes -band [System.IO.FileAttributes]::ReparsePoint) { return $true }
-        if ($directory.Name -in @(".git", "App_Data", "Database", "Backups", "Security", "KEY", "TaskPublications")) { return $true }
+        if ($directory.Name -in $protectedNames) { return $true }
         $relative = [System.IO.Path]::GetRelativePath($root, $directory.FullName).Replace('\', '/')
         if ($cargoOutput -and -not $IncludeReleaseOutputs -and $relative -cmatch '^(?:[^/]+/)?(?:debug|release)/bundle(?:/|$)') { return $true }
         if ($directory.Name -in @('Templates', 'OcrModels', 'Resources')) {
@@ -40,7 +42,7 @@ function Test-ExportDocProtectedArtifact {
             if ($entry.Name -eq '.git' -or ($entry.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { return $true }
             if ($entry.PSIsContainer) { $pending.Push($entry.FullName) }
             elseif (-not $IncludeReleaseOutputs -and $entry.Name -match '^exportdoc-(?:desktop|web|container)-.+\.(?:zip|tar\.gz)$') { return $true }
-            elseif ($entry.Name -eq 'PG_VERSION' -or $entry.Name -match '\.((?:db|sqlite3?)(?:-wal|-shm|-journal)?|edmrecovery|edmmigration|dump)$') { return $true }
+            elseif ($entry.Name -eq 'PG_VERSION' -or $entry.Name -match '\.((?:db|sqlite3?)(?:-wal|-shm|-journal)?|edmrecovery|edmmigration|dump|patch|diff)$') { return $true }
         }
     }
     return $false

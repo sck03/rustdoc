@@ -104,6 +104,16 @@ try {
   cdp = await CdpClient.connect(chrome.browserWebSocketUrl);
   await open("classic"); await waitFor(`document.querySelector(${JSON.stringify(editor)})?.textContent.includes('Shared template')`);
   assert.equal(await read(saveEnabled), false); await record("database-template-first-load");
+  await editText("组合输入草稿", false);
+  for (const key of ["Enter", "Escape"]) {
+    for (const composition of [{ isComposing: true }, { keyCode: 229 }]) {
+      await read(`document.querySelector('textarea[aria-label="在画布编辑文字"]').dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(key)},ctrlKey:true,bubbles:true,cancelable:true,...${JSON.stringify(composition)}}))`);
+      assert.equal(await read("document.querySelector('textarea[aria-label=\"在画布编辑文字\"]')?.value"), "组合输入草稿");
+    }
+  }
+  await read("document.querySelector('textarea[aria-label=\"在画布编辑文字\"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}))");
+  await waitFor("!document.querySelector('textarea[aria-label=\"在画布编辑文字\"]')");
+  await record("ime-confirm-and-cancel-preserve-text-draft");
   await editText("LOCAL DRAFT"); await waitFor(saveEnabled);
   await read("window.__remoteRefresh()"); await settle();
   assert((await read(`document.querySelector(${JSON.stringify(editor)}).textContent`)).includes("LOCAL DRAFT")); await record("query-refresh-retains-draft");
