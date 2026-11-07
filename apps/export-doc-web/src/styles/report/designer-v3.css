@@ -703,11 +703,6 @@
   background: var(--edm-white);
 }
 
-.report-designer-v3-preview-flow-content .edm-report-preview-sample-value {
-  color: var(--edm-primary-800);
-  font-style: italic;
-}
-
 .report-designer-v3-handle {
   position: absolute;
   z-index: var(--edm-z-sticky);
