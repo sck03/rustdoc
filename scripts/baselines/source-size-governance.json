@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-07",
-  "reviewNotes": "2026-11-07: remeasure web production after removing unreachable CSS, internal exports and duplicate report preview mutations (86,324 lines, down 2,505 from the prior baseline). Automation growth to 40,161 lines covers real pagination/layout, IME, mobile save, preview cancellation and request-contract regressions; reuse existing harnesses. Refresh only these two aggregates, retaining per-file limits and growth allowances. Other aggregates retain the 2026-11-06 review.",
+  "reviewNotes": "2026-11-07: web baseline remains 86,324 after dead CSS/internal export/preview cleanup; automation remains 40,161. Desktop/OCR/Excel aggregate is 10,576 after implementing F2 startup migration feedback: separate startup coordination and progress modules, cancellable chunked I/O, isolated window permissions, and cancellation/resume/profile-boundary regressions. Existing per-file limits and the 75-line subsequent growth allowance remain unchanged. Other aggregates retain their prior review.",
   "rules": [
     {
       "name": "repository web production default",
@@ -24,9 +24,9 @@
       ],
       "filePattern": "^.+\\.rs$",
       "maximumLines": 1000,
-      "baselineAggregateLines": 10179,
+      "baselineAggregateLines": 10576,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 10254,
+      "maximumAggregateLines": 10651,
       "reportFiles": false
     },
     {

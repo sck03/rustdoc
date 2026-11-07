@@ -7,14 +7,14 @@ use std::{
 
 use tauri::Manager;
 
+use crate::migration_progress::MigrationProgress;
 use crate::runtime_data_root_migration::apply_pending_data_root_migration;
+use crate::runtime_data_root_migration::pending_data_root_migration_path;
 pub(crate) use crate::runtime_data_root_migration::schedule_data_root_migration;
 use crate::runtime_data_root_storage::ensure_runtime_data_root_is_usable;
 use crate::runtime_paths_config::{persist_runtime_data_root, read_persisted_data_root};
 use crate::runtime_portable::resolve_portable_runtime_root;
 
-#[cfg(test)]
-use crate::runtime_data_root_migration::pending_data_root_migration_path;
 #[cfg(test)]
 use crate::runtime_data_root_network::{is_network_file_system_magic, is_network_file_system_name};
 #[cfg(test)]
@@ -68,50 +68,89 @@ pub(crate) struct RuntimePaths {
     pub(crate) portable: bool,
 }
 
-pub(crate) fn prepare_runtime_paths(app: &tauri::App) -> Result<RuntimePaths, Box<dyn Error>> {
-    let app_root_argument = runtime_arg_value("--app-root");
-    let data_root_argument = runtime_arg_value("--data-root");
-    let default_app_root = match app.path().resource_dir() {
-        Ok(path) => path,
-        Err(_) => current_exe_dir()?,
-    };
-    let app_root = app_root_argument
-        .or_else(|| env::var_os("EXPORTDOCMANAGER_APP_ROOT").map(PathBuf::from))
-        .unwrap_or(default_app_root);
-    let portable_root =
-        resolve_portable_runtime_root(&app_root, runtime_arg_value("--portable-root"))?;
-    let portable = portable_root.is_some();
-    let storage_root = portable_root.as_deref().unwrap_or(&app_root);
-    let explicit_data_root =
-        data_root_argument.or_else(|| env::var_os("EXPORTDOCMANAGER_DATA_ROOT").map(PathBuf::from));
-    let runtime_config_root = if portable {
-        storage_root.to_path_buf()
-    } else {
-        env::var_os(RUNTIME_CONFIG_ROOT_ENVIRONMENT_VARIABLE)
-            .map(PathBuf::from)
-            .unwrap_or_else(|| app_root.join("RuntimeConfig"))
-    };
-    if !portable {
-        apply_pending_data_root_migration(&runtime_config_root, &app_root)?;
+pub(crate) struct RuntimePathSetup {
+    app_root: PathBuf,
+    storage_root: PathBuf,
+    pub(crate) runtime_config_root: PathBuf,
+    explicit_data_root: Option<PathBuf>,
+    portable: bool,
+}
+
+impl RuntimePathSetup {
+    pub(crate) fn resolve(app: &tauri::App) -> Result<Self, Box<dyn Error>> {
+        let app_root_argument = runtime_arg_value("--app-root");
+        let data_root_argument = runtime_arg_value("--data-root");
+        let default_app_root = match app.path().resource_dir() {
+            Ok(path) => path,
+            Err(_) => current_exe_dir()?,
+        };
+        let app_root = app_root_argument
+            .or_else(|| env::var_os("EXPORTDOCMANAGER_APP_ROOT").map(PathBuf::from))
+            .unwrap_or(default_app_root);
+        let portable_root =
+            resolve_portable_runtime_root(&app_root, runtime_arg_value("--portable-root"))?;
+        let portable = portable_root.is_some();
+        let storage_root = portable_root.as_deref().unwrap_or(&app_root);
+        let explicit_data_root = data_root_argument
+            .or_else(|| env::var_os("EXPORTDOCMANAGER_DATA_ROOT").map(PathBuf::from));
+        let runtime_config_root = if portable {
+            storage_root.to_path_buf()
+        } else {
+            env::var_os(RUNTIME_CONFIG_ROOT_ENVIRONMENT_VARIABLE)
+                .map(PathBuf::from)
+                .unwrap_or_else(|| app_root.join("RuntimeConfig"))
+        };
+        Ok(Self {
+            storage_root: storage_root.to_path_buf(),
+            app_root,
+            runtime_config_root,
+            explicit_data_root,
+            portable,
+        })
     }
-    let data_root = resolve_data_root(
-        storage_root,
-        &runtime_config_root,
-        explicit_data_root,
-        portable,
-    )?;
 
-    ensure_directory(&app_root)?;
-    ensure_runtime_data_directories(&data_root)?;
-    let log_root = data_root.join("Logs");
+    pub(crate) fn migration_pending(&self) -> Result<bool, Box<dyn Error>> {
+        if self.portable {
+            return Ok(false);
+        }
+        let marker = pending_data_root_migration_path(&self.runtime_config_root);
+        crate::runtime_data_root_storage::reject_link_like_path(&marker)?;
+        Ok(marker.try_exists()?)
+    }
 
-    Ok(RuntimePaths {
-        app_root,
-        data_root,
-        log_root,
-        runtime_config_root,
-        portable,
-    })
+    pub(crate) fn prepare(
+        self,
+        progress: &MigrationProgress,
+    ) -> Result<RuntimePaths, Box<dyn Error>> {
+        let Self {
+            app_root,
+            storage_root,
+            runtime_config_root,
+            explicit_data_root,
+            portable,
+        } = self;
+        if !portable {
+            apply_pending_data_root_migration(&runtime_config_root, &app_root, progress)?;
+        }
+        let data_root = resolve_data_root(
+            &storage_root,
+            &runtime_config_root,
+            explicit_data_root,
+            portable,
+        )?;
+
+        ensure_directory(&app_root)?;
+        ensure_runtime_data_directories(&data_root)?;
+        let log_root = data_root.join("Logs");
+
+        Ok(RuntimePaths {
+            app_root,
+            data_root,
+            log_root,
+            runtime_config_root,
+            portable,
+        })
+    }
 }
 
 fn runtime_arg_value(name: &str) -> Option<PathBuf> {

@@ -11,14 +11,17 @@ import { UnsavedChangesProvider } from "./ui/unsavedChangesGuard.tsx";
 import { ConfirmationProvider } from "./ui/ConfirmationProvider.tsx";
 import { applyInterfaceDensity, readInterfaceDensity } from "./app/interfaceDensity.ts";
 import { installPortableFonts } from "./app/typographyPolicy.ts";
+import { isTauri } from "@tauri-apps/api/core";
+import { MigrationStartupScreen } from "./desktop/MigrationStartupScreen.tsx";
 
 installPortableFonts();
-installFrontendErrorLogger();
+const migrationStartup = isTauri() && window.location.hash === "#/startup-migration";
+if (!migrationStartup) installFrontendErrorLogger();
 applyInterfaceDensity(readInterfaceDensity());
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
+    {migrationStartup ? <MigrationStartupScreen /> : <QueryClientProvider client={queryClient}>
       <HashRouter>
         <ConfirmationProvider>
           <UnsavedChangesProvider>
@@ -28,6 +31,6 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
           </UnsavedChangesProvider>
         </ConfirmationProvider>
       </HashRouter>
-    </QueryClientProvider>
+    </QueryClientProvider>}
   </React.StrictMode>,
 );

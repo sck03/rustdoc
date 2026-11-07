@@ -16,7 +16,9 @@ mod desktop_commands;
 mod desktop_file_dialog_commands;
 mod desktop_open_commands;
 mod desktop_runtime;
+mod desktop_startup;
 mod log_rotation;
+mod migration_progress;
 #[cfg(windows)]
 mod platform_process;
 mod runtime_data_root_migration;
@@ -83,7 +85,10 @@ fn run_tauri_app() -> tauri::Result<()> {
     let mut builder = tauri::Builder::default();
     if !is_desktop_smoke_session() {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
+            if let Some(window) = app
+                .get_webview_window("main")
+                .or_else(|| app.get_webview_window("migration-startup"))
+            {
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
@@ -125,40 +130,24 @@ fn run_tauri_app() -> tauri::Result<()> {
             tauri_updater_commands::install_tauri_update,
             tauri_updater_commands::cancel_tauri_update,
             desktop_runtime::get_desktop_runtime_context,
-            desktop_runtime::restart_after_startup_failure
+            desktop_runtime::restart_after_startup_failure,
+            desktop_startup::get_data_root_migration_progress
         ])
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
-            let result: Result<(), Box<dyn std::error::Error>> = (|| {
-                let paths = runtime_paths::prepare_runtime_paths(app)?;
-                set_runtime_diagnostic_log_root(&paths.log_root);
-                app.manage(paths.clone());
-                app.manage(tauri_updater_commands::TauriUpdaterState::default());
-                match runtime_prerequisites::check(&paths).and_then(|_| {
-                    desktop_runtime::start(&paths, app.handle().clone())
-                        .map_err(|error| error.to_string())
-                }) {
-                    Ok(runtime) => {
-                        app.manage(runtime);
-                    }
-                    Err(error) => {
-                        let message = error.to_string();
-                        let log = write_tauri_error(&message)
-                            .unwrap_or_else(|| paths.log_root.join("tauri-errors.log"));
-                        app.manage(desktop_runtime::StartupFailure {
-                            message,
-                            log_path: log.to_string_lossy().into_owned(),
-                        });
-                    }
-                }
-                window::open_main_window(app, &paths)?;
-                STARTUP_FINISHED.store(true, Ordering::Release);
-                Ok(())
-            })();
+            let result = desktop_startup::prepare(app);
             // Tauri panics on setup errors inside its event loop; they never reach main's Result.
             result.inspect_err(|error| show_startup_failure(&error.to_string()))
         })
         .on_window_event(|window, event| {
+            if window.label() == "migration-startup" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    if desktop_startup::cancel_if_running(window.app_handle()) {
+                        api.prevent_close();
+                    }
+                }
+                return;
+            }
             if window.label() != "main" {
                 return;
             }
@@ -184,6 +173,10 @@ fn run_tauri_app() -> tauri::Result<()> {
 
     app.run(|app_handle, event| {
         if let tauri::RunEvent::ExitRequested { api, .. } = event {
+            if desktop_startup::cancel_if_running(app_handle) {
+                api.prevent_exit();
+                return;
+            }
             if !desktop_commands::is_app_exit_confirmed() {
                 if let Some(window) = app_handle.get_webview_window("main") {
                     api.prevent_exit();

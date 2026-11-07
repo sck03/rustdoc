@@ -5,6 +5,58 @@ use crate::runtime_paths_config::{
 };
 use std::sync::atomic::{AtomicU64, Ordering};
 
+#[test]
+fn cancelled_migration_keeps_recovery_journal_and_resumes() {
+    let workspace = Workspace::new();
+    workspace.prepare_journal(true, false);
+    let progress = MigrationProgress::default();
+    progress.cancel();
+    let error = apply_pending_data_root_migration(
+        &workspace.paths.runtime_config_root,
+        &workspace.paths.app_root,
+        &progress,
+    )
+    .unwrap_err();
+    assert!(error.to_string().contains("暂停"));
+    assert!(pending_data_root_migration_path(&workspace.paths.runtime_config_root).is_file());
+    assert!(
+        workspace
+            .target
+            .join(DATA_ROOT_MIGRATION_PENDING_FILE)
+            .is_file()
+    );
+    assert_eq!(
+        fs::read(
+            workspace
+                .paths
+                .data_root
+                .join("Database/exportdoc-native.db")
+        )
+        .unwrap(),
+        b"database-snapshot"
+    );
+    workspace.apply().unwrap();
+    assert!(ensure_data_root_available(&workspace.target).is_ok());
+}
+
+#[test]
+fn startup_profile_must_not_write_into_either_migration_tree() {
+    let workspace = Workspace::new();
+    assert_eq!(
+        startup_profile(&workspace.paths.runtime_config_root).unwrap(),
+        workspace.paths.runtime_config_root.join("StartupWebView")
+    );
+    let marker = pending_data_root_migration_path(&workspace.paths.runtime_config_root);
+    let mut migration: PendingDataRootMigration = read_marker(&marker).unwrap();
+    migration.target_root = workspace
+        .paths
+        .runtime_config_root
+        .to_string_lossy()
+        .into_owned();
+    fs::write(&marker, serde_json::to_vec(&migration).unwrap()).unwrap();
+    assert!(startup_profile(&workspace.paths.runtime_config_root).is_err());
+}
+
 struct Workspace {
     root: PathBuf,
     paths: RuntimePaths,
@@ -51,7 +103,11 @@ impl Workspace {
     }
 
     fn apply(&self) -> Result<(), Box<dyn Error>> {
-        apply_pending_data_root_migration(&self.paths.runtime_config_root, &self.paths.app_root)
+        apply_pending_data_root_migration(
+            &self.paths.runtime_config_root,
+            &self.paths.app_root,
+            &MigrationProgress::default(),
+        )
     }
 
     fn prepare_journal(&self, copy: bool, seal_source: bool) -> MigrationJournal {
@@ -64,7 +120,11 @@ impl Workspace {
         let journal = MigrationJournal {
             schema_version: 1,
             migration,
-            source_manifest: collect_tree_manifest(&self.paths.data_root).unwrap(),
+            source_manifest: collect_tree_manifest(
+                &self.paths.data_root,
+                &MigrationProgress::default(),
+            )
+            .unwrap(),
         };
         write_marker(
             &self.target.join(DATA_ROOT_MIGRATION_PENDING_FILE),
@@ -76,6 +136,7 @@ impl Workspace {
                 &journal.source_manifest,
                 &self.paths.data_root,
                 &self.target,
+                &MigrationProgress::default(),
             )
             .unwrap();
         }
@@ -304,7 +365,7 @@ fn committed_recovery_preserves_changes_made_in_the_already_published_target() {
     let journal = workspace.prepare_journal(true, true);
     journal
         .source_manifest
-        .remove_verified_source(&workspace.paths.data_root)
+        .remove_verified_source(&workspace.paths.data_root, &MigrationProgress::default())
         .unwrap();
     fs::rename(
         workspace.target.join(DATA_ROOT_MIGRATION_PENDING_FILE),

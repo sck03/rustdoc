@@ -10,9 +10,11 @@ if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
 }
 
 $mainSourcePath = Join-Path $RepositoryRoot "apps\export-doc-tauri\src-tauri\src\main.rs"
-$permissionPath = Join-Path $RepositoryRoot "apps\export-doc-tauri\src-tauri\permissions\desktop-bridge.toml"
+$permissionPath = Join-Path $RepositoryRoot "apps\export-doc-tauri\src-tauri\permissions"
 $mainSource = Get-Content -LiteralPath $mainSourcePath -Raw -Encoding UTF8
-$permissionSource = Get-Content -LiteralPath $permissionPath -Raw -Encoding UTF8
+$permissionSource = (Get-ChildItem -LiteralPath $permissionPath -Filter '*.toml' -File | ForEach-Object {
+    Get-Content -LiteralPath $_.FullName -Raw -Encoding UTF8
+}) -join "`n"
 $handlerMatch = [regex]::Match($mainSource, '(?s)invoke_handler\(tauri::generate_handler!\[(.*?)\]\)')
 if (-not $handlerMatch.Success) {
     throw "无法在 '$mainSourcePath' 中找到 Tauri 命令注册表。"
@@ -24,19 +26,19 @@ $registeredCommands = @(
         '(?m)^\s*(?:[a-z_][a-z0-9_]*::)+(?<command>[a-z_][a-z0-9_]*)\s*,?\s*$'
     ) | ForEach-Object { $_.Groups["command"].Value } | Sort-Object -Unique
 )
-$permissionAllowMatch = [regex]::Match(
+$permissionAllowMatches = [regex]::Matches(
     $permissionSource,
     '(?s)commands\.allow\s*=\s*\[(?<commands>.*?)\]'
 )
-if (-not $permissionAllowMatch.Success) {
+if ($permissionAllowMatches.Count -eq 0) {
     throw "无法在 '$permissionPath' 中找到 commands.allow 桌面权限白名单。"
 }
 
 $allowedCommands = @(
-    [regex]::Matches(
-        $permissionAllowMatch.Groups["commands"].Value,
-        '"(?<command>[a-z_][a-z0-9_]*)"'
-    ) | ForEach-Object { $_.Groups["command"].Value } |
+    $permissionAllowMatches | ForEach-Object {
+        [regex]::Matches($_.Groups['commands'].Value, '"(?<command>[a-z_][a-z0-9_]*)"') |
+            ForEach-Object { $_.Groups['command'].Value }
+    } |
         Sort-Object -Unique
 )
 $missingPermissions = @($registeredCommands | Where-Object { $_ -notin $allowedCommands })

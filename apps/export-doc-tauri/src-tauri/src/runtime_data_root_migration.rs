@@ -12,6 +12,7 @@ use fs2::FileExt;
 use serde::de::DeserializeOwned;
 
 use crate::{
+    migration_progress::MigrationProgress,
     runtime_data_root_network::reject_network_data_root,
     runtime_data_root_storage::{
         canonical_runtime_data_root, directory_tree_size, ensure_directory_is_empty,
@@ -111,12 +112,15 @@ pub(crate) fn schedule_data_root_migration(
 pub(crate) fn apply_pending_data_root_migration(
     runtime_config_root: &Path,
     app_root: &Path,
+    progress: &MigrationProgress,
 ) -> Result<(), Box<dyn Error>> {
     let pending_path = pending_data_root_migration_path(runtime_config_root);
     reject_link_like_path(&pending_path)?;
     if !pending_path.try_exists()? {
         return Ok(());
     }
+    progress.stage("prepare", None);
+    progress.check()?;
     let migration: PendingDataRootMigration = read_marker(&pending_path)?;
     if migration.schema_version != DATA_ROOT_MIGRATION_SCHEMA_VERSION {
         return Err("数据目录迁移标记版本不受支持，已保留原数据和标记。".into());
@@ -170,7 +174,7 @@ pub(crate) fn apply_pending_data_root_migration(
         }
         ensure_data_root_available(&source_root)?;
         ensure_expected_runtime_data_root(&source_root)?;
-        let reservation = collect_tree_manifest(&target_root)?;
+        let reservation = collect_tree_manifest(&target_root, progress)?;
         if reservation
             .entries
             .iter()
@@ -191,28 +195,37 @@ pub(crate) fn apply_pending_data_root_migration(
         let journal = MigrationJournal {
             schema_version: 1,
             migration: migration.clone(),
-            source_manifest: collect_tree_manifest(&source_root)?,
+            source_manifest: collect_tree_manifest(&source_root, progress)?,
         };
         journal.source_manifest.validate(&target_root)?;
         write_marker(&journal_path, &journal)?;
         journal
     };
     if redirected {
-        journal.source_manifest.verify(&target_root)?;
+        progress.stage("verify", None);
+        journal.source_manifest.verify(&target_root, progress)?;
     } else {
         ensure_data_root_available(&source_root)?;
-        copy_verified_tree(&journal.source_manifest, &source_root, &target_root)?;
-        journal.source_manifest.verify(&source_root)?;
+        copy_verified_tree(
+            &journal.source_manifest,
+            &source_root,
+            &target_root,
+            progress,
+        )?;
+        journal.source_manifest.verify(&source_root, progress)?;
+        progress.check()?;
         write_marker(
             &source_root.join(DATA_ROOT_MIGRATION_REDIRECT_FILE),
             &migration,
         )?;
     }
     // A crash between either write is recoverable while the pending fence remains.
+    progress.stage("switch", None);
     persist_migrated_root(runtime_config_root, &target_root)?;
+    progress.stage("cleanup", None);
     journal
         .source_manifest
-        .remove_verified_source(&source_root)?;
+        .remove_verified_source(&source_root, progress)?;
     fs::rename(&journal_path, &completion_path)?;
     sync_directory(&target_root);
     finish_committed(
@@ -331,6 +344,20 @@ fn write_marker(path: &Path, value: &impl serde::Serialize) -> Result<(), Box<dy
 
 pub(crate) fn pending_data_root_migration_path(runtime_config_root: &Path) -> PathBuf {
     runtime_config_root.join(DATA_ROOT_MIGRATION_MARKER_FILE_NAME)
+}
+
+pub(crate) fn startup_profile(runtime_config_root: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    let migration: PendingDataRootMigration =
+        read_marker(&pending_data_root_migration_path(runtime_config_root))?;
+    let profile = runtime_config_root.join("StartupWebView");
+    reject_link_like_path(&profile)?;
+    for root in [&migration.source_root, &migration.target_root] {
+        let root = Path::new(root);
+        validate_migration_root_shape(root, "migrationRoot")?;
+        validate_distinct_migration_roots(&profile, root)
+            .map_err(|_| "启动缓存不能与迁移源或目标目录相互包含，请将运行配置放在独立目录。")?;
+    }
+    Ok(profile)
 }
 
 fn ensure_migration_disk_capacity(source: &Path, target: &Path) -> Result<(), Box<dyn Error>> {

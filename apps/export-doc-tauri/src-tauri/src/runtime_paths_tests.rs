@@ -275,7 +275,8 @@ fn schedules_and_applies_data_root_migration_before_runtime_start() {
     assert!(scheduled.restart_required);
     assert!(pending_data_root_migration_path(&config_root).exists());
 
-    apply_pending_data_root_migration(&config_root, &app_root).unwrap();
+    apply_pending_data_root_migration(&config_root, &app_root, &MigrationProgress::default())
+        .unwrap();
 
     assert!(
         source_root

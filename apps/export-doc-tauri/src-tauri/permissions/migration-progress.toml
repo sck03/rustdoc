@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-migration-progress"
+description = "Allow the startup window to read migration progress."
+commands.allow = ["get_data_root_migration_progress"]

@@ -12,6 +12,7 @@ use export_doc_engine::maintenance::{
 };
 use sha2::{Digest, Sha256};
 
+use crate::migration_progress::MigrationProgress;
 use crate::runtime_data_root_storage::reject_link_like_path;
 
 pub(crate) const COPY_TEMP_FILE: &str = ".exportdoc-data-root-migration-copy.tmp";
@@ -52,10 +53,13 @@ pub(crate) fn managed_marker(relative: &str) -> bool {
     })
 }
 
-pub(crate) fn collect_tree_manifest(root: &Path) -> Result<TreeManifest, Box<dyn Error>> {
+pub(crate) fn collect_tree_manifest(
+    root: &Path,
+    progress: &MigrationProgress,
+) -> Result<TreeManifest, Box<dyn Error>> {
     reject_link_like_path(root)?;
     let mut entries = Vec::new();
-    collect_directory(root, root, &mut entries)?;
+    collect_directory(root, root, &mut entries, progress)?;
     Ok(TreeManifest { entries })
 }
 
@@ -63,10 +67,12 @@ fn collect_directory(
     root: &Path,
     directory: &Path,
     entries: &mut Vec<TreeEntry>,
+    progress: &MigrationProgress,
 ) -> Result<(), Box<dyn Error>> {
     let mut children = fs::read_dir(directory)?.collect::<Result<Vec<_>, _>>()?;
     children.sort_by_key(|entry| entry.file_name());
     for child in children {
+        progress.check()?;
         let path = child.path();
         let relative = path
             .strip_prefix(root)?
@@ -87,7 +93,7 @@ fn collect_directory(
         let digest = if metadata.is_dir() {
             None
         } else if metadata.is_file() {
-            Some(hash_file(&path)?)
+            Some(hash_file(&path, progress)?)
         } else {
             return Err(format!("迁移不支持的文件对象：{}", path.display()).into());
         };
@@ -97,7 +103,7 @@ fn collect_directory(
             sha256: digest,
         });
         if metadata.is_dir() {
-            collect_directory(root, &path, entries)?;
+            collect_directory(root, &path, entries, progress)?;
         }
     }
     Ok(())
@@ -130,9 +136,13 @@ impl TreeManifest {
         Ok(())
     }
 
-    pub(crate) fn verify(&self, root: &Path) -> Result<(), Box<dyn Error>> {
+    pub(crate) fn verify(
+        &self,
+        root: &Path,
+        progress: &MigrationProgress,
+    ) -> Result<(), Box<dyn Error>> {
         self.validate(root)?;
-        let found = collect_tree_manifest(root)?;
+        let found = collect_tree_manifest(root, progress)?;
         let identities = |manifest: &Self| {
             manifest
                 .entries
@@ -151,12 +161,17 @@ impl TreeManifest {
         Ok(())
     }
 
-    pub(crate) fn remove_verified_source(&self, root: &Path) -> Result<(), Box<dyn Error>> {
+    pub(crate) fn remove_verified_source(
+        &self,
+        root: &Path,
+        progress: &MigrationProgress,
+    ) -> Result<(), Box<dyn Error>> {
         self.validate(root)?;
         for entry in self.entries.iter().filter(|entry| entry.sha256.is_some()) {
+            progress.check()?;
             let path = root.join(&entry.path);
             if path.try_exists()? {
-                entry.verify_file(&path)?;
+                entry.verify_file(&path, progress)?;
                 fs::remove_file(&path)?;
             }
         }
@@ -189,9 +204,13 @@ impl TreeManifest {
 }
 
 impl TreeEntry {
-    pub(crate) fn verify_file(&self, path: &Path) -> Result<(), Box<dyn Error>> {
+    pub(crate) fn verify_file(
+        &self,
+        path: &Path,
+        progress: &MigrationProgress,
+    ) -> Result<(), Box<dyn Error>> {
         self.verify_size(path)?;
-        self.verify_digest(path, &hash_file(path)?)
+        self.verify_digest(path, &hash_file(path, progress)?)
     }
     fn verify_digest(&self, path: &Path, digest: &str) -> Result<(), Box<dyn Error>> {
         if self.sha256.as_deref() != Some(digest) {
@@ -209,23 +228,29 @@ impl TreeEntry {
     }
 }
 
-fn hash_file(path: &Path) -> Result<String, Box<dyn Error>> {
+fn hash_file(path: &Path, progress: &MigrationProgress) -> Result<String, Box<dyn Error>> {
     let mut file = fs::File::open(path)?;
-    hash_to(&mut file, &mut std::io::sink())
+    hash_to(&mut file, &mut std::io::sink(), progress, false)
 }
 fn hash_to(
     input: &mut impl Read,
     output: &mut impl std::io::Write,
+    progress: &MigrationProgress,
+    report_bytes: bool,
 ) -> Result<String, Box<dyn Error>> {
     let mut hasher = Sha256::new();
     let mut buffer = vec![0_u8; 1024 * 1024];
     loop {
+        progress.check()?;
         let read = input.read(&mut buffer)?;
         if read == 0 {
             break;
         }
         hasher.update(&buffer[..read]);
         output.write_all(&buffer[..read])?;
+        if report_bytes {
+            progress.advance(read as u64)?;
+        }
     }
     Ok(hasher
         .finalize()
@@ -238,6 +263,7 @@ pub(crate) fn copy_verified_tree(
     manifest: &TreeManifest,
     source: &Path,
     target: &Path,
+    progress: &MigrationProgress,
 ) -> Result<(), Box<dyn Error>> {
     manifest.validate(source)?;
     manifest.validate(target)?;
@@ -249,7 +275,14 @@ pub(crate) fn copy_verified_tree(
         }
         fs::remove_file(&temporary)?;
     }
+    let total = manifest
+        .entries
+        .iter()
+        .try_fold(0_u64, |total, entry| total.checked_add(entry.bytes))
+        .ok_or("迁移数据总量超出支持范围。")?;
+    progress.stage("copy", Some(total));
     for entry in &manifest.entries {
+        progress.check()?;
         let destination = target.join(&entry.path);
         reject_link_like_path(&destination)?;
         if entry.sha256.is_none() {
@@ -257,7 +290,8 @@ pub(crate) fn copy_verified_tree(
             continue;
         }
         if destination.try_exists()? {
-            entry.verify_file(&destination)?;
+            entry.verify_file(&destination, progress)?;
+            progress.advance(entry.bytes)?;
             continue;
         }
         let original = source.join(&entry.path);
@@ -270,15 +304,18 @@ pub(crate) fn copy_verified_tree(
         let digest = hash_to(
             &mut input.by_ref().take(entry.bytes.saturating_add(1)),
             &mut output,
+            progress,
+            true,
         )?;
         entry.verify_digest(&original, &digest)?;
         output.sync_all()?;
         drop(output);
-        entry.verify_file(&temporary)?;
+        entry.verify_file(&temporary, progress)?;
         fs::rename(&temporary, &destination)?;
         crate::runtime_data_root_storage::sync_directory(destination.parent().unwrap_or(target));
     }
-    manifest.verify(target)
+    progress.stage("verify", None);
+    manifest.verify(target, progress)
 }
 
 #[cfg(test)]
@@ -286,7 +323,35 @@ mod tests {
     use super::*;
 
     #[test]
+    fn copy_reports_written_bytes_and_checks_cancellation_between_chunks() {
+        struct CancelWriter<'a>(&'a MigrationProgress, Vec<u8>);
+        impl std::io::Write for CancelWriter<'_> {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                self.1.extend_from_slice(bytes);
+                self.0.cancel();
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let progress = MigrationProgress::default();
+        let data = vec![17_u8; 2 * 1024 * 1024];
+        progress.stage("copy", Some(data.len() as u64));
+        let mut output = Vec::new();
+        hash_to(&mut data.as_slice(), &mut output, &progress, true).unwrap();
+        assert_eq!(output, data);
+        let snapshot = progress.snapshot();
+        assert_eq!(snapshot.completed_bytes, data.len() as u64);
+        assert_eq!(snapshot.total_bytes, Some(data.len() as u64));
+        let mut cancelled_output = CancelWriter(&progress, Vec::new());
+        assert!(hash_to(&mut data.as_slice(), &mut cancelled_output, &progress, true).is_err());
+        assert_eq!(cancelled_output.1.len(), 1024 * 1024);
+    }
+
+    #[test]
     fn manifest_detects_same_length_changes_and_cleanup_preserves_changed_source() {
+        let progress = MigrationProgress::default();
         let root = std::env::current_dir()
             .unwrap()
             .join("target/runtime-tree-manifest-tests")
@@ -294,17 +359,17 @@ mod tests {
         fs::create_dir_all(root.join("Database")).unwrap();
         let file = root.join("Database/data.db");
         fs::write(&file, b"first").unwrap();
-        let first = collect_tree_manifest(&root).unwrap();
+        let first = collect_tree_manifest(&root, &progress).unwrap();
         fs::write(&file, b"other").unwrap();
-        assert_ne!(first, collect_tree_manifest(&root).unwrap());
+        assert_ne!(first, collect_tree_manifest(&root, &progress).unwrap());
         let target = root.with_extension("copy");
-        assert!(copy_verified_tree(&first, &root, &target).is_err());
+        assert!(copy_verified_tree(&first, &root, &target, &progress).is_err());
         assert!(!target.join("Database/data.db").exists());
-        let current = collect_tree_manifest(&root).unwrap();
-        copy_verified_tree(&current, &root, &target).unwrap();
+        let current = collect_tree_manifest(&root, &progress).unwrap();
+        copy_verified_tree(&current, &root, &target, &progress).unwrap();
         assert_eq!(fs::read(target.join("Database/data.db")).unwrap(), b"other");
         fs::remove_dir_all(target).unwrap();
-        assert!(first.remove_verified_source(&root).is_err());
+        assert!(first.remove_verified_source(&root, &progress).is_err());
         assert_eq!(fs::read(&file).unwrap(), b"other");
         fs::remove_dir_all(root).unwrap();
     }

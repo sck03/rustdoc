@@ -6,7 +6,7 @@ use tauri::{WebviewUrl, WebviewWindowBuilder};
 use crate::runtime_paths::RuntimePaths;
 
 pub(crate) fn open_main_window(
-    app: &tauri::App,
+    app: &tauri::AppHandle,
     paths: &RuntimePaths,
 ) -> Result<(), Box<dyn Error>> {
     let url = if !cfg!(feature = "custom-protocol") {
@@ -47,7 +47,7 @@ fn webview_data_directory(data_root: &Path) -> PathBuf {
     data_root.join("WebView")
 }
 
-fn allow_main_navigation(url: &tauri::Url) -> bool {
+pub(crate) fn allow_main_navigation(url: &tauri::Url) -> bool {
     if cfg!(feature = "custom-protocol") {
         matches!(
             (url.scheme(), url.host_str()),
