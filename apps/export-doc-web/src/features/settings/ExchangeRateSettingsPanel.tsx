@@ -69,7 +69,7 @@ export function ExchangeRateSettingsPanel({ client, settings, canManageSettings,
 
 export default ExchangeRateSettingsPanel;
 
-export function ExchangeRateCurrencySettingsPanel({
+function ExchangeRateCurrencySettingsPanel({
   settings,
   disabled,
   onPatchSettings,

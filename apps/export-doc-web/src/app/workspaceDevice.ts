@@ -15,8 +15,8 @@ export type WorkspaceDeviceProfile = {
   capabilities: WorkspaceDeviceCapabilities;
 };
 
-export const workspacePhoneMaxWidth = 680;
-export const workspaceDesktopMinWidth = 1181;
+const workspacePhoneMaxWidth = 680;
+const workspaceDesktopMinWidth = 1181;
 
 const capabilities: Record<WorkspaceDeviceMode, WorkspaceDeviceCapabilities> = {
   phone: {

@@ -8,6 +8,7 @@ import { OfficeDialog, OfficeField, OfficeQueryState, OfficeSubmit } from "../of
 import { useCommunicationOperation } from "./useCommunication.ts";
 import { announcementActive, announcementStatus, communicationAccess } from "./communicationModel.ts";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export function AnnouncementDetails({ client, user, row, onEdit, onDeleted }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: Announcement; onEdit: () => void; onDeleted: () => void }) {
   const operation = useCommunicationOperation();
@@ -47,5 +48,6 @@ function AnnouncementAction({ client, row, action, onClose, onDeleted }: { clien
 function AnnouncementReceipts({ client, user, row }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: Announcement }) {
   const [page, setPage] = useState(1);
   const query = useQuery({ queryKey: ["office", "receipts", user.id, row.id, page, row.versionNumber], queryFn: ({ signal }) => client.listAnnouncementReceipts({ id: row.id, pageNumber: page, pageSize: 20 }, { signal }) });
+  useServerPageNumber(query, page, setPage);
   return <><OfficeQueryState query={query} emptyTitle="尚无阅读回执" /><ol className="oa-history">{query.data?.items.map(r => <li key={r.id}>{r.readerName} · 发布版本 {r.publishVersion} · {formatBusinessDateTime(r.readAt, user.businessTimeZone)}</li>)}</ol><Pagination pageNumber={page} totalCount={query.data?.totalCount ?? 0} pageSize={20} isBusy={query.isFetching} onPageChange={setPage} /></>;
 }

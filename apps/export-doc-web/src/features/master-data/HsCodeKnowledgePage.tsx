@@ -1,8 +1,8 @@
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import "../../styles/features/hs-knowledge.css";
-import { Download, RefreshCw, ShieldCheck, Sparkles, Upload } from "lucide-react";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import { RefreshCw, ShieldCheck, Sparkles } from "lucide-react";
+import { type FormEvent, useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import type { ExportDocManagerApiClient, HsCodeExampleInput } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
@@ -10,10 +10,12 @@ import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
-import { currentLocalDateInputValue, dateInputToApiDate, readApiError } from "../../ui/formUtils.ts";
+import { dateInputToApiDate, readApiError } from "../../ui/formUtils.ts";
 import { useDebouncedValue } from "../../ui/useDebouncedValue.ts";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
-import { downloadBlob } from "../../ui/downloadBlob.ts";
+import { HsKnowledgeTransfer } from "./HsKnowledgeTransfer.tsx";
+import { Button } from "../../ui/Button.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { HsCodeToolsPanel } from "./HsCodeToolsPanel.tsx";
 import { HsKnowledgeWorkflow } from "./HsKnowledgeWorkflow.tsx";
 import { HsKnowledgeNavigation, hsKnowledgeSections } from "./HsKnowledgeNavigation.tsx";
@@ -45,7 +47,7 @@ export function HsCodeKnowledgePage({ businessDate, client }: { businessDate: st
     {section === "search" ? <KnowledgeSearch client={client} canOperate={permission.canOperate}/> : null}
     {section === "examples" ? <ExampleLibrary businessYear={businessYear} client={client} canOperate={permission.canManage && workspaceDeviceMode !== "phone"} canManage={permission.canManage && workspaceDeviceMode !== "phone"} canBatchManage={permission.canManage && workspaceDeviceCapabilities.canUseBatchOperations}/> : null}
     {section === "history" ? <HistoryLearning businessYear={businessYear} client={client} canOperate={permission.canManage}/> : null}
-    {section === "transfer" ? <>{!workspaceDeviceCapabilities.canImportExport ? <WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="知识库迁移属于完整导入导出操作，请使用带鼠标或触控板的电脑。" tablet="连接鼠标或触控板后可在当前设备完成知识库迁移。"/> : null}<KnowledgeTransfer client={client} canImport={permission.canManage && workspaceDeviceCapabilities.canImportExport} canExport={permission.canManage && workspaceDeviceCapabilities.canImportExport}/></> : null}
+    {section === "transfer" ? <>{!workspaceDeviceCapabilities.canImportExport ? <WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="知识库迁移属于完整导入导出操作，请使用带鼠标或触控板的电脑。" tablet="连接鼠标或触控板后可在当前设备完成知识库迁移。"/> : null}<HsKnowledgeTransfer client={client} canImport={permission.canManage && workspaceDeviceCapabilities.canImportExport} canExport={permission.canManage && workspaceDeviceCapabilities.canImportExport}/></> : null}
     {section === "annual" ? <div className="knowledge-task-card knowledge-tool-card">{!workspaceDeviceCapabilities.canImportExport ? <WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="年度税则导入和版本维护请使用带鼠标或触控板的电脑；手机端可继续查询当前有效编码。" tablet="连接鼠标或触控板后可在当前设备导入年度税则；当前仍可查询和现场确认。"/> : null}<p className="knowledge-task-lead">只有年度税则导入和可信知识库迁移可以建立当前有效编码；每条有效编码都必须带来源、年度和验证时间。</p><HsCodeToolsPanel businessYear={businessYear} mode="import" client={client} disabled={!permission.canManage || !workspaceDeviceCapabilities.canImportExport} keyword="" onLocalDataChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["hs-knowledge"] }); }}/></div> : null}
     {section === "online" ? <div className="knowledge-task-card knowledge-tool-card"><WorkspaceDeviceNotice mode={workspaceDeviceMode} phone="可联网搜索并逐条审核候选；批量审核请使用桌面端。" tablet="可联网搜索并逐条审核候选；批量审核请使用桌面端。"/><p className="knowledge-task-lead">联网实例只进入待审核候选池。选择已验证年度税则中的有效编码后，才会加入公司的申报实例库。</p><HsCodeToolsPanel businessYear={businessYear} mode="remote" client={client} disabled={!permission.canManage} keyword="" onLocalDataChanged={async () => undefined} onRemoteCandidatesChanged={async () => { await queryClient.invalidateQueries({ queryKey: ["hs-remote-candidates"] }); }}/><RemoteCandidateReview client={client} canOperate={permission.canManage} canBatchOperate={permission.canManage && workspaceDeviceCapabilities.canUseBatchOperations}/></div> : null}
   </ListWorkspace>;
@@ -94,6 +96,7 @@ function ExampleLibrary({ businessYear, client, canOperate, canManage, canBatchM
   const [keyword, setKeyword] = useState(""); const debouncedKeyword = useDebouncedValue(keyword); const [pageNumber, setPageNumber] = useState(1); const [pageSize, setPageSize] = useState(30);
   const [editing, setEditing] = useState<HsCodeExampleInput | null>(null); const [selected, setSelected] = useState<Set<number>>(new Set()); const [feedback, setFeedback] = useState<KnowledgeFeedback | null>(null);
   const data = useQuery({ queryKey: ["hs-knowledge", "examples", debouncedKeyword, pageNumber, pageSize], queryFn: ({ signal }) => client.listHsCodeKnowledgeExamples({ keyword: debouncedKeyword, pageNumber, pageSize }, { signal }), placeholderData: keepPreviousData });
+  useServerPageNumber(data, pageNumber, setPageNumber);
   const invalidate = async () => { setSelected(new Set()); await queryClient.invalidateQueries({ queryKey: ["hs-knowledge", "examples"] }); };
   const save = useMutation({ mutationFn: (value: HsCodeExampleInput) => client.saveHsCodeKnowledgeExample({ body: value }), onSuccess: async () => { setEditing(null); setFeedback({tone:"success",message:"申报实例已保存。"}); await invalidate(); }, onError: error => setFeedback({tone:"error",message:readApiError(error)}) });
   const remove = useMutation({ mutationFn: (id: number) => client.deleteHsCodeKnowledgeExample({ id }), onSuccess: async () => { setFeedback({tone:"success",message:"申报实例已删除。"}); await invalidate(); }, onError: error => setFeedback({tone:"error",message:readApiError(error)}) });
@@ -122,7 +125,7 @@ function ExampleLibrary({ businessYear, client, canOperate, canManage, canBatchM
     })) return;
     remove.mutate(id);
   }
-  return <div className="knowledge-task-card"><div className="section-heading"><div><h2>申报实例库</h2><p>只保存已经人工确认、可以参与智能查询的公司经验。</p></div>{canOperate ? <button className="command-button" type="button" onClick={() => setEditing(blank)}>新增实例</button> : null}</div>
+  return <div className="knowledge-task-card"><div className="section-heading"><div><h2>申报实例库</h2><p>只保存已经人工确认、可以参与智能查询的公司经验。</p></div>{canOperate ? <Button variant={editing ? "secondary" : "primary"} disabled={save.isPending} onClick={() => setEditing(blank)}>新增实例</Button> : null}</div>
     <div className="knowledge-list-toolbar"><input className="knowledge-filter" aria-label="搜索申报实例" value={keyword} onChange={event => setKeyword(event.target.value)} placeholder="搜索名称、规格或HS编码"/>{canBatchManage && selected.size ? <button className="secondary-button danger-button" type="button" onClick={() => void confirmBatchDelete()}>批量删除（{selected.size}）</button> : null}</div>
     {feedback ? <InlineNotice tone={feedback.tone}>{feedback.message}</InlineNotice> : null}
     {editing ? <form className="knowledge-editor" onSubmit={event => { event.preventDefault(); save.mutate(editing); }}><label>商品名称<input required maxLength={300} value={editing.productName} onChange={event => setEditing({...editing, productName:event.target.value})}/></label><label>历史/原始编码<input required maxLength={20} value={editing.rawReportedHsCode} onChange={event => setEditing({...editing, rawReportedHsCode:event.target.value})}/></label><label>当前有效编码<input maxLength={20} value={editing.resolvedCurrentHsCode} onChange={event => setEditing({...editing, resolvedCurrentHsCode:event.target.value})}/></label><label>来源年份<input type="number" value={editing.sourceYear ?? ""} onChange={event => setEditing({...editing, sourceYear:event.target.value ? Number(event.target.value) : undefined})}/></label><label className="wide">规格与申报要素<textarea maxLength={1500} value={editing.specification} onChange={event => setEditing({...editing, specification:event.target.value})}/></label><div className="wide form-actions"><button className="command-button" type="submit" disabled={save.isPending}>保存实例</button><button className="secondary-button" type="button" onClick={() => setEditing(null)}>取消</button></div></form> : null}
@@ -138,6 +141,7 @@ function RemoteCandidateReview({ client, canOperate, canBatchOperate }: { client
   const [status, setStatus] = useState("Pending"); const [keyword, setKeyword] = useState(""); const debouncedKeyword = useDebouncedValue(keyword); const [pageNumber, setPageNumber] = useState(1); const [pageSize, setPageSize] = useState(30);
   const [selected, setSelected] = useState<Set<number>>(new Set()); const [drafts, setDrafts] = useState<Record<number,string>>({}); const [feedback, setFeedback] = useState<KnowledgeFeedback | null>(null);
   const candidates = useQuery({ queryKey: ["hs-remote-candidates", status, debouncedKeyword, pageNumber, pageSize], queryFn: ({ signal }) => client.listHsCodeRemoteCandidates({ status, keyword: debouncedKeyword, pageNumber, pageSize }, { signal }), placeholderData: keepPreviousData });
+  useServerPageNumber(candidates, pageNumber, setPageNumber);
   useEffect(() => { setPageNumber(1); setSelected(new Set()); }, [status, debouncedKeyword, pageSize]);
   useEffect(() => { setDrafts(current => { const next = {...current}; for (const item of candidates.data?.items ?? []) if (!(item.id in next)) next[item.id] = item.suggestedCurrentHsCode ?? ""; return next; }); }, [candidates.data]);
   const refresh = async (value: string) => { setFeedback({tone:"success",message:value}); setSelected(new Set()); await queryClient.invalidateQueries({ queryKey: ["hs-remote-candidates"] }); await queryClient.invalidateQueries({ queryKey: ["hs-knowledge", "examples"] }); };
@@ -166,6 +170,7 @@ function HistoryLearning({ businessYear, client, canOperate }: { businessYear: n
   const [pageNumber, setPageNumber] = useState(1); const [pageSize, setPageSize] = useState(30);
   const [feedback, setFeedback] = useState<KnowledgeFeedback | null>(null);
   const candidates = useQuery({ queryKey: ["hs-history-candidates", debouncedKeyword, pageNumber, pageSize], queryFn: ({ signal }) => client.discoverHsCodeHistoryCandidates({ keyword: debouncedKeyword, pageNumber, pageSize }, { signal }), placeholderData: keepPreviousData });
+  useServerPageNumber(candidates, pageNumber, setPageNumber);
   useEffect(() => setPageNumber(1), [debouncedKeyword, pageSize]);
   const confirm = useMutation({
     mutationFn: (item: NonNullable<typeof candidates.data>["items"][number]) => client.saveHsCodeKnowledgeExample({ body: { id: 0, rawReportedHsCode: item.rawCode, resolvedCurrentHsCode: item.currentCode, productName: item.productName, specification: item.specification, source: `HistoryConfirmed:${item.source}`, sourceYear: businessYear, resolutionStatus: "ManuallyVerified", isManuallyVerified: true } }),
@@ -189,11 +194,9 @@ function HistoryLearning({ businessYear, client, canOperate }: { businessYear: n
         {item.variantCount > 0 ? <div className="history-candidate-variants"><small>历史款式</small><span>{item.variantSamples.join("、")}{item.variantCount > item.variantSamples.length ? ` 等 ${item.variantCount} 个` : ""}</span></div> : null}
         <div className="history-candidate-meta"><span>{item.source}</span><span>历史资料 {item.sourceCount} 条</span>{item.variantCount > 0 ? <span>{item.variantCount} 个不同款式</span> : null}</div>
       </div>
-      <div className="history-candidate-actions"><span className="status-pill">{knowledgeStatusLabel(item.resolutionStatus)}</span>{canOperate ? <button className="command-button" type="button" disabled={!item.canConfirm || confirm.isPending} onClick={() => confirm.mutate(item)}>{item.canConfirm ? "确认加入" : "需先处理编码"}</button> : null}</div>
+      <div className="history-candidate-actions"><span className="status-pill">{knowledgeStatusLabel(item.resolutionStatus)}</span>{canOperate ? <Button disabled={!item.canConfirm || confirm.isPending} onClick={() => confirm.mutate(item)}>{item.canConfirm ? "确认加入" : "需先处理编码"}</Button> : null}</div>
     </article>)}</div>
     {candidates.data?.totalCount === 0 ? <PageState title="没有新的待确认资料" description="已确认或重复的历史经验不会再次进入候选列表。" /> : null}
     <Pagination pageNumber={pageNumber} totalPages={Math.max(1, Math.ceil((candidates.data?.totalCount ?? 0) / pageSize))} totalCount={candidates.data?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={candidates.isFetching} onPageChange={setPageNumber} onPageSizeChange={setPageSize}/>
   </div>;
 }
-
-function KnowledgeTransfer({client,canImport,canExport}:{client:ExportDocManagerApiClient;canImport:boolean;canExport:boolean}) { const input=useRef<HTMLInputElement>(null);const[message,setMessage]=useState("");const importer=useMutation({mutationFn:(file:File)=>client.importHsCodeKnowledge({body:file}),onSuccess:value=>setMessage(value.result.message),onError:error=>setMessage(readApiError(error))});async function download(){const blob=await client.exportHsCodeKnowledge();downloadBlob(blob,`ExportDocManager-HsLibrary-${currentLocalDateInputValue().replace(/-/g,"")}.edmhs`);}return <div className="knowledge-task-grid"><article className="knowledge-task-card"><Download size={28}/><h2>导出本机知识库</h2><p>包含已验证税则、正式申报实例、替代关系和学习记录，不包含业务单据和账号数据。</p>{canExport?<button className="command-button" type="button" onClick={()=>void download()}>导出 .edmhs</button>:<span className="muted-text">需要管理权限</span>}</article><article className="knowledge-task-card"><Upload size={28}/><h2>导入另一台电脑</h2><p>导入前校验完整性；缺少有效编码来源、年度或验证时间的知识包会被拒绝。</p><input ref={input} hidden type="file" accept=".edmhs" onChange={event=>{const file=event.currentTarget.files?.[0];event.currentTarget.value="";if(file)importer.mutate(file);}}/>{canImport?<button className="command-button" type="button" disabled={importer.isPending} onClick={()=>input.current?.click()}>选择知识库文件</button>:<span className="muted-text">当前权限只能查看</span>}</article>{message?<InlineNotice tone={importer.isError?"error":"success"} className="knowledge-transfer-message">{message}</InlineNotice>:null}</div>; }

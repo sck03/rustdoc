@@ -9,6 +9,9 @@ import { OfficeRequestsPanel } from "./OfficeRequestsPanel.tsx";
 import { OfficePager, OfficeQueryState, OfficeTabs } from "./OfficeUi.tsx";
 import { useOfficeDirectory, useOfficeResourceOperation, useOfficeView } from "./useOfficeData.ts";
 import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
+import { Button } from "../../ui/Button.tsx";
+import { Field, FilterBar } from "../../ui/primitives/Field.tsx";
+import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
 import "../../styles/routes/office.css";
 
 export function MeetingRoomsPage({ client, user }: { client: ExportDocManagerApiClient; user: ApiUserDto }) {
@@ -30,21 +33,23 @@ function MeetingRoomsDirectory({ client, user }: { client: ExportDocManagerApiCl
   const [deleting, setDeleting] = useState<MeetingRoomRecord | null>(null);
   const deletion = useOfficeResourceOperation("rooms");
   return <>
-    <div className="office-toolbar"><form className="office-search" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
-      <input aria-label="搜索会议室" placeholder="会议室名称或位置" maxLength={120} value={keyword} onChange={(event) => model.changeKeyword(event.target.value)} />
-      <button className="command-button secondary" type="submit">搜索</button></form>
+    <PageHeader title="会议室" count={query.data?.totalCount} unit="间" actions={<>
+      <Button aria-label="刷新会议室" icon={<RefreshCw size={18} aria-hidden="true" />} disabled={query.isFetching} onClick={model.refresh}>刷新</Button>
+      {access.allows("manage") && <Button variant="primary" icon={<Plus size={18} aria-hidden="true" />} disabled={query.isFetching} onClick={() => setEditing("new")}>添加会议室</Button>}
+    </>} />
+    <FilterBar label="会议室筛选" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
+      <Field label="会议室"><input aria-label="搜索会议室" placeholder="名称或位置" maxLength={120} value={keyword} onChange={(event) => model.changeKeyword(event.target.value)} /></Field>
       {access.allows("manage") && <label className="checkbox-field"><input type="checkbox" checked={includeInactive} onChange={(event) => model.changeInactive(event.target.checked)} />含停用</label>}
-      <button className="icon-button" type="button" aria-label="刷新会议室" disabled={query.isFetching} onClick={model.refresh}><RefreshCw size={17} aria-hidden="true" /></button>
-      {access.allows("manage") && <button className="command-button" type="button" disabled={query.isFetching} onClick={() => setEditing("new")}><Plus size={17} aria-hidden="true" />添加会议室</button>}
-    </div>
+      <Button type="submit" disabled={query.isFetching}>搜索</Button>
+    </FilterBar>
     <OfficeQueryState query={query} emptyTitle={search ? "没有找到会议室" : "尚未添加会议室，请联系行政管理员"} />
     {!query.isError && <div className="office-resource-grid">{query.data?.items.map((room) => <article key={room.id} className="office-resource-card">
-      <div className="office-card-heading"><CalendarDays size={21} aria-hidden="true" /><h2>{room.name}</h2><span className="office-badge" data-state={room.isActive ? (room.inUse ? "InUse" : "Available") : "Cancelled"}>{room.isActive ? (room.inUse ? "使用中" : "可预约") : "已停用"}</span></div>
+      <div className="office-card-heading"><CalendarDays size={20} aria-hidden="true" /><h2>{room.name}</h2><span className="office-badge" data-state={room.isActive ? (room.inUse ? "InUse" : "Available") : "Cancelled"}>{room.isActive ? (room.inUse ? "使用中" : "可预约") : "已停用"}</span></div>
       <p className="office-card-detail"><MapPin size={16} aria-hidden="true" />{room.location || "位置未填写"}</p>
       <p className="office-card-detail"><UsersRound size={16} aria-hidden="true" />{room.capacity} 人 · {room.requiresKey ? "需领还钥匙" : "无需钥匙"}</p>
       <p className="office-muted office-card-description">{room.equipment || "暂无设备说明"}</p>
       {room.handlingName && <p>办理分工：{room.handlingName} · {room.handlerNames}</p>}
-      <footer className="office-card-actions"><button className="command-button" type="button" disabled={query.isFetching} onClick={() => setBooking(room)}>查看日程{access.allows("create") && room.isActive ? "与预约" : ""}</button>
+      <footer className="office-card-actions"><Button disabled={query.isFetching} onClick={() => setBooking(room)}>查看日程{access.allows("create") && room.isActive ? "与预约" : ""}</Button>
         {access.allows("manage") && (!room.handlingKey || room.canHandle) && <><button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => setEditing(room)}>编辑</button>
           <button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => setDeleting(room)}>删除</button></>}</footer>
     </article>)}</div>}

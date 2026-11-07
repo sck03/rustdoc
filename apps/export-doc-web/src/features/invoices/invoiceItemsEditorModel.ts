@@ -202,7 +202,7 @@ export function calculateInvoiceItemTableMinWidth(columns: InvoiceItemColumnDefi
   return Math.max(420, 148 + columns.reduce((total, column) => total + getInvoiceItemColumnWidth(column), 0));
 }
 
-export function getInvoiceItemColumnWidth(column: InvoiceItemColumnDefinition) {
+function getInvoiceItemColumnWidth(column: InvoiceItemColumnDefinition) {
   if (column.colClassName.includes("item-wide-col")) {
     return 170;
   }
@@ -214,7 +214,7 @@ export function getInvoiceItemColumnWidth(column: InvoiceItemColumnDefinition) {
   return 112;
 }
 
-export function readItemClipboardValue(item: ApiInvoiceItemDto | undefined, column: InvoiceItemColumnDefinition) {
+function readItemClipboardValue(item: ApiInvoiceItemDto | undefined, column: InvoiceItemColumnDefinition) {
   if (!item) {
     return "";
   }
@@ -227,7 +227,7 @@ export function readItemClipboardValue(item: ApiInvoiceItemDto | undefined, colu
   return sanitizeClipboardCell(typeof value === "string" ? value : "");
 }
 
-export function sanitizeClipboardCell(value: string) {
+function sanitizeClipboardCell(value: string) {
   return value.replace(/\r?\n/g, " ").replace(/\t/g, " ");
 }
 

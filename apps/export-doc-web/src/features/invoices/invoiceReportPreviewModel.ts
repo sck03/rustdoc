@@ -7,10 +7,10 @@ export { fileNameFromPath };
 export type PackageTemplateView = { template: ApiReportTemplateDto; displayName: string; withSealDefault: boolean; initiallySelected: boolean };
 export type BatchExportItemSetting = BatchExportItem;
 export type BatchExportConfigDraft = { fileNamePattern: string; folderPattern: string; mergePdf: boolean; zipAfterExport: boolean; items: BatchExportItemSetting[] };
-export const DEFAULT_DOCUMENT_EMAIL_SUBJECT_TEMPLATE = "Export Documents for Invoice {InvoiceNo}";
-export const DEFAULT_DOCUMENT_EMAIL_BODY_TEMPLATE = "Dear Customer,\r\n\r\nPlease find the attached export documents.\r\n\r\nBest regards,";
-export const DEFAULT_BATCH_EXPORT_FILE_NAME_PATTERN = "{InvoiceNo}_{DocType}";
-export const DEFAULT_BATCH_EXPORT_FOLDER_PATTERN = "{InvoiceNo}_Docs_{Date}";
+const DEFAULT_DOCUMENT_EMAIL_SUBJECT_TEMPLATE = "Export Documents for Invoice {InvoiceNo}";
+const DEFAULT_DOCUMENT_EMAIL_BODY_TEMPLATE = "Dear Customer,\r\n\r\nPlease find the attached export documents.\r\n\r\nBest regards,";
+const DEFAULT_BATCH_EXPORT_FILE_NAME_PATTERN = "{InvoiceNo}_{DocType}";
+const DEFAULT_BATCH_EXPORT_FOLDER_PATTERN = "{InvoiceNo}_Docs_{Date}";
 
 export function buildDocumentPackagePrintHtml(packagePreview: ApiInvoiceDocumentPackagePreviewResponse) {
   const headHtml = packagePreview.items
@@ -40,11 +40,11 @@ ${bodyHtml}
 </html>`;
 }
 
-export function extractHtmlHead(html: string) {
+function extractHtmlHead(html: string) {
   return html.match(/<head[^>]*>([\s\S]*?)<\/head>/i)?.[1] ?? "";
 }
 
-export function extractHtmlBody(html: string) {
+function extractHtmlBody(html: string) {
   return html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? html;
 }
 
@@ -92,7 +92,7 @@ export function buildDocumentEmailBody(
   );
 }
 
-export function applyDocumentEmailTemplate(
+function applyDocumentEmailTemplate(
   template: string,
   invoiceNo: string | undefined,
   customerName: string | undefined,
@@ -153,7 +153,7 @@ export function buildPackageTemplateViewsFromItems(
   return views;
 }
 
-export function findTemplateForBatchExportItem(
+function findTemplateForBatchExportItem(
   item: BatchExportItemSetting,
   templates: ApiReportTemplateDto[],
   usedTemplatePaths: Set<string>,
@@ -198,7 +198,7 @@ export function buildInvoiceBookingSheetDefaultFileName(invoiceNo: string | unde
   return `${invoiceName || `invoice-${invoiceId}`}_订舱托单.xlsx`;
 }
 
-export function applyBatchExportPattern(
+function applyBatchExportPattern(
   pattern: string,
   invoiceNo: string | undefined,
   customerName: string | undefined,
@@ -227,7 +227,7 @@ export function applyBatchExportPattern(
     .trim();
 }
 
-export function replaceBatchExportPlaceholder(value: string, placeholder: string, replacement: string) {
+function replaceBatchExportPlaceholder(value: string, placeholder: string, replacement: string) {
   return value.replace(new RegExp(`\\{${placeholder}\\}`, "gi"), replacement);
 }
 

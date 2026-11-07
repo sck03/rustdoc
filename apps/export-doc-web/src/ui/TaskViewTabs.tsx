@@ -26,11 +26,11 @@ export function TaskViewTabs<T extends string>({
     items={items.map(item => ({ key: item.id, label: item.label, disabled: item.disabled, panelId: getTaskViewPanelId(resolvedIdPrefix, item.id) }))} />;
 }
 
-export function getTaskViewTabId(idPrefix: string, tabId: string) {
+function getTaskViewTabId(idPrefix: string, tabId: string) {
   return getTabId(idPrefix, tabId);
 }
 
-export function getTaskViewPanelId(idPrefix: string, tabId: string) {
+function getTaskViewPanelId(idPrefix: string, tabId: string) {
   return `${idPrefix}-panel-${tabId}`;
 }
 

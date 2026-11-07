@@ -5,6 +5,7 @@ import { useOfficeOperation, useOfficePaging } from "./useOfficeData.ts";
 import { identityQueryRoots } from "../../api/queryKeys.ts";
 import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export const usePersonnelOperation = () => useOfficeOperation(identityQueryRoots);
 
@@ -25,6 +26,7 @@ export function usePersonnelDirectory(client: ExportDocManagerApiClient, user: A
     refetchInterval: 60000, refetchIntervalInBackground: false,
     enabled,
   });
+  useServerPageNumber(query, paging.pageNumber, paging.setPageNumber);
   return { paging, query, options, keyword, departmentId, status, attentionOnly,
     changeKeyword: (text: string) => { list.setKeywordInput(text); if (!text) list.setKeyword(""); },
     search: () => list.setKeyword(keyword),
@@ -48,6 +50,7 @@ export function usePersonnelHistory(client: ExportDocManagerApiClient, user: Api
   const paging = useOfficePaging();
   const query = useQuery({ queryKey: ["office", "people", "history", user.id, user.companyScope, id, paging.pageNumber, paging.pageSize],
     queryFn: ({ signal }) => client.getPersonnelHistory({ id, pageNumber: paging.pageNumber, pageSize: paging.pageSize }, { signal }) });
+  useServerPageNumber(query, paging.pageNumber, paging.setPageNumber);
   return { paging, query };
 }
 
@@ -57,5 +60,6 @@ export function usePersonnelAccountOptions(client: ExportDocManagerApiClient, us
   const [search, setSearch] = useState("");
   const query = useQuery({ queryKey: ["office", "people", "accounts", user.id, user.companyScope, id, search, paging.pageNumber, paging.pageSize],
     queryFn: ({ signal }) => client.listPersonnelAccountOptions({ id, keyword: search || undefined, pageNumber: paging.pageNumber, pageSize: paging.pageSize }, { signal }) });
+  useServerPageNumber(query, paging.pageNumber, paging.setPageNumber);
   return { paging, query, keyword, setKeyword, search: () => { setSearch(keyword.trim()); paging.resetPage(); } };
 }

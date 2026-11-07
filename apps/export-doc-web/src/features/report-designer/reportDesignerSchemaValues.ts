@@ -111,7 +111,7 @@ export function normalizeOptionalBorderStyle(value: unknown, path: string, issue
   };
 }
 
-export function readBorderSide(value: unknown, fallback: boolean, path: string, issues: ReportDesignerSchemaIssue[]) {
+function readBorderSide(value: unknown, fallback: boolean, path: string, issues: ReportDesignerSchemaIssue[]) {
   if (value === undefined || value === null || value === "") {
     return fallback;
   }
@@ -168,7 +168,7 @@ export function readOptionalImageSource(value: unknown, path: string, issues: Re
   return readRequiredImageSource(value, path, issues);
 }
 
-export function readCssColor(value: unknown, path: string, issues: ReportDesignerSchemaIssue[]) {
+function readCssColor(value: unknown, path: string, issues: ReportDesignerSchemaIssue[]) {
   if (typeof value === "string" && isReportDesignerCssColor(value)) {
     return value.trim();
   }

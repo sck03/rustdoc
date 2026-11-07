@@ -1,4 +1,4 @@
-export const DEFAULT_BUSINESS_TIME_ZONE = "Asia/Shanghai";
+const DEFAULT_BUSINESS_TIME_ZONE = "Asia/Shanghai";
 
 type BusinessDateTimeParts = {
   year: number;

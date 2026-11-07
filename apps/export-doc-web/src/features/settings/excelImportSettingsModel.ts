@@ -7,7 +7,7 @@ import {
 
 type ExcelImportSettingsRecord = Record<string, unknown>;
 
-export const defaultExcelImportSettings: ExcelImportSettingsRecord = {
+const defaultExcelImportSettings: ExcelImportSettingsRecord = {
   schemeName: "Default",
   exporterNameCNCell: "A1",
   exporterNameCell: "B3",

@@ -13,7 +13,7 @@ export const invoiceTypeOptions = [
   { value: "实际数据", label: "实际数据" },
 ];
 
-export const invoiceStatusOptions = [
+const invoiceStatusOptions = [
   { value: "Draft", label: "草稿" },
   { value: "Verified", label: "已核对" },
   { value: "Shipped", label: "已出运" },

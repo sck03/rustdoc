@@ -106,7 +106,7 @@ export function hasRouteModulePermission(
   return hasModulePermission(moduleAccess, moduleKey, requiredAccessLevel);
 }
 
-export function normalizePermissionAccessLevel(value: unknown): PermissionAccessLevel {
+function normalizePermissionAccessLevel(value: unknown): PermissionAccessLevel {
   if (typeof value !== "string") return "none";
   const normalized = value.trim().toLowerCase();
   return normalized === "view" || normalized === "operate" || normalized === "manage"

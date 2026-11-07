@@ -4,7 +4,7 @@ import type { ReportDesignerV3DocumentState } from "./reportDesignerV3Mutations.
 
 export const REPORT_DESIGNER_MIN_BODY_BAND_HUNDREDTH_MM = 1000;
 
-export function defaultReportDesignerLayerHeight(layer: Pick<ReportDesignerV3Layer, "role" | "print">) {
+function defaultReportDesignerLayerHeight(layer: Pick<ReportDesignerV3Layer, "role" | "print">) {
   if (layer.role === "Header") return Math.max(1800, layer.print.minHeightHundredthMm);
   if (layer.role === "Footer") return Math.max(1400, layer.print.minHeightHundredthMm);
   return 0;

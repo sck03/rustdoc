@@ -6,7 +6,7 @@ import { normalizeListPageSize } from "../../ui/listViewState.ts";
 
 import { formatPlainNumber } from "../../ui/formUtils.ts";
 
-export const singleWindowOperationCenterViewStateStorageKey = "export-doc-manager.single-window.operation-center.list-view-state.v1";
+const singleWindowOperationCenterViewStateStorageKey = "export-doc-manager.single-window.operation-center.list-view-state.v1";
 
 export const businessTypeOptions = [
   { value: "CustomsCoo", label: "海关原产地证" },
@@ -53,11 +53,11 @@ export function saveSingleWindowOperationCenterViewState(state: SingleWindowOper
   });
 }
 
-export function readStoredViewState(storageKey: string): Record<string, unknown> {
+function readStoredViewState(storageKey: string): Record<string, unknown> {
   return readStoredJsonObject(storageKey);
 }
 
-export function writeStoredViewState(storageKey: string, state: Record<string, unknown>) {
+function writeStoredViewState(storageKey: string, state: Record<string, unknown>) {
   writeStoredJson(storageKey, state);
 }
 
@@ -98,7 +98,7 @@ export function formatReceiptKind(value?: string) {
   return formatOptionLabel(value, receiptKindOptions);
 }
 
-export function formatOptionLabel(value: string | undefined, options: Array<{ value: string; label: string }>) {
+function formatOptionLabel(value: string | undefined, options: Array<{ value: string; label: string }>) {
   if (!value) {
     return "-";
   }
@@ -164,6 +164,6 @@ export async function invalidateSingleWindowBatchQueries(
   await queryClient.refetchQueries({ queryKey, type: "active" });
 }
 
-export function toSafeFileName(value: string) {
+function toSafeFileName(value: string) {
   return value.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_").trim();
 }

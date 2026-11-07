@@ -7,18 +7,21 @@ import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { PageState } from "../../ui/PageState.tsx";
 import type { ApprovalAccount } from "./useApprovalSettings.ts";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export function UnitWorkflowTasksPanel({ client, user, accounts }: { client: ExportDocManagerApiClient; user: ApiUserDto; accounts: ApprovalAccount[] }) {
   const [page, setPage] = useState(1);
   const [assignee, setAssignee] = useState(0);
   const [editing, setEditing] = useState<UnitWorkflowTask | null>(null);
   const query = useQuery({ queryKey: ["unit-workflow-tasks", user.contextId, page, assignee], queryFn: ({ signal }) => client.getUnitWorkflowTasks({ pageNumber: page, pageSize: 20, assigneeId: assignee || undefined }, { signal }) });
+  useServerPageNumber(query, page, setPage);
   return <details><summary>在途任务与职责交接</summary><p>包含待激活的后续任务。交接只改变未签署任务，保留原流程版本、申请资料与历史签署。</p>
     <OfficeField label="按责任人查看"><select value={assignee} onChange={e => { setAssignee(Number(e.target.value)); setPage(1); }}><option value={0}>全部责任人</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.fullName}</option>)}</select></OfficeField>
     {query.isError ? <PageState tone="error" title="在途任务读取失败" description={readApiError(query.error)} action={<button type="button" onClick={() => void query.refetch()}>重试</button>} /> : query.isPending ? <PageState tone="loading" title="正在读取在途任务" /> : <>
       {!query.data.items.length && <p>当前没有等待交接的在途任务。</p>}
       {query.data.items.map(task => <div className="office-resource-card" key={`${task.requestId}:${task.taskKey}`}><strong>事项 #{task.requestId} · {task.nodeKey}</strong><p>{task.assigneeName} · {task.active ? "当前待办" : "等待前序节点"}{task.dueAt && ` · 到期 ${formatBusinessDateTime(task.dueAt, user.businessTimeZone)}`}</p>{task.identityAvailable === false && <p role="status">签署身份已失效，请安排移交或重新审核授权。</p>}{task.authorizationEndsAt && <p>身份到期：{formatBusinessDateTime(task.authorizationEndsAt, user.businessTimeZone)}</p>}<button type="button" className="command-button secondary" onClick={() => setEditing(task)}>移交任务</button></div>)}
-      <div className="office-card-actions"><button type="button" disabled={page === 1 || query.isFetching} onClick={() => setPage(page - 1)}>上一页</button><span>第 {page} 页 · 共 {query.data.totalCount} 项</span><button type="button" disabled={page * 20 >= query.data.totalCount || query.isFetching} onClick={() => setPage(page + 1)}>下一页</button></div>
+      <Pagination pageNumber={page} pageSize={20} totalCount={query.data.totalCount} isBusy={query.isFetching} onPageChange={setPage} />
     </>}
     {editing && <Handover client={client} task={editing} accounts={accounts} onClose={() => setEditing(null)} onSaved={() => setEditing(null)} />}
   </details>;

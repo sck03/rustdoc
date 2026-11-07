@@ -13,7 +13,7 @@ import {
  * arbitrary business string here would turn the generated <img> into a
  * browser-side URL fetch primitive (SSRF and data exfiltration risk).
  */
-export const CONTROLLED_REPORT_IMAGE_FIELD_PATHS = [
+const CONTROLLED_REPORT_IMAGE_FIELD_PATHS = [
   "doc_seal_path",
   "customs_seal_path",
 ] as const;

@@ -150,7 +150,7 @@ export function createDetailTableBlock(): ReportBlock {
   };
 }
 
-export function createDetailTablePrintSettings() {
+function createDetailTablePrintSettings() {
   return {
     repeatHeaderOnPageBreak: true,
     keepRowsTogether: true,

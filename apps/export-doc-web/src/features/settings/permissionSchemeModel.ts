@@ -22,7 +22,7 @@ export const presetLabels: Record<string, string> = {
   manage: "完整管理",
 };
 
-export const presetRanks: Record<string, number> = { view: 1, operate: 2, manage: 3 };
+const presetRanks: Record<string, number> = { view: 1, operate: 2, manage: 3 };
 
 /** OA schemes operate within one unit; group reporting has a separate authorization. */
 export function schemeActionDataScopes(resources: ApiPermissionResourceDefinitionDto[], scopes: string[]) {
@@ -40,7 +40,7 @@ export function grantKey(resourceKey: string, action: string) {
   return `${resourceKey}\u001f${action}`;
 }
 
-export function splitGrantKey(key: string) {
+function splitGrantKey(key: string) {
   const [resourceKey = "", action = ""] = key.split("\u001f", 2);
   return [resourceKey, action] as const;
 }

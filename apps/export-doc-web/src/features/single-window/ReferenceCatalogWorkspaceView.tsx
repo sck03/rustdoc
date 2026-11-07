@@ -125,7 +125,7 @@ export function ReferenceCatalogToolbar({
           <Save size={17} aria-hidden="true" />
           <span>保存</span>
         </button>
-        <button className="command-button danger" type="button" disabled={!canReset || isBusy} onClick={onReset}>
+        <button className="command-button secondary danger" type="button" disabled={!canReset || isBusy} onClick={onReset}>
           <RotateCcw size={17} aria-hidden="true" />
           <span>恢复内置</span>
         </button>
@@ -157,7 +157,7 @@ export function ReferenceCatalogExcelPanel({
             <RefreshCw size={16} aria-hidden="true" />
             <span>预览</span>
           </button>
-          <button className="command-button" type="button" disabled={!workspace.canApply} onClick={workspace.applyPreview}>
+          <button className="command-button secondary" type="button" disabled={!workspace.canApply} onClick={workspace.applyPreview}>
             <FileSpreadsheet size={16} aria-hidden="true" />
             <span>应用到草稿</span>
           </button>

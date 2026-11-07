@@ -9,6 +9,7 @@ await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, 
   const routes = await page.locator('.workspace-nav a[href]').evaluateAll(nodes => [...new Set(nodes.map(node => node.hash).filter(Boolean))]);
   assert(routes.length >= 25, 'Audit the complete authorized navigation, rather than a single representative page');
   routes.push(...['calendar', 'handling', 'delegations', 'templates', 'runtime'].map(view => `#/office/approval-settings?view=${view}`));
+  routes.push(...['examples', 'history', 'transfer', 'annual', 'online'].map(section => `#/master-data/hs-knowledge/${section}`));
   const results = [];
   for (const width of [1440, 1024, 390]) {
     await page.setViewportSize({ width, height: 1000 });
@@ -32,6 +33,7 @@ await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, 
         });
         const search = document.querySelector('.nav-search input');
         return { invalid, fields: fields.filter(field => field.getClientRects().length).length,
+          primaryActions: [...document.querySelectorAll('main .command-button:not(.secondary)')].filter(node => node.getClientRects().length).map(node => node.textContent),
           font: getComputedStyle(document.body).fontFamily,
           searchBackground: search ? getComputedStyle(search).backgroundColor : null,
           overflow: document.documentElement.scrollWidth > innerWidth + 1,
@@ -39,6 +41,7 @@ await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, 
       });
       assert.deepEqual(metrics.invalid, [], `${width} ${route}: labels and filter controls share a row`);
       assert.equal(metrics.overflow, false, `${width} ${route}: no page overflow ${JSON.stringify(metrics.overflowElements)}`);
+      assert(metrics.primaryActions.length <= 1, `${width} ${route}: one primary action ${JSON.stringify(metrics.primaryActions)}`);
       assert(metrics.font.replaceAll('"', '').startsWith('Noto Sans CJK SC'), `${route}: use the bundled interface family (${metrics.font})`);
       if (metrics.searchBackground) assert.equal(metrics.searchBackground, 'rgba(0, 0, 0, 0)', 'Navigation search stays transparent');
       results.push({ width, route, ...metrics });
@@ -48,6 +51,20 @@ await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, 
       }
     }
   }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(url + '/#/master-data/hs-knowledge/examples');
+  await page.getByRole('button', { name: '新增实例', exact: true }).click();
+  assert.deepEqual(await page.locator('main .command-button:not(.secondary)').allTextContents(), ['保存实例'], 'Editing makes save the primary action');
+  await page.getByRole('button', { name: '取消', exact: true }).click();
+  await page.goto(url + '/#/master-data/hs-knowledge/transfer');
+  const exportRoute = '**/api/master-data/hs-knowledge/export';
+  await page.route(exportRoute, route => route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ message: '知识库导出服务暂不可用' }) }));
+  await page.getByRole('button', { name: '导出 .edmhs', exact: true }).click();
+  await page.getByText('知识库导出服务暂不可用', { exact: true }).waitFor();
+  await page.unroute(exportRoute);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出 .edmhs', exact: true }).click();
+  assert((await download).suggestedFilename().endsWith('.edmhs'), 'Export can be retried after a failure');
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto(url);
   await page.locator('.workspace-header h1').waitFor();

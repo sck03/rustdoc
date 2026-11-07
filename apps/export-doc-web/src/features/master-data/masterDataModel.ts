@@ -114,7 +114,7 @@ export function applyHsCodeRemoteDetailResolution(
   return nextItems;
 }
 
-export function upsertHsCodeResult(items: ApiHsCodeDto[], original: ApiHsCodeDto, next: ApiHsCodeDto) {
+function upsertHsCodeResult(items: ApiHsCodeDto[], original: ApiHsCodeDto, next: ApiHsCodeDto) {
   const normalizedNext = normalizeHsCodeDtoForRequest(next);
   const nextIdentity = normalizeText(normalizedNext.code || normalizedNext.normalizedCode || normalizedNext.detailUrl);
   if (!nextIdentity) {
@@ -129,7 +129,7 @@ export function upsertHsCodeResult(items: ApiHsCodeDto[], original: ApiHsCodeDto
   return items.map((item, index) => (index === existingIndex ? normalizedNext : item));
 }
 
-export function isRemovedOriginal(item: ApiHsCodeDto, original: ApiHsCodeDto, removedItems: ApiHsCodeDto[]) {
+function isRemovedOriginal(item: ApiHsCodeDto, original: ApiHsCodeDto, removedItems: ApiHsCodeDto[]) {
   return isSameHsCodeResult(item, original) && removedItems.some((removed) => isSameHsCodeResult(removed, original));
 }
 
@@ -139,7 +139,7 @@ export function shouldFetchRemoteHsCodeDetail(item: ApiHsCodeDto) {
     !normalizeText(item.elements);
 }
 
-export function isSameHsCodeResult(left: ApiHsCodeDto, right: ApiHsCodeDto) {
+function isSameHsCodeResult(left: ApiHsCodeDto, right: ApiHsCodeDto) {
   const leftCode = normalizeText(left.code || left.normalizedCode).toLowerCase();
   const rightCode = normalizeText(right.code || right.normalizedCode).toLowerCase();
   if (leftCode && rightCode) {
@@ -235,7 +235,7 @@ export function applyHsCodeToProductRecord(record: MasterDataRecord, hsCode: Api
   };
 }
 
-export function fillProductTextFieldFromHsCode(
+function fillProductTextFieldFromHsCode(
   record: MasterDataRecord,
   fieldName: string,
   label: string,
@@ -251,7 +251,7 @@ export function fillProductTextFieldFromHsCode(
   return { ...record, [fieldName]: normalized };
 }
 
-export function parseHsCodeRebateRate(value?: string) {
+function parseHsCodeRebateRate(value?: string) {
   const normalized = normalizeText(value).replace("%", "");
   const match = /-?\d+(?:\.\d+)?/.exec(normalized);
   if (!match) {
@@ -289,7 +289,7 @@ export function buildProductUnitAssistance(products: ApiProductDto[], units: Api
   };
 }
 
-export function addProductUnitSuggestion(map: Map<string, string[]>, englishUnit?: string, chineseUnit?: string) {
+function addProductUnitSuggestion(map: Map<string, string[]>, englishUnit?: string, chineseUnit?: string) {
   const englishKey = normalizeUnitEnglishKey(englishUnit);
   const normalizedChinese = normalizeText(chineseUnit);
   if (!englishKey || !normalizedChinese) {
@@ -305,7 +305,7 @@ export function addProductUnitSuggestion(map: Map<string, string[]>, englishUnit
   map.set(englishKey, values);
 }
 
-export function buildUniqueTextSuggestions(values: Array<string | undefined>, upperCase = false) {
+function buildUniqueTextSuggestions(values: Array<string | undefined>, upperCase = false) {
   const suggestions = new Set<string>();
   for (const value of values) {
     const normalized = upperCase ? normalizeUnitEnglishKey(value) : normalizeText(value);
@@ -325,7 +325,7 @@ export function normalizeHsCodeKey(value?: string) {
   return normalizeText(value).replace(/[^0-9A-Za-z]/g, "").toUpperCase();
 }
 
-export function findProductChineseUnitCandidates(assistance: ProductUnitAssistance, englishUnit: string) {
+function findProductChineseUnitCandidates(assistance: ProductUnitAssistance, englishUnit: string) {
   return assistance.suggestionsByEnglish.get(normalizeUnitEnglishKey(englishUnit)) ?? [];
 }
 
@@ -402,7 +402,7 @@ export function readRecordNumber(record: MasterDataRecord, name: string) {
   return 0;
 }
 
-export function readDisplayString(value: unknown) {
+function readDisplayString(value: unknown) {
   if (typeof value === "number") {
     return String(value);
   }
@@ -455,7 +455,7 @@ export function normalizeCustomerRecord(record: MasterDataRecord, id: number) {
   return next;
 }
 
-export function normalizeMixedFields(
+function normalizeMixedFields(
   record: MasterDataRecord,
   id: number,
   textFields: string[],
@@ -507,7 +507,7 @@ export function normalizeHsCodeRecord(record: MasterDataRecord, id: number) {
   return next;
 }
 
-export const customerTextFields = [
+const customerTextFields = [
   "customerNameEN",
   "displayName",
   "notifyPartyName",

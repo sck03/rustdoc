@@ -1,6 +1,6 @@
 import { isCalendarDate } from "../../ui/calendarDate.ts";
 
-export const defaultQueryPageSize = 50;
+const defaultQueryPageSize = 50;
 export const queryPageSizeOptions = [20, 50, 100, 200] as const;
 
 export type QueryFilters = {

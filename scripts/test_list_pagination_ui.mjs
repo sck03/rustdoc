@@ -18,7 +18,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import React from 'react';
   import { createRoot } from 'react-dom/client';
   import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
-  import { MemoryRouter } from 'react-router-dom';
+  import { MemoryRouter, Routes, Route } from 'react-router-dom';
   import ${source('styles/index.css')};
   import { PermissionAccessProvider } from ${source('app/PermissionAccessContext.tsx')};
   import { ConfirmationProvider } from ${source('ui/ConfirmationProvider.tsx')};
@@ -37,6 +37,20 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { useReportTemplateWorkspaceQueries } from ${source('features/reports/useReportTemplateWorkspaceQueries.ts')};
   import { Pagination } from ${source('ui/primitives/Pagination.tsx')};
   import { getMasterDataConfig } from ${source('features/master-data/masterDataConfigs.ts')};
+  import { HsCodeKnowledgePage } from ${source('features/master-data/HsCodeKnowledgePage.tsx')};
+  import { EmailDeliveryHistory } from ${source('features/tools/EmailDeliveryHistory.tsx')};
+  import { MeetingRoomsPage } from ${source('features/office/MeetingRoomsPage.tsx')};
+  import { OfficeSuppliesPage } from ${source('features/office/OfficeSuppliesPage.tsx')};
+  import { PersonnelPage } from ${source('features/office/PersonnelPage.tsx')};
+  import { OfficePager, OfficeQueryState } from ${source('features/office/OfficeUi.tsx')};
+  import { useOfficeHistory, useOfficeRequests } from ${source('features/office/useOfficeData.ts')};
+  import { usePersonnelHistory, usePersonnelAccountOptions } from ${source('features/office/usePersonnelData.ts')};
+  import { useOrganizationManagers } from ${source('features/organization/useOrganizationDirectory.ts')};
+  import { UnitMembersPanel } from ${source('features/organization/UnitMembersPanel.tsx')};
+  import { UnitWorkflowSummary } from ${source('features/organization/UnitWorkflowSummary.tsx')};
+  import { UnitWorkflowTasksPanel } from ${source('features/oa/UnitWorkflowTasksPanel.tsx')};
+  import { WorkflowExceptionsPanel } from ${source('features/oa/WorkflowExceptionsPanel.tsx')};
+  import { PersonnelFoundationPanel } from ${source('features/organization/PersonnelFoundationPanel.tsx')};
   import ${source('styles/workspaces.css')}; import ${source('styles/responsive.css')};
   const mode = new URLSearchParams(location.search).get('mode');
   window.__requests = []; window.__totalPages = 3; window.__fail = false;
@@ -50,7 +64,8 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
       request.completed = true;
       if (window.__fail) return reject(new Error('分页测试读取失败'));
       const totalPages = window.__totalPages, pageNumber = Math.max(1, Math.min(input.pageNumber, totalPages));
-      resolve({ items: [], rows: [], pageNumber: ['announcements', 'notifications'].includes(mode) ? input.pageNumber : pageNumber, pageSize: input.pageSize, totalPages,
+      resolve({ items: [], rows: [], departments: [], unitId: 'test-unit', completedSince: '2026-10-01T00:00:00+08:00', asOf: '2026-10-06T00:00:00+08:00',
+        ...(mode === 'exceptions' ? {} : { pageNumber: ['announcements', 'notifications'].includes(mode) ? input.pageNumber : pageNumber, pageSize: input.pageSize }), totalPages,
         totalCount: totalPages * input.pageSize, hasNextPage: pageNumber < totalPages, hasPreviousPage: pageNumber > 1 });
     }, 180);
     options?.signal?.addEventListener('abort', () => {
@@ -66,6 +81,21 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
     queryReportTemplateV3ImageResources: list, listUserReportTemplates: list, listReportTemplates: async () => [],
     listCustomersPage: mode === 'master' ? list : async () => ({ items: [] }),
     getSettings: async () => ({ settings: { system: { defaultExportDirectory: '' } } }) };
+  for (const name of ['listHsCodeKnowledgeExamples', 'listHsCodeRemoteCandidates', 'discoverHsCodeHistoryCandidates',
+    'listEmailDeliveries', 'listMeetingRooms', 'listOfficeSupplies', 'listPersonnel', 'getMeetingBookingHistory', 'listMeetingBookings',
+    'getPersonnelHistory', 'listPersonnelAccountOptions', 'listOrganizationManagers', 'getUnitMembers', 'getUnitWorkflowSummary',
+    'getUnitWorkflowTasks', 'listOaWorkflowExceptions', 'listPositions']) client[name] = list;
+  client.getPersonnelOptions = async () => ({ departments: [], canCreate: false });
+  function HookDirectory({ user }) {
+    const hooks = { 'office-history': () => useOfficeHistory(client, user, 'rooms', 1),
+      'office-requests': () => useOfficeRequests(client, user, 'rooms'),
+      'personnel-history': () => usePersonnelHistory(client, user, 1),
+      'personnel-accounts': () => usePersonnelAccountOptions(client, user, 1),
+      'organization-managers': () => useOrganizationManagers(client, 'TEST') };
+    const m = hooks[mode]();
+    return <><OfficeQueryState query={m.query} emptyTitle="暂无记录" /><OfficePager page={m.query.data} paging={m.paging} busy={m.query.isFetching} /></>;
+  }
+  function Knowledge() { return <Routes><Route path="/:section" element={<HsCodeKnowledgePage client={client} businessDate="2026-10-06" />} /></Routes>; }
   function Templates() {
     const { userTemplateDirectory: d, userTemplatesQuery: q } = useReportTemplateWorkspaceQueries({ client, reportType: 'ExportDocument', enabled: true,
       includeDesignerData: false, includeArchived: false, canPreviewInvoiceSource: false, canPreviewPaymentSource: false, selectedUserTemplateId: 0, selectedTemplatePath: '' });
@@ -75,14 +105,22 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   const components = { invoices: InvoiceListPage, payments: PaymentListPage, jobs: JobCenterPage,
     query: QueryPage, audit: AuditLogPage, 'single-window': SingleWindowOperationCenterPage, master: MasterDataListPage,
     attachments: BusinessAttachmentsPage, worklist: WorklistPage, announcements: AnnouncementsPage, notifications: NotificationsPage,
-    resources: ReportImageResourceGallery, templates: Templates };
+    resources: ReportImageResourceGallery, templates: Templates,
+    'hs-examples': Knowledge, 'hs-online': Knowledge, 'hs-history': Knowledge, mail: EmailDeliveryHistory,
+    rooms: MeetingRoomsPage, supplies: OfficeSuppliesPage, personnel: PersonnelPage,
+    'office-history': HookDirectory, 'office-requests': HookDirectory, 'personnel-history': HookDirectory,
+    'personnel-accounts': HookDirectory, 'organization-managers': HookDirectory,
+    'unit-members': UnitMembersPanel, 'unit-summary': UnitWorkflowSummary, 'unit-tasks': UnitWorkflowTasksPanel,
+    exceptions: WorkflowExceptionsPanel, foundation: PersonnelFoundationPanel };
   const Component = components[mode];
-  const permissions = ['document.invoices', 'document.payments', 'document.jobs', 'document.query', 'document.single-window', 'document.master-data', 'office.announcements', 'office.notifications']
+  const permissions = ['document.invoices', 'document.payments', 'document.jobs', 'document.query', 'document.single-window', 'document.master-data', 'office.announcements', 'office.notifications', 'office.people', 'office.rooms', 'office.supplies', 'document.hs-knowledge']
     .map(resourceKey => ({ resourceKey, action: 'view', dataScope: 'all' }));
-  createRoot(document.getElementById('root')).render(<MemoryRouter><QueryClientProvider client={queries}>
+  permissions.push({resourceKey:'document.hs-knowledge',action:'manage',dataScope:'all'});
+  createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[mode.startsWith('hs-') ? '/' + mode.slice(3) : '/']}><QueryClientProvider client={queries}>
     <PermissionAccessProvider grants={[]} permissions={permissions} subject={{ id: 1 }} canManageSettings={false}>
       <ConfirmationProvider><main><h1>列表分页验收</h1><Component client={client} businessDate='2026-10-06'
-        user={{ id: 1, capabilities: { permissions }, businessTimeZone: 'Asia/Shanghai' }} editable={false} resources={[]} onChoose={() => {}}
+        user={{ id: 1, companyScope: 'TEST', capabilities: { permissions }, businessTimeZone: 'Asia/Shanghai' }} editable={false} resources={[]} onChoose={() => {}}
+        businessTimeZone="Asia/Shanghai" company="TEST" unitId="test-unit" accounts={[]}
         config={getMasterDataConfig('customers')} canOperate={false} canManage={false} canViewMasterData canViewHsCodes={false}/></main></ConfirmationProvider>
     </PermissionAccessProvider></QueryClientProvider></MemoryRouter>);
 ` }, outfile: path.join(output, 'app.js'), bundle: true, platform: 'browser', format: 'esm', jsx: 'automatic', logLevel: 'silent' });
@@ -103,13 +141,17 @@ try {
   context = await require('playwright').chromium.launchPersistentContext(path.join(output, 'Chrome'), {
     executablePath: locateChromeForTesting(repo), headless: true, viewport: { width: 1280, height: 900 },
   });
-  for (const mode of ['invoices', 'payments', 'jobs', 'query', 'audit', 'single-window', 'master', 'attachments', 'worklist', 'announcements', 'notifications', 'resources', 'templates']) {
+  for (const mode of ['invoices', 'payments', 'jobs', 'query', 'audit', 'single-window', 'master', 'attachments', 'worklist', 'announcements', 'notifications', 'resources', 'templates',
+    'hs-examples', 'hs-online', 'hs-history', 'mail', 'rooms', 'supplies', 'personnel', 'office-history', 'office-requests',
+    'personnel-history', 'personnel-accounts', 'organization-managers', 'unit-members', 'unit-summary', 'unit-tasks', 'exceptions', 'foundation']) {
     const page = await context.newPage();
     page.setDefaultTimeout(5000);
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
     await page.goto(`http://127.0.0.1:${server.address().port}/?mode=${mode}`);
     if (mode === 'resources') await page.getByText('图片资源库', { exact: true }).click();
+    if (mode === 'unit-tasks') await page.getByText('在途任务与职责交接', { exact: true }).click();
+    if (mode === 'foundation') await page.getByText('岗位、雇佣与审批职责', { exact: true }).click();
     const pager = page.locator(mode === 'resources' ? '.report-designer-v3-resource-card-actions' : '.pagination-bar');
     const waitPage = async number => {
       if (mode === 'resources') {

@@ -66,7 +66,7 @@ function normalizeDetailTableCellContent(
   };
 }
 
-export function validateCompositePositions(parts: ReportDetailTableCellContent[], path: string, issues: ReportDesignerSchemaIssue[]) {
+function validateCompositePositions(parts: ReportDetailTableCellContent[], path: string, issues: ReportDesignerSchemaIssue[]) {
   let position = 0;
   parts.forEach((part, index) => {
     if (part.kind === "LineBreak" || part.kind === "Spacer") position = 0;

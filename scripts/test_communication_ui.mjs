@@ -121,7 +121,7 @@ await withOfficeUi('communication-ui', async ({ output, require, url, operations
   expense=await invoke('SubmitExpenseRequest',{expectedVersion:expense.versionNumber},{id:expense.id},token);
   expense=await approveTask(invoke,reviewerToken,'Expense',expense.id);
   const financePage = await openPage(financeName, 'Finance-Review-2026');
-  await financePage.getByRole('link', { name: '站内通知', exact: true }).click();
+  await financePage.getByRole('link', { name: '通知与公告', exact: true }).click();
   await financePage.getByRole('heading', { name: `审批通过 · ${expenseBody.title}`, exact: true }).waitFor();
   await financePage.getByRole('button', { name: '标记已读', exact: true }).click();
   await financePage.getByRole('heading', { name: '站内通知 · 0 条未读', exact: true }).waitFor();

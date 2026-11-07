@@ -228,7 +228,7 @@ export function validateCatalog(catalog: SingleWindowReferenceCatalogModel) {
   return errors;
 }
 
-export function findDuplicateValues(values: readonly string[]) {
+function findDuplicateValues(values: readonly string[]) {
   const counts = new Map<string, { value: string; count: number }>();
   for (const rawValue of values) {
     const value = rawValue.trim();

@@ -132,7 +132,7 @@ function PersonnelHistory({ client, user, id }: { client: ExportDocManagerApiCli
   </>;
 }
 
-export function PersonnelClearancePanel({ client, user, record }: { client: ExportDocManagerApiClient; user: ApiUserDto; record: PersonnelRecord }) {
+function PersonnelClearancePanel({ client, user, record }: { client: ExportDocManagerApiClient; user: ApiUserDto; record: PersonnelRecord }) {
   const query = usePersonnelClearance(client, user, record.employee.id);
   if (query.isPending) return <PageState tone="loading" title="正在核对交接事项" />;
   if (query.isError) return <PageState tone="error" title="交接核对失败" description={readApiError(query.error)} action={<button className="command-button secondary" type="button" onClick={() => void query.refetch()}>重新核对</button>} />;

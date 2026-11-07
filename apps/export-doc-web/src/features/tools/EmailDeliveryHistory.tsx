@@ -8,6 +8,7 @@ import { PageState } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 const statusLabels: Record<string, string> = { Sent: "已发送", Attempting: "投递中", Uncertain: "结果不确定" };
 
@@ -18,6 +19,7 @@ export function EmailDeliveryHistory({ client, businessTimeZone }: { client: Exp
     queryKey: [...queryKeys.emailDeliveries(), keyword, status, pageNumber, pageSize],
     queryFn: ({ signal }) => client.listEmailDeliveries({ keyword, status, pageNumber, pageSize }, { signal }),
   });
+  useServerPageNumber(query, pageNumber, state.setPageNumber);
   return <section className="form-section" aria-label="邮件投递记录">
     <div className="section-header"><h2>投递记录</h2><span>查看当前授权范围内的邮件历史</span></div>
     <form className="toolbar" onSubmit={(event) => { event.preventDefault(); state.setKeyword(state.keywordInput); }}>

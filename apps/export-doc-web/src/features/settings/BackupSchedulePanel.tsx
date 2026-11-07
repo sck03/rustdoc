@@ -1,6 +1,7 @@
 import type { BackupPlanController } from "./useBackupPlan.ts";
 import { formatRuntimeDate } from "./settingsFormatters.ts";
 import { CollapsibleSection } from "../../ui/primitives/Card.tsx";
+import { Button } from "../../ui/Button.tsx";
 
 export function BackupSchedulePanel({ controller: c, disabled }: { controller: BackupPlanController; disabled: boolean }) {
   if (!c.draft || !c.status) return null;
@@ -29,7 +30,7 @@ export function BackupSchedulePanel({ controller: c, disabled }: { controller: B
       </CollapsibleSection>
     </fieldset>
     <div className="detail-grid"><div className="detail-item"><span>下次执行（{c.status.timeZone}）</span><strong>{formatRuntimeDate(c.status.nextRunAt ?? undefined, c.status.timeZone) || "未启用"}</strong></div><div className="detail-item"><span>备份内容</span><strong>完整加密快照</strong></div></div>
-    <button className="command-button" type="button" disabled={disabled || c.dirty || c.activeJob || !c.status.encryptionPasswordSet} onClick={() => c.start("backup")}>立即备份一次</button>
+    <Button disabled={disabled || c.dirty || c.activeJob || !c.status.encryptionPasswordSet} onClick={() => c.start("backup")}>立即备份一次</Button>
     <p className="settings-helper-text">手动执行不要求启用定时计划。请先保存密码及存储设置；计划关闭时不会启动定时线程。</p>
   </section>;
 }

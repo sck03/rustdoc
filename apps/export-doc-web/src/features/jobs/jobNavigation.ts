@@ -4,7 +4,7 @@ export function normalizeJobId(value: string | null | undefined) {
   return (value ?? "").trim();
 }
 
-export function buildJobCenterPath(jobId: string | null | undefined) {
+function buildJobCenterPath(jobId: string | null | undefined) {
   const normalized = normalizeJobId(jobId);
   if (!normalized) {
     return "/jobs";

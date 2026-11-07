@@ -113,7 +113,7 @@ export const containerPackingRenderModeOptions: Array<{
 export const containerPackingAutoRefreshDebounceMs = 900;
 
 
-export const containerPackingColorPalette = [
+const containerPackingColorPalette = [
   "#4287f5",
   "#16a34a",
   "#f59e0b",
@@ -353,7 +353,7 @@ export function readPositiveIntegerInput(value: string, fallback = 1) {
   return parsed > 0 ? parsed : fallback;
 }
 
-export function colorHexToSignedArgb(hex: string) {
+function colorHexToSignedArgb(hex: string) {
   const normalized = hex.trim().replace(/^#/, "");
 
   if (!/^[0-9a-f]{6}$/i.test(normalized)) {

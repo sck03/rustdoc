@@ -8,13 +8,16 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { OfficeDialog,OfficeField,OfficeSubmit } from "../office/OfficeUi.tsx";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { notificationLink } from "../communication/communicationModel.ts";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 function requestRoute(item:OaWorkflowException):string {
   return notificationLink(item)??"/office/approvals";
 }
 export function WorkflowExceptionsPanel({client}:{client:ExportDocManagerApiClient}) {
   const [page,setPage]=useState(1),[selected,setSelected]=useState<OaWorkflowException|null>(null);
   const query=useQuery({queryKey:["office","approval-settings","exceptions",page],queryFn:({signal})=>client.listOaWorkflowExceptions({pageNumber:page,pageSize:20},{signal}),refetchInterval:30000,refetchIntervalInBackground:false});
-  return <section className="office-resource-card" aria-label="流程异常队列"><h3>流程异常队列</h3><p className="office-muted">此处仅显示运行元数据。人员或授权失效先移交任务；系统动作可重新排队，执行时仍核对原业务授权。</p>{query.isError&&<InlineNotice tone="error">{readApiError(query.error)}</InlineNotice>}<ul>{query.data?.items.map(item=><li key={`${item.requestId}:${item.nodeKey}`}><strong>申请 #{item.requestId} · {item.nodeName}</strong> · {item.errorCode}<Link to={requestRoute(item)}>查看申请</Link>{item.nodeKind==="System"&&<button type="button" disabled={query.isFetching} onClick={()=>setSelected(item)}>重试系统动作</button>}{item.nodeKind==="Approval"&&<p>在下方未完成任务中选择合格接任身份。</p>}</li>)}</ul>{query.data&&!query.data.items.length&&<p>当前没有失败节点。</p>}<div className="office-card-actions"><button type="button" disabled={page===1||query.isFetching} onClick={()=>setPage(p=>p-1)}>上一页异常</button><span>第 {page} 页 · {query.data?.totalCount??0} 项</span><button type="button" disabled={query.isFetching||page*20>=(query.data?.totalCount??0)} onClick={()=>setPage(p=>p+1)}>下一页异常</button></div>{selected&&<RetryDialog client={client} item={selected} onClose={()=>setSelected(null)}/>}</section>;
+  useServerPageNumber(query, page, setPage, 20);
+  return <section className="office-resource-card" aria-label="流程异常队列"><h3>流程异常队列</h3><p className="office-muted">此处仅显示运行元数据。人员或授权失效先移交任务；系统动作可重新排队，执行时仍核对原业务授权。</p>{query.isError&&<InlineNotice tone="error">{readApiError(query.error)}</InlineNotice>}<ul>{query.data?.items.map(item=><li key={`${item.requestId}:${item.nodeKey}`}><strong>申请 #{item.requestId} · {item.nodeName}</strong> · {item.errorCode}<Link to={requestRoute(item)}>查看申请</Link>{item.nodeKind==="System"&&<button type="button" disabled={query.isFetching} onClick={()=>setSelected(item)}>重试系统动作</button>}{item.nodeKind==="Approval"&&<p>在下方未完成任务中选择合格接任身份。</p>}</li>)}</ul>{query.data&&!query.data.items.length&&<p>当前没有失败节点。</p>}<Pagination pageNumber={page} pageSize={20} totalCount={query.data?.totalCount ?? 0} isBusy={query.isFetching} onPageChange={setPage} />{selected&&<RetryDialog client={client} item={selected} onClose={()=>setSelected(null)}/>}</section>;
 }
 function RetryDialog({client,item,onClose}:{client:ExportDocManagerApiClient;item:OaWorkflowException;onClose:()=>void}) {
   const operation=useOfficeOperation([["office","approval-settings"],["unit-workflow-tasks"]],false);

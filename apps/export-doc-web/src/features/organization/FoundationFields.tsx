@@ -1,13 +1,13 @@
 import type { IdentityAssignment, IdentityCandidatePage, IdentityEffectivePeriod, IdentityPositionSave, IdentityProjectSave, IdentityResponsibilitySave } from "../../api/index.ts";
 import { OfficeField } from "../office/OfficeUi.tsx";
 const workflowNames = { leave: "请假", overtime: "加班", expense: "报销", travel: "出差", purchase: "采购", general: "通用申请", room: "会议室", supply: "物品", personnel: "人员变动" } as const;
-export function PeriodFields({ value, onChange }: { value: IdentityEffectivePeriod; onChange: (value: IdentityEffectivePeriod) => void }) {
+function PeriodFields({ value, onChange }: { value: IdentityEffectivePeriod; onChange: (value: IdentityEffectivePeriod) => void }) {
   return <div className="office-form-grid"><OfficeField label="生效日"><input type="date" required value={value.startsOn} onChange={event => onChange({ ...value, startsOn: event.target.value })} /></OfficeField><OfficeField label="失效日（选填，当天已失效）"><input type="date" value={value.endsOn ?? ""} min={value.startsOn || undefined} onChange={event => onChange({ ...value, endsOn: event.target.value || null })} /></OfficeField></div>;
 }
 function DepartmentField({ value, options, onChange }: { value?: string | null; options: IdentityCandidatePage; onChange: (id: string | null) => void }) {
   return <OfficeField label="所属部门（选填）"><select value={value ?? ""} onChange={event => onChange(event.target.value || null)}><option value="">全单位</option>{value && !options.departments.some(row => row.id === value) && <option value={value}>保留已保存部门</option>}{options.departments.map(row => <option key={row.id} value={row.id}>{row.name} · {row.code}</option>)}</select></OfficeField>;
 }
-export function AppointmentField({ value, options, onChange, disabled = false, label = "承担任职" }: { value: string; options: IdentityCandidatePage; onChange: (id: string) => void; disabled?: boolean; label?: string }) {
+function AppointmentField({ value, options, onChange, disabled = false, label = "承担任职" }: { value: string; options: IdentityCandidatePage; onChange: (id: string) => void; disabled?: boolean; label?: string }) {
   const rows = options.items.flatMap(person => person.appointments.map(appointment => ({ id: appointment.id, label: `${person.name} · ${person.employeeNumber} · ${appointment.jobTitle}` })));
   return <OfficeField label={label}><select required disabled={disabled} value={value} onChange={event => onChange(event.target.value)}><option value="">选择人员与任职</option>{value && !rows.some(row => row.id === value) && <option value={value}>保留已保存任职</option>}{rows.map(row => <option key={row.id} value={row.id}>{row.label}</option>)}</select></OfficeField>;
 }

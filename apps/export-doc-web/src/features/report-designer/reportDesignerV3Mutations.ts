@@ -194,7 +194,7 @@ export function moveSelectedV3Elements(
  * helper without cloning the complete document on every animation frame;
  * the full mutation remains the single commit path on pointer-up.
  */
-export function resolveV3MoveDelta(
+function resolveV3MoveDelta(
   state: ReportDesignerV3DocumentState,
   deltaX: number,
   deltaY: number,

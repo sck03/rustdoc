@@ -4,11 +4,12 @@ import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
 import type { OfficePage } from "./officeModel.ts";
+import { Button } from "../../ui/Button.tsx";
 export { Dialog as OfficeDialog } from "../../ui/primitives/Dialog.tsx";
 export { Field as OfficeField } from "../../ui/primitives/Field.tsx";
 
 export function OfficeSubmit({ busy, disabled = false, label = "保存", children }: { busy: boolean; disabled?: boolean; label?: string; children?: ReactNode }) {
-  return <footer className="office-form-actions">{children}<button className="command-button" type="submit" disabled={busy || disabled}>{busy ? "正在处理…" : label}</button></footer>;
+  return <footer className="office-form-actions">{children}<Button variant="primary" type="submit" busy={busy} disabled={disabled}>{label}</Button></footer>;
 }
 export function OfficeQueryState({ query, emptyTitle }: { query: { isPending: boolean; isError: boolean; error: unknown; data?: { items: unknown[] }; refetch: () => unknown }; emptyTitle: string }) {
   if (query.isPending) return <PageState tone="loading" title="正在加载" />;
@@ -18,7 +19,7 @@ export function OfficeQueryState({ query, emptyTitle }: { query: { isPending: bo
 export function OfficePager({ page, paging, busy }: {
   page?: OfficePage<unknown>; paging: { pageNumber: number; pageSize: number; setPageNumber: (page: number) => void; changePageSize: (size: number) => void }; busy: boolean;
 }) {
-  return <Pagination pageNumber={page?.pageNumber ?? paging.pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0}
+  return <Pagination pageNumber={paging.pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0}
     pageSize={paging.pageSize} pageSizeOptions={[12,24,48,96]} isBusy={busy} onPageChange={paging.setPageNumber} onPageSizeChange={paging.changePageSize} />;
 }
 export function OfficeTabs({ records, onChange, recordsLabel, resourcesLabel = "资源与申请" }: { records: boolean; onChange: (records: boolean) => void; recordsLabel: string; resourcesLabel?: string }) {

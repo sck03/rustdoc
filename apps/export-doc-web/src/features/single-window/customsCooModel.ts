@@ -259,7 +259,7 @@ export function buildCooPackingSummary(packQty: string, packUnit: string) {
   return quantityText ? `${quantityText} ${unitText}`.trim() : `${normalizedPackQty} ${unitText}`.trim();
 }
 
-export function buildCooGoodsDescriptionQuantityText(packQty: string) {
+function buildCooGoodsDescriptionQuantityText(packQty: string) {
   const quantity = parseStrictDecimal(packQty);
   if (quantity <= 0) {
     return "";
@@ -272,7 +272,7 @@ export function buildCooGoodsDescriptionQuantityText(packQty: string) {
   return normalizeText(packQty);
 }
 
-export function resolveCooGoodsDescriptionPackUnit(packUnit: string, packQty: string) {
+function resolveCooGoodsDescriptionPackUnit(packUnit: string, packQty: string) {
   const normalizedUnit = normalizeCooEnglishUnit(packUnit);
   const quantity = parseStrictDecimal(packQty);
   const singular = quantity === 1;
@@ -325,15 +325,15 @@ export function getCooGoodsDescriptionFailureMessage(item: ApiCustomsCooItemDto)
     : "请先确认当前货项已经填了包装件数、包装单位(英)和英文品名，再点“生成货物描述”。";
 }
 
-export function isCooNonGoodsItem(value: string) {
+function isCooNonGoodsItem(value: string) {
   return normalizeText(value).toUpperCase() === "Y";
 }
 
-export function isCooIrregularPack(value: string) {
+function isCooIrregularPack(value: string) {
   return normalizeText(value) === "2";
 }
 
-export function parseStrictDecimal(value: string) {
+function parseStrictDecimal(value: string) {
   const trimmed = normalizeText(value);
   if (!/^[+-]?\d+(?:\.\d+)?$/.test(trimmed)) {
     return 0;
@@ -343,7 +343,7 @@ export function parseStrictDecimal(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function toEnglishWords(value: number): string {
+function toEnglishWords(value: number): string {
   if (value < 0) {
     return `MINUS ${toEnglishWords(Math.abs(value))}`;
   }
@@ -355,7 +355,7 @@ export function toEnglishWords(value: number): string {
   return convertWholeNumberToEnglish(Math.trunc(value)).trim();
 }
 
-export function convertWholeNumberToEnglish(value: number): string {
+function convertWholeNumberToEnglish(value: number): string {
   const ones = [
     "",
     "ONE",
@@ -411,7 +411,7 @@ export function firstNonEmpty(...values: string[]) {
   return values.find((value) => value.trim())?.trim() ?? "";
 }
 
-export function normalizeCooItem(item: ApiCustomsCooItemDto, index: number): ApiCustomsCooItemDto {
+function normalizeCooItem(item: ApiCustomsCooItemDto, index: number): ApiCustomsCooItemDto {
   return {
     ...createEmptyCooItem(item.documentId, index + 1, item.invNo),
     ...item,
@@ -422,7 +422,7 @@ export function normalizeCooItem(item: ApiCustomsCooItemDto, index: number): Api
   };
 }
 
-export function normalizeNonpartyCorp(corp: ApiCustomsCooNonpartyCorpDto, index: number): ApiCustomsCooNonpartyCorpDto {
+function normalizeNonpartyCorp(corp: ApiCustomsCooNonpartyCorpDto, index: number): ApiCustomsCooNonpartyCorpDto {
   return {
     ...createEmptyNonpartyCorp(corp.documentId, index + 1),
     ...corp,
@@ -432,7 +432,7 @@ export function normalizeNonpartyCorp(corp: ApiCustomsCooNonpartyCorpDto, index:
   };
 }
 
-export function normalizeAttachment(attachment: ApiCustomsCooAttachmentDto): ApiCustomsCooAttachmentDto {
+function normalizeAttachment(attachment: ApiCustomsCooAttachmentDto): ApiCustomsCooAttachmentDto {
   return {
     ...attachment,
     id: numberOrZero(attachment.id),
@@ -441,7 +441,7 @@ export function normalizeAttachment(attachment: ApiCustomsCooAttachmentDto): Api
   };
 }
 
-export function isMeaningfulCooItem(item: ApiCustomsCooItemDto) {
+function isMeaningfulCooItem(item: ApiCustomsCooItemDto) {
   const textValues = [
     item.ciqRegNo,
     item.fobValue,
@@ -485,7 +485,7 @@ export function isMeaningfulCooItem(item: ApiCustomsCooItemDto) {
   return item.id > 0 || textValues.some((value) => Boolean(value?.trim()));
 }
 
-export function isMeaningfulNonpartyCorp(corp: ApiCustomsCooNonpartyCorpDto) {
+function isMeaningfulNonpartyCorp(corp: ApiCustomsCooNonpartyCorpDto) {
   return (
     corp.id > 0 ||
     Boolean(corp.entName.trim()) ||
@@ -584,7 +584,7 @@ export function fileNameFromPath(path: string) {
   return path.split(/[\\/]/).filter(Boolean).pop()?.trim() || path.trim();
 }
 
-export function resolveDocType(fileName: string) {
+function resolveDocType(fileName: string) {
   const extension = fileName.split(".").pop();
   return extension && extension !== fileName ? extension.trim().toUpperCase() : "";
 }
@@ -760,6 +760,6 @@ export function normalizeText(value?: string) {
   return value?.trim() ?? "";
 }
 
-export function normalizeUpperText(value?: string) {
+function normalizeUpperText(value?: string) {
   return normalizeText(value).toUpperCase();
 }

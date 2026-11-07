@@ -1,7 +1,7 @@
 import { readStoredJsonObject, writeStoredJson } from "./browserStorage.ts";
 
 export const listPageSizeOptions = [20, 50, 100, 200] as const;
-export const defaultListPageSize = 50;
+const defaultListPageSize = 50;
 
 export type StoredListViewState = {
   keyword: string;

@@ -17,8 +17,8 @@ type CommitOptions = {
 
 // Large templates retain structural sharing between snapshots, but a bounded
 // count alone can still reserve too much memory after repeated bulk edits.
-export const REPORT_DESIGNER_V3_HISTORY_MAX_ENTRIES = 40;
-export const REPORT_DESIGNER_V3_HISTORY_MAX_ESTIMATED_BYTES = 12 * 1024 * 1024;
+const REPORT_DESIGNER_V3_HISTORY_MAX_ENTRIES = 40;
+const REPORT_DESIGNER_V3_HISTORY_MAX_ESTIMATED_BYTES = 12 * 1024 * 1024;
 
 export function useReportDesignerV3History(initialSchema: ReportDesignerV3Schema) {
   const initialState = useMemo(() => createReportDesignerV3DocumentState(initialSchema), [initialSchema]);

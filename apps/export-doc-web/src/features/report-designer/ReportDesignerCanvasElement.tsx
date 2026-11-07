@@ -49,7 +49,7 @@ export const ReportDesignerCanvasElementNode = memo(function ReportDesignerCanva
   </div>;
 });
 
-export const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCanvasElementPreview({ element, selectedGridCellId, selectedGridEndCellId, client }: {
+const ReportDesignerCanvasElementPreview = memo(function ReportDesignerCanvasElementPreview({ element, selectedGridCellId, selectedGridEndCellId, client }: {
   element: ReportDesignerV3Element;
   client?: ExportDocManagerApiClient;
   selectedGridCellId?: string;
@@ -145,7 +145,7 @@ function ReportDesignerCanvasResizeHandles() {
   );
 }
 
-export function reportDesignerCanvasElementStyle(element: ReportDesignerV3Element): CSSProperties {
+function reportDesignerCanvasElementStyle(element: ReportDesignerV3Element): CSSProperties {
   const usesOuterStyle = element.type !== "Flow";
   const style: CSSProperties = {
     left: `${hundredthMmToMm(element.xHundredthMm)}mm`,

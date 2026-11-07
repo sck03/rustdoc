@@ -3,8 +3,8 @@ import { createIssue, isRecord, readRequiredFieldPath, readString, type ReportDe
 
 export const MAX_CONDITIONAL_RULES = 8;
 export const conditionOperators = ["HasValue", "IsEmpty", "Equals", "NotEquals", "Contains", "NotContains", "StartsWith", "EndsWith", "GreaterThan", "GreaterOrEqual", "LessThan", "LessOrEqual"] as const;
-export const comparisonTypes = ["Text", "Number", "Date"] as const;
-export const conditionMatchModes = ["All", "Any"] as const;
+const comparisonTypes = ["Text", "Number", "Date"] as const;
+const conditionMatchModes = ["All", "Any"] as const;
 export type ReportComparisonType = typeof comparisonTypes[number];
 export type ReportConditionMatch = typeof conditionMatchModes[number];
 export type ReportConditionalRule = {

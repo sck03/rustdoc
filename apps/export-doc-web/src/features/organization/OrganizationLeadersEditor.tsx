@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { ExportDocManagerApiClient, OrganizationLeader } from "../../api/index.ts";
 import { OrganizationManagerPicker } from "./OrganizationManagerPicker.tsx";
 
-export const leaderWorkflows: Record<string, string> = { leave: "请假", overtime: "加班", expense: "报销", travel: "出差", purchase: "采购", general: "通用申请", personnel: "人员变动", room: "会议室", supply: "物品" };
+const leaderWorkflows: Record<string, string> = { leave: "请假", overtime: "加班", expense: "报销", travel: "出差", purchase: "采购", general: "通用申请", personnel: "人员变动", room: "会议室", supply: "物品" };
 
 export function OrganizationLeadersEditor({ client, company, primary, value, initialNames, onChange }: {
   client: ExportDocManagerApiClient; company: string; primary?: number; value: OrganizationLeader[]; initialNames?: Record<string, string>; onChange: (value: OrganizationLeader[]) => void;

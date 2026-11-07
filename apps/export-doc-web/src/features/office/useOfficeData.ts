@@ -6,6 +6,7 @@ import { officeResourceQueryRoots } from "../../api/queryKeys.ts";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { officeAccess, officeDayRange, officeRequestFocus, type OfficeAction, type OfficeKind, type OfficePage, type OfficeRequestRow } from "./officeModel.ts";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export function useOfficeView() {
   const [search, setSearch] = useSearchParams();
@@ -36,6 +37,7 @@ export function useOfficeDirectory<T extends { id: number }>(user: ApiUserDto, k
     refetchInterval: 30000, refetchIntervalInBackground: false,
   });
   const commitSearch = () => { setSearch(keyword.trim()); paging.resetPage(); };
+  useServerPageNumber(query, paging.pageNumber, paging.setPageNumber);
   const acceptSaved = (saved: T) => queries.setQueriesData<OfficePage<T>>(
     { queryKey: ["office", kind, "resources", user.id, user.companyScope] },
     page => page ? { ...page, items: page.items.map(item => item.id === saved.id ? saved : item) } : page);
@@ -69,6 +71,7 @@ export function useOfficeHistory(client: ExportDocManagerApiClient, user: ApiUse
         ? client.getMeetingBookingHistory(input, { signal }) : client.getOfficeSupplyRequestHistory(input, { signal });
     },
   });
+  useServerPageNumber(query, paging.pageNumber, paging.setPageNumber);
   return { paging, query };
 }
 
@@ -132,6 +135,7 @@ export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUs
     setSearch({ view: "requests", status: nextStatus, ...(handling ? { handlingOnly: "true" } : {}), ...(approvals ? { approvalsOnly: "true" } : {}) });
     paging.resetPage();
   };
+  useServerPageNumber(query, paging.pageNumber, paging.setPageNumber);
   return { access, paging, query, mineOnly, status, focus, focused, handlingOnly, approvalsOnly,
     changeApprovals: (value: boolean) => showRequests("Pending", false, value),
     changeHandling: (value: boolean) => showRequests("", value),

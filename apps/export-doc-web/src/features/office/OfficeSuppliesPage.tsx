@@ -10,6 +10,9 @@ import { OfficeRequestsPanel } from "./OfficeRequestsPanel.tsx";
 import { OfficePager, OfficeQueryState, OfficeTabs } from "./OfficeUi.tsx";
 import { useOfficeDirectory, useOfficeResourceOperation, useOfficeView } from "./useOfficeData.ts";
 import { RecordDeleteDialog } from "./RecordDeleteDialog.tsx";
+import { Button } from "../../ui/Button.tsx";
+import { Field, FilterBar } from "../../ui/primitives/Field.tsx";
+import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
 import "../../styles/routes/office.css";
 
 type SupplyDialog = { kind: "edit"; supply?: OfficeSupplyRecord } | { kind: "apply" | "restock" | "stocktake" | "history" | "delete"; supply: OfficeSupplyRecord };
@@ -34,23 +37,26 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
   const saved = (supply: OfficeSupplyRecord) => { model.acceptSaved(supply); close(); };
   const deletion = useOfficeResourceOperation("supplies");
   return <>
-    <div className="office-toolbar"><form className="office-search" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
-      <input aria-label="搜索办公物品" placeholder="物品名称或存放位置" maxLength={120} value={keyword} onChange={(event) => model.changeKeyword(event.target.value)} /><button className="command-button secondary" type="submit">搜索</button></form>
+    <PageHeader title="办公物品" count={query.data?.totalCount} actions={<>
+      <Button aria-label="刷新办公物品" icon={<RefreshCw size={18} aria-hidden="true" />} disabled={query.isFetching} onClick={model.refresh}>刷新</Button>
+      {access.allows("manage") && <Button variant="primary" icon={<Plus size={18} aria-hidden="true" />} disabled={query.isFetching} onClick={() => setDialog({ kind: "edit" })}>添加物品</Button>}
+    </>} />
+    <FilterBar label="办公物品筛选" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
+      <Field label="物品"><input aria-label="搜索办公物品" placeholder="名称或存放位置" maxLength={120} value={keyword} onChange={(event) => model.changeKeyword(event.target.value)} /></Field>
       <label className="checkbox-field"><input type="checkbox" checked={lowStockOnly} onChange={(event) => model.changeLowStock(event.target.checked)} />仅低库存</label>
       {access.allows("manage") && <label className="checkbox-field"><input type="checkbox" checked={includeInactive} onChange={(event) => model.changeInactive(event.target.checked)} />含停用</label>}
-      <button className="icon-button" type="button" aria-label="刷新办公物品" disabled={query.isFetching} onClick={model.refresh}><RefreshCw size={17} aria-hidden="true" /></button>
-      {access.allows("manage") && <button className="command-button" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "edit" })}><Plus size={17} aria-hidden="true" />添加物品</button>}
-    </div>
+      <Button type="submit" disabled={query.isFetching}>搜索</Button>
+    </FilterBar>
     <OfficeQueryState query={query} emptyTitle={search || lowStockOnly ? "没有符合条件的物品" : "尚未添加物品，请联系行政管理员"} />
     {!query.isError && <div className="office-resource-grid">{query.data?.items.map((supply) => <article key={supply.id} className="office-resource-card">
-      <div className="office-card-heading"><Package size={21} aria-hidden="true" /><h2>{supply.name}</h2><span className="office-badge" data-state={!supply.isActive ? "Cancelled" : supply.lowStock ? "Pending" : "Available"}>{!supply.isActive ? "已停用" : supply.lowStock ? "低库存" : supply.isReturnable ? "可借用" : "消耗品"}</span></div>
+      <div className="office-card-heading"><Package size={20} aria-hidden="true" /><h2>{supply.name}</h2><span className="office-badge" data-state={!supply.isActive ? "Cancelled" : supply.lowStock ? "Pending" : "Available"}>{!supply.isActive ? "已停用" : supply.lowStock ? "低库存" : supply.isReturnable ? "可借用" : "消耗品"}</span></div>
       <p className="office-stock-number">可用 <strong>{supply.availableQuantity}</strong> {supply.unit}</p>
       <p className="office-muted">在库 {supply.stockQuantity} · 已预留 {supply.reservedQuantity} · 最低可用 {supply.minimumStock}</p>
       {supply.handlingName && <p>物品组：{supply.handlingName} · 保管人员：{supply.handlerNames}</p>}
       <p className="office-card-detail"><MapPin size={16} aria-hidden="true" />{supply.location || "领取位置未填写"}</p>
       <p className="office-muted office-card-description">{supply.description || (supply.isReturnable ? "借用后需要按期归还" : "按需领用，交接时确认发放")}</p>
       <footer className="office-card-actions">
-        {supply.isActive && access.allows("create") && <button className="command-button" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "apply", supply })}>申请{supply.isReturnable ? "借用" : "领用"}</button>}
+        {supply.isActive && access.allows("create") && <Button disabled={query.isFetching} onClick={() => setDialog({ kind: "apply", supply })}>申请{supply.isReturnable ? "借用" : "领用"}</Button>}
         {allowsSupply("restock", supply) && <button className="command-button secondary" type="button" disabled={query.isFetching} onClick={() => setDialog({ kind: "restock", supply })}>补充库存</button>}
         {(allowsSupply("restock", supply) || allowsSupply("manage", supply)) && <details className="office-secondary-actions">
           <summary>更多操作</summary><div>

@@ -35,7 +35,7 @@ export const importStrategyOptions: Array<{ value: TemplateImportStrategyOption;
 
 export const previewSourcePageSize = 50;
 
-export function defaultTemplateFileName(reportType: ReportTypeOption) {
+function defaultTemplateFileName(reportType: ReportTypeOption) {
   return reportType === "PaymentVoucher" ? "payment_voucher_template.dtpl" : "invoice_template.dtpl";
 }
 

@@ -7,7 +7,7 @@ import { ApprovalRevisionPolicyEditor } from "./ApprovalRevisionPolicyEditor.tsx
 import { ApprovalMaterialPolicyEditor } from "./ApprovalMaterialPolicyEditor.tsx";
 import { ApprovalSourcePicker,approvalSources } from "./ApprovalSourcePicker.tsx";
 import { WorkflowNodeSettings } from "./WorkflowNodeSettings.tsx";
-export const initialStage=(dependsOn:string[]=[]):OaApprovalStage=>({key:createRequestKey(),name:"审批节点",kind:"Approval",phase:"Decision",dependsOn,source:"DepartmentManager",approverUserIds:[],decision:"All",selfApproval:"Skip",repeatedApprover:"Allow",conditions:[],dueHours:48});
+const initialStage=(dependsOn:string[]=[]):OaApprovalStage=>({key:createRequestKey(),name:"审批节点",kind:"Approval",phase:"Decision",dependsOn,source:"DepartmentManager",approverUserIds:[],decision:"All",selfApproval:"Skip",repeatedApprover:"Allow",conditions:[],dueHours:48});
 export type ApprovalStagesEditorProps={client:ExportDocManagerApiClient;stages:OaApprovalStage[];accounts:ApprovalAccount[];handlers:ApprovalAccount[];units:OaRoutingUnit[];currentCompanyCode:string;definitions:OaApprovalRule[];onChange:(stages:OaApprovalStage[])=>void};
 export function ApprovalStagesEditor({client,stages,accounts,handlers,units,currentCompanyCode,definitions,onChange}:ApprovalStagesEditorProps) {
   const [catalogUnits,setCatalogUnits]=useState<Record<string,number>>({});

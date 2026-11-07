@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { identityQueryRoots, queryKeys } from "../../api/queryKeys.ts";
 import { useOfficeOperation, useOfficePaging } from "../office/useOfficeData.ts";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export function useOrganizationDirectory(client: ExportDocManagerApiClient) {
   return useQuery({ queryKey: queryKeys.organizationDirectory(), queryFn: ({ signal }) => client.getOrganizationDirectory({ signal }) });
@@ -19,5 +20,6 @@ export function useOrganizationManagers(client: ExportDocManagerApiClient, compa
   const query = useQuery({ queryKey: ["organization-managers", personnel, companyCode, search, paging.pageNumber, paging.pageSize],
     queryFn: ({ signal }) => client[personnel ? "listPersonnelReportingOptions" : "listOrganizationManagers"]({ companyCode, keyword: search || undefined,
       pageNumber: paging.pageNumber, pageSize: paging.pageSize }, { signal }) });
+  useServerPageNumber(query, paging.pageNumber, paging.setPageNumber);
   return { paging, query, keyword, setKeyword, search: () => { setSearch(keyword.trim()); paging.resetPage(); } };
 }
