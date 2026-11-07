@@ -28,6 +28,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   stageServerMigrationRestore(request: StageServerMigrationRestoreRequest, init?: ApiRequestInit): Promise<ApiServerMigrationRestoreResponse> {
+    init = { timeoutMs: 86400000, ...init };
     const path = "/api/server-migration/restore";
     return transport.request<ApiServerMigrationRestoreResponse>("POST", path, {
       body: request.body,

@@ -116,7 +116,9 @@ impl Pool {
         drop(state);
         if let Some(check) = &self.health_check {
             if let Err(cause) = check() {
-                if let Ok(mut state) = self.state.lock() {
+                if !matches!(cause.kind, ErrorKind::Busy | ErrorKind::Timeout)
+                    && let Ok(mut state) = self.state.lock()
+                {
                     state.failed = true;
                 }
                 return Err(cause);

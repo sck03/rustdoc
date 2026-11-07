@@ -273,6 +273,17 @@ pub fn generate(
         )
         .unwrap();
         let mut path = op.path.to_string();
+        if let Some(seconds) = op.value["x-exportdoc-timeout-seconds"]
+            .as_u64()
+            .filter(|seconds| *seconds > 30)
+        {
+            let milliseconds = (seconds + 10).min(24 * 60 * 60) * 1000;
+            writeln!(
+                methods,
+                "    init = {{ timeoutMs: {milliseconds}, ...init }};"
+            )
+            .unwrap();
+        }
         let paths: Vec<_> = params.iter().filter(|p| p["in"] == "path").collect();
         for p in &paths {
             path = path.replace(

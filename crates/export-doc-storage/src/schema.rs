@@ -58,7 +58,7 @@ pub(crate) fn sqlite_shape(connection: &rusqlite::Connection) -> Result<String> 
     Ok(hex(digest.finalize().as_ref()))
 }
 #[cfg(feature = "postgres")]
-pub(crate) fn postgres_shape(client: &mut impl ::postgres::GenericClient) -> Result<String> {
+pub(crate) fn postgres_shape(client: &mut crate::postgres::client::Client) -> Result<String> {
     let mut digest = Sha256::new();
     for query in [
         "SELECT table_name,column_name,ordinal_position::text,data_type,udt_name,is_nullable,COALESCE(column_default,'') FROM information_schema.columns WHERE table_schema='public' ORDER BY table_name,ordinal_position",

@@ -20,11 +20,24 @@ pub(super) fn save_template_package_to_path(
 }
 
 pub(super) fn template_files(paths: &RuntimePaths) -> Result<Vec<(String, Vec<u8>)>> {
+    let mut files = vec![];
+    visit_template_files(paths, |path, bytes| {
+        files.push((path, bytes));
+        Ok(())
+    })?;
+    files.sort_by_cached_key(|file| file.0.to_lowercase());
+    Ok(files)
+}
+
+pub(super) fn visit_template_files(
+    paths: &RuntimePaths,
+    mut visit: impl FnMut(String, Vec<u8>) -> Result<()>,
+) -> Result<()> {
     let root = user_root(paths);
     if !template_directory_exists(&root)? {
-        return Ok(vec![]);
+        return Ok(());
     }
-    let mut files = vec![];
+    let mut count = 0usize;
     let mut total_bytes = 0usize;
     let mut stack = vec![root.clone()];
     while let Some(directory) = stack.pop() {
@@ -49,14 +62,14 @@ pub(super) fn template_files(paths: &RuntimePaths) -> Result<Vec<(String, Vec<u8
             }
             let bytes = media::read_local(&path, MAX_TEMPLATE_BYTES)?;
             total_bytes = total_bytes.saturating_add(bytes.len());
-            if files.len() >= MAX_PACKAGE_ENTRIES || total_bytes > MAX_PACKAGE_BYTES {
+            count += 1;
+            if count > MAX_PACKAGE_ENTRIES || total_bytes > MAX_PACKAGE_BYTES {
                 return Err(invalid("模板目录超过 2000 个文件或 50 MiB，请先整理模板。"));
             }
-            files.push((relative, bytes));
+            visit(relative, bytes)?;
         }
     }
-    files.sort_by(|left, right| left.0.to_lowercase().cmp(&right.0.to_lowercase()));
-    Ok(files)
+    Ok(())
 }
 
 pub(super) fn files_digest(files: &[(String, Vec<u8>)]) -> String {

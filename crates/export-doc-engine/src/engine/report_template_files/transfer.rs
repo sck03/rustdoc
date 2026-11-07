@@ -25,7 +25,7 @@ pub fn download(
                 file_name.into()
             },
             media_type: "application/vnd.exportdoc.dtpl".into(),
-            content: fs::read(&resolved.path)?,
+            content: media::read_local(&resolved.path, MAX_TEMPLATE_BYTES)?,
         });
     }
     auth::authorize(actor, PERMISSION, "export")?;

@@ -252,6 +252,8 @@ pub struct Foundation {
 }
 #[derive(Clone, Serialize)]
 pub struct Operation {
+    #[serde(rename = "x-exportdoc-timeout-seconds")]
+    pub timeout_seconds: u64,
     pub tags: Vec<&'static str>,
     #[serde(rename = "operationId")]
     pub id: &'static str,
@@ -293,6 +295,7 @@ pub fn ep(
         method,
         path,
         operation: Operation {
+            timeout_seconds: crate::request_limits::seconds(id),
             tags: vec!["ExportDocManager.Api"],
             id,
             responses,

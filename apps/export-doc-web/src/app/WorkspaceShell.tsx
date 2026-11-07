@@ -43,7 +43,7 @@ import {
 import { useWorkspaceDeviceMode } from "./workspaceDevice.ts";
 
 export type WorkspaceNotice = {
-  id: "permission" | "license";
+  id: "permission" | "license" | "logout";
   tone: "error" | "warning" | "info";
   title: string;
   message: string;

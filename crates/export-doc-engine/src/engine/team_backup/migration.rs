@@ -9,7 +9,7 @@ use super::{
 use crate::{contracts, generated_api::*, paths::RuntimePaths};
 use serde_json::{Value, json};
 use std::{fs, path::PathBuf};
-pub(super) const MAGIC: &[u8] = b"EDM-SERVER-MIGRATION-1";
+pub(super) const MAGIC: &[u8] = b"EDM-SERVER-MIGRATION-2";
 /// Offline administrator import. A database maintenance lease proves the API has stopped.
 #[cfg(feature = "postgres")]
 pub fn stage_file(

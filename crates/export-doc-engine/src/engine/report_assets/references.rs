@@ -1,6 +1,6 @@
 //! One reference scan per operation, independent of the image catalog size.
 use super::*;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Default)]
 pub(super) struct References {
@@ -14,8 +14,17 @@ impl References {
         actor: &Actor,
         paths: Option<&crate::paths::RuntimePaths>,
     ) -> Result<Self> {
+        Self::query(tx, actor, paths, None)
+    }
+
+    pub fn query(
+        tx: &Connection,
+        actor: &Actor,
+        paths: Option<&crate::paths::RuntimePaths>,
+        targets: Option<&[&str]>,
+    ) -> Result<Self> {
         let mut index = Self::default();
-        let mut visible_templates = HashSet::new();
+        let mut visible_templates = HashMap::new();
         for (kind, permission) in [
             ("invoices", "document.invoices"),
             ("exporters", "document.master-data"),
@@ -24,7 +33,7 @@ impl References {
         ] {
             let mut cursor = None;
             loop {
-                let (next, rows) = tx.resource_references(kind, cursor, 200)?;
+                let (next, rows) = tx.resource_references(kind, targets, cursor, 200)?;
                 if rows.is_empty() {
                     break;
                 }
@@ -35,19 +44,32 @@ impl References {
                     let visible = if kind == "report-templates" {
                         template_visible(actor, &record)
                     } else if kind == "template-versions" {
-                        record["templateId"]
-                            .as_i64()
-                            .is_some_and(|id| visible_templates.contains(&id))
+                        if let Some(id) = record["templateId"].as_i64() {
+                            if let std::collections::hash_map::Entry::Vacant(entry) =
+                                visible_templates.entry(id)
+                            {
+                                let visible = tx
+                                    .report_template_metadata(id)?
+                                    .is_some_and(|template| template_visible(actor, &template));
+                                entry.insert(visible);
+                            }
+                            visible_templates[&id]
+                        } else {
+                            false
+                        }
                     } else {
                         !permission.is_empty() && auth::visible(actor, permission, "view", &record)
                     };
-                    if kind == "report-templates" && visible {
+                    if kind == "report-templates" {
                         if let Some(id) = record["id"].as_i64() {
-                            visible_templates.insert(id);
+                            visible_templates.insert(id, visible);
                         }
                     }
                     let mut ids = HashSet::new();
                     collect(kind, &record, &mut ids)?;
+                    if let Some(targets) = targets {
+                        ids.retain(|id| targets.contains(&id.as_str()));
+                    }
                     if visible
                         || (kind == "report-templates"
                             && super::super::report_templates::policy::output_visible(
@@ -65,6 +87,9 @@ impl References {
         }
         if let Some(paths) = paths {
             for (id, visible) in report_template_files::resource_access(paths, actor)? {
+                if targets.is_some_and(|targets| !targets.contains(&id.as_str())) {
+                    continue;
+                }
                 if visible {
                     index.readable.insert(id.clone());
                 }

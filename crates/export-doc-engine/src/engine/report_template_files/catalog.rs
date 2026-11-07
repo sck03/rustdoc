@@ -234,12 +234,10 @@ pub(super) fn revision(content: &[u8], display: &str) -> String {
     crate::paths::hex(&digest)
 }
 pub(super) fn validate_revision(path: &Path, display: &str, expected: &str) -> Result<()> {
-    let revision = match fs::read(path) {
+    let revision = match media::read_local(path, MAX_TEMPLATE_BYTES) {
         Ok(content) => revision(&content, display),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
-        Err(error) => {
-            return Err(unavailable(format!("无法读取报表模板以核对修订号:{error}")));
-        }
+        Err(error) if error.status == Some(404) => String::new(),
+        Err(error) => return Err(error),
     };
     if revision != expected {
         return Err(conflict("模板已被其他用户修改或删除，请重新加载后重试。"));
@@ -253,10 +251,13 @@ pub(super) fn catalog_rows(paths: &RuntimePaths) -> Result<Vec<Value>> {
     }
     let path = user_root(paths).join(CATALOG_FILE);
     paths::ensure_safe_absolute(&path).map_err(unavailable)?;
-    let bytes = match fs::read(&path) {
+    let bytes = match media::read_local(&path, MAX_TEMPLATE_BYTES) {
         Ok(bytes) => bytes,
-        Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(cause) => return Err(cause.into()),
+        Err(cause) if cause.status == Some(404) => return Ok(Vec::new()),
+        Err(cause) if matches!(cause.status, Some(400 | 413)) => {
+            return Err(unavailable(cause.message));
+        }
+        Err(cause) => return Err(cause),
     };
     let catalog: Catalog =
         serde_json::from_slice(&bytes).map_err(|_| unavailable("模板目录配置已损坏。"))?;
@@ -266,6 +267,9 @@ pub(super) fn save_catalog(paths: &RuntimePaths, rows: &[Value]) -> Result<()> {
     let root = user_root(paths);
     fs::create_dir_all(&root)?;
     let json = serde_json::to_string_pretty(&json!({"reports": rows}))?;
+    if json.len() > MAX_TEMPLATE_BYTES {
+        return Err(invalid("模板目录配置超过容量上限。"));
+    }
     paths::atomic_write(&root.join(CATALOG_FILE), json.as_bytes()).map_err(unavailable)
 }
 pub(super) fn upsert_catalog_row(
@@ -375,8 +379,15 @@ fn resolve(paths: &RuntimePaths, kind: &str, stored: &str, must_exist: bool) -> 
     if kind_of_category(category) != kind {
         return Err(invalid("模板类型与请求的报表类型不匹配。"));
     }
-    if must_exist && !absolute.is_file() {
-        return Err(error(404, "报表模板不存在。"));
+    if must_exist {
+        match fs::metadata(&absolute) {
+            Ok(metadata) if metadata.is_file() => (),
+            Ok(_) => return Err(unavailable("报表模板路径不是文件。")),
+            Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => {
+                return Err(error(404, "报表模板不存在。"));
+            }
+            Err(cause) => return Err(cause.into()),
+        }
     }
     let stored = to_stored(paths, &absolute)?;
     let metadata = catalog_rows(paths)?
@@ -411,7 +422,10 @@ pub(super) fn catalog_entries(paths: &RuntimePaths, kind: &str) -> Result<Vec<Va
     if !template_directory_exists(&root)? {
         return Ok(Vec::new());
     }
-    let metadata = catalog_rows(paths)?;
+    let metadata: std::collections::HashMap<_, _> = catalog_rows(paths)?
+        .into_iter()
+        .map(|row| (text(&row, "fileName"), row))
+        .collect();
     let mut rows = Vec::new();
     let mut stack = vec![root.clone()];
     while let Some(directory) = stack.pop() {
@@ -438,10 +452,7 @@ pub(super) fn catalog_entries(paths: &RuntimePaths, kind: &str) -> Result<Vec<Va
                 continue;
             }
             let stored = to_stored(paths, &path)?;
-            let row = metadata
-                .iter()
-                .find(|row| text(row, "fileName") == stored)
-                .unwrap_or(&Value::Null);
+            let row = metadata.get(&stored).unwrap_or(&Value::Null);
             rows.push(json!({
                 "reportType":kind,
                 "displayName":display_name(&text(row, "name"), &path),

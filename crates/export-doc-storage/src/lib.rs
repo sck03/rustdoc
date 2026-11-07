@@ -291,7 +291,11 @@ impl Connection {
             return Err(Error::unavailable("数据库事务状态异常，已停止服务。"));
         }
         let result = self.adapter.health();
-        if result.is_err() {
+        if result
+            .as_ref()
+            .is_err_and(|error| !matches!(error.kind, ErrorKind::Busy | ErrorKind::Timeout))
+            || self.adapter.is_closed()
+        {
             self.failed.set(true);
         }
         result
@@ -420,7 +424,7 @@ delegate! {
     query_generic(query:&GenericQuery<'_>)->(i64, Vec<Value>);
     explain_query(query:&QueryPlan<'_>)->Value;
     scan_generic(query:&GenericQuery<'_>,before_id:Option<i64>)->(Option<i64>, Vec<Value>);
-    resource_references(kind:&str,before_id:Option<i64>,limit:i64)->(Option<i64>,Vec<Value>);
+    resource_references(kind:&str,ids:Option<&[&str]>,before_id:Option<i64>,limit:i64)->(Option<i64>,Vec<Value>);
     ownership_counts(kinds:&[&str])->Vec<(Option<i64>,i64)>;
     query_scoped(query:&ScopedQuery<'_>)->(i64,Vec<Value>);
     query_business(query:&BusinessQuery<'_>)->(i64, Vec<Value>);

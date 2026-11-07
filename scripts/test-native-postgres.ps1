@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$PostgresBin,
-    [ValidateRange(60, 7200)][int]$TimeoutSeconds = 1800,
+    [ValidateRange(60, 7200)][int]$TimeoutSeconds = 3600,
     [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance')][string]$Scope = 'All',
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     [ValidateRange(200, 100000)][int]$HistoryRows = 10000,
@@ -93,7 +93,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SEL
         }
     }
     if ($Scope -in @('All', 'Storage', 'Workflows')) {
-        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--lib') + $cargoProfile + @('--', 'workflow_constraints_tests::postgres', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL workflow constraints'
+        Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--lib') + $cargoProfile + @('--', 'postgres', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL constraints and network cancellation'
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-storage', '--features', 'postgres', '--test', 'contract') + $cargoProfile + @('--', '--ignored', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Native PostgreSQL storage contract'
     }
     if ($Scope -in @('All', 'Engine')) {

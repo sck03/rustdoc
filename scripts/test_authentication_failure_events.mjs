@@ -14,7 +14,7 @@ fs.mkdirSync(workspace, { recursive: true });
 const modelPath = path.join(repoRoot, "apps", "export-doc-web", "src", "api", "authenticationFailureEvents.ts").replaceAll("\\", "/");
 const apiPath = path.join(repoRoot, "apps", "export-doc-web", "src", "api", "index.ts").replaceAll("\\", "/");
 const sessionClientPath=path.join(repoRoot,"apps","export-doc-web","src","app","sessionApiClient.ts").replaceAll("\\","/");
-fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import { ApiError } from ${JSON.stringify(apiPath)}; import { createSessionApiClient } from ${JSON.stringify(sessionClientPath)}; globalThis.__model = { ...model, ApiError, createSessionApiClient };`, "utf8");
+fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import { ApiError } from ${JSON.stringify(apiPath)}; import { createSessionApiClient, revokeSession } from ${JSON.stringify(sessionClientPath)}; globalThis.__model = { ...model, ApiError, createSessionApiClient, revokeSession };`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -74,4 +74,28 @@ assert(sentAuthorization === "Bearer after-renewal", "the stable client must sen
 resolveResponse(unauthorized()); await nextRequest; await new Promise(resolve => setTimeout(resolve, 0));
 assert(failures === 2, "a 401 for the renewed token still expires the current session");
 releaseListener();
+const { revokeSession } = globalThis.__model;
+let logoutFetches = 0;
+let activeToken = "revoked-session";
+let releaseDesktop;
+const desktopReady = new Promise(resolve => { releaseDesktop = resolve; });
+const logout = revokeSession({ baseUrl: "http://localhost", accessToken: activeToken,
+  desktopAccessToken: () => desktopReady,
+  fetch: async (url, init) => {
+    logoutFetches += 1;
+    assert(url.pathname === "/api/auth/logout", "logout must reach the server endpoint");
+    assert(new Headers(init.headers).get("authorization") === "Bearer revoked-session", "revocation must retain the submitted session identity");
+    return new Response(null, { status: 204 });
+  },
+});
+activeToken = "replacement-session";
+releaseDesktop("desktop-token");
+await logout;
+assert(logoutFetches === 1, "logout must not disappear while resolving desktop credentials");
+await revokeSession({ baseUrl: "http://localhost", accessToken: "expired", fetch: async () => unauthorized() });
+let failedLogout = false;
+try { await revokeSession({ baseUrl: "http://localhost", accessToken: activeToken, fetch: async () => new Response("unavailable", { status: 503 }) }); }
+catch (error) { failedLogout = error instanceof ApiError && error.status === 503; }
+assert(failedLogout, "failed revocation must be reported so the workspace can keep its session");
+fs.rmSync(workspace, { recursive: true, force: true });
 process.stdout.write("authentication failure event tests passed\n");

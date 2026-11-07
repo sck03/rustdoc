@@ -4,15 +4,8 @@ use super::*;
 const CHUNK: usize = 1024 * 1024;
 const PREFIX: usize = 8;
 const TAG: usize = 16;
+const NONCE_LENGTH: usize = 12;
 
-fn version_two(magic: &[u8]) -> Result<Vec<u8>> {
-    if magic.last() != Some(&b'1') || magic.len() > 64 {
-        return Err(invalid("包类型标记无效。"));
-    }
-    let mut magic = magic.to_vec();
-    *magic.last_mut().unwrap() = b'2';
-    Ok(magic)
-}
 fn cipher(password: &str, salt: &[u8]) -> Result<Aes256Gcm> {
     let key = zeroize::Zeroizing::new(pbkdf2_hmac_array::<Sha256, 32>(
         password.as_bytes(),
@@ -42,7 +35,7 @@ pub(in crate::engine::team_backup) fn seal(
     mut input: impl Read,
     output: &mut impl Write,
 ) -> Result<()> {
-    let mut header = version_two(magic)?;
+    let mut header = magic.to_vec();
     let mut random = [0; SALT_LENGTH + PREFIX];
     getrandom::fill(&mut random).map_err(|_| unavailable("无法生成包随机数。"))?;
     header.extend_from_slice(&random);
@@ -87,12 +80,7 @@ pub(in crate::engine::team_backup) fn open(
 ) -> Result<()> {
     let mut prefix = vec![0; magic.len()];
     exact(&mut input, &mut prefix)?;
-    if prefix == magic {
-        let payload = super::open(magic, password, std::io::Cursor::new(prefix).chain(input))?;
-        output.write_all(&payload)?;
-        return Ok(());
-    }
-    if prefix != version_two(magic)? {
+    if prefix != magic {
         return Err(invalid("包类型或格式不匹配。"));
     }
     let mut random = [0; SALT_LENGTH + PREFIX];
@@ -158,7 +146,7 @@ mod tests {
             super::super::ManifestFile::from_path("Templates/large.bin", &source).unwrap();
         let encrypted = workspace.0.join("large.sealed");
         seal(
-            b"EDM-TEST-1",
+            b"EDM-TEST-2",
             "large-file-test-password",
             fs::File::open(&source).unwrap(),
             &mut fs::File::create(&encrypted).unwrap(),
@@ -183,7 +171,7 @@ mod tests {
             hash: Sha256::new(),
         };
         open(
-            b"EDM-TEST-1",
+            b"EDM-TEST-2",
             "large-file-test-password",
             fs::File::open(&encrypted).unwrap(),
             &mut output,
@@ -216,7 +204,7 @@ mod tests {
         let payload = vec![42; CHUNK * 2 + 7];
         let mut encrypted = Vec::new();
         seal(
-            b"EDM-TEST-1",
+            b"EDM-TEST-2",
             "correct-password",
             payload.as_slice(),
             &mut encrypted,
@@ -224,7 +212,7 @@ mod tests {
         .unwrap();
         let decode = |bytes: &[u8], password| {
             let mut output = Vec::new();
-            open(b"EDM-TEST-1", password, bytes, &mut output).map(|_| output)
+            open(b"EDM-TEST-2", password, bytes, &mut output).map(|_| output)
         };
         assert_eq!(decode(&encrypted, "correct-password").unwrap(), payload);
         assert!(decode(&encrypted, "wrong-password").is_err());
@@ -236,7 +224,7 @@ mod tests {
         for length in [1, encrypted.len() - 1, encrypted.len() - 20] {
             assert!(decode(&encrypted[..length], "correct-password").is_err());
         }
-        let header = b"EDM-TEST-1".len() + SALT_LENGTH + PREFIX;
+        let header = b"EDM-TEST-2".len() + SALT_LENGTH + PREFIX;
         let record = CHUNK + 4 + TAG;
         let mut reordered = encrypted.clone();
         reordered[header..header + record]

@@ -36,6 +36,7 @@ import { useBusinessDateSessionRefresh } from "./app/useBusinessDateSessionRefre
 import { useUnitContextSwitch } from "./app/useUnitContextSwitch.ts";
 import { prefetchLandingDashboard } from "./app/loginPrefetch.ts";
 import { createSessionApiClient } from "./app/sessionApiClient.ts";
+import { useSessionLogout } from "./app/useSessionLogout.ts";
 import { isDashboardRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
 import {
   getDefaultWorkspaceRoute,
@@ -521,17 +522,10 @@ function App() {
     }
   }
 
-  async function handleLogout() {
-    if (!await confirmDiscardChanges("退出登录")) {
-      return;
-    }
-
-    if (session) {
-      void client.logout().catch(() => undefined);
-    }
-
-    endSession(null);
-  }
+  const handleLogout = useSessionLogout({
+    session: sessionRef, action: sessionActionRef, unitTransition: unitTransitionRef,
+    desktopAccessToken, setBusy: setSessionActionBusy, endSession, setNotice: setWorkspaceNotice,
+  });
 
   async function handleRefreshSession(reauthenticate = false) {
     const previousSession = sessionRef.current;

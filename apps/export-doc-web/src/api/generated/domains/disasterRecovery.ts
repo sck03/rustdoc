@@ -12,6 +12,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadRecoveryArchiveWithTicket(request: DownloadRecoveryArchiveWithTicketRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/disaster-recovery/archives/downloads/${encodePath(request.token)}`;
     return transport.request<Blob>("GET", path, { init });
   },

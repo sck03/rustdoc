@@ -85,7 +85,9 @@ pub(super) fn read(
     let entry = find(tx, id)?;
     if !actor.admin
         && !owns(actor, &entry)
-        && !References::load(tx, actor, paths)?.readable.contains(id)
+        && !References::query(tx, actor, paths, Some(&[id]))?
+            .readable
+            .contains(id)
     {
         return Err(error(403, "没有读取此图片的权限。"));
     }
@@ -293,7 +295,7 @@ pub fn handle(
             )
         }
         QUERY_REPORT_TEMPLATE_V3_IMAGE_RESOURCES => {
-            let _access = report_template_files::storage_lock(&service.paths)?;
+            let _access = report_template_files::storage_read_lock(&service.paths)?;
             let tx = store.connection()?;
             let references = References::load(&tx, actor, Some(&service.paths))?;
             let mut items = vec![];
@@ -368,7 +370,7 @@ pub fn download(
     parameters: &[(&str, String)],
 ) -> Result<FileOutput> {
     let id = parameter_id(parameters)?;
-    let _access = report_template_files::storage_lock(&service.paths)?;
+    let _access = report_template_files::storage_read_lock(&service.paths)?;
     let image = read(
         &service.store.connection()?,
         actor,
@@ -415,7 +417,7 @@ pub fn hydrate(
     data: &mut ReportData,
     content: Option<&[u8]>,
 ) -> Result<()> {
-    let _access = report_template_files::storage_lock(paths)?;
+    let _access = report_template_files::storage_read_lock(paths)?;
     let tx = store.connection()?;
     hydrate_in(&tx, paths, actor, data, content)
 }
@@ -505,6 +507,12 @@ fn template_images(
     mut consume: impl FnMut(String, &Value) -> Result<()>,
 ) -> Result<()> {
     let schema = schema_bytes(content)?;
+    let targets: Vec<_> = schema["resources"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|resource| resource["id"].as_str())
+        .collect();
     let mut references = None;
     for resource in schema["resources"].as_array().into_iter().flatten() {
         crate::operation::check()?;
@@ -512,7 +520,7 @@ fn template_images(
         let entry = find(tx, &id)?;
         if !actor.admin && !owns(actor, &entry) {
             if references.is_none() {
-                references = Some(References::load(tx, actor, paths)?);
+                references = Some(References::query(tx, actor, paths, Some(&targets))?);
             }
             if !references.as_ref().unwrap().readable.contains(&id) {
                 return Err(error(403, "没有读取此图片的权限。"));

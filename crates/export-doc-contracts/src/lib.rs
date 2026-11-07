@@ -6,5 +6,6 @@ pub mod openapi;
 pub mod permission_actions;
 pub mod report_batches;
 pub mod report_pages;
+pub mod request_limits;
 pub mod template_history;
 pub mod validation;

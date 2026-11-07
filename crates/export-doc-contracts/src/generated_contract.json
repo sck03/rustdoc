@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "2f576948617a02e26de8434df0d7702e57009808ee72bc20ae40ffd34e542d24",
+  "digest": "bc1a8167f2b17a481edec1b5dbe74cb3ca0744aacda854f7ade76bceb7f56444",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -8024,7 +8024,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowClientProfilesResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "AdmitSupplier": {
       "policy": {
@@ -8112,7 +8113,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "AnalyzeContainerPacking": {
       "policy": {
@@ -8178,7 +8180,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiContainerPackingAnalyzeResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "AnalyzeInvoiceProfit": {
       "policy": {
@@ -8244,7 +8247,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceProfitAnalysisResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ApplyPermissionSchemeVersion": {
       "policy": {
@@ -8362,6 +8366,7 @@
       "response": {
         "$ref": "#/components/schemas/PermissionSchemeApplication"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "permission-versions",
         "action": "apply"
@@ -8518,7 +8523,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ApproveGeneralRequest": {
       "policy": {
@@ -8671,7 +8677,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ApproveLeaveRequest": {
       "policy": {
@@ -8824,7 +8831,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ApproveMeetingBooking": {
       "policy": {
@@ -8952,7 +8960,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ApproveOfficeSupplyRequest": {
       "policy": {
@@ -9080,7 +9089,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ApproveOvertimeRequest": {
       "policy": {
@@ -9233,7 +9243,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ApprovePersonnelChangeRequest": {
       "policy": {
@@ -9386,7 +9397,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ApprovePurchaseRequest": {
       "policy": {
@@ -9539,7 +9551,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ApproveTravelRequest": {
       "policy": {
@@ -9692,7 +9705,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ArchiveAnnouncement": {
       "policy": {
@@ -9841,6 +9855,7 @@
       "response": {
         "$ref": "#/components/schemas/Announcement"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "archive",
@@ -9957,7 +9972,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiEmailTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ArchiveSalesOpportunity": {
       "policy": {
@@ -10046,7 +10062,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ArchiveUserReportTemplate": {
       "policy": {
@@ -10153,7 +10170,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiUserReportTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "AuthorizeServerMigrationOperation": {
       "policy": {
@@ -10222,7 +10240,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSensitiveOperationAuthorizationResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "BuildAgentConsignmentDefaults": {
       "policy": {
@@ -10297,7 +10316,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiAgentConsignmentDocumentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "BuildAgentConsignmentExportReview": {
       "policy": {
@@ -10372,7 +10392,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/SingleWindowExportReview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "BuildCustomsCooDefaults": {
       "policy": {
@@ -10447,7 +10468,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCustomsCooDocumentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "BuildCustomsCooExportReview": {
       "policy": {
@@ -10522,7 +10544,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/SingleWindowExportReview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CancelApprovedPersonnelChange": {
       "policy": {
@@ -10675,7 +10698,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CancelExpenseRequest": {
       "policy": {
@@ -10828,7 +10852,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CancelGeneralRequest": {
       "policy": {
@@ -10981,7 +11006,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CancelJob": {
       "policy": {
@@ -11048,7 +11074,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CancelLeaveRequest": {
       "policy": {
@@ -11201,7 +11228,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CancelMeetingBooking": {
       "policy": {
@@ -11329,7 +11357,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CancelOaActivation": {
       "policy": {
@@ -11481,7 +11510,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaApprovalSettings"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CancelOfficeSupplyRequest": {
       "policy": {
@@ -11609,7 +11639,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CancelOvertimeRequest": {
       "policy": {
@@ -11762,7 +11793,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CancelPersonnelChangeRequest": {
       "policy": {
@@ -11915,7 +11947,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CancelPurchaseRequest": {
       "policy": {
@@ -12068,7 +12101,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CancelTravelRequest": {
       "policy": {
@@ -12221,7 +12255,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CaptureRemoteHsCodes": {
       "policy": {
@@ -12290,7 +12325,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeSearchResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CheckReportTemplateStorage": {
       "policy": {
@@ -12361,7 +12397,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplateStorageStatusResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CleanupAuditLogs": {
       "policy": {
@@ -12427,7 +12464,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiAuditLogCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CleanupDatabaseBackups": {
       "policy": {
@@ -12493,7 +12531,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiBackupCreateResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CleanupSystemLogs": {
       "policy": {
@@ -12548,7 +12587,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSystemLogCleanupResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ClearAllHsCodes": {
       "policy": {
@@ -12623,7 +12663,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ClearFinishedJobs": {
       "policy": {
@@ -12675,7 +12716,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CloneInvoice": {
       "policy": {
@@ -12755,7 +12797,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceCloneResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CloneInvoiceAsType": {
       "policy": {
@@ -12838,7 +12881,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceCloneTypeResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CloneUserReportTemplate": {
       "policy": {
@@ -12939,7 +12983,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiUserReportTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CollectSingleWindowClientReceipts": {
       "policy": {
@@ -13034,7 +13079,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/SingleWindowReceiptCollectionResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CommitHsCodeCleanup": {
       "policy": {
@@ -13109,7 +13155,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CommitHsCodesImport": {
       "policy": {
@@ -13184,7 +13231,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeImportCommitResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CommitUserReportTemplateHistoryCleanup": {
       "policy": {
@@ -13288,7 +13336,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CompleteCrmFollowUp": {
       "policy": {
@@ -13379,7 +13428,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmFollowUpDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CompleteExpenseRequest": {
       "policy": {
@@ -13532,7 +13582,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CompleteGeneralRequest": {
       "policy": {
@@ -13685,7 +13736,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CompleteLeaveRequest": {
       "policy": {
@@ -13838,7 +13890,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CompleteOvertimeRequest": {
       "policy": {
@@ -13991,7 +14044,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CompletePurchaseRequest": {
       "policy": {
@@ -14144,7 +14198,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CompleteTravelRequest": {
       "policy": {
@@ -14297,7 +14352,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ConfirmAnnouncementRead": {
       "policy": {
@@ -14446,6 +14502,7 @@
       "response": {
         "$ref": "#/components/schemas/Announcement"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "read",
@@ -14526,7 +14583,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ConfirmSupplierAssessment": {
       "policy": {
@@ -14628,7 +14686,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSupplierAssessmentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateAnnouncement": {
       "policy": {
@@ -14766,6 +14825,7 @@
       "response": {
         "$ref": "#/components/schemas/Announcement"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "create",
@@ -14828,7 +14888,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BusinessAttachmentCategoryRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateCrmContact": {
       "policy": {
@@ -14913,7 +14974,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmContactDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateCrmCustomer": {
       "policy": {
@@ -14987,7 +15049,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmCustomerDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateCrmFollowUp": {
       "policy": {
@@ -15061,7 +15124,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmFollowUpDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateCustomer": {
       "policy": {
@@ -15141,7 +15205,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCustomerDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateCustomsCooProducerProfile": {
       "policy": {
@@ -15221,7 +15286,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCustomsCooProducerProfileSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateDatabaseBackup": {
       "policy": {
@@ -15276,7 +15342,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateDisasterRecoveryPackage": {
       "policy": {
@@ -15345,7 +15412,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateEmailTemplate": {
       "policy": {
@@ -15440,7 +15508,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiEmailTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateExpenseRequest": {
       "policy": {
@@ -15582,7 +15651,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateExporter": {
       "policy": {
@@ -15662,7 +15732,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiExporterDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateGeneralRequest": {
       "policy": {
@@ -15804,7 +15875,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateHsCode": {
       "policy": {
@@ -15876,7 +15948,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateInvoice": {
       "policy": {
@@ -15945,7 +16018,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateJobDownloadTicket": {
       "policy": {
@@ -16012,7 +16086,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiDownloadTicket"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateLeaveRequest": {
       "policy": {
@@ -16154,7 +16229,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateMeetingBooking": {
       "policy": {
@@ -16271,7 +16347,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateMeetingRoom": {
       "policy": {
@@ -16388,7 +16465,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingRoomRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateOfficeSupply": {
       "policy": {
@@ -16505,7 +16583,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateOfficeSupplyRequest": {
       "policy": {
@@ -16622,7 +16701,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateOrganizationCompany": {
       "policy": {
@@ -16749,7 +16829,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiOrganizationCompanyDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateOrganizationDepartment": {
       "policy": {
@@ -16876,7 +16957,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiOrganizationDepartmentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateOvertimeRequest": {
       "policy": {
@@ -17018,7 +17100,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreatePayee": {
       "policy": {
@@ -17098,7 +17181,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiPayeeDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreatePayment": {
       "policy": {
@@ -17178,7 +17262,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiPaymentSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreatePermissionTemplate": {
       "policy": {
@@ -17275,7 +17360,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiPermissionTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreatePersonnel": {
       "policy": {
@@ -17392,7 +17478,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/PersonnelRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreatePersonnelChangeRequest": {
       "policy": {
@@ -17534,7 +17621,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreatePort": {
       "policy": {
@@ -17614,7 +17702,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiPortDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreatePostgreSqlPhysicalBackup": {
       "policy": {
@@ -17661,7 +17750,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreatePostgreSqlPhysicalBackupDownloadTicket": {
       "policy": {
@@ -17727,7 +17817,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiDownloadTicket"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreatePostgreSqlRestorePlan": {
       "policy": {
@@ -17785,7 +17876,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiPostgreSqlRestorePlanResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateProduct": {
       "policy": {
@@ -17865,7 +17957,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiProductDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreatePurchaseRequest": {
       "policy": {
@@ -18007,7 +18100,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateRecoveryArchiveDownloadTicket": {
       "policy": {
@@ -18094,7 +18188,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiDownloadTicket"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateReportTemplate": {
       "policy": {
@@ -18182,7 +18277,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplateContentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateSalesOpportunity": {
       "policy": {
@@ -18270,7 +18366,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSalesOpportunityDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateServerMigrationPackage": {
       "policy": {
@@ -18339,7 +18436,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateSupplier": {
       "policy": {
@@ -18413,7 +18511,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateSupplierAssessment": {
       "policy": {
@@ -18501,7 +18600,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierAssessmentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateSupplierContact": {
       "policy": {
@@ -18589,7 +18689,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierContactDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateSupplierProductLink": {
       "policy": {
@@ -18677,7 +18778,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierProductLinkDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateTravelRequest": {
       "policy": {
@@ -18819,7 +18921,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateUnit": {
       "policy": {
@@ -18899,7 +19002,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiUnitDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "createUserAccount": {
       "policy": {
@@ -18996,7 +19100,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiUserSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "CreateUserReportTemplate": {
       "policy": {
@@ -19097,7 +19202,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiUserReportTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeactivateCrmCustomer": {
       "policy": {
@@ -19188,7 +19294,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmCustomerDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeactivateSupplier": {
       "policy": {
@@ -19276,7 +19383,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeactivateSupplierProductLink": {
       "policy": {
@@ -19374,7 +19482,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierProductLinkDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteAnnouncement": {
       "policy": {
@@ -19523,6 +19632,7 @@
       "response": {
         "$ref": "#/components/schemas/AnnouncementDeleteResult"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "delete",
@@ -19687,6 +19797,7 @@
       "response": {
         "$ref": "#/components/schemas/Announcement"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "delete-attachment",
@@ -19855,7 +19966,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteAttachmentOfGeneralRequest": {
       "policy": {
@@ -20018,7 +20130,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteAttachmentOfLeaveRequest": {
       "policy": {
@@ -20181,7 +20294,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteAttachmentOfMeetingBooking": {
       "policy": {
@@ -20344,7 +20458,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteAttachmentOfOfficeSupplyRequest": {
       "policy": {
@@ -20507,7 +20622,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteAttachmentOfOvertimeRequest": {
       "policy": {
@@ -20670,7 +20786,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteAttachmentOfPersonnelChangeRequest": {
       "policy": {
@@ -20833,7 +20950,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteAttachmentOfPurchaseRequest": {
       "policy": {
@@ -20996,7 +21114,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteAttachmentOfTravelRequest": {
       "policy": {
@@ -21159,7 +21278,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteAuditLogsByCriteria": {
       "policy": {
@@ -21225,7 +21345,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiAuditLogCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteBusinessAttachment": {
       "policy": {
@@ -21294,7 +21415,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteBusinessAttachmentCategory": {
       "policy": {
@@ -21365,7 +21487,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteContainerPackingContainerType": {
       "policy": {
@@ -21437,7 +21560,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteContainerPackingProject": {
       "policy": {
@@ -21506,7 +21630,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteCrmContact": {
       "policy": {
@@ -21605,7 +21730,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteCrmCustomer": {
       "policy": {
@@ -21694,7 +21820,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteCrmFollowUp": {
       "policy": {
@@ -21783,7 +21910,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteCustomer": {
       "policy": {
@@ -21866,7 +21994,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteCustomsCooProducerProfile": {
       "policy": {
@@ -21956,7 +22085,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteExporter": {
       "policy": {
@@ -22039,7 +22169,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteHsCode": {
       "policy": {
@@ -22123,7 +22254,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteHsCodeKnowledgeExample": {
       "policy": {
@@ -22180,7 +22312,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DeleteHsCodeKnowledgeExamplesBatch": {
       "policy": {
@@ -22246,7 +22379,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteHsCodesBatch": {
       "policy": {
@@ -22321,7 +22455,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteInvoice": {
       "policy": {
@@ -22401,7 +22536,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteJob": {
       "policy": {
@@ -22468,7 +22604,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteMeetingRoom": {
       "policy": {
@@ -22588,7 +22725,8 @@
       "request": {
         "$ref": "#/components/schemas/DeleteRecordRequest"
       },
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DeleteOfficeSupply": {
       "policy": {
@@ -22708,7 +22846,8 @@
       "request": {
         "$ref": "#/components/schemas/DeleteRecordRequest"
       },
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DeleteOrganizationCompany": {
       "policy": {
@@ -22837,7 +22976,8 @@
       "request": {
         "$ref": "#/components/schemas/DeleteRecordRequest"
       },
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DeleteOrganizationDepartment": {
       "policy": {
@@ -22966,7 +23106,8 @@
       "request": {
         "$ref": "#/components/schemas/DeleteRecordRequest"
       },
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DeletePayee": {
       "policy": {
@@ -23049,7 +23190,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeletePayment": {
       "policy": {
@@ -23140,7 +23282,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeletePermissionTemplate": {
       "policy": {
@@ -23239,7 +23382,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeletePersonnel": {
       "policy": {
@@ -23359,7 +23503,8 @@
       "request": {
         "$ref": "#/components/schemas/DeleteRecordRequest"
       },
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DeletePersonnelAttachment": {
       "policy": {
@@ -23515,7 +23660,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/PersonnelRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeletePersonnelImage": {
       "policy": {
@@ -23654,7 +23800,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PersonnelRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeletePort": {
       "policy": {
@@ -23737,7 +23884,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteProduct": {
       "policy": {
@@ -23820,7 +23968,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteReportTemplate": {
       "policy": {
@@ -23923,7 +24072,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteSupplier": {
       "policy": {
@@ -24012,7 +24162,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteSupplierAssessment": {
       "policy": {
@@ -24111,7 +24262,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteSupplierContact": {
       "policy": {
@@ -24210,7 +24362,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteSupplierProductLink": {
       "policy": {
@@ -24309,7 +24462,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DeleteUnit": {
       "policy": {
@@ -24392,7 +24546,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "deleteUserAccount": {
       "policy": {
@@ -24501,7 +24656,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DiffOaDefinitions": {
       "policy": {
@@ -24661,7 +24817,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaDefinitionDiff"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DisableEmailTemplate": {
       "policy": {
@@ -24770,7 +24927,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiEmailTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DisableOaDefinition": {
       "policy": {
@@ -24912,7 +25070,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaApprovalSettings"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DisableUserReportTemplate": {
       "policy": {
@@ -25017,7 +25176,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiUserReportTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DiscoverHsCodeHistoryCandidates": {
       "policy": {
@@ -25101,7 +25261,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/HsCodeHistoryCandidatePage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DispatchSingleWindowBatchToClient": {
       "policy": {
@@ -25196,7 +25357,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/SingleWindowClientDispatchResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DownloadAgentConsignmentSubmitPackage": {
       "policy": {
@@ -25281,7 +25443,8 @@
       "request": {
         "$ref": "#/components/schemas/ApiSingleWindowSubmitPackageRequest"
       },
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadAnnouncementAttachment": {
       "policy": {
@@ -25428,6 +25591,7 @@
       },
       "request": null,
       "response": null,
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "download",
@@ -25584,7 +25748,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadApprovalOfGeneralRequest": {
       "policy": {
@@ -25735,7 +25900,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadApprovalOfLeaveRequest": {
       "policy": {
@@ -25886,7 +26052,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadApprovalOfMeetingBooking": {
       "policy": {
@@ -26037,7 +26204,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadApprovalOfOfficeSupplyRequest": {
       "policy": {
@@ -26188,7 +26356,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadApprovalOfOvertimeRequest": {
       "policy": {
@@ -26339,7 +26508,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadApprovalOfPersonnelChangeRequest": {
       "policy": {
@@ -26490,7 +26660,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadApprovalOfPurchaseRequest": {
       "policy": {
@@ -26641,7 +26812,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadApprovalOfTravelRequest": {
       "policy": {
@@ -26792,7 +26964,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadAttachmentOfExpenseRequest": {
       "policy": {
@@ -26943,7 +27116,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadAttachmentOfGeneralRequest": {
       "policy": {
@@ -27094,7 +27268,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadAttachmentOfLeaveRequest": {
       "policy": {
@@ -27245,7 +27420,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadAttachmentOfMeetingBooking": {
       "policy": {
@@ -27396,7 +27572,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadAttachmentOfOfficeSupplyRequest": {
       "policy": {
@@ -27547,7 +27724,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadAttachmentOfOvertimeRequest": {
       "policy": {
@@ -27698,7 +27876,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadAttachmentOfPersonnelChangeRequest": {
       "policy": {
@@ -27849,7 +28028,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadAttachmentOfPurchaseRequest": {
       "policy": {
@@ -28000,7 +28180,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadAttachmentOfTravelRequest": {
       "policy": {
@@ -28151,7 +28332,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadAuditLogs": {
       "policy": {
@@ -28216,7 +28398,8 @@
       "request": {
         "$ref": "#/components/schemas/ApiAuditLogFilterRequest"
       },
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadBusinessAttachment": {
       "policy": {
@@ -28284,7 +28467,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadCloudDatabaseBackup": {
       "policy": {
@@ -28353,7 +28537,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DownloadContainerPackingPdf": {
       "policy": {
@@ -28421,7 +28606,8 @@
       "request": {
         "$ref": "#/components/schemas/ApiContainerPackingPdfRequest"
       },
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadCustomsCooSubmitPackage": {
       "policy": {
@@ -28506,7 +28692,8 @@
       "request": {
         "$ref": "#/components/schemas/ApiSingleWindowSubmitPackageRequest"
       },
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadInvoiceTransferPackage": {
       "policy": {
@@ -28582,7 +28769,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadJobResult": {
       "policy": {
@@ -28651,7 +28839,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 86400
     },
     "DownloadJobResultWithTicket": {
       "policy": {
@@ -28705,7 +28894,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 86400
     },
     "DownloadMaterialsOfExpenseRequest": {
       "policy": {
@@ -28856,7 +29046,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadMaterialsOfGeneralRequest": {
       "policy": {
@@ -29007,7 +29198,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadMaterialsOfLeaveRequest": {
       "policy": {
@@ -29158,7 +29350,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadMaterialsOfMeetingBooking": {
       "policy": {
@@ -29309,7 +29502,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadMaterialsOfOfficeSupplyRequest": {
       "policy": {
@@ -29460,7 +29654,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadMaterialsOfOvertimeRequest": {
       "policy": {
@@ -29611,7 +29806,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadMaterialsOfPersonnelChangeRequest": {
       "policy": {
@@ -29762,7 +29958,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadMaterialsOfPurchaseRequest": {
       "policy": {
@@ -29913,7 +30110,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadMaterialsOfTravelRequest": {
       "policy": {
@@ -30064,7 +30262,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadPersonnelAttachment": {
       "policy": {
@@ -30208,7 +30407,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadPostgreSqlPhysicalBackupWithTicket": {
       "policy": {
@@ -30268,7 +30468,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 86400
     },
     "DownloadQueriedInvoices": {
       "policy": {
@@ -30339,7 +30540,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "DownloadRecoveryArchiveWithTicket": {
       "policy": {
@@ -30393,7 +30595,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 86400
     },
     "DownloadReportTemplateFile": {
       "policy": {
@@ -30472,7 +30675,8 @@
       "request": {
         "$ref": "#/components/schemas/ApiReportTemplateFileDownloadRequest"
       },
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadReportTemplatePackage": {
       "policy": {
@@ -30537,7 +30741,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadReportTemplateV3ImageResource": {
       "policy": {
@@ -30611,7 +30816,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadSingleWindowReceiptPackage": {
       "policy": {
@@ -30682,7 +30888,8 @@
       "request": {
         "$ref": "#/components/schemas/ApiSingleWindowReceiptPackageExportRequest"
       },
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "DownloadSupportPackage": {
       "policy": {
@@ -30740,7 +30947,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "EditBusinessAttachmentMetadata": {
       "policy": {
@@ -30809,7 +31017,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BusinessAttachmentRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteApprovedPersonnelChange": {
       "policy": {
@@ -30962,7 +31171,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteExpenseRequestFulfillment": {
       "policy": {
@@ -31115,7 +31325,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteExpenseRequestWorkflow": {
       "policy": {
@@ -31268,7 +31479,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteGeneralRequestFulfillment": {
       "policy": {
@@ -31421,7 +31633,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteGeneralRequestWorkflow": {
       "policy": {
@@ -31574,7 +31787,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteLeaveRequestFulfillment": {
       "policy": {
@@ -31727,7 +31941,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteLeaveRequestWorkflow": {
       "policy": {
@@ -31880,7 +32095,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteMeetingBookingFulfillment": {
       "policy": {
@@ -32033,7 +32249,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteMeetingBookingWorkflow": {
       "policy": {
@@ -32186,7 +32403,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteOfficeSupplyRequestFulfillment": {
       "policy": {
@@ -32339,7 +32557,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteOfficeSupplyRequestWorkflow": {
       "policy": {
@@ -32492,7 +32711,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteOvertimeRequestFulfillment": {
       "policy": {
@@ -32645,7 +32865,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteOvertimeRequestWorkflow": {
       "policy": {
@@ -32798,7 +33019,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecutePersonnelChangeRequestFulfillment": {
       "policy": {
@@ -32951,7 +33173,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecutePersonnelChangeRequestWorkflow": {
       "policy": {
@@ -33104,7 +33327,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecutePurchaseRequestFulfillment": {
       "policy": {
@@ -33257,7 +33481,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecutePurchaseRequestWorkflow": {
       "policy": {
@@ -33410,7 +33635,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteTravelRequestFulfillment": {
       "policy": {
@@ -33563,7 +33789,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExecuteTravelRequestWorkflow": {
       "policy": {
@@ -33716,7 +33943,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ExportCrmCustomers": {
       "policy": {
@@ -33790,7 +34018,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "ExportHsCodeKnowledge": {
       "policy": {
@@ -33853,7 +34082,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "ExportSuppliers": {
       "policy": {
@@ -33927,7 +34157,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "FetchRemoteHsCodeDetail": {
       "policy": {
@@ -33996,7 +34227,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GenerateApprovalOfExpenseRequest": {
       "policy": {
@@ -34148,7 +34380,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GenerateApprovalOfGeneralRequest": {
       "policy": {
@@ -34300,7 +34533,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GenerateApprovalOfLeaveRequest": {
       "policy": {
@@ -34452,7 +34686,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GenerateApprovalOfMeetingBooking": {
       "policy": {
@@ -34604,7 +34839,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ResourceSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GenerateApprovalOfOfficeSupplyRequest": {
       "policy": {
@@ -34756,7 +34992,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ResourceSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GenerateApprovalOfOvertimeRequest": {
       "policy": {
@@ -34908,7 +35145,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GenerateApprovalOfPersonnelChangeRequest": {
       "policy": {
@@ -35060,7 +35298,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GenerateApprovalOfPurchaseRequest": {
       "policy": {
@@ -35212,7 +35451,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GenerateApprovalOfTravelRequest": {
       "policy": {
@@ -35364,7 +35604,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetAccessRestrictions": {
       "policy": {
@@ -35493,6 +35734,7 @@
       "response": {
         "$ref": "#/components/schemas/AccessRestrictionList"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "access-restrictions",
         "action": "list"
@@ -35571,7 +35813,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiAgentConsignmentDocumentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetAgentConsignmentLockedFields": {
       "policy": {
@@ -35646,7 +35889,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowLockedFieldsResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetAnnouncement": {
       "policy": {
@@ -35784,6 +36028,7 @@
       "response": {
         "$ref": "#/components/schemas/Announcement"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "get",
@@ -35867,7 +36112,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiBackupPlanStatus"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetBusinessAttachment": {
       "policy": {
@@ -35925,7 +36171,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BusinessAttachmentDetails"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetCloudBackupStatus": {
       "policy": {
@@ -35977,7 +36224,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCloudBackupStatusResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetContainerPackingProject": {
       "policy": {
@@ -36046,7 +36294,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiContainerPackingProjectResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetCrmCustomer": {
       "policy": {
@@ -36114,7 +36363,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCrmCustomerDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetCrmDashboard": {
       "policy": {
@@ -36196,7 +36446,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCrmDashboardDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetCrmEmailVariableDraft": {
       "policy": {
@@ -36270,7 +36521,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCrmEmailVariableDraftDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "getCurrentUser": {
       "policy": {
@@ -36302,7 +36554,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiUserDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetCustomer": {
       "policy": {
@@ -36375,7 +36628,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCustomerDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetCustomsCooDocument": {
       "policy": {
@@ -36450,7 +36704,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCustomsCooDocumentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetCustomsCooEditorOptions": {
       "policy": {
@@ -36499,7 +36754,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCustomsCooEditorOptionsResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetCustomsCooIssuingAuthorities": {
       "policy": {
@@ -36548,7 +36804,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowIssuingAuthorityCatalogResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetCustomsCooLockedFields": {
       "policy": {
@@ -36623,7 +36880,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowLockedFieldsResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetCustomsCooProducerProfile": {
       "policy": {
@@ -36703,7 +36961,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCustomsCooProducerProfileResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetDashboard": {
       "policy": {
@@ -36752,7 +37011,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiDashboardResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetDisasterRecoveryStatus": {
       "policy": {
@@ -36804,7 +37064,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiDisasterRecoveryStatusResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetEmailToolStatus": {
       "policy": {
@@ -36861,7 +37122,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiEmailStatusResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetExpenseRequest": {
       "policy": {
@@ -37003,7 +37265,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetExpenseRequestCommandResult": {
       "policy": {
@@ -37155,7 +37418,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaCommandResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetExporter": {
       "policy": {
@@ -37228,7 +37492,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiExporterDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetGeneralRequest": {
       "policy": {
@@ -37370,7 +37635,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetGeneralRequestCommandResult": {
       "policy": {
@@ -37522,7 +37788,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaCommandResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "getHealth": {
       "policy": {
@@ -37555,7 +37822,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiHealthResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetHsCode": {
       "policy": {
@@ -37622,7 +37890,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetHsCodeRemoteHealth": {
       "policy": {
@@ -37674,7 +37943,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeRemoteHealthResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetIdentityCandidates": {
       "policy": {
@@ -37815,6 +38085,7 @@
       "response": {
         "$ref": "#/components/schemas/IdentityCandidatePage"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "candidates",
         "action": "list"
@@ -37887,7 +38158,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceDetailDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetInvoiceDataMaintenancePreview": {
       "policy": {
@@ -37970,7 +38242,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceDataMaintenancePreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetInvoiceHsCode": {
       "policy": {
@@ -38037,7 +38310,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetJob": {
       "policy": {
@@ -38104,7 +38378,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetLeaveRequest": {
       "policy": {
@@ -38246,7 +38521,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetLeaveRequestCommandResult": {
       "policy": {
@@ -38398,7 +38674,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaCommandResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetLicenseStatus": {
       "policy": {
@@ -38430,7 +38707,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiLicenseStatusResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "getLiveness": {
       "policy": {
@@ -38454,7 +38732,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "GetMeetingBooking": {
       "policy": {
@@ -38596,7 +38875,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetMeetingBookingCommandResult": {
       "policy": {
@@ -38748,7 +39028,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaCommandResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetMeetingBookingHistory": {
       "policy": {
@@ -38889,7 +39170,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfOfficeRequestEventRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetMeetingRoomAvailability": {
       "policy": {
@@ -39030,7 +39312,8 @@
         "items": {
           "$ref": "#/components/schemas/MeetingBusySlot"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetNotificationUnreadCount": {
       "policy": {
@@ -39157,6 +39440,7 @@
       "response": {
         "$ref": "#/components/schemas/NotificationCount"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "notification",
         "action": "unread-count",
@@ -39331,7 +39615,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaApprovalHub"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetOaApprovalSettings": {
       "policy": {
@@ -39462,7 +39747,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaApprovalSettings"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetOaRequestProjects": {
       "policy": {
@@ -39657,7 +39943,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRoutingSources"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetOaRoutingSources": {
       "policy": {
@@ -39828,7 +40115,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRoutingSources"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetOaRoutingUnits": {
       "policy": {
@@ -39934,7 +40222,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRoutingUnits"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetOfficeStockHistory": {
       "policy": {
@@ -40075,7 +40364,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfOfficeStockMovementRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetOfficeSupplyRequest": {
       "policy": {
@@ -40217,7 +40507,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetOfficeSupplyRequestCommandResult": {
       "policy": {
@@ -40369,7 +40660,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaCommandResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetOfficeSupplyRequestHistory": {
       "policy": {
@@ -40510,7 +40802,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfOfficeRequestEventRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetOrganizationDirectory": {
       "policy": {
@@ -40626,7 +40919,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiOrganizationDirectoryResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetOvertimeRequest": {
       "policy": {
@@ -40768,7 +41062,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetOvertimeRequestCommandResult": {
       "policy": {
@@ -40920,7 +41215,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaCommandResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetPayee": {
       "policy": {
@@ -40993,7 +41289,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPayeeDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetPayment": {
       "policy": {
@@ -41066,7 +41363,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPaymentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetPermissionSchemeVersion": {
       "policy": {
@@ -41210,6 +41508,7 @@
       "response": {
         "$ref": "#/components/schemas/ApiPermissionTemplateDto"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "permission-versions",
         "action": "version"
@@ -41347,6 +41646,7 @@
       "response": {
         "$ref": "#/components/schemas/PermissionSchemeVersions"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "permission-versions",
         "action": "versions"
@@ -41468,7 +41768,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PersonnelRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetPersonnelAvatar": {
       "policy": {
@@ -41585,7 +41886,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "GetPersonnelChangeRequest": {
       "policy": {
@@ -41727,7 +42029,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetPersonnelChangeRequestCommandResult": {
       "policy": {
@@ -41879,7 +42182,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaCommandResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetPersonnelClearance": {
       "policy": {
@@ -41997,7 +42301,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PersonnelClearance"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetPersonnelHistory": {
       "policy": {
@@ -42139,7 +42444,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfPersonnelEventRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetPersonnelImage": {
       "policy": {
@@ -42264,7 +42570,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "GetPersonnelOptions": {
       "policy": {
@@ -42390,7 +42697,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PersonnelOptions"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetPort": {
       "policy": {
@@ -42463,7 +42771,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPortDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetProduct": {
       "policy": {
@@ -42536,7 +42845,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiProductDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetPurchaseRequest": {
       "policy": {
@@ -42678,7 +42988,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetPurchaseRequestCommandResult": {
       "policy": {
@@ -42830,7 +43141,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaCommandResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "getReadiness": {
       "policy": {
@@ -42857,7 +43169,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "GetReportTemplateContent": {
       "policy": {
@@ -42941,7 +43254,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplateContentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetReportTemplateFieldCatalog": {
       "policy": {
@@ -43012,7 +43326,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplateFieldCatalogResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetReportTemplateV3Contract": {
       "policy": {
@@ -43072,7 +43387,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplateV3ContractResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetRuntimeMetrics": {
       "policy": {
@@ -43127,7 +43443,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiRuntimeMetricsResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSalesOpportunity": {
       "policy": {
@@ -43195,7 +43512,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSalesOpportunityDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetServerMigrationStatus": {
       "policy": {
@@ -43247,7 +43565,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiServerMigrationStatusResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSettings": {
       "policy": {
@@ -43279,7 +43598,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSettingsResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSharedDatabaseOwnershipSummary": {
       "policy": {
@@ -43317,7 +43637,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSharedDatabaseOwnershipSummaryResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSingleWindowClientProfiles": {
       "policy": {
@@ -43375,7 +43696,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowClientProfilesResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSingleWindowExportReview": {
       "policy": {
@@ -43458,7 +43780,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/SingleWindowExportReview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSingleWindowOperationCenterDetail": {
       "policy": {
@@ -43531,7 +43854,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/SingleWindowOperationCenterDetail"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSingleWindowReferenceCatalog": {
       "policy": {
@@ -43583,7 +43907,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowReferenceCatalogResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSubmissionOfExpenseRequest": {
       "policy": {
@@ -43735,7 +44060,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSubmissionOfGeneralRequest": {
       "policy": {
@@ -43887,7 +44213,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSubmissionOfLeaveRequest": {
       "policy": {
@@ -44039,7 +44366,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSubmissionOfMeetingBooking": {
       "policy": {
@@ -44191,7 +44519,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ResourceSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSubmissionOfOfficeSupplyRequest": {
       "policy": {
@@ -44343,7 +44672,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ResourceSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSubmissionOfOvertimeRequest": {
       "policy": {
@@ -44495,7 +44825,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSubmissionOfPersonnelChangeRequest": {
       "policy": {
@@ -44647,7 +44978,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSubmissionOfPurchaseRequest": {
       "policy": {
@@ -44799,7 +45131,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSubmissionOfTravelRequest": {
       "policy": {
@@ -44951,7 +45284,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmission"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSupplier": {
       "policy": {
@@ -45019,7 +45353,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSupplierDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetSupplierAssessmentOverview": {
       "policy": {
@@ -45079,7 +45414,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSupplierAssessmentOverviewDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetTravelRequest": {
       "policy": {
@@ -45221,7 +45557,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetTravelRequestCommandResult": {
       "policy": {
@@ -45373,7 +45710,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaCommandResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetUnit": {
       "policy": {
@@ -45446,7 +45784,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiUnitDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetUnitAccessDirectory": {
       "policy": {
@@ -45561,7 +45900,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/UnitAccessDirectory"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetUnitApproverOptions": {
       "policy": {
@@ -45676,7 +46016,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/UnitApproverOptions"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetUnitMembers": {
       "policy": {
@@ -45823,7 +46164,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/UnitMemberDirectory"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetUnitPermissionTemplates": {
       "policy": {
@@ -45938,7 +46280,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/UnitPermissionTemplates"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetUnitWorkflowSummary": {
       "policy": {
@@ -46071,7 +46414,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/UnitWorkflowSummary"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetUnitWorkflowTasks": {
       "policy": {
@@ -46204,7 +46548,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/UnitWorkflowTasks"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetUserReportTemplate": {
       "policy": {
@@ -46275,7 +46620,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiUserReportTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetUserReportTemplateHistoryRetention": {
       "policy": {
@@ -46369,7 +46715,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiTemplateHistoryRetention"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "GetWorklist": {
       "policy": {
@@ -46440,7 +46787,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/WorklistPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ImportCrmCustomers": {
       "policy": {
@@ -46514,7 +46862,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmCustomerImportResultDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ImportHsCodeKnowledge": {
       "policy": {
@@ -46578,7 +46927,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeKnowledgeImportResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ImportHsCodesFromPath": {
       "policy": {
@@ -46653,7 +47003,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeImportResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ImportInvoiceTransferPackage": {
       "policy": {
@@ -46725,7 +47076,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceTransferImportResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ImportLetterOfCreditDocument": {
       "policy": {
@@ -46813,7 +47165,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiLetterOfCreditImportResponse"
-      }
+      },
+      "timeoutSeconds": 600
     },
     "ImportReportTemplateFile": {
       "policy": {
@@ -46904,7 +47257,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplateContentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ImportReportTemplatePackage": {
       "policy": {
@@ -46995,7 +47349,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplatePackageImportResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ImportSingleWindowReceiptPackage": {
       "policy": {
@@ -47070,7 +47425,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowImportedPackageResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ImportSingleWindowReferenceCatalogJson": {
       "policy": {
@@ -47144,7 +47500,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowReferenceCatalogSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ImportSingleWindowSubmitPackage": {
       "policy": {
@@ -47219,7 +47576,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowImportedPackageResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ImportSuppliers": {
       "policy": {
@@ -47293,7 +47651,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierImportResultDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ImportUploadedInvoiceTransferPackage": {
       "policy": {
@@ -47382,7 +47741,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceTransferImportResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "IssueMeetingRoomKey": {
       "policy": {
@@ -47510,7 +47870,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "IssueOfficeSupply": {
       "policy": {
@@ -47638,7 +47999,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "LinkPersonnelAccount": {
       "policy": {
@@ -47767,7 +48129,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/PersonnelRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListAnnouncementDepartments": {
       "policy": {
@@ -47894,6 +48257,7 @@
       "response": {
         "$ref": "#/components/schemas/AnnouncementDepartmentList"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "departments",
@@ -48053,6 +48417,7 @@
       "response": {
         "$ref": "#/components/schemas/AnnouncementReceiptPage"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "receipts",
@@ -48209,6 +48574,7 @@
       "response": {
         "$ref": "#/components/schemas/AnnouncementPage"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "list",
@@ -48339,7 +48705,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiAuditLogDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListAvailableExchangeRateCurrencies": {
       "policy": {
@@ -48394,7 +48761,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiExchangeRateAvailableCurrenciesResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListBusinessAttachmentCategories": {
       "policy": {
@@ -48453,7 +48821,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BusinessAttachmentCategoryCatalog"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListBusinessAttachments": {
       "policy": {
@@ -48550,7 +48919,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BusinessAttachmentPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListCloudDatabaseBackups": {
       "policy": {
@@ -48608,7 +48978,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCloudBackupListResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListContainerPackingContainerTypes": {
       "policy": {
@@ -48660,7 +49031,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiContainerTypeListResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListContainerPackingProjects": {
       "policy": {
@@ -48725,7 +49097,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiContainerPackingProjectListResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListCustomers": {
       "policy": {
@@ -48788,7 +49161,8 @@
         "items": {
           "$ref": "#/components/schemas/ApiCustomerDto"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListCustomersPage": {
       "policy": {
@@ -48871,7 +49245,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiCustomerDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListCustomOptions": {
       "policy": {
@@ -48939,7 +49314,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCustomOptionListResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListCustomsCooProducerProfiles": {
       "policy": {
@@ -48996,7 +49372,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCustomsCooProducerProfileListResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListDatabaseBackups": {
       "policy": {
@@ -49048,7 +49425,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiBackupListResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListDecisionsOfExpenseRequest": {
       "policy": {
@@ -49222,7 +49600,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaDecisionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListDecisionsOfGeneralRequest": {
       "policy": {
@@ -49396,7 +49775,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaDecisionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListDecisionsOfLeaveRequest": {
       "policy": {
@@ -49570,7 +49950,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaDecisionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListDecisionsOfMeetingBooking": {
       "policy": {
@@ -49744,7 +50125,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaDecisionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListDecisionsOfOfficeSupplyRequest": {
       "policy": {
@@ -49918,7 +50300,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaDecisionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListDecisionsOfOvertimeRequest": {
       "policy": {
@@ -50092,7 +50475,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaDecisionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListDecisionsOfPersonnelChangeRequest": {
       "policy": {
@@ -50266,7 +50650,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaDecisionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListDecisionsOfPurchaseRequest": {
       "policy": {
@@ -50440,7 +50825,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaDecisionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListDecisionsOfTravelRequest": {
       "policy": {
@@ -50614,7 +51000,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaDecisionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListEmailDeliveries": {
       "policy": {
@@ -50716,7 +51103,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiEmailDeliveryDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListEmailTemplates": {
       "policy": {
@@ -50808,7 +51196,8 @@
         "items": {
           "$ref": "#/components/schemas/ApiEmailTemplateDto"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListEmailTemplateVariables": {
       "policy": {
@@ -50878,7 +51267,8 @@
         "items": {
           "$ref": "#/components/schemas/ApiEmailTemplateVariableDto"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListEmailTemplateVersions": {
       "policy": {
@@ -50962,7 +51352,8 @@
         "items": {
           "$ref": "#/components/schemas/ApiEmailTemplateVersionDto"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListEmployments": {
       "policy": {
@@ -51095,6 +51486,7 @@
       "response": {
         "$ref": "#/components/schemas/IdentityEmploymentPage"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "employments",
         "action": "list"
@@ -51161,7 +51553,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiExchangeRateListResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListExpenseRequest": {
       "policy": {
@@ -51337,7 +51730,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequestPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListExpenseRequestWorkflowCandidates": {
       "policy": {
@@ -51489,7 +51883,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaWorkflowCandidates"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListExporters": {
       "policy": {
@@ -51552,7 +51947,8 @@
         "items": {
           "$ref": "#/components/schemas/ApiExporterDto"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListExportersPage": {
       "policy": {
@@ -51635,7 +52031,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiExporterDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListGeneralHandlingServices": {
       "policy": {
@@ -51766,7 +52163,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OfficeHandlingDirectory"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListGeneralRequest": {
       "policy": {
@@ -51942,7 +52340,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequestPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListGeneralRequestWorkflowCandidates": {
       "policy": {
@@ -52094,7 +52493,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaWorkflowCandidates"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListHistoryOfExpenseRequest": {
       "policy": {
@@ -52252,7 +52652,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaEventPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListHistoryOfGeneralRequest": {
       "policy": {
@@ -52410,7 +52811,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaEventPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListHistoryOfLeaveRequest": {
       "policy": {
@@ -52568,7 +52970,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaEventPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListHistoryOfOvertimeRequest": {
       "policy": {
@@ -52726,7 +53129,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaEventPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListHistoryOfPersonnelChangeRequest": {
       "policy": {
@@ -52884,7 +53288,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaEventPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListHistoryOfPurchaseRequest": {
       "policy": {
@@ -53042,7 +53447,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaEventPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListHistoryOfTravelRequest": {
       "policy": {
@@ -53200,7 +53606,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaEventPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListHsCodeKnowledgeExamples": {
       "policy": {
@@ -53284,7 +53691,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeKnowledgeExamplePage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListHsCodeRemoteCandidates": {
       "policy": {
@@ -53375,7 +53783,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/HsCodeRemoteCandidatePage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListHsCodes": {
       "policy": {
@@ -53459,7 +53868,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiHsCodeDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListInvoices": {
       "policy": {
@@ -53557,7 +53967,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiInvoiceListItemDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListInvoiceStatusHistory": {
       "policy": {
@@ -53632,7 +54043,8 @@
         "items": {
           "$ref": "#/components/schemas/ApiInvoiceStatusHistoryDto"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListJobs": {
       "policy": {
@@ -53723,7 +54135,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfBackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListLeaveRequest": {
       "policy": {
@@ -53899,7 +54312,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequestPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListLeaveRequestWorkflowCandidates": {
       "policy": {
@@ -54051,7 +54465,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaWorkflowCandidates"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListMeetingBookings": {
       "policy": {
@@ -54274,7 +54689,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfMeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListMeetingBookingWorkflowCandidates": {
       "policy": {
@@ -54426,7 +54842,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaWorkflowCandidates"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListMeetingRooms": {
       "policy": {
@@ -54571,7 +54988,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfMeetingRoomRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListNotifications": {
       "policy": {
@@ -54722,6 +55140,7 @@
       "response": {
         "$ref": "#/components/schemas/NotificationPage"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "notification",
         "action": "inbox",
@@ -54887,7 +55306,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaDefinitionVersions"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListOaWorkflowExceptions": {
       "policy": {
@@ -55036,7 +55456,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaWorkflowExceptions"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListOfficeSupplies": {
       "policy": {
@@ -55188,7 +55609,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfOfficeSupplyRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListOfficeSupplyRequests": {
       "policy": {
@@ -55411,7 +55833,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfOfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListOfficeSupplyRequestWorkflowCandidates": {
       "policy": {
@@ -55563,7 +55986,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaWorkflowCandidates"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListOrganizationManagers": {
       "policy": {
@@ -55719,7 +56143,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfOrganizationManagerRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListOvertimeRequest": {
       "policy": {
@@ -55895,7 +56320,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequestPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListOvertimeRequestWorkflowCandidates": {
       "policy": {
@@ -56047,7 +56473,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaWorkflowCandidates"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPayees": {
       "policy": {
@@ -56110,7 +56537,8 @@
         "items": {
           "$ref": "#/components/schemas/ApiPayeeDto"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPayeesPage": {
       "policy": {
@@ -56193,7 +56621,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiPayeeDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPayments": {
       "policy": {
@@ -56274,7 +56703,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiPaymentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPermissionTemplates": {
       "policy": {
@@ -56330,7 +56760,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPermissionTemplateCatalogResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPersonnel": {
       "policy": {
@@ -56489,7 +56920,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfPersonnelDirectoryRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPersonnelAccountOptions": {
       "policy": {
@@ -56638,7 +57070,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfPersonnelAccountRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPersonnelChangeRequest": {
       "policy": {
@@ -56807,7 +57240,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequestPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPersonnelChangeRequestWorkflowCandidates": {
       "policy": {
@@ -56959,7 +57393,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaWorkflowCandidates"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPersonnelReportingOptions": {
       "policy": {
@@ -57115,7 +57550,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfOrganizationManagerRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPorts": {
       "policy": {
@@ -57178,7 +57614,8 @@
         "items": {
           "$ref": "#/components/schemas/ApiPortDto"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPortsPage": {
       "policy": {
@@ -57261,7 +57698,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiPortDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPositions": {
       "policy": {
@@ -57394,6 +57832,7 @@
       "response": {
         "$ref": "#/components/schemas/IdentityPositionPage"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "positions",
         "action": "list"
@@ -57435,7 +57874,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPostgreSqlPhysicalBackupListResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListProducts": {
       "policy": {
@@ -57527,7 +57967,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiProductDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListProjects": {
       "policy": {
@@ -57660,6 +58101,7 @@
       "response": {
         "$ref": "#/components/schemas/IdentityProjectPage"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "projects",
         "action": "list"
@@ -57839,7 +58281,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequestPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListPurchaseRequestWorkflowCandidates": {
       "policy": {
@@ -57991,7 +58434,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaWorkflowCandidates"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListQueriedInvoices": {
       "policy": {
@@ -58157,7 +58601,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiQueryInvoiceRowDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListReportTemplates": {
       "policy": {
@@ -58234,7 +58679,8 @@
         "items": {
           "$ref": "#/components/schemas/ApiReportTemplateDto"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListResponsibilities": {
       "policy": {
@@ -58367,6 +58813,7 @@
       "response": {
         "$ref": "#/components/schemas/IdentityResponsibilityPage"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "responsibilities",
         "action": "list"
@@ -58501,7 +58948,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OfficeHandlingDirectory"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSalesOpportunityHistory": {
       "policy": {
@@ -58575,7 +59023,8 @@
         "items": {
           "$ref": "#/components/schemas/ApiSalesOpportunityHistoryDto"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSingleWindowOperationCenter": {
       "policy": {
@@ -58670,7 +59119,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/SingleWindowOperationCenterPageResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSubmissionsOfExpenseRequest": {
       "policy": {
@@ -58828,7 +59278,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmissionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSubmissionsOfGeneralRequest": {
       "policy": {
@@ -58986,7 +59437,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmissionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSubmissionsOfLeaveRequest": {
       "policy": {
@@ -59144,7 +59596,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmissionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSubmissionsOfMeetingBooking": {
       "policy": {
@@ -59302,7 +59755,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ResourceSubmissionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSubmissionsOfOfficeSupplyRequest": {
       "policy": {
@@ -59460,7 +59914,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ResourceSubmissionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSubmissionsOfOvertimeRequest": {
       "policy": {
@@ -59618,7 +60073,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmissionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSubmissionsOfPersonnelChangeRequest": {
       "policy": {
@@ -59776,7 +60232,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmissionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSubmissionsOfPurchaseRequest": {
       "policy": {
@@ -59934,7 +60391,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmissionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSubmissionsOfTravelRequest": {
       "policy": {
@@ -60092,7 +60550,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaSubmissionPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSupplierAssessments": {
       "policy": {
@@ -60169,7 +60628,8 @@
         "items": {
           "$ref": "#/components/schemas/ApiSupplierAssessmentDto"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListSupplyHandlingServices": {
       "policy": {
@@ -60300,7 +60760,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OfficeHandlingDirectory"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListTravelRequest": {
       "policy": {
@@ -60476,7 +60937,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequestPage"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListTravelRequestWorkflowCandidates": {
       "policy": {
@@ -60628,7 +61090,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaWorkflowCandidates"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListUnits": {
       "policy": {
@@ -60691,7 +61154,8 @@
         "items": {
           "$ref": "#/components/schemas/ApiUnitDto"
         }
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListUnitsPage": {
       "policy": {
@@ -60774,7 +61238,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiUnitDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListUserReportTemplates": {
       "policy": {
@@ -60890,7 +61355,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfUserReportTemplateSummaryRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListUserReportTemplateVersions": {
       "policy": {
@@ -60998,7 +61464,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiUserReportTemplateVersionDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ListUsers": {
       "policy": {
@@ -61054,7 +61521,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiUserListResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "Login": {
       "policy": {
@@ -61156,7 +61624,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiLoginResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "Logout": {
       "policy": {
@@ -61188,7 +61657,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiLogoutResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ManageAnnouncements": {
       "policy": {
@@ -61332,6 +61802,7 @@
       "response": {
         "$ref": "#/components/schemas/AnnouncementPage"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "manage-list",
@@ -61479,7 +61950,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaApprovalPreview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewApprovalOfGeneralRequest": {
       "policy": {
@@ -61621,7 +62093,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaApprovalPreview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewApprovalOfLeaveRequest": {
       "policy": {
@@ -61763,7 +62236,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaApprovalPreview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewApprovalOfOvertimeRequest": {
       "policy": {
@@ -61905,7 +62379,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaApprovalPreview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewApprovalOfPersonnelChangeRequest": {
       "policy": {
@@ -62047,7 +62522,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaApprovalPreview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewApprovalOfPurchaseRequest": {
       "policy": {
@@ -62189,7 +62665,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaApprovalPreview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewApprovalOfTravelRequest": {
       "policy": {
@@ -62331,7 +62808,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaApprovalPreview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewCrmCustomerImport": {
       "policy": {
@@ -62411,7 +62889,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCrmCustomerImportPreviewDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewEmailTemplate": {
       "policy": {
@@ -62496,7 +62975,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiEmailTemplatePreviewDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewExcelImport": {
       "policy": {
@@ -62568,7 +63048,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiExcelImportPreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewHsCodeCleanup": {
       "policy": {
@@ -62632,7 +63113,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeCleanupPreview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewHsCodesImportFromPath": {
       "policy": {
@@ -62704,7 +63186,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeImportPreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewHsCodesImportUpload": {
       "policy": {
@@ -62805,7 +63288,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeImportPreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewHsCodesObsolete": {
       "policy": {
@@ -62869,7 +63353,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeObsoletePreview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewInvoiceDocumentPackageHtml": {
       "policy": {
@@ -62957,7 +63442,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceDocumentPackagePreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewInvoiceReportDraftHtml": {
       "policy": {
@@ -63034,7 +63520,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiReportHtmlPreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewInvoiceReportHtml": {
       "policy": {
@@ -63122,7 +63609,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiReportHtmlPreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewInvoiceTransferPackage": {
       "policy": {
@@ -63194,7 +63682,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceTransferPreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewOaApprovalSheet": {
       "policy": {
@@ -63336,7 +63825,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaSheetPreview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewOcrImage": {
       "policy": {
@@ -63417,7 +63907,8 @@
         }
       },
       "request": null,
-      "response": null
+      "response": null,
+      "timeoutSeconds": 30
     },
     "PreviewOrganizationCompanyChange": {
       "policy": {
@@ -63545,7 +64036,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OrganizationChangeImpact"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewPaymentVoucherDraftHtml": {
       "policy": {
@@ -63622,7 +64114,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiPaymentReportHtmlPreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewPaymentVoucherHtml": {
       "policy": {
@@ -63710,7 +64203,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiPaymentReportHtmlPreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewPermissionSchemeApplication": {
       "policy": {
@@ -63828,6 +64322,7 @@
       "response": {
         "$ref": "#/components/schemas/PermissionSchemeApplication"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "permission-versions",
         "action": "preview"
@@ -63905,7 +64400,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplatePreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewShippingMarkImage": {
       "policy": {
@@ -63977,7 +64473,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiShippingMarkImagePreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewSingleWindowReferenceCatalogExcelImport": {
       "policy": {
@@ -64201,7 +64698,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowReferenceCatalogExcelImportPreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewSupplierImport": {
       "policy": {
@@ -64281,7 +64779,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSupplierImportPreviewDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewUploadedExcelImport": {
       "policy": {
@@ -64359,7 +64858,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiExcelImportPreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewUploadedInvoiceTransferPackage": {
       "policy": {
@@ -64434,7 +64934,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceTransferPreviewResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PreviewUserReportTemplateHistoryCleanup": {
       "policy": {
@@ -64538,7 +65039,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiTemplateHistoryCleanupPreview"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PublishAnnouncement": {
       "policy": {
@@ -64687,6 +65189,7 @@
       "response": {
         "$ref": "#/components/schemas/Announcement"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "publish",
@@ -64801,7 +65304,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiEmailTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PublishOaDefinition": {
       "policy": {
@@ -64943,7 +65447,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaApprovalSettings"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PublishPermissionScheme": {
       "policy": {
@@ -65061,6 +65566,7 @@
       "response": {
         "$ref": "#/components/schemas/PermissionSchemePublication"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "permission-versions",
         "action": "publish"
@@ -65169,7 +65675,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiUserReportTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "PurgeCancelledInvoice": {
       "policy": {
@@ -65273,7 +65780,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoicePurgeResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "QueryCrmContacts": {
       "policy": {
@@ -65368,7 +65876,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiCrmContactDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "QueryCrmCustomers": {
       "policy": {
@@ -65467,7 +65976,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiCrmCustomerDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "QueryCrmFollowUps": {
       "policy": {
@@ -65583,7 +66093,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiCrmFollowUpDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "QueryReportTemplateV3ImageResources": {
       "policy": {
@@ -65665,7 +66176,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfReportTemplateImageResourceListItem"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "QuerySalesOpportunities": {
       "policy": {
@@ -65758,7 +66270,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiSalesOpportunityDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "QuerySupplierContacts": {
       "policy": {
@@ -65853,7 +66366,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiSupplierContactDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "QuerySupplierProductLinks": {
       "policy": {
@@ -65948,7 +66462,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiSupplierProductLinkDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "QuerySuppliers": {
       "policy": {
@@ -66047,7 +66562,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiSupplierDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReadAllNotifications": {
       "policy": {
@@ -66174,6 +66690,7 @@
       "response": {
         "$ref": "#/components/schemas/NotificationCount"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "notification",
         "action": "read-all",
@@ -66317,6 +66834,7 @@
       "response": {
         "$ref": "#/components/schemas/SiteNotification"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "notification",
         "action": "notification-read",
@@ -66475,7 +66993,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReassignGeneralRequestApproval": {
       "policy": {
@@ -66628,7 +67147,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReassignLeaveRequestApproval": {
       "policy": {
@@ -66781,7 +67301,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReassignOvertimeRequestApproval": {
       "policy": {
@@ -66934,7 +67455,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReassignPersonnelChangeRequestApproval": {
       "policy": {
@@ -67087,7 +67609,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReassignPurchaseRequestApproval": {
       "policy": {
@@ -67240,7 +67763,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReassignTravelRequestApproval": {
       "policy": {
@@ -67393,7 +67917,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReassignUnitWorkflowTask": {
       "policy": {
@@ -67519,7 +68044,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/UnitTaskChange"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RecognizeOcrImage": {
       "policy": {
@@ -67597,7 +68123,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiOcrRecognizeImageResponse"
-      }
+      },
+      "timeoutSeconds": 95
     },
     "RecordHsCodeKnowledgeFeedback": {
       "policy": {
@@ -67663,7 +68190,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RecordInvoiceHsCodeKnowledgeFeedback": {
       "policy": {
@@ -67729,7 +68257,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RecycleReportTemplateV3ImageResource": {
       "policy": {
@@ -67810,7 +68339,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RegisterLicense": {
       "policy": {
@@ -67873,7 +68403,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiLicenseRegisterResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RejectExpenseRequest": {
       "policy": {
@@ -68026,7 +68557,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RejectGeneralRequest": {
       "policy": {
@@ -68179,7 +68711,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RejectLeaveRequest": {
       "policy": {
@@ -68332,7 +68865,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RejectMeetingBooking": {
       "policy": {
@@ -68460,7 +68994,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RejectOfficeSupplyRequest": {
       "policy": {
@@ -68588,7 +69123,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RejectOvertimeRequest": {
       "policy": {
@@ -68741,7 +69277,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RejectPersonnelChangeRequest": {
       "policy": {
@@ -68894,7 +69431,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RejectPurchaseRequest": {
       "policy": {
@@ -69047,7 +69585,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RejectTravelRequest": {
       "policy": {
@@ -69200,7 +69739,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RemindExpenseRequest": {
       "policy": {
@@ -69353,7 +69893,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RemindGeneralRequest": {
       "policy": {
@@ -69506,7 +70047,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RemindLeaveRequest": {
       "policy": {
@@ -69659,7 +70201,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RemindOvertimeRequest": {
       "policy": {
@@ -69812,7 +70355,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RemindPersonnelChangeRequest": {
       "policy": {
@@ -69965,7 +70509,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RemindPurchaseRequest": {
       "policy": {
@@ -70118,7 +70663,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RemindTravelRequest": {
       "policy": {
@@ -70271,7 +70817,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RenameReportTemplate": {
       "policy": {
@@ -70362,7 +70909,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplateContentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RenewSession": {
       "policy": {
@@ -70394,7 +70942,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiLoginResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RepairSingleWindowExportReviewGroups": {
       "policy": {
@@ -70488,7 +71037,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowRepairGroupsResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ResetHsCodeRemoteCandidates": {
       "policy": {
@@ -70551,7 +71101,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ResetSingleWindowReferenceCatalog": {
       "policy": {
@@ -70609,7 +71160,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowReferenceCatalogSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ResolveRemoteHsCodeDetail": {
       "policy": {
@@ -70681,7 +71233,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeRemoteDetailResolutionResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RestockOfficeSupply": {
       "policy": {
@@ -70809,7 +71362,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeStockMovementRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RestoreCrmCustomer": {
       "policy": {
@@ -70900,7 +71454,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmCustomerDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RestoreCrmFollowUp": {
       "policy": {
@@ -70991,7 +71546,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmFollowUpDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RestoreDatabaseBackup": {
       "policy": {
@@ -71060,7 +71616,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RestoreDisasterRecoveryPackage": {
       "policy": {
@@ -71129,7 +71686,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RestoreEmailTemplate": {
       "policy": {
@@ -71238,7 +71796,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiEmailTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RestoreEmailTemplateVersion": {
       "policy": {
@@ -71357,7 +71916,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiEmailTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RestorePostgreSqlPhysicalBackup": {
       "policy": {
@@ -71432,7 +71992,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiServerMigrationRestoreResponse"
-      }
+      },
+      "timeoutSeconds": 86400
     },
     "RestoreSupplier": {
       "policy": {
@@ -71520,7 +72081,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RestoreSupplierProductLink": {
       "policy": {
@@ -71618,7 +72180,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierProductLinkDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RestoreUserReportTemplate": {
       "policy": {
@@ -71723,7 +72286,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiUserReportTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RestoreUserReportTemplateVersion": {
       "policy": {
@@ -71838,7 +72402,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiUserReportTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RetryJob": {
       "policy": {
@@ -71911,7 +72476,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RetryOaSystemNode": {
       "policy": {
@@ -72053,7 +72619,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaSystemRetryResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReturnForCorrectionExpenseRequest": {
       "policy": {
@@ -72206,7 +72773,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReturnForCorrectionGeneralRequest": {
       "policy": {
@@ -72359,7 +72927,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReturnForCorrectionLeaveRequest": {
       "policy": {
@@ -72512,7 +73081,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReturnForCorrectionOvertimeRequest": {
       "policy": {
@@ -72665,7 +73235,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReturnForCorrectionPersonnelChangeRequest": {
       "policy": {
@@ -72818,7 +73389,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReturnForCorrectionPurchaseRequest": {
       "policy": {
@@ -72971,7 +73543,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReturnForCorrectionTravelRequest": {
       "policy": {
@@ -73124,7 +73697,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReturnMeetingRoomKey": {
       "policy": {
@@ -73252,7 +73826,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReturnOfficeSupply": {
       "policy": {
@@ -73380,7 +73955,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReviewHsCodeRemoteCandidate": {
       "policy": {
@@ -73449,7 +74025,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReviewHsCodeRemoteCandidatesBatch": {
       "policy": {
@@ -73515,7 +74092,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReviewInvoice": {
       "policy": {
@@ -73580,7 +74158,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/InvoiceReviewResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ReviewLetterOfCreditCompliance": {
       "policy": {
@@ -73665,7 +74244,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiLetterOfCreditReviewResponse"
-      }
+      },
+      "timeoutSeconds": 125
     },
     "RunBackupPlan": {
       "policy": {
@@ -73743,7 +74323,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "RunShutdownMaintenance": {
       "policy": {
@@ -73785,7 +74366,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiShutdownMaintenanceResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveAccessRestriction": {
       "policy": {
@@ -73903,6 +74485,7 @@
       "response": {
         "$ref": "#/components/schemas/AccessRestrictionRecord"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "access-restrictions",
         "action": "save"
@@ -73992,7 +74575,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiAgentConsignmentDocumentSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveAgentConsignmentSubmitPackageToPath": {
       "policy": {
@@ -74078,7 +74662,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowHandoffPackageResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveAuditLogsToPath": {
       "policy": {
@@ -74144,7 +74729,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiAuditLogCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveBackupPlan": {
       "policy": {
@@ -74233,7 +74819,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiBackupPlanStatus"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveBusinessAttachmentToPath": {
       "policy": {
@@ -74313,7 +74900,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveContainerPackingContainerType": {
       "policy": {
@@ -74382,7 +74970,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiContainerTypeSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveContainerPackingPdfToPath": {
       "policy": {
@@ -74454,7 +75043,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiContainerPackingPdfSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveContainerPackingProject": {
       "policy": {
@@ -74523,7 +75113,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiContainerPackingProjectSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveCustomOption": {
       "policy": {
@@ -74602,7 +75193,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCustomOptionListResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveCustomsCooDocument": {
       "policy": {
@@ -74688,7 +75280,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCustomsCooDocumentSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveCustomsCooSubmitPackageToPath": {
       "policy": {
@@ -74774,7 +75367,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowHandoffPackageResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveEmailTemplateDraft": {
       "policy": {
@@ -74883,7 +75477,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiEmailTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveHsCodeKnowledgeExample": {
       "policy": {
@@ -74949,7 +75544,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/HsCodeDeclarationExample"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveInvoiceSealImage": {
       "policy": {
@@ -75018,7 +75614,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceSealImageSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveInvoiceTransferPackageToPath": {
       "policy": {
@@ -75109,7 +75706,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceTransferExportResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveOaApprovalSettings": {
       "policy": {
@@ -75251,7 +75849,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaApprovalSettings"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SavePosition": {
       "policy": {
@@ -75369,6 +75968,7 @@
       "response": {
         "$ref": "#/components/schemas/IdentityPosition"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "positions",
         "action": "save"
@@ -75490,6 +76090,7 @@
       "response": {
         "$ref": "#/components/schemas/IdentityProject"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "projects",
         "action": "save"
@@ -75567,7 +76168,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveReportTemplateContent": {
       "policy": {
@@ -75658,7 +76260,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplateContentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveReportTemplateFileToPath": {
       "policy": {
@@ -75738,7 +76341,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplateFileExportResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveReportTemplatePackageToPath": {
       "policy": {
@@ -75815,7 +76419,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplatePackageExportResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveResponsibility": {
       "policy": {
@@ -75933,6 +76538,7 @@
       "response": {
         "$ref": "#/components/schemas/IdentityResponsibility"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "responsibilities",
         "action": "save"
@@ -76005,7 +76611,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiShippingMarkImageSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveSingleWindowClientProfile": {
       "policy": {
@@ -76077,7 +76684,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowClientProfilesResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveSingleWindowReceiptPackageToPath": {
       "policy": {
@@ -76149,7 +76757,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowHandoffPackageResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveSupportPackageToRuntime": {
       "policy": {
@@ -76204,7 +76813,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupportPackageResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveUnitAccess": {
       "policy": {
@@ -76330,7 +76940,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/UnitAccessRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveUnitPermissionTemplate": {
       "policy": {
@@ -76456,7 +77067,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiPermissionTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SaveUserReportTemplateDraft": {
       "policy": {
@@ -76561,7 +77173,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiUserReportTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ScheduleOaDefinition": {
       "policy": {
@@ -76703,7 +77316,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaApprovalSettings"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SearchHsCodeKnowledge": {
       "policy": {
@@ -76775,7 +77389,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/HsCodeKnowledgeSearchResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SearchInvoiceHsCodeKnowledge": {
       "policy": {
@@ -76847,7 +77462,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/HsCodeKnowledgeSearchResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SearchRemoteHsCodes": {
       "policy": {
@@ -76913,7 +77529,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeSearchResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SearchSupplierProductOptions": {
       "policy": {
@@ -77005,7 +77622,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiPagedResponseOfApiSupplierProductOptionDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SendEmail": {
       "policy": {
@@ -77096,7 +77714,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiEmailSendResponse"
-      }
+      },
+      "timeoutSeconds": 65
     },
     "SetDefaultReportTemplate": {
       "policy": {
@@ -77187,7 +77806,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SetPrimaryCrmContact": {
       "policy": {
@@ -77288,7 +77908,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmContactDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SetPrimarySupplierContact": {
       "policy": {
@@ -77386,7 +78007,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierContactDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ShareEmailTemplate": {
       "policy": {
@@ -77495,7 +78117,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiEmailTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ShareUserReportTemplate": {
       "policy": {
@@ -77600,7 +78223,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiUserReportTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SimulateOaDefinition": {
       "policy": {
@@ -77717,7 +78341,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaSimulationResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StageRecoveryArchiveRestore": {
       "policy": {
@@ -77815,7 +78440,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StageServerMigrationRestore": {
       "policy": {
@@ -77921,7 +78547,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiServerMigrationRestoreResponse"
-      }
+      },
+      "timeoutSeconds": 86400
     },
     "StartBlankBookingSheetDownloadJob": {
       "policy": {
@@ -77973,7 +78600,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartBlankBookingSheetSaveToPathJob": {
       "policy": {
@@ -78042,7 +78670,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartBookingSheetConvertSaveToPathJob": {
       "policy": {
@@ -78111,7 +78740,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartExcelTemplateDownloadJob": {
       "policy": {
@@ -78163,7 +78793,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartExcelTemplateSaveToPathJob": {
       "policy": {
@@ -78232,7 +78863,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartInvoiceBookingSheetDownloadJob": {
       "policy": {
@@ -78301,7 +78933,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartInvoiceBookingSheetSaveToPathJob": {
       "policy": {
@@ -78373,7 +79006,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartInvoiceDocumentEmailJob": {
       "policy": {
@@ -78475,7 +79109,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartInvoiceDocumentPackageDownloadJob": {
       "policy": {
@@ -78557,7 +79192,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartInvoiceDocumentPackageSaveToPathJob": {
       "policy": {
@@ -78642,7 +79278,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartInvoiceReportPdfDownloadJob": {
       "policy": {
@@ -78724,7 +79361,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartInvoiceReportPdfSaveToPathJob": {
       "policy": {
@@ -78809,7 +79447,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartInvoiceReportPdfZipDownloadJob": {
       "policy": {
@@ -78880,7 +79519,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartInvoiceReportPdfZipSaveToPathJob": {
       "policy": {
@@ -78954,7 +79594,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartPaymentVoucherPdfDownloadJob": {
       "policy": {
@@ -79036,7 +79677,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartPaymentVoucherPdfSaveToPathJob": {
       "policy": {
@@ -79121,7 +79763,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StartPdfMergeSaveToPathJob": {
       "policy": {
@@ -79206,7 +79849,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "StocktakeOfficeSupply": {
       "policy": {
@@ -79334,7 +79978,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeStockMovementRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SubmitExpenseRequest": {
       "policy": {
@@ -79487,7 +80132,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SubmitGeneralRequest": {
       "policy": {
@@ -79640,7 +80286,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SubmitLeaveRequest": {
       "policy": {
@@ -79793,7 +80440,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SubmitMeetingBooking": {
       "policy": {
@@ -79946,7 +80594,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SubmitOfficeSupplyRequest": {
       "policy": {
@@ -80099,7 +80748,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SubmitOvertimeRequest": {
       "policy": {
@@ -80252,7 +80902,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SubmitPersonnelChangeRequest": {
       "policy": {
@@ -80405,7 +81056,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SubmitPurchaseRequest": {
       "policy": {
@@ -80558,7 +81210,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SubmitTravelRequest": {
       "policy": {
@@ -80711,7 +81364,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SuggestEmailServerConfig": {
       "policy": {
@@ -80782,7 +81436,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiEmailServerSuggestionResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "SuspendAccountForSecurity": {
       "policy": {
@@ -80900,6 +81555,7 @@
       "response": {
         "$ref": "#/components/schemas/AccountSecurityResult"
       },
+      "timeoutSeconds": 30,
       "foundation": {
         "kind": "account-security",
         "action": "suspend"
@@ -80946,7 +81602,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiLoginResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "TestBackupReplica": {
       "policy": {
@@ -81024,7 +81681,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "TestCloudBackupConnection": {
       "policy": {
@@ -81082,7 +81740,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCloudBackupCommandResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "TestEmailConnection": {
       "policy": {
@@ -81145,7 +81804,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiEmailTestResponse"
-      }
+      },
+      "timeoutSeconds": 65
     },
     "TransferCrmFollowUp": {
       "policy": {
@@ -81236,7 +81896,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmFollowUpDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "TransferSharedDatabaseOwnership": {
       "policy": {
@@ -81297,7 +81958,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSharedDatabaseOwnershipTransferResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "TransitionInvoiceStatus": {
       "policy": {
@@ -81383,7 +82045,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "TransitionSalesOpportunity": {
       "policy": {
@@ -81482,7 +82145,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSalesOpportunityDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UnlinkPersonnelAccount": {
       "policy": {
@@ -81611,7 +82275,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/PersonnelRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UnlockAgentConsignmentFields": {
       "policy": {
@@ -81697,7 +82362,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiAgentConsignmentUnlockFieldsResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UnlockCustomsCooFields": {
       "policy": {
@@ -81783,7 +82449,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCustomsCooUnlockFieldsResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UnverifyInvoice": {
       "policy": {
@@ -81866,7 +82533,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateAnnouncement": {
       "policy": {
@@ -82015,6 +82683,7 @@
       "response": {
         "$ref": "#/components/schemas/Announcement"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "update",
@@ -82089,7 +82758,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BusinessAttachmentRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateBusinessAttachmentCategory": {
       "policy": {
@@ -82158,7 +82828,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/BusinessAttachmentCategoryRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateCrmContact": {
       "policy": {
@@ -82256,7 +82927,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmContactDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateCrmCustomer": {
       "policy": {
@@ -82344,7 +83016,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmCustomerDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateCrmCustomerBatchStatus": {
       "policy": {
@@ -82418,7 +83091,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmCustomerBatchStatusResult"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateCrmFollowUp": {
       "policy": {
@@ -82506,7 +83180,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCrmFollowUpDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateCustomer": {
       "policy": {
@@ -82600,7 +83275,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCustomerDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateCustomsCooProducerProfile": {
       "policy": {
@@ -82701,7 +83377,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiCustomsCooProducerProfileSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateDraftOfMeetingBooking": {
       "policy": {
@@ -82854,7 +83531,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateDraftOfOfficeSupplyRequest": {
       "policy": {
@@ -83007,7 +83685,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateExpenseRequest": {
       "policy": {
@@ -83160,7 +83839,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateExporter": {
       "policy": {
@@ -83254,7 +83934,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiExporterDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateGeneralRequest": {
       "policy": {
@@ -83407,7 +84088,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateHsCode": {
       "policy": {
@@ -83491,7 +84173,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateInvoice": {
       "policy": {
@@ -83574,7 +84257,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiInvoiceSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateLeaveRequest": {
       "policy": {
@@ -83727,7 +84411,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateMeetingBooking": {
       "policy": {
@@ -83856,7 +84541,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateMeetingRoom": {
       "policy": {
@@ -83985,7 +84671,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/MeetingRoomRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateOfficeSupply": {
       "policy": {
@@ -84114,7 +84801,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateOfficeSupplyRequest": {
       "policy": {
@@ -84243,7 +84931,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateOrganizationCompany": {
       "policy": {
@@ -84381,7 +85070,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiOrganizationCompanyDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateOrganizationDepartment": {
       "policy": {
@@ -84519,7 +85209,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiOrganizationDepartmentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateOvertimeRequest": {
       "policy": {
@@ -84672,7 +85363,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdatePayee": {
       "policy": {
@@ -84766,7 +85458,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiPayeeDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdatePayment": {
       "policy": {
@@ -84860,7 +85553,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiPaymentSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdatePermissionTemplate": {
       "policy": {
@@ -84968,7 +85662,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiPermissionTemplateDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdatePersonnel": {
       "policy": {
@@ -85097,7 +85792,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/PersonnelRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdatePersonnelChangeRequest": {
       "policy": {
@@ -85250,7 +85946,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdatePort": {
       "policy": {
@@ -85344,7 +86041,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiPortDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateProduct": {
       "policy": {
@@ -85438,7 +86136,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiProductDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdatePurchaseRequest": {
       "policy": {
@@ -85591,7 +86290,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateReportTemplateDisplayName": {
       "policy": {
@@ -85682,7 +86382,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplateContentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateSalesOpportunity": {
       "policy": {
@@ -85781,7 +86482,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSalesOpportunityDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateSettings": {
       "policy": {
@@ -85868,7 +86570,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSettingsSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateSingleWindowReferenceCatalog": {
       "policy": {
@@ -85940,7 +86643,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowReferenceCatalogSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateSupplier": {
       "policy": {
@@ -86028,7 +86732,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateSupplierAssessment": {
       "policy": {
@@ -86126,7 +86831,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierAssessmentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateSupplierContact": {
       "policy": {
@@ -86224,7 +86930,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierContactDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateSupplierProductLink": {
       "policy": {
@@ -86322,7 +87029,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSupplierProductLinkDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateTravelRequest": {
       "policy": {
@@ -86475,7 +87183,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UpdateUnit": {
       "policy": {
@@ -86569,7 +87278,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiUnitDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "updateUserAccount": {
       "policy": {
@@ -86677,7 +87387,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiUserSaveResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadAndRestorePostgreSqlPhysicalBackup": {
       "policy": {
@@ -86775,7 +87486,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiServerMigrationRestoreResponse"
-      }
+      },
+      "timeoutSeconds": 86400
     },
     "UploadAndStartBookingSheetConvertDownloadJob": {
       "policy": {
@@ -86847,7 +87559,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadAndStartPdfMergeDownloadJob": {
       "policy": {
@@ -86927,7 +87640,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadAnnouncementAttachment": {
       "policy": {
@@ -87088,6 +87802,7 @@
       "response": {
         "$ref": "#/components/schemas/Announcement"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "upload",
@@ -87274,7 +87989,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadAttachmentToGeneralRequest": {
       "policy": {
@@ -87455,7 +88171,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadAttachmentToLeaveRequest": {
       "policy": {
@@ -87636,7 +88353,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadAttachmentToMeetingBooking": {
       "policy": {
@@ -87815,7 +88533,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadAttachmentToOfficeSupplyRequest": {
       "policy": {
@@ -87994,7 +88713,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadAttachmentToOvertimeRequest": {
       "policy": {
@@ -88175,7 +88895,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadAttachmentToPersonnelChangeRequest": {
       "policy": {
@@ -88356,7 +89077,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadAttachmentToPurchaseRequest": {
       "policy": {
@@ -88537,7 +89259,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadAttachmentToTravelRequest": {
       "policy": {
@@ -88718,7 +89441,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadBusinessAttachment": {
       "policy": {
@@ -88790,7 +89514,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BusinessAttachmentRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadExporterSeal": {
       "policy": {
@@ -88924,7 +89649,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiExporterDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadHsCodesImportFile": {
       "policy": {
@@ -89002,7 +89728,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiHsCodeImportResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadLatestDatabaseBackupToCloud": {
       "policy": {
@@ -89063,7 +89790,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadLetterOfCreditDocument": {
       "policy": {
@@ -89157,7 +89885,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiLetterOfCreditImportResponse"
-      }
+      },
+      "timeoutSeconds": 600
     },
     "UploadOcrImage": {
       "policy": {
@@ -89243,7 +89972,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiOcrRecognizeImageResponse"
-      }
+      },
+      "timeoutSeconds": 95
     },
     "UploadPersonnelAttachment": {
       "policy": {
@@ -89411,7 +90141,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PersonnelRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadPersonnelImage": {
       "policy": {
@@ -89551,7 +90282,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PersonnelRecord"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadReportTemplateFile": {
       "policy": {
@@ -89678,7 +90410,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplateContentDto"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadReportTemplatePackage": {
       "policy": {
@@ -89779,7 +90512,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplatePackageImportResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadReportTemplateV3ImageResource": {
       "policy": {
@@ -89872,7 +90606,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiReportTemplateImageResourceResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadSingleWindowReceiptPackage": {
       "policy": {
@@ -89964,7 +90699,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowImportedPackageResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "UploadSingleWindowSubmitPackage": {
       "policy": {
@@ -90056,7 +90792,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiSingleWindowImportedPackageResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "ValidateSettings": {
       "policy": {
@@ -90133,7 +90870,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiSettingsValidationResponse"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "VerifyExpenseApproval": {
       "policy": {
@@ -90285,7 +91023,8 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaApprovalVerification"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "VoidExpenseRequest": {
       "policy": {
@@ -90438,7 +91177,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "VoidGeneralRequest": {
       "policy": {
@@ -90591,7 +91331,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "VoidLeaveRequest": {
       "policy": {
@@ -90744,7 +91485,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "VoidOvertimeRequest": {
       "policy": {
@@ -90897,7 +91639,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "VoidPurchaseRequest": {
       "policy": {
@@ -91050,7 +91793,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "VoidTravelRequest": {
       "policy": {
@@ -91203,7 +91947,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "WithdrawAnnouncement": {
       "policy": {
@@ -91352,6 +92097,7 @@
       "response": {
         "$ref": "#/components/schemas/Announcement"
       },
+      "timeoutSeconds": 30,
       "communication": {
         "kind": "announcement",
         "action": "withdraw",
@@ -91510,7 +92256,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "WithdrawGeneralRequest": {
       "policy": {
@@ -91663,7 +92410,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "WithdrawLeaveRequest": {
       "policy": {
@@ -91816,7 +92564,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "WithdrawOvertimeRequest": {
       "policy": {
@@ -91969,7 +92718,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "WithdrawPersonnelChangeRequest": {
       "policy": {
@@ -92122,7 +92872,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "WithdrawPurchaseRequest": {
       "policy": {
@@ -92275,7 +93026,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     },
     "WithdrawTravelRequest": {
       "policy": {
@@ -92428,7 +93180,8 @@
       },
       "response": {
         "$ref": "#/components/schemas/OaRequest"
-      }
+      },
+      "timeoutSeconds": 30
     }
   },
   "schemas": {

@@ -35,6 +35,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   restorePostgreSqlPhysicalBackup(request: RestorePostgreSqlPhysicalBackupRequest, init?: ApiRequestInit): Promise<ApiServerMigrationRestoreResponse> {
+    init = { timeoutMs: 86400000, ...init };
     const path = "/api/postgresql-maintenance/backups/restore";
     return transport.request<ApiServerMigrationRestoreResponse>("POST", path, {
       body: request.body,
@@ -43,6 +44,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadAndRestorePostgreSqlPhysicalBackup(request: UploadAndRestorePostgreSqlPhysicalBackupRequest, init?: ApiRequestInit): Promise<ApiServerMigrationRestoreResponse> {
+    init = { timeoutMs: 86400000, ...init };
     const path = "/api/postgresql-maintenance/backups/upload-restore";
     return transport.request<ApiServerMigrationRestoreResponse>("POST", path, {
       body: request.body,

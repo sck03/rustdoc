@@ -602,32 +602,5 @@ mod header_tests {
 }
 
 fn request_seconds(operation: Operation) -> u64 {
-    if body::backup_upload(operation)
-        || [
-            DOWNLOAD_JOB_RESULT,
-            DOWNLOAD_JOB_RESULT_WITH_TICKET,
-            DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
-            DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET,
-            RESTORE_POSTGRE_SQL_PHYSICAL_BACKUP,
-        ]
-        .contains(&operation)
-    {
-        return export_doc_engine::engine::backup_io::TIMEOUT_SECONDS;
-    }
-    if [
-        UPLOAD_LETTER_OF_CREDIT_DOCUMENT,
-        IMPORT_LETTER_OF_CREDIT_DOCUMENT,
-    ]
-    .contains(&operation)
-    {
-        600
-    } else if operation == REVIEW_LETTER_OF_CREDIT_COMPLIANCE {
-        125
-    } else if [UPLOAD_OCR_IMAGE, RECOGNIZE_OCR_IMAGE].contains(&operation) {
-        95
-    } else if [SEND_EMAIL, TEST_EMAIL_CONNECTION].contains(&operation) {
-        65
-    } else {
-        30
-    }
+    export_doc_contracts::request_limits::seconds(operation.id)
 }

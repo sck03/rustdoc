@@ -53,6 +53,14 @@ mod tests {
             "description":"Payload Too Large",
             "content":{"application/json":{"schema":{"$ref":"#/components/schemas/ApiErrorResponse"}}}
         });
+        for path in baseline["paths"].as_object_mut().unwrap().values_mut() {
+            for operation in path.as_object_mut().unwrap().values_mut() {
+                if let Some(id) = operation["operationId"].as_str() {
+                    operation["x-exportdoc-timeout-seconds"] =
+                        serde_json::json!(crate::request_limits::seconds(id));
+                }
+            }
+        }
         // Ordinary backup directories only know file modification time, not snapshot time.
         for name in ["ApiBackupItemDto", "ApiSharedDatabaseBackupItemDto"] {
             let schema = &mut baseline["components"]["schemas"][name];

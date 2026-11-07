@@ -35,7 +35,9 @@ export default defineConfig({
     },
     proxy: {
       "/api": apiTarget,
+      "/downloads": apiTarget,
       "/healthz": apiTarget,
+      "/livez": apiTarget,
       "/readyz": apiTarget,
       "/openapi": apiTarget,
     },

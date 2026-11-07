@@ -11,6 +11,12 @@ use std::time::{Duration, Instant};
 
 /// Always acquired before the database mutex; protects files through rollback.
 pub(crate) fn lock(paths: &RuntimePaths) -> Result<fs::File> {
+    acquire(paths, false)
+}
+pub(crate) fn read_lock(paths: &RuntimePaths) -> Result<fs::File> {
+    acquire(paths, true)
+}
+fn acquire(paths: &RuntimePaths, shared: bool) -> Result<fs::File> {
     let path = paths
         .data_root
         .join("Locks")
@@ -26,7 +32,11 @@ pub(crate) fn lock(paths: &RuntimePaths) -> Result<fs::File> {
     let started = Instant::now();
     loop {
         crate::operation::check()?;
-        match file.try_lock_exclusive() {
+        match if shared {
+            FileExt::try_lock_shared(&file)
+        } else {
+            FileExt::try_lock_exclusive(&file)
+        } {
             Ok(()) => {
                 let recovery = paths.data_root.join("Cache").join("TemplateTransactions");
                 paths::ensure_safe_absolute(&recovery).map_err(unavailable)?;
@@ -124,12 +134,14 @@ impl FileTransaction {
                 root
             }
         };
-        let backup = if target.is_file() {
-            let backup = snapshot_root.join(format!("{}.bak", self.snapshots.len()));
-            fs::copy(&target, &backup)?;
-            Some(backup)
-        } else {
-            None
+        let backup = match media::read_local(&target, MAX_TEMPLATE_BYTES) {
+            Ok(bytes) => {
+                let backup = snapshot_root.join(format!("{}.bak", self.snapshots.len()));
+                fs::write(&backup, bytes)?;
+                Some(backup)
+            }
+            Err(error) if error.status == Some(404) => None,
+            Err(error) => return Err(error),
         };
         self.snapshots.push(Snapshot { target, backup });
         let manifest = json!({"schemaVersion":1,"files":self.snapshots.iter().map(|snapshot| json!({
@@ -148,7 +160,8 @@ impl FileTransaction {
         let mut failures = Vec::new();
         for snapshot in self.snapshots.iter().rev() {
             let result = match &snapshot.backup {
-                Some(backup) => fs::read(backup)
+                Some(backup) => crate::operation::OperationScope::detached(Duration::from_secs(5))
+                    .run(|| media::read_local(backup, MAX_TEMPLATE_BYTES))
                     .map_err(|error| error.to_string())
                     .and_then(|bytes| {
                         paths::atomic_write(&snapshot.target, &bytes)

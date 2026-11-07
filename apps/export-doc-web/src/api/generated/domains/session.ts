@@ -7,11 +7,13 @@ import type { ApiHealthResponse, ApiLoginResponse, ApiLogoutResponse, ApiUserDto
 export default function createApi(transport: ApiTransport) {
   return {
   downloadJobResultWithTicket(request: DownloadJobResultWithTicketRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/downloads/jobs/${encodePath(request.token)}`;
     return transport.request<Blob>("GET", path, { init });
   },
 
   downloadPostgreSqlPhysicalBackupWithTicket(request: DownloadPostgreSqlPhysicalBackupWithTicketRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/downloads/postgresql-backups/${encodePath(request.token)}`;
     return transport.request<Blob>("GET", path, { init });
   },

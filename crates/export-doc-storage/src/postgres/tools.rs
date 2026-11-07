@@ -18,9 +18,9 @@ pub fn client_parameters(connection: &str) -> Result<ClientParameters> {
         .get_hosts()
         .iter()
         .map(|host| match host {
-            ::postgres::config::Host::Tcp(host) => host.clone(),
+            ::tokio_postgres::config::Host::Tcp(host) => host.clone(),
             #[cfg(unix)]
-            ::postgres::config::Host::Unix(path) => path.to_string_lossy().into_owned(),
+            ::tokio_postgres::config::Host::Unix(path) => path.to_string_lossy().into_owned(),
         })
         .collect();
     let database = config.get_dbname().unwrap_or("").to_owned();
@@ -43,8 +43,8 @@ pub fn client_parameters(connection: &str) -> Result<ClientParameters> {
         password: String::from_utf8(config.get_password().unwrap_or_default().to_vec())
             .map_err(|_| Error::unavailable("PostgreSQL 密码必须为 UTF-8。"))?,
         ssl_mode: match config.get_ssl_mode() {
-            ::postgres::config::SslMode::Disable => "disable",
-            ::postgres::config::SslMode::Require => "verify-full",
+            ::tokio_postgres::config::SslMode::Disable => "disable",
+            ::tokio_postgres::config::SslMode::Require => "verify-full",
             _ => "prefer",
         },
     })

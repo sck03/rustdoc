@@ -27,6 +27,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadJobResult(request: DownloadJobResultRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/jobs/${encodePath(request.jobId)}/download`;
     return transport.request<Blob>("GET", path, { init });
   },

@@ -20,6 +20,69 @@ fn with_image(content: &str, image: &Value) -> String {
 }
 
 #[test]
+fn history_only_image_uses_current_template_visibility() {
+    let fixture = Fixture::new();
+    let image = resource(&fixture);
+    let reader = fixture.user("history-image-reader");
+    let draft = fixture.create(
+        CREATE_USER_REPORT_TEMPLATE,
+        json!({"reportType":"ExportDocument","name":"历史图片模板","contentHtml":""}),
+    );
+    let parameters = [("id", draft["id"].to_string())];
+    let saved = fixture.request(SAVE_USER_REPORT_TEMPLATE_DRAFT, &parameters, &[], Some(json!({
+        "reportType":"ExportDocument","name":"历史图片模板","expectedVersion":draft["versionNumber"],
+        "contentHtml":with_image(draft["contentHtml"].as_str().unwrap(), &image)
+    })));
+    let cleared = fixture.request(SAVE_USER_REPORT_TEMPLATE_DRAFT, &parameters, &[], Some(json!({
+        "reportType":"ExportDocument","name":"历史图片模板","expectedVersion":saved["versionNumber"],"contentHtml":draft["contentHtml"]
+    })));
+    let published = fixture.request(
+        PUBLISH_USER_REPORT_TEMPLATE,
+        &parameters,
+        &[],
+        Some(json!({"expectedVersion":cleared["versionNumber"]})),
+    );
+    let shared = fixture.request(
+        SHARE_USER_REPORT_TEMPLATE,
+        &parameters,
+        &[],
+        Some(json!({"expectedVersion":published["versionNumber"],"shareScope":"Company"})),
+    );
+    let resource_parameters = [("resourceId", image["id"].as_str().unwrap().into())];
+    assert_eq!(
+        reader
+            .bytes(
+                DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
+                &resource_parameters,
+                &[],
+                None,
+                jobs::PDF_LIMIT
+            )
+            .unwrap(),
+        Fixture::png()
+    );
+    fixture.request(
+        SHARE_USER_REPORT_TEMPLATE,
+        &parameters,
+        &[],
+        Some(json!({"expectedVersion":shared["versionNumber"],"shareScope":"Private"})),
+    );
+    assert_eq!(
+        reader
+            .bytes(
+                DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
+                &resource_parameters,
+                &[],
+                None,
+                jobs::PDF_LIMIT
+            )
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
+}
+
+#[test]
 fn file_template_resources_are_readable_and_cannot_be_recycled() {
     let fixture = Fixture::new();
     let image = resource(&fixture);

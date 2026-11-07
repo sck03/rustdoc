@@ -1,5 +1,5 @@
 //! 团队备份与灾备：受管路径辅助、密封包格式、一次性票据与状态接口的最小回归。
-use super::sealed::{Entry, ManifestFile, open, seal, unpack, verify_manifest, zip_payload};
+use super::sealed::{Entry, ManifestFile, open_to, seal_to, unpack, verify_manifest, zip_payload};
 use super::*;
 use std::time::Instant;
 #[cfg(feature = "postgres")]
@@ -47,40 +47,57 @@ fn sha256_hex_matches_known_vector() {
 #[test]
 fn sealed_package_roundtrip_keeps_payload_secret() {
     let mut sealed = Vec::new();
-    seal(
-        b"EDM-TEST",
+    seal_to(
+        b"EDM-TEST-2",
         "password-123",
-        b"business data".to_vec(),
+        b"business data".as_slice(),
         &mut sealed,
     )
     .unwrap();
     assert_ne!(&sealed[..], b"business data");
-    assert_eq!(
-        &**open(b"EDM-TEST", "password-123", sealed.as_slice()).unwrap(),
-        b"business data"
-    );
+    let mut output = Vec::new();
+    open_to(
+        b"EDM-TEST-2",
+        "password-123",
+        sealed.as_slice(),
+        &mut output,
+    )
+    .unwrap();
+    assert_eq!(output, b"business data");
 }
 
 #[test]
 fn sealed_package_rejects_wrong_password_and_magic() {
     let mut sealed = Vec::new();
-    seal(
-        b"EDM-TEST",
+    seal_to(
+        b"EDM-TEST-2",
         "password-123",
-        b"business data".to_vec(),
+        b"business data".as_slice(),
         &mut sealed,
     )
     .unwrap();
-    assert!(open(b"EDM-TEST", "wrong-password", sealed.as_slice()).is_err());
-    assert!(open(b"EDM-OTHER", "password-123", sealed.as_slice()).is_err());
-    assert!(
-        open(
-            b"EDM-TEST",
+    for (magic, password, input) in [
+        (
+            b"EDM-TEST-2".as_slice(),
+            "wrong-password",
+            sealed.as_slice(),
+        ),
+        (b"EDM-OTHER-2".as_slice(), "password-123", sealed.as_slice()),
+        (
+            b"EDM-TEST-2".as_slice(),
             "password-123",
-            b"not a sealed package".as_slice()
-        )
-        .is_err()
-    );
+            b"not a sealed package".as_slice(),
+        ),
+        (
+            b"EDM-TEST-2".as_slice(),
+            "password-123",
+            b"EDM-TEST-1old-v1-payload".as_slice(),
+        ),
+    ] {
+        let mut output = Vec::new();
+        assert!(open_to(magic, password, input, &mut output).is_err());
+        assert!(output.is_empty());
+    }
 }
 
 #[test]

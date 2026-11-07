@@ -31,6 +31,7 @@ use std::{
 };
 pub(super) use transaction::FileTransaction;
 pub(super) use transaction::lock as storage_lock;
+pub(super) use transaction::read_lock as storage_read_lock;
 pub use transfer::{download, upload};
 use unicode_normalization::UnicodeNormalization;
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
@@ -100,7 +101,10 @@ pub(super) fn load_template_content(
 ) -> Result<(String, String)> {
     auth::authorize(actor, PERMISSION, "view")?;
     let resolved = resolve_editable(service, kind, stored, true)?;
-    let content = report_templates::editable_content(kind, &fs::read(&resolved.path)?)?;
+    let content = report_templates::editable_content(
+        kind,
+        &media::read_local(&resolved.path, MAX_TEMPLATE_BYTES)?,
+    )?;
     if content.len() > MAX_TEMPLATE_BYTES {
         return Err(invalid("报表模板内容超过允许的大小。"));
     }
@@ -113,10 +117,7 @@ pub(super) fn load_resolved_template(
     stored: &str,
 ) -> Result<(String, String, Vec<u8>, Option<bool>)> {
     let resolved = catalog::resolve_template(paths, kind, stored)?;
-    let content = fs::read(&resolved.path)?;
-    if content.len() > MAX_TEMPLATE_BYTES {
-        return Err(invalid("报表模板内容超过允许的大小。"));
-    }
+    let content = media::read_local(&resolved.path, MAX_TEMPLATE_BYTES)?;
     Ok((
         resolved.display,
         catalog::to_stored(paths, &resolved.path)?,
@@ -136,7 +137,7 @@ pub(super) fn resource_access(
     actor: &Actor,
 ) -> Result<std::collections::HashMap<String, bool>> {
     let mut ids = std::collections::HashMap::new();
-    for (path, bytes) in template_files(paths)? {
+    package::visit_template_files(paths, |path, bytes| {
         crate::operation::check()?;
         let kind = kind_of_category(path.split('/').next().unwrap_or(""));
         let design = report_templates::validate_bytes(kind, &bytes)
@@ -146,7 +147,8 @@ pub(super) fn resource_access(
             let accessible = ids.entry(resource.id).or_insert(false);
             *accessible |= visible;
         }
-    }
+        Ok(())
+    })?;
     Ok(ids)
 }
 
@@ -441,7 +443,7 @@ fn rename_template(
                     }
                 }
             })?;
-            let content = fs::read(&target)?;
+            let content = media::read_local(&target, MAX_TEMPLATE_BYTES)?;
             content_dto(kind, &stored, &current.display, current.with_seal, &content)
         })
     })
@@ -466,7 +468,7 @@ fn update_display_name(
             let display = display_name(&text(body, "displayName"), &resolved.path);
             files.capture(&user_root(&service.paths).join(CATALOG_FILE))?;
             upsert_catalog_row(&service.paths, kind, &stored, &display, resolved.with_seal)?;
-            let content = fs::read(&resolved.path)?;
+            let content = media::read_local(&resolved.path, MAX_TEMPLATE_BYTES)?;
             content_dto(kind, &stored, &display, resolved.with_seal, &content)
         })
     })
@@ -575,7 +577,7 @@ fn save_template_file_to_path(
 ) -> Result<Value> {
     let target = export_path(&text(body, "filePath"))?;
     let resolved = resolve_editable(service, kind, &text(body, "templatePath"), true)?;
-    let content = fs::read(&resolved.path)?;
+    let content = media::read_local(&resolved.path, MAX_TEMPLATE_BYTES)?;
     paths::atomic_write(&target, &content).map_err(unavailable)?;
     Ok(contracts::project(
         contracts::schema("ApiReportTemplateFileExportResponse"),

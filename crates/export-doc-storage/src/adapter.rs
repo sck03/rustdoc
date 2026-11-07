@@ -370,10 +370,11 @@ pub(crate) trait Adapter: Send {
     fn resource_references(
         &self,
         kind: &str,
+        ids: Option<&[&str]>,
         before_id: Option<i64>,
         limit: i64,
     ) -> Result<(Option<i64>, Vec<Value>)> {
-        let (sql, projection) = resource_query::build(kind, self.provider() == "PostgreSQL")?;
+        let (sql, projection) = resource_query::build(kind, ids, self.provider() == "PostgreSQL")?;
         self.scan_page(sql, &projection, before_id, limit.clamp(1, 200))
     }
     fn ownership_counts(&self, kinds: &[&str]) -> Result<Vec<(Option<i64>, i64)>> {

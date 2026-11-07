@@ -203,13 +203,13 @@ function createRequestTimeout(callerSignal: AbortSignal | null | undefined, time
     return { signal: callerSignal ?? undefined, dispose: () => undefined };
   }
   const timeoutController = new AbortController();
-  const timeoutId = setTimeout(() => timeoutController.abort(), normalizedTimeout);
+  const timeoutId = setTimeout(() => timeoutController.abort(new DOMException("请求超过等待时限，请检查操作结果后重试。", "TimeoutError")), normalizedTimeout);
   const signals = [callerSignal, timeoutController.signal].filter((signal): signal is AbortSignal => Boolean(signal));
   if (signals.length === 1) {
     return { signal: signals[0], dispose: () => clearTimeout(timeoutId) };
   }
   const combinedController = new AbortController();
-  const abort = () => combinedController.abort();
+  const abort = () => combinedController.abort(signals.find(signal => signal.aborted)?.reason);
   for (const signal of signals) {
     signal.addEventListener("abort", abort, { once: true });
     if (signal.aborted) abort();

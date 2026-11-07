@@ -6,6 +6,24 @@ pub fn exercise(app: &str, maintenance: &str) {
     let mut results = vec![];
     for instance in [true, false] {
         let pool = Pool::postgres(app, Default::default()).unwrap();
+        let cancelled = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+        export_doc_storage::operation::run(
+            cancelled,
+            Instant::now() + Duration::from_secs(1),
+            || {
+                assert_eq!(pool.health().unwrap_err().kind, ErrorKind::Timeout);
+                assert_eq!(
+                    pool.acquire(|| false).err().unwrap().kind,
+                    ErrorKind::Timeout
+                );
+            },
+        );
+        pool.health().unwrap();
+        assert_eq!(
+            pool.snapshot()["failed"],
+            false,
+            "caller cancellation must not poison a healthy pool"
+        );
         assert!(matches!(Connection::postgres(app),Err(cause) if cause.kind==ErrorKind::Busy));
         let body = json!({"versionNumber":1,"ownerUserId":1,"companyScope":"TEST","departmentId":"RECOVERY","amount":"123.45"});
         let committed = {

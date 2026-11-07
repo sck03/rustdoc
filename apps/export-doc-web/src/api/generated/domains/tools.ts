@@ -43,6 +43,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   importLetterOfCreditDocument(request: ImportLetterOfCreditDocumentRequest, init?: ApiRequestInit): Promise<ApiLetterOfCreditImportResponse> {
+    init = { timeoutMs: 610000, ...init };
     const path = "/api/tools/letter-of-credit/import";
     return transport.request<ApiLetterOfCreditImportResponse>("POST", path, {
       body: request.body,
@@ -123,6 +124,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   recognizeOcrImage(request: RecognizeOcrImageRequest, init?: ApiRequestInit): Promise<ApiOcrRecognizeImageResponse> {
+    init = { timeoutMs: 105000, ...init };
     const path = "/api/tools/ocr/recognize-image";
     return transport.request<ApiOcrRecognizeImageResponse>("POST", path, {
       body: request.body,
@@ -131,6 +133,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   reviewLetterOfCreditCompliance(request: ReviewLetterOfCreditComplianceRequest, init?: ApiRequestInit): Promise<ApiLetterOfCreditReviewResponse> {
+    init = { timeoutMs: 135000, ...init };
     const path = "/api/tools/letter-of-credit/review";
     return transport.request<ApiLetterOfCreditReviewResponse>("POST", path, {
       body: request.body,
@@ -163,6 +166,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   sendEmail(request: SendEmailRequest, init?: ApiRequestInit): Promise<ApiEmailSendResponse> {
+    init = { timeoutMs: 75000, ...init };
     const path = "/api/tools/email/send";
     return transport.request<ApiEmailSendResponse>("POST", path, {
       body: request.body,
@@ -239,6 +243,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   testEmailConnection(init?: ApiRequestInit): Promise<ApiEmailTestResponse> {
+    init = { timeoutMs: 75000, ...init };
     const path = "/api/tools/email/test-connection";
     return transport.request<ApiEmailTestResponse>("POST", path, { init });
   },
@@ -263,6 +268,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadLetterOfCreditDocument(request: UploadLetterOfCreditDocumentRequest, init?: ApiRequestInit): Promise<ApiLetterOfCreditImportResponse> {
+    init = { timeoutMs: 610000, ...init };
     const path = "/api/tools/letter-of-credit/import-upload";
     return transport.request<ApiLetterOfCreditImportResponse>("POST", path, {
       query: {
@@ -274,6 +280,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadOcrImage(request: UploadOcrImageRequest, init?: ApiRequestInit): Promise<ApiOcrRecognizeImageResponse> {
+    init = { timeoutMs: 105000, ...init };
     const path = "/api/tools/ocr/recognize-image-upload";
     return transport.request<ApiOcrRecognizeImageResponse>("POST", path, {
       query: {

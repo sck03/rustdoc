@@ -13,7 +13,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub(super) const MAGIC: &[u8] = b"EDM-DISASTER-RECOVERY-1";
+pub(super) const MAGIC: &[u8] = b"EDM-DISASTER-RECOVERY-2";
 fn root(paths: &RuntimePaths) -> Result<PathBuf> {
     super::disaster_root(paths)
 }

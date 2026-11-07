@@ -14,7 +14,7 @@ use std::{
 
 // Streaming transports have no application quota; checked u64 counters still reject overflow.
 pub const MAX_FILE_BYTES: u64 = u64::MAX;
-pub const TIMEOUT_SECONDS: u64 = 24 * 60 * 60;
+pub const TIMEOUT_SECONDS: u64 = export_doc_contracts::request_limits::TRANSFER_SECONDS;
 
 pub enum Download {
     Memory {

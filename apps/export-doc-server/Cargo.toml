@@ -21,7 +21,7 @@ export-doc-contracts = { path = "../../crates/export-doc-contracts" }
 export-doc-engine = { path = "../../crates/export-doc-engine", features = ["excel", "invoice-transfer", "exchange-rates", "hs-remote", "mail", "ocr", "ai", "single-window"] }
 export-doc-storage = { path = "../../crates/export-doc-storage" }
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "multipart", "tokio"] }
-tokio = { version = "=1.54.1", features = ["rt-multi-thread", "net", "signal", "time", "sync", "macros", "fs", "io-util"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "signal", "time", "sync", "macros", "fs", "io-util"] }
 tokio-util = { version = "=0.7.20", features = ["io"] }
 hyper = { workspace = true, features = ["server", "http1"] }
 hyper-util = { workspace = true, features = ["tokio", "service"] }

@@ -1,6 +1,88 @@
 use super::*;
 
 #[test]
+fn managed_reads_reject_oversized_templates_and_catalogs_before_decoding() {
+    let workspace = Workspace::new();
+    let service = open(&workspace);
+    let root = user_root(&service.paths);
+    fs::create_dir_all(root.join("Export")).unwrap();
+    let path = root.join("Export/oversized.dtpl");
+    fs::File::create(&path)
+        .unwrap()
+        .set_len((MAX_TEMPLATE_BYTES + 1) as u64)
+        .unwrap();
+    assert!(
+        load_template_content(
+            &service,
+            &admin(),
+            "ExportDocument",
+            "user:Export/oversized.dtpl"
+        )
+        .is_err()
+    );
+    assert!(
+        load_resolved_template(
+            &service.paths,
+            "ExportDocument",
+            "user:Export/oversized.dtpl"
+        )
+        .is_err()
+    );
+    assert!(validate_revision(&path, "oversized", "").is_err());
+    assert!(template_files(&service.paths).is_err());
+    fs::File::create(root.join(CATALOG_FILE))
+        .unwrap()
+        .set_len((MAX_TEMPLATE_BYTES + 1) as u64)
+        .unwrap();
+    assert!(catalog_rows(&service.paths).is_err());
+    assert_eq!(
+        fs::metadata(path).unwrap().len(),
+        (MAX_TEMPLATE_BYTES + 1) as u64
+    );
+}
+
+#[test]
+fn image_readers_share_the_file_lock_and_exclude_writers() {
+    use fs2::FileExt;
+    let workspace = Workspace::new();
+    let paths = workspace.paths();
+    let first = storage_read_lock(&paths).unwrap();
+    let second = storage_read_lock(&paths).unwrap();
+    let writer = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(paths.data_root.join("Locks/report-template-storage.lock"))
+        .unwrap();
+    assert!(FileExt::try_lock_exclusive(&writer).is_err());
+    drop(first);
+    assert!(FileExt::try_lock_exclusive(&writer).is_err());
+    drop(second);
+    FileExt::try_lock_exclusive(&writer).unwrap();
+}
+
+#[test]
+fn cancelled_file_write_still_restores_the_bounded_snapshot() {
+    let workspace = Workspace::new();
+    let paths = workspace.paths();
+    let target = user_root(&paths).join("Export/cancelled.dtpl");
+    fs::create_dir_all(target.parent().unwrap()).unwrap();
+    fs::write(&target, b"original").unwrap();
+    let scope = crate::operation::OperationScope::new(std::time::Duration::from_secs(5));
+    let result = scope.run(|| {
+        let mut transaction = FileTransaction::new(&paths)?;
+        transaction.execute(|files| {
+            files.capture(&target)?;
+            fs::write(&target, b"partial")?;
+            scope.cancel();
+            crate::operation::check()
+        })
+    });
+    assert!(result.is_err());
+    assert_eq!(fs::read(target).unwrap(), b"original");
+    assert!(FileTransaction::new(&paths).is_ok());
+}
+
+#[test]
 fn package_rejects_ambiguous_paths_and_capacity_before_import() {
     fn zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
         let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
@@ -72,6 +154,13 @@ fn catalog_failures_are_not_empty_successes() {
     let root = user_root(&paths);
     fs::create_dir_all(&root).unwrap();
     let path = root.join(CATALOG_FILE);
+    fs::write(&path, br#"{"reports":[]}"#).unwrap();
+    let scope = crate::operation::OperationScope::new(std::time::Duration::from_secs(5));
+    scope.cancel();
+    assert_eq!(
+        scope.run(|| catalog_rows(&paths)).unwrap_err().status,
+        Some(504)
+    );
     for bytes in [
         b"{}".as_slice(),
         b"null",

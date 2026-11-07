@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-11-07",
-  "reviewNotes": "2026-11-07: web baseline remains 86,324 after dead CSS/internal export/preview cleanup; automation remains 40,161. Desktop/OCR/Excel aggregate is 10,576 after implementing F2 startup migration feedback: separate startup coordination and progress modules, cancellable chunked I/O, isolated window permissions, and cancellation/resume/profile-boundary regressions. Existing per-file limits and the 75-line subsequent growth allowance remain unchanged. Other aggregates retain their prior review.",
+  "updatedAt": "2026-11-08",
+  "reviewNotes": "2026-11-08: reviewed Rust native production at 100,782 (including inline/module tests), tests/examples at 29,500, and automation at 40,355. Growth implements a dedicated bounded PostgreSQL wire client, shared request budgets, targeted image references, bounded template I/O and cancellation/fault regressions; obsolete v1 backup decoding and PostgreSQL RefCell wrappers were removed. Logout coordination moved from App into its own hook, retaining the application-shell baseline. Per-file limits and subsequent growth allowances are unchanged. Other aggregates retain their prior review.",
   "rules": [
     {
       "name": "repository web production default",
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 100332,
+      "baselineAggregateLines": 100782,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 100407,
+      "maximumAggregateLines": 100857,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 29179,
+      "baselineAggregateLines": 29500,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 29299,
+      "maximumAggregateLines": 29620,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 40161,
+      "baselineAggregateLines": 40355,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 40311,
+      "maximumAggregateLines": 40505,
       "reportFiles": false
     },
     {

@@ -110,7 +110,7 @@ try {
     fetch: fetchImpl,
   });
 
-  await assert.rejects(client.getHealth(), { name: "AbortError" }, "default timeout must abort a hung request");
+  await assert.rejects(client.getHealth(), { name: "TimeoutError" }, "default timeout must abort a hung request");
   assert.equal(requests.length, 1);
   assert.equal(requests[0].signal.aborted, true);
 
@@ -128,7 +128,7 @@ try {
 
   const timeoutController = new AbortController();
   const timeoutRequest = client.getHealth({ signal: timeoutController.signal, timeoutMs: 20 });
-  await assert.rejects(timeoutRequest, { name: "AbortError" }, "internal timeout must remain active with a caller signal");
+  await assert.rejects(timeoutRequest, { name: "TimeoutError" }, "internal timeout must remain active with a caller signal");
   assert.equal(timeoutController.signal.aborted, false, "internal timeout must not abort the caller's controller");
 
   const tokenClient = createExportDocManagerApiClient({
@@ -139,7 +139,7 @@ try {
   });
   await assert.rejects(
     tokenClient.getHealth(),
-    { name: "AbortError" },
+    { name: "TimeoutError" },
     "request timeout must cover a token provider that never resolves",
   );
   assert.equal(requests.length, 3, "a stalled token provider must not start a fetch request");
@@ -170,6 +170,31 @@ try {
     return new Response("{}", { headers: { "content-type": "application/json" } });
   } });
   await uploadClient.uploadReportTemplateFile({ fileName: template.name, body: template });
+
+  const scheduledTimeouts = [];
+  const originalTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (callback, delay, ...args) => {
+    scheduledTimeouts.push(delay);
+    return originalTimeout(callback, delay, ...args);
+  };
+  try {
+    const budgetClient = createExportDocManagerApiClient({ baseUrl: "https://api.example.test", fetch: async () => new Response("{}", { headers: { "content-type": "application/json" } }) });
+    await budgetClient.uploadLetterOfCreditDocument({ fileName: "credit.pdf", body: template });
+    await budgetClient.reviewLetterOfCreditCompliance({ body: {} });
+    await budgetClient.recognizeOcrImage({ body: {} });
+    await budgetClient.testEmailConnection();
+    await budgetClient.downloadJobResult({ jobId: "job" });
+    await budgetClient.testEmailConnection({ timeoutMs: 1234 });
+    assert.deepEqual(scheduledTimeouts, [610000, 135000, 105000, 75000, 86400000, 1234]);
+  } finally {
+    globalThis.setTimeout = originalTimeout;
+  }
+
+  const customCancellation = new AbortController();
+  const cancellationReason = new Error("caller changed workspace");
+  const customRequest = tokenClient.getHealth({ signal: customCancellation.signal });
+  customCancellation.abort(cancellationReason);
+  await assert.rejects(customRequest, error => error === cancellationReason);
 
   console.log("API client timeout, cancellation and binary upload contracts passed.");
 } finally {

@@ -4,6 +4,8 @@
 
 ## 本地入口
 
+2026-11-08 网络与会话回归：`test-native-postgres.ps1 -Scope All -PostgresBin <PostgreSQL 18 bin>` 增加握手停滞、查询取消、连接复用与网络黑洞测试，使用隔离集群和独立账号。每条 Cargo 命令的默认预算为 3600 秒（含编译），避免完整团队流程接近 30 分钟时被旧预算截断，仍可通过 `-TimeoutSeconds` 指定。`test_api_client_request_contracts.mjs` 检查超时分类及长操作预算；`test_authentication_failure_events.mjs` 和真实 `test_unit_identity_ui.mjs` 覆盖注销失败保留会话、成功撤销及身份隔离。Vite 开发代理同时覆盖 `/api`、`/downloads`、健康探针和 `/openapi`。
+
 2026-10-29 视觉门禁保留 84 个场景及文本、几何、溢出、交互、无障碍断言。GitHub Windows runner 的 `query-mobile-390` 原生日期控件差异实测为 0.331%，默认截图像素比例阈值由 0.2% 调整为 0.5%；`FRONTEND_VISUAL_MAX_DIFF_RATIO` 可显式覆盖。没有批量更新参考图来掩盖差异，失败时仍上传截图/差异/摘要。Firefox/WebKit 重型兼容验收继续仅手动触发。
 
 | 入口 | 用途 |
@@ -165,7 +167,7 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 
 - “日常灾备”默认关闭，可手工执行或按业务时区每天／每周生成完整加密包。“异机副本”选择 WebDAV／S3 并测试写入、回读和删除。新包及副本成功后执行受管保留策略，副本失败保留本地包和旧备份。内建为完整快照，增量和 WAL/PITR 由数据库运维另行配置。
 - 桌面 `.edmrecovery` 灾备包包含 SQLite 快照、Security 主密钥和 DataRoot/Templates；从本机明确选择的文件校验并暂存后，退出重开即可恢复。启动先取得实例锁，校验暂存内容，保存原文件并记录替换日志；失败停止启动，保留恢复目录。
-- PostgreSQL API 沿用“物理备份”名称，实际为 `pg_dump` custom-format `.dump`。完整包另含主密钥和用户模板。新包使用 ZIP64／v2 认证分块，上传下载及摘要使用固定缓冲和受管磁盘，不设置固定总容量额度；旧 v1 包仍按旧格式边界读取。磁盘余量、存储协议及 24 小时任务时限仍适用。
+- PostgreSQL API 沿用“物理备份”名称，实际为 `pg_dump` custom-format `.dump`。完整包另含主密钥和用户模板。完整包仅接受 ZIP64／v2 认证分块格式，上传下载及摘要使用固定缓冲和受管磁盘，不设置固定总容量额度；v1 包明确拒绝，不自动转换或覆盖。磁盘余量、存储协议及 24 小时任务时限仍适用。
 - 服务器在界面完成密码/确认及暂存后，停止正常 API，使用同一个 AppRoot/DataRoot 执行 `ExportDocManager.Server --app-root <AppRoot> --data-root <DataRoot> --restore-pending`。维护进程需提供 `EXPORTDOCMANAGER_POSTGRES_CONNECTION`、独立 `EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION` 和 NOLOGIN 所有者 `EXPORTDOCMANAGER_POSTGRES_OWNER`；两种连接须指向同一数据库，均可使用对应 `_FILE`。命令完成即退出，再以业务连接启动 API。
 - 新镜像部署依次执行 `docker compose stop application`、`docker compose run --rm --no-deps restore`、`docker compose up -d --no-deps --wait application`；每条成功后再执行下一条。旧源码入口继续使用 `scripts/run-native-docker.ps1 -RestorePending -NoPause` 及原 RuntimeRoot。普通 API 不持维护密钥，失败保留停止状态、待恢复标记及安全副本。
 - 服务端现有完整包可在网页按编号暂存恢复；外部大包可用 `--import-migration <绝对包路径> --package-password-file <私有密码文件>`，在 API 停止后通过独立维护锁导入并恢复。命令保持原 AppRoot／DataRoot 和维护连接。
