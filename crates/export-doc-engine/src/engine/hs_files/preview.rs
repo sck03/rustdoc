@@ -150,11 +150,18 @@ fn comparable(item: &Value) -> Value {
 mod tests {
     use super::*;
     #[test]
-    fn complete_reconciliation_bounds_replacements_and_normalizes_names() {
-        let mut rows = vec![vec!["HS编码".into(), "商品名称".into()]];
+    fn annual_reconciliation_normalizes_units_and_names_and_bounds_replacements() {
+        let mut rows = vec![vec![
+            "HS编码".into(),
+            "商品名称".into(),
+            "法定第一单位".into(),
+            "法定第二单位".into(),
+        ]];
         for number in 0..1000 {
             rows.push(vec![format!("6109{number:06}"), "E\u{301}cole".into()]);
         }
+        rows[1].extend(["132".into(), "35".into()]);
+        rows[2].push("137".into());
         let table = export_doc_excel::TableData {
             rows,
             first_row: 1,
@@ -181,6 +188,9 @@ mod tests {
             complete: true,
         };
         let items = items(&input, &existing).unwrap();
+        assert_eq!(items[0]["item"]["unit"], "本/千克");
+        assert_eq!(items[1]["item"]["unit"], "137");
+        assert_eq!(items[0]["changeType"], "Add");
         let missing = items.last().unwrap();
         assert_eq!(missing["changeType"], "SuspectedObsolete");
         assert_eq!(

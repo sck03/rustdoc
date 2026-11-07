@@ -1,5 +1,6 @@
 //! Column recognition and regulatory unit names; no file or database access.
 use crate::hs;
+use std::{collections::BTreeMap, sync::OnceLock};
 pub const COLUMNS: &[(&str, &[&str])] = &[
     (
         "code",
@@ -160,96 +161,70 @@ pub fn headers(rows: &[Vec<String>]) -> Result<(usize, Vec<(&'static str, usize)
     best.ok_or_else(|| "未找到包含 HS 编码和商品名称的表头。".into())
 }
 pub fn unit(value: &str) -> String {
-    let names = &[
-        ("001", "台"),
-        ("002", "座"),
-        ("003", "辆"),
-        ("004", "艘"),
-        ("005", "架"),
-        ("006", "套"),
-        ("007", "个"),
-        ("008", "只"),
-        ("009", "头"),
-        ("010", "张"),
-        ("011", "件"),
-        ("012", "支"),
-        ("013", "根"),
-        ("014", "条"),
-        ("015", "把"),
-        ("016", "块"),
-        ("017", "卷"),
-        ("018", "副"),
-        ("019", "枚"),
-        ("020", "吊"),
-        ("021", "双"),
-        ("022", "对"),
-        ("023", "箱"),
-        ("025", "桶"),
-        ("026", "扎"),
-        ("027", "包"),
-        ("028", "筐"),
-        ("029", "罗"),
-        ("030", "匹"),
-        ("031", "册"),
-        ("032", "本"),
-        ("033", "格"),
-        ("034", "筒"),
-        ("035", "千克"),
-        ("036", "克"),
-        ("037", "毫克"),
-        ("038", "吨"),
-        ("039", "公担"),
-        ("044", "厘米"),
-        ("045", "毫米"),
-        ("046", "米"),
-        ("047", "千米"),
-        ("048", "英尺"),
-        ("049", "英寸"),
-        ("050", "码"),
-        ("063", "千瓦时"),
-        ("070", "升"),
-        ("071", "毫升"),
-        ("072", "微升"),
-        ("095", "升"),
-        ("096", "毫升"),
-        ("097", "微升"),
-        ("110", "平方米"),
-        ("111", "平方英尺"),
-        ("112", "平方码"),
-        ("115", "立方米"),
-        ("116", "立方英尺"),
-        ("120", "立方厘米"),
-        ("121", "立方毫米"),
-        ("126", "立方米"),
-        ("132", "升"),
-        ("133", "毫升"),
-        ("134", "微升"),
-        ("135", "升"),
-        ("136", "毫升"),
-        ("137", "微升"),
-        ("138", "升"),
-        ("139", "毫升"),
-        ("140", "微升"),
-        ("141", "升"),
-        ("142", "毫升"),
-        ("143", "微升"),
-        ("144", "升"),
-        ("145", "毫升"),
-        ("146", "微升"),
-        ("147", "升"),
-        ("148", "毫升"),
-        ("149", "微升"),
-        ("163", "克拉"),
-    ];
-    let normalized = value
-        .trim()
-        .parse::<u16>()
-        .ok()
-        .map(|n| format!("{n:03}"))
-        .unwrap_or_else(|| value.trim().into());
-    names
-        .iter()
-        .find(|(code, _)| *code == normalized)
-        .map(|(_, name)| (*name).into())
-        .unwrap_or_else(|| value.trim().into())
+    // Official CusUnit snapshot and provenance: docs/海关计量单位数据来源.md.
+    static NAMES: OnceLock<BTreeMap<u16, &str>> = OnceLock::new();
+    let names = NAMES.get_or_init(|| {
+        include_str!("../resources/customs-units.tsv")
+            .lines()
+            .skip(1)
+            .map(|line| {
+                let (code, name) = line.split_once('\t').expect("bundled customs unit row");
+                (code.parse().expect("bundled customs unit code"), name)
+            })
+            .collect()
+    });
+    let value = value.trim();
+    let name = value
+        .bytes()
+        .all(|byte| byte.is_ascii_digit())
+        .then(|| value.parse::<u16>().ok().and_then(|code| names.get(&code)))
+        .flatten();
+    name.copied().unwrap_or(value).into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn official_customs_units_replace_incorrect_codes_and_preserve_unknown_input() {
+        for (code, expected) in [
+            ("013", "枝"),
+            ("30", "米"),
+            ("070", "吨"),
+            ("132", "本"),
+            ("149", "百万贝可"),
+            ("163", "部"),
+            ("181", "百万英热"),
+            (" 00035 ", "千克"),
+        ] {
+            assert_eq!(unit(code), expected, "{code}");
+        }
+        for unknown in [
+            "",
+            "137",
+            "138",
+            "999",
+            "0999",
+            "+035",
+            "-35",
+            "35.0",
+            "千克",
+            "自定义单位",
+        ] {
+            assert_eq!(unit(unknown), unknown);
+        }
+        let rows: Vec<_> = include_str!("../resources/customs-units.tsv")
+            .lines()
+            .skip(1)
+            .map(|line| line.split_once('\t').unwrap())
+            .collect();
+        assert_eq!(rows.len(), 127);
+        assert!(rows.windows(2).all(|pair| pair[0].0 < pair[1].0));
+        for (code, name) in rows {
+            assert!(code.len() == 3 && code.bytes().all(|b| b.is_ascii_digit()));
+            assert!(!name.is_empty());
+            assert_eq!(unit(code), name);
+        }
+    }
 }

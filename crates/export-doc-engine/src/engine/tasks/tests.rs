@@ -3,6 +3,7 @@ use crate::contracts;
 use crate::paths::RuntimePaths;
 use std::{fs, sync::mpsc, time::Instant};
 mod completion;
+mod downloads;
 mod publication;
 
 struct Fixture {

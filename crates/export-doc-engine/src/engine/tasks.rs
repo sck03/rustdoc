@@ -365,14 +365,26 @@ impl Jobs {
     }
 
     pub fn download(&self, actor: &Actor, id: &str) -> Result<FileOutput> {
-        self.prepare_download(actor, id)?.into_memory()
+        let (pending, snapshot) = self.capture_download(actor, id)?;
+        let download = pending.verify()?;
+        self.authorize_download(actor, id, Some(&snapshot))?;
+        download.into_memory()
     }
-    pub(crate) fn authorize_download(&self, actor: &Actor, id: &str) -> Result<()> {
+    pub(crate) fn authorize_download(
+        &self,
+        actor: &Actor,
+        id: &str,
+        expected: Option<&Value>,
+    ) -> Result<()> {
         self.health()?;
         let _completion = self.completion.read()?;
-        persistence::authorize_download(&self.store, actor, id)
+        persistence::authorize_download(&self.store, actor, id, expected)
     }
-    pub fn prepare_download(&self, actor: &Actor, id: &str) -> Result<super::backup_io::Download> {
+    pub(crate) fn capture_download(
+        &self,
+        actor: &Actor,
+        id: &str,
+    ) -> Result<(super::backup_io::PendingDownload, Value)> {
         self.health()?;
         let _completion = self.completion.read()?;
         persistence::download(&self.store, actor, id, &self.download_budget)

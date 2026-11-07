@@ -2,7 +2,7 @@
 use super::ManagedOutput;
 use crate::engine::{
     auth,
-    backup_io::Download,
+    backup_io::{Download, PendingDownload},
     error::{Result, invalid, unavailable},
     store::{Actor, Store},
 };
@@ -60,7 +60,7 @@ pub(super) fn describe(store: &Store, actor: &Actor, output: &ManagedOutput) -> 
         json!({"path":relative,"fileName":path.file_name().and_then(|n| n.to_str()),"size":output.size,"digest":output.digest}),
     )
 }
-pub(super) fn open(store: &Store, actor: &Actor, descriptor: &Value) -> Result<Download> {
+pub(super) fn open(store: &Store, actor: &Actor, descriptor: &Value) -> Result<PendingDownload> {
     let path = resolve(store, descriptor["path"].as_str().unwrap_or(""))?;
     auth::authorize(actor, permission(&path), "manage")?;
     let size = descriptor["size"]
@@ -69,5 +69,5 @@ pub(super) fn open(store: &Store, actor: &Actor, descriptor: &Value) -> Result<D
     let digest = descriptor["digest"]
         .as_str()
         .ok_or_else(|| unavailable("备份摘要缺失。"))?;
-    Download::open(&path, Some((size, digest)))
+    Download::prepare(&path, Some((size, digest)))
 }

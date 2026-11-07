@@ -2,6 +2,7 @@ use super::{FileOutput, TaskOutput};
 use crate::{
     contracts,
     engine::{
+        backup_io::{Budget, Download, PendingDownload},
         error::{Result, conflict, error, invalid, unavailable},
         media::digest,
         records::text,
@@ -356,13 +357,14 @@ pub fn download(
     store: &Store,
     actor: &Actor,
     id: &str,
-    budget: &std::sync::Arc<super::super::backup_io::Budget>,
-) -> Result<super::super::backup_io::Download> {
+    budget: &std::sync::Arc<Budget>,
+) -> Result<(PendingDownload, Value)> {
     let connection = store.connection()?;
     let job = downloadable(&connection, actor, id)?;
     if job["_managedOutput"].is_object() {
         drop(connection);
-        return super::managed_output::open(store, actor, &job["_managedOutput"]);
+        let pending = super::managed_output::open(store, actor, &job["_managedOutput"])?;
+        return Ok((pending, job));
     }
     let record_id = job["id"]
         .as_i64()
@@ -381,14 +383,17 @@ pub fn download(
     {
         return Err(unavailable("任务输出完整性校验失败。"));
     }
-    Ok(super::super::backup_io::Download::Memory {
-        output: FileOutput {
-            file_name: blob.file_name,
-            media_type: blob.media_type,
-            content: blob.content,
-        },
-        reservation,
-    })
+    Ok((
+        PendingDownload::ready(Download::Memory {
+            output: FileOutput {
+                file_name: blob.file_name,
+                media_type: blob.media_type,
+                content: blob.content,
+            },
+            reservation,
+        }),
+        job,
+    ))
 }
 fn downloadable(connection: &Connection, actor: &Actor, id: &str) -> Result<Value> {
     let job = checked(connection, actor, id)?;
@@ -406,8 +411,16 @@ fn downloadable(connection: &Connection, actor: &Actor, id: &str) -> Result<Valu
     authorize_output(connection, actor, &job)?;
     Ok(job)
 }
-pub(super) fn authorize_download(store: &Store, actor: &Actor, id: &str) -> Result<()> {
-    downloadable(&store.connection()?, actor, id)?;
+pub(super) fn authorize_download(
+    store: &Store,
+    actor: &Actor,
+    id: &str,
+    expected: Option<&Value>,
+) -> Result<()> {
+    let current = downloadable(&store.connection()?, actor, id)?;
+    if expected.is_some_and(|snapshot| snapshot != &current) {
+        return Err(conflict("任务输出在校验期间已变化，请重新下载。"));
+    }
     Ok(())
 }
 pub fn cancel(store: &Store, actor: &Actor, id: &str) -> Result<()> {

@@ -28,10 +28,41 @@ pub enum Download {
         size: u64,
     },
 }
+
+/// Owns the authorized file handle while verification runs outside publication locks.
+pub(crate) struct PendingDownload {
+    download: Download,
+    expected: Option<(u64, String)>,
+}
+impl PendingDownload {
+    pub(crate) fn ready(download: Download) -> Self {
+        Self {
+            download,
+            expected: None,
+        }
+    }
+    pub(crate) fn verify(mut self) -> Result<Download> {
+        crate::operation::check()?;
+        if let Some(expected) = self.expected {
+            let Download::File { file, .. } = &mut self.download else {
+                return Err(unavailable("备份校验状态无效。"));
+            };
+            if copy_and_hash(file, &mut std::io::sink(), MAX_FILE_BYTES)? != expected {
+                return Err(unavailable("备份文件已变化，不能下载不完整结果。"));
+            }
+            file.seek(SeekFrom::Start(0))?;
+        }
+        crate::operation::check()?;
+        Ok(self.download)
+    }
+}
 impl Download {
     pub fn open(path: &Path, expected: Option<(u64, &str)>) -> Result<Self> {
+        Self::prepare(path, expected)?.verify()
+    }
+    pub(crate) fn prepare(path: &Path, expected: Option<(u64, &str)>) -> Result<PendingDownload> {
         crate::paths::ensure_safe_absolute(path).map_err(invalid)?;
-        let mut file = fs::File::open(path).map_err(|cause| {
+        let file = fs::File::open(path).map_err(|cause| {
             if cause.kind() == std::io::ErrorKind::NotFound {
                 error(404, "备份文件不存在或已按保留策略清理。")
             } else {
@@ -44,24 +75,21 @@ impl Download {
                 "已登记备份文件为空或类型无效，请检查备份目录。",
             ));
         }
-        if let Some((size, hash)) = expected {
-            if metadata.len() != size
-                || copy_and_hash(&mut file, &mut std::io::sink(), MAX_FILE_BYTES)?
-                    != (size, hash.to_owned())
-            {
-                return Err(unavailable("备份文件已变化，不能下载不完整结果。"));
-            }
-            file.seek(SeekFrom::Start(0))?;
+        if expected.is_some_and(|(size, _)| metadata.len() != size) {
+            return Err(unavailable("备份文件已变化，不能下载不完整结果。"));
         }
-        Ok(Self::File {
-            file_name: path
-                .file_name()
-                .ok_or_else(|| invalid("备份文件名无效。"))?
-                .to_string_lossy()
-                .into_owned(),
-            media_type: "application/octet-stream".into(),
-            file,
-            size: metadata.len(),
+        Ok(PendingDownload {
+            download: Self::File {
+                file_name: path
+                    .file_name()
+                    .ok_or_else(|| invalid("备份文件名无效。"))?
+                    .to_string_lossy()
+                    .into_owned(),
+                media_type: "application/octet-stream".into(),
+                file,
+                size: metadata.len(),
+            },
+            expected: expected.map(|(size, hash)| (size, hash.to_owned())),
         })
     }
     /// In-process callers have a bounded byte API; HTTP uses the file variant directly.

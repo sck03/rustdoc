@@ -1,9 +1,71 @@
 use super::*;
+use crate::engine::store;
 
 fn file_output(path: &std::path::Path, bytes: &[u8]) -> TaskOutput {
     let mut output = TaskOutput::file("suggested.pdf".into(), "application/pdf", bytes.to_vec());
     output.destination = Some(path.into());
     output
+}
+
+fn directory_output(path: &std::path::Path, files: &[(&str, &[u8])]) -> TaskOutput {
+    TaskOutput {
+        file: None,
+        managed_file: None,
+        destination: None,
+        publication: None,
+        archive: None,
+        detail: "saved folder".into(),
+        directory: Some(DirectoryOutput {
+            path: path.into(),
+            files: files
+                .iter()
+                .map(|(name, bytes)| FileOutput {
+                    file_name: (*name).into(),
+                    media_type: "application/pdf".into(),
+                    content: bytes.to_vec(),
+                })
+                .collect(),
+        }),
+    }
+}
+
+fn break_version(store: &Store, actor: &Actor, id: &str) -> i64 {
+    store
+        .transaction(|tx| {
+            let mut record = persistence::checked(tx, actor, id)?;
+            let record_id = record["id"].as_i64().unwrap();
+            record["versionNumber"] = json!(100000);
+            tx.set_body(record_id, &record)?;
+            Ok(record_id)
+        })
+        .unwrap()
+}
+
+fn change_user(
+    tx: &store::Connection<'_>,
+    actor: &Actor,
+    id: i64,
+    field: &str,
+    value: Value,
+) -> Result<()> {
+    let mut user = store::get(tx, "users", id)?;
+    let identity = user["username"].as_str().unwrap().to_owned();
+    user[field] = value;
+    store::save(tx, "users", id, user, Some(identity), actor, "restrict")?;
+    Ok(())
+}
+
+#[cfg(any(feature = "postgres", feature = "excel"))]
+fn save_invoice(store: &Store, actor: &Actor, number: &str) -> i64 {
+    let invoice = crate::invoice::InvoiceDraft::demo("2026-10-28", number)
+        .build()
+        .unwrap();
+    let body = serde_json::to_value(invoice).unwrap();
+    store
+        .transaction(|tx| store::save(tx, "invoices", 0, body, None, actor, "create"))
+        .unwrap()["id"]
+        .as_i64()
+        .unwrap()
 }
 
 #[test]
@@ -49,25 +111,30 @@ fn completed_download_rechecks_originating_module_after_revocation() {
     )
     .unwrap();
     assert_eq!(jobs.download(&actor, id).unwrap().content, b"%PDF-review");
+    let (pending, snapshot) = jobs.capture_download(&actor, id).unwrap();
     store
         .transaction(|tx| {
-            let mut user = crate::engine::store::get(tx, "users", actor.id)?;
-            user["disabledModules"] = json!(["office.general"]);
-            crate::engine::store::save(
+            change_user(
                 tx,
-                "users",
-                actor.id,
-                user,
-                Some("download-review".into()),
                 &admin,
-                "restrict-module",
-            )?;
-            Ok(())
+                actor.id,
+                "disabledModules",
+                json!(["office.general"]),
+            )
         })
         .unwrap();
+    drop(pending.verify().unwrap());
+    assert_eq!(
+        jobs.authorize_download(&actor, id, Some(&snapshot))
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
     assert_eq!(jobs.download(&actor, id).err().unwrap().status, Some(403));
     assert_eq!(
-        jobs.authorize_download(&actor, id).unwrap_err().status,
+        jobs.authorize_download(&actor, id, None)
+            .unwrap_err()
+            .status,
         Some(403)
     );
     assert_eq!(
@@ -82,13 +149,14 @@ fn business_archive_is_atomic_cancelable_and_survives_task_cleanup() {
     for scenario in ["cancel", "denied", "rollback", "ready"] {
         let fixture = Fixture::new();
         let store = fixture.store();
+        let body = json!({"status":"Approved"});
         let record = store
             .transaction(|tx| {
-                crate::engine::store::save(
+                store::save(
                     tx,
                     "archive-fixture",
                     0,
-                    json!({"status":"Approved"}),
+                    body,
                     None,
                     &fixture.actor,
                     "submit",
@@ -117,14 +185,7 @@ fn business_archive_is_atomic_cancelable_and_survives_task_cleanup() {
             }));
         }
         if scenario == "rollback" {
-            store
-                .transaction(|tx| {
-                    let mut job = persistence::checked(tx, &fixture.actor, id)?;
-                    job["versionNumber"] = json!(100000);
-                    tx.set_body(job["id"].as_i64().unwrap(), &job)?;
-                    Ok(())
-                })
-                .unwrap();
+            break_version(&store, &fixture.actor, id);
         }
         let finished = persistence::finish(&store, &fixture.actor, id, Ok(result));
         if scenario == "rollback" {
@@ -210,18 +271,7 @@ fn metadata_write_failure_restores_a_preexisting_selected_file() {
     let job = persistence::create(&store, &fixture.actor, "Export", "保存冲突").unwrap();
     let id = job["jobId"].as_str().unwrap();
     // Inject an optimistic SQL update failure after the filesystem write.
-    let record_id = persistence::checked(&store.connection().unwrap(), &fixture.actor, id).unwrap()
-        ["id"]
-        .as_i64()
-        .unwrap();
-    store
-        .transaction(|tx| {
-            let mut record = persistence::checked(tx, &fixture.actor, id)?;
-            record["versionNumber"] = json!(100000);
-            tx.set_body(record["id"].as_i64().unwrap(), &record)?;
-            Ok(())
-        })
-        .unwrap();
+    let record_id = break_version(&store, &fixture.actor, id);
     assert!(
         persistence::finish(
             &store,
@@ -262,7 +312,7 @@ fn recovery_uses_the_database_receipt_to_restore_or_keep_a_published_file() {
         .transaction(|tx| {
             let mut record = persistence::checked(tx, &fixture.actor, id)?;
             record["status"] = json!("Succeeded");
-            crate::engine::store::save(
+            store::save(
                 tx,
                 "background-jobs",
                 record["id"].as_i64().unwrap(),
@@ -286,22 +336,7 @@ fn directory_publication_records_its_location_and_keeps_unexpected_changes() {
     let target = fixture.root.0.join("selected-folder");
     let job = persistence::create(&store, &fixture.actor, "Export", "文件夹输出").unwrap();
     let id = job["jobId"].as_str().unwrap();
-    let make = || TaskOutput {
-        file: None,
-        managed_file: None,
-        destination: None,
-        publication: None,
-        archive: None,
-        detail: "saved folder".into(),
-        directory: Some(DirectoryOutput {
-            path: target.clone(),
-            files: vec![FileOutput {
-                file_name: "one.pdf".into(),
-                media_type: "application/pdf".into(),
-                content: b"%PDF-1.7 test".to_vec(),
-            }],
-        }),
-    };
+    let make = || directory_output(&target, &[("one.pdf", b"%PDF-1.7 test")]);
     let mut published = output::publish(&store, id, &make()).unwrap().unwrap();
     fs::write(target.join("user-note.txt"), b"keep user content").unwrap();
     assert!(published.rollback().is_err());
@@ -346,18 +381,13 @@ fn queued_finalization_rechecks_account_status_before_publishing() {
                 )
             }));
             entered.recv_timeout(Duration::from_secs(2)).unwrap();
-            let mut user = crate::engine::store::get(tx, "users", fixture.actor.id)?;
-            user["isActive"] = json!(false);
-            crate::engine::store::save(
+            change_user(
                 tx,
-                "users",
-                fixture.actor.id,
-                user,
-                Some("admin".into()),
                 &fixture.actor,
-                "disable",
-            )?;
-            Ok(())
+                fixture.actor.id,
+                "isActive",
+                json!(false),
+            )
         })
         .unwrap();
     worker.unwrap().join().unwrap().unwrap();
@@ -390,29 +420,10 @@ fn recovery_finishes_partial_cleanup_and_compensation_ignores_request_cancellati
     output::recover(&store).unwrap();
     assert!(!journal.exists());
     let folder = fixture.root.0.join("partial-folder");
-    let output = TaskOutput {
-        file: None,
-        managed_file: None,
-        destination: None,
-        publication: None,
-        archive: None,
-        detail: String::new(),
-        directory: Some(DirectoryOutput {
-            path: folder.clone(),
-            files: vec![
-                FileOutput {
-                    file_name: "one.pdf".into(),
-                    media_type: "application/pdf".into(),
-                    content: b"%PDF-one".to_vec(),
-                },
-                FileOutput {
-                    file_name: "two.pdf".into(),
-                    media_type: "application/pdf".into(),
-                    content: b"%PDF-two".to_vec(),
-                },
-            ],
-        }),
-    };
+    let output = directory_output(
+        &folder,
+        &[("one.pdf", b"%PDF-one"), ("two.pdf", b"%PDF-two")],
+    );
     let publication = output::publish(&store, id, &output).unwrap();
     drop(publication);
     fs::remove_file(folder.join("one.pdf")).unwrap(); // Interrupted verified rollback.
@@ -449,14 +460,7 @@ fn postgres_publication_recovery_snapshot_and_final_authorization_share_the_same
     fs::write(&target, b"previous user file").unwrap();
     let job = persistence::create(&store, &actor, "Export", "数据库失败恢复").unwrap();
     let id = job["jobId"].as_str().unwrap();
-    store
-        .transaction(|tx| {
-            let mut record = persistence::checked(tx, &actor, id)?;
-            record["versionNumber"] = json!(100000);
-            tx.set_body(record["id"].as_i64().unwrap(), &record)?;
-            Ok(())
-        })
-        .unwrap();
+    break_version(&store, &actor, id);
     assert!(
         persistence::finish(
             &store,
@@ -473,23 +477,7 @@ fn postgres_publication_recovery_snapshot_and_final_authorization_share_the_same
     output::recover(&store).unwrap();
     assert_eq!(fs::read(&target).unwrap(), b"previous user file");
 
-    let invoice = crate::invoice::InvoiceDraft::demo("2026-10-27", "PG-SNAPSHOT")
-        .build()
-        .unwrap();
-    let saved = store
-        .transaction(|tx| {
-            crate::engine::store::save(
-                tx,
-                "invoices",
-                0,
-                serde_json::to_value(invoice)?,
-                None,
-                &actor,
-                "create",
-            )
-        })
-        .unwrap();
-    let invoice_id = saved["id"].as_i64().unwrap();
+    let invoice_id = save_invoice(&store, &actor, "PG-SNAPSHOT");
     let requests = vec![
         json!({"reportType":"ExportDocument","templatePath":export_doc_report::Builtin::Invoice.path(),"withSeal":false}),
     ];
@@ -505,9 +493,9 @@ fn postgres_publication_recovery_snapshot_and_final_authorization_share_the_same
     .unwrap();
     store
         .transaction(|tx| {
-            let mut record = crate::engine::store::get(tx, "invoices", invoice_id)?;
+            let mut record = store::get(tx, "invoices", invoice_id)?;
             record["invoiceNo"] = json!("PG-NEW");
-            crate::engine::store::save(tx, "invoices", invoice_id, record, None, &actor, "edit")?;
+            store::save(tx, "invoices", invoice_id, record, None, &actor, "edit")?;
             Ok(())
         })
         .unwrap();
@@ -525,20 +513,7 @@ fn postgres_publication_recovery_snapshot_and_final_authorization_share_the_same
         .unwrap(),
     );
     store
-        .transaction(|tx| {
-            let mut account = crate::engine::store::get(tx, "users", actor.id)?;
-            account["isActive"] = json!(false);
-            crate::engine::store::save(
-                tx,
-                "users",
-                actor.id,
-                account,
-                Some("admin".into()),
-                &actor,
-                "disable",
-            )?;
-            Ok(())
-        })
+        .transaction(|tx| change_user(tx, &actor, actor.id, "isActive", json!(false)))
         .unwrap();
     persistence::finish(&store, &actor, id, Ok(output)).unwrap();
     assert_eq!(
@@ -562,14 +537,8 @@ fn conflicting_output_sources_fail_without_creating_a_directory_or_file() {
             result.file = None;
             result.destination = Some(target.clone());
         } else {
-            result.directory = Some(DirectoryOutput {
-                path: target.clone(),
-                files: vec![FileOutput {
-                    file_name: "two.pdf".into(),
-                    media_type: "application/pdf".into(),
-                    content: b"%PDF-directory".to_vec(),
-                }],
-            });
+            result.directory =
+                directory_output(&target, &[("two.pdf", b"%PDF-directory")]).directory;
         }
         persistence::finish(&store, &fixture.actor, id, Ok(result)).unwrap();
         assert_eq!(
@@ -634,23 +603,7 @@ fn excel_exports_recheck_narrowed_data_scope_in_the_final_transaction() {
         .clone();
     let reader =
         crate::engine::auth::current_actor(&store, account["id"].as_i64().unwrap()).unwrap();
-    let invoice = crate::invoice::InvoiceDraft::demo("2026-10-28", "EXPORT-SCOPE")
-        .build()
-        .unwrap();
-    let saved = store
-        .transaction(|tx| {
-            crate::engine::store::save(
-                tx,
-                "invoices",
-                0,
-                serde_json::to_value(invoice)?,
-                None,
-                &admin,
-                "create",
-            )
-        })
-        .unwrap();
-    let invoice_id = saved["id"].as_i64().unwrap();
+    let invoice_id = save_invoice(&store, &admin, "EXPORT-SCOPE");
     let checks = [
         crate::engine::excel::invoice_publication_check(invoice_id),
         crate::engine::invoice_query::publication_check(vec![invoice_id]),
