@@ -477,7 +477,7 @@ export function InvoiceItemsEditor({
   }
 
   function handleProductKeywordKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key !== "Enter") {
+    if (isComposingKey(event.nativeEvent) || event.key !== "Enter") {
       return;
     }
 

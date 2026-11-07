@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type Ref } from "react";
 import { ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import { Link } from "react-router-dom";
+import { isComposingKey } from "../ui/keyboardEvent.ts";
 import { searchWorkspaceNavGroups, type WorkspaceNavGroupConfig } from "./workspaceNavigation.ts";
 
 type Props = {
@@ -46,7 +47,7 @@ export function WorkspaceNavigation({ groups, pathname, collapsed, activeGroupKe
         <Search size={16} aria-hidden="true" />
         <input ref={searchRef} type="search" aria-label="查找功能" placeholder="查找功能" maxLength={80} autoComplete="off"
           value={query} onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => { if (event.key === "Escape" && query) { event.preventDefault(); event.stopPropagation(); setQuery(""); } }} />
+          onKeyDown={(event) => { if (!isComposingKey(event.nativeEvent) && event.key === "Escape" && query) { event.preventDefault(); event.stopPropagation(); setQuery(""); } }} />
         {query && <button type="button" aria-label="清除功能搜索" onClick={() => { setQuery(""); searchRef.current?.focus(); }}>
           <X size={16} aria-hidden="true" />
         </button>}

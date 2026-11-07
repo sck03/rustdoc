@@ -32,6 +32,7 @@
     "test:invoice-list-models": "node ../../scripts/test_invoice_list_models.mjs",
     "test:invoice-editing": "node ../../scripts/test_invoice_editing_contracts.mjs && node ../../scripts/test_invoice_save_workspace_ui.mjs",
     "test:list-pagination-ui": "node ../../scripts/test_list_pagination_ui.mjs",
+    "test:input-method-ui": "node ../../scripts/test_input_method_ui.mjs",
     "test:invoice-text-normalization": "node ../../scripts/test_invoice_text_normalization_model.mjs",
     "test:settings-models": "node ../../scripts/test_settings_models.mjs",
     "test:exchange-rate-ui": "node ../../scripts/test_exchange_rate_ui.mjs",

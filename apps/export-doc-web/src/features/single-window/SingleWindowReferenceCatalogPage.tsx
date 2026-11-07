@@ -17,6 +17,7 @@ import {
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
@@ -216,7 +217,7 @@ export function SingleWindowReferenceCatalogPage({
     }
 
     function closeContextMenuOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (!event.defaultPrevented && !isComposingKey(event) && event.key === "Escape") {
         setContextMenu(null);
       }
     }
@@ -379,6 +380,7 @@ export function SingleWindowReferenceCatalogPage({
   }
 
   function handleCatalogKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.defaultPrevented || isComposingKey(event.nativeEvent)) return;
     const position = resolveCatalogCellPosition(event.target) ?? focusedCell;
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
       event.preventDefault();

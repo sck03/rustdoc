@@ -6,6 +6,7 @@ import { useLocation,useNavigate,useParams } from "react-router-dom";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import {
 normalizeText,
@@ -302,6 +303,7 @@ export function MasterDataEditorPage({
 
   useEffect(() => {
     function handleDocumentKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || isComposingKey(event)) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
         saveCurrentMasterDataDraft();

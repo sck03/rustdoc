@@ -1,4 +1,5 @@
 import { Dialog } from "../../ui/primitives/Dialog.tsx";
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import type {
   ClipboardEventHandler,
   KeyboardEventHandler,
@@ -340,10 +341,7 @@ export function ReferenceCatalogAliasDialog({
         <div data-ui="dialog-toolbar"><span>第 {editor.rowIndex + 1} 行</span></div>
         <textarea ref={inputRef} value={editor.value} onChange={(event) => onChange(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.preventDefault();
-              onClose();
-            }
+            if (isComposingKey(event.nativeEvent)) return;
             if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
               event.preventDefault();
               onApply();

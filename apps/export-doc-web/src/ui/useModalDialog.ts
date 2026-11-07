@@ -1,4 +1,5 @@
 import { useEffect, useRef, type RefObject } from "react";
+import { isComposingKey } from "./keyboardEvent.ts";
 
 const inertBranchStates = new WeakMap<HTMLElement, { count: number; previousInert: boolean }>();
 const focusableSelector = 'button, [href], input, select, textarea, [tabindex], summary, [contenteditable="true"]';
@@ -67,6 +68,7 @@ export function useModalDialog<T extends HTMLElement = HTMLDivElement>(
     }
 
     function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || isComposingKey(event)) return;
       const activeElement = document.activeElement;
       // A confirmation dialog may be opened from inside this dialog.  Only
       // the topmost dialog that owns focus should consume Escape/Tab; this

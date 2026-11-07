@@ -13,6 +13,7 @@ import { isDesktopBridgeAvailable, selectSaveExcelPath } from "../../desktop/des
 import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { readStoredJson, writeStoredJson } from "../../ui/browserStorage.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
@@ -95,6 +96,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
 
   useEffect(() => {
     function handlePageKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.defaultPrevented || isComposingKey(event)) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
         event.preventDefault();
         keywordInputRef.current?.focus();
@@ -180,6 +182,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
   }
 
   function handleQueryFormKeyDown(event: KeyboardEvent<HTMLFormElement>) {
+    if (event.defaultPrevented || isComposingKey(event.nativeEvent)) return;
     const shouldSearch =
       event.key === "Enter" &&
       !event.ctrlKey &&

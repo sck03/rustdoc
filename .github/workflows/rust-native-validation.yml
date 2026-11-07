@@ -232,6 +232,7 @@ jobs:
           npm --prefix apps/export-doc-web run test:font-build
           npm --prefix apps/export-doc-web run test:invoice-editing
           npm --prefix apps/export-doc-web run test:document-editor-ui
+          npm --prefix apps/export-doc-web run test:input-method-ui
           npm --prefix apps/export-doc-web run test:report-designer-v3
           npm --prefix apps/export-doc-web run test:abortable-operations-ui
           npm --prefix apps/export-doc-web run test:email-template-workspace-ui

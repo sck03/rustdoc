@@ -1,5 +1,6 @@
 import { KeyboardEvent, useEffect, useState } from "react";
 import { Button } from "../Button.tsx";
+import { isComposingKey } from "../keyboardEvent.ts";
 
 export function Pagination({
   pageNumber,
@@ -43,6 +44,7 @@ export function Pagination({
   }
 
   function handleGoToPageKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (isComposingKey(event.nativeEvent)) return;
     if (event.key === "Enter") {
       event.preventDefault();
       submitGoToPage();

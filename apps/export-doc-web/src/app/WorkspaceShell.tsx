@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import "../styles/workspaces.css";
 import "../styles/responsive.css";
 import { PermissionSourceSummary } from "./PermissionSourceSummary.tsx";
+import { isComposingKey } from "../ui/keyboardEvent.ts";
 import {
   FileText,
   LogOut,
@@ -182,6 +183,7 @@ export function WorkspaceShell({
     });
 
     const handleNavigationKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || isComposingKey(event)) return;
       if (event.key === "Escape") {
         event.preventDefault();
         setIsMobileNavOpen(false);

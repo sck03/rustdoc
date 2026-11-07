@@ -7,6 +7,7 @@ import { ApiPaymentDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
+import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { isConcurrencyConflict, normalizeText, readApiError, readRouteSuccessMessage } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
@@ -274,6 +275,7 @@ export function PaymentEditorPage({
 
   useEffect(() => {
     function handleDocumentKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || isComposingKey(event)) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
         formRef.current?.requestSubmit();

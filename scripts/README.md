@@ -32,6 +32,8 @@
 
 `test:concurrency-feedback` 包含 `test_packing_credit_workspace_ui.mjs`：真实 React 组件验证装柜保存续编/切换/加载取消、刷新失败后的版本，以及信用证导入/审查在切换、修订、卸载后的迟到成功与错误。`test:abortable-operations-ui` 另验证印章选择和二进制读取的资料切换、停用与卸载边界；`test_native_desktop_editions.mjs <包父目录> Full` 在真实 WebView2 核对 ArrayBuffer 字节与格式拒绝，再执行原桌面流程。SQLite 查询中断、回滚/连接复用及备份取消在 Storage 单元测试，专用查询合同由 SQLite 与 `test-native-postgres.ps1 -Scope Workflows` 共用。
 
+`test:input-method-ui` 验证查询、参考目录、导航、弹窗、分页和色值输入在 composition/229 事件中保留输入，同时保持普通键盘动作。它进入 Chromium 编辑回归门禁；事件回归不等同于系统输入法候选窗真机验收。
+
 同一并发门禁包含 `test_catalog_history_workspaces_ui.mjs`，核对 HS 选择时版本、原因确认、5000 条疑似作废的跨页选择与排除、年度预检分页，以及历史容量清理和切换取消。`test_report_template_draft_ui.mjs` 覆盖画布未确认文字和属性文字／数值缓冲的后台刷新、保存／离开保护及单步撤销。HS／历史用例和存储投影共用 SQLite 与 PostgreSQL 的业务合同；HS 操作说明见[年度维护与清理](../docs/HS编码年度维护与清理.md)。
 
 2026-10-08 移除四个旧 HTML 报表 visual/pdf/pdf-pixels/print-pixels 入口及其专用阈值和解析代码：它们将 .dtpl 当 HTML 读取，不能验证当前 Rust 输出。现用浏览器定位保留在 `lib/chromium-executable.mjs`，业务资料 PDF 查看器会话仍保留。原 HTML 对照夹具不作为运行模板。
