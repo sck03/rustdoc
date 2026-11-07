@@ -276,7 +276,7 @@ pub(super) fn handle(
             .ok_or_else(|| conflict("当前公告状态不能执行此操作。"))?;
         if action == "publish" {
             fields(tx, actor, &row)?;
-            if text(&row, "expiresAt") <= store::timestamp() {
+            if store::instant(&text(&row, "expiresAt"))? <= chrono::Utc::now() {
                 return Err(invalid("不能发布已经过期的公告，请调整有效期。"));
             }
             row["publishVersion"] = json!(row["publishVersion"].as_i64().unwrap_or(0) + 1);

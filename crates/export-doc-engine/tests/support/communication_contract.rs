@@ -84,6 +84,13 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
     let now = chrono::Utc::now();
     let body = json!({"requestKey":nonce().unwrap(),"title":"制度更新与放假安排","body":"第一行\n第二行 <script>保持纯文字</script>","audienceDepartment":"GENERAL","isPinned":true,"startsAt":(now-chrono::Duration::hours(1)).to_rfc3339(),"expiresAt":(now+chrono::Duration::days(30)).to_rfc3339()});
     let mut row = create(CREATE_ANNOUNCEMENT, body.clone());
+    for key in ["startsAt", "expiresAt"] {
+        assert_eq!(
+            chrono::DateTime::parse_from_rfc3339(row[key].as_str().unwrap()).unwrap(),
+            chrono::DateTime::parse_from_rfc3339(body[key].as_str().unwrap()).unwrap(),
+            "saved announcement must preserve {key}"
+        );
+    }
     let id = row["id"].as_i64().unwrap();
     assert_eq!(create(CREATE_ANNOUNCEMENT, body.clone())["id"], id);
     let mut injected = body.clone();

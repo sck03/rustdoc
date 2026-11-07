@@ -29,14 +29,7 @@ pub struct CommunicationQuery<'a> {
 }
 pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
     let mut values = vec![];
-    let mut bind = |value: String| {
-        values.push(value);
-        format!(
-            "CAST({}{} AS TEXT)",
-            if postgres { "$" } else { "?" },
-            values.len()
-        )
-    };
+    let mut bind = |value: String| crate::sql::bind(&mut values, value, postgres);
     let company = bind(q.company.into());
     let mut filter = format!("r.company={company}");
     let order = match &q.view {
@@ -49,8 +42,13 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                     .collect::<Vec<_>>()
                     .join(",");
                 let now = bind((*now).into());
+                let (now_seconds, now_nanos) = crate::sql::instant_order(&now, postgres);
+                let (start_seconds, start_nanos) =
+                    crate::sql::instant_order("r.body->>'startsAt'", postgres);
+                let (end_seconds, end_nanos) =
+                    crate::sql::instant_order("r.body->>'expiresAt'", postgres);
                 filter += &format!(
-                    " AND r.body->>'status'='Published' AND r.body->>'startsAt'<={now} AND r.body->>'expiresAt'>{now} AND (r.body->>'audienceDepartment'='' OR r.body->>'audienceDepartment' IN ({department}))"
+                    " AND r.body->>'status'='Published' AND ({start_seconds},{start_nanos})<=({now_seconds},{now_nanos}) AND ({end_seconds},{end_nanos})>({now_seconds},{now_nanos}) AND (r.body->>'audienceDepartment'='' OR r.body->>'audienceDepartment' IN ({department}))"
                 );
             }
             if q.unread_only {
@@ -73,6 +71,7 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                     continue;
                 }
                 let mut condition = match scope.rank {
+                    1..=4 if q.assigned_only && scope.handling_keys.is_none() => String::new(),
                     1 => format!(" AND parent.owner_id={reader}"),
                     2 => format!(
                         " AND parent.department IN ({})",
@@ -85,18 +84,18 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                     3..=4 => String::new(),
                     _ => continue,
                 };
-                if !scope.statuses.is_empty() {
+                let status = if scope.statuses.is_empty() {
+                    String::new()
+                } else {
                     let states = scope
                         .statuses
                         .iter()
                         .map(|s| bind(s.clone()))
                         .collect::<Vec<_>>();
-                    condition += &format!(" AND parent.body->>'status' IN ({})", states.join(","));
-                }
+                    format!(" AND parent.body->>'status' IN ({})", states.join(","))
+                };
+                condition += &status;
                 if let Some(keys) = &scope.handling_keys {
-                    if keys.is_empty() {
-                        continue;
-                    }
                     let keys = keys.iter().map(|key| bind(key.clone())).collect::<Vec<_>>();
                     condition +=
                         &format!(" AND parent.body->>'handlingKey' IN ({})", keys.join(","));
@@ -134,22 +133,7 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
                         scope.workflow_date,
                     );
                     condition = if q.assigned_only {
-                        format!(
-                            " AND {participant}{condition}",
-                            condition = if scope.statuses.is_empty() {
-                                String::new()
-                            } else {
-                                format!(
-                                    " AND parent.body->>'status' IN ({})",
-                                    scope
-                                        .statuses
-                                        .iter()
-                                        .map(|s| bind(s.clone()))
-                                        .collect::<Vec<_>>()
-                                        .join(",")
-                                )
-                            }
-                        )
+                        format!(" AND {participant}{status}")
                     } else {
                         format!(" AND ((TRUE {condition}) OR {participant})")
                     };

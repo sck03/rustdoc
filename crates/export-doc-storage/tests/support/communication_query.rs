@@ -58,6 +58,22 @@ pub fn exercise(db: &Connection) {
     let (count, rows) = db.query_communications(&q).unwrap();
     assert_eq!(count, 2);
     assert_eq!(rows[0]["id"], a);
+    for (now, expected) in [
+        ("2026-09-30T00:00:00.000000000Z", 2),
+        ("2026-09-30T00:00:00.000000001Z", 2),
+        ("2026-09-30T08:00:00+08:00", 2),
+        ("2026-08-31T23:59:59.999999999Z", 0),
+        ("2026-09-01T00:00:00.000000000Z", 3),
+        ("2026-09-01T00:00:00.000000001Z", 3),
+        ("2026-09-30T00:00:00.000Z", 2),
+    ] {
+        q.view = CommunicationView::Announcements { manage: false, now };
+        assert_eq!(
+            db.query_communications(&q).unwrap().0,
+            expected,
+            "validity at {now}"
+        );
+    }
     insert(
         "announcement-receipt",
         "read-old-release",
@@ -73,6 +89,7 @@ pub fn exercise(db: &Connection) {
     assert_eq!(db.query_communications(&q).unwrap().0, 1);
     q.company = "OTHER";
     assert_eq!(db.query_communications(&q).unwrap().0, 0);
+    q.company = "COMMS-QUERY";
     let parent = insert(
         "oa-general",
         "parent",
@@ -83,40 +100,30 @@ pub fn exercise(db: &Connection) {
         "event-recipient",
         json!({"ownerUserId":200,"departmentId":"A","requestId":parent,"requestKind":"oa-general","status":"Unread"}),
     );
+    let scope = |kind: &str, rank, statuses, handling_keys| NotificationScope {
+        workflow_date: None,
+        node_access: vec![],
+        restrictions: vec![],
+        approval_principals: vec![],
+        kind: kind.into(),
+        rank,
+        statuses,
+        handling_keys,
+    };
     for (rank, expected) in [(0, 0), (1, 0), (2, 1), (3, 1), (4, 1)] {
         let scopes = [
-            NotificationScope {
-                workflow_date: None,
-                node_access: vec![],
-                restrictions: vec![],
-                approval_principals: vec![],
-                handling_keys: None,
-                kind: "oa-general".into(),
-                rank,
-                statuses: vec![],
-            },
-            NotificationScope {
-                workflow_date: None,
-                node_access: vec![],
-                restrictions: vec![],
-                approval_principals: vec![],
-                kind: "oa-general".into(),
-                rank: 3,
-                statuses: vec!["Approved".into(), "Completed".into()],
-                handling_keys: Some(vec![]),
-            },
+            scope("oa-general", rank, vec![], None),
+            scope(
+                "oa-general",
+                3,
+                vec!["Approved".into(), "Completed".into()],
+                Some(vec![]),
+            ),
         ];
         let q = CommunicationQuery {
-            company: "COMMS-QUERY",
-            department: "A",
-            departments: &[],
-            assigned_only: false,
-            context: "",
-            reader: 200,
-            unread_only: true,
             view: CommunicationView::Notifications { scopes: &scopes },
-            offset: 0,
             limit: 20,
+            ..q
         };
         assert_eq!(db.query_communications(&q).unwrap().0, expected);
     }
@@ -136,31 +143,18 @@ pub fn exercise(db: &Connection) {
             json!({"ownerUserId":200,"departmentId":"A","requestId":parent,"requestKind":"oa-expense","status":"Unread"}),
         );
     }
-    let scopes = [NotificationScope {
-        workflow_date: None,
-        node_access: vec![],
-        restrictions: vec![],
-        approval_principals: vec![],
-        handling_keys: None,
-        kind: "oa-expense".into(),
-        rank: 2,
-        statuses: vec!["Approved".into(), "HandedOff".into()],
-    }];
+    let scopes = [scope(
+        "oa-expense",
+        2,
+        vec!["Approved".into(), "HandedOff".into()],
+        None,
+    )];
     let mut finance = CommunicationQuery {
-        company: "COMMS-QUERY",
-        department: "A",
-        departments: &[],
-        assigned_only: false,
-        context: "",
-        reader: 200,
-        unread_only: true,
         view: CommunicationView::Notifications { scopes: &scopes },
-        offset: 0,
-        limit: 1,
+        ..q
     };
     let (count, rows) = db.query_communications(&finance).unwrap();
-    assert_eq!(count, 2);
-    assert_eq!(rows.len(), 1);
+    assert_eq!((count, rows.len()), (2, 1));
     finance.offset = 1;
     let (count, next) = db.query_communications(&finance).unwrap();
     assert_eq!(count, 2);
@@ -168,9 +162,10 @@ pub fn exercise(db: &Connection) {
     finance.offset = 0;
     finance.department = "B";
     assert_eq!(db.query_communications(&finance).unwrap().0, 0);
+    finance.assigned_only = true;
+    assert_eq!(db.query_communications(&finance).unwrap().0, 0);
     // A failed/reverted business transaction cannot leave published notices or receipts.
     db.rollback().unwrap();
-    q.company = "COMMS-QUERY";
     assert_eq!(db.query_communications(&q).unwrap().0, 0);
     assert!(
         db.find_identity("site-notification", "event-recipient")

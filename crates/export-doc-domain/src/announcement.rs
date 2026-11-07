@@ -12,8 +12,8 @@ pub fn validity(starts_at: &str, expires_at: &str) -> Result<(String, String), S
         return Err("失效时间必须晚于生效时间。".into());
     }
     Ok((
-        start.to_rfc3339_opts(SecondsFormat::Millis, true),
-        end.to_rfc3339_opts(SecondsFormat::Millis, true),
+        start.to_rfc3339_opts(SecondsFormat::Nanos, true),
+        end.to_rfc3339_opts(SecondsFormat::Nanos, true),
     ))
 }
 pub fn next_status(status: &str, action: &str) -> Option<&'static str> {
@@ -36,10 +36,22 @@ mod tests {
             validity("2026-09-30T12:00:00+08:00", "2026-09-30T05:00:00Z")
                 .unwrap()
                 .0,
-            "2026-09-30T04:00:00.000Z"
+            "2026-09-30T04:00:00.000000000Z"
         );
         assert_eq!(next_status("Published", "publish"), None);
         assert_eq!(next_status("Archived", "publish"), None);
         assert_eq!(next_status("Withdrawn", "publish"), Some("Published"));
+    }
+
+    #[test]
+    fn validity_preserves_submillisecond_intervals() {
+        let (start, end) = validity(
+            "2026-11-07T08:00:00.123456788+08:00",
+            "2026-11-07T00:00:00.123456789Z",
+        )
+        .unwrap();
+        assert_eq!(start, "2026-11-07T00:00:00.123456788Z");
+        assert_eq!(end, "2026-11-07T00:00:00.123456789Z");
+        assert!(validity(&start, &end).is_ok());
     }
 }
