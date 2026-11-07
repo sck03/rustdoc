@@ -24,10 +24,6 @@
     justify-content: stretch;
   }
 
-  .report-template-management-current {
-    max-width: none;
-  }
-
   .report-export-defaults-grid {
     grid-template-columns: minmax(0, 1fr);
   }

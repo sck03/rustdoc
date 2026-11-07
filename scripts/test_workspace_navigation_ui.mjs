@@ -14,6 +14,7 @@ const require = createRequire(path.join(web, "package.json"));
 fs.mkdirSync(output, { recursive: true });
 const axe = fs.readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
 await require("esbuild").build({ stdin: { resolveDir: web, loader: "tsx", contents: `
+  import './src/styles/index.css';
   import React from 'react';
   import {createRoot} from 'react-dom/client';
   import {MemoryRouter,useLocation} from 'react-router-dom';
@@ -25,7 +26,6 @@ await require("esbuild").build({ stdin: { resolveDir: web, loader: "tsx", conten
   import {PermissionAccessProvider} from './src/app/PermissionAccessContext.tsx';
   import {ConfirmationProvider} from './src/ui/ConfirmationProvider.tsx';
   import {JobCenterPage} from './src/features/jobs/JobCenterPage.tsx';
-  import './src/styles/index.css'; import './src/styles/workspaces.css'; import './src/styles/responsive.css';
   const params=new URLSearchParams(location.search), edition=params.get('edition')||'Full', desktop=edition!=='Full';
   const workspaces=edition==='Full'?['document','sales','office']:edition==='Sales'?['sales']:['document'];
   const items=getWorkspaceRouteItems().filter(item=>!item.workspace||workspaces.includes(item.workspace));
@@ -42,7 +42,7 @@ await require("esbuild").build({ stdin: { resolveDir: web, loader: "tsx", conten
   const invoices=Array.from({length:41},(_,index)=>({id:index+1,invoiceNo:'INV'+String(index+1).padStart(3,'0'),customerName:'示例客户 '+(index+1)}));
   window.__requests=[];window.__errors=[];window.addEventListener('error',event=>window.__errors.push(event.message));
   const paged=items=>({items,pageNumber:1,pageSize:20,totalCount:items.length,totalPages:1});
-  const client={listJobs:async()=>paged([]),getSettings:async()=>({settings:{}}),
+  const client={listJobs:async()=>paged([]),getSettings:async()=>({settings:{system:{defaultExportDirectory:''}}}),
     listReportTemplates:async()=>[['invoice_template.dtpl','出口发票'],['packing_list_template.dtpl','装箱单'],['customs_declaration_template.dtpl','报关单']].map(([templatePath,displayName])=>({templatePath,displayName,withSealDefault:true})),
     listInvoices:async input=>{window.__requests.push({kind:'search',keyword:input.keyword});return paged(invoices.filter(invoice=>(invoice.invoiceNo+' '+invoice.customerName).includes(input.keyword||'')).slice(0,20))},
     startInvoiceReportPdfZipDownloadJob:async input=>{window.__requests.push({kind:'zip',body:input.body});throw new Error('模拟依赖不可用，请稍后重试。')},
@@ -92,9 +92,11 @@ async function audit(label) {
   await evaluate(page, axe, false);
   const violations = await read("axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}}).then(r=>r.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})))");
   assert.deepEqual(violations, [], `${label}: accessibility`);
-  assert(await read("document.documentElement.scrollWidth <= innerWidth+1"), `${label}: horizontal overflow`);
+  const overflow = await read("({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,nodes:[...document.querySelectorAll('body *')].filter(n=>n.getClientRects().length&&n.getBoundingClientRect().right>innerWidth+1).slice(0,12).map(n=>({tag:n.tagName,className:n.className,right:n.getBoundingClientRect().right}))})");
+  await captureScreenshot(page, path.join(output, `${label}.png`));
+  assert(overflow.scrollWidth <= overflow.width + 1, `${label}: horizontal overflow ${JSON.stringify(overflow)}`);
   assert.deepEqual(await read("window.__errors"), [], `${label}: browser errors`);
-  await captureScreenshot(page, path.join(output, `${label}.png`)); results.push(label);
+  results.push(label);
 }
 try {
   chrome = await startChrome({ browserExecutable: locateChromeForTesting(repo, "headless-shell"), userDataDir: path.join(repo, ".codex-runtime/workspace-navigation-ui-chrome"), timeoutMs: 30000 });

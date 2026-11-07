@@ -42,7 +42,7 @@ const responsiveOverridesCss = readCssGraph(path.join(stylesRoot, "styles/respon
 const workspaceStateSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "reportTemplateWorkspaceState.ts"), "utf8");
 const userPanelSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "ReportTemplateUserPanel.tsx"), "utf8");
 const exportDefaultsPanelSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "reports", "ReportExportDefaultsPanel.tsx"), "utf8");
-const invoicePreviewModelSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceReportPreviewModel.ts"), "utf8");
+const invoicePreviewModelPath = path.join(repoRoot, "apps/export-doc-web/src/features/invoices/invoiceReportPreviewModel.ts");
 const invoicePackageWorkspaceSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "useInvoiceDocumentPackageWorkspace.ts"), "utf8");
 const modelImportSpecifier = `./${path.relative(workspaceRoot, modelPath).replaceAll("\\", "/")}`;
 const exportDefaultsModelImportSpecifier = `./${path.relative(workspaceRoot, exportDefaultsModelPath).replaceAll("\\", "/")}`;
@@ -55,13 +55,14 @@ fs.writeFileSync(
     `export { buildUserTemplateClonePayload, buildUserTemplateCreatePayload, readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveDefaultTemplatePath, resolvePreviewSourceId, resolveReportTypeOptions } from ${JSON.stringify(modelImportSpecifier)};`,
     `export { resolveBatchExportItems } from ${JSON.stringify(exportDefaultsModelImportSpecifier)};`,
     `export { deriveReportTemplateWorkspaceState } from ${JSON.stringify(workspaceStateModelImportSpecifier)};`,
+    `export { buildBatchExportConfigDraft, buildDocumentEmailSubject, buildDocumentEmailBody, buildPackageTemplateViewsFromItems } from ${JSON.stringify(invoicePreviewModelPath.replaceAll("\\", "/"))};`,
   ].join("\n"),
   "utf8",
 );
 
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entryPath], outfile: bundlePath, bundle: true, platform: "node", format: "esm" });
-const { buildUserTemplateClonePayload, buildUserTemplateCreatePayload, deriveReportTemplateWorkspaceState, readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveBatchExportItems, resolveDefaultTemplatePath, resolvePreviewSourceId, resolveReportTypeOptions } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
+const { buildUserTemplateClonePayload, buildUserTemplateCreatePayload, deriveReportTemplateWorkspaceState, readUserTemplateIdFromKey, readUserTemplateIdFromSearch, resolveBatchExportItems, resolveDefaultTemplatePath, resolvePreviewSourceId, resolveReportTypeOptions, buildBatchExportConfigDraft, buildDocumentEmailSubject, buildDocumentEmailBody, buildPackageTemplateViewsFromItems } = await import(`${pathToFileURL(bundlePath).href}?v=${Date.now()}`);
 
 assertEqual(resolveReportTypeOptions(true, false, true)[0]?.value, "PaymentVoucher", "财务账号应默认进入获准的付款报表域");
 assertEqual(resolveReportTypeOptions(true, false, true).length, 1, "财务账号不得看到出口报表域");
@@ -281,7 +282,18 @@ if (/<details[^>]*template-user-panel[^>]*\bopen(?:\s|>|=\{true\})/u.test(userPa
   throw new Error("我的 / 共享模板默认应保持折叠");
 }
 assertMatch(exportDefaultsPanelSource, /resolveBatchExportItems\(settings\.batchExport\.items,\s*templates\)/, "管理页应显示与高级导出一致的有效单据项");
-assertMatch(invoicePreviewModelSource, /resolveBatchExportItems\(readBatchExportItems\(settings\),\s*templates\)/, "发票高级导出应复用有效单据项模型");
+const disabledItems = [{ templatePath: templates[1].templatePath, name: "商业发票", reportType: "ExportDocument", isEnabled: false, showSeal: false }];
+const exportDraft = buildBatchExportConfigDraft({ batchExport: { items: disabledItems, outputFileNamePattern: "{InvoiceNo}", outputFolderPattern: "  ", mergePdf: false, zipAfterExport: false } }, templates);
+assertEqual(JSON.stringify(exportDraft.items), JSON.stringify(disabledItems), "发票高级导出须保留配置中的单据顺序与禁用状态");
+assertEqual(buildBatchExportConfigDraft({ batchExport: { ...exportDraft, items: [...disabledItems, { ...disabledItems[0], reportType: "PaymentVoucher" }], outputFileNamePattern: "", outputFolderPattern: "" } }, templates).items.length, 1, "发票导出不得混入付款凭证配置");
+assertEqual(exportDraft.mergePdf, false, "明确关闭合并时不能被默认值覆盖");
+assertEqual(exportDraft.zipAfterExport, false, "明确关闭压缩时不能被默认值覆盖");
+assertEqual(exportDraft.folderPattern, "{InvoiceNo}_Docs_{Date}", "空白导出目录格式使用正式默认值");
+assertEqual(buildBatchExportConfigDraft(undefined, templates).items.length, templates.length, "尚未加载设置时提供当前模板默认项");
+assertEqual(buildPackageTemplateViewsFromItems(templates, disabledItems)[0].withSealDefault, false, "打印选项保留明确的无章设置");
+const emailSettings = { email: { documentEmailSubjectTemplate: "单据 {InvoiceNo} / {Customer}", documentEmailBodyTemplate: "日期 {Date}" } };
+assertEqual(buildDocumentEmailSubject(emailSettings, "INV-1", "Acme", "20261107"), "单据 INV-1 / Acme", "邮件主题读取现行设置并替换业务字段");
+assertEqual(buildDocumentEmailBody(emailSettings, "INV-1", "Acme", "20261107"), "日期 20261107", "邮件正文读取现行设置并替换日期");
 if (/updateSettings\s*\(/u.test(invoicePackageWorkspaceSource)) {
   throw new Error("发票高级导出不得重新保存全局单据包设置");
 }

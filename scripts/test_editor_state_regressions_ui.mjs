@@ -41,7 +41,7 @@ const client={listProducts:async()=>page([get("products",1)]),listUnits:async()=
   deletePayee:(r,i)=>deferred("payees-delete",r,i),
   updateProduct:(r,i)=>deferred("products",r,i),createProduct:(r,i)=>deferred("products",r,i),
   listCustomOptions:async({optionType})=>({optionType,options:[]}),
-  getSettings:async()=>({settings:{system:{documentFieldLabels:{}},report:{}},secrets:{},storagePolicy:""}),
+  getSettings:async()=>({settings:{system:{defaultExportDirectory:'',documentFieldLabels:{}},report:{}},secrets:{},storagePolicy:""}),
   listReportTemplates:async()=>[],listPayeesPage:async()=>page([get("payees",1)]),
   getPayment:async({id})=>records.get("payment:"+id)??({...createEmptyPayment("2026-10-25"),id,voucherNo:"payment "+id,rowVersion:"native:1"}),
   updatePayment:(r,i)=>deferred("payment",r,i),createPayment:(r,i)=>deferred("payment",r,i),

@@ -29,6 +29,7 @@ const schemePath = path.join(repoRoot, "apps/export-doc-web/src/features/setting
 fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as product from ${JSON.stringify(productEditionPath)}; import * as permission from ${JSON.stringify(permissionAccessPath)}; import * as device from ${JSON.stringify(workspaceDevicePath)}; import * as scheme from ${JSON.stringify(schemePath)}; globalThis.__model = model; globalThis.__product = product; globalThis.__permission = permission; globalThis.__device = device; globalThis.__scheme = scheme;`, "utf8");
 fs.appendFileSync(entry, `import * as routeQuery from ${JSON.stringify(routeQueryPath)}; import * as permissionNavigation from ${JSON.stringify(permissionNavigationPath)}; globalThis.__routeQuery = routeQuery; globalThis.__permissionNavigation = permissionNavigation;`);
 fs.appendFileSync(entry, `import * as routeAccess from ${JSON.stringify(path.join(repoRoot, "apps/export-doc-web/src/app/routeAccess.ts").replaceAll("\\", "/"))}; globalThis.__routeAccess = routeAccess;`);
+fs.appendFileSync(entry, `import * as workspaceAccess from ${JSON.stringify(path.join(repoRoot, "apps/export-doc-web/src/app/workspaceAccess.ts").replaceAll("\\", "/"))}; globalThis.__workspaceAccess = workspaceAccess;`);
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
 await import(pathToFileURL(bundle).href);
@@ -206,12 +207,12 @@ assert(partialCrmGroups.flatMap((group) => group.items.flatMap((item) => item.ch
 assert(sendOnlyEmailRoutes.includes("/tools/email"), "email send capability exposes the email page");
 assert(deliveryOnlyEmailRoutes.includes("/tools/email"), "delivery-history capability exposes the email page");
 assert(!noEmailCapabilityRoutes.includes("/tools/email"), "legacy email module alone cannot expose the email page");
-assert(model.hasWorkspaceNavItemPermission(model.findWorkspaceNavItem("/tools/email"), [permissionGrant("common.email-delivery", "send")]), "direct email URL accepts send capability");
-assert(model.hasWorkspaceNavItemPermission(model.findWorkspaceNavItem("/tools/email"), [permissionGrant("common.email-delivery", "view-delivery")]), "direct email URL accepts delivery-history capability");
-assert(!model.hasWorkspaceNavItemPermission(model.findWorkspaceNavItem("/tools/email"), []), "direct email URL fails closed without a capability");
-assert(model.hasWorkspaceNavItemPermission(model.findWorkspaceNavItem("/crm/follow-ups"), [permissionGrant("sales.customers", "view")]), "customer directory needs its own view capability");
-assert(!model.hasWorkspaceNavItemPermission(model.findWorkspaceNavItem("/crm/follow-ups"), []), "customer route denies absent capabilities");
-assert(model.hasWorkspaceNavItemPermission(model.findWorkspaceNavItem("/crm/follow-ups"), [permissionGrant("sales.customers", "view"), permissionGrant("sales.follow-ups", "view")]), "direct URL accepts complete page capabilities");
+assert(globalThis.__workspaceAccess.hasWorkspaceItemPermission(model.findWorkspaceNavItem("/tools/email"), [permissionGrant("common.email-delivery", "send")]), "direct email URL accepts send capability");
+assert(globalThis.__workspaceAccess.hasWorkspaceItemPermission(model.findWorkspaceNavItem("/tools/email"), [permissionGrant("common.email-delivery", "view-delivery")]), "direct email URL accepts delivery-history capability");
+assert(!globalThis.__workspaceAccess.hasWorkspaceItemPermission(model.findWorkspaceNavItem("/tools/email"), []), "direct email URL fails closed without a capability");
+assert(globalThis.__workspaceAccess.hasWorkspaceItemPermission(model.findWorkspaceNavItem("/crm/follow-ups"), [permissionGrant("sales.customers", "view")]), "customer directory needs its own view capability");
+assert(!globalThis.__workspaceAccess.hasWorkspaceItemPermission(model.findWorkspaceNavItem("/crm/follow-ups"), []), "customer route denies absent capabilities");
+assert(globalThis.__workspaceAccess.hasWorkspaceItemPermission(model.findWorkspaceNavItem("/crm/follow-ups"), [permissionGrant("sales.customers", "view"), permissionGrant("sales.follow-ups", "view")]), "direct URL accepts complete page capabilities");
 assert((model.findWorkspaceNavItem("/payments/8")?.moduleKey ?? null) === "document.payments", "payment route module guard");
 assert((model.findWorkspaceNavItem("/crm/follow-ups")?.moduleKey ?? null) === "sales.crm", "sales route module guard");
 assert((model.findWorkspaceNavItem("/master-data/hs-knowledge/search")?.moduleKey ?? null) === "document.hs-knowledge", "HS knowledge uses its own route guard");

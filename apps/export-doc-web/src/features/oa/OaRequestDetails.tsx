@@ -8,6 +8,7 @@ import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { downloadBlob } from "../../ui/downloadBlob.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
+import { Button } from "../../ui/Button.tsx";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "../office/OfficeUi.tsx";
 import { useOaOperation } from "./useOaOperation.ts";
 import { OaApprovalDocument } from "./OaApprovalDocument.tsx";
@@ -36,16 +37,18 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
   const [action, setAction] = useState<OaActionName | number | null>(null);
   const editable = !row.materialAccess?.isPartial && ["Draft", "Returned"].includes(row.status) && oaAccess(user, row.kind, "edit", row);
   const api = oaApi(client, row.kind);
+  const actions = oaActions(row, user);
+  const primaryAction = actions.find(action => ["submit", "approve", "complete"].includes(action));
   return <article className="oa-detail">
     <header className="oa-detail-summary">
     <div className="office-card-heading"><h2>{row.title ?? `申请 #${row.id}`}</h2><span className="office-badge" data-state={row.status}>{oaStatus[row.status]}</span></div>
     <dl className="oa-facts"><div><dt>申请编号</dt><dd>#{row.id}</dd></div><div><dt>{row.kind === "personnel" ? "变动人员" : "申请人"}</dt><dd>{requestPersonLabel(row.employeeName, row)}</dd></div><div><dt>所属部门</dt><dd>{row.departmentId}</dd></div><div><dt>更新时间</dt><dd>{formatBusinessDateTime(row.updatedAt, user.businessTimeZone)}</dd></div></dl>
     {row.kind === "personnel" && row.status === "Completed" && <InlineNotice tone="success" title="人员变动已生效">最终审批已更新人员档案和关联账号。
       {canViewPersonnelDetails(user) && <Link to={`/office/people/${row.employeeId}`}>查看人员档案</Link>}</InlineNotice>}
-    {(editable || oaActions(row, user).length > 0) && <div className="office-card-actions">
+    {(editable || actions.length > 0) && <div className="office-card-actions">
       {editable && <button type="button" className="command-button secondary" disabled={operation.busy} onClick={onEdit}>编辑草稿</button>}
       {editable && <button type="button" className="command-button secondary" disabled={operation.busy} onClick={() => setPreviewing(true)}>预览审批流程</button>}
-      {oaActions(row, user).map((action) => <button type="button" className={`command-button${["cancel", "withdraw", "reject", "void"].includes(action) ? " secondary" : ""}`} key={action} disabled={operation.busy} onClick={() => setAction(action)}>{oaActionLabel(action, row.kind)}</button>)}
+      {actions.map((action) => <Button variant={action === primaryAction ? "primary" : "secondary"} key={action} disabled={operation.busy} onClick={() => setAction(action)}>{oaActionLabel(action, row.kind)}</Button>)}
     </div>}
     <PersonnelExecutionNotice client={client} user={user} row={row} />
     {row.status === "HandedOff" && <InlineNotice tone="success" title="财务交接已登记">此状态仅记录资料交接，不代表已记账或已付款；办理人、时间和说明见审批与办理记录。</InlineNotice>}

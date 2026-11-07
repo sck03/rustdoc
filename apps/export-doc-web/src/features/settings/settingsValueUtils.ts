@@ -47,13 +47,8 @@ export function normalizeCurrencyList(currencies: string[]) {
   return normalized;
 }
 
-export function readRecordValue(record: SettingsRecord, ...keys: string[]) {
-  for (const key of keys) if (Object.prototype.hasOwnProperty.call(record, key)) return record[key];
-  return undefined;
-}
-
-export function readRecordString(record: SettingsRecord, ...keys: string[]) {
-  const value = readRecordValue(record, ...keys);
+export function readRecordString(record: SettingsRecord, key: string) {
+  const value = record[key];
   return typeof value === "string" ? value.trim() : value == null ? "" : String(value).trim();
 }
 
@@ -61,5 +56,3 @@ export function readFiniteNumber(value: unknown, fallback: number) {
   const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : fallback;
 }
-
-export function toPascalCase(value: string) { return value ? `${value[0].toUpperCase()}${value.slice(1)}` : value; }

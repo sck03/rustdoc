@@ -79,14 +79,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .maintenance-section-nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .maintenance-technical-nav {
-    grid-column: 1 / -1;
-  }
-
   .single-window-tool-group,
 .single-window-section-tools {
     flex-basis: calc(50% - 8px);
@@ -129,11 +121,5 @@
   .report-template-preview-actions {
     grid-column: 1 / -1;
     justify-content: flex-end;
-  }
-
-
-
-  .single-window-board-grid {
-    grid-template-columns: 1fr;
   }
 }

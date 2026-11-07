@@ -9,12 +9,6 @@
   min-width: 128px;
 }
 
-.invoice-custom-fields-json textarea {
-  min-height: 132px;
-  font-family: var(--edm-font-mono);
-  line-height: inherit;
-}
-
 .invoice-special-terms-field textarea {
   min-height: 118px;
 }
@@ -275,16 +269,6 @@
 
 .communication-settings-grid .email-body-template-field textarea {
   min-height: 156px;
-}
-
-.communication-settings-grid .webdav-password-setting {
-  grid-column: 3;
-}
-
-.communication-settings-grid .webdav-enabled-setting {
-  grid-column: 4;
-  align-self: end;
-  min-height: 36px;
 }
 
 .settings-path-control {

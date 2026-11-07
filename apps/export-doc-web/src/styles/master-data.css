@@ -132,14 +132,6 @@
 }
 .hs-knowledge-surface input::placeholder,
 .hs-knowledge-surface textarea::placeholder { color: var(--edm-text-secondary); opacity: 1; }
-.hs-knowledge-readonly .knowledge-score button,
-.hs-knowledge-readonly .remote-candidate-review article > div:last-child button,
-.hs-knowledge-readonly .knowledge-table article > div:last-child button,
-.hs-knowledge-readonly .section-heading .command-button,
-.hs-knowledge-readonly .knowledge-editor,
-.hs-knowledge-readonly .knowledge-task-grid article:nth-of-type(2) .command-button {
-  display: none;
-}
 .hs-code-import-source-actions { display: flex; gap: 12px; margin-top: 20px; }
 .warning-note { margin-top: 12px; padding: 12px 12px; color: var(--edm-warning-900); background: var(--edm-warning-50); border: 1px solid var(--edm-warning-400); border-radius: var(--edm-radius-md); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
 .hs-code-preview { display: grid; gap: 12px; }

@@ -60,7 +60,6 @@
 .oa-attachments li { margin-block: calc(2 * 4px); overflow-wrap: anywhere; }
 .oa-hub h3 { margin: 0; }
 .oa-hub-eyebrow { margin: 0 0 8px; color: var(--edm-neutral-650); font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
-.oa-hub-tabs button,
 .oa-hub a.command-button,
 .oa-hub-all,
 .oa-hub-start-card .office-card-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }

@@ -45,21 +45,9 @@
 
   .exchange-rate-detail-grid,
 .update-center-detail-grid,
-.update-center-layout,
-.update-package-detail-grid,
-.mandatory-update-detail-grid,
 .email-status-detail-grid,
 .email-tool-layout {
     grid-template-columns: 1fr;
-  }
-
-  .startup-update-banner {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .startup-update-banner .command-button {
-    grid-column: 2;
-    justify-self: start;
   }
 
   .update-release-notes,
@@ -101,13 +89,11 @@
     max-width: none;
   }
 
-  .report-template-tools,
-.report-export-actions {
+  .report-template-tools {
     justify-content: flex-start;
   }
 
-  .report-template-tools .command-button,
-.report-export-actions .command-button {
+  .report-template-tools .command-button {
     flex: 1 1 140px;
     justify-content: center;
   }
@@ -132,10 +118,6 @@
   }
 
   .report-pdf-controls {
-    grid-template-columns: 1fr;
-  }
-
-  .document-package-rules-grid {
     grid-template-columns: 1fr;
   }
 
@@ -214,11 +196,6 @@
     width: 100%;
   }
 
-
-
-
-
-
   .section-header {
     align-items: stretch;
     flex-direction: column;
@@ -261,8 +238,7 @@
     max-width: none;
   }
 
-  .detail-grid,
-.single-window-client-folder-grid {
+  .detail-grid {
     grid-template-columns: 1fr;
   }
 
@@ -309,8 +285,7 @@
   }
 
   .customs-coo-summary-grid,
-.single-window-document-summary-grid,
-.handoff-result-grid {
+.single-window-document-summary-grid {
     grid-template-columns: 1fr;
   }
 
@@ -347,10 +322,6 @@
 
   .single-window-review-subheader .toolbar-actions {
     justify-content: flex-start;
-  }
-
-  .receipt-package-grid {
-    grid-template-columns: 1fr;
   }
 
   .detail-item-wide {

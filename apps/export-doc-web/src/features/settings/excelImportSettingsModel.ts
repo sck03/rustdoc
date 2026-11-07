@@ -3,8 +3,6 @@ import {
   readFiniteNumber,
   readNestedValue,
   readRecordString,
-  readRecordValue,
-  toPascalCase,
 } from "./settingsValueUtils.ts";
 
 type ExcelImportSettingsRecord = Record<string, unknown>;
@@ -87,7 +85,7 @@ export function normalizeExcelImportSettings(value: unknown) {
   const source = isRecord(value) ? value : {};
   const result: ExcelImportSettingsRecord = {};
   for (const [key, defaultValue] of Object.entries(defaultExcelImportSettings)) {
-    const sourceValue = readRecordValue(source, key, toPascalCase(key));
+    const sourceValue = source[key];
     result[key] = typeof defaultValue === "number"
       ? readFiniteNumber(sourceValue, defaultValue)
       : sourceValue == null ? defaultValue : String(sourceValue);
@@ -109,7 +107,7 @@ export function buildExcelSchemeOptions(schemes: ExcelImportSettingsRecord[]) {
 export function readExcelImportRecordNumber(record: ExcelImportSettingsRecord, key: string) {
   const defaultValue = defaultExcelImportSettings[key];
   return readFiniteNumber(
-    readRecordValue(record, key, toPascalCase(key)),
+    record[key],
     typeof defaultValue === "number" ? defaultValue : 0,
   );
 }

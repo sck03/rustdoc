@@ -13,23 +13,6 @@
   flex-wrap: wrap;
   gap: 8px 16px;
 }
-.identity-management-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 36px;
-  padding: 8px 16px;
-  color: var(--edm-neutral-650);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--edm-radius-sm);
-  cursor: pointer;
-}
-@media (hover: hover) and (pointer: fine) {
-.identity-management-tab:hover {
-  color: var(--edm-primary-775);
-}
-}
 .identity-management-security-note {
   display: inline-flex;
   align-items: center;
@@ -68,38 +51,6 @@
 
 .user-personnel-summary {
   grid-column: 1 / -1;
-}
-
-.compact-option-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 8px;
-}
-
-.compact-option-row {
-  display: grid;
-  gap: 4px;
-  padding: 8px 12px;
-  border: 1px solid var(--edm-neutral-300);
-  border-radius: var(--edm-radius-md);
-  background: var(--edm-white);
-  color: var(--edm-ink-700);
-  text-align: left;
-  cursor: pointer;
-}
-
-@media (hover: hover) and (pointer: fine) {
-
-.compact-option-row:hover:not(:disabled) {
-  border-color: var(--edm-primary-300);
-  background: var(--edm-primary-50);
-}
-}
-
-.compact-option-row span {
-  color: var(--edm-text-secondary);
-  font-size: var(--edm-font-size-xs);
-  line-height: var(--edm-line-height-xs);
 }
 
 .field-help {

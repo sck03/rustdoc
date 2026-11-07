@@ -16,6 +16,8 @@ await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, 
       await page.goto(url + '/' + route);
       await page.locator('.workspace-header h1').waitFor();
       await page.getByText('正在加载页面', { exact: true }).waitFor({ state: 'hidden' });
+      await page.waitForFunction(() => ![...document.querySelectorAll('.page-state[data-tone="loading"]')].some(node => node.getClientRects().length));
+      await page.locator('[aria-busy="true"], .oa-hub-count[aria-label="正在读取"]').first().waitFor({ state: 'hidden' });
       await page.evaluate(() => document.fonts.ready);
       const metrics = await page.evaluate(() => {
         const fields = [...document.querySelectorAll('[data-ui="filter-bar"] [data-ui="field"], [data-ui="field"][data-inline="true"], .office-toolbar [data-ui="field"]')];
@@ -41,7 +43,7 @@ await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, 
       if (metrics.searchBackground) assert.equal(metrics.searchBackground, 'rgba(0, 0, 0, 0)', 'Navigation search stays transparent');
       results.push({ width, route, ...metrics });
       console.log(`[layout] ${width} ${route}: ${metrics.fields} filter fields`);
-      if (route.includes('/query') || route === '#/dashboard' || route.includes('/jobs')) {
+      if (width === 1440 || route.includes('/query') || route === '#/dashboard' || route.includes('/jobs')) {
         await page.screenshot({ path: path.join(output, `${width}-${route.replace(/[^a-z0-9]/gi, '_')}.png`), fullPage: true });
       }
     }
@@ -58,12 +60,14 @@ await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, 
   assert(fonts.some(font => font.isCustomFont && font.familyName.includes('Noto Sans CJK SC') && font.glyphCount > 0), 'The title renders real bundled glyphs');
   await page.evaluate(() => document.fonts.load('400 14px "Noto Serif CJK SC"', '中文报表'));
   const manifest = JSON.parse(fs.readFileSync(path.join(repo, 'Resources/Fonts/OpenSource/font-manifest.json'), 'utf8'));
-  const assets = fs.readdirSync(path.join(repo, 'apps/export-doc-web/dist/assets')).filter(name => name.endsWith('.otf'));
-  assert.equal(assets.length, 3, 'The UI contains exactly the approved three font files');
+  const assets = fs.readdirSync(path.join(repo, 'apps/export-doc-web/dist/assets')).filter(name => name.endsWith('.woff2'));
+  assert.equal(assets.length, manifest.fonts.length, 'The UI contains every approved web font face');
+  const expectedHashes = new Set(manifest.fonts.map(font => font.web.sha256.toLowerCase()));
   for (const asset of assets) {
     const sha = createHash('sha256').update(fs.readFileSync(path.join(repo, 'apps/export-doc-web/dist/assets', asset))).digest('hex');
-    assert(manifest.fonts.some(font => font.sha256.toLowerCase() === sha), `Unmodified approved font: ${asset}`);
+    assert(expectedHashes.delete(sha), `Unique approved web font: ${asset}`);
   }
+  assert.equal(expectedHashes.size, 0, 'All approved web font hashes are present');
   await page.goto(url + '/#/crm/email-templates');
   await page.getByRole('button', { name: '新建模板', exact: true }).click();
   await page.getByLabel('模板名称', { exact: true }).fill('字体回归');

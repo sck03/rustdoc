@@ -449,13 +449,6 @@
   font-weight: var(--edm-font-weight-medium);
 }
 
-.container-packing-visual-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  min-width: 0;
-}
-
 .container-packing-projection-view {
   display: grid;
   gap: 8px;
@@ -585,12 +578,4 @@
   flex: 0 0 auto;
   border: 1px solid color-mix(in srgb, var(--edm-neutral-900) 35%, transparent);
   border-radius: var(--edm-radius-xs);
-}
-
-.container-packing-result-frame {
-  min-height: 170px;
-}
-
-.container-packing-result-table {
-  min-width: 1180px;
 }

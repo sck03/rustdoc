@@ -1,4 +1,5 @@
 import { KeyboardEvent, useEffect, useState } from "react";
+import { Button } from "../Button.tsx";
 
 export function Pagination({
   pageNumber,
@@ -74,31 +75,29 @@ export function Pagination({
           onChange={(event) => setGoToPageText(event.target.value.replace(/[^\d]/g, ""))}
           onKeyDown={handleGoToPageKeyDown}
         />
-        <button type="button" disabled={isBusy} onClick={submitGoToPage}>
+        <Button disabled={isBusy} onClick={submitGoToPage}>
           跳转
-        </button>
+        </Button>
       </label>
       <div className="pager-buttons">
-        <button type="button" disabled={isBusy || normalizedPageNumber <= 1} onClick={() => changePage(1)}>
+        <Button disabled={isBusy || normalizedPageNumber <= 1} onClick={() => changePage(1)}>
           首页
-        </button>
-        <button type="button" disabled={isBusy || normalizedPageNumber <= 1} onClick={() => changePage(normalizedPageNumber - 1)}>
+        </Button>
+        <Button disabled={isBusy || normalizedPageNumber <= 1} onClick={() => changePage(normalizedPageNumber - 1)}>
           上一页
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
           disabled={isBusy || normalizedPageNumber >= normalizedTotalPages}
           onClick={() => changePage(normalizedPageNumber + 1)}
         >
           下一页
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
           disabled={isBusy || normalizedPageNumber >= normalizedTotalPages}
           onClick={() => changePage(normalizedTotalPages)}
         >
           末页
-        </button>
+        </Button>
       </div>
     </footer>
   );

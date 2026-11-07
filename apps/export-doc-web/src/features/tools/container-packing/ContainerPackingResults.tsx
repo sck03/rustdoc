@@ -40,7 +40,7 @@ export function ContainerPackingResults({
           title="准备装柜方案"
           description="填写柜型与货物后分析，即可查看装柜图并导出现场作业单。"
           action={(
-            <button className="command-button" type="button" disabled={!canAnalyze || isAnalyzing} onClick={onAnalyze}>
+            <button className="command-button secondary" type="button" disabled={!canAnalyze || isAnalyzing} onClick={onAnalyze}>
               {isAnalyzing ? "正在分析…" : "立即生成效果图"}
             </button>
           )}

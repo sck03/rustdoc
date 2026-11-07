@@ -21,18 +21,6 @@
   overflow: visible;
 }
 
-.report-template-grid-preview {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.report-template-grid-source {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.report-template-grid-new {
-  grid-template-columns: minmax(0, 1fr);
-}
-
 .report-template-management-workspace,
 .report-template-editor,
 .report-template-new-designer,
@@ -48,24 +36,6 @@
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
-}
-
-.report-template-source-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  min-width: 0;
-  padding: 12px;
-  border-bottom: 1px solid var(--edm-neutral-250);
-  background: var(--edm-white);
-}
-
-.report-template-source-mode-note {
-  margin-right: auto;
-  color: var(--edm-text-secondary);
-  font-size: var(--edm-font-size-xs);
-  line-height: var(--edm-line-height-xs);
 }
 
 .report-template-preview-workspace {
@@ -320,19 +290,11 @@
   white-space: nowrap;
 }
 
-.report-template-management-header p,
-.report-template-management-current {
+.report-template-management-header p {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-xs);
   line-height: var(--edm-line-height-xs);
   font-weight: var(--edm-font-weight-medium);
-}
-
-.report-template-management-current {
-  max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .report-template-designer-toolbar {

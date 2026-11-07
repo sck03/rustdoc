@@ -32,8 +32,8 @@ const updaterEndpointModel = globalThis.__updaterEndpointModel;
 const masterDataModel = globalThis.__masterDataModel;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 
-const normalized = m.normalizeExcelImportSettings({ SchemeName: "Legacy", ItemsStartRow: "25", invoiceNoCell: null });
-assert(normalized.schemeName === "Legacy", "PascalCase scheme name");
+const normalized = m.normalizeExcelImportSettings({ schemeName: "Custom", itemsStartRow: "25", invoiceNoCell: null });
+assert(normalized.schemeName === "Custom", "current contract scheme name");
 assert(normalized.itemsStartRow === 25, "numeric string conversion");
 assert(normalized.invoiceNoCell === "O9", "null restores default");
 assert(m.createDefaultExcelImportSettings(" ").schemeName === "Default", "blank default scheme name");
@@ -41,14 +41,14 @@ assert(m.createDefaultExcelImportSettings(" Custom ").schemeName === "Custom", "
 
 const settings = { excelImportSchemes: [
   { schemeName: "A", itemsStartRow: 21 },
-  { SchemeName: "A", ItemsStartRow: 99 },
+  { schemeName: "A", itemsStartRow: 99 },
   { schemeName: "", itemsStartRow: 30 },
   { schemeName: "B", itemsStartRow: "31" },
 ] };
 const schemes = m.readExcelImportSchemesForSettings(settings);
 assert(schemes.length === 2 && schemes[0].itemsStartRow === 21 && schemes[1].itemsStartRow === 31, "scheme filtering and normalization");
 assert(JSON.stringify(m.buildExcelSchemeOptions(schemes)) === JSON.stringify([{ value: "A", label: "A" }, { value: "B", label: "B" }]), "scheme options");
-assert(m.readExcelImportRecordNumber({ ItemsStartRow: "42" }, "itemsStartRow") === 42, "record number PascalCase");
+assert(m.readExcelImportRecordNumber({ itemsStartRow: "42" }, "itemsStartRow") === 42, "record number current contract");
 assert(m.readExcelImportRecordNumber({}, "itemsStartRow") === 20, "record number default");
 assert(navigation.readSettingsCategoryFromSearch("?section=paymentReports") === "runtime", "obsolete payment report category is not retained");
 assert(navigation.readSettingsCategoryFromSearch("?section=documentOutput") === "runtime", "obsolete document output category is not retained");

@@ -462,7 +462,6 @@ h1 {
 
 .form-section,
 .table-frame,
-.loading-panel,
 .settings-command-strip,
 .settings-category-nav,
 .workspace-surface-card,
@@ -483,8 +482,6 @@ h1 {
   color: var(--edm-ink-800);
 }
 
-.page-jump-control button,
-.pager-buttons button,
 .master-data-tab,
 .settings-category-item {
   border-radius: var(--edm-radius-lg);

@@ -2,23 +2,12 @@
 .table-frame.summary-table-frame { min-height: 0; }
 .summary-table-frame .empty-cell { height: auto; padding: 24px 16px; }
 .dashboard-section-stack { display: grid; gap: 16px; min-width: 0; }
-.list-workspace-header { display: grid; gap: 16px; min-width: 0; margin-bottom: 16px; }
 .workspace-start-guide { margin: 12px 0; padding: 12px 16px; border: 1px solid var(--edm-line); border-radius: var(--edm-radius-sm); background: var(--edm-white); }
 .workspace-start-guide > summary { cursor: pointer; color: var(--edm-text-secondary); }
 .workspace-start-guide > summary strong { color: var(--edm-text); margin-right: 12px; }
 .workspace-start-guide > summary span { font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
 .workspace-start-guide[open] > summary { margin-bottom: 12px; }
-.list-workspace-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.list-workspace-heading > div { min-width: 0; }
-.list-workspace-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
-.list-workspace-title h2 { margin: 0; font-size: var(--edm-font-size-lg); line-height: var(--edm-line-height-lg); }
-.list-workspace-title span,
-.list-workspace-heading p { color: var(--edm-text-secondary); font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
-.list-workspace-heading p { margin: 8px 0 0; line-height: inherit; }
-.list-workspace-actions,
 .list-workspace-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
-.list-workspace-actions { justify-content: flex-end; }
-.list-workspace-query { padding: 12px; background: var(--edm-bg-muted); border: 1px solid var(--edm-line); border-radius: var(--edm-radius-sm); }
 .list-workspace-filters > input,
 .list-workspace-filters > select,
 .list-workspace-filters > label > select,
@@ -34,8 +23,6 @@
 .list-workspace-selection select { width: auto; max-width: 100%; }
 .list-workspace-selection .section-description { color: var(--edm-ink-600); }
 @media (max-width: 1180px) {
-  .list-workspace-heading { flex-direction: column; gap: 12px; }
-  .list-workspace-actions { justify-content: flex-start; }
   .list-workspace-filters > input,
 .list-workspace-filters > .search-form { flex-basis: 100%; min-width: 0; }
 }

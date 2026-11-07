@@ -1,9 +1,8 @@
 import type { ApiInvoiceDocumentPackagePreviewResponse, ApiReportTemplateDto, AppSettings, BatchExportItem } from "../../api/index.ts";
 import { fileNameFromPath, resolveBatchExportItems } from "../reports/reportExportDefaultsModel.ts";
+import { templatePathsMatch } from "../reports/reportTemplateSelectionModel.ts";
 
 export { fileNameFromPath };
-
-type SettingsLike = AppSettings | Record<string, unknown>;
 
 export type PackageTemplateView = { template: ApiReportTemplateDto; displayName: string; withSealDefault: boolean; initiallySelected: boolean };
 export type BatchExportItemSetting = BatchExportItem;
@@ -50,49 +49,29 @@ export function extractHtmlBody(html: string) {
 }
 
 export function buildBatchExportConfigDraft(
-  settings: SettingsLike | undefined,
+  settings: AppSettings | undefined,
   templates: ApiReportTemplateDto[],
 ): BatchExportConfigDraft {
-  const batchExport = readBatchExportRecord(settings);
-  const items = resolveBatchExportItems(readBatchExportItems(settings), templates);
+  const batchExport = settings?.batchExport;
+  const items = resolveBatchExportItems(batchExport?.items.filter(item => item.reportType === "ExportDocument") ?? [], templates);
 
   return {
-    fileNamePattern: readBatchExportPattern(batchExport, "outputFileNamePattern", "OutputFileNamePattern", DEFAULT_BATCH_EXPORT_FILE_NAME_PATTERN),
-    folderPattern: readBatchExportPattern(batchExport, "outputFolderPattern", "OutputFolderPattern", DEFAULT_BATCH_EXPORT_FOLDER_PATTERN),
-    mergePdf: readBatchExportBoolean(batchExport, "mergePdf", "MergePdf", true),
-    zipAfterExport: readBatchExportBoolean(batchExport, "zipAfterExport", "ZipAfterExport", true),
+    fileNamePattern: batchExport?.outputFileNamePattern.trim() ? batchExport.outputFileNamePattern : DEFAULT_BATCH_EXPORT_FILE_NAME_PATTERN,
+    folderPattern: batchExport?.outputFolderPattern.trim() ? batchExport.outputFolderPattern : DEFAULT_BATCH_EXPORT_FOLDER_PATTERN,
+    mergePdf: batchExport?.mergePdf ?? true,
+    zipAfterExport: batchExport?.zipAfterExport ?? true,
     items,
   };
 }
 
-export function readBatchExportPattern(
-  batchExport: Record<string, unknown> | null,
-  camelName: string,
-  pascalName: string,
-  fallback: string,
-) {
-  const value = batchExport ? readRecordValue(batchExport, camelName, pascalName) : undefined;
-  return typeof value === "string" && value.trim() ? value : fallback;
-}
-
-export function readBatchExportBoolean(
-  batchExport: Record<string, unknown> | null,
-  camelName: string,
-  pascalName: string,
-  fallback: boolean,
-) {
-  const value = batchExport ? readRecordValue(batchExport, camelName, pascalName) : undefined;
-  return typeof value === "boolean" ? value : fallback;
-}
-
 export function buildDocumentEmailSubject(
-  settings: SettingsLike | undefined,
+  settings: AppSettings | undefined,
   invoiceNo: string | undefined,
   customerName: string | undefined,
   dateText: string,
 ) {
   return applyDocumentEmailTemplate(
-    readEmailTemplate(settings, "documentEmailSubjectTemplate", "DocumentEmailSubjectTemplate") || DEFAULT_DOCUMENT_EMAIL_SUBJECT_TEMPLATE,
+    settings?.email.documentEmailSubjectTemplate.trim() ? settings.email.documentEmailSubjectTemplate : DEFAULT_DOCUMENT_EMAIL_SUBJECT_TEMPLATE,
     invoiceNo,
     customerName,
     dateText,
@@ -100,27 +79,17 @@ export function buildDocumentEmailSubject(
 }
 
 export function buildDocumentEmailBody(
-  settings: SettingsLike | undefined,
+  settings: AppSettings | undefined,
   invoiceNo: string | undefined,
   customerName: string | undefined,
   dateText: string,
 ) {
   return applyDocumentEmailTemplate(
-    readEmailTemplate(settings, "documentEmailBodyTemplate", "DocumentEmailBodyTemplate") || DEFAULT_DOCUMENT_EMAIL_BODY_TEMPLATE,
+    settings?.email.documentEmailBodyTemplate.trim() ? settings.email.documentEmailBodyTemplate : DEFAULT_DOCUMENT_EMAIL_BODY_TEMPLATE,
     invoiceNo,
     customerName,
     dateText,
   );
-}
-
-export function readEmailTemplate(settings: SettingsLike | undefined, ...names: string[]) {
-  const email = settings ? readRecordValue(settings, "email", "Email") : undefined;
-  if (!isRecord(email)) {
-    return "";
-  }
-
-  const value = readRecordValue(email, ...names);
-  return typeof value === "string" && value.trim() ? value : "";
 }
 
 export function applyDocumentEmailTemplate(
@@ -184,40 +153,6 @@ export function buildPackageTemplateViewsFromItems(
   return views;
 }
 
-export function readBatchExportItems(settings?: SettingsLike): BatchExportItemSetting[] {
-  const batchExport = readBatchExportRecord(settings);
-  if (!batchExport) {
-    return [];
-  }
-
-  const rawItems = readRecordValue(batchExport, "items", "Items");
-  if (!Array.isArray(rawItems)) {
-    return [];
-  }
-
-  const items: BatchExportItemSetting[] = [];
-  for (const rawItem of rawItems) {
-    if (!isRecord(rawItem)) {
-      continue;
-    }
-
-    const reportType = readString(rawItem, "reportType", "ReportType");
-    if (!isExportBatchReportType(reportType)) {
-      continue;
-    }
-
-    items.push({
-      name: readString(rawItem, "name", "Name"),
-      templatePath: readString(rawItem, "templatePath", "TemplatePath"),
-      isEnabled: readBoolean(rawItem, true, "isEnabled", "IsEnabled"),
-      showSeal: readBoolean(rawItem, true, "showSeal", "ShowSeal"),
-      reportType,
-    });
-  }
-
-  return items;
-}
-
 export function findTemplateForBatchExportItem(
   item: BatchExportItemSetting,
   templates: ApiReportTemplateDto[],
@@ -226,7 +161,7 @@ export function findTemplateForBatchExportItem(
   const pathMatch = templates.find(
     (template) =>
       !usedTemplatePaths.has(template.templatePath) &&
-      pathsReferToSameTemplate(item.templatePath, template.templatePath),
+      templatePathsMatch(item.templatePath, template.templatePath),
   );
   if (pathMatch) {
     return pathMatch;
@@ -244,29 +179,6 @@ export function findTemplateForBatchExportItem(
   );
 
   return fileNameMatches.length === 1 ? fileNameMatches[0] : undefined;
-}
-
-export function isExportBatchReportType(reportType: string) {
-  return reportType.trim().toLowerCase() === "exportdocument";
-}
-
-export function pathsReferToSameTemplate(left: string, right: string) {
-  const leftPath = normalizePathForMatch(left);
-  const rightPath = normalizePathForMatch(right);
-  if (!leftPath || !rightPath) {
-    return false;
-  }
-
-  return leftPath === rightPath || leftPath.endsWith(`/${rightPath}`) || rightPath.endsWith(`/${leftPath}`);
-}
-
-export function normalizePathForMatch(path: string) {
-  return path
-    .trim()
-    .replace(/^file:[/\\]*/i, "")
-    .replace(/\\/g, "/")
-    .replace(/\/+/g, "/")
-    .replace(/^\/+/, "");
 }
 
 export function buildDocumentPackageDefaultFileName(
@@ -328,34 +240,4 @@ export function formatDateForBatchExport(value: Date) {
 
 export function sanitizeFileNamePart(value: string) {
   return value.replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_").replace(/^_+|_+$/g, "");
-}
-
-export function readBatchExportRecord(settings?: SettingsLike) {
-  const batchExport = settings ? readRecordValue(settings, "batchExport", "BatchExport") : undefined;
-  return isRecord(batchExport) ? batchExport : null;
-}
-
-export function readRecordValue(record: SettingsLike, ...names: string[]) {
-  const source = record as unknown as Record<string, unknown>;
-  for (const name of names) {
-    if (Object.prototype.hasOwnProperty.call(source, name)) {
-      return source[name];
-    }
-  }
-
-  return undefined;
-}
-
-export function readString(record: Record<string, unknown>, ...names: string[]) {
-  const value = readRecordValue(record, ...names);
-  return typeof value === "string" ? value.trim() : "";
-}
-
-export function readBoolean(record: Record<string, unknown>, fallback: boolean, ...names: string[]) {
-  const value = readRecordValue(record, ...names);
-  return typeof value === "boolean" ? value : fallback;
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }

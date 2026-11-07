@@ -107,9 +107,9 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 字体准备复用 `lib/verified-download.mjs`：流式下载并核对 SHA-256，单文件最多 32 MiB、总时限 120 秒，支持取消和并行独立临时文件；坏摘要、超限、超时或取消均保留原字体并清理本次临时文件。`node scripts/test_verified_download.mjs` 验证这些边界，随脚本套件执行。
 
-生产 UI 与前端视觉/缩放夹具使用同一份已核验的 Noto Sans 常规/粗体文件，生产构建还发布项目内 Noto Serif 常规以供报表选择；不另外引入字体。`npm --prefix apps/export-doc-web run build` 通过 prebuild 自动准备并校验字体，首次克隆、桌面和 Docker 共用同一入口；Docker 构建前复制准备脚本、下载器与字体清单。单独首次运行视觉或缩放检查仍先执行 `node scripts/provision-report-fonts.mjs`。`test:font-build` 验证首次准备、缓存复用、坏摘要阻止编译和 Docker 输入契约；真实镜像构建仍须 Docker 环境。视觉检查固定 `zh-CN` 与 `Asia/Shanghai`，字体加载失败直接报错；夹具使用正式 route 样式入口，更新参考图检查布局和文字，不放宽像素阈值。
+生产 UI 与前端视觉/缩放夹具使用已核验的 Noto Sans 400/500/700 完整 WOFF2，生产构建还发布 Noto Serif 400 WOFF2 供衬线选择；PDF 使用对应受管 OTF，不另外引入字体。`npm --prefix apps/export-doc-web run build` 通过 prebuild 自动准备并校验字体，首次克隆、桌面和 Docker 共用同一入口；Docker 构建前复制准备脚本、下载器与字体清单。单独首次运行视觉或缩放检查仍先执行 `node scripts/provision-report-fonts.mjs`。`test:font-build` 验证首次准备、缓存复用、坏摘要阻止编译和 Docker 输入契约；真实镜像构建仍须 Docker 环境。视觉检查固定 `zh-CN` 与 `Asia/Shanghai`，字体加载失败直接报错；夹具使用正式 route 样式入口，更新参考图检查布局和文字，不放宽像素阈值。
 
-`npm --prefix apps/export-doc-web run test:filter-typography-ui` 要求先完成 React build 与 `office_review` locked 构建；复用隔离的真实 Rust HTTP/React 宿主，在 390/1024/1440 检查授权导航及流程分区的筛选同行、溢出、透明查找框和实际 Noto 字形，并验证三份发布字体摘要。输出写入 `artifacts/frontend-filter-typography-ui`；此回归不替代系统 IME/DPI 或全部业务编辑状态验收。
+`npm --prefix apps/export-doc-web run test:filter-typography-ui` 要求先完成 React build 与 `office_review` locked 构建；复用隔离的真实 Rust HTTP/React 宿主，在 390/1024/1440 检查授权导航及流程分区的筛选同行、溢出、透明查找框和实际 Noto 字形，并按 manifest 验证四份完整 WOFF2 的唯一摘要集合。等待主体和可见加载态结束后，为每个桌面路由保存截图。输出写入 `artifacts/frontend-filter-typography-ui`；此回归不替代系统 IME/DPI 或全部业务编辑状态验收。
 
 六份默认报表统一为 `.dtpl`。开发维护源为 `lib/default-report-designs.mjs`，通过 `node scripts/generate_default_dtpl_templates.mjs` 重建容器，再运行 `node scripts/test_report_designer_v3_contract.mjs` 校验设计器读写与尺寸保留。生成源和六份资产同时提交；旧 HTML 仅可作只读版式参考，不进入目录或发布包。
 

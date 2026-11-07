@@ -71,7 +71,7 @@ const read = async expression => (await evaluate(page, expression, true)).value;
 async function waitFor(expression) {
   const end = Date.now() + 20000;
   while (Date.now() < end) { if (await read(`Boolean(${expression})`)) return; await delay(50); }
-  throw new Error(`Timeout: ${expression}\n${await read("document.body.innerText.slice(-2500)")}`);
+  throw new Error(`Timeout: ${expression}\n${await read("JSON.stringify(window.__errors)")}\n${await read("document.body.innerText.slice(-2500)")}`);
 }
 async function settle() {
   await waitFor("window.__ready?.()");

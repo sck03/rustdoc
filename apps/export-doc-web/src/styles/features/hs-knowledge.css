@@ -1,6 +1,5 @@
 @layer route {
 /* HS knowledge and classification controls load with their domain. */
-.hs-knowledge-entry,
 .hs-knowledge-nav,
 .knowledge-intro,
 .section-heading,
@@ -11,17 +10,6 @@
   justify-content: space-between;
   gap: 16px;
 }
-
-.hs-knowledge-entry {
-  padding: 20px 20px;
-  margin-bottom: 20px;
-  background: var(--edm-bg-surface);
-  border: 1px solid var(--edm-line);
-  border-radius: var(--edm-radius-2xl);
-}
-
-.hs-knowledge-entry div { display: grid; gap: 4px; }
-.hs-knowledge-entry span,
 .muted-text { color: var(--edm-text-secondary); }
 .hs-knowledge-surface { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; }
 .page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
@@ -237,7 +225,6 @@
 
 @media (max-width: 1180px) {
   .page-heading,
-.hs-knowledge-entry,
 .knowledge-result,
 .knowledge-table article { align-items: stretch; flex-direction: column; }
   .knowledge-search-form,

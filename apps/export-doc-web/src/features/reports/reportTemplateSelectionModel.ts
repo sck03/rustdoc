@@ -1,3 +1,5 @@
+import type { AppSettings } from "../../api/index.ts";
+
 export type ReportTemplatePath = { templatePath: string };
 
 export function fileNameFromTemplatePath(path: string) {
@@ -47,31 +49,9 @@ export function resolveReportTemplatePath({
 }
 
 export function readDefaultReportTemplatePath(
-  settings: unknown,
+  settings: AppSettings | undefined,
   reportType: "ExportDocument" | "PaymentVoucher",
 ) {
-  if (!isRecord(settings)) return "";
-  const defaults = readRecordValue(settings, "reportTemplateDefaults", "ReportTemplateDefaults");
-  if (!isRecord(defaults)) return "";
-  return readString(
-    defaults,
-    reportType === "ExportDocument" ? "exportDocumentTemplatePath" : "paymentVoucherTemplatePath",
-    reportType === "ExportDocument" ? "ExportDocumentTemplatePath" : "PaymentVoucherTemplatePath",
-  );
-}
-
-function readRecordValue(record: Record<string, unknown>, ...names: string[]) {
-  for (const name of names) {
-    if (Object.prototype.hasOwnProperty.call(record, name)) return record[name];
-  }
-  return undefined;
-}
-
-function readString(record: Record<string, unknown>, ...names: string[]) {
-  const value = readRecordValue(record, ...names);
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  const defaults = settings?.reportTemplateDefaults;
+  return (reportType === "ExportDocument" ? defaults?.exportDocumentTemplatePath : defaults?.paymentVoucherTemplatePath)?.trim() ?? "";
 }

@@ -55,28 +55,6 @@
   margin-left: auto;
 }
 
-.invoice-section-nav-primary {
-  color: var(--edm-white);
-  background: var(--edm-primary-650);
-  border-color: var(--edm-primary-650);
-}
-
-@media (hover: hover) and (pointer: fine) {
-
-.invoice-section-nav-primary:hover:not(:disabled) {
-  color: var(--edm-white);
-  background: var(--edm-primary-750);
-  border-color: var(--edm-primary-750);
-}
-}
-
-.invoice-editor-section-anchor {
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-  scroll-margin-top: 76px;
-}
-
 .invoice-new-optional-section {
   min-width: 0;
   background: var(--edm-white);
@@ -268,8 +246,7 @@
   flex: 0 0 auto;
 }
 
-.report-template-tools,
-.report-export-actions {
+.report-template-tools {
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -299,15 +276,6 @@
 .report-template-tools .command-button {
   min-width: 108px;
   justify-content: center;
-}
-
-.report-export-actions {
-  justify-content: flex-start;
-  padding: 4px 0;
-}
-
-.report-export-actions .command-button {
-  min-width: 128px;
 }
 
 .report-export-advanced {
@@ -367,43 +335,6 @@
   min-width: 0;
   padding-top: 4px;
   border-top: 1px solid var(--edm-neutral-200);
-}
-
-.document-package-config {
-  min-width: 0;
-  border: 1px solid var(--edm-neutral-350);
-  border-radius: var(--edm-radius-md);
-  background: var(--edm-neutral-25);
-}
-
-.document-package-config summary {
-  min-height: 38px;
-  padding: 12px 12px;
-  color: var(--edm-neutral-700);
-  font-size: var(--edm-font-size-sm);
-  line-height: var(--edm-line-height-sm);
-  font-weight: var(--edm-font-weight-medium);
-  cursor: pointer;
-}
-
-.document-package-config-body {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-  padding: 0 12px 12px;
-}
-
-.document-package-rules-grid {
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(128px, auto) minmax(128px, auto);
-  gap: 12px;
-  align-items: end;
-  min-width: 0;
-}
-
-.document-package-config-frame {
-  min-height: 180px;
-  max-height: 320px;
 }
 
 .document-package-heading {

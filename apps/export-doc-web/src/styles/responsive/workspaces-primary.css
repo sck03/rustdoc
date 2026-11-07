@@ -2,14 +2,11 @@
 @media (min-width: 681px) and (max-width: 1180px) {
   .settings-category-panel .field-grid,
 .settings-category-panel .runtime-detail-grid,
-.settings-category-panel .communication-settings-grid,
-.settings-category-panel .maintenance-section-nav {
+.settings-category-panel .communication-settings-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .settings-category-panel .communication-settings-grid .email-body-template-field,
-.settings-category-panel .communication-settings-grid .webdav-password-setting,
-.settings-category-panel .communication-settings-grid .webdav-enabled-setting {
+  .settings-category-panel .communication-settings-grid .email-body-template-field {
     grid-column: auto;
     grid-row: auto;
   }
@@ -84,15 +81,10 @@
 }
 
 @media (max-width: 1180px) {
-  .identity-management-intro {
-    align-items: flex-start;
-    flex-direction: column;
-  }
 
   .toolbar,
 .editor-toolbar,
-.settings-command-strip,
-.pagination-bar {
+.settings-command-strip {
     align-items: stretch;
     flex-direction: column;
   }
@@ -292,15 +284,6 @@
     grid-template-columns: 1fr;
   }
 
-  .job-tool-link-panel {
-    grid-template-columns: 1fr;
-  }
-
-  .job-excel-analysis-meta,
-.job-excel-analysis-fields {
-    grid-template-columns: 1fr;
-  }
-
   .container-packing-project-panel {
     grid-template-columns: 1fr;
   }
@@ -357,19 +340,7 @@
     max-height: 360px;
   }
 
-  .container-packing-visual-grid {
-    grid-template-columns: 1fr;
-  }
-
   .report-zip-options {
-    grid-template-columns: 1fr;
-  }
-
-  .job-excel-preview {
-    grid-template-columns: 1fr;
-  }
-
-  .job-excel-conflict-actions {
     grid-template-columns: 1fr;
   }
 
@@ -385,12 +356,7 @@
     grid-column: auto;
   }
 
-  .hs-code-tool-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .hs-code-import-actions .command-button,
-.hs-code-remote-form .command-button {
+  .hs-code-remote-form .command-button {
     justify-content: center;
     width: 100%;
   }
@@ -404,9 +370,7 @@
     grid-column: auto;
   }
 
-  .communication-settings-grid .email-body-template-field,
-.communication-settings-grid .webdav-password-setting,
-.communication-settings-grid .webdav-enabled-setting {
+  .communication-settings-grid .email-body-template-field {
     grid-column: auto;
     grid-row: auto;
   }
@@ -421,10 +385,6 @@
 
   .invoice-maintenance-danger-zone > .command-button {
     justify-self: stretch;
-  }
-
-  .maintenance-section-nav {
-    grid-template-columns: 1fr;
   }
 
   .exchange-currency-manager {

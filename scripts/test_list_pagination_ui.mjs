@@ -19,6 +19,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { createRoot } from 'react-dom/client';
   import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
   import { MemoryRouter } from 'react-router-dom';
+  import ${source('styles/index.css')};
   import { PermissionAccessProvider } from ${source('app/PermissionAccessContext.tsx')};
   import { ConfirmationProvider } from ${source('ui/ConfirmationProvider.tsx')};
   import { InvoiceListPage } from ${source('features/invoices/InvoiceListPage.tsx')};
@@ -36,7 +37,6 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { useReportTemplateWorkspaceQueries } from ${source('features/reports/useReportTemplateWorkspaceQueries.ts')};
   import { Pagination } from ${source('ui/primitives/Pagination.tsx')};
   import { getMasterDataConfig } from ${source('features/master-data/masterDataConfigs.ts')};
-   import ${source('styles/index.css')};
   import ${source('styles/workspaces.css')}; import ${source('styles/responsive.css')};
   const mode = new URLSearchParams(location.search).get('mode');
   window.__requests = []; window.__totalPages = 3; window.__fail = false;
@@ -65,7 +65,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
     listAnnouncements: list, listNotifications: list, getNotificationUnreadCount: async () => ({ unreadCount: 0 }),
     queryReportTemplateV3ImageResources: list, listUserReportTemplates: list, listReportTemplates: async () => [],
     listCustomersPage: mode === 'master' ? list : async () => ({ items: [] }),
-    getSettings: async () => ({ settings: {} }) };
+    getSettings: async () => ({ settings: { system: { defaultExportDirectory: '' } } }) };
   function Templates() {
     const { userTemplateDirectory: d, userTemplatesQuery: q } = useReportTemplateWorkspaceQueries({ client, reportType: 'ExportDocument', enabled: true,
       includeDesignerData: false, includeArchived: false, canPreviewInvoiceSource: false, canPreviewPaymentSource: false, selectedUserTemplateId: 0, selectedTemplatePath: '' });
@@ -123,6 +123,25 @@ try {
     };
     try {
       await waitPage(1);
+      if (mode !== 'resources') {
+        for (const [width, density, height] of [[1280, 'comfortable', 40], [1280, 'compact', 34], [390, 'comfortable', 44]]) {
+          await page.setViewportSize({ width, height: 900 });
+          await page.evaluate(value => document.documentElement.dataset.interfaceDensity = value, density);
+          const layout = await pager.evaluate(element => {
+            const controls = [...element.querySelectorAll('button, input, select')];
+            const jump = [...element.querySelector('.page-jump-control').children].map(child => child.getBoundingClientRect());
+            return {
+              heights: controls.map(control => ({ tag: control.tagName, height: control.getBoundingClientRect().height })),
+              jumpCenters: jump.map(rect => rect.y + rect.height / 2),
+              overflow: element.scrollWidth > element.clientWidth + 1,
+            };
+          });
+          assert(layout.heights.every(value => value.height >= (value.tag === 'BUTTON' ? height : Math.min(height, 40))), mode + ': shared control density ' + JSON.stringify({ width, density, layout }));
+          assert(Math.max(...layout.jumpCenters) - Math.min(...layout.jumpCenters) < 1, mode + ': jump controls remain aligned without loading dashboard');
+          assert.equal(layout.overflow, false, mode + ': pagination fits the viewport');
+        }
+        await page.setViewportSize({ width: 1280, height: 900 });
+      }
       await pager.getByRole('button', { name: '下一页', exact: true }).click();
       await waitPage(2);
       await pager.getByRole('button', { name: mode === 'resources' ? '下一页' : '末页', exact: true }).click();
@@ -155,7 +174,7 @@ try {
   }
   fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify(results, null, 2));
   assert(results.every(result => result.passed), JSON.stringify(results, null, 2));
-  console.log(`List pagination: ${results.length} React lists passed delayed navigation, failed refresh/retry, server page correction, fresh-cache recovery and offline resume.`);
+  console.log(`List pagination: ${results.length} React lists passed shared layout/density, delayed navigation, failed refresh/retry, server page correction, fresh-cache recovery and offline resume.`);
 } finally {
   await context?.close();
   await new Promise(resolve => server.close(resolve));

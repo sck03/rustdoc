@@ -8,6 +8,7 @@
 @import "./tokens/motion.css" layer(tokens);
 @import "./tokens/density.css" layer(tokens);
 @import "./primitives/controls.css" layer(primitives);
+@import "./primitives/pagination.css" layer(primitives);
 @import "./primitives/tabs.css" layer(primitives);
 @import "./primitives/patterns.css" layer(primitives);
 @import "./primitives/dialog.css" layer(primitives);

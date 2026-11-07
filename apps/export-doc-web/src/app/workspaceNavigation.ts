@@ -1,8 +1,8 @@
 import { LayoutDashboard } from "lucide-react";
-import { hasWorkspaceItemAccess, hasWorkspaceItemPermission } from "./workspaceAccess.ts";
+import { hasWorkspaceItemAccess } from "./workspaceAccess.ts";
 import {
   workspaceNavGroups, type WorkspaceCapabilities, type WorkspaceContext,
-  type WorkspaceNavGroupConfig, type WorkspaceNavItem, type WorkspacePermissionGrant,
+  type WorkspaceNavGroupConfig, type WorkspaceNavItem,
 } from "./workspaceNavigationCatalog.ts";
 export {
   workspaceNavGroups, isDashboardRoute, isLicenseRoute, isAuditLogRoute, isAccessControlRoute,
@@ -56,10 +56,6 @@ export function findWorkspaceNavItem(pathname: string) {
   const routes = getWorkspaceRouteItems();
   return routes.flatMap(item => item.searchItems ?? []).find(item => !item.to.includes("?") && item.isActive(pathname))
     ?? routes.find((item) => item.isActive(pathname));
-}
-
-export function hasWorkspaceNavItemPermission(item: WorkspaceNavItem, permissions: WorkspacePermissionGrant[] | undefined) {
-  return hasWorkspaceItemPermission(item, permissions);
 }
 
 export function findActiveWorkspaceNavGroupKey(pathname: string, groups: WorkspaceNavGroupConfig[] = workspaceNavGroups) {

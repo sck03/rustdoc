@@ -1,8 +1,3 @@
-.form-header {
-  justify-content: space-between;
-  gap: 12px;
-}
-
 label {
   display: grid;
   gap: 8px;

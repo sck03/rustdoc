@@ -7,8 +7,6 @@
   transform: translateY(0) scale(0.98);
 }
 
-.page-jump-control button,
-.pager-buttons button,
 .master-data-tab {
   color: var(--edm-ink-800);
   background: color-mix(in srgb, var(--edm-white) 90%, transparent);
@@ -17,8 +15,6 @@
 
 @media (hover: hover) and (pointer: fine) {
 
-.page-jump-control button:hover:not(:disabled),
-.pager-buttons button:hover:not(:disabled),
 .master-data-tab:hover {
   color: var(--edm-primary-700);
   background: var(--edm-primary-50);
@@ -29,8 +25,6 @@
 .search-form,
 .path-field-control input,
 .path-field-control textarea,
-.page-size-control select,
-.page-jump-control input,
 .settings-check,
 .toggle-field,
 .inline-check {
@@ -187,14 +181,6 @@ tbody tr:hover {
   white-space: nowrap;
 }
 
-.pagination-bar {
-  min-height: 52px;
-  padding: 8px 12px;
-  background: color-mix(in srgb, var(--edm-white) 82%, transparent);
-  border: 1px solid var(--edm-line);
-  border-radius: var(--edm-radius-md);
-}
-
 .detail-item {
   min-height: 62px;
   padding: 12px 12px;
@@ -246,13 +232,6 @@ tbody tr:hover {
   background: var(--edm-primary-600);
   border-color: var(--edm-primary-700);
 }
-}
-
-.loading-panel {
-  display: grid;
-  place-items: center;
-  color: var(--edm-text-secondary);
-  background: color-mix(in srgb, var(--edm-white) 84%, transparent);
 }
 
 @media (max-width: 1180px) {

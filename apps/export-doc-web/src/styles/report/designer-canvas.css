@@ -142,12 +142,6 @@
   min-width: 0;
 }
 
-.new-report-detail-column-list {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
 .new-report-detail-column-card {
   display: grid;
   gap: 8px;

@@ -336,13 +336,6 @@
   resize: vertical;
 }
 
-.coo-item-editor-table {
-  min-width: 3420px;
-  table-layout: fixed;
-}
-
-.coo-item-editor-table th,
-.coo-item-editor-table td,
 .coo-nonparty-table th,
 .coo-nonparty-table td,
 .coo-attachment-table th,
@@ -351,42 +344,15 @@
   padding: 4px 8px;
 }
 
-.coo-item-editor-table th:first-child,
-.coo-item-editor-table td:first-child {
-  width: 118px;
-  text-align: center;
-}
-
 .coo-nonparty-table th:first-child,
 .coo-nonparty-table td:first-child {
   width: 58px;
   text-align: center;
 }
 
-.coo-item-editor-table th:nth-child(2),
-.coo-item-editor-table td:nth-child(2),
 .coo-nonparty-table th:nth-child(2),
 .coo-nonparty-table td:nth-child(2) {
   width: 78px;
-}
-
-.coo-item-editor-table th:nth-child(5),
-.coo-item-editor-table td:nth-child(5),
-.coo-item-editor-table th:nth-child(6),
-.coo-item-editor-table td:nth-child(6),
-.coo-item-editor-table th:nth-child(21),
-.coo-item-editor-table td:nth-child(21),
-.coo-item-editor-table th:nth-child(22),
-.coo-item-editor-table td:nth-child(22),
-.coo-item-editor-table th:nth-child(24),
-.coo-item-editor-table td:nth-child(24),
-.coo-item-editor-table th:nth-child(27),
-.coo-item-editor-table td:nth-child(27),
-.coo-item-editor-table th:nth-child(28),
-.coo-item-editor-table td:nth-child(28),
-.coo-item-editor-table th:nth-child(29),
-.coo-item-editor-table td:nth-child(29) {
-  width: 170px;
 }
 
 .coo-nonparty-table {
@@ -440,11 +406,6 @@
 .coo-attachment-delay-cell input {
   width: 18px;
   height: 18px;
-}
-
-.coo-review-table,
-.agent-consignment-review-table {
-  min-width: 940px;
 }
 
 .single-window-export-review-panel {
@@ -516,58 +477,4 @@
 .single-window-export-review-issue-table th:first-child,
 .single-window-export-review-issue-table td:first-child {
   width: 76px;
-}
-
-.handoff-profile-actions {
-  justify-content: flex-end;
-}
-
-.single-window-client-folder-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
-  gap: 12px;
-  min-width: 0;
-}
-
-.handoff-result-grid {
-  margin-top: 4px;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
-}
-
-.handoff-receipt-files table {
-  min-width: 860px;
-}
-
-.receipt-package-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  min-width: 0;
-}
-
-.receipt-package-panel {
-  display: grid;
-  align-content: start;
-  gap: 16px;
-  min-width: 0;
-}
-
-.receipt-package-panel h3 {
-  margin: 0;
-  color: var(--edm-neutral-800);
-  font-size: var(--edm-font-size-md);
-  line-height: var(--edm-line-height-md);
-}
-
-.receipt-package-keep {
-  align-self: end;
-}
-
-.receipt-package-result-table table {
-  min-width: 1080px;
-}
-@media (max-width: 680px) {
-  .coo-review-page button, .coo-review-workspace button, .coo-review-panel button {
-    min-height: var(--edm-touch-target);
-  }
 }
