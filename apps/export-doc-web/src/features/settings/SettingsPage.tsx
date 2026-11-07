@@ -3,7 +3,6 @@ import { lazy, Suspense, useEffect } from "react";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import "../../styles/settings-center.css";
 import { ListChecks, RefreshCw, RotateCcw, Save } from "lucide-react";
-import { Navigate, useLocation } from "react-router-dom";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
@@ -12,7 +11,6 @@ import { SettingsCategoryNav, SettingsValidationPanel } from "./SettingsPagePane
 import { settingsCategoryForPath, changedSettingCounts } from "./settingsDraftModel.ts";
 import { systemDefaultPatches } from "./settingsDefaults.ts";
 import { readSettingsCategoryFromSearch, readSettingsPanelLabelFromSearch } from "./settingsNavigationModel.ts";
-import { settingsOperationDestination } from "./systemOperationNavigation.ts";
 import { useSettingsWorkspace } from "./useSettingsWorkspace.ts";
 
 const LazyRuntimeDatabaseSettingsPanel = lazy(() => import("./RuntimeDatabaseSettingsPanel.tsx"));
@@ -46,12 +44,7 @@ function SettingsPanelDeepLink({ label }: { label: string | null }) {
 }
 
 
-export function SettingsPage(props: Parameters<typeof useSettingsWorkspace>[0]) {
-  const location = useLocation();
-  const destination = settingsOperationDestination(location.search);
-  return destination ? <Navigate to={destination} replace /> : <SettingsEditor {...props} />;
-}
-function SettingsEditor({
+export function SettingsPage({
   client,
   canManageSettings,
   canManageUsers,

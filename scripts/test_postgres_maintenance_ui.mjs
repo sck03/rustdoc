@@ -119,7 +119,7 @@ async function login(first = false) {
   await page.locator('.login-submit-button').waitFor({ state: 'hidden' });
   access = (await (await operation('Login', { body: { username: 'admin', password } })).json()).accessToken;
   assert(access);
-  await page.goto(origin + '/#/settings?section=postgresql');
+  await page.goto(origin + '/#/system/backup?section=recovery');
   await page.getByRole('heading', { name: '数据库备份与外部文件恢复', exact: true }).waitFor();
 }
 async function createUnit(name) {
@@ -160,13 +160,14 @@ try {
   page.setDefaultTimeout(30000);
   await login(true);
   // Exercise the new plan through the real React client and PostgreSQL service.
-  await page.getByRole('button', { name: '日常灾备', exact: true }).click();
+  const sections = page.getByRole('tablist', { name: '备份与恢复分类' });
+  await sections.getByRole('tab', { name: '备份计划', exact: true }).click();
   const schedule = page.locator('[aria-label="日常灾备"]');
   await schedule.getByLabel('启用日常灾备', { exact: true }).waitFor();
   assert.equal(await schedule.getByLabel('启用日常灾备', { exact: true }).isChecked(), false);
   await schedule.getByLabel('备份包密码', { exact: true }).fill('Scheduled-password-2026');
   await schedule.getByLabel('再次输入新密码', { exact: true }).fill('Scheduled-password-2026');
-  await page.getByRole('button', { name: '保存灾备设置', exact: true }).click();
+  await page.getByRole('button', { name: '保存计划', exact: true }).click();
   await page.getByText('灾备设置已保存。', { exact: true }).waitFor();
   const started = page.waitForResponse(response => response.url().endsWith('/api/disaster-recovery/plan/run') && response.request().method() === 'POST');
   await schedule.getByRole('button', { name: '立即备份一次' }).click();
@@ -187,6 +188,7 @@ try {
   assert(Buffer.from(await archiveDownload.arrayBuffer()).subarray(0, 22).toString().startsWith('EDM-SERVER-MIGRATION-2'));
   await createUnit('After scheduled archive');
   await page.getByRole('button', { name: '重新加载灾备设置', exact: true }).click();
+  await sections.getByRole('tab', { name: '备份文件', exact: true }).click();
   await page.locator('[aria-label="完整备份列表"]').getByRole('button', { name: '用于恢复' }).first().click();
   const archiveRestore = page.locator('[aria-label="从本地完整备份恢复"]');
   await archiveRestore.getByLabel('所选备份的密码').fill('Scheduled-password-2026');
@@ -226,7 +228,7 @@ try {
   const originalTemplate = fs.readFileSync(path.join(repo, 'Templates/Export/invoice_template.dtpl'));
   fs.writeFileSync(template, originalTemplate);
   const migration = page.locator('.maintenance-full-migration-panel');
-  await page.getByRole('button', { name: '整机迁移', exact: true }).click();
+  await sections.getByRole('tab', { name: '整机迁移', exact: true }).click();
   await migration.getByLabel('管理员当前密码').fill(password);
   await migration.getByLabel('新迁移包密码', { exact: true }).fill('Migration-password-2026');
   await migration.getByLabel('再次输入密码', { exact: true }).fill('Migration-password-2026');

@@ -26,6 +26,7 @@ tokio-util = { version = "=0.7.20", features = ["io"] }
 hyper = { workspace = true, features = ["server", "http1"] }
 hyper-util = { workspace = true, features = ["tokio", "service"] }
 tower-http = { version = "=0.7.1", features = ["fs", "cors"] }
+tower = { version = "=0.5.3", default-features = false }
 serde_json.workspace = true
 chrono.workspace = true
 subtle = "=2.6.1"

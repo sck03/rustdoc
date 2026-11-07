@@ -160,6 +160,7 @@ fn desktop_router(
         .allow_methods(AllowMethods::mirror_request())
         .allow_headers(AllowHeaders::mirror_request())
         .allow_credentials(true)
+        .max_age(Duration::from_secs(600))
         .expose_headers([header::CONTENT_DISPOSITION]);
     let authority = authority.to_owned();
     let (router, control) = crate::compose_router(service, None, Some(Arc::from(token)));

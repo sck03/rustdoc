@@ -1,5 +1,4 @@
-import { settingsCategories } from "./settingsCategoryCatalog.ts";
-import { settingsOperationDestination } from "./systemOperationNavigation.ts";
+import { allSettingsCategories } from "./settingsCategoryCatalog.ts";
 
 const sections = [
   ["runtime", "system", "常规与目录", "运行参数 数据目录"],
@@ -10,10 +9,10 @@ const sections = [
   ["excel-import", "excelImport", "Excel 导入方案", "出口商 映射"],
   ["exchange-rate", "exchangeRate", "汇率与币制", "币种 汇率"],
   ["communication", "email", "邮件设置", "SMTP 发件人 收件人规则"],
-  ["backup", "backupPolicy", "日常灾备", "自动备份 定时 全量 保留"],
-  ["backup", "backupReplica", "异机副本", "WebDAV S3 NAS MinIO 网盘 远程备份"],
-  ["backup", "backupRecovery", "恢复与校验", "数据库 还原 PostgreSQL SQLite"],
-  ["backup", "backupMigration", "整机迁移", "完整迁移 换机"],
+  ["backup", "plan", "日常灾备", "自动备份 定时 全量 保留"],
+  ["backup", "replica", "异机副本", "WebDAV S3 NAS MinIO 网盘 远程备份"],
+  ["backup", "recovery", "恢复与校验", "数据库 还原 PostgreSQL SQLite"],
+  ["backup", "migration", "整机迁移", "完整迁移 换机"],
   ["ai", "ai", "AI 服务", "模型 API Key 提示词"],
   ["maintenance", "logs", "日志管理", "审计留存 运行日志 清理"],
   ["maintenance", "diagnostics", "运行诊断", "依赖 浏览器"],
@@ -23,8 +22,9 @@ const sections = [
 ] as const;
 
 export const settingsFeatureLinks = sections.map(([categoryKey, section, label, keywords]) => {
-  const category = settingsCategories.find((item) => item.key === categoryKey);
-  const to = settingsOperationDestination(`?section=${section}`) ?? `/settings?section=${section}`;
+  const category = allSettingsCategories.find((item) => item.key === categoryKey);
+  const pathname = categoryKey === "backup" || categoryKey === "maintenance" ? `/system/${categoryKey}` : "/settings";
+  const to = `${pathname}?section=${section}`;
   return {
     label, keywords, to, search: to.split("?")[1] ?? "",
     description: `${category?.label ?? label} / ${label}`,

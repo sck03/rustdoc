@@ -149,7 +149,7 @@ function PersonnelClearancePanel({ client, user, record }: { client: ExportDocMa
     </InlineNotice>
     {(data.businessDataCount ?? 0) > 0 && <InlineNotice tone="warning" title="业务资料待交接">
       发票 {data.invoiceCount ?? 0} 条、付款报销 {data.paymentCount ?? 0} 条、其他业务资料 {data.otherBusinessDataCount ?? 0} 条。
-      {user.capabilities.canManageUsers && <> <Link to="/settings?section=ownership">前往维护设置改派业务归属</Link></>}
+      {user.capabilities.canManageUsers && <> <Link to="/system/maintenance?section=ownership">改派业务归属</Link></>}
     </InlineNotice>}
     {data.items.length > 0 && <ul>{data.items.map((item) => {
       const kind = item.kind === "rooms" ? "rooms" : "supplies";

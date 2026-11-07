@@ -70,7 +70,7 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
   results.push("settings-cross-category-save-and-independent-backup-maintenance");
   await clickText(page, "发票清理", '[aria-label="系统维护分类"] button');
   await waitFor(page, "window.__route.includes('section=invoice-cleanup') && document.querySelector('[aria-label=发票数据清理]')");
-  await start("&section=invoice-cleanup");
+  await start("&path=/system/maintenance&section=invoice-cleanup");
   await waitFor(page, "document.querySelector('[aria-label=发票数据清理]')");
   await audit(page, "settings-maintenance-route-and-deep-link");
 
@@ -106,13 +106,13 @@ export async function runSettingsWorkspaceCases({ open, currentPage, read, click
   await reveal("服务器恢复与升级步骤");
   await audit(page, "settings-postgresql-backup-and-scoped-defaults");
   for (const width of [390, 320]) {
-    await start("&section=postgresql&provider=PostgreSQL", width);
+    await start("&path=/system/backup&section=recovery&provider=PostgreSQL", width);
     await waitFor(page, "document.querySelector('.maintenance-full-migration-panel')");
     for (const title of ["恢复数据库（回到某份备份）", "从外部完整包恢复", "服务器恢复与升级步骤"]) await reveal(title);
     await audit(page, "settings-postgresql-maintenance-" + width);
   }
 
-  await start("&section=backupPolicy&provider=PostgreSQL", 390);
+  await start("&path=/system/backup&section=plan&provider=PostgreSQL", 390);
   await waitFor(page, "document.querySelector('[aria-label=日常灾备] input')");
   await click(page, '[aria-label="日常灾备"] input[type=checkbox]');
   await textField("备份包密码", "backup-password-2026");

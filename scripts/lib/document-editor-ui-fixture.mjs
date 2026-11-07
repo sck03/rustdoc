@@ -116,7 +116,7 @@ function ExportDefaultsFixture(){
 const grants=['document.invoices','document.payments','document.master-data','document.reports','document.excel'].map(moduleKey=>({moduleKey,accessLevel:readonly?'view':'manage'}));
 const permissions=Object.values(permissionResources).flatMap(resourceKey=>Object.values(permissionActions).map(action=>({resourceKey,action,dataScope:'all'})));
 permissions.push(...grants.flatMap(({moduleKey})=>(readonly?['view']:['view','operate','manage']).map(action=>({resourceKey:moduleKey,action,dataScope:'all'}))));
-const entry=mode==='payment'?'/payments/9':mode==='payment-new'?'/payments/new':mode==='settings'?'/settings?'+new URLSearchParams({section:params.get('section')||'documentDefaults',group:params.get('group')||'invoice'}):mode==='export-defaults'?'/export-defaults':mode==='edit'?'/invoices/7':'/invoices/new';
+const entry=mode==='payment'?'/payments/9':mode==='payment-new'?'/payments/new':mode==='settings'?(params.get('path')||'/settings')+'?'+new URLSearchParams({section:params.get('section')||'documentDefaults',group:params.get('group')||'invoice'}):mode==='export-defaults'?'/export-defaults':mode==='edit'?'/invoices/7':'/invoices/new';
 const settingsProps={client,canManageSettings:!readonly,canManageUsers:!readonly&&!params.has('desktop'),canUseDocumentWorkspace:params.get('edition')!=='Sales',isDesktopRuntime:params.has('desktop'),productName:'单据工作台'};
 createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[entry]}><QueryClientProvider client={queries}>
   <PermissionAccessProvider grants={grants} permissions={permissions} subject={{id:1,companyScope:'DEMO',departmentId:'OFFICE'}} canManageSettings={!readonly}><ConfirmationProvider><UnsavedChangesProvider>

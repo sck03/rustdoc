@@ -10,6 +10,7 @@ use std::{
     time::Duration,
 };
 use tokio::sync::Notify;
+use tower::Layer;
 
 #[derive(Default)]
 struct Inner {
@@ -132,7 +133,9 @@ pub async fn serve(
                     },
                     Err(cause) => { shutdown.stop(); break Err(cause); }
                 };
-                let route = router.clone().layer(axum::Extension(axum::extract::ConnectInfo(peer)));
+                // Wrap the shared router once per connection instead of cloning
+                // and layering every endpoint in its routing table.
+                let route = axum::Extension(axum::extract::ConnectInfo(peer)).layer(router.clone());
                 let control = shutdown.clone();
                 connections.spawn(async move {
                     let mut builder = hyper::server::conn::http1::Builder::new();

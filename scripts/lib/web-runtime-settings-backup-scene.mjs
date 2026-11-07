@@ -186,7 +186,7 @@ export function createSettingsBackupSmokeScene(runtime) {
       "Timed out waiting for the document email default settings.",
     );
 
-    const backupUrl = buildSettingsSectionUrl(options.webUrl, "backup", "smokeBackupSettings");
+    const backupUrl = buildSettingsSectionUrl(options.webUrl, "recovery", "smokeBackupSettings", "/system/backup");
     await page.send("Page.navigate", { url: backupUrl });
     await waitForPageExpression(page, `Boolean(document.querySelector('[aria-label="数据备份与还原"] details'))`, timeoutMs, "Backup tools did not load.");
     await evaluate(page, `document.querySelector('[aria-label="数据备份与还原"] details').open=true`, false);
@@ -856,7 +856,7 @@ export function createSettingsBackupSmokeScene(runtime) {
   function buildBackupCheckUrl(webUrl) {
     const url = new URL(webUrl);
     url.searchParams.set("smokeBackup", "1");
-    url.hash = "/settings?section=backup";
+    url.hash = "/system/backup?section=recovery";
     return url.toString();
   }
 

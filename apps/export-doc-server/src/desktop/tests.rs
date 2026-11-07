@@ -94,10 +94,29 @@ async fn desktop_http_preserves_original_login_and_rejects_untrusted_callers() {
     let response = app.clone().oneshot(preflight).await.unwrap();
     assert!(response.status().is_success());
     assert_eq!(response.headers()["access-control-allow-origin"], origin);
+    assert_eq!(response.headers()["access-control-max-age"], "600");
     assert_eq!(
         response.headers()["access-control-allow-credentials"],
         "true"
     );
+    for (host, untrusted_origin) in [
+        ("evil.example:51888", origin),
+        (authority, "https://evil.example"),
+        (authority, "http://127.0.0.1:5173"),
+    ] {
+        let request = Request::builder()
+            .method("OPTIONS")
+            .uri("/api/auth/login")
+            .header(header::HOST, host)
+            .header(header::ORIGIN, untrusted_origin)
+            .header("access-control-request-method", "POST")
+            .body(Body::empty())
+            .unwrap();
+        let denied = app.clone().oneshot(request).await.unwrap();
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+        assert!(!denied.headers().contains_key("access-control-max-age"));
+        assert!(!denied.headers().contains_key("access-control-allow-origin"));
+    }
 
     let login = Request::builder()
         .method("POST")

@@ -113,13 +113,13 @@ export function buildDocumentEmailSettingsDeepLinkUrl(webUrl) {
   return buildSettingsSectionUrl(webUrl, "email", "smokeDocumentEmailSettings");
 }
 
-export function buildSettingsSectionUrl(webUrl, section, smokeParamName) {
+export function buildSettingsSectionUrl(webUrl, section, smokeParamName, pathname = "/settings") {
   const url = new URL(webUrl);
   if (smokeParamName) {
     url.searchParams.set(smokeParamName, "1");
   }
 
-  url.hash = `/settings?section=${encodeURIComponent(section)}`;
+  url.hash = `${pathname}?section=${encodeURIComponent(section)}`;
   return url.toString();
 }
 

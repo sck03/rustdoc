@@ -27,26 +27,8 @@ export function readSettingsCategoryFromSearch(
     case "email":
       category = "communication";
       break;
-    case "webDav":
-    case "backup":
-    case "backupPolicy":
-    case "backupReplica":
-    case "backupMigration":
-    case "backupRecovery":
-    case "postgresql":
-      category = "backup";
-      break;
     case "ai":
       category = "ai";
-      break;
-    case "maintenance":
-    case "diagnostics":
-    case "logs":
-    case "ownership":
-    case "invoice-cleanup":
-    case "support":
-    case "validation":
-      category = "maintenance";
       break;
     case "updater":
       category = "runtime";
@@ -68,31 +50,8 @@ export function readSettingsPanelLabelFromSearch(search: string) {
     case "currency":
     case "currencies":
       return "汇率与币制";
-    case "webDav":
-    case "backupReplica":
-      return "异机副本";
-    case "backupPolicy":
-      return "日常灾备";
-    case "backupMigration":
-      return "完整服务器迁移";
-    case "backupRecovery":
-      return "从本地完整备份恢复";
-    case "backup":
-      return "数据备份与还原";
     case "singleWindow":
       return "申报默认值";
-    case "postgresql":
-      return "PostgreSQL 团队库维护";
-    case "logs":
-      return "日志管理";
-    case "diagnostics":
-      return "运行诊断";
-    case "support":
-      return "问题诊断包";
-    case "ownership":
-      return "数据归属改派";
-    case "invoice-cleanup":
-      return "发票清理";
     case "database":
       return "数据库连接";
     case "updater":

@@ -56,10 +56,7 @@ assert(navigation.readSettingsPanelLabelFromSearch("?section=documentOutput") ==
 assert(navigation.readSettingsPanelLabelFromSearch("?section=paymentReports") === null, "obsolete payment report panel is removed");
 assert(navigation.readSettingsCategoryFromSearch("?section=paymentTemplates") === "runtime", "obsolete settings deep link is not retained");
 assert(navigation.readSettingsCategoryFromSearch("?section=users") === "runtime", "users moved to independent access-control page");
-assert(navigation.readSettingsCategoryFromSearch("?section=%20diagnostics%20") === "maintenance", "trimmed category");
-assert(navigation.readSettingsPanelLabelFromSearch("?section=backup") === "数据备份与还原", "backup panel");
-assert(navigation.readSettingsPanelLabelFromSearch("?section=diagnostics") === "运行诊断", "diagnostics panel");
-assert(navigation.readSettingsCategoryFromSearch("?section=ownership") === "maintenance", "ownership maintenance category");
+assert(navigation.readSettingsCategoryFromSearch("?section=%20documents%20") === "documents", "trimmed category");
 assert(navigation.readSettingsCategoryFromSearch("?section=updater") === "runtime", "updater belongs to runtime settings");
 assert(navigation.readSettingsPanelLabelFromSearch("?section=updater") === "软件更新", "updater panel deep link");
 assert(navigation.readSettingsPanelLabelFromSearch("?section=unknown") === null, "unknown panel");
@@ -164,12 +161,12 @@ for (const section of ["documents", "documentDefaults", "documentFields"]) {
   assert(navigation.readSettingsCategoryFromSearch("?section=" + section) === "documents", "document settings category");
   assert(navigation.readSettingsCategoryFromSearch("?section=" + section, salesEditionCategories.map(item => item.key)) === "runtime", "document deep link is filtered");
 }
-for (const section of ["backup", "backupPolicy", "webDav", "postgresql", "backupReplica", "backupMigration", "backupRecovery"]) {
-  assert(navigation.readSettingsCategoryFromSearch("?section=" + section) === "backup", "backup tools are consolidated");
+for (const section of ["backup", "backupPolicy", "webDav", "postgresql", "backupReplica", "backupMigration", "backupRecovery", "diagnostics", "logs", "ownership"]) {
+  assert(navigation.readSettingsCategoryFromSearch("?section=" + section) === "runtime", "retired operation links do not select settings categories");
+  assert(navigation.readSettingsPanelLabelFromSearch("?section=" + section) === null, "retired operation panels are not part of the settings editor");
 }
 assert(navigation.readDocumentFieldGroup("?group=payment") === "payment", "payment group deep link");
 assert(navigation.readDocumentFieldGroup("?group=unknown") === "invoice", "invalid group fallback");
-assert(navigation.readSettingsPanelLabelFromSearch("?section=logs") === "日志管理", "log maintenance deep link");
 const before = { revision: 1, system: { appName: "App", logRetentionDays: 30, documentFieldLabels: { invoice: { spare1: "旧名" }, item: {}, payment: {} } }, email: { smtpHost: "old" } };
 const after = structuredClone(before);
 after.system.documentFieldLabels.invoice.spare1 = "新名"; after.email.smtpHost = "new";
