@@ -34,6 +34,7 @@ import { getWorkspaceDeviceCapabilities, useWorkspaceDeviceMode } from "../../sr
 import { WorkspaceDeviceNotice } from "../../src/ui/WorkspaceDeviceNotice.tsx";
 import { HsKnowledgeWorkflow } from "../../src/features/master-data/HsKnowledgeWorkflow.tsx";
 import { HsKnowledgeNavigation } from "../../src/features/master-data/HsKnowledgeNavigation.tsx";
+import { ReportTemplateWorkspaceHeader } from "../../src/features/reports/ReportTemplateWorkspaceHeader.tsx";
 
 const visualSearch = new URLSearchParams(location.search);
 const page = visualSearch.get("page") ?? "dashboard";
@@ -199,25 +200,14 @@ function SingleWindowBaseline() { return <section className="editor-surface"><di
 function ReportBaseline() {
   const deviceMode = useWorkspaceDeviceMode();
   const isDesktop = getWorkspaceDeviceCapabilities(deviceMode).canUseDenseWorkbench;
+  const [mode, setMode] = React.useState<"design" | "preview">(isDesktop ? "design" : "preview");
   return <RecordWorkspace className="report-template-surface">
-    <div className="report-template-sticky-header">
-      <div className="editor-toolbar report-template-designer-toolbar">
-        <button type="button" className="command-button secondary">返回模板管理</button>
-        <div className="editor-title report-template-current-title"><span>报表设计</span><small>当前模板：发票</small></div>
-        <div className="toolbar-actions">
-          <div className="segmented-control report-template-view-tabs has-advanced-html" role="tablist" aria-label="报表设计视图">
-            <button type="button" role="tab" aria-selected={isDesktop} className={isDesktop ? "segmented-active" : ""} disabled={!isDesktop}>可视化设计</button>
-            <button type="button" role="tab" aria-selected={false} disabled={!isDesktop}>高级 HTML</button>
-            <button type="button" role="tab" aria-selected={!isDesktop} className={isDesktop ? "" : "segmented-active"}>预览</button>
-          </div>
-          <button type="submit" className="command-button" disabled={!isDesktop}>保存</button>
-        </div>
-      </div>
-    </div>
-    <WorkspaceDeviceNotice mode={deviceMode} phone="当前设备提供模板预览；返回模板管理可切换模板，完整设计请使用桌面端。" tablet="可预览并使用高级 HTML；完整可视化设计仍建议使用更宽屏幕。"/>
-    {isDesktop
+    <ReportTemplateWorkspaceHeader title="发票" workspaceMode={mode} canPreview canSave={false}
+      onBackToManagement={() => undefined} onDesign={() => setMode("design")} onPreview={() => setMode("preview")} />
+    <WorkspaceDeviceNotice mode={deviceMode} phone="点击“设计”可修改模板；用“添加内容 / 画布 / 属性”切换面板，多选按钮支持触屏批量排版。" tablet="可触控编辑模板；小屏可切换面板，复杂表格也可连接鼠标操作。"/>
+    {mode === "design"
       ? <main className="report-template-new-designer"><div className="form-section" style={{minHeight:420}}><h2>模板画布</h2><div className="table-frame"><table><tbody><tr><td>EXPORTER</td><td>INVOICE NO.</td></tr><tr><td>CONSIGNEE</td><td>DATE</td></tr></tbody></table></div></div></main>
-      : <main className="form-section report-template-preview-workspace" style={{minHeight:360}}><div className="section-header"><div><h2>模板预览</h2><p>当前设备保持查看和确认模式。</p></div></div><div className="report-preview-empty">当前模板将在此显示分页和换行效果</div></main>}
+      : <main className="form-section report-template-preview-workspace" style={{minHeight:360}}><div className="section-header"><h2>模板预览</h2></div><div className="report-preview-empty">当前模板将在此显示分页和换行效果</div></main>}
   </RecordWorkspace>;
 }
 
@@ -229,7 +219,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   </React.StrictMode>,
 );
 requestAnimationFrame(() => requestAnimationFrame(() => {
-  document.querySelectorAll(".knowledge-workflow, .table-frame").forEach((element) => {
+  document.querySelectorAll(".table-frame").forEach((element) => {
     if (!element.hasAttribute("tabindex")) element.setAttribute("tabindex", "0");
   });
   document.documentElement.dataset.visualBaselineReady = "true";

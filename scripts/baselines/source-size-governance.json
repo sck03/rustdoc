@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-11-06",
-  "reviewNotes": "2026-11-06: reviewed D/A/L correctness and lifecycle changes, explicit shutdown and backup scratch modules, shared decimal/text/input boundaries, WOFF2 build validation and regression scenarios. Rebaseline these measured aggregates for this authorized batch; retain per-file limits and existing growth allowances. Remove retired wrappers, duplicate report HTML generation and unused designer styles.",
+  "updatedAt": "2026-11-07",
+  "reviewNotes": "2026-11-07: remeasure web production after removing unreachable CSS, internal exports and duplicate report preview mutations (86,324 lines, down 2,505 from the prior baseline). Automation growth to 40,161 lines covers real pagination/layout, IME, mobile save, preview cancellation and request-contract regressions; reuse existing harnesses. Refresh only these two aggregates, retaining per-file limits and growth allowances. Other aggregates retain the 2026-11-06 review.",
   "rules": [
     {
       "name": "repository web production default",
@@ -10,9 +10,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 88829,
+      "baselineAggregateLines": 86324,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 89029,
+      "maximumAggregateLines": 86524,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 39948,
+      "baselineAggregateLines": 40161,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 40098,
+      "maximumAggregateLines": 40311,
       "reportFiles": false
     },
     {

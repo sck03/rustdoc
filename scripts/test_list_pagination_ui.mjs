@@ -35,7 +35,8 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { NotificationsPage } from ${source('features/communication/NotificationsPage.tsx')};
   import { ReportImageResourceGallery } from ${source('features/report-designer/ReportImageResourceGallery.tsx')};
   import { useReportTemplateWorkspaceQueries } from ${source('features/reports/useReportTemplateWorkspaceQueries.ts')};
-  import { Pagination } from ${source('ui/primitives/Pagination.tsx')};
+  import { ReportTemplateSelectionPanel } from ${source('features/reports/ReportTemplateSelectionPanel.tsx')};
+  import ${source('styles/routes/reports.css')};
   import { getMasterDataConfig } from ${source('features/master-data/masterDataConfigs.ts')};
   import { HsCodeKnowledgePage } from ${source('features/master-data/HsCodeKnowledgePage.tsx')};
   import { EmailDeliveryHistory } from ${source('features/tools/EmailDeliveryHistory.tsx')};
@@ -99,8 +100,9 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   function Templates() {
     const { userTemplateDirectory: d, userTemplatesQuery: q } = useReportTemplateWorkspaceQueries({ client, reportType: 'ExportDocument', enabled: true,
       includeDesignerData: false, includeArchived: false, canPreviewInvoiceSource: false, canPreviewPaymentSource: false, selectedUserTemplateId: 0, selectedTemplatePath: '' });
-    return <>{q.isError && <p>{q.error.message}</p>}<Pagination pageNumber={d.pageNumber} pageSize={50} totalPages={d.totalPages} totalCount={d.totalCount}
-      pageSizeOptions={[50]} isBusy={d.loading} onPageChange={d.onPageChange} onPageSizeChange={() => {}} /></>;
+    return <>{q.isError && <p>{q.error.message}</p>}<ReportTemplateSelectionPanel directory={d} reportType="ExportDocument" reportTypeOptions={[]}
+      templates={[]} userTemplates={[]} selectedTemplatePath="" selectedUserTemplateId={0} defaultTemplatePath="" isBusy={d.loading} canSetDefault={false}
+      onReportTypeChange={() => {}} onTemplateChange={() => {}} onUserTemplateChange={() => {}} onSetDefault={() => {}} /></>;
   }
   const components = { invoices: InvoiceListPage, payments: PaymentListPage, jobs: JobCenterPage,
     query: QueryPage, audit: AuditLogPage, 'single-window': SingleWindowOperationCenterPage, master: MasterDataListPage,
@@ -206,6 +208,16 @@ try {
       await page.evaluate(() => window.__online(true));
       await waitPage(3);
       assert.equal(await page.evaluate(() => window.__requests.at(-1).aborted), false, mode + ': stale corrected-page cache cannot cancel a new request');
+      if (mode === 'hs-online') {
+        const tabs = page.getByRole('tablist', { name: '候选审核状态' });
+        await tabs.getByRole('tab', { name: '待审核', exact: true }).focus();
+        for (const [key, label] of [['ArrowRight','已确认'], ['End','已忽略'], ['Home','待审核']]) {
+          await page.keyboard.press(key);
+          assert.equal(await tabs.getByRole('tab', { name: label, exact: true }).getAttribute('aria-selected'), 'true');
+          assert.equal(await tabs.getByRole('tab', { name: label, exact: true }).evaluate(node => node === document.activeElement), true);
+        }
+        await waitPage(1);
+      }
       assert.deepEqual(errors, [], mode + ': React errors');
       await page.screenshot({ path: path.join(output, mode + '.png'), fullPage: true });
       results.push({ mode, passed: true });

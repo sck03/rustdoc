@@ -6,6 +6,8 @@ import {
 } from "../../api/index.ts";
 import { SelectField, TextField } from "../../ui/FormFields.tsx";
 import { ReportTemplateVersionHistory } from "./ReportTemplateVersionHistory.tsx";
+import { StatusBadge } from "../../ui/primitives/Card.tsx";
+import { Button } from "../../ui/Button.tsx";
 
 const reportTemplateShareScopeOptions = [
   { value: "Private", label: "仅自己可见" },
@@ -68,7 +70,7 @@ export function ReportTemplateUserPanel({
             <strong>创建我的模板</strong>
           </div>
           <TextField label="新模板名称" value={newTemplateName} disabled={isBusy} onChange={onNewTemplateNameChange} />
-          <small>填写新名称后，可新建空白模板自行设计，或复制当前模板继续修改。保存后即可自己打印、导出，无需发布或共享。</small>
+          <small>私人模板保存后即可打印；共享需另行发布。</small>
           <div className="template-management-actions">
             {allowCreateBlank ? (
               <button className="command-button secondary" type="button" disabled={!canCreateBlank} onClick={onCreateBlank}>
@@ -91,13 +93,13 @@ export function ReportTemplateUserPanel({
               <strong>{currentTemplate.canEdit ? "当前模板可编辑" : "当前模板只读"}</strong>
             </div>
             <div className="template-status-chips" aria-label="模板状态">
-              <span className={`template-status-chip ${currentTemplate.status === "Published" ? "active" : "inactive"}`}>
+              <StatusBadge tone={currentTemplate.status === "Published" ? "positive" : "muted"}>
                 {reportTemplateStatusLabel(currentTemplate.status)}
-              </span>
-              <span className={`template-status-chip ${currentTemplate.shareScope !== "Private" ? "shared" : "private"}`}>
+              </StatusBadge>
+              <StatusBadge tone={currentTemplate.shareScope !== "Private" ? "info" : "muted"}>
                 {reportTemplateShareScopeLabel(currentTemplate.shareScope)}
-              </span>
-              <span className="template-status-chip version">V{currentTemplate.versionNumber}</span>
+              </StatusBadge>
+              <StatusBadge>V{currentTemplate.versionNumber}</StatusBadge>
             </div>
             <small>
               {currentTemplate.canEdit
@@ -119,24 +121,24 @@ export function ReportTemplateUserPanel({
                   />
                 ) : null}
                 {currentTemplate.canPublish ? (
-                  <button className="command-button compact-button primary" type="button" disabled={isBusy} onClick={onPublish}>
+                  <Button disabled={isBusy} onClick={onPublish}>
                     发布（为共享准备）
-                  </button>
+                  </Button>
                 ) : null}
                 {currentTemplate.canDisable ? (
-                  <button className="command-button compact-button danger-button" type="button" disabled={isBusy} onClick={onDisable}>
+                  <Button variant="danger" disabled={isBusy} onClick={onDisable}>
                     停用模板
-                  </button>
+                  </Button>
                 ) : null}
                 {currentTemplate.canRestore ? (
-                  <button className="command-button compact-button secondary" type="button" disabled={isBusy} onClick={onRestore}>
+                  <Button disabled={isBusy} onClick={onRestore}>
                     {currentTemplate.status === "Archived" ? "恢复为草稿" : "恢复发布"}
-                  </button>
+                  </Button>
                 ) : null}
                 {currentTemplate.canArchive ? (
-                  <button className="command-button compact-button danger-button" type="button" disabled={isBusy} onClick={onArchive}>
+                  <Button variant="danger" disabled={isBusy} onClick={onArchive}>
                     归档模板
-                  </button>
+                  </Button>
                 ) : null}
               </div>
             ) : null}

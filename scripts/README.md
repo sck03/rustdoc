@@ -91,9 +91,9 @@ pwsh -NoProfile -File scripts/package-native-web-server.ps1 -Version 1.2.3 -NoPa
 
 ## 桌面启动检查与资源
 
-桌面业务库统一位于 `App_Data/Database/exportdoc-native.db`，实例锁位于 `App_Data/Locks`。旧位置 `App_Data/exportdoc-native.db` 中受支持的数据库会通过 SQLite 快照自动搬入 Database，原文件保留在 `Backups/DatabaseLayout`；新旧两处同时有库则停止并提示核对。不要手工只移动正在使用的主文件：它可能还有未合并的 WAL。WebView 内部数据库保留在 `WebView` profile 中。
+桌面业务库统一位于 `App_Data/Database/exportdoc-native.db`，实例锁位于 `App_Data/Locks`。旧位置出现数据库或伴随文件时拒绝启动，不自动搬迁或覆盖；Database 目录仅有 WAL/SHM 时也拒绝初始化。重建使用明确的新 DataRoot，不要手工只移动正在使用的主文件。WebView 内部数据库保留在 `WebView` profile 中。
 
-便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 13，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
+便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 14，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
 
 Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便携包携带原版固定清单验证的微软离线安装器；缺少 WebView2 时显示安装／退出选择，保留取消、繁忙、超时和需重启处理。构建时核对微软签名、版本、大小和 SHA-256。Windows GNU 构建同时携带 `WebView2Loader.dll`。
 
@@ -125,7 +125,7 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 ### 更新程序与数据库
 
-源码脚本的启动／更新经过：准备镜像 → 停 API → 等数据库就绪 → 独立维护容器初始化/逐版升级 → 启 API 并检查就绪。构建及缺失镜像取得在停 API 前完成，失败不打断原应用；已有/离线镜像按 missing 策略复用。原 `compose.yml` 的维护服务仍由脚本显式运行，`-SkipBuild` 复用已有镜像。新版 `compose.image.yml` 则声明初始化完成依赖，支持直接 Compose 启动；升级时先 pull，再 down（不删卷）及 up。两种入口的恢复失败均保留 API 停止状态。
+源码脚本的启动／更新经过：准备镜像 → 停 API → 等数据库就绪 → 独立维护容器初始化或校验当前基线 → 启 API 并检查就绪。构建及缺失镜像取得在停 API 前完成，失败不打断原应用；已有/离线镜像按 missing 策略复用。原 `compose.yml` 的维护服务仍由脚本显式运行，`-SkipBuild` 复用已有镜像。新版 `compose.image.yml` 则声明初始化完成依赖，支持直接 Compose 启动；升级时先 pull，再 down（不删卷）及 up。两种入口的恢复失败均保留 API 停止状态。
 
 应用 schema 与 PostgreSQL 软件主版本是两件事：当前只支持全新 schema 14，不迁移旧试验库。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。维护前保留需要的备份/完整迁移包。
 

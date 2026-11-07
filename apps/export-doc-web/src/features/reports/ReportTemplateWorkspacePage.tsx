@@ -393,7 +393,7 @@ export function ReportTemplateWorkspacePage({
       onError: (error) => showFeedback(readApiError(error), "error"),
     });
 
-  const { samplePreviewMutation, invoicePreviewMutation, paymentPreviewMutation, previewFormat, setPreviewFormat, page: previewPage } = useReportTemplatePreviewMutations({
+  const { previewMutation, previewFormat, setPreviewFormat, page: previewPage } = useReportTemplatePreviewMutations({
     client,
     reportType,
     selectedTemplatePath,
@@ -495,9 +495,7 @@ export function ReportTemplateWorkspacePage({
       restoreUserTemplateVersionMutation.isPending,
       updateUserTemplateStatusMutation.isPending,
       exportDefaults.isBusy,
-      samplePreviewMutation.isPending,
-      invoicePreviewMutation.isPending,
-      paymentPreviewMutation.isPending,
+      previewMutation.isPending,
     ],
     canManageTemplates,
     canDesignTemplates,
@@ -541,10 +539,7 @@ export function ReportTemplateWorkspacePage({
     reportType,
     selectedTemplateContentActive,
     selectedTemplatePath,
-    templatePreviewMode,
-    renderInvoicePreview: nextContent => invoicePreviewMutation.mutate({ content: nextContent }),
-    renderPaymentPreview: nextContent => paymentPreviewMutation.mutate({ content: nextContent }),
-    renderSamplePreview: nextContent => samplePreviewMutation.mutate(nextContent ?? previewContent),
+    renderPreview: nextContent => previewMutation.mutate({ content: nextContent }),
     saveDefaultTemplateContent: (nextContent) => saveMutation.mutate(nextContent),
     saveUserTemplateContent: (nextContent) => saveUserTemplateMutation.mutate(nextContent),
     setMessage,
@@ -790,7 +785,6 @@ export function ReportTemplateWorkspacePage({
           workspaceMode={workspaceMode}
           canPreview={canRenderTemplatePreview}
           canSave={canSave}
-          designDisabled={false}
           onBackToManagement={() => void handleBackToManagement()}
           onDesign={() => setWorkspaceMode("design")}
           onPreview={handleRenderTemplatePreview}
@@ -832,19 +826,13 @@ export function ReportTemplateWorkspacePage({
             renderedHtml={renderedPreviewHtml}
             isBusy={isBusy}
             canPreview={canRenderTemplatePreview}
-            canSave={canSave}
             onModeChange={handleTemplatePreviewModeChange}
             onSampleProfileChange={handleTemplatePreviewSampleProfileChange}
             onSourceChange={handlePreviewSourceChange}
             onPreview={handleRenderTemplatePreview}
             pdf={{ format: previewFormat, ...previewPage,
               onFormatChange: format => { setPreviewFormat(format); setPreview(null); },
-              onPageChange: pageIndex => {
-                const target = { pageIndex, previewRevision: previewPage.previewRevision };
-                if (templatePreviewMode === "sample") samplePreviewMutation.mutate(target);
-                else if (reportType === "PaymentVoucher") paymentPreviewMutation.mutate(target);
-                else invoicePreviewMutation.mutate(target);
-              },
+              onPageChange: pageIndex => previewMutation.mutate({ pageIndex, previewRevision: previewPage.previewRevision }),
             }}
           />
         </div>

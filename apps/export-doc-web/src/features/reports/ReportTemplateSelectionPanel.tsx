@@ -3,6 +3,7 @@ import { SelectField } from "../../ui/FormFields.tsx";
 import { Field, FilterBar } from "../../ui/primitives/Field.tsx";
 import { fileNameFromPath, matchesTemplatePath, type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
 import { CircleCheckBig } from "lucide-react";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 
 export function ReportTemplateSelectionPanel({
   reportType,
@@ -80,11 +81,7 @@ export function ReportTemplateSelectionPanel({
         </button>
       </div>
       <small>内置原稿只读，公共模板和全局默认由管理员维护。需要自己的样式，请在“我的 / 共享模板”中复制；私人模板保存后即可直接使用。</small>
-      {directory.totalPages > 1 ? <div className="template-management-actions" aria-label="用户模板分页">
-        <button className="command-button secondary compact-button" type="button" disabled={directory.pageNumber <= 1 || directory.loading} onClick={() => directory.onPageChange(directory.pageNumber - 1)}>上一页</button>
-        <small>用户模板 {directory.pageNumber} / {directory.totalPages} 页 · 共 {directory.totalCount} 个</small>
-        <button className="command-button secondary compact-button" type="button" disabled={directory.pageNumber >= directory.totalPages || directory.loading} onClick={() => directory.onPageChange(directory.pageNumber + 1)}>下一页</button>
-      </div> : null}
+      {directory.totalPages > 1 ? <Pagination pageNumber={directory.pageNumber} totalPages={directory.totalPages} totalCount={directory.totalCount} pageSize={50} isBusy={directory.loading} onPageChange={directory.onPageChange} /> : null}
     </FilterBar>
   );
 }

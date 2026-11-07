@@ -5,7 +5,7 @@ import {
   ApiReportTemplatePreviewResponse,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
-import { type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
+import { type ReportTypeOption, type TemplatePreviewMode } from "./reportTemplateDesignerModel.ts";
 
 export function useReportTemplatePreviewMutations({
   client,
@@ -26,7 +26,7 @@ export function useReportTemplatePreviewMutations({
   selectedTemplatePath: string;
   content: string;
   sampleProfile: string;
-  mode: string;
+  mode: TemplatePreviewMode;
   canDesignTemplates: boolean;
   withSeal: boolean;
   previewInvoiceId: number;
@@ -36,50 +36,36 @@ export function useReportTemplatePreviewMutations({
 }) {
   const [previewFormat, setPreviewFormat] = useState<"Svg" | "PdfPage">("Svg");
   const [page, setPage] = useState({ pageIndex: 0, pageCount: 0, previewRevision: "" });
-  const scope = useMemo(() => ({ mode, reportType, selectedTemplatePath, content, sampleProfile, withSeal, previewInvoiceId, previewPaymentId, previewFormat }),
-    [mode, reportType, selectedTemplatePath, content, sampleProfile, withSeal, previewInvoiceId, previewPaymentId, previewFormat]);
+  const scope = useMemo(() => ({ mode, reportType, selectedTemplatePath, content, sampleProfile, withSeal, canDesignTemplates, previewInvoiceId, previewPaymentId, previewFormat }),
+    [mode, reportType, selectedTemplatePath, content, sampleProfile, withSeal, canDesignTemplates, previewInvoiceId, previewPaymentId, previewFormat]);
   useEffect(() => setPage({ pageIndex: 0, pageCount: 0, previewRevision: "" }), [scope]);
   type PageRequest = { pageIndex?: number; previewRevision?: string; content?: string };
-  const request = (target?: PageRequest) => ({ previewFormat, pageIndex: target?.pageIndex ?? 0, previewRevision: target?.previewRevision || undefined });
-  const accept = (response: ApiReportTemplatePreviewResponse) => {
-    setPage({ pageIndex: response.pageIndex ?? 0, pageCount: response.pageCount ?? 0, previewRevision: response.previewRevision ?? "" });
-    onPreviewed(response);
-  };
   const run = useAbortableOperation(scope, { cancelPrevious: true });
-  const failed = (error: unknown) => { if (!isAbortError(error)) onError(error); };
-  const samplePreviewMutation = useMutation({
+  const previewMutation = useMutation({
     gcTime: 0,
-    mutationFn: (input?: string | PageRequest) =>
-      run(signal => client.previewReportTemplateContent({
-        body: reportType === "ExportDocument"
-          ? { reportType, content: typeof input === "string" ? input : content, withSeal, sampleProfile, ...request(typeof input === "object" ? input : undefined) }
-          : { reportType, content: typeof input === "string" ? input : content, sampleProfile, ...request(typeof input === "object" ? input : undefined) },
-      }, { signal })),
-    onSuccess: accept,
-    onError: failed,
+    mutationFn: (target?: PageRequest) => run(async signal => {
+      const request = { previewFormat, pageIndex: target?.pageIndex ?? 0, previewRevision: target?.previewRevision || undefined };
+      const draft = target?.content ?? content;
+      if (mode === "sample") {
+        return client.previewReportTemplateContent({ body: {
+          reportType, content: draft, sampleProfile, ...request,
+          ...(reportType === "ExportDocument" ? { withSeal } : {}),
+        } }, { signal });
+      }
+      const body = { templatePath: selectedTemplatePath, content: canDesignTemplates ? draft : undefined, ...request };
+      if (reportType === "PaymentVoucher") {
+        const response = await client.previewPaymentVoucherHtml({ paymentId: previewPaymentId, body }, { signal });
+        return { ...response, withSeal: null };
+      }
+      const response = await client.previewInvoiceReportHtml({ invoiceId: previewInvoiceId, body: { ...body, reportType, withSeal } }, { signal });
+      return { ...response, withSeal: response.withSeal ?? withSeal };
+    }),
+    onSuccess: response => {
+      setPage({ pageIndex: response.pageIndex ?? 0, pageCount: response.pageCount ?? 0, previewRevision: response.previewRevision ?? "" });
+      onPreviewed(response);
+    },
+    onError: error => { if (!isAbortError(error)) onError(error); },
   });
 
-  const invoicePreviewMutation = useMutation({
-    gcTime: 0,
-    mutationFn: (target?: PageRequest) =>
-      run(signal => client.previewInvoiceReportHtml({
-        invoiceId: previewInvoiceId,
-        body: { reportType, templatePath: selectedTemplatePath, withSeal, content: canDesignTemplates ? target?.content ?? content : undefined, ...request(target) },
-      }, { signal })),
-    onSuccess: (response) => accept({ ...response, withSeal: response.withSeal ?? withSeal }),
-    onError: failed,
-  });
-
-  const paymentPreviewMutation = useMutation({
-    gcTime: 0,
-    mutationFn: (target?: PageRequest) =>
-      run(signal => client.previewPaymentVoucherHtml({
-        paymentId: previewPaymentId,
-        body: { templatePath: selectedTemplatePath, content: canDesignTemplates ? target?.content ?? content : undefined, ...request(target) },
-      }, { signal })),
-    onSuccess: (response) => accept({ ...response, withSeal: null }),
-    onError: failed,
-  });
-
-  return { samplePreviewMutation, invoicePreviewMutation, paymentPreviewMutation, previewFormat, setPreviewFormat, page };
+  return { previewMutation, previewFormat, setPreviewFormat, page };
 }

@@ -28,6 +28,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { SupplierProductLinksPanel } from ${source('features/suppliers/SupplierProductLinksPanel.tsx')};
   import { SupplierAssessmentsPanel } from ${source('features/suppliers/SupplierAssessmentsPanel.tsx')};
   import { SalesOpportunityPage } from ${source('features/opportunities/SalesOpportunityPage.tsx')};
+  import { useReportTemplatePreviewMutations } from ${source('features/reports/useReportTemplatePreviewMutations.ts')};
   window.pending = []; window.results = []; window.completed = []; window.refreshes = [];
   window.attachmentUploads = [];
   window.attachmentRecord = { versionNumber: 1, attachments: Array.from({ length: window.mode === 'attachments-partial' ? 18 : 20 }, () => ({ sizeBytes: 1 })) };
@@ -47,6 +48,27 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
     const run = useAbortableOperation(scope, { cancelPrevious: window.mode === 'latest' });
     return <button onClick={() => void run(delayed).then(value => window.results.push({ value }),
       error => window.results.push({ name: error.name, message: error.message }))}>开始读取</button>;
+  }
+  function Preview({ scope, allowed }) {
+    const [formatMode, setMode] = useState('sample');
+    const [reportType, setReportType] = useState('ExportDocument');
+    const previewClient = {
+      previewReportTemplateContent: (input, options) => lookup(input, options, 'sample'),
+      previewInvoiceReportHtml: (input, options) => lookup(input, options, 'invoice'),
+      previewPaymentVoucherHtml: (input, options) => lookup(input, options, 'payment'),
+    };
+    const { previewMutation, page, setPreviewFormat } = useReportTemplatePreviewMutations({
+      client: previewClient, reportType, selectedTemplatePath: 'builtin:template.dtpl', content: 'draft-'+scope,
+      sampleProfile: 'sample', mode: formatMode, canDesignTemplates: allowed, withSeal: true,
+      previewInvoiceId: 7, previewPaymentId: 9,
+      onPreviewed: response => window.completed.push(response), onError: error => window.results.push(error.message),
+    });
+    return <><button onClick={() => previewMutation.mutate({content:'committed-'+scope})}>生成预览</button>
+      <button onClick={() => previewMutation.mutate({pageIndex:1,previewRevision:page.previewRevision})}>预览下一页</button>
+      <button onClick={() => setMode('savedSource')}>当前单据</button>
+      <button onClick={() => setReportType('PaymentVoucher')}>付款模板</button>
+      <button onClick={() => setPreviewFormat('PdfPage')}>实际PDF</button>
+      <output>{page.pageIndex+'/'+page.pageCount}</output></>;
   }
   function Office() {
     const operation = useOfficeOperation();
@@ -81,6 +103,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
         : window.mode === 'seal' ? <ExporterSealField label='单证章路径' scopeKey={String(scope)} value='' actionDisabled={sealDisabled}
           onUploadFile={async file => window.completed.push({name:file.name,type:file.type,bytes:Array.from(new Uint8Array(await file.arrayBuffer()))})}
           onError={error => window.results.push(error.message)}/>
+        : window.mode === 'preview' ? <Preview scope={scope} allowed={!sealDisabled}/>
         : window.mode === 'office' ? <Office/> : window.mode.startsWith('attachments') ? <Attachments/> : <Generic scope={scope}/> : <p>编辑页已关闭</p>}</>;
   }
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
@@ -115,6 +138,34 @@ try {
       results.push(name);
     } catch (error) { failures.push(`${name}: ${error.message}`); }
     finally { await page.close(); }
+  }
+  for (const kind of ['sample', 'invoice', 'payment']) {
+    await scenario('preview-request-and-pagination-'+kind, 'preview', async page => {
+      if (kind !== 'sample') await page.getByRole('button', {name:'当前单据',exact:true}).click();
+      if (kind === 'payment') await page.getByRole('button', {name:'付款模板',exact:true}).click();
+      await page.getByRole('button', {name:'实际PDF',exact:true}).click();
+      await page.getByRole('button', {name:'生成预览',exact:true}).click();
+      await page.waitForFunction(() => window.pending.length === 1);
+      const request = await page.evaluate(() => ({kind:window.pending[0].kind,body:window.pending[0].body}));
+      assert.equal(request.kind, kind); assert.equal(request.body.content, 'committed-0');
+      assert.equal(request.body.previewFormat, 'PdfPage'); assert.equal(request.body.pageIndex, 0);
+      await page.evaluate(() => window.pending[0].resolve({html:'first',pageIndex:0,pageCount:2,previewRevision:'revision'}));
+      await page.waitForFunction(() => window.completed.length === 1);
+      await page.getByRole('button', {name:'预览下一页',exact:true}).click();
+      await page.waitForFunction(() => window.pending.length === 2);
+      assert.deepEqual(await page.evaluate(() => [window.pending[1].kind,window.pending[1].body.pageIndex,window.pending[1].body.previewRevision]), [kind,1,'revision']);
+    });
+  }
+  for (const boundary of ['scope','unmount','disabled','mode','format','report']) for (const reject of [false,true]) {
+    await scenario('preview-cancel-'+boundary+'-'+reject, 'preview', async page => {
+      await page.getByRole('button', {name:'生成预览',exact:true}).click();
+      await page.waitForFunction(() => window.pending.length === 1);
+      await page.getByRole('button', {name:{scope:'切换资料',unmount:'离开编辑页',disabled:'停用印章操作',mode:'当前单据',format:'实际PDF',report:'付款模板'}[boundary],exact:true}).click();
+      await page.waitForFunction(() => window.pending[0].signal.aborted);
+      await page.evaluate(reject => reject ? window.pending[0].reject(new Error('迟到错误')) : window.pending[0].resolve({html:'迟到预览',pageCount:99}), reject);
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      assert.deepEqual(await page.evaluate(() => [window.completed,window.results]), [[],[]]);
+    });
   }
   for (const phase of ['select', 'read']) for (const boundary of ['none', 'scope', 'unmount', 'disabled']) for (const reject of [false, true]) {
     await scenario(`seal-${phase}-${boundary}-${reject ? 'failure' : 'success'}`, 'seal', async page => {

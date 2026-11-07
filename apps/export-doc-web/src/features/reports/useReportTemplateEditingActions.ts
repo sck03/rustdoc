@@ -22,10 +22,7 @@ export function useReportTemplateEditingActions({
   reportType,
   selectedTemplateContentActive,
   selectedTemplatePath,
-  templatePreviewMode,
-  renderInvoicePreview,
-  renderPaymentPreview,
-  renderSamplePreview,
+  renderPreview,
   saveDefaultTemplateContent,
   saveUserTemplateContent,
   setMessage,
@@ -45,10 +42,7 @@ export function useReportTemplateEditingActions({
   reportType: ReportTypeOption;
   selectedTemplateContentActive: boolean;
   selectedTemplatePath: string;
-  templatePreviewMode: TemplatePreviewMode;
-  renderInvoicePreview: (content?: string) => void;
-  renderPaymentPreview: (content?: string) => void;
-  renderSamplePreview: (content?: string) => void;
+  renderPreview: (content: string) => void;
   saveDefaultTemplateContent: (content: string) => void;
   saveUserTemplateContent: (content: string) => void;
   setMessage: Dispatch<SetStateAction<string | null>>;
@@ -115,16 +109,7 @@ export function useReportTemplateEditingActions({
     }
 
     setWorkspaceMode("preview");
-    if (templatePreviewMode === "sample") {
-      renderSamplePreview(nextContent);
-      return;
-    }
-
-    if (reportType === "PaymentVoucher") {
-      renderPaymentPreview(nextContent);
-    } else {
-      renderInvoicePreview(nextContent);
-    }
+    renderPreview(nextContent);
   }
 
   return {

@@ -8,7 +8,6 @@ export function ReportTemplateWorkspaceHeader({
   workspaceMode,
   canPreview,
   canSave,
-  designDisabled,
   onBackToManagement,
   onDesign,
   onPreview,
@@ -17,7 +16,6 @@ export function ReportTemplateWorkspaceHeader({
   workspaceMode: TemplateWorkspaceMode;
   canPreview: boolean;
   canSave: boolean;
-  designDisabled?: boolean;
   onBackToManagement: () => void;
   onDesign: () => void;
   onPreview: () => void;
@@ -25,7 +23,7 @@ export function ReportTemplateWorkspaceHeader({
   return (
     <div className="report-template-sticky-header">
       <div className="editor-toolbar report-template-designer-toolbar">
-        <Button variant="secondary" icon={<ArrowLeft size={17} aria-hidden="true" />} onClick={onBackToManagement}>
+        <Button variant="secondary" icon={<ArrowLeft size={18} aria-hidden="true" />} onClick={onBackToManagement}>
           返回模板管理
         </Button>
         <div className="editor-title report-template-current-title">
@@ -35,15 +33,15 @@ export function ReportTemplateWorkspaceHeader({
         </div>
         <div className="toolbar-actions">
           <div
-            className="report-template-view-tabs v3-only"
+            className="report-template-view-tabs"
           >
             <SegmentedNav label="报表设计视图" value={workspaceMode} onChange={value => value === "design" ? onDesign() : onPreview()}
               items={[
-                { key: "design", disabled: designDisabled, label: <><LayoutTemplate size={16} aria-hidden="true" /><span title={designDisabled ? "当前设备仅提供模板选择与预览，完整设计请使用桌面端" : undefined}>可视化设计</span></> },
+                { key: "design", label: <><LayoutTemplate size={16} aria-hidden="true" /><span>可视化设计</span></> },
                 { key: "preview", disabled: !canPreview, label: <><Eye size={16} aria-hidden="true" /><span>预览</span></> },
               ]} />
           </div>
-          <Button variant="primary" type="submit" icon={<Save size={17} aria-hidden="true" />} disabled={designDisabled || !canSave}>保存</Button>
+          <Button variant="primary" type="submit" icon={<Save size={18} aria-hidden="true" />} disabled={!canSave}>保存</Button>
         </div>
       </div>
     </div>

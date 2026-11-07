@@ -1,4 +1,5 @@
-import { Eye, Save } from "lucide-react";
+import { Eye } from "lucide-react";
+import { Button } from "../../ui/Button.tsx";
 import { SelectField } from "../../ui/FormFields.tsx";
 import { FilterBar } from "../../ui/primitives/Field.tsx";
 import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
@@ -14,7 +15,6 @@ export function ReportTemplatePreviewWorkspace({
   renderedHtml,
   isBusy,
   canPreview,
-  canSave,
   onModeChange,
   onSampleProfileChange,
   onSourceChange,
@@ -29,7 +29,6 @@ export function ReportTemplatePreviewWorkspace({
   renderedHtml: string;
   isBusy: boolean;
   canPreview: boolean;
-  canSave: boolean;
   onModeChange: (mode: TemplatePreviewMode) => void;
   onSampleProfileChange: (value: string) => void;
   onSourceChange: (value: string) => void;
@@ -62,21 +61,16 @@ export function ReportTemplatePreviewWorkspace({
           />
         )}
         <div className="report-template-preview-actions">
-          <button className="command-button secondary" type="button" disabled={!canPreview} onClick={onPreview}>
-            <Eye size={17} aria-hidden="true" />
-            <span>{mode === "savedSource" ? "真实数据预览" : "样例预览"}</span>
-          </button>
-          <button className="command-button" type="submit" disabled={!canSave}>
-            <Save size={17} aria-hidden="true" />
-            <span>保存</span>
-          </button>
+          <Button disabled={!canPreview} onClick={onPreview} icon={<Eye size={18} aria-hidden="true" />}>
+            {mode === "savedSource" ? "真实数据预览" : "样例预览"}
+          </Button>
         </div>
       </FilterBar>
       <div className="report-template-preview report-template-preview-full">
         {pdf.format === "PdfPage" && pdf.pageCount > 0 ? <div className="report-template-preview-pagination" role="group" aria-label="PDF 预览翻页">
-          <button type="button" className="command-button secondary" disabled={isBusy || pdf.pageIndex <= 0} onClick={() => pdf.onPageChange(pdf.pageIndex - 1)}>上一页</button>
+          <Button disabled={isBusy || pdf.pageIndex <= 0} onClick={() => pdf.onPageChange(pdf.pageIndex - 1)}>上一页</Button>
           <span aria-live="polite">{pdf.pageIndex + 1} / {pdf.pageCount}</span>
-          <button type="button" className="command-button secondary" disabled={isBusy || pdf.pageIndex + 1 >= pdf.pageCount} onClick={() => pdf.onPageChange(pdf.pageIndex + 1)}>下一页</button>
+          <Button disabled={isBusy || pdf.pageIndex + 1 >= pdf.pageCount} onClick={() => pdf.onPageChange(pdf.pageIndex + 1)}>下一页</Button>
         </div> : null}
         <iframe title="模板预览" sandbox="" srcDoc={renderedHtml} />
       </div>

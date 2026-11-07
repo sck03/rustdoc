@@ -141,7 +141,7 @@ try {
   await clickText("导入导出", "[role=tab]"); await audit("report-transfer-view");
   await open("/reports/templates/manage?manyTemplates=true&userTemplateId=180");
   await waitFor("document.querySelector('.template-default-selection select')?.value==='user-template:180'");
-  await clickText("下一页", '[aria-label="用户模板分页"] button');
+  await clickText("下一页", '.template-selection-panel [data-ui="pagination"] button');
   await waitFor("window.__calls.some(call=>call.name==='userTemplates'&&call.input.pageNumber===2)");
   await input('[aria-label="搜索模板目录"]', "分页模板 120");
   await waitFor("window.__calls.some(call=>call.name==='userTemplates'&&call.input.pageNumber===1&&call.input.keyword==='分页模板 120')");

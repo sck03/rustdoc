@@ -5,6 +5,7 @@ import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { ReportTemplateHistoryRetention } from "./ReportTemplateHistoryRetention.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 
 export function ReportTemplateVersionHistory({ client, template, enabled, isBusy, onRestore }: {
   client: ExportDocManagerApiClient; template: ApiUserReportTemplateDto; enabled: boolean; isBusy: boolean; onRestore: (version: number) => void;
@@ -29,11 +30,7 @@ export function ReportTemplateVersionHistory({ client, template, enabled, isBusy
         <div><strong>V{version.versionNumber} · {version.changeType}</strong><small>{version.changedBy || "当前用户"} · {new Date(version.createdAt).toLocaleString()}</small></div>
         {template.canEdit && version.canRestore && version.versionNumber !== template.versionNumber ? <button className="command-button secondary compact-button" type="button" disabled={isBusy} onClick={() => onRestore(version.versionNumber)}>恢复</button> : null}
       </div>)}
-      {query.data && query.data.totalPages > 1 ? <div className="template-management-actions">
-        <button className="command-button secondary compact-button" type="button" disabled={!query.data.hasPreviousPage || query.isFetching} onClick={() => setPageNumber(value => value - 1)}>上一页</button>
-        <small>{pageNumber} / {query.data.totalPages} 页</small>
-        <button className="command-button secondary compact-button" type="button" disabled={!query.data.hasNextPage || query.isFetching} onClick={() => setPageNumber(value => value + 1)}>下一页</button>
-      </div> : null}
+      {query.data && query.data.totalPages > 1 ? <Pagination pageNumber={pageNumber} totalPages={query.data.totalPages} totalCount={query.data.totalCount} pageSize={20} isBusy={query.isFetching} onPageChange={setPageNumber} /> : null}
     </div> : null}
   </details>;
 }

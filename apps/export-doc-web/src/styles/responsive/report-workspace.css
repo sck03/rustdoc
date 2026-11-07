@@ -81,10 +81,6 @@
     grid-row: 3;
   }
 
-  .report-template-current-title {
-    flex: 0 1 auto;
-  }
-
   .report-template-management-workspace {
     grid-template-columns: minmax(0, 1fr);
   }

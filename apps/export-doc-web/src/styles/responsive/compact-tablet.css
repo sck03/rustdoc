@@ -64,10 +64,6 @@
     min-height: var(--edm-touch-target);
   }
 
-  .report-template-sticky-header .segmented-control,
-.report-template-sticky-header button[type="submit"] {
-    display: none;
-  }
 }
 
 @media (min-width: 681px) and (max-width: 1180px) {

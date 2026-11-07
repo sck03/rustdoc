@@ -27,6 +27,7 @@ const designContent = text => {
 userTemplates[0]={...userTemplates[0],contentHtml:designContent(scenario==='v3'?'BASELINE CANVAS':'Shared template')};
 let file={...templates[0],content:designContent(scenario==='dtpl'?'DTPL CANVAS':'File baseline'),revision:scenario==='dtpl'?'dtpl-1':'file-1',storagePolicy:''};
 client.getReportTemplateFieldCatalog=()=>call('fields',{}, {reportType:'ExportDocument',categoryOrder:[],fields:[]});
+client.previewReportTemplateContent=input=>call('samplePreview',input,{reportType:'ExportDocument',html:'<!doctype html><html lang="zh-CN"><title>预览</title><body>预览结果</body></html>',pageIndex:input.body.pageIndex??0,pageCount:2,previewRevision:'preview-1'});
 client.listUserReportTemplates=input=>window.__failReload?Promise.reject(new Error('reload unavailable')):call('userTemplates',input,page(userTemplates.map(({contentHtml,...item})=>item),input));
 client.getUserReportTemplate=input=>window.__failReload?Promise.reject(new Error('reload unavailable')):window.__missingTemplate?Promise.reject(new ApiError(404,'Not Found','模板已删除')):call('userTemplateContent',input,exact(userTemplates,input.id));
 client.getReportTemplateContent=input=>window.__failReload?Promise.reject(new Error('reload unavailable')):window.__missingTemplate?Promise.reject(new ApiError(404,'Not Found','模板已删除')):call('templateContent',input,file);
@@ -182,6 +183,17 @@ try {
   await read('document.querySelector(".report-designer-v3-toolbar button[aria-label=文本]").click()'); await waitFor(saveEnabled);
   const count = await read("document.querySelectorAll('[data-v3-element-id]').length");
   await click("预览", ".report-template-designer-toolbar button"); await waitFor("document.querySelector('.report-template-designer-toolbar [aria-selected=true]')?.textContent.includes('预览')");
+  await settle();
+  assert.equal(await read("[...document.querySelectorAll('.report-template-layout button[type=submit]')].filter(node=>node.getClientRects().length).length"), 1, "预览仅保留页头保存入口");
+  assert.equal(await read("window.__calls.filter(call=>call.name==='samplePreview').length"), 1);
+  await captureScreenshot(page, path.join(output, "preview-single-save.png"));
+  for (const width of [1024, 390]) {
+    await page.send("Emulation.setDeviceMetricsOverride", { width, height: 1000, deviceScaleFactor: 1, mobile: false }); await settle();
+    assert(await read("document.querySelector('.report-template-current-title').getBoundingClientRect().height < 64"), "窄屏标题不因横向 flex 基准撑高");
+    assert.equal(await read("[...document.querySelectorAll('.report-template-layout button[type=submit]')].filter(node=>node.getClientRects().length).length"), 1, "窄屏保留唯一保存入口");
+    await captureScreenshot(page, path.join(output, `preview-${width}.png`));
+  }
+  await page.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false }); await settle();
   await click("可视化设计", ".report-template-designer-toolbar button"); await settle();
   assert.equal(await read("document.querySelectorAll('[data-v3-element-id]').length"), count); assert.equal(await read(saveEnabled), true); await record("preview-roundtrip-retains-canvas-history");
   await read("window.__failSave=true;window.__pauseSave=true"); await click("保存"); await waitFor("window.__finishSave");
@@ -218,6 +230,11 @@ try {
     await click("返回模板管理"); await waitFor("document.querySelector('[data-dialog-purpose=confirmation]')"); await click("取消", "[data-dialog-purpose=confirmation] button");
     await record(fileTemplate ? "missing-file-keeps-draft-and-leave-guard" : "missing-database-template-keeps-draft-and-leave-guard");
   }
+  await open("classic"); await editText("手机保存草稿", false); await waitFor(saveEnabled);
+  await page.send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: false }); await settle();
+  await click("保存"); await settle();
+  assert((await read("window.__calls.find(call=>call.name==='saveUser').input.body.contentHtml")).includes("手机保存草稿"));
+  assert.equal(await read(saveEnabled), false); await record("phone-save-commits-pending-draft");
   fs.writeFileSync(path.join(output, "summary.json"), JSON.stringify({ passed: results.length, results }, null, 2));
   process.stdout.write(`Report template draft UI passed (${results.length} cases).\n`);
 } finally {
