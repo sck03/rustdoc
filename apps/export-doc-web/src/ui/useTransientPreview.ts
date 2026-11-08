@@ -2,9 +2,9 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { isAbortError, useAbortableOperationController } from "./useAbortableOperation.ts";
 
 /** Large previews live only with their current source, never in the mutation cache. */
-export function useTransientPreview<T>(
+export function useTransientPreview<T, Input = void>(
   scope: unknown,
-  operation: (signal: AbortSignal) => Promise<T>,
+  operation: (signal: AbortSignal, input: Input) => Promise<T>,
   onError: (error: unknown) => void,
   onSuccess?: () => void,
 ) {
@@ -23,12 +23,12 @@ export function useTransientPreview<T>(
     return cancel;
   }, [scope, clear, cancel]);
 
-  async function generate() {
+  async function generate(input: Input) {
     const request = ++sequence.current;
     const current = () => request === sequence.current && Object.is(scope, latestScope.current);
     setState({ scope, value: null, pending: true });
     try {
-      const value = await run(operation);
+      const value = await run(signal => operation(signal, input));
       if (!current()) return;
       setState({ scope, value, pending: false });
       onSuccess?.();

@@ -54,4 +54,66 @@ pub fn exercise(db: &Connection) {
         0,
         "rolled-back metadata cannot outlive the record"
     );
+    field_selection(db);
+}
+
+fn field_selection(db: &Connection) {
+    db.begin().unwrap();
+    let mut ids = vec![];
+    for (company, status, invoice, extra) in [
+        ("SEARCH", "Pending", "CAFÉ%_", ""),
+        ("SEARCH", "Pending", "cafe\u{301}%_", ""),
+        ("OTHER", "Pending", "café%_", ""),
+        ("SEARCH", "Done", "café%_", ""),
+        ("SEARCH", "Pending", "unrelated", "café%_"),
+    ] {
+        let mut body = json!({"versionNumber":1,"ownerUserId":1,"companyScope":company,"departmentId":"D","businessType":"AgentConsignment","status":status,"invoiceNo":invoice,"_manifest":{"secret":extra,"padding":"x".repeat(10000)}});
+        let id = db
+            .insert(&RecordWrite::unkeyed("sw-batches", &body))
+            .unwrap();
+        body["id"] = json!(id);
+        db.set_body(id, &body).unwrap();
+        ids.push(id);
+    }
+    db.commit().unwrap();
+    db.begin_read().unwrap();
+    let query = |offset, count| {
+        db.query_record_fields(
+            &GenericQuery {
+                kind: "sw-batches",
+                scope: DataScope {
+                    company_wide: true,
+                    company: "SEARCH",
+                    ..Default::default()
+                },
+                keyword: "café%_",
+                filters: &[
+                    ("status", "Pending".into()),
+                    ("businessType", "AgentConsignment".into()),
+                ],
+                fields: &[("id", "id"), ("invoiceNo", "invoiceNo")],
+                offset,
+                limit: 1,
+                ..Default::default()
+            },
+            &["batchReference", "invoiceNo", "contractNo", "referenceNo"],
+            count,
+        )
+        .unwrap()
+    };
+    let (count, first) = query(0, true);
+    assert_eq!(
+        count, 2,
+        "scope, filters, NFC and literal wildcard search agree"
+    );
+    assert_eq!(first[0]["id"], ids[1]);
+    assert_eq!(
+        first[0].as_object().unwrap().len(),
+        2,
+        "manifest and secret are never materialized"
+    );
+    assert_eq!(query(1, false).1[0]["id"], ids[0]);
+    assert_eq!(query(i64::MAX, true).0, 2);
+    assert!(query(i64::MAX, true).1.is_empty());
+    db.commit().unwrap();
 }

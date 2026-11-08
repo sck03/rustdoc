@@ -1,59 +1,25 @@
-import { useState } from "react";
-import type { ApiCrmCustomerImportPreviewDto, ExportDocManagerApiClient } from "../../api/index.ts";
-import { readApiError } from "../../ui/formUtils.ts";
-import { OperationFeedback, errorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import type { ExportDocManagerApiClient } from "../../api/index.ts";
+import { OperationFeedback } from "../../ui/OperationFeedback.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
-import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { useFileImportWorkspace } from "../../ui/useFileImportWorkspace.ts";
 
 export function CrmCustomerImportPanel({ client, canImport, onImported }: {
   client: ExportDocManagerApiClient;
   canImport: boolean;
-  onImported: () => Promise<void>;
+  onImported: (signal: AbortSignal) => Promise<void>;
 }) {
-  const [preview, setPreview] = useState<ApiCrmCustomerImportPreviewDto | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
-  const runAbortableOperation = useAbortableOperation();
-
-  async function selectFile(file?: File) {
-    if (!canImport || !file) return;
-    setBusy(true);
-    try {
-      setPreview(await runAbortableOperation((signal) => client.previewCrmCustomerImport(
-        { fileName: file.name, body: file },
-        { signal },
-      )));
-      setFeedback(null);
-    } catch (error) {
-      if (!isAbortError(error)) {
-        setFeedback(errorFeedback(readApiError(error)));
-        setPreview(null);
-      }
-    }
-    finally { setBusy(false); }
-  }
-
-  async function confirmImport() {
-    if (!canImport || !preview?.validRows) return;
-    setBusy(true);
-    try {
-      const result = await runAbortableOperation((signal) => client.importCrmCustomers(
-        { body: { previewId: preview.previewId } },
-        { signal },
-      ));
-      setFeedback(successFeedback(`已导入 ${result.createdCustomers} 家客户、${result.createdContacts} 位联系人，跳过 ${result.skippedDuplicates} 行。`));
-      setPreview(null);
-      await onImported();
-    } catch (error) {
-      if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
-    }
-    finally { setBusy(false); }
-  }
+  const { preview, busy, importing, feedback, select: selectFile, commit: confirmImport } = useFileImportWorkspace({
+    owner: client, enabled: canImport,
+    preview: (file, signal) => client.previewCrmCustomerImport({ fileName: file.name, body: file }, { signal }),
+    commit: (value, signal) => client.importCrmCustomers({ body: { previewId: value.previewId } }, { signal }),
+    describe: result => `已导入 ${result.createdCustomers} 家客户、${result.createdContacts} 位联系人，跳过 ${result.skippedDuplicates} 行。`,
+    onImported,
+  });
 
   return <section className="form-section">
     <div className="section-header"><h3>客户文件导入</h3><span>CSV / XLSX，最多 5000 行、10 MB</span></div>
     <div className="form-actions">
-      <label className={`secondary-button${canImport ? "" : " disabled"}`}>选择文件<input type="file" hidden disabled={!canImport} accept=".csv,.xlsx,.xlsm" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; void selectFile(file); }} /></label>
+      <label className={`secondary-button${canImport ? "" : " disabled"}`}>选择文件<input type="file" hidden disabled={!canImport || importing} accept=".csv,.xlsx,.xlsm" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; selectFile(file); }} /></label>
       <button className="primary-button" type="button" disabled={!canImport || busy || !preview?.validRows} onClick={() => void confirmImport()}>{busy ? "处理中..." : "确认导入有效行"}</button>
     </div>
     <OperationFeedback feedback={feedback} />

@@ -142,6 +142,50 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
         let bytes = service.dispatch(operation, parameters, query, body, token)?;
         Ok(serde_json::from_slice(&bytes).unwrap())
     });
+    #[cfg(feature = "excel")]
+    for (preview_op, import_op, count_key) in [
+        (
+            PREVIEW_CRM_CUSTOMER_IMPORT,
+            IMPORT_CRM_CUSTOMERS,
+            "createdCustomers",
+        ),
+        (
+            PREVIEW_SUPPLIER_IMPORT,
+            IMPORT_SUPPLIERS,
+            "createdSuppliers",
+        ),
+    ] {
+        let data = format!(
+            "公司名称,联系人,邮箱\n导入-{0},测试,invalid\n导入-{0},测试,valid@example.test\n导入-{0},,",
+            nonce().unwrap()
+        );
+        let preview = service
+            .upload(
+                preview_op,
+                &[],
+                json!({}),
+                "names.csv",
+                data.as_bytes(),
+                token,
+            )
+            .unwrap();
+        assert_eq!(preview["validRows"], 1);
+        assert_eq!(preview["duplicateRows"], 1);
+        let imported: Value = serde_json::from_slice(
+            &service
+                .dispatch(
+                    import_op,
+                    &[],
+                    &[],
+                    Some(json!({"previewId":preview["previewId"]})),
+                    token,
+                )
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(imported[count_key], 1);
+        assert_eq!(imported["createdContacts"], 1);
+    }
     tools_contract::exercise(&|operation, parameters, query, body| {
         let bytes = service.dispatch(operation, parameters, query, body, token)?;
         Ok(serde_json::from_slice(&bytes).unwrap())

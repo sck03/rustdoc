@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-08",
-  "reviewNotes": "2026-11-08: reviewed Rust native production at 101,122 (including inline/module tests). The additional 340 lines implement shared streaming output preparation/recovery, desktop archive export, cancellation-aware maintenance waits, report resource admission and precise contract regressions. File/directory publication shares one schema 2 journal; no legacy recovery branch or duplicate renderer was added. New use cases and resource policies have dedicated modules. Reviewed automation at 40,514: actual mixed-paper printing and desktop backup checks share native picker isolation and document-scope normalization with existing tests. Tests/examples reviewed at 29,622 add slow-reader capacity/disconnect regression and serialize business scenarios sharing the process renderer. Per-file limits and subsequent growth allowances are unchanged. Other aggregates retain their prior review.",
+  "reviewNotes": "2026-11-08: reviewed automation at 40,679 after extending the existing party workspace fixture with import request ordering, lifecycle response isolation and approval polling recovery (32 scenarios total); no duplicate browser harness or new test entry. Per-file limits and subsequent growth allowances remain unchanged. Prior Rust review baseline remains 101,122 including inline/module tests; current production stays below it. Prior tests/examples review baseline remains 29,622. Other aggregates retain their prior review.",
   "rules": [
     {
       "name": "repository web production default",
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 40514,
+      "baselineAggregateLines": 40679,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 40664,
+      "maximumAggregateLines": 40829,
       "reportFiles": false
     },
     {

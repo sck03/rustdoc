@@ -184,18 +184,20 @@ export function useCustomerFollowUpWorkspace({ businessTimeZone, client }: Custo
       await Promise.all([queryClient.invalidateQueries({ queryKey: queryKeys.crmCustomersRoot() }), queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() })]);
       return;
     }
-    await runAbortableOperation(async (signal) => {
+    const load = async (requestSignal: AbortSignal) => {
       const page = await client.queryCrmCustomers(
         { keyword: customerKeyword.trim(), status: "", pageNumber: 1, pageSize: 100 },
-        { signal },
+        { signal: requestSignal },
       );
+      requestSignal.throwIfAborted();
       setCustomers(page.items);
       setCustomerId(0);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.crmCustomersRoot() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() }),
       ]);
-    });
+    };
+    await (signal ? load(signal) : runAbortableOperation(load));
   }
 
   async function searchCustomerOptions() {
@@ -214,6 +216,7 @@ export function useCustomerFollowUpWorkspace({ businessTimeZone, client }: Custo
   }
 
   async function reloadContacts(preferred?: ApiCrmContactDto, signal?: AbortSignal) {
+    signal?.throwIfAborted();
     if (!customerId) {
       setContacts([]);
       return;

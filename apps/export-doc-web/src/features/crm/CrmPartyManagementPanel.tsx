@@ -3,7 +3,8 @@ import type { ApiCrmContactDto, ApiCrmCustomerDto, ExportDocManagerApiClient } f
 import { requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
-import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { isAbortError } from "../../ui/useAbortableOperation.ts";
+import { runRecordAction } from "../../ui/runRecordAction.ts";
 import { useVersionedRecordDraft } from "../../ui/useVersionedRecordDraft.ts";
 import { ServerDraftUpdateNotice } from "../../ui/serverDraftSync.tsx";
 import { useScopedSave } from "../../ui/useScopedSave.ts";
@@ -31,7 +32,6 @@ type Props = {
 
 export function CrmPartyManagementPanel(props: Props) {
   const requestConfirmation = useConfirmation();
-  const runAbortableOperation = useAbortableOperation();
   const {
     client, customers, contacts, customerId, onReloadCustomers, onReloadContacts, onFeedback,
     canCreateCustomer, canEditCustomer, canDeactivateCustomer, canDeleteCustomer, canCreateContact, canEditContact,
@@ -105,15 +105,16 @@ export function CrmPartyManagementPanel(props: Props) {
   async function changeCustomerAvailability(restore: boolean) {
     if (!canDeactivateCustomer || !selectedCustomer) return;
     const action = restore ? "恢复" : "停用";
-    if (!await requestConfirmation({
+    const submitted = { ...customerDraft.values };
+    await runRecordAction(customerSave, onFeedback, {
+      confirm: [() => requestConfirmation({
       title: `${action} CRM 客户`,
       description: `确定${action}客户“${selectedCustomer.name}”吗？`,
       details: restore ? ["恢复后客户状态将变为跟进中。"] : ["停用不会删除跟进或商机历史。"],
       confirmLabel: `确认${action}`,
       tone: restore ? undefined : "danger",
-    }) || !await confirmDiscardChanges(`${action}客户`)) return;
-    try {
-      const saved = await runAbortableOperation((signal) => restore
+      }), () => confirmDiscardChanges(`${action}客户`)],
+      request: signal => restore
         ? client.restoreCrmCustomer(
           { id: selectedCustomer.id, body: { expectedVersion: selectedCustomer.versionNumber } },
           { signal },
@@ -121,29 +122,28 @@ export function CrmPartyManagementPanel(props: Props) {
         : client.deactivateCrmCustomer(
           { id: selectedCustomer.id, body: { expectedVersion: selectedCustomer.versionNumber } },
           { signal },
-        ));
-      await onReloadCustomers(saved);
-      customerDraft.reset();
-      onFeedback(successFeedback(restore ? "CRM 客户已恢复为跟进中。" : "CRM 客户已停用，历史记录保持不变。"));
-    } catch (error) {
-      if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
-    }
+        ),
+      apply: saved => customerDraft.acceptSaved(saved, submitted),
+      refresh: onReloadCustomers,
+      success: restore ? "CRM 客户已恢复为跟进中。" : "CRM 客户已停用，历史记录保持不变。",
+    });
   }
 
   async function deleteCustomer() {
-    if (!canDeleteCustomer || !selectedCustomer || !await requestConfirmation({ title: "删除 CRM 客户", description: `确定删除 CRM 客户“${selectedCustomer.name}”吗？`, details: ["存在业务引用时服务端会拒绝删除。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除客户")) return;
-    try {
-      await runAbortableOperation((signal) => client.deleteCrmCustomer(
+    if (!canDeleteCustomer || !selectedCustomer) return;
+    await runRecordAction(customerSave, onFeedback, {
+      confirm: [() => requestConfirmation({ title: "删除 CRM 客户", description: `确定删除 CRM 客户“${selectedCustomer.name}”吗？`, details: ["存在业务引用时服务端会拒绝删除。"], confirmLabel: "确认删除", tone: "danger" }), () => confirmDiscardChanges("删除客户")],
+      request: signal => client.deleteCrmCustomer(
         { id: selectedCustomer.id, expectedVersion: selectedCustomer.versionNumber },
         { signal },
-      ));
-      await onReloadCustomers();
-      customerDraft.reset();
-      contactDraft.reset();
-      onFeedback(successFeedback("CRM 客户已删除。"));
-    } catch (error) {
-      if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
-    }
+      ),
+      apply: (_, { continueInScope }) => {
+        continueInScope(`customer:0:${props.section}`);
+        customerDraft.reset(); contactDraft.reset(); props.onSelectCustomer(0);
+      },
+      refresh: (_, signal) => onReloadCustomers(undefined, signal),
+      success: "CRM 客户已删除。",
+    });
   }
 
   async function saveContact(event: FormEvent<HTMLFormElement>) {
@@ -174,36 +174,35 @@ export function CrmPartyManagementPanel(props: Props) {
 
   async function setPrimaryContact() {
     if (!canSetPrimaryContact || !selectedContact || selectedContact.isPrimary) return;
-    if (!await confirmDiscardChanges("设为主要联系人")) return;
-    try {
-      const saved = await runAbortableOperation((signal) => client.setPrimaryCrmContact({
+    const submitted = { ...contactDraft.values };
+    await runRecordAction(contactSave, onFeedback, {
+      confirm: [() => confirmDiscardChanges("设为主要联系人")],
+      request: signal => client.setPrimaryCrmContact({
         customerId: activeCustomerId,
         id: selectedContact.id,
         body: { expectedVersion: selectedContact.versionNumber },
-      }, { signal }));
-      await onReloadContacts();
-      contactDraft.reset();
-      setContactId(saved.id);
-      onFeedback(successFeedback("主要联系人已切换。"));
-    } catch (error) {
-      if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
-    }
+      }, { signal }),
+      apply: saved => contactDraft.acceptSaved(saved, submitted),
+      refresh: onReloadContacts,
+      success: "主要联系人已切换。",
+    });
   }
 
   async function deleteContact() {
-    if (!canDeleteContact || !selectedContact || !await requestConfirmation({ title: "删除客户联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, details: ["历史跟进记录仍会保留。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除联系人")) return;
-    try {
-      await runAbortableOperation((signal) => client.deleteCrmContact(
+    if (!canDeleteContact || !selectedContact) return;
+    await runRecordAction(contactSave, onFeedback, {
+      confirm: [() => requestConfirmation({ title: "删除客户联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, details: ["历史跟进记录仍会保留。"], confirmLabel: "确认删除", tone: "danger" }), () => confirmDiscardChanges("删除联系人")],
+      request: signal => client.deleteCrmContact(
         { customerId: activeCustomerId, id: selectedContact.id, expectedVersion: selectedContact.versionNumber },
         { signal },
-      ));
-      setContactId(0);
-      await onReloadContacts();
-      contactDraft.reset();
-      onFeedback(successFeedback("联系人已删除，历史跟进仍保留。"));
-    } catch (error) {
-      if (!isAbortError(error)) onFeedback(requestErrorFeedback(error));
-    }
+      ),
+      apply: (_, { continueInScope }) => {
+        continueInScope(`customer:${customerId}:contact:0:${props.section}`);
+        setContactId(0); contactDraft.reset();
+      },
+      refresh: (_, signal) => onReloadContacts(undefined, signal),
+      success: "联系人已删除，历史跟进仍保留。",
+    });
   }
 
   return (

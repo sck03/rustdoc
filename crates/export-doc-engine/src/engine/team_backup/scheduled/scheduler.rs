@@ -1,6 +1,7 @@
 use super::*;
+use crate::operation::{self, OperationScope};
 use chrono::{Datelike, NaiveTime, TimeZone};
-use std::sync::{Arc, Condvar, Mutex, OnceLock, Weak};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock, TryLockError, Weak};
 use std::thread::JoinHandle;
 
 fn zone(service: &NativeService, now: DateTime<Utc>) -> Result<chrono_tz::Tz> {
@@ -42,17 +43,38 @@ pub(super) fn next_run(service: &NativeService, plan: &BackupPlan) -> Result<Opt
     }
     Ok(None)
 }
+#[derive(Default)]
+struct Control {
+    stopping: bool,
+    active: Option<OperationScope>,
+}
 struct Worker {
-    stop: Arc<(Mutex<bool>, Condvar)>,
+    stop: Arc<(Mutex<Control>, Condvar)>,
     handle: JoinHandle<()>,
 }
 #[derive(Default)]
 pub(in crate::engine) struct Scheduler {
     service: OnceLock<Weak<NativeService>>,
     worker: Mutex<Option<Worker>>,
-    pub(super) gate: Mutex<()>,
+    gate: Mutex<()>,
 }
 impl Scheduler {
+    pub(super) fn lock(&self) -> Result<MutexGuard<'_, ()>> {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        loop {
+            operation::check()?;
+            match self.gate.try_lock() {
+                Ok(guard) => return Ok(guard),
+                Err(TryLockError::Poisoned(_)) => return Err(unavailable("灾备执行状态异常。")),
+                Err(TryLockError::WouldBlock) => {
+                    if std::time::Instant::now() >= deadline {
+                        return Err(error(429, "灾备计划正在处理中，请稍后重试。"));
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+            }
+        }
+    }
     pub(in crate::engine) fn health(&self) -> Result<()> {
         let worker = self
             .worker
@@ -118,30 +140,50 @@ impl Scheduler {
             .get()
             .ok_or_else(|| unavailable("灾备调度器未绑定。"))?
             .clone();
-        let stop = Arc::new((Mutex::new(false), Condvar::new()));
+        let stop = Arc::new((Mutex::new(Control::default()), Condvar::new()));
         let signal = stop.clone();
         let handle = std::thread::Builder::new()
             .name("exportdoc-backup-schedule".into())
             .spawn(move || {
                 loop {
-                    if *signal.0.lock().unwrap_or_else(|poison| poison.into_inner()) {
+                    if signal
+                        .0
+                        .lock()
+                        .unwrap_or_else(|poison| poison.into_inner())
+                        .stopping
+                    {
                         break;
                     }
                     let Some(service) = weak.upgrade() else {
                         break;
                     };
                     if let Ok(_access) = service.maintenance.try_read() {
-                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(||
-                            service.backup_scheduler.run(&service, None, Utc::now())));
+                        let scope = OperationScope::new(Duration::from_secs(30));
+                        {
+                            let mut control = signal.0.lock().unwrap_or_else(|p| p.into_inner());
+                            if control.stopping {
+                                break;
+                            }
+                            control.active = Some(scope.clone());
+                        }
+                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                            scope.run(|| service.backup_scheduler.run(&service, None, Utc::now()))
+                        }));
+                        let stopping = {
+                            let mut control = signal.0.lock().unwrap_or_else(|p| p.into_inner());
+                            control.active = None;
+                            control.stopping
+                        };
+                        if stopping {
+                            break;
+                        }
                         match result {
-                            Ok(Ok(_)) => {},
+                            Ok(Ok(_)) => {}
                             Ok(Err(cause)) => {
-                                let _ = update_state(&service.store, None,
-                                    json!({"lastResult":"Failed", "lastError":cause.message}));
-                            },
+                                record_failure(&service, &cause.message);
+                            }
                             Err(_) => {
-                                let _ = update_state(&service.store, None,
-                                    json!({"lastResult":"Failed", "lastError":"灾备调度线程异常退出，请重启服务。"}));
+                                record_failure(&service, "灾备调度线程异常退出，请重启服务。");
                                 break;
                             }
                         }
@@ -151,7 +193,9 @@ impl Scheduler {
                     drop(
                         signal
                             .1
-                            .wait_timeout_while(stopped, Duration::from_secs(30), |stop| !*stop),
+                            .wait_timeout_while(stopped, Duration::from_secs(30), |stop| {
+                                !stop.stopping
+                            }),
                     );
                 }
             })
@@ -201,10 +245,7 @@ impl Scheduler {
         manual: Option<&Actor>,
         now: DateTime<Utc>,
     ) -> Result<Option<Value>> {
-        let _gate = self
-            .gate
-            .lock()
-            .map_err(|_| unavailable("灾备执行状态异常。"))?;
+        let _gate = self.lock()?;
         let saved = load(&service.store)?;
         let previous = state(&service.store)?;
         let slot = saved
@@ -262,15 +303,33 @@ impl Scheduler {
                 None,
                 json!({"archiveId":id, "slot":slot, "lastRunAt":now, "runningJobId":null, "lastResult":"Running", "lastError":""}),
             )?;
-            let job = run::start(service, &actor, &saved, id.clone(), password, package_lock)?;
-            update_state(
-                &service.store,
-                Some(&id),
-                json!({"runningJobId":job["jobId"]}),
-            )?;
+            let job = match run::start(service, &actor, &saved, id.clone(), password, package_lock)
+            {
+                Ok(job) => job,
+                Err(cause) => {
+                    OperationScope::detached(Duration::from_secs(2)).run(|| {
+                        update_state(
+                            &service.store,
+                            Some(&id),
+                            json!({"lastResult":"Failed", "lastError":cause.message}),
+                        )
+                    })?;
+                    return Err(cause);
+                }
+            };
+            // A submitted job has its own lifetime; publish its identity even if
+            // the initiating request/tick was canceled just after submission.
+            OperationScope::detached(Duration::from_secs(2)).run(|| {
+                update_state(
+                    &service.store,
+                    Some(&id),
+                    json!({"runningJobId":job["jobId"]}),
+                )
+            })?;
             Ok(Some(job))
         })();
         if let Err(cause) = &start {
+            operation::check()?;
             if manual.is_none() || previous["lastResult"] != "Running" {
                 update_state(
                     &service.store,
@@ -287,16 +346,71 @@ impl Scheduler {
     }
 }
 fn signal(worker: &Worker) -> Result<()> {
-    *worker
+    let mut control = worker
         .stop
         .0
         .lock()
-        .map_err(|_| unavailable("灾备停止状态异常。"))? = true;
+        .map_err(|_| unavailable("灾备停止状态异常。"))?;
+    control.stopping = true;
+    if let Some(scope) = &control.active {
+        scope.cancel();
+    }
     worker.stop.1.notify_all();
     Ok(())
+}
+fn record_failure(service: &NativeService, message: &str) {
+    if let Err(cause) = OperationScope::detached(Duration::from_secs(1)).run(|| {
+        update_state(
+            &service.store,
+            None,
+            json!({"lastResult":"Failed", "lastError":message}),
+        )
+    }) {
+        eprintln!("灾备调度失败：{message}；状态记录失败：{}", cause.message);
+    }
 }
 impl Drop for Scheduler {
     fn drop(&mut self) {
         let _ = self.stop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn stop_cancels_an_active_tick_waiting_for_the_plan_lock() {
+        let scheduler = Arc::new(Scheduler::default());
+        let gate = scheduler.gate.lock().unwrap();
+        let scope = OperationScope::new(Duration::from_secs(30));
+        let stop = Arc::new((
+            Mutex::new(Control {
+                stopping: false,
+                active: Some(scope.clone()),
+            }),
+            Condvar::new(),
+        ));
+        let active = scheduler.clone();
+        let (ready, started) = std::sync::mpsc::channel();
+        let handle = std::thread::spawn(move || {
+            scope.run(|| {
+                ready.send(()).unwrap();
+                assert_eq!(active.lock().unwrap_err().status, Some(504));
+            });
+        });
+        *scheduler.worker.lock().unwrap() = Some(Worker { stop, handle });
+        started.recv().unwrap();
+        let before = std::time::Instant::now();
+        scheduler.stop().unwrap();
+        assert!(before.elapsed() < Duration::from_secs(2));
+        drop(gate);
+    }
+    #[test]
+    fn deadline_cancels_plan_lock_waits() {
+        let scheduler = Scheduler::default();
+        let _gate = scheduler.gate.lock().unwrap();
+        let cause =
+            OperationScope::new(Duration::from_millis(30)).run(|| scheduler.lock().unwrap_err());
+        assert_eq!(cause.status, Some(504));
     }
 }

@@ -34,8 +34,8 @@ mod supplier_overview_query;
 pub use job_query::{JobOutputRetention, JobQuery, JobRetention};
 pub use office_query::OfficeQuery;
 pub use personnel_query::PersonnelQuery;
-mod record_export;
 mod record_query;
+mod record_selection;
 mod related_query;
 mod resource_query;
 mod workflow_origin;
@@ -398,7 +398,7 @@ delegate! {
     workflow_system_requests(action:&str)->Vec<Value>;
     workflow_exceptions(company:&str,offset:i64,limit:i64)->Value;
     workflow_decisions(request:i64,revision:i64,generation:Option<i64>,offset:i64,limit:i64)->Value;
-    export_record_page(query:&GenericQuery<'_>,search_fields:&[&str],count:bool)->(i64,Vec<Value>);
+    query_record_fields(query:&GenericQuery<'_>,search_fields:&[&str],count:bool)->(i64,Vec<Value>);
     export_primary_contacts(kind:&str,scope:&DataScope<'_>,relation:&str,parents:&[i64])->Vec<Value>;
     command_receipt(actor:i64,context:&str,key:&str)->Option<Value>;
     put_command_receipt(receipt:&Value,result:&Value)->();

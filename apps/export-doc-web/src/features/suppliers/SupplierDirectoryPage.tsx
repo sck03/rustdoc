@@ -3,9 +3,11 @@ import { FilterBar } from "../../ui/primitives/Field.tsx";
 import { useEffect, useState, type FormEvent } from "react";
 import { useVersionedRecordDraft } from "../../ui/useVersionedRecordDraft.ts";
 import { useScopedSave } from "../../ui/useScopedSave.ts";
+import { runRecordAction } from "../../ui/runRecordAction.ts";
+import { useFileImportWorkspace } from "../../ui/useFileImportWorkspace.ts";
 import { isAbortError } from "../../ui/useAbortableOperation.ts";
 import { ServerDraftUpdateNotice } from "../../ui/serverDraftSync.tsx";
-import type { ApiSupplierContactDto, ApiSupplierDto, ApiSupplierImportPreviewDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ApiSupplierContactDto, ApiSupplierDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { currentLocalDateInputValue, readApiError } from "../../ui/formUtils.ts";
 import { SupplierProductLinksPanel } from "./SupplierProductLinksPanel.tsx";
 import { SupplierAssessmentsPanel } from "./SupplierAssessmentsPanel.tsx";
@@ -69,8 +71,6 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
   const [contactPageSize, setContactPageSize] = useState(20);
   const [contactTotalCount, setContactTotalCount] = useState(0);
   const [contactTotalPages, setContactTotalPages] = useState(1);
-  const [importPreview, setImportPreview] = useState<ApiSupplierImportPreviewDto | null>(null);
-  const [busy, setBusy] = useState(false);
   const view = readRouteChoice<SupplierTaskView>(params.get("view"), ["overview", "directory", "profile", "contacts", "products", "assessments", "import"], "directory");
   const setView = (value: SupplierTaskView) => updateRoute({ view: value }, false);
   const [contactView, setContactView] = useState<"directory" | "editor">("directory");
@@ -79,6 +79,13 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
   const supplierDraftDirty = supplierDraft.isDirty, contactDraftDirty = contactDraft.isDirty;
   const supplierSave = useScopedSave(`supplier:${supplierId}:${view}`, client);
   const contactSave = useScopedSave(`supplier:${supplierId}:contact:${contactId}:${view}:${contactView}`, client);
+  const { preview: importPreview, busy, importing, feedback: importFeedback, select: previewImport, commit: confirmImport } = useFileImportWorkspace({
+    owner: client, enabled: canImportSupplier && view === "import",
+    preview: (file, signal) => client.previewSupplierImport({ fileName: file.name, body: file }, { signal }),
+    commit: (value, signal) => client.importSuppliers({ body: { previewId: value.previewId } }, { signal }),
+    describe: result => `已导入 ${result.createdSuppliers} 家供应商、${result.createdContacts} 位联系人，跳过 ${result.skippedRows} 行。`,
+    onImported: async () => { setRevision(value => value + 1); },
+  });
   const selectedSupplier = supplierDraft.record;
   const selectedContact = contactDraft.record;
   const confirmDiscardChanges = useConfirmUnsavedChanges();
@@ -121,11 +128,6 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
     contactDraft.reset();
     setContactId(nextContactId);
     setContactView("editor");
-  }
-
-  async function loadSupplierOptions(preferred?: ApiSupplierDto) {
-    setSuppliers(preferred ? [preferred] : []);
-    setSupplierId(preferred?.id ?? 0);
   }
 
   async function openSupplier(item: ApiSupplierDto) {
@@ -203,39 +205,38 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
   }
 
   async function changeSupplierStatus(action: "admit" | "deactivate" | "restore") {
-    if (!selectedSupplier) return;
+    if (!selectedSupplier || (action === "admit" ? !canAdmitSupplier : !canDeactivateSupplier)) return;
     const labels = {
       admit: ["准入供应商", "确认该供应商已经完成准入审核并进入合作中状态吗？", "供应商已准入。"],
       deactivate: ["停用供应商", "停用会保留联系人、供货关系和评价历史，确定继续吗？", "供应商已停用。"],
       restore: ["恢复供应商", "恢复后供应商将回到考察中状态，确定继续吗？", "供应商已恢复考察。"],
     } as const;
     const [title, description, successMessage] = labels[action];
-    if (!await requestConfirmation({
-      title,
-      description,
-      confirmLabel: title,
-      tone: action === "deactivate" ? "danger" : undefined,
-    }) || !await confirmDiscardChanges(title)) return;
-    try {
-      const request = { id: selectedSupplier.id, body: { expectedVersion: selectedSupplier.versionNumber } };
-      const saved = action === "admit"
-        ? await client.admitSupplier(request)
-        : action === "restore"
-          ? await client.restoreSupplier(request)
-          : await client.deactivateSupplier(request);
-      await loadSupplierOptions(saved);
-      supplierDraft.reset();
-      setRevision((value) => value + 1);
-      setFeedback(successFeedback(successMessage));
-    } catch (error) {
-      setFeedback(requestErrorFeedback(error));
-    }
+    const submitted = { ...supplierDraft.values };
+    const request = { id: selectedSupplier.id, body: { expectedVersion: selectedSupplier.versionNumber } };
+    await runRecordAction(supplierSave, setFeedback, {
+      confirm: [() => requestConfirmation({ title, description, confirmLabel: title, tone: action === "deactivate" ? "danger" : undefined }), () => confirmDiscardChanges(title)],
+      request: signal => action === "admit" ? client.admitSupplier(request, { signal }) : action === "restore" ? client.restoreSupplier(request, { signal }) : client.deactivateSupplier(request, { signal }),
+      apply: saved => {
+        supplierDraft.acceptSaved(saved, submitted);
+        setSuppliers(current => [saved, ...current.filter(item => item.id !== saved.id)]);
+        setRevision(value => value + 1);
+      },
+      success: successMessage,
+    });
   }
 
   async function deleteSupplier() {
-    if (!canDeleteSupplier || !selectedSupplier || !await requestConfirmation({ title: "删除供应商", description: `确定删除供应商“${selectedSupplier.name}”吗？`, details: ["只有没有供货关系和评价的供应商才能删除。", "联系人会随供应商一并删除；有业务历史时请使用“停用供应商”。"], confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除供应商")) return;
-    try { const response = await client.deleteSupplier({ id: selectedSupplier.id, expectedVersion: selectedSupplier.versionNumber }); supplierDraft.reset(); contactDraft.reset(); await loadSupplierOptions(); setRevision((value) => value + 1); setView("directory"); setFeedback(successFeedback(response.message)); }
-    catch (error) { setFeedback(requestErrorFeedback(error)); }
+    if (!canDeleteSupplier || !selectedSupplier) return;
+    await runRecordAction(supplierSave, setFeedback, {
+      confirm: [() => requestConfirmation({ title: "删除供应商", description: `确定删除供应商“${selectedSupplier.name}”吗？`, details: ["只有没有供货关系和评价的供应商才能删除。", "联系人会随供应商一并删除；有业务历史时请使用“停用供应商”。"], confirmLabel: "确认删除", tone: "danger" }), () => confirmDiscardChanges("删除供应商")],
+      request: signal => client.deleteSupplier({ id: selectedSupplier.id, expectedVersion: selectedSupplier.versionNumber }, { signal }),
+      apply: (_, { continueInScope }) => {
+        continueInScope("supplier:0:directory"); supplierDraft.reset(); contactDraft.reset(); setSuppliers([]);
+        updateRoute({ supplierId: null, view: "directory" }); setRevision(value => value + 1);
+      },
+      success: "供应商已删除。",
+    });
   }
 
   async function saveContact(event: FormEvent<HTMLFormElement>) {
@@ -258,44 +259,29 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
 
   async function setPrimaryContact() {
     if (!canSetPrimaryContact || !selectedContact) return;
-    if (!await confirmDiscardChanges("设为主要联系人")) return;
-    try {
-      const saved = await client.setPrimarySupplierContact({
-        supplierId,
-        id: selectedContact.id,
-        body: { expectedVersion: selectedContact.versionNumber },
-      });
-      await reloadContacts(saved);
-      contactDraft.reset();
-      setFeedback(successFeedback("主要联系人已切换。"));
-    } catch (error) {
-      setFeedback(requestErrorFeedback(error));
-    }
+    const submitted = { ...contactDraft.values };
+    await runRecordAction(contactSave, setFeedback, {
+      confirm: [() => confirmDiscardChanges("设为主要联系人")],
+      request: signal => client.setPrimarySupplierContact({ supplierId, id: selectedContact.id, body: { expectedVersion: selectedContact.versionNumber } }, { signal }),
+      apply: saved => { contactDraft.acceptSaved(saved, submitted); setContacts(current => current.map(item => item.id === saved.id ? saved : { ...item, isPrimary: false })); },
+      refresh: reloadContacts,
+      success: "主要联系人已切换。",
+    });
   }
 
   async function deleteContact() {
-    if (!canDeleteContact || !selectedContact || !await requestConfirmation({ title: "删除供应商联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, confirmLabel: "确认删除", tone: "danger" }) || !await confirmDiscardChanges("删除联系人")) return;
-    try {
-      await client.deleteSupplierContact({ supplierId, id: selectedContact.id, expectedVersion: selectedContact.versionNumber });
-      await reloadContacts(); contactDraft.reset(); setContactView("directory"); setFeedback(successFeedback("联系人已删除。"));
-    }
-    catch (error) { setFeedback(requestErrorFeedback(error)); }
-  }
-
-  async function previewImport(file?: File) {
-    if (!canImportSupplier || !file) return; setBusy(true);
-    try { setImportPreview(await client.previewSupplierImport({ fileName: file.name, body: file })); setFeedback(null); }
-    catch (error) { setFeedback(errorFeedback(readApiError(error))); setImportPreview(null); }
-    finally { setBusy(false); }
-  }
-
-  async function confirmImport() {
-    if (!canImportSupplier || !importPreview?.validRows) return; setBusy(true);
-    try {
-      const result = await client.importSuppliers({ body: { previewId: importPreview.previewId } });
-      setFeedback(successFeedback(`已导入 ${result.createdSuppliers} 家供应商、${result.createdContacts} 位联系人，跳过 ${result.skippedRows} 行。`));
-      setImportPreview(null); await loadSupplierOptions(); setRevision((value) => value + 1);
-    } catch (error) { setFeedback(errorFeedback(readApiError(error))); } finally { setBusy(false); }
+    if (!canDeleteContact || !selectedContact) return;
+    await runRecordAction(contactSave, setFeedback, {
+      confirm: [() => requestConfirmation({ title: "删除供应商联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, confirmLabel: "确认删除", tone: "danger" }), () => confirmDiscardChanges("删除联系人")],
+      request: signal => client.deleteSupplierContact({ supplierId, id: selectedContact.id, expectedVersion: selectedContact.versionNumber }, { signal }),
+      apply: (_, { continueInScope }) => {
+        continueInScope(`supplier:${supplierId}:contact:0:${view}:directory`);
+        setContacts(current => current.filter(item => item.id !== selectedContact.id));
+        contactDraft.reset(); setContactId(0); setContactView("directory");
+      },
+      refresh: (_, signal) => reloadContacts(undefined, signal),
+      success: "联系人已删除。",
+    });
   }
 
   async function exportRows() {
@@ -308,7 +294,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
   }
 
   return <ListWorkspace >
-    <OperationFeedback feedback={feedback} />
+    <OperationFeedback feedback={view === "import" ? importFeedback : feedback} />
     {(view === "profile" ? supplierDraft : contactDraft).hasPendingServerVersion ? <ServerDraftUpdateNotice
       entityLabel={view === "profile" ? "供应商" : "联系人"}
       onKeepLocal={(view === "profile" ? supplierDraft : contactDraft).keepLocalDraft}
@@ -340,7 +326,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
     }} /></div> : null}
     {view === "import" && canImportSupplier ? <section className="form-section" aria-label="导入供应商"><div className="section-header"><h3>导入供应商</h3><span>CSV/XLSX 最多 5000 行、10 MB</span></div>
       <div className="form-actions">
-        {canImportSupplier ? <label className="secondary-button">选择导入文件<input type="file" hidden accept=".csv,.xlsx,.xlsm" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; void previewImport(file); }} /></label> : null}
+        {canImportSupplier ? <label className="secondary-button">选择导入文件<input type="file" hidden disabled={importing} accept=".csv,.xlsx,.xlsm" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; previewImport(file); }} /></label> : null}
         {canImportSupplier ? <button className="primary-button" type="button" disabled={busy || !importPreview?.validRows} onClick={() => void confirmImport()}>确认导入有效行</button> : null}
       </div>
       {importPreview ? <><p>共 {importPreview.totalRows} 行，有效 {importPreview.validRows} 行，重复 {importPreview.duplicateRows} 行。提交将使用服务端预检快照并重新校验；下表最多展示前 30 行。</p>

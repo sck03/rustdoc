@@ -50,6 +50,46 @@ fn relation(supplier: bool) -> &'static str {
         "crmCustomerId"
     }
 }
+fn existing_names(
+    tx: &export_doc_storage::Connection,
+    actor: &Actor,
+    kind: &str,
+    permission: &str,
+) -> Result<BTreeSet<String>> {
+    let mut names = BTreeSet::new();
+    let mut offset = 0;
+    loop {
+        operation::check()?;
+        let rows = tx
+            .query_record_fields(
+                &export_doc_storage::GenericQuery {
+                    kind,
+                    scope: auth::data_scope(actor, permission, "view"),
+                    fields: &[("name", "name")],
+                    offset,
+                    limit: 2000,
+                    ..Default::default()
+                },
+                &[],
+                false,
+            )?
+            .1;
+        let complete = rows.len() < 2000;
+        names.extend(rows.iter().map(|row| store::normalize(&text(row, "name"))));
+        if complete {
+            return Ok(names);
+        }
+        offset += 2000;
+    }
+}
+/// Invalid rows never reserve a name; preview and commit use the same rule.
+fn accept_row(row: &mut Value, names: &mut BTreeSet<String>) -> bool {
+    let key = store::normalize(&text(row, "name"));
+    let valid = row["error"] == "" && !key.is_empty();
+    let duplicate = valid && !names.insert(key);
+    row["isDuplicate"] = json!(duplicate);
+    valid && !duplicate
+}
 pub fn upload(
     service: &NativeService,
     actor: &Actor,
@@ -65,12 +105,10 @@ pub fn upload(
     let mut rows = party::map_rows(&table, supplier).map_err(invalid)?;
     let resource = catalog::resource(kind(supplier)).unwrap();
     service.store.transaction_for(actor, operation, &[], |tx, actor| {
-        let mut names: BTreeSet<_> = store::all(tx,resource.key)?.iter().filter(|row| auth::visible(actor,resource.permission,"view",row))
-            .map(|row| store::normalize(&text(row,"name"))).collect();
+        let mut names = existing_names(tx,actor,resource.key,resource.permission)?;
         for row in &mut rows {
             operation::check()?;
-            let key = store::normalize(&text(row,"name"));
-            row["isDuplicate"] = json!(!key.is_empty() && !names.insert(key));
+            accept_row(row, &mut names);
         }
         let identity = import_previews::save(tx,actor,&service.clock,resource.key,&rows)?;
         Ok(json!({"totalRows":rows.len(),"validRows":rows.iter().filter(|row| row["error"] == "" && row["isDuplicate"] != true).count(),
@@ -88,14 +126,12 @@ fn import(
     let contacts = catalog::resource(contact_kind(supplier)).unwrap();
     service.store.transaction_for(actor, operation, &[], |tx, actor| {
         let rows = import_previews::consume(tx,actor,&service.clock,resource.key,&text(body,"previewId"))?;
-        let mut names: BTreeSet<_> = store::all(tx,resource.key)?.iter().filter(|row| auth::visible(actor,resource.permission,"view",row))
-            .map(|row| store::normalize(&text(row,"name"))).collect();
+        let mut names = existing_names(tx,actor,resource.key,resource.permission)?;
         let (mut created,mut contact_count,mut skipped) = (0,0,0);
         for row in rows {
             operation::check()?;
-            let row = party::normalize(&row,supplier);
-            let key = store::normalize(&text(&row,"name"));
-            if row["error"] != "" || key.is_empty() || !names.insert(key) { skipped += 1; continue; }
+            let mut row = party::normalize(&row,supplier);
+            if !accept_row(&mut row, &mut names) { skipped += 1; continue; }
             let mut party = contracts::initial(contracts::schema(resource.schema));
             for key in ["name","countryRegion","website","status","notes","source","category","mainProducts"] {
                 if let Some(value) = row.get(key) { party[key] = value.clone(); }
@@ -152,7 +188,7 @@ fn export(
                 ..Default::default()
             };
             let count = tx
-                .export_record_page(&selection(i64::MAX, 1), &fields, true)?
+                .query_record_fields(&selection(i64::MAX, 1), &fields, true)?
                 .0;
             if count > 10_000 {
                 return Err(invalid("当前筛选超过 10000 条，请缩小范围后导出。"));
@@ -161,7 +197,7 @@ fn export(
             while rows.len() < (count as usize) {
                 operation::check()?;
                 let page = tx
-                    .export_record_page(&selection(rows.len() as i64, 2000), &fields, false)?
+                    .query_record_fields(&selection(rows.len() as i64, 2000), &fields, false)?
                     .1;
                 if page.is_empty() {
                     return Err(unavailable("导出结果在读取中缺失。"));

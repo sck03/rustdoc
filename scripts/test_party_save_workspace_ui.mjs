@@ -14,19 +14,26 @@ import React,{useRef,useState} from "react";import {createRoot} from "react-dom/
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";import {MemoryRouter,useLocation,useNavigate} from "react-router-dom";
 import {SupplierDirectoryPage} from ${source("features/suppliers/SupplierDirectoryPage.tsx")};
 import {CustomerFollowUpPage} from ${source("features/crm/CustomerFollowUpPage.tsx")};
+import {ApprovalDocument} from ${source("features/oa/ApprovalDocument.tsx")};
 import {PermissionAccessProvider} from ${source("app/PermissionAccessContext.tsx")};
 import {permissionResources,permissionActions} from ${source("app/permissionCatalog.ts")};
 import {ConfirmationProvider} from ${source("ui/ConfirmationProvider.tsx")};
 import {UnsavedChangesProvider,useHasUnsavedChanges} from ${source("ui/unsavedChangesGuard.tsx")};
 import {useBusinessDateSessionRefresh} from ${source("app/useBusinessDateSessionRefresh.ts")};
 window.requests=[];window.contactQueries=[];window.meCalls=0;
+window.previews=[];window.imports=[];window.documentCalls=0;
 const queries=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});window.queries=queries;
 const page=(items,number=1)=>({items,pageNumber:number,pageSize:20,totalCount:21,totalPages:2});
 let party={id:1,name:"original",versionNumber:1,status:"考察中"},contact={id:21,name:"original contact",versionNumber:1,supplierCompanyId:1,crmCustomerId:1};
 const getParty=async ({id})=>({...party,id,name:id===2?"second record":party.name});
 const getContacts=async (request,init)=>{window.contactQueries.push(request);if(window.refreshFailure)throw new Error("directory unavailable");return page(request.pageNumber===2||!window.mode.startsWith("supplier")?[contact]:[{...contact,id:1}],request.pageNumber)};
 const save=(request,init)=>new Promise((resolve,reject)=>window.requests.push({request,signal:init.signal,resolve,reject}));
+const preview=(request,init)=>new Promise((resolve,reject)=>window.previews.push({request,signal:init.signal,resolve,reject}));
+const commit=(request,init)=>new Promise((resolve,reject)=>window.imports.push({request,signal:init.signal,resolve,reject}));
 const client={getSupplier:getParty,getCrmCustomer:getParty,querySuppliers:async()=>page([party]),queryCrmCustomers:async()=>page([party]),
+admitSupplier:save,deactivateSupplier:save,restoreSupplier:save,deleteSupplier:save,setPrimarySupplierContact:save,deleteSupplierContact:save,
+deactivateCrmCustomer:save,restoreCrmCustomer:save,deleteCrmCustomer:save,setPrimaryCrmContact:save,deleteCrmContact:save,
+previewSupplierImport:preview,previewCrmCustomerImport:preview,importSuppliers:commit,importCrmCustomers:commit,
 querySupplierContacts:getContacts,queryCrmContacts:getContacts,updateSupplier:save,createSupplier:save,updateSupplierContact:save,createSupplierContact:save,
 updateCrmCustomer:save,createCrmCustomer:save,updateCrmContact:save,createCrmContact:save,getCurrentUser:async()=>{window.meCalls++;return {id:1,capabilities:{},businessDateValidUntilUtc:"2099-01-01T00:00:00Z"}}};
 window.finish=(index=0)=>{const pending=window.requests[index],isContact="supplierCompanyId" in pending.request.body||"crmCustomerId" in pending.request.body;
@@ -37,10 +44,12 @@ const [session,store]=useState(window.mode==="session-restored"?{accessToken:"re
 const setSession=value=>{sessionRef.current=value;validatedUserTokenRef.current=value.accessToken;store(value)};
 window.login=()=>setSession({accessToken:"fresh",user});window.renew=()=>setSession({accessToken:"renewed",user});
 useBusinessDateSessionRefresh({client,desktopContextLoading:false,queryClient:queries,session,sessionRef,setSession,validatedUserTokenRef});return <div>session harness</div>}
+const approvalApi={submission:async()=>{window.documentCalls++;if(window.documentCalls===2)throw new Error("document unavailable");return {documentStatus:window.documentCalls<4?"Running":"Ready",submissionNumber:1}}};
 function Harness(){const [shown,setShown]=useState(true),navigate=useNavigate(),location=useLocation();window.navigate=navigate;window.hide=()=>setShown(false);window.route=location.search;
-window.dirty=useHasUnsavedChanges();return !shown?<div>unmounted</div>:window.mode.startsWith("session")?<SessionHarness/>:window.mode.startsWith("supplier")?<SupplierDirectoryPage businessDate="2026-10-25" client={client}/>:<CustomerFollowUpPage businessTimeZone="Asia/Shanghai" client={client}/>}
+window.dirty=useHasUnsavedChanges();return !shown?<div>unmounted</div>:window.mode==="approval"?<ApprovalDocument api={approvalApi} user={{id:1}} row={{id:1,status:"Approved",versionNumber:1,submissionId:1}} scope="test"/>:window.mode.startsWith("session")?<SessionHarness/>:window.mode.startsWith("supplier")?<SupplierDirectoryPage businessDate="2026-10-25" client={client}/>:<CustomerFollowUpPage businessTimeZone="Asia/Shanghai" client={client}/>}
 const mode=window.mode,isNew=mode.endsWith("new")&&!mode.includes("contacts"),contacts=mode.includes("contacts");
-const entry=mode.startsWith("supplier")?"/suppliers?view="+(contacts?"contacts":"profile")+(isNew?"&new=true":"&supplierId=1"):"/crm?view="+(contacts?"contacts":"profile")+(isNew?"":"&customerId=1");
+const view=mode.endsWith("import")?"import":contacts?"contacts":"profile";
+const entry=mode.startsWith("supplier")?"/suppliers?view="+view+(isNew?"&new=true":"&supplierId=1"):"/crm?view="+view+(isNew?"":"&customerId=1");
 const permissions=Object.values(permissionResources).flatMap(resourceKey=>Object.values(permissionActions).map(action=>({resourceKey,action,dataScope:"all"})));
 createRoot(document.getElementById("root")).render(<MemoryRouter initialEntries={[entry]}><QueryClientProvider client={queries}><PermissionAccessProvider permissions={permissions}>
 <ConfirmationProvider><UnsavedChangesProvider><Harness/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider></QueryClientProvider></MemoryRouter>);
@@ -58,13 +67,52 @@ async function scenario(mode, check) {
     }
     if (mode === "supplier-contacts-new") await page.getByRole("button", { name: "新增联系人", exact: true }).click();
     if (mode === "crm-contacts-new") await page.getByRole("button", { name: "新建", exact: true }).click();
-    if (!mode.startsWith("session")) await page.locator(`input[name="${mode.includes("contacts") ? "contactName" : "name"}"]`).waitFor();
+    if (!mode.startsWith("session") && !mode.endsWith("import") && mode !== "approval") await page.locator(`input[name="${mode.includes("contacts") ? "contactName" : "name"}"]`).waitFor();
     await check(page); assert.deepEqual(errors, []); passed++;
   } catch (error) { await page.screenshot({ path: path.join(output, `failure-${passed}.png`), fullPage: true }); throw error; }
   finally { await page.close(); }
 }
 const submit = page => page.locator('form:has(button[type="submit"]:text-matches("保存|建立|添加"))').evaluate(form => { form.requestSubmit(); form.requestSubmit(); });
 try {
+  for (const mode of ["supplier-import", "crm-import"]) for (const oldFirst of [false, true]) await scenario(mode, async page => {
+    const file = name => ({ name: `${name}.csv`, mimeType: "text/csv", buffer: Buffer.from("name\n" + name) });
+    await page.locator('input[type="file"]').setInputFiles(file("A"));
+    await page.locator('input[type="file"]').setInputFiles(file("B"));
+    await page.waitForFunction(() => window.previews.length === 2);
+    assert.equal(await page.evaluate(() => window.previews[0].signal.aborted), true);
+    const finish = index => page.evaluate(index => window.previews[index].resolve({ previewId: index ? "B" : "A", validRows: 1, totalRows: 1, duplicateRows: 0, rows: [{ rowNumber: 2, name: index ? "B" : "A", error: "", isDuplicate: false }] }), index);
+    const button = page.getByRole("button", { name: /确认导入有效行|处理中/ });
+    if (oldFirst) { await finish(0); assert.equal(await button.isDisabled(), true); }
+    await finish(1); await page.getByRole("cell", { name: "B", exact: true }).waitFor();
+    if (!oldFirst) await finish(0);
+    await button.click(); await page.waitForFunction(() => window.imports.length === 1);
+    assert.equal(await page.evaluate(() => window.imports[0].request.body.previewId), "B");
+    assert.equal(await page.locator('input[type="file"]').isDisabled(), true);
+    await page.evaluate(() => window.imports[0].resolve({createdCustomers:1,createdSuppliers:1,createdContacts:0,skippedRows:0,skippedDuplicates:0}));
+    await page.getByText(/已导入 1 家/).waitFor(); assert.equal(await button.isDisabled(), true);
+  });
+  for (const mode of ["supplier-profile", "crm-profile", "supplier-contacts", "crm-contacts"]) for (const deletion of [false, true]) await scenario(mode, async page => {
+    const contact = mode.includes("contacts"), supplier = mode.startsWith("supplier");
+    await page.getByRole("button", { name: deletion ? supplier ? "删除" : contact ? "删除联系人" : "删除客户" : contact ? "设为主要联系人" : supplier ? "停用供应商" : "停用客户", exact: true }).click();
+    if (deletion || !contact) await page.getByRole("dialog").getByRole("button", { name: deletion ? "确认删除" : supplier ? "停用供应商" : "确认停用", exact: true }).click();
+    await page.waitForFunction(() => window.requests.length === 1);
+    await page.evaluate(supplier => window.navigate(supplier ? "/suppliers?view=profile&supplierId=2" : "/crm?view=profile&customerId=2"), supplier);
+    await page.waitForFunction(() => document.querySelector('input[name="name"]')?.value === "second record");
+    await page.locator('input[name="name"]').fill("second draft");
+    await page.evaluate(() => window.requests[0].resolve({id:1,name:"old result",versionNumber:2,status:"停用",isPrimary:true}));
+    await page.waitForFunction(() => window.requests[0].signal.aborted);
+    assert.equal(await page.locator('input[name="name"]').inputValue(), "second draft");
+    assert.equal(await page.getByText(/已删除|已停用|已切换/).count(), 0);
+  });
+  await scenario("approval", async page => {
+    await page.getByText("document unavailable", { exact: false }).waitFor();
+    const calls = await page.evaluate(() => window.documentCalls);
+    await page.waitForTimeout(3300);
+    assert.equal(await page.evaluate(() => window.documentCalls), calls, "cached Running must not restart polling after failure");
+    await page.getByRole("button", {name:"重试",exact:true}).click();
+    await page.getByRole("button", {name:"下载审批单 PDF",exact:true}).waitFor();
+    assert.equal(await page.evaluate(() => window.documentCalls), 4);
+  });
   for (const mode of ["supplier-profile", "crm-profile", "supplier-contacts", "crm-contacts", "supplier-new", "crm-new", "supplier-contacts-new", "crm-contacts-new"]) {
     await scenario(mode, async page => {
       const input = page.locator(`input[name="${mode.includes("contacts") ? "contactName" : "name"}"]`);

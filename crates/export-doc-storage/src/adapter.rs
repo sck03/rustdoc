@@ -56,8 +56,8 @@ pub(crate) trait Adapter: Send {
         append_workflow_operation(entry: &Value) -> () => command_receipts::operation;
         freeze_request_revision(id: i64, snapshot: &Value) -> () => workflow_runtime::freeze;
         save_workflow_state(request: i64, revision: i64, progress: &WorkflowProgress<'_>, plan: &Value, active_tasks: &[String]) -> () => workflow_runtime::persist;
-        export_record_page(query: &GenericQuery<'_>, search_fields: &[&str], count: bool) -> (i64, Vec<Value>) => record_export::page;
-        export_primary_contacts(kind: &str, scope: &DataScope<'_>, relation: &str, parents: &[i64]) -> Vec<Value> => record_export::contacts;
+        query_record_fields(query: &GenericQuery<'_>, search_fields: &[&str], count: bool) -> (i64, Vec<Value>) => record_selection::page;
+        export_primary_contacts(kind: &str, scope: &DataScope<'_>, relation: &str, parents: &[i64]) -> Vec<Value> => record_selection::contacts;
     }
     query_operations! {
         query_hs(&HsQuery<'_>) -> Vec<Value> => hs_query::build, query_slice;

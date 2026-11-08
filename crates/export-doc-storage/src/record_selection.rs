@@ -1,4 +1,4 @@
-//! Export selection applies scope and exact field searches before allocating result rows.
+//! Shared list/export selection applies scope and field searches before allocating rows.
 use crate::{Adapter, DataScope, GenericQuery, Result, generic_query, sql};
 use serde_json::Value;
 pub(crate) fn page(

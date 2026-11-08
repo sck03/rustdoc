@@ -10,6 +10,8 @@ mod receipts;
 mod references;
 mod review;
 mod tracking;
+#[cfg(test)]
+mod tracking_tests;
 use super::{
     NativeService, auth,
     error::{Result, error, invalid, unavailable},
@@ -131,14 +133,29 @@ pub fn handle(
         )?)
         .map_err(Into::into);
     }
+    if [
+        LIST_SINGLE_WINDOW_OPERATION_CENTER,
+        GET_SINGLE_WINDOW_OPERATION_CENTER_DETAIL,
+    ]
+    .contains(&operation)
+    {
+        let value = service
+            .store
+            .read_for(actor, operation, query, |tx, actor| {
+                if operation == LIST_SINGLE_WINDOW_OPERATION_CENTER {
+                    return tracking::list(tx, actor, query);
+                }
+                let id = parameter(parameters, "batchId")
+                    .parse()
+                    .ok()
+                    .filter(|n| *n > 0)
+                    .ok_or_else(|| invalid("批次编号无效。"))?;
+                tracking::get(tx, actor, id, "view")
+            })?;
+        return serde_json::to_vec(&contracts::dto(contracts::response(operation.id), value))
+            .map_err(Into::into);
+    }
     let value=service.store.transaction_for(actor, operation, &[], |tx, actor|{
-        if operation==LIST_SINGLE_WINDOW_OPERATION_CENTER{
-            return tracking::list(tx,actor,query);
-        }
-        if operation==GET_SINGLE_WINDOW_OPERATION_CENTER_DETAIL {
-            let id=parameter(parameters,"batchId").parse().ok().filter(|n|*n>0).ok_or_else(||invalid("批次编号无效。"))?;
-            return tracking::get(tx,actor,id,"view");
-        }
         let business=if [GET_CUSTOMS_COO_DOCUMENT,SAVE_CUSTOMS_COO_DOCUMENT,BUILD_CUSTOMS_COO_DEFAULTS,GET_CUSTOMS_COO_LOCKED_FIELDS,UNLOCK_CUSTOMS_COO_FIELDS,BUILD_CUSTOMS_COO_EXPORT_REVIEW].contains(&operation){Business::Coo}
             else if [GET_AGENT_CONSIGNMENT_DOCUMENT,SAVE_AGENT_CONSIGNMENT_DOCUMENT,BUILD_AGENT_CONSIGNMENT_DEFAULTS,GET_AGENT_CONSIGNMENT_LOCKED_FIELDS,UNLOCK_AGENT_CONSIGNMENT_FIELDS,BUILD_AGENT_CONSIGNMENT_EXPORT_REVIEW].contains(&operation){Business::Acd}
             else {Business::parse(parameter(parameters,"businessType")).map_err(invalid)?};

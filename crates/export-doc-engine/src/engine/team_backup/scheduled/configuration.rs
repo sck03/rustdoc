@@ -90,11 +90,7 @@ pub(in crate::engine) fn save(
         }
     }
     {
-        let _gate = service
-            .backup_scheduler
-            .gate
-            .lock()
-            .map_err(|_| unavailable("日常灾备状态异常。"))?;
+        let _gate = service.backup_scheduler.lock()?;
         service.store.transaction_as(actor, |tx, actor| {
             administrator(actor)?;
             let old: SavedPlan = tx.settings(PLAN)?.map(serde_json::from_value).transpose()

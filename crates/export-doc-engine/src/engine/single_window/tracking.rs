@@ -212,17 +212,47 @@ pub fn list(tx: &Connection, actor: &Actor, query: &[(&str, String)]) -> Result<
     if keyword.chars().count() > 200 {
         return Err(invalid("批次检索最多 200 字。"));
     }
-    let mut rows = store::all(tx, BATCHES)?;
-    rows.retain(|r| {
-        auth::visible(actor, PERMISSION, "view", r)
-            && (business.is_empty() || r["businessType"] == business)
-            && (status.is_empty() || r["status"] == status)
-            && ["batchReference", "invoiceNo", "contractNo", "referenceNo"]
-                .iter()
-                .any(|key| store::normalize(rules::text(r, key)).contains(&keyword))
-    });
-    rows.sort_by(|a, b| b["id"].as_i64().cmp(&a["id"].as_i64()));
-    let mut page = store::page_only(rows, query);
+    let filters = [("businessType", business), ("status", status)]
+        .into_iter()
+        .filter(|(_, value)| !value.is_empty())
+        .map(|(key, value)| (key, value.to_owned()))
+        .collect::<Vec<_>>();
+    let fields = [
+        "batchId",
+        "submissionVersion",
+        "draftRevision",
+        "receiptCount",
+        "batchReference",
+        "businessType",
+        "invoiceNo",
+        "contractNo",
+        "companyScope",
+        "status",
+        "referenceNo",
+        "lastReceiptCode",
+        "lastReceiptMessage",
+        "clientProfileName",
+        "assignedCardIdentifier",
+        "createdAt",
+        "updatedAt",
+    ]
+    .map(|key| (key, key));
+    let (number, size, offset) = store::page_parameters(query);
+    let (count, rows) = tx.query_record_fields(
+        &export_doc_storage::GenericQuery {
+            kind: BATCHES,
+            scope: auth::data_scope(actor, PERMISSION, "view"),
+            filters: &filters,
+            keyword: &keyword,
+            fields: &fields,
+            offset,
+            limit: size as i64,
+            ..Default::default()
+        },
+        &["batchReference", "invoiceNo", "contractNo", "referenceNo"],
+        true,
+    )?;
+    let mut page = contracts::page(rows, count as usize, number, size);
     page["rows"] = page["items"].take();
     Ok(page)
 }

@@ -1,6 +1,72 @@
 use super::*;
 
 #[test]
+fn invalid_rows_do_not_hide_valid_names_and_commit_rechecks_the_snapshot() {
+    let directory = crate::engine::test_support::ScratchDirectory::new();
+    let service = directory.service();
+    let actor = auth::current_actor(
+        &service.store,
+        service.store.all("users").unwrap()[0]["id"]
+            .as_i64()
+            .unwrap(),
+    )
+    .unwrap();
+    for (preview_op, commit_op, created_key) in [
+        (
+            PREVIEW_CRM_CUSTOMER_IMPORT,
+            IMPORT_CRM_CUSTOMERS,
+            "createdCustomers",
+        ),
+        (
+            PREVIEW_SUPPLIER_IMPORT,
+            IMPORT_SUPPLIERS,
+            "createdSuppliers",
+        ),
+    ] {
+        let data = "公司名称,联系人,邮箱\nCafe\u{301},测试,invalid-email\nCAFÉ,测试,valid@example.test\ncafé,测试,valid@example.test\n其他单位,,\n";
+        let preview = upload(&service, &actor, preview_op, "names.csv", data.as_bytes()).unwrap();
+        assert_eq!(preview["validRows"], 2);
+        assert_eq!(preview["duplicateRows"], 1);
+        assert_eq!(preview["rows"][0]["isDuplicate"], false);
+        assert_eq!(preview["rows"][1]["isDuplicate"], false);
+        let resource = kind(supplier(commit_op));
+        service
+            .store
+            .transaction(|tx| {
+                store::save(
+                    tx,
+                    resource,
+                    0,
+                    json!({"name":"其他单位"}),
+                    None,
+                    &actor,
+                    "create",
+                )?;
+                Ok(())
+            })
+            .unwrap();
+        let result = import(
+            &service,
+            &actor,
+            commit_op,
+            &json!({"previewId":preview["previewId"]}),
+        )
+        .unwrap();
+        assert_eq!(result[created_key], 1);
+        assert_eq!(result["createdContacts"], 1);
+        assert!(
+            import(
+                &service,
+                &actor,
+                commit_op,
+                &json!({"previewId":preview["previewId"]})
+            )
+            .is_err()
+        );
+    }
+}
+
+#[test]
 fn exports_refresh_permissions_and_only_include_contacts_in_their_independent_scope() {
     let directory = crate::engine::test_support::ScratchDirectory::new();
     let service = directory.service();

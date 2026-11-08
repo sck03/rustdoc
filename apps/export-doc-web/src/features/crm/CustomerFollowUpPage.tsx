@@ -89,7 +89,7 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
         onCreateCustomer={() => { setCustomerId(0); void changeView("profile"); }}
         onSelectCustomer={(customer) => { setCustomers((current) => [customer, ...current.filter((item) => item.id !== customer.id)]); setCustomerId(customer.id); changeView("profile"); }}
       /></div> : null}
-      {view === "import" && canImportCustomer ? <div aria-label="导入客户"><CrmCustomerImportPanel client={client} canImport={canImportCustomer} onImported={() => reloadCustomers()} /></div> : null}
+      {view === "import" && canImportCustomer ? <div aria-label="导入客户"><CrmCustomerImportPanel client={client} canImport={canImportCustomer} onImported={signal => reloadCustomers(undefined, signal)} /></div> : null}
 
       {view === "followup-editor" && editFollowUpId && !editingFollowUp && <PageState tone={feedback ? "error" : "loading"} title={feedback ? "无法打开跟进记录" : "正在读取跟进记录"} />}
       {view === "followup-editor" && (!editFollowUpId || editingFollowUp) ? <form className="form-grid" key={`${transferMode ? "transfer" : "edit"}-${editingFollowUp?.id ?? "new"}-${editingFollowUp?.versionNumber ?? 0}`} onSubmit={transferMode ? transferFollowUp : handleCreate} aria-label="跟进记录编辑">
