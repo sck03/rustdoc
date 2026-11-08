@@ -13,7 +13,7 @@ pub(crate) fn due(db: &(impl Adapter + ?Sized), now: &str) -> Result<Vec<Value>>
         "json_object"
     };
     let select = format!(
-        "SELECT {object}('requestId',o.request_id,'revision',o.revision,'actorId',o.actor_id,'contextId',o.context_id,'effectiveAt',o.effective_at,'state',o.state) AS body FROM personnel_change_orders o WHERE o.state='Pending' AND {time}<={now} ORDER BY {time},o.request_id LIMIT 20"
+        "SELECT {object}('requestId',o.request_id,'revision',o.revision,'actorId',o.actor_id,'contextId',o.context_id,'effectiveAt',o.effective_at,'state',o.state) AS body FROM personnel_change_orders o JOIN workflow_instances w ON w.request_id=o.request_id AND w.revision=o.revision JOIN records r ON r.id=o.request_id AND w.revision=CAST(NULLIF(r.body->>'submissionNumber','') AS BIGINT) WHERE o.state='Pending' AND w.state='Approved' AND w.suspended_at='' AND {time}<={now} ORDER BY {time},o.request_id LIMIT 20"
     );
     rows(db, select, v)
 }

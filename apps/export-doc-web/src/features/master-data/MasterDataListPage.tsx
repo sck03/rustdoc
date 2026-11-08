@@ -60,7 +60,7 @@ export function MasterDataListPage({
           <span>已选 {selectedRecordIds.size} 条编码</span>
           <HsCodeObsoleteAction client={client} records={Array.from(selectedRecords.values())} disabled={isBusy} onChanged={async () => {
             setSelectedRecords(new Map());
-            await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("hs-codes") });
+            await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("hs-codes") }, { throwOnError: true });
           }} />
             <button
               className="command-button secondary danger"
@@ -114,9 +114,10 @@ export function MasterDataListPage({
           description={`确定删除“${buildMasterDataDisplayName(config, pendingDeleteRecord)}”吗？`}
           details={config.key === "hs-codes" ? ["只删除目录记录，历史单据、商品、申报实例及替代关系保留。", "使用读取时版本，记录变化后拒绝删除；年度淘汰可先确认作废再按保留期清理。"] : ["删除后无法在列表中继续查看。", "如该资料已被业务单据引用，系统会拒绝删除并说明原因。"]}
           confirmLabel="确认删除"
-          isBusy={deleteMutation.isPending}
+          isBusy={isBusy}
           onCancel={() => setPendingDeleteRecord(null)}
           onConfirm={() => {
+            if (isBusy || !canManage) return;
             setListSuccessMessage(null);
             deleteMutation.mutate(pendingDeleteRecord);
           }}
@@ -128,9 +129,10 @@ export function MasterDataListPage({
           description={`确定删除选中的 ${selectedRecordIds.size} 条 HS 编码吗？`}
           details={["只删除选中的目录记录，历史单据、商品、申报实例及替代关系保留。", "使用选择时版本，任一编码已变化则整批回滚。"]}
           confirmLabel={`删除 ${selectedRecordIds.size} 条`}
-          isBusy={batchDeleteHsCodesMutation.isPending}
+          isBusy={isBusy}
           onCancel={() => setBatchDeleteDialogOpen(false)}
           onConfirm={() => {
+            if (isBusy || !canManage) return;
             setListSuccessMessage(null);
             batchDeleteHsCodesMutation.mutate(Array.from(selectedRecords.values()));
           }}
@@ -193,7 +195,7 @@ function MasterDataTable({
   selectedIds?: Set<number>;
 }) {
   function handleRowKeyDown(event: ReactKeyboardEvent<HTMLTableRowElement>, record: MasterDataRecord) {
-    if (event.target !== event.currentTarget) {
+    if (isBusy || event.target !== event.currentTarget) {
       return;
     }
 
@@ -256,7 +258,7 @@ function MasterDataTable({
                 className="clickable-row"
                 key={config.routeId(record)}
                 tabIndex={0}
-                onClick={() => onOpen(record)}
+                onClick={() => { if (!isBusy) onOpen(record); }}
                 onKeyDown={(event) => handleRowKeyDown(event, record)}
               >
                 {enableSelection ? (

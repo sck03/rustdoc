@@ -27,6 +27,7 @@ export function MasterDataRoute({ client }: { client: ExportDocManagerApiClient 
 
   return (
     <MasterDataListPage
+      key={config.key}
       client={client}
       config={config}
       canOperate={config.key === "hs-codes" ? permission.canManage : permission.canOperate}

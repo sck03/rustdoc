@@ -28,9 +28,9 @@ export function useMasterDataPersistence({ client, config, record, isNew, record
     setHasConcurrencyConflict(!isNew && isConcurrencyConflict(error));
   };
   const refresh = () => Promise.all([
-    queries.invalidateQueries({ queryKey: queryKeys.masterDataRoot(config.key) }),
+    queries.invalidateQueries({ queryKey: queryKeys.masterDataRoot(config.key) }, { throwOnError: true }),
     ...(config.key === "customers" || config.key === "exporters"
-      ? [queries.invalidateQueries({ queryKey: queryKeys.invoiceParties() })] : []),
+      ? [queries.invalidateQueries({ queryKey: queryKeys.invoiceParties() }, { throwOnError: true })] : []),
   ]);
   function persist(submitted: MasterDataRecord, write: (signal: AbortSignal) => Promise<MasterDataRecord>, message: string) {
     return boundary.run(async ({ signal, checkCurrent, continueInScope }) => {
@@ -70,8 +70,11 @@ export function useMasterDataPersistence({ client, config, record, isNew, record
       const response = await config.delete(client, record, recordKey, signal); checkCurrent();
       queries.removeQueries({ queryKey: queryKeys.masterDataRecord(config.key, recordKey) });
       queries.removeQueries({ queryKey: queryKeys.masterDataRecord(config.key, config.routeId(record)) });
-      navigate(`/master-data/${config.key}`, { replace: true, state: { successMessage: response.message || `${config.label}已删除。` } });
-      await refresh();
+      let successMessage = response.message || `${config.label}已删除。`;
+      try { await refresh(); }
+      catch (error) { checkCurrent(); successMessage += `目录刷新失败：${readApiError(error)}`; }
+      checkCurrent();
+      navigate(`/master-data/${config.key}`, { replace: true, state: { successMessage } });
     }),
     onError: error => { if (!isAbortError(error)) onDeleteError(); onError(error); },
   });

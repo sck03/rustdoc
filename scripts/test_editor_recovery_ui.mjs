@@ -84,6 +84,10 @@ try {
     await page.waitForFunction(() => window.ws.currentInvoiceDraft.contractNo === "HEADER");
     assert.equal(await page.evaluate(() => window.originalRows === window.ws.currentInvoiceDraft.items), true);
     assert.equal(await page.evaluate(() => window.ws.currentInvoiceDraft.totalAmount), 10000);
+    await page.evaluate(() => window.ws.patchInvoice({ items: window.ws.invoice.items.map((row, index) => index === 4999 ? { ...row, styleName: "中文续编" } : row) }));
+    await page.waitForFunction(() => window.ws.currentInvoiceDraft.items[4999].styleName === "中文续编");
+    assert.equal(await page.evaluate(() => window.originalRows[0] === window.ws.currentInvoiceDraft.items[0]), true);
+    assert.equal(await page.evaluate(() => window.ws.currentInvoiceDraft.totalAmount), 10000);
     await page.evaluate(() => window.ws.patchInvoice({ items: window.ws.invoice.items.map((row, index) => index ? row : { ...row, quantity: 3 }) }));
     await page.waitForFunction(() => window.ws.currentInvoiceDraft.totalAmount === 10004);
   }, 5000);

@@ -104,12 +104,22 @@ export default function createApi(transport: ApiTransport) {
 
   deleteCustomer(request: DeleteCustomerRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/customers/${encodePath(request.id)}`;
-    return transport.request<ApiCommandResponse>("DELETE", path, { init });
+    return transport.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "rowVersion": request.rowVersion,
+      },
+      init,
+    });
   },
 
   deleteExporter(request: DeleteExporterRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/exporters/${encodePath(request.id)}`;
-    return transport.request<ApiCommandResponse>("DELETE", path, { init });
+    return transport.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "rowVersion": request.rowVersion,
+      },
+      init,
+    });
   },
 
   deleteHsCode(request: DeleteHsCodeRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
@@ -145,22 +155,42 @@ export default function createApi(transport: ApiTransport) {
 
   deletePayee(request: DeletePayeeRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/payees/${encodePath(request.id)}`;
-    return transport.request<ApiCommandResponse>("DELETE", path, { init });
+    return transport.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "rowVersion": request.rowVersion,
+      },
+      init,
+    });
   },
 
   deletePort(request: DeletePortRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/ports/${encodePath(request.id)}`;
-    return transport.request<ApiCommandResponse>("DELETE", path, { init });
+    return transport.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "rowVersion": request.rowVersion,
+      },
+      init,
+    });
   },
 
   deleteProduct(request: DeleteProductRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/products/${encodePath(request.id)}`;
-    return transport.request<ApiCommandResponse>("DELETE", path, { init });
+    return transport.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "rowVersion": request.rowVersion,
+      },
+      init,
+    });
   },
 
   deleteUnit(request: DeleteUnitRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/master-data/units/${encodePath(request.id)}`;
-    return transport.request<ApiCommandResponse>("DELETE", path, { init });
+    return transport.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "rowVersion": request.rowVersion,
+      },
+      init,
+    });
   },
 
   discoverHsCodeHistoryCandidates(request: DiscoverHsCodeHistoryCandidatesRequest = {}, init?: ApiRequestInit): Promise<HsCodeHistoryCandidatePage> {

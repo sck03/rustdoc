@@ -11,7 +11,7 @@ import { isComposingKey } from "../../../ui/keyboardEvent.ts";
 import { useServerDraftSync } from "../../../ui/serverDraftSync.tsx";
 import { useConfirmation } from "../../../ui/ConfirmationProvider.tsx";
 import { hasCustomOptionValue } from "../../custom-options/customOptionModel.ts";
-import { canDeleteInvoiceStatus, canUnverifyInvoiceStatus, canTransitionInvoiceStatus, createEmptyInvoice, getCounterpartInvoiceType, getInvoiceStatusActionLabel, getNextInvoiceStatus, isInvoiceEditableStatus, normalizeInvoiceDetailsForSave, normalizeInvoiceForSave, normalizeInvoiceStatus, normalizeInvoiceType, readRouteInvoiceDraft, readRouteInvoiceImportAction, type RouteInvoiceImportAction, uppercaseInvoiceEnglishText } from "../invoiceModel.ts";
+import { canDeleteInvoiceStatus, canUnverifyInvoiceStatus, canTransitionInvoiceStatus, createEmptyInvoice, getCounterpartInvoiceType, getInvoiceStatusActionLabel, getNextInvoiceStatus, isInvoiceEditableStatus, createInvoiceDetailsProjector, normalizeInvoiceForSave, normalizeInvoiceStatus, normalizeInvoiceType, readRouteInvoiceDraft, readRouteInvoiceImportAction, type RouteInvoiceImportAction, uppercaseInvoiceEnglishText } from "../invoiceModel.ts";
 import { areInvoiceDraftsEqual } from "../invoiceDraftEquality.ts";
 import { buildInvoiceSnapshot, mergeRouteInvoiceImportDraft, readInvoiceItemBlankRowCount } from "../invoiceEditorHelpers.ts";
 import { calculateInvoiceTotals } from "../invoiceItemsEditorModel.ts";
@@ -203,9 +203,10 @@ export function useInvoiceEditorWorkspace({ businessDate, client, mode }: {
   const targetInvoiceType = getCounterpartInvoiceType(invoice?.type);
   const cloneInvoiceTypeLabel = `生成${targetInvoiceType}`;
   const canUnverifyInvoice = !isNew && isInvoiceIdValid && canUnverifyInvoiceStatus(invoice?.status);
+  const projectDetails = useMemo(createInvoiceDetailsProjector, []);
   const normalizedDetails = useMemo(
-    () => invoice ? normalizeInvoiceDetailsForSave(invoice) : undefined,
-    [invoice?.items, invoice?.exchangeRate, invoice?.currency],
+    () => invoice ? projectDetails(invoice) : undefined,
+    [projectDetails, invoice?.items, invoice?.exchangeRate, invoice?.currency],
   );
   const currentInvoiceDraft = useMemo(
     () => (invoice ? normalizeInvoiceForSave(invoice, isNew || !isInvoiceIdValid ? 0 : parsedInvoiceId, pendingHsFeedback, normalizedDetails) : undefined),

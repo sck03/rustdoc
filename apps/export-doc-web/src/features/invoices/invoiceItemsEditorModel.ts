@@ -5,7 +5,7 @@ import { documentSpareKeys, mapDocumentSpareFields } from "../../ui/documentSpar
 import type { EditableInvoiceItemField, InvoiceItemColumnDefinition } from "./invoiceItemTableModel.ts";
 import { invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
 import { parseTabularClipboard } from "../../ui/tabularClipboard.ts";
-import { invoiceItemPriceCalculationModes, invoiceItemUnitPriceMaximumScale, invoiceItemUnitPriceStandardScale, invoiceItemWeightScale, invoiceItemVolumeScale, roundTo, roundUnitPrice, roundWeight, roundVolume, normalizePriceCalculationMode, normalizeInvoiceItemPrices, copyInvoiceItemWithTotals } from "./invoiceItemCalculation.ts";
+import { invoiceItemPriceCalculationModes, invoiceItemUnitPriceMaximumScale, invoiceItemUnitPriceStandardScale, invoiceItemWeightScale, invoiceItemVolumeScale, roundTo, roundUnitPrice, roundWeight, roundVolume, normalizePriceCalculationMode, normalizeInvoiceItemPrices } from "./invoiceItemCalculation.ts";
 export { invoiceItemPriceCalculationModes, invoiceItemUnitPriceStandardScale, invoiceItemUnitPriceMaximumScale, invoiceItemWeightScale, invoiceItemVolumeScale, recalculateInvoiceItem, calculateInvoiceTotals, haveInvoiceTotalsInputsChanged, normalizePriceCalculationMode, hasChanged, roundMoney, roundTo, roundUnitPrice, roundWeight, roundVolume } from "./invoiceItemCalculation.ts";
 export type { InvoiceItemPriceCalculationMode } from "./invoiceItemCalculation.ts";
 export const maxInvoiceItemRows = ApiInvoiceEditingLimitsContractDefaults.maxItems;
@@ -350,11 +350,7 @@ export function createEmptyInvoiceItem(invoiceId = 0): ApiInvoiceItemDto {
 }
 
 
-const normalizedRows = new WeakMap<ApiInvoiceItemDto, { signature: string; value: ApiInvoiceItemDto }>();
 export function normalizeInvoiceItemForSave(item: ApiInvoiceItemDto): ApiInvoiceItemDto {
-  const signature = JSON.stringify(item);
-  const cached = normalizedRows.get(item);
-  if (cached?.signature === signature) return copyInvoiceItemWithTotals(cached.value);
   const normalized = {
     ...createEmptyInvoiceItem(numberValue(item.invoiceId)),
     ...item,
@@ -394,8 +390,7 @@ export function normalizeInvoiceItemForSave(item: ApiInvoiceItemDto): ApiInvoice
   };
 
   normalizeInvoiceItemPrices(normalized);
-  normalizedRows.set(item, { signature, value: normalized });
-  return copyInvoiceItemWithTotals(normalized);
+  return normalized;
 }
 
 

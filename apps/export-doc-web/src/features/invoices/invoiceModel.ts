@@ -1,8 +1,9 @@
-import { ApiInvoiceDetailDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
+import { ApiInvoiceDetailDto, ApiInvoiceItemDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { dateInputToApiDate, readNumber, toDateInputValue } from "../../ui/formUtils.ts";
 import { mapDocumentSpareFields } from "../../ui/documentSpareFields.ts";
 import {
   calculateInvoiceTotals,
+  haveInvoiceTotalsInputsChanged,
   createEmptyInvoiceItem,
   isMeaningfulInvoiceItem,
   normalizeInvoiceItemForSave,
@@ -302,6 +303,30 @@ export function normalizeInvoiceDetailsForSave(invoice: Pick<ApiInvoiceDetailDto
   const items = (invoice.items ?? []).map(normalizeInvoiceItemForSave)
     .filter(item => isMeaningfulInvoiceItem(item) || Boolean(item.printRows?.length));
   return { ...calculateInvoiceTotals(items, invoice.exchangeRate, invoice.currency), items };
+}
+
+/** Per-editor projection of immutable draft rows; callers must not mutate its output. */
+export function createInvoiceDetailsProjector() {
+  const rows = new WeakMap<ApiInvoiceItemDto, ApiInvoiceItemDto | null>();
+  let previous: ReturnType<typeof normalizeInvoiceDetailsForSave> | undefined;
+  let previousRate: number | null | undefined, previousCurrency: string | undefined;
+  return (invoice: Pick<ApiInvoiceDetailDto, "items" | "exchangeRate" | "currency">) => {
+    const items: ApiInvoiceItemDto[] = [];
+    for (const item of invoice.items ?? []) {
+      if (!rows.has(item)) {
+        const normalized = normalizeInvoiceItemForSave(item);
+        rows.set(item, isMeaningfulInvoiceItem(normalized) || normalized.printRows?.length ? normalized : null);
+      }
+      const normalized = rows.get(item);
+      if (normalized) items.push(normalized);
+    }
+    const totals = previous && previousRate === invoice.exchangeRate && previousCurrency === invoice.currency
+      && !haveInvoiceTotalsInputsChanged(previous.items, items)
+      ? previous : calculateInvoiceTotals(items, invoice.exchangeRate, invoice.currency);
+    previousRate = invoice.exchangeRate; previousCurrency = invoice.currency;
+    previous = { ...totals, items };
+    return previous;
+  };
 }
 
 export function normalizeInvoiceShippingMarks(invoice: Pick<ApiInvoiceDetailDto, "shippingMarksType" | "shippingMarks" | "shippingMarksImage">) {

@@ -99,7 +99,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
     create: async (client, record, signal) => (await client.createCustomer({ body: record as unknown as ApiCustomerDto }, { signal })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record, signal) =>
       (await client.updateCustomer({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiCustomerDto }, { signal })) as unknown as MasterDataRecord,
-    delete: (client, record, _recordKey, signal) => client.deleteCustomer({ id: numberValue(record.id) }, { signal }),
+    delete: (client, record, _recordKey, signal) => client.deleteCustomer({ id: numberValue(record.id), rowVersion: String(record.rowVersion ?? "") }, { signal }),
   },
   {
     key: "exporters",
@@ -179,7 +179,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
     create: async (client, record, signal) => (await client.createExporter({ body: record as unknown as ApiExporterDto }, { signal })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record, signal) =>
       (await client.updateExporter({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiExporterDto }, { signal })) as unknown as MasterDataRecord,
-    delete: (client, record, _recordKey, signal) => client.deleteExporter({ id: numberValue(record.id) }, { signal }),
+    delete: (client, record, _recordKey, signal) => client.deleteExporter({ id: numberValue(record.id), rowVersion: String(record.rowVersion ?? "") }, { signal }),
   },
   {
     key: "payees",
@@ -242,7 +242,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
     create: async (client, record, signal) => (await client.createPayee({ body: record as unknown as ApiPayeeDto }, { signal })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record, signal) =>
       (await client.updatePayee({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiPayeeDto }, { signal })) as unknown as MasterDataRecord,
-    delete: (client, record, _recordKey, signal) => client.deletePayee({ id: numberValue(record.id) }, { signal }),
+    delete: (client, record, _recordKey, signal) => client.deletePayee({ id: numberValue(record.id), rowVersion: String(record.rowVersion ?? "") }, { signal }),
   },
   {
     key: "products",
@@ -352,7 +352,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
     create: async (client, record, signal) => (await client.createProduct({ body: record as unknown as ApiProductDto }, { signal })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record, signal) =>
       (await client.updateProduct({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiProductDto }, { signal })) as unknown as MasterDataRecord,
-    delete: (client, record, _recordKey, signal) => client.deleteProduct({ id: numberValue(record.id) }, { signal }),
+    delete: (client, record, _recordKey, signal) => client.deleteProduct({ id: numberValue(record.id), rowVersion: String(record.rowVersion ?? "") }, { signal }),
   },
   {
     key: "ports",
@@ -393,7 +393,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
     create: async (client, record, signal) => (await client.createPort({ body: record as unknown as ApiPortDto }, { signal })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record, signal) =>
       (await client.updatePort({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiPortDto }, { signal })) as unknown as MasterDataRecord,
-    delete: (client, record, _recordKey, signal) => client.deletePort({ id: numberValue(record.id) }, { signal }),
+    delete: (client, record, _recordKey, signal) => client.deletePort({ id: numberValue(record.id), rowVersion: String(record.rowVersion ?? "") }, { signal }),
   },
   {
     key: "units",
@@ -432,7 +432,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
     create: async (client, record, signal) => (await client.createUnit({ body: record as unknown as ApiUnitDto }, { signal })) as unknown as MasterDataRecord,
     update: async (client, recordKey, record, signal) =>
       (await client.updateUnit({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiUnitDto }, { signal })) as unknown as MasterDataRecord,
-    delete: (client, record, _recordKey, signal) => client.deleteUnit({ id: numberValue(record.id) }, { signal }),
+    delete: (client, record, _recordKey, signal) => client.deleteUnit({ id: numberValue(record.id), rowVersion: String(record.rowVersion ?? "") }, { signal }),
   },
   {
     key: "hs-codes",

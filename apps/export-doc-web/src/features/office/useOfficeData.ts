@@ -84,7 +84,7 @@ export function useOfficeOperation(relatedKeys: readonly QueryKey[] = [], includ
   const mounted = useRef(true);
   const revision = useRef(0);
   useLayoutEffect(() => { mounted.current = true; return () => { mounted.current = false; revision.current++; }; }, []);
-  const refresh = () => Promise.all([...(includeOffice ? [["office"]] : []), ["worklist"], ...relatedKeys].map(queryKey => queries.invalidateQueries({ queryKey })));
+  const refresh = () => Promise.all([...(includeOffice ? [["office"]] : []), ["worklist"], ...relatedKeys].map(queryKey => queries.invalidateQueries({ queryKey }, { throwOnError: true })));
   async function run<T>(operation: (signal: AbortSignal) => Promise<T>, done: (result: T) => void, refreshAfter = true) {
     if (inFlight.current) return;
     inFlight.current = true;

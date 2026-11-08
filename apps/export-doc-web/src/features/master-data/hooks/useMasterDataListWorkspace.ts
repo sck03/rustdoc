@@ -1,4 +1,4 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ExportDocManagerApiClient } from "../../../api/index.ts";
@@ -8,6 +8,8 @@ import { useServerPageNumber } from "../../../ui/useServerPageNumber.ts";
 import { loadListViewState, normalizeListPageSize, saveListViewState } from "../../../ui/listViewState.ts";
 import { type MasterDataEntityConfig, type MasterDataEntityKey, type MasterDataRecord } from "../masterDataTypes.ts";
 import { hsCodeVersionReference } from "../hsCodeMaintenance.ts";
+import { useScopedSave } from "../../../ui/useScopedSave.ts";
+import { isAbortError } from "../../../ui/useAbortableOperation.ts";
 function buildMasterDataListViewStateStorageKey(entityKey: MasterDataEntityKey) {
   return `export-doc-manager.master-data.${entityKey}.list-view-state.v1`;
 }
@@ -34,6 +36,7 @@ export function useMasterDataListWorkspace({ client, config, canManage }: {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const deletion = useScopedSave(config.key, client);
   const routeSuccessMessage = readRouteSuccessMessage(location.state);
   const successMessage = listSuccessMessage ?? routeSuccessMessage;
 
@@ -46,6 +49,8 @@ export function useMasterDataListWorkspace({ client, config, canManage }: {
     setPageSize(nextViewState.pageSize);
     setListSuccessMessage(null);
     setSelectedRecords(new Map());
+    setPendingDeleteRecord(null);
+    setBatchDeleteDialogOpen(false);
   }, [config.key, listViewStateStorageKey]);
 
   useEffect(() => {
@@ -70,7 +75,7 @@ export function useMasterDataListWorkspace({ client, config, canManage }: {
         pageNumber,
         pageSize,
       }, signal),
-    placeholderData: keepPreviousData,
+    placeholderData: (previous, query) => query?.queryKey[1] === config.key ? previous : undefined,
   });
 
   useEffect(() => {
@@ -105,45 +110,51 @@ export function useMasterDataListWorkspace({ client, config, canManage }: {
     setSelectedRecords(new Map());
   }
 
-  const deleteMutation = useMutation({
-    mutationFn: (record: MasterDataRecord) => config.delete(client, record, config.routeId(record)),
-    onSuccess: async (response, deletedRecord) => {
+  function removeRecords(records: MasterDataRecord[], batch: boolean) {
+    return deletion.run(async ({ signal, checkCurrent }) => {
+      if (!canManage || masterDataQuery.isFetching || masterDataQuery.isPlaceholderData) return;
+      const response = batch
+        ? await client.deleteHsCodesBatch({ body: { ids: records.map(row => row.id), expectedVersions: records.map(hsCodeVersionReference) } }, { signal })
+        : await config.delete(client, records[0], config.routeId(records[0]), signal);
+      checkCurrent();
       setPendingDeleteRecord(null);
-      setListSuccessMessage(response.message || `${config.label}已删除。`);
-      queryClient.removeQueries({ queryKey: queryKeys.masterDataRecord(config.key, config.routeId(deletedRecord)) });
-      const invalidations = [queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot(config.key) })];
-      if (config.key === "customers" || config.key === "exporters") {
-        invalidations.push(queryClient.invalidateQueries({ queryKey: queryKeys.invoiceParties() }));
+      setBatchDeleteDialogOpen(false);
+      setSelectedRecords(new Map());
+      const message = response.message || `${config.label}已删除。`;
+      setListSuccessMessage(message);
+      for (const record of records) queryClient.removeQueries({ queryKey: queryKeys.masterDataRecord(config.key, config.routeId(record)) });
+      try {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot(config.key) }, { throwOnError: true }),
+          ...(config.key === "customers" || config.key === "exporters"
+            ? [queryClient.invalidateQueries({ queryKey: queryKeys.invoiceParties() }, { throwOnError: true })] : []),
+        ]);
+      } catch (error) {
+        checkCurrent();
+        setListSuccessMessage(`${message}列表刷新失败：${readApiError(error)}`);
       }
-
-      await Promise.all(invalidations);
-    },
-    onError: () => {
+    });
+  }
+  const deleteMutation = useMutation({
+    mutationFn: (record: MasterDataRecord) => removeRecords([record], false),
+    onError: error => {
+      if (isAbortError(error)) return;
       setPendingDeleteRecord(null);
       setListSuccessMessage(null);
     },
   });
 
   const batchDeleteHsCodesMutation = useMutation({
-    mutationFn: (records: MasterDataRecord[]) =>
-      client.deleteHsCodesBatch({
-        body: { ids: records.map(row => row.id), expectedVersions: records.map(hsCodeVersionReference) },
-      }),
-    onSuccess: async (response) => {
-      setBatchDeleteDialogOpen(false);
-      setListSuccessMessage(response.message || "选中的HS编码已删除。");
-      setSelectedRecords(new Map());
-      await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("hs-codes") });
-      await masterDataQuery.refetch();
-    },
-    onError: () => {
+    mutationFn: (records: MasterDataRecord[]) => removeRecords(records, true),
+    onError: error => {
+      if (isAbortError(error)) return;
       setBatchDeleteDialogOpen(false);
       setListSuccessMessage(null);
     },
   });
 
   function handleDelete(record: MasterDataRecord) {
-    if (!canManage || deleteMutation.isPending) {
+    if (!canManage || isBusy) {
       return;
     }
 
@@ -151,6 +162,7 @@ export function useMasterDataListWorkspace({ client, config, canManage }: {
   }
 
   function toggleSelectedRecord(record: MasterDataRecord, selected: boolean) {
+    if (isBusy) return;
     const id = numberValue(record.id);
     if (id <= 0) {
       return;
@@ -169,6 +181,7 @@ export function useMasterDataListWorkspace({ client, config, canManage }: {
   }
 
   function toggleAllCurrentPageRecords(selected: boolean) {
+    if (isBusy) return;
     const currentRows = page?.items ?? [];
     setSelectedRecords((current) => {
       const next = new Map(current);
@@ -190,7 +203,7 @@ export function useMasterDataListWorkspace({ client, config, canManage }: {
   }
 
   function handleBatchDeleteHsCodes() {
-    if (!canManage || batchDeleteHsCodesMutation.isPending || selectedRecordIds.size === 0) {
+    if (!canManage || isBusy || selectedRecordIds.size === 0) {
       return;
     }
 
@@ -198,14 +211,14 @@ export function useMasterDataListWorkspace({ client, config, canManage }: {
   }
 
   const page = masterDataQuery.data ?? null;
-  const message = batchDeleteHsCodesMutation.isError
+  const message = batchDeleteHsCodesMutation.isError && !isAbortError(batchDeleteHsCodesMutation.error)
     ? readApiError(batchDeleteHsCodesMutation.error)
-    : deleteMutation.isError
+    : deleteMutation.isError && !isAbortError(deleteMutation.error)
     ? readApiError(deleteMutation.error)
     : masterDataQuery.isError
       ? readApiError(masterDataQuery.error)
       : null;
-  const isBusy = masterDataQuery.isFetching || deleteMutation.isPending || batchDeleteHsCodesMutation.isPending;
+  const isBusy = masterDataQuery.isFetching || masterDataQuery.isPlaceholderData || deletion.isSaving;
   return {
     keyword, setKeyword, pageNumber, setPageNumber, pageSize,
     setListSuccessMessage, selectedRecords, setSelectedRecords, selectedRecordIds, pendingDeleteRecord,

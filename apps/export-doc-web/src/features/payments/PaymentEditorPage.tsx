@@ -128,7 +128,7 @@ export function PaymentEditorPage({
           state: { successMessage: "付款报销已创建。" },
         });
       }
-      try { await queryClient.invalidateQueries({ queryKey: queryKeys.paymentsRoot() }); }
+      try { await queryClient.invalidateQueries({ queryKey: queryKeys.paymentsRoot() }, { throwOnError: true }); }
       catch (error) { checkCurrent(); setMessage(`付款报销已保存，但列表刷新失败：${readApiError(error)}`); }
     }),
     onError: (error) => {

@@ -3,9 +3,10 @@ use super::*;
 mod fixture;
 
 #[test]
-fn complete_download_rechecks_private_material_after_the_preparation_snapshot() {
+fn busy_document_generation_recovers_and_download_rechecks_private_material() {
     let directory = crate::engine::test_support::ScratchDirectory::new();
     let service = directory.service();
+    service.workflow_scheduler.stop().unwrap();
     let login = fixture::request(
         &service,
         "",
@@ -86,6 +87,31 @@ fn complete_download_rechecks_private_material_after_the_preparation_snapshot() 
         ),
     )
     .unwrap();
+    let administrator =
+        auth::current_actor(&service.store, login["user"]["id"].as_i64().unwrap()).unwrap();
+    let mut occupied = vec![];
+    for _ in 0..2 {
+        let (release, held) = std::sync::mpsc::channel();
+        let job = service
+            .jobs
+            .start(
+                &administrator,
+                crate::generated_api::GET_JOB,
+                "test",
+                "Occupied worker",
+                move |_| {
+                    held.recv_timeout(std::time::Duration::from_secs(30))
+                        .unwrap();
+                    Ok(TaskOutput::file(
+                        "test.txt".into(),
+                        "text/plain",
+                        b"test".to_vec(),
+                    ))
+                },
+            )
+            .unwrap();
+        occupied.push((release, job));
+    }
     let row = fixture::call(
         &service,
         &token,
@@ -100,6 +126,60 @@ fn complete_download_rechecks_private_material_after_the_preparation_snapshot() 
         ),
     )
     .unwrap();
+    assert_eq!(
+        row["status"], "Approved",
+        "busy document preparation must not undo approval"
+    );
+    for _ in 0..2 {
+        crate::engine::oa::document_schedule::tick(&service).unwrap();
+        service
+            .store
+            .read(|tx| {
+                let pending = store::get(tx, "oa-general", id)?;
+                assert!(crate::engine::oa::fulfillment::active_system(
+                    &pending,
+                    export_doc_domain::approval_graph::SystemAction::GenerateApprovalDocument
+                )?);
+                let snapshot =
+                    submissions::checked(tx, &pending, row["submissionId"].as_i64().unwrap())?;
+                assert!(text(&snapshot, "documentError").is_empty());
+                Ok(())
+            })
+            .unwrap();
+    }
+    for (release, job) in occupied {
+        release.send(()).unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while service
+            .jobs
+            .get(&administrator, job["jobId"].as_str().unwrap())
+            .unwrap()["status"]
+            != "Succeeded"
+        {
+            assert!(std::time::Instant::now() < deadline);
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    loop {
+        crate::engine::oa::document_schedule::tick(&service).unwrap();
+        let started = service
+            .store
+            .read(|tx| {
+                let snapshot =
+                    submissions::checked(tx, &row, row["submissionId"].as_i64().unwrap())?;
+                Ok(!text(&snapshot, "documentJobId").is_empty())
+            })
+            .unwrap();
+        if started {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "scheduler must start the deferred document without manual retry"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
     let actor = auth::current_actor(&service.store, reviewer_id).unwrap();
     let op = crate::generated_api::ALL_OPERATIONS
         .iter()
@@ -128,8 +208,6 @@ fn complete_download_rechecks_private_material_after_the_preparation_snapshot() 
             Ok(())
         })
         .unwrap();
-    let administrator =
-        auth::current_actor(&service.store, login["user"]["id"].as_i64().unwrap()).unwrap();
     service
         .store
         .transaction(|tx| {

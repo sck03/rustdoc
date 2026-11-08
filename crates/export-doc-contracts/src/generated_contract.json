@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "a68e896699a0934cc4932a33bc0551dfd223e096b6583e32dd0e7e6c76cbde5a",
+  "digest": "8c744b5a8cf488c2c59098f5afda503abb84a9b4d1dd56ae509d60260885ad6f",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -21953,6 +21953,15 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
           "required": true
+        },
+        {
+          "name": "rowVersion",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": true
         }
       ],
       "requestBody": null,
@@ -22126,6 +22135,15 @@
             "type": "integer",
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
+          "required": true
+        },
+        {
+          "name": "rowVersion",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "minLength": 1
           },
           "required": true
         }
@@ -23149,6 +23167,15 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
           "required": true
+        },
+        {
+          "name": "rowVersion",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": true
         }
       ],
       "requestBody": null,
@@ -23843,6 +23870,15 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
           "required": true
+        },
+        {
+          "name": "rowVersion",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required": true
         }
       ],
       "requestBody": null,
@@ -23925,6 +23961,15 @@
             "type": "integer",
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
+          "required": true
+        },
+        {
+          "name": "rowVersion",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "minLength": 1
           },
           "required": true
         }
@@ -24503,6 +24548,15 @@
             "type": "integer",
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
+          "required": true
+        },
+        {
+          "name": "rowVersion",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "minLength": 1
           },
           "required": true
         }

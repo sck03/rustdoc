@@ -455,7 +455,7 @@ export function MasterDataEditorPage({
         ) : null}
         {config.key === "hs-codes" && !isNew && canManage && record && <HsCodeObsoleteAction client={client} records={[record]}
           disabled={isBusy || hasUnsavedRecordChanges} onChanged={async () => {
-            await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("hs-codes") });
+            await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("hs-codes") }, { throwOnError: true });
           }} />}
       </div>
 

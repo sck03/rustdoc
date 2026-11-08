@@ -4,6 +4,8 @@
 
 ## 本地入口
 
+2026-11-08 并发/性能回归：`test_party_save_workspace_ui.mjs` 使用真实 QueryClient 验证刷新错误传播，并覆盖主数据分类切换、版本删除与迟到响应；`test_invoice_editing_contracts.mjs` 核对不可变行投影与完整规范化等价，输出 5000 行文字编辑耗时。`test_native_desktop_editions.mjs <包父目录> Full --without-ocr --entry-rows-only` 还通过生成客户端与实际界面验证六类主数据版本删除，然后执行中文明细、撤销、保存回读及 PDF 场景；需先重新构建包含最新前端的对应测试包。
+
 2026-11-08 编辑恢复回归：`test:invoice-editing` 增加 `test_editor_recovery_ui.mjs`，验证真实发票工作区的显式重载、失败保留、切换记录、5000 行表头复用与备份 404 停止轮询。`test:abortable-operations-ui` 验证当前预览取消后可重试，`test:report-designer-v3` 验证缺失必要打印字段明确拒绝。旧数据库快照 WebDAV 入口和五条 API 已移除，使用完整加密灾备的“异机副本”。本批验证与清理见[记录](../docs/2026-11-08编辑恢复与资源边界修复记录.md)。
 
 2026-11-08 网络与会话回归：`test-native-postgres.ps1 -Scope All -PostgresBin <PostgreSQL 18 bin>` 增加握手停滞、查询取消、连接复用与网络黑洞测试，使用隔离集群和独立账号。每条 Cargo 命令的默认预算为 3600 秒（含编译），避免完整团队流程接近 30 分钟时被旧预算截断，仍可通过 `-TimeoutSeconds` 指定。`test_api_client_request_contracts.mjs` 检查超时分类及长操作预算；`test_authentication_failure_events.mjs` 和真实 `test_unit_identity_ui.mjs` 覆盖注销失败保留会话、成功撤销及身份隔离。Vite 开发代理同时覆盖 `/api`、`/downloads`、健康探针和 `/openapi`。

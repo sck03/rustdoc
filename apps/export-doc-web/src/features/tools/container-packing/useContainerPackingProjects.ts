@@ -33,7 +33,7 @@ export function useContainerPackingProjects(client: ExportDocManagerApiClient, r
   }
   const onError = (error: unknown) => { if (!isAbortError(error)) setMessage(readApiError(error)); };
   async function refresh(check: () => void) {
-    try { await queries.invalidateQueries({ queryKey: queryKeys.containerPackingProjects() }); }
+    try { await queries.invalidateQueries({ queryKey: queryKeys.containerPackingProjects() }, { throwOnError: true }); }
     catch (error) { check(); setMessage(`操作已完成，但方案目录刷新失败：${readApiError(error)}`); }
   }
   const saveProjectMutation = useMutation({

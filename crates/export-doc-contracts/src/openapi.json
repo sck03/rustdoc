@@ -50482,6 +50482,15 @@
               "pattern": "^-?(?:0|[1-9]\\d*)$"
             },
             "required": true
+          },
+          {
+            "name": "rowVersion",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
           }
         ]
       },
@@ -50986,6 +50995,15 @@
               "type": "integer",
               "format": "int32",
               "pattern": "^-?(?:0|[1-9]\\d*)$"
+            },
+            "required": true
+          },
+          {
+            "name": "rowVersion",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1
             },
             "required": true
           }
@@ -54295,6 +54313,15 @@
               "pattern": "^-?(?:0|[1-9]\\d*)$"
             },
             "required": true
+          },
+          {
+            "name": "rowVersion",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
           }
         ]
       },
@@ -54801,6 +54828,15 @@
               "pattern": "^-?(?:0|[1-9]\\d*)$"
             },
             "required": true
+          },
+          {
+            "name": "rowVersion",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
           }
         ]
       },
@@ -55247,6 +55283,15 @@
               "type": "integer",
               "format": "int32",
               "pattern": "^-?(?:0|[1-9]\\d*)$"
+            },
+            "required": true
+          },
+          {
+            "name": "rowVersion",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1
             },
             "required": true
           }
@@ -55753,6 +55798,15 @@
               "type": "integer",
               "format": "int32",
               "pattern": "^-?(?:0|[1-9]\\d*)$"
+            },
+            "required": true
+          },
+          {
+            "name": "rowVersion",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1
             },
             "required": true
           }

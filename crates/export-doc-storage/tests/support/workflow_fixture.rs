@@ -203,6 +203,84 @@ pub fn exercise(tx: &Connection) {
         .unwrap();
     tx.freeze_request_revision(archive, &snapshot).unwrap();
     tx.freeze_request_revision(archive, &snapshot).unwrap();
+    // A paused first batch must not starve the next eligible personnel order.
+    let mut scheduled = vec![];
+    for index in 0..21 {
+        let mut row = json!({"versionNumber":1,"ownerUserId":account,"companyScope":"WORKFLOW-FIXTURE","departmentId":"D","status":"Approved","submissionNumber":1});
+        let id = tx
+            .insert(&RecordWrite::unkeyed("oa-general", &row))
+            .unwrap();
+        row["id"] = json!(id);
+        tx.set_body(id, &row).unwrap();
+        tx.publish_workflow(
+            id,
+            1,
+            &[Task {
+                key: "approved".into(),
+                node: "review".into(),
+                assignee: account,
+                context: String::new(),
+                acted_by: Some(account),
+                acted_by_context: String::new(),
+                status: "Approved".into(),
+                active: false,
+                independent: false,
+                due_at: "2026-11-02T00:00:00Z".into(),
+                started_at: "2026-11-01T00:00:00Z".into(),
+                acted_at: "2026-11-01T01:00:00Z".into(),
+                elapsed_seconds: Some(3600),
+            }],
+        )
+        .unwrap();
+        let mut plan = tx.get("oa-general", id).unwrap().unwrap()["approvalPlan"].clone();
+        plan["suspendedAt"] = json!(if index < 20 {
+            "2026-11-01T00:00:00Z"
+        } else {
+            ""
+        });
+        tx.save_workflow_state(
+            id,
+            1,
+            &WorkflowProgress {
+                approval: "Approved",
+                handling: None,
+            },
+            &plan,
+            &[],
+        )
+        .unwrap();
+        tx.schedule_personnel_order(&json!({"requestId":id,"revision":1,"actorId":account,"contextId":"","effectiveAt":"2026-11-02T00:00:00Z"})).unwrap();
+        scheduled.push((id, plan));
+    }
+    for _ in 0..3 {
+        let due = tx.due_personnel_orders("2026-11-03T00:00:00Z").unwrap();
+        assert_eq!(due.len(), 1);
+        assert_eq!(due[0]["requestId"], scheduled[20].0);
+    }
+    scheduled[0].1["suspendedAt"] = json!("");
+    tx.save_workflow_state(
+        scheduled[0].0,
+        1,
+        &WorkflowProgress {
+            approval: "Approved",
+            handling: None,
+        },
+        &scheduled[0].1,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(
+        tx.due_personnel_orders("2026-11-03T00:00:00Z")
+            .unwrap()
+            .len(),
+        2
+    );
+    assert!(
+        tx.due_personnel_orders("2026-11-01T00:00:00Z")
+            .unwrap()
+            .is_empty()
+    );
+    // A rejected statement aborts a PostgreSQL transaction, so keep it last.
     assert!(
         tx.delete("oa-general", request, 1).is_err(),
         "submitted material protects its parent"

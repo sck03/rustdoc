@@ -72,14 +72,6 @@ function itemTotals(item: ApiInvoiceItemDto): RowTotals {
   return totals;
 }
 
-/** Copies remain editable while unchanged row calculations share a weakly held cache. */
-export function copyInvoiceItemWithTotals(item: ApiInvoiceItemDto): ApiInvoiceItemDto {
-  itemTotals(item);
-  const copy = { ...item };
-  rowTotals.set(copy, rowTotals.get(item)!);
-  return copy;
-}
-
 export function calculateInvoiceTotals(items: ApiInvoiceItemDto[], exchangeRate?: number | null, currency?: string): Partial<ApiInvoiceDetailDto> {
   const totals = { amount: decimal(0), cartons: decimal(0), grossWeight: decimal(0), netWeight: decimal(0), purchase: decimal(0), quantity: decimal(0), refund: decimal(0), volume: decimal(0) };
   const keys = Object.keys(totals) as Array<keyof RowTotals>;

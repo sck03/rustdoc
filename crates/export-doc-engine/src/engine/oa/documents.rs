@@ -27,6 +27,9 @@ pub(super) fn start_approved(
     ];
     match start(service, actor, *operation, &parameters) {
         Ok(snapshot) => Ok(snapshot),
+        // Admission contention is temporary. Leave the durable system node active
+        // so the bounded scheduler retries after its normal interval.
+        Err(cause) if cause.status == Some(429) => Err(cause),
         // Failure remains visible on the approved submission; the applicant can
         // retry without repeating approval or the personnel transaction.
         Err(cause) => service.store.transaction(|tx| {
@@ -56,7 +59,10 @@ pub(super) fn start(
     let _gate = service
         .oa_document_gate
         .try_lock()
-        .map_err(|_| error(429, "正在准备审批单，请稍后重试。"))?;
+        .map_err(|cause| match cause {
+            std::sync::TryLockError::WouldBlock => error(429, "正在准备审批单，请稍后重试。"),
+            std::sync::TryLockError::Poisoned(_) => unavailable("审批单准备状态异常。"),
+        })?;
     let meta = metadata(operation).ok_or_else(|| invalid("未知审批单操作。"))?;
     let id = submissions::id(parameters)?;
     let request_id = records::id(parameters)?;

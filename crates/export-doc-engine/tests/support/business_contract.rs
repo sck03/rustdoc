@@ -37,6 +37,84 @@ fn version(row: &Value) -> Value {
 
 /// Provider-independent regressions for the complete customer/supplier workflow.
 pub fn exercise(request: &Request<'_>) {
+    for (create, update, get, delete, fields) in [
+        (
+            CREATE_CUSTOMER,
+            UPDATE_CUSTOMER,
+            GET_CUSTOMER,
+            DELETE_CUSTOMER,
+            json!({"displayName":"版本客户","customerNameEN":"Version customer"}),
+        ),
+        (
+            CREATE_EXPORTER,
+            UPDATE_EXPORTER,
+            GET_EXPORTER,
+            DELETE_EXPORTER,
+            json!({"exporterNameCN":"版本出口商","exporterNameEN":"Version exporter"}),
+        ),
+        (
+            CREATE_PAYEE,
+            UPDATE_PAYEE,
+            GET_PAYEE,
+            DELETE_PAYEE,
+            json!({"name":"Version payee"}),
+        ),
+        (
+            CREATE_PRODUCT,
+            UPDATE_PRODUCT,
+            GET_PRODUCT,
+            DELETE_PRODUCT,
+            json!({"productCode":nonce().unwrap(),"nameCN":"版本商品","nameEN":"Version product"}),
+        ),
+        (
+            CREATE_PORT,
+            UPDATE_PORT,
+            GET_PORT,
+            DELETE_PORT,
+            json!({"nameCN":"版本港口","nameEN":"Version port"}),
+        ),
+        (
+            CREATE_UNIT,
+            UPDATE_UNIT,
+            GET_UNIT,
+            DELETE_UNIT,
+            json!({"nameCN":"版本单位","nameEN":"Version unit"}),
+        ),
+    ] {
+        let row = save(request, create, &[], fields);
+        let path = [("id", row["id"].to_string())];
+        let saved = save(request, update, &path, row.clone());
+        assert!(matches!(
+            request(delete, &path, &[], None).unwrap_err().status,
+            Some(400 | 409)
+        ));
+        assert_eq!(
+            request(
+                delete,
+                &path,
+                &[("rowVersion", row["rowVersion"].as_str().unwrap().into())],
+                None
+            )
+            .unwrap_err()
+            .status,
+            Some(409)
+        );
+        assert_eq!(
+            read(request, get, &path, &[], None)["rowVersion"],
+            saved["rowVersion"]
+        );
+        read(
+            request,
+            delete,
+            &path,
+            &[("rowVersion", saved["rowVersion"].as_str().unwrap().into())],
+            None,
+        );
+        assert_eq!(
+            request(get, &path, &[], None).unwrap_err().status,
+            Some(404)
+        );
+    }
     let suffix = nonce().unwrap();
     let customer = save(
         request,

@@ -193,7 +193,7 @@ fn opportunity_product_references_prevent_deletion_and_keep_projection_metadata_
         .json::<Value>(
             DELETE_PRODUCT,
             &[("id", product["id"].to_string())],
-            &[("expectedVersion", product["versionNumber"].to_string())],
+            &[("rowVersion", product["rowVersion"].as_str().unwrap().into())],
             None,
         )
         .unwrap_err();

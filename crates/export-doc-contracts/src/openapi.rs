@@ -150,6 +150,23 @@ mod tests {
             "type":"object", "properties":{"destinationPath":{"type":"string","minLength":1,"maxLength":4096}},
             "required":["destinationPath"], "additionalProperties":false
         });
+        // Master-data deletes require the row version already enforced by storage.
+        for kind in [
+            "customers",
+            "exporters",
+            "payees",
+            "products",
+            "ports",
+            "units",
+        ] {
+            baseline["paths"][format!("/api/master-data/{kind}/{{id}}")]["delete"]["parameters"]
+                .as_array_mut()
+                .unwrap()
+                .push(serde_json::json!({
+                    "name":"rowVersion", "in":"query", "required":true,
+                    "schema":{"type":"string", "minLength":1}
+                }));
+        }
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

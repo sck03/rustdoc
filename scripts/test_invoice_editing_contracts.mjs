@@ -60,6 +60,27 @@ assert.ok(shortened.startIndex < shortened.endIndex && shortened.endIndex <= 300
 assert.ok(shortened.topSpacerHeight < 300 * 42);
 assert.equal(items.haveInvoiceTotalsInputsChanged(manyRows, manyRows.map((row, i) => i ? row : { ...row, styleName: "edited text" })), false);
 assert.equal(items.haveInvoiceTotalsInputsChanged(manyRows, manyRows.map((row, i) => i ? row : { ...row, totalPrice: 1 })), true);
+const project = invoice.createInvoiceDetailsProjector();
+const draft = { items: manyRows, exchangeRate: 7, currency: "USD" };
+const projected = project(draft);
+const edited = { ...draft, items: manyRows.map((row, i) => i === 4999 ? { ...row, styleName: "text edit" } : row) };
+const next = project(edited);
+assert.equal(next.items[0], projected.items[0], "unchanged rows retain their projection identity");
+assert.notEqual(next.items[4999], projected.items[4999]);
+assert.deepEqual(next, invoice.normalizeInvoiceDetailsForSave(edited));
+for (const changed of [
+  { ...edited, items: edited.items.map((row, i) => i === 4999 ? { ...row, quantity: 3, unitPrice: 1.005 } : row) },
+  { ...edited, exchangeRate: 0, currency: "CNY" },
+  { ...edited, items: [...edited.items, { ...items.createEmptyInvoiceItem(), printRows: [{ text: "print only" }] }] },
+  draft,
+]) assert.deepEqual(project(changed), invoice.normalizeInvoiceDetailsForSave(changed), "edits, print rows and undo preserve exact save semantics");
+const timings = [];
+for (let i = 0; i < 24; i++) {
+  const changed = { ...draft, items: manyRows.map((row, index) => index === 4999 ? { ...row, styleName: String(i) } : row) };
+  const start = performance.now(); project(changed); timings.push(performance.now() - start);
+}
+timings.sort((a,b) => a-b);
+console.log(`5000-row text projection: median=${timings[12].toFixed(2)}ms p95=${timings[22].toFixed(2)}ms`);
 const before = { ...invoice.createEmptyInvoice("2026-10-25"), id:7, invoiceNo:"submitted", rowVersion:"native:1" };
 const saved = { ...before, rowVersion:"native:2" };
 const current = { ...before, invoiceNo:"new unsaved" };

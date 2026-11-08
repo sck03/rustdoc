@@ -38,7 +38,7 @@ export function ReportTemplateHistoryRetention({ client, template, enabled, isBu
         if (!preview || !reason.trim()) return;
         const response = await client.commitUserReportTemplateHistoryCleanup({ id: template.id, body: { token: preview.token, reason: reason.trim() } }, { signal });
         checkCurrent(); saved = true; setPreview(null); setReason(""); setMessage(response.message);
-        await queries.invalidateQueries({ queryKey: queryKeys.userReportTemplateVersions(template.id) });
+        await queries.invalidateQueries({ queryKey: queryKeys.userReportTemplateVersions(template.id) }, { throwOnError: true });
       });
     } catch (failure) {
       if (!isAbortError(failure)) setError(`${saved ? "历史已清理，但刷新失败：" : ""}${readApiError(failure)}`);

@@ -12,8 +12,8 @@ export async function verifyDesktopEntryRows({ run, request, token, cdp, output 
   const web = path.join(repo, 'apps/export-doc-web');
   const require = createRequire(path.join(web, 'package.json'));
   const bundle = path.join(output, 'entry-print-model.mjs');
-  await require('esbuild').build({ stdin: { resolveDir: web, contents: "export {createEmptyInvoice} from './src/features/invoices/invoiceModel.ts'; export {createEmptyInvoiceItem} from './src/features/invoices/invoiceItemsEditorModel.ts';" }, bundle: true, platform: 'node', format: 'esm', outfile: bundle, logLevel: 'silent' });
-  const { createEmptyInvoice, createEmptyInvoiceItem } = await import(pathToFileURL(bundle).href);
+  await require('esbuild').build({ stdin: { resolveDir: web, contents: "export {createEmptyInvoice} from './src/features/invoices/invoiceModel.ts'; export {createEmptyInvoiceItem} from './src/features/invoices/invoiceItemsEditorModel.ts'; export {masterDataConfigs} from './src/features/master-data/masterDataConfigs.ts'; export {createExportDocManagerApiClient} from './src/api/index.ts';" }, bundle: true, platform: 'node', format: 'esm', outfile: bundle, logLevel: 'silent' });
+  const { createEmptyInvoice, createEmptyInvoiceItem, masterDataConfigs, createExportDocManagerApiClient } = await import(pathToFileURL(bundle).href);
   const wait = expression => waitFor(() => run(`Boolean(${expression})`), 30000, expression);
   const screenshot = async name => {
     await run("document.getElementById('invoice-editor-navigation').scrollIntoView({block:'start'}); true");
@@ -23,6 +23,23 @@ export async function verifyDesktopEntryRows({ run, request, token, cdp, output 
     const expression = `[...document.querySelectorAll('button')].find(e=>e.textContent.trim()===${JSON.stringify(label)}&&!e.closest('[hidden]'))`;
     await wait(expression); await run(`${expression}.click(); true`);
   };
+  const context = await run("window.__TAURI_INTERNALS__.invoke('get_desktop_runtime_context')");
+  const client = createExportDocManagerApiClient({baseUrl:context.apiBaseUrl,accessToken:token,desktopAccessToken:context.desktopAccessToken});
+  for (const config of masterDataConfigs.filter(config=>config.key!=="hs-codes")) {
+    const name = `VERSION-CHECK-${config.key.toUpperCase()}`, body = config.emptyRecord();
+    body[config.primaryField] = name;
+    for (const field of config.sections.flatMap(section=>section.fields).filter(field=>field.required)) body[field.name] = name;
+    const created = await config.create(client, config.normalizeRecord(body,0));
+    const id = config.routeId(created), saved = await config.update(client,id,created);
+    await assert.rejects(config.delete(client,{...created,rowVersion:""},id),error=>[400,409].includes(error.status));
+    await assert.rejects(config.delete(client,created,id),error=>error.status===409);
+    assert.equal((await config.get(client,id)).rowVersion,saved.rowVersion);
+    await run(`location.hash=${JSON.stringify('#/master-data/'+config.key)}; true`);
+    const button = `[...document.querySelectorAll('tr button[title="删除"]')].find(button=>button.closest('tr').textContent.includes(${JSON.stringify(name)}))`;
+    await wait(`${button} && !${button}.disabled`); await run(`${button}.click(); true`);
+    await click('确认删除');
+    await waitFor(async()=>{try {await config.get(client,id);return false;}catch(error){if(error.status===404)return true;throw error;}},15000,`${config.key} deletion did not commit`);
+  }
   const edit = async (line, text) => {
     const expression = `document.querySelector('[aria-label="打印第 ${line} 行描述"]')`;
     await wait(expression);

@@ -1,6 +1,12 @@
 //! Shared query/path shapes. Requiredness, integer widths and bounds remain explicit.
 use super::model::*;
 
+pub(super) fn row_versioned_record_id() -> Vec<Parameter> {
+    let mut parameters = record_id32();
+    parameters.push(p("rowVersion", "query", Some(true), s().min_length(1)));
+    parameters
+}
+
 #[rustfmt::skip]
 pub(super) fn positive_record_id32() -> Vec<Parameter> { vec![p("id","path",Some(true),i().minimum(num("1")).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))] }
 #[rustfmt::skip]

@@ -8034,6 +8034,7 @@ export interface DeleteCrmFollowUpRequest {
 
 export interface DeleteCustomerRequest {
   id: number;
+  rowVersion: string;
 }
 
 export interface DeleteCustomsCooProducerProfileRequest {
@@ -8042,6 +8043,7 @@ export interface DeleteCustomsCooProducerProfileRequest {
 
 export interface DeleteExporterRequest {
   id: number;
+  rowVersion: string;
 }
 
 export interface DeleteHsCodeRequest {
@@ -8092,6 +8094,7 @@ export interface DeleteOrganizationDepartmentRequest {
 
 export interface DeletePayeeRequest {
   id: number;
+  rowVersion: string;
 }
 
 export interface DeletePaymentRequest {
@@ -8123,10 +8126,12 @@ export interface DeletePersonnelImageRequest {
 
 export interface DeletePortRequest {
   id: number;
+  rowVersion: string;
 }
 
 export interface DeleteProductRequest {
   id: number;
+  rowVersion: string;
 }
 
 export interface DeleteReportTemplateRequest {
@@ -8160,6 +8165,7 @@ export interface DeleteSupplierProductLinkRequest {
 
 export interface DeleteUnitRequest {
   id: number;
+  rowVersion: string;
 }
 
 export interface DiffOaDefinitionsRequest {

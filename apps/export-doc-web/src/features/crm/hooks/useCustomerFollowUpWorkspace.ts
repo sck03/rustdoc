@@ -181,7 +181,7 @@ export function useCustomerFollowUpWorkspace({ businessTimeZone, client }: Custo
       signal?.throwIfAborted();
       setCustomers(current => [preferred, ...current.filter(item => item.id !== preferred.id)]);
       setCustomerId(preferred.id);
-      await Promise.all([queryClient.invalidateQueries({ queryKey: queryKeys.crmCustomersRoot() }), queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() })]);
+      await Promise.all([queryClient.invalidateQueries({ queryKey: queryKeys.crmCustomersRoot() }, { throwOnError: true }), queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() }, { throwOnError: true })]);
       return;
     }
     const load = async (requestSignal: AbortSignal) => {
@@ -193,8 +193,8 @@ export function useCustomerFollowUpWorkspace({ businessTimeZone, client }: Custo
       setCustomers(page.items);
       setCustomerId(0);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.crmCustomersRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.crmCustomersRoot() }, { throwOnError: true }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() }, { throwOnError: true }),
       ]);
     };
     await (signal ? load(signal) : runAbortableOperation(load));

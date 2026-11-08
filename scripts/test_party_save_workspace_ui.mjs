@@ -11,7 +11,10 @@ Object.assign(process.env, { TEMP: path.join(output, "Temp"), TMP: path.join(out
 const bundle = path.join(output, "app.js"), source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\", "/"));
 await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, contents: `
 import React,{useRef,useState} from "react";import {createRoot} from "react-dom/client";
-import {QueryClient,QueryClientProvider} from "@tanstack/react-query";import {MemoryRouter,useLocation,useNavigate} from "react-router-dom";
+import {QueryClient,QueryClientProvider,useQuery} from "@tanstack/react-query";import {MemoryRouter,Routes,Route,useLocation,useNavigate} from "react-router-dom";
+import {queryKeys} from ${source("api/queryKeys.ts")};
+import {MasterDataRoute} from ${source("features/master-data/MasterDataPages.tsx")};
+import {useOfficeOperation} from ${source("features/office/useOfficeData.ts")};
 import {SupplierDirectoryPage} from ${source("features/suppliers/SupplierDirectoryPage.tsx")};
 import {CustomerFollowUpPage} from ${source("features/crm/CustomerFollowUpPage.tsx")};
 import {ApprovalDocument} from ${source("features/oa/ApprovalDocument.tsx")};
@@ -31,6 +34,9 @@ const save=(request,init)=>new Promise((resolve,reject)=>window.requests.push({r
 const preview=(request,init)=>new Promise((resolve,reject)=>window.previews.push({request,signal:init.signal,resolve,reject}));
 const commit=(request,init)=>new Promise((resolve,reject)=>window.imports.push({request,signal:init.signal,resolve,reject}));
 const client={getSupplier:getParty,getCrmCustomer:getParty,querySuppliers:async()=>page([party]),queryCrmCustomers:async()=>page([party]),
+listCustomersPage:async()=>page([{id:17,customerNameEN:"customer row",rowVersion:"native:4"}]),
+listExportersPage:()=>new Promise(resolve=>window.finishExporters=()=>resolve(page([{id:18,exporterNameEN:"exporter row",rowVersion:"native:5"}]))),
+deleteCustomer:save,deleteExporter:save,
 admitSupplier:save,deactivateSupplier:save,restoreSupplier:save,deleteSupplier:save,setPrimarySupplierContact:save,deleteSupplierContact:save,
 deactivateCrmCustomer:save,restoreCrmCustomer:save,deleteCrmCustomer:save,setPrimaryCrmContact:save,deleteCrmContact:save,
 previewSupplierImport:preview,previewCrmCustomerImport:preview,importSuppliers:commit,importCrmCustomers:commit,
@@ -45,12 +51,18 @@ const setSession=value=>{sessionRef.current=value;validatedUserTokenRef.current=
 window.login=()=>setSession({accessToken:"fresh",user});window.renew=()=>setSession({accessToken:"renewed",user});
 useBusinessDateSessionRefresh({client,desktopContextLoading:false,queryClient:queries,session,sessionRef,setSession,validatedUserTokenRef});return <div>session harness</div>}
 const approvalApi={submission:async()=>{window.documentCalls++;if(window.documentCalls===2)throw new Error("document unavailable");return {documentStatus:window.documentCalls<4?"Running":"Ready",submissionNumber:1}}};
-function Harness(){const [shown,setShown]=useState(true),navigate=useNavigate(),location=useLocation();window.navigate=navigate;window.hide=()=>setShown(false);window.route=location.search;
+function OfficeHarness(){const operation=useOfficeOperation();useQuery({queryKey:["office","refresh-test"],queryFn:async()=>{if(window.refreshFailure)throw new Error("directory unavailable");return []}});
+return <><button onClick={()=>operation.run(async()=>{window.refreshFailure=true;window.writes=(window.writes||0)+1;return 1},()=>{window.applied=true})}>保存操作</button><div>{operation.error}</div></>}
+function Harness(){const [shown,setShown]=useState(true),navigate=useNavigate(),location=useLocation();window.navigate=navigate;window.hide=()=>setShown(false);window.route=location.pathname+location.search;
+useQuery({queryKey:[...queryKeys.crmCustomersRoot(),"refresh-test"],enabled:window.mode==="crm-profile",queryFn:async()=>{if(window.refreshFailure)throw new Error("directory unavailable");return []}});
+if(window.mode==="master")return <Routes><Route path="/master-data/:entityKey" element={<MasterDataRoute client={client}/>}/></Routes>;
+if(window.mode==="office-refresh")return <OfficeHarness/>;
 window.dirty=useHasUnsavedChanges();return !shown?<div>unmounted</div>:window.mode==="approval"?<ApprovalDocument api={approvalApi} user={{id:1}} row={{id:1,status:"Approved",versionNumber:1,submissionId:1}} scope="test"/>:window.mode.startsWith("session")?<SessionHarness/>:window.mode.startsWith("supplier")?<SupplierDirectoryPage businessDate="2026-10-25" client={client}/>:<CustomerFollowUpPage businessTimeZone="Asia/Shanghai" client={client}/>}
 const mode=window.mode,isNew=mode.endsWith("new")&&!mode.includes("contacts"),contacts=mode.includes("contacts");
 const view=mode.endsWith("import")?"import":contacts?"contacts":"profile";
-const entry=mode.startsWith("supplier")?"/suppliers?view="+view+(isNew?"&new=true":"&supplierId=1"):"/crm?view="+view+(isNew?"":"&customerId=1");
+const entry=mode==="master"?"/master-data/customers":mode.startsWith("supplier")?"/suppliers?view="+view+(isNew?"&new=true":"&supplierId=1"):"/crm?view="+view+(isNew?"":"&customerId=1");
 const permissions=Object.values(permissionResources).flatMap(resourceKey=>Object.values(permissionActions).map(action=>({resourceKey,action,dataScope:"all"})));
+permissions.push(...["view","operate","manage"].map(action=>({resourceKey:"document.master-data",action,dataScope:"all"})));
 createRoot(document.getElementById("root")).render(<MemoryRouter initialEntries={[entry]}><QueryClientProvider client={queries}><PermissionAccessProvider permissions={permissions}>
 <ConfirmationProvider><UnsavedChangesProvider><Harness/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider></QueryClientProvider></MemoryRouter>);
 ` }, outfile: bundle, bundle: true, platform: "browser", format: "iife", jsx: "automatic", logLevel: "silent" });
@@ -67,13 +79,38 @@ async function scenario(mode, check) {
     }
     if (mode === "supplier-contacts-new") await page.getByRole("button", { name: "新增联系人", exact: true }).click();
     if (mode === "crm-contacts-new") await page.getByRole("button", { name: "新建", exact: true }).click();
-    if (!mode.startsWith("session") && !mode.endsWith("import") && mode !== "approval") await page.locator(`input[name="${mode.includes("contacts") ? "contactName" : "name"}"]`).waitFor();
+    if (!mode.startsWith("session") && !mode.endsWith("import") && !["approval","master","office-refresh"].includes(mode)) await page.locator(`input[name="${mode.includes("contacts") ? "contactName" : "name"}"]`).waitFor();
     await check(page); assert.deepEqual(errors, []); passed++;
   } catch (error) { await page.screenshot({ path: path.join(output, `failure-${passed}.png`), fullPage: true }); throw error; }
   finally { await page.close(); }
 }
 const submit = page => page.locator('form:has(button[type="submit"]:text-matches("保存|建立|添加"))').evaluate(form => { form.requestSubmit(); form.requestSubmit(); });
 try {
+  await scenario("office-refresh", async page => {
+    await page.getByRole("button", {name:"保存操作"}).click();
+    await page.getByText(/操作已成功，列表刷新失败/).waitFor();
+    assert.deepEqual(await page.evaluate(()=>[window.writes,window.applied]), [1,true]);
+  });
+  await scenario("master", async page => {
+    const row = page.getByRole("row").filter({hasText:"customer row"});
+    await row.waitFor();
+    await row.focus(); await page.keyboard.press("Delete");
+    await page.getByRole("dialog").waitFor();
+    await page.evaluate(()=>window.navigate("/master-data/exporters"));
+    await page.waitForFunction(()=>window.finishExporters);
+    assert.equal(await page.getByRole("dialog").count(),0);
+    assert.equal(await page.getByRole("row").filter({hasText:"customer row"}).count(),0);
+    await page.keyboard.press("Delete"); assert.equal(await page.evaluate(()=>window.requests.length),0);
+    await page.evaluate(()=>window.finishExporters());
+    await page.getByRole("row").filter({hasText:"exporter row"}).focus(); await page.keyboard.press("Delete");
+    await page.getByRole("button",{name:"确认删除",exact:true}).click();
+    await page.waitForFunction(()=>window.requests.length===1);
+    assert.deepEqual(await page.evaluate(()=>window.requests[0].request),{id:18,rowVersion:"native:5"});
+    await page.evaluate(()=>window.navigate("/master-data/customers"));
+    await row.waitFor(); await page.evaluate(()=>window.requests[0].resolve({message:"old deletion result"}));
+    assert.equal(await page.evaluate(()=>window.requests[0].signal.aborted),true);
+    assert.equal(await page.getByText("old deletion result").count(),0);
+  });
   for (const mode of ["supplier-import", "crm-import"]) for (const oldFirst of [false, true]) await scenario(mode, async page => {
     const file = name => ({ name: `${name}.csv`, mimeType: "text/csv", buffer: Buffer.from("name\n" + name) });
     await page.locator('input[type="file"]').setInputFiles(file("A"));
@@ -142,7 +179,7 @@ try {
   }
   for (const mode of ["supplier-contacts", "crm-contacts", "crm-profile"]) await scenario(mode, async page => {
     await submit(page); await page.waitForFunction(() => window.requests.length === 1);
-    await page.evaluate(() => { window.refreshFailure = true; window.queries.invalidateQueries = async () => { throw new Error("directory unavailable"); }; window.finish(); });
+    await page.evaluate(() => { window.refreshFailure = true; window.finish(); });
     await page.getByText(/已保存，但目录刷新失败/).waitFor(); assert.equal(await page.evaluate(() => window.dirty), false);
     await submit(page); await page.waitForFunction(() => window.requests.length === 2);
     assert.equal(await page.evaluate(() => window.requests[1].request.body.expectedVersion), 2);

@@ -182,11 +182,18 @@ fn catalog_failures_are_not_empty_successes() {
         );
         assert_eq!(fs::read(&path).unwrap(), bytes);
     }
-    fs::remove_file(&path).unwrap();
+    // Independent fixtures avoid Windows delete-pending handles when changing
+    // a file into a directory (or vice versa) under the same path.
+    let directory_workspace = Workspace::new();
+    let paths = directory_workspace.paths();
+    let path = user_root(&paths).join(CATALOG_FILE);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
     fs::create_dir(&path).unwrap();
     assert_eq!(catalog_rows(&paths).unwrap_err().status, Some(503));
-    fs::remove_dir(&path).unwrap();
-    fs::remove_dir(&root).unwrap();
+    let file_workspace = Workspace::new();
+    let paths = file_workspace.paths();
+    let root = user_root(&paths);
+    fs::create_dir_all(root.parent().unwrap()).unwrap();
     fs::write(&root, b"not a directory").unwrap();
     assert_eq!(
         resource_access(&paths, &admin()).unwrap_err().status,

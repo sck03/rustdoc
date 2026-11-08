@@ -18,7 +18,11 @@ pub(super) fn tick(service: &NativeService) -> Result<()> {
         });
         match prepared {
             Ok(Some((actor, row, meta))) => {
-                let result = super::documents::start_approved(service, &actor, &meta, &row)?;
+                let result = match super::documents::start_approved(service, &actor, &meta, &row) {
+                    Ok(result) => result,
+                    Err(cause) if cause.status == Some(429) => break,
+                    Err(cause) => return Err(cause),
+                };
                 if !matches!(result["documentStatus"].as_str(), Some("Ready" | "Running")) {
                     block(service, &kind, id, &entry, "ApprovalDocumentFailed")?;
                 }
