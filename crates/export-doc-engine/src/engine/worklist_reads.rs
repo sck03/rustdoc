@@ -3,15 +3,15 @@ use super::super::{auth, error::Result, store::Actor};
 use crate::engine::store::Connection;
 use serde_json::Value;
 
-pub(super) fn rows(
+pub(super) fn visit(
     tx: &Connection,
     actor: &Actor,
     kind: &str,
     resource: &str,
     actions: &[&str],
     office: bool,
-) -> Result<Vec<Value>> {
-    let mut result = vec![];
+    mut consume: impl FnMut(Value) -> Result<()>,
+) -> Result<()> {
     let scoped = !matches!(resource, "office.rooms" | "office.supplies");
     let scopes: Vec<_> = actions
         .iter()
@@ -74,20 +74,25 @@ pub(super) fn rows(
         )
     })
     .collect();
-    let mut offset = 0;
+    let mut cursor = None;
     loop {
-        let (total, batch) = tx.query_scoped(&export_doc_storage::ScopedQuery {
-            kind,
-            scopes: if scoped { &scopes } else { &[] },
-            company: office.then_some(actor.company.as_str()),
-            fields: &fields,
-            offset,
-            limit: 200,
-        })?;
+        crate::operation::check()?;
+        let (next, batch) = tx.scan_worklist(
+            &export_doc_storage::ScopedQuery {
+                kind,
+                scopes: if scoped { &scopes } else { &[] },
+                company: office.then_some(actor.company.as_str()),
+                fields: &fields,
+                limit: 200,
+            },
+            actor.id,
+            &auth::data_scope(actor, "sales.customers", "view"),
+            cursor,
+        )?;
         if batch.is_empty() {
             break;
         }
-        offset += batch.len() as i64;
+        let count = batch.len();
         for record in batch {
             let mut visible = !office || record["companyScope"] == actor.company;
             for action in actions {
@@ -100,12 +105,13 @@ pub(super) fn rows(
                 };
             }
             if visible {
-                result.push(record);
+                consume(record)?;
             }
         }
-        if offset >= total {
+        cursor = next;
+        if count < 200 {
             break;
         }
     }
-    Ok(result)
+    Ok(())
 }

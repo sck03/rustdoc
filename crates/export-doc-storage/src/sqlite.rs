@@ -610,6 +610,25 @@ impl Adapter for Sqlite {
             .map(|v| serde_json::from_str(&v).map_err(Into::into))
             .transpose()
     }
+    fn settings_revision(&self, name: &str) -> Result<i64> {
+        Ok(self.connection.borrow().query_cached(
+            "SELECT COALESCE((SELECT version FROM settings WHERE name=?1),0)",
+            [name],
+            |r| r.get(0),
+        )?)
+    }
+    fn compare_set_settings(&self, name: &str, expected: i64, body: &Value) -> Result<bool> {
+        let body = serde_json::to_string(body)?;
+        let changed = if expected == 0 {
+            self.connection.borrow().execute("INSERT INTO settings(name,version,body) VALUES(?1,1,?2) ON CONFLICT(name) DO NOTHING", params![name,body])?
+        } else {
+            self.connection.borrow().execute(
+                "UPDATE settings SET version=version+1,body=?3 WHERE name=?1 AND version=?2",
+                params![name, expected, body],
+            )?
+        };
+        Ok(changed == 1)
+    }
     fn personnel_private_profile(&self, id: i64) -> Result<Option<Value>> {
         let value: Option<String> = self
             .connection

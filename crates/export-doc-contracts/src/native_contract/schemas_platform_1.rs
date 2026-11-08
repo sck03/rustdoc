@@ -99,12 +99,14 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("requireSameFootprintStacking",b())
     ])),
     ("ApiContainerTypeDto",o(vec![
+        ("versionNumber",i().minimum(num("1")).format("int64")),
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("name",s()),("length",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("width",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("height",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("maxVolume",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
         ("maxWeight",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("isSystemDefault",b())
-    ]).required(vec!["id","name","length","width","height","maxVolume","maxWeight","isSystemDefault"])),
+    ]).required(vec!["id","versionNumber","name","length","width","height","maxVolume","maxWeight","isSystemDefault"])),
     ("ApiContainerTypeListResponse",o(vec![("containerTypes",a(r("ApiContainerTypeDto"))),("storagePolicy",s())]).required(vec!["containerTypes","storagePolicy"])),
     ("ApiContainerTypeSaveRequest",o(vec![
+        ("expectedVersion",i().minimum(num("1")).format("int64")),
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("name",s()),("length",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("width",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("height",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("maxVolume",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
         ("maxWeight",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"))

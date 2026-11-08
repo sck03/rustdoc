@@ -11,6 +11,9 @@ pub fn document() -> Value {
 }
 
 #[cfg(test)]
+#[path = "contract_evolution.rs"]
+mod evolution;
+#[cfg(test)]
 mod tests {
     use super::*;
     fn difference(path: &str, actual: &Value, expected: &Value) -> Option<String> {
@@ -167,6 +170,7 @@ mod tests {
                     "schema":{"type":"string", "minLength":1}
                 }));
         }
+        evolution::reviewed_versioning(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

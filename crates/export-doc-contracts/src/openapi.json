@@ -2259,6 +2259,11 @@
           "name": {
             "type": "string"
           },
+          "versionNumber": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
           "width": {
             "type": [
               "integer",
@@ -2270,6 +2275,7 @@
         },
         "required": [
           "id",
+          "versionNumber",
           "name",
           "length",
           "width",
@@ -2300,6 +2306,11 @@
       "ApiContainerTypeSaveRequest": {
         "type": "object",
         "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
           "height": {
             "type": [
               "integer",
@@ -4218,10 +4229,16 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "versionNumber": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
           }
         },
         "required": [
           "id",
+          "versionNumber",
           "ciqRegNo",
           "prdcEtpsName",
           "prdcEtpsConcEr",
@@ -4325,6 +4342,11 @@
       "ApiCustomsCooProducerProfileSaveRequest": {
         "type": "object",
         "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
           "profile": {
             "$ref": "#/components/schemas/ApiCustomsCooProducerProfileInputDto"
           }
@@ -15746,12 +15768,18 @@
           "catalog": {
             "$ref": "#/components/schemas/SingleWindowReferenceCatalogModel"
           },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
           "storagePolicy": {
             "type": "string"
           }
         },
         "required": [
           "catalog",
+          "revision",
           "storagePolicy"
         ]
       },
@@ -15760,10 +15788,16 @@
         "properties": {
           "catalog": {
             "$ref": "#/components/schemas/SingleWindowReferenceCatalogModel"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
           }
         },
         "required": [
-          "catalog"
+          "catalog",
+          "expectedRevision"
         ]
       },
       "ApiSingleWindowReferenceCatalogSaveResponse": {
@@ -15775,6 +15809,11 @@
           "message": {
             "type": "string"
           },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
           "storagePolicy": {
             "type": "string"
           },
@@ -15785,6 +15824,7 @@
         "required": [
           "success",
           "catalog",
+          "revision",
           "message",
           "storagePolicy"
         ]
@@ -120237,6 +120277,30 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "pageNumber",
+            "in": "query",
+            "schema": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$"
+            }
           }
         ]
       },
@@ -120415,6 +120479,16 @@
               "type": "integer",
               "format": "int32",
               "pattern": "^-?(?:0|[1-9]\\d*)$"
+            },
+            "required": true
+          },
+          {
+            "name": "expectedVersion",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
@@ -122254,6 +122328,18 @@
             "BearerAuth": [],
             "DesktopAccess": []
           }
+        ],
+        "parameters": [
+          {
+            "name": "expectedRevision",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            },
+            "required": true
+          }
         ]
       },
       "get": {
@@ -122683,6 +122769,18 @@
           {
             "BearerAuth": [],
             "DesktopAccess": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "expectedRevision",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            },
+            "required": true
           }
         ],
         "requestBody": {
@@ -126260,6 +126358,16 @@
               "pattern": "^-?(?:0|[1-9]\\d*)$"
             },
             "required": true
+          },
+          {
+            "name": "expectedVersion",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "required": true
           }
         ]
       }
@@ -126586,6 +126694,9 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
           }
         },
         "x-exportdoc-policy": {
@@ -126630,6 +126741,16 @@
               "type": "integer",
               "format": "int32",
               "pattern": "^-?(?:0|[1-9]\\d*)$"
+            },
+            "required": true
+          },
+          {
+            "name": "expectedVersion",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }

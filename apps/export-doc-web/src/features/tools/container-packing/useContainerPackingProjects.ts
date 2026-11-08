@@ -72,7 +72,9 @@ export function useContainerPackingProjects(client: ExportDocManagerApiClient, r
       const project = projectsQuery.data?.projects?.find(project => project.id === projectId);
       if (!await confirmAction({ title: "删除装柜方案", description: `确定删除方案“${project?.name || latest.current.draft.projectName}”吗？`, confirmLabel: "确认删除", tone: "danger" })) return;
       checkCurrent(); loads.cancel();
-      await client.deleteContainerPackingProject({ id: projectId }, { signal }); checkCurrent();
+      const expectedVersion = latest.current.id === projectId ? latest.current.version : project?.versionNumber;
+      if (!expectedVersion) throw new Error("方案版本已丢失，请重新加载后重试。");
+      await client.deleteContainerPackingProject({ id: projectId, expectedVersion }, { signal }); checkCurrent();
       if (latest.current.id === projectId) {
         continueInScope("packing:0");
         // Keep the cargo draft so a deleted project can be saved under a new identity.

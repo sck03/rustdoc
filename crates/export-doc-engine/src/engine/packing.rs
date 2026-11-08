@@ -114,7 +114,7 @@ pub fn handle(
             SAVE_CONTAINER_PACKING_PROJECT => save_project(tx, actor, body),
             DELETE_CONTAINER_PACKING_PROJECT => {
                 let row = project(tx, actor, id(parameters)?, "delete")?;
-                remove(tx, actor, PROJECTS, &row)?;
+                remove(tx, actor, PROJECTS, &row, query)?;
                 Ok(json!({"success":true,"message":"方案已删除。"}))
             }
             LIST_CONTAINER_PACKING_CONTAINER_TYPES => {
@@ -134,7 +134,7 @@ pub fn handle(
                 if row["isSystemDefault"] == true {
                     return Err(conflict("系统默认柜型不能删除。"));
                 }
-                remove(tx, actor, TYPES, &row)?;
+                remove(tx, actor, TYPES, &row, query)?;
                 Ok(json!({"success":true,"message":"自定义柜型已删除。"}))
             }
             _ => Err(invalid("装柜操作无效。")),
@@ -231,7 +231,7 @@ pub fn seed(store: &Store) -> Result<()> {
 fn save_type(tx: &Connection, actor: &Actor, body: &Value) -> Result<Value> {
     let name = export_doc_domain::crm::text(&text(body, "name"), "柜型名称", 100, true)
         .map_err(invalid)?;
-    let mut record_id = body["id"].as_i64().unwrap_or(0);
+    let record_id = body["id"].as_i64().unwrap_or(0);
     if record_id < 0
         || builtins()
             .iter()
@@ -246,20 +246,12 @@ fn save_type(tx: &Connection, actor: &Actor, body: &Value) -> Result<Value> {
     value["name"] = json!(name);
     let dimensions: ApiContainerDimensionsDto = serde_json::from_value(json!({"length":value["length"],"width":value["width"],"height":value["height"],"volume":value["maxVolume"],"maxWeight":value["maxWeight"]})).map_err(|e| invalid(e.to_string()))?;
     packing::Dimensions::new(&dimensions).map_err(invalid)?;
-    if record_id == 0 {
-        if let Some(existing) = store::all(tx, TYPES)?
-            .into_iter()
-            .find(|row| store::normalize(&text(row, "name")) == store::normalize(&name))
-        {
-            record_id = existing["id"].as_i64().unwrap_or(0);
-        }
-    }
     if record_id > 0 {
         let previous = store::get(tx, TYPES, record_id)?;
         if previous["isSystemDefault"] == true {
             return Err(conflict("系统默认柜型不支持覆盖。"));
         }
-        value["expectedVersion"] = previous["versionNumber"].clone();
+        store::check_version(&previous, store::expected(body))?;
     }
     value["isSystemDefault"] = json!(false);
     let saved = store::save(
@@ -275,7 +267,21 @@ fn save_type(tx: &Connection, actor: &Actor, body: &Value) -> Result<Value> {
         json!({"success":true,"id":saved["id"],"containerType":saved,"message":"柜型已保存。","storagePolicy":POLICY}),
     )
 }
-fn remove(tx: &Connection, actor: &Actor, kind: &str, row: &Value) -> Result<()> {
+fn remove(
+    tx: &Connection,
+    actor: &Actor,
+    kind: &str,
+    row: &Value,
+    query: &[(&str, String)],
+) -> Result<()> {
+    store::check_version(
+        row,
+        query
+            .iter()
+            .find(|(key, _)| *key == "expectedVersion")
+            .and_then(|(_, value)| value.parse().ok())
+            .unwrap_or(0),
+    )?;
     let record_id = row["id"].as_i64().unwrap_or(0);
     let version = row["versionNumber"].as_i64().unwrap_or(0);
     if !tx.delete(kind, record_id, version)? {

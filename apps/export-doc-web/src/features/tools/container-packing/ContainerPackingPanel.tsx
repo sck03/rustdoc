@@ -81,6 +81,10 @@ export function ContainerPackingPanel({
     containerTypes,
     container.containerType,
   );
+  const containerTypeVersions = useRef(new Map<number, number>());
+  if (selectedContainerType && !containerTypeVersions.current.has(selectedContainerType.id)) {
+    containerTypeVersions.current.set(selectedContainerType.id, selectedContainerType.versionNumber);
+  }
   const validCargoRows = cargoRows.filter(isValidContainerPackingCargoRow);
   const analysisRequest = useMemo(
     () => buildContainerPackingAnalyzeRequest(container, cargoRows, rules),
@@ -224,6 +228,7 @@ export function ContainerPackingPanel({
       client.saveContainerPackingContainerType({
         body: {
           id: selectedContainerType?.id ?? 0,
+          expectedVersion: selectedContainerType ? containerTypeVersions.current.get(selectedContainerType.id) : undefined,
           name: container.containerType.trim(),
           length: readPositiveIntegerInput(container.length, 0),
           width: readPositiveIntegerInput(container.width, 0),
@@ -233,6 +238,7 @@ export function ContainerPackingPanel({
         },
       }),
     onSuccess: (nextResponse) => {
+      containerTypeVersions.current.set(nextResponse.id, nextResponse.containerType.versionNumber);
       setContainer((current) => ({
         ...current,
         containerType: nextResponse.containerType.name,
@@ -249,7 +255,7 @@ export function ContainerPackingPanel({
 
   const deleteContainerTypeMutation = useMutation({
     mutationFn: (containerTypeId: number) =>
-      client.deleteContainerPackingContainerType({ id: containerTypeId }),
+      client.deleteContainerPackingContainerType({ id: containerTypeId, expectedVersion: containerTypeVersions.current.get(containerTypeId) ?? 0 }),
     onSuccess: () => {
       setContainer((current) => ({ ...current, containerType: "" }));
       setMessage("柜型已删除。");
@@ -281,6 +287,7 @@ export function ContainerPackingPanel({
 
   function applyContainerType(typeName: string) {
     const definition = findContainerType(containerTypes, typeName);
+    if (definition) containerTypeVersions.current.set(definition.id, definition.versionNumber);
     setContainer((current) =>
       definition
         ? {

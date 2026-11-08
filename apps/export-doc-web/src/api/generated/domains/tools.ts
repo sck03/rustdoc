@@ -16,12 +16,22 @@ export default function createApi(transport: ApiTransport) {
 
   deleteContainerPackingContainerType(request: DeleteContainerPackingContainerTypeRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/tools/container-packing/container-types/${encodePath(request.id)}`;
-    return transport.request<ApiCommandResponse>("DELETE", path, { init });
+    return transport.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
   },
 
   deleteContainerPackingProject(request: DeleteContainerPackingProjectRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {
     const path = `/api/tools/container-packing/projects/${encodePath(request.id)}`;
-    return transport.request<ApiCommandResponse>("DELETE", path, { init });
+    return transport.request<ApiCommandResponse>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
   },
 
   downloadContainerPackingPdf(request: DownloadContainerPackingPdfRequest, init?: ApiRequestInit): Promise<Blob> {

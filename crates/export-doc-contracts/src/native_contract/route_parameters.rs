@@ -1,6 +1,26 @@
 //! Shared query/path shapes. Requiredness, integer widths and bounds remain explicit.
 use super::model::*;
 
+pub(super) fn expected_revision() -> Vec<Parameter> {
+    vec![p(
+        "expectedRevision",
+        "query",
+        Some(true),
+        i().minimum(num("0")).format("int64"),
+    )]
+}
+
+pub(super) fn required_versioned_record_id() -> Vec<Parameter> {
+    let mut parameters = record_id32();
+    parameters.push(p(
+        "expectedVersion",
+        "query",
+        Some(true),
+        i().minimum(num("1")).format("int64"),
+    ));
+    parameters
+}
+
 pub(super) fn row_versioned_record_id() -> Vec<Parameter> {
     let mut parameters = record_id32();
     parameters.push(p("rowVersion", "query", Some(true), s().min_length(1)));

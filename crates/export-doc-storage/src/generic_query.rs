@@ -190,7 +190,6 @@ pub struct ScopedQuery<'a> {
     pub scopes: &'a [DataScope<'a>],
     pub company: Option<&'a str>,
     pub fields: &'a [(&'a str, &'a str)],
-    pub offset: i64,
     pub limit: i64,
 }
 pub(crate) fn scoped(q: &ScopedQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {

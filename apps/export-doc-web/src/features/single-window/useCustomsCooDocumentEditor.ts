@@ -7,6 +7,8 @@ import type {
 } from "../../api/index.ts";
 import { selectCustomsCooAttachmentFiles } from "../../desktop/desktopBridge.ts";
 import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
+import { useScopedSave } from "../../ui/useScopedSave.ts";
+import { isAbortError } from "../../ui/useAbortableOperation.ts";
 import {
   buildCooGoodsDescription,
   copyCooOriginAndEnterpriseFields,
@@ -22,6 +24,8 @@ import { cloneEditorDocument } from "./singleWindowEditorTools.ts";
 type MessageSetter = Dispatch<SetStateAction<string | null>>;
 
 type CustomsCooDocumentEditorOptions = {
+  scope: string;
+  owner: unknown;
   document: ApiCustomsCooDocumentDto | null;
   undoDocument: ApiCustomsCooDocumentDto | null;
   setDocument: Dispatch<SetStateAction<ApiCustomsCooDocumentDto | null>>;
@@ -31,6 +35,7 @@ type CustomsCooDocumentEditorOptions = {
 };
 
 export function useCustomsCooDocumentEditor({
+  scope, owner,
   document,
   undoDocument,
   setDocument,
@@ -38,6 +43,7 @@ export function useCustomsCooDocumentEditor({
   setMessage,
   setSuccessMessage,
 }: CustomsCooDocumentEditorOptions) {
+  const attachments = useScopedSave(scope, owner);
   const clearToolFeedback = useCallback(() => {
     setUndoDocument(null);
     setSuccessMessage(null);
@@ -120,9 +126,11 @@ export function useCustomsCooDocumentEditor({
     }
 
     try {
+      await attachments.run(async context => {
       const attachmentPaths = (await selectCustomsCooAttachmentFiles())
         .map((filePath) => filePath.trim())
         .filter(Boolean);
+      context.checkCurrent();
       if (attachmentPaths.length === 0) {
         return;
       }
@@ -144,11 +152,13 @@ export function useCustomsCooDocumentEditor({
       setUndoDocument(null);
       setMessage(null);
       setSuccessMessage(`已添加 ${attachmentPaths.length} 个附件，保存后写入草稿。`);
+      });
     } catch (error) {
+      if (isAbortError(error)) return;
       setMessage(readDesktopError(error));
       setSuccessMessage(null);
     }
-  }, [document, setDocument, setMessage, setSuccessMessage, setUndoDocument]);
+  }, [document, attachments.run, setDocument, setMessage, setSuccessMessage, setUndoDocument]);
 
   const patchAttachment = useCallback((index: number, next: Partial<ApiCustomsCooAttachmentDto>) => {
     setDocument((current) => current

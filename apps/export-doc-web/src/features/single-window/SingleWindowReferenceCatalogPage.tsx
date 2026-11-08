@@ -10,9 +10,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useScopedSave } from "../../ui/useScopedSave.ts";
+import { isAbortError } from "../../ui/useAbortableOperation.ts";
+import { mergeSavedDraftFields } from "../../ui/recordDraftMerge.ts";
 import {
   ExportDocManagerApiClient,
+  ApiSingleWindowReferenceCatalogSaveResponse,
   SingleWindowReferenceCatalogModel,
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -91,73 +95,43 @@ export function SingleWindowReferenceCatalogPage({
     }
   }, [catalogQuery.error, catalogQuery.isError]);
 
-  const saveMutation = useMutation({
-    mutationFn: (catalog: SingleWindowReferenceCatalogModel) =>
-      client.updateSingleWindowReferenceCatalog({
-        body: {
-          catalog,
-        },
-      }),
-    onSuccess: async (response) => {
-      const nextCatalog = normalizeCatalog(response.catalog);
-      setDraft(nextCatalog);
-      setHasUnsavedChanges(false);
-      setMessage(null);
-      setSuccessMessage(response.message || "单一窗口申报词典已保存。");
-      queryClient.setQueryData(queryKeys.singleWindowReferenceCatalog(), {
-        catalog: nextCatalog,
-        storagePolicy: response.storagePolicy,
+  const [revision, setRevision] = useState(0);
+  const [acknowledged, setAcknowledged] = useState<{ client: ExportDocManagerApiClient; response: ApiSingleWindowReferenceCatalogSaveResponse }>();
+  const persistence = useScopedSave(`catalog:${canManageReferenceCatalog}:${canResetReferenceCatalog}`, client);
+  const latestDraft = useRef(draft); latestDraft.current = draft;
+  async function persist(request: (signal: AbortSignal) => Promise<ApiSingleWindowReferenceCatalogSaveResponse>) {
+    if (!canManageReferenceCatalog || !draft) return;
+    try {
+      await persistence.run(async context => {
+        const submitted = latestDraft.current;
+        const response = await request(context.signal);
+        context.checkCurrent();
+        const saved = normalizeCatalog(response.catalog);
+        const current = latestDraft.current;
+        const next = current && submitted ? mergeSavedDraftFields(current, submitted, saved, Object.keys(saved) as (keyof SingleWindowReferenceCatalogModel)[]) : saved;
+        setDraft(next);
+        setRevision(response.revision);
+        setAcknowledged({ client, response: { ...response, catalog: saved } });
+        setHasUnsavedChanges(buildReferenceCatalogSnapshot(next) !== buildReferenceCatalogSnapshot(saved));
+        setMessage(null); setSuccessMessage(response.message || "申报词典已保存。");
+        queryClient.setQueryData(queryKeys.singleWindowReferenceCatalog(), { ...response, catalog: saved });
       });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowReferenceCatalog() });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const resetMutation = useMutation({
-    mutationFn: () => client.resetSingleWindowReferenceCatalog(),
-    onSuccess: async (response) => {
-      const nextCatalog = normalizeCatalog(response.catalog);
-      setDraft(nextCatalog);
-      setHasUnsavedChanges(false);
-      setMessage(null);
-      setSuccessMessage(response.message || "已恢复内置申报词典。");
-      queryClient.setQueryData(queryKeys.singleWindowReferenceCatalog(), {
-        catalog: nextCatalog,
-        storagePolicy: response.storagePolicy,
-      });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowReferenceCatalog() });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const importJsonMutation = useMutation({
-    mutationFn: (file: File) =>
-      client.importSingleWindowReferenceCatalogJson({
-        body: file,
-      }),
-    onSuccess: async (response) => {
-      const nextCatalog = normalizeCatalog(response.catalog);
-      setDraft(nextCatalog);
-      setHasUnsavedChanges(false);
-      setMessage(null);
-      setSuccessMessage(response.message || "单一窗口申报词典已导入。");
-      queryClient.setQueryData(queryKeys.singleWindowReferenceCatalog(), {
-        catalog: nextCatalog,
-        storagePolicy: response.storagePolicy,
-      });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowReferenceCatalog() });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
+    } catch (error) {
+      if (!isAbortError(error)) { setMessage(readApiError(error)); setSuccessMessage(null); }
+    }
+  }
+  const saveMutation = {
+    isPending: persistence.isSaving,
+    mutate: (catalog: SingleWindowReferenceCatalogModel) => void persist(signal => client.updateSingleWindowReferenceCatalog({ body: { catalog, expectedRevision: revision } }, { signal })),
+  };
+  const resetMutation = {
+    isPending: persistence.isSaving,
+    mutate: () => { if (canResetReferenceCatalog) void persist(signal => client.resetSingleWindowReferenceCatalog({ expectedRevision: revision }, { signal })); },
+  };
+  const importJsonMutation = {
+    isPending: persistence.isSaving,
+    mutate: (file: File) => void persist(signal => client.importSingleWindowReferenceCatalogJson({ body: file, expectedRevision: revision }, { signal })),
+  };
 
   const activePage = useMemo(
     () => catalogPages.find((page) => page.key === activeKey) ?? catalogPages[0],
@@ -187,11 +161,13 @@ export function SingleWindowReferenceCatalogPage({
   const canSave = canManageReferenceCatalog && Boolean(draft) && validationErrors.length === 0 && !isBusy;
   const serverDraftSync = useServerDraftSync({
     resourceKey: "single-window-reference-catalog",
-    incomingValue: catalogQuery.data?.catalog,
+    incomingValue: catalogQuery.data,
+    persistedValue: acknowledged?.client === client ? acknowledged.response : undefined,
     isDirty: canManageReferenceCatalog && hasUnsavedChanges,
-    fingerprint: buildReferenceCatalogSnapshot,
-    applyIncoming: (serverCatalog) => {
-      setDraft(normalizeCatalog(serverCatalog));
+    fingerprint: response => `${response.revision}:${buildReferenceCatalogSnapshot(response.catalog)}`,
+    applyIncoming: (response) => {
+      setDraft(normalizeCatalog(response.catalog));
+      setRevision(response.revision);
       setHasUnsavedChanges(false);
       setMessage(null);
     },

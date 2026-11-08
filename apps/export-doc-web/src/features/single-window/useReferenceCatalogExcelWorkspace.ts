@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useLayoutEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useTransientPreview } from "../../ui/useTransientPreview.ts";
 import type { ApiSingleWindowReferenceCatalogExcelImportPreviewResponse, ExportDocManagerApiClient, SingleWindowReferenceCatalogModel } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import {
@@ -47,15 +47,12 @@ export function useReferenceCatalogExcelWorkspace({
   const [dataStartRowNumber, setDataStartRowNumber] = useState("2");
   const [columnMap, setColumnMap] = useState<Record<string, string>>({});
   const [importMode, setImportMode] = useState<"append" | "replace">("append");
-  const [preview, setPreview] = useState<ApiSingleWindowReferenceCatalogExcelImportPreviewResponse | null>(null);
-
-  const previewMutation = useMutation({
-    mutationFn: (selectedFile: File) => client.previewSingleWindowReferenceCatalogExcelImport({
-      ...buildExcelImportRequest(activeKey, selectedFile, sheetName, headerRowNumber, dataStartRowNumber, columnMap),
-      body: selectedFile,
-    }),
-    onSuccess: (response) => {
-      setPreview(response);
+  const scope = useMemo(() => ({ client, activeKey, canManage }), [client, activeKey, canManage]);
+  const previewOperation = useTransientPreview<ApiSingleWindowReferenceCatalogExcelImportPreviewResponse, ReturnType<typeof buildExcelImportRequest> & { body: File }>(
+    scope,
+    (signal, request) => client.previewSingleWindowReferenceCatalogExcelImport(request, { signal }),
+    error => showError(readApiError(error)),
+    response => {
       setSheetName(response.sheetName || "");
       setHeaderRowNumber(String(response.headerRowNumber || 1));
       setDataStartRowNumber(String(response.dataStartRowNumber || 2));
@@ -63,23 +60,23 @@ export function useReferenceCatalogExcelWorkspace({
       clearMessages();
       showSuccess(response.message || "Excel 预览已生成。");
     },
-    onError: (error) => showError(readApiError(error)),
-  });
+  );
+  const { preview, clear } = previewOperation;
 
-  const isBusy = externalBusy || previewMutation.isPending;
+  const isBusy = externalBusy || previewOperation.isPending;
   const canPreview = canManage && Boolean(file)
     && readPositiveInteger(dataStartRowNumber, 2) > readPositiveInteger(headerRowNumber, 1)
     && !isBusy;
   const canApply = canManage && Boolean(draft) && Boolean(preview)
     && preview?.catalogKey === activePage.key && (preview?.rowCount ?? 0) > 0 && !isBusy;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     reset();
-  }, [activeKey]);
+  }, [scope]);
 
   function reset() {
     setFile(null);
-    setPreview(null);
+    clear();
     setSheetName("");
     setHeaderRowNumber("1");
     setDataStartRowNumber("2");
@@ -95,26 +92,26 @@ export function useReferenceCatalogExcelWorkspace({
     event.currentTarget.value = "";
     if (!selectedFile || !canManage || isBusy) return;
     setFile(selectedFile);
-    setPreview(null);
+    clear();
     setSheetName("");
     setHeaderRowNumber("1");
     setDataStartRowNumber("2");
     setColumnMap({});
     clearMessages();
-    previewMutation.mutate(selectedFile);
+    void previewOperation.generate({ ...buildExcelImportRequest(activeKey, selectedFile, "", "1", "2", {}), body: selectedFile });
   }
   function previewFile() {
     if (file && canPreview) {
       clearMessages();
-      previewMutation.mutate(file);
+      void previewOperation.generate({ ...buildExcelImportRequest(activeKey, file, sheetName, headerRowNumber, dataStartRowNumber, columnMap), body: file });
     }
   }
   function updateColumn(fieldKey: string, value: string) {
     setColumnMap((current) => ({ ...current, [fieldKey]: value }));
-    setPreview(null);
+    clear();
   }
   function applyPreview() {
-    if (!draft || !preview || preview.catalogKey !== activePage.key) return;
+    if (!canApply || !draft || !preview || preview.catalogKey !== activePage.key) return;
     const importedRows = getRows(preview.catalog, activePage.key);
     if (importedRows.length === 0) {
       showError("Excel 预览没有可导入行。");
@@ -145,19 +142,19 @@ export function useReferenceCatalogExcelWorkspace({
     previewFile,
     applyPreview,
     reset,
-    setSheetName(value: string) { setSheetName(value); setPreview(null); clearMessages(); },
+    setSheetName(value: string) { setSheetName(value); clear(); clearMessages(); },
     setHeaderRowNumber(value: string) {
       setHeaderRowNumber(value);
       const nextHeader = readPositiveInteger(value, 1);
       if (readPositiveInteger(dataStartRowNumber, 2) <= nextHeader) setDataStartRowNumber(String(nextHeader + 1));
-      setPreview(null);
+      clear();
       clearMessages();
     },
     setDataStartRowNumber(value: string) {
       setDataStartRowNumber(value);
       const nextDataStart = readPositiveInteger(value, 2);
       if (nextDataStart <= readPositiveInteger(headerRowNumber, 1)) setHeaderRowNumber(String(Math.max(1, nextDataStart - 1)));
-      setPreview(null);
+      clear();
       clearMessages();
     },
     setImportMode,

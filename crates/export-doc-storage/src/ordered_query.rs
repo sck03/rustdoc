@@ -10,7 +10,11 @@ pub(crate) fn build(
     pg: bool,
 ) -> Result<(QuerySql, String)> {
     let (mut sql, projection) = generic_query::build(query, pg)?;
-    sql.order = match order {
+    sql.order = expression(order, pg);
+    Ok((sql, projection))
+}
+pub(crate) fn expression(order: RecordOrder, pg: bool) -> String {
+    match order {
         RecordOrder::IdAscending => "r.id".into(),
         RecordOrder::CreatedDescending | RecordOrder::UpdatedDescending => {
             let path = if matches!(order, RecordOrder::CreatedDescending) {
@@ -21,6 +25,5 @@ pub(crate) fn build(
             let (seconds, nanos) = sql::instant_order(&sql::field(path, pg), pg);
             format!("{seconds} DESC,{nanos} DESC,r.id DESC")
         }
-    };
-    Ok((sql, projection))
+    }
 }

@@ -32,6 +32,18 @@ fn fixture() -> (ScratchDirectory, TestService, store::Actor) {
 }
 
 #[test]
+fn worklist_refreshes_a_revoked_actor_inside_its_read_snapshot() {
+    let (_root, service, admin) = fixture();
+    let mut account=accounts::save(&service.store,&admin,0,json!({"username":"worklist-reader","fullName":"待办阅览员","role":"User","companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Worklist-Snapshot-2026","permissionGrants":[{"resourceKey":"document.invoices","action":"view","dataScope":"company"},{"resourceKey":"document.invoices","action":"operate","dataScope":"company"}]})).unwrap()["user"].clone();
+    let stale = auth::current_actor(&service.store, account["id"].as_i64().unwrap()).unwrap();
+    assert!(worklist::query(&service.store, &stale, &Default::default(), &[]).is_ok());
+    account["expectedVersion"] = account["versionNumber"].clone();
+    account["isActive"] = json!(false);
+    accounts::save(&service.store, &admin, stale.id, account).unwrap();
+    assert!(worklist::query(&service.store, &stale, &Default::default(), &[]).is_err());
+}
+
+#[test]
 fn supplier_overview_refreshes_scope_and_revocation_inside_the_read_snapshot() {
     let (_root, service, admin) = fixture();
     service

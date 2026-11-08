@@ -1,7 +1,7 @@
 import { EditorWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { FormEvent, useMemo, useState } from "react";
 import "../../styles/routes/single-window.css";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { FileCheck2 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -16,7 +16,6 @@ import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { ServerDraftUpdateNotice, useServerDraftSync } from "../../ui/serverDraftSync.tsx";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { CustomsCooProducerProfileDialog } from "./CustomsCooProducerProfileDialog.tsx";
 import { CustomsCooIdentitySections } from "./CustomsCooIdentitySections.tsx";
@@ -30,6 +29,7 @@ import { SingleWindowScopedClearControls } from "./SingleWindowScopedClearContro
 import { SingleWindowDocumentActionBar } from "./SingleWindowDocumentActionBar.tsx";
 import { SingleWindowSectionNav } from "./SingleWindowSectionNav.tsx";
 import { SingleWindowTabs } from "./SingleWindowNavigation.tsx";
+import { useSingleWindowDocumentWorkspace } from "./useSingleWindowDocumentWorkspace.ts";
 import { useSingleWindowLockedFields } from "./useSingleWindowLockedFields.ts";
 import { useCustomsCooProducerProfiles } from "./useCustomsCooProducerProfiles.ts";
 import { useCustomsCooAuthoritySelection } from "./useCustomsCooAuthoritySelection.ts";
@@ -39,7 +39,6 @@ import {
   applyCooDefaultsToEmptyFields,
   areEditorDocumentsEqual,
   clearCooManualOverrides,
-  cloneEditorDocument,
   cooScopedClearOptionsByGroup,
 } from "./singleWindowEditorTools.ts";
 import {
@@ -47,7 +46,6 @@ import {
   formatScopedClearResultMessage,
   normalizeCooDocumentForSave,
   toIssuingAuthorityOptions,
-  type CooScopedClearRequest,
 } from "./customsCooModel.ts";
 
 const customsCooBusinessType = "CustomsCoo";
@@ -83,7 +81,6 @@ const emptyCooEditorOptions: ApiCustomsCooEditorOptionsResponse = {
 };
 
 export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }) {
-  const requestConfirmation = useConfirmation();
   const permission = useModulePermission("document.single-window");
   const { invoiceId } = useParams();
   const navigate = useNavigate();
@@ -113,6 +110,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     removeNonpartyCorp,
     undoToolAction: handleUndoToolAction,
   } = useCustomsCooDocumentEditor({
+    scope: `${parsedInvoiceId}:${permission.canOperate}`, owner: client,
     document,
     undoDocument,
     setDocument,
@@ -151,168 +149,31 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     enabled: isInvoiceIdValid,
   });
 
-  const buildDefaultsMutation = useMutation({
-    mutationFn: (_snapshot: ApiCustomsCooDocumentDto) => client.buildCustomsCooDefaults({ invoiceId: parsedInvoiceId }),
-    onSuccess: (nextDocument, snapshot) => {
-      setDocument(nextDocument);
-      setUndoDocument(areEditorDocumentsEqual(snapshot, nextDocument) ? null : snapshot);
-      setMessage(null);
-      setSuccessMessage(
-        areEditorDocumentsEqual(snapshot, nextDocument)
-          ? "当前已经是按发票推导的建议值，无需恢复默认值。"
-          : "已恢复为按当前发票推导的默认值，保存后写入草稿。",
-      );
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
+  const workspace = useSingleWindowDocumentWorkspace({
+    scope: String(parsedInvoiceId), owner: client, enabled: isInvoiceIdValid && permission.canOperate,
+    document, setDocument, setUndoDocument, setMessage, setSuccessMessage, setPersistedDocumentSnapshot,
+    documentQueryKey, reviewQueryKey,
+    snapshot: value => buildCooDocumentSnapshot(value, parsedInvoiceId),
+    saveDocument: (value, signal) => client.saveCustomsCooDocument({ invoiceId: parsedInvoiceId, body: normalizeCooDocumentForSave(value, parsedInvoiceId) }, { signal }),
+    getDocument: signal => client.getCustomsCooDocument({ invoiceId: parsedInvoiceId }, { signal }),
+    buildDefaults: signal => client.buildCustomsCooDefaults({ invoiceId: parsedInvoiceId }, { signal }),
+    repair: (groupKeys, signal) => client.repairSingleWindowExportReviewGroups({ businessType: customsCooBusinessType, invoiceId: parsedInvoiceId, body: { groupKeys } }, { signal }),
+    fillEmpty: applyCooDefaultsToEmptyFields, clearScope: applyCooDefaultsForScope, clearManual: clearCooManualOverrides,
+    clearMessage: formatScopedClearResultMessage,
   });
-
-  const fillEmptyMutation = useMutation({
-    mutationFn: (_snapshot: ApiCustomsCooDocumentDto) => client.buildCustomsCooDefaults({ invoiceId: parsedInvoiceId }),
-    onSuccess: (defaults, snapshot) => {
-      const result = applyCooDefaultsToEmptyFields(snapshot, defaults);
-      setDocument(result.document);
-      setUndoDocument(result.changedCount > 0 ? snapshot : null);
-      setMessage(null);
-      setSuccessMessage(
-        result.changedCount > 0
-          ? `已按当前发票回填 ${result.changedCount} 个空白项，保存后写入草稿。`
-          : "当前可回填的空白项已经都补齐了。",
-      );
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const scopedClearMutation = useMutation({
-    mutationFn: async (request: CooScopedClearRequest) => ({
-      defaults: await client.buildCustomsCooDefaults({ invoiceId: parsedInvoiceId }),
-      request,
-    }),
-    onSuccess: ({ defaults, request }) => {
-      const result = applyCooDefaultsForScope(
-        request.snapshot,
-        defaults,
-        request.groupKey,
-        request.categoryKey ?? "",
-      );
-      setDocument(result.document);
-      setUndoDocument(result.changedCount > 0 ? request.snapshot : null);
-      setMessage(null);
-      setSuccessMessage(formatScopedClearResultMessage(request, result.changedCount));
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const repairReviewMutation = useMutation({
-    mutationFn: async (request: { groupKeys: string[]; snapshot: ApiCustomsCooDocumentDto | null }) => {
-      let savedBeforeRepair = false;
-      if (request.snapshot) {
-        await client.saveCustomsCooDocument({
-          invoiceId: parsedInvoiceId,
-          body: normalizeCooDocumentForSave(request.snapshot, parsedInvoiceId),
-        });
-        savedBeforeRepair = true;
-      }
-
-      const response = await client.repairSingleWindowExportReviewGroups({
-        businessType: customsCooBusinessType,
-        invoiceId: parsedInvoiceId,
-        body: { groupKeys: request.groupKeys },
-      });
-      const repairedDocument = await client.getCustomsCooDocument({ invoiceId: parsedInvoiceId });
-      return { response, repairedDocument, savedBeforeRepair };
-    },
-    onSuccess: async ({ response, repairedDocument, savedBeforeRepair }) => {
-      setDocument(repairedDocument);
-      setPersistedDocumentSnapshot(buildCooDocumentSnapshot(repairedDocument, parsedInvoiceId));
-      setUndoDocument(null);
-      queryClient.setQueryData(documentQueryKey, repairedDocument);
-      queryClient.setQueryData(reviewQueryKey, response.review);
-      setMessage(null);
-      setSuccessMessage(
-        `${savedBeforeRepair ? "已先保存当前草稿，" : ""}${
-          response.message || `已自动修复 ${response.repairedGroupCount} 个预检分组。`
-        }`,
-      );
-      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: (body: ApiCustomsCooDocumentDto) =>
-      client.saveCustomsCooDocument({
-        invoiceId: parsedInvoiceId,
-        body,
-      }),
-    onSuccess: async (response) => {
-      setDocument(response.document);
-      setPersistedDocumentSnapshot(buildCooDocumentSnapshot(response.document, parsedInvoiceId));
-      setUndoDocument(null);
-      queryClient.setQueryData(documentQueryKey, response.document);
-      setMessage(null);
-      setSuccessMessage(response.message || "海关原产地证草稿已保存。");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() }),
-        queryClient.invalidateQueries({ queryKey: reviewQueryKey }),
-      ]);
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
   const lockedFieldsWorkspace = useSingleWindowLockedFields({
-    document,
-    isDocumentValid: isInvoiceIdValid,
+    workspace, document,
     hasUnsavedChanges: Boolean(document && documentQuery.data && !areEditorDocumentsEqual(document, documentQuery.data)),
-    saveDocument: async () => {
-      const response = await client.saveCustomsCooDocument({
-        invoiceId: parsedInvoiceId,
-        body: normalizeCooDocumentForSave(document!, parsedInvoiceId),
-      });
-      return response.document;
-    },
-    loadLockedFields: () => client.getCustomsCooLockedFields({ invoiceId: parsedInvoiceId }),
-    unlockFields: (fieldKeys) => client.unlockCustomsCooFields({ invoiceId: parsedInvoiceId, body: { fieldKeys } }),
-    applyPersistedDocument: (nextDocument) => {
-      setDocument(nextDocument);
-      setPersistedDocumentSnapshot(buildCooDocumentSnapshot(nextDocument, parsedInvoiceId));
-      setUndoDocument(null);
-      queryClient.setQueryData(documentQueryKey, nextDocument);
-      void Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() }),
-        queryClient.invalidateQueries({ queryKey: reviewQueryKey }),
-      ]);
-    },
-    clearMessages: () => { setMessage(null); setSuccessMessage(null); },
-    showError: (nextMessage) => { setMessage(nextMessage); setSuccessMessage(null); },
-    showSuccess: (nextMessage) => { setMessage(null); setSuccessMessage(nextMessage); },
+    loadLockedFields: signal => client.getCustomsCooLockedFields({ invoiceId: parsedInvoiceId }, { signal }),
+    unlockFields: (fieldKeys, signal) => client.unlockCustomsCooFields({ invoiceId: parsedInvoiceId, body: { fieldKeys } }, { signal }),
   });
 
-  const producerProfiles = useCustomsCooProducerProfiles({ client, queryClient, document, setDocument: (next) => setDocument(next), setUndoDocument, setMessage, setSuccessMessage });
+  const producerProfiles = useCustomsCooProducerProfiles({ workspace, client, queryClient, document, setDocument: (next) => setDocument(next), setUndoDocument, setMessage, setSuccessMessage });
 
   const isBusy =
     documentQuery.isFetching ||
     reviewQuery.isFetching ||
-    buildDefaultsMutation.isPending ||
-    fillEmptyMutation.isPending ||
-    scopedClearMutation.isPending ||
-    repairReviewMutation.isPending ||
-    saveMutation.isPending ||
-    lockedFieldsWorkspace.isPending ||
+    workspace.isPending ||
     producerProfiles.isPending;
   const loadMessage = !isInvoiceIdValid
     ? "发票 ID 无效。"
@@ -346,6 +207,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
   const serverDraftSync = useServerDraftSync({
     resourceKey: parsedInvoiceId,
     incomingValue: documentQuery.data,
+    persistedValue: workspace.persistedDocument,
     isDirty: hasUnsavedDocumentChanges,
     fingerprint: (serverDocument) => buildCooDocumentSnapshot(serverDocument, parsedInvoiceId),
     applyIncoming: (serverDocument) => {
@@ -361,107 +223,12 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     message: "当前海关原产地证草稿有未保存的修改。",
   });
 
-  async function handleRepairReviewGroups(groupKeys: string[]) {
-    if (!permission.canOperate || !document || !isInvoiceIdValid || groupKeys.length === 0) {
-      return;
-    }
-
-    const snapshot = cloneEditorDocument(document);
-    const shouldSaveCurrentDraft =
-      documentQuery.data != null && !areEditorDocumentsEqual(snapshot, documentQuery.data);
-
-    if (
-      shouldSaveCurrentDraft &&
-      !await requestConfirmation({ title: "保存并自动修复", description: "当前海关原产地证草稿有未保存修改，需要先保存当前草稿再执行自动修复。", confirmLabel: "保存并修复" })
-    ) {
-      return;
-    }
-
-    setMessage(null);
-    setSuccessMessage(null);
-    repairReviewMutation.mutate({
-      groupKeys,
-      snapshot: shouldSaveCurrentDraft ? snapshot : null,
-    });
-  }
-
-  async function handleRestoreDefaults() {
-    if (!document || !isInvoiceIdValid) {
-      return;
-    }
-
-    if (!await requestConfirmation({ title: "重新套用建议值", description: "系统将按当前发票重新生成建议值。", details: ["原来的手工覆盖内容会被替换。"], confirmLabel: "重新套用" })) {
-      return;
-    }
-
-    setMessage(null);
-    setSuccessMessage(null);
-    buildDefaultsMutation.mutate(cloneEditorDocument(document));
-  }
-
-  function handleFillEmptyFields() {
-    if (!document || !isInvoiceIdValid) {
-      return;
-    }
-
-    setMessage(null);
-    setSuccessMessage(null);
-    fillEmptyMutation.mutate(cloneEditorDocument(document));
-  }
-
-  async function handleClearManualOverrides() {
-    if (!document || !isInvoiceIdValid) {
-      return;
-    }
-
-    if (!await requestConfirmation({ title: "清空手工覆盖", description: "确定清空手工补充的覆盖字段吗？", details: ["系统回写值会保留。", "保存后才会写入草稿。"], confirmLabel: "清空覆盖" })) {
-      return;
-    }
-
-    const snapshot = cloneEditorDocument(document);
-    const result = clearCooManualOverrides(snapshot);
-    setDocument(result.document);
-    setUndoDocument(result.changedCount > 0 ? snapshot : null);
-    setMessage(null);
-    setSuccessMessage(
-      result.changedCount > 0
-        ? "已清空手工补充的覆盖字段，系统回写值已保留，保存后写入草稿。"
-        : "当前没有可清空的手工覆盖字段。",
-    );
-  }
-
-  async function handleClearScopedGroup(groupKey: string) {
-    if (!document || !isInvoiceIdValid) {
-      return;
-    }
-
-    if (!await requestConfirmation({ title: "恢复分组建议值", description: `确定把“${groupKey}”分组里的手工覆盖值恢复到当前发票建议值吗？`, confirmLabel: "确认恢复" })) {
-      return;
-    }
-
-    setMessage(null);
-    setSuccessMessage(null);
-    scopedClearMutation.mutate({ snapshot: cloneEditorDocument(document), groupKey });
-  }
-
-  async function handleClearScopedCategory(groupKey: string, categoryKey: string, categoryLabel: string) {
-    if (!document || !isInvoiceIdValid) {
-      return;
-    }
-
-    if (!await requestConfirmation({ title: "恢复分类建议值", description: `确定只恢复“${groupKey}”分组里的“${categoryLabel}”吗？`, confirmLabel: "确认恢复" })) {
-      return;
-    }
-
-    setMessage(null);
-    setSuccessMessage(null);
-    scopedClearMutation.mutate({
-      snapshot: cloneEditorDocument(document),
-      groupKey,
-      categoryKey,
-      categoryLabel,
-    });
-  }
+  const handleRepairReviewGroups = (groupKeys: string[]) => workspace.repair(groupKeys, hasUnsavedDocumentChanges);
+  const handleRestoreDefaults = workspace.restore;
+  const handleFillEmptyFields = workspace.fillEmpty;
+  const handleClearManualOverrides = workspace.clearManual;
+  const handleClearScopedGroup = workspace.clearScope;
+  const handleClearScopedCategory = workspace.clearScope;
 
   async function handleBackToInvoice() {
     if (await confirmDiscardChanges("返回发票")) {
@@ -483,7 +250,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
 
     setMessage(null);
     setSuccessMessage(null);
-    saveMutation.mutate(normalizeCooDocumentForSave(document, parsedInvoiceId));
+    void workspace.save();
   }
 
   return (
@@ -596,7 +363,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
               review={reviewQuery.data ?? null}
               isBusy={reviewQuery.isFetching}
               isActionDisabled={!permission.canOperate || isBusy || !isInvoiceIdValid}
-              repairBusy={repairReviewMutation.isPending}
+              repairBusy={workspace.isPending}
               onRepairGroups={handleRepairReviewGroups}
             />
           </section>

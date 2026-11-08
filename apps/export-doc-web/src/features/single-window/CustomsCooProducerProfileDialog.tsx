@@ -14,9 +14,12 @@ import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { Dialog } from "../../ui/primitives/Dialog.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 type ProducerProfileDraft = Required<ApiCustomsCooProducerProfileInputDto> & {
   id: number;
+  versionNumber: number;
 };
 
 export function CustomsCooProducerProfileDialog({
@@ -36,6 +39,8 @@ export function CustomsCooProducerProfileDialog({
   const queryClient = useQueryClient();
   const [keyword, setKeyword] = useState("");
   const [committedKeyword, setCommittedKeyword] = useState("");
+  const [pageNumber, setPageNumber] = useState(1);
+  const pageSize = 50;
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [draft, setDraft] = useState<ProducerProfileDraft>(() => toDraft(currentProfile));
   const [cleanDraft, setCleanDraft] = useState<ProducerProfileDraft>(() => toDraft(currentProfile));
@@ -43,16 +48,17 @@ export function CustomsCooProducerProfileDialog({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const profilesQuery = useQuery({
-    queryKey: queryKeys.singleWindowCustomsCooProducerProfiles(committedKeyword.trim()),
+    queryKey: [...queryKeys.singleWindowCustomsCooProducerProfiles(committedKeyword.trim()), pageNumber, pageSize],
     queryFn: ({ signal }) =>
       client.listCustomsCooProducerProfiles({
         keyword: committedKeyword.trim() || undefined,
+        pageNumber, pageSize,
       }, { signal }),
   });
 
   const saveMutation = useMutation({
     mutationFn: (nextDraft: ProducerProfileDraft) => {
-      const body = { profile: normalizeProfileInput(nextDraft) };
+      const body = { profile: normalizeProfileInput(nextDraft), expectedVersion: nextDraft.id > 0 ? nextDraft.versionNumber : undefined };
       return nextDraft.id > 0
         ? client.updateCustomsCooProducerProfile({ id: nextDraft.id, body })
         : client.createCustomsCooProducerProfile({ body });
@@ -73,7 +79,7 @@ export function CustomsCooProducerProfileDialog({
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: number) => client.deleteCustomsCooProducerProfile({ id }),
+    mutationFn: (profile: ProducerProfileDraft) => client.deleteCustomsCooProducerProfile({ id: profile.id, expectedVersion: profile.versionNumber }),
     onSuccess: async () => {
       const nextDraft = toDraft(currentProfile);
       setSelectedId(null);
@@ -90,6 +96,7 @@ export function CustomsCooProducerProfileDialog({
   });
 
   const profiles = profilesQuery.data?.items ?? [];
+  useServerPageNumber(profilesQuery, pageNumber, setPageNumber, pageSize);
   const isBusy = profilesQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
   const selectedCount = selectedId ? 1 : 0;
   const isDraftDirty = !producerProfileDraftEquals(draft, cleanDraft);
@@ -102,6 +109,7 @@ export function CustomsCooProducerProfileDialog({
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCommittedKeyword(keyword.trim());
+    setPageNumber(1);
   }
 
   async function beginCreate() {
@@ -167,7 +175,7 @@ export function CustomsCooProducerProfileDialog({
       return;
     }
 
-    deleteMutation.mutate(selectedId);
+    deleteMutation.mutate(draft);
   }
 
   async function handleApplyDraft() {
@@ -201,7 +209,7 @@ export function CustomsCooProducerProfileDialog({
   }
 
   return (
-    <Dialog title="生产企业资料" description={`共 ${profiles.length} 条资料`} size="full" busy={isBusy} onClose={() => void handleClose()} closeLabel="关闭">
+    <Dialog title="生产企业资料" description={`共 ${profilesQuery.data?.totalCount ?? 0} 条资料`} size="full" busy={isBusy} onClose={() => void handleClose()} closeLabel="关闭">
       <div className="producer-profile-dialog">
         <div className="producer-profile-toolbar">
           <form className="producer-profile-search" onSubmit={handleSearch}>
@@ -209,7 +217,7 @@ export function CustomsCooProducerProfileDialog({
               aria-label="生产企业资料关键字"
               value={keyword}
               onChange={(event) => setKeyword(event.target.value)}
-              placeholder="代码、名称、联系人、电话、款号"
+              placeholder="代码、名称、款号、发票号"
             />
             <button className="command-button secondary" type="submit" disabled={isBusy}>
               <Search size={16} aria-hidden="true" />
@@ -302,6 +310,7 @@ export function CustomsCooProducerProfileDialog({
               </tbody>
             </table>
           </ResponsiveTableFrame>
+          <Pagination pageNumber={pageNumber} pageSize={pageSize} totalCount={profilesQuery.data?.totalCount ?? 0} isBusy={isBusy} onPageChange={setPageNumber} />
 
           <form className="producer-profile-editor" id="producer-profile-form" onSubmit={handleSave} onKeyDownCapture={handleEnterAsTabFormKeyDown}>
             <div className="producer-profile-editor-header">
@@ -415,6 +424,7 @@ function ProfileSelect({
 function toDraft(profile: ApiCustomsCooProducerProfileInputDto | ApiCustomsCooProducerProfileDto): ProducerProfileDraft {
   return {
     id: "id" in profile ? profile.id : 0,
+    versionNumber: "versionNumber" in profile ? profile.versionNumber : 0,
     ciqRegNo: profile.ciqRegNo ?? "",
     prdcEtpsName: profile.prdcEtpsName ?? "",
     prdcEtpsConcEr: profile.prdcEtpsConcEr ?? "",

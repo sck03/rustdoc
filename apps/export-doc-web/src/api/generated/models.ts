@@ -500,6 +500,7 @@ export interface ApiContainerTypeDto {
   maxVolume: number;
   maxWeight: number;
   name: string;
+  versionNumber: number;
   width: number;
 }
 
@@ -509,6 +510,7 @@ export interface ApiContainerTypeListResponse {
 }
 
 export interface ApiContainerTypeSaveRequest {
+  expectedVersion?: number;
   height?: number;
   id?: number;
   length?: number;
@@ -921,6 +923,7 @@ export interface ApiCustomsCooProducerProfileDto {
   producerSertFlag: string;
   producerTel: string;
   updatedAt: string;
+  versionNumber: number;
 }
 
 export interface ApiCustomsCooProducerProfileInputDto {
@@ -950,6 +953,7 @@ export interface ApiCustomsCooProducerProfileResponse {
 }
 
 export interface ApiCustomsCooProducerProfileSaveRequest {
+  expectedVersion?: number;
   profile: ApiCustomsCooProducerProfileInputDto;
 }
 
@@ -3426,16 +3430,19 @@ export interface ApiSingleWindowReferenceCatalogExcelImportPreviewResponse {
 
 export interface ApiSingleWindowReferenceCatalogResponse {
   catalog: SingleWindowReferenceCatalogModel;
+  revision: number;
   storagePolicy: string;
 }
 
 export interface ApiSingleWindowReferenceCatalogSaveRequest {
   catalog: SingleWindowReferenceCatalogModel;
+  expectedRevision: number;
 }
 
 export interface ApiSingleWindowReferenceCatalogSaveResponse {
   catalog: SingleWindowReferenceCatalogModel;
   message: string;
+  revision: number;
   storagePolicy: string;
   success: boolean;
 }
@@ -8010,10 +8017,12 @@ export interface DeleteBusinessAttachmentCategoryRequest {
 
 export interface DeleteContainerPackingContainerTypeRequest {
   id: number;
+  expectedVersion: number;
 }
 
 export interface DeleteContainerPackingProjectRequest {
   id: number;
+  expectedVersion: number;
 }
 
 export interface DeleteCrmContactRequest {
@@ -8039,6 +8048,7 @@ export interface DeleteCustomerRequest {
 
 export interface DeleteCustomsCooProducerProfileRequest {
   id: number;
+  expectedVersion: number;
 }
 
 export interface DeleteExporterRequest {
@@ -8991,6 +9001,7 @@ export interface ImportSingleWindowReceiptPackageRequest {
 }
 
 export interface ImportSingleWindowReferenceCatalogJsonRequest {
+  expectedRevision: number;
   body: Blob;
 }
 
@@ -9080,6 +9091,8 @@ export interface ListCustomersPageRequest {
 
 export interface ListCustomsCooProducerProfilesRequest {
   keyword?: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListDecisionsOfExpenseRequestRequest {
@@ -10023,6 +10036,10 @@ export interface RepairSingleWindowExportReviewGroupsRequest {
 
 export interface ResetHsCodeRemoteCandidatesRequest {
   body: HsCodeRemoteCandidateResetInput;
+}
+
+export interface ResetSingleWindowReferenceCatalogRequest {
+  expectedRevision: number;
 }
 
 export interface ResolveRemoteHsCodeDetailRequest {

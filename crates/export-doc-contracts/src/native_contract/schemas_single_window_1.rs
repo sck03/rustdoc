@@ -25,16 +25,17 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiCustomsCooOptionDto",o(vec![("value",s()),("label",s())]).required(vec!["value","label"])),
     ("ApiCustomsCooOriginCriteriaOptionSetDto",o(vec![("certType",s()),("originCriteria",s()),("options",a(r("ApiCustomsCooOptionDto")))]).required(vec!["certType","originCriteria","options"])),
     ("ApiCustomsCooProducerProfileDto",object_groups(vec![
+        (&["versionNumber"], i().minimum(num("1")).format("int64")),
         (&["id"], Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         (&["ciqRegNo","prdcEtpsName","prdcEtpsConcEr","prdcEtpsTel","producer","producerTel","producerFax","producerEmail","producerSertFlag","lastInvoiceNo","lastContractNo","lastSourceStyleNo"], s()),
         (&["createdAt","updatedAt","lastUsedAt"], s().format("date-time")),
-    ]).required(vec!["id","ciqRegNo","prdcEtpsName","prdcEtpsConcEr","prdcEtpsTel","producer","producerTel","producerFax","producerEmail","producerSertFlag","lastInvoiceNo","lastContractNo","lastSourceStyleNo","createdAt","updatedAt","lastUsedAt"])),
+    ]).required(vec!["id","versionNumber","ciqRegNo","prdcEtpsName","prdcEtpsConcEr","prdcEtpsTel","producer","producerTel","producerFax","producerEmail","producerSertFlag","lastInvoiceNo","lastContractNo","lastSourceStyleNo","createdAt","updatedAt","lastUsedAt"])),
     ("ApiCustomsCooProducerProfileInputDto",object_groups(vec![
         (&["ciqRegNo","prdcEtpsName","prdcEtpsConcEr","prdcEtpsTel","producer","producerTel","producerFax","producerEmail","producerSertFlag","lastInvoiceNo","lastContractNo","lastSourceStyleNo"], s()),
     ])),
     ("ApiCustomsCooProducerProfileListResponse",o(vec![("items",a(r("ApiCustomsCooProducerProfileDto"))),("totalCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("storagePolicy",s())]).required(vec!["items","totalCount","storagePolicy"])),
     ("ApiCustomsCooProducerProfileResponse",o(vec![("profile",r("ApiCustomsCooProducerProfileDto")),("storagePolicy",s())]).required(vec!["profile","storagePolicy"])),
-    ("ApiCustomsCooProducerProfileSaveRequest",o(vec![("profile",r("ApiCustomsCooProducerProfileInputDto"))]).required(vec!["profile"])),
+    ("ApiCustomsCooProducerProfileSaveRequest",o(vec![("profile",r("ApiCustomsCooProducerProfileInputDto")),("expectedVersion",i().minimum(num("1")).format("int64"))]).required(vec!["profile"])),
     ("ApiCustomsCooProducerProfileSaveResponse",o(vec![
         ("success",b()),("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("profile",r("ApiCustomsCooProducerProfileDto")),
         ("message",s()),("storagePolicy",s())
@@ -93,12 +94,13 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("columnMappings",a(r("ApiSingleWindowReferenceCatalogExcelColumnMappingDto"))),("catalog",r("SingleWindowReferenceCatalogModel")),("rowCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("message",s()),("storagePolicy",s())
     ]).required(vec!["success","catalogKey","sheetName","sheetNames","headerRowNumber","dataStartRowNumber","columnMappings","catalog","rowCount","message","storagePolicy"])),
-    ("ApiSingleWindowReferenceCatalogResponse",o(vec![("catalog",r("SingleWindowReferenceCatalogModel")),("storagePolicy",s())]).required(vec!["catalog","storagePolicy"])),
-    ("ApiSingleWindowReferenceCatalogSaveRequest",o(vec![("catalog",r("SingleWindowReferenceCatalogModel"))]).required(vec!["catalog"])),
+    ("ApiSingleWindowReferenceCatalogResponse",o(vec![("catalog",r("SingleWindowReferenceCatalogModel")),("revision",i().minimum(num("0")).format("int64")),("storagePolicy",s())]).required(vec!["catalog","revision","storagePolicy"])),
+    ("ApiSingleWindowReferenceCatalogSaveRequest",o(vec![("catalog",r("SingleWindowReferenceCatalogModel")),("expectedRevision",i().minimum(num("0")).format("int64"))]).required(vec!["catalog","expectedRevision"])),
     ("ApiSingleWindowReferenceCatalogSaveResponse",o(vec![
+        ("revision",i().minimum(num("1")).format("int64")),
         ("success",b()),("catalog",r("SingleWindowReferenceCatalogModel")),("message",s()),
         ("storagePolicy",s())
-    ]).required(vec!["success","catalog","message","storagePolicy"])),
+    ]).required(vec!["success","catalog","revision","message","storagePolicy"])),
     ("ApiSingleWindowRepairGroupsRequest",o(vec![("groupKeys",a(s()))]).required(vec!["groupKeys"])),
     ("ApiSingleWindowRepairGroupsResponse",o(vec![
         ("success",b()),("repairedGroupCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("review",r("SingleWindowExportReview")),

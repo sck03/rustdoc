@@ -7,6 +7,23 @@ pub(crate) fn page(
     search_fields: &[&str],
     count: bool,
 ) -> Result<(i64, Vec<Value>)> {
+    selected_page(db, query, search_fields, count, None)
+}
+pub(crate) fn ordered_page(
+    db: &(impl Adapter + ?Sized),
+    query: &GenericQuery<'_>,
+    search_fields: &[&str],
+    order: crate::RecordOrder,
+) -> Result<(i64, Vec<Value>)> {
+    selected_page(db, query, search_fields, true, Some(order))
+}
+fn selected_page(
+    db: &(impl Adapter + ?Sized),
+    query: &GenericQuery<'_>,
+    search_fields: &[&str],
+    count: bool,
+    order: Option<crate::RecordOrder>,
+) -> Result<(i64, Vec<Value>)> {
     let pg = db.provider() == "PostgreSQL";
     let selected = GenericQuery {
         kind: query.kind,
@@ -19,6 +36,9 @@ pub(crate) fn page(
         ..Default::default()
     };
     let (mut statement, projection) = generic_query::build(&selected, pg)?;
+    if let Some(order) = order {
+        statement.order = crate::ordered_query::expression(order, pg);
+    }
     if !query.keyword.is_empty() {
         let mut choices = vec![];
         let keyword = sql::bind(&mut statement.values, query.keyword, pg);

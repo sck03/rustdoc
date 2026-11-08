@@ -302,3 +302,7 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntime
 用户明确授权清理过期测试程序包及隔离测试数据时，可在确认来源、用途、无运行进程和无需保留后，按已盘点的绝对路径单独回收。此授权不扩大默认清理器的保护边界；正在使用的程序及业务库、用户备份/原件、私有补丁和可复用缓存继续保留。测试目录名或较早修改时间本身不能证明其中全部内容都已无用。
 
 带有效 `CACHEDIR.TAG` 的 Cargo 输出中，`debug/release/build/*/out` 下的生成资源可随构建目录清理；这不会放行业务数据库、备份、链接或其它位置的 `Resources/Templates`。PostgreSQL 的 `PG_VERSION`、SQLite 伴随文件同样受到保护。`-IncludeCodexRuntimeWorkspaces` 清理旧构建/一次性工作区时，仍保留原生归档、PostgreSQL 客户端、审计工具和包下载缓存；`artifacts/releases`、其它目录的 `exportdoc-desktop/web/container` 发布归档及 Cargo 安装器 `bundle` 默认按发布输出保护。清理后的下一次构建需要重新编译，但无需重复下载保留的依赖。
+
+## 2026-11-09 单一窗口验证补充
+
+`npm --prefix apps/export-doc-web run test:concurrency-feedback` 包含 `test_single_window_workspace_ui.mjs`，覆盖两类单据保存续编、重复提交、切换/卸载/撤权/客户端变化、保存成功后锁定字段读取失败，以及参考目录 Excel 迟到响应与缓存释放。`test_native_desktop_editions.mjs <packagesRoot> Full --without-ocr --entry-rows-only` 在实际 Tauri/WebView2 中追加版本冲突、保存响应暂停期间续编、中文输入和保存回读，沿用原有表格/设计器/PDF 验证；必须先用当前前端重建桌面宿主。

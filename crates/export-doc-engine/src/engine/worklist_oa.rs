@@ -5,7 +5,11 @@ use crate::engine::{
     oa::{self, approval},
 };
 
-pub(super) fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
+pub(super) fn groups(
+    tx: &Connection,
+    actor: &Actor,
+    selection: &Selection<'_>,
+) -> Result<Vec<Group>> {
     let mut groups = vec![];
     let workflow_date = crate::engine::units::today(tx)?;
     for (kind, name) in [
@@ -21,7 +25,7 @@ pub(super) fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
         if !allowed(actor, resource, &["view"]) {
             continue;
         }
-        let mut items = vec![];
+        let mut group = Group::new(kind, name);
         let principals = approval::queue_approvers(tx, actor, resource)?;
         let keys = if kind == "oa-general" {
             handling::keys(tx, actor, "office.general")?
@@ -30,28 +34,30 @@ pub(super) fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
         };
         let rank = auth::scope_rank(actor, resource, "view")
             .max(auth::scope_rank(actor, resource, "complete"));
-        let mut offset = 0;
+        let mut cursor = None;
         loop {
             crate::operation::check()?;
-            let (total, rows) = tx.query_records(&export_doc_storage::RecordQuery {
-                kind,
-                company: &actor.company,
-                statuses: &["Draft", "Returned", "Pending", "Approved"],
-                departments: (rank == 2 && !actor.oa_assigned_only)
-                    .then_some(actor.departments.as_slice()),
-                owner: (rank == 1 && !actor.oa_assigned_only).then_some(actor.id),
-                visible_user: Some(actor.id),
-                visible_principals: &principals,
-                node_access: auth::node_access(actor, resource),
-                workflow_date: Some(workflow_date),
-                visible_context: Some(&actor.context),
-                include_participants: !actor.oa_assigned_only,
-                handling_keys: (kind == "oa-general").then_some(keys.as_slice()),
-                handling_states: handling::GENERAL_STATES,
-                offset,
-                limit: 100,
-                ..Default::default()
-            })?;
+            let (next, rows) = tx.scan_records(
+                &export_doc_storage::RecordQuery {
+                    kind,
+                    company: &actor.company,
+                    statuses: &["Draft", "Returned", "Pending", "Approved"],
+                    departments: (rank == 2 && !actor.oa_assigned_only)
+                        .then_some(actor.departments.as_slice()),
+                    owner: (rank == 1 && !actor.oa_assigned_only).then_some(actor.id),
+                    visible_user: Some(actor.id),
+                    visible_principals: &principals,
+                    node_access: auth::node_access(actor, resource),
+                    workflow_date: Some(workflow_date),
+                    visible_context: Some(&actor.context),
+                    include_participants: !actor.oa_assigned_only,
+                    handling_keys: (kind == "oa-general").then_some(keys.as_slice()),
+                    handling_states: handling::GENERAL_STATES,
+                    limit: 100,
+                    ..Default::default()
+                },
+                cursor,
+            )?;
             let count = rows.len() as i64;
             for row in rows {
                 if !oa::viewable(tx, actor, resource, &row)? {
@@ -97,25 +103,24 @@ pub(super) fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
                 } else {
                     Value::Null
                 };
-                items.push(item(
-                    &row,
-                    text(&row, "title"),
-                    format!("{} · {label}", text(&row, "employeeName")),
-                    Value::Null,
-                    date,
-                    instant,
-                ));
+                group.push(
+                    item(
+                        &row,
+                        text(&row, "title"),
+                        format!("{} · {label}", text(&row, "employeeName")),
+                        Value::Null,
+                        date,
+                        instant,
+                    ),
+                    selection,
+                )?;
             }
-            offset += count;
-            if count == 0 || offset >= total {
+            cursor = next;
+            if count < 100 {
                 break;
             }
         }
-        groups.push(Group {
-            key: kind,
-            name,
-            rows: items,
-        });
+        groups.push(group);
     }
     Ok(groups)
 }

@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "8c744b5a8cf488c2c59098f5afda503abb84a9b4d1dd56ae509d60260885ad6f",
+  "digest": "e52895341cef6ab74d1bf9e785c0fd825031c8777d49e32a30e4c78455847dea",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -21530,6 +21530,16 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
           "required": true
+        },
+        {
+          "name": "expectedVersion",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "required": true
         }
       ],
       "requestBody": null,
@@ -21603,6 +21613,16 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
           "required": true
+        },
+        {
+          "name": "expectedVersion",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "required": true
         }
       ],
       "requestBody": null,
@@ -21625,6 +21645,9 @@
         },
         "404": {
           "description": "Not Found"
+        },
+        "409": {
+          "description": "Conflict"
         }
       },
       "request": null,
@@ -22044,6 +22067,16 @@
             "type": "integer",
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
+          "required": true
+        },
+        {
+          "name": "expectedVersion",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -47389,7 +47422,18 @@
         }
       },
       "office": null,
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "expectedRevision",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "required": true
+        }
+      ],
       "requestBody": {
         "required": true,
         "content": {
@@ -49225,6 +49269,30 @@
           "in": "query",
           "schema": {
             "type": "string"
+          }
+        },
+        {
+          "name": "pageNumber",
+          "in": "query",
+          "schema": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "schema": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
           }
         }
       ],
@@ -71006,7 +71074,18 @@
         }
       },
       "office": null,
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "expectedRevision",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "required": true
+        }
+      ],
       "requestBody": null,
       "responses": {
         "200": {
@@ -95260,6 +95339,11 @@
         "name": {
           "type": "string"
         },
+        "versionNumber": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
         "width": {
           "type": [
             "integer",
@@ -95271,6 +95355,7 @@
       },
       "required": [
         "id",
+        "versionNumber",
         "name",
         "length",
         "width",
@@ -95301,6 +95386,11 @@
     "ApiContainerTypeSaveRequest": {
       "type": "object",
       "properties": {
+        "expectedVersion": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
         "height": {
           "type": [
             "integer",
@@ -97219,10 +97309,16 @@
         "updatedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "versionNumber": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
         }
       },
       "required": [
         "id",
+        "versionNumber",
         "ciqRegNo",
         "prdcEtpsName",
         "prdcEtpsConcEr",
@@ -97326,6 +97422,11 @@
     "ApiCustomsCooProducerProfileSaveRequest": {
       "type": "object",
       "properties": {
+        "expectedVersion": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
         "profile": {
           "$ref": "#/components/schemas/ApiCustomsCooProducerProfileInputDto"
         }
@@ -108733,12 +108834,18 @@
         "catalog": {
           "$ref": "#/components/schemas/SingleWindowReferenceCatalogModel"
         },
+        "revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
         "storagePolicy": {
           "type": "string"
         }
       },
       "required": [
         "catalog",
+        "revision",
         "storagePolicy"
       ]
     },
@@ -108747,10 +108854,16 @@
       "properties": {
         "catalog": {
           "$ref": "#/components/schemas/SingleWindowReferenceCatalogModel"
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
         }
       },
       "required": [
-        "catalog"
+        "catalog",
+        "expectedRevision"
       ]
     },
     "ApiSingleWindowReferenceCatalogSaveResponse": {
@@ -108762,6 +108875,11 @@
         "message": {
           "type": "string"
         },
+        "revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
         "storagePolicy": {
           "type": "string"
         },
@@ -108772,6 +108890,7 @@
       "required": [
         "success",
         "catalog",
+        "revision",
         "message",
         "storagePolicy"
       ]

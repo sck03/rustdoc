@@ -2,6 +2,9 @@ use export_doc_engine::{api::ApiError, contracts, generated_api::*};
 use serde_json::{Value, json};
 #[path = "hs_maintenance_contract.rs"]
 mod hs_maintenance;
+#[path = "reference_versioning_contract.rs"]
+#[cfg(feature = "single-window")]
+mod reference_versioning;
 
 pub fn exercise(
     call: &impl Fn(
@@ -53,13 +56,33 @@ pub fn exercise(
         .find(|t| t["isSystemDefault"] == true)
         .unwrap();
     reject(
-        by_id(
+        call(
             DELETE_CONTAINER_PACKING_CONTAINER_TYPE,
-            builtin["id"].as_i64().unwrap(),
+            &[("id", builtin["id"].to_string())],
+            &[("expectedVersion", builtin["versionNumber"].to_string())],
+            None,
         ),
         409,
     );
-    by_id(DELETE_CONTAINER_PACKING_PROJECT, id).unwrap();
+    reject(
+        call(
+            DELETE_CONTAINER_PACKING_PROJECT,
+            &[("id", id.to_string())],
+            &[("expectedVersion", "1".into())],
+            None,
+        ),
+        409,
+    );
+    call(
+        DELETE_CONTAINER_PACKING_PROJECT,
+        &[("id", id.to_string())],
+        &[(
+            "expectedVersion",
+            read["project"]["versionNumber"].to_string(),
+        )],
+        None,
+    )
+    .unwrap();
     reject(by_id(GET_CONTAINER_PACKING_PROJECT, id), 404);
 
     let mut code = contracts::overlay(
@@ -101,4 +124,6 @@ pub fn exercise(
     update(changed).unwrap();
     reject(update(row), 409);
     hs_maintenance::exercise(call);
+    #[cfg(feature = "single-window")]
+    reference_versioning::exercise(call);
 }

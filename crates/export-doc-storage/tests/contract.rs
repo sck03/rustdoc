@@ -48,6 +48,8 @@ mod template_query;
 mod test_workspace;
 #[path = "support/workflow_fixture.rs"]
 mod workflow_fixture;
+#[path = "support/worklist_query.rs"]
+mod worklist_query;
 use serde_json::json;
 use std::fs;
 
@@ -97,6 +99,7 @@ fn sqlite_model_and_structure_validation_preserve_rejected_files() {
 }
 
 fn roundtrip(connection: &Connection) {
+    worklist_query::exercise(connection);
     query_plans::exercise(connection);
     normalized_search::exercise(connection);
     foundation_query::exercise(connection);

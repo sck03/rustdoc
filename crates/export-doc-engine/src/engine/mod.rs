@@ -271,9 +271,11 @@ impl NativeService {
             return Err(invalid("请求不属于已生成的 API 契约。"));
         }
         crate::operation::check()?;
-        if operation.requires_authentication {
-            self.session_actor_for_operation(token, operation)?;
-        }
+        let authenticated_actor = if operation.requires_authentication {
+            Some(self.session_actor_for_operation(token, operation)?)
+        } else {
+            None
+        };
         if !Self::supports(operation) {
             return Err(unsupported(format!(
                 "此功能尚未完成 Rust 原生迁移：{}。",
@@ -297,7 +299,10 @@ impl NativeService {
                 json!({"success":true,"message":"关闭维护完成"})
             }
             _ => {
-                let actor = self.session_actor_for_operation(token, operation)?;
+                let actor = match authenticated_actor {
+                    Some(actor) => actor,
+                    None => self.session_actor_for_operation(token, operation)?,
+                };
                 self.authorize_operation(&actor, operation, query)?;
                 if operation == GET_RUNTIME_METRICS {
                     auth::authorize(&actor, "system.settings", "view")?;

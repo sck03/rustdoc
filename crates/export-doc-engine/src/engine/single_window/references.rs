@@ -31,42 +31,148 @@ pub fn handle(
     query: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
-    let result=service.store.transaction_for(actor, operation, &[], |tx, actor|match operation{
-        GET_CUSTOMS_COO_ISSUING_AUTHORITIES=>Ok(rules::catalog::authorities()),
-        GET_CUSTOMS_COO_EDITOR_OPTIONS=>Ok(rules::catalog::editor_options()),
-        GET_SINGLE_WINDOW_REFERENCE_CATALOG=>Ok(json!({"catalog":catalog(tx)?,"storagePolicy":POLICY})),
-        UPDATE_SINGLE_WINDOW_REFERENCE_CATALOG|RESET_SINGLE_WINDOW_REFERENCE_CATALOG|IMPORT_SINGLE_WINDOW_REFERENCE_CATALOG_JSON=>{
-            let value=if operation==RESET_SINGLE_WINDOW_REFERENCE_CATALOG{rules::catalog::defaults().clone()}else if operation==IMPORT_SINGLE_WINDOW_REFERENCE_CATALOG_JSON{body.clone()}else{body["catalog"].clone()};
+    let execute = |tx: &Connection, actor: &Actor| match operation {
+        GET_CUSTOMS_COO_ISSUING_AUTHORITIES => Ok(rules::catalog::authorities()),
+        GET_CUSTOMS_COO_EDITOR_OPTIONS => Ok(rules::catalog::editor_options()),
+        GET_SINGLE_WINDOW_REFERENCE_CATALOG => Ok(
+            json!({"catalog":catalog(tx)?,"revision":tx.settings_revision("sw-reference-catalog")?,"storagePolicy":POLICY}),
+        ),
+        UPDATE_SINGLE_WINDOW_REFERENCE_CATALOG
+        | RESET_SINGLE_WINDOW_REFERENCE_CATALOG
+        | IMPORT_SINGLE_WINDOW_REFERENCE_CATALOG_JSON => {
+            let value = if operation == RESET_SINGLE_WINDOW_REFERENCE_CATALOG {
+                rules::catalog::defaults().clone()
+            } else if operation == IMPORT_SINGLE_WINDOW_REFERENCE_CATALOG_JSON {
+                body.clone()
+            } else {
+                body["catalog"].clone()
+            };
             rules::catalog::validate(&value).map_err(invalid)?;
-            tx.set_settings("sw-reference-catalog",1,&value)?;
-            tx.append_audit_details(&export_doc_storage::AuditWrite{kind:"sw-reference-catalog",record_id:0,version:1,action:"edit",actor_id:actor.id,occurred_at:&store::timestamp(),note:""},&json!({"groups":6}))?;
-            Ok(json!({"success":true,"catalog":value,"message":"申报词典已保存。","storagePolicy":POLICY}))
+            let expected = if operation == UPDATE_SINGLE_WINDOW_REFERENCE_CATALOG {
+                body["expectedRevision"].as_i64()
+            } else {
+                parameter(query, "expectedRevision").parse().ok()
+            }
+            .filter(|revision| *revision >= 0 && *revision < i64::MAX)
+            .ok_or_else(|| invalid("缺少有效的词典版本。"))?;
+            if !tx.compare_set_settings("sw-reference-catalog", expected, &value)? {
+                return Err(super::super::error::conflict(
+                    "申报词典已变化，请重新加载后重试。",
+                ));
+            }
+            let revision = expected + 1;
+            tx.append_audit_details(
+                &export_doc_storage::AuditWrite {
+                    kind: "sw-reference-catalog",
+                    record_id: 0,
+                    version: revision,
+                    action: "edit",
+                    actor_id: actor.id,
+                    occurred_at: &store::timestamp(),
+                    note: "",
+                },
+                &json!({"groups":6}),
+            )?;
+            Ok(
+                json!({"success":true,"catalog":value,"revision":revision,"message":"申报词典已保存。","storagePolicy":POLICY}),
+            )
         }
-        LIST_CUSTOMS_COO_PRODUCER_PROFILES=>{
-            let keyword=store::normalize(parameter(query,"keyword"));let mut rows=store::all(tx,PRODUCERS)?;
-            rows.retain(|r|auth::visible(actor,PERMISSION,"view",r)&&["ciqRegNo","prdcEtpsName","lastSourceStyleNo","lastInvoiceNo"].iter().any(|k|store::normalize(rules::text(r,k)).contains(&keyword)));
-            rows.sort_by(|a,b|b["updatedAt"].as_str().cmp(&a["updatedAt"].as_str()));
-            Ok(json!({"totalCount":rows.len(),"items":rows,"storagePolicy":POLICY}))
+        LIST_CUSTOMS_COO_PRODUCER_PROFILES => {
+            let keyword = store::normalize(parameter(query, "keyword"));
+            let page = parameter(query, "pageNumber")
+                .parse::<i64>()
+                .unwrap_or(1)
+                .max(1);
+            let size = parameter(query, "pageSize")
+                .parse::<i64>()
+                .unwrap_or(50)
+                .clamp(1, 200);
+            let (total, rows) = tx.query_ordered_record_fields(
+                &export_doc_storage::GenericQuery {
+                    kind: PRODUCERS,
+                    scope: auth::data_scope(actor, PERMISSION, "view"),
+                    keyword: &keyword,
+                    offset: page.saturating_sub(1).saturating_mul(size),
+                    limit: size,
+                    ..Default::default()
+                },
+                &[
+                    "ciqRegNo",
+                    "prdcEtpsName",
+                    "lastSourceStyleNo",
+                    "lastInvoiceNo",
+                ],
+                export_doc_storage::RecordOrder::UpdatedDescending,
+            )?;
+            Ok(json!({"totalCount":total,"items":rows,"storagePolicy":POLICY}))
         }
-        GET_CUSTOMS_COO_PRODUCER_PROFILE=>{
-            let row=store::get(tx,PRODUCERS,records::id(parameters)?)?;
-            if !auth::visible(actor,PERMISSION,"view",&row){return Err(error(403,"无权查看该生产企业。"));}
+        GET_CUSTOMS_COO_PRODUCER_PROFILE => {
+            let row = store::get(tx, PRODUCERS, records::id(parameters)?)?;
+            if !auth::visible(actor, PERMISSION, "view", &row) {
+                return Err(error(403, "无权查看该生产企业。"));
+            }
             Ok(json!({"profile":row,"storagePolicy":POLICY}))
         }
-        CREATE_CUSTOMS_COO_PRODUCER_PROFILE|UPDATE_CUSTOMS_COO_PRODUCER_PROFILE=>{
-            let id=if operation==UPDATE_CUSTOMS_COO_PRODUCER_PROFILE{records::id(parameters)?}else{0};
-            let value=producer(tx,actor,id,&body["profile"],false)?;
-            Ok(json!({"success":true,"id":value["id"],"profile":value,"message":"生产企业资料已保存。","storagePolicy":POLICY}))
+        CREATE_CUSTOMS_COO_PRODUCER_PROFILE | UPDATE_CUSTOMS_COO_PRODUCER_PROFILE => {
+            let id = if operation == UPDATE_CUSTOMS_COO_PRODUCER_PROFILE {
+                records::id(parameters)?
+            } else {
+                0
+            };
+            let value = producer(
+                tx,
+                actor,
+                id,
+                &body["profile"],
+                store::expected(body),
+                false,
+            )?;
+            Ok(
+                json!({"success":true,"id":value["id"],"profile":value,"message":"生产企业资料已保存。","storagePolicy":POLICY}),
+            )
         }
-        DELETE_CUSTOMS_COO_PRODUCER_PROFILE=>{
-            let id=records::id(parameters)?;let previous=store::get(tx,PRODUCERS,id)?;
-            if !auth::visible(actor,PERMISSION,"delete",&previous){return Err(error(403,"无权删除该生产企业。"));}
-            if !tx.delete(PRODUCERS,id,previous["versionNumber"].as_i64().ok_or_else(||unavailable("生产企业版本无效。"))?)?{return Err(super::super::error::conflict("生产企业资料已变化。"));}
-            tx.append_audit_details(&export_doc_storage::AuditWrite{kind:PRODUCERS,record_id:id,version:previous["versionNumber"].as_i64().unwrap_or(1),action:"delete",actor_id:actor.id,occurred_at:&store::timestamp(),note:""},&json!({"name":previous["prdcEtpsName"]}))?;
+        DELETE_CUSTOMS_COO_PRODUCER_PROFILE => {
+            let id = records::id(parameters)?;
+            let previous = store::get(tx, PRODUCERS, id)?;
+            if !auth::visible(actor, PERMISSION, "delete", &previous) {
+                return Err(error(403, "无权删除该生产企业。"));
+            }
+            store::check_version(
+                &previous,
+                parameter(query, "expectedVersion").parse().unwrap_or(0),
+            )?;
+            if !tx.delete(
+                PRODUCERS,
+                id,
+                previous["versionNumber"]
+                    .as_i64()
+                    .ok_or_else(|| unavailable("生产企业版本无效。"))?,
+            )? {
+                return Err(super::super::error::conflict("生产企业资料已变化。"));
+            }
+            tx.append_audit_details(
+                &export_doc_storage::AuditWrite {
+                    kind: PRODUCERS,
+                    record_id: id,
+                    version: previous["versionNumber"].as_i64().unwrap_or(1),
+                    action: "delete",
+                    actor_id: actor.id,
+                    occurred_at: &store::timestamp(),
+                    note: "",
+                },
+                &json!({"name":previous["prdcEtpsName"]}),
+            )?;
             Ok(json!({"success":true,"message":"生产企业资料已删除。"}))
         }
-        _=>Err(invalid("资料操作无效。")),
-    })?;
+        _ => Err(invalid("资料操作无效。")),
+    };
+    let result = if operation.method == "GET" {
+        service.store.read_for(actor, operation, query, execute)?
+    } else {
+        service
+            .store
+            .transaction_for(actor, operation, query, execute)?
+    };
     Ok(contracts::dto(contracts::response(operation.id), result))
 }
 fn producer(
@@ -74,6 +180,7 @@ fn producer(
     actor: &Actor,
     id: i64,
     input: &Value,
+    expected: i64,
     remember: bool,
 ) -> Result<Value> {
     export_doc_contracts::validation::structure(
@@ -112,7 +219,8 @@ fn producer(
         if !auth::visible(actor, PERMISSION, "edit", &previous) {
             return Err(error(403, "无权修改该生产企业。"));
         }
-        input["expectedVersion"] = previous["versionNumber"].clone();
+        store::check_version(&previous, expected)?;
+        input["expectedVersion"] = json!(expected);
         input["lastUsedAt"] = previous["lastUsedAt"].clone();
         rules::text(&previous, "companyScope").to_owned()
     } else {
@@ -181,7 +289,14 @@ pub fn remember(tx: &Connection, actor: &Actor, document: &Value) -> Result<()> 
         input["lastInvoiceNo"] = document["invoiceNo"].clone();
         input["lastContractNo"] = document["contractNo"].clone();
         input["lastSourceStyleNo"] = row["sourceStyleNo"].clone();
-        producer(tx, actor, id, &input, true)?;
+        producer(
+            tx,
+            actor,
+            id,
+            &input,
+            existing.as_ref().map(store::expected).unwrap_or(0),
+            true,
+        )?;
     }
     Ok(())
 }

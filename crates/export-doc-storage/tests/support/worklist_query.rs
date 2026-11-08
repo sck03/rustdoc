@@ -1,0 +1,104 @@
+use export_doc_storage::{Connection, DataScope, RecordWrite, ScopedQuery};
+use serde_json::{Value, json};
+fn insert(db: &Connection, kind: &str, mut value: Value, owner: i64) -> i64 {
+    value["versionNumber"] = json!(1);
+    value["companyScope"] = json!("WORKLIST");
+    value["departmentId"] = json!("D");
+    value["ownerUserId"] = json!(owner);
+    let id = db.insert(&RecordWrite::unkeyed(kind, &value)).unwrap();
+    value["id"] = json!(id);
+    db.set_body(id, &value).unwrap();
+    id
+}
+pub fn exercise(db: &Connection) {
+    db.begin().unwrap();
+    assert_eq!(db.settings_revision("version-test").unwrap(), 0);
+    assert!(
+        db.compare_set_settings("version-test", 0, &json!({"value":1}))
+            .unwrap()
+    );
+    assert!(
+        !db.compare_set_settings("version-test", 0, &json!({"value":2}))
+            .unwrap()
+    );
+    assert!(
+        db.compare_set_settings("version-test", 1, &json!({"value":3}))
+            .unwrap()
+    );
+    assert!(
+        !db.compare_set_settings("version-test", 1, &json!({"value":4}))
+            .unwrap()
+    );
+    assert_eq!(db.settings_revision("version-test").unwrap(), 2);
+    assert_eq!(db.settings("version-test").unwrap().unwrap()["value"], 3);
+    let scopes = [DataScope {
+        all: true,
+        ..Default::default()
+    }];
+    let mut query = ScopedQuery {
+        kind: "invoices",
+        scopes: &scopes,
+        company: Some("WORKLIST"),
+        fields: &[("id", "id")],
+        limit: 37,
+    };
+    let mut ids = vec![];
+    for index in 0..405 {
+        let active = index % 2 == 0;
+        let id = insert(
+            db,
+            "invoices",
+            json!({"status":if active{"Draft"}else{"Confirmed"},"private":"not projected"}),
+            1,
+        );
+        if active {
+            ids.push(id);
+        }
+    }
+    insert(db, "invoices", json!({"status":"Draft"}), 2);
+    let mut cursor = None;
+    let mut found = vec![];
+    loop {
+        let (next, rows) = db.scan_worklist(&query, 1, &scopes[0], cursor).unwrap();
+        if rows.is_empty() {
+            break;
+        }
+        assert!(rows.iter().all(|row| row.as_object().unwrap().len() == 1));
+        found.extend(rows.iter().map(|row| row["id"].as_i64().unwrap()));
+        cursor = next;
+    }
+    ids.reverse();
+    assert_eq!(found, ids);
+    let visible = insert(db, "crm-customers", json!({"name":"可见客户"}), 1);
+    let hidden = insert(db, "crm-customers", json!({"name":"不可见客户"}), 2);
+    let follow = insert(
+        db,
+        "crm-follow-ups",
+        json!({"crmCustomerId":visible,"isCompleted":false}),
+        1,
+    );
+    insert(
+        db,
+        "crm-follow-ups",
+        json!({"crmCustomerId":hidden,"isCompleted":false}),
+        1,
+    );
+    insert(
+        db,
+        "crm-follow-ups",
+        json!({"crmCustomerId":visible,"isCompleted":true}),
+        1,
+    );
+    query.kind = "crm-follow-ups";
+    let customer_scope = DataScope {
+        own: true,
+        company: "WORKLIST",
+        user_id: 1,
+        ..Default::default()
+    };
+    let (_, rows) = db.scan_worklist(&query, 1, &customer_scope, None).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["id"], follow);
+    assert_eq!(rows[0]["customerName"], "可见客户");
+    db.rollback().unwrap();
+}

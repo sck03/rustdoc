@@ -605,6 +605,24 @@ impl Adapter for Postgres {
             })
             .transpose()
     }
+    fn settings_revision(&self, name: &str) -> Result<i64> {
+        Ok(self
+            .client
+            .query_one(
+                "SELECT COALESCE((SELECT version FROM settings WHERE name=$1),0)",
+                &[&name],
+            )?
+            .try_get(0)?)
+    }
+    fn compare_set_settings(&self, name: &str, expected: i64, body: &Value) -> Result<bool> {
+        let body = serde_json::to_string(body)?;
+        let changed = if expected == 0 {
+            self.client.execute("INSERT INTO settings(name,version,body) VALUES($1,1,$2::text::jsonb) ON CONFLICT(name) DO NOTHING", &[&name,&body])?
+        } else {
+            self.client.execute("UPDATE settings SET version=version+1,body=$3::text::jsonb WHERE name=$1 AND version=$2", &[&name,&expected,&body])?
+        };
+        Ok(changed == 1)
+    }
     fn personnel_private_profile(&self, id: i64) -> Result<Option<Value>> {
         self.client
             .query_opt(

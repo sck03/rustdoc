@@ -57,12 +57,12 @@ pub(crate) trait Adapter: Send {
         freeze_request_revision(id: i64, snapshot: &Value) -> () => workflow_runtime::freeze;
         save_workflow_state(request: i64, revision: i64, progress: &WorkflowProgress<'_>, plan: &Value, active_tasks: &[String]) -> () => workflow_runtime::persist;
         query_record_fields(query: &GenericQuery<'_>, search_fields: &[&str], count: bool) -> (i64, Vec<Value>) => record_selection::page;
+        query_ordered_record_fields(query: &GenericQuery<'_>, search_fields: &[&str], order: RecordOrder) -> (i64, Vec<Value>) => record_selection::ordered_page;
         export_primary_contacts(kind: &str, scope: &DataScope<'_>, relation: &str, parents: &[i64]) -> Vec<Value> => record_selection::contacts;
     }
     query_operations! {
         query_hs(&HsQuery<'_>) -> Vec<Value> => hs_query::build, query_slice;
         query_generic(&GenericQuery<'_>) -> (i64, Vec<Value>) => generic_query::build, query_page;
-        query_scoped(&ScopedQuery<'_>) -> (i64, Vec<Value>) => generic_query::scoped, query_page;
         query_business(&BusinessQuery<'_>) -> (i64, Vec<Value>) => business_query::build, query_page;
         query_crm(&CrmQuery<'_>) -> (i64, Vec<Value>) => crm_query::build, query_page;
         query_related(&RelatedQuery<'_>) -> (i64, Vec<Value>) => related_query::build, query_page;
@@ -332,6 +332,38 @@ pub(crate) trait Adapter: Send {
         let (sql, projection) = generic_query::build(query, pg)?;
         self.scan_page(sql, &projection, before_id, query.limit)
     }
+    fn scan_worklist(
+        &self,
+        query: &ScopedQuery<'_>,
+        actor: i64,
+        customer_scope: &DataScope<'_>,
+        before_id: Option<i64>,
+    ) -> Result<(Option<i64>, Vec<Value>)> {
+        let (sql, projection) = worklist_query::build(
+            query,
+            actor,
+            customer_scope,
+            self.provider() == "PostgreSQL",
+        )?;
+        self.scan_page(sql, &projection, before_id, query.limit)
+    }
+    fn scan_records(
+        &self,
+        query: &RecordQuery<'_>,
+        before_id: Option<i64>,
+    ) -> Result<(Option<i64>, Vec<Value>)> {
+        let pg = self.provider() == "PostgreSQL";
+        let mut statement = record_query::sql(query, pg);
+        if workflow_runtime::request_kind(query.kind) {
+            statement.source = query_source::Source::Workflow;
+        }
+        self.scan_page(
+            statement,
+            &sql::projection(query.fields, pg)?,
+            before_id,
+            query.limit,
+        )
+    }
     fn scan_page(
         &self,
         mut sql: QuerySql,
@@ -535,6 +567,8 @@ pub(crate) trait Adapter: Send {
     fn credential(&self, id: i64) -> Result<Option<Credential>>;
     fn set_credential(&self, id: i64, salt: &[u8], hash: &[u8], iterations: u32) -> Result<()>;
     fn settings(&self, name: &str) -> Result<Option<Value>>;
+    fn settings_revision(&self, name: &str) -> Result<i64>;
+    fn compare_set_settings(&self, name: &str, expected: i64, body: &Value) -> Result<bool>;
     fn set_settings(&self, name: &str, version: i64, body: &Value) -> Result<()>;
     fn attachment_bytes(&self, invoice_id: i64) -> Result<i64>;
     fn insert_blob(&self, blob: &BlobWrite<'_>) -> Result<()>;

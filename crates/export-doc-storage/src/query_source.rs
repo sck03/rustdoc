@@ -5,6 +5,7 @@ use crate::{GenericQuery, QuerySql};
 pub(crate) enum Source {
     Records,
     Projected,
+    Workflow,
 }
 impl Source {
     pub(crate) fn for_kind(kind: &str) -> Self {
@@ -18,13 +19,19 @@ impl Source {
         match self {
             Self::Records => "records",
             Self::Projected => "record_rows",
+            Self::Workflow => "workflow_record_filters",
         }
     }
 }
 pub(crate) fn slice(sql: &QuerySql, projection: &str, offset: i64, limit: i64) -> String {
     let table = sql.source.table();
+    let projected = if matches!(sql.source, Source::Workflow) {
+        "workflow_list_records"
+    } else {
+        table
+    };
     format!(
-        "WITH selected AS MATERIALIZED (SELECT r.id FROM {table} r WHERE {filter} ORDER BY {order} LIMIT {limit} OFFSET {offset}) SELECT {projection} FROM selected p JOIN {table} r ON r.id=p.id ORDER BY {order}",
+        "WITH selected AS MATERIALIZED (SELECT r.id FROM {table} r WHERE {filter} ORDER BY {order} LIMIT {limit} OFFSET {offset}) SELECT {projection} FROM selected p JOIN {projected} r ON r.id=p.id ORDER BY {order}",
         filter = sql.filter,
         order = sql.order,
         limit = limit.clamp(1, 2000),

@@ -2,7 +2,7 @@ use super::{
     auth,
     error::{Result, invalid, unavailable},
     records::text,
-    store::{self, Actor, Store},
+    store::{Actor, Store},
 };
 use crate::clock::{BusinessClock, BusinessTime};
 use crate::engine::store::Connection;
@@ -10,15 +10,12 @@ use chrono::{DateTime, Duration, NaiveDate};
 use serde_json::{Value, json};
 #[path = "worklist_oa.rs"]
 mod oa;
+#[path = "worklist_page.rs"]
+mod page;
 #[path = "worklist_reads.rs"]
 mod reads;
-use reads::rows;
-
-struct Group {
-    key: &'static str,
-    name: &'static str,
-    rows: Vec<Value>,
-}
+use page::{Group, Selection};
+use reads::visit;
 
 fn item(
     record: &Value,
@@ -28,299 +25,271 @@ fn item(
     date: Value,
     instant: Value,
 ) -> Value {
-    json!({"recordId":record["id"], "parentId":parent, "title":title, "description":description, "dueDate":date, "dueAt":instant, "isOverdue":false})
+    json!({"recordId":record["id"],"parentId":parent,"title":title,"description":description,"dueDate":date,"dueAt":instant,"isOverdue":false})
 }
 fn allowed(actor: &Actor, resource: &str, actions: &[&str]) -> bool {
     actions
         .iter()
         .all(|action| auth::authorize(actor, resource, action).is_ok())
 }
-fn groups(tx: &Connection, actor: &Actor) -> Result<Vec<Group>> {
-    let mine = |record: &Value| record["ownerUserId"] == actor.id;
+fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<Vec<Group>> {
     let mut groups = vec![];
     if allowed(actor, "document.invoices", &["view", "operate"]) {
-        let rows = rows(
+        let mut group = Group::new("invoice-review", "单据待核对");
+        visit(
             tx,
             actor,
             "invoices",
             "document.invoices",
             &["view", "operate"],
             false,
-        )?
-        .iter()
-        .filter(|record| record["status"] == "Draft" && mine(record))
-        .map(|record| {
-            item(
-                record,
-                text(record, "invoiceNo"),
-                format!(
-                    "{} · {}",
-                    text(record, "type"),
-                    text(record, "customerNameEN")
-                ),
-                Value::Null,
-                Value::Null,
-                Value::Null,
-            )
-        })
-        .collect();
-        groups.push(Group {
-            key: "invoice-review",
-            name: "单据待核对",
-            rows,
-        });
+            |r| {
+                group.push(
+                    item(
+                        &r,
+                        text(&r, "invoiceNo"),
+                        format!("{} · {}", text(&r, "type"), text(&r, "customerNameEN")),
+                        Value::Null,
+                        Value::Null,
+                        Value::Null,
+                    ),
+                    selection,
+                )
+            },
+        )?;
+        groups.push(group);
     }
     if allowed(actor, "sales.follow-ups", &["view", "complete"])
         && allowed(actor, "sales.customers", &["view"])
     {
-        let mut items = vec![];
-        let mut customers = std::collections::BTreeMap::new();
-        for record in rows(
+        let mut group = Group::new("customer-follow-up", "客户跟进");
+        visit(
             tx,
             actor,
             "crm-follow-ups",
             "sales.follow-ups",
             &["view", "complete"],
             false,
-        )?
-        .iter()
-        .filter(|record| record["isCompleted"] != true && mine(record))
-        {
-            let customer_id = record["crmCustomerId"]
-                .as_i64()
-                .ok_or_else(|| unavailable("跟进记录缺少客户编号。"))?;
-            if !customers.contains_key(&customer_id) {
-                customers.insert(customer_id, store::get(tx, "crm-customers", customer_id)?);
-            }
-            let customer = &customers[&customer_id];
-            if !auth::visible(actor, "sales.customers", "view", customer) {
-                continue;
-            }
-            let next = text(record, "nextAction");
-            items.push(item(
-                record,
-                text(customer, "name"),
-                if next.is_empty() {
-                    text(record, "summary")
-                } else {
-                    next
-                },
-                customer["id"].clone(),
-                Value::Null,
-                record["nextFollowUpAt"].clone(),
-            ));
-        }
-        groups.push(Group {
-            key: "customer-follow-up",
-            name: "客户跟进",
-            rows: items,
-        });
+            |r| {
+                let next = text(&r, "nextAction");
+                group.push(
+                    item(
+                        &r,
+                        text(&r, "customerName"),
+                        if next.is_empty() {
+                            text(&r, "summary")
+                        } else {
+                            next
+                        },
+                        r["crmCustomerId"].clone(),
+                        Value::Null,
+                        r["nextFollowUpAt"].clone(),
+                    ),
+                    selection,
+                )
+            },
+        )?;
+        groups.push(group);
     }
     if allowed(actor, "office.rooms", &["view"]) {
-        let mut meetings = rows(tx, actor, "bookings", "office.rooms", &["view"], true)?;
-        for r in &mut meetings {
-            r["reviewAllowed"] = json!(super::oa::approval::authority(tx, actor, r)?.is_some());
-        }
-        if allowed(actor, "office.rooms", &["approve"]) {
-            let rows = meetings
-                .iter()
-                .filter(|r| {
-                    r["status"] == "Pending"
-                        && r["ownerUserId"] != actor.id
-                        && r["reviewAllowed"] == true
-                })
-                .map(|r| {
-                    item(
-                        r,
-                        text(r, "title"),
-                        format!("{} · 待审批", text(r, "applicantName")),
-                        Value::Null,
-                        Value::Null,
-                        r["startsAt"].clone(),
-                    )
-                })
-                .collect();
-            groups.push(Group {
-                key: "meeting-approval",
-                name: "会议室待审批",
-                rows,
-            });
-        }
-        for (key, name, status, due, description) in [
-            (
-                "meeting-collection",
-                "会议室待使用／交接",
-                "Approved",
-                "startsAt",
-                "待使用／交接",
-            ),
-            (
-                "meeting-return",
-                "会议室待结束／归还",
-                "InUse",
-                "endsAt",
-                "待结束使用／归还钥匙",
-            ),
-        ] {
-            let mut rows = vec![];
-            for r in &meetings {
-                if r["status"] == status
-                    && (mine(r)
-                        || super::handling::resource_access(
-                            tx,
-                            actor,
-                            "office.rooms",
-                            if status == "Approved" {
-                                "issue"
+        let approve = allowed(actor, "office.rooms", &["approve"]);
+        let mut approval = Group::new("meeting-approval", "会议室待审批");
+        let mut collection = Group::new("meeting-collection", "会议室待使用／交接");
+        let mut returns = Group::new("meeting-return", "会议室待结束／归还");
+        visit(
+            tx,
+            actor,
+            "bookings",
+            "office.rooms",
+            &["view"],
+            true,
+            |r| {
+                let own = r["ownerUserId"] == actor.id;
+                match text(&r, "status").as_str() {
+                    "Pending"
+                        if approve
+                            && !own
+                            && super::oa::approval::authority(tx, actor, &r)?.is_some() =>
+                    {
+                        approval.push(
+                            item(
+                                &r,
+                                text(&r, "title"),
+                                format!("{} · 待审批", text(&r, "applicantName")),
+                                Value::Null,
+                                Value::Null,
+                                r["startsAt"].clone(),
+                            ),
+                            selection,
+                        )?
+                    }
+                    "Approved" | "InUse" => {
+                        let collecting = r["status"] == "Approved";
+                        let action = if collecting { "issue" } else { "return" };
+                        if own
+                            || super::handling::resource_access(
+                                tx,
+                                actor,
+                                "office.rooms",
+                                action,
+                                &r,
+                                false,
+                            )?
+                        {
+                            let (group, due, label) = if collecting {
+                                (&mut collection, "startsAt", "待使用／交接")
                             } else {
-                                "return"
-                            },
-                            r,
-                            false,
-                        )?)
-                {
-                    rows.push(item(
-                        r,
-                        text(r, "title"),
-                        format!("{} · {description}", text(r, "applicantName")),
-                        Value::Null,
-                        Value::Null,
-                        r[due].clone(),
-                    ));
+                                (&mut returns, "endsAt", "待结束使用／归还钥匙")
+                            };
+                            group.push(
+                                item(
+                                    &r,
+                                    text(&r, "title"),
+                                    format!("{} · {label}", text(&r, "applicantName")),
+                                    Value::Null,
+                                    Value::Null,
+                                    r[due].clone(),
+                                ),
+                                selection,
+                            )?;
+                        }
+                    }
+                    _ => {}
                 }
-            }
-            groups.push(Group { key, name, rows });
+                Ok(())
+            },
+        )?;
+        if approve {
+            groups.push(approval);
         }
+        groups.extend([collection, returns]);
     }
     if allowed(actor, "office.supplies", &["view"]) {
-        let mut requests = rows(
+        let approve = allowed(actor, "office.supplies", &["approve"]);
+        let mut approval = Group::new("supply-approval", "物品待审批");
+        let mut collection = Group::new("supply-collection", "物品待领用／发放");
+        let mut returns = Group::new("supply-return", "借用物品待归还");
+        visit(
             tx,
             actor,
             "supply-requests",
             "office.supplies",
             &["view"],
             true,
+            |r| {
+                let own = r["ownerUserId"] == actor.id;
+                match text(&r, "status").as_str() {
+                    "Pending"
+                        if approve
+                            && !own
+                            && super::oa::approval::authority(tx, actor, &r)?.is_some() =>
+                    {
+                        approval.push(
+                            item(
+                                &r,
+                                format!("{} · 物品领用", text(&r, "applicantName")),
+                                text(&r, "purpose"),
+                                Value::Null,
+                                Value::Null,
+                                Value::Null,
+                            ),
+                            selection,
+                        )?
+                    }
+                    "Approved" | "Issued" => {
+                        let collecting = r["status"] == "Approved";
+                        let action = if collecting { "issue" } else { "return" };
+                        if own
+                            || super::handling::resource_access(
+                                tx,
+                                actor,
+                                "office.supplies",
+                                action,
+                                &r,
+                                false,
+                            )?
+                        {
+                            let description =
+                                format!("{} · {}", text(&r, "applicantName"), text(&r, "purpose"));
+                            if collecting {
+                                collection.push(
+                                    item(
+                                        &r,
+                                        text(&r, "supplyName"),
+                                        description,
+                                        Value::Null,
+                                        Value::Null,
+                                        Value::Null,
+                                    ),
+                                    selection,
+                                )?;
+                            } else if r["isReturnable"] == true
+                                && r["returnedQuantity"].as_i64().unwrap_or(0)
+                                    < r["quantity"].as_i64().unwrap_or(0)
+                            {
+                                returns.push(
+                                    item(
+                                        &r,
+                                        text(&r, "supplyName"),
+                                        description,
+                                        Value::Null,
+                                        r["returnDueDate"].clone(),
+                                        Value::Null,
+                                    ),
+                                    selection,
+                                )?;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                Ok(())
+            },
         )?;
-        for r in &mut requests {
-            r["reviewAllowed"] = json!(super::oa::approval::authority(tx, actor, r)?.is_some());
+        if approve {
+            groups.push(approval);
         }
-        if allowed(actor, "office.supplies", &["approve"]) {
-            let rows = requests
-                .iter()
-                .filter(|r| {
-                    r["status"] == "Pending"
-                        && r["ownerUserId"] != actor.id
-                        && r["reviewAllowed"] == true
-                })
-                .map(|r| {
-                    item(
-                        r,
-                        format!("{} · 物品领用", text(r, "applicantName")),
-                        text(r, "purpose"),
-                        Value::Null,
-                        Value::Null,
-                        Value::Null,
-                    )
-                })
-                .collect();
-            groups.push(Group {
-                key: "supply-approval",
-                name: "物品待审批",
-                rows,
-            });
-        }
-        let mut collection = vec![];
-        let mut returns = vec![];
-        for r in &requests {
-            let action = if r["status"] == "Approved" {
-                "issue"
-            } else {
-                "return"
-            };
-            if !mine(r)
-                && !super::handling::resource_access(
-                    tx,
-                    actor,
-                    "office.supplies",
-                    action,
-                    r,
-                    false,
-                )?
-            {
-                continue;
-            }
-            if !["Approved", "Issued"].contains(&text(r, "status").as_str()) {
-                continue;
-            }
-            let description = format!("{} · {}", text(r, "applicantName"), text(r, "purpose"));
-            if r["status"] == "Approved" {
-                collection.push(item(
-                    r,
-                    text(r, "supplyName"),
-                    description,
-                    Value::Null,
-                    Value::Null,
-                    Value::Null,
-                ));
-            } else if r["isReturnable"] == true
-                && r["returnedQuantity"].as_i64().unwrap_or(0) < r["quantity"].as_i64().unwrap_or(0)
-            {
-                returns.push(item(
-                    r,
-                    text(r, "supplyName"),
-                    description,
-                    Value::Null,
-                    r["returnDueDate"].clone(),
-                    Value::Null,
-                ));
-            }
-        }
-        groups.push(Group {
-            key: "supply-collection",
-            name: "物品待领用／发放",
-            rows: collection,
-        });
-        groups.push(Group {
-            key: "supply-return",
-            name: "借用物品待归还",
-            rows: returns,
-        });
+        groups.extend([collection, returns]);
     }
     if allowed(actor, "office.people", &["view", "view-details"]) {
-        let people = rows(
+        let mut probation = Group::new("probation-end", "试用期到期");
+        let mut contract = Group::new("contract-end", "劳动合同到期");
+        visit(
             tx,
             actor,
             "people",
             "office.people",
             &["view", "view-details"],
             true,
+            |r| {
+                for (group, field, eligible) in [
+                    (
+                        &mut probation,
+                        "probationEndsOn",
+                        r["status"] == "Probation",
+                    ),
+                    (&mut contract, "contractEndsOn", true),
+                ] {
+                    if eligible && r[field].is_string() {
+                        group.push(
+                            item(
+                                &r,
+                                text(&r, "fullName"),
+                                format!("{} · {}", text(&r, "employeeNumber"), group.name),
+                                Value::Null,
+                                r[field].clone(),
+                                Value::Null,
+                            ),
+                            selection,
+                        )?;
+                    }
+                }
+                Ok(())
+            },
         )?;
-        for (key, name, field) in [
-            ("probation-end", "试用期到期", "probationEndsOn"),
-            ("contract-end", "劳动合同到期", "contractEndsOn"),
-        ] {
-            let rows = people
-                .iter()
-                .filter(|r| {
-                    r["status"] != "Departed"
-                        && (key != "probation-end" || r["status"] == "Probation")
-                        && r[field].is_string()
-                })
-                .map(|r| {
-                    item(
-                        r,
-                        text(r, "fullName"),
-                        format!("{} · {name}", text(r, "employeeNumber")),
-                        Value::Null,
-                        r[field].clone(),
-                        Value::Null,
-                    )
-                })
-                .collect();
-            groups.push(Group { key, name, rows });
-        }
+        groups.extend([probation, contract]);
     }
-    groups.extend(oa::groups(tx, actor)?);
+    groups.extend(oa::groups(tx, actor, selection)?);
     Ok(groups)
 }
 fn deadline(item: &Value, now: &BusinessTime) -> Result<Option<(bool, bool, String)>> {
@@ -374,25 +343,24 @@ pub fn query(
     }
     let selected = parameter("source");
     let now = clock.now().map_err(unavailable)?;
-    store.read(|tx|{
-        let groups=groups(tx,actor)?;
-        if !selected.is_empty()&&!groups.iter().any(|g|g.key==selected){return Err(invalid("该待办来源不存在或当前账号无权查看。"));}
-        let mut sources=vec![];let mut all=vec![];
+    store.read_for(actor,crate::generated_api::GET_WORKLIST,query,|tx,actor| {
+        let selection=Selection { now:&now,due,source:selected,keep:page*size };
+        let groups=groups(tx,actor,&selection)?;
+        if !selected.is_empty() && !groups.iter().any(|group|group.key==selected) { return Err(invalid("该待办来源不存在或当前账号无权查看。")); }
+        let mut sources=vec![];
+        let mut rows=vec![];
+        let mut count=0;
+        let mut skip=(page-1)*size;
         for group in groups {
-            let mut rows=vec![];
-            for mut item in group.rows {
-                crate::operation::check()?;
-                let deadline=deadline(&item,&now)?;
-                let included=match due {"Overdue"=>deadline.as_ref().is_some_and(|d|d.0),"Upcoming"=>deadline.as_ref().is_some_and(|d|d.1),"Undated"=>deadline.is_none(),_=>true};
-                if !included{continue;}
-                item["source"]=json!(group.key);item["isOverdue"]=json!(deadline.as_ref().is_some_and(|d|d.0));
-                rows.push((deadline.map(|d|d.2).unwrap_or_else(||"~".into()),item));
+            sources.push(json!({"key":group.key,"name":group.name,"count":group.count}));
+            if !selected.is_empty() && selected!=group.key { continue; }
+            count+=group.count;
+            if skip>=group.count { skip-=group.count; continue; }
+            if rows.len()<size {
+                rows.extend(group.into_rows().skip(skip).take(size-rows.len()));
+                skip=0;
             }
-            rows.sort_by(|a,b|a.0.cmp(&b.0).then_with(||a.1["recordId"].as_i64().cmp(&b.1["recordId"].as_i64())));
-            sources.push(json!({"key":group.key,"name":group.name,"count":rows.len()}));
-            if selected.is_empty()||selected==group.key {all.extend(rows.into_iter().map(|(_,item)|item));}
         }
-        let count=all.len();
-        Ok(json!({"page":crate::contracts::page(all.into_iter().skip((page-1)*size).take(size).collect(),count,page,size),"sources":sources,"businessDate":now.today.to_string(),"asOf":now.utc_now.to_rfc3339()}))
+        Ok(json!({"page":crate::contracts::page(rows,count,page,size),"sources":sources,"businessDate":now.today.to_string(),"asOf":now.utc_now.to_rfc3339()}))
     })
 }

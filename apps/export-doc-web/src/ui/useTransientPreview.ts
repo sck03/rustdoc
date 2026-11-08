@@ -6,7 +6,7 @@ export function useTransientPreview<T, Input = void>(
   scope: unknown,
   operation: (signal: AbortSignal, input: Input) => Promise<T>,
   onError: (error: unknown) => void,
-  onSuccess?: () => void,
+  onSuccess?: (value: T) => void,
 ) {
   const { run, cancel } = useAbortableOperationController(scope, { cancelPrevious: true });
   const sequence = useRef(0);
@@ -31,7 +31,7 @@ export function useTransientPreview<T, Input = void>(
       const value = await run(signal => operation(signal, input));
       if (!current()) return;
       setState({ scope, value, pending: false });
-      onSuccess?.();
+      onSuccess?.(value);
     } catch (error) {
       if (!current()) return;
       setState(null);

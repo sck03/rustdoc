@@ -15,6 +15,21 @@ pub fn defaults() -> &'static Value {
         .expect("bundled declaration dictionary")
     })
 }
+
+#[test]
+fn bundled_catalog_is_valid_and_common_descriptions_are_not_aliases() {
+    validate(defaults()).unwrap();
+    assert!(find(defaults(), "acdTradeModes", "用于区内外非实际进出境货物").is_none());
+    for (code, name) in [
+        ("5000", "料件进出区"),
+        ("5100", "成品进出区"),
+        ("5200", "区内边角调出"),
+        ("5300", "设备进出区"),
+    ] {
+        assert_eq!(resolve(defaults(), "acdTradeModes", name, "code"), code);
+    }
+}
+
 pub fn authorities() -> Value {
     let data: Value = serde_json::from_str(include_str!(
         "../../../../Resources/SingleWindow/customs_coo_issuing_authorities.json"

@@ -16,6 +16,7 @@ import { verifyDesktopBookingExport } from './lib/native-booking-export.mjs';
 import { verifyDesktopBusinessAttachments } from './lib/native-business-attachments.mjs';
 import { verifyDesktopOcr } from './lib/native-ocr-ui.mjs';
 import { verifyDesktopEntryRows } from './lib/native-entry-print-rows.mjs';
+import { verifyDesktopSingleWindow } from './lib/native-single-window.mjs';
 import { verifyDesktopPersonnelDeletion } from './lib/native-personnel-deletion.mjs';
 import { verifyDesktopMaintenance } from './lib/native-maintenance-workflow.mjs';
 import { verifyDesktopBackupSave } from './lib/native-backup-save-checks.mjs';
@@ -139,8 +140,11 @@ for (const edition of selected) {
     await captureScreenshot(cdp, path.join(output, `${edition}-about.png`));
     if (marker.ocr && !process.argv.includes('--blank-grid-only') && !process.argv.includes('--entry-rows-only')) await verifyDesktopOcr({ run, cdp, repo, output, context, token: login.body.accessToken, operations });
     if (process.argv.includes('--entry-rows-only')) {
-      await verifyDesktopEntryRows({ run, request, token: login.body.accessToken, cdp, output });
-      if (edition === 'Full') await verifyDesktopPersonnelDeletion({ run, request, token: login.body.accessToken, cdp, output });
+      const { invoiceId } = await verifyDesktopEntryRows({ run, request, token: login.body.accessToken, cdp, output });
+      if (edition === 'Full') {
+        await verifyDesktopSingleWindow({ run, cdp, output, token: login.body.accessToken, invoiceId });
+        await verifyDesktopPersonnelDeletion({ run, request, token: login.body.accessToken, cdp, output });
+      }
     } else if (process.argv.includes('--blank-grid-only')) {
       await verifyDesktopBlankGrid({ run, request, token: login.body.accessToken, businessDate: login.body.user.businessDate, cdp, output });
     } else if (edition === 'Full') {
@@ -150,7 +154,8 @@ for (const edition of selected) {
       await verifyDesktopListPagination({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopDetailDesigner({ run, request, token: login.body.accessToken, cdp, output });
       const invoice = await verifyDesktopConditionalReports({ run, request, token: login.body.accessToken, cdp, output });
-      await verifyDesktopEntryRows({ run, request, token: login.body.accessToken, cdp, output });
+      const { invoiceId } = await verifyDesktopEntryRows({ run, request, token: login.body.accessToken, cdp, output });
+      await verifyDesktopSingleWindow({ run, cdp, output, token: login.body.accessToken, invoiceId });
       await verifyDesktopPersonnelDeletion({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopBlankDetails({ run, request, token: login.body.accessToken, invoice, cdp, output });
       await verifyDesktopBookingExport({ run, request, token: login.body.accessToken, invoice, cdp, output });
