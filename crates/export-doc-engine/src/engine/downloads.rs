@@ -1,7 +1,7 @@
 //! Authenticated task and backup downloads, including the maintenance read lock.
 use super::{
     NativeService, backup_io,
-    error::{Result, unavailable, unsupported},
+    error::{Result, unsupported},
     team_backup,
 };
 use crate::generated_api::{
@@ -16,10 +16,7 @@ impl NativeService {
         token: &str,
         work: impl FnOnce(&super::store::Actor) -> Result<T>,
     ) -> Result<T> {
-        let _access = self
-            .maintenance
-            .read()
-            .map_err(|_| unavailable("数据库维护状态异常。"))?;
+        let _access = crate::engine::maintenance::acquire_read(&self.maintenance)?;
         let actor = self.sessions.actor(&self.store, token)?;
         self.authorize_operation(&actor, operation, &[])?;
         work(&actor)

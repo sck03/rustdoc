@@ -154,10 +154,7 @@ impl NativeService {
             .contains(&operation)
     }
     pub fn upload_pdf_merge(&self, files: Vec<tasks::FileOutput>, token: &str) -> Result<Value> {
-        let _access = self
-            .maintenance
-            .read()
-            .map_err(|_| unavailable("数据库维护状态异常。"))?;
+        let _access = crate::engine::maintenance::acquire_read(&self.maintenance)?;
         let actor = self.sessions.actor(&self.store, token)?;
         self.authorize_operation(&actor, UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB, &[])?;
         pdf_merge::upload(self, &actor, files)
@@ -171,10 +168,7 @@ impl NativeService {
         content: &[u8],
         token: &str,
     ) -> Result<Value> {
-        let _access = self
-            .maintenance
-            .read()
-            .map_err(|_| unavailable("数据库维护状态异常。"))?;
+        let _access = crate::engine::maintenance::acquire_read(&self.maintenance)?;
         let actor = self.sessions.actor(&self.store, token)?;
         self.authorize_operation(&actor, operation, &[])?;
         #[cfg(feature = "invoice-transfer")]

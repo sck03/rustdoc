@@ -31,8 +31,18 @@ mod private_template_output;
 #[path = "support/report_resource_contract.rs"]
 mod resource_contract;
 
+// Independent business fixtures share the process-wide renderer. Exercise its
+// contention separately in the HTTP capacity regression, not between scenarios.
+fn report_scenario() -> std::sync::MutexGuard<'static, ()> {
+    static SCENARIO: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    SCENARIO
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 #[test]
 fn template_metadata_pages_and_history_keep_content_in_detail_only() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let mut ids = vec![];
     for name in ["C-目录", "A-目录", "B-目录"] {
@@ -76,6 +86,7 @@ fn template_metadata_pages_and_history_keep_content_in_detail_only() {
 
 #[test]
 fn original_react_empty_template_requests_create_server_drafts_and_keep_empty_updates_invalid() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     for kind in ["ExportDocument", "PaymentVoucher"] {
         let created = fixture.create(
@@ -239,6 +250,7 @@ impl Drop for Fixture {
 
 #[test]
 fn builtins_images_pdf_jobs_and_backup_restore_share_the_business_store() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let exporter = fixture.create(
         CREATE_EXPORTER,
@@ -384,6 +396,7 @@ fn builtins_images_pdf_jobs_and_backup_restore_share_the_business_store() {
 
 #[test]
 fn template_publication_sharing_history_and_concurrency_are_not_generic_record_updates() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let content = serde_json::to_string(&fixture::invoice()).unwrap();
     let template = fixture.create(
@@ -508,6 +521,7 @@ fn template_publication_sharing_history_and_concurrency_are_not_generic_record_u
 
 #[test]
 fn report_images_enforce_upload_ownership_and_references() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let uploader = fixture.user("image-owner");
     let stranger = fixture.user("image-reader");
@@ -580,6 +594,7 @@ fn report_images_enforce_upload_ownership_and_references() {
 
 #[test]
 fn payment_drafts_preview_without_persistence_and_save_with_a_real_identity() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let mut draft = export_doc_domain::payment::new("2026-09-16").unwrap();
     draft.voucher_no = "PAY-DRAFT-001".into();
@@ -661,6 +676,7 @@ fn payment_drafts_preview_without_persistence_and_save_with_a_real_identity() {
 
 #[test]
 fn custom_payment_methods_are_typed_deduplicated_and_persistent() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let parameters = [("optionType", "PaymentMethod".into())];
     let initial = fixture.request(LIST_CUSTOM_OPTIONS, &parameters, &[], None);

@@ -431,6 +431,27 @@ async fn execute(
                             .download_report_resource(&parameters, &token)
                             .map(response::Reply::file);
                     }
+                    let preview_memory = if [
+                        PREVIEW_REPORT_TEMPLATE_CONTENT,
+                        PREVIEW_INVOICE_REPORT_HTML,
+                        PREVIEW_INVOICE_REPORT_DRAFT_HTML,
+                        PREVIEW_PAYMENT_VOUCHER_HTML,
+                        PREVIEW_PAYMENT_VOUCHER_DRAFT_HTML,
+                        PREVIEW_INVOICE_DOCUMENT_PACKAGE_HTML,
+                    ]
+                    .contains(&operation)
+                    {
+                        // Reserve before rendering/JSON encoding and keep the actual bytes until
+                        // the response is sent or disconnected. Slow readers cannot accumulate HTML.
+                        Some(
+                            state
+                                .preview_memory
+                                .reserve_working(64 * 1024 * 1024)
+                                .map_err(|_| error(429, "报表预览资源正在使用，请稍后重试。"))?,
+                        )
+                    } else {
+                        None
+                    };
                     let result = state.service.dispatch_with_bootstrap(
                         operation,
                         &parameters,
@@ -439,6 +460,14 @@ async fn execute(
                         &token,
                         &bootstrap,
                     )?;
+                    if preview_memory.is_some() {
+                        if result.len() > 64 * 1024 * 1024 {
+                            return Err(error(400, "报表预览响应超过容量上限。"));
+                        }
+                        let mut reply = response::Reply::bytes(result);
+                        reply.memory_reservation = preview_memory;
+                        return Ok(reply);
+                    }
                     if [
                         CREATE_POSTGRE_SQL_PHYSICAL_BACKUP_DOWNLOAD_TICKET,
                         CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET,

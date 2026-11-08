@@ -20,7 +20,6 @@ struct Pdf {
 #[derive(Default)]
 pub(in crate::engine) struct Cache {
     entries: Mutex<VecDeque<Entry>>,
-    rendering: Mutex<()>,
 }
 
 impl Cache {
@@ -69,6 +68,7 @@ pub(super) fn response(
     body: &Value,
     mut metadata: Value,
 ) -> Result<Value> {
+    let _rendering = resources::acquire()?;
     let format = body["previewFormat"].as_str().unwrap_or("Svg");
     if format == "Svg" {
         metadata["html"] = json!(
@@ -78,9 +78,10 @@ pub(super) fn response(
                     &service.report_fonts,
                     &crate::operation::cancellation_flag()
                 )?
-                .html(
+                .html_with_limit(
                     &service.report_fonts,
-                    &crate::operation::cancellation_flag()
+                    &crate::operation::cancellation_flag(),
+                    resources::PREVIEW_BYTES,
                 )?
         );
         validate_current_access(service, actor, &data, &template, &metadata)?;
@@ -89,22 +90,6 @@ pub(super) fn response(
     if format != "PdfPage" {
         return Err(invalid("未知预览格式。"));
     }
-    let waiting = Instant::now();
-    let _rendering = loop {
-        crate::operation::check()?;
-        match service.report_previews.rendering.try_lock() {
-            Ok(guard) => break guard,
-            Err(std::sync::TryLockError::Poisoned(_)) => {
-                return Err(unavailable("PDF 预览状态异常。"));
-            }
-            Err(std::sync::TryLockError::WouldBlock)
-                if waiting.elapsed() < Duration::from_secs(5) =>
-            {
-                std::thread::sleep(Duration::from_millis(10))
-            }
-            Err(_) => return Err(error(429, "PDF 页图预览繁忙，请稍后重试。")),
-        }
-    };
     let page = body
         .get("pageIndex")
         .map_or(Some(0), Value::as_u64)

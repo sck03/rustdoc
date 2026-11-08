@@ -2759,6 +2759,10 @@ export interface ApiRecoveryArchiveRestoreRequest {
   password: string;
 }
 
+export interface ApiRecoveryArchiveSaveRequest {
+  destinationPath: string;
+}
+
 export interface ApiReportHtmlPreviewRequest {
   content?: string;
   pageIndex?: number;
@@ -10462,6 +10466,11 @@ export interface StartPaymentVoucherPdfSaveToPathJobRequest {
 
 export interface StartPdfMergeSaveToPathJobRequest {
   body: ApiPdfMergeRequest;
+}
+
+export interface StartRecoveryArchiveSaveToPathJobRequest {
+  id: string;
+  body: ApiRecoveryArchiveSaveRequest;
 }
 
 export interface StocktakeOfficeSupplyRequest {

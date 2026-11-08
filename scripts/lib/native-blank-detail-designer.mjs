@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { captureScreenshot } from './web-runtime-browser-session.mjs';
 import { waitFor } from './web-runtime-smoke-common.mjs';
+import { normalizeReportScope } from './report-html-comparison.mjs';
 
 export async function verifyDesktopBlankDetails({ run, request, token, invoice, cdp, output }) {
   const wait = expression => waitFor(() => run(`Boolean(${expression})`), 30000, 'Blank detail designer: ' + expression);
@@ -94,7 +95,7 @@ export async function verifyDesktopBlankDetails({ run, request, token, invoice, 
   const productsOnlyDesign = await save(tableTemplate.id);
   assert(!productsOnlyDesign.layers.flatMap(layer => layer.elements).find(element => element.block?.type === 'DetailTable').block.entryDescriptionColumnId);
   const productsOnlyHtml = await previewPdf(tableTemplate.id, 'blank-products-only', entryInvoice.body.id);
-  assert.equal(productsOnlyHtml, html, 'A products-only template must ignore entry mode on the same invoice and preserve automatic output');
+  assert.equal(normalizeReportScope(productsOnlyHtml), normalizeReportScope(html), 'A products-only template must ignore entry mode on the same invoice and preserve automatic output');
 
   const freeTemplate = await create('空白独立商品字段与占位');
   const catalog = await request('GetReportTemplateFieldCatalog', token);

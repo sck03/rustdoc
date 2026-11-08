@@ -21,6 +21,7 @@ fn with_image(content: &str, image: &Value) -> String {
 
 #[test]
 fn history_only_image_uses_current_template_visibility() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let image = resource(&fixture);
     let reader = fixture.user("history-image-reader");
@@ -84,6 +85,7 @@ fn history_only_image_uses_current_template_visibility() {
 
 #[test]
 fn file_template_resources_are_readable_and_cannot_be_recycled() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let image = resource(&fixture);
     let reader = fixture.user("file-image-reader");
@@ -159,6 +161,7 @@ fn file_template_resources_are_readable_and_cannot_be_recycled() {
 
 #[test]
 fn shared_template_does_not_bypass_its_source_domain_permission_for_images() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let image = resource(&fixture);
     let reader = fixture.user("no-payment-image-view");
@@ -197,6 +200,7 @@ fn shared_template_does_not_bypass_its_source_domain_permission_for_images() {
 
 #[test]
 fn resource_id_in_invoice_text_does_not_grant_image_access() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let image = resource(&fixture);
     let reader = fixture.user("image-text-reference");

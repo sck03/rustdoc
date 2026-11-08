@@ -14,7 +14,7 @@ fs.mkdirSync(temporary, { recursive: true });
 Object.assign(process.env, { TEMP: temporary, TMP: temporary, TMPDIR: temporary });
 const bundle = path.join(output, 'app.js');
 await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, contents: `
-  import React, { useState } from 'react';
+  import React, { useMemo, useState } from 'react';
   import { createRoot } from 'react-dom/client';
   import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
   import { useAbortableOperation } from ${source('ui/useAbortableOperation.ts')};
@@ -29,6 +29,8 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { SupplierAssessmentsPanel } from ${source('features/suppliers/SupplierAssessmentsPanel.tsx')};
   import { SalesOpportunityPage } from ${source('features/opportunities/SalesOpportunityPage.tsx')};
   import { useReportTemplatePreviewMutations } from ${source('features/reports/useReportTemplatePreviewMutations.ts')};
+  import { InvoiceReportPreviewPanel } from ${source('features/invoices/InvoiceReportPreviewPanel.tsx')};
+  import { useInvoiceDocumentPackageWorkspace } from ${source('features/invoices/useInvoiceDocumentPackageWorkspace.ts')};
   window.pending = []; window.results = []; window.completed = []; window.refreshes = [];
   window.attachmentUploads = [];
   window.attachmentRecord = { versionNumber: 1, attachments: Array.from({ length: window.mode === 'attachments-partial' ? 18 : 20 }, () => ({ sizeBytes: 1 })) };
@@ -39,6 +41,9 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   }
   const lookup = (input, options, kind = 'primary') => new Promise((resolve, reject) => window.pending.push({ ...input, kind, signal: options.signal, resolve, reject }));
   const client = { searchSupplierProductOptions: lookup, queryCrmCustomers: lookup, listProducts: (input, options) => lookup(input, options, 'product'),
+    listReportTemplates: async () => [{templatePath:'builtin:invoice_template.dtpl',displayName:'发票',withSealDefault:true}],
+    getSettings: async () => ({}),
+    previewInvoiceReportDraftHtml: lookup, previewInvoiceReportHtml: lookup, previewInvoiceDocumentPackageHtml: lookup,
     listSupplierAssessments: (input, options) => lookup(input, options, 'assessment-list'),
     createSupplierAssessment: (input, options) => lookup(input, options, 'assessment-create'),
     updateSupplierAssessment: (input, options) => lookup(input, options, 'assessment-update'),
@@ -48,6 +53,20 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
     const run = useAbortableOperation(scope, { cancelPrevious: window.mode === 'latest' });
     return <button onClick={() => void run(delayed).then(value => window.results.push({ value }),
       error => window.results.push({ name: error.name, message: error.message }))}>开始读取</button>;
+  }
+  function Invoice({ scope }) {
+    const draft = useMemo(() => ({id:7,invoiceNo:'draft-'+scope}), [scope]);
+    return <InvoiceReportPreviewPanel client={client} invoiceId={7} invoiceDraft={draft}/>;
+  }
+  function Package({ scope }) {
+    const [revision, setRevision] = useState(0);
+    const templates = useMemo(() => Array.from({length:revision+1}, (_, index) => ({templatePath:'template-'+index,displayName:'模板'+index,withSealDefault:true})), [revision]);
+    const workspace = useInvoiceDocumentPackageWorkspace({client, invoiceId:7,sourceRevision:scope,previewAllowed:true, templates,desktopAvailable:false,defaultExportDirectory:'',feedback:{clear(){},showError(message){window.results.push(message)},showJob(){},showStatus(){}},onPreviewGenerated(){}});
+    window.packageState = workspace.templateState;
+    return <><button onClick={() => workspace.changeTemplateSelected('template-0',false)}>取消第一份</button>
+      <button onClick={() => workspace.changeTemplateSeal('template-0',false)}>取消第一枚章</button>
+      <button onClick={() => setRevision(value=>value+1)}>刷新模板目录</button>
+      <button onClick={workspace.previewPackage}>组合预览</button><output>{workspace.preview?.items?.[0]?.html ?? ''}</output></>;
   }
   function Preview({ scope, allowed }) {
     const [formatMode, setMode] = useState('sample');
@@ -103,13 +122,17 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
         : window.mode === 'seal' ? <ExporterSealField label='单证章路径' scopeKey={String(scope)} value='' actionDisabled={sealDisabled}
           onUploadFile={async file => window.completed.push({name:file.name,type:file.type,bytes:Array.from(new Uint8Array(await file.arrayBuffer()))})}
           onError={error => window.results.push(error.message)}/>
+        : window.mode === 'invoice-preview' ? <Invoice scope={scope}/>
+        : window.mode === 'package-preview' ? <Package scope={scope}/>
         : window.mode === 'preview' ? <Preview scope={scope} allowed={!sealDisabled}/>
         : window.mode === 'office' ? <Office/> : window.mode.startsWith('attachments') ? <Attachments/> : <Generic scope={scope}/> : <p>编辑页已关闭</p>}</>;
   }
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
+  window.queries = queries;
   const permissions = ['sales.opportunities', 'sales.quotes'].map(resourceKey => ({ resourceKey, action: 'create', dataScope: 'all' }));
+  permissions.push(...['preview','print'].map(action=>({resourceKey:'document.invoice-output',action,dataScope:'all'})),{resourceKey:'common.report-catalog',action:'view',dataScope:'all'});
   createRoot(document.getElementById('root')).render(<React.StrictMode><MemoryRouter initialEntries={['/?view=editor']}><QueryClientProvider client={queries}>
-    <PermissionAccessProvider permissions={permissions}><ConfirmationProvider><UnsavedChangesProvider><App/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider>
+    <PermissionAccessProvider permissions={permissions} subject={{id:1,companyScope:'DEFAULT',departmentId:'GENERAL'}}><ConfirmationProvider><UnsavedChangesProvider><App/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider>
   </QueryClientProvider></MemoryRouter></React.StrictMode>);
 ` }, outfile: bundle, bundle: true, platform: 'browser', format: 'iife', jsx: 'automatic', logLevel: 'silent' });
 
@@ -139,6 +162,40 @@ try {
     } catch (error) { failures.push(`${name}: ${error.message}`); }
     finally { await page.close(); }
   }
+  for (const reject of [false, true]) {
+    await scenario('invoice-preview-discards-old-draft-'+reject, 'invoice-preview', async page => {
+      await page.getByRole('button', {name:'预览',exact:true}).click();
+      await page.waitForFunction(() => window.pending.length === 1);
+      await page.getByRole('button',{name:'切换资料',exact:true}).click();
+      await page.waitForFunction(() => window.pending[0].signal.aborted);
+      await page.evaluate(reject => reject ? window.pending[0].reject(new Error('obsolete error')) : window.pending[0].resolve({html:'OLD-DRAFT-A'}), reject);
+      await page.waitForTimeout(50);
+      assert.equal(await page.getByRole('button',{name:'打印',exact:true}).isEnabled(), false);
+      assert(!await page.locator('body').innerText().then(text=>text.includes('obsolete error')));
+      for (let index=1;index<=4;index++) {
+        await page.getByRole('button',{name:'预览',exact:true}).click();
+        await page.waitForFunction(count=>window.pending.length===count,index+1);
+        await page.evaluate(index=>window.pending[index].resolve({html:'<!doctype html><html><body>current-'+index+'</body></html>'}),index);
+        await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(button=>button.textContent.includes('打印')&&!button.disabled));
+      }
+      assert.equal(await page.evaluate(()=>window.queries.getMutationCache().getAll().filter(m=>m.state.data?.html).length),0);
+    });
+  }
+  await scenario('package-refresh-preserves-selection-and-cancels-preview','package-preview',async page=>{
+    await page.getByRole('button',{name:'取消第一份',exact:true}).click();
+    await page.getByRole('button',{name:'取消第一枚章',exact:true}).click();
+    await page.getByRole('button',{name:'刷新模板目录',exact:true}).click();
+    await page.waitForFunction(()=>Object.keys(window.packageState).length===2);
+    assert.deepEqual(await page.evaluate(()=>window.packageState['template-0']),{selected:false,withSeal:false});
+    assert.deepEqual(await page.evaluate(()=>window.packageState['template-1']),{selected:true,withSeal:true});
+    await page.getByRole('button',{name:'组合预览',exact:true}).click();
+    await page.waitForFunction(()=>window.pending.length===1);
+    await page.getByRole('button',{name:'切换资料',exact:true}).click();
+    await page.waitForFunction(()=>window.pending[0].signal.aborted);
+    await page.evaluate(()=>window.pending[0].resolve({items:[{html:'obsolete-package'}]}));
+    await page.waitForTimeout(50);
+    assert.equal(await page.locator('output').innerText(),'');
+  });
   for (const kind of ['sample', 'invoice', 'payment']) {
     await scenario('preview-request-and-pagination-'+kind, 'preview', async page => {
       if (kind !== 'sample') await page.getByRole('button', {name:'当前单据',exact:true}).click();

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiBackupPlan, ApiBackupPlanSaveRequest, ApiBackupPlanStatus, ApiBackupS3Settings, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { startDownloadFromTicket } from "../../ui/downloadJobResult.ts";
+import { isDesktopBridgeAvailable, selectSaveFilePath } from "../../desktop/desktopBridge.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
@@ -73,9 +74,20 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
   });
   const download = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) => run(async (signal) => {
+      if (isDesktopBridgeAvailable()) {
+        const destinationPath = await selectSaveFilePath(name);
+        signal.throwIfAborted();
+        if (!destinationPath) return;
+        return client.startRecoveryArchiveSaveToPathJob({ id, body: { destinationPath } }, { signal });
+      }
       const ticket = await client.createRecoveryArchiveDownloadTicket({ id }, { signal });
       signal.throwIfAborted(); startDownloadFromTicket(client, ticket, name);
     }),
+    onSuccess: (job) => {
+      if (!job) return;
+      setLastJobId(job.jobId); setMessage(null); setSuccess("保存任务已启动。");
+      void queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
+    },
     onError: fail,
   });
   const busy = save.isPending || start.isPending || cancel.isPending || download.isPending;

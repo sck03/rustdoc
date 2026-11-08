@@ -116,41 +116,42 @@ pub fn success(
         .and_then(|m| m.keys().next())
         .map(String::as_str)
         .unwrap_or("application/json");
-    let mut response = if reply.stream.is_some() || reply.file.is_some() {
-        use tokio::io::AsyncReadExt;
-        let permit = match reply
-            .download_permit
-            .take()
-            .or_else(|| state.downloads.clone().try_acquire_owned().ok())
-        {
-            Some(permit) => permit,
-            None => return error(crate::request::error(429, "下载正在处理，请稍后重试。")),
-        };
-        let (source, size): (Box<dyn tokio::io::AsyncRead + Unpin + Send>, u64) =
-            if let Some((file, size)) = reply.stream {
-                (Box::new(tokio::fs::File::from_std(file).take(size)), size)
-            } else {
-                let size = reply.bytes.len() as u64;
-                (
-                    crate::download_body::memory_source(reply.bytes, reply.memory_reservation),
-                    size,
-                )
+    let mut response =
+        if reply.stream.is_some() || reply.file.is_some() || reply.memory_reservation.is_some() {
+            use tokio::io::AsyncReadExt;
+            let permit = match reply
+                .download_permit
+                .take()
+                .or_else(|| state.downloads.clone().try_acquire_owned().ok())
+            {
+                Some(permit) => permit,
+                None => return error(crate::request::error(429, "下载正在处理，请稍后重试。")),
             };
-        let mut response = Response::new(crate::download_body::body(
-            source,
-            size,
-            permit,
-            state.telemetry.clone(),
-            request_id.to_owned(),
-            state.shutdown.clone(),
-        ));
-        response
-            .headers_mut()
-            .insert(header::CONTENT_LENGTH, size.into());
-        response
-    } else {
-        Response::new(Body::from(reply.bytes))
-    };
+            let (source, size): (Box<dyn tokio::io::AsyncRead + Unpin + Send>, u64) =
+                if let Some((file, size)) = reply.stream {
+                    (Box::new(tokio::fs::File::from_std(file).take(size)), size)
+                } else {
+                    let size = reply.bytes.len() as u64;
+                    (
+                        crate::download_body::memory_source(reply.bytes, reply.memory_reservation),
+                        size,
+                    )
+                };
+            let mut response = Response::new(crate::download_body::body(
+                source,
+                size,
+                permit,
+                state.telemetry.clone(),
+                request_id.to_owned(),
+                state.shutdown.clone(),
+            ));
+            response
+                .headers_mut()
+                .insert(header::CONTENT_LENGTH, size.into());
+            response
+        } else {
+            Response::new(Body::from(reply.bytes))
+        };
     if let Some((status, _)) = success {
         if let Ok(status) = status.parse::<u16>() {
             *response.status_mut() = StatusCode::from_u16(status).unwrap_or(StatusCode::OK);

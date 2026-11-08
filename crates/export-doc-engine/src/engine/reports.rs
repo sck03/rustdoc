@@ -15,6 +15,7 @@ use std::{path::PathBuf, sync::atomic::AtomicBool};
 mod jobs;
 pub(in crate::engine) mod page_preview;
 mod preparation;
+pub(super) mod resources;
 mod samples;
 pub(super) use preparation::{prepare_batch, publication_check};
 

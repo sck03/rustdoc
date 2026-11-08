@@ -35,6 +35,7 @@ fn http_uses_generated_routes_and_denies_unauthenticated_or_local_operations() {
         for (method, path, status) in [
             ("GET", "/api/invoices", StatusCode::UNAUTHORIZED),
             ("GET", "/api/diagnostics/metrics", StatusCode::UNAUTHORIZED),
+            ("POST", "/api/disaster-recovery/archives/00000000000000000000000000000000/save-to-path-jobs", StatusCode::FORBIDDEN),
             (
                 "POST",
                 "/api/system/shutdown-maintenance",

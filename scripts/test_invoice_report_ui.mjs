@@ -10,6 +10,8 @@ import { startChrome, createPageSession, evaluate, captureScreenshot } from "./l
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
 import { verifyReportConditionsHttp } from "./lib/report-conditions-http.mjs";
 import { verifyReportPdfPreview } from "./lib/report-pdf-preview-http.mjs";
+import { verifyPackagePrint } from "./lib/report-package-print-checks.mjs";
+import { normalizeReportScope } from "./lib/report-html-comparison.mjs";
 
 // Real React + Rust HTTP regression. Uses the existing isolated review host.
 const repo = path.resolve(import.meta.dirname, "..");
@@ -24,8 +26,8 @@ fs.mkdirSync(output, { recursive: true });
 const web = path.join(repo, "apps/export-doc-web");
 const require = createRequire(path.join(web, "package.json"));
 const model = path.join(output, "models.mjs");
-await require("esbuild").build({ stdin: { loader: "ts", resolveDir: web, contents: `export {createEmptyInvoice} from ${JSON.stringify(path.join(web,"src/features/invoices/invoiceModel.ts"))}; export {createEmptyInvoiceItem} from ${JSON.stringify(path.join(web,"src/features/invoices/invoiceItemsEditorModel.ts"))};` }, bundle: true, platform: "node", format: "esm", outfile: model });
-const { createEmptyInvoice, createEmptyInvoiceItem } = await import(pathToFileURL(model).href);
+await require("esbuild").build({ stdin: { loader: "ts", resolveDir: web, contents: `export {createEmptyInvoice} from ${JSON.stringify(path.join(web,"src/features/invoices/invoiceModel.ts"))}; export {createEmptyInvoiceItem} from ${JSON.stringify(path.join(web,"src/features/invoices/invoiceItemsEditorModel.ts"))}; export {buildDocumentPackagePrintHtml} from ${JSON.stringify(path.join(web,"src/features/invoices/invoiceReportPreviewModel.ts"))};` }, bundle: true, platform: "node", format: "esm", outfile: model });
+const { createEmptyInvoice, createEmptyInvoiceItem, buildDocumentPackagePrintHtml } = await import(pathToFileURL(model).href);
 const executable = cargoExampleExecutable(repo, 'office_review');
 const server = spawnProcessTree(executable, [path.join(output, "Data"), appRoot], { cwd: repo, windowsHide: true, stdio: ["ignore","pipe","pipe"] });
 let chrome, cdp, page;
@@ -149,12 +151,13 @@ try {
   assert.match(real,/EUR11\.00/);assert.match(real,/EUR11011\.00/);
   assert.match(real,/Special Terms: BY APPOINTMENT/);assert.match(real,/KEEP DRY/);
   assert.equal((real.match(/>EUR</g)||[]).length,0,"No detached currency heading");
-  const pagePresentation = html => html.slice(0,html.indexOf('<svg')).replace(/@page report\d+\{size:210mm 297mm\}#report\d+\{page:report\d+;width:210mm\}/g,'');
+  const pagePresentation = html => normalizeReportScope(html.slice(0,html.indexOf('<svg'))).replace(/@page report-\d+\{size:210mm 297mm\}#report-\d+\{page:report-\d+;width:210mm\}/g,'');
   assert.equal(pagePresentation(real),pagePresentation(sample),"Sample and saved source use identical A4 presentation with independent pagination");
   fs.writeFileSync(path.join(output,"saved.html"),real);
   await captureScreenshot(page,path.join(output,"saved.png"));
   await verifyReportConditionsHttp({ api, url, headers, invoiceId });
   if (withNativePdf) await verifyReportPdfPreview({ repo, output, api, url, headers, page, run, wait, click, captureScreenshot });
+  await verifyPackagePrint({api,page,run,output,compose:buildDocumentPackagePrintHtml});
   console.log(`Invoice seals and native sample/saved preview passed: ${output}`);
 } catch(error) {
   if(page){await captureScreenshot(page,path.join(output,"failure.png"));fs.writeFileSync(path.join(output,"failure.txt"),await run("document.body.innerText"));}

@@ -56,6 +56,7 @@ pub const OPERATIONS: &[Operation] = &[
     RUN_BACKUP_PLAN,
     TEST_BACKUP_REPLICA,
     CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET,
+    START_RECOVERY_ARCHIVE_SAVE_TO_PATH_JOB,
     STAGE_RECOVERY_ARCHIVE_RESTORE,
     DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET,
     CREATE_POSTGRE_SQL_PHYSICAL_BACKUP,
@@ -82,6 +83,7 @@ pub const OPERATIONS: &[Operation] = &[
 ];
 /// 灾备包只能由受信任的桌面版创建和恢复；浏览器版请使用服务器迁移包。
 pub const LOCAL: &[Operation] = &[
+    START_RECOVERY_ARCHIVE_SAVE_TO_PATH_JOB,
     CREATE_DISASTER_RECOVERY_PACKAGE,
     RESTORE_DISASTER_RECOVERY_PACKAGE,
 ];
@@ -266,6 +268,9 @@ pub fn handle(
         TEST_BACKUP_REPLICA => scheduled::test_replica(service, actor),
         CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET => {
             scheduled::ticket(service, actor, header(parameters, "id"))
+        }
+        START_RECOVERY_ARCHIVE_SAVE_TO_PATH_JOB => {
+            scheduled::save_to_path(service, actor, header(parameters, "id"), body)
         }
         STAGE_RECOVERY_ARCHIVE_RESTORE => {
             scheduled::stage_restore(service, actor, header(parameters, "id"), body)

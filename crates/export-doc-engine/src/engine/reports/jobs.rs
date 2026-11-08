@@ -147,8 +147,11 @@ pub(super) fn start(
                     "export-pdf",
                 )? {
                     crate::operation::check()?;
-                    let document = prepared.render(&fonts, cancelled)?;
-                    let pdf = render::pdf_document(&document, &fonts, cancelled)?;
+                    let pdf = {
+                        let _rendering = resources::acquire()?;
+                        let document = prepared.render(&fonts, cancelled)?;
+                        render::pdf_document(&document, &fonts, cancelled)?
+                    };
                     let name = prepared.file_name(*id);
                     output_index += 1;
                     if let Some(archive) = &mut archive {

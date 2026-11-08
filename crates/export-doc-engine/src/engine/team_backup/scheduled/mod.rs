@@ -8,11 +8,13 @@ mod replica;
 mod repository;
 mod restore;
 mod run;
+mod save_archive;
 mod scheduler;
 #[cfg(test)]
 mod tests;
 pub(in crate::engine) use configuration::{save, status};
 pub(in crate::engine) use restore::stage_restore;
+pub(in crate::engine) use save_archive::save_to_path;
 pub(in crate::engine) use scheduler::Scheduler;
 const PLAN: &str = "scheduled-recovery-plan";
 const STATE: &str = "scheduled-recovery-state";

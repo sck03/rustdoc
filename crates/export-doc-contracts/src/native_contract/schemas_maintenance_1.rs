@@ -75,6 +75,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("webDav",r("ApiBackupWebDavSettings")),("webDavPassword",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).max_length(4096)),("s3SecretAccessKey",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).max_length(4096)),
         ("s3SessionToken",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).max_length(16384)),("encryptionPassword",s().description("空字符串保留已保存密码；密码仅加密存储，不回传。").max_length(1024))
     ]).required(vec!["expectedRevision","expectedSettingsRevision","plan","webDav","webDavPassword","s3SecretAccessKey","s3SessionToken","encryptionPassword"]).additional(Additional::Allowed(false))),
+    ("ApiRecoveryArchiveSaveRequest",o(vec![("destinationPath",s().min_length(1).max_length(4096))]).required(vec!["destinationPath"]).additional(Additional::Allowed(false))),
     ("ApiRecoveryArchiveRestoreRequest",o(vec![("password",s().max_length(1024)),("adminPassword",s().max_length(1024)),("confirmationText",s().enumeration(Enumeration::Values(vec![serde_json::json!("MIGRATE"),serde_json::json!("RECOVER")])))]).required(vec!["password","adminPassword","confirmationText"]).additional(Additional::Allowed(false))),
     ("ApiBackupPlanStatus",o(vec![
         ("revision",i().format("int64")),("plan",r("ApiBackupPlan")),("encryptionPasswordSet",b()),

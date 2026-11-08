@@ -716,6 +716,7 @@ const operationDomains: Record<string, Domain> = {
   startPaymentVoucherPdfDownloadJob: "reports",
   startPaymentVoucherPdfSaveToPathJob: "reports",
   startPdfMergeSaveToPathJob: "tools",
+  startRecoveryArchiveSaveToPathJob: "disasterRecovery",
   stocktakeOfficeSupply: "office",
   submitExpenseRequest: "office",
   submitGeneralRequest: "office",

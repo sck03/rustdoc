@@ -8,14 +8,13 @@ use crate::{
         records::text,
         store::{self, Actor, Connection, Store},
     },
-    paths::{nonce, valid_file_name},
+    paths::nonce,
 };
 use export_doc_storage::BlobWrite;
 use serde_json::{Value, json};
 
 pub(super) const KIND: &str = "background-jobs";
 const OUTPUT: &str = "job-output";
-const MAX_OUTPUT: usize = 64 * 1024 * 1024;
 
 pub(super) fn active(job: &Value) -> bool {
     matches!(
@@ -185,7 +184,12 @@ fn create_in(
 }
 
 pub fn finish(store: &Store, actor: &Actor, id: &str, result: Result<TaskOutput>) -> Result<()> {
-    finish_controlled(store, actor, id, result, None)
+    let mut publication = None;
+    let result = result.and_then(|output| {
+        publication = super::output::prepare(store, id, &output)?;
+        Ok(output)
+    });
+    finish_controlled(store, actor, id, result, None, publication)
 }
 pub(super) fn finish_controlled(
     store: &Store,
@@ -193,8 +197,9 @@ pub(super) fn finish_controlled(
     id: &str,
     result: Result<TaskOutput>,
     canceled: Option<&std::sync::atomic::AtomicBool>,
+    mut publication: Option<super::output::Publication>,
 ) -> Result<()> {
-    let mut publication = None;
+    let mut published = false;
     let mut prepared = false;
     let result = store.transaction(|connection| {
         let mut job = checked(connection, actor, id)?;
@@ -205,25 +210,6 @@ pub(super) fn finish_controlled(
             .as_i64()
             .ok_or_else(|| unavailable("任务记录编号缺失。"))?;
         connection.delete_blob(record_id, OUTPUT)?;
-        let result = result.and_then(|output| {
-            if let Some(file) = output.file.as_ref().or_else(||output.archive.as_ref().map(|archive| &archive.file)) {
-                if !valid_file_name(&file.file_name)
-                    || file.content.len() > MAX_OUTPUT
-                    || file.content.is_empty()
-                    || file.media_type.contains(['\r', '\n'])
-                    || !file.media_type.contains('/')
-                {
-                    return Err(invalid("任务输出文件名、类型或容量不符合要求。"));
-                }
-            }
-            if usize::from(output.file.is_some()) + usize::from(output.directory.is_some())
-                + usize::from(output.managed_file.is_some()) + usize::from(output.archive.is_some()) > 1
-                || output.destination.is_some() && output.file.is_none()
-            {
-                return Err(invalid("任务输出来源重复或保存位置缺少对应文件。"));
-            }
-            Ok(output)
-        });
         if job["cancelRequested"] == true || canceled.is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Acquire)) {
             job["status"] = json!("Canceled");
             job["statusText"] = json!("已取消");
@@ -240,7 +226,8 @@ pub(super) fn finish_controlled(
                         job["_managedOutput"] = super::managed_output::describe(store, &current, path)?;
                     }
                 }
-                publication = super::output::publish(store, id, &output)?;
+                if let Some(publication) = &mut publication { publication.publish()?; }
+                published = true;
                 Ok(output)
             });
             match result {
@@ -255,6 +242,10 @@ pub(super) fn finish_controlled(
                         if connection.provider() == "SQLite" {
                             let managed = output.managed_file.as_ref().expect("managed output");
                             job["outputPath"] = json!(managed.path.to_str().ok_or_else(|| invalid("备份位置不是有效 Unicode。"))?);
+                            if let Some(path) = &output.destination {
+                                job["outputPath"] = json!(path.to_str().ok_or_else(|| invalid("输出位置不是有效 Unicode。"))?);
+                                job["_savedOutput"] = json!({"kind":"File","path":path,"size":managed.size,"digest":managed.digest});
+                            }
                         }
                     }
                     if let Some(file) = output.file {
@@ -306,9 +297,9 @@ pub(super) fn finish_controlled(
         Ok(())
     });
     if let Some(publication) = &mut publication {
-        if result.is_ok() {
+        if result.is_ok() && published {
             publication.commit()?;
-        } else if !prepared {
+        } else if !published || !prepared {
             publication.rollback()?;
         }
         // Commit failure can be indeterminate; startup resolves the durable receipt.

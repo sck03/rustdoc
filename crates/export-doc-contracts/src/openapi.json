@@ -12817,6 +12817,20 @@
         ],
         "additionalProperties": false
       },
+      "ApiRecoveryArchiveSaveRequest": {
+        "type": "object",
+        "properties": {
+          "destinationPath": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "required": [
+          "destinationPath"
+        ],
+        "additionalProperties": false
+      },
       "ApiReportHtmlPreviewRequest": {
         "type": "object",
         "properties": {
@@ -46243,6 +46257,107 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ApiRecoveryArchiveRestoreRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/disaster-recovery/archives/{id}/save-to-path-jobs": {
+      "post": {
+        "x-exportdoc-timeout-seconds": 30,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "StartRecoveryArchiveSaveToPathJob",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackgroundJobSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid destination"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Desktop administrator required"
+          },
+          "404": {
+            "description": "Archive missing"
+          },
+          "429": {
+            "description": "Busy"
+          },
+          "503": {
+            "description": "Storage unavailable"
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": false,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.backup",
+              "action": "manage"
+            },
+            {
+              "resourceKey": "system.disaster-recovery",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "system.backup",
+                "actions": [
+                  "manage"
+                ],
+                "administratorOnly": true
+              },
+              {
+                "resourceKey": "system.disaster-recovery",
+                "actions": [
+                  "manage"
+                ],
+                "administratorOnly": true
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiRecoveryArchiveSaveRequest"
               }
             }
           }

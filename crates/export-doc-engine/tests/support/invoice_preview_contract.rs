@@ -2,6 +2,7 @@ use super::*;
 
 #[test]
 fn unlinked_invoice_seals_persist_render_and_reject_foreign_references() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let saved = fixture.create(
         SAVE_INVOICE_SEAL_IMAGE,
@@ -123,6 +124,7 @@ fn unlinked_invoice_seals_persist_render_and_reject_foreign_references() {
 
 #[test]
 fn inherited_seals_can_be_overridden_or_cleared_without_changing_exporter() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let exporter = fixture.create(CREATE_EXPORTER, json!({"exporterNameEN":"SEAL ARCHIVE"}));
     let sealed: Value = fixture
@@ -167,6 +169,7 @@ fn inherited_seals_can_be_overridden_or_cleared_without_changing_exporter() {
 
 #[test]
 fn every_default_previews_samples_and_saved_documents_through_the_current_design() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let invoice = fixture
         .client()

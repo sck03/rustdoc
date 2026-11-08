@@ -2,6 +2,7 @@ use super::*;
 
 #[test]
 fn saved_private_template_prints_without_publish_or_share_permission() {
+    let _scenario = report_scenario();
     let fixture = Fixture::new();
     let owner = fixture.user("private-designer");
     let other = fixture.user("private-reader");

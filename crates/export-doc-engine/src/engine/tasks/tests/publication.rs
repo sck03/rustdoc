@@ -29,6 +29,31 @@ fn directory_output(path: &std::path::Path, files: &[(&str, &[u8])]) -> TaskOutp
     }
 }
 
+#[test]
+fn streamed_publication_recovers_large_files_and_preserves_prior_output() {
+    use std::io::{Seek, SeekFrom, Write};
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let source = fixture.root.0.join("source.edmrecovery");
+    let mut file = fs::File::create(&source).unwrap();
+    file.seek(SeekFrom::Start(65 * 1024 * 1024)).unwrap();
+    file.write_all(b"large verified archive").unwrap();
+    drop(file);
+    let target = fixture.root.0.join("selected.edmrecovery");
+    fs::write(&target, b"prior archive").unwrap();
+    let job = persistence::create(&store, &fixture.actor, "Backup", "流式保存恢复").unwrap();
+    let mut result = TaskOutput::managed_file(source, "saved".into()).unwrap();
+    result.destination = Some(target.clone());
+    let published = output::publish(&store, job["jobId"].as_str().unwrap(), &result).unwrap();
+    assert_eq!(
+        fs::metadata(&target).unwrap().len(),
+        result.managed_file.as_ref().unwrap().size
+    );
+    drop(published);
+    output::recover(&store).unwrap();
+    assert_eq!(fs::read(&target).unwrap(), b"prior archive");
+}
+
 fn break_version(store: &Store, actor: &Actor, id: &str) -> i64 {
     store
         .transaction(|tx| {

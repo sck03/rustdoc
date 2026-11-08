@@ -301,16 +301,28 @@ impl Jobs {
             .name(format!("exportdoc-task-{kind}"))
             .spawn(move || {
                 let flag = scope.cancellation_flag();
+                let mut publication = None;
                 let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    scope.run_result(|| work(&flag))
+                    scope.run_result(|| {
+                        let output = work(&flag)?;
+                        publication = output::prepare(&store, &worker_id, &output)?;
+                        Ok(output)
+                    })
                 }))
                 .unwrap_or_else(|_| Err(unavailable("文件处理异常终止，未发布输出。")));
                 // Persist terminal state outside the canceled execution scope.
                 let finished = completion.finish(|| {
-                    persistence::finish_controlled(&store, &owner, &worker_id, result, Some(&flag))
-                        .and_then(|_| {
-                            retention::prune(&store, retention, chrono::Utc::now()).map(|_| ())
-                        })
+                    persistence::finish_controlled(
+                        &store,
+                        &owner,
+                        &worker_id,
+                        result,
+                        Some(&flag),
+                        publication,
+                    )
+                    .and_then(|_| {
+                        retention::prune(&store, retention, chrono::Utc::now()).map(|_| ())
+                    })
                 });
                 if let Ok(mut runtime) = state.lock() {
                     runtime.active.remove(&worker_id);

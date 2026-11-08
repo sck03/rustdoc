@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { SlidersHorizontal } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { ApiInvoiceDetailDto, ApiReportHtmlPreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ApiInvoiceDetailDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission, usePermission, usePermissionCapabilities } from "../../app/PermissionAccessContext.tsx";
 import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { readApiError } from "../../ui/formUtils.ts";
+import { useTransientPreview } from "../../ui/useTransientPreview.ts";
 import { PermissionNotice } from "../../ui/PageState.tsx";
 import { printReportPreviewHtml } from "../reports/printReportPreview.ts";
 import { readDefaultReportTemplatePath, resolveReportTemplatePath } from "../reports/reportTemplateSelectionModel.ts";
@@ -31,6 +32,7 @@ type Props = {
   defaultToAddress?: string;
   hasUnsavedDraftChanges?: boolean;
 };
+const EMPTY_TEMPLATES: NonNullable<Awaited<ReturnType<ExportDocManagerApiClient["listReportTemplates"]>>> = [];
 
 export function InvoiceReportPreviewPanel({
   client,
@@ -55,7 +57,6 @@ export function InvoiceReportPreviewPanel({
   const navigate = useNavigate();
   const [selectedTemplatePath, setSelectedTemplatePath] = useState("");
   const [withSeal, setWithSeal] = useState(true);
-  const [preview, setPreview] = useState<ApiReportHtmlPreviewResponse | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [lastCreatedJobId, setLastCreatedJobId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -81,7 +82,7 @@ export function InvoiceReportPreviewPanel({
     enabled: hasPreviewSource,
     staleTime: 5 * 60 * 1000,
   });
-  const templates = templatesQuery.data ?? [];
+  const templates = templatesQuery.data ?? EMPTY_TEMPLATES;
   const configuredTemplatePath = readDefaultReportTemplatePath(
     settingsQuery.data?.settings,
     "ExportDocument",
@@ -110,6 +111,18 @@ export function InvoiceReportPreviewPanel({
   }
 
   const feedback = { clear: clearFeedback, showError, showJob, showStatus };
+  const previewScope = useMemo(() => ({}), [client, invoiceId, invoiceDraft, selectedTemplatePath,
+    withSeal, previewPermission.allowed, templatesQuery.dataUpdatedAt]);
+  const singlePreview = useTransientPreview(previewScope, (signal) => {
+    const body = { reportType: "ExportDocument", templatePath: selectedTemplatePath, withSeal };
+    return invoiceDraft
+      ? client.previewInvoiceReportDraftHtml({ body: { ...body, invoice: invoiceDraft } }, { signal })
+      : client.previewInvoiceReportHtml({ invoiceId, body }, { signal });
+  }, (error) => showError(readApiError(error)), () => {
+    documentPackage.clearPreview();
+    clearFeedback();
+  });
+  const preview = singlePreview.preview;
   const fileExports = useInvoiceFileExportOperations({
     client,
     invoiceId,
@@ -126,13 +139,16 @@ export function InvoiceReportPreviewPanel({
     invoiceId,
     invoiceNo,
     customerName,
+    sourceRevision: invoiceDraft,
+    catalogRevision: templatesQuery.dataUpdatedAt,
+    previewAllowed: previewPermission.allowed && canUseSavedInvoiceOutput,
     defaultToAddress,
     templates,
     settingsResponse: settingsQuery.data,
     desktopAvailable,
     defaultExportDirectory,
     feedback,
-    onPreviewGenerated: () => setPreview(null),
+    onPreviewGenerated: singlePreview.clear,
   });
 
   useEffect(() => {
@@ -150,30 +166,13 @@ export function InvoiceReportPreviewPanel({
   }, [configuredTemplatePath, selectedTemplatePath, settingsQuery.isFetching, templates]);
 
   useEffect(() => {
-    setPreview(null);
-    documentPackage.clearPreview();
     clearFeedback();
   }, [invoiceDraft]);
-
-  const previewMutation = useMutation({
-    mutationFn: () => {
-      const body = { reportType: "ExportDocument", templatePath: selectedTemplatePath, withSeal };
-      return invoiceDraft
-        ? client.previewInvoiceReportDraftHtml({ body: { ...body, invoice: invoiceDraft } })
-        : client.previewInvoiceReportHtml({ invoiceId, body });
-    },
-    onSuccess: (response) => {
-      setPreview(response);
-      documentPackage.clearPreview();
-      clearFeedback();
-    },
-    onError: (error) => showError(readApiError(error)),
-  });
 
   const isBusy =
     templatesQuery.isFetching ||
     settingsQuery.isFetching ||
-    previewMutation.isPending ||
+    singlePreview.isPending ||
     fileExports.isPending ||
     documentPackage.isPending ||
     isPrinting;
@@ -216,7 +215,7 @@ export function InvoiceReportPreviewPanel({
     setSelectedTemplatePath(value);
     const template = templates.find((item) => item.templatePath === value);
     if (template) setWithSeal(template.withSealDefault ?? true);
-    setPreview(null);
+    singlePreview.clear();
     documentPackage.clearPreview();
     clearFeedback();
   }
@@ -232,6 +231,7 @@ export function InvoiceReportPreviewPanel({
   }
 
   async function printPreview() {
+    if (!canPrintPreview) return;
     const html = documentPackage.preview?.items.length
       ? buildDocumentPackagePrintHtml(documentPackage.preview)
       : preview?.html ?? "";
@@ -264,7 +264,7 @@ export function InvoiceReportPreviewPanel({
         jobId={lastCreatedJobId}
         statusMessage={statusMessage}
         templateMessage={templateMessage}
-        onPreview={() => previewMutation.mutate()}
+        onPreview={() => void singlePreview.generate()}
         onPrint={() => void printPreview()}
         onRefresh={() => void templatesQuery.refetch()}
       />
@@ -288,7 +288,7 @@ export function InvoiceReportPreviewPanel({
         onTemplateChange={handleTemplateChange}
         onWithSealChange={(value) => {
           setWithSeal(value);
-          setPreview(null);
+          singlePreview.clear();
           documentPackage.clearPreview();
           clearFeedback();
         }}

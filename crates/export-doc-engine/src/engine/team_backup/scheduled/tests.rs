@@ -13,6 +13,46 @@ fn configure(service: &NativeService) {
     body["encryptionPassword"] = json!("scheduled-backup-test-password");
     save(service, &admin(), &body).unwrap();
 }
+
+#[test]
+fn desktop_archive_save_streams_verified_bytes_and_rejects_changed_sources() {
+    let workspace = Workspace::new();
+    let service = open_service(&workspace);
+    configure(&service);
+    assert_eq!(
+        wait(&service, run_now(&service, &admin()).unwrap())["status"],
+        "Succeeded"
+    );
+    let archive = repository::list(&service.paths).unwrap().remove(0);
+    let target = service.paths.cache_root.join("selected.edmrecovery");
+    let body = json!({"destinationPath":target});
+    let mut unauthorized = admin();
+    unauthorized.admin = false;
+    assert_eq!(
+        save_to_path(&service, &unauthorized, &archive.id, &body)
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
+    let job = wait(
+        &service,
+        save_to_path(&service, &admin(), &archive.id, &body).unwrap(),
+    );
+    assert_eq!(job["status"], "Succeeded", "{job}");
+    assert_eq!(job["outputPath"], json!(target));
+    assert_eq!(
+        crate::engine::backup_io::digest_file(&target).unwrap(),
+        (archive.size_bytes, archive.sha256)
+    );
+    fs::write(
+        repository::root(&service.paths).join(&archive.file_name),
+        b"corrupt",
+    )
+    .unwrap();
+    assert!(save_to_path(&service, &admin(), &archive.id, &body).is_err());
+    assert_eq!(fs::metadata(&target).unwrap().len(), archive.size_bytes);
+    service.close().unwrap();
+}
 fn wait(service: &NativeService, job: Value) -> Value {
     let deadline = Instant::now() + Duration::from_secs(30);
     loop {

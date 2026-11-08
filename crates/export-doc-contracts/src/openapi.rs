@@ -94,6 +94,30 @@ mod tests {
         );
         let exchange = schedule.clone();
         schedule["properties"]["exchange"] = exchange;
+        // Reviewed desktop archive export: retain the backup administrator policy,
+        // bearer/desktop authentication and all other frozen endpoint metadata.
+        let mut save = baseline["paths"]["/api/disaster-recovery/plan/run"]["post"].clone();
+        save["operationId"] = serde_json::json!("StartRecoveryArchiveSaveToPathJob");
+        save["parameters"] = baseline["paths"]["/api/disaster-recovery/archives/{id}/download-ticket"]
+            ["post"]["parameters"].clone();
+        save["requestBody"] = serde_json::json!({"required":true,"content":{
+            "application/json":{"schema":{"$ref":"#/components/schemas/ApiRecoveryArchiveSaveRequest"}}
+        }});
+        save["responses"].as_object_mut().unwrap().remove("409");
+        for (code, description) in [
+            ("400", "Invalid destination"),
+            ("403", "Desktop administrator required"),
+            ("429", "Busy"),
+            ("503", "Storage unavailable"),
+        ] {
+            save["responses"][code]["description"] = serde_json::json!(description);
+        }
+        baseline["paths"]["/api/disaster-recovery/archives/{id}/save-to-path-jobs"] =
+            serde_json::json!({"post":save});
+        baseline["components"]["schemas"]["ApiRecoveryArchiveSaveRequest"] = serde_json::json!({
+            "type":"object", "properties":{"destinationPath":{"type":"string","minLength":1,"maxLength":4096}},
+            "required":["destinationPath"], "additionalProperties":false
+        });
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

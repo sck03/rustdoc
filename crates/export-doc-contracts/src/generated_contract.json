@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "bc1a8167f2b17a481edec1b5dbe74cb3ca0744aacda854f7ade76bceb7f56444",
+  "digest": "974958b2ccb6442c3d16a26c52848cd94078158cf8df1a9e69a74a6d845c4dfe",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -79852,6 +79852,102 @@
       },
       "timeoutSeconds": 30
     },
+    "StartRecoveryArchiveSaveToPathJob": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": false,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "system.backup",
+            "action": "manage"
+          },
+          {
+            "resourceKey": "system.disaster-recovery",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "system.backup",
+              "actions": [
+                "manage"
+              ],
+              "administratorOnly": true
+            },
+            {
+              "resourceKey": "system.disaster-recovery",
+              "actions": [
+                "manage"
+              ],
+              "administratorOnly": true
+            }
+          ]
+        }
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "schema": {
+            "type": "string"
+          },
+          "required": true
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiRecoveryArchiveSaveRequest"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "Success",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackgroundJobSnapshot"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Invalid destination"
+        },
+        "401": {
+          "description": "Authentication required"
+        },
+        "403": {
+          "description": "Desktop administrator required"
+        },
+        "404": {
+          "description": "Archive missing"
+        },
+        "429": {
+          "description": "Busy"
+        },
+        "503": {
+          "description": "Storage unavailable"
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/ApiRecoveryArchiveSaveRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/BackgroundJobSnapshot"
+      },
+      "timeoutSeconds": 30
+    },
     "StocktakeOfficeSupply": {
       "policy": {
         "requiresAuthentication": true,
@@ -105954,6 +106050,20 @@
         "password",
         "adminPassword",
         "confirmationText"
+      ],
+      "additionalProperties": false
+    },
+    "ApiRecoveryArchiveSaveRequest": {
+      "type": "object",
+      "properties": {
+        "destinationPath": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "destinationPath"
       ],
       "additionalProperties": false
     },

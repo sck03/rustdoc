@@ -41,6 +41,7 @@ enum Phase {
 #[serde(deny_unknown_fields)]
 struct Receipt {
     schema: u8,
+    directory: bool,
     job: String,
     target: PathBuf,
     stage: Option<PathBuf>,
@@ -111,84 +112,134 @@ fn native_temporary(name: &str) -> bool {
         .is_some_and(job_id)
 }
 
+#[cfg(test)]
 pub(super) fn publish(store: &Store, id: &str, output: &TaskOutput) -> Result<Option<Publication>> {
-    let (target, stage, parts, previous) =
-        if let (Some(target), Some(file)) = (&output.destination, &output.file) {
-            if output.directory.is_some() {
-                return Err(invalid("文件任务不能同时写入单文件与批次目录。"));
-            }
-            paths::ensure_safe_absolute(target).map_err(invalid)?;
-            let name = target
-                .file_name()
-                .and_then(|name| name.to_str())
-                .filter(|name| paths::valid_file_name(name))
-                .ok_or_else(|| invalid("输出文件名无效。"))?;
-            let previous = match fs::metadata(target) {
-                Ok(info) if info.is_file() => {
-                    if info.len() > 64 * 1024 * 1024 {
-                        return Err(invalid(
-                            "输出位置已有文件超过 64 MiB，请选择新的输出文件名。",
-                        ));
-                    }
-                    let (size, digest) = fingerprint(target)?;
-                    Some(Prior { size, digest })
+    let mut publication = prepare(store, id, output)?;
+    if let Some(publication) = &mut publication {
+        publication.publish()?;
+    }
+    Ok(publication)
+}
+
+/// Copy and verify output before entering the database publication transaction.
+pub(super) fn prepare(store: &Store, id: &str, output: &TaskOutput) -> Result<Option<Publication>> {
+    if let Some(file) = output
+        .file
+        .as_ref()
+        .or_else(|| output.archive.as_ref().map(|archive| &archive.file))
+    {
+        if !paths::valid_file_name(&file.file_name)
+            || file.content.is_empty()
+            || file.content.len() > 64 * 1024 * 1024
+            || file.media_type.contains(['\r', '\n'])
+            || !file.media_type.contains('/')
+        {
+            return Err(invalid("任务输出文件名、类型或容量不符合要求。"));
+        }
+    }
+    if usize::from(output.file.is_some())
+        + usize::from(output.directory.is_some())
+        + usize::from(output.managed_file.is_some())
+        + usize::from(output.archive.is_some())
+        > 1
+        || output.destination.is_some() && output.file.is_none() && output.managed_file.is_none()
+    {
+        return Err(invalid("任务输出来源重复或保存位置缺少对应文件。"));
+    }
+    let (target, stage, parts, previous) = if let Some(target) = &output.destination {
+        if output.directory.is_some() {
+            return Err(invalid("文件任务不能同时写入单文件与批次目录。"));
+        }
+        paths::ensure_safe_absolute(target).map_err(invalid)?;
+        let name = target
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| paths::valid_file_name(name))
+            .ok_or_else(|| invalid("输出文件名无效。"))?;
+        let previous = match fs::metadata(target) {
+            Ok(info) if info.is_file() => {
+                if info.len() > 64 * 1024 * 1024 {
+                    return Err(invalid(
+                        "输出位置已有文件超过 64 MiB，请选择新的输出文件名。",
+                    ));
                 }
-                Ok(_) => return Err(invalid("输出位置不是普通文件。")),
-                Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => None,
-                Err(cause) => return Err(cause.into()),
-            };
-            (
-                target.clone(),
-                None,
-                vec![Part {
-                    name: name.into(),
-                    size: file.content.len() as u64,
-                    digest: media::digest(&file.content),
-                }],
-                previous,
-            )
-        } else if let Some(group) = &output.directory {
-            paths::ensure_safe_absolute(&group.path).map_err(invalid)?;
-            if group.path.try_exists()? {
-                return Err(invalid("本次导出目录已存在，请重新导出。"));
+                let (size, digest) = fingerprint(target)?;
+                Some(Prior { size, digest })
             }
-            if group.files.is_empty() || group.files.len() > 21 {
-                return Err(invalid("批次文件数量无效。"));
-            }
-            let mut names = BTreeSet::new();
-            let mut total = 0usize;
-            let mut parts = Vec::with_capacity(group.files.len());
-            for file in &group.files {
-                if !paths::valid_file_name(&file.file_name)
-                    || file.file_name == OWNER
-                    || !names.insert(file.file_name.to_lowercase())
-                    || file.content.is_empty()
-                {
-                    return Err(invalid("批次文件名重复或内容无效。"));
-                }
-                total = total
-                    .checked_add(file.content.len())
-                    .filter(|total| *total <= 64 * 1024 * 1024)
-                    .ok_or_else(|| invalid("批次输出超过 64 MiB。"))?;
-                parts.push(Part {
-                    name: file.file_name.clone(),
-                    size: file.content.len() as u64,
-                    digest: media::digest(&file.content),
-                });
-            }
-            let parent = group
-                .path
-                .parent()
-                .ok_or_else(|| invalid("输出目录缺少父目录。"))?;
-            (
-                group.path.clone(),
-                Some(parent.join(format!(".exportdoc-batch-{id}"))),
-                parts,
-                None,
-            )
-        } else {
-            return Ok(None);
+            Ok(_) => return Err(invalid("输出位置不是普通文件。")),
+            Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => None,
+            Err(cause) => return Err(cause.into()),
         };
+        let (size, digest) = if let Some(file) = &output.file {
+            (file.content.len() as u64, media::digest(&file.content))
+        } else if let Some(file) = &output.managed_file {
+            if file.size == 0
+                || file.digest.len() != 64
+                || !file.digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+            {
+                return Err(invalid("备份文件描述无效。"));
+            }
+            (file.size, file.digest.clone())
+        } else {
+            return Err(invalid("缺少待保存的文件。"));
+        };
+        (
+            target.clone(),
+            Some(
+                target
+                    .parent()
+                    .ok_or_else(|| invalid("输出目录无效。"))?
+                    .join(format!(".exportdoc-batch-{id}")),
+            ),
+            vec![Part {
+                name: name.into(),
+                size,
+                digest,
+            }],
+            previous,
+        )
+    } else if let Some(group) = &output.directory {
+        paths::ensure_safe_absolute(&group.path).map_err(invalid)?;
+        if group.path.try_exists()? {
+            return Err(invalid("本次导出目录已存在，请重新导出。"));
+        }
+        if group.files.is_empty() || group.files.len() > 21 {
+            return Err(invalid("批次文件数量无效。"));
+        }
+        let mut names = BTreeSet::new();
+        let mut total = 0usize;
+        let mut parts = Vec::with_capacity(group.files.len());
+        for file in &group.files {
+            if !paths::valid_file_name(&file.file_name)
+                || file.file_name == OWNER
+                || !names.insert(file.file_name.to_lowercase())
+                || file.content.is_empty()
+            {
+                return Err(invalid("批次文件名重复或内容无效。"));
+            }
+            total = total
+                .checked_add(file.content.len())
+                .filter(|total| *total <= 64 * 1024 * 1024)
+                .ok_or_else(|| invalid("批次输出超过 64 MiB。"))?;
+            parts.push(Part {
+                name: file.file_name.clone(),
+                size: file.content.len() as u64,
+                digest: media::digest(&file.content),
+            });
+        }
+        let parent = group
+            .path
+            .parent()
+            .ok_or_else(|| invalid("输出目录缺少父目录。"))?;
+        (
+            group.path.clone(),
+            Some(parent.join(format!(".exportdoc-batch-{id}"))),
+            parts,
+            None,
+        )
+    } else {
+        return Ok(None);
+    };
     if !job_id(id) || !target.parent().is_some_and(Path::is_dir) {
         return Err(invalid("输出事务标识或父目录无效。"));
     }
@@ -201,7 +252,8 @@ pub(super) fn publish(store: &Store, id: &str, output: &TaskOutput) -> Result<Op
     let mut publication = Publication {
         root,
         receipt: Receipt {
-            schema: 1,
+            schema: 2,
+            directory: output.directory.is_some(),
             job: id.into(),
             target,
             stage,
@@ -232,24 +284,29 @@ pub(super) fn publish(store: &Store, id: &str, output: &TaskOutput) -> Result<Op
             fs::create_dir(stage)?;
             crate::secrets::private_directory(stage).map_err(unavailable)?;
             paths::atomic_write(&stage.join(OWNER), id.as_bytes()).map_err(unavailable)?;
-            for file in &output.directory.as_ref().expect("directory output").files {
-                paths::atomic_write(&stage.join(&file.file_name), &file.content)
+            if let Some(group) = &output.directory {
+                for file in &group.files {
+                    paths::atomic_write(&stage.join(&file.file_name), &file.content)
+                        .map_err(unavailable)?;
+                }
+            } else {
+                let staged_file = stage.join(&publication.receipt.parts[0].name);
+                if let Some(file) = &output.file {
+                    paths::atomic_write(&staged_file, &file.content).map_err(unavailable)?;
+                } else if let Some(file) = &output.managed_file {
+                    paths::ensure_safe_absolute(&file.path).map_err(unavailable)?;
+                    let mut input = fs::File::open(&file.path)?;
+                    paths::atomic_write_with(&staged_file, |target| {
+                        let actual = backup_io::copy_and_hash(&mut input, target, file.size)
+                            .map_err(|cause| cause.to_string())?;
+                        if actual != (file.size, file.digest.clone()) {
+                            return Err("备份源文件已变化，未保存。".into());
+                        }
+                        Ok(())
+                    })
                     .map_err(unavailable)?;
+                }
             }
-        }
-        publication.receipt.phase = Phase::Ready;
-        write_receipt(&publication)?;
-        if let Some(stage) = &publication.receipt.stage {
-            if publication.receipt.target.try_exists()? {
-                return Err(invalid("输出目录已出现，当前内容没有被覆盖。"));
-            }
-            fs::rename(stage, &publication.receipt.target)?;
-        } else {
-            paths::atomic_write(
-                &publication.receipt.target,
-                &output.file.as_ref().expect("file output").content,
-            )
-            .map_err(unavailable)?;
         }
         Ok(())
     })();
@@ -265,6 +322,35 @@ pub(super) fn publish(store: &Store, id: &str, output: &TaskOutput) -> Result<Op
 }
 
 impl Publication {
+    pub(super) fn publish(&mut self) -> Result<()> {
+        let target = &self.receipt.target;
+        paths::ensure_safe_absolute(target).map_err(unavailable)?;
+        if let Some(prior) = &self.receipt.previous {
+            if !matches(target, prior.size, &prior.digest)? {
+                return Err(unavailable("输出目标在准备期间发生变化，未覆盖当前文件。"));
+            }
+        } else if target.try_exists()? {
+            return Err(invalid("输出位置已出现，请选择新的位置。"));
+        }
+        let stage = self
+            .receipt
+            .stage
+            .as_ref()
+            .ok_or_else(|| unavailable("缺少输出暂存目录。"))?;
+        if !owned(stage, &self.receipt.job)? {
+            return Err(unavailable("输出暂存身份无效。"));
+        }
+        self.receipt.phase = Phase::Ready;
+        write_receipt(self)?;
+        let source = if self.receipt.directory {
+            stage.clone()
+        } else {
+            stage.join(&self.receipt.parts[0].name)
+        };
+        paths::ensure_safe_absolute(&source).map_err(unavailable)?;
+        fs::rename(source, target)?;
+        Ok(())
+    }
     pub(super) fn commit(&mut self) -> Result<()> {
         crate::operation::OperationScope::detached(Duration::from_secs(30))
             .run_result(|| self.commit_inner())
@@ -272,8 +358,13 @@ impl Publication {
     fn commit_inner(&mut self) -> Result<()> {
         self.receipt.phase = Phase::Committed;
         write_receipt(self)?;
-        if self.receipt.stage.is_some() && owned(&self.receipt.target, &self.receipt.job)? {
+        if self.receipt.directory && owned(&self.receipt.target, &self.receipt.job)? {
             fs::remove_file(self.receipt.target.join(OWNER))?;
+        }
+        if let Some(stage) = &self.receipt.stage {
+            if stage.try_exists()? {
+                self.remove_directory(stage, false)?;
+            }
         }
         self.cleanup()
     }
@@ -284,7 +375,7 @@ impl Publication {
     }
     fn rollback_inner(&mut self) -> Result<()> {
         if !matches!(self.receipt.phase, Phase::Preparing) {
-            if self.receipt.stage.is_some() {
+            if self.receipt.directory {
                 if self.receipt.target.try_exists()? {
                     self.remove_directory(&self.receipt.target, true)?;
                 }
@@ -489,7 +580,7 @@ pub(super) fn recover(store: &Store) -> Result<()> {
         let hex =
             |value: &str| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit());
         let mut names = BTreeSet::new();
-        if receipt.schema != 1
+        if receipt.schema != 2
             || receipt.job != id
             || receipt.parts.is_empty()
             || receipt.parts.len() > 21
@@ -498,7 +589,7 @@ pub(super) fn recover(store: &Store) -> Result<()> {
                     || part.name == OWNER
                     || !names.insert(part.name.to_lowercase())
                     || part.size == 0
-                    || part.size > 64 * 1024 * 1024
+                    || receipt.directory && part.size > 64 * 1024 * 1024
                     || !hex(&part.digest)
             })
             || receipt
@@ -515,12 +606,16 @@ pub(super) fn recover(store: &Store) -> Result<()> {
                 .parent()
                 .ok_or_else(|| unavailable("输出恢复父目录无效。"))?
                 .join(format!(".exportdoc-batch-{id}"));
-            if stage != &expected || receipt.previous.is_some() {
+            if stage != &expected || receipt.directory && receipt.previous.is_some() {
                 return Err(unavailable("输出恢复暂存路径不匹配。"));
             }
-        } else if receipt.parts.len() != 1
-            || receipt.target.file_name().and_then(|name| name.to_str())
-                != Some(receipt.parts[0].name.as_str())
+        } else {
+            return Err(unavailable("输出恢复缺少暂存目录。"));
+        }
+        if !receipt.directory
+            && (receipt.parts.len() != 1
+                || receipt.target.file_name().and_then(|name| name.to_str())
+                    != Some(receipt.parts[0].name.as_str()))
         {
             return Err(unavailable("输出恢复文件不匹配。"));
         }

@@ -8,7 +8,7 @@ use krilla::geom::Size;
 use krilla::page::PageSettings;
 use krilla_svg::{SurfaceExt, SvgSettings};
 use std::{
-    sync::atomic::{AtomicBool, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::{Duration, Instant},
 };
 
@@ -23,6 +23,7 @@ pub struct Document {
 const MAX_SVG_PAGE: usize = 64 * 1024 * 1024;
 const MAX_SVG_DOCUMENT: usize = 128 * 1024 * 1024;
 const MAX_HTML: usize = 96 * 1024 * 1024;
+static HTML_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 pub(crate) fn check_svg_size(svg: &str) -> Result<()> {
     if !export_doc_domain::document_text::is_valid(svg) {
         return Err(invalid("报表文字含不支持的控制字符，请检查单据与模板。"));
@@ -103,15 +104,13 @@ impl<'a> Conversion<'a> {
         Ok(())
     }
 }
-fn append_html(html: &mut String, text: &str) -> Result<()> {
-    if text.len() > MAX_HTML.saturating_sub(html.len()) {
+fn append_html(html: &mut String, text: &str, maximum: usize) -> Result<()> {
+    if text.len() > maximum.saturating_sub(html.len()) {
         return Err(invalid("报表预览超过容量上限。"));
     }
     let required = html.len() + text.len();
     if html.capacity() < required {
-        let capacity = required
-            .max(html.capacity().saturating_mul(2))
-            .min(MAX_HTML);
+        let capacity = required.max(html.capacity().saturating_mul(2)).min(maximum);
         html.try_reserve_exact(capacity - html.len())
             .map_err(|_| unavailable("无法分配报表预览缓冲。"))?;
     }
@@ -120,22 +119,43 @@ fn append_html(html: &mut String, text: &str) -> Result<()> {
 }
 impl Document {
     pub fn html(&self, fonts: &crate::Fonts, cancelled: &AtomicBool) -> Result<String> {
+        self.html_with_limit(fonts, cancelled, MAX_HTML)
+    }
+    pub fn html_with_limit(
+        &self,
+        fonts: &crate::Fonts,
+        cancelled: &AtomicBool,
+        maximum: usize,
+    ) -> Result<String> {
+        let maximum = maximum.min(MAX_HTML);
         let control = Conversion::new(self, cancelled)?;
         let options = fonts.svg_options()?;
+        // A package combines independent documents in one DOM, including SVG resources.
+        let scope = HTML_SEQUENCE.fetch_add(1, Ordering::Relaxed);
         let mut html = String::from(
             "<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><style>html,body{margin:0;padding:0;background:#e8ebed}.report-page{margin:12px auto;background:white;break-after:page;page-break-after:always;max-width:100%}.report-page:last-child{break-after:auto;page-break-after:auto}.report-page svg{display:block;width:100%;height:auto}@media print{html,body{background:white}.report-page{margin:0;max-width:none}}@page{margin:0}",
         );
         for (index, page) in self.pages.iter().enumerate() {
-            html.push_str(&format!("@page report{index}{{size:{}mm {}mm}}#report{index}{{page:report{index};width:{}mm}}",page.width_mm,page.height_mm,page.width_mm));
+            append_html(
+                &mut html,
+                &format!(
+                    "@page report{scope}-{index}{{size:{}mm {}mm}}#report{scope}-{index}{{page:report{scope}-{index};width:{}mm}}",
+                    page.width_mm, page.height_mm, page.width_mm
+                ),
+                maximum,
+            )?;
         }
         html.push_str("</style></head><body>");
         for (index, page) in self.pages.iter().enumerate() {
             control.page(&page.svg)?;
             let tree = usvg::Tree::from_str(&page.svg, &options)
                 .map_err(|error| invalid(format!("报表预览布局无效：{error}")))?;
-            let mut svg = tree.to_string(&usvg::WriteOptions::default());
+            let mut svg = tree.to_string(&usvg::WriteOptions {
+                id_prefix: Some(format!("report{scope}-{index}-")),
+                ..Default::default()
+            });
             control.check()?;
-            if svg.len() > MAX_HTML.saturating_sub(html.len()) {
+            if svg.len() > maximum.saturating_sub(html.len()) {
                 return Err(invalid("报表预览超过容量上限。"));
             }
             // usvg writes absolute dimensions without a viewBox. Restore the
@@ -166,13 +186,14 @@ impl Document {
             }
             append_html(
                 &mut html,
-                &format!("<section class=\"report-page\" id=\"report{index}\">"),
+                &format!("<section class=\"report-page\" id=\"report{scope}-{index}\">"),
+                maximum,
             )?;
-            append_html(&mut html, &svg)?;
-            append_html(&mut html, "</section>")?;
+            append_html(&mut html, &svg, maximum)?;
+            append_html(&mut html, "</section>", maximum)?;
         }
         control.check()?;
-        append_html(&mut html, "</body></html>")?;
+        append_html(&mut html, "</body></html>", maximum)?;
         Ok(html)
     }
 }
@@ -239,7 +260,7 @@ mod conversion_tests {
         );
         let mut html = String::from("kept");
         let text = "x".repeat(MAX_HTML);
-        assert!(append_html(&mut html, &text).is_err());
+        assert!(append_html(&mut html, &text, MAX_HTML).is_err());
         assert_eq!(html, "kept");
         let mut pages = (0..500).map(|_| "<svg/>".into()).collect();
         assert!(push_svg(&mut pages, "<svg/>".into()).is_err());

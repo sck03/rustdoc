@@ -43,12 +43,13 @@ export async function verifyReportPdfPreview({ repo, output, api, url, headers, 
   await run(`(()=>{const select=[...document.querySelectorAll('select')].find(node=>[...node.options].some(option=>option.value==='exportLongItems'));select.value='exportLongItems';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   await click('样例预览');
   const controls = 'document.querySelector(\'[aria-label="PDF 预览翻页"]\')';
-  await wait(`${controls}?.querySelector('span')?.textContent.startsWith('1 / ') && ![...${controls}.querySelectorAll('button')].find(button=>button.textContent==='下一页').disabled`, 'Multi-page PDF controls missing');
+  const pageNumber = `${controls}?.querySelector('[aria-live="polite"]')?.textContent`;
+  await wait(`${pageNumber}?.startsWith('1 / ') && ![...${controls}.querySelectorAll('button')].find(button=>button.textContent==='下一页').disabled`, 'Multi-page PDF controls missing');
   await click('下一页');
-  await wait(`${controls}?.querySelector('span')?.textContent.startsWith('2 / ') && document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('PDF 第 2 页')`, 'Next PDF page did not reach React');
+  await wait(`${pageNumber}?.startsWith('2 / ') && document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('PDF 第 2 页')`, 'Next PDF page did not reach React');
   await captureScreenshot(page, path.join(output, 'actual-pdf-next-page-ui.png'));
   await click('上一页');
-  await wait(`${controls}?.querySelector('span')?.textContent.startsWith('1 / ')`, 'Previous PDF page did not reach React');
+  await wait(`${pageNumber}?.startsWith('1 / ')`, 'Previous PDF page did not reach React');
 
   fs.writeFileSync(path.join(output, 'pdf-preview-result.json'), JSON.stringify({
     pageCount: first.pageCount, revision: first.previewRevision, invalidPageStatus: invalidPage.status,

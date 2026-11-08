@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
-  ApiInvoiceDocumentPackagePreviewResponse,
   ApiReportTemplateDto,
   ApiSettingsResponse,
   ExportDocManagerApiClient,
@@ -12,6 +11,7 @@ import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { useTransientPreview } from "../../ui/useTransientPreview.ts";
 import {
   buildBatchExportConfigDraft,
   buildDocumentEmailBody,
@@ -32,6 +32,9 @@ type Feedback = {
 type Options = {
   client: ExportDocManagerApiClient;
   invoiceId: number;
+  sourceRevision?: unknown;
+  catalogRevision?: number;
+  previewAllowed: boolean;
   invoiceNo?: string;
   customerName?: string;
   defaultToAddress?: string;
@@ -59,7 +62,6 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
   } = options;
   const queryClient = useQueryClient();
   const runAbortableOperation = useAbortableOperation();
-  const [preview, setPreview] = useState<ApiInvoiceDocumentPackagePreviewResponse | null>(null);
   const [destinationPath, setDestinationPath] = useState("");
   const [createZip, setCreateZip] = useState(true);
   const [createZipTouched, setCreateZipTouched] = useState(false);
@@ -92,11 +94,10 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
   );
 
   useEffect(() => {
-    if (!packageTemplates.length) return;
-    setTemplateState(() => {
+    setTemplateState((current) => {
       const next: Record<string, PackageTemplateState> = {};
       for (const entry of packageTemplates) {
-        next[entry.template.templatePath] = {
+        next[entry.template.templatePath] = current[entry.template.templatePath] ?? {
           selected: entry.initiallySelected,
           withSeal: entry.withSealDefault,
         };
@@ -137,16 +138,15 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
   }));
   const defaultFileName = buildDocumentPackageDefaultFileName(configDefaults, invoiceNo, customerName, invoiceId);
 
-  const previewMutation = useMutation({
-    mutationFn: () => runAbortableOperation((signal) =>
-      client.previewInvoiceDocumentPackageHtml({ invoiceId, body: { items: selectedItems } }, { signal })),
-    onSuccess: (response) => {
-      setPreview(response);
+  const selectionKey = JSON.stringify(selectedItems);
+  const previewScope = useMemo(() => ({}), [client, invoiceId, options.sourceRevision,
+    options.catalogRevision, options.previewAllowed, selectionKey, templates]);
+  const packagePreview = useTransientPreview(previewScope, (signal) =>
+    client.previewInvoiceDocumentPackageHtml({ invoiceId, body: { items: selectedItems } }, { signal }),
+    (error) => feedback.showError(readApiError(error)), () => {
       onPreviewGenerated();
       feedback.clear();
-    },
-    onError: (error) => feedback.showError(readApiError(error)),
-  });
+    });
   const packageMutation = useMutation({
     mutationFn: async () => runAbortableOperation(async (signal) => {
       const job = desktopAvailable
@@ -193,7 +193,7 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     onError: (error) => feedback.showError(readApiError(error)),
   });
   function clearGeneratedOutput() {
-    setPreview(null);
+    packagePreview.clear();
     feedback.clear();
   }
   async function pickDestination() {
@@ -211,7 +211,7 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
   }
 
   return {
-    preview,
+    preview: packagePreview.preview,
     destinationPath,
     createZip,
     includeMergedPdf,
@@ -223,8 +223,8 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     emailSubject,
     emailBody,
     emailIncludeMergedPdf,
-    isPending: previewMutation.isPending || packageMutation.isPending || emailMutation.isPending,
-    clearPreview: () => setPreview(null),
+    isPending: packagePreview.isPending || packageMutation.isPending || emailMutation.isPending,
+    clearPreview: packagePreview.clear,
     changeTemplateSelected(templatePath: string, selected: boolean) {
       setTemplateState((current) => ({
         ...current,
@@ -239,7 +239,7 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
       }));
       clearGeneratedOutput();
     },
-    previewPackage: () => previewMutation.mutate(),
+    previewPackage: () => { if (options.previewAllowed) void packagePreview.generate(); },
     generatePackage: () => packageMutation.mutate(),
     pickDestination,
     changeDestination(value: string) {

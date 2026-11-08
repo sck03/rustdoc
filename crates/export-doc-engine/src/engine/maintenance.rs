@@ -14,10 +14,20 @@ use std::{
 };
 
 pub(super) fn acquire(lock: &std::sync::RwLock<()>) -> Result<std::sync::RwLockWriteGuard<'_, ()>> {
+    wait(|| lock.try_write())
+}
+
+pub(super) fn acquire_read(
+    lock: &std::sync::RwLock<()>,
+) -> Result<std::sync::RwLockReadGuard<'_, ()>> {
+    wait(|| lock.try_read())
+}
+
+fn wait<T>(mut acquire: impl FnMut() -> std::sync::TryLockResult<T>) -> Result<T> {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
     loop {
         crate::operation::check()?;
-        match lock.try_write() {
+        match acquire() {
             Ok(guard) => return Ok(guard),
             Err(std::sync::TryLockError::Poisoned(_)) => {
                 return Err(unavailable("数据库维护状态异常。"));
@@ -29,6 +39,33 @@ pub(super) fn acquire(lock: &std::sync::RwLock<()>) -> Result<std::sync::RwLockW
                 return Err(super::error::error(504, "等待数据库维护超时，请稍后重试。"));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod lock_tests {
+    use super::*;
+    use std::{
+        sync::RwLock,
+        time::{Duration, Instant},
+    };
+
+    #[test]
+    fn reads_and_writes_honor_cancellation_while_maintenance_is_held() {
+        let lock = RwLock::new(());
+        let held = lock.write().unwrap();
+        let scope = crate::operation::OperationScope::new(Duration::from_secs(5));
+        std::thread::scope(|threads| {
+            let waiter = threads.spawn(|| scope.run(|| acquire_read(&lock).map(drop)));
+            std::thread::sleep(Duration::from_millis(25));
+            let canceled = Instant::now();
+            scope.cancel();
+            assert_eq!(waiter.join().unwrap().unwrap_err().status, Some(504));
+            assert!(canceled.elapsed() < Duration::from_secs(1));
+        });
+        assert_eq!(scope.run(|| acquire(&lock)).unwrap_err().status, Some(504));
+        drop(held);
+        drop(acquire_read(&lock).unwrap());
     }
 }
 

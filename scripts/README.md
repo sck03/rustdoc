@@ -215,7 +215,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 
 同一宿主构建后，`node scripts/test_personnel_accounts_ui.mjs` 验证人员与账号双向入口、启停和改名同步、同名工号选择、窄屏、继承权限时模块开闭，以及人事直接办理、管理员启用离职审批、人事提交和批准后停用账号。Rust 人员契约在 SQLite 与 `test-native-postgres.ps1 -Scope All` 的真实 PostgreSQL 18 中共用审批策略、版本回滚、交接、身份隔离和权限测试。
 
-发票印章与模板预览回归复用该隔离宿主：先构建 React 和 `office_review`，再运行 `node scripts/test_invoice_report_ui.mjs`，验证无出口商关联的上传按钮、图片保存回读及样例/真实单据的原生排版。
+发票印章与模板预览回归复用该隔离宿主：先构建 React 和 `office_review`，再运行 `node scripts/test_invoice_report_ui.mjs`，验证无出口商关联的上传按钮、图片保存回读及样例/真实单据的原生排版。该入口还使用真实 Rust 输出组合 A4、A5 与横向页面，检查 CSS/SVG 标识不重复，并核对浏览器打印 PDF 的各页尺寸。`test:abortable-operations-ui` 验证发票/单据包迟到响应、预览缓存释放和目录刷新保留选择。
 
 实际 PDF 页图专项使用 `node scripts/test_invoice_report_ui.mjs --with-native-pdf`，验证多页翻页、修订变化、越界及未登录拒绝和真实 React 翻页。优先将 `EXPORTDOCMANAGER_REVIEW_APP_ROOT` 指向 `build-native.ps1` 组装的当前平台/架构测试包，直接读取包内 `Resources/Pdf`（Windows 为 `pdfium.dll`，Linux 为 `libpdfium.so`，macOS 为 `libpdfium.dylib`）。未设置时使用仓库 AppRoot，其资源也必须来自本项目锁定摘要的原生包；不要求复制或清理包内原生库。缺库时该专项明确失败；普通 SVG/krilla 回归不要求 PDFium。
 
@@ -238,7 +238,7 @@ OA 真实界面回归先执行 `cargo build --locked -p export-doc-server --exam
 - 装柜三维：`test:container-packing-model` 检查同色材质复用、层线几何与资源只释放一次；`node scripts/test_container_packing_scene_ui.mjs` 使用真实 WebGL 检查俯视/柜门方向、切换框线和父级重绘时保留视角、右键、暂停及退出清理。该浏览器回归不替代各 OS 的 GPU 驱动验收。
 - 依赖：`generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository`，要求 `unresolved=0 / disallowed=0`。
 - 平台：`verify-native-desktop.mjs` 验证 Tauri／SQLite，排除 Slint／egui／PostgreSQL 桌面依赖；`assert-tauri-command-permissions.ps1` 校验 command 与能力白名单。
-- Windows 桌面：`node scripts/test_native_desktop_editions.mjs [包父目录] Full --without-ocr` 验证独立 Full 测试包的 About、设计器、托单与业务资料操作。可设置 `EXPORTDOCMANAGER_DESKTOP_VALIDATION_OUTPUT_ROOT` 指定隔离验收输出父目录；默认是仓库 `artifacts/edition-validation`，不会使用程序包的 App_Data。
+- Windows 桌面：`node scripts/test_native_desktop_editions.mjs [包父目录] Full --without-ocr` 验证独立 Full 测试包的 About、设计器、托单、业务资料及完整灾备保存。灾备场景只在原生对话框边界提供测试保存路径，实际执行 React、带桌面认证的 HTTP 请求、后台任务和文件发布，并核对大小及 SHA-256。可设置 `EXPORTDOCMANAGER_DESKTOP_VALIDATION_OUTPUT_ROOT` 指定隔离验收输出父目录；默认是仓库 `artifacts/edition-validation`，不会使用程序包的 App_Data。
 - Windows 退出：`node scripts/test_native_desktop_shutdown.mjs [便携包目录] [EXE路径]` 使用隔离 DataRoot 验证真实 React/WebView2、重复退出、宿主异常终止、独立窗口不受影响及 HTTP 端口释放。调试端口仅注入测试子进程，不修改正式配置；其它 OS 需独立验收。
 - 脚本：`verify-script-suite.ps1`、`verify-github-workflow-actions.mjs`、`test_tauri_updater_release_contract.mjs`、`github/verify-public-source.ps1`、`git diff --check`。
 - 人员与审批职责：`node scripts/test_approval_permissions_ui.mjs` 在隔离 Rust `office_review` 宿主上验证常用/自定义职位、从普通员工建立公司审批方案、跨部门行政和人事审批，以及私密档案、财务办理、模块限制和会话撤销边界。

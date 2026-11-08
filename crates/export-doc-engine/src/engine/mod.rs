@@ -182,10 +182,7 @@ impl NativeService {
         parameters: &[(&str, String)],
         token: &str,
     ) -> Result<tasks::FileOutput> {
-        let _access = self
-            .maintenance
-            .read()
-            .map_err(|_| unavailable("数据库维护状态异常。"))?;
+        let _access = crate::engine::maintenance::acquire_read(&self.maintenance)?;
         let actor = self.sessions.actor(&self.store, token)?;
         self.authorize_operation(&actor, DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE, &[])?;
         report_assets::download(self, &actor, parameters)
@@ -197,10 +194,7 @@ impl NativeService {
         parameters: &[(&str, String)],
         token: &str,
     ) -> Result<tasks::FileOutput> {
-        let _access = self
-            .maintenance
-            .read()
-            .map_err(|_| unavailable("数据库维护状态异常。"))?;
+        let _access = crate::engine::maintenance::acquire_read(&self.maintenance)?;
         let actor = self.sessions.actor(&self.store, token)?;
         self.authorize_operation(&actor, operation, &[])?;
         if oa::metadata(operation).is_some_and(|meta| {
@@ -264,11 +258,7 @@ impl NativeService {
             }
         }
         let _read = if operation != RESTORE_DATABASE_BACKUP {
-            Some(
-                self.maintenance
-                    .read()
-                    .map_err(|_| unavailable("数据库维护状态异常。"))?,
-            )
+            Some(crate::engine::maintenance::acquire_read(&self.maintenance)?)
         } else {
             None
         };

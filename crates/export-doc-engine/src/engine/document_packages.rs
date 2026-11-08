@@ -42,6 +42,7 @@ pub(super) fn files(
     action: &str,
     cancelled: &AtomicBool,
 ) -> Result<Vec<(String, Vec<u8>)>> {
+    let _rendering = reports::resources::acquire()?;
     let mut files = vec![];
     let mut combined = export_doc_report::Document { pages: vec![] };
     let mut total = 0usize;
@@ -104,6 +105,7 @@ pub fn handle(
         return Err(error(403, "单据不在当前账号的输出范围内。"));
     }
     if operation == PREVIEW_INVOICE_DOCUMENT_PACKAGE_HTML {
+        let _rendering = reports::resources::acquire()?;
         let mut output = vec![];
         let mut total = 0usize;
         let prepared = reports::prepare_batch(
@@ -120,13 +122,14 @@ pub fn handle(
                 &service.report_fonts,
                 &crate::operation::cancellation_flag(),
             )?;
-            let html = document.html(
+            let html = document.html_with_limit(
                 &service.report_fonts,
                 &crate::operation::cancellation_flag(),
+                reports::resources::PREVIEW_BYTES - total,
             )?;
             total = total
                 .checked_add(html.len())
-                .filter(|n| *n <= 32 * 1024 * 1024)
+                .filter(|n| *n <= reports::resources::PREVIEW_BYTES)
                 .ok_or_else(|| invalid("组合预览超过 32 MiB。"))?;
             let mut item = item;
             item["html"] = json!(html);
