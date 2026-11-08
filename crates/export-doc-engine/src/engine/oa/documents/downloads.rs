@@ -42,10 +42,12 @@ pub(in crate::engine) fn prepare(
         let cancelled = crate::operation::cancellation_flag();
         let design = sheet_templates::validate_design(&text(&snapshot, "template.content"))?;
         let data = export_doc_report::approval::data(&snapshot, &store::timestamp())?;
-        let _fonts = service.report_fonts.enter()?;
-        let document = export_doc_report::render_design(&data, &design, &cancelled)?;
-        let content =
-            export_doc_report::pdf_document(&document, &service.report_fonts, &cancelled)?;
+        let content = {
+            let _rendering = crate::engine::reports::resources::acquire()?;
+            let _fonts = service.report_fonts.enter()?;
+            let document = export_doc_report::render_design(&data, &design, &cancelled)?;
+            export_doc_report::pdf_document(&document, &service.report_fonts, &cancelled)?
+        };
         if content.len() > PDF_LIMIT {
             return Err(unavailable("材料投影审批单超过容量。"));
         }

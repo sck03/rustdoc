@@ -45,9 +45,11 @@ export default function BackupSettingsPanel({ client, databaseProvider, disabled
     {section === "plan" && c.status && <InlineNotice tone={c.status.lastError ? "warning" : "info"} title={`最近灾备：${backupResultLabel(c.status.lastResult)}`}>
       {formatRuntimeDate(c.status.lastRunAt ?? undefined)}{c.status.lastError && ` · ${c.status.lastError}`}
     </InlineNotice>}
-    {c.jobId && <InlineNotice tone={c.job?.status === "Failed" ? "error" : "info"} title={c.job?.title || "后台任务"}
-      action={<div className="toolbar-actions"><ViewJobButton jobId={c.jobId} />{c.activeJob && <button className="command-button secondary" type="button" disabled={c.busy} onClick={c.cancel}>取消任务</button>}</div>}>
-      {c.job?.errorMessage || c.job?.detailText || c.job?.statusText || "正在读取任务状态"}
+    {c.jobId && <InlineNotice tone={c.jobError || c.job?.status === "Failed" ? "error" : "info"} title={c.job?.title || "后台任务"}
+      action={<div className="toolbar-actions"><ViewJobButton jobId={c.jobId} />{c.activeJob && <button className="command-button secondary" type="button" disabled={c.busy} onClick={c.cancel}>取消任务</button>}
+        {c.jobError && <><button className="command-button secondary" type="button" disabled={c.jobFetching} onClick={c.retryJob}>重试查询</button><button className="command-button secondary" type="button" onClick={c.dismissJob}>停止跟踪</button></>}
+      </div>}>
+      {c.jobError || c.job?.errorMessage || c.job?.detailText || c.job?.statusText || "正在读取任务状态"}
     </InlineNotice>}
     {section === "plan" && <BackupSchedulePanel controller={c} disabled={busy} />}
     {section === "archives" && <BackupArchivesPanel controller={c} disabled={busy} onRestore={(id) => setSection("recovery", id)} />}

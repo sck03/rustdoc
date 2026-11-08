@@ -33,9 +33,9 @@ export function useTransientPreview<T>(
       setState({ scope, value, pending: false });
       onSuccess?.();
     } catch (error) {
-      if (!current() || isAbortError(error)) return;
+      if (!current()) return;
       setState(null);
-      onError(error);
+      if (!isAbortError(error)) onError(error);
     }
   }
   const current = state && Object.is(scope, state.scope) ? state : null;

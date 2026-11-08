@@ -369,7 +369,6 @@ fn implemented_parameterless_reads_match_the_generated_response_structure() {
                 LIST_AVAILABLE_EXCHANGE_RATE_CURRENCIES,
                 GET_HS_CODE_REMOTE_HEALTH,
                 SEARCH_REMOTE_HS_CODES,
-                LIST_CLOUD_DATABASE_BACKUPS,
                 LIST_POSTGRE_SQL_PHYSICAL_BACKUPS,
             ]
             .contains(operation)

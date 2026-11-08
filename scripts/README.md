@@ -4,6 +4,8 @@
 
 ## 本地入口
 
+2026-11-08 编辑恢复回归：`test:invoice-editing` 增加 `test_editor_recovery_ui.mjs`，验证真实发票工作区的显式重载、失败保留、切换记录、5000 行表头复用与备份 404 停止轮询。`test:abortable-operations-ui` 验证当前预览取消后可重试，`test:report-designer-v3` 验证缺失必要打印字段明确拒绝。旧数据库快照 WebDAV 入口和五条 API 已移除，使用完整加密灾备的“异机副本”。本批验证与清理见[记录](../docs/2026-11-08编辑恢复与资源边界修复记录.md)。
+
 2026-11-08 网络与会话回归：`test-native-postgres.ps1 -Scope All -PostgresBin <PostgreSQL 18 bin>` 增加握手停滞、查询取消、连接复用与网络黑洞测试，使用隔离集群和独立账号。每条 Cargo 命令的默认预算为 3600 秒（含编译），避免完整团队流程接近 30 分钟时被旧预算截断，仍可通过 `-TimeoutSeconds` 指定。`test_api_client_request_contracts.mjs` 检查超时分类及长操作预算；`test_authentication_failure_events.mjs` 和真实 `test_unit_identity_ui.mjs` 覆盖注销失败保留会话、成功撤销及身份隔离。Vite 开发代理同时覆盖 `/api`、`/downloads`、健康探针和 `/openapi`。
 
 2026-10-29 视觉门禁保留 84 个场景及文本、几何、溢出、交互、无障碍断言。GitHub Windows runner 的 `query-mobile-390` 原生日期控件差异实测为 0.331%，默认截图像素比例阈值由 0.2% 调整为 0.5%；`FRONTEND_VISUAL_MAX_DIFF_RATIO` 可显式覆盖。没有批量更新参考图来掩盖差异，失败时仍上传截图/差异/摘要。Firefox/WebKit 重型兼容验收继续仅手动触发。

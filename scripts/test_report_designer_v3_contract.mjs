@@ -118,6 +118,13 @@ function assertFixedRightMetadataLayout(source, templatePath) {
 }
 
 const landscapeSchema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
+for (const missing of ["print", "repeatOnEveryPage", "keepTogether", "pinToPageBottom", "minHeightHundredthMm"]) {
+  const draft = structuredClone(landscapeSchema);
+  if (missing === "print") delete draft.layers[0].print;
+  else delete draft.layers[0].print[missing];
+  const result = api.normalizeReportDesignerV3Schema(draft);
+  assert(result.issues.some(issue => issue.severity === "error" && issue.path.includes("print")), "缺失当前打印设置必须明确拒绝，不能静默补全旧模板");
+}
 Object.assign(landscapeSchema.page, {orientation: "Landscape", widthHundredthMm: 29700, heightHundredthMm: 21000});
 landscapeSchema.layers = landscapeSchema.layers.filter(layer => layer.role === "Body").map(layer => ({ ...layer, elements: [] }));
 landscapeSchema.layers[0].elements.push({ ...api.createV3TextElement(1000, 1000), id: "title", text: "标题" });

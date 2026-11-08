@@ -249,14 +249,8 @@ export function normalizeInvoiceForSave(
   invoice: ApiInvoiceDetailDto,
   id: number,
   pendingHsFeedback: HsCodeKnowledgeFeedbackInput[] = [],
+  details = normalizeInvoiceDetailsForSave(invoice),
 ): ApiInvoiceDetailDto {
-  const items = (invoice.items ?? []).map(normalizeInvoiceItemForSave).filter(item => isMeaningfulInvoiceItem(item) || Boolean(item.printRows?.length));
-  const calculatedTotals = calculateInvoiceTotals(
-    items,
-    invoice.exchangeRate,
-    invoice.currency,
-  );
-
   return {
     ...invoice,
     id,
@@ -291,15 +285,6 @@ export function normalizeInvoiceForSave(
     supervisionMode: invoice.supervisionMode?.trim() || "一般贸易",
     status: normalizeInvoiceStatus(invoice.status),
     type: normalizeInvoiceType(invoice.type),
-    totalAmount: readNumber(String(invoice.totalAmount)),
-    totalCartons: readNumber(String(invoice.totalCartons)),
-    totalQuantity: readNumber(String(invoice.totalQuantity)),
-    totalGrossWeight: readNumber(String(invoice.totalGrossWeight)),
-    totalNetWeight: readNumber(String(invoice.totalNetWeight)),
-    totalVolume: readNumber(String(invoice.totalVolume)),
-    totalPurchaseAmount: readNumber(String(invoice.totalPurchaseAmount)),
-    totalTaxRefundAmount: readNumber(String(invoice.totalTaxRefundAmount)),
-    totalProfit: readNumber(String(invoice.totalProfit)),
     exchangeRate: readNumber(String(invoice.exchangeRate)),
     ...normalizeInvoiceShippingMarks(invoice),
     specialTerms: invoice.specialTerms ?? "",
@@ -308,9 +293,15 @@ export function normalizeInvoiceForSave(
     letterOfCreditSourcePath: invoice.letterOfCreditSourcePath?.trim() ?? "",
     letterOfCreditContent: invoice.letterOfCreditContent ?? "",
     pendingHsFeedback,
-    items,
-    ...calculatedTotals,
+    ...details,
   };
+}
+
+/** The editor reuses this projection while only header fields change. */
+export function normalizeInvoiceDetailsForSave(invoice: Pick<ApiInvoiceDetailDto, "items" | "exchangeRate" | "currency">) {
+  const items = (invoice.items ?? []).map(normalizeInvoiceItemForSave)
+    .filter(item => isMeaningfulInvoiceItem(item) || Boolean(item.printRows?.length));
+  return { ...calculateInvoiceTotals(items, invoice.exchangeRate, invoice.currency), items };
 }
 
 export function normalizeInvoiceShippingMarks(invoice: Pick<ApiInvoiceDetailDto, "shippingMarksType" | "shippingMarks" | "shippingMarksImage">) {

@@ -122,9 +122,12 @@ pub(super) fn start(
                 .recv_timeout(std::time::Duration::from_secs(30))
                 .map_err(|_| unavailable("审批单任务未能绑定提交版本。"))?;
             crate::operation::check()?;
-            let _fonts = fonts.enter()?;
-            let document = export_doc_report::render_design(&data, &design, cancelled)?;
-            let bytes = export_doc_report::pdf_document(&document, &fonts, cancelled)?;
+            let bytes = {
+                let _rendering = crate::engine::reports::resources::acquire()?;
+                let _fonts = fonts.enter()?;
+                let document = export_doc_report::render_design(&data, &design, cancelled)?;
+                export_doc_report::pdf_document(&document, &fonts, cancelled)?
+            };
             if bytes.len() > 16 * 1024 * 1024 {
                 return Err(unavailable(
                     "审批单超过 16 MiB 容量，请联系管理员检查模板。",

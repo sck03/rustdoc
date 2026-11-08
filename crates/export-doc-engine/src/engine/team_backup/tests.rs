@@ -210,16 +210,6 @@ fn download_ticket_is_single_use() {
 }
 
 #[test]
-fn cloud_status_reports_unconfigured_state() {
-    let workspace = Workspace::new();
-    let service = open_service(&workspace);
-    let value = cloud::status(&service, &admin()).unwrap();
-    assert_eq!(value["enabled"], false);
-    assert_eq!(value["isConfigured"], false);
-    assert!(value["backupRoot"].as_str().unwrap().ends_with("Backups"));
-}
-
-#[test]
 fn disaster_status_reports_clean_workspace() {
     let workspace = Workspace::new();
     let service = open_service(&workspace);

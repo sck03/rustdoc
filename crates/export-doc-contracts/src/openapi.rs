@@ -47,6 +47,38 @@ mod tests {
             "../tests/fixtures/native-contract-baseline.json"
         ))
         .unwrap();
+        // Reviewed removal: database-only WebDAV snapshots are replaced by
+        // complete encrypted recovery replicas. No deployed legacy clients.
+        for path in [
+            "status",
+            "test-connection",
+            "upload-latest",
+            "backups",
+            "download",
+        ] {
+            assert!(
+                baseline["paths"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove(&format!("/api/backup/cloud/{path}"))
+                    .is_some()
+            );
+        }
+        for schema in [
+            "ApiCloudBackupCommandResponse",
+            "ApiCloudBackupDownloadRequest",
+            "ApiCloudBackupItemDto",
+            "ApiCloudBackupListResponse",
+            "ApiCloudBackupStatusResponse",
+        ] {
+            assert!(
+                baseline["components"]["schemas"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove(schema)
+                    .is_some()
+            );
+        }
         let login = &mut baseline["paths"]["/api/auth/login"]["post"];
         login["requestBody"]["x-exportdoc-max-bytes"] = serde_json::json!(4096);
         login["responses"]["413"] = serde_json::json!({

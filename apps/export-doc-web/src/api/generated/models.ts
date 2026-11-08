@@ -352,43 +352,6 @@ export interface ApiBackupWebDavSettings {
   userName: string;
 }
 
-export interface ApiCloudBackupCommandResponse {
-  backupRoot: string;
-  localBackupPath: string;
-  message: string;
-  remoteFileName: string;
-  sizeBytes: number;
-  storagePolicy: string;
-  success: boolean;
-}
-
-export interface ApiCloudBackupDownloadRequest {
-  remoteFileName: string;
-}
-
-export interface ApiCloudBackupItemDto {
-  fileName: string;
-  lastModified: string;
-  sizeBytes: number;
-}
-
-export interface ApiCloudBackupListResponse {
-  backupRoot: string;
-  backups: ApiCloudBackupItemDto[];
-  storagePolicy: string;
-}
-
-export interface ApiCloudBackupStatusResponse {
-  backupRoot: string;
-  enabled: boolean;
-  isConfigured: boolean;
-  latestBackupFileName: string;
-  latestBackupSizeBytes: number;
-  storagePolicy: string;
-  url: string;
-  userName: string;
-}
-
 export interface ApiCommandResponse {
   message: string;
   success: boolean;
@@ -8336,10 +8299,6 @@ export interface DownloadAuditLogsRequest {
 export interface DownloadBusinessAttachmentRequest {
   id: number;
   revision: number;
-}
-
-export interface DownloadCloudDatabaseBackupRequest {
-  body: ApiCloudBackupDownloadRequest;
 }
 
 export interface DownloadContainerPackingPdfRequest {

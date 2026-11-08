@@ -14,7 +14,7 @@ import { waitForJobCompletion } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { isStrongRecoveryPassword, readDesktopError, updateBackupQuery } from "./backupManagementModel.ts";
 
-export function useBackupManagement(client: ExportDocManagerApiClient, canManageSettings: boolean, sections = { database: true, cloud: false }) {
+export function useBackupManagement(client: ExportDocManagerApiClient, canManageSettings: boolean, sections = { database: true }) {
   const queryClient = useQueryClient();
   const requestConfirmation = useConfirmation();
   const desktopBridgeAvailable = isDesktopBridgeAvailable();
@@ -24,7 +24,6 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   const [cleanupDays, setCleanupDays] = useState(30);
   const [restoreFileName, setRestoreFileName] = useState("");
   const [restoreConfirmation, setRestoreConfirmation] = useState("");
-  const [cloudDownloadFileName, setCloudDownloadFileName] = useState("");
   const [runtimeStorage, setRuntimeStorage] = useState<RuntimeStorageContext | null>(null);
   const [dataRootMigrationPending, setDataRootMigrationPending] = useState(false);
   const [recoveryPassword, setRecoveryPassword] = useState("");
@@ -60,16 +59,6 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     queryFn: ({ signal }) => client.listDatabaseBackups({ signal }),
     enabled: canManageSettings && sections.database,
   });
-  const cloudStatusQuery = useQuery({
-    queryKey: queryKeys.cloudBackupStatus(),
-    queryFn: ({ signal }) => client.getCloudBackupStatus({ signal }),
-    enabled: canManageSettings && sections.cloud,
-  });
-  const cloudBackupsQuery = useQuery({
-    queryKey: queryKeys.cloudBackupBackups(),
-    queryFn: ({ signal }) => client.listCloudDatabaseBackups({ signal }),
-    enabled: canManageSettings && sections.cloud && Boolean(cloudStatusQuery.data?.enabled) && Boolean(cloudStatusQuery.data?.isConfigured),
-  });
   const disasterRecoveryQuery = useQuery({
     queryKey: queryKeys.disasterRecoveryStatus(),
     queryFn: ({ signal }) => client.getDisasterRecoveryStatus({ signal }),
@@ -92,18 +81,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   }, [backupQuery.data, restoreFileName]);
 
   useEffect(() => {
-    const remoteBackups = cloudBackupsQuery.data?.backups ?? [];
-    if (remoteBackups.length === 0) {
-      setCloudDownloadFileName("");
-      return;
-    }
-    if (!remoteBackups.some((backup) => backup.fileName === cloudDownloadFileName)) {
-      setCloudDownloadFileName(remoteBackups[0].fileName);
-    }
-  }, [cloudBackupsQuery.data, cloudDownloadFileName]);
-
-  useEffect(() => {
-    const failedQuery = [backupQuery, cloudStatusQuery, cloudBackupsQuery, disasterRecoveryQuery]
+    const failedQuery = [backupQuery, disasterRecoveryQuery]
       .find((query) => query.isError);
     if (failedQuery) {
       setMessage(readApiError(failedQuery.error));
@@ -112,10 +90,6 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   }, [
     backupQuery.error,
     backupQuery.isError,
-    cloudBackupsQuery.error,
-    cloudBackupsQuery.isError,
-    cloudStatusQuery.error,
-    cloudStatusQuery.isError,
     disasterRecoveryQuery.error,
     disasterRecoveryQuery.isError,
   ]);
@@ -145,24 +119,6 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
       updateBackupQuery(queryClient, response);
       setMessage(null);
       setSuccessMessage(response.message || "旧备份清理完成。");
-    },
-    onError: mutationError,
-  });
-  const uploadCloudMutation = useMutation({
-    mutationFn: () => client.uploadLatestDatabaseBackupToCloud(),
-    onSuccess: (job) => {
-      setMessage(null);
-      setSuccessMessage("WebDAV 上传任务已加入“文件任务”。");
-      setLastCreatedJobId(job.jobId);
-    },
-    onError: mutationError,
-  });
-  const downloadCloudMutation = useMutation({
-    mutationFn: () => client.downloadCloudDatabaseBackup({ body: { remoteFileName: cloudDownloadFileName } }),
-    onSuccess: (job) => {
-      setMessage(null);
-      setSuccessMessage("WebDAV 下载与校验任务已加入“文件任务”；完成后刷新备份列表即可使用。");
-      setLastCreatedJobId(job.jobId);
     },
     onError: mutationError,
   });
@@ -209,13 +165,10 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   });
 
   const backups = backupQuery.data?.backups ?? [];
-  const cloudStatus = cloudStatusQuery.data ?? null;
-  const cloudBackups = cloudBackupsQuery.data?.backups ?? [];
   const disasterRecoveryStatus = disasterRecoveryQuery.data ?? null;
-  const cloudBackupsEnabled = canManageSettings && Boolean(cloudStatus?.enabled) && Boolean(cloudStatus?.isConfigured);
   const isBusy =
-    backupQuery.isFetching || cloudStatusQuery.isFetching || cloudBackupsQuery.isFetching || disasterRecoveryQuery.isFetching ||
-    createMutation.isPending || cleanupMutation.isPending || uploadCloudMutation.isPending || downloadCloudMutation.isPending ||
+    backupQuery.isFetching || disasterRecoveryQuery.isFetching ||
+    createMutation.isPending || cleanupMutation.isPending ||
     restoreMutation.isPending || createRecoveryMutation.isPending || restoreRecoveryMutation.isPending || dataRootMigrationPending;
 
   const clearNotices = () => {
@@ -230,9 +183,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   const refreshBackups = () => {
     clearNotices();
     if (sections.database) void backupQuery.refetch();
-    if (sections.cloud) void cloudStatusQuery.refetch();
     if (desktopBridgeAvailable) void disasterRecoveryQuery.refetch();
-    if (sections.cloud && cloudBackupsEnabled) void cloudBackupsQuery.refetch();
   };
   const chooseNewDataRoot = async () => {
     if (!runtimeStorage?.migrationSupported || dataRootMigrationPending) return;
@@ -281,7 +232,6 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     backupRoot: backupQuery.data?.backupRoot,
     backupLoading: backupQuery.isFetching,
     backups,
-    cloudBackups,
     disasterRecoveryStatus,
     isBusy,
     cleanupDays,
@@ -290,8 +240,6 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     setRestoreFileName,
     restoreConfirmation,
     setRestoreConfirmation,
-    cloudDownloadFileName,
-    setCloudDownloadFileName,
     recoveryPassword,
     setRecoveryPassword,
     recoveryPasswordConfirmation,
@@ -301,10 +249,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     setRecoveryRestorePassword,
     recoveryRestoreConfirmation,
     setRecoveryRestoreConfirmation,
-    cloudBackupsEnabled,
     canRestore: canManageSettings && Boolean(restoreFileName) && restoreConfirmation.trim() === "RESTORE" && !isBusy,
-    canUploadCloud: canManageSettings && Boolean(cloudStatus?.enabled) && Boolean(cloudStatus?.isConfigured) && backups.length > 0 && !isBusy,
-    canDownloadCloud: cloudBackupsEnabled && Boolean(cloudDownloadFileName) && cloudBackups.length > 0 && !isBusy,
     canCreateRecovery: canManageSettings && Boolean(disasterRecoveryStatus?.supported) && !disasterRecoveryStatus?.pendingRestore &&
       isStrongRecoveryPassword(recoveryPassword) && recoveryPassword === recoveryPasswordConfirmation && !isBusy,
     canRestoreRecovery: canManageSettings && Boolean(disasterRecoveryStatus?.supported) && !disasterRecoveryStatus?.pendingRestore &&
@@ -315,8 +260,6 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     chooseRecoveryPackage,
     createBackup: () => runMutation(createMutation.mutate),
     cleanupBackups: () => runMutation(cleanupMutation.mutate),
-    uploadLatestBackup: () => runMutation(uploadCloudMutation.mutate),
-    downloadCloudBackup: () => runMutation(downloadCloudMutation.mutate),
     restoreBackup: () => runMutation(restoreMutation.mutate),
     createRecoveryPackage: () => runMutation(createRecoveryMutation.mutate),
     restoreRecoveryPackage: () => runMutation(restoreRecoveryMutation.mutate),

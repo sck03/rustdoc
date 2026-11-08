@@ -1,6 +1,6 @@
 //! Keep terminal snapshots and cleanup behind one publication boundary.
 use crate::engine::error::{Result, unavailable};
-use std::sync::{RwLock, RwLockReadGuard, TryLockError};
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError};
 use std::time::{Duration, Instant};
 
 #[derive(Default)]
@@ -19,10 +19,7 @@ impl Completion {
     }
 
     pub(super) fn recover(&self, work: impl FnOnce() -> Result<()>) -> Result<()> {
-        let mut failure = self
-            .0
-            .write()
-            .map_err(|_| unavailable("任务发布状态异常。"))?;
+        let mut failure = self.write()?;
         // Only a fully verified recovery may clear the publication latch.
         work()?;
         *failure = None;
@@ -30,15 +27,31 @@ impl Completion {
     }
 
     pub(super) fn finish(&self, work: impl FnOnce() -> Result<()>) -> Result<()> {
-        let mut failure = self
-            .0
-            .write()
-            .map_err(|_| unavailable("任务发布状态异常。"))?;
-        let result = work();
-        if let Err(cause) = &result {
-            *failure = Some(format!("任务发布或清理未完成，请重启核对恢复状态：{cause}"));
+        // Terminal persistence must outlive execution cancellation, but lock
+        // admission, SQL and retention share one independent deadline.
+        crate::operation::OperationScope::detached(Duration::from_secs(30)).run(|| {
+            let mut failure = self.write()?;
+            let result = work();
+            if let Err(cause) = &result {
+                *failure = Some(format!("任务发布或清理未完成，请重启核对恢复状态：{cause}"));
+            }
+            result
+        })
+    }
+
+    fn write(&self) -> Result<RwLockWriteGuard<'_, Option<String>>> {
+        let deadline = Instant::now() + Duration::from_secs(30);
+        loop {
+            crate::operation::check()?;
+            match self.0.try_write() {
+                Ok(guard) => return Ok(guard),
+                Err(TryLockError::Poisoned(_)) => return Err(unavailable("任务发布状态异常。")),
+                Err(TryLockError::WouldBlock) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                Err(TryLockError::WouldBlock) => return Err(unavailable("任务发布等待超过时限。")),
+            }
         }
-        result
     }
 
     pub(super) fn read(&self) -> Result<RwLockReadGuard<'_, Option<String>>> {
@@ -67,6 +80,25 @@ impl Completion {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn completion_wait_is_cancellable_and_terminal_work_outlives_cancellation() {
+        let completion = Completion::default();
+        let reader = completion.read().unwrap();
+        let scope = crate::operation::OperationScope::new(Duration::from_millis(25));
+        let started = Instant::now();
+        assert_eq!(
+            scope.run(|| completion.write()).unwrap_err().status,
+            Some(504)
+        );
+        assert!(started.elapsed() < Duration::from_secs(1));
+        drop(reader);
+        scope.cancel();
+        scope
+            .run(|| completion.finish(crate::operation::check))
+            .unwrap();
+        drop(completion.read().unwrap());
+    }
 
     #[test]
     fn only_successful_recovery_reopens_publication() {

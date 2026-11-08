@@ -1,26 +1,20 @@
-//! WebDAV 云备份。配置来自数据库设置,密码保存在受密封凭证区。
-//! 传输复用受控 ureq 客户端:HTTPS 使用平台证书校验,解析地址受策略限制,
-//! 流式下载仍写入受管暂存文件并在失败时清理。
+//! WebDAV 完整加密副本的配置、受控传输及响应边界。
+//! 凭据来自密封存储，上传后流式回读校验；发布与失败清理由 recovery 管理。
 use super::{
-    CLOUD_STORAGE_POLICY, NativeService, auth,
-    error::{Result, error, invalid, unavailable},
+    error::{Result, invalid, unavailable},
     settings,
-    store::{Actor, Store},
-    tasks::TaskOutput,
+    store::Store,
 };
-use crate::{contracts, generated_api::*};
+use crate::api::ApiError;
 use base64::{Engine, prelude::BASE64_STANDARD};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::{fs, io::Read, path::Path, time::Duration};
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 const TRANSFER_TIMEOUT: Duration = Duration::from_secs(super::super::backup_io::TIMEOUT_SECONDS);
-const PROP_FIND_LIMIT: usize = 2 * 1024 * 1024;
 const ERROR_LIMIT: usize = 64 * 1024;
 const TRANSFER_BUFFER: usize = 128 * 1024;
-mod download;
 mod recovery;
-use download::download_backup;
 pub(super) use recovery::{RecoveryTarget, validate_recovery_settings};
 
 struct Config {
@@ -31,10 +25,6 @@ struct Config {
 }
 
 impl Config {
-    fn read(service: &NativeService) -> Result<Self> {
-        Self::read_parts(&service.store, &service.protector)
-    }
-
     /// 后台任务复用同一读取路径:任务开始时重新读取当前设置与受密封保护的密码。
     fn read_parts(store: &Store, protector: &crate::secrets::Protector) -> Result<Self> {
         let settings = settings::current(store)?;
@@ -133,28 +123,6 @@ fn percent_encode(value: &str) -> String {
     output
 }
 
-fn percent_decode(value: &str) -> Result<String> {
-    let bytes = value.as_bytes();
-    let mut output = Vec::with_capacity(bytes.len());
-    let mut index = 0;
-    while index < bytes.len() {
-        if bytes[index] == b'%' {
-            let hex = value
-                .get(index + 1..index + 3)
-                .ok_or_else(|| unavailable("WebDAV 文件地址编码不完整。"))?;
-            output.push(
-                u8::from_str_radix(hex, 16)
-                    .map_err(|_| unavailable("WebDAV 文件地址编码无效。"))?,
-            );
-            index += 3;
-            continue;
-        }
-        output.push(bytes[index]);
-        index += 1;
-    }
-    String::from_utf8(output).map_err(|_| unavailable("WebDAV 文件名不是有效 UTF-8。"))
-}
-
 fn authorization(config: &Config) -> (String, String) {
     (
         "Authorization".into(),
@@ -239,435 +207,25 @@ fn failure(status: u16, body: &[u8]) -> ApiError {
     ))
 }
 
-// --- WebDAV 操作。 ---
-
-use crate::api::ApiError;
-
-struct CloudItem {
-    file_name: String,
-    size_bytes: u64,
-    last_modified: String,
-}
-
-/// PROPFIND 列出远端备份。
-fn propfind(config: &Config) -> Result<Vec<CloudItem>> {
-    let endpoint = parse_url(&config.url)?;
-    let (name, value) = authorization(config);
-    let body = "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:displayname/><d:getcontentlength/><d:getlastmodified/><d:resourcetype/></d:prop></d:propfind>";
-    let response = request(
-        &endpoint,
-        "PROPFIND",
-        &endpoint.propfind_url(),
-        &[
-            (name.as_str(), value),
-            ("Depth", "1".into()),
-            ("Content-Type", "application/xml; charset=utf-8".into()),
-        ],
-        body.as_bytes(),
-        PROP_FIND_LIMIT,
-        REQUEST_TIMEOUT,
-    )?;
-    if !(200..300).contains(&response.status) {
-        return Err(failure(response.status, &response.body));
-    }
-    parse_propfind(
-        std::str::from_utf8(&response.body)
-            .map_err(|_| unavailable("WebDAV 响应不是有效 UTF-8。"))?,
-        &endpoint,
-    )
-}
-
-/// 依据 href 而非展示名定位文件，解析大小、时间与目录标记；
-/// 命名空间前缀(d:、D: 或默认)不影响匹配。
-fn parse_propfind(xml: &str, endpoint: &Endpoint) -> Result<Vec<CloudItem>> {
-    use quick_xml::Reader;
-    use quick_xml::events::Event;
-
-    #[derive(Default)]
-    struct Pending {
-        href: String,
-        size_bytes: u64,
-        last_modified: String,
-        collection: bool,
-    }
-
-    fn local_name(name: &str) -> &str {
-        name.rsplit(':').next().unwrap_or(name)
-    }
-
-    let mut reader = Reader::from_str(xml);
-    let mut response: Option<Pending> = None;
-    let mut text_target: Option<String> = None;
-    let mut text_buffer = String::new();
-    let mut items = Vec::new();
-    loop {
-        match reader
-            .read_event()
-            .map_err(|_| unavailable("WebDAV PROPFIND 返回了无效 XML。"))?
-        {
-            Event::Start(event) => {
-                let name = local_name(event.name().as_ref()).to_string();
-                if name == "response" {
-                    response = Some(Pending::default());
-                }
-                if name == "collection" {
-                    if let Some(pending) = response.as_mut() {
-                        pending.collection = true;
-                    }
-                }
-                if response.is_some()
-                    && matches!(
-                        name.as_str(),
-                        "href" | "getcontentlength" | "getlastmodified" | "resourcetype"
-                    )
-                {
-                    text_target = Some(name);
-                    text_buffer.clear();
-                }
-            }
-            Event::Empty(event) => {
-                let qualified = event.name();
-                let name = local_name(qualified.as_ref());
-                if response.is_some() && name == "collection" {
-                    if let Some(pending) = response.as_mut() {
-                        pending.collection = true;
-                    }
-                }
-            }
-            Event::Text(event) => {
-                if text_target.is_some() {
-                    text_buffer.push_str(event.as_ref());
-                }
-            }
-            Event::CData(event) => {
-                if text_target.is_some() {
-                    text_buffer.push_str(event.as_ref());
-                }
-            }
-            Event::GeneralRef(event) => {
-                let escaped = format!("&{};", event.as_ref());
-                let decoded = quick_xml::escape::unescape(&escaped)
-                    .map_err(|_| unavailable("WebDAV XML 含未知实体。"))?;
-                if text_target.is_some() {
-                    text_buffer.push_str(&decoded);
-                }
-            }
-            Event::DocType(_) => return Err(unavailable("WebDAV XML 不允许外部实体声明。")),
-            Event::End(event) => {
-                let qualified = event.name();
-                let name = local_name(qualified.as_ref());
-                if text_target.as_deref() == Some(name) {
-                    let value = text_buffer.trim();
-                    if let Some(pending) = response.as_mut() {
-                        match name {
-                            "href" => pending.href = value.into(),
-                            "getcontentlength" => {
-                                pending.size_bytes = value
-                                    .parse()
-                                    .map_err(|_| unavailable("WebDAV 返回无效文件大小。"))?
-                            }
-                            "getlastmodified" => {
-                                pending.last_modified = chrono::DateTime::parse_from_rfc2822(value)
-                                    .map(|time| time.with_timezone(&chrono::Utc).to_rfc3339())
-                                    .unwrap_or_default()
-                            }
-                            _ => {}
-                        }
-                    }
-                    text_target = None;
-                }
-                if name == "response" {
-                    let Some(pending) = response.take() else {
-                        continue;
-                    };
-                    if pending.collection {
-                        continue;
-                    }
-                    let base = url::Url::parse(&endpoint.propfind_url())
-                        .map_err(|_| invalid("WebDAV 目录无效。"))?;
-                    let href = base
-                        .join(pending.href.trim())
-                        .map_err(|_| unavailable("WebDAV 返回无效文件地址。"))?;
-                    let Some(relative) = href.path().strip_prefix(base.path()) else {
-                        continue;
-                    };
-                    if href.origin() != base.origin()
-                        || href.query().is_some()
-                        || href.fragment().is_some()
-                        || relative.is_empty()
-                        || relative.contains('/')
-                    {
-                        continue;
-                    }
-                    let file_name = percent_decode(relative)?;
-                    if !crate::paths::valid_file_name(&file_name) {
-                        return Err(unavailable("WebDAV 返回无效备份文件名。"));
-                    }
-                    if file_name.is_empty() || !file_name.ends_with(".sqlite3") {
-                        continue;
-                    }
-                    items.push(CloudItem {
-                        file_name,
-                        size_bytes: pending.size_bytes,
-                        last_modified: pending.last_modified,
-                    });
-                }
-            }
-            Event::Eof => break,
-            _ => {}
-        }
-    }
-    items.sort_by(|left, right| {
-        right
-            .last_modified
-            .cmp(&left.last_modified)
-            .then_with(|| right.file_name.cmp(&left.file_name))
-    });
-    Ok(items)
-}
-
-/// 上传一个本地备份文件到 WebDAV。流式写入仍保留取消边界。
-fn upload_file(config: &Config, path: &Path, file_name: &str) -> Result<()> {
-    let endpoint = parse_url(&config.url)?;
-    let (name, value) = authorization(config);
-    let metadata = fs::metadata(path)?;
-    if !metadata.is_file() || metadata.len() == 0 {
-        return Err(invalid("要上传的本地备份文件为空或不存在。"));
-    }
-    let remote = remote_path(&endpoint, file_name)?;
-    let mut reader = std::io::BufReader::new(fs::File::open(path)?);
-    let mut response = agent(TRANSFER_TIMEOUT)
-        .put(&remote)
-        .header(name.as_str(), value)
-        .header("Content-Type", "application/octet-stream")
-        .header("Content-Length", metadata.len().to_string())
-        .send(ureq::SendBody::from_reader(&mut reader))
-        .map_err(|error| match error {
-            ureq::Error::Timeout(_) => unavailable("WebDAV 上传超时。"),
-            _ => unavailable(format!("WebDAV 上传失败:{error}")),
-        })?;
-    let status = response.status().as_u16();
-    let mut body_reader = response.body_mut().as_reader();
-    let body = read_limited(&mut body_reader, ERROR_LIMIT, "WebDAV 响应超过容量上限。")?;
-    if !(200..300).contains(&status) {
-        return Err(failure(status, &body));
-    }
-    Ok(())
-}
-
-// --- API 操作。 ---
-
-pub(super) fn status(service: &NativeService, actor: &Actor) -> Result<Value> {
-    auth::authorize(actor, "system.backup", "manage")?;
-    let config = Config::read(service)?;
-    let latest = super::latest_local_backup(&service.paths)?;
-    let mut response = contracts::initial(contracts::schema("ApiCloudBackupStatusResponse"));
-    response["enabled"] = json!(config.enabled);
-    response["isConfigured"] = json!(config.configured());
-    response["url"] = json!(config.url);
-    response["userName"] = json!(config.user);
-    response["latestBackupFileName"] = json!(
-        latest
-            .as_ref()
-            .map(|(name, _, _)| name.as_str())
-            .unwrap_or("")
-    );
-    response["latestBackupSizeBytes"] =
-        json!(latest.as_ref().map(|(_, size, _)| *size).unwrap_or(0));
-    response["backupRoot"] = json!(super::backup_root(&service.paths)?);
-    response["storagePolicy"] = json!(CLOUD_STORAGE_POLICY);
-    Ok(response)
-}
-
-pub(super) fn test_connection(service: &NativeService, actor: &Actor) -> Result<Value> {
-    auth::authorize(actor, "system.backup", "manage")?;
-    let config = Config::read(service)?;
-    if !config.configured() {
-        return Err(invalid("WebDAV 尚未配置,请先保存服务器地址和用户名。"));
-    }
-    propfind(&config)?;
-    let mut response = contracts::initial(contracts::schema("ApiCloudBackupCommandResponse"));
-    response["success"] = json!(true);
-    response["message"] = json!("WebDAV 连接测试成功。");
-    response["backupRoot"] = json!(super::backup_root(&service.paths)?);
-    response["storagePolicy"] = json!(CLOUD_STORAGE_POLICY);
-    Ok(response)
-}
-
-pub(super) fn upload_latest(service: &NativeService, actor: &Actor) -> Result<Value> {
-    auth::authorize(actor, "system.backup", "manage")?;
-    let config = Config::read(service)?;
-    require_enabled(&config)?;
-    let (name, size, path) = super::latest_local_backup(&service.paths)?
-        .ok_or_else(|| error(404, "当前没有可上传的数据库备份,请先创建本地备份。"))?;
-    if size == 0 {
-        return Err(invalid("要上传的本地备份文件为空。"));
-    }
-    let store = service.store.clone();
-    let protector = service.protector.clone();
-    let actor_id = actor.id;
-    service.jobs.start(
-        actor,
-        UPLOAD_LATEST_DATABASE_BACKUP_TO_CLOUD,
-        "CloudBackupUpload",
-        "上传最新数据库备份到 WebDAV",
-        move |_| {
-            let actor = auth::current_actor(&store, actor_id)?;
-            auth::authorize_operation(&actor, UPLOAD_LATEST_DATABASE_BACKUP_TO_CLOUD, &[])?;
-            let config = Config::read_parts(&store, &protector)?;
-            require_enabled(&config)?;
-            upload_file(&config, &path, &name)?;
-            Ok(TaskOutput {
-                file: None,
-                detail: format!("已上传 {name}({size} 字节)到 WebDAV。"),
-                destination: None,
-                directory: None,
-                managed_file: None,
-                publication: None,
-                archive: None,
-            })
-        },
-    )
-}
-
-pub(super) fn list(service: &NativeService, actor: &Actor) -> Result<Value> {
-    auth::authorize(actor, "system.backup", "manage")?;
-    let config = Config::read(service)?;
-    require_enabled(&config)?;
-    let backups = propfind(&config)?
-        .into_iter()
-        .map(|item| {
-            let mut value = contracts::initial(contracts::schema("ApiCloudBackupItemDto"));
-            value["fileName"] = json!(item.file_name);
-            value["sizeBytes"] = json!(item.size_bytes);
-            value["lastModified"] = json!(item.last_modified);
-            value
-        })
-        .collect::<Vec<_>>();
-    let mut response = contracts::initial(contracts::schema("ApiCloudBackupListResponse"));
-    response["backups"] = json!(backups);
-    response["backupRoot"] = json!(super::backup_root(&service.paths)?);
-    response["storagePolicy"] = json!(CLOUD_STORAGE_POLICY);
-    Ok(response)
-}
-
-pub(super) fn download(service: &NativeService, actor: &Actor, body: &Value) -> Result<Value> {
-    auth::authorize(actor, "system.backup", "manage")?;
-    let config = Config::read(service)?;
-    require_enabled(&config)?;
-    let remote_name = super::records_text(body, "remoteFileName");
-    if !crate::paths::valid_file_name(&remote_name) || !remote_name.ends_with(".sqlite3") {
-        return Err(invalid(
-            "只能下载当前 WebDAV 云备份列表中的 SQLite 备份文件。",
-        ));
-    }
-    let store = service.store.clone();
-    let protector = service.protector.clone();
-    let paths = service.paths.clone();
-    let actor_id = actor.id;
-    let remote_name = remote_name.to_string();
-    service.jobs.start(
-        actor,
-        DOWNLOAD_CLOUD_DATABASE_BACKUP,
-        "CloudBackupDownload",
-        "下载并验证 WebDAV 数据库备份",
-        move |_| {
-            let actor = auth::current_actor(&store, actor_id)?;
-            auth::authorize_operation(&actor, DOWNLOAD_CLOUD_DATABASE_BACKUP, &[])?;
-            let config = Config::read_parts(&store, &protector)?;
-            require_enabled(&config)?;
-            let size = download_backup(&config, &paths, &remote_name)?;
-            Ok(TaskOutput {
-                file: None,
-                detail: format!("{remote_name}({size} 字节)已通过校验并导入受管备份目录。"),
-                destination: None,
-                directory: None,
-                managed_file: None,
-                publication: None,
-                archive: None,
-            })
-        },
-    )
-}
-
-#[cfg(test)]
-#[path = "tests/cloud_download.rs"]
-mod download_tests;
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn dav_hrefs_use_only_direct_children_and_decode_xml_and_url_independently() {
-        let endpoint = parse_url("https://dav.example.invalid/team/backups/").unwrap();
-        let xml = r#"<multistatus xmlns="DAV:">
-          <response><href>https://dav.example.invalid/team/backups/%E5%A4%87%E4%BB%BD&amp;1.sqlite3</href><displayname>misleading.sqlite3</displayname></response>
-          <response><href>relative.sqlite3</href></response>
-          <response><href>/elsewhere/foreign.sqlite3</href></response>
-          <response><href>https://other.invalid/team/backups/foreign.sqlite3</href></response>
-          <response><href>nested/foreign.sqlite3</href></response>
-          <response><href>directory.sqlite3</href><resourcetype><collection></collection></resourcetype></response>
-        </multistatus>"#;
-        let mut names = parse_propfind(xml, &endpoint)
-            .unwrap()
-            .into_iter()
-            .map(|item| item.file_name)
-            .collect::<Vec<_>>();
-        names.sort();
-        assert_eq!(names, vec!["relative.sqlite3", "备份&1.sqlite3"]);
-        for href in [
-            "bad%FF.sqlite3",
-            "bad%GG.sqlite3",
-            "nested%2Fescape.sqlite3",
-        ] {
-            assert!(
-                parse_propfind(
-                    &format!("<multistatus><response><href>{href}</href></response></multistatus>"),
-                    &endpoint
-                )
-                .is_err()
-            );
-        }
-        assert!(
-            parse_propfind(
-                "<!DOCTYPE a [<!ENTITY secret SYSTEM 'file:///key'>]><a/>",
-                &endpoint
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn https_paths_namespaced_dav_xml_and_size_limits_are_enforced() {
+    fn replica_urls_and_response_limits_are_bounded() {
         let endpoint = parse_url("https://dav.example.invalid/team/backups").unwrap();
         assert_eq!(
-            endpoint.request_url("%E5%A4%87%E4%BB%BD.sqlite3"),
-            "https://dav.example.invalid/team/backups/%E5%A4%87%E4%BB%BD.sqlite3"
-        );
-        assert_eq!(
-            endpoint.propfind_url(),
-            "https://dav.example.invalid/team/backups/"
+            endpoint.request_url("%E5%A4%87%E4%BB%BD.edmrecovery"),
+            "https://dav.example.invalid/team/backups/%E5%A4%87%E4%BB%BD.edmrecovery"
         );
         assert!(parse_url("ftp://dav.example.invalid/backups").is_err());
         assert!(parse_url("https://user:secret@dav.example.invalid/backups").is_err());
-        assert!(remote_path(&endpoint, "../escape.sqlite3").is_err());
-        let xml = r#"<D:multistatus xmlns:D="DAV:"><D:response><D:href>/team/backups/2026-09-20.sqlite3</D:href><D:propstat><D:prop><D:displayname>2026-09-20.sqlite3</D:displayname><D:getcontentlength>4096</D:getcontentlength><D:getlastmodified>Sun, 20 Sep 2026 08:00:00 GMT</D:getlastmodified></D:prop></D:propstat></D:response><D:response><D:resourcetype><D:collection/></D:resourcetype></D:response></D:multistatus>"#;
-        let items = parse_propfind(xml, &endpoint).unwrap();
-        assert_eq!(items.len(), 1);
+        assert!(remote_path(&endpoint, "../escape.edmrecovery").is_err());
+        assert!(read_limited(&mut std::io::Cursor::new(vec![0; 65]), 64, "too large").is_err());
         assert_eq!(
-            (
-                items[0].file_name.as_str(),
-                items[0].size_bytes,
-                items[0].last_modified.as_str()
-            ),
-            ("2026-09-20.sqlite3", 4096, "2026-09-20T08:00:00+00:00")
-        );
-        let mut reader = std::io::Cursor::new(vec![0u8; 65]);
-        assert!(read_limited(&mut reader, 64, "too large").is_err());
-        let mut reader = std::io::Cursor::new(vec![0u8; 64]);
-        assert_eq!(
-            read_limited(&mut reader, 64, "too large").unwrap().len(),
+            read_limited(&mut std::io::Cursor::new(vec![0; 64]), 64, "too large")
+                .unwrap()
+                .len(),
             64
         );
     }

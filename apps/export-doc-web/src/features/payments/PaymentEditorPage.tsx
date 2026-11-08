@@ -204,7 +204,7 @@ export function PaymentEditorPage({
     resourceKey: isNew ? "new" : parsedPaymentId,
     incomingValue: isNew ? null : paymentQuery.data,
     isDirty: hasUnsavedPaymentChanges,
-    fingerprint: (serverPayment) => buildPaymentSnapshot(serverPayment, parsedPaymentId),
+    fingerprint: (serverPayment) => buildPaymentSnapshot(serverPayment, serverPayment.id),
     applyIncoming: (serverPayment) => {
       setPayment(serverPayment);
       setPersistedPaymentSnapshot(buildPaymentSnapshot(serverPayment, parsedPaymentId));
@@ -321,9 +321,7 @@ export function PaymentEditorPage({
       confirmLabel: "加载最新版本",
     })) return;
     const result = await paymentQuery.refetch();
-    if (result.data && !result.isError) {
-      setPayment(result.data);
-      setPersistedPaymentSnapshot(buildPaymentSnapshot(result.data, parsedPaymentId));
+    if (result.data && !result.isError && serverDraftSync.acceptServerVersion(result.data)) {
       setConcurrencyMessage(null);
       setMessage(null);
       setSuccessMessage("已加载服务器上的最新付款记录，请检查后继续编辑。");

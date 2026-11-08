@@ -227,7 +227,7 @@ function normalizeLayers(
       name: "覆盖层",
       role: "Overlay",
       designHeightHundredthMm: 0,
-      print: createLegacyV3LayerPrintDefaults(),
+      print: { repeatOnEveryPage: false, keepTogether: false, pinToPageBottom: false, minHeightHundredthMm: 0 },
       visible: true,
       locked: false,
       elements: [],
@@ -438,32 +438,26 @@ function normalizeLayerPrint(
   path: string,
   issues: ReportDesignerSchemaIssue[],
 ) {
-  // V3 documents written before layer print metadata existed must not gain
-  // silent repeat/pin behavior when reopened.  Migrations from V2 provide
-  // explicit settings, while old V3 records get a conservative no-repeat
-  // default.
-  const fallback = createLegacyV3LayerPrintDefaults();
-  if (!isRecord(value)) return fallback;
-  const repeat = typeof value.repeatOnEveryPage === "boolean" ? value.repeatOnEveryPage : fallback.repeatOnEveryPage;
-  const keepTogether = typeof value.keepTogether === "boolean" ? value.keepTogether : fallback.keepTogether;
-  const requestedPin = typeof value.pinToPageBottom === "boolean" ? value.pinToPageBottom : fallback.pinToPageBottom;
+  if (!isRecord(value)) {
+    issues.push({ severity: "error", path, message: "缺少当前模板必需的图层打印设置。" });
+    value = {};
+  }
+  const settings = value as Record<string, unknown>;
+  for (const key of ["repeatOnEveryPage", "keepTogether", "pinToPageBottom"] as const) {
+    if (typeof settings[key] !== "boolean") issues.push({ severity: "error", path: `${path}.${key}`, message: "图层打印设置必须为布尔值。" });
+  }
+  if (!Number.isInteger(settings.minHeightHundredthMm)) issues.push({ severity: "error", path: `${path}.minHeightHundredthMm`, message: "图层最小高度必须为整数。" });
+  const repeat = settings.repeatOnEveryPage === true;
+  const keepTogether = settings.keepTogether === true;
+  const requestedPin = settings.pinToPageBottom === true;
   const pinToPageBottom = role === "Footer" ? requestedPin : false;
   if (requestedPin && role !== "Footer") {
     issues.push({ severity: "warning", path: `${path}.pinToPageBottom`, message: "只有页脚图层支持贴底，已关闭该设置。" });
   }
-  const minHeightHundredthMm = readInteger(value.minHeightHundredthMm, 0, 0, 26000, `${path}.minHeightHundredthMm`, issues);
+  const minHeightHundredthMm = readInteger(settings.minHeightHundredthMm, 0, 0, 26000, `${path}.minHeightHundredthMm`, issues);
   return { repeatOnEveryPage: role === "Body" ? false : repeat, keepTogether, pinToPageBottom, minHeightHundredthMm,
-    followBody: role === "Footer" && !pinToPageBottom && value.followBody === true,
-    firstPageOnly: value.firstPageOnly === true };
-}
-
-function createLegacyV3LayerPrintDefaults() {
-  return {
-    repeatOnEveryPage: false,
-    keepTogether: false,
-    pinToPageBottom: false,
-    minHeightHundredthMm: 0,
-  } as const;
+    followBody: role === "Footer" && !pinToPageBottom && settings.followBody === true,
+    firstPageOnly: settings.firstPageOnly === true };
 }
 
 function normalizeStyle(value: unknown, path: string, issues: ReportDesignerSchemaIssue[]): ReportDesignerV3ElementStyle {

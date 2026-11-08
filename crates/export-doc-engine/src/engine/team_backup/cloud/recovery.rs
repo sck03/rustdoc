@@ -1,4 +1,4 @@
-//! Complete encrypted recovery replicas, isolated from the historical SQLite-only cloud API.
+//! Complete encrypted recovery replicas with verified, atomic remote publication.
 use super::*;
 use crate::engine::backup_io;
 

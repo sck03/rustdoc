@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "./Button.tsx";
 import { InlineNotice } from "./PageState.tsx";
 
@@ -29,6 +29,13 @@ export function useServerDraftSync<T>({
   applyIncoming,
 }: ServerDraftSyncOptions<T>) {
   const normalizedResourceKey = String(resourceKey);
+  const resourceScope = useMemo(() => ({}), [normalizedResourceKey]);
+  const resourceScopeRef = useRef<object | null>(resourceScope);
+  resourceScopeRef.current = resourceScope;
+  useLayoutEffect(() => {
+    resourceScopeRef.current = resourceScope;
+    return () => { resourceScopeRef.current = null; };
+  }, [resourceScope]);
   const fingerprintRef = useRef(fingerprint);
   const applyIncomingRef = useRef(applyIncoming);
   const appliedRef = useRef<AppliedServerDraft | null>(null);
@@ -57,13 +64,7 @@ export function useServerDraftSync<T>({
       acknowledgedRef.current = null; setPending(null); return;
     }
     if (isFirstValueForResource || (!isDirty && applied.fingerprint !== incomingFingerprint)) {
-      applyIncomingRef.current(incomingValue);
-      appliedRef.current = {
-        resourceKey: normalizedResourceKey,
-        fingerprint: incomingFingerprint,
-      };
-      acknowledgedRef.current = null;
-      setPending(null);
+      acceptServerVersion(incomingValue);
       return;
     }
 
@@ -90,18 +91,22 @@ export function useServerDraftSync<T>({
         });
   }, [incomingValue, persistedValue, isDirty, normalizedResourceKey]);
 
-  function loadServerVersion() {
-    if (!pending) {
-      return;
-    }
-
-    applyIncomingRef.current(pending.value);
+  // Explicit adoption also works before the background-sync effect has run.
+  // A refresh started on another record must never replace the current draft.
+  function acceptServerVersion(value: T) {
+    if (resourceScopeRef.current !== resourceScope) return false;
+    applyIncomingRef.current(value);
     appliedRef.current = {
-      resourceKey: pending.resourceKey,
-      fingerprint: pending.fingerprint,
+      resourceKey: normalizedResourceKey,
+      fingerprint: fingerprintRef.current(value),
     };
     acknowledgedRef.current = null;
     setPending(null);
+    return true;
+  }
+
+  function loadServerVersion() {
+    if (pending?.resourceKey === normalizedResourceKey) acceptServerVersion(pending.value);
   }
 
   function keepLocalDraft() {
@@ -125,6 +130,7 @@ export function useServerDraftSync<T>({
     hasPendingServerVersion: Boolean(pending),
     keepLocalDraft,
     loadServerVersion,
+    acceptServerVersion,
   };
 }
 

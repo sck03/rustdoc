@@ -8,6 +8,7 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { backupPlanDraft, validateBackupPlan } from "./backupPlanModel.ts";
+import { isTerminalJob } from "../jobs/jobPresentation.ts";
 
 export function useBackupPlan(client: ExportDocManagerApiClient, canManage: boolean,
   onSettingsSaved?: (status: ApiBackupPlanStatus, previousRevision: number) => void) {
@@ -19,30 +20,32 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [lastJobId, setLastJobId] = useState<string | null>(null);
+  const [dismissedJobId, setDismissedJobId] = useState<string | null>(null);
   const dirty = Boolean(draft && baseline && (confirmation || JSON.stringify(draft) !== JSON.stringify(backupPlanDraft(baseline))));
   const { confirmDiscardChanges } = useUnsavedChangesGuard({ isDirty: dirty, message: "灾备计划或异机存储有未保存的修改。" });
   const query = useQuery({
     queryKey: queryKeys.backupPlan(),
     queryFn: ({ signal }) => client.getBackupPlan({ signal }),
     enabled: canManage,
-    refetchInterval: (query) => query.state.data?.runningJobId ? 3_000 : query.state.data?.plan.enabled ? 30_000 : false,
+    refetchInterval: (query) => query.state.error ? false : query.state.data?.runningJobId ? 3_000 : query.state.data?.plan.enabled ? 30_000 : false,
     refetchIntervalInBackground: false,
   });
   const apply = (status: ApiBackupPlanStatus) => {
     setDraft(backupPlanDraft(status)); setBaseline(status); setConfirmation("");
   };
   useEffect(() => { if (query.data && !dirty) apply(query.data); }, [query.data, dirty]);
-  const jobId = query.data?.runningJobId ?? lastJobId ?? null;
+  const trackedJobId = query.data?.runningJobId ?? lastJobId ?? null;
+  const jobId = trackedJobId === dismissedJobId ? null : trackedJobId;
   const job = useQuery({
     queryKey: ["backup-plan-job", jobId],
     queryFn: ({ signal }) => client.getJob({ jobId: jobId! }, { signal }),
     enabled: Boolean(jobId) && canManage,
-    refetchInterval: (query) => ["Succeeded", "Failed", "Canceled"].includes(query.state.data?.status ?? "") ? false : 2_000,
+    refetchInterval: (query) => query.state.error || isTerminalJob(query.state.data?.status) ? false : 2_000,
     refetchIntervalInBackground: false,
   });
-  const activeJob = Boolean(jobId && !["Succeeded", "Failed", "Canceled"].includes(job.data?.status ?? "") && !job.isError);
+  const activeJob = Boolean(jobId && !isTerminalJob(job.data?.status) && !job.isError);
   useEffect(() => {
-    if (job.data && ["Succeeded", "Failed", "Canceled"].includes(job.data.status)) {
+    if (job.data && isTerminalJob(job.data.status)) {
       void queryClient.invalidateQueries({ queryKey: queryKeys.backupPlan() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.serverMigrationStatus() });
       void queryClient.invalidateQueries({ queryKey: queryKeys.disasterRecoveryStatus() });
@@ -93,6 +96,10 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
   const busy = save.isPending || start.isPending || cancel.isPending || download.isPending;
   return {
     query, status: query.data, draft, dirty, confirmation, setConfirmation, message, success, busy, activeJob, job: job.data, jobId,
+    jobError: job.isError ? readApiError(job.error) : null,
+    jobFetching: job.isFetching,
+    retryJob: () => { void job.refetch(); },
+    dismissJob: () => { setDismissedJobId(jobId); setLastJobId(null); },
     updatePlan: <K extends keyof ApiBackupPlan>(key: K, value: ApiBackupPlan[K]) => setDraft((current) => current && ({ ...current, plan: { ...current.plan, [key]: value } })),
     updateS3: <K extends keyof ApiBackupS3Settings>(key: K, value: ApiBackupS3Settings[K]) => setDraft((current) => current && ({ ...current, plan: { ...current.plan, s3: { ...current.plan.s3, [key]: value } } })),
     updateWebDav: (key: "url" | "userName", value: string) => setDraft((current) => current && ({ ...current, webDav: { ...current.webDav, [key]: value, enabled: true } })),

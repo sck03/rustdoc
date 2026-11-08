@@ -14,19 +14,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["fileName","fullPath","sizeBytes","lastWriteTime"])),
     ("ApiBackupListResponse",o(vec![("backups",a(r("ApiBackupItemDto"))),("backupRoot",s()),("storagePolicy",s())]).required(vec!["backups","backupRoot","storagePolicy"])),
     ("ApiBackupRestoreRequest",o(vec![("backupFileName",s()),("confirmationText",s())]).required(vec!["backupFileName","confirmationText"])),
-    ("ApiCloudBackupCommandResponse",o(vec![
-        ("success",b()),("message",s()),("remoteFileName",s()),
-        ("localBackupPath",s()),("sizeBytes",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int64").pattern("^-?(?:0|[1-9]\\d*)$")),("backupRoot",s()),
-        ("storagePolicy",s())
-    ]).required(vec!["success","message","remoteFileName","localBackupPath","sizeBytes","backupRoot","storagePolicy"])),
-    ("ApiCloudBackupDownloadRequest",o(vec![("remoteFileName",s())]).required(vec!["remoteFileName"])),
-    ("ApiCloudBackupItemDto",o(vec![("fileName",s()),("sizeBytes",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int64").pattern("^-?(?:0|[1-9]\\d*)$")),("lastModified",s().format("date-time"))]).required(vec!["fileName","sizeBytes","lastModified"])),
-    ("ApiCloudBackupListResponse",o(vec![("backups",a(r("ApiCloudBackupItemDto"))),("backupRoot",s()),("storagePolicy",s())]).required(vec!["backups","backupRoot","storagePolicy"])),
-    ("ApiCloudBackupStatusResponse",o(vec![
-        ("enabled",b()),("isConfigured",b()),("url",s()),
-        ("userName",s()),("latestBackupFileName",s()),("latestBackupSizeBytes",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int64").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("backupRoot",s()),("storagePolicy",s())
-    ]).required(vec!["enabled","isConfigured","url","userName","latestBackupFileName","latestBackupSizeBytes","backupRoot","storagePolicy"])),
     ("ApiDisasterRecoveryCreateRequest",o(vec![("password",s())]).required(vec!["password"])),
     ("ApiDisasterRecoveryRestoreRequest",o(vec![("packagePath",s()),("password",s()),("confirmationText",s())]).required(vec!["packagePath","password","confirmationText"])),
     ("ApiDisasterRecoveryStatusResponse",o(vec![

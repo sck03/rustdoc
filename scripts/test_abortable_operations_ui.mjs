@@ -162,6 +162,17 @@ try {
     } catch (error) { failures.push(`${name}: ${error.message}`); }
     finally { await page.close(); }
   }
+  await scenario('invoice-preview-current-abort-can-retry', 'invoice-preview', async page => {
+    const preview = page.getByRole('button', {name:'预览',exact:true});
+    await preview.click();
+    await page.waitForFunction(() => window.pending.length === 1);
+    await page.evaluate(() => window.pending[0].reject(new DOMException('session paused', 'AbortError')));
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent === '预览' && !button.disabled));
+    await preview.click();
+    await page.waitForFunction(() => window.pending.length === 2);
+    await page.evaluate(() => window.pending[1].resolve({html:'<!doctype html><html><body>recovered</body></html>'}));
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.includes('打印') && !button.disabled));
+  });
   for (const reject of [false, true]) {
     await scenario('invoice-preview-discards-old-draft-'+reject, 'invoice-preview', async page => {
       await page.getByRole('button', {name:'预览',exact:true}).click();
