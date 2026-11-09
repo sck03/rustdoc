@@ -1,6 +1,6 @@
 CREATE TABLE schema_model (version BIGINT PRIMARY KEY,model TEXT NOT NULL,shape TEXT NOT NULL);
-CREATE TABLE schema_version (version BIGINT PRIMARY KEY CHECK(version = 15));
-INSERT INTO schema_version VALUES (15);
+CREATE TABLE schema_version (version BIGINT PRIMARY KEY CHECK(version = 16));
+INSERT INTO schema_version VALUES (16);
 -- The same compact, UTF-8 key order supplies bounded search metadata and fallback reads.
 CREATE FUNCTION exportdoc_record_text(value jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$

@@ -36,22 +36,15 @@ fn binding(
     Ok((profile, business))
 }
 
-fn directory(
-    service: &NativeService,
-    profile: &Value,
-    business: Business,
-) -> Result<std::path::PathBuf> {
-    profiles::root(
-        service,
-        rules::text(
-            profile,
-            if business == Business::Coo {
-                "customsCooClientRootPath"
-            } else {
-                "agentConsignmentClientRootPath"
-            },
-        ),
-    )
+fn directory(profile: &Value, business: Business, box_name: &str) -> Result<std::path::PathBuf> {
+    profiles::directory(rules::text(
+        &profile[if business == Business::Coo {
+            "customsCooDirectories"
+        } else {
+            "agentConsignmentDirectories"
+        }],
+        box_name,
+    ))
 }
 
 /// Publish a complete file without ever replacing an existing official payload.
@@ -103,7 +96,7 @@ pub fn handle(
             .transaction_for(actor, operation, &[], |tx, actor| {
                 let mut row = tracking::get(tx, actor, id, "operate")?;
                 let (profile, business) = binding(service, tx, actor, &row)?;
-                let outbox = directory(service, &profile, business)?.join("OutBox");
+                let outbox = directory(&profile, business, "outBox")?;
                 let package = tracking::archived(tx, &row)?;
                 tracking::verify(service, &row, &package.manifest, false)?;
                 if row["status"] == "QueuedToClient" {
@@ -132,7 +125,6 @@ pub fn handle(
     if row["status"] != "QueuedToClient" {
         let result = (|| -> Result<()> {
             ensure_safe_absolute(&outbox).map_err(invalid)?;
-            fs::create_dir_all(&outbox)?;
             for descriptor in package.manifest["payloadFiles"]
                 .as_array()
                 .into_iter()
@@ -181,26 +173,26 @@ pub fn handle(
 }
 
 fn collect(service: &NativeService, actor: &Actor, id: i64) -> Result<Value> {
-    let (row, root, business) = service.store.read_for(
+    let (row, roots, business) = service.store.read_for(
         actor,
         COLLECT_SINGLE_WINDOW_CLIENT_RECEIPTS,
         &[],
         |tx, actor| {
             let row = tracking::get(tx, actor, id, "operate")?;
             let (profile, business) = binding(service, tx, actor, &row)?;
-            let root = directory(service, &profile, business)?;
-            Ok((row, root, business))
+            let roots = vec![
+                directory(&profile, business, "inBox")?,
+                directory(&profile, business, "failBox")?,
+            ];
+            Ok((row, roots, business))
         },
     )?;
     let mut selected = BTreeSet::new();
     let mut inspected = 0;
-    let mut folders = vec![root.join("InBox"), root.join("FailBox")];
+    let mut folders = roots.clone();
     while let Some(folder) = folders.pop() {
         crate::operation::check()?;
         ensure_safe_absolute(&folder).map_err(invalid)?;
-        if !folder.try_exists()? {
-            continue;
-        }
         for item in fs::read_dir(&folder)? {
             crate::operation::check()?;
             inspected += 1;
@@ -248,6 +240,6 @@ fn collect(service: &NativeService, actor: &Actor, id: i64) -> Result<Value> {
         }
     }
     Ok(
-        json!({"batchId":id,"batchReference":row["batchReference"],"receiptRootPath":root,"receiptFiles":selected}),
+        json!({"batchId":id,"batchReference":row["batchReference"],"receiptDirectories":roots,"receiptFiles":selected}),
     )
 }

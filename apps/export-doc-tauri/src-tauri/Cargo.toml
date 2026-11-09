@@ -16,6 +16,7 @@ tauri-build = { version = "=2.7.4", features = [] }
 serde_json.workspace = true
 
 [dependencies]
+export-doc-single-window = { path = "../../../crates/export-doc-single-window" }
 export-doc-engine = { path = "../../../crates/export-doc-engine", features = ["s3-backup"] }
 export-doc-server = { path = "../../export-doc-server", default-features = false }
 fs2 = "=0.4.3"

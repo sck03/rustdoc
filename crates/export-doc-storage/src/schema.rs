@@ -1,7 +1,7 @@
 //! Fresh pre-production baseline. Earlier experimental databases are never opened or rewritten.
 use crate::{Error, Result};
 use sha2::{Digest, Sha256};
-pub const SCHEMA_VERSION: i64 = 15;
+pub const SCHEMA_VERSION: i64 = 16;
 pub(crate) fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }

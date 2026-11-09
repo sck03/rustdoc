@@ -30,6 +30,7 @@ mod runtime_paths_config;
 mod runtime_portable;
 mod runtime_prerequisites;
 mod runtime_tree_manifest;
+mod single_window_client;
 mod tauri_updater_commands;
 mod tauri_updater_task;
 #[cfg(all(test, windows))]
@@ -98,6 +99,7 @@ fn run_tauri_app() -> tauri::Result<()> {
 
     let app = builder
         .invoke_handler(tauri::generate_handler![
+            single_window_client::detect_single_window_client_directories,
             desktop_file_dialog_commands::select_single_window_package_file,
             desktop_file_dialog_commands::select_invoice_transfer_package_file,
             desktop_file_dialog_commands::select_disaster_recovery_package_file,

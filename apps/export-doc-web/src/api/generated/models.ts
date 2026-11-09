@@ -3304,17 +3304,24 @@ export interface ApiShutdownMaintenanceResponse {
   uploadedBackupFileName: string;
 }
 
+export interface ApiSingleWindowClientDirectories {
+  failBox: string;
+  inBox: string;
+  outBox: string;
+  sentBox: string;
+}
+
 export interface ApiSingleWindowClientDispatchRequest {
   batchId: number;
 }
 
 export interface ApiSingleWindowClientProfileDto {
-  agentConsignmentClientRootPath: string;
+  agentConsignmentDirectories: ApiSingleWindowClientDirectories;
   canSubmitAgentConsignment: boolean;
   canSubmitCustomsCoo: boolean;
   cardIdentifier: string;
   companyScope: string;
-  customsCooClientRootPath: string;
+  customsCooDirectories: ApiSingleWindowClientDirectories;
   id: number;
   isActive: boolean;
   isEnabled: boolean;
@@ -3326,12 +3333,12 @@ export interface ApiSingleWindowClientProfileDto {
 }
 
 export interface ApiSingleWindowClientProfileSaveRequest {
-  agentConsignmentClientRootPath: string;
+  agentConsignmentDirectories: ApiSingleWindowClientDirectories;
   canSubmitAgentConsignment: boolean;
   canSubmitCustomsCoo: boolean;
   cardIdentifier: string;
   companyScope: string;
-  customsCooClientRootPath: string;
+  customsCooDirectories: ApiSingleWindowClientDirectories;
   profileKey: string;
   profileName: string;
 }
@@ -6527,8 +6534,8 @@ export type SingleWindowReceiptBusinessStatus = "Unknown" | "Received" | "Accept
 export interface SingleWindowReceiptCollectionResult {
   batchId: number;
   batchReference: string;
+  receiptDirectories: string[];
   receiptFiles: string[];
-  receiptRootPath: string;
 }
 
 export type SingleWindowReceiptKind = "Unknown" | "CustomsCooBusinessReceipt" | "CustomsCooTechnicalReceipt" | "CustomsCooAttachmentReceipt" | "AgentConsignmentImportResponse" | "AgentConsignmentAcd002";

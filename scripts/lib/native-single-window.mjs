@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { verifyDesktopClientDirectories, verifyOfficialClientTransport } from './native-single-window-directories.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -115,8 +116,7 @@ export async function verifyDesktopSingleWindow({ run, cdp, output, token, invoi
   const imported = await client.createSingleWindowSource({ body: { referenceNo: 'DESKTOP-EXCEL-DECLARATION', invoice: preview.invoice } });
   assert.equal(imported.sourceKind, 'Excel');
   assert.equal((await client.getCustomsCooDocument({ sourceId: imported.id })).items.length, preview.invoice.items.length);
-  const profile = (await client.saveSingleWindowClientProfile({ body: { profileKey: '', profileName: '隔离桌面测试', companyScope: 'DEFAULT',
-    cardIdentifier: 'TEST-ONLY', customsCooClientRootPath: '', agentConsignmentClientRootPath: '', canSubmitCustomsCoo: true, canSubmitAgentConsignment: true } })).profiles[0];
+  const { profile, detected } = await verifyDesktopClientDirectories({run,cdp,output,client});
   const manualAcd = await client.getAgentConsignmentDocument({ sourceId });
   await client.saveAgentConsignmentDocument({ sourceId, body: { ...manualAcd, copCusCode: 'TEST000001', gName: '测试货物', codeTS: '6109100010',
     declTotal: '100', ieDate: '20261109', tradeMode: '0110', oriCountry: '142', tradeCode: '1234567890', agentCode: '0987654321' } });
@@ -126,6 +126,9 @@ export async function verifyDesktopSingleWindow({ run, cdp, output, token, invoi
   await client.uploadSingleWindowSubmitPackage({ body: new Blob([fs.readFileSync(packagePath)]), fileName: 'desktop-manual.swpkg' });
   const dispatch = await client.dispatchSingleWindowBatchToClient({ body: { batchId: handoff.trackingBatchId } });
   assert.equal(fs.readdirSync(dispatch.targetDirectory).filter(name => name.endsWith('.xml')).length, 1);
+  if (process.env.EXPORTDOCMANAGER_SW_CLIENT_TRANSPORT === '1') {
+    await verifyOfficialClientTransport({client,profile,detected,sourceId,output});
+  }
   fs.writeFileSync(path.join(output, 'single-window-results.json'), JSON.stringify({ catalogVersionConflict: true, producerVersionConflict: true, manualSource: true, independentConsignee: true,
     excelPreviewRows: preview.invoice.items.length, swpkgExportImportDispatch: true, results }, null, 2));
 }

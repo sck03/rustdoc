@@ -1,15 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Copy, CreditCard, FolderOpen, Plus, RefreshCw, Save, ShieldCheck } from "lucide-react";
+import { Building2, Copy, CreditCard, Plus, RefreshCw, Save, ShieldCheck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ApiSingleWindowClientProfileDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { selectDirectory } from "../../desktop/desktopBridge.ts";
-import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { TextField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { writeClipboardText } from "../../ui/clipboard.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
-import { PathField } from "../../ui/PathField.tsx";
+import { emptyClientDirectories, SingleWindowClientDirectories } from "./SingleWindowClientDirectories.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 
 const NEW_PROFILE_KEY = "__new__";
@@ -26,8 +24,8 @@ export function SingleWindowStationProfilePanel({
   const [profileName, setProfileName] = useState("");
   const [companyScope, setCompanyScope] = useState("");
   const [cardIdentifier, setCardIdentifier] = useState("");
-  const [customsCooClientRootPath, setCustomsCooClientRootPath] = useState("");
-  const [agentConsignmentClientRootPath, setAgentConsignmentClientRootPath] = useState("");
+  const [customsCooDirectories, setCustomsCooDirectories] = useState(emptyClientDirectories);
+  const [agentConsignmentDirectories, setAgentConsignmentDirectories] = useState(emptyClientDirectories);
   const [canSubmitCustomsCoo, setCanSubmitCustomsCoo] = useState(true);
   const [canSubmitAgentConsignment, setCanSubmitAgentConsignment] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
@@ -53,8 +51,8 @@ export function SingleWindowStationProfilePanel({
     profileName,
     companyScope,
     cardIdentifier,
-    customsCooClientRootPath,
-    agentConsignmentClientRootPath,
+    customsCooDirectories,
+    agentConsignmentDirectories,
     canSubmitCustomsCoo,
     canSubmitAgentConsignment,
   });
@@ -62,16 +60,16 @@ export function SingleWindowStationProfilePanel({
     profileName: selectedProfile.profileName ?? "",
     companyScope: selectedProfile.companyScope ?? "",
     cardIdentifier: selectedProfile.cardIdentifier ?? "",
-    customsCooClientRootPath: selectedProfile.customsCooClientRootPath ?? "",
-    agentConsignmentClientRootPath: selectedProfile.agentConsignmentClientRootPath ?? "",
+    customsCooDirectories: selectedProfile.customsCooDirectories,
+    agentConsignmentDirectories: selectedProfile.agentConsignmentDirectories,
     canSubmitCustomsCoo: selectedProfile.canSubmitCustomsCoo,
     canSubmitAgentConsignment: selectedProfile.canSubmitAgentConsignment,
   } : {
     profileName: "",
     companyScope: "",
     cardIdentifier: "",
-    customsCooClientRootPath: "",
-    agentConsignmentClientRootPath: "",
+    customsCooDirectories: emptyClientDirectories(),
+    agentConsignmentDirectories: emptyClientDirectories(),
     canSubmitCustomsCoo: true,
     canSubmitAgentConsignment: true,
   });
@@ -117,23 +115,24 @@ export function SingleWindowStationProfilePanel({
         profileName: profileName.trim(),
         companyScope: companyScope.trim(),
         cardIdentifier: cardIdentifier.trim(),
-        customsCooClientRootPath: customsCooClientRootPath.trim(),
-        agentConsignmentClientRootPath: agentConsignmentClientRootPath.trim(),
+        customsCooDirectories,
+        agentConsignmentDirectories,
         canSubmitCustomsCoo,
         canSubmitAgentConsignment,
       },
     }),
     onSuccess: async (response) => {
       queryClient.setQueryData(queryKeys.singleWindowClientProfiles(), response);
-      const savedProfile = response.profiles.find((profile) => profile.profileKey === response.activeProfileKey)
-        ?? response.profiles[0]
+      const savedProfile = response.profiles.find((profile) => selectedProfile
+        ? profile.profileKey === selectedProfile.profileKey
+        : !profiles.some(previous => previous.profileKey === profile.profileKey))
         ?? null;
       const nextProfileKey = savedProfile?.profileKey ?? NEW_PROFILE_KEY;
       loadedProfileKeyRef.current = nextProfileKey;
       setSelectedProfileKey(nextProfileKey);
       if (savedProfile) loadProfile(savedProfile);
       else resetDraft();
-      setMessage(response.message || "操作档案已保存并启用。");
+      setMessage("操作档案已保存。");
       setMessageKind("success");
       await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowClientProfiles() });
     },
@@ -174,8 +173,8 @@ export function SingleWindowStationProfilePanel({
     setProfileName("");
     setCompanyScope("");
     setCardIdentifier("");
-    setCustomsCooClientRootPath("");
-    setAgentConsignmentClientRootPath("");
+    setCustomsCooDirectories(emptyClientDirectories());
+    setAgentConsignmentDirectories(emptyClientDirectories());
     setCanSubmitCustomsCoo(true);
     setCanSubmitAgentConsignment(true);
   }
@@ -184,25 +183,10 @@ export function SingleWindowStationProfilePanel({
     setProfileName(profile.profileName ?? "");
     setCompanyScope(profile.companyScope ?? "");
     setCardIdentifier(profile.cardIdentifier ?? "");
-    setCustomsCooClientRootPath(profile.customsCooClientRootPath ?? "");
-    setAgentConsignmentClientRootPath(profile.agentConsignmentClientRootPath ?? "");
+    setCustomsCooDirectories(profile.customsCooDirectories);
+    setAgentConsignmentDirectories(profile.agentConsignmentDirectories);
     setCanSubmitCustomsCoo(profile.canSubmitCustomsCoo);
     setCanSubmitAgentConsignment(profile.canSubmitAgentConsignment);
-  }
-
-  async function chooseRoot(kind: "coo" | "acd") {
-    if (!canOperate) return;
-    try {
-      const current = kind === "coo" ? customsCooClientRootPath : agentConsignmentClientRootPath;
-      const selected = await selectDirectory(current);
-      if (!selected) return;
-      if (kind === "coo") setCustomsCooClientRootPath(selected);
-      else setAgentConsignmentClientRootPath(selected);
-      setDesktopMessage(null);
-      setMessage(null);
-    } catch (error) {
-      setDesktopMessage(readDesktopError(error));
-    }
   }
 
   async function changeSelectedProfile(nextProfileKey: string) {
@@ -300,7 +284,7 @@ export function SingleWindowStationProfilePanel({
             onClick={() => saveMutation.mutate()}
           >
             <Save size={17} aria-hidden="true" />
-            <span>保存并启用</span>
+            <span>保存档案</span>
           </button>
         </div>
       </div>
@@ -408,33 +392,15 @@ export function SingleWindowStationProfilePanel({
           <input type="checkbox" checked={canSubmitCustomsCoo} disabled={!canOperate || isBusy} onChange={(event) => setCanSubmitCustomsCoo(event.target.checked)} />
           <span><strong>海关原产地证</strong><small>COO 提交与回执目录</small></span>
         </label>
-        <PathField
-          label="COO 交接目录（官方客户端或手工导入）"
-          value={customsCooClientRootPath}
-          disabled={!canOperate || isBusy || !canSubmitCustomsCoo}
-          description="留空时在业务数据目录中为该档案创建交接目录；官方客户端不会自动导入，请按客户端要求完成操作。"
-          actions={<>
-            <DesktopIconButton title="选择 COO 交接目录" disabled={!canOperate || isBusy || !canSubmitCustomsCoo} onClick={() => void chooseRoot("coo")}><FolderOpen size={17} aria-hidden="true" /></DesktopIconButton>
-            {renderOpenPathAction(customsCooClientRootPath, "打开 COO 交接目录", setDesktopMessage)}
-          </>}
-          onChange={setCustomsCooClientRootPath}
-        />
         <label className="single-window-capability-card">
           <input type="checkbox" checked={canSubmitAgentConsignment} disabled={!canOperate || isBusy} onChange={(event) => setCanSubmitAgentConsignment(event.target.checked)} />
           <span><strong>报关代理委托</strong><small>ACD 提交与回执目录</small></span>
         </label>
-        <PathField
-          label="ACD 交接目录（官方客户端或手工导入）"
-          value={agentConsignmentClientRootPath}
-          disabled={!canOperate || isBusy || !canSubmitAgentConsignment}
-          description="与 COO 及其他公司档案目录必须完全分开；留空会创建受管交接目录，仍需人工确认官方客户端导入。"
-          actions={<>
-            <DesktopIconButton title="选择 ACD 交接目录" disabled={!canOperate || isBusy || !canSubmitAgentConsignment} onClick={() => void chooseRoot("acd")}><FolderOpen size={17} aria-hidden="true" /></DesktopIconButton>
-            {renderOpenPathAction(agentConsignmentClientRootPath, "打开 ACD 交接目录", setDesktopMessage)}
-          </>}
-          onChange={setAgentConsignmentClientRootPath}
-        />
       </div>
+      <SingleWindowClientDirectories key={selectedProfileKey} value={{ customsCooDirectories, agentConsignmentDirectories }}
+        disabled={!canOperate || isBusy} autoDetect={selectedProfileKey === NEW_PROFILE_KEY && !isBusy && canOperate}
+        cooEnabled={canSubmitCustomsCoo} acdEnabled={canSubmitAgentConsignment}
+        onChange={next => { setCustomsCooDirectories(next.customsCooDirectories); setAgentConsignmentDirectories(next.agentConsignmentDirectories); }} />
     </section>
   );
 }

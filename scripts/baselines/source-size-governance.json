@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-09",
-  "reviewNotes": "2026-11-09: reviewed independent declaration source module, three native API definitions and explicit frozen-contract changes; reuse existing Excel parser and record storage, with no new dependency or legacy compatibility layer. Reviewed shared SQLite/PostgreSQL source contract, protocol probes, authorization and real desktop extension. Removed duplicate Excel preview orchestration and row-restore append behavior. Per-file limits and subsequent growth allowances remain unchanged.",
+  "reviewNotes": "2026-11-09: reviewed independent declaration sources, shared Excel parsing and record storage. Subsequently reviewed official-client directory discovery, a pure whitelisted settings parser reusing bounded XML validation, eight independent paths and explicit frozen-contract replacement. Removed common-root concatenation and duplicate XML checks; host IO remains in Tauri and directory fields are extracted from the profile panel. Native baseline records the reviewed 118-line net addition. Per-file limits and subsequent growth allowances remain unchanged.",
   "rules": [
     {
       "name": "repository web production default",
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 101867,
+      "baselineAggregateLines": 101985,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 101942,
+      "maximumAggregateLines": 102060,
       "reportFiles": false
     },
     {

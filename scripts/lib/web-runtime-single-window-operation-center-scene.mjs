@@ -431,8 +431,8 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
         profileName: `Smoke ${definition.displayName} ${timestamp}`,
         companyScope,
         cardIdentifier: `SMOKE-${definition.key.toUpperCase()}-${timestamp}`,
-        customsCooClientRootPath: definition.key === "coo" ? clientRoot : "",
-        agentConsignmentClientRootPath: definition.key === "acd" ? clientRoot : "",
+        customsCooDirectories: createSingleWindowTestDirectories(definition.key === "coo" ? clientRoot : ""),
+        agentConsignmentDirectories: createSingleWindowTestDirectories(definition.key === "acd" ? clientRoot : ""),
         canSubmitCustomsCoo: definition.key === "coo",
         canSubmitAgentConsignment: definition.key === "acd",
       }),
@@ -537,9 +537,9 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
   function singleWindowProfileContainsPath(profile, expectedPath) {
     const expected = normalizePathForCompare(expectedPath).toLowerCase();
     return Boolean(profile && expected && [
-      profile.customsCooClientRootPath,
-      profile.agentConsignmentClientRootPath,
-    ].some((candidate) => normalizePathForCompare(candidate).toLowerCase() === expected));
+      profile.customsCooDirectories?.outBox,
+      profile.agentConsignmentDirectories?.outBox,
+    ].some((candidate) => candidate && normalizePathForCompare(path.dirname(candidate)).toLowerCase() === expected));
   }
 
   function buildSingleWindowOperationCenterCheckUrl(webUrl, smokeRunId) {
@@ -552,3 +552,4 @@ export function createSingleWindowOperationCenterSmokeScene(runtime) {
 
   return { run: waitForSingleWindowOperationCenterCheck };
 }
+import { createSingleWindowTestDirectories } from './single-window-test-directories.mjs';

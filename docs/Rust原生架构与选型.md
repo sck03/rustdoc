@@ -99,7 +99,7 @@ Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分
 
 桌面令牌由 Rust 宿主生成，仅由主窗口受限 IPC 获取，不写 URL 或日志。随机回环端口、精确 Host／Origin 校验、官方 endpoint policy、登录会话与对象权限共同控制桌面访问。网络服务不安装本机文件／进程能力。
 
-AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，业务 SQLite 在 DataRoot/Database，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。数据库仅接受全新 schema 15（2026-11-09 独立申报基线）；旧测试库和旧 schema 备份拒绝打开或恢复，显式选择新目录/数据库建库，不自动删除原数据。
+AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，业务 SQLite 在 DataRoot/Database，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。数据库仅接受全新 schema 16（2026-11-09 独立申报及客户端目录基线）；旧测试库和旧 schema 备份拒绝打开或恢复，显式选择新目录/数据库建库，不自动删除原数据。
 
 2026-10-30 权限目录分别声明单位及动作可授范围、记录范围和流程归属；Contract 编译器把既有注解转换为统一访问规则，Domain 与编译器共用纯动作映射。任职/方案编辑器共用范围模型；独立签署资格同时用于审批与移交。`oa/queue_authority` 只复用本次读取的代理与业务身份，Storage 提供摘要投影、供应商评价聚合、账号批读及资源未结存在判断；Engine 负责当前授权与业务组合。保留原数组接口并在内部按批读取，未引入跨请求权限缓存、运行依赖或数据库迁移。
 

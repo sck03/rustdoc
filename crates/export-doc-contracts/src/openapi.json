@@ -15264,6 +15264,29 @@
           "storagePolicy"
         ]
       },
+      "ApiSingleWindowClientDirectories": {
+        "type": "object",
+        "properties": {
+          "failBox": {
+            "type": "string"
+          },
+          "inBox": {
+            "type": "string"
+          },
+          "outBox": {
+            "type": "string"
+          },
+          "sentBox": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "outBox",
+          "sentBox",
+          "inBox",
+          "failBox"
+        ]
+      },
       "ApiSingleWindowClientDispatchRequest": {
         "type": "object",
         "properties": {
@@ -15283,8 +15306,8 @@
       "ApiSingleWindowClientProfileDto": {
         "type": "object",
         "properties": {
-          "agentConsignmentClientRootPath": {
-            "type": "string"
+          "agentConsignmentDirectories": {
+            "$ref": "#/components/schemas/ApiSingleWindowClientDirectories"
           },
           "canSubmitAgentConsignment": {
             "type": "boolean"
@@ -15298,8 +15321,8 @@
           "companyScope": {
             "type": "string"
           },
-          "customsCooClientRootPath": {
-            "type": "string"
+          "customsCooDirectories": {
+            "$ref": "#/components/schemas/ApiSingleWindowClientDirectories"
           },
           "id": {
             "type": [
@@ -15340,8 +15363,8 @@
           "companyScope",
           "cardIdentifier",
           "stationAssignmentCode",
-          "customsCooClientRootPath",
-          "agentConsignmentClientRootPath",
+          "customsCooDirectories",
+          "agentConsignmentDirectories",
           "canSubmitCustomsCoo",
           "canSubmitAgentConsignment",
           "isEnabled",
@@ -15352,8 +15375,8 @@
       "ApiSingleWindowClientProfileSaveRequest": {
         "type": "object",
         "properties": {
-          "agentConsignmentClientRootPath": {
-            "type": "string"
+          "agentConsignmentDirectories": {
+            "$ref": "#/components/schemas/ApiSingleWindowClientDirectories"
           },
           "canSubmitAgentConsignment": {
             "type": "boolean"
@@ -15367,8 +15390,8 @@
           "companyScope": {
             "type": "string"
           },
-          "customsCooClientRootPath": {
-            "type": "string"
+          "customsCooDirectories": {
+            "$ref": "#/components/schemas/ApiSingleWindowClientDirectories"
           },
           "profileKey": {
             "type": "string"
@@ -15382,8 +15405,8 @@
           "profileName",
           "companyScope",
           "cardIdentifier",
-          "customsCooClientRootPath",
-          "agentConsignmentClientRootPath",
+          "customsCooDirectories",
+          "agentConsignmentDirectories",
           "canSubmitCustomsCoo",
           "canSubmitAgentConsignment"
         ]
@@ -30605,20 +30628,23 @@
           "batchReference": {
             "type": "string"
           },
-          "receiptFiles": {
+          "receiptDirectories": {
             "type": "array",
             "items": {
               "type": "string"
             }
           },
-          "receiptRootPath": {
-            "type": "string"
+          "receiptFiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
           "batchId",
           "batchReference",
-          "receiptRootPath",
+          "receiptDirectories",
           "receiptFiles"
         ]
       },
@@ -119842,6 +119868,26 @@
           },
           "409": {
             "description": "Conflict"
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-exportdoc-policy": {

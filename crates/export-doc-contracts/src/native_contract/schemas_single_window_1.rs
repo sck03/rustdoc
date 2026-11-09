@@ -45,18 +45,19 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("lockedFields",a(r("ApiSingleWindowLockedFieldDto"))),("message",s())
     ]).required(vec!["success","changedCount","document","lockedFields","message"])),
     ("ApiSingleWindowClientDispatchRequest",o(vec![("batchId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))]).required(vec!["batchId"])),
+    ("ApiSingleWindowClientDirectories",o(vec![("outBox",s()),("sentBox",s()),("inBox",s()),("failBox",s())]).required(vec!["outBox","sentBox","inBox","failBox"])),
     ("ApiSingleWindowClientProfileDto",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("stationKey",s()),("profileKey",s()),
         ("profileName",s()),("companyScope",s()),("cardIdentifier",s()),
-        ("stationAssignmentCode",s()),("customsCooClientRootPath",s()),("agentConsignmentClientRootPath",s()),
+        ("stationAssignmentCode",s()),("customsCooDirectories",r("ApiSingleWindowClientDirectories")),("agentConsignmentDirectories",r("ApiSingleWindowClientDirectories")),
         ("canSubmitCustomsCoo",b()),("canSubmitAgentConsignment",b()),("isEnabled",b()),
         ("isActive",b()),("updatedAt",s().format("date-time"))
-    ]).required(vec!["id","stationKey","profileKey","profileName","companyScope","cardIdentifier","stationAssignmentCode","customsCooClientRootPath","agentConsignmentClientRootPath","canSubmitCustomsCoo","canSubmitAgentConsignment","isEnabled","isActive","updatedAt"])),
+    ]).required(vec!["id","stationKey","profileKey","profileName","companyScope","cardIdentifier","stationAssignmentCode","customsCooDirectories","agentConsignmentDirectories","canSubmitCustomsCoo","canSubmitAgentConsignment","isEnabled","isActive","updatedAt"])),
     ("ApiSingleWindowClientProfileSaveRequest",o(vec![
         ("profileKey",s()),("profileName",s()),("companyScope",s()),
-        ("cardIdentifier",s()),("customsCooClientRootPath",s()),("agentConsignmentClientRootPath",s()),
+        ("cardIdentifier",s()),("customsCooDirectories",r("ApiSingleWindowClientDirectories")),("agentConsignmentDirectories",r("ApiSingleWindowClientDirectories")),
         ("canSubmitCustomsCoo",b()),("canSubmitAgentConsignment",b())
-    ]).required(vec!["profileKey","profileName","companyScope","cardIdentifier","customsCooClientRootPath","agentConsignmentClientRootPath","canSubmitCustomsCoo","canSubmitAgentConsignment"])),
+    ]).required(vec!["profileKey","profileName","companyScope","cardIdentifier","customsCooDirectories","agentConsignmentDirectories","canSubmitCustomsCoo","canSubmitAgentConsignment"])),
     ("ApiSingleWindowClientProfilesResponse",o(vec![
         ("profiles",a(r("ApiSingleWindowClientProfileDto"))),("activeProfileKey",s()),("storagePolicy",s()),
         ("message",s())
@@ -176,9 +177,9 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("SingleWindowPackageType",Schema::default().enumeration(Enumeration::Values(vec![serde_json::json!("SubmitPackage"),serde_json::json!("ReceiptPackage")]))),
     ("SingleWindowReceiptBusinessStatus",Schema::default().enumeration(Enumeration::Values(vec![serde_json::json!("Unknown"),serde_json::json!("Received"),serde_json::json!("Accepted"),serde_json::json!("Rejected"),serde_json::json!("PendingReview"),serde_json::json!("Approved"),serde_json::json!("Failed")]))),
     ("SingleWindowReceiptCollectionResult",o(vec![
-        ("batchId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("batchReference",s()),("receiptRootPath",s()),
+        ("batchId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("batchReference",s()),("receiptDirectories",a(s())),
         ("receiptFiles",a(s()))
-    ]).required(vec!["batchId","batchReference","receiptRootPath","receiptFiles"])),
+    ]).required(vec!["batchId","batchReference","receiptDirectories","receiptFiles"])),
     ("SingleWindowReceiptKind",Schema::default().enumeration(Enumeration::Values(vec![serde_json::json!("Unknown"),serde_json::json!("CustomsCooBusinessReceipt"),serde_json::json!("CustomsCooTechnicalReceipt"),serde_json::json!("CustomsCooAttachmentReceipt"),serde_json::json!("AgentConsignmentImportResponse"),serde_json::json!("AgentConsignmentAcd002")]))),
     ("SingleWindowReceiptParseResult",o(vec![
         ("businessType",r("SingleWindowBusinessType")),("receiptKind",r("SingleWindowReceiptKind")),("referenceNo",s()),

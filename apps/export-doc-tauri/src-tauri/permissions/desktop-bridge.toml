@@ -2,6 +2,7 @@
 identifier = "allow-desktop-bridge"
 description = "Allow the main desktop window to call ExportDocManager Tauri bridge commands."
 commands.allow = [
+  "detect_single_window_client_directories",
   "select_single_window_package_file",
   "select_invoice_transfer_package_file",
   "select_disaster_recovery_package_file",

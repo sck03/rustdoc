@@ -131,23 +131,13 @@ export function readDisplayValue(value?: string | number) {
   return readDisplayText(value);
 }
 
-export function resolveBusinessClientRoot(
+export function resolveBusinessClientDirectories(
   profile: ApiSingleWindowClientProfileDto,
   businessType: string,
 ) {
   return businessType.trim().toLowerCase() === "customscoo"
-    ? profile.customsCooClientRootPath?.trim() ?? ""
-    : profile.agentConsignmentClientRootPath?.trim() ?? "";
-}
-
-export function buildClientBoxPath(rootPath: string, boxName: "OutBox" | "SentBox" | "InBox" | "FailBox") {
-  const normalizedRoot = rootPath.trim().replace(/[\\/]+$/, "");
-  if (!normalizedRoot) {
-    return "";
-  }
-
-  const separator = normalizedRoot.includes("/") && !normalizedRoot.includes("\\") ? "/" : "\\";
-  return `${normalizedRoot}${separator}${boxName}`;
+    ? profile.customsCooDirectories
+    : profile.agentConsignmentDirectories;
 }
 
 export function buildReceiptPackageFileName(detail: Pick<SingleWindowOperationCenterDetail, "batchId" | "batchReference" | "invoiceNo">) {

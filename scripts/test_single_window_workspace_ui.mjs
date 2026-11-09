@@ -31,6 +31,8 @@ import {MemoryRouter,Routes,Route,useNavigate} from "react-router-dom";
 import {AgentConsignmentPage} from ${source("features/single-window/AgentConsignmentPage.tsx")};
 import {CustomsCooPage} from ${source("features/single-window/CustomsCooPage.tsx")};
 import {SingleWindowSourcesPage} from ${source("features/single-window/SingleWindowSourcesPage.tsx")};
+import {SingleWindowClientDirectories,emptyClientDirectories} from ${source("features/single-window/SingleWindowClientDirectories.tsx")};
+import {SingleWindowStationProfilePanel} from ${source("features/single-window/SingleWindowStationProfilePanel.tsx")};
 import {useReferenceCatalogExcelWorkspace} from ${source("features/single-window/useReferenceCatalogExcelWorkspace.ts")};
 import {catalogPages,getRows} from ${source("features/single-window/referenceCatalogModel.ts")};
 import {PermissionAccessProvider} from ${source("app/PermissionAccessContext.tsx")};
@@ -40,10 +42,14 @@ const initial={agent:${JSON.stringify(example(schemas.ApiAgentConsignmentDocumen
 const catalog=${JSON.stringify(example(schemas.SingleWindowReferenceCatalogModel))};
 const queries=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity},mutations:{retry:false}}});window.queries=queries;
 const records=new Map();window.pending=[];
+window.profileRows=[1,2].map(id=>({...${JSON.stringify(example(schemas.ApiSingleWindowClientProfileDto))},id,profileKey:'profile-'+id,profileName:'档案'+id,companyScope:'DEFAULT',cardIdentifier:'CARD-'+id,isEnabled:true,isActive:id===1,canSubmitCustomsCoo:true,canSubmitAgentConsignment:true}));
+if(window.mode==='directories'){window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>new Promise((resolve,reject)=>window.pending.push({command,args,resolve,reject}))};}
 const get=id=>{if(!records.has(id))records.set(id,{...initial[window.mode],id:0,sourceId:id,draftRevision:0,expectedDraftRevision:0,copCusCode:'1234567890',gName:'initial',certNo:'initial'});return records.get(id)};
 const defer=(kind,request,init)=>new Promise((resolve,reject)=>window.pending.push({kind,request,signal:init.signal,resolve,reject}));
 const save=(r,i)=>defer('save',r,i),defaults=(r,i)=>defer('defaults',r,i);
 const client={getAgentConsignmentDocument:async r=>get(r.sourceId),getCustomsCooDocument:async r=>get(r.sourceId),
+  getSingleWindowClientProfiles:async()=>({profiles:window.profileRows,activeProfileKey:'profile-1'}),
+  saveSingleWindowClientProfile:r=>defer('profile',r,{}),
   listSingleWindowSources:async()=>({items:[],totalCount:0}),
   previewSingleWindowExcelImport:(r,i)=>defer('source-preview',r,i),
   createSingleWindowSource:(r,i)=>defer('source-create',r,i),
@@ -60,10 +66,12 @@ function Excel(){const [activeKey,setKey]=useState('countries'),[draft,setDraft]
  const workspace=useReferenceCatalogExcelWorkspace({client,activeKey,activePage,draft,rows:getRows(draft,activeKey),canManage:true,externalBusy:false,markDraft:setDraft,clearMessages:()=>setNotice(''),showError:setNotice,showSuccess:setNotice});
  window.excel=workspace;window.setKey=setKey;return <><input type="file" onChange={workspace.handleFile}/><output>{workspace.sheetName}</output><span>{notice}</span></>;
 }
+function Directories({enabled}){const [value,setValue]=useState({customsCooDirectories:emptyClientDirectories(),agentConsignmentDirectories:emptyClientDirectories()});window.directoryValue=value;
+ return <SingleWindowClientDirectories value={value} onChange={setValue} autoDetect disabled={!enabled} cooEnabled acdEnabled/>;}
 function Harness(){const navigate=useNavigate(),[shown,setShown]=useState(true),[enabled,setEnabled]=useState(true),[owner,setOwner]=useState(client);
  window.navigate=navigate;window.hide=()=>setShown(false);window.revoke=()=>setEnabled(false);window.changeClient=()=>setOwner({...client});window.dirty=useHasUnsavedChanges();
  const permissions=['view',...(enabled?['operate','manage']:[])].map(action=>({resourceKey:'document.single-window',action,dataScope:'all'}));
- return <PermissionAccessProvider permissions={permissions}>{!shown?<span>closed</span>:window.mode==='sources'?<SingleWindowSourcesPage client={owner}/>:window.mode==='excel'?<Excel/>:<Routes><Route path="/:sourceId" element={window.mode==='agent'?<AgentConsignmentPage client={owner}/>:<CustomsCooPage client={owner}/>}/></Routes>}</PermissionAccessProvider>;
+ return <PermissionAccessProvider permissions={permissions}>{!shown?<span>closed</span>:window.mode==='profiles'?<SingleWindowStationProfilePanel client={owner} canOperate={enabled}/>:window.mode==='directories'?<Directories enabled={enabled}/>:window.mode==='sources'?<SingleWindowSourcesPage client={owner}/>:window.mode==='excel'?<Excel/>:<Routes><Route path="/:sourceId" element={window.mode==='agent'?<AgentConsignmentPage client={owner}/>:<CustomsCooPage client={owner}/>}/></Routes>}</PermissionAccessProvider>;
 }
 createRoot(document.getElementById('root')).render(<QueryClientProvider client={queries}><MemoryRouter initialEntries={['/1']}><ConfirmationProvider><UnsavedChangesProvider><Harness/></UnsavedChangesProvider></ConfirmationProvider></MemoryRouter></QueryClientProvider>);
 ` } });
@@ -81,6 +89,59 @@ async function scenario(mode, check) {
 }
 const submit = page => page.locator("form.entity-form").evaluate(form => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
 try {
+  await scenario('profiles',async page=>{
+    await page.getByLabel('选择操作档案').selectOption('profile-2');
+    await page.getByLabel('ACD 发送目录 OutBox',{exact:true}).fill('F:/第二张卡');
+    await page.getByRole('button',{name:'保存档案',exact:true}).click();
+    await page.waitForFunction(()=>window.pending.length===1);
+    await page.evaluate(()=>{
+      const p=window.pending[0];window.profileRows[1]={...window.profileRows[1],...p.request.body};
+      p.resolve({profiles:window.profileRows,activeProfileKey:'profile-1'});
+    });
+    await page.getByText('操作档案已保存。',{exact:true}).waitFor();
+    assert.equal(await page.getByLabel('选择操作档案').inputValue(),'profile-2');
+    assert.equal(await page.getByLabel('ACD 发送目录 OutBox',{exact:true}).inputValue(),'F:/第二张卡');
+  });
+  const detected = { customsCooDirectories: {outBox:'F:/发送',sentBox:'E:/归档',inBox:'D:/回执',failBox:'F:/失败'}, agentConsignmentDirectories:{outBox:'F:/ACD发送',sentBox:'E:/ACD归档',inBox:'D:/ACD回执',failBox:'F:/ACD失败'} };
+  await scenario('directories', async page => {
+    await page.waitForFunction(() => window.pending.length===1);
+    await page.evaluate(found => window.pending[0].resolve(found), detected);
+    await page.getByText('已读取客户端任务目录，请核对后保存。').waitFor();
+    assert.deepEqual(await page.evaluate(() => window.directoryValue),detected);
+    await page.getByLabel('COO 回执目录 InBox',{exact:true}).fill('D:/手动回执');
+    await page.getByRole('button',{name:'选择 COO 回执目录 InBox',exact:true}).click();
+    await page.waitForFunction(() => window.pending.length===2);
+    await page.evaluate(() => window.pending[1].resolve(null));
+    assert.equal(await page.getByLabel('COO 回执目录 InBox',{exact:true}).inputValue(),'D:/手动回执');
+  });
+  await scenario('directories', async page => {
+    await page.waitForFunction(() => window.pending.length===1);
+    await page.getByLabel('ACD 发送目录 OutBox',{exact:true}).fill('F:/手动发送');
+    await page.evaluate(found => window.pending[0].resolve(found), detected);
+    await page.getByText(/目录已手动修改/).waitFor();
+    assert.equal(await page.getByLabel('ACD 发送目录 OutBox',{exact:true}).inputValue(),'F:/手动发送');
+    await page.getByRole('button',{name:'重新检测目录'}).click();
+    await page.waitForFunction(() => window.pending.length===2);
+    await page.evaluate(found => window.pending[1].resolve(found), detected);
+    await page.getByText('已读取客户端任务目录，请核对后保存。').waitFor();
+    assert.deepEqual(await page.evaluate(() => window.directoryValue),detected);
+  });
+  await scenario('directories', async page => {
+    await page.waitForFunction(() => window.pending.length===1);
+    await page.evaluate(() => window.pending[0].reject(Error('未找到客户端配置')));
+    await page.getByText('未找到客户端配置',{exact:true}).waitFor();
+    await page.getByRole('button',{name:'选择 COO 发送目录 OutBox',exact:true}).click();
+    await page.waitForFunction(() => window.pending.length===2);
+    await page.evaluate(() => window.pending[1].resolve('F:/人工选择'));
+    await page.waitForFunction(() => window.directoryValue.customsCooDirectories.outBox==='F:/人工选择');
+  });
+  for(const action of ['hide','revoke']) await scenario('directories', async page => {
+    await page.waitForFunction(() => window.pending.length===1);
+    await page.evaluate(action => window[action](), action);
+    await page.evaluate(found => window.pending[0].resolve(found), detected);
+    assert.equal(await page.getByText('已读取客户端任务目录，请核对后保存。').count(),0);
+    assert.equal(await page.evaluate(() => window.directoryValue.customsCooDirectories.outBox),'');
+  });
   for (const mode of ["agent", "coo"]) {
     const label = mode === "agent" ? /^主要货物名称/ : "原产地证编号";
     await scenario(mode, async page => {

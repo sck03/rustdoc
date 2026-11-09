@@ -1,6 +1,7 @@
 //! Explicit reviewed changes to the frozen served contract; never copy live output.
 use serde_json::{Value, json};
 pub(super) fn reviewed_versioning(baseline: &mut Value) {
+    reviewed_client_directories(baseline);
     for name in ["ApiCustomsCooProducerProfileDto", "ApiContainerTypeDto"] {
         let schema = &mut baseline["components"]["schemas"][name];
         schema["properties"]["versionNumber"] =
@@ -63,6 +64,56 @@ pub(super) fn reviewed_versioning(baseline: &mut Value) {
             .unwrap();
     for name in ["pageNumber", "pageSize"] {
         parameters.push(json!({"name":name,"in":"query","schema":{"type":["integer","string"],"format":"int32","pattern":"^-?(?:0|[1-9]\\d*)$"}}));
+    }
+}
+
+fn reviewed_client_directories(baseline: &mut Value) {
+    for code in ["503", "504"] {
+        baseline["paths"]["/api/single-window/client-profiles"]["put"]["responses"][code] =
+            baseline["paths"]["/api/single-window/client/dispatch"]["post"]["responses"][code]
+                .clone();
+    }
+    let schemas = &mut baseline["components"]["schemas"];
+    schemas["ApiSingleWindowClientDirectories"] = json!({"type":"object","properties":{
+        "outBox":{"type":"string"},"sentBox":{"type":"string"},"inBox":{"type":"string"},"failBox":{"type":"string"}},
+        "required":["outBox","sentBox","inBox","failBox"]});
+    for name in [
+        "ApiSingleWindowClientProfileDto",
+        "ApiSingleWindowClientProfileSaveRequest",
+    ] {
+        let schema = &mut schemas[name];
+        for (old, new) in [
+            ("customsCooClientRootPath", "customsCooDirectories"),
+            (
+                "agentConsignmentClientRootPath",
+                "agentConsignmentDirectories",
+            ),
+        ] {
+            schema["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove(old)
+                .unwrap();
+            schema["properties"][new] =
+                json!({"$ref":"#/components/schemas/ApiSingleWindowClientDirectories"});
+            for field in schema["required"].as_array_mut().unwrap() {
+                if field == old {
+                    *field = json!(new);
+                }
+            }
+        }
+    }
+    let schema = &mut schemas["SingleWindowReceiptCollectionResult"];
+    schema["properties"]
+        .as_object_mut()
+        .unwrap()
+        .remove("receiptRootPath")
+        .unwrap();
+    schema["properties"]["receiptDirectories"] = json!({"type":"array","items":{"type":"string"}});
+    for field in schema["required"].as_array_mut().unwrap() {
+        if field == "receiptRootPath" {
+            *field = json!("receiptDirectories");
+        }
     }
 }
 

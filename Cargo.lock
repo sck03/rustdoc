@@ -1765,6 +1765,7 @@ dependencies = [
  "base64 0.23.1",
  "export-doc-engine",
  "export-doc-server",
+ "export-doc-single-window",
  "fs2",
  "getrandom 0.4.3",
  "libc",

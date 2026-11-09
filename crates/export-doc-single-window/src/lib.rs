@@ -1,4 +1,5 @@
 pub mod authentication;
+pub mod client_settings;
 pub mod package;
 pub mod receipt;
 pub mod xml;

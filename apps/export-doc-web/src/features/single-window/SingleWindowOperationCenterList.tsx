@@ -17,14 +17,13 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { isDirectTableRowKeyboardEvent } from "../../ui/tableRowInteractions.ts";
 import { DetailItem } from "./SingleWindowOperationCenterTables.tsx";
 import {
-  buildClientBoxPath,
   buildReceiptPackageFileName,
   formatBatchStatus,
   formatBusinessType,
   formatDateTime,
   invalidateSingleWindowBatchQueries,
   readDisplayText,
-  resolveBusinessClientRoot,
+  resolveBusinessClientDirectories,
 } from "./singleWindowOperationCenterModel.ts";
 
 export function FilterSelect({
@@ -198,9 +197,9 @@ export function OperationCenterListActionsPanel({
     profile.companyScope.trim().toLocaleLowerCase() === row.companyScope.trim().toLocaleLowerCase() &&
     profile.cardIdentifier === row.assignedCardIdentifier,
   );
-  const clientRoot = profile && isActiveProfileMatch ? resolveBusinessClientRoot(profile, row.businessType) : "";
-  const outBoxPath = buildClientBoxPath(clientRoot, "OutBox");
-  const inBoxPath = buildClientBoxPath(clientRoot, "InBox");
+  const directories = profile && isActiveProfileMatch ? resolveBusinessClientDirectories(profile, row.businessType) : null;
+  const outBoxPath = directories?.outBox ?? "";
+  const inBoxPath = directories?.inBox ?? "";
   const isBusy = dispatchMutation.isPending || receiptMutation.isPending;
   const canDispatch = isActiveProfileMatch && row.status === "SubmitPackageImported";
   const canCollect = isActiveProfileMatch && ![

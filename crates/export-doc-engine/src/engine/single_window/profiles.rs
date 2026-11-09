@@ -2,7 +2,7 @@ use super::*;
 use crate::paths::{ensure_safe_absolute, nonce};
 use base64::{Engine, prelude::BASE64_STANDARD};
 use export_doc_single_window::{authentication, prefixed};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 pub const OPERATIONS: &[Operation] = &[
     GET_SINGLE_WINDOW_CLIENT_PROFILES,
@@ -20,22 +20,19 @@ pub fn local(service: &NativeService) -> Result<()> {
     Ok(())
 }
 
-pub fn root(service: &NativeService, relative: &str) -> Result<PathBuf> {
-    let path = Path::new(relative);
-    if relative.is_empty()
-        || relative.contains([':', '\\'])
-        || path.is_absolute()
-        || path
-            .components()
-            .any(|p| !matches!(p, Component::Normal(_)))
-        || relative
-            .split('/')
-            .any(|part| !crate::paths::valid_file_name(part))
-    {
-        return Err(invalid("客户端交接目录须为运行数据目录内的安全相对路径。"));
-    }
-    let path = service.paths.data_root.join(path);
+pub const BOXES: [&str; 4] = ["outBox", "sentBox", "inBox", "failBox"];
+
+pub fn directory(value: &str) -> Result<PathBuf> {
+    let path = PathBuf::from(value);
     ensure_safe_absolute(&path).map_err(invalid)?;
+    match std::fs::metadata(&path) {
+        Ok(meta) if meta.is_dir() => {}
+        Ok(_) => return Err(invalid("客户端交接路径必须是文件夹。")),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(invalid("客户端交接目录不存在，请重新检测或选择目录。"));
+        }
+        Err(e) => return Err(unavailable(format!("无法访问客户端交接目录：{e}"))),
+    }
     Ok(path)
 }
 
@@ -44,12 +41,14 @@ fn overlaps(left: &str, right: &str) -> bool {
         return false;
     }
     let parts = |s: &str| {
-        s.split('/')
+        Path::new(s)
+            .components()
             .map(|p| {
+                let p = p.as_os_str().to_string_lossy();
                 if cfg!(windows) {
                     p.to_lowercase()
                 } else {
-                    p.into()
+                    p.into_owned()
                 }
             })
             .collect::<Vec<String>>()
@@ -118,7 +117,7 @@ fn response(tx: &Connection, service: &NativeService, actor: &Actor) -> Result<V
             .then_with(|| a["profileName"].as_str().cmp(&b["profileName"].as_str()))
     });
     Ok(
-        json!({"profiles":profiles,"activeProfileKey":active,"storagePolicy":"档案及加密交接凭证保存在本机业务数据库；交接目录位于运行数据目录内。","message":"持卡机操作档案已读取。"}),
+        json!({"profiles":profiles,"activeProfileKey":active,"storagePolicy":"档案及加密交接凭证保存在本机业务数据库；官方客户端的四类交接目录分别保存为本机绝对路径。","message":"持卡机操作档案已读取。"}),
     )
 }
 
@@ -172,19 +171,22 @@ pub fn handle(
                 value["isEnabled"]=json!(true);
                 value["isActive"]=json!(rows.is_empty());
             }
-            for (field,enabled,suffix) in [("customsCooClientRootPath","canSubmitCustomsCoo","coo"),("agentConsignmentClientRootPath","canSubmitAgentConsignment","acd")] {
+            let mut directories = Vec::new();
+            for (field,enabled) in [("customsCooDirectories","canSubmitCustomsCoo"),("agentConsignmentDirectories","canSubmitAgentConsignment")] {
                 value[enabled]=body[enabled].clone();
-                let requested=rules::text(body,field);
-                let directory=if requested.is_empty() && body[enabled]==true {
-                    Path::new("SingleWindow").join("Clients").join(rules::text(&value,"profileKey")).join(suffix).to_string_lossy().replace('\\',"/")
-                } else { requested.into() };
-                if !directory.is_empty() { root(service,&directory)?; }
-                value[field]=json!(directory);
+                value[field]=json!({});
+                for key in BOXES {
+                    let requested=rules::text(&body[field],key);
+                    if body[enabled]==true {
+                        let identity=directory(requested)?.canonicalize()?.to_string_lossy().into_owned();
+                        if directories.iter().any(|other: &String| overlaps(other,&identity)) {
+                            return Err(invalid("不同业务及不同用途的客户端目录不得相同或互相包含。"));
+                        }
+                        directories.push(identity);
+                    }
+                    value[field][key]=json!(requested);
+                }
             }
-            let directories = [rules::text(&value,"customsCooClientRootPath"),rules::text(&value,"agentConsignmentClientRootPath")];
-            if overlaps(directories[0],directories[1]) || rows.iter().filter(|r|r["profileKey"]!=value["profileKey"]).any(|r| {
-                directories.iter().any(|dir| ["customsCooClientRootPath","agentConsignmentClientRootPath"].iter().any(|key| overlaps(dir,rules::text(r,key))))
-            }) { return Err(invalid("不同档案或业务的交接目录不得重叠。")); }
             value
         };
         if operation==ACTIVATE_SINGLE_WINDOW_CLIENT_PROFILE {

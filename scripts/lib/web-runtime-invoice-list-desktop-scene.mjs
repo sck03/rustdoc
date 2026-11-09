@@ -682,7 +682,7 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
     return {
       stationReceiptCollected: true,
       receiptFiles,
-      stationReceiptRootPath: payload.receiptRootPath,
+      stationReceiptDirectories: payload.receiptDirectories,
     };
   }
 
@@ -784,8 +784,8 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
         profileName: `Smoke Invoice List ${timestamp}`,
         companyScope,
         cardIdentifier: `SMOKE-INVOICE-LIST-${timestamp}`,
-        customsCooClientRootPath: cooClientRoot,
-        agentConsignmentClientRootPath: acdClientRoot,
+        customsCooDirectories: createSingleWindowTestDirectories(cooClientRoot),
+        agentConsignmentDirectories: createSingleWindowTestDirectories(acdClientRoot),
         canSubmitCustomsCoo: true,
         canSubmitAgentConsignment: true,
       }),
@@ -799,8 +799,8 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
       : null;
     if (!activeProfile ||
         activeProfile.companyScope !== companyScope ||
-        normalizePathForCompare(activeProfile.customsCooClientRootPath) !== normalizePathForCompare(cooClientRoot) ||
-        normalizePathForCompare(activeProfile.agentConsignmentClientRootPath) !== normalizePathForCompare(acdClientRoot)) {
+        normalizePathForCompare(activeProfile.customsCooDirectories.outBox) !== normalizePathForCompare(path.join(cooClientRoot, 'OutBox')) ||
+        normalizePathForCompare(activeProfile.agentConsignmentDirectories.outBox) !== normalizePathForCompare(path.join(acdClientRoot, 'OutBox'))) {
       throw new Error(`Single Window invoice-list station profile response is incomplete: ${JSON.stringify(payload)}`);
     }
     return activeProfile;
@@ -1128,3 +1128,4 @@ export function createInvoiceListDesktopSmokeScene(runtime) {
 
   return { run: waitForInvoiceListDesktopWorkflowCheck };
 }
+import { createSingleWindowTestDirectories } from './single-window-test-directories.mjs';

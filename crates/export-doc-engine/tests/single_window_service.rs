@@ -144,9 +144,21 @@ fn independent_sources_enforce_ownership_without_invoice_permissions() {
 }
 
 fn profile(f: &Fixture) -> Value {
+    profile_at(f, &f.root)
+}
+fn profile_at(f: &Fixture, directory_root: &std::path::Path) -> Value {
+    let boxes = |kind: &str| {
+        let mut value = json!({});
+        for key in ["outBox", "sentBox", "inBox", "failBox"] {
+            let path = directory_root.join(format!("{key}-{kind}-自定义"));
+            std::fs::create_dir_all(&path).unwrap();
+            value[key] = json!(path);
+        }
+        value
+    };
     let body = contracts::overlay(
         contracts::object(SAVE_SINGLE_WINDOW_CLIENT_PROFILE.id, true),
-        &json!({"profileName":"测试持卡机","companyScope":"DEFAULT","cardIdentifier":"CARD-TEST","canSubmitCustomsCoo":true,"canSubmitAgentConsignment":true}),
+        &json!({"profileName":"测试持卡机","companyScope":"DEFAULT","cardIdentifier":"CARD-TEST","canSubmitCustomsCoo":true,"canSubmitAgentConsignment":true,"customsCooDirectories":boxes("coo"),"agentConsignmentDirectories":boxes("acd")}),
     );
     let value = call(f, SAVE_SINGLE_WINDOW_CLIENT_PROFILE, 0, Some(body));
     assert_eq!(value["profiles"].as_array().unwrap().len(), 1);
@@ -259,7 +271,8 @@ fn declaration_revision_locks_and_stable_source_items_survive_reorder() {
 #[test]
 fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
     let f = Fixture::new();
-    let station = profile(&f);
+    let external = Fixture::new();
+    let station = profile_at(&f, &external.root);
     let source = invoice(&f, "NATIVE-SW-HANDOFF");
     let id = source["id"].as_i64().unwrap();
     acd(&f, id);
@@ -293,10 +306,17 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
         0,
         Some(json!({"batchId":batch})),
     );
-    let root = f
-        .root
-        .join(station["agentConsignmentClientRootPath"].as_str().unwrap());
-    assert_eq!(std::fs::read_dir(root.join("OutBox")).unwrap().count(), 1);
+    let outbox = std::path::Path::new(
+        station["agentConsignmentDirectories"]["outBox"]
+            .as_str()
+            .unwrap(),
+    );
+    let inbox = std::path::Path::new(
+        station["agentConsignmentDirectories"]["inBox"]
+            .as_str()
+            .unwrap(),
+    );
+    assert_eq!(std::fs::read_dir(outbox).unwrap().count(), 1);
     call(
         &f,
         DISPATCH_SINGLE_WINDOW_BATCH_TO_CLIENT,
@@ -304,12 +324,11 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
         Some(json!({"batchId":batch})),
     );
     assert_eq!(
-        std::fs::read_dir(root.join("OutBox")).unwrap().count(),
+        std::fs::read_dir(outbox).unwrap().count(),
         1,
         "repeat dispatch must not duplicate XML"
     );
-    std::fs::create_dir_all(root.join("InBox")).unwrap();
-    let receipt_path = root.join("InBox").join(format!(
+    let receipt_path = inbox.join(format!(
         "{}.xml",
         exported["manifest"]["batchReference"].as_str().unwrap()
     ));
@@ -377,6 +396,58 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
 }
 
 #[test]
+fn client_directories_reject_missing_relative_and_overlapping_locations() {
+    let f = Fixture::new();
+    let station = profile(&f);
+    let mut request =
+        contracts::initial(contracts::schema("ApiSingleWindowClientProfileSaveRequest"));
+    for key in request
+        .as_object()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>()
+    {
+        request[&key] = station[&key].clone();
+    }
+    for path in [
+        "relative/OutBox".to_owned(),
+        f.root.join("missing").to_string_lossy().into_owned(),
+        station["customsCooDirectories"]["inBox"]
+            .as_str()
+            .unwrap()
+            .to_owned(),
+        f.root.to_string_lossy().into_owned(),
+    ] {
+        let mut invalid = request.clone();
+        invalid["customsCooDirectories"]["outBox"] = json!(path);
+        assert_eq!(
+            f.client()
+                .json::<Value>(SAVE_SINGLE_WINDOW_CLIENT_PROFILE, &[], &[], Some(invalid))
+                .unwrap_err()
+                .status,
+            Some(400)
+        );
+    }
+    // Two cards may use the same official task folders; the active manifest binding remains mandatory.
+    request["profileKey"] = json!("");
+    request["cardIdentifier"] = json!("SECOND-CARD");
+    let result = call(&f, SAVE_SINGLE_WINDOW_CLIENT_PROFILE, 0, Some(request));
+    assert_eq!(result["profiles"].as_array().unwrap().len(), 2);
+    let mut disabled = station.clone();
+    disabled["canSubmitCustomsCoo"] = json!(false);
+    disabled["customsCooDirectories"]["outBox"] = json!(f.root.join("disconnected-device"));
+    // Inactive task paths remain editable later and do not block the other task.
+    let request_schema = contracts::schema("ApiSingleWindowClientProfileSaveRequest");
+    call(
+        &f,
+        SAVE_SINGLE_WINDOW_CLIENT_PROFILE,
+        0,
+        Some(contracts::dto(request_schema, disabled)),
+    );
+}
+
+#[test]
 fn first_coo_receipt_matches_certificate_without_batch_filename() {
     let f = Fixture::new();
     let station = profile(&f);
@@ -412,10 +483,8 @@ fn first_coo_receipt_matches_certificate_without_batch_filename() {
         0,
         Some(json!({"batchId":batch})),
     );
-    let root = f
-        .root
-        .join(station["customsCooClientRootPath"].as_str().unwrap())
-        .join("InBox/2026-11-09");
+    let root = std::path::Path::new(station["customsCooDirectories"]["inBox"].as_str().unwrap())
+        .join("2026-11-09");
     std::fs::create_dir_all(&root).unwrap();
     std::fs::write(root.join("official-random-name.xml"),
         "<Receipt><CertNo>RC261234567899005</CertNo><Channel>1</Channel><RepCode>0</RepCode><Note>received</Note></Receipt>").unwrap();
