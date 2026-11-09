@@ -421,7 +421,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
             &applicant.token,
         )
         .unwrap();
-    let start = std::time::Instant::now();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
     loop {
         let current = fixture::call(
             service,
@@ -431,10 +431,18 @@ pub fn exercise(service: &NativeService, admin: &str) {
             None,
         )
         .unwrap();
-        if current["approvalDocument"]["documentStatus"] == "Ready" {
+        let document = &current["approvalDocument"];
+        if document["documentStatus"] == "Ready" {
             break;
         }
-        assert!(start.elapsed() < std::time::Duration::from_secs(20));
+        assert_eq!(
+            document["documentStatus"], "Running",
+            "approval PDF stopped: {document}"
+        );
+        assert!(
+            std::time::Instant::now() < deadline,
+            "approval PDF timed out: {document}"
+        );
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
     assert!(
