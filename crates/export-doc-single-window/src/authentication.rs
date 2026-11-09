@@ -90,7 +90,7 @@ pub fn content_digest(manifest: &Value) -> Result<String> {
             "packageType",
             "businessType",
             "batchReference",
-            "sourceInvoiceId",
+            "sourceId",
             "sourceDocumentId",
             "sourceDocumentType",
             "submissionVersion",

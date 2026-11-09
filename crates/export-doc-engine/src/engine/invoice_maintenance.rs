@@ -164,7 +164,7 @@ fn delete_workspace(transaction: &Connection, invoice_id: i64) -> Result<()> {
     for kind in ["sw-coo", "sw-acd", "sw-batches"] {
         for record in store::all(transaction, kind)?
             .into_iter()
-            .filter(|record| record["sourceInvoiceId"].as_i64() == Some(invoice_id))
+            .filter(|record| record["sourceId"].as_i64() == Some(invoice_id))
         {
             if !transaction.delete(
                 kind,

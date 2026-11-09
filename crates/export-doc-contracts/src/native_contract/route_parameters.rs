@@ -1,6 +1,15 @@
 //! Shared query/path shapes. Requiredness, integer widths and bounds remain explicit.
 use super::model::*;
 
+pub(super) fn single_window_source_id() -> Vec<Parameter> {
+    vec![p(
+        "sourceId",
+        "path",
+        Some(true),
+        i().minimum(num("1")).format("int64"),
+    )]
+}
+
 pub(super) fn expected_revision() -> Vec<Parameter> {
     vec![p(
         "expectedRevision",

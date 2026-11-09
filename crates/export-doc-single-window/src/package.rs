@@ -187,7 +187,7 @@ impl Package {
             m,
         )?;
         Business::parse(text(m, "businessType"))?;
-        if m["schemaVersion"] != "4.0"
+        if m["schemaVersion"] != "5.0"
             || !["SubmitPackage", "ReceiptPackage"].contains(&text(m, "packageType"))
             || !hex(text(m, "packageId"), 32)
             || !protocol_token(text(m, "batchReference"), 40)
@@ -200,7 +200,7 @@ impl Package {
             return Err("交接包版本、批次或认证绑定信息无效。".into());
         }
         for key in [
-            "sourceInvoiceId",
+            "sourceId",
             "sourceDocumentId",
             "submissionVersion",
             "draftRevision",

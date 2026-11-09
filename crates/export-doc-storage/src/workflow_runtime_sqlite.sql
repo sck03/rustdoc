@@ -1,4 +1,4 @@
--- Part of the complete schema 14 baseline; never applied to an existing database.
+-- Part of the complete schema 15 baseline; never applied to an existing database.
 CREATE TABLE request_revisions (
     id INTEGER PRIMARY KEY REFERENCES records(id) ON DELETE RESTRICT,
     request_id INTEGER NOT NULL REFERENCES records(id) ON DELETE RESTRICT,

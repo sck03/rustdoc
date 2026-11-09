@@ -38,7 +38,7 @@ fn manifest(
     version: i64,
 ) -> Result<Value> {
     let mut m = contracts::initial(contracts::schema("SingleWindowPackageManifest"));
-    m["schemaVersion"] = json!("4.0");
+    m["schemaVersion"] = json!("5.0");
     m["packageId"] = json!(nonce().map_err(unavailable)?.to_uppercase());
     m["batchReference"] = json!(format!(
         "SW-{}",
@@ -46,7 +46,7 @@ fn manifest(
     ));
     m["packageType"] = json!("SubmitPackage");
     m["businessType"] = json!(business.name());
-    m["sourceInvoiceId"] = invoice["id"].clone();
+    m["sourceId"] = invoice["id"].clone();
     m["sourceDocumentId"] = doc["id"].clone();
     m["sourceDocumentType"] = json!(if business == Business::Coo {
         "CustomsCooDocument"
@@ -56,9 +56,10 @@ fn manifest(
     m["submissionVersion"] = json!(version);
     m["draftRevision"] = doc["draftRevision"].clone();
     m["sourceBaselineHash"] = json!(digest(&serde_json::to_vec(invoice)?));
-    for key in ["invoiceNo", "contractNo", "companyScope"] {
+    for key in ["invoiceNo", "companyScope"] {
         m[key] = invoice[key].clone();
     }
+    m["contractNo"] = doc["contractNo"].clone();
     for key in ["stationKey", "cardIdentifier"] {
         m[key] = assignment[key].clone();
     }
@@ -114,13 +115,13 @@ fn submit(
                     "canSubmitAgentConsignment"
                 }] != true
             {
-                return Err(invalid("授权码的公司抬头或申报业务与来源发票不一致。"));
+                return Err(invalid("授权码的公司抬头或申报业务与申报资料不一致。"));
             }
             let version = store::all(tx, BATCHES)?
                 .iter()
                 .filter(|r| {
                     r["_sourceLocal"] == true
-                        && r["sourceInvoiceId"] == id
+                        && r["sourceId"] == id
                         && r["businessType"] == business.name()
                 })
                 .filter_map(|r| r["submissionVersion"].as_i64())
@@ -198,6 +199,12 @@ fn submit(
             let package = Package::seal(m, files, secret, &tracking::check).map_err(invalid)?;
             let bytes = package.encode(&tracking::check).map_err(invalid)?;
             let mut row = tracking::from_manifest(&package.manifest, true);
+            row["referenceNo"] = document[if business == Business::Coo {
+                "certNo"
+            } else {
+                "consignNo"
+            }]
+            .clone();
             row["status"] = json!("SubmitPackageExported");
             tracking::bind(service, &mut row, secret)?;
             tracking::add_package(&mut row, &package.manifest, "Exported")?;
@@ -233,6 +240,23 @@ pub fn handle(
         let result = imports::import(service, actor, operation, body, name, &bytes)?;
         return serde_json::to_vec(&result).map_err(Into::into);
     }
+    let download = [
+        DOWNLOAD_CUSTOMS_COO_SUBMIT_PACKAGE,
+        DOWNLOAD_AGENT_CONSIGNMENT_SUBMIT_PACKAGE,
+        DOWNLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
+    ]
+    .contains(&operation);
+    let path = Path::new(rules::text(body, "packagePath"));
+    if !download {
+        profiles::local(service)?;
+        ensure_safe_absolute(path).map_err(invalid)?;
+        if !path
+            .extension()
+            .is_some_and(|s| s.eq_ignore_ascii_case("swpkg"))
+        {
+            return Err(invalid("请选择 .swpkg 交接包保存位置。"));
+        }
+    }
     let receipt = [
         DOWNLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
         SAVE_SINGLE_WINDOW_RECEIPT_PACKAGE_TO_PATH,
@@ -251,31 +275,16 @@ pub fn handle(
         } else {
             Business::Acd
         };
-        let id = parameter(parameters, "invoiceId")
+        let id = parameter(parameters, "sourceId")
             .parse()
             .ok()
             .filter(|id| *id > 0)
-            .ok_or_else(|| invalid("来源发票编号无效。"))?;
+            .ok_or_else(|| invalid("申报资料编号无效。"))?;
         submit(service, actor, operation, business, id, body)?
     };
     let bytes = package.encode(&tracking::check).map_err(invalid)?;
-    if [
-        DOWNLOAD_CUSTOMS_COO_SUBMIT_PACKAGE,
-        DOWNLOAD_AGENT_CONSIGNMENT_SUBMIT_PACKAGE,
-        DOWNLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
-    ]
-    .contains(&operation)
-    {
+    if download {
         return Ok(bytes);
-    }
-    profiles::local(service)?;
-    let path = Path::new(rules::text(body, "packagePath"));
-    ensure_safe_absolute(path).map_err(invalid)?;
-    if !path
-        .extension()
-        .is_some_and(|s| s.eq_ignore_ascii_case("zip"))
-    {
-        return Err(invalid("请选择 .zip 交接包保存位置。"));
     }
     crate::operation::check()?;
     atomic_write(path, &bytes).map_err(unavailable)?;

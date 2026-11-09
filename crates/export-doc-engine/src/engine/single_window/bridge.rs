@@ -194,8 +194,9 @@ fn collect(service: &NativeService, actor: &Actor, id: i64) -> Result<Value> {
     )?;
     let mut selected = BTreeSet::new();
     let mut inspected = 0;
-    for name in ["InBox", "FailBox"] {
-        let folder = root.join(name);
+    let mut folders = vec![root.join("InBox"), root.join("FailBox")];
+    while let Some(folder) = folders.pop() {
+        crate::operation::check()?;
         ensure_safe_absolute(&folder).map_err(invalid)?;
         if !folder.try_exists()? {
             continue;
@@ -206,9 +207,15 @@ fn collect(service: &NativeService, actor: &Actor, id: i64) -> Result<Value> {
             if inspected > 10_000 {
                 return Err(invalid("客户端回执目录超过 10000 项，请先归档已处理文件。"));
             }
-            let path = item?.path();
+            let item = item?;
+            let path = item.path();
             ensure_safe_absolute(&path).map_err(invalid)?;
-            if !path.is_file()
+            let kind = item.file_type()?;
+            if kind.is_dir() {
+                folders.push(path);
+                continue;
+            }
+            if !kind.is_file()
                 || !path
                     .extension()
                     .is_some_and(|s| s.eq_ignore_ascii_case("xml"))

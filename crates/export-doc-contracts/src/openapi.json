@@ -702,7 +702,7 @@
           "sourceDiffSummary": {
             "type": "string"
           },
-          "sourceInvoiceId": {
+          "sourceId": {
             "type": [
               "integer",
               "string"
@@ -733,7 +733,7 @@
         },
         "required": [
           "id",
-          "sourceInvoiceId",
+          "sourceId",
           "invoiceNo",
           "contractNo",
           "status",
@@ -3590,7 +3590,7 @@
           "sourceDiffSummary": {
             "type": "string"
           },
-          "sourceInvoiceId": {
+          "sourceId": {
             "type": [
               "integer",
               "string"
@@ -3648,7 +3648,7 @@
         },
         "required": [
           "id",
-          "sourceInvoiceId",
+          "sourceId",
           "invoiceNo",
           "contractNo",
           "status",
@@ -15869,6 +15869,66 @@
           "repairedGroupCount",
           "review",
           "message"
+        ]
+      },
+      "ApiSingleWindowSourceCreateRequest": {
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "$ref": "#/components/schemas/ApiInvoiceDetailDto"
+          },
+          "referenceNo": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "referenceNo"
+        ]
+      },
+      "ApiSingleWindowSourceDto": {
+        "type": "object",
+        "properties": {
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "invoiceNo": {
+            "type": "string"
+          },
+          "sourceKind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "invoiceNo",
+          "sourceKind",
+          "createdAt"
+        ]
+      },
+      "ApiSingleWindowSourceListResponse": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiSingleWindowSourceDto"
+            }
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "items",
+          "totalCount"
         ]
       },
       "ApiSingleWindowSubmitPackageRequest": {
@@ -29871,14 +29931,6 @@
           "hasIssues": {
             "type": "boolean"
           },
-          "invoiceId": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
-          },
           "invoiceNo": {
             "type": "string"
           },
@@ -29901,6 +29953,14 @@
           "sourceDiffSummary": {
             "type": "string"
           },
+          "sourceId": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
           "totalErrorCount": {
             "type": [
               "integer",
@@ -29920,7 +29980,7 @@
         },
         "required": [
           "businessType",
-          "invoiceId",
+          "sourceId",
           "invoiceNo",
           "contractNo",
           "draftRevision",
@@ -30452,7 +30512,7 @@
           "sourceDocumentType": {
             "type": "string"
           },
-          "sourceInvoiceId": {
+          "sourceId": {
             "type": [
               "integer",
               "string"
@@ -30487,7 +30547,7 @@
           "packageType",
           "businessType",
           "batchReference",
-          "sourceInvoiceId",
+          "sourceId",
           "sourceDocumentId",
           "sourceDocumentType",
           "submissionVersion",
@@ -118996,7 +119056,7 @@
         }
       }
     },
-    "/api/single-window/acd/{invoiceId}": {
+    "/api/single-window/acd/{sourceId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -119066,12 +119126,12 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
@@ -119146,12 +119206,12 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
@@ -119168,7 +119228,7 @@
         }
       }
     },
-    "/api/single-window/acd/{invoiceId}/build-defaults": {
+    "/api/single-window/acd/{sourceId}/build-defaults": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -119238,19 +119298,19 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
         ]
       }
     },
-    "/api/single-window/acd/{invoiceId}/export-review": {
+    "/api/single-window/acd/{sourceId}/export-review": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -119320,19 +119380,19 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
         ]
       }
     },
-    "/api/single-window/acd/{invoiceId}/locked-fields": {
+    "/api/single-window/acd/{sourceId}/locked-fields": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -119402,19 +119462,19 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
         ]
       }
     },
-    "/api/single-window/acd/{invoiceId}/submit-package/download": {
+    "/api/single-window/acd/{sourceId}/submit-package/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -119485,12 +119545,12 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
@@ -119507,7 +119567,7 @@
         }
       }
     },
-    "/api/single-window/acd/{invoiceId}/submit-package/save-to-path": {
+    "/api/single-window/acd/{sourceId}/submit-package/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -119577,12 +119637,12 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
@@ -119599,7 +119659,7 @@
         }
       }
     },
-    "/api/single-window/acd/{invoiceId}/unlock-fields": {
+    "/api/single-window/acd/{sourceId}/unlock-fields": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -119669,12 +119729,12 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
@@ -120685,7 +120745,7 @@
         }
       }
     },
-    "/api/single-window/coo/{invoiceId}": {
+    "/api/single-window/coo/{sourceId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -120755,12 +120815,12 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
@@ -120835,12 +120895,12 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
@@ -120857,7 +120917,7 @@
         }
       }
     },
-    "/api/single-window/coo/{invoiceId}/build-defaults": {
+    "/api/single-window/coo/{sourceId}/build-defaults": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -120927,19 +120987,19 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
         ]
       }
     },
-    "/api/single-window/coo/{invoiceId}/export-review": {
+    "/api/single-window/coo/{sourceId}/export-review": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -121009,19 +121069,19 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
         ]
       }
     },
-    "/api/single-window/coo/{invoiceId}/locked-fields": {
+    "/api/single-window/coo/{sourceId}/locked-fields": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -121091,19 +121151,19 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
         ]
       }
     },
-    "/api/single-window/coo/{invoiceId}/submit-package/download": {
+    "/api/single-window/coo/{sourceId}/submit-package/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -121174,12 +121234,12 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
@@ -121196,7 +121256,7 @@
         }
       }
     },
-    "/api/single-window/coo/{invoiceId}/submit-package/save-to-path": {
+    "/api/single-window/coo/{sourceId}/submit-package/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -121266,12 +121326,12 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
@@ -121288,7 +121348,7 @@
         }
       }
     },
-    "/api/single-window/coo/{invoiceId}/unlock-fields": {
+    "/api/single-window/coo/{sourceId}/unlock-fields": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -121358,12 +121418,12 @@
         ],
         "parameters": [
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
@@ -121380,7 +121440,7 @@
         }
       }
     },
-    "/api/single-window/export-review/{businessType}/{invoiceId}": {
+    "/api/single-window/export-review/{businessType}/{sourceId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -121458,7 +121518,7 @@
             "required": true
           },
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
@@ -121470,7 +121530,7 @@
         ]
       }
     },
-    "/api/single-window/export-review/{businessType}/{invoiceId}/repair": {
+    "/api/single-window/export-review/{businessType}/{sourceId}/repair": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "tags": [
@@ -121548,7 +121608,7 @@
             "required": true
           },
           {
-            "name": "invoiceId",
+            "name": "sourceId",
             "in": "path",
             "schema": {
               "type": "integer",
@@ -122790,6 +122850,261 @@
               "schema": {
                 "type": "string",
                 "format": "byte"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/single-window/sources": {
+      "get": {
+        "x-exportdoc-timeout-seconds": 30,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "ListSingleWindowSources",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSingleWindowSourceListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": {
+            "readModule": "document.single-window",
+            "writeModule": null,
+            "readAccessLevel": null,
+            "writeAccessLevel": null,
+            "selector": 0,
+            "disabled": false,
+            "overridesParent": false
+          },
+          "requirements": [],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "document.single-window",
+                "actions": [
+                  "view"
+                ],
+                "administratorOnly": false
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageNumber",
+            "in": "query",
+            "schema": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$"
+            }
+          }
+        ]
+      },
+      "post": {
+        "x-exportdoc-timeout-seconds": 30,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "CreateSingleWindowSource",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiSingleWindowSourceDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": {
+            "readModule": "document.single-window",
+            "writeModule": null,
+            "readAccessLevel": null,
+            "writeAccessLevel": null,
+            "selector": 0,
+            "disabled": false,
+            "overridesParent": false
+          },
+          "requirements": [],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "document.single-window",
+                "actions": [
+                  "operate"
+                ],
+                "administratorOnly": false
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiSingleWindowSourceCreateRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/single-window/sources/excel/preview": {
+      "post": {
+        "x-exportdoc-timeout-seconds": 30,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "PreviewSingleWindowExcelImport",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiExcelImportPreviewResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "413": {
+            "description": "Payload Too Large"
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": {
+            "readModule": "document.single-window",
+            "writeModule": null,
+            "readAccessLevel": null,
+            "writeAccessLevel": null,
+            "selector": 0,
+            "disabled": false,
+            "overridesParent": false
+          },
+          "requirements": [],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "document.single-window",
+                "actions": [
+                  "operate"
+                ],
+                "administratorOnly": false
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fileName",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "$ref": "#/components/schemas/IFormFile"
               }
             }
           }

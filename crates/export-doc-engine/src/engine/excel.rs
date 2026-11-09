@@ -92,12 +92,7 @@ pub fn upload(
         return Err(error(413, "上传的 Excel 为空或超过 25 MiB。"));
     }
     if operation == PREVIEW_UPLOADED_EXCEL_IMPORT {
-        let settings = settings::current(&service.store)?;
-        let date = service.clock.now().map_err(unavailable)?.today.to_string();
-        let preview =
-            export_doc_excel::preview(bytes, name, &settings["excelImport"], &date, &check)
-                .map_err(invalid)?;
-        return serde_json::to_value(preview).map_err(Into::into);
+        return preview(service, name, bytes);
     }
     let replay = Replay::new(operation, &[], &serde_json::json!({})).with_input(name, bytes);
     let bytes = bytes.to_vec();
@@ -120,6 +115,17 @@ pub fn upload(
             ))
         },
     )
+}
+pub(super) fn preview(service: &NativeService, name: &str, bytes: &[u8]) -> Result<Value> {
+    source_name(name)?;
+    if bytes.is_empty() || bytes.len() > export_doc_excel::MAX_INPUT {
+        return Err(error(413, "上传的 Excel 为空或超过 25 MiB。"));
+    }
+    let settings = settings::current(&service.store)?;
+    let date = service.clock.now().map_err(unavailable)?.today.to_string();
+    let result = export_doc_excel::preview(bytes, name, &settings["excelImport"], &date, &check)
+        .map_err(invalid)?;
+    serde_json::to_value(result).map_err(Into::into)
 }
 pub fn handle(
     service: &NativeService,

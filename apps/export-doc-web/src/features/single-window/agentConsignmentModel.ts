@@ -46,19 +46,19 @@ export function buildAgentConsignmentEditorOptions(catalog?: SingleWindowReferen
   };
 }
 
-export function normalizeAgentConsignmentDocumentForSave(document: ApiAgentConsignmentDocumentDto, invoiceId: number): ApiAgentConsignmentDocumentDto {
+export function normalizeAgentConsignmentDocumentForSave(document: ApiAgentConsignmentDocumentDto, sourceId: number): ApiAgentConsignmentDocumentDto {
   return {
     ...document,
     id: numberOrZero(document.id),
-    sourceInvoiceId: invoiceId,
+    sourceId: sourceId,
     expectedDraftRevision: Number.isInteger(document.draftRevision) && document.draftRevision >= 0
       ? document.draftRevision
       : 0,
   };
 }
 
-export function buildAgentConsignmentDocumentSnapshot(document: ApiAgentConsignmentDocumentDto, invoiceId: number) {
-  return JSON.stringify(normalizeAgentConsignmentDocumentForSave(document, invoiceId));
+export function buildAgentConsignmentDocumentSnapshot(document: ApiAgentConsignmentDocumentDto, sourceId: number) {
+  return JSON.stringify(normalizeAgentConsignmentDocumentForSave(document, sourceId));
 }
 
 export function formatScopedClearResultMessage(request: AgentScopedClearRequest, changedCount: number) {

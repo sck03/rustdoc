@@ -71,7 +71,20 @@ pub fn import(
                     tracking::matches(&row, m, false)?;
                     row
                 } else {
-                    tracking::from_manifest(m, false)
+                    let mut row = tracking::from_manifest(m, false);
+                    let snapshot: Value = serde_json::from_slice(
+                        package
+                            .files
+                            .get("snapshot.json")
+                            .ok_or_else(|| invalid("提交包缺少申报快照。"))?,
+                    )?;
+                    row["referenceNo"] = snapshot[if business == Business::Coo {
+                        "CertNo"
+                    } else {
+                        "ConsignNo"
+                    }]
+                    .clone();
+                    row
                 };
                 let changed = tracking::add_package(&mut row, m, "Imported")?;
                 if changed {

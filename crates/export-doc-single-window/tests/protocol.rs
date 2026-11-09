@@ -1,6 +1,98 @@
 use export_doc_domain::single_window::Business;
 use export_doc_single_window::{authentication, digest, receipt, xml};
 use serde_json::json;
+#[path = "support/declarations.rs"]
+mod declarations;
+
+#[test]
+fn common_certificates_validate_and_preserve_independent_parties_and_goods() {
+    use export_doc_domain::single_window::{draft, validation, xml as output};
+    for (cert, country, sequence) in declarations::COMMON {
+        let document = declarations::coo(cert, country, sequence);
+        assert!(
+            validation::review(Business::Coo, &document).is_empty(),
+            "{cert}"
+        );
+        let text = String::from_utf8(output::payload(Business::Coo, &document).unwrap()).unwrap();
+        assert!(text.contains("DESTINATION RECEIVER/nTEST ADDRESS"));
+        assert!(text.contains("100% COTTON KNITTED T-SHIRTS, ADULT"));
+        if cert == "RC" {
+            assert!(text.contains("<OriInvs><OriInv>"));
+        }
+        let mut missing = document.clone();
+        missing["items"] = json!([]);
+        assert!(!validation::review(Business::Coo, &missing).is_empty());
+        let mut saved = document.clone();
+        saved["contractNo"] = json!("DESTINATION-CONTRACT");
+        saved["items"][0]["goodsNameE"] = json!("DETAILED NAME");
+        saved["items"][0]["sourceItemId"] = json!(42);
+        let locks = draft::locks(Business::Coo, &saved, &document);
+        let mut reloaded = document.clone();
+        draft::restore_locked(Business::Coo, &mut reloaded, &saved, &locks);
+        assert_eq!(reloaded["items"], saved["items"]);
+        assert_eq!(reloaded["contractNo"], "DESTINATION-CONTRACT");
+    }
+    let acd = declarations::acd();
+    assert!(export_doc_domain::single_window::validation::review(Business::Acd, &acd).is_empty());
+    for field in [
+        "copCusCode",
+        "gName",
+        "codeTS",
+        "declTotal",
+        "ieDate",
+        "tradeMode",
+        "oriCountry",
+        "tradeCode",
+        "agentCode",
+    ] {
+        let mut missing = acd.clone();
+        missing[field] = json!("");
+        assert!(
+            validation::review(Business::Acd, &missing)
+                .iter()
+                .any(|issue| issue.field == field),
+            "{field}"
+        );
+    }
+    for (cert, country, sequence) in declarations::COMMON {
+        let mut missing = declarations::coo(cert, country, sequence);
+        missing["items"][0]["oriCriteria"] = json!("");
+        assert_eq!(
+            validation::review(Business::Coo, &missing)
+                .iter()
+                .any(|issue| issue.field == "oriCriteria"),
+            cert != "C"
+        );
+    }
+    let mut rcep = declarations::coo("RC", "JAPAN", "9005");
+    rcep["invNo"] = json!("");
+    assert!(
+        validation::review(Business::Coo, &rcep)
+            .iter()
+            .any(|issue| issue.field == "invNo")
+    );
+    let mut wrong_date = acd.clone();
+    wrong_date["ieDate"] = json!("2026-11-09");
+    assert!(
+        validation::review(Business::Acd, &wrong_date)
+            .iter()
+            .any(|issue| issue.field == "ieDate")
+    );
+    for (field, value) in [
+        ("gName", "货".repeat(256)),
+        ("tradeMode", "x".into()),
+        ("declTotal", "1234567890123456.1234".into()),
+    ] {
+        let mut invalid = acd.clone();
+        invalid[field] = json!(value);
+        assert!(
+            validation::review(Business::Acd, &invalid)
+                .iter()
+                .any(|issue| issue.field == field),
+            "{field}"
+        );
+    }
+}
 
 #[test]
 fn receipt_xml_decodes_entities_and_rejects_ambiguous_or_expanding_input() {
@@ -45,7 +137,7 @@ fn assignment_and_manifest_mac_bind_company_card_and_utf16_text() {
     let code = authentication::encode_assignment(&assignment).unwrap();
     assert_eq!(authentication::assignment(&code).unwrap(), assignment);
     assert!(authentication::assignment(&(code + "!")).is_err());
-    let mut manifest = json!({"schemaVersion":"4.0","packageId":"id","packageType":"SubmitPackage","businessType":"CustomsCoo","batchReference":"batch","contentDigest":digest(b"payload"),"sourcePackageDigest":"","stationKey":assignment["stationKey"],"clientProfileKey":assignment["profileKey"],"cardIdentifier":"CARD","companyScope":"DEFAULT","assignmentNonce":"nonce","authenticationAlgorithm":"HMAC-SHA256"});
+    let mut manifest = json!({"schemaVersion":"5.0","packageId":"id","packageType":"SubmitPackage","businessType":"CustomsCoo","batchReference":"batch","contentDigest":digest(b"payload"),"sourcePackageDigest":"","stationKey":assignment["stationKey"],"clientProfileKey":assignment["profileKey"],"cardIdentifier":"CARD","companyScope":"DEFAULT","assignmentNonce":"nonce","authenticationAlgorithm":"HMAC-SHA256"});
     manifest["authenticationTag"] = json!(authentication::sign(&manifest, secret).unwrap());
     authentication::verify(&manifest, secret).unwrap();
     manifest["companyScope"] = json!("other");

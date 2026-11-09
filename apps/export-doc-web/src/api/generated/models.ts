@@ -164,7 +164,7 @@ export interface ApiAgentConsignmentDocumentDto {
   sign: string;
   sourceDiffCount: number;
   sourceDiffSummary: string;
-  sourceInvoiceId: number;
+  sourceId: number;
   status: string;
   tradeCode: string;
   tradeMode: string;
@@ -795,7 +795,7 @@ export interface ApiCustomsCooDocumentDto {
   remark: string;
   sourceDiffCount: number;
   sourceDiffSummary: string;
-  sourceInvoiceId: number;
+  sourceId: number;
   specInvTerms: string;
   status: string;
   thirdPartyInvFlag: string;
@@ -3456,6 +3456,23 @@ export interface ApiSingleWindowRepairGroupsResponse {
   repairedGroupCount: number;
   review: SingleWindowExportReview;
   success: boolean;
+}
+
+export interface ApiSingleWindowSourceCreateRequest {
+  invoice?: ApiInvoiceDetailDto;
+  referenceNo: string;
+}
+
+export interface ApiSingleWindowSourceDto {
+  createdAt: string;
+  id: number;
+  invoiceNo: string;
+  sourceKind: string;
+}
+
+export interface ApiSingleWindowSourceListResponse {
+  items: ApiSingleWindowSourceDto[];
+  totalCount: number;
 }
 
 export interface ApiSingleWindowSubmitPackageRequest {
@@ -6378,11 +6395,11 @@ export interface SingleWindowExportReview {
   draftRevision: number;
   groups: SingleWindowExportIssueGroup[];
   hasIssues: boolean;
-  invoiceId: number;
   invoiceNo: string;
   manualLockedFieldCount: number;
   sourceDiffCount: number;
   sourceDiffSummary: string;
+  sourceId: number;
   totalErrorCount: number;
   totalWarningCount: number;
 }
@@ -6496,7 +6513,7 @@ export interface SingleWindowPackageManifest {
   sourceBaselineHash: string;
   sourceDocumentId: number;
   sourceDocumentType: string;
-  sourceInvoiceId: number;
+  sourceId: number;
   sourcePackageDigest: string;
   stationKey: string;
   submissionVersion: number;
@@ -7569,19 +7586,19 @@ export interface AuthorizeServerMigrationOperationRequest {
 }
 
 export interface BuildAgentConsignmentDefaultsRequest {
-  invoiceId: number;
+  sourceId: number;
 }
 
 export interface BuildAgentConsignmentExportReviewRequest {
-  invoiceId: number;
+  sourceId: number;
 }
 
 export interface BuildCustomsCooDefaultsRequest {
-  invoiceId: number;
+  sourceId: number;
 }
 
 export interface BuildCustomsCooExportReviewRequest {
-  invoiceId: number;
+  sourceId: number;
 }
 
 export interface CancelApprovedPersonnelChangeRequest {
@@ -7887,6 +7904,10 @@ export interface CreateSalesOpportunityRequest {
 
 export interface CreateServerMigrationPackageRequest {
   body: ApiServerMigrationCreateRequest;
+}
+
+export interface CreateSingleWindowSourceRequest {
+  body: ApiSingleWindowSourceCreateRequest;
 }
 
 export interface CreateSupplierRequest {
@@ -8209,7 +8230,7 @@ export interface DispatchSingleWindowBatchToClientRequest {
 }
 
 export interface DownloadAgentConsignmentSubmitPackageRequest {
-  invoiceId: number;
+  sourceId: number;
   body: ApiSingleWindowSubmitPackageRequest;
 }
 
@@ -8322,7 +8343,7 @@ export interface DownloadContainerPackingPdfRequest {
 }
 
 export interface DownloadCustomsCooSubmitPackageRequest {
-  invoiceId: number;
+  sourceId: number;
   body: ApiSingleWindowSubmitPackageRequest;
 }
 
@@ -8585,11 +8606,11 @@ export interface GetAccessRestrictionsRequest {
 }
 
 export interface GetAgentConsignmentDocumentRequest {
-  invoiceId: number;
+  sourceId: number;
 }
 
 export interface GetAgentConsignmentLockedFieldsRequest {
-  invoiceId: number;
+  sourceId: number;
 }
 
 export interface GetAnnouncementRequest {
@@ -8617,11 +8638,11 @@ export interface GetCustomerRequest {
 }
 
 export interface GetCustomsCooDocumentRequest {
-  invoiceId: number;
+  sourceId: number;
 }
 
 export interface GetCustomsCooLockedFieldsRequest {
-  invoiceId: number;
+  sourceId: number;
 }
 
 export interface GetCustomsCooProducerProfileRequest {
@@ -8851,7 +8872,7 @@ export interface GetSalesOpportunityRequest {
 
 export interface GetSingleWindowExportReviewRequest {
   businessType: string;
-  invoiceId: number;
+  sourceId: number;
 }
 
 export interface GetSingleWindowOperationCenterDetailRequest {
@@ -9551,6 +9572,12 @@ export interface ListSingleWindowOperationCenterRequest {
   pageSize?: number;
 }
 
+export interface ListSingleWindowSourcesRequest {
+  keyword?: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface ListSubmissionsOfExpenseRequestRequest {
   id: number;
   pageNumber?: number;
@@ -9760,6 +9787,11 @@ export interface PreviewReportTemplateContentRequest {
 
 export interface PreviewShippingMarkImageRequest {
   body: ApiShippingMarkImagePreviewRequest;
+}
+
+export interface PreviewSingleWindowExcelImportRequest {
+  fileName?: string;
+  body: Blob;
 }
 
 export interface PreviewSingleWindowReferenceCatalogExcelImportRequest {
@@ -10030,7 +10062,7 @@ export interface RenameReportTemplateRequest {
 
 export interface RepairSingleWindowExportReviewGroupsRequest {
   businessType: string;
-  invoiceId: number;
+  sourceId: number;
   body: ApiSingleWindowRepairGroupsRequest;
 }
 
@@ -10180,12 +10212,12 @@ export interface SaveAccessRestrictionRequest {
 }
 
 export interface SaveAgentConsignmentDocumentRequest {
-  invoiceId: number;
+  sourceId: number;
   body: ApiAgentConsignmentDocumentDto;
 }
 
 export interface SaveAgentConsignmentSubmitPackageToPathRequest {
-  invoiceId: number;
+  sourceId: number;
   body: ApiSingleWindowSubmitPackageRequest;
 }
 
@@ -10221,12 +10253,12 @@ export interface SaveCustomOptionRequest {
 }
 
 export interface SaveCustomsCooDocumentRequest {
-  invoiceId: number;
+  sourceId: number;
   body: ApiCustomsCooDocumentDto;
 }
 
 export interface SaveCustomsCooSubmitPackageToPathRequest {
-  invoiceId: number;
+  sourceId: number;
   body: ApiSingleWindowSubmitPackageRequest;
 }
 
@@ -10542,12 +10574,12 @@ export interface UnlinkPersonnelAccountRequest {
 }
 
 export interface UnlockAgentConsignmentFieldsRequest {
-  invoiceId: number;
+  sourceId: number;
   body: ApiSingleWindowUnlockFieldsRequest;
 }
 
 export interface UnlockCustomsCooFieldsRequest {
-  invoiceId: number;
+  sourceId: number;
   body: ApiSingleWindowUnlockFieldsRequest;
 }
 

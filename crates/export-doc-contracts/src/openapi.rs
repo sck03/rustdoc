@@ -171,6 +171,7 @@ mod tests {
                 }));
         }
         evolution::reviewed_versioning(&mut baseline);
+        evolution::reviewed_independent_declarations(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

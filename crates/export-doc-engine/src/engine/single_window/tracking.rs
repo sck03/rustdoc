@@ -69,7 +69,7 @@ pub fn from_manifest(m: &Value, local: bool) -> Value {
         "invoiceNo",
         "contractNo",
         "companyScope",
-        "sourceInvoiceId",
+        "sourceId",
         "sourceDocumentId",
     ] {
         row[key] = m[key].clone();
@@ -168,7 +168,7 @@ pub fn matches(row: &Value, m: &Value, receipt: bool) -> Result<()> {
     for key in [
         "businessType",
         "batchReference",
-        "sourceInvoiceId",
+        "sourceId",
         "sourceDocumentId",
         "sourceDocumentType",
         "submissionVersion",

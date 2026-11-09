@@ -129,11 +129,11 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["groupKey","groupDisplayName","canAutoRepair","issues","errorCount","warningCount","infoCount"])),
     ("SingleWindowExportIssueSeverity",Schema::default().enumeration(Enumeration::Values(vec![serde_json::json!("Info"),serde_json::json!("Warning"),serde_json::json!("Error")]))),
     ("SingleWindowExportReview",o(vec![
-        ("businessType",r("SingleWindowBusinessType")),("invoiceId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("invoiceNo",s()),
+        ("businessType",r("SingleWindowBusinessType")),("sourceId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("invoiceNo",s()),
         ("contractNo",s()),("draftRevision",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("manualLockedFieldCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("sourceDiffCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("sourceDiffSummary",s()),("groups",a(r("SingleWindowExportIssueGroup"))),
         ("totalErrorCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("totalWarningCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("hasIssues",b())
-    ]).required(vec!["businessType","invoiceId","invoiceNo","contractNo","draftRevision","manualLockedFieldCount","sourceDiffCount","sourceDiffSummary","groups","totalErrorCount","totalWarningCount","hasIssues"])),
+    ]).required(vec!["businessType","sourceId","invoiceNo","contractNo","draftRevision","manualLockedFieldCount","sourceDiffCount","sourceDiffSummary","groups","totalErrorCount","totalWarningCount","hasIssues"])),
     ("SingleWindowOperationCenterDetail",object_groups(vec![
         (&["batchId","submissionVersion","draftRevision","payloadFileCount","attachmentFileCount","warningCount","clientDispatchAttemptCount"], Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         (&["batchReference","businessType","invoiceNo","contractNo","companyScope","status","referenceNo","clientProfileName","assignedCardIdentifier","clientDispatchOperationId"], s()),
@@ -168,11 +168,11 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         (&["schemaVersion","packageId","batchReference","sourceDocumentType","sourceBaselineHash","invoiceNo","contractNo","companyScope","snapshotSha256","sourcePackageDigest","receiptReferenceNo","contentDigest","stationKey","cardIdentifier","clientProfileKey","clientProfileName","assignmentNonce","authenticationAlgorithm","authenticationTag","createdOnMachine"], s()),
         (&["packageType"], r("SingleWindowPackageType")),
         (&["businessType"], r("SingleWindowBusinessType")),
-        (&["sourceInvoiceId","sourceDocumentId","submissionVersion","draftRevision"], Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
+        (&["sourceId","sourceDocumentId","submissionVersion","draftRevision"], Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         (&["createdAt"], s().format("date-time")),
         (&["payloadFiles","attachmentFiles"], a(r("SingleWindowPackageFile"))),
         (&["warnings"], a(s())),
-    ]).required(vec!["schemaVersion","packageId","packageType","businessType","batchReference","sourceInvoiceId","sourceDocumentId","sourceDocumentType","submissionVersion","draftRevision","sourceBaselineHash","invoiceNo","contractNo","companyScope","snapshotSha256","sourcePackageDigest","receiptReferenceNo","contentDigest","stationKey","cardIdentifier","clientProfileKey","clientProfileName","assignmentNonce","authenticationAlgorithm","authenticationTag","createdAt","createdOnMachine","payloadFiles","attachmentFiles","warnings"])),
+    ]).required(vec!["schemaVersion","packageId","packageType","businessType","batchReference","sourceId","sourceDocumentId","sourceDocumentType","submissionVersion","draftRevision","sourceBaselineHash","invoiceNo","contractNo","companyScope","snapshotSha256","sourcePackageDigest","receiptReferenceNo","contentDigest","stationKey","cardIdentifier","clientProfileKey","clientProfileName","assignmentNonce","authenticationAlgorithm","authenticationTag","createdAt","createdOnMachine","payloadFiles","attachmentFiles","warnings"])),
     ("SingleWindowPackageType",Schema::default().enumeration(Enumeration::Values(vec![serde_json::json!("SubmitPackage"),serde_json::json!("ReceiptPackage")]))),
     ("SingleWindowReceiptBusinessStatus",Schema::default().enumeration(Enumeration::Values(vec![serde_json::json!("Unknown"),serde_json::json!("Received"),serde_json::json!("Accepted"),serde_json::json!("Rejected"),serde_json::json!("PendingReview"),serde_json::json!("Approved"),serde_json::json!("Failed")]))),
     ("SingleWindowReceiptCollectionResult",o(vec![

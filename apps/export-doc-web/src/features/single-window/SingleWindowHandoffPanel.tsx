@@ -12,11 +12,11 @@ import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 type SingleWindowHandoffPanelProps = {
   businessType: "CustomsCoo" | "AgentConsignment";
   client: ExportDocManagerApiClient;
-  invoiceId: number;
+  sourceId: number;
   canOperate: boolean;
 };
 
-export function SingleWindowHandoffPanel({ businessType, client, invoiceId, canOperate }: SingleWindowHandoffPanelProps) {
+export function SingleWindowHandoffPanel({ businessType, client, sourceId, canOperate }: SingleWindowHandoffPanelProps) {
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
   const [savedPath, setSavedPath] = useState("");
@@ -30,20 +30,20 @@ export function SingleWindowHandoffPanel({ businessType, client, invoiceId, canO
       if (!isDesktop) {
         const body = { stationAssignmentCode: stationAssignmentCode.trim() };
         const blob = businessType === "CustomsCoo"
-          ? await client.downloadCustomsCooSubmitPackage({ invoiceId, body })
-          : await client.downloadAgentConsignmentSubmitPackage({ invoiceId, body });
-        downloadBlob(blob, `${filePrefix}-${invoiceId}.swpkg`);
+          ? await client.downloadCustomsCooSubmitPackage({ sourceId, body })
+          : await client.downloadAgentConsignmentSubmitPackage({ sourceId, body });
+        downloadBlob(blob, `${filePrefix}-${sourceId}.swpkg`);
         return "";
       }
 
-      const targetPath = await selectSavePackagePath(`${filePrefix}-${invoiceId}.swpkg`);
+      const targetPath = await selectSavePackagePath(`${filePrefix}-${sourceId}.swpkg`);
       if (!targetPath) {
         return null;
       }
 
       const response = businessType === "CustomsCoo"
-        ? await client.saveCustomsCooSubmitPackageToPath({ invoiceId, body: { packagePath: targetPath, stationAssignmentCode: stationAssignmentCode.trim() } })
-        : await client.saveAgentConsignmentSubmitPackageToPath({ invoiceId, body: { packagePath: targetPath, stationAssignmentCode: stationAssignmentCode.trim() } });
+        ? await client.saveCustomsCooSubmitPackageToPath({ sourceId, body: { packagePath: targetPath, stationAssignmentCode: stationAssignmentCode.trim() } })
+        : await client.saveAgentConsignmentSubmitPackageToPath({ sourceId, body: { packagePath: targetPath, stationAssignmentCode: stationAssignmentCode.trim() } });
       return response.success ? targetPath : "";
     },
     onSuccess: async (targetPath) => {

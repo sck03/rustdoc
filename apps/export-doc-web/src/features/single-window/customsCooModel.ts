@@ -105,11 +105,11 @@ export function shouldShowCooGoodsProducerContactFields(certType: string | undef
   return normalizeUpperText(certType) === "H";
 }
 
-export function normalizeCooDocumentForSave(document: ApiCustomsCooDocumentDto, invoiceId: number): ApiCustomsCooDocumentDto {
+export function normalizeCooDocumentForSave(document: ApiCustomsCooDocumentDto, sourceId: number): ApiCustomsCooDocumentDto {
   return {
     ...document,
     id: numberOrZero(document.id),
-    sourceInvoiceId: invoiceId,
+    sourceId: sourceId,
     expectedDraftRevision: Number.isInteger(document.draftRevision) && document.draftRevision >= 0
       ? document.draftRevision
       : 0,
@@ -119,8 +119,8 @@ export function normalizeCooDocumentForSave(document: ApiCustomsCooDocumentDto, 
   };
 }
 
-export function buildCooDocumentSnapshot(document: ApiCustomsCooDocumentDto, invoiceId: number) {
-  return JSON.stringify(normalizeCooDocumentForSave(document, invoiceId));
+export function buildCooDocumentSnapshot(document: ApiCustomsCooDocumentDto, sourceId: number) {
+  return JSON.stringify(normalizeCooDocumentForSave(document, sourceId));
 }
 
 export function formatScopedClearResultMessage(request: CooScopedClearRequest, changedCount: number) {

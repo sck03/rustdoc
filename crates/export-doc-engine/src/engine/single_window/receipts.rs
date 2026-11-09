@@ -189,14 +189,12 @@ fn write_back(
     else {
         return Ok(());
     };
-    if document["sourceInvoiceId"] != m["sourceInvoiceId"]
-        || document["companyScope"] != m["companyScope"]
-    {
+    if document["sourceId"] != m["sourceId"] || document["companyScope"] != m["companyScope"] {
         return Err(unavailable("申报来源关联不一致，已停止回写。"));
     }
     let newer = store::all(tx, BATCHES)?.iter().any(|r| {
         r["_sourceLocal"] == true
-            && r["sourceInvoiceId"] == m["sourceInvoiceId"]
+            && r["sourceId"] == m["sourceId"]
             && r["businessType"] == business.name()
             && r["submissionVersion"].as_i64() > m["submissionVersion"].as_i64()
     });
@@ -222,7 +220,7 @@ fn write_back(
         business.kind(),
         id,
         document,
-        Some(m["sourceInvoiceId"].to_string()),
+        Some(m["sourceId"].to_string()),
         actor,
         "receipt",
     )?;

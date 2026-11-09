@@ -99,7 +99,7 @@ Slint 和 egui 客户端已退役。2026-09-28 按用户清理要求移除本分
 
 桌面令牌由 Rust 宿主生成，仅由主窗口受限 IPC 获取，不写 URL 或日志。随机回环端口、精确 Host／Origin 校验、官方 endpoint policy、登录会话与对象权限共同控制桌面访问。网络服务不安装本机文件／进程能力。
 
-AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，业务 SQLite 在 DataRoot/Database，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。数据库仅接受全新 schema 14（2026-11-06 新基线）；旧测试库和旧 schema 备份拒绝打开或恢复，显式选择新目录/数据库建库，不自动删除原数据。
+AppRoot／DataRoot 由组合根明确注入；便携版数据在包旁 App_Data，业务 SQLite 在 DataRoot/Database，WebView profile 在 DataRoot/WebView。安装模式运行配置放在 AppRoot/RuntimeConfig 或显式指定的受管配置根，不默认落入系统 AppData。数据库仅接受全新 schema 15（2026-11-09 独立申报基线）；旧测试库和旧 schema 备份拒绝打开或恢复，显式选择新目录/数据库建库，不自动删除原数据。
 
 2026-10-30 权限目录分别声明单位及动作可授范围、记录范围和流程归属；Contract 编译器把既有注解转换为统一访问规则，Domain 与编译器共用纯动作映射。任职/方案编辑器共用范围模型；独立签署资格同时用于审批与移交。`oa/queue_authority` 只复用本次读取的代理与业务身份，Storage 提供摘要投影、供应商评价聚合、账号批读及资源未结存在判断；Engine 负责当前授权与业务组合。保留原数组接口并在内部按批读取，未引入跨请求权限缓存、运行依赖或数据库迁移。
 
@@ -118,3 +118,5 @@ Tauri 使用 MIT／Apache-2.0 双许可路径，具体传递组件以生成 noti
 按原版逐页核对界面、后端、权限及操作闭环，积累一批后集中联调，最后统一运行完整门禁。开发中只做必要编译与针对真实失败的回归，不逐模块重复全量构建或测试。功能核对表见《Rust原生功能迁移核对表》，平台验收见《Rust桌面平台适配与验收》。路由存在、编译通过和旧 Slint 截图均不表示当前 Tauri 页面已验收。
 
 桌面构建／运行入口为 `scripts/build-native.ps1`／`run-native.ps1`。网页发布包可通过 `--setup-web` 准备配置并自动识别相邻 Web 目录；新版 Docker 镜像通过 `--print-compose` 输出独立部署配置，无需克隆源码。`package-native-web-server.ps1` 与 `run-native-docker.ps1` 继续用于构建、已有部署及开发验证。实际结果按平台记录在当前批次进度中。
+
+2026-11-09：独立申报沿用 Storage records 和唯一 Excel 解析器，Domain 负责默认值/字段锁定，Engine sources 负责授权快照，React 页面和 hook 分离。数据库基线 15、交接包 5.0；详见[独立申报与联调记录](./2026-11-09独立申报与联调记录.md)。

@@ -71,7 +71,7 @@ export function SingleWindowExportReviewPanel({
   return (
     <div className="single-window-export-review-panel">
       <div className="detail-grid single-window-document-summary-grid">
-        <SummaryItem label="发票号" value={review.invoiceNo} />
+        <SummaryItem label="资料编号" value={review.invoiceNo} />
         <SummaryItem label="合同号" value={review.contractNo} />
         <SummaryItem label="草稿版本" value={review.draftRevision} />
         <SummaryItem label="人工锁定字段" value={review.manualLockedFieldCount} />

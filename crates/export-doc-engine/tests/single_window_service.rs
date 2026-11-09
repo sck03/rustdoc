@@ -2,6 +2,11 @@
 #[path = "support/native_fixture.rs"]
 mod native_fixture;
 use export_doc_engine::{contracts, generated_api::*, invoice::InvoiceDraft};
+#[path = "../../export-doc-single-window/tests/support/declarations.rs"]
+#[allow(dead_code)]
+mod declarations;
+#[path = "support/single_window_sources_contract.rs"]
+mod sources_contract;
 use native_fixture::Fixture;
 use serde_json::{Value, json};
 
@@ -11,7 +16,7 @@ fn call(f: &Fixture, op: Operation, id: i64, body: Option<Value>) -> Value {
             if op == GET_SINGLE_WINDOW_OPERATION_CENTER_DETAIL {
                 "batchId"
             } else {
-                "invoiceId"
+                "sourceId"
             },
             id.to_string(),
         )]
@@ -34,6 +39,110 @@ fn invoice(f: &Fixture, name: &str) -> Value {
         json!(InvoiceDraft::demo("2026-09-17", name).build().unwrap()),
     )
 }
+
+#[test]
+fn independent_sources_keep_customs_parties_and_detail_rows_separate() {
+    let f = Fixture::new();
+    sources_contract::exercise(&|op, path, query, body| f.client().json(op, path, query, body));
+}
+
+#[test]
+fn independent_sources_enforce_ownership_without_invoice_permissions() {
+    let f = Fixture::new();
+    let scheme = f.create(
+        CREATE_PERMISSION_TEMPLATE,
+        json!({"code":"SW-OWN","name":"本人申报","isActive":true,"grants":[
+            {"resourceKey":"document.single-window","action":"view","dataScope":"own"},
+            {"resourceKey":"document.single-window","action":"operate","dataScope":"own"}
+        ]}),
+    );
+    let scheme = f.client().publish_scheme(scheme);
+    let user = |name: &str| {
+        f.create(CREATE_USER_ACCOUNT, json!({"username":name,"fullName":name,"role":"User","companyScope":"DEFAULT","departmentId":"GENERAL",
+            "permissionTemplateId":scheme["id"],"permissionSchemeVersion":scheme["publishedVersion"],"isActive":true,"resetPassword":"Sw-Test-2026"}));
+        f.client()
+            .login(name.into(), "Sw-Test-2026".into())
+            .unwrap()
+            .0
+    };
+    let owner = user("sw-owner");
+    let other = user("sw-other");
+    let source: Value = owner
+        .json(
+            CREATE_SINGLE_WINDOW_SOURCE,
+            &[],
+            &[],
+            Some(json!({"referenceNo":"OWN-001"})),
+        )
+        .unwrap();
+    let parameters = [("sourceId", source["id"].to_string())];
+    let draft: Value = owner
+        .json(GET_CUSTOMS_COO_DOCUMENT, &parameters, &[], None)
+        .unwrap();
+    owner
+        .json::<Value>(
+            SAVE_CUSTOMS_COO_DOCUMENT,
+            &parameters,
+            &[],
+            Some(draft.clone()),
+        )
+        .unwrap();
+    assert_eq!(
+        other
+            .json::<Value>(GET_CUSTOMS_COO_DOCUMENT, &parameters, &[], None)
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
+    assert_eq!(
+        other
+            .json::<Value>(SAVE_CUSTOMS_COO_DOCUMENT, &parameters, &[], Some(draft))
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
+    assert_eq!(
+        other
+            .json::<Value>(LIST_SINGLE_WINDOW_SOURCES, &[], &[], None)
+            .unwrap()["totalCount"],
+        0
+    );
+    let invoice = invoice(&f, "PROTECTED-INVOICE");
+    assert_eq!(
+        owner
+            .json::<Value>(
+                GET_AGENT_CONSIGNMENT_DOCUMENT,
+                &[("sourceId", invoice["id"].to_string())],
+                &[],
+                None
+            )
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
+    #[cfg(feature = "excel")]
+    {
+        let bytes = include_bytes!("../../export-doc-excel/tests/fixtures/last-row-formulas.xls");
+        let preview = owner
+            .upload(
+                PREVIEW_SINGLE_WINDOW_EXCEL_IMPORT,
+                &[],
+                json!({}),
+                "customer.xls",
+                bytes,
+            )
+            .unwrap();
+        assert_eq!(preview["success"], true, "{preview}");
+        assert!(!preview["invoice"]["items"].as_array().unwrap().is_empty());
+        assert_eq!(
+            owner
+                .json::<Value>(LIST_SINGLE_WINDOW_SOURCES, &[], &[], None)
+                .unwrap()["totalCount"],
+            1
+        );
+    }
+}
+
 fn profile(f: &Fixture) -> Value {
     let body = contracts::overlay(
         contracts::object(SAVE_SINGLE_WINDOW_CLIENT_PROFILE.id, true),
@@ -86,7 +195,7 @@ fn declaration_revision_locks_and_stable_source_items_survive_reorder() {
         f.client()
             .json::<Value>(
                 SAVE_CUSTOMS_COO_DOCUMENT,
-                &[("invoiceId", id.to_string())],
+                &[("sourceId", id.to_string())],
                 &[],
                 Some(coo)
             )
@@ -156,7 +265,7 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
     acd(&f, id);
     let review = call(&f, BUILD_AGENT_CONSIGNMENT_EXPORT_REVIEW, id, None);
     assert_eq!(review["totalErrorCount"], 0, "{review}");
-    let package_path = f.root.join("submit.zip");
+    let package_path = f.root.join("submit.swpkg");
     let exported = call(
         &f,
         SAVE_AGENT_CONSIGNMENT_SUBMIT_PACKAGE_TO_PATH,
@@ -171,7 +280,7 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
             UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
             &[],
             json!({}),
-            "submit.zip",
+            "submit.swpkg",
             &bytes,
         )
         .unwrap();
@@ -212,7 +321,7 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
         Some(json!({"batchId":batch})),
     );
     assert_eq!(collected["receiptFiles"].as_array().unwrap().len(), 1);
-    let receipt_zip = f.root.join("receipt.zip");
+    let receipt_zip = f.root.join("receipt.swpkg");
     call(
         &f,
         SAVE_SINGLE_WINDOW_RECEIPT_PACKAGE_TO_PATH,
@@ -228,7 +337,7 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
             UPLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
             &[],
             json!({}),
-            "receipt.zip",
+            "receipt.swpkg",
             &receipt,
         )
         .unwrap();
@@ -240,7 +349,7 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
             UPLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
             &[],
             json!({}),
-            "receipt.zip",
+            "receipt.swpkg",
             &receipt,
         )
         .unwrap();
@@ -260,9 +369,65 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
                 UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
                 &[],
                 json!({}),
-                "submit.zip",
+                "submit.swpkg",
                 &bytes
             )
             .is_err()
+    );
+}
+
+#[test]
+fn first_coo_receipt_matches_certificate_without_batch_filename() {
+    let f = Fixture::new();
+    let station = profile(&f);
+    let source = call(
+        &f,
+        CREATE_SINGLE_WINDOW_SOURCE,
+        0,
+        Some(json!({"referenceNo":"COO-RECEIPT"})),
+    );
+    let id = source["id"].as_i64().unwrap();
+    let mut draft = declarations::coo("RC", "JAPAN", "9005");
+    draft["sourceId"] = json!(id);
+    call(&f, SAVE_CUSTOMS_COO_DOCUMENT, id, Some(draft));
+    let exported = call(
+        &f,
+        SAVE_CUSTOMS_COO_SUBMIT_PACKAGE_TO_PATH,
+        id,
+        Some(json!({"packagePath":f.root.join("coo.swpkg"),"stationAssignmentCode":""})),
+    );
+    let batch = exported["trackingBatchId"].as_i64().unwrap();
+    f.client()
+        .upload(
+            UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
+            &[],
+            json!({}),
+            "coo.swpkg",
+            &std::fs::read(f.root.join("coo.swpkg")).unwrap(),
+        )
+        .unwrap();
+    call(
+        &f,
+        DISPATCH_SINGLE_WINDOW_BATCH_TO_CLIENT,
+        0,
+        Some(json!({"batchId":batch})),
+    );
+    let root = f
+        .root
+        .join(station["customsCooClientRootPath"].as_str().unwrap())
+        .join("InBox/2026-11-09");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("official-random-name.xml"),
+        "<Receipt><CertNo>RC261234567899005</CertNo><Channel>1</Channel><RepCode>0</RepCode><Note>received</Note></Receipt>").unwrap();
+    let collected = call(
+        &f,
+        COLLECT_SINGLE_WINDOW_CLIENT_RECEIPTS,
+        0,
+        Some(json!({"batchId":batch})),
+    );
+    assert_eq!(
+        collected["receiptFiles"].as_array().unwrap().len(),
+        1,
+        "{collected}"
     );
 }

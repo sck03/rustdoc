@@ -114,7 +114,7 @@ pub fn build(business: Business, current: &Value, defaults: &Value) -> Value {
         groups.entry(name).or_default().push(json!({"groupKey":name,"groupDisplayName":name,"message":issue.message,"severity":"Error","canAutoRepair":repair,"navigationTarget":{"groupKey":name,"propertyKey":rules::pascal(&issue.field),"goodsLineNo":issue.row.map(|r|r+1)}}));
     }
     let groups:Vec<_>=groups.into_iter().map(|(key,issues)|json!({"groupKey":key,"groupDisplayName":key,"canAutoRepair":issues.iter().any(|i|i["canAutoRepair"]==true),"errorCount":issues.len(),"warningCount":0,"infoCount":0,"issues":issues})).collect();
-    json!({"businessType":business.name(),"invoiceId":current["sourceInvoiceId"],"invoiceNo":current["invoiceNo"],"contractNo":current["contractNo"],"draftRevision":current["draftRevision"],"manualLockedFieldCount":current["manualLockedFieldCount"],"sourceDiffCount":current["sourceDiffCount"],"sourceDiffSummary":current["sourceDiffSummary"],"groups":groups,"totalErrorCount":issues.len(),"totalWarningCount":0,"hasIssues":!issues.is_empty()})
+    json!({"businessType":business.name(),"sourceId":current["sourceId"],"invoiceNo":current["invoiceNo"],"contractNo":current["contractNo"],"draftRevision":current["draftRevision"],"manualLockedFieldCount":current["manualLockedFieldCount"],"sourceDiffCount":current["sourceDiffCount"],"sourceDiffSummary":current["sourceDiffSummary"],"groups":groups,"totalErrorCount":issues.len(),"totalWarningCount":0,"hasIssues":!issues.is_empty()})
 }
 pub fn repair(
     business: Business,

@@ -305,4 +305,6 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntime
 
 ## 2026-11-09 单一窗口验证补充
 
+独立申报补充：`test_single_window_workspace_ui.mjs` 同时验证手工建档、失败 Excel 不静默建空档、切换客户端后取消旧预览。真实桌面脚本追加从“申报资料”手工创建、独立收货人保存和客户 XLS 预览/建档；SQLite/PostgreSQL 共用 `single_window_sources_contract`。匿名 XML 生成与 XSD 校验命令、ACD 参考文件重复 Curr 差异及真实发送边界见[联调记录](../docs/2026-11-09独立申报与联调记录.md)。
+
 `npm --prefix apps/export-doc-web run test:concurrency-feedback` 包含 `test_single_window_workspace_ui.mjs`，覆盖两类单据保存续编、重复提交、切换/卸载/撤权/客户端变化、保存成功后锁定字段读取失败，以及参考目录 Excel 迟到响应与缓存释放。`test_native_desktop_editions.mjs <packagesRoot> Full --without-ocr --entry-rows-only` 在实际 Tauri/WebView2 中追加版本冲突、保存响应暂停期间续编、中文输入和保存回读，沿用原有表格/设计器/PDF 验证；必须先用当前前端重建桌面宿主。

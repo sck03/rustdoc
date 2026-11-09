@@ -51,9 +51,9 @@ const agentScopedClearGroups = [
 ] as const;
 export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiClient }) {
   const permission = useModulePermission("document.single-window");
-  const { invoiceId } = useParams();
+  const { sourceId } = useParams();
   const navigate = useNavigate();
-  const parsedInvoiceId = Number(invoiceId);
+  const parsedInvoiceId = Number(sourceId);
   const isInvoiceIdValid = Number.isInteger(parsedInvoiceId) && parsedInvoiceId > 0;
   const documentQueryKey = queryKeys.singleWindowAgentConsignmentDocument(parsedInvoiceId);
   const reviewQueryKey = queryKeys.singleWindowAgentConsignmentExportReview(parsedInvoiceId);
@@ -66,7 +66,7 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
 
   const documentQuery = useQuery({
     queryKey: documentQueryKey,
-    queryFn: ({ signal }) => client.getAgentConsignmentDocument({ invoiceId: parsedInvoiceId }, { signal }),
+    queryFn: ({ signal }) => client.getAgentConsignmentDocument({ sourceId: parsedInvoiceId }, { signal }),
     enabled: isInvoiceIdValid,
   });
 
@@ -75,7 +75,7 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     queryFn: ({ signal }) =>
       client.getSingleWindowExportReview({
         businessType: agentConsignmentBusinessType,
-        invoiceId: parsedInvoiceId,
+        sourceId: parsedInvoiceId,
       }, { signal }),
     enabled: isInvoiceIdValid,
   });
@@ -91,10 +91,10 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     document, setDocument, setUndoDocument, setMessage, setSuccessMessage, setPersistedDocumentSnapshot,
     documentQueryKey, reviewQueryKey,
     snapshot: value => buildAgentConsignmentDocumentSnapshot(value, parsedInvoiceId),
-    saveDocument: (value, signal) => client.saveAgentConsignmentDocument({ invoiceId: parsedInvoiceId, body: normalizeAgentConsignmentDocumentForSave(value, parsedInvoiceId) }, { signal }),
-    getDocument: signal => client.getAgentConsignmentDocument({ invoiceId: parsedInvoiceId }, { signal }),
-    buildDefaults: signal => client.buildAgentConsignmentDefaults({ invoiceId: parsedInvoiceId }, { signal }),
-    repair: (groupKeys, signal) => client.repairSingleWindowExportReviewGroups({ businessType: agentConsignmentBusinessType, invoiceId: parsedInvoiceId, body: { groupKeys } }, { signal }),
+    saveDocument: (value, signal) => client.saveAgentConsignmentDocument({ sourceId: parsedInvoiceId, body: normalizeAgentConsignmentDocumentForSave(value, parsedInvoiceId) }, { signal }),
+    getDocument: signal => client.getAgentConsignmentDocument({ sourceId: parsedInvoiceId }, { signal }),
+    buildDefaults: signal => client.buildAgentConsignmentDefaults({ sourceId: parsedInvoiceId }, { signal }),
+    repair: (groupKeys, signal) => client.repairSingleWindowExportReviewGroups({ businessType: agentConsignmentBusinessType, sourceId: parsedInvoiceId, body: { groupKeys } }, { signal }),
     fillEmpty: applyAgentDefaultsToEmptyFields,
     clearScope: applyAgentDefaultsForScope,
     clearManual: clearAgentManualOverrides,
@@ -103,8 +103,8 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
   const lockedFieldsWorkspace = useSingleWindowLockedFields({
     workspace, document,
     hasUnsavedChanges: Boolean(document && documentQuery.data && !areEditorDocumentsEqual(document, documentQuery.data)),
-    loadLockedFields: signal => client.getAgentConsignmentLockedFields({ invoiceId: parsedInvoiceId }, { signal }),
-    unlockFields: (fieldKeys, signal) => client.unlockAgentConsignmentFields({ invoiceId: parsedInvoiceId, body: { fieldKeys } }, { signal }),
+    loadLockedFields: signal => client.getAgentConsignmentLockedFields({ sourceId: parsedInvoiceId }, { signal }),
+    unlockFields: (fieldKeys, signal) => client.unlockAgentConsignmentFields({ sourceId: parsedInvoiceId, body: { fieldKeys } }, { signal }),
   });
 
   const isBusy =
@@ -112,7 +112,7 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
     reviewQuery.isFetching ||
     workspace.isPending;
   const loadMessage = !isInvoiceIdValid
-    ? "发票 ID 无效。"
+    ? "申报资料 无效。"
     : documentQuery.isError
       ? readApiError(documentQuery.error)
       : null;
@@ -174,8 +174,8 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
   }
 
   async function handleBackToInvoice() {
-    if (await confirmDiscardChanges("返回发票")) {
-      navigate(isInvoiceIdValid ? `/invoices/${parsedInvoiceId}` : "/invoices");
+    if (await confirmDiscardChanges("申报资料")) {
+      navigate("/single-window/sources");
     }
   }
 
@@ -301,7 +301,7 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
             />
           </section>
 
-          <SingleWindowHandoffPanel businessType="AgentConsignment" client={client} invoiceId={parsedInvoiceId} canOperate={permission.canOperate} />
+          <SingleWindowHandoffPanel businessType="AgentConsignment" client={client} sourceId={parsedInvoiceId} canOperate={permission.canOperate} />
         </form>
       ) : null}
 

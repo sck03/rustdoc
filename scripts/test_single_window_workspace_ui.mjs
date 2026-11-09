@@ -30,6 +30,7 @@ import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
 import {MemoryRouter,Routes,Route,useNavigate} from "react-router-dom";
 import {AgentConsignmentPage} from ${source("features/single-window/AgentConsignmentPage.tsx")};
 import {CustomsCooPage} from ${source("features/single-window/CustomsCooPage.tsx")};
+import {SingleWindowSourcesPage} from ${source("features/single-window/SingleWindowSourcesPage.tsx")};
 import {useReferenceCatalogExcelWorkspace} from ${source("features/single-window/useReferenceCatalogExcelWorkspace.ts")};
 import {catalogPages,getRows} from ${source("features/single-window/referenceCatalogModel.ts")};
 import {PermissionAccessProvider} from ${source("app/PermissionAccessContext.tsx")};
@@ -39,10 +40,13 @@ const initial={agent:${JSON.stringify(example(schemas.ApiAgentConsignmentDocumen
 const catalog=${JSON.stringify(example(schemas.SingleWindowReferenceCatalogModel))};
 const queries=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity},mutations:{retry:false}}});window.queries=queries;
 const records=new Map();window.pending=[];
-const get=id=>{if(!records.has(id))records.set(id,{...initial[window.mode],id:0,sourceInvoiceId:id,draftRevision:0,expectedDraftRevision:0,copCusCode:'1234567890',gName:'initial',certNo:'initial'});return records.get(id)};
+const get=id=>{if(!records.has(id))records.set(id,{...initial[window.mode],id:0,sourceId:id,draftRevision:0,expectedDraftRevision:0,copCusCode:'1234567890',gName:'initial',certNo:'initial'});return records.get(id)};
 const defer=(kind,request,init)=>new Promise((resolve,reject)=>window.pending.push({kind,request,signal:init.signal,resolve,reject}));
 const save=(r,i)=>defer('save',r,i),defaults=(r,i)=>defer('defaults',r,i);
-const client={getAgentConsignmentDocument:async r=>get(r.invoiceId),getCustomsCooDocument:async r=>get(r.invoiceId),
+const client={getAgentConsignmentDocument:async r=>get(r.sourceId),getCustomsCooDocument:async r=>get(r.sourceId),
+  listSingleWindowSources:async()=>({items:[],totalCount:0}),
+  previewSingleWindowExcelImport:(r,i)=>defer('source-preview',r,i),
+  createSingleWindowSource:(r,i)=>defer('source-create',r,i),
   saveAgentConsignmentDocument:save,saveCustomsCooDocument:save,buildAgentConsignmentDefaults:defaults,buildCustomsCooDefaults:defaults,
   getSingleWindowExportReview:async()=>{if(window.failRefresh)throw Error('refresh unavailable');return {groups:[]}},
   getSingleWindowReferenceCatalog:async()=>({catalog,revision:0}),
@@ -50,7 +54,7 @@ const client={getAgentConsignmentDocument:async r=>get(r.invoiceId),getCustomsCo
   getCustomsCooEditorOptions:async()=>(${JSON.stringify(example(schemas.ApiCustomsCooEditorOptionsResponse))}),getCustomsCooIssuingAuthorities:async()=>({options:[]}),
   previewSingleWindowReferenceCatalogExcelImport:(r,i)=>defer('preview',r,i),
 };
-window.finish=(index=0)=>{const p=window.pending[index],saved={...p.request.body,id:101,draftRevision:p.request.body.expectedDraftRevision+1};records.set(p.request.invoiceId,saved);p.resolve({document:saved,message:'saved'});};
+window.finish=(index=0)=>{const p=window.pending[index],saved={...p.request.body,id:101,draftRevision:p.request.body.expectedDraftRevision+1};records.set(p.request.sourceId,saved);p.resolve({document:saved,message:'saved'});};
 function Excel(){const [activeKey,setKey]=useState('countries'),[draft,setDraft]=useState(catalog),[notice,setNotice]=useState('');
  const activePage=catalogPages.find(page=>page.key===activeKey);
  const workspace=useReferenceCatalogExcelWorkspace({client,activeKey,activePage,draft,rows:getRows(draft,activeKey),canManage:true,externalBusy:false,markDraft:setDraft,clearMessages:()=>setNotice(''),showError:setNotice,showSuccess:setNotice});
@@ -59,7 +63,7 @@ function Excel(){const [activeKey,setKey]=useState('countries'),[draft,setDraft]
 function Harness(){const navigate=useNavigate(),[shown,setShown]=useState(true),[enabled,setEnabled]=useState(true),[owner,setOwner]=useState(client);
  window.navigate=navigate;window.hide=()=>setShown(false);window.revoke=()=>setEnabled(false);window.changeClient=()=>setOwner({...client});window.dirty=useHasUnsavedChanges();
  const permissions=['view',...(enabled?['operate','manage']:[])].map(action=>({resourceKey:'document.single-window',action,dataScope:'all'}));
- return <PermissionAccessProvider permissions={permissions}>{!shown?<span>closed</span>:window.mode==='excel'?<Excel/>:<Routes><Route path="/:invoiceId" element={window.mode==='agent'?<AgentConsignmentPage client={owner}/>:<CustomsCooPage client={owner}/>}/></Routes>}</PermissionAccessProvider>;
+ return <PermissionAccessProvider permissions={permissions}>{!shown?<span>closed</span>:window.mode==='sources'?<SingleWindowSourcesPage client={owner}/>:window.mode==='excel'?<Excel/>:<Routes><Route path="/:sourceId" element={window.mode==='agent'?<AgentConsignmentPage client={owner}/>:<CustomsCooPage client={owner}/>}/></Routes>}</PermissionAccessProvider>;
 }
 createRoot(document.getElementById('root')).render(<QueryClientProvider client={queries}><MemoryRouter initialEntries={['/1']}><ConfirmationProvider><UnsavedChangesProvider><Harness/></UnsavedChangesProvider></ConfirmationProvider></MemoryRouter></QueryClientProvider>);
 ` } });
@@ -128,6 +132,35 @@ try {
     await page.evaluate(() => window.pending[0].resolve({ catalogKey:'countries',sheetName:'obsolete',headerRowNumber:1,dataStartRowNumber:2,columnMappings:[],rowCount:1 }));
     assert.equal(await page.locator("output").textContent(), ""); assert.equal(await page.evaluate(() => window.excel.preview), null);
     assert.equal(await page.evaluate(() => window.queries.getMutationCache().getAll().length), 0);
+  });
+  await scenario("sources", async page => {
+    await page.getByLabel("资料编号 / 客户发票号").fill("CUSTOMER-MANUAL");
+    await page.getByRole("button", { name: "创建申报资料" }).click();
+    await page.waitForFunction(() => window.pending.length === 1);
+    assert.deepEqual(await page.evaluate(() => window.pending[0].request.body), { referenceNo: "CUSTOMER-MANUAL" });
+    await page.evaluate(() => window.pending[0].resolve({ id: 1 }));
+    await page.getByText("申报资料已创建，可分别填写代理委托和原产地证。").waitFor();
+    assert.equal(await page.evaluate(() => window.dirty), false);
+  });
+  await scenario("sources", async page => {
+    await page.getByLabel("资料编号 / 客户发票号").fill("CUSTOMER-EXCEL");
+    await page.locator('input[type="file"]').setInputFiles({ name: "custom.xlsx", mimeType: "application/octet-stream", buffer: Buffer.from("invalid") });
+    await page.waitForFunction(() => window.pending.length === 1);
+    await page.evaluate(() => window.pending[0].reject(Error('invalid workbook')));
+    await page.getByText('invalid workbook', { exact: true }).waitFor();
+    assert.equal(await page.getByRole('button', { name: '创建申报资料' }).isDisabled(), true);
+    await page.getByRole('button', { name: '清除文件，手工录入' }).click();
+    assert.equal(await page.getByRole('button', { name: '创建申报资料' }).isEnabled(), true);
+  });
+  await scenario("sources", async page => {
+    await page.getByLabel("资料编号 / 客户发票号").fill("STALE-CUSTOMER");
+    await page.locator('input[type="file"]').setInputFiles({ name: "custom.xlsx", mimeType: "application/octet-stream", buffer: Buffer.from("fixture") });
+    await page.waitForFunction(() => window.pending.length === 1);
+    await page.evaluate(() => window.changeClient());
+    await page.waitForFunction(() => window.pending[0].signal.aborted);
+    await page.evaluate(() => window.pending[0].resolve({ success:true, errors:[], invoice:{items:[]} }));
+    assert.equal(await page.getByLabel("资料编号 / 客户发票号").inputValue(), "");
+    assert.equal(await page.getByText(/已识别/).count(), 0);
   });
   console.log(`Single-window workspace UI: ${passed} scenarios passed.`);
 } finally { await context.close(); }

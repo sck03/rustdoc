@@ -191,7 +191,7 @@ pub fn defaults(
     today: &str,
 ) -> Result<Value, String> {
     let mut out = business.blank();
-    out["sourceInvoiceId"] = invoice["id"].clone();
+    out["sourceId"] = invoice["id"].clone();
     out["invoiceNo"] = invoice["invoiceNo"].clone();
     out["contractNo"] = invoice["contractNo"].clone();
     out["status"] = json!("Draft");

@@ -82,10 +82,10 @@ const emptyCooEditorOptions: ApiCustomsCooEditorOptionsResponse = {
 
 export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }) {
   const permission = useModulePermission("document.single-window");
-  const { invoiceId } = useParams();
+  const { sourceId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const parsedInvoiceId = Number(invoiceId);
+  const parsedInvoiceId = Number(sourceId);
   const isInvoiceIdValid = Number.isInteger(parsedInvoiceId) && parsedInvoiceId > 0;
   const documentQueryKey = queryKeys.singleWindowCustomsCooDocument(parsedInvoiceId);
   const reviewQueryKey = queryKeys.singleWindowCustomsCooExportReview(parsedInvoiceId);
@@ -121,7 +121,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
 
   const documentQuery = useQuery({
     queryKey: documentQueryKey,
-    queryFn: ({ signal }) => client.getCustomsCooDocument({ invoiceId: parsedInvoiceId }, { signal }),
+    queryFn: ({ signal }) => client.getCustomsCooDocument({ sourceId: parsedInvoiceId }, { signal }),
     enabled: isInvoiceIdValid,
   });
 
@@ -144,7 +144,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     queryFn: ({ signal }) =>
       client.getSingleWindowExportReview({
         businessType: customsCooBusinessType,
-        invoiceId: parsedInvoiceId,
+        sourceId: parsedInvoiceId,
       }, { signal }),
     enabled: isInvoiceIdValid,
   });
@@ -154,18 +154,18 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     document, setDocument, setUndoDocument, setMessage, setSuccessMessage, setPersistedDocumentSnapshot,
     documentQueryKey, reviewQueryKey,
     snapshot: value => buildCooDocumentSnapshot(value, parsedInvoiceId),
-    saveDocument: (value, signal) => client.saveCustomsCooDocument({ invoiceId: parsedInvoiceId, body: normalizeCooDocumentForSave(value, parsedInvoiceId) }, { signal }),
-    getDocument: signal => client.getCustomsCooDocument({ invoiceId: parsedInvoiceId }, { signal }),
-    buildDefaults: signal => client.buildCustomsCooDefaults({ invoiceId: parsedInvoiceId }, { signal }),
-    repair: (groupKeys, signal) => client.repairSingleWindowExportReviewGroups({ businessType: customsCooBusinessType, invoiceId: parsedInvoiceId, body: { groupKeys } }, { signal }),
+    saveDocument: (value, signal) => client.saveCustomsCooDocument({ sourceId: parsedInvoiceId, body: normalizeCooDocumentForSave(value, parsedInvoiceId) }, { signal }),
+    getDocument: signal => client.getCustomsCooDocument({ sourceId: parsedInvoiceId }, { signal }),
+    buildDefaults: signal => client.buildCustomsCooDefaults({ sourceId: parsedInvoiceId }, { signal }),
+    repair: (groupKeys, signal) => client.repairSingleWindowExportReviewGroups({ businessType: customsCooBusinessType, sourceId: parsedInvoiceId, body: { groupKeys } }, { signal }),
     fillEmpty: applyCooDefaultsToEmptyFields, clearScope: applyCooDefaultsForScope, clearManual: clearCooManualOverrides,
     clearMessage: formatScopedClearResultMessage,
   });
   const lockedFieldsWorkspace = useSingleWindowLockedFields({
     workspace, document,
     hasUnsavedChanges: Boolean(document && documentQuery.data && !areEditorDocumentsEqual(document, documentQuery.data)),
-    loadLockedFields: signal => client.getCustomsCooLockedFields({ invoiceId: parsedInvoiceId }, { signal }),
-    unlockFields: (fieldKeys, signal) => client.unlockCustomsCooFields({ invoiceId: parsedInvoiceId, body: { fieldKeys } }, { signal }),
+    loadLockedFields: signal => client.getCustomsCooLockedFields({ sourceId: parsedInvoiceId }, { signal }),
+    unlockFields: (fieldKeys, signal) => client.unlockCustomsCooFields({ sourceId: parsedInvoiceId, body: { fieldKeys } }, { signal }),
   });
 
   const producerProfiles = useCustomsCooProducerProfiles({ workspace, client, queryClient, document, setDocument: (next) => setDocument(next), setUndoDocument, setMessage, setSuccessMessage });
@@ -176,7 +176,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
     workspace.isPending ||
     producerProfiles.isPending;
   const loadMessage = !isInvoiceIdValid
-    ? "发票 ID 无效。"
+    ? "申报资料 无效。"
     : documentQuery.isError
       ? readApiError(documentQuery.error)
       : null;
@@ -231,8 +231,8 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
   const handleClearScopedCategory = workspace.clearScope;
 
   async function handleBackToInvoice() {
-    if (await confirmDiscardChanges("返回发票")) {
-      navigate(isInvoiceIdValid ? `/invoices/${parsedInvoiceId}` : "/invoices");
+    if (await confirmDiscardChanges("申报资料")) {
+      navigate("/single-window/sources");
     }
   }
 
@@ -368,7 +368,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
             />
           </section>
 
-          <SingleWindowHandoffPanel businessType="CustomsCoo" client={client} invoiceId={parsedInvoiceId} canOperate={permission.canOperate} />
+          <SingleWindowHandoffPanel businessType="CustomsCoo" client={client} sourceId={parsedInvoiceId} canOperate={permission.canOperate} />
         </form>
       ) : null}
 

@@ -41,6 +41,9 @@ mod personnel_contract;
 mod personnel_policy_contract;
 #[path = "support/personnel_scope_contract.rs"]
 mod personnel_scope_contract;
+#[cfg(feature = "single-window")]
+#[path = "support/single_window_sources_contract.rs"]
+mod sources_contract;
 #[path = "support/template_contract.rs"]
 mod template_contract;
 #[path = "support/tools_contract.rs"]
@@ -133,6 +136,11 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     });
     phase("permission_identity_contract::exercise", || {
         permission_identity_contract::exercise(&service, token)
+    });
+    #[cfg(feature = "single-window")]
+    sources_contract::exercise(&|operation, parameters, query, body| {
+        let bytes = service.dispatch(operation, parameters, query, body, token)?;
+        Ok(serde_json::from_slice(&bytes).unwrap())
     });
     invoice_clone_contract::exercise(&|operation, parameters, query, body| {
         let bytes = service.dispatch(operation, parameters, query, body, token)?;

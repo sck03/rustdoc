@@ -16,7 +16,7 @@ export function CooSummary({ document }: { document: ApiCustomsCooDocumentDto })
         </div>
       </div>
       <div className="detail-grid customs-coo-summary-grid">
-        <SummaryItem label="发票 ID" value={document.sourceInvoiceId} />
+        <SummaryItem label="申报资料" value={document.sourceId} />
         <SummaryItem label="发票号" value={document.invNo || document.invoiceNo} />
         <SummaryItem label="状态" value={document.status} />
         <SummaryItem label="草稿版本" value={document.draftRevision} />

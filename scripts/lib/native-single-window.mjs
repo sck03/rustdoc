@@ -24,15 +24,15 @@ export async function verifyDesktopSingleWindow({ run, cdp, output, token, invoi
   assert.equal(page.totalCount, 1); assert.equal(page.items.length, 1);
   await client.deleteCustomsCooProducerProfile({ id: producer.id, expectedVersion: updated.profile.versionNumber });
   const results = [];
-  const agentDraft = await client.getAgentConsignmentDocument({ invoiceId });
-  await client.saveAgentConsignmentDocument({ invoiceId, body: {
+  const agentDraft = await client.getAgentConsignmentDocument({ sourceId: invoiceId });
+  await client.saveAgentConsignmentDocument({ sourceId: invoiceId, body: {
     ...agentDraft, expectedDraftRevision: agentDraft.draftRevision, copCusCode: '1234567890',
     gName: '测试货物', codeTS: '6109100000', declTotal: '114142', ieDate: '20261109',
     tradeMode: '0110', oriCountry: '142', tradeCode: '1234567890', agentCode: '1234567890',
   } });
   for (const [kind, label, fieldName, read] of [
-    ['acd', '主要货物名称', 'gName', () => client.getAgentConsignmentDocument({ invoiceId })],
-    ['coo', '原产地证编号', 'certNo', () => client.getCustomsCooDocument({ invoiceId })],
+    ['acd', '主要货物名称', 'gName', () => client.getAgentConsignmentDocument({ sourceId: invoiceId })],
+    ['coo', '原产地证编号', 'certNo', () => client.getCustomsCooDocument({ sourceId: invoiceId })],
   ]) {
     await run(`location.hash=${JSON.stringify(`#/single-window/${kind}/${invoiceId}`)}; true`);
     const field = `[...document.querySelectorAll('label')].find(e=>e.textContent.trim().startsWith(${JSON.stringify(label)}))?.querySelector('input')`;
@@ -84,5 +84,48 @@ export async function verifyDesktopSingleWindow({ run, cdp, output, token, invoi
     await captureScreenshot(cdp, path.join(output, `Full-single-window-${kind}.png`), { captureBeyondViewport: false });
     results.push({ kind, continuedInput: true, imeRoundtrip: true, draftRevision: (await read()).draftRevision });
   }
-  fs.writeFileSync(path.join(output, 'single-window-results.json'), JSON.stringify({ catalogVersionConflict: true, producerVersionConflict: true, results }, null, 2));
+  await run("location.hash='#/single-window/sources'; true");
+  const sourceField = "[...document.querySelectorAll('label')].find(e=>e.textContent.includes('资料编号 / 客户发票号'))?.querySelector('input')";
+  await wait(sourceField);
+  await run(`${sourceField}.focus(); true`);
+  await cdp.send('Input.insertText', { text: 'DESKTOP-MANUAL-DECLARATION' });
+  await run("[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='创建申报资料').click(); true");
+  await wait("document.body.textContent.includes('申报资料已创建')");
+  const independent = await client.listSingleWindowSources({ keyword: 'DESKTOP-MANUAL-DECLARATION' });
+  assert.equal(independent.items.length, 1);
+  const sourceId = independent.items[0].id;
+  await assert.rejects(client.getInvoice({ id: sourceId }), error => error.status === 404);
+  await captureScreenshot(cdp, path.join(output, 'Full-single-window-sources.png'), { captureBeyondViewport: false });
+  await run(`[...document.querySelectorAll('a')].find(e=>e.getAttribute('href')===${JSON.stringify(`#/single-window/coo/${sourceId}`)}).click(); true`);
+  const consignee = "[...document.querySelectorAll('label')].find(e=>e.querySelector('span')?.textContent.trim()==='收货人')?.querySelector('textarea')";
+  await wait(consignee);
+  await run(`${consignee}.focus(); ${consignee}.select(); true`);
+  await cdp.send('Input.insertText', { text: '目的地收货人 / DESTINATION CUSTOMER' });
+  await wait(`${consignee}.value===${JSON.stringify('目的地收货人 / DESTINATION CUSTOMER')}`);
+  await wait("[...document.querySelectorAll('button')].some(e=>e.textContent.trim()==='保存草稿'&&!e.disabled)");
+  await run("[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='保存草稿').click(); true");
+  await waitFor(async () => (await client.getCustomsCooDocument({ sourceId })).consignee.includes('DESTINATION CUSTOMER'), 30000, 'Independent consignee was not saved');
+  await captureScreenshot(cdp, path.join(output, 'Full-single-window-independent.png'), { captureBeyondViewport: false });
+  const workbook = path.resolve(import.meta.dirname, '../../crates/export-doc-excel/tests/fixtures/last-row-formulas.xls');
+  const before = await client.listSingleWindowSources({});
+  const preview = await client.previewSingleWindowExcelImport({ fileName: 'customer-format.xls', body: new Blob([fs.readFileSync(workbook)]) });
+  assert.equal(preview.success, true, JSON.stringify(preview.errors));
+  assert(preview.invoice.items.length > 0);
+  assert.equal((await client.listSingleWindowSources({})).totalCount, before.totalCount);
+  const imported = await client.createSingleWindowSource({ body: { referenceNo: 'DESKTOP-EXCEL-DECLARATION', invoice: preview.invoice } });
+  assert.equal(imported.sourceKind, 'Excel');
+  assert.equal((await client.getCustomsCooDocument({ sourceId: imported.id })).items.length, preview.invoice.items.length);
+  const profile = (await client.saveSingleWindowClientProfile({ body: { profileKey: '', profileName: '隔离桌面测试', companyScope: 'DEFAULT',
+    cardIdentifier: 'TEST-ONLY', customsCooClientRootPath: '', agentConsignmentClientRootPath: '', canSubmitCustomsCoo: true, canSubmitAgentConsignment: true } })).profiles[0];
+  const manualAcd = await client.getAgentConsignmentDocument({ sourceId });
+  await client.saveAgentConsignmentDocument({ sourceId, body: { ...manualAcd, copCusCode: 'TEST000001', gName: '测试货物', codeTS: '6109100010',
+    declTotal: '100', ieDate: '20261109', tradeMode: '0110', oriCountry: '142', tradeCode: '1234567890', agentCode: '0987654321' } });
+  const packagePath = path.join(output, 'desktop-manual.swpkg');
+  const handoff = await client.saveAgentConsignmentSubmitPackageToPath({ sourceId, body: { packagePath, stationAssignmentCode: profile.stationAssignmentCode } });
+  assert(fs.statSync(packagePath).size > 0);
+  await client.uploadSingleWindowSubmitPackage({ body: new Blob([fs.readFileSync(packagePath)]), fileName: 'desktop-manual.swpkg' });
+  const dispatch = await client.dispatchSingleWindowBatchToClient({ body: { batchId: handoff.trackingBatchId } });
+  assert.equal(fs.readdirSync(dispatch.targetDirectory).filter(name => name.endsWith('.xml')).length, 1);
+  fs.writeFileSync(path.join(output, 'single-window-results.json'), JSON.stringify({ catalogVersionConflict: true, producerVersionConflict: true, manualSource: true, independentConsignee: true,
+    excelPreviewRows: preview.invoice.items.length, swpkgExportImportDispatch: true, results }, null, 2));
 }

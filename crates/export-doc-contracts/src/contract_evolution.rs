@@ -65,3 +65,104 @@ pub(super) fn reviewed_versioning(baseline: &mut Value) {
         parameters.push(json!({"name":name,"in":"query","schema":{"type":["integer","string"],"format":"int32","pattern":"^-?(?:0|[1-9]\\d*)$"}}));
     }
 }
+
+pub(super) fn reviewed_independent_declarations(baseline: &mut Value) {
+    for (name, before) in [
+        ("ApiAgentConsignmentDocumentDto", "sourceInvoiceId"),
+        ("ApiCustomsCooDocumentDto", "sourceInvoiceId"),
+        ("SingleWindowPackageManifest", "sourceInvoiceId"),
+        ("SingleWindowExportReview", "invoiceId"),
+    ] {
+        let schema = &mut baseline["components"]["schemas"][name];
+        let property = schema["properties"]
+            .as_object_mut()
+            .unwrap()
+            .remove(before)
+            .unwrap();
+        schema["properties"]["sourceId"] = property;
+        for field in schema["required"].as_array_mut().unwrap() {
+            if field == before {
+                *field = json!("sourceId");
+            }
+        }
+    }
+    let paths = baseline["paths"].as_object_mut().unwrap();
+    let changed: Vec<_> = paths
+        .keys()
+        .filter(|p| p.starts_with("/api/single-window/") && p.contains("{invoiceId}"))
+        .cloned()
+        .collect();
+    for path in changed {
+        let mut operations = paths.remove(&path).unwrap();
+        for operation in operations.as_object_mut().unwrap().values_mut() {
+            for parameter in operation["parameters"].as_array_mut().unwrap() {
+                if parameter["name"] == "invoiceId" {
+                    parameter["name"] = json!("sourceId");
+                    if !path.contains("export-review/{businessType}") {
+                        parameter["schema"] =
+                            json!({"type":"integer","minimum":1,"format":"int64"});
+                    }
+                }
+            }
+        }
+        paths.insert(path.replace("{invoiceId}", "{sourceId}"), operations);
+    }
+    let mut template = baseline["paths"]["/api/single-window/coo/editor-options"]["get"].clone();
+    for (path, method, id, response, errors, action) in [
+        (
+            "/api/single-window/sources",
+            "get",
+            "ListSingleWindowSources",
+            "ApiSingleWindowSourceListResponse",
+            vec!["401", "403"],
+            "view",
+        ),
+        (
+            "/api/single-window/sources",
+            "post",
+            "CreateSingleWindowSource",
+            "ApiSingleWindowSourceDto",
+            vec!["400", "401", "403", "409"],
+            "operate",
+        ),
+        (
+            "/api/single-window/sources/excel/preview",
+            "post",
+            "PreviewSingleWindowExcelImport",
+            "ApiExcelImportPreviewResponse",
+            vec!["400", "401", "403", "413"],
+            "operate",
+        ),
+    ] {
+        template["operationId"] = json!(id);
+        template["x-exportdoc-policy"]["access"]["resources"][0]["actions"] = json!([action]);
+        let mut operation = template.clone();
+        operation["responses"] = json!({"200":{"description":"OK","content":{"application/json":{"schema":{"$ref":format!("#/components/schemas/{response}")}}}}});
+        for code in errors {
+            operation["responses"][code] = json!({"description":match code { "400"=>"Bad Request", "401"=>"Unauthorized", "403"=>"Forbidden", "409"=>"Conflict", _=>"Payload Too Large" }});
+        }
+        if method == "get" {
+            operation["parameters"] = baseline["paths"]["/api/single-window/coo/producer-profiles"]
+                ["get"]["parameters"]
+                .clone();
+        } else {
+            let excel = id == "PreviewSingleWindowExcelImport";
+            operation["requestBody"] = json!({"required":true,"content":{if excel {"application/octet-stream"} else {"application/json"}:{"schema":{"$ref":format!("#/components/schemas/{}",if excel {"IFormFile"} else {"ApiSingleWindowSourceCreateRequest"})}}}});
+            if excel {
+                operation["parameters"] =
+                    json!([{"name":"fileName","in":"query","schema":{"type":"string"}}]);
+            }
+        }
+        if baseline["paths"].get(path).is_none() {
+            baseline["paths"][path] = json!({});
+        }
+        baseline["paths"][path][method] = operation;
+    }
+    let schemas = &mut baseline["components"]["schemas"];
+    schemas["ApiSingleWindowSourceCreateRequest"] = json!({"type":"object","properties":{
+        "referenceNo":{"type":"string","minLength":1,"maxLength":100},"invoice":{"$ref":"#/components/schemas/ApiInvoiceDetailDto"}},"required":["referenceNo"]});
+    schemas["ApiSingleWindowSourceDto"] = json!({"type":"object","properties":{
+        "id":{"type":"integer","format":"int64"},"invoiceNo":{"type":"string"},"sourceKind":{"type":"string"},"createdAt":{"type":"string","format":"date-time"}},"required":["id","invoiceNo","sourceKind","createdAt"]});
+    schemas["ApiSingleWindowSourceListResponse"] = json!({"type":"object","properties":{
+        "items":{"type":"array","items":{"$ref":"#/components/schemas/ApiSingleWindowSourceDto"}},"totalCount":{"type":"integer","format":"int64"}},"required":["items","totalCount"]});
+}

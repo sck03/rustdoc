@@ -130,11 +130,12 @@ fn rules(scope: &'static str, row: Option<usize>, value: &Value, issues: &mut Ve
                 Some("不在允许的选项中".into())
             }
             "ValidateExactDate" => {
-                let date = if text(rule, "format") == "yyyyMMdd"
-                    && raw.len() == 8
-                    && raw.bytes().all(|b| b.is_ascii_digit())
-                {
-                    format!("{}-{}-{}", &raw[..4], &raw[4..6], &raw[6..])
+                let date = if text(rule, "format") == "yyyyMMdd" {
+                    if raw.len() == 8 && raw.bytes().all(|b| b.is_ascii_digit()) {
+                        format!("{}-{}-{}", &raw[..4], &raw[4..6], &raw[6..])
+                    } else {
+                        String::new()
+                    }
                 } else {
                     raw.into()
                 };
@@ -200,6 +201,18 @@ pub fn review(business: Business, document: &Value) -> Vec<Issue> {
     rules(business.scope(), None, document, &mut issues);
     if business == Business::Acd {
         return issues;
+    }
+    if document["items"]
+        .as_array()
+        .is_none_or(|rows| rows.is_empty())
+    {
+        issue(
+            &mut issues,
+            "coo",
+            None,
+            "items",
+            "请至少填写一行商品明细。".into(),
+        );
     }
     let cert = text(document, "certType").to_uppercase();
     if !reference()["options"]["certTypeOptions"]

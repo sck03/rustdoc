@@ -44,6 +44,7 @@ const SingleWindowReferenceCatalogPage = lazyNamed(
   "SingleWindowReferenceCatalogPage",
 );
 const CustomsCooPage = lazyNamed(() => import("../features/single-window/CustomsCooPage.tsx"), "CustomsCooPage");
+const SingleWindowSourcesPage = lazyNamed(() => import("../features/single-window/SingleWindowSourcesPage.tsx"), "SingleWindowSourcesPage");
 const AgentConsignmentPage = lazyNamed(
   () => import("../features/single-window/AgentConsignmentPage.tsx"),
   "AgentConsignmentPage",
@@ -154,8 +155,9 @@ export function AppWorkspaceRoutes({
         <Route path="/single-window/operation-center" element={<SingleWindowOperationCenterPage client={client} />} />
         <Route path="/single-window/operation-center/:batchId" element={<SingleWindowOperationCenterDetailPage client={client} />} />
         <Route path="/single-window/reference-catalog" element={<SingleWindowReferenceCatalogPage client={client} />} />
-        <Route path="/single-window/coo/:invoiceId" element={<CustomsCooPage client={client} />} />
-        <Route path="/single-window/acd/:invoiceId" element={<AgentConsignmentPage client={client} />} />
+        <Route path="/single-window/sources" element={<SingleWindowSourcesPage client={client} />} />
+        <Route path="/single-window/coo/:sourceId" element={<CustomsCooPage client={client} />} />
+        <Route path="/single-window/acd/:sourceId" element={<AgentConsignmentPage client={client} />} />
         <Route
           path="/reports/templates/manage"
           element={

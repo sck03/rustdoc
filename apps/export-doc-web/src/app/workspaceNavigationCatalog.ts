@@ -104,7 +104,7 @@ const navigationEntries = {
   singleWindow: { label: "单一窗口", description: "准备申报资料，处理交接批次与回执", to: "/single-window/operation-center", icon: Network,
         isActive: (path) => path.startsWith("/single-window"), children: [
       { label: "申报业务", description: "准备申报资料，处理交接批次与回执", to: "/single-window/operation-center", icon: Network,
-        isActive: (path) => path === "/single-window" || path.startsWith("/single-window/operation-center") || path.startsWith("/single-window/coo") || path.startsWith("/single-window/acd"),
+        isActive: (path) => path === "/single-window" || path.startsWith("/single-window/sources") || path.startsWith("/single-window/operation-center") || path.startsWith("/single-window/coo") || path.startsWith("/single-window/acd"),
         workspace: "document", moduleKey: "document.single-window" },
       { label: "申报词典", description: "维护申报代码、字段选项与参考数据", to: "/single-window/reference-catalog", icon: Database,
         isActive: (path) => path.startsWith("/single-window/reference-catalog"), workspace: "document", moduleKey: "document.declaration-dictionary" },

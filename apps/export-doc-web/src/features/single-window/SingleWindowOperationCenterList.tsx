@@ -75,7 +75,7 @@ export function OperationCenterTable({
   return (
     <ResponsiveTableFrame label="单一窗口操作批次" mobileLayout="cards" busy={isBusy}>
       <table className="single-window-operation-table">
-        <thead><tr><th>发票号</th><th>公司抬头</th><th>业务</th><th>状态</th><th>批次号</th><th>版本</th><th>回执</th><th>持卡档案</th><th>更新</th><th>操作</th></tr></thead>
+        <thead><tr><th>资料编号</th><th>公司抬头</th><th>业务</th><th>状态</th><th>批次号</th><th>版本</th><th>回执</th><th>持卡档案</th><th>更新</th><th>操作</th></tr></thead>
         <tbody>
           {data.length === 0 ? <tr><td colSpan={10} className="empty-cell">{isBusy ? "加载中" : "暂无数据"}</td></tr> : data.map((row) => (
             <tr
@@ -87,7 +87,7 @@ export function OperationCenterTable({
               onDoubleClick={() => onOpen(row.batchId)}
               onKeyDown={(event) => handleRowKeyDown(event, row.batchId)}
             >
-              <td className="strong-cell" data-label="发票号">{readDisplayText(row.invoiceNo)}</td>
+              <td className="strong-cell" data-label="资料编号">{readDisplayText(row.invoiceNo)}</td>
               <td data-label="公司抬头">{readDisplayText(row.companyScope)}</td>
               <td data-label="业务">{formatBusinessType(row.businessType)}</td>
               <td data-label="状态"><span className="status-pill">{formatBatchStatus(row.status)}</span></td>
@@ -234,7 +234,7 @@ export function OperationCenterListActionsPanel({
       {message ? <InlineNotice tone={messageKind}>{message}</InlineNotice> : null}
 
       <div className="operation-center-list-action-grid">
-        <DetailItem label="发票号" value={row.invoiceNo} />
+        <DetailItem label="资料编号" value={row.invoiceNo} />
         <DetailItem label="公司抬头" value={row.companyScope} />
         <DetailItem label="业务" value={formatBusinessType(row.businessType)} />
         <DetailItem label="状态" value={formatBatchStatus(row.status)} />

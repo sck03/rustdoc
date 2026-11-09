@@ -9,6 +9,7 @@ mod profiles;
 mod receipts;
 mod references;
 mod review;
+mod sources;
 mod tracking;
 #[cfg(test)]
 mod tracking_tests;
@@ -24,6 +25,9 @@ use export_doc_domain::single_window::{self as rules, Business};
 use serde_json::{Value, json};
 pub const PERMISSION: &str = "document.single-window";
 pub const OPERATIONS: &[Operation] = &[
+    LIST_SINGLE_WINDOW_SOURCES,
+    CREATE_SINGLE_WINDOW_SOURCE,
+    PREVIEW_SINGLE_WINDOW_EXCEL_IMPORT,
     GET_CUSTOMS_COO_DOCUMENT,
     SAVE_CUSTOMS_COO_DOCUMENT,
     BUILD_CUSTOMS_COO_DEFAULTS,
@@ -73,6 +77,9 @@ pub fn requires_local(operation: Operation) -> bool {
         || bridge::OPERATIONS.contains(&operation)
 }
 pub fn accepts_upload(operation: Operation) -> bool {
+    if operation == PREVIEW_SINGLE_WINDOW_EXCEL_IMPORT {
+        return true;
+    }
     #[cfg(feature = "excel")]
     if catalog_excel::UPLOADS.contains(&operation) {
         return true;
@@ -87,6 +94,12 @@ pub fn upload(
     name: &str,
     bytes: &[u8],
 ) -> Result<Value> {
+    if operation == PREVIEW_SINGLE_WINDOW_EXCEL_IMPORT {
+        #[cfg(feature = "excel")]
+        return super::excel::preview(service, name, bytes);
+        #[cfg(not(feature = "excel"))]
+        return Err(error(501, "当前构建未启用 Excel 导入。"));
+    }
     #[cfg(feature = "excel")]
     if catalog_excel::UPLOADS.contains(&operation) {
         return catalog_excel::preview(service, actor, operation, metadata, name, bytes);
@@ -98,13 +111,7 @@ pub fn parameter<'a>(values: &'a [(&str, String)], key: &str) -> &'a str {
     crate::engine::request_values::find(values, key).unwrap_or("")
 }
 pub fn source(tx: &Connection, actor: &Actor, id: i64, action: &str) -> Result<Value> {
-    let invoice = store::get(tx, "invoices", id)?;
-    if !auth::visible(actor, PERMISSION, action, &invoice)
-        || !auth::visible(actor, "document.invoices", "view", &invoice)
-    {
-        return Err(error(403, "没有此发票单一窗口资料的操作权限。"));
-    }
-    Ok(invoice)
+    sources::load(tx, actor, id, action)
 }
 pub fn handle(
     service: &NativeService,
@@ -114,6 +121,10 @@ pub fn handle(
     query: &[(&str, String)],
     body: &Value,
 ) -> Result<Vec<u8>> {
+    if [LIST_SINGLE_WINDOW_SOURCES, CREATE_SINGLE_WINDOW_SOURCE].contains(&operation) {
+        return serde_json::to_vec(&sources::handle(service, actor, operation, query, body)?)
+            .map_err(Into::into);
+    }
     if packages::OPERATIONS.contains(&operation) {
         return packages::handle(service, actor, operation, parameters, body);
     }
@@ -159,7 +170,7 @@ pub fn handle(
         let business=if [GET_CUSTOMS_COO_DOCUMENT,SAVE_CUSTOMS_COO_DOCUMENT,BUILD_CUSTOMS_COO_DEFAULTS,GET_CUSTOMS_COO_LOCKED_FIELDS,UNLOCK_CUSTOMS_COO_FIELDS,BUILD_CUSTOMS_COO_EXPORT_REVIEW].contains(&operation){Business::Coo}
             else if [GET_AGENT_CONSIGNMENT_DOCUMENT,SAVE_AGENT_CONSIGNMENT_DOCUMENT,BUILD_AGENT_CONSIGNMENT_DEFAULTS,GET_AGENT_CONSIGNMENT_LOCKED_FIELDS,UNLOCK_AGENT_CONSIGNMENT_FIELDS,BUILD_AGENT_CONSIGNMENT_EXPORT_REVIEW].contains(&operation){Business::Acd}
             else {Business::parse(parameter(parameters,"businessType")).map_err(invalid)?};
-        let id=parameter(parameters,"invoiceId").parse::<i64>().ok().filter(|n|*n>0).ok_or_else(||invalid("请选择有效来源发票。"))?;
+        let id=parameter(parameters,"sourceId").parse::<i64>().ok().filter(|n|*n>0).ok_or_else(||invalid("请选择有效来源发票。"))?;
         let mut loaded=documents::load(tx,actor,service,business,id,"view")?;
         match operation{
             GET_CUSTOMS_COO_DOCUMENT|GET_AGENT_CONSIGNMENT_DOCUMENT=>Ok(loaded.current),

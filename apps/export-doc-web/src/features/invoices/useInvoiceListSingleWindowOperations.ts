@@ -42,14 +42,14 @@ export function useInvoiceListSingleWindowOperations({ client, queryClient, defa
     mutationFn: async ({ invoice, businessType, packagePath: targetPath, assignmentCode }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType; packagePath: string; assignmentCode: string }) => runAbortableOperation(async (signal) => {
       if (isDesktopBridgeAvailable()) {
         const response = businessType === "CustomsCoo"
-          ? await client.saveCustomsCooSubmitPackageToPath({ invoiceId: invoice.id, body: { packagePath: targetPath, stationAssignmentCode: assignmentCode } }, { signal })
-          : await client.saveAgentConsignmentSubmitPackageToPath({ invoiceId: invoice.id, body: { packagePath: targetPath, stationAssignmentCode: assignmentCode } }, { signal });
+          ? await client.saveCustomsCooSubmitPackageToPath({ sourceId: invoice.id, body: { packagePath: targetPath, stationAssignmentCode: assignmentCode } }, { signal })
+          : await client.saveAgentConsignmentSubmitPackageToPath({ sourceId: invoice.id, body: { packagePath: targetPath, stationAssignmentCode: assignmentCode } }, { signal });
         return { mode: "desktop" as const, response };
       }
       const body = { stationAssignmentCode: assignmentCode };
       const blob = businessType === "CustomsCoo"
-        ? await client.downloadCustomsCooSubmitPackage({ invoiceId: invoice.id, body }, { signal })
-        : await client.downloadAgentConsignmentSubmitPackage({ invoiceId: invoice.id, body }, { signal });
+        ? await client.downloadCustomsCooSubmitPackage({ sourceId: invoice.id, body }, { signal })
+        : await client.downloadAgentConsignmentSubmitPackage({ sourceId: invoice.id, body }, { signal });
       downloadBlob(blob, buildSingleWindowPackageDefaultFileName(invoice, businessType));
       return { mode: "browser" as const };
     }),
@@ -57,12 +57,12 @@ export function useInvoiceListSingleWindowOperations({ client, queryClient, defa
     onError: (error) => { setMessage(readApiError(error)); setMessageType("error"); setJobId(null); setPackagePath(null); },
   });
   const reviewMutation = useMutation({
-    mutationFn: async ({ invoice, businessType }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType }) => runAbortableOperation(async (signal) => ({ invoice, businessType, review: await client.getSingleWindowExportReview({ businessType, invoiceId: invoice.id }, { signal }) })),
+    mutationFn: async ({ invoice, businessType }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType }) => runAbortableOperation(async (signal) => ({ invoice, businessType, review: await client.getSingleWindowExportReview({ businessType, sourceId: invoice.id }, { signal }) })),
     onSuccess: ({ invoice, businessType, review: nextReview }) => { setDraft({ invoice }); setReview(nextReview); setReviewBusinessType(businessType); setReviewInvoiceId(invoice.id); setPackagePath(null); setJobId(null); setMessage(buildSingleWindowReviewMessage(nextReview, businessType)); setMessageType(nextReview.totalErrorCount > 0 ? "error" : "success"); },
     onError: (error) => { setMessage(readApiError(error)); setMessageType("error"); setJobId(null); setReview(null); setReviewBusinessType(null); setReviewInvoiceId(null); },
   });
   const repairMutation = useMutation({
-    mutationFn: async ({ invoice, businessType, groupKeys }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType; groupKeys: string[] }) => runAbortableOperation(async (signal) => ({ invoice, businessType, response: await client.repairSingleWindowExportReviewGroups({ businessType, invoiceId: invoice.id, body: { groupKeys } }, { signal }) })),
+    mutationFn: async ({ invoice, businessType, groupKeys }: { invoice: ApiInvoiceListItemDto; businessType: SingleWindowBusinessType; groupKeys: string[] }) => runAbortableOperation(async (signal) => ({ invoice, businessType, response: await client.repairSingleWindowExportReviewGroups({ businessType, sourceId: invoice.id, body: { groupKeys } }, { signal }) })),
     onSuccess: ({ invoice, businessType, response }) => { setDraft({ invoice }); setReview(response.review); setReviewBusinessType(businessType); setReviewInvoiceId(invoice.id); setPackagePath(null); setJobId(null); setMessage(response.message || buildSingleWindowReviewMessage(response.review, businessType)); setMessageType(response.review.totalErrorCount > 0 ? "error" : "success"); void queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() }); },
     onError: (error) => { setMessage(readApiError(error)); setMessageType("error"); setJobId(null); },
   });

@@ -139,7 +139,7 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
       <div className="toolbar single-window-toolbar">
         <form className="search-form" onSubmit={handleSearch}>
           <Search size={17} aria-hidden="true" />
-          <input aria-label="搜索单一窗口批次" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="发票号、合同号、批次号、回执号" />
+          <input aria-label="搜索单一窗口批次" value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="资料编号、合同号、批次号、回执号" />
         </form>
         <div className="filter-bar">
           <FilterSelect label="业务" value={businessType} options={businessTypeOptions} onChange={(value) => { setBusinessType(value); setPageNumber(1); }} />

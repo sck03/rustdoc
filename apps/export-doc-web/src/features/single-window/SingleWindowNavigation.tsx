@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 
 export function getSingleWindowTitle(pathname: string) {
+  if (pathname.startsWith("/single-window/sources")) return "申报资料";
   if (/\/single-window\/acd\/\d+/.test(pathname)) {
     return "报关代理委托草稿";
   }
@@ -24,12 +25,14 @@ export function getSingleWindowTitle(pathname: string) {
 export function SingleWindowTabs({
   activeKey,
 }: {
-  activeKey: "operation-center" | "reference-catalog" | "customs-coo" | "agent-consignment";
+  activeKey: "sources" | "operation-center" | "reference-catalog" | "customs-coo" | "agent-consignment";
 }) {
   const canViewOperations = useModulePermission("document.single-window").canView;
   const canViewDictionary = useModulePermission("document.declaration-dictionary").canView;
   return (
     <nav className="workspace-tabs" aria-label="单一窗口分类">
+      {canViewOperations && <Link className={activeKey === "sources" ? "workspace-tab workspace-tab-active" : "workspace-tab"}
+        to="/single-window/sources" aria-current={activeKey === "sources" ? "page" : undefined}>申报资料</Link>}
       {canViewOperations && <Link
         className={activeKey === "operation-center" ? "workspace-tab workspace-tab-active" : "workspace-tab"}
         to="/single-window/operation-center"

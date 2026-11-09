@@ -19,8 +19,8 @@ const agentPaperInfoOptions = ["已收齐", "待补充", "发票", "装箱单", 
 export function AgentConsignmentSummary({ document }: { document: ApiAgentConsignmentDocumentDto }) {
   return (
     <div className="detail-grid single-window-document-summary-grid">
-      <SummaryItem label="发票 ID" value={document.sourceInvoiceId} />
-      <SummaryItem label="发票号" value={document.invoiceNo} />
+      <SummaryItem label="申报资料" value={document.sourceId} />
+      <SummaryItem label="资料编号" value={document.invoiceNo} />
       <SummaryItem label="合同号" value={document.contractNo} />
       <SummaryItem label="状态" value={document.status} />
       <SummaryItem label="委托编号" value={document.consignNo} />
@@ -56,7 +56,7 @@ export function AgentConsignmentWorkbench({
               label="企业内部编号"
               value={document.copCusCode}
               required
-              description="10 位企业海关编码，通常与经营单位编码一致。"
+              description="企业自编编号，最多 10 个字符。"
               onChange={(value) => onPatchDocument({ copCusCode: value })}
             />
             <SelectField

@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "e52895341cef6ab74d1bf9e785c0fd825031c8777d49e32a30e4c78455847dea",
+  "digest": "0f14951117c056345e09c688a4d1590285ed4f85ca3d787f55c556be92b64677",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -10275,12 +10275,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -10351,12 +10351,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -10427,12 +10427,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -10503,12 +10503,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -18439,6 +18439,79 @@
       },
       "timeoutSeconds": 30
     },
+    "CreateSingleWindowSource": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": {
+          "readModule": "document.single-window",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": null,
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [],
+        "permissionBypass": false,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "document.single-window",
+              "actions": [
+                "operate"
+              ],
+              "administratorOnly": false
+            }
+          ]
+        }
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiSingleWindowSourceCreateRequest"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiSingleWindowSourceDto"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "409": {
+          "description": "Conflict"
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/ApiSingleWindowSourceCreateRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/ApiSingleWindowSourceDto"
+      },
+      "timeoutSeconds": 30
+    },
     "CreateSupplier": {
       "policy": {
         "requiresAuthentication": true,
@@ -25479,12 +25552,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -28658,12 +28731,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -35789,12 +35862,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -35865,12 +35938,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -36627,12 +36700,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -36803,12 +36876,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -43703,7 +43776,7 @@
           "required": true
         },
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
@@ -59062,6 +59135,94 @@
       },
       "timeoutSeconds": 30
     },
+    "ListSingleWindowSources": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": {
+          "readModule": "document.single-window",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": null,
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [],
+        "permissionBypass": false,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "document.single-window",
+              "actions": [
+                "view"
+              ],
+              "administratorOnly": false
+            }
+          ]
+        }
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "keyword",
+          "in": "query",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "pageNumber",
+          "in": "query",
+          "schema": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "schema": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiSingleWindowSourceListResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/ApiSingleWindowSourceListResponse"
+      },
+      "timeoutSeconds": 30
+    },
     "ListSubmissionsOfExpenseRequest": {
       "policy": {
         "requiresAuthentication": true,
@@ -64413,6 +64574,85 @@
       },
       "response": {
         "$ref": "#/components/schemas/ApiShippingMarkImagePreviewResponse"
+      },
+      "timeoutSeconds": 30
+    },
+    "PreviewSingleWindowExcelImport": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": {
+          "readModule": "document.single-window",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": null,
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [],
+        "permissionBypass": false,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "document.single-window",
+              "actions": [
+                "operate"
+              ],
+              "administratorOnly": false
+            }
+          ]
+        }
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "fileName",
+          "in": "query",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/octet-stream": {
+            "schema": {
+              "$ref": "#/components/schemas/IFormFile"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiExcelImportPreviewResponse"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "413": {
+          "description": "Payload Too Large"
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/ApiExcelImportPreviewResponse"
       },
       "timeoutSeconds": 30
     },
@@ -70925,7 +71165,7 @@
           "required": true
         },
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
@@ -74474,12 +74714,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -74561,12 +74801,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -75179,12 +75419,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -75266,12 +75506,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -82298,12 +82538,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -82385,12 +82625,12 @@
       "office": null,
       "parameters": [
         {
-          "name": "invoiceId",
+          "name": "sourceId",
           "in": "path",
           "schema": {
             "type": "integer",
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
+            "format": "int64",
+            "minimum": 1
           },
           "required": true
         }
@@ -93782,7 +94022,7 @@
         "sourceDiffSummary": {
           "type": "string"
         },
-        "sourceInvoiceId": {
+        "sourceId": {
           "type": [
             "integer",
             "string"
@@ -93813,7 +94053,7 @@
       },
       "required": [
         "id",
-        "sourceInvoiceId",
+        "sourceId",
         "invoiceNo",
         "contractNo",
         "status",
@@ -96670,7 +96910,7 @@
         "sourceDiffSummary": {
           "type": "string"
         },
-        "sourceInvoiceId": {
+        "sourceId": {
           "type": [
             "integer",
             "string"
@@ -96728,7 +96968,7 @@
       },
       "required": [
         "id",
-        "sourceInvoiceId",
+        "sourceId",
         "invoiceNo",
         "contractNo",
         "status",
@@ -108935,6 +109175,66 @@
         "repairedGroupCount",
         "review",
         "message"
+      ]
+    },
+    "ApiSingleWindowSourceCreateRequest": {
+      "type": "object",
+      "properties": {
+        "invoice": {
+          "$ref": "#/components/schemas/ApiInvoiceDetailDto"
+        },
+        "referenceNo": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      "required": [
+        "referenceNo"
+      ]
+    },
+    "ApiSingleWindowSourceDto": {
+      "type": "object",
+      "properties": {
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "invoiceNo": {
+          "type": "string"
+        },
+        "sourceKind": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "invoiceNo",
+        "sourceKind",
+        "createdAt"
+      ]
+    },
+    "ApiSingleWindowSourceListResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ApiSingleWindowSourceDto"
+          }
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "items",
+        "totalCount"
       ]
     },
     "ApiSingleWindowSubmitPackageRequest": {
@@ -122684,14 +122984,6 @@
         "hasIssues": {
           "type": "boolean"
         },
-        "invoiceId": {
-          "type": [
-            "integer",
-            "string"
-          ],
-          "format": "int32",
-          "pattern": "^-?(?:0|[1-9]\\d*)$"
-        },
         "invoiceNo": {
           "type": "string"
         },
@@ -122714,6 +123006,14 @@
         "sourceDiffSummary": {
           "type": "string"
         },
+        "sourceId": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        },
         "totalErrorCount": {
           "type": [
             "integer",
@@ -122733,7 +123033,7 @@
       },
       "required": [
         "businessType",
-        "invoiceId",
+        "sourceId",
         "invoiceNo",
         "contractNo",
         "draftRevision",
@@ -123265,7 +123565,7 @@
         "sourceDocumentType": {
           "type": "string"
         },
-        "sourceInvoiceId": {
+        "sourceId": {
           "type": [
             "integer",
             "string"
@@ -123300,7 +123600,7 @@
         "packageType",
         "businessType",
         "batchReference",
-        "sourceInvoiceId",
+        "sourceId",
         "sourceDocumentId",
         "sourceDocumentType",
         "submissionVersion",

@@ -62,7 +62,7 @@ export function SingleWindowDocumentActionBar({
       <div className="single-window-toolbar-head">
         <button className="command-button secondary" type="button" onClick={onBack}>
           <ArrowLeft size={17} aria-hidden="true" />
-          <span>返回发票</span>
+          <span>申报资料</span>
         </button>
         <div className="editor-title single-window-document-title">
           {titleIcon}

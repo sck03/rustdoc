@@ -39,7 +39,7 @@ const normalized = m.normalizeCooDocumentForSave({
   nonpartyCorps: [{ sortNo: 0, entName: " Factory " }, { sortNo: 0 }],
   attachments: [{ fileName: " invoice.pdf ", filePath: " E:/Docs/invoice.pdf " }],
 }, 19);
-assert(normalized.sourceInvoiceId === 19, "source invoice normalization");
+assert(normalized.sourceId === 19, "source invoice normalization");
 assert(normalized.items.length === 1 && normalized.items[0].gNo === 1, "empty COO item filtering");
 assert(normalized.nonpartyCorps.length === 1 && normalized.nonpartyCorps[0].sortNo === 1, "empty nonparty filtering");
 assert(normalized.attachments[0].id === 0 && normalized.attachments[0].sortOrder === 0, "attachment numeric normalization");

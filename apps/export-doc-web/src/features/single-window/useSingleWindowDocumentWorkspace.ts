@@ -28,7 +28,7 @@ type Options<T extends object> = {
   clearManual(document: T): Change<T>;
   clearMessage(request: ScopedClear<T>, count: number): string;
 };
-const serverFields = new Set(["id", "sourceInvoiceId", "draftRevision", "expectedDraftRevision", "createdAt", "updatedAt"]);
+const serverFields = new Set(["id", "sourceId", "draftRevision", "expectedDraftRevision", "createdAt", "updatedAt"]);
 
 /** One cancellation/serialization boundary for saves, confirmations and document tools. */
 export function useSingleWindowDocumentWorkspace<T extends object>(options: Options<T>) {

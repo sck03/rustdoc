@@ -59,6 +59,7 @@ mod schemas_reports_1;
 mod schemas_sales_1;
 mod schemas_single_window_1;
 mod schemas_workflow_1;
+mod single_window_sources;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
@@ -70,6 +71,7 @@ pub(super) fn document() -> Value {
     schemas.extend(schemas_maintenance_1::entries());
     schemas.extend(schemas_sales_1::entries());
     schemas.extend(schemas_single_window_1::entries());
+    schemas.extend(single_window_sources::schemas());
     schemas.extend(schemas_reports_1::entries());
     schemas.extend(schemas_hs_1::entries());
     schemas.extend(schemas_personnel_1::entries());
@@ -103,6 +105,7 @@ pub(super) fn document() -> Value {
     endpoints.extend(endpoints_tools::entries());
     endpoints.extend(endpoints_reports::entries());
     endpoints.extend(endpoints_single_window::entries());
+    endpoints.extend(single_window_sources::endpoints());
     endpoints.extend(endpoints_master_data::entries());
     endpoints.extend(endpoints_crm::entries());
     endpoints.extend(endpoints_suppliers::entries());

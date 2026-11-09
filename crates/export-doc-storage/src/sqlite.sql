@@ -1,7 +1,7 @@
 PRAGMA foreign_keys = ON;
 CREATE TABLE schema_model (version INTEGER PRIMARY KEY,model TEXT NOT NULL,shape TEXT NOT NULL);
-CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 14));
-INSERT INTO schema_version VALUES (14);
+CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 15));
+INSERT INTO schema_version VALUES (15);
 CREATE TABLE records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL,

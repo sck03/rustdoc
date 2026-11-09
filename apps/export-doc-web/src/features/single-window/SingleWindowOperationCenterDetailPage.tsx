@@ -90,7 +90,7 @@ function OperationCenterDetail({ detail }: { detail: SingleWindowOperationCenter
           <DetailItem label="公司抬头" value={detail.companyScope} wide />
           <DetailItem label="业务类型" value={formatBusinessType(detail.businessType)} />
           <DetailItem label="当前状态" value={formatBatchStatus(detail.status)} />
-          <DetailItem label="发票号" value={detail.invoiceNo} />
+          <DetailItem label="资料编号" value={detail.invoiceNo} />
           <DetailItem label="合同号" value={detail.contractNo} />
           <DetailItem label="业务参考号" value={detail.referenceNo} />
           <DetailItem label="提交版本" value={detail.submissionVersion} />

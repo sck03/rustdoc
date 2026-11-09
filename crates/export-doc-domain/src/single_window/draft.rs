@@ -27,6 +27,18 @@ fn excluded(business: Business, scope: &str, key: &str) -> bool {
 /// Public lock keys retain the original Goods:Item:id:Property contract.
 pub fn fields(business: Business, document: &Value) -> BTreeMap<String, String> {
     let mut result = BTreeMap::new();
+    if business == Business::Coo {
+        result.insert(
+            "Items".into(),
+            document["items"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(identity)
+                .collect::<Vec<_>>()
+                .join("\n"),
+        );
+    }
     for key in crate::contracts::schema(business.schema())["properties"]
         .as_object()
         .into_iter()
@@ -75,6 +87,29 @@ pub fn restore_locked(
             }
         }
     }
+    if business == Business::Coo && locks.contains("Items") {
+        let suggested: BTreeMap<_, _> = defaults["items"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|row| (identity(row), row.clone()))
+            .collect();
+        defaults["items"] = json!(
+            saved["items"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|row| {
+                    let mut current = suggested
+                        .get(&identity(row))
+                        .cloned()
+                        .unwrap_or_else(|| row.clone());
+                    current["gNo"] = row["gNo"].clone();
+                    current
+                })
+                .collect::<Vec<_>>()
+        );
+    }
     if let Some(rows) = defaults["items"].as_array_mut() {
         let saved_rows: BTreeMap<_, _> = saved["items"]
             .as_array()
@@ -92,16 +127,6 @@ pub fn restore_locked(
                     *value = saved_row[key].clone();
                 }
             }
-        }
-        for row in saved["items"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter(|row| row["sourceItemId"].as_i64().unwrap_or(0) <= 0)
-        {
-            let mut row = row.clone();
-            row["gNo"] = json!(rows.len() + 1);
-            rows.push(row);
         }
     }
     for key in [
@@ -121,7 +146,6 @@ pub fn restore_locked(
     }
     defaults["expectedDraftRevision"] = saved["draftRevision"].clone();
     defaults["manualLockedFieldCount"] = json!(locks.len());
-    let _ = business;
 }
 pub fn changes(business: Business, baseline: &Value, defaults: &Value) -> (usize, String) {
     let previous = fields(business, baseline);
@@ -164,6 +188,9 @@ pub fn changes(business: Business, baseline: &Value, defaults: &Value) -> (usize
     (changed.len(), summary)
 }
 pub fn display(business: Business, key: &str) -> String {
+    if key == "Items" {
+        return "商品明细行及顺序".into();
+    }
     let property = key.rsplit(':').next().unwrap_or(key);
     let scope = if key.starts_with("Goods:") {
         "goods"

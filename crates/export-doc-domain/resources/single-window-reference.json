@@ -2184,7 +2184,7 @@
     {
       "scope": "acd",
       "key": "tradeMode",
-      "method": "ValidateMaxLength",
+      "method": "ValidateDigits",
       "numbers": [
         4
       ],
@@ -2219,7 +2219,7 @@
       "key": "declTotal",
       "method": "ValidateDecimal",
       "numbers": [
-        19,
+        15,
         4
       ],
       "allowed": [],
@@ -2231,7 +2231,7 @@
       "key": "declarePrice",
       "method": "ValidateDecimal",
       "numbers": [
-        19,
+        17,
         2
       ],
       "allowed": [],
@@ -2241,7 +2241,7 @@
     {
       "scope": "acd",
       "key": "copCusCode",
-      "method": "ValidateDigits",
+      "method": "ValidateMaxLength",
       "numbers": [
         10
       ],
@@ -2292,6 +2292,127 @@
       "allowed": [],
       "format": "",
       "label": "经营单位"
+    },
+    {
+      "scope": "acd",
+      "key": "sign",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        512
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "数字签名"
+    },
+    {
+      "scope": "acd",
+      "key": "operType",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        1
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "操作类型"
+    },
+    {
+      "scope": "acd",
+      "key": "gName",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        255
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "主要货物名称"
+    },
+    {
+      "scope": "acd",
+      "key": "qtyOrWeight",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        255
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "数（重）量"
+    },
+    {
+      "scope": "acd",
+      "key": "packingCondition",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        255
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "包装情况"
+    },
+    {
+      "scope": "acd",
+      "key": "consignTele",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        30
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "委托方联系电话"
+    },
+    {
+      "scope": "acd",
+      "key": "entryId",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        18
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "报关单编号"
+    },
+    {
+      "scope": "acd",
+      "key": "paperInfo",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "收到单证情况"
+    },
+    {
+      "scope": "acd",
+      "key": "otherRecInfo",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        500
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "收到其他单证情况"
+    },
+    {
+      "scope": "acd",
+      "key": "promiseNote",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        1024
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "承诺说明"
+    },
+    {
+      "scope": "acd",
+      "key": "declTele",
+      "method": "ValidateMaxLength",
+      "numbers": [
+        20
+      ],
+      "allowed": [],
+      "format": "",
+      "label": "被委托方联系电话"
     }
   ],
   "labels": {
@@ -3054,9 +3175,8 @@
   "sets": {
     "CustomsCooDocumentEditableExclusions": [
       "Id",
-      "SourceInvoiceId",
+      "SourceId",
       "InvoiceNo",
-      "ContractNo",
       "Status",
       "CertNo",
       "WarningCount",
@@ -3083,9 +3203,8 @@
     ],
     "AgentConsignmentEditableExclusions": [
       "Id",
-      "SourceInvoiceId",
+      "SourceId",
       "InvoiceNo",
-      "ContractNo",
       "Status",
       "CounterpartyStatus",
       "ConsignNo",

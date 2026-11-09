@@ -95,11 +95,11 @@ pub fn save(
 ) -> Result<Value> {
     validation::structure(business, body).map_err(invalid)?;
     let invoice = source(tx, actor, invoice_id, "edit")?;
-    if body["sourceInvoiceId"]
+    if body["sourceId"]
         .as_i64()
         .is_some_and(|n| n > 0 && n != invoice_id)
     {
-        return Err(invalid("来源发票编号与请求路径不一致。"));
+        return Err(invalid("申报资料编号与请求路径不一致。"));
     }
     let revision = loaded
         .stored
@@ -132,9 +132,8 @@ pub fn save(
             }
         }
     }
-    body["sourceInvoiceId"] = json!(invoice_id);
+    body["sourceId"] = json!(invoice_id);
     body["invoiceNo"] = invoice["invoiceNo"].clone();
-    body["contractNo"] = invoice["contractNo"].clone();
     body["status"] = json!("Draft");
     body["draftRevision"] = json!(
         revision
