@@ -52,6 +52,7 @@ pub const OPERATIONS: &[Operation] = &[
 pub fn read<'a>(query: &'a [(&str, String)], key: &str) -> &'a str {
     crate::engine::request_values::find(query, key).unwrap_or("")
 }
+#[cfg(feature = "excel")]
 pub fn codes(tx: &Connection) -> Result<BTreeMap<String, ApiHsCodeDto>> {
     store::all(tx, CODES)?
         .into_iter()
@@ -182,12 +183,18 @@ pub fn handle(
             hs_learning::save_example(tx, actor, body)
         }
         DELETE_HS_CODE_KNOWLEDGE_EXAMPLE | DELETE_HS_CODE_KNOWLEDGE_EXAMPLES_BATCH => {
-            let ids = if operation == DELETE_HS_CODE_KNOWLEDGE_EXAMPLE {
-                BTreeSet::from([id(parameters)?])
+            let expected = if operation == DELETE_HS_CODE_KNOWLEDGE_EXAMPLE {
+                mutations::versions(
+                    &json!([{"id":id(parameters)?,"expectedVersion":read(query,"expectedVersion").parse::<i64>().unwrap_or(0)}]),
+                )?
             } else {
-                ids(body)?
+                mutations::versions(&body["items"])?
             };
-            let count = delete(tx, actor, EXAMPLES, &ids)?;
+            for (id, version) in &expected {
+                operation::check()?;
+                store::check_version(&store::get(tx, EXAMPLES, *id)?, *version)?;
+            }
+            let count = delete(tx, actor, EXAMPLES, &expected.keys().copied().collect())?;
             Ok(
                 json!({"success":true,"message":format!("已删除 {count} 条案例。"),"deletedCount":count}),
             )
@@ -196,7 +203,7 @@ pub fn handle(
             hs_learning::feedback(tx, actor, body, year)?;
             Ok(json!({"success":true,"message":"反馈已记录。"}))
         }
-        DISCOVER_HS_CODE_HISTORY_CANDIDATES => hs_learning::history(tx, actor, query, year),
+        DISCOVER_HS_CODE_HISTORY_CANDIDATES => super::hs_history::discover(tx, actor, query, year),
         _ => hs_learning::remote_review(tx, actor, operation, query, body, year),
     };
     let value = if [
@@ -207,6 +214,7 @@ pub fn handle(
         SEARCH_INVOICE_HS_CODE_KNOWLEDGE,
         LIST_HS_CODE_KNOWLEDGE_EXAMPLES,
         LIST_HS_CODE_REMOTE_CANDIDATES,
+        DISCOVER_HS_CODE_HISTORY_CANDIDATES,
         PREVIEW_HS_CODES_OBSOLETE,
     ]
     .contains(&operation)

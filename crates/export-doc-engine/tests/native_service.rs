@@ -447,12 +447,21 @@ fn worklist_preserves_source_counts_filtering_and_the_react_page_contract() {
         let invoice = InvoiceDraft::demo("2026-09-16", number).build().unwrap();
         fixture.request(CREATE_INVOICE, None, Some(json!(invoice)));
     }
+    let first: Value = fixture
+        .client()
+        .json(GET_WORKLIST, &[], &[("pageSize", "1".into())], None)
+        .unwrap();
+    assert!(first["nextCursor"].is_string());
     let page: Value = fixture
         .client()
         .json(
             GET_WORKLIST,
             &[],
-            &[("pageSize", "1".into()), ("pageNumber", "2".into())],
+            &[
+                ("pageSize", "1".into()),
+                ("pageNumber", "2".into()),
+                ("cursor", first["nextCursor"].as_str().unwrap().into()),
+            ],
             None,
         )
         .unwrap();
@@ -461,6 +470,19 @@ fn worklist_preserves_source_counts_filtering_and_the_react_page_contract() {
     assert_eq!(page["page"]["items"].as_array().unwrap().len(), 1);
     assert_eq!(page["page"]["items"][0]["source"], "invoice-review");
     assert_eq!(page["sources"][0]["count"], 2);
+    assert_ne!(
+        first["page"]["items"][0]["recordId"],
+        page["page"]["items"][0]["recordId"]
+    );
+    assert!(page["nextCursor"].is_null());
+    assert_eq!(
+        fixture
+            .client()
+            .json::<Value>(GET_WORKLIST, &[], &[("pageNumber", "999999".into())], None)
+            .unwrap_err()
+            .status,
+        Some(400)
+    );
     let overdue: Value = fixture
         .client()
         .json(GET_WORKLIST, &[], &[("due", "Overdue".into())], None)

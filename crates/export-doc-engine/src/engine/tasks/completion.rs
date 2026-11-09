@@ -1,4 +1,4 @@
-//! Keep terminal snapshots and cleanup behind one publication boundary.
+//! Keep terminal snapshots and publication recovery behind one boundary.
 use crate::engine::error::{Result, unavailable};
 use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError};
 use std::time::{Duration, Instant};
@@ -28,7 +28,7 @@ impl Completion {
 
     pub(super) fn finish(&self, work: impl FnOnce() -> Result<()>) -> Result<()> {
         // Terminal persistence must outlive execution cancellation, but lock
-        // admission, SQL and retention share one independent deadline.
+        // admission, SQL and output recovery share one independent deadline.
         crate::operation::OperationScope::detached(Duration::from_secs(30)).run(|| {
             let mut failure = self.write()?;
             let result = work();

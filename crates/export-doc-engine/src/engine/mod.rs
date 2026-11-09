@@ -39,6 +39,7 @@ mod handling;
 mod hs;
 #[cfg(feature = "excel")]
 mod hs_files;
+mod hs_history;
 mod hs_learning;
 #[cfg(feature = "excel")]
 mod hs_package;

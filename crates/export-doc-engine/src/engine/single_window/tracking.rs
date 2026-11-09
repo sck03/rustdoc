@@ -108,7 +108,7 @@ pub fn add_package(row: &mut Value, m: &Value, direction: &str) -> Result<bool> 
     Ok(true)
 }
 
-pub fn archive(tx: &Connection, row: &Value, bytes: &[u8]) -> Result<()> {
+pub fn archive(tx: &Connection, row: &Value, bytes: &[u8], hash: &str) -> Result<()> {
     let id = row["id"]
         .as_i64()
         .ok_or_else(|| unavailable("批次编号损坏。"))?;
@@ -118,22 +118,26 @@ pub fn archive(tx: &Connection, row: &Value, bytes: &[u8]) -> Result<()> {
         record_id: id,
         file_name: &format!("{}.zip", rules::text(row, "batchReference")),
         media_type: "application/zip",
-        digest: &digest(bytes),
+        digest: hash,
         content: bytes,
         created_at: &store::timestamp(),
     })?;
     Ok(())
 }
 
-pub fn archived(tx: &Connection, row: &Value) -> Result<Package> {
-    let file = tx
+pub fn archived_blob(tx: &Connection, row: &Value) -> Result<export_doc_storage::Blob> {
+    Ok(tx
         .blob(
             row["id"]
                 .as_i64()
                 .ok_or_else(|| unavailable("批次编号损坏。"))?,
             "sw-submit",
         )?
-        .ok_or_else(|| unavailable("提交包归档缺失。"))?;
+        .ok_or_else(|| unavailable("提交包归档缺失。"))?)
+}
+
+pub fn decode_archive(file: &export_doc_storage::Blob) -> Result<Package> {
+    crate::operation::check()?;
     if digest(&file.content) != file.digest {
         return Err(unavailable("提交包归档摘要不匹配。"));
     }

@@ -72,12 +72,12 @@ impl Retention {
 }
 
 pub(super) fn prune(store: &Store, policy: Retention, now: DateTime<Utc>) -> Result<usize> {
-    store.transaction(|tx| {
-        let cutoff = (now - Duration::days(i64::from(policy.days))).to_rfc3339();
-        let fields = super::queries::metadata_fields();
-        let mut removed = 0;
-        loop {
-            crate::operation::check()?;
+    let cutoff = (now - Duration::days(i64::from(policy.days))).to_rfc3339();
+    let fields = super::queries::metadata_fields();
+    let mut removed = 0;
+    loop {
+        crate::operation::check()?;
+        let count = store.transaction(|tx| {
             let mut query = super::queries::batch(None, false, &fields);
             query.retention = Some(export_doc_storage::JobRetention {
                 cutoff: &cutoff,
@@ -85,50 +85,49 @@ pub(super) fn prune(store: &Store, policy: Retention, now: DateTime<Utc>) -> Res
                 global: policy.global_limit,
             });
             let (_, jobs) = tx.query_jobs(&query)?;
-            if jobs.is_empty() {
-                break;
-            }
+            let count = jobs.len();
             for job in jobs {
+                crate::operation::check()?;
                 remove(tx, &owner(&job)?, job)?;
-                removed += 1;
             }
+            Ok(count)
+        })?;
+        removed += count;
+        if count == 0 {
+            break;
         }
-        let outputs = export_doc_storage::JobOutputRetention {
-            global_bytes: policy.global_output_bytes,
-            per_user_bytes: policy.per_user_output_bytes,
-        };
+    }
+    let outputs = export_doc_storage::JobOutputRetention {
+        global_bytes: policy.global_output_bytes,
+        per_user_bytes: policy.per_user_output_bytes,
+    };
+    for input in [false, true] {
         loop {
             crate::operation::check()?;
-            let rows = tx.expired_job_outputs(&outputs)?;
-            if rows.is_empty() {
+            let count = store.transaction(|tx| {
+                let rows = if input {
+                    tx.expired_job_inputs(&outputs)?
+                } else {
+                    tx.expired_job_outputs(&outputs)?
+                };
+                let count = rows.len();
+                for row in rows {
+                    crate::operation::check()?;
+                    let id = row["id"]
+                        .as_i64()
+                        .ok_or_else(|| super::super::error::unavailable("任务编号无效。"))?;
+                    if input {
+                        super::persistence::expire_input(tx, id)?;
+                    } else {
+                        super::persistence::expire_output(tx, id)?;
+                    }
+                }
+                Ok(count)
+            })?;
+            if count == 0 {
                 break;
             }
-            for row in rows {
-                super::persistence::expire_output(
-                    tx,
-                    row["id"]
-                        .as_i64()
-                        .ok_or_else(|| super::super::error::unavailable("任务编号无效。"))?,
-                )?;
-            }
         }
-        // Reuse the same bounded per-user/global policy for retry workbooks.
-        // Successful jobs never need their input; failed/canceled jobs retain only the newest budget.
-        loop {
-            crate::operation::check()?;
-            let rows = tx.expired_job_inputs(&outputs)?;
-            if rows.is_empty() {
-                break;
-            }
-            for row in rows {
-                super::persistence::expire_input(
-                    tx,
-                    row["id"]
-                        .as_i64()
-                        .ok_or_else(|| super::super::error::unavailable("任务编号无效。"))?,
-                )?;
-            }
-        }
-        Ok(removed)
-    })
+    }
+    Ok(removed)
 }

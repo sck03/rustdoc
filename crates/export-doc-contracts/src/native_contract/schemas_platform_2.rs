@@ -44,9 +44,10 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("dueAt",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date-time")),("isOverdue",b())
     ]).required(vec!["source","recordId","title","description","isOverdue"])),
     ("WorklistPage",o(vec![
+        ("nextCursor",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String]))),
         ("page",r("PagedResultOfWorklistItem")),("sources",a(r("WorklistSourceCount"))),("businessDate",s().format("date")),
         ("asOf",s().format("date-time"))
-    ]).required(vec!["page","sources","businessDate","asOf"])),
+    ]).required(vec!["nextCursor","page","sources","businessDate","asOf"])),
     ("WorklistSourceCount",o(vec![("key",s()),("name",s()),("count",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))]).required(vec!["key","name","count"])),
     ("OfficeHandlingService",o(vec![
         ("key",s()),("name",s()),("category",s().enumeration(Enumeration::Values(vec![serde_json::json!("Seal"),serde_json::json!("Certificate"),serde_json::json!("IT"),serde_json::json!("Repair"),serde_json::json!("Other"),serde_json::json!("Supply"),serde_json::json!("Room")]))),
@@ -123,10 +124,11 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("writeCoordinatorFailed",b())
     ]).required(vec!["capacity","leased","failed","acquireTimeouts","acquireTimeoutMilliseconds","wait","operations","writeWait","writeTransactions","writeCoordinatorFailed"]).additional(Additional::Allowed(false))),
     ("ApiRuntimeJobMetrics",o(vec![
+        ("retentionFailure",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String]))),
         ("active",i().minimum(num("0")).format("int64")),("workerHandles",i().minimum(num("0")).format("int64")),("stopping",b()),
         ("failed",b()),("persistedCounts",ty(Primitive::Object).additional(Additional::Schema(Box::new(i().minimum(num("0")).format("int64"))))),("retainedOutputBytes",i().minimum(num("0")).format("int64")),
         ("retainedInputBytes",i().minimum(num("0")).format("int64")),("downloadMemory",o(vec![("capacityBytes",i().minimum(num("0")).format("int64")),("reservedBytes",i().minimum(num("0")).format("int64")),("rejections",i().minimum(num("0")).format("int64"))]).required(vec!["capacityBytes","reservedBytes","rejections"]).additional(Additional::Allowed(false)))
-    ]).required(vec!["active","workerHandles","stopping","failed","persistedCounts","retainedOutputBytes","retainedInputBytes","downloadMemory"]).additional(Additional::Allowed(false))),
+    ]).required(vec!["retentionFailure","active","workerHandles","stopping","failed","persistedCounts","retainedOutputBytes","retainedInputBytes","downloadMemory"]).additional(Additional::Allowed(false))),
     ("ApiRuntimeHttpMetrics",object_groups(vec![
         (&["requests","queueWait","downloads"], r("ApiRuntimeLatencyMetrics")),
         (&["queueCapacity","queuedRequests","admissionRejected","bulkRejected","requestCapacity","availableRequestSlots","bulkCapacity","availableBulkSlots","uptimeSeconds","logsDropped","logWriteErrors","downloadCapacity","downloadTimeouts","downloadDisconnects","downloadReadErrors"], i().minimum(num("0")).format("int64")),

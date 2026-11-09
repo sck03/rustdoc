@@ -134,7 +134,12 @@ export default function createApi(transport: ApiTransport) {
 
   deleteHsCodeKnowledgeExample(request: DeleteHsCodeKnowledgeExampleRequest, init?: ApiRequestInit): Promise<void> {
     const path = `/api/master-data/hs-knowledge/examples/${encodePath(request.id)}`;
-    return transport.request<void>("DELETE", path, { init });
+    return transport.request<void>("DELETE", path, {
+      query: {
+        "expectedVersion": request.expectedVersion,
+      },
+      init,
+    });
   },
 
   deleteHsCodeKnowledgeExamplesBatch(request: DeleteHsCodeKnowledgeExamplesBatchRequest, init?: ApiRequestInit): Promise<ApiCommandResponse> {

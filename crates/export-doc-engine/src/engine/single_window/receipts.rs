@@ -98,21 +98,48 @@ pub fn references(receipts: &[Value], expected: &str) -> Result<String> {
     Ok(reference)
 }
 
+pub struct PreparedReceipts<'a> {
+    package: &'a Package,
+    business: Business,
+    parsed: Vec<Value>,
+    hashes: Vec<String>,
+}
+
+pub fn prepare<'a>(service: &NativeService, package: &'a Package) -> Result<PreparedReceipts<'a>> {
+    let business =
+        Business::parse(rules::text(&package.manifest, "businessType")).map_err(invalid)?;
+    let mut parsed = Vec::with_capacity(package.files.len());
+    let mut hashes = Vec::with_capacity(package.files.len());
+    for (name, bytes) in &package.files {
+        crate::operation::check()?;
+        parsed.push(parse(service, business, bytes, name)?);
+        hashes.push(digest(bytes));
+    }
+    primary(&parsed)?;
+    let reference = references(&parsed, "")?;
+    if !reference.eq_ignore_ascii_case(rules::text(&package.manifest, "receiptReferenceNo")) {
+        return Err(invalid("回执内容编号与交接包清单不一致。"));
+    }
+    Ok(PreparedReceipts {
+        package,
+        business,
+        parsed,
+        hashes,
+    })
+}
+
 pub fn import(
     service: &NativeService,
     tx: &Connection,
     actor: &Actor,
-    package: &Package,
+    prepared: &PreparedReceipts<'_>,
 ) -> Result<(Value, Vec<Value>, usize)> {
+    let package = prepared.package;
     let m = &package.manifest;
     let mut row = tracking::find(tx, actor, rules::text(m, "batchReference"), "operate")?;
     tracking::verify(service, &row, m, true)?;
-    let business = Business::parse(rules::text(m, "businessType")).map_err(invalid)?;
-    let mut parsed = Vec::new();
-    for (name, bytes) in &package.files {
-        crate::operation::check()?;
-        parsed.push(parse(service, business, bytes, name)?);
-    }
+    let business = prepared.business;
+    let parsed = &prepared.parsed;
     let reference = references(&parsed, rules::text(&row, "referenceNo"))?;
     if !reference.eq_ignore_ascii_case(rules::text(m, "receiptReferenceNo")) {
         return Err(invalid("回执内容编号与交接包清单不一致。"));
@@ -121,8 +148,8 @@ pub fn import(
     let mut hashes: BTreeSet<String> = serde_json::from_value(row["_receiptHashes"].clone())
         .map_err(|_| unavailable("回执归档索引损坏。"))?;
     let mut count = 0;
-    for ((_, bytes), receipt) in package.files.iter().zip(&parsed) {
-        let hash = digest(bytes);
+    for (((_, bytes), receipt), hash) in package.files.iter().zip(parsed).zip(&prepared.hashes) {
+        crate::operation::check()?;
         if !hashes.insert(hash.clone()) {
             continue;
         }
@@ -170,7 +197,7 @@ pub fn import(
         }
         row = tracking::save(tx, actor, row, None)?;
     }
-    Ok((row, parsed, count))
+    Ok((row, parsed.clone(), count))
 }
 
 fn write_back(

@@ -4,6 +4,8 @@
 
 ## 本地入口
 
+2026-11-09 知识库与资源回归：`test:concurrency-feedback` 纳入 `test_hs_example_workspaces_ui.mjs`，覆盖中文续编、卸载取消、选择时版本删除、删除期间字段锁和候选按需共享查询。SQLite 工具合同与 PostgreSQL `-Scope All` 复用实例版本/批删回滚/历史款式聚合场景。待办第二页起必须传上一页 `nextCursor`，筛选或页容量变化重新取首页。实现、验证及定向清理见[本批记录](../docs/2026-11-09知识库并发与有界资源修复记录.md)。
+
 2026-11-09 事务与资源收尾：`test:abortable-operations-ui` 增加发票列表的关闭、切换、卸载、迟到成功/失败与 StrictMode 回归；Storage 同一合同覆盖 SQLite/PostgreSQL 申报版本聚合。GitHub actionlint 固定版本归档缓存仍逐次校验摘要，网络 504 使用有界重试。当前数据库为 schema 16，详见[收尾记录](../docs/2026-11-09事务边界与资源收尾记录.md)。
 
 2026-11-08 并发/性能回归：`test_party_save_workspace_ui.mjs` 使用真实 QueryClient 验证刷新错误传播，并覆盖主数据分类切换、版本删除与迟到响应；`test_invoice_editing_contracts.mjs` 核对不可变行投影与完整规范化等价，输出 5000 行文字编辑耗时。`test_native_desktop_editions.mjs <包父目录> Full --without-ocr --entry-rows-only` 还通过生成客户端与实际界面验证六类主数据版本删除，然后执行中文明细、撤销、保存回读及 PDF 场景；需先重新构建包含最新前端的对应测试包。

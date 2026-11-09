@@ -171,6 +171,9 @@ pub fn cancellation_flag() -> Arc<AtomicBool> {
             .unwrap_or_else(|| Arc::new(AtomicBool::new(false)))
     })
 }
+pub(crate) fn deadline() -> Option<Instant> {
+    CURRENT.with(|current| current.borrow().as_ref().map(|scope| scope.deadline))
+}
 /// Actual transport peer supplied by the HTTP host, never a forwarded header.
 pub fn source() -> Option<std::net::IpAddr> {
     CURRENT.with(|current| current.borrow().as_ref().and_then(|scope| scope.source))

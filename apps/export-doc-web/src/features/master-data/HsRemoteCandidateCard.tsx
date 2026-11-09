@@ -1,5 +1,6 @@
 import { ExternalAnchor } from "../../ui/ExternalAnchor.tsx";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 import type { ExportDocManagerApiClient, HsCodeRemoteCandidate } from "../../api/index.ts";
 import { Button } from "../../ui/Button.tsx";
@@ -36,7 +37,7 @@ export function HsRemoteCandidateCard({
   onReset: () => void;
 }) {
   return <article className={canOperate && allowSelection ? "remote-candidate-card remote-candidate-card-selectable" : "remote-candidate-card"}>
-    {canOperate && allowSelection ? <input type="checkbox" aria-label={`选择 ${candidate.productName}`} checked={selected} onChange={onToggle} /> : null}
+    {canOperate && allowSelection ? <input type="checkbox" disabled={isBusy} aria-label={`选择 ${candidate.productName}`} checked={selected} onChange={onToggle} /> : null}
     <div className="remote-candidate-evidence">
       <div className="remote-candidate-title"><strong>{candidate.productName}</strong><span className="status-pill">{formatHsKnowledgeStatus(candidate.resolutionStatus)}</span></div>
       <div className="remote-code-comparison">
@@ -53,19 +54,21 @@ export function HsRemoteCandidateCard({
         <RemoteCandidatePicker client={client} candidate={candidate} draft={draft} disabled={isBusy} onDraft={onDraft} onConfirm={onConfirm} />
         <Button variant="text" disabled={isBusy} onClick={onIgnore}>忽略此实例</Button>
       </> : null}
-      {status !== "Pending" && canOperate ? <Button onClick={onReset}>恢复待审核</Button> : null}
+      {status !== "Pending" && canOperate ? <Button disabled={isBusy} onClick={onReset}>恢复待审核</Button> : null}
     </div>
   </article>;
 }
 
 function RemoteCandidatePicker({ client, candidate, draft, disabled, onDraft, onConfirm }: { client: ExportDocManagerApiClient; candidate: HsCodeRemoteCandidate; draft:string; disabled:boolean; onDraft:(value:string)=>void; onConfirm:(code:string)=>void }) {
+  const [activated,setActivated] = useState(false);
   const debouncedDraft = useDebouncedValue(draft.trim(), 350);
   const lookup = useQuery({
-    queryKey:["hs-active-code-picker",candidate.id,debouncedDraft],
+    queryKey:["hs-active-code-picker",debouncedDraft],
     queryFn:({signal})=>client.listHsCodes({pageNumber:1,pageSize:30,keyword:debouncedDraft},{signal}),
-    enabled:debouncedDraft.length>=4,
+    enabled:activated && debouncedDraft.length>=4,
+    staleTime:60_000,
   });
   const activeItems=(lookup.data?.items??[]).filter(item=>item.status==="Active"&&!item.requiresAnnualReview&&item.sourceName&&item.effectiveYear&&item.lastVerifiedAt);
   const selected=activeItems.find(item=>(item.code||item.normalizedCode).replace(/[^0-9A-Za-z]/g,"")===draft.replace(/[^0-9A-Za-z]/g,""));
-  return <div className="remote-candidate-picker" aria-busy={lookup.isFetching}><input aria-label="选择当前有效HS编码" list={`active-hs-codes-${candidate.id}`} value={draft} onChange={event=>onDraft(event.target.value)} placeholder="输入有效编码检索"/><datalist id={`active-hs-codes-${candidate.id}`}>{activeItems.map(item=><option key={item.normalizedCode} value={item.code||item.normalizedCode}>{item.name} · {item.effectiveYear}年</option>)}</datalist><Button variant="primary" disabled={disabled||!selected} onClick={()=>selected&&onConfirm(selected.code||selected.normalizedCode)}>{lookup.isFetching?"检索中":selected?"确认加入":"选择有效编码"}</Button>{lookup.isError?<small className="remote-candidate-picker-error">有效编码检索失败，请稍后重试。</small>:null}</div>;
+  return <div className="remote-candidate-picker" aria-busy={lookup.isFetching}><input disabled={disabled} onFocus={()=>setActivated(true)} aria-label="选择当前有效HS编码" list={`active-hs-codes-${candidate.id}`} value={draft} onChange={event=>onDraft(event.target.value)} placeholder="输入有效编码检索"/><datalist id={`active-hs-codes-${candidate.id}`}>{activeItems.map(item=><option key={item.normalizedCode} value={item.code||item.normalizedCode}>{item.name} · {item.effectiveYear}年</option>)}</datalist><Button variant="primary" disabled={disabled||!selected} onClick={()=>selected&&onConfirm(selected.code||selected.normalizedCode)}>{lookup.isFetching?"检索中":selected?"确认加入":"选择有效编码"}</Button>{lookup.isError?<small className="remote-candidate-picker-error">有效编码检索失败，请稍后重试。</small>:null}</div>;
 }

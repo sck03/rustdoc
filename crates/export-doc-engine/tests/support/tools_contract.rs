@@ -1,5 +1,7 @@
 use export_doc_engine::{api::ApiError, contracts, generated_api::*};
 use serde_json::{Value, json};
+#[path = "hs_examples_contract.rs"]
+mod hs_examples;
 #[path = "hs_maintenance_contract.rs"]
 mod hs_maintenance;
 #[path = "reference_versioning_contract.rs"]
@@ -124,6 +126,7 @@ pub fn exercise(
     update(changed).unwrap();
     reject(update(row), 409);
     hs_maintenance::exercise(call);
+    hs_examples::exercise(call);
     #[cfg(feature = "single-window")]
     reference_versioning::exercise(call);
 }

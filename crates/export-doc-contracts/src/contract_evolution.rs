@@ -1,6 +1,28 @@
 //! Explicit reviewed changes to the frozen served contract; never copy live output.
 use serde_json::{Value, json};
 pub(super) fn reviewed_versioning(baseline: &mut Value) {
+    baseline["paths"]["/api/worklist"]["get"]["responses"]["400"] =
+        json!({"description":"Bad Request"});
+    baseline["components"]["schemas"]["ApiRuntimeJobMetrics"]["properties"]["retentionFailure"] =
+        json!({"type":["null","string"]});
+    baseline["components"]["schemas"]["ApiRuntimeJobMetrics"]["required"]
+        .as_array_mut()
+        .unwrap()
+        .insert(0, json!("retentionFailure"));
+    baseline["paths"]["/api/worklist"]["get"]["parameters"]
+        .as_array_mut()
+        .unwrap()
+        .insert(
+            0,
+            json!({"name":"cursor","in":"query","schema":{"type":"string","maxLength":1024}}),
+        );
+    baseline["components"]["schemas"]["WorklistPage"]["properties"]["nextCursor"] =
+        json!({"type":["null","string"]});
+    baseline["components"]["schemas"]["WorklistPage"]["required"]
+        .as_array_mut()
+        .unwrap()
+        .insert(0, json!("nextCursor"));
+    reviewed_hs_examples(baseline);
     reviewed_client_directories(baseline);
     for name in ["ApiCustomsCooProducerProfileDto", "ApiContainerTypeDto"] {
         let schema = &mut baseline["components"]["schemas"][name];
@@ -65,6 +87,44 @@ pub(super) fn reviewed_versioning(baseline: &mut Value) {
     for name in ["pageNumber", "pageSize"] {
         parameters.push(json!({"name":name,"in":"query","schema":{"type":["integer","string"],"format":"int32","pattern":"^-?(?:0|[1-9]\\d*)$"}}));
     }
+}
+
+fn reviewed_hs_examples(baseline: &mut Value) {
+    let schemas = &mut baseline["components"]["schemas"];
+    schemas["HsCodeDeclarationExample"]["properties"]["versionNumber"] =
+        json!({"type":"integer","minimum":1,"format":"int64"});
+    schemas["HsCodeDeclarationExample"]["required"]
+        .as_array_mut()
+        .unwrap()
+        .insert(0, json!("versionNumber"));
+    schemas["HsCodeExampleInput"]["properties"]["expectedVersion"] =
+        json!({"type":"integer","minimum":0,"format":"int64"});
+    schemas["HsCodeKnowledgeExampleDeleteBatchInput"] = json!({"type":"object","properties":{"items":{"type":"array","minItems":1,"maxItems":5000,"items":{"type":"object","properties":{"id":{"type":"integer","minimum":1,"format":"int64"},"expectedVersion":{"type":"integer","minimum":1,"format":"int64"}},"required":["id","expectedVersion"],"additionalProperties":false}}},"required":["items"],"additionalProperties":false});
+    for (path, method, codes) in [
+        (
+            "/api/master-data/hs-knowledge/examples",
+            "post",
+            vec!["404", "409", "503"],
+        ),
+        (
+            "/api/master-data/hs-knowledge/examples/{id}",
+            "delete",
+            vec!["400", "409", "503"],
+        ),
+        (
+            "/api/master-data/hs-knowledge/examples/delete-batch",
+            "post",
+            vec!["400", "404", "409", "503"],
+        ),
+    ] {
+        for code in codes {
+            baseline["paths"][path][method]["responses"][code] = json!({"description":match code {"400"=>"Bad Request","404"=>"Not Found","409"=>"Conflict",_=>"Service Unavailable"}});
+        }
+    }
+    baseline["paths"]["/api/master-data/hs-knowledge/examples/{id}"]["delete"]["parameters"] = json!([
+        {"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int32","pattern":"^-?(?:0|[1-9]\\d*)$"}},
+        {"name":"expectedVersion","in":"query","required":true,"schema":{"type":"integer","minimum":1,"format":"int64"}}
+    ]);
 }
 
 fn reviewed_client_directories(baseline: &mut Value) {

@@ -42,7 +42,7 @@ pub(super) fn files(
     action: &str,
     cancelled: &AtomicBool,
 ) -> Result<Vec<(String, Vec<u8>)>> {
-    let _rendering = reports::resources::acquire()?;
+    let _rendering = reports::resources::acquire_for_job()?;
     let mut files = vec![];
     let mut combined = export_doc_report::Document { pages: vec![] };
     let mut total = 0usize;

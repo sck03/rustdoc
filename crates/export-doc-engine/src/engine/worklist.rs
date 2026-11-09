@@ -342,25 +342,42 @@ pub fn query(
         return Err(invalid("未知待办到期筛选。"));
     }
     let selected = parameter("source");
+    let after = page::Cursor::parse(parameter("cursor"), due, selected, page, size)?;
     let now = clock.now().map_err(unavailable)?;
     store.read_for(actor,crate::generated_api::GET_WORKLIST,query,|tx,actor| {
-        let selection=Selection { now:&now,due,source:selected,keep:page*size };
+        let selection=Selection { now:&now,due,source:selected,keep:size+1,after:after.as_ref() };
         let groups=groups(tx,actor,&selection)?;
         if !selected.is_empty() && !groups.iter().any(|group|group.key==selected) { return Err(invalid("该待办来源不存在或当前账号无权查看。")); }
         let mut sources=vec![];
         let mut rows=vec![];
         let mut count=0;
-        let mut skip=(page-1)*size;
+        if after.as_ref().is_some_and(|cursor| !groups.iter().any(|group| group.key == cursor.source)) {
+            return Err(invalid("游标来源已不可见，请从首页重新读取。"));
+        }
+        let mut reached=after.is_none();
         for group in groups {
             sources.push(json!({"key":group.key,"name":group.name,"count":group.count}));
             if !selected.is_empty() && selected!=group.key { continue; }
             count+=group.count;
-            if skip>=group.count { skip-=group.count; continue; }
-            if rows.len()<size {
-                rows.extend(group.into_rows().skip(skip).take(size-rows.len()));
-                skip=0;
+            if after.as_ref().is_some_and(|cursor| cursor.source == group.key) { reached=true; }
+            if !reached { continue; }
+            if rows.len()<=size {
+                rows.extend(group.into_rows().take(size+1-rows.len()));
             }
         }
-        Ok(json!({"page":crate::contracts::page(rows,count,page,size),"sources":sources,"businessDate":now.today.to_string(),"asOf":now.utc_now.to_rfc3339()}))
+        let has_next=rows.len()>size;
+        rows.truncate(size);
+        let next_cursor=if has_next {
+            let last=rows.last().ok_or_else(|| unavailable("待办分页结果无效。"))?;
+            Some(serde_json::to_string(&page::Cursor {
+                source:text(last,"source"),deadline:deadline(last,&now)?.map(|d| d.2).unwrap_or_else(|| "~".into()),
+                id:last["recordId"].as_i64().ok_or_else(|| unavailable("待办编号无效。"))?,
+                due:due.into(),filter:selected.into(),page:page+1,size,
+            })?)
+        } else { None };
+        let mut result=crate::contracts::page(rows,count,page,size);
+        result["pageNumber"]=json!(page);
+        result["hasNextPage"]=json!(has_next);
+        Ok(json!({"page":result,"sources":sources,"businessDate":now.today.to_string(),"asOf":now.utc_now.to_rfc3339(),"nextCursor":next_cursor}))
     })
 }

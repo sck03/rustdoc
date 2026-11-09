@@ -115,6 +115,7 @@ struct Runtime {
     preparing_retries: usize,
     stopping: bool,
     failure: Option<String>,
+    retention_failure: Option<String>,
 }
 struct TaskSpec<'a> {
     operation: Operation,
@@ -135,7 +136,7 @@ pub struct Jobs {
 
 impl Jobs {
     pub fn metrics(&self) -> Result<Value> {
-        let (active, workers, stopping, failed) = {
+        let (active, workers, stopping, failed, retention_failure) = {
             let runtime = self
                 .runtime
                 .lock()
@@ -145,10 +146,11 @@ impl Jobs {
                 runtime.workers.len(),
                 runtime.stopping,
                 runtime.failure.is_some(),
+                runtime.retention_failure.clone(),
             )
         };
         Ok(
-            json!({"active":active,"workerHandles":workers,"stopping":stopping,"failed":failed,
+            json!({"active":active,"workerHandles":workers,"stopping":stopping,"failed":failed,"retentionFailure":retention_failure,
             "persistedCounts":self.store.connection()?.job_counts()?,"retainedOutputBytes":self.store.connection()?.job_output_bytes()?,"retainedInputBytes":self.store.connection()?.job_input_bytes()?,"downloadMemory":self.download_budget.snapshot()}),
         )
     }
@@ -320,11 +322,19 @@ impl Jobs {
                         Some(&flag),
                         publication,
                     )
-                    .and_then(|_| {
-                        retention::prune(&store, retention, chrono::Utc::now()).map(|_| ())
-                    })
                 });
+                // Publication is already durable. Maintenance has its own deadline and
+                // short transactions; it must not hold the output completion gate.
+                let maintenance = if finished.is_ok() {
+                    OperationScope::detached(Duration::from_secs(30))
+                        .run_result(|| retention::prune(&store, retention, chrono::Utc::now()))
+                        .err()
+                        .map(|cause| cause.to_string())
+                } else {
+                    None
+                };
                 if let Ok(mut runtime) = state.lock() {
+                    runtime.retention_failure = maintenance;
                     runtime.active.remove(&worker_id);
                     if let Err(cause) = finished {
                         runtime.failure =
@@ -356,11 +366,11 @@ impl Jobs {
 
     pub fn completed(&self, actor: &Actor, kind: &str, title: &str, detail: &str) -> Result<Value> {
         self.health()?;
+        retention::prune(&self.store, self.retention, chrono::Utc::now())?;
         let job = persistence::create_completed(&self.store, actor, kind, title, detail)?;
         let id = job["jobId"]
             .as_str()
             .ok_or_else(|| unavailable("任务编号缺失。"))?;
-        retention::prune(&self.store, self.retention, chrono::Utc::now())?;
         self.get(actor, id)
     }
 

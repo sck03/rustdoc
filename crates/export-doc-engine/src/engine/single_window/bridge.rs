@@ -90,39 +90,65 @@ pub fn handle(
     if operation == COLLECT_SINGLE_WINDOW_CLIENT_RECEIPTS {
         return collect(service, actor, id);
     }
-    let (row, profile, outbox, package) =
-        service
-            .store
-            .transaction_for(actor, operation, &[], |tx, actor| {
-                let mut row = tracking::get(tx, actor, id, "operate")?;
-                let (profile, business) = binding(service, tx, actor, &row)?;
-                let outbox = directory(&profile, business, "outBox")?;
-                let package = tracking::archived(tx, &row)?;
-                tracking::verify(service, &row, &package.manifest, false)?;
-                if row["status"] == "QueuedToClient" {
-                    return Ok((row, profile, outbox, package));
-                }
-                if row["clientDispatchAttemptCount"].as_i64().unwrap_or(0) > 0 {
-                    return Err(error(
-                        409,
-                        "此批次已经尝试派发；请核对客户端收件状态后新建提交版本，避免重复申报。",
-                    ));
-                }
-                if row["status"] != "SubmitPackageImported" {
-                    return Err(error(
-                        409,
-                        "请先导入提交包并确认当前持卡机，再送入官方客户端。",
-                    ));
-                }
-                row["status"] = json!("ClientDispatching");
-                row["clientDispatchOperationId"] = json!(nonce().map_err(unavailable)?);
-                row["clientDispatchAttemptCount"] = json!(1);
-                row["clientDispatchLeaseUntil"] =
-                    json!((chrono::Utc::now() + chrono::Duration::seconds(60)).to_rfc3339());
-                let row = tracking::save(tx, actor, row, None)?;
-                Ok((row, profile, outbox, package))
-            })?;
+    let (snapshot, profile, outbox, archive) =
+        service.store.read_for(actor, operation, &[], |tx, actor| {
+            let row = tracking::get(tx, actor, id, "operate")?;
+            let (profile, business) = binding(service, tx, actor, &row)?;
+            let outbox = directory(&profile, business, "outBox")?;
+            let archive = if row["status"] == "QueuedToClient" {
+                None
+            } else {
+                Some(tracking::archived_blob(tx, &row)?)
+            };
+            Ok((row, profile, outbox, archive))
+        })?;
+    let package = archive.as_ref().map(tracking::decode_archive).transpose()?;
+    drop(archive);
+    if let Some(package) = &package {
+        tracking::verify(service, &snapshot, &package.manifest, false)?;
+    }
+    let row = service
+        .store
+        .transaction_for(actor, operation, &[], |tx, actor| {
+            let mut row = tracking::get(tx, actor, id, "operate")?;
+            let (current_profile, business) = binding(service, tx, actor, &row)?;
+            if current_profile != profile
+                || directory(&current_profile, business, "outBox")? != outbox
+            {
+                return Err(error(409, "持卡机档案已变化，请重新派发。"));
+            }
+            if row["status"] == "QueuedToClient" {
+                return Ok(row);
+            }
+            store::check_version(&row, store::expected(&snapshot))?;
+            let package = package
+                .as_ref()
+                .ok_or_else(|| error(409, "批次状态已变化，请重新读取。"))?;
+            tracking::verify(service, &row, &package.manifest, false)?;
+            if row["clientDispatchAttemptCount"].as_i64().unwrap_or(0) > 0 {
+                return Err(error(
+                    409,
+                    "此批次已经尝试派发；请核对客户端收件状态后新建提交版本，避免重复申报。",
+                ));
+            }
+            if row["status"] != "SubmitPackageImported" {
+                return Err(error(
+                    409,
+                    "请先导入提交包并确认当前持卡机，再送入官方客户端。",
+                ));
+            }
+            row["status"] = json!("ClientDispatching");
+            row["clientDispatchOperationId"] = json!(nonce().map_err(unavailable)?);
+            row["clientDispatchAttemptCount"] = json!(1);
+            row["clientDispatchLeaseUntil"] =
+                json!((chrono::Utc::now() + chrono::Duration::seconds(60)).to_rfc3339());
+            let row = tracking::save(tx, actor, row, None)?;
+            Ok(row)
+        })?;
     if row["status"] != "QueuedToClient" {
+        let package = package
+            .as_ref()
+            .ok_or_else(|| unavailable("派发包缺失。"))?;
         let result = (|| -> Result<()> {
             ensure_safe_absolute(&outbox).map_err(invalid)?;
             for descriptor in package.manifest["payloadFiles"]

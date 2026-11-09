@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn missing_nested_paging_and_invalid_scalars_are_reported() {
         assert!(
-            response("GetWorklist", &json!({"items":[]}))
+            response("GetWorklist", &json!({"nextCursor":null,"items":[]}))
                 .unwrap_err()
                 .contains("$.page")
         );

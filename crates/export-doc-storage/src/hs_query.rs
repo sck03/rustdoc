@@ -17,7 +17,7 @@ pub struct HsQuery<'a> {
 pub(crate) fn build(query: &HsQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
     if !matches!(
         query.kind,
-        "hs-codes" | "hs-examples" | "hs-feedback" | "hs-replacements"
+        "hs-codes" | "hs-examples" | "hs-feedback" | "hs-replacements" | "hs-candidates"
     ) || query.offset < 0
         || !(1..=2000).contains(&query.limit)
     {
@@ -65,6 +65,12 @@ pub(crate) fn build(query: &HsQuery<'_>, pg: bool) -> Result<(QuerySql, String)>
             "CASE WHEN r.body->>'isManuallyVerified'='true' THEN 0 ELSE 1 END, r.body->>'updatedAt' DESC, r.id"
         } else {
             "CASE WHEN json_extract(r.body,'$.isManuallyVerified')=1 THEN 0 ELSE 1 END, json_extract(r.body,'$.updatedAt') DESC, r.id"
+        }
+    } else if query.kind == "hs-candidates" {
+        if pg {
+            "r.body->>'lastSeenAt' DESC, r.id DESC"
+        } else {
+            "json_extract(r.body,'$.lastSeenAt') DESC, r.id DESC"
         }
     } else {
         "r.id"

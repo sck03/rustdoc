@@ -148,7 +148,7 @@ pub(super) fn start(
                 )? {
                     crate::operation::check()?;
                     let pdf = {
-                        let _rendering = resources::acquire()?;
+                        let _rendering = resources::acquire_for_job()?;
                         let document = prepared.render(&fonts, cancelled)?;
                         render::pdf_document(&document, &fonts, cancelled)?
                     };

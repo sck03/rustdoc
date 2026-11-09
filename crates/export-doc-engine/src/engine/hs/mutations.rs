@@ -33,7 +33,7 @@ pub(super) fn preview_obsolete(tx: &Connection) -> Result<Value> {
     )
 }
 
-fn versions(value: &Value) -> Result<BTreeMap<i64, i64>> {
+pub(super) fn versions(value: &Value) -> Result<BTreeMap<i64, i64>> {
     let rows = value
         .as_array()
         .filter(|rows| !rows.is_empty() && rows.len() <= MAX_BATCH)

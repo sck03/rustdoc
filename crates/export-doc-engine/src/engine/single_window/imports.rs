@@ -1,5 +1,5 @@
 use super::*;
-use export_doc_single_window::{Package, authentication};
+use export_doc_single_window::{Package, authentication, digest};
 
 pub fn import(
     service: &NativeService,
@@ -34,12 +34,18 @@ pub fn import(
             "原生交接直接使用数据库归档，请关闭保留解包工作目录。",
         ));
     }
+    let prepared = if submit {
+        None
+    } else {
+        Some(receipts::prepare(service, &package)?)
+    };
+    let archive_hash = if submit { digest(bytes) } else { String::new() };
     let (row, parsed, count) =
         service
             .store
             .transaction_for(actor, operation, &[], |tx, actor| {
-                if !submit {
-                    return receipts::import(service, tx, actor, &package);
+                if let Some(prepared) = &prepared {
+                    return receipts::import(service, tx, actor, prepared);
                 }
                 let profile = profiles::active(tx, actor, service)?;
                 let m = &package.manifest;
@@ -103,7 +109,7 @@ pub fn import(
                     }
                     tracking::bind(service, &mut row, &profiles::secret(service, &profile)?)?;
                     row = tracking::save(tx, actor, row, Some(&profile))?;
-                    tracking::archive(tx, &row, bytes)?;
+                    tracking::archive(tx, &row, bytes, &archive_hash)?;
                 }
                 Ok((row, Vec::new(), 0))
             })?;

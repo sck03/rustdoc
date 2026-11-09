@@ -20,6 +20,7 @@ import { verifyDesktopSingleWindow } from './lib/native-single-window.mjs';
 import { verifyDesktopPersonnelDeletion } from './lib/native-personnel-deletion.mjs';
 import { verifyDesktopMaintenance } from './lib/native-maintenance-workflow.mjs';
 import { verifyDesktopBackupSave } from './lib/native-backup-save-checks.mjs';
+import { verifyDesktopHsExamples } from './lib/native-hs-examples.mjs';
 
 assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
 const repo = path.resolve(import.meta.dirname, '..');
@@ -148,6 +149,7 @@ for (const edition of selected) {
     } else if (process.argv.includes('--blank-grid-only')) {
       await verifyDesktopBlankGrid({ run, request, token: login.body.accessToken, businessDate: login.body.user.businessDate, cdp, output });
     } else if (edition === 'Full') {
+      await verifyDesktopHsExamples({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopBackupSave({run,request,token:login.body.accessToken,cdp,output,dataRoot:path.join(output,edition)});
       assert(text.includes('行政与人事') && text.includes('申请与审批') && text.includes('通知与公告'));
       await verifyDesktopMaintenance({run,request,token:login.body.accessToken,businessDate:login.body.user.businessDate,cdp,output});

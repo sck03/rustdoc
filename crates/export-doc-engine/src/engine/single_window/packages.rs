@@ -215,6 +215,7 @@ fn submit(
     let secret = rules::text(&assignment, "authenticationSecret");
     let package = Package::seal(m, files, secret, &tracking::check).map_err(invalid)?;
     let bytes = package.encode(&tracking::check).map_err(invalid)?;
+    let archive_hash = digest(&bytes);
     let manifest = package.manifest;
     let row = service
         .store
@@ -244,7 +245,7 @@ fn submit(
             tracking::bind(service, &mut row, secret)?;
             tracking::add_package(&mut row, &manifest, "Exported")?;
             let row = tracking::save(tx, actor, row, Some(&invoice))?;
-            tracking::archive(tx, &row, &bytes)?;
+            tracking::archive(tx, &row, &bytes, &archive_hash)?;
             Ok(row)
         })?;
     Ok(Export {

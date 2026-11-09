@@ -125,7 +125,7 @@ inspectTypeScriptSources(files, (file, source) => {
   }
 
   if (sourceRelativePath === "features/master-data/HsCodeKnowledgePage.tsx") {
-    for (const hsKnowledgeContract of ["useDebouncedValue", "placeholderData: keepPreviousData", "Pagination", "confirmSelected", "queryFn: ({ signal })"]) {
+    for (const hsKnowledgeContract of ["useDebouncedValue", "placeholderData: keepPreviousData", "Pagination", "RemoteCandidateReview", "ExampleLibrary", "queryFn: ({ signal })"]) {
       if (!sourceText.includes(hsKnowledgeContract)) {
         failures.push(`${sourceRelativePath}: HS 实例、候选和历史列表缺少防抖/分页/准确反馈闭环：${hsKnowledgeContract}`);
       }

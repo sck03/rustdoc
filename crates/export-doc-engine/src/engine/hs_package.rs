@@ -213,7 +213,8 @@ pub fn import(service: &NativeService, actor: &Actor, name: &str, bytes: &[u8]) 
             let fingerprint=rules::fingerprint(&[&raw,&text(row,"productName"),&text(row,"specification")]);
             if !unique.insert(fingerprint.clone()){return Err(invalid("知识包包含重复案例。"));}
             let old=tx.find_identity(hs::EXAMPLES,&fingerprint.to_lowercase())?;let mut input=row.clone();input["id"]=json!(0);
-            if let Some(old)=&old{input["id"]=old["id"].clone();
+            input["expectedVersion"]=json!(0);
+            if let Some(old)=&old{input["id"]=old["id"].clone();input["expectedVersion"]=old["versionNumber"].clone();
                 if old["isManuallyVerified"]==true{
                     if row["isManuallyVerified"]==true&&old["resolvedCurrentHsCode"]!=row["resolvedCurrentHsCode"]{return Err(conflict("导入案例与已有人工确认编码冲突。"));}
                     input["resolvedCurrentHsCode"]=old["resolvedCurrentHsCode"].clone();input["isManuallyVerified"]=json!(true);input["source"]=old["source"].clone();

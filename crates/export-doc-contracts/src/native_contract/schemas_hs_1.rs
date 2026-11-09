@@ -75,15 +75,15 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("storagePolicy",s()),("standardCodeCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("0"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("declarationExampleCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("0"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))
     ]).required(vec!["items","count","source","storagePolicy","standardCodeCount","declarationExampleCount"])),
     ("ApiPagedResponseOfApiHsCodeDto",super::schema_shapes::paged_response("ApiHsCodeDto")),
-    ("HsCodeDeclarationExample",o(vec![
+    ("HsCodeDeclarationExample",o(vec![("versionNumber",i().minimum(num("1")).format("int64")),
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("fingerprint",s().max_length(64)),("rawReportedHsCode",s().max_length(20)),
         ("resolvedCurrentHsCode",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).max_length(20)),("productName",s().max_length(300)),("specification",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).max_length(1500)),
         ("searchText",s().max_length(2000)),("source",s().max_length(100)),("sourceYear",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("resolutionStatus",s().max_length(30)),("isManuallyVerified",b()),("useCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("rejectedCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("lastUsedAt",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date-time")),("createdAt",s().format("date-time")),
         ("updatedAt",s().format("date-time"))
-    ]).required(vec!["fingerprint","rawReportedHsCode","productName","searchText","source","resolutionStatus","id","isManuallyVerified","useCount","rejectedCount","createdAt","updatedAt"])),
-    ("HsCodeExampleInput",o(vec![
+    ]).required(vec!["versionNumber","fingerprint","rawReportedHsCode","productName","searchText","source","resolutionStatus","id","isManuallyVerified","useCount","rejectedCount","createdAt","updatedAt"])),
+    ("HsCodeExampleInput",o(vec![("expectedVersion",i().minimum(num("0")).format("int64")),
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("rawReportedHsCode",s()),("resolvedCurrentHsCode",s()),
         ("productName",s()),("specification",s()),("source",s()),
         ("sourceYear",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("resolutionStatus",s().default_value(serde_json::json!("Unresolved"))),("isManuallyVerified",b().default_value(serde_json::json!(true)))
@@ -99,7 +99,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("sourceCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("variantCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("variantSamples",a(s())),
         ("resolutionStatus",s()),("replacementCandidates",a(s())),("canConfirm",b())
     ]).required(vec!["fingerprint","rawCode","currentCode","productName","specification","source","sourceCount","variantCount","variantSamples","resolutionStatus","replacementCandidates","canConfirm"])),
-    ("HsCodeKnowledgeExampleDeleteBatchInput",o(vec![("ids",a(Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")))]).required(vec!["ids"])),
+    ("HsCodeKnowledgeExampleDeleteBatchInput",o(vec![("items",a(o(vec![("id",i().minimum(num("1")).format("int64")),("expectedVersion",i().minimum(num("1")).format("int64"))]).required(vec!["id","expectedVersion"]).additional(Additional::Allowed(false))).min_items(1).max_items(5000))]).required(vec!["items"]).additional(Additional::Allowed(false))),
     ("HsCodeKnowledgeFeedbackInput",o(vec![
         ("queryText",s()),("productName",s()),("specification",s()),
         ("candidateCode",s()),("accepted",b())

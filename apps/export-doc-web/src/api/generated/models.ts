@@ -3014,6 +3014,7 @@ export interface ApiRuntimeJobMetrics {
   persistedCounts: Record<string, number>;
   retainedInputBytes: number;
   retainedOutputBytes: number;
+  retentionFailure: string | null;
   stopping: boolean;
   workerHandles: number;
 }
@@ -4163,9 +4164,11 @@ export interface HsCodeDeclarationExample {
   specification?: string | null;
   updatedAt: string;
   useCount: number;
+  versionNumber: number;
 }
 
 export interface HsCodeExampleInput {
+  expectedVersion?: number;
   id: number;
   isManuallyVerified?: boolean;
   productName: string;
@@ -4203,7 +4206,7 @@ export interface HsCodeHistoryLearningCandidate {
 }
 
 export interface HsCodeKnowledgeExampleDeleteBatchInput {
-  ids: number[];
+  items: { expectedVersion: number; id: number }[];
 }
 
 export interface HsCodeKnowledgeFeedbackInput {
@@ -6927,6 +6930,7 @@ export interface WorklistItem {
 export interface WorklistPage {
   asOf: string;
   businessDate: string;
+  nextCursor: string | null;
   page: PagedResultOfWorklistItem;
   sources: WorklistSourceCount[];
 }
@@ -8091,6 +8095,7 @@ export interface DeleteHsCodeRequest {
 
 export interface DeleteHsCodeKnowledgeExampleRequest {
   id: number;
+  expectedVersion: number;
 }
 
 export interface DeleteHsCodeKnowledgeExamplesBatchRequest {
@@ -8990,6 +8995,7 @@ export interface GetUserReportTemplateHistoryRetentionRequest {
 }
 
 export interface GetWorklistRequest {
+  cursor?: string;
   source?: string;
   due?: WorklistDueFilter;
   pageNumber?: number;

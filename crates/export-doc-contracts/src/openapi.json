@@ -13907,6 +13907,12 @@
             "format": "int64",
             "minimum": 0
           },
+          "retentionFailure": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "stopping": {
             "type": "boolean"
           },
@@ -13917,6 +13923,7 @@
           }
         },
         "required": [
+          "retentionFailure",
           "active",
           "workerHandles",
           "stopping",
@@ -19341,9 +19348,15 @@
             ],
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
+          "versionNumber": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
           }
         },
         "required": [
+          "versionNumber",
           "fingerprint",
           "rawReportedHsCode",
           "productName",
@@ -19361,6 +19374,11 @@
       "HsCodeExampleInput": {
         "type": "object",
         "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
           "id": {
             "type": [
               "integer",
@@ -19546,21 +19564,36 @@
       "HsCodeKnowledgeExampleDeleteBatchInput": {
         "type": "object",
         "properties": {
-          "ids": {
+          "items": {
             "type": "array",
             "items": {
-              "type": [
-                "integer",
-                "string"
+              "type": "object",
+              "properties": {
+                "expectedVersion": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 1
+                },
+                "id": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "id",
+                "expectedVersion"
               ],
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
-            }
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 5000
           }
         },
         "required": [
-          "ids"
-        ]
+          "items"
+        ],
+        "additionalProperties": false
       },
       "HsCodeKnowledgeFeedbackInput": {
         "type": "object",
@@ -32432,6 +32465,12 @@
             "type": "string",
             "format": "date"
           },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "page": {
             "$ref": "#/components/schemas/PagedResultOfWorklistItem"
           },
@@ -32443,6 +32482,7 @@
           }
         },
         "required": [
+          "nextCursor",
           "page",
           "sources",
           "businessDate",
@@ -53233,6 +53273,15 @@
           },
           "401": {
             "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "503": {
+            "description": "Service Unavailable"
           }
         },
         "x-exportdoc-policy": {
@@ -53299,11 +53348,23 @@
               }
             }
           },
+          "400": {
+            "description": "Bad Request"
+          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "503": {
+            "description": "Service Unavailable"
           }
         },
         "x-exportdoc-policy": {
@@ -53363,11 +53424,20 @@
           "204": {
             "description": "No Content"
           },
+          "400": {
+            "description": "Bad Request"
+          },
           "401": {
             "description": "Unauthorized"
           },
           "404": {
             "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "503": {
+            "description": "Service Unavailable"
           }
         },
         "x-exportdoc-policy": {
@@ -53412,6 +53482,16 @@
               "type": "integer",
               "format": "int32",
               "pattern": "^-?(?:0|[1-9]\\d*)$"
+            },
+            "required": true
+          },
+          {
+            "name": "expectedVersion",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
             },
             "required": true
           }
@@ -129607,6 +129687,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad Request"
           }
         },
         "x-exportdoc-policy": {
@@ -129627,6 +129710,14 @@
           }
         ],
         "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
           {
             "name": "source",
             "in": "query",

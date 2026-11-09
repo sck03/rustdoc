@@ -129,7 +129,7 @@ pub(super) fn start(
                 .map_err(|_| unavailable("审批单任务未能绑定提交版本。"))?;
             crate::operation::check()?;
             let bytes = {
-                let _rendering = crate::engine::reports::resources::acquire()?;
+                let _rendering = crate::engine::reports::resources::acquire_for_job()?;
                 let _fonts = fonts.enter()?;
                 let document = export_doc_report::render_design(&data, &design, cancelled)?;
                 export_doc_report::pdf_document(&document, &fonts, cancelled)?
