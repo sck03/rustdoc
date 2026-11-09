@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { captureScreenshot } from './web-runtime-browser-session.mjs';
@@ -44,6 +45,22 @@ export async function verifyDesktopClientDirectories({ run, cdp, output, client 
   return {profile,detected};
 }
 
+export function findOfficialClientSentFiles(sentBox, payloads) {
+  const entries=fs.readdirSync(sentBox,{recursive:true,withFileTypes:true}).filter(entry=>entry.isFile());
+  const matches=payloads.map(payload=>{
+    const name=path.parse(path.basename(payload.relativePath));
+    // The official client appends a timestamp when archiving; verify the content too.
+    const entry=entries.find(entry=>{
+      if (entry.name!==name.base && !(entry.name.startsWith(`${name.name}_`) && entry.name.endsWith(name.ext))) return false;
+      const archived=path.join(entry.parentPath,entry.name);
+      return fs.statSync(archived).size===payload.sizeBytes &&
+        createHash('sha256').update(fs.readFileSync(archived)).digest('hex')===payload.sha256.toLowerCase();
+    });
+    return entry ? path.join(entry.parentPath,entry.name) : null;
+  });
+  return matches.length && matches.every(Boolean) ? matches : null;
+}
+
 // Opt-in only: this sends the anonymous declaration made by the desktop test to
 // the already configured official client. Never used by ordinary CI runs.
 export async function verifyOfficialClientTransport({client,profile,detected,sourceId,output}) {
@@ -56,12 +73,8 @@ export async function verifyOfficialClientTransport({client,profile,detected,sou
     await client.uploadSingleWindowSubmitPackage({fileName:path.basename(packagePath),body:new Blob([fs.readFileSync(packagePath)])});
     const dispatched=await client.dispatchSingleWindowBatchToClient({body:{batchId:handoff.trackingBatchId}});
     assert.equal(path.resolve(dispatched.targetDirectory),path.resolve(detected.agentConsignmentDirectories.outBox));
-    const names=handoff.manifest.payloadFiles.map(file=>path.basename(file.relativePath));
-    const sent=await waitFor(()=>{
-      const entries=fs.readdirSync(detected.agentConsignmentDirectories.sentBox,{recursive:true,withFileTypes:true});
-      const matches=entries.filter(entry=>entry.isFile() && names.includes(entry.name)).map(entry=>path.join(entry.parentPath,entry.name));
-      return matches.length===names.length ? matches : null;
-    },90000,'Official client did not archive the anonymous payload to SentBox');
+    const sent=await waitFor(()=>findOfficialClientSentFiles(detected.agentConsignmentDirectories.sentBox,handoff.manifest.payloadFiles),
+      90000,'Official client did not archive the anonymous payload to SentBox');
     const receipts=await client.collectSingleWindowClientReceipts({body:{batchId:handoff.trackingBatchId}});
     fs.writeFileSync(path.join(output,'official-client-transport.json'),JSON.stringify({batchReference:handoff.manifest.batchReference,sentFiles:sent,receiptFileCount:receipts.receiptFiles.length,businessAcceptanceConfirmed:false},null,2));
   } finally { await client.saveSingleWindowClientProfile({body}); }
