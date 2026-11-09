@@ -98,7 +98,61 @@ fn sqlite_model_and_structure_validation_preserve_rejected_files() {
     test_workspace::remove(&root).unwrap();
 }
 
+fn single_window_versions(connection: &Connection) {
+    connection.begin().unwrap();
+    assert_eq!(
+        connection
+            .single_window_submission_version(12345, "CustomsCoo")
+            .unwrap(),
+        0
+    );
+    for (source, business, local, version) in [
+        (12345, "CustomsCoo", true, 1),
+        (12345, "CustomsCoo", true, 12),
+        (12345, "CustomsCoo", true, 3),
+        (12345, "CustomsCoo", false, 99),
+        (12345, "AgentConsignment", true, 21),
+        (12346, "CustomsCoo", true, 31),
+    ] {
+        connection
+            .insert(&RecordWrite::unkeyed(
+                "sw-batches",
+                &json!({
+                    "sourceId":source,"businessType":business,"_sourceLocal":local,
+                    "submissionVersion":version,"versionNumber":1,"ownerUserId":1,"companyScope":"DEFAULT","departmentId":"GENERAL","_manifest":{"padding":"x".repeat(100_000)}
+                }),
+            ))
+            .unwrap();
+    }
+    assert_eq!(
+        connection
+            .single_window_submission_version(12345, "CustomsCoo")
+            .unwrap(),
+        12
+    );
+    assert_eq!(
+        connection
+            .single_window_submission_version(12345, "AgentConsignment")
+            .unwrap(),
+        21
+    );
+    assert_eq!(
+        connection
+            .single_window_submission_version(12346, "CustomsCoo")
+            .unwrap(),
+        31
+    );
+    connection.rollback().unwrap();
+    assert_eq!(
+        connection
+            .single_window_submission_version(12345, "CustomsCoo")
+            .unwrap(),
+        0
+    );
+}
+
 fn roundtrip(connection: &Connection) {
+    single_window_versions(connection);
     worklist_query::exercise(connection);
     query_plans::exercise(connection);
     normalized_search::exercise(connection);

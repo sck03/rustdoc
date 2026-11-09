@@ -192,12 +192,14 @@ fn write_back(
     if document["sourceId"] != m["sourceId"] || document["companyScope"] != m["companyScope"] {
         return Err(unavailable("申报来源关联不一致，已停止回写。"));
     }
-    let newer = store::all(tx, BATCHES)?.iter().any(|r| {
-        r["_sourceLocal"] == true
-            && r["sourceId"] == m["sourceId"]
-            && r["businessType"] == business.name()
-            && r["submissionVersion"].as_i64() > m["submissionVersion"].as_i64()
-    });
+    let newer = tx.single_window_submission_version(
+        m["sourceId"]
+            .as_i64()
+            .ok_or_else(|| unavailable("申报来源编号损坏。"))?,
+        business.name(),
+    )? > m["submissionVersion"]
+        .as_i64()
+        .ok_or_else(|| unavailable("申报版本损坏。"))?;
     if document["draftRevision"] != m["draftRevision"] || newer {
         return Ok(());
     }
@@ -227,15 +229,20 @@ fn write_back(
     Ok(())
 }
 
-pub fn export(service: &NativeService, actor: &Actor, body: &Value) -> Result<(Package, Value)> {
+pub fn export(
+    service: &NativeService,
+    actor: &Actor,
+    operation: Operation,
+    body: &Value,
+) -> Result<packages::Export> {
     profiles::local(service)?;
     let selected: Vec<String> = serde_json::from_value(body["receiptFiles"].clone())
         .map_err(|_| invalid("请选择 XML 回执文件。"))?;
     if selected.is_empty() || selected.len() > 200 {
         return Err(invalid("每次请选择 1–200 个回执文件。"));
     }
-    service.store.transaction(|tx| {
-        let mut row = tracking::find(tx, actor, rules::text(body, "batchReference"), "operate")?;
+    let (row, profile) = service.store.read_for(actor, operation, &[], |tx, actor| {
+        let row = tracking::find(tx, actor, rules::text(body, "batchReference"), "operate")?;
         if row["businessType"] != body["businessType"] || row["invoiceNo"] != body["invoiceNo"] {
             return Err(invalid("回执导出业务或发票不匹配。"));
         }
@@ -250,58 +257,80 @@ pub fn export(service: &NativeService, actor: &Actor, body: &Value) -> Result<(P
                 return Err(invalid("请切换到该批次绑定的持卡机档案。"));
             }
         }
-        let business = Business::parse(rules::text(&row, "businessType")).map_err(invalid)?;
-        let mut files = BTreeMap::new();
-        let mut descriptors = Vec::new();
-        let mut parsed = Vec::new();
-        let mut total = 0;
-        let mut hashes = BTreeSet::new();
-        for (index, path) in selected.iter().enumerate() {
-            crate::operation::check()?;
-            let path = std::path::Path::new(path);
-            let name = path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .filter(|n| crate::paths::valid_file_name(n))
-                .ok_or_else(|| invalid("回执文件名无效。"))?;
-            let bytes = super::super::media::read_local(path, 10 * 1024 * 1024)?;
-            total += bytes.len();
-            if total > 50 * 1024 * 1024 {
-                return Err(invalid("回执总容量最多 50 MiB。"));
-            }
-            if !hashes.insert(digest(&bytes)) {
-                continue;
-            }
-            let name = format!("receipts/{:03}_{name}", index + 1);
-            parsed.push(parse(service, business, &bytes, &name)?);
-            descriptors
-                .push(describe(&name, &bytes, "application/xml", "官方业务回执").map_err(invalid)?);
-            files.insert(name, bytes);
+        Ok((row, profile))
+    })?;
+    let business = Business::parse(rules::text(&row, "businessType")).map_err(invalid)?;
+    let mut files = BTreeMap::new();
+    let mut descriptors = Vec::new();
+    let mut parsed = Vec::new();
+    let mut total = 0;
+    let mut hashes = BTreeSet::new();
+    for (index, path) in selected.iter().enumerate() {
+        crate::operation::check()?;
+        let path = std::path::Path::new(path);
+        let name = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .filter(|n| crate::paths::valid_file_name(n))
+            .ok_or_else(|| invalid("回执文件名无效。"))?;
+        let bytes = super::super::media::read_local(path, 10 * 1024 * 1024)?;
+        total += bytes.len();
+        if total > 50 * 1024 * 1024 {
+            return Err(invalid("回执总容量最多 50 MiB。"));
         }
-        primary(&parsed)?;
-        let reference = references(&parsed, rules::text(&row, "referenceNo"))?;
-        let mut manifest = row["_manifest"].clone();
-        manifest["packageType"] = json!("ReceiptPackage");
-        manifest["packageId"] = json!(crate::paths::nonce().map_err(unavailable)?.to_uppercase());
-        manifest["sourcePackageDigest"] = manifest["contentDigest"].clone();
-        manifest["snapshotSha256"] = json!("");
-        manifest["receiptReferenceNo"] = json!(reference);
-        manifest["payloadFiles"] = json!(descriptors);
-        manifest["attachmentFiles"] = json!([]);
-        manifest["warnings"] = json!([]);
-        manifest["createdAt"] = json!(store::timestamp());
-        let package = Package::seal(
-            manifest,
-            files,
-            &tracking::secret(service, &row)?,
-            &tracking::check,
-        )
-        .map_err(invalid)?;
-        tracking::add_package(&mut row, &package.manifest, "Exported")?;
-        if rank(rules::text(&row, "status")) == 0 {
-            row["status"] = json!("ReceiptPackageExported");
+        if !hashes.insert(digest(&bytes)) {
+            continue;
         }
-        let row = tracking::save(tx, actor, row, None)?;
-        Ok((package, row))
+        let name = format!("receipts/{:03}_{name}", index + 1);
+        parsed.push(parse(service, business, &bytes, &name)?);
+        descriptors
+            .push(describe(&name, &bytes, "application/xml", "官方业务回执").map_err(invalid)?);
+        files.insert(name, bytes);
+    }
+    primary(&parsed)?;
+    let reference = references(&parsed, rules::text(&row, "referenceNo"))?;
+    let mut manifest = row["_manifest"].clone();
+    manifest["packageType"] = json!("ReceiptPackage");
+    manifest["packageId"] = json!(crate::paths::nonce().map_err(unavailable)?.to_uppercase());
+    manifest["sourcePackageDigest"] = manifest["contentDigest"].clone();
+    manifest["snapshotSha256"] = json!("");
+    manifest["receiptReferenceNo"] = json!(reference);
+    manifest["payloadFiles"] = json!(descriptors);
+    manifest["attachmentFiles"] = json!([]);
+    manifest["warnings"] = json!([]);
+    manifest["createdAt"] = json!(store::timestamp());
+    let package = Package::seal(
+        manifest,
+        files,
+        &tracking::secret(service, &row)?,
+        &tracking::check,
+    )
+    .map_err(invalid)?;
+    let bytes = package.encode(&tracking::check).map_err(invalid)?;
+    let manifest = package.manifest;
+    // Filesystem reads, parsing, hashing and ZIP encoding finish before the
+    // short write transaction. Revalidate both authority and the binding.
+    let row = service
+        .store
+        .transaction_for(actor, operation, &[], |tx, actor| {
+            let mut current =
+                tracking::find(tx, actor, rules::text(body, "batchReference"), "operate")?;
+            if profiles::active(tx, actor, service)? != profile {
+                return Err(error(409, "持卡机档案已变化，请重新导出回执。"));
+            }
+            tracking::verify(service, &current, &manifest, true)?;
+            references(&parsed, rules::text(&current, "referenceNo"))?;
+            tracking::add_package(&mut current, &manifest, "Exported")?;
+            if rank(rules::text(&current, "status")) == 0
+                && current["status"] != "ClientDispatching"
+            {
+                current["status"] = json!("ReceiptPackageExported");
+            }
+            tracking::save(tx, actor, current, None)
+        })?;
+    Ok(packages::Export {
+        manifest,
+        bytes,
+        row,
     })
 }

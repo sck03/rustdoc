@@ -2,6 +2,31 @@ use super::*;
 use std::time::Duration;
 
 #[test]
+fn dispatch_completion_preserves_receipts_and_rejects_obsolete_attempts() {
+    for succeeded in [false, true] {
+        for status in ["Accepted", "PendingReview", "Approved", "Rejected"] {
+            let mut row = json!({"status":status,"clientDispatchOperationId":"current","clientDispatchLeaseUntil":"lease"});
+            let before = row.clone();
+            assert!(bridge::complete_dispatch(&mut row, "old", succeeded).is_err());
+            assert_eq!(row, before);
+            bridge::complete_dispatch(&mut row, "current", succeeded).unwrap();
+            assert_eq!(row["status"], status);
+            assert!(row["clientDispatchLeaseUntil"].is_null());
+        }
+        let mut row = json!({"status":"ClientDispatching","clientDispatchOperationId":"current"});
+        bridge::complete_dispatch(&mut row, "current", succeeded).unwrap();
+        assert_eq!(
+            row["status"],
+            if succeeded {
+                "QueuedToClient"
+            } else {
+                "ClientDispatchFailed"
+            }
+        );
+    }
+}
+
+#[test]
 fn operation_center_reads_projected_pages_while_a_writer_is_busy() {
     let directory = crate::engine::test_support::ScratchDirectory::new();
     let service = directory.service();

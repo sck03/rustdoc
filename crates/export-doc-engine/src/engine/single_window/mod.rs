@@ -166,42 +166,120 @@ pub fn handle(
         return serde_json::to_vec(&contracts::dto(contracts::response(operation.id), value))
             .map_err(Into::into);
     }
-    let value=service.store.transaction_for(actor, operation, &[], |tx, actor|{
-        let business=if [GET_CUSTOMS_COO_DOCUMENT,SAVE_CUSTOMS_COO_DOCUMENT,BUILD_CUSTOMS_COO_DEFAULTS,GET_CUSTOMS_COO_LOCKED_FIELDS,UNLOCK_CUSTOMS_COO_FIELDS,BUILD_CUSTOMS_COO_EXPORT_REVIEW].contains(&operation){Business::Coo}
-            else if [GET_AGENT_CONSIGNMENT_DOCUMENT,SAVE_AGENT_CONSIGNMENT_DOCUMENT,BUILD_AGENT_CONSIGNMENT_DEFAULTS,GET_AGENT_CONSIGNMENT_LOCKED_FIELDS,UNLOCK_AGENT_CONSIGNMENT_FIELDS,BUILD_AGENT_CONSIGNMENT_EXPORT_REVIEW].contains(&operation){Business::Acd}
-            else {Business::parse(parameter(parameters,"businessType")).map_err(invalid)?};
-        let id=parameter(parameters,"sourceId").parse::<i64>().ok().filter(|n|*n>0).ok_or_else(||invalid("请选择有效来源发票。"))?;
-        let mut loaded=documents::load(tx,actor,service,business,id,"view")?;
-        match operation{
-            GET_CUSTOMS_COO_DOCUMENT|GET_AGENT_CONSIGNMENT_DOCUMENT=>Ok(loaded.current),
-            BUILD_CUSTOMS_COO_DEFAULTS|BUILD_AGENT_CONSIGNMENT_DEFAULTS=>Ok(loaded.defaults),
-            GET_CUSTOMS_COO_LOCKED_FIELDS|GET_AGENT_CONSIGNMENT_LOCKED_FIELDS=>Ok(rules::draft::details(business,&loaded.current,&loaded.defaults,&loaded.locks)),
-            SAVE_CUSTOMS_COO_DOCUMENT|SAVE_AGENT_CONSIGNMENT_DOCUMENT=>{
-                source(tx,actor,id,"edit")?;
-                let saved=documents::save(tx,actor,service,business,id,body,&loaded)?;Ok(json!({"success":true,"id":saved["id"],"document":saved,"message":"单证草稿已保存。"}))
+    let work = |tx: &Connection, actor: &Actor| {
+        let business = if [
+            GET_CUSTOMS_COO_DOCUMENT,
+            SAVE_CUSTOMS_COO_DOCUMENT,
+            BUILD_CUSTOMS_COO_DEFAULTS,
+            GET_CUSTOMS_COO_LOCKED_FIELDS,
+            UNLOCK_CUSTOMS_COO_FIELDS,
+            BUILD_CUSTOMS_COO_EXPORT_REVIEW,
+        ]
+        .contains(&operation)
+        {
+            Business::Coo
+        } else if [
+            GET_AGENT_CONSIGNMENT_DOCUMENT,
+            SAVE_AGENT_CONSIGNMENT_DOCUMENT,
+            BUILD_AGENT_CONSIGNMENT_DEFAULTS,
+            GET_AGENT_CONSIGNMENT_LOCKED_FIELDS,
+            UNLOCK_AGENT_CONSIGNMENT_FIELDS,
+            BUILD_AGENT_CONSIGNMENT_EXPORT_REVIEW,
+        ]
+        .contains(&operation)
+        {
+            Business::Acd
+        } else {
+            Business::parse(parameter(parameters, "businessType")).map_err(invalid)?
+        };
+        let id = parameter(parameters, "sourceId")
+            .parse::<i64>()
+            .ok()
+            .filter(|n| *n > 0)
+            .ok_or_else(|| invalid("请选择有效来源发票。"))?;
+        let mut loaded = documents::load(tx, actor, service, business, id, "view")?;
+        match operation {
+            GET_CUSTOMS_COO_DOCUMENT | GET_AGENT_CONSIGNMENT_DOCUMENT => Ok(loaded.current),
+            BUILD_CUSTOMS_COO_DEFAULTS | BUILD_AGENT_CONSIGNMENT_DEFAULTS => Ok(loaded.defaults),
+            GET_CUSTOMS_COO_LOCKED_FIELDS | GET_AGENT_CONSIGNMENT_LOCKED_FIELDS => Ok(
+                rules::draft::details(business, &loaded.current, &loaded.defaults, &loaded.locks),
+            ),
+            SAVE_CUSTOMS_COO_DOCUMENT | SAVE_AGENT_CONSIGNMENT_DOCUMENT => {
+                source(tx, actor, id, "edit")?;
+                let saved = documents::save(tx, actor, service, business, id, body, &loaded)?;
+                Ok(
+                    json!({"success":true,"id":saved["id"],"document":saved,"message":"单证草稿已保存。"}),
+                )
             }
-            UNLOCK_CUSTOMS_COO_FIELDS|UNLOCK_AGENT_CONSIGNMENT_FIELDS=>{
-                source(tx,actor,id,"edit")?;
-                let selected:Vec<String>=serde_json::from_value(body["fieldKeys"].clone()).map_err(|_|invalid("请选择需要解锁的字段。"))?;
-                if selected.is_empty()||selected.len()>10_000{return Err(invalid("请选择有效数量的锁定字段。"));}
-                let mut changed=0;for key in selected {if loaded.locks.remove(&key){changed+=1;}}
-                if changed>0{
-                    let mut updated=loaded.defaults.clone();rules::draft::restore_locked(business,&mut updated,&loaded.current,&loaded.locks);
-                    loaded.current=documents::save(tx,actor,service,business,id,&updated,&loaded)?;
+            UNLOCK_CUSTOMS_COO_FIELDS | UNLOCK_AGENT_CONSIGNMENT_FIELDS => {
+                source(tx, actor, id, "edit")?;
+                let selected: Vec<String> = serde_json::from_value(body["fieldKeys"].clone())
+                    .map_err(|_| invalid("请选择需要解锁的字段。"))?;
+                if selected.is_empty() || selected.len() > 10_000 {
+                    return Err(invalid("请选择有效数量的锁定字段。"));
                 }
-                Ok(json!({"success":true,"changedCount":changed,"document":loaded.current,"lockedFields":rules::draft::details(business,&loaded.current,&loaded.defaults,&loaded.locks)["fields"],"message":format!("已恢复 {changed} 个字段的建议值。")}))
+                let mut changed = 0;
+                for key in selected {
+                    if loaded.locks.remove(&key) {
+                        changed += 1;
+                    }
+                }
+                if changed > 0 {
+                    let mut updated = loaded.defaults.clone();
+                    rules::draft::restore_locked(
+                        business,
+                        &mut updated,
+                        &loaded.current,
+                        &loaded.locks,
+                    );
+                    loaded.current =
+                        documents::save(tx, actor, service, business, id, &updated, &loaded)?;
+                }
+                Ok(
+                    json!({"success":true,"changedCount":changed,"document":loaded.current,"lockedFields":rules::draft::details(business,&loaded.current,&loaded.defaults,&loaded.locks)["fields"],"message":format!("已恢复 {changed} 个字段的建议值。")}),
+                )
             }
-            REPAIR_SINGLE_WINDOW_EXPORT_REVIEW_GROUPS=>{
-                source(tx,actor,id,"edit")?;
-                let groups:Vec<String>=serde_json::from_value(body["groupKeys"].clone()).map_err(|_|invalid("请选择修复分组。"))?;
-                let changed=review::repair(business,&mut loaded,&groups)?;
-                if changed>0{loaded.current=documents::save(tx,actor,service,business,id,&loaded.current,&loaded)?;}
-                Ok(json!({"success":true,"repairedGroupCount":changed,"review":review::build(business,&loaded.current,&loaded.defaults),"message":"所选分组已按当前来源资料修复。"}))
+            REPAIR_SINGLE_WINDOW_EXPORT_REVIEW_GROUPS => {
+                source(tx, actor, id, "edit")?;
+                let groups: Vec<String> = serde_json::from_value(body["groupKeys"].clone())
+                    .map_err(|_| invalid("请选择修复分组。"))?;
+                let changed = review::repair(business, &mut loaded, &groups)?;
+                if changed > 0 {
+                    loaded.current = documents::save(
+                        tx,
+                        actor,
+                        service,
+                        business,
+                        id,
+                        &loaded.current,
+                        &loaded,
+                    )?;
+                }
+                Ok(
+                    json!({"success":true,"repairedGroupCount":changed,"review":review::build(business,&loaded.current,&loaded.defaults),"message":"所选分组已按当前来源资料修复。"}),
+                )
             }
-            GET_SINGLE_WINDOW_EXPORT_REVIEW|BUILD_CUSTOMS_COO_EXPORT_REVIEW|BUILD_AGENT_CONSIGNMENT_EXPORT_REVIEW=>Ok(review::build(business,&loaded.current,&loaded.defaults)),
-            _=>Err(invalid("单一窗口操作不属于当前工作区。")),
+            GET_SINGLE_WINDOW_EXPORT_REVIEW
+            | BUILD_CUSTOMS_COO_EXPORT_REVIEW
+            | BUILD_AGENT_CONSIGNMENT_EXPORT_REVIEW => {
+                Ok(review::build(business, &loaded.current, &loaded.defaults))
+            }
+            _ => Err(invalid("单一窗口操作不属于当前工作区。")),
         }
-    })?;
+    };
+    let value = if [
+        SAVE_CUSTOMS_COO_DOCUMENT,
+        SAVE_AGENT_CONSIGNMENT_DOCUMENT,
+        UNLOCK_CUSTOMS_COO_FIELDS,
+        UNLOCK_AGENT_CONSIGNMENT_FIELDS,
+        REPAIR_SINGLE_WINDOW_EXPORT_REVIEW_GROUPS,
+    ]
+    .contains(&operation)
+    {
+        service.store.transaction_for(actor, operation, &[], work)?
+    } else {
+        service.store.read_for(actor, operation, &[], work)?
+    };
     serde_json::to_vec(&contracts::dto(contracts::response(operation.id), value))
         .map_err(Into::into)
 }

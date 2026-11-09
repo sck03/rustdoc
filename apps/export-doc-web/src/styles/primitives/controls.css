@@ -32,7 +32,10 @@ input:focus, select:focus, textarea:focus { border-color: var(--edm-accent); box
 input[readonly], textarea[readonly] { background: var(--edm-neutral-50); color: var(--edm-text-secondary); border-color: var(--edm-line); }
 input:disabled, select:disabled, textarea:disabled { background: var(--edm-bg-disabled); color: var(--edm-text-disabled); border-color: var(--edm-line); cursor: not-allowed; }
 input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--edm-danger-500); box-shadow: var(--edm-shadow-error); }
-.nav-search input[type="search"] { color: inherit; background: transparent; border: 0; border-radius: 0; padding: var(--edm-space-2) 0; box-shadow: none; }
+.nav-search input[type="search"] { color: inherit; border-radius: 0; padding: var(--edm-space-2) 0; }
+/* Decorated inputs share one border and focus indicator on their container. */
+:is(.search-form, .login-input-shell, .nav-search, .employee-picker-control) input:not([type="checkbox"]):not([type="radio"]) { background: transparent; border: 0; outline: 0; box-shadow: none; }
+:is(.search-form, .login-input-shell):focus-within { box-shadow: var(--edm-shadow-focus); }
 .nav-search:focus-within { border-color: var(--edm-primary-150); outline: 2px solid var(--edm-primary-150); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) {
   .command-button:hover:not(:disabled), [data-ui="button"]:hover:not(:disabled) { background: var(--edm-accent-hover); }
@@ -61,3 +64,4 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
   input, select, textarea { font-size: var(--edm-font-size-lg); line-height: var(--edm-line-height-lg); }
 }
 @media (forced-colors: active) { :where(button,a,input,select,textarea):focus-visible { outline-color: Highlight; } }
+@media (forced-colors: active) { :is(.search-form, .login-input-shell):focus-within { outline: 2px solid Highlight; outline-offset: 2px; } }

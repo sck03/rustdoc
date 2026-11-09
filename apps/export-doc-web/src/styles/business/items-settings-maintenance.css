@@ -278,6 +278,7 @@
   padding: 0 12px;
   color: var(--edm-neutral-650);
   background: transparent;
+  border: 1px solid transparent;
   border-radius: var(--edm-radius-md);
   font-size: var(--edm-font-size-sm);
   line-height: var(--edm-line-height-sm);

@@ -4,12 +4,40 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { withOfficeUi } from '../../../../scripts/lib/native-office-ui.mjs';
 
+async function checkInputFrames(page) {
+  const inputs = page.locator(':is(.search-form,.login-input-shell,.nav-search,.employee-picker-control) input:visible');
+  for (const input of await inputs.all()) {
+    const frames = () => input.evaluate(node => {
+      const style = getComputedStyle(node), shell = getComputedStyle(node.parentElement);
+      return { border: style.borderTopWidth, shadow: style.boxShadow, outline: style.outlineStyle, shellBorder: shell.borderTopWidth, shellShadow: shell.boxShadow, shellOutline: shell.outlineStyle };
+    });
+    await input.evaluate(node => node.blur());
+    const idle = await frames();
+    assert.equal(idle.border, '0px', `${page.url()}: inner input has no second border`);
+    await input.click();
+    const focused = await frames();
+    assert.equal(focused.border, '0px'); assert.equal(focused.shadow, 'none'); assert.equal(focused.outline, 'none');
+    assert(focused.shellBorder !== '0px' && (focused.shellShadow !== 'none' || focused.shellOutline !== 'none'), 'Focus remains visible on the rounded shell');
+    await input.evaluate(node => node.blur());
+  }
+}
+
 await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, openPage }) => {
   const page = await openPage('oa-review', 'Review-2026-Test');
+  const login = await page.context().newPage();
+  await login.goto(url); await login.locator('.login-card').waitFor();
+  await checkInputFrames(login);
+  await login.emulateMedia({ forcedColors: 'active' }); await checkInputFrames(login);
+  await login.emulateMedia({ forcedColors: 'none' });
+  await login.locator('input[autocomplete=username]').click(); await login.keyboard.press('Tab');
+  assert.equal(await login.locator('input[autocomplete=current-password]').evaluate(node => document.activeElement === node), true);
+  assert.equal(await login.locator('input[autocomplete=current-password]').evaluate(node => getComputedStyle(node).boxShadow), 'none');
+  await login.screenshot({path:path.join(output,'login-single-focus.png')}); await login.close();
   const routes = await page.locator('.workspace-nav a[href]').evaluateAll(nodes => [...new Set(nodes.map(node => node.hash).filter(Boolean))]);
   assert(routes.length >= 25, 'Audit the complete authorized navigation, rather than a single representative page');
   routes.push(...['calendar', 'handling', 'delegations', 'templates', 'runtime'].map(view => `#/office/approval-settings?view=${view}`));
   routes.push(...['examples', 'history', 'transfer', 'annual', 'online'].map(section => `#/master-data/hs-knowledge/${section}`));
+  routes.push('#/settings?section=documentDefaults');
   const results = [];
   for (const width of [1440, 1024, 390]) {
     await page.setViewportSize({ width, height: 1000 });
@@ -20,6 +48,30 @@ await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, 
       await page.waitForFunction(() => ![...document.querySelectorAll('.page-state[data-tone="loading"]')].some(node => node.getClientRects().length));
       await page.locator('[aria-busy="true"], .oa-hub-count[aria-label="正在读取"]').first().waitFor({ state: 'hidden' });
       await page.evaluate(() => document.fonts.ready);
+      await checkInputFrames(page);
+      if (width === 1440 && route.endsWith('/online')) {
+        await page.emulateMedia({ forcedColors: 'active' }); await checkInputFrames(page);
+        await page.emulateMedia({ forcedColors: 'none' });
+      }
+      for (const item of await page.locator('.settings-category-item:visible').all()) {
+        assert.equal(await item.evaluate(node => getComputedStyle(node).borderTopStyle), 'solid', 'Settings categories do not inherit the browser outset border');
+      }
+      if (route.endsWith('section=documentDefaults')) {
+        const fields = await page.locator('.document-settings-fields [data-ui="field"]').evaluateAll(nodes => nodes.map(node => {
+          const label = node.querySelector('.form-field-label').getBoundingClientRect();
+          const control = node.querySelector('select,input').getBoundingClientRect();
+          return { label: label.toJSON(), control: control.toJSON() };
+        }));
+        assert.equal(fields.length, 2);
+        const [left, right] = fields;
+        if (right.control.left > left.control.right) {
+          assert(Math.abs(left.label.top - right.label.top) <= 1, 'Default labels align despite the optional description');
+          assert(Math.abs(left.control.top - right.control.top) <= 1, 'Default controls align despite the optional description');
+        } else {
+          assert(right.label.top > left.control.bottom, 'Narrow layouts stack the fields in reading order');
+        }
+        await page.screenshot({ path: path.join(output, `${width}-document-defaults.png`), fullPage: true });
+      }
       const metrics = await page.evaluate(() => {
         const fields = [...document.querySelectorAll('[data-ui="filter-bar"] [data-ui="field"], [data-ui="field"][data-inline="true"], .office-toolbar [data-ui="field"]')];
         const invalid = fields.flatMap(field => {
@@ -33,7 +85,7 @@ await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, 
         });
         const search = document.querySelector('.nav-search input');
         return { invalid, fields: fields.filter(field => field.getClientRects().length).length,
-          primaryActions: [...document.querySelectorAll('main .command-button:not(.secondary)')].filter(node => node.getClientRects().length).map(node => node.textContent),
+          primaryActions: [...document.querySelectorAll('main .command-button:not(.secondary):not([aria-current])')].filter(node => node.getClientRects().length).map(node => node.textContent),
           font: getComputedStyle(document.body).fontFamily,
           searchBackground: search ? getComputedStyle(search).backgroundColor : null,
           overflow: document.documentElement.scrollWidth > innerWidth + 1,

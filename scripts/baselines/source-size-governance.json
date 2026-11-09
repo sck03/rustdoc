@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-09",
-  "reviewNotes": "2026-11-09: reviewed independent declaration sources, shared Excel parsing and record storage. Subsequently reviewed official-client directory discovery, a pure whitelisted settings parser reusing bounded XML validation, eight independent paths and explicit frozen-contract replacement. Removed common-root concatenation and duplicate XML checks; host IO remains in Tauri and directory fields are extracted from the profile panel. Native baseline records the reviewed 118-line net addition. Automation baseline adds only the reviewed 13 net lines for timestamp-renamed SentBox correlation with manifest size and SHA-256; validated against actual official archives and rejected mismatches. Per-file limits, remaining headroom and subsequent growth allowances remain unchanged.",
+  "reviewNotes": "2026-11-09: reviewed independent declaration sources, shared Excel parsing and record storage. Subsequently reviewed official-client directory discovery, a pure whitelisted settings parser reusing bounded XML validation, eight independent paths and explicit frozen-contract replacement. Removed common-root concatenation and duplicate XML checks; host IO remains in Tauri and directory fields are extracted from the profile panel. Native baseline records the reviewed 118-line net addition. Automation baseline adds only the reviewed 13 net lines for timestamp-renamed SentBox correlation with manifest size and SHA-256; validated against actual official archives and rejected mismatches. Per-file limits, remaining headroom and subsequent growth allowances remain unchanged. 2026-11-09 stability follow-up: reviewed 237 native-production lines (including co-located tests and rustfmt-expanded authorization closures), 98 native contract-test lines, and 101 automation lines for transaction revalidation, dispatch state preservation, SQL version aggregation, real stale-operation regressions and verified actionlint download caching. Invoice action extraction removes duplicate mutation lifecycle code. Only reviewed net increments update aggregate baselines; existing headroom, per-file limits and growth allowances remain unchanged.",
   "rules": [
     {
       "name": "repository web production default",
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 101985,
+      "baselineAggregateLines": 102222,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 102060,
+      "maximumAggregateLines": 102297,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 30509,
+      "baselineAggregateLines": 30607,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 30629,
+      "maximumAggregateLines": 30727,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 41097,
+      "baselineAggregateLines": 41198,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 41247,
+      "maximumAggregateLines": 41348,
       "reportFiles": false
     },
     {

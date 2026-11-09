@@ -21,7 +21,3 @@ async function requireDesktopPath(label: string, unavailableMessage: string, sel
   try { return (await selector())?.trim() || ""; }
   catch (error) { const detail = error instanceof Error && error.message.trim() ? error.message.trim() : "桌面文件操作未完成。"; throw new Error(`${label}失败：${detail}`); }
 }
-
-export function readPathDialogError(error: unknown) {
-  return error instanceof Error && error.message.trim() ? error.message : "桌面文件路径选择失败。";
-}

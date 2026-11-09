@@ -143,6 +143,50 @@ fn independent_sources_enforce_ownership_without_invoice_permissions() {
     }
 }
 
+#[test]
+fn viewing_another_source_does_not_authorize_implicit_export_drafts() {
+    let f = Fixture::new();
+    let scheme = f.create(
+        CREATE_PERMISSION_TEMPLATE,
+        json!({"code":"SW-VIEW-ALL","name":"查看全部仅办理本人","isActive":true,"grants":[
+            {"resourceKey":"document.single-window","action":"view","dataScope":"all"},
+            {"resourceKey":"document.single-window","action":"operate","dataScope":"own"}
+        ]}),
+    );
+    let scheme = f.client().publish_scheme(scheme);
+    f.create(CREATE_USER_ACCOUNT, json!({"username":"sw-reader","fullName":"查看员","role":"User","companyScope":"DEFAULT","departmentId":"GENERAL",
+        "permissionTemplateId":scheme["id"],"permissionSchemeVersion":scheme["publishedVersion"],"isActive":true,"resetPassword":"Sw-Test-2026"}));
+    let reader = f
+        .client()
+        .login("sw-reader".into(), "Sw-Test-2026".into())
+        .unwrap()
+        .0;
+    let source = f.create(
+        CREATE_SINGLE_WINDOW_SOURCE,
+        json!({"referenceNo":"NO-IMPLICIT-DRAFT"}),
+    );
+    let parameters = [("sourceId", source["id"].to_string())];
+    let before: Value = reader
+        .json(GET_CUSTOMS_COO_DOCUMENT, &parameters, &[], None)
+        .unwrap();
+    assert_eq!(
+        reader
+            .json::<Value>(
+                DOWNLOAD_CUSTOMS_COO_SUBMIT_PACKAGE,
+                &parameters,
+                &[],
+                Some(json!({"stationAssignmentCode":""}))
+            )
+            .unwrap_err()
+            .status,
+        Some(403)
+    );
+    let after: Value = reader
+        .json(GET_CUSTOMS_COO_DOCUMENT, &parameters, &[], None)
+        .unwrap();
+    assert_eq!(after, before, "a rejected export must not persist a draft");
+}
+
 fn profile(f: &Fixture) -> Value {
     profile_at(f, &f.root)
 }

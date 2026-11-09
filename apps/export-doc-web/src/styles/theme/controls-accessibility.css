@@ -43,7 +43,6 @@
 .app-shell textarea:focus,
 .search-form:focus-within {
   border-color: var(--edm-primary-500);
-  outline: 0;
 }
 
 @media (hover: hover) and (pointer: fine) {

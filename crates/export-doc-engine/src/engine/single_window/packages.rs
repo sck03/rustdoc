@@ -79,16 +79,27 @@ fn submit(
     business: Business,
     id: i64,
     body: &Value,
-) -> Result<(Package, Value)> {
-    service
-        .store
-        .transaction_for(actor, operation, &[], |tx, actor| {
-            let invoice = source(tx, actor, id, "operate")?;
-            let mut loaded = documents::load(tx, actor, service, business, id, "view")?;
-            if loaded.stored.is_none() {
-                loaded.current =
+) -> Result<Export> {
+    // Preserve the existing implicit first draft, but do not hold its transaction
+    // while reading attachments or constructing the archive.
+    let initial = service.store.read_for(actor, operation, &[], |tx, actor| {
+        documents::load(tx, actor, service, business, id, "operate")
+    })?;
+    if initial.stored.is_none() {
+        service
+            .store
+            .transaction_for(actor, operation, &[], |tx, actor| {
+                let loaded = documents::load(tx, actor, service, business, id, "operate")?;
+                if loaded.stored.is_none() {
                     documents::save(tx, actor, service, business, id, &loaded.current, &loaded)?;
-            }
+                }
+                Ok(())
+            })?;
+    }
+    let (invoice, loaded, assignment, version, attachments) =
+        service.store.read_for(actor, operation, &[], |tx, actor| {
+            let invoice = source(tx, actor, id, "operate")?;
+            let loaded = documents::load(tx, actor, service, business, id, "view")?;
             let document = &loaded.current;
             let issues = rules::validation::review(business, document);
             if !issues.is_empty() {
@@ -117,88 +128,112 @@ fn submit(
             {
                 return Err(invalid("授权码的公司抬头或申报业务与申报资料不一致。"));
             }
-            let version = store::all(tx, BATCHES)?
-                .iter()
-                .filter(|r| {
-                    r["_sourceLocal"] == true
-                        && r["sourceId"] == id
-                        && r["businessType"] == business.name()
-                })
-                .filter_map(|r| r["submissionVersion"].as_i64())
-                .max()
-                .unwrap_or(0)
+            let version = tx
+                .single_window_submission_version(id, business.name())?
                 .checked_add(1)
                 .ok_or_else(|| unavailable("申报版本超限。"))?;
-            let mut m = manifest(business, document, &invoice, &assignment, version)?;
-            let mut files = BTreeMap::new();
-            let snapshot = serde_json::to_vec_pretty(&export_doc_single_window::package::wire(
-                document, true,
-            ))?;
-            m["snapshotSha256"] = json!(digest(&snapshot));
-            files.insert("snapshot.json".into(), snapshot);
-            let payload = rules::xml::payload(business, document).map_err(invalid)?;
-            let name = format!(
-                "payloads/{}_{}.xml",
-                rules::text(&m, "batchReference"),
-                business.scope()
-            );
-            let mut payloads = vec![
-                describe(&name, &payload, "application/xml", "申报业务报文").map_err(invalid)?,
-            ];
-            files.insert(name, payload);
             let mut attachments = Vec::new();
-            for (index, row) in document["attachments"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .enumerate()
-            {
+            let mut total = 0_u64;
+            for row in document["attachments"].as_array().into_iter().flatten() {
                 crate::operation::check()?;
+                let document_id = document["id"]
+                    .as_i64()
+                    .ok_or_else(|| unavailable("申报单证编号损坏。"))?;
                 let key = rules::text(row, "filePath");
-                let blob = tx
-                    .blob(document["id"].as_i64().unwrap_or(0), key)?
+                let info = tx
+                    .blob_info(document_id, key)?
                     .ok_or_else(|| error(404, "单证附件不存在，请重新选择并保存。"))?;
-                if digest(&blob.content) != blob.digest {
-                    return Err(unavailable("附件摘要校验失败。"));
+                total = total
+                    .checked_add(info.size)
+                    .ok_or_else(|| invalid("附件容量超限。"))?;
+                if total > 50 * 1024 * 1024 {
+                    return Err(invalid("附件总容量最多 50 MiB。"));
                 }
-                let name = format!(
-                    "attachments/{:03}_{}",
-                    index + 1,
-                    rules::text(row, "fileName")
-                );
-                attachments.push(
-                    describe(
-                        &name,
-                        &blob.content,
-                        rules::text(row, "mediaType"),
-                        rules::text(row, "description"),
-                    )
-                    .map_err(invalid)?,
-                );
-                let payload = document_files::payload(document, row, &blob.content);
-                let payload_name = format!(
-                    "payloads/{}_attachment_{:03}.xml",
-                    rules::text(&m, "batchReference"),
-                    index + 1
-                );
-                payloads.push(
-                    describe(
-                        &payload_name,
-                        &payload,
-                        "application/xml",
-                        "原产地证附件报文",
-                    )
-                    .map_err(invalid)?,
-                );
-                files.insert(payload_name, payload);
-                files.insert(name, blob.content);
+                let blob = tx
+                    .blob(document_id, key)?
+                    .ok_or_else(|| unavailable("单证附件内容缺失。"))?;
+                attachments.push((row.clone(), blob));
             }
-            m["payloadFiles"] = json!(payloads);
-            m["attachmentFiles"] = json!(attachments);
-            let secret = rules::text(&assignment, "authenticationSecret");
-            let package = Package::seal(m, files, secret, &tracking::check).map_err(invalid)?;
-            let bytes = package.encode(&tracking::check).map_err(invalid)?;
-            let mut row = tracking::from_manifest(&package.manifest, true);
+            Ok((invoice, loaded, assignment, version, attachments))
+        })?;
+    let document = &loaded.current;
+    let mut m = manifest(business, document, &invoice, &assignment, version)?;
+    let mut files = BTreeMap::new();
+    let snapshot =
+        serde_json::to_vec_pretty(&export_doc_single_window::package::wire(document, true))?;
+    m["snapshotSha256"] = json!(digest(&snapshot));
+    files.insert("snapshot.json".into(), snapshot);
+    let payload = rules::xml::payload(business, document).map_err(invalid)?;
+    let name = format!(
+        "payloads/{}_{}.xml",
+        rules::text(&m, "batchReference"),
+        business.scope()
+    );
+    let mut payloads =
+        vec![describe(&name, &payload, "application/xml", "申报业务报文").map_err(invalid)?];
+    files.insert(name, payload);
+    let mut descriptors = Vec::new();
+    for (index, (row, blob)) in attachments.into_iter().enumerate() {
+        crate::operation::check()?;
+        if digest(&blob.content) != blob.digest {
+            return Err(unavailable("附件摘要校验失败。"));
+        }
+        let name = format!(
+            "attachments/{:03}_{}",
+            index + 1,
+            rules::text(&row, "fileName")
+        );
+        descriptors.push(
+            describe(
+                &name,
+                &blob.content,
+                rules::text(&row, "mediaType"),
+                rules::text(&row, "description"),
+            )
+            .map_err(invalid)?,
+        );
+        let payload = document_files::payload(document, &row, &blob.content);
+        let payload_name = format!(
+            "payloads/{}_attachment_{:03}.xml",
+            rules::text(&m, "batchReference"),
+            index + 1
+        );
+        payloads.push(
+            describe(
+                &payload_name,
+                &payload,
+                "application/xml",
+                "原产地证附件报文",
+            )
+            .map_err(invalid)?,
+        );
+        files.insert(payload_name, payload);
+        files.insert(name, blob.content);
+    }
+    m["payloadFiles"] = json!(payloads);
+    m["attachmentFiles"] = json!(descriptors);
+    let secret = rules::text(&assignment, "authenticationSecret");
+    let package = Package::seal(m, files, secret, &tracking::check).map_err(invalid)?;
+    let bytes = package.encode(&tracking::check).map_err(invalid)?;
+    let manifest = package.manifest;
+    let row = service
+        .store
+        .transaction_for(actor, operation, &[], |tx, actor| {
+            let current = documents::load(tx, actor, service, business, id, "operate")?;
+            if source(tx, actor, id, "operate")? != invoice
+                || current.current != loaded.current
+                || current.stored != loaded.stored
+                || tx.single_window_submission_version(id, business.name())? != version - 1
+            {
+                return Err(error(409, "申报来源、草稿或提交版本已变化，请重新导出。"));
+            }
+            if rules::text(body, "stationAssignmentCode").is_empty()
+                && profiles::assignment(service, &profiles::active(tx, actor, service)?)?
+                    != assignment
+            {
+                return Err(error(409, "持卡机档案已变化，请重新导出。"));
+            }
+            let mut row = tracking::from_manifest(&manifest, true);
             row["referenceNo"] = document[if business == Business::Coo {
                 "certNo"
             } else {
@@ -207,11 +242,22 @@ fn submit(
             .clone();
             row["status"] = json!("SubmitPackageExported");
             tracking::bind(service, &mut row, secret)?;
-            tracking::add_package(&mut row, &package.manifest, "Exported")?;
+            tracking::add_package(&mut row, &manifest, "Exported")?;
             let row = tracking::save(tx, actor, row, Some(&invoice))?;
             tracking::archive(tx, &row, &bytes)?;
-            Ok((package, row))
-        })
+            Ok(row)
+        })?;
+    Ok(Export {
+        manifest,
+        bytes,
+        row,
+    })
+}
+
+pub(super) struct Export {
+    pub manifest: Value,
+    pub bytes: Vec<u8>,
+    pub row: Value,
 }
 
 pub fn handle(
@@ -262,8 +308,12 @@ pub fn handle(
         SAVE_SINGLE_WINDOW_RECEIPT_PACKAGE_TO_PATH,
     ]
     .contains(&operation);
-    let (package, row) = if receipt {
-        receipts::export(service, actor, body)?
+    let Export {
+        manifest,
+        bytes,
+        row,
+    } = if receipt {
+        receipts::export(service, actor, operation, body)?
     } else {
         let business = if [
             DOWNLOAD_CUSTOMS_COO_SUBMIT_PACKAGE,
@@ -282,11 +332,10 @@ pub fn handle(
             .ok_or_else(|| invalid("申报资料编号无效。"))?;
         submit(service, actor, operation, business, id, body)?
     };
-    let bytes = package.encode(&tracking::check).map_err(invalid)?;
     if download {
         return Ok(bytes);
     }
     crate::operation::check()?;
     atomic_write(path, &bytes).map_err(unavailable)?;
-    serde_json::to_vec(&json!({"success":true,"packagePath":path,"manifest":package.manifest,"trackingBatchId":row["id"],"storagePolicy":POLICY,"message":"交接包已归档并保存。"})).map_err(Into::into)
+    serde_json::to_vec(&json!({"success":true,"packagePath":path,"manifest":manifest,"trackingBatchId":row["id"],"storagePolicy":POLICY,"message":"交接包已归档并保存。"})).map_err(Into::into)
 }

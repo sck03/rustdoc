@@ -20,11 +20,11 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
     invoicePermission, excelPermission, singleWindowPermission, batchInvoices, setBatchInvoices,
     invoicePackageExportPermission, workspaceDeviceMode, workspaceDeviceCapabilities, canAuthorizeBatchExport, canBatchExport,
     keyword, setKeyword, committedKeyword, pageNumber, setPageNumber,
-    pageSize, copyDraft, setCopyDraft, setCopyMessage, transferDraft,
-    setTransferDraft, transferUploadFile, setTransferUploadFile, setTransferMessage, transferSuccessMessage,
+    pageSize, copyDraft, closeCopyPanel, transferDraft,
+    closeTransferPanel, transferUploadFile, transferSuccessMessage,
     lastExportedPackagePath, excelImportInputRef, navigate, routeSuccessMessage, invoicesQuery,
-    singleWindow, handleSearch, handleResetSearch, handlePageSizeChange, cloneInvoiceMutation,
-    previewTransferPackageMutation, importTransferPackageMutation, openCopyPanel, openSingleWindowPanel, patchCopyDraft,
+    singleWindow, handleSearch, handleResetSearch, handlePageSizeChange, copyBusy,
+    transferBusy, openCopyPanel, openSingleWindowPanel, patchCopyDraft,
     submitCopyInvoice, handleExportTransferPackage, handleChooseImportTransferPackage, handleChooseExcelImport, handleExcelImportUpload,
     handlePreviewTransferPackage, handlePreviewTransferUpload, patchTransferDraft, submitTransferImport, handleOpenLastExportedPackage,
     invoices, message, isBusy,
@@ -113,11 +113,8 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
       {copyDraft ? (
         <InvoiceCopyOptionsPanel
           draft={copyDraft}
-          isBusy={cloneInvoiceMutation.isPending}
-          onCancel={() => {
-            setCopyDraft(null);
-            setCopyMessage(null);
-          }}
+          isBusy={copyBusy}
+          onCancel={closeCopyPanel}
           onChange={patchCopyDraft}
           onSubmit={submitCopyInvoice}
         />
@@ -125,15 +122,11 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
       {transferDraft ? (
         <InvoiceTransferImportPanel
           draft={transferDraft}
-          isBusy={previewTransferPackageMutation.isPending || importTransferPackageMutation.isPending}
+          isBusy={transferBusy}
           uploadMode={!isDesktopBridgeAvailable()}
           uploadFile={transferUploadFile}
           onUploadFileChange={handlePreviewTransferUpload}
-          onCancel={() => {
-            setTransferDraft(null);
-            setTransferUploadFile(null);
-            setTransferMessage(null);
-          }}
+          onCancel={closeTransferPanel}
           onChange={patchTransferDraft}
           onPreview={handlePreviewTransferPackage}
           onSubmit={submitTransferImport}

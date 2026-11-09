@@ -38,6 +38,7 @@ mod record_query;
 mod record_selection;
 mod related_query;
 mod resource_query;
+mod single_window_query;
 mod workflow_origin;
 mod worklist_query;
 pub use generic_query::ScopedQuery;
@@ -389,6 +390,7 @@ delegate! {
     personnel_order_state(id:i64,state:&str,error:&str)->();
     personnel_order(id:i64)->Option<Value>;
     workflow_version_next(company:&str,key:&str)->i64;
+    single_window_submission_version(source:i64,business:&str)->i64;
     workflow_versions(company:&str,key:&str,offset:i64,limit:i64)->Value;
     workflow_activation_save(entry:&Value)->Value;
     workflow_activation_list(company:&str,due:Option<&str>)->Vec<Value>;

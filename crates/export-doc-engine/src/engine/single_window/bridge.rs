@@ -150,18 +150,11 @@ pub fn handle(
         finalize.run(|| {
             service.store.transaction(|tx| {
                 let mut current = tracking::get(tx, actor, id, "operate")?;
-                current["clientDispatchLeaseUntil"] = Value::Null;
-                current["status"] = json!(if result.is_ok() {
-                    "QueuedToClient"
-                } else {
-                    "ClientDispatchFailed"
-                });
-                if result.is_ok() {
-                    current["lastClientDispatchAt"] = json!(store::timestamp());
-                } else {
-                    current["_dispatchError"] =
-                        json!("派发未完整确认；请核对官方客户端后重新生成提交版本。");
-                }
+                complete_dispatch(
+                    &mut current,
+                    rules::text(&row, "clientDispatchOperationId"),
+                    result.is_ok(),
+                )?;
                 tracking::save(tx, actor, current, None).map(|_| ())
             })
         })?;
@@ -170,6 +163,35 @@ pub fn handle(
     Ok(
         json!({"batchId":id,"batchReference":row["batchReference"],"targetDirectory":outbox,"profileName":profile["profileName"],"payloadFileCount":row["payloadFileCount"],"attachmentFileCount":row["attachmentFileCount"]}),
     )
+}
+
+pub(super) fn complete_dispatch(
+    row: &mut Value,
+    operation_id: &str,
+    succeeded: bool,
+) -> Result<()> {
+    if operation_id.is_empty() || rules::text(row, "clientDispatchOperationId") != operation_id {
+        return Err(error(409, "派发操作已变化，不能登记旧操作结果。"));
+    }
+    row["clientDispatchLeaseUntil"] = Value::Null;
+    // A receipt may arrive during filesystem publication. Only advance the
+    // dispatching state; never replace a newer business receipt with transport state.
+    if row["status"] == "ClientDispatching" {
+        row["status"] = json!(if succeeded {
+            "QueuedToClient"
+        } else {
+            "ClientDispatchFailed"
+        });
+    }
+    if succeeded {
+        row["lastClientDispatchAt"] = json!(store::timestamp());
+        row.as_object_mut()
+            .ok_or_else(|| unavailable("申报批次损坏。"))?
+            .remove("_dispatchError");
+    } else {
+        row["_dispatchError"] = json!("派发未完整确认；请核对官方客户端后重新生成提交版本。");
+    }
+    Ok(())
 }
 
 fn collect(service: &NativeService, actor: &Actor, id: i64) -> Result<Value> {

@@ -8,7 +8,7 @@
 [data-ui="form-grid"] { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: var(--edm-layout-gap); min-width: 0; margin: 0; padding: 0; border: 0; }
 [data-ui="form-grid"][data-columns="1"] { grid-template-columns: minmax(0,1fr); }
 [data-ui="form-grid"][data-columns="3"] { grid-template-columns: repeat(3,minmax(0,1fr)); }
-[data-ui="field"] { display: grid; gap: var(--edm-space-2); min-width: 0; color: var(--edm-text); font-size: var(--edm-font-size-md); line-height: var(--edm-line-height-md); }
+[data-ui="field"] { display: grid; align-content: start; gap: var(--edm-space-2); min-width: 0; color: var(--edm-text); font-size: var(--edm-font-size-md); line-height: var(--edm-line-height-md); }
 [data-ui="field"] > span { display: flex; align-items: center; gap: var(--edm-space-2); font-weight: var(--edm-font-weight-medium); }
 [data-ui="field"][data-inline="true"] { grid-template-columns: auto minmax(0,1fr); align-items: center; }
 [data-ui="field"][data-inline="true"] > span { white-space: nowrap; }

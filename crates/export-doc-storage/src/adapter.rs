@@ -39,6 +39,7 @@ pub(crate) trait Adapter: Send {
         responsibility_appointments(unit: i64, responsibility: i64, project: Option<i64>, kind: &str, date: &str) -> Vec<Value> => foundation::resolve_duty;
         placement_appointments(unit: i64, source: &str, id: i64, date: &str) -> Vec<Value> => foundation::placement_appointments;
         workflow_version_next(company: &str, key: &str) -> i64 => workflow_publications::next;
+        single_window_submission_version(source: i64, business: &str) -> i64 => single_window_query::latest_version;
         workflow_versions(company: &str, key: &str, offset: i64, limit: i64) -> Value => workflow_publications::versions;
         workflow_activation_save(entry: &Value) -> Value => workflow_publications::save;
         workflow_activation_list(company: &str, due: Option<&str>) -> Vec<Value> => workflow_publications::list;

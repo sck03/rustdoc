@@ -21,7 +21,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { useOfficeOperation } from ${source('features/office/useOfficeData.ts')};
   import { AttachmentUploadPanel } from ${source('ui/AttachmentUploadPanel.tsx')};
   import { ExporterSealField } from ${source('features/master-data/ExporterSealField.tsx')};
-  import { MemoryRouter } from 'react-router-dom';
+  import { MemoryRouter, useLocation } from 'react-router-dom';
   import { ConfirmationProvider } from ${source('ui/ConfirmationProvider.tsx')};
   import { UnsavedChangesProvider } from ${source('ui/unsavedChangesGuard.tsx')};
   import { PermissionAccessProvider } from ${source('app/PermissionAccessContext.tsx')};
@@ -31,6 +31,8 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { useReportTemplatePreviewMutations } from ${source('features/reports/useReportTemplatePreviewMutations.ts')};
   import { InvoiceReportPreviewPanel } from ${source('features/invoices/InvoiceReportPreviewPanel.tsx')};
   import { useInvoiceDocumentPackageWorkspace } from ${source('features/invoices/useInvoiceDocumentPackageWorkspace.ts')};
+  import { useInvoiceListSingleWindowOperations } from ${source('features/invoices/useInvoiceListSingleWindowOperations.ts')};
+  import { useInvoiceListWorkspace } from ${source('features/invoices/hooks/useInvoiceListWorkspace.ts')};
   window.pending = []; window.results = []; window.completed = []; window.refreshes = [];
   window.attachmentUploads = [];
   window.attachmentRecord = { versionNumber: 1, attachments: Array.from({ length: window.mode === 'attachments-partial' ? 18 : 20 }, () => ({ sizeBytes: 1 })) };
@@ -41,6 +43,11 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   }
   const lookup = (input, options, kind = 'primary') => new Promise((resolve, reject) => window.pending.push({ ...input, kind, signal: options.signal, resolve, reject }));
   const client = { searchSupplierProductOptions: lookup, queryCrmCustomers: lookup, listProducts: (input, options) => lookup(input, options, 'product'),
+    getSingleWindowExportReview: lookup, repairSingleWindowExportReviewGroups: lookup,
+    downloadCustomsCooSubmitPackage: lookup, startInvoiceBookingSheetDownloadJob: lookup,
+    listInvoices: async () => ({items:[],totalCount:0,totalPages:1}),
+    previewUploadedExcelImport: lookup, previewUploadedInvoiceTransferPackage: lookup,
+    cloneInvoice: lookup, importUploadedInvoiceTransferPackage: lookup,
     listReportTemplates: async () => [{templatePath:'builtin:invoice_template.dtpl',displayName:'发票',withSealDefault:true}],
     getSettings: async () => ({}),
     previewInvoiceReportDraftHtml: lookup, previewInvoiceReportHtml: lookup, previewInvoiceDocumentPackageHtml: lookup,
@@ -53,6 +60,16 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
     const run = useAbortableOperation(scope, { cancelPrevious: window.mode === 'latest' });
     return <button onClick={() => void run(delayed).then(value => window.results.push({ value }),
       error => window.results.push({ name: error.name, message: error.message }))}>开始读取</button>;
+  }
+  function SingleWindow() {
+    const workspace = useInvoiceListSingleWindowOperations({ client, queryClient: queries, defaultExportDirectory:'', canView:true, canOperate:true, canExportBookingSheet:true });
+    window.singleWindow = workspace;
+    return <output>{workspace.draft?.invoice.id}:{workspace.reviewInvoiceId}:{workspace.message}</output>;
+  }
+  function InvoiceList() {
+    const workspace = useInvoiceListWorkspace({ client });
+    window.invoiceList = workspace;
+    return <><button onClick={() => workspace.handleExcelImportUpload(new File(['data'],'test.xlsx'))}>导入Excel</button><output>{workspace.message}:{workspace.transferDraft?.packagePath}</output></>;
   }
   function Invoice({ scope }) {
     const draft = useMemo(() => ({id:7,invoiceNo:'draft-'+scope}), [scope]);
@@ -107,6 +124,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
       }}/><output>{operation.error}</output></>;
   }
   function App() {
+    window.currentLocation = useLocation().pathname;
     const [scope, setScope] = useState(0), [open, setOpen] = useState(true), [sealDisabled, setSealDisabled] = useState(false);
     const refresh = () => window.mode.startsWith('attachments') ? Promise.resolve('updated') : new Promise(resolve => window.refreshes.push(resolve));
     useQuery({ queryKey: ['office', 'test'], initialData: 'before', staleTime: Infinity,
@@ -122,6 +140,8 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
         : window.mode === 'seal' ? <ExporterSealField label='单证章路径' scopeKey={String(scope)} value='' actionDisabled={sealDisabled}
           onUploadFile={async file => window.completed.push({name:file.name,type:file.type,bytes:Array.from(new Uint8Array(await file.arrayBuffer()))})}
           onError={error => window.results.push(error.message)}/>
+        : window.mode === 'single-window' ? <SingleWindow/>
+        : window.mode === 'invoice-list' ? <InvoiceList/>
         : window.mode === 'invoice-preview' ? <Invoice scope={scope}/>
         : window.mode === 'package-preview' ? <Package scope={scope}/>
         : window.mode === 'preview' ? <Preview scope={scope} allowed={!sealDisabled}/>
@@ -130,6 +150,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   const queries = new QueryClient({ defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } } });
   window.queries = queries;
   const permissions = ['sales.opportunities', 'sales.quotes'].map(resourceKey => ({ resourceKey, action: 'create', dataScope: 'all' }));
+  for (const resourceKey of ['document.invoices','document.excel','document.single-window']) for (const action of ['view','create','edit','operate']) permissions.push({ resourceKey, action, dataScope:'all' });
   permissions.push(...['preview','print'].map(action=>({resourceKey:'document.invoice-output',action,dataScope:'all'})),{resourceKey:'common.report-catalog',action:'view',dataScope:'all'});
   createRoot(document.getElementById('root')).render(<React.StrictMode><MemoryRouter initialEntries={['/?view=editor']}><QueryClientProvider client={queries}>
     <PermissionAccessProvider permissions={permissions} subject={{id:1,companyScope:'DEFAULT',departmentId:'GENERAL'}}><ConfirmationProvider><UnsavedChangesProvider><App/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider>
@@ -159,9 +180,74 @@ try {
       await check(page);
       assert.deepEqual(errors, []);
       results.push(name);
-    } catch (error) { failures.push(`${name}: ${error.message}`); }
+    } catch (error) { failures.push(`${name}: ${error.message}`); console.error(name, await page.evaluate(() => ({location:window.currentLocation, pending:window.pending.map(p=>({aborted:p.signal?.aborted})),message:window.invoiceList?.message,errors:document.body.innerText}))); }
     finally { await page.close(); }
   }
+  for (const boundary of ['close', 'switch', 'unmount']) for (const reject of [false, true]) {
+    await scenario(`single-window-review-${boundary}-${reject}`, 'single-window', async page => {
+      await page.evaluate(() => window.singleWindow.open({id:1,invoiceNo:'ONE'}));
+      await page.evaluate(() => window.singleWindow.buildReview({id:1,invoiceNo:'ONE'}, 'CustomsCoo'));
+      await page.waitForFunction(() => window.pending.length === 1);
+      if (boundary === 'unmount') await page.getByRole('button',{name:'离开编辑页',exact:true}).click();
+      else await page.evaluate(boundary => boundary === 'close' ? window.singleWindow.close() : window.singleWindow.open({id:2,invoiceNo:'TWO'}), boundary);
+      assert.equal(await page.evaluate(() => window.pending[0].signal.aborted), true);
+      await page.evaluate(reject => reject ? window.pending[0].reject(new Error('obsolete error')) : window.pending[0].resolve({totalErrorCount:0,totalWarningCount:0,hasIssues:false,groups:[]}), reject);
+      await page.waitForTimeout(30);
+      assert(!await page.locator('body').innerText().then(text => text.includes('obsolete error')));
+      if (boundary !== 'unmount') {
+        assert.equal(await page.evaluate(() => window.singleWindow.review), null);
+        assert.equal(await page.evaluate(() => window.singleWindow.draft?.invoice.id ?? null), boundary === 'switch' ? 2 : null);
+        assert.equal(await page.evaluate(() => window.singleWindow.isBusy), false);
+      }
+    });
+  }
+  await scenario('single-window-close-during-export-review-does-not-submit', 'single-window', async page => {
+    await page.evaluate(() => { window.singleWindow.open({id:1,invoiceNo:'ONE'}); window.singleWindow.setStationAssignmentCode('assignment'); });
+    await page.waitForFunction(() => window.singleWindow.stationAssignmentCode === 'assignment');
+    await page.evaluate(() => { void window.singleWindow.exportPackage({id:1,invoiceNo:'ONE'}, 'CustomsCoo'); });
+    await page.waitForFunction(() => window.pending.length === 1);
+    await page.evaluate(() => { window.singleWindow.close(); window.pending[0].resolve({totalErrorCount:0,totalWarningCount:0,hasIssues:false,groups:[]}); });
+    await page.waitForTimeout(30);
+    assert.equal(await page.evaluate(() => window.pending.length), 1);
+  });
+  for (const mode of ['excel', 'transfer', 'copy']) for (const reject of [false, true]) {
+    await scenario(`invoice-list-${mode}-late-${reject}`, 'invoice-list', async page => {
+      if (mode === 'copy') {
+        await page.evaluate(() => window.invoiceList.openCopyPanel({id:1,invoiceNo:'ONE'}));
+        await page.waitForFunction(() => window.invoiceList.copyDraft?.source.id === 1);
+        await page.evaluate(() => { void window.invoiceList.submitCopyInvoice({preventDefault(){}}); });
+      } else await page.evaluate(mode => mode === 'excel'
+        ? window.invoiceList.handleExcelImportUpload(new File(['data'],'test.xlsx'))
+        : window.invoiceList.handlePreviewTransferUpload(new File(['data'],'test.edpkg')), mode);
+      await page.waitForFunction(() => window.pending.length === 1);
+      if (mode === 'excel') await page.getByRole('button',{name:'离开编辑页',exact:true}).click();
+      else await page.evaluate(mode => mode === 'copy' ? window.invoiceList.closeCopyPanel() : window.invoiceList.closeTransferPanel(), mode);
+      assert.equal(await page.evaluate(() => window.pending[0].signal.aborted), true);
+      await page.evaluate(({mode,reject}) => reject ? window.pending[0].reject(new Error('obsolete error')) : window.pending[0].resolve(mode === 'copy' ? {id:2,invoice:{},message:'old'} : {invoice:{id:0},message:'old'}), {mode,reject});
+      await page.waitForTimeout(30);
+      assert(!await page.locator('body').innerText().then(text => text.includes('obsolete error')));
+      if (mode === 'transfer') assert.equal(await page.evaluate(() => window.invoiceList.transferDraft), null);
+      assert.equal(await page.evaluate(() => window.currentLocation), '/');
+      assert.equal(await page.evaluate(() => window.queries.getMutationCache().getAll().filter(m => m.state.data).length), 0);
+    });
+  }
+  await scenario('invoice-list-new-transfer-preview-wins', 'invoice-list', async page => {
+    await page.evaluate(() => window.invoiceList.handlePreviewTransferUpload(new File(['a'],'old.edpkg')));
+    await page.waitForFunction(() => window.pending.length === 1);
+    await page.evaluate(() => window.invoiceList.handlePreviewTransferUpload(new File(['b'],'new.edpkg')));
+    await page.waitForFunction(() => window.pending.length === 2);
+    await page.evaluate(() => window.pending[1].resolve({preview:{invoiceNo:'NEW',invoiceExists:false,invoiceMatches:false},checksumValid:true}));
+    await page.waitForFunction(() => window.invoiceList.transferDraft?.packagePath === 'new.edpkg');
+    await page.evaluate(() => window.pending[0].resolve({preview:{invoiceNo:'OLD',invoiceExists:false,invoiceMatches:false},checksumValid:true}));
+    await page.waitForTimeout(30);
+    assert.equal(await page.evaluate(() => window.invoiceList.transferDraft.packagePath), 'new.edpkg');
+  });
+  await scenario('invoice-list-current-excel-survives-strict-effects', 'invoice-list', async page => {
+    await page.getByRole('button', {name:'导入Excel',exact:true}).click();
+    await page.waitForFunction(() => window.pending.length === 1);
+    await page.evaluate(() => window.pending[0].resolve({invoice:{id:0},success:true}));
+    await page.waitForFunction(() => window.currentLocation === '/invoices/new');
+  });
   await scenario('invoice-preview-current-abort-can-retry', 'invoice-preview', async page => {
     const preview = page.getByRole('button', {name:'预览',exact:true});
     await preview.click();

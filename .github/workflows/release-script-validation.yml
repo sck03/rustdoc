@@ -56,12 +56,27 @@ jobs:
       - name: Validate script syntax and process contracts
         shell: pwsh
         run: ./scripts/verify-script-suite.ps1
+      - name: Restore actionlint download cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
+        with:
+          path: .codex-runtime/tools/actionlint/downloads
+          key: actionlint-1.7.12-linux-amd64-v1
       - name: Validate workflow syntax with checksum-verified actionlint
+        timeout-minutes: 7
         run: |
-          mkdir -p .codex-runtime/tools/actionlint
+          mkdir -p .codex-runtime/tools/actionlint/downloads
           cd .codex-runtime/tools/actionlint
-          curl --fail --location --retry 3 --connect-timeout 20 --max-time 120 -o actionlint.tar.gz https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
-          curl --fail --location --retry 3 --connect-timeout 20 --max-time 120 -o checksums.txt https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_checksums.txt
+          cd downloads
+          for asset in actionlint_1.7.12_linux_amd64.tar.gz actionlint_1.7.12_checksums.txt; do
+            if [ ! -s "$asset" ]; then
+              curl --fail --location --retry 8 --retry-delay 10 --retry-max-time 180 --connect-timeout 20 --max-time 60 \
+                -o "$asset.part" "https://github.com/rhysd/actionlint/releases/download/v1.7.12/$asset"
+              mv "$asset.part" "$asset"
+            fi
+          done
+          cp actionlint_1.7.12_linux_amd64.tar.gz ../actionlint.tar.gz
+          cp actionlint_1.7.12_checksums.txt ../checksums.txt
+          cd ..
           awk '$2 == "actionlint_1.7.12_linux_amd64.tar.gz" {print $1 "  actionlint.tar.gz"}' checksums.txt | sha256sum --check --strict
           tar -xzf actionlint.tar.gz
           cd "$GITHUB_WORKSPACE"
