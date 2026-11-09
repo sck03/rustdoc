@@ -24,6 +24,12 @@ async function checkInputFrames(page) {
 
 await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, openPage }) => {
   const page = await openPage('oa-review', 'Review-2026-Test');
+  // A fresh document must load the HS tool styles without first visiting master data.
+  await page.goto(url + '/#/master-data/hs-knowledge/online');
+  await page.reload();
+  await page.locator('.hs-code-remote-form').waitFor();
+  assert.equal(await page.locator('.hs-code-remote-form').evaluate(node => getComputedStyle(node).display), 'flex');
+  await checkInputFrames(page);
   const login = await page.context().newPage();
   await login.goto(url); await login.locator('.login-card').waitFor();
   await checkInputFrames(login);
@@ -37,7 +43,7 @@ await withOfficeUi('frontend-filter-typography-ui', async ({ repo, output, url, 
   assert(routes.length >= 25, 'Audit the complete authorized navigation, rather than a single representative page');
   routes.push(...['calendar', 'handling', 'delegations', 'templates', 'runtime'].map(view => `#/office/approval-settings?view=${view}`));
   routes.push(...['examples', 'history', 'transfer', 'annual', 'online'].map(section => `#/master-data/hs-knowledge/${section}`));
-  routes.push('#/settings?section=documentDefaults');
+  routes.push('#/settings?section=documentDefaults', '#/master-data/hs-codes');
   const results = [];
   for (const width of [1440, 1024, 390]) {
     await page.setViewportSize({ width, height: 1000 });
