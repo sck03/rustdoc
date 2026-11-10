@@ -3,6 +3,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 /** Serializes a form's saves and rejects results after leaving its workspace. */
 export function useScopedSave(scope: string, owner: unknown) {
   const latest = useRef({ scope, owner });
+  const mounted = useRef(false);
   latest.current = { scope, owner };
   const active = useRef<{ controller: AbortController; scopes: Set<string>; owner: unknown } | null>(null);
   const [isSaving, setSaving] = useState(false);
@@ -14,10 +15,13 @@ export function useScopedSave(scope: string, owner: unknown) {
       active.current.controller.abort(); active.current = null; setSaving(false);
     }
   }, [scope, owner]);
-  useLayoutEffect(() => () => { active.current?.controller.abort(); active.current = null; }, []);
+  useLayoutEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; active.current?.controller.abort(); active.current = null; };
+  }, []);
 
   async function run(operation: (context: { signal: AbortSignal; checkCurrent: () => void; continueInScope: (next: string) => void }) => Promise<void>) {
-    if (latest.current.scope !== scope || latest.current.owner !== owner) throw new DOMException("操作所属页面已变化。", "AbortError");
+    if (!mounted.current || latest.current.scope !== scope || latest.current.owner !== owner) throw new DOMException("操作所属页面已变化。", "AbortError");
     if (active.current) throw new DOMException("保存操作正在进行。", "AbortError");
     const pending = { controller: new AbortController(), scopes: new Set([scope]), owner };
     active.current = pending; setSaving(true);

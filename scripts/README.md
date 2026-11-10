@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-10 会话与资源：`npm --prefix apps/export-doc-web run test:settings-models` 包含设置、备份和任务中心的真实 React／QueryClient 生命周期检查；`test:invoice-editing` 增加 5000 行连续保存不保留 mutation 输入／响应的回归。项目待办限制进入两库共用办理合同；HTTP 上传空间和暂存清理随工作区测试执行。实现、验收与清理边界见[本批记录](../docs/2026-11-10会话权限与上传资源优化记录.md)。
+
 2026-11-10 稳定性与 Excel：单一窗口“申报资料 → 下载 Excel 模板”提供正式导入样式；默认智能识别，发票和申报资料均可在每次导入时选择手动方案。方案在“系统设置 → Excel 导入 → 高级导入方案”管理。完整字段与限制见[Excel 导入说明](../docs/单一窗口Excel导入说明.md)，本批门禁和清理记录见[稳定性与资源精简记录](../docs/2026-11-10稳定性与资源精简记录.md)。`test_single_window_workspace_ui.mjs` 验证分区定位、版本冲突及作用域取消；`test_native_desktop_editions.mjs` 的 Full 场景验证真实桌面模板保存、Excel 方案上传和中文输入。
 
 2026-11-10 共享控件：`npm --prefix apps/export-doc-web run test:shared-control-layout-ui` 在真实 HTTP/React 中核对长文本、待办分页与文件按钮；需先构建 `office_review` 与前端。Full 桌面验收复用同一检查并增加操作档案对齐。`test_hs_transfer_ui.mjs` 纳入 `test:concurrency-feedback`；单一窗口工作区回归覆盖版本绑定、保存/导出互斥、卸载取消及迟到下载。见[本批记录](../docs/2026-11-10导出一致性与共享控件修复记录.md)。

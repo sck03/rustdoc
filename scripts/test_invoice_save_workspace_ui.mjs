@@ -83,6 +83,15 @@ async function scenario(check,{isNew=false,gridMode=false,initialRows=1}={}){
 }
 try{
   await scenario(async page=>{
+    for(let n=0;n<8;n++){
+      await page.evaluate(()=>window.actions.save());
+      await page.waitForFunction(n=>window.requests.length===n+1,n);
+      await page.evaluate(n=>window.finish(n),n);
+      await page.waitForFunction(()=>!window.saveBusy);
+    }
+    assert.equal(await page.evaluate(()=>window.queryClient.getMutationCache().getAll().length),0);
+  },{initialRows:5000});
+  await scenario(async page=>{
     await page.getByRole("button",{name:"save",exact:true}).click();await page.waitForFunction(()=>window.requests.length===1);
     await page.getByLabel("invoice-number").fill("newer unsaved");await page.evaluate(()=>window.finish());
     await page.waitForFunction(()=>window.invoice.rowVersion==="native:2");

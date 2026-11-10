@@ -663,6 +663,10 @@ pub(super) fn object_scope_filters(
     }
     filters
 }
+/// Every projected record passed to scope evaluation must retain these fields.
+pub(in crate::engine) const RECORD_SCOPE_FIELDS: &[&str] =
+    &["companyScope", "departmentId", "ownerUserId", "projectId"];
+
 /// Object restrictions always intersect an additional participation grant.
 /// Participation can satisfy only the participation rule, never a unit,
 /// department, project or explicit deny restriction.

@@ -50,28 +50,6 @@ pub fn id(parameters: &[(&str, String)]) -> Result<i64> {
         .ok_or_else(|| invalid("记录编号必须大于零。"))
 }
 
-fn addressed_id(
-    store: &Store,
-    resource: &Resource,
-    operation: Operation,
-    parameters: &[(&str, String)],
-) -> Result<i64> {
-    if operation.path.contains("{code}") {
-        let code = parameters
-            .iter()
-            .find(|(key, _)| *key == "code")
-            .map(|(_, value)| store::normalize(value))
-            .filter(|value| !value.is_empty())
-            .ok_or_else(|| invalid("缺少记录代码。"))?;
-        return store
-            .all(resource.key)?
-            .iter()
-            .find(|record| store::normalize(&text(record, resource.identity)) == code)
-            .and_then(|record| record["id"].as_i64())
-            .ok_or_else(|| error(404, "记录不存在。"));
-    }
-    id(parameters)
-}
 pub fn field<'a>(body: &'a Value, path: &str) -> &'a Value {
     path.split('.').fold(body, |value, key| &value[key])
 }
@@ -262,10 +240,7 @@ pub fn handle(
                 "view"
             },
         )?;
-        let value = store.get(
-            resource.key,
-            addressed_id(store, resource, operation, parameters)?,
-        )?;
+        let value = store.get(resource.key, id(parameters)?)?;
         if !auth::visible(
             actor,
             permission,
@@ -298,7 +273,7 @@ pub fn handle(
         return Err(invalid("请求内容须为业务对象。"));
     }
     let record_id = if operation == resource.update && operation != resource.create {
-        addressed_id(store, resource, operation, parameters)?
+        id(parameters)?
     } else {
         request["id"].as_i64().unwrap_or(0)
     };
@@ -682,14 +657,10 @@ pub fn delete(
     query: &[(&str, String)],
 ) -> Result<Value> {
     auth::authorize(actor, resource.permission, "delete")?;
-    let record_id = addressed_id(
-        store,
-        resource,
-        resource
-            .delete
-            .ok_or_else(|| invalid("此记录不支持删除。"))?,
-        parameters,
-    )?;
+    resource
+        .delete
+        .ok_or_else(|| invalid("此记录不支持删除。"))?;
+    let record_id = id(parameters)?;
     for (key, value) in query {
         if *key == "rowVersion" {
             body["rowVersion"] = json!(value);

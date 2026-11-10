@@ -11,6 +11,7 @@ mod shutdown;
 pub use service_shutdown::close_service;
 pub use shutdown::{Shutdown, serve};
 mod telemetry;
+mod temporary_space;
 mod web;
 const MAX_REQUESTS: usize = 16;
 const MAX_QUEUED_REQUESTS: usize = 16;
@@ -38,6 +39,7 @@ pub struct ServerState {
     downloads: Arc<Semaphore>,
     processing: Arc<Semaphore>,
     preview_memory: Arc<export_doc_engine::engine::backup_io::Budget>,
+    upload_space: Arc<temporary_space::Budget>,
     tickets: Arc<downloads::Tickets>,
     desktop_token: Option<Arc<str>>,
     shutdown: Shutdown,
@@ -62,6 +64,9 @@ fn compose_router(
     let telemetry = Arc::new(telemetry::Telemetry::new(service.paths.log_root.clone()));
     let shutdown = Shutdown::default();
     let state = ServerState {
+        upload_space: Arc::new(temporary_space::Budget::new(
+            service.paths.cache_root.clone(),
+        )),
         telemetry,
         service,
         requests: Arc::new(admission::Admission::new(

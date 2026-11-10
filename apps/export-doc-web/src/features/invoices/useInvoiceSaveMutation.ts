@@ -1,10 +1,10 @@
 import { useMemo, useRef, type Dispatch, type SetStateAction } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import type { ApiInvoiceDetailDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { isConcurrencyConflict, readApiError } from "../../ui/formUtils.ts";
-import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { normalizeInvoiceForSave, normalizeInvoiceStatus } from "./invoiceModel.ts";
 import { reconcileSavedInvoice, remainingHsFeedback } from "./invoiceSaveModel.ts";
 import { invalidateInvoiceViews } from "./invoiceCache.ts";
@@ -26,11 +26,8 @@ export function useInvoiceSaveMutation(options: InvoicePersistenceOptions) {
   const scope = useMemo(() => ({}), [client, invoiceId, isNew]);
   const latest = useRef({ scope, invoice, feedback: options.pendingHsFeedback ?? [] });
   latest.current = { scope, invoice, feedback: options.pendingHsFeedback ?? [] };
-  const run = useAbortableOperation(scope);
-  const saving = useRef(false);
-  const mutation = useMutation({
-    mutationFn: (body: ApiInvoiceDetailDto) => run(async signal => {
-      try {
+  return useScopedMutation("invoice-save", scope, {
+    mutationFn: async (body: ApiInvoiceDetailDto, signal) => {
         const response = await (isNew ? client.createInvoice({ body }, { signal }) : client.updateInvoice({ id: invoiceId, body }, { signal }));
         signal.throwIfAborted();
         if (latest.current.scope !== scope || !latest.current.invoice) throw new DOMException("单据已切换。", "AbortError");
@@ -52,30 +49,12 @@ export function useInvoiceSaveMutation(options: InvoicePersistenceOptions) {
         } catch (error) {
           if (!signal.aborted && latest.current.scope === scope) setMessage(`发票已保存，但关联列表刷新失败：${readApiError(error)}`);
         }
-        return response;
-      } finally { saving.current = false; }
-    }),
+    },
     onError: error => {
-      if (isAbortError(error)) return;
       const message = readApiError(error);
       setMessage(isConcurrencyConflict(error) ? null : message);
       setConcurrencyMessage(isConcurrencyConflict(error) ? message : null);
       setSuccessMessage(null);
     },
   });
-  const mutate: typeof mutation.mutate = (body, callbacks) => {
-    if (saving.current) return;
-    saving.current = true;
-    mutation.mutate(body, { ...callbacks, onSettled: (...args) => {
-      saving.current = false;
-      return callbacks?.onSettled?.(...args);
-    } });
-  };
-  const mutateAsync: typeof mutation.mutateAsync = async (body, callbacks) => {
-    if (saving.current) throw new DOMException("保存正在进行。", "AbortError");
-    saving.current = true;
-    try { return await mutation.mutateAsync(body, callbacks); }
-    finally { saving.current = false; }
-  };
-  return { ...mutation, mutate, mutateAsync };
 }

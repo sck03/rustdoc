@@ -270,7 +270,12 @@ async fn execute(
         })
         .await
         .map_err(|_| error(503, "上传授权任务中断。"))??;
-        let file = backup::receive(body, &state.service.paths.cache_root).await?;
+        let file = backup::receive(
+            body,
+            &state.service.paths.cache_root,
+            state.upload_space.clone(),
+        )
+        .await?;
         backup_upload = Some((authorization, file));
         body::Parsed {
             body: None,

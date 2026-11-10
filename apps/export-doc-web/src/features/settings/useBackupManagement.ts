@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import {
@@ -25,7 +26,6 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
   const [restoreFileName, setRestoreFileName] = useState("");
   const [restoreConfirmation, setRestoreConfirmation] = useState("");
   const [runtimeStorage, setRuntimeStorage] = useState<RuntimeStorageContext | null>(null);
-  const [dataRootMigrationPending, setDataRootMigrationPending] = useState(false);
   const [recoveryPassword, setRecoveryPassword] = useState("");
   const [recoveryPasswordConfirmation, setRecoveryPasswordConfirmation] = useState("");
   const [recoveryPackagePath, setRecoveryPackagePath] = useState("");
@@ -52,7 +52,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     return () => {
       cancelled = true;
     };
-  }, [desktopBridgeAvailable]);
+  }, [desktopBridgeAvailable, client]);
 
   const backupQuery = useQuery({
     queryKey: queryKeys.backups(),
@@ -98,23 +98,24 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     setMessage(readApiError(error));
     setSuccessMessage(null);
   };
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      const acceptedJob = await client.createDatabaseBackup();
+  const createMutation = useScopedMutation("backup", client, {
+    mutationFn: async (_: void, signal) => {
+      const acceptedJob = await client.createDatabaseBackup({ signal });
       return waitForJobCompletion(client, acceptedJob, {
+        signal,
         timeoutMessage: "数据库备份仍在后台生成，可稍后到“文件任务”查看结果。",
       });
     },
     onSuccess: (job) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.backups() });
       setMessage(null);
       setSuccessMessage("数据库备份已完成，备份列表正在刷新。");
       setLastCreatedJobId(job.jobId);
     },
+    refreshKeys: () => [queryKeys.backups()],
     onError: mutationError,
   });
-  const cleanupMutation = useMutation({
-    mutationFn: () => client.cleanupDatabaseBackups({ body: { daysToKeep: cleanupDays } }),
+  const cleanupMutation = useScopedMutation("backup", client, {
+    mutationFn: (_: void, signal) => client.cleanupDatabaseBackups({ body: { daysToKeep: cleanupDays } }, { signal }),
     onSuccess: (response) => {
       updateBackupQuery(queryClient, response);
       setMessage(null);
@@ -122,10 +123,10 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     },
     onError: mutationError,
   });
-  const restoreMutation = useMutation({
-    mutationFn: () => client.restoreDatabaseBackup({
+  const restoreMutation = useScopedMutation("backup", client, {
+    mutationFn: (_: void, signal) => client.restoreDatabaseBackup({
       body: { backupFileName: restoreFileName, confirmationText: restoreConfirmation.trim() },
-    }),
+    }, { signal }),
     onSuccess: (job) => {
       setMessage(null);
       setSuccessMessage("数据库已恢复，请重新登录。");
@@ -135,8 +136,8 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     },
     onError: mutationError,
   });
-  const createRecoveryMutation = useMutation({
-    mutationFn: () => client.createDisasterRecoveryPackage({ body: { password: recoveryPassword } }),
+  const createRecoveryMutation = useScopedMutation("backup", client, {
+    mutationFn: (_: void, signal) => client.createDisasterRecoveryPackage({ body: { password: recoveryPassword } }, { signal }),
     onSuccess: (job) => {
       setMessage(null);
       setSuccessMessage("加密灾难恢复包任务已加入“文件任务”；完成后可在恢复包目录中查看。");
@@ -146,14 +147,14 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     },
     onError: mutationError,
   });
-  const restoreRecoveryMutation = useMutation({
-    mutationFn: () => client.restoreDisasterRecoveryPackage({
+  const restoreRecoveryMutation = useScopedMutation("backup", client, {
+    mutationFn: (_: void, signal) => client.restoreDisasterRecoveryPackage({
       body: {
         packagePath: recoveryPackagePath,
         password: recoveryRestorePassword,
         confirmationText: recoveryRestoreConfirmation.trim(),
       },
-    }),
+    }, { signal }),
     onSuccess: (job) => {
       setMessage(null);
       setSuccessMessage("灾难恢复校验任务已加入“文件任务”；任务成功后请立即重启程序。");
@@ -164,12 +165,40 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     onError: mutationError,
   });
 
+  const migrationMutation = useScopedMutation("backup", client, {
+    mutationFn: async (_: void, signal) => {
+      if (!await requestConfirmation({
+        title: "更换运行数据目录",
+        description: "程序将在退出后迁移现有数据，并于下次启动使用新目录。",
+        details: ["请选择本机磁盘上的保存位置，程序会创建 ExportDocManager_Data 专用子目录。", "迁移期间请勿关闭计算机或拔出目标磁盘。"],
+        confirmLabel: "继续选择目录", tone: "warning",
+      })) return null;
+      signal.throwIfAborted();
+      const result = await scheduleDataRootMigration();
+      signal.throwIfAborted();
+      if (!result) return null;
+      return { result, context: await getRuntimeStorageContext() };
+    },
+    onSuccess: (saved) => {
+      if (!saved) return;
+      setSuccessMessage(`${saved.result.message} 新目录：${saved.result.targetDataRoot}`);
+      if (saved.context) setRuntimeStorage(saved.context);
+    },
+    onError: error => setMessage(readDesktopError(error)),
+  });
+  const selectionMutation = useScopedMutation("backup", client, {
+    mutationFn: () => selectDisasterRecoveryPackageFile(),
+    onSuccess: selected => {
+      if (selected) { setRecoveryPackagePath(selected); setRecoveryRestoreConfirmation(""); }
+    },
+    onError: error => setMessage(readDesktopError(error)),
+  });
   const backups = backupQuery.data?.backups ?? [];
   const disasterRecoveryStatus = disasterRecoveryQuery.data ?? null;
   const isBusy =
     backupQuery.isFetching || disasterRecoveryQuery.isFetching ||
     createMutation.isPending || cleanupMutation.isPending ||
-    restoreMutation.isPending || createRecoveryMutation.isPending || restoreRecoveryMutation.isPending || dataRootMigrationPending;
+    restoreMutation.isPending || createRecoveryMutation.isPending || restoreRecoveryMutation.isPending || migrationMutation.isPending || selectionMutation.isPending;
 
   const clearNotices = () => {
     setMessage(null);
@@ -177,6 +206,7 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     setLastCreatedJobId(null);
   };
   const runMutation = (mutate: () => void) => {
+    if (isBusy || !canManageSettings) return;
     clearNotices();
     mutate();
   };
@@ -185,42 +215,8 @@ export function useBackupManagement(client: ExportDocManagerApiClient, canManage
     if (sections.database) void backupQuery.refetch();
     if (desktopBridgeAvailable) void disasterRecoveryQuery.refetch();
   };
-  const chooseNewDataRoot = async () => {
-    if (!runtimeStorage?.migrationSupported || dataRootMigrationPending) return;
-    if (!await requestConfirmation({
-      title: "更换运行数据目录",
-      description: "程序将在退出后迁移现有数据，并于下次启动使用新目录。",
-      details: ["请选择本机磁盘上的保存位置，程序会创建 ExportDocManager_Data 专用子目录。", "迁移期间请勿关闭计算机或拔出目标磁盘。"],
-      confirmLabel: "继续选择目录",
-      tone: "warning",
-    })) return;
-
-    setDataRootMigrationPending(true);
-    clearNotices();
-    try {
-      const result = await scheduleDataRootMigration();
-      if (!result) return;
-      setSuccessMessage(`${result.message} 新目录：${result.targetDataRoot}`);
-      const context = await getRuntimeStorageContext();
-      if (context) setRuntimeStorage(context);
-    } catch (error) {
-      setMessage(readDesktopError(error));
-    } finally {
-      setDataRootMigrationPending(false);
-    }
-  };
-  const chooseRecoveryPackage = async () => {
-    clearNotices();
-    try {
-      const selected = await selectDisasterRecoveryPackageFile();
-      if (selected) {
-        setRecoveryPackagePath(selected);
-        setRecoveryRestoreConfirmation("");
-      }
-    } catch (error) {
-      setMessage(readDesktopError(error));
-    }
-  };
+  const chooseNewDataRoot = () => { if (runtimeStorage?.migrationSupported) runMutation(migrationMutation.mutate); };
+  const chooseRecoveryPackage = () => runMutation(selectionMutation.mutate);
 
   return {
     canManageSettings,

@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { useLocation } from "react-router-dom";
 import type { ApiSettingsResponse, ApiSettingsValidationResponse, AppSettings, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -114,15 +115,15 @@ export function useSettingsWorkspace({
     }
   }, [settingsQuery.error, settingsQuery.isError]);
 
-  const saveMutation = useMutation({
-    mutationFn: (body: SettingsRecord) =>
+  const saveMutation = useScopedMutation("settings", client, {
+    mutationFn: (body: SettingsRecord, signal) =>
       client.updateSettings({
         body: {
           settings: body as unknown as AppSettings,
           updateSecrets,
         },
-      }),
-    onSuccess: async (response) => {
+      }, { signal }),
+    onSuccess: (response) => {
       setConcurrencyMessage(null);
       setSettings(response.settings as unknown as SettingsRecord);
       setMessage(null);
@@ -135,12 +136,9 @@ export function useSettingsWorkspace({
         settings: response.settings,
         storagePolicy: settingsQuery.data?.storagePolicy ?? "",
       });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.settings() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.exchangeRatesRoot() }),
-        ...["ExportDocument", "PaymentVoucher"].map((type) => queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplateFields(type) })),
-      ]);
     },
+    refreshKeys: () => [queryKeys.settings(), queryKeys.exchangeRatesRoot(),
+      ...["ExportDocument", "PaymentVoucher"].map(type => queryKeys.reportTemplateFields(type))],
     onError: (error) => {
       setConcurrencyMessage(isConcurrencyConflict(error) ? readApiError(error) : null);
       setMessage(isConcurrencyConflict(error) ? null : readApiError(error));
@@ -148,14 +146,14 @@ export function useSettingsWorkspace({
     },
   });
 
-  const validateSettingsMutation = useMutation({
-    mutationFn: (body: SettingsRecord) =>
+  const validateSettingsMutation = useScopedMutation("settings", client, {
+    mutationFn: (body: SettingsRecord, signal) =>
       client.validateSettings({
         body: {
           settings: body as unknown as AppSettings,
           updateSecrets,
         },
-      }),
+      }, { signal }),
     onSuccess: (response) => {
       setValidationResult(response);
       setMessage(response.isValid ? null : "设置校验发现需要处理的问题。");
@@ -173,26 +171,26 @@ export function useSettingsWorkspace({
     },
   });
 
-  const testEmailMutation = useMutation({
-    mutationFn: () => client.testEmailConnection(),
-    onSuccess: async (response) => {
+  const testEmailMutation = useScopedMutation("settings", client, {
+    mutationFn: (_: void, signal) => client.testEmailConnection({ signal }),
+    onSuccess: (response) => {
       setMessage(null);
       setSuccessMessage(response.message || "邮件连接测试成功。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.emailStatus() });
     },
+    refreshKeys: () => [queryKeys.emailStatus()],
     onError: (error) => {
       setMessage(readApiError(error));
       setSuccessMessage(null);
     },
   });
 
-  const inferEmailServerMutation = useMutation({
-    mutationFn: (request: EmailServerSuggestionDraft) =>
+  const inferEmailServerMutation = useScopedMutation("settings", client, {
+    mutationFn: (request: EmailServerSuggestionDraft, signal) =>
       client.suggestEmailServerConfig({
         body: {
           emailAddress: request.emailAddress,
         },
-      }),
+      }, { signal }),
     onSuccess: (response, request) => {
       const draftEmailAddress = response.emailAddress || request.emailAddress;
       const patches: SettingPatch[] = [];
@@ -226,7 +224,7 @@ export function useSettingsWorkspace({
     },
   });
 
-  const maintenanceActions = useSettingsMaintenanceActions({ client, refetchHealth: healthQuery.refetch, setMessage, setSuccessMessage });
+  const maintenanceActions = useSettingsMaintenanceActions({ client, setMessage, setSuccessMessage });
   const cleanupSystemLogsMutation = maintenanceActions.cleanupMutation;
 
   const isBusy =

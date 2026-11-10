@@ -3,7 +3,7 @@ import { Field, FilterBar } from "../../ui/primitives/Field.tsx";
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { type FormEvent, useEffect, useState } from "react";
 import "../../styles/jobs-excel.css";
-import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Play, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { type BackgroundJobSnapshot, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -40,7 +40,6 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const workspaceDeviceProfile = useWorkspaceDeviceProfile();
   const workspaceDeviceMode = workspaceDeviceProfile.mode;
   const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
-  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusedJobId = normalizeJobId(searchParams.get("jobId"));
   const [initialListViewState] = useState(() => loadListViewState(jobListViewStateStorageKey));
@@ -91,7 +90,6 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
   const configuredReportTemplatePath = readDefaultReportTemplatePath(settingsQuery.data?.settings, "ExportDocument");
   const operations = useJobCenterOperations({
     client,
-    queryClient,
     canOperate: jobPermission.canOperate,
     canManage: jobPermission.canManage,
     canCreateInvoiceReportZip,

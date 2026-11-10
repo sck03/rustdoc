@@ -1,6 +1,7 @@
 //! Owned report resources, shipping marks and seals. Metadata and bytes share
 //! the business transaction, so backups and restores retain the same images.
 mod references;
+mod registration;
 use super::{
     auth,
     error::{Result, conflict, error, invalid, unavailable},
@@ -13,8 +14,8 @@ use super::{
 use crate::generated_api::*;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use export_doc_report::{RasterImage, ReportData};
-use export_doc_storage::BlobWrite;
 use references::References;
+pub(super) use registration::ValidatedImage;
 use serde_json::{Value, json};
 
 const KIND: &str = "report-images";
@@ -128,70 +129,6 @@ fn read_entry(tx: &Connection, entry: &Value) -> Result<RasterImage> {
         bytes: blob.content,
     })
 }
-pub(super) fn register(
-    tx: &Connection,
-    actor: &Actor,
-    bytes: &[u8],
-    file_name: &str,
-    limit: usize,
-) -> Result<Value> {
-    let media_type = media::image_type(bytes, limit)?;
-    let hash = media::digest(bytes);
-    let extension = if media_type == "image/png" {
-        "png"
-    } else {
-        "jpg"
-    };
-    let id = format!("img-{hash}.{extension}");
-    let previous = tx.find_identity(KIND, &id)?;
-    if let Some(mut previous) = previous {
-        read_entry(tx, &previous)?;
-        if !owns(actor, &previous) {
-            previous["uploaders"]
-                .as_array_mut()
-                .ok_or_else(|| unavailable("图片归属记录损坏。"))?
-                .push(json!(actor.id));
-            let record_id = previous["id"].as_i64().unwrap();
-            return store::save(tx, KIND, record_id, previous, Some(id), actor, "image-own");
-        }
-        return Ok(previous);
-    }
-    if tx
-        .query_generic(&export_doc_storage::GenericQuery {
-            kind: KIND,
-            scope: export_doc_storage::DataScope {
-                all: true,
-                ..Default::default()
-            },
-            fields: &[("id", "id")],
-            limit: 1,
-            ..Default::default()
-        })?
-        .0
-        >= 1000
-    {
-        return Err(conflict("图片资源已达到 1000 个，请回收未使用图片后重试。"));
-    }
-    let record = store::save(
-        tx,
-        KIND,
-        0,
-        json!({"resourceId":id,"mediaType":media_type,"sha256":hash,"byteLength":bytes.len(),"altText":file_name,"uploaders":[actor.id]}),
-        Some(id.clone()),
-        actor,
-        "image-upload",
-    )?;
-    tx.insert_blob(&BlobWrite {
-        kind: KIND,
-        record_id: record["id"].as_i64().unwrap(),
-        file_name: &id,
-        media_type,
-        digest: &hash,
-        content: bytes,
-        created_at: &store::timestamp(),
-    })?;
-    Ok(record)
-}
 fn response(record: &Value) -> Value {
     json!({"id":record["resourceId"],"mediaType":record["mediaType"],"byteLength":record["byteLength"],"sha256":record["sha256"],"altText":record["altText"],"storagePolicy":"受控图片和归属保存在业务数据库，随备份恢复。"})
 }
@@ -208,9 +145,11 @@ pub fn upload(
         return Err(invalid("图片文件名无效。"));
     }
     if operation == UPLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE {
+        auth::authorize(actor, "document.report-resources", "upload")?;
+        let image = ValidatedImage::new(bytes, MAX_RESOURCE)?;
         return store.transaction_as(actor, |tx, actor| {
             auth::authorize(actor, "document.report-resources", "upload")?;
-            register(tx, actor, bytes, name, MAX_RESOURCE).map(|v| response(&v))
+            image.register(tx, actor, name).map(|v| response(&v))
         });
     }
     let id = super::records::id(parameters)?;
@@ -220,12 +159,13 @@ pub fn upload(
         "customs" | "Customs" => "customsSealPath",
         _ => return Err(invalid("印章类别只能是 document 或 customs。")),
     };
+    let image = ValidatedImage::new(bytes, 5 * 1024 * 1024)?;
     store.transaction_as(actor, |tx, actor| {
         let mut exporter = store::get(tx, "exporters", id)?;
         if !auth::visible(actor, "document.master-data", "edit", &exporter) {
             return Err(error(403, "没有修改此出口商印章的权限。"));
         }
-        let image = register(tx, actor, bytes, name, 5 * 1024 * 1024)?;
+        let image = image.register(tx, actor, name)?;
         exporter[field] = json!(format!("Files/Seals/{}", text(&image, "resourceId")));
         let identity = text(&exporter, "exporterNameEN");
         store::save(
@@ -266,15 +206,15 @@ pub fn handle(
             let bytes = STANDARD
                 .decode(encoded)
                 .map_err(|_| invalid("唛头图片编码无效。"))?;
-            let decoded = media::image_type(&bytes, 5 * 1024 * 1024)?;
-            if kind != format!("data:{decoded}") {
+            let image = ValidatedImage::new(&bytes, 5 * 1024 * 1024)?;
+            if kind != format!("data:{}", image.media_type()) {
                 return Err(invalid("图片内容与声明类型不一致。"));
             }
             let saved = store.transaction_as(actor, |tx, actor| {
                 if auth::authorize(actor, "document.invoices", "edit").is_err() {
                     auth::authorize(actor, "document.invoices", "create")?;
                 }
-                register(tx, actor, &bytes, "单据图片", 5 * 1024 * 1024)
+                image.register(tx, actor, "单据图片")
             })?;
             let folder = if operation == SAVE_INVOICE_SEAL_IMAGE {
                 "Seals"
@@ -297,18 +237,38 @@ pub fn handle(
         QUERY_REPORT_TEMPLATE_V3_IMAGE_RESOURCES => {
             let _access = report_template_files::storage_read_lock(&service.paths)?;
             let tx = store.connection()?;
-            let references = References::load(&tx, actor, Some(&service.paths))?;
+            let entries = tx.all(KIND)?;
+            let foreign: Vec<_> = entries
+                .iter()
+                .filter(|entry| !actor.admin && !owns(actor, entry))
+                .filter_map(|entry| entry["resourceId"].as_str())
+                .collect();
+            let readable =
+                References::query(&tx, actor, Some(&service.paths), Some(&foreign))?.readable;
             let mut items = vec![];
-            for entry in tx.all(KIND)? {
+            for entry in entries {
                 let id = text(&entry, "resourceId");
                 let own = owns(actor, &entry);
-                if !actor.admin && !own && !references.readable.contains(&id) {
+                if !actor.admin && !own && !readable.contains(&id) {
                     continue;
                 }
-                let is_referenced = references.all.contains(&id);
-                items.push(json!({"id":entry["resourceId"],"mediaType":entry["mediaType"],"byteLength":entry["byteLength"],"sha256":entry["sha256"],"ownsUpload":own,"isReferenced":is_referenced,"canRecycle":(actor.admin||own)&&!is_referenced}));
+                items.push(json!({"id":entry["resourceId"],"mediaType":entry["mediaType"],"byteLength":entry["byteLength"],"sha256":entry["sha256"],"ownsUpload":own}));
             }
-            Ok(store::paged(items, query))
+            let mut page = store::paged(items, query);
+            let targets: Vec<_> = page["items"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|item| item["id"].as_str())
+                .collect();
+            let references = References::query(&tx, actor, Some(&service.paths), Some(&targets))?;
+            for item in page["items"].as_array_mut().into_iter().flatten() {
+                let referenced = references.all.contains(item["id"].as_str().unwrap());
+                item["isReferenced"] = json!(referenced);
+                item["canRecycle"] =
+                    json!((actor.admin || item["ownsUpload"] == true) && !referenced);
+            }
+            Ok(page)
         }
         RECYCLE_REPORT_TEMPLATE_V3_IMAGE_RESOURCE => {
             let id = parameter_id(parameters)?;

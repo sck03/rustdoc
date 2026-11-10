@@ -5,6 +5,7 @@ import type { ApiInvoiceSaveResponse } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import type { ExporterSealType } from "../master-data/ExporterSealField.tsx";
 import { getInvoiceStatusLabel, normalizeInvoiceForSave, normalizeInvoiceStatus } from "./invoiceModel.ts";
 import { invoiceSealDataUrl } from "./invoiceSealImage.ts";
@@ -37,8 +38,8 @@ export function useInvoicePersistenceOperations(options: InvoicePersistenceOptio
     queryClient.setQueryData(queryKeys.invoice(response.id), response.invoice);
   };
   const saveInvoiceMutation = useInvoiceSaveMutation(options);
-  const exporterSealMutation = useMutation({
-    mutationFn: ({ file, sealType }: { sealType: ExporterSealType; file: File }) => run(async signal => {
+  const exporterSealMutation = useScopedMutation("invoice-seal", scope, {
+    mutationFn: async ({ file, sealType }: { sealType: ExporterSealType; file: File }, signal) => {
       if (!invoice) throw new Error("请先打开需要编辑的发票。");
       const imageDataUrl = await invoiceSealDataUrl(file);
       check(signal);
@@ -47,10 +48,10 @@ export function useInvoicePersistenceOperations(options: InvoicePersistenceOptio
       const field = sealType === "document" ? "docSealPath" : "customsSealPath";
       setInvoice(current => current && current.id === invoice.id ? { ...current, [field]: saved.imagePath } : current);
       setMessage(null); setSuccessMessage(sealType === "document" ? "单证章已上传，请保存发票。" : "报关章已上传，请保存发票。");
-      return saved;
-    }), onError: failed,
+    }, onError: failed,
   });
   const cloneInvoiceTypeMutation = useMutation({
+    gcTime: 0,
     mutationKey: [...invoiceControlMutationKey(invoiceId), "clone"],
     mutationFn: ({ targetType }: { targetType: string }) => run(async signal => {
       const response = await client.cloneInvoiceAsType({ id: invoiceId, body: { targetType,
@@ -60,28 +61,28 @@ export function useInvoicePersistenceOperations(options: InvoicePersistenceOptio
       setMessage(null); setSuccessMessage(null);
       await refresh(signal, "另一类型发票已生成");
       navigate(`/invoices/${response.id}`, { state: { successMessage: response.message || `已生成同一发票号的${response.invoice.type}。` } });
-      return response;
     }), onError: failed,
   });
   const unverifyInvoiceMutation = useMutation({
+    gcTime: 0,
     mutationKey: [...invoiceControlMutationKey(invoiceId), "unverify"],
     mutationFn: () => run(async signal => {
       const response = await client.unverifyInvoice({ id: invoiceId, body: { rowVersion: invoice?.rowVersion ?? "", note: "用户申请反审核，返回草稿后重新核对。" } }, { signal });
       check(signal); accept(response, "发票已反审核，当前为草稿状态。");
       await refresh(signal, "发票已反审核", response.id);
-      return response;
     }), onError: failed,
   });
   const statusTransitionMutation = useMutation({
+    gcTime: 0,
     mutationKey: [...invoiceControlMutationKey(invoiceId), "transition"],
     mutationFn: ({ targetStatus, note }: { targetStatus: string; note: string }) => run(async signal => {
       const response = await client.transitionInvoiceStatus({ id: invoiceId, body: { targetStatus, rowVersion: invoice?.rowVersion ?? "", note } }, { signal });
       check(signal); accept(response, `发票状态已更新为“${getInvoiceStatusLabel(response.invoice.status)}”。`);
       await refresh(signal, "发票状态已更新", response.id);
-      return response;
     }), onError: failed,
   });
   const deleteInvoiceMutation = useMutation({
+    gcTime: 0,
     mutationKey: [...invoiceControlMutationKey(invoiceId), "delete"],
     mutationFn: () => run(async signal => {
       const response = await client.deleteInvoice({ id: invoiceId, rowVersion: invoice?.rowVersion ?? "" }, { signal });
@@ -92,15 +93,12 @@ export function useInvoicePersistenceOperations(options: InvoicePersistenceOptio
       await refresh(signal, "发票已删除");
       await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
       check(signal); navigate("/invoices", { replace: true, state: { successMessage: response.message || "发票已删除。" } });
-      return response;
     }), onError: failed,
   });
-  const saveCustomOptionMutation = useMutation({
-    mutationFn: ({ optionType, value }: { optionType: string; value: string }) => run(async signal => {
-      const response = await client.saveCustomOption({ optionType, body: { value } }, { signal });
-      check(signal); await queryClient.invalidateQueries({ queryKey: queryKeys.customOptionsRoot() });
-      return response;
-    }), onError: failed,
+  const saveCustomOptionMutation = useScopedMutation("invoice-options", scope, {
+    mutationFn: ({ optionType, value }: { optionType: string; value: string }, signal) => client.saveCustomOption({ optionType, body: { value } }, { signal }),
+    refreshKeys: () => [queryKeys.customOptionsRoot()],
+    onError: failed,
   });
   const refreshParties = () => Promise.all([queryKeys.masterDataRoot("customers"), queryKeys.masterDataRoot("exporters")]
     .map(queryKey => queryClient.invalidateQueries({ queryKey })));

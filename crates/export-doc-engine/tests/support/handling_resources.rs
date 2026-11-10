@@ -11,6 +11,96 @@ pub(super) fn exercise(
     policy: &mut Value,
 ) {
     let [admin, applicant, first, second, leader] = tokens;
+    let person = call(service, admin, GET_PERSONNEL, employee, None).unwrap();
+    let directory = call(service, admin, GET_ORGANIZATION_DIRECTORY, 0, None).unwrap();
+    let unit = directory["companies"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|unit| unit["code"] == users[1]["companyScope"])
+        .unwrap()["id"]
+        .to_string();
+    let project = call(
+        service,
+        admin,
+        SAVE_PROJECT,
+        0,
+        Some(json!({
+            "unitId":unit,"code":format!("worklist-{}",nonce().unwrap()),"name":"待办项目范围",
+            "ownerAppointmentId":person["organization"]["primaryAssignmentId"],"members":[],
+            "isActive":true,"expectedVersion":0,"note":"项目范围回归"
+        })),
+    )
+    .unwrap();
+    let check_project_scope =
+        |resource: &str, source: &str, list_operation: Operation, record: i64| {
+            let restriction = call(service, admin, SAVE_ACCESS_RESTRICTION, 0, Some(json!({
+            "principalKind":"Account","principalId":users[2]["id"].to_string(),
+            "resourceKey":resource,"action":"view","mode":"Projects","members":[project["id"]],
+            "reason":"只查看项目待办","expectedVersion":0
+        }))).unwrap();
+            let token = call(
+                service,
+                "",
+                LOGIN,
+                0,
+                Some(json!({"username":users[2]["username"],"password":"Handling-2026-Test"})),
+            )
+            .unwrap();
+            let token = token["accessToken"].as_str().unwrap();
+            let page = list(
+                service,
+                token,
+                list_operation,
+                &[
+                    ("requestId", record.to_string()),
+                    ("handlingOnly", "true".into()),
+                ],
+            );
+            assert_eq!(page["totalCount"], 1);
+            for summary in ["true", "false"] {
+                let work = list(
+                    service,
+                    token,
+                    GET_WORKLIST,
+                    &[
+                        ("source", source.into()),
+                        ("includeSummary", summary.into()),
+                    ],
+                );
+                assert!(
+                    work["page"]["items"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|item| item["recordId"] == record),
+                    "project-authorized request missing from {source}"
+                );
+            }
+            call(
+                service,
+                admin,
+                SAVE_ACCESS_RESTRICTION,
+                0,
+                Some(json!({
+                    "principalKind":"Account","principalId":users[2]["id"].to_string(),
+                    "resourceKey":resource,"action":"view","mode":"Unrestricted","members":[],
+                    "reason":"项目范围回归完成","expectedVersion":restriction["versionNumber"]
+                })),
+            )
+            .unwrap();
+            call(
+                service,
+                "",
+                LOGIN,
+                0,
+                Some(json!({"username":users[2]["username"],"password":"Handling-2026-Test"})),
+            )
+            .unwrap()["accessToken"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        };
     let save = |policy: &mut Value| {
         policy["expectedVersion"] = policy["versionNumber"].clone();
         *policy =
@@ -43,7 +133,7 @@ pub(super) fn exercise(
             .any(|r| r["id"] == room_id)
     );
     let start = chrono::Utc::now() + chrono::Duration::minutes(10);
-    let body = json!({"requestKey":nonce().unwrap(),"meetingRoomId":room_id,"title":"办理闭环","attendeeCount":2,"startsAt":start.to_rfc3339(),"endsAt":(start+chrono::Duration::hours(1)).to_rfc3339()});
+    let body = json!({"requestKey":nonce().unwrap(),"projectId":project["id"],"meetingRoomId":room_id,"title":"办理闭环","attendeeCount":2,"startsAt":start.to_rfc3339(),"endsAt":(start+chrono::Duration::hours(1)).to_rfc3339()});
     let mut booking = call(
         service,
         applicant,
@@ -109,6 +199,13 @@ pub(super) fn exercise(
         );
         assert_eq!(work["page"]["totalCount"], 1);
     }
+    let first = check_project_scope(
+        "office.rooms",
+        "meeting-collection",
+        LIST_MEETING_BOOKINGS,
+        id,
+    );
+    let first = first.as_str();
     let update = |active, key| {
         let mut value = room.clone();
         value["expectedVersion"] = room["versionNumber"].clone();
@@ -282,7 +379,7 @@ pub(super) fn exercise(
     let supply = call(service, admin, CREATE_OFFICE_SUPPLY, 0, Some(json!({"name":"共同保管耗材","unit":"件","minimumStock":0,"isActive":true,"isReturnable":false,"handlingKey":"daily"}))).unwrap();
     let supply_id = supply["id"].as_i64().unwrap();
     call(service, first, RESTOCK_OFFICE_SUPPLY, supply_id, Some(json!({"operationId":nonce().unwrap(),"expectedVersion":supply["versionNumber"],"quantity":5,"note":"共同管理入库"}))).unwrap();
-    let mut supply_request = call(service, applicant, CREATE_OFFICE_SUPPLY_REQUEST, 0, Some(json!({"requestKey":nonce().unwrap(),"officeSupplyId":supply_id,"quantity":2,"purpose":"双人办理库存只扣一次","returnDueDate":null}))).unwrap();
+    let mut supply_request = call(service, applicant, CREATE_OFFICE_SUPPLY_REQUEST, 0, Some(json!({"requestKey":nonce().unwrap(),"projectId":project["id"],"officeSupplyId":supply_id,"quantity":2,"purpose":"双人办理库存只扣一次","returnDueDate":null}))).unwrap();
     let request_id = supply_request["id"].as_i64().unwrap();
     {
         supply_request = call(
@@ -306,6 +403,13 @@ pub(super) fn exercise(
         );
         assert_eq!(assigned["totalCount"], 1);
     }
+    let first = check_project_scope(
+        "office.supplies",
+        "supply-collection",
+        LIST_OFFICE_SUPPLY_REQUESTS,
+        request_id,
+    );
+    let first = first.as_str();
     let issue =
         json!({"expectedVersion":supply_request["versionNumber"],"note":"第二位办理人发放"});
     call(

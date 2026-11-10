@@ -1714,6 +1714,7 @@ dependencies = [
  "export-doc-contracts",
  "export-doc-engine",
  "export-doc-storage",
+ "fs2",
  "hyper",
  "hyper-util",
  "serde_json",

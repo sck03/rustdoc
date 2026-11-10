@@ -102,7 +102,17 @@ pub(super) fn handle(
                     company(tx, &text(&department, "companyCode"))?
                 }
                 "Projects" => {
-                    let unit = company(tx, &text(&target, "companyCode"))?;
+                    let unit = company(
+                        tx,
+                        &text(
+                            &target,
+                            if principal == "Account" {
+                                "companyScope"
+                            } else {
+                                "companyCode"
+                            },
+                        ),
+                    )?;
                     tx.foundation_get("projects", unit["id"].as_i64().unwrap_or(0), member)?
                         .ok_or_else(|| invalid("项目不属于当前单位。"))?;
                     unit

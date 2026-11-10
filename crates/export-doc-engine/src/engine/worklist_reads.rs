@@ -52,29 +52,21 @@ pub(super) fn visit(
             "handlingKey",
         ][..],
     };
-    let fields: Vec<_> = [
-        "id",
-        "status",
-        "companyScope",
-        "departmentId",
-        "ownerUserId",
-        "kind",
-        "approvalPlan",
-        "applicantAccountId",
-    ]
-    .into_iter()
-    .chain(names.iter().copied())
-    .map(|field| {
-        (
-            field,
-            if field == "fullName" {
-                "profile.fullName"
-            } else {
-                field
-            },
-        )
-    })
-    .collect();
+    let fields: Vec<_> = ["id", "status", "kind", "approvalPlan", "applicantAccountId"]
+        .into_iter()
+        .chain(auth::RECORD_SCOPE_FIELDS.iter().copied())
+        .chain(names.iter().copied())
+        .map(|field| {
+            (
+                field,
+                if field == "fullName" {
+                    "profile.fullName"
+                } else {
+                    field
+                },
+            )
+        })
+        .collect();
     // These queues have no deadline, so their display order is exactly physical id ASC.
     // Date/instant and dynamic workflow queues retain their full semantic evaluation.
     let source = if selection.include_summary {

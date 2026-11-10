@@ -110,7 +110,7 @@ fn preview(tx: &Connection, actor: &Actor, package: &Package) -> Result<Value> {
 fn image(
     tx: &Connection,
     actor: &Actor,
-    package: &Package,
+    images: &BTreeMap<&str, report_assets::ValidatedImage<'_>>,
     value: &mut Value,
     field: &str,
     asset: &str,
@@ -119,11 +119,10 @@ fn image(
     if text(value, field).is_empty() {
         return Ok(());
     }
-    let bytes = package
-        .assets
+    let image = images
         .get(asset)
         .ok_or_else(|| invalid("单据包包含未随包提供的图片，请补齐图片后重新导出。"))?;
-    let record = report_assets::register(tx, actor, bytes, field, 5 * 1024 * 1024)?;
+    let record = image.register(tx, actor, field)?;
     value[field] = json!(format!("{prefix}{}", text(&record, "resourceId")));
     Ok(())
 }
@@ -133,7 +132,7 @@ fn party(
     kind: &str,
     source: Option<&Value>,
     invoice: &Value,
-    package: &Package,
+    images: &BTreeMap<&str, report_assets::ValidatedImage<'_>>,
     date: chrono::NaiveDate,
 ) -> Result<i64> {
     let resource = catalog::resource(kind).ok_or_else(|| invalid("往来单位类型无效。"))?;
@@ -167,7 +166,7 @@ fn party(
     );
     if kind == "exporters" {
         for key in ["docSealPath", "customsSealPath"] {
-            image(tx, actor, package, &mut value, key, key, "Files/Seals/")?;
+            image(tx, actor, images, &mut value, key, key, "Files/Seals/")?;
         }
     }
     Ok(
@@ -216,7 +215,18 @@ fn import(
         return Err(invalid("单据包冲突处理方式无效。"));
     }
     let date = service.clock.now().map_err(invalid)?.today;
-    service.store.transaction(|tx| {
+    let images = package
+        .assets
+        .iter()
+        .map(|(name, bytes)| {
+            Ok((
+                name.as_str(),
+                report_assets::ValidatedImage::new(bytes, 5 * 1024 * 1024)?,
+            ))
+        })
+        .collect::<Result<BTreeMap<_, _>>>()?;
+    service.store.transaction_as(actor, |tx, actor| {
+        auth::authorize(actor, "document.invoices", "operate")?;
         let preview=preview(tx,actor,package)?;
         let existing=find_invoice(tx,actor,&package.invoice)?;
         let mut invoice=contracts::overlay(contracts::initial(contracts::schema("ApiInvoiceDetailDto")),&clean("ApiInvoiceDetailDto",package.invoice.clone()));
@@ -242,11 +252,11 @@ fn import(
             }
         }
         if action!="AppendItems"||id==0 {
-            invoice["customerId"]=json!(party(tx,actor,"customers",package.customer.as_ref(),&invoice,package,date)?);
-            invoice["exporterId"]=json!(party(tx,actor,"exporters",package.exporter.as_ref(),&invoice,package,date)?);
-            image(tx,actor,package,&mut invoice,"shippingMarksImage","shippingMarksImage","Files/ShippingMarks/")?;
+            invoice["customerId"]=json!(party(tx,actor,"customers",package.customer.as_ref(),&invoice,&images,date)?);
+            invoice["exporterId"]=json!(party(tx,actor,"exporters",package.exporter.as_ref(),&invoice,&images,date)?);
+            image(tx,actor,&images,&mut invoice,"shippingMarksImage","shippingMarksImage","Files/ShippingMarks/")?;
             for (field,asset) in [("docSealPath","invoiceDocSealPath"),("customsSealPath","invoiceCustomsSealPath")] {
-                image(tx,actor,package,&mut invoice,field,asset,"Files/Seals/")?;
+                image(tx,actor,&images,&mut invoice,field,asset,"Files/Seals/")?;
             }
             invoice["letterOfCreditSourcePath"]=json!("");
         }

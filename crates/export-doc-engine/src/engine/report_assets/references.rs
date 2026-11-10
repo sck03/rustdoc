@@ -1,4 +1,4 @@
-//! One reference scan per operation, independent of the image catalog size.
+//! Targeted reference checks; empty pages never scan business documents.
 use super::*;
 use std::collections::{HashMap, HashSet};
 
@@ -24,6 +24,9 @@ impl References {
         targets: Option<&[&str]>,
     ) -> Result<Self> {
         let mut index = Self::default();
+        if targets.is_some_and(<[&str]>::is_empty) {
+            return Ok(index);
+        }
         let mut visible_templates = HashMap::new();
         for (kind, permission) in [
             ("invoices", "document.invoices"),
