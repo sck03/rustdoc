@@ -124,10 +124,10 @@ impl Group {
             rows: BinaryHeap::new(),
         }
     }
-    pub fn push(&mut self, mut value: Value, selection: &Selection<'_>) -> Result<()> {
+    pub fn push(&mut self, mut value: Value, selection: &Selection<'_>) -> Result<bool> {
         crate::operation::check()?;
         if !selection.include_summary && !selection.accepts(self.key) {
-            return Ok(());
+            return Ok(false);
         }
         let due = deadline(&value, selection.now)?;
         let included = match selection.due {
@@ -137,11 +137,11 @@ impl Group {
             _ => true,
         };
         if !included {
-            return Ok(());
+            return Ok(false);
         }
         self.count += 1;
         if !selection.accepts(self.key) {
-            return Ok(());
+            return Ok(false);
         }
         value["source"] = json!(self.key);
         value["isOverdue"] = json!(due.as_ref().is_some_and(|d| d.0));
@@ -156,7 +156,7 @@ impl Group {
             cursor.source == self.key
                 && (entry.deadline.as_str(), entry.id) <= (cursor.deadline.as_str(), cursor.id)
         }) {
-            return Ok(());
+            return Ok(false);
         }
         if self.rows.len() < selection.keep {
             self.rows.push(entry);
@@ -164,7 +164,7 @@ impl Group {
             self.rows.pop();
             self.rows.push(entry);
         }
-        Ok(())
+        Ok(true)
     }
     pub fn into_rows(self) -> impl Iterator<Item = Value> {
         self.rows

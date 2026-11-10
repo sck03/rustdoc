@@ -99,11 +99,11 @@ export function createConditionalBlock(reportType: ReportDesignerReportType = "E
   return {
     id: createReportBlockId("conditional"),
     type: "Conditional",
-    condition: {
+    conditions: [{
       fieldPath,
       operator: "HasValue",
       value: "",
-    },
+    }],
     content: {
       kind: "Field",
       label,

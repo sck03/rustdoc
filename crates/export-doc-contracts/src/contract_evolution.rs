@@ -1,6 +1,7 @@
 //! Explicit reviewed changes to the frozen served contract; never copy live output.
 use serde_json::{Value, json};
 pub(super) fn reviewed_versioning(baseline: &mut Value) {
+    reviewed_profile_versions_and_product_identity(baseline);
     reviewed_email_pagination(baseline);
     baseline["paths"]["/api/worklist"]["get"]["responses"]["400"] =
         json!({"description":"Bad Request"});
@@ -89,6 +90,87 @@ pub(super) fn reviewed_versioning(baseline: &mut Value) {
     for name in ["pageNumber", "pageSize"] {
         parameters.push(json!({"name":name,"in":"query","schema":{"type":["integer","string"],"format":"int32","pattern":"^-?(?:0|[1-9]\\d*)$"}}));
     }
+}
+
+fn reviewed_profile_versions_and_product_identity(baseline: &mut Value) {
+    let mapping = &mut baseline["components"]["schemas"]["ExcelImportSettings"];
+    mapping["properties"]["sheetName"] = json!({"type":"string","minLength":1,"maxLength":31});
+    mapping["required"]
+        .as_array_mut()
+        .unwrap()
+        .insert(0, json!("sheetName"));
+    baseline["x-exportdoc-configuration"]["defaults"]["excelImport"]["sheetName"] = json!("明细单");
+    baseline["components"]["schemas"]["ApiExcelImportPreviewRequest"]["properties"]["schemeName"] =
+        json!({"type":"string","maxLength":100});
+    baseline["components"]["schemas"]["ApiExcelImportPreviewRequest"]["required"] =
+        json!(["filePath"]);
+    for path in ["/api/tools/excel/import-preview-upload"] {
+        baseline["paths"][path]["post"]["parameters"].as_array_mut().unwrap().push(json!({"name":"schemeName","in":"query","schema":{"type":"string","maxLength":100}}));
+    }
+    for (suffix, name) in [
+        ("download", "StartSingleWindowExcelTemplateDownloadJob"),
+        (
+            "save-to-path",
+            "StartSingleWindowExcelTemplateSaveToPathJob",
+        ),
+    ] {
+        let mut endpoint =
+            baseline["paths"][format!("/api/tools/excel/template/{suffix}")]["post"].clone();
+        endpoint["operationId"] = json!(name);
+        endpoint["x-exportdoc-policy"] =
+            baseline["paths"]["/api/single-window/client/dispatch"]["post"]["x-exportdoc-policy"]
+                .clone();
+        endpoint["x-exportdoc-policy"]["requirements"] = json!([
+            {"resourceKey":"document.jobs","action":"view"},
+            {"resourceKey":"document.jobs","action":"operate"}
+        ]);
+        endpoint["x-exportdoc-policy"]["access"]["resources"].as_array_mut().unwrap().extend([
+            json!({"resourceKey":"document.jobs","actions":["view"],"administratorOnly":false}),
+            json!({"resourceKey":"document.jobs","actions":["operate"],"administratorOnly":false})
+        ]);
+        endpoint["responses"]["403"] = json!({"description":"Forbidden"});
+        endpoint["responses"]["503"] = json!({"description":"Service Unavailable"});
+        baseline["paths"][format!("/api/single-window/sources/excel/template/{suffix}")] =
+            json!({"post":endpoint});
+    }
+    for (name, field, minimum) in [
+        ("ApiSingleWindowClientProfileDto", "versionNumber", 1),
+        (
+            "ApiSingleWindowClientProfileSaveRequest",
+            "expectedVersion",
+            0,
+        ),
+    ] {
+        let schema = &mut baseline["components"]["schemas"][name];
+        schema["properties"][field] = json!({"type":"integer","minimum":minimum,"format":"int64"});
+        schema["required"]
+            .as_array_mut()
+            .unwrap()
+            .insert(0, json!(field));
+    }
+    baseline["components"]["schemas"]["ApiSingleWindowClientProfilesResponse"]["properties"]["savedProfileKey"] =
+        json!({"type":"string"});
+    let system = &mut baseline["components"]["schemas"]["SystemSettings"];
+    system["properties"]
+        .as_object_mut()
+        .unwrap()
+        .remove("appName")
+        .unwrap();
+    system["required"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|field| field != "appName");
+    let configuration = &mut baseline["x-exportdoc-configuration"];
+    configuration["defaults"]["system"]
+        .as_object_mut()
+        .unwrap()
+        .remove("appName")
+        .unwrap();
+    configuration["labels"]
+        .as_object_mut()
+        .unwrap()
+        .remove("system.appName")
+        .unwrap();
 }
 
 fn reviewed_export_and_worklist(baseline: &mut Value) {
@@ -356,8 +438,7 @@ pub(super) fn reviewed_independent_declarations(baseline: &mut Value) {
             let excel = id == "PreviewSingleWindowExcelImport";
             operation["requestBody"] = json!({"required":true,"content":{if excel {"application/octet-stream"} else {"application/json"}:{"schema":{"$ref":format!("#/components/schemas/{}",if excel {"IFormFile"} else {"ApiSingleWindowSourceCreateRequest"})}}}});
             if excel {
-                operation["parameters"] =
-                    json!([{"name":"fileName","in":"query","schema":{"type":"string"}}]);
+                operation["parameters"] = json!([{"name":"fileName","in":"query","schema":{"type":"string"}},{"name":"schemeName","in":"query","schema":{"type":"string","maxLength":100}}]);
             }
         }
         if baseline["paths"].get(path).is_none() {

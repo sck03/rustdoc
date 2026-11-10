@@ -10,7 +10,7 @@ export function createShippingMarksScenario(api) {
   grid.rows[0].heightMm = 28;
   Object.assign(grid.rows[0].cells[0], { contentKind: "Field", fieldPath, label: "", fallbackText: "N/M" });
   const conditional = api.createConditionalBlock();
-  conditional.condition = { fieldPath: "Invoice.InvoiceNo", operator: "HasValue", value: "" };
+  conditional.conditions = [{ fieldPath: "Invoice.InvoiceNo", operator: "HasValue", value: "" }];
   conditional.content = { kind: "Field", fieldPath, text: "", fallbackText: "N/M" };
   const detail = api.createDetailTableBlock();
   detail.sideBand = api.createDetailTableSideBand();

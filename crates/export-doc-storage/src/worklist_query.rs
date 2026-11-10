@@ -1,10 +1,18 @@
 //! Cheap candidate predicates precede permission evaluation and DTO allocation.
 use crate::{DataScope, QuerySql, Result, ScopedQuery, generic_query, sql};
 
+/// Source selection is a storage predicate; live action authorization stays in the engine.
+#[derive(Default)]
+pub struct WorklistScan<'a> {
+    pub source: &'a str,
+    pub ascending: bool,
+}
+
 pub(crate) fn build(
     query: &ScopedQuery<'_>,
     actor: i64,
     customer_scope: &DataScope<'_>,
+    scan: &WorklistScan<'_>,
     pg: bool,
 ) -> Result<(QuerySql, String)> {
     let (mut statement, mut projection) = generic_query::scoped(query, pg)?;
@@ -41,5 +49,28 @@ pub(crate) fn build(
         _ => return Err(crate::Error::unavailable("未知待办来源。")),
     };
     statement.filter += &format!(" AND ({candidate})");
+    let state = match scan.source {
+        "meeting-approval" | "supply-approval" => Some("Pending"),
+        "meeting-collection" | "supply-collection" => Some("Approved"),
+        "meeting-return" => Some("InUse"),
+        "supply-return" => Some("Issued"),
+        "probation-end" => Some("Probation"),
+        _ => None,
+    };
+    if let Some(state) = state {
+        let parameter = sql::bind(&mut statement.values, state, pg);
+        statement.filter += &format!(" AND {status}={parameter}");
+    }
+    if scan.source == "contract-end" || scan.source == "probation-end" {
+        let field = sql::field(
+            if scan.source == "contract-end" {
+                "contractEndsOn"
+            } else {
+                "probationEndsOn"
+            },
+            pg,
+        );
+        statement.filter += &format!(" AND {field} IS NOT NULL");
+    }
     Ok((statement, projection))
 }

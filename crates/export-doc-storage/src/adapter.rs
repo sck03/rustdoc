@@ -328,15 +328,17 @@ pub(crate) trait Adapter: Send {
         query: &ScopedQuery<'_>,
         actor: i64,
         customer_scope: &DataScope<'_>,
-        before_id: Option<i64>,
+        scan: &WorklistScan<'_>,
+        cursor: Option<i64>,
     ) -> Result<(Option<i64>, Vec<Value>)> {
         let (sql, projection) = worklist_query::build(
             query,
             actor,
             customer_scope,
+            scan,
             self.provider() == "PostgreSQL",
         )?;
-        self.scan_page(sql, &projection, before_id, query.limit)
+        self.scan_ordered_page(sql, &projection, cursor, query.limit, scan.ascending)
     }
     fn scan_records(
         &self,
@@ -357,24 +359,35 @@ pub(crate) trait Adapter: Send {
     }
     fn scan_page(
         &self,
-        mut sql: QuerySql,
+        sql: QuerySql,
         projection: &str,
         before_id: Option<i64>,
         limit: i64,
     ) -> Result<(Option<i64>, Vec<Value>)> {
+        self.scan_ordered_page(sql, projection, before_id, limit, false)
+    }
+    fn scan_ordered_page(
+        &self,
+        mut sql: QuerySql,
+        projection: &str,
+        previous: Option<i64>,
+        limit: i64,
+        ascending: bool,
+    ) -> Result<(Option<i64>, Vec<Value>)> {
         let pg = self.provider() == "PostgreSQL";
-        if let Some(id) = before_id {
+        if let Some(id) = previous {
             let cursor = sql::bind(&mut sql.values, id, pg);
+            let comparison = if ascending { ">" } else { "<" };
             sql.filter
-                .push_str(&format!(" AND r.id<CAST({cursor} AS BIGINT)"));
+                .push_str(&format!(" AND r.id{comparison}CAST({cursor} AS BIGINT)"));
         }
-        sql.order = "r.id DESC".into();
+        sql.order = if ascending { "r.id ASC" } else { "r.id DESC" }.into();
         let projection = if pg {
             format!("jsonb_build_array(r.id,({projection})::jsonb)::text")
         } else {
             format!("json_array(r.id,json({projection}))")
         };
-        let mut cursor = before_id;
+        let mut cursor = previous;
         let mut rows = Vec::new();
         for mut row in self.query_slice(&sql, &projection, 0, limit)? {
             let parts = row
@@ -383,7 +396,16 @@ pub(crate) trait Adapter: Send {
                 .ok_or_else(|| Error::unavailable("记录扫描结果损坏。"))?;
             let id = parts[0]
                 .as_i64()
-                .filter(|id| *id > 0 && cursor.is_none_or(|cursor| *id < cursor))
+                .filter(|id| {
+                    *id > 0
+                        && cursor.is_none_or(|cursor| {
+                            if ascending {
+                                *id > cursor
+                            } else {
+                                *id < cursor
+                            }
+                        })
+                })
                 .ok_or_else(|| Error::unavailable("记录扫描游标无效。"))?;
             cursor = Some(id);
             rows.push(parts.pop().expect("validated row projection"));

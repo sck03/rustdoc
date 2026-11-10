@@ -78,13 +78,6 @@ pub(crate) fn at(range: &Range<Data>, row: usize, col: usize) -> String {
     }
     text(range.get_value(((row - 1) as u32, (col - 1) as u32)))
 }
-fn configured(range: &Range<Data>, settings: &Value, key: &str) -> String {
-    settings[key]
-        .as_str()
-        .and_then(mapping::cell)
-        .map(|(row, col)| at(range, row as usize, col as usize))
-        .unwrap_or_default()
-}
 fn score(value: f32) -> Decimal {
     Decimal::from_str(&format!("{value:.4}")).unwrap_or_default()
 }
@@ -167,11 +160,14 @@ fn content_range(range: Range<Data>, total: &mut usize, check: Check<'_>) -> Res
 pub fn preview(
     bytes: &[u8],
     name: &str,
-    settings: &Value,
+    manual: Option<&Value>,
     business_date: &str,
     check: Check<'_>,
 ) -> Result<ApiExcelImportPreviewResponse> {
     check()?;
+    let manual = manual
+        .map(crate::manual_mapping::ManualMapping::read)
+        .transpose()?;
     let mut workbook = crate::reader::open(bytes, check)?;
     let epoch = match &workbook {
         Sheets::Xls(book) => Some(book.has_1904_epoch()),
@@ -188,6 +184,9 @@ pub fn preview(
     let mut total_cells = 0_usize;
     for name in names {
         check()?;
+        if manual.as_ref().is_some_and(|mapping| name != mapping.sheet) {
+            continue;
+        }
         let range = workbook
             .worksheet_range(&name)
             .map_err(|e| format!("工作表 {name} 无法读取：{e}"))?;
@@ -206,7 +205,12 @@ pub fn preview(
             }
             cells.push(values);
         }
-        let analysis = analyze_cells(&name, &cells);
+        let mut analysis = analyze_cells(&name, &cells);
+        if let Some(mapping) = &manual {
+            analysis.table = Some(mapping.table());
+            analysis.field_candidates.clear();
+            analysis.confidence = 1.0;
+        }
         analyses.push(ApiExcelImportSheetAnalysisDto {
             name: name.clone(),
             used_row_count: height as i64,
@@ -225,7 +229,15 @@ pub fn preview(
         }
     }
     let Some((range, analysis)) = selected else {
-        let message = "没有识别到可导入的商品明细，请核对表头并填写数据后重试。".to_owned();
+        let message = manual.as_ref().map_or_else(
+            || "没有识别到可导入的商品明细，请核对表头并填写数据后重试。".to_owned(),
+            |mapping| {
+                format!(
+                    "手动方案指定的工作表“{}”不存在或没有有效内容。",
+                    mapping.sheet
+                )
+            },
+        );
         return Ok(ApiExcelImportPreviewResponse {
             source_path: name.into(),
             success: false,
@@ -263,18 +275,16 @@ pub fn preview(
             columns.entry(index).or_insert(field.column);
         }
     }
-    let configured_layout = [(1, "styleNoCol"), (8, "quantityCol")]
-        .iter()
-        .all(|(index, key)| {
-            columns.get(index).copied() == settings[*key].as_u64().map(|n| n as usize)
-        });
-    if configured_layout {
+    let template_layout = manual.is_none()
+        && detected.data_start_row == mapping::ITEMS_START_ROW as usize
+        && columns.len() >= 8
+        && columns
+            .iter()
+            .all(|(&index, &column)| mapping::item_column(ITEM_COLUMNS[index].key) == Some(column));
+    if template_layout {
         for (index, column) in ITEM_COLUMNS.iter().enumerate() {
-            if let Some(col) = settings[format!("{}Col", column.key)]
-                .as_u64()
-                .filter(|n| *n > 0 && *n <= 128)
-            {
-                columns.insert(index, col as usize);
+            if let Some(col) = mapping::item_column(column.key) {
+                columns.insert(index, col);
             }
         }
     }
@@ -298,30 +308,38 @@ pub fn preview(
             }
         }
     }
-    if configured_layout {
-        for (key, setting) in mapping::HEADERS {
-            let value = settings[*setting]
-                .as_str()
-                .and_then(mapping::cell)
-                .and_then(|(row, col)| numeric_date(&range, key, row as usize, col as usize, epoch))
-                .unwrap_or_else(|| configured(&range, settings, setting));
+    if template_layout {
+        for &(key, row, col) in mapping::HEADERS {
+            let value = numeric_date(&range, key, row as usize, col as usize, epoch)
+                .unwrap_or_else(|| at(&range, row as usize, col as usize));
             if !value.is_empty() {
-                header[*key] = json!(value);
+                header[key] = json!(value);
             }
         }
-        for (key, start, count) in mapping::MULTILINE {
-            if let Some((row, col)) = settings[*start].as_str().and_then(mapping::cell) {
-                let lines = (0..settings[*count].as_u64().unwrap_or(1).min(20))
-                    .map(|offset| at(&range, row as usize + offset as usize, col as usize))
+        for &(key, row) in mapping::MULTILINE {
+            let lines = (0..4)
+                .map(|offset| at(&range, row as usize + offset, 2))
+                .filter(|line| !line.is_empty())
+                .collect::<Vec<_>>();
+            header[key] = json!(lines.join("\n"));
+        }
+    }
+    if let Some(mapping) = &manual {
+        for &(key, row, col) in &mapping.headers {
+            header[key] =
+                json!(
+                    numeric_date(&range, key, row as usize, col as usize, epoch)
+                        .unwrap_or_else(|| at(&range, row as usize, col as usize))
+                );
+        }
+        for &(key, row, col, count) in &mapping.multiline {
+            header[key] = json!(
+                (0..count)
+                    .map(|offset| at(&range, row as usize + offset, col as usize))
                     .filter(|line| !line.is_empty())
-                    .collect::<Vec<_>>();
-                header[*key] = json!(lines.join("\n"));
-            }
-        }
-        let shipment = numeric_date(&range, "shipmentDate", 13, 15, epoch)
-            .unwrap_or_else(|| at(&range, 13, 15));
-        if !shipment.is_empty() {
-            header["shipmentDate"] = json!(shipment);
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
         }
     }
     let mut errors = vec![];
@@ -351,20 +369,18 @@ pub fn preview(
     });
     draft.header = serde_json::from_value(header).map_err(|e| format!("发票抬头数据无效：{e}"))?;
     draft.rows.clear();
-    let supplements = crate::supplements::Tables::read(&range, detected.data_start_row, check)?;
-    let mut source_fields = vec![];
-    let start = if configured_layout {
-        settings["itemsStartRow"]
-            .as_u64()
-            .unwrap_or(detected.data_start_row as u64) as usize
+    let supplements = if manual.is_some() {
+        crate::supplements::Tables::default()
     } else {
-        detected.data_start_row
+        crate::supplements::Tables::read(&range, detected.data_start_row, check)?
     };
-    let end = settings["itemsEndRow"]
-        .as_u64()
-        .filter(|end| configured_layout && *end >= start as u64)
-        .map(|end| end as usize)
-        .unwrap_or(range.end().unwrap().0 as usize + 1);
+    let mut source_fields = vec![];
+    let start = detected.data_start_row;
+    let end = range.end().unwrap().0 as usize + 1;
+    let end = manual
+        .as_ref()
+        .filter(|mapping| mapping.end > 0)
+        .map_or(end, |mapping| end.min(mapping.end));
     let end = supplements.detail_end().map_or(end, |last| end.min(last));
     for row_index in start..=end {
         check()?;

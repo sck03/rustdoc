@@ -1,6 +1,6 @@
 import { FileInput } from "../../ui/FileInput.tsx";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { ChevronDown, ChevronUp, FileText, ShieldCheck, Upload } from "lucide-react";
 import { ApiInvoiceDetailDto, ApiLetterOfCreditReviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import {
@@ -51,12 +51,12 @@ export function InvoiceLetterOfCreditPanel({
   const run = useAbortableOperation(scope, { cancelPrevious: true });
   const isCurrent = (submitted: typeof scope) => latestScope.current === submitted;
 
-  const importMutation = useMutation({
-    mutationFn: ({ source }: { source: LetterOfCreditImportSource; scope: typeof scope }) => run(signal => source.kind === "desktop"
+  const importMutation = useScopedMutation(String(invoice.id), scope, {
+    mutationFn: (source: LetterOfCreditImportSource, signal) => source.kind === "desktop"
       ? client.importLetterOfCreditDocument({ body: { filePath: source.filePath } }, { signal })
-      : client.uploadLetterOfCreditDocument({ fileName: source.file.name, body: source.file }, { signal })),
-    onSuccess: (response, submitted) => {
-      if (!isCurrent(submitted.scope)) return;
+      : client.uploadLetterOfCreditDocument({ fileName: source.file.name, body: source.file }, { signal }),
+    onSuccess: (response) => {
+      setBrowserFile(null);
       onChange({
         letterOfCreditSourcePath: response.sourcePath,
         letterOfCreditContent: response.extractedText,
@@ -66,30 +66,27 @@ export function InvoiceLetterOfCreditPanel({
       setImportMessage(`信用证已导入：${response.sourceDescription}`);
       setImportMessageType("success");
     },
-    onError: (error, submitted) => {
-      if (!isCurrent(submitted.scope) || isAbortError(error)) return;
+    onError: (error) => {
       setImportMessage(readApiError(error));
       setImportMessageType("error");
       onClearPageMessages();
     },
   });
 
-  const reviewMutation = useMutation({
-    mutationFn: (submitted: typeof scope) => run(signal =>
+  const reviewMutation = useScopedMutation(String(invoice.id), scope, {
+    mutationFn: (_input: void, signal) =>
       client.reviewLetterOfCreditCompliance({
         body: {
-          invoice: normalizeInvoiceForSave(submitted.invoice, submitted.invoice.id ?? 0),
+          invoice: normalizeInvoiceForSave(invoice, invoice.id ?? 0),
         },
-      }, { signal })),
-    onSuccess: (response, submitted) => {
-      if (!isCurrent(submitted)) return;
+      }, { signal }),
+    onSuccess: (response) => {
       setReviewResult(response);
       setReviewMessage(null);
       onClearPageMessages();
       clearImportMessage();
     },
-    onError: (error, submitted) => {
-      if (!isCurrent(submitted) || isAbortError(error)) return;
+    onError: (error) => {
       setReviewResult(null);
       setReviewMessage(readApiError(error));
       onClearPageMessages();
@@ -122,7 +119,6 @@ export function InvoiceLetterOfCreditPanel({
     setBrowserFile(null);
     clearImportMessage();
     clearReviewState();
-    importMutation.reset(); reviewMutation.reset();
   }, [invoice.id, client]);
 
   useEffect(() => { clearReviewState(); }, [scope]);
@@ -187,7 +183,7 @@ export function InvoiceLetterOfCreditPanel({
         return;
       }
 
-      importMutation.mutate({ source: { kind: "desktop", filePath }, scope });
+      importMutation.mutate({ kind: "desktop", filePath });
       return;
     }
 
@@ -201,7 +197,7 @@ export function InvoiceLetterOfCreditPanel({
       return;
     }
 
-    importMutation.mutate({ source: { kind: "browser", file: browserFile }, scope });
+    importMutation.mutate({ kind: "browser", file: browserFile });
   }
 
   function selectBrowserFile(file: File | null) {
@@ -239,7 +235,7 @@ export function InvoiceLetterOfCreditPanel({
     onClearPageMessages();
     clearImportMessage();
     setReviewMessage(null);
-    reviewMutation.mutate(scope);
+    reviewMutation.mutate();
   }
 
   return (

@@ -23,6 +23,8 @@ pub const OPERATIONS: &[Operation] = &[
     PREVIEW_UPLOADED_EXCEL_IMPORT,
     START_EXCEL_TEMPLATE_DOWNLOAD_JOB,
     START_EXCEL_TEMPLATE_SAVE_TO_PATH_JOB,
+    START_SINGLE_WINDOW_EXCEL_TEMPLATE_DOWNLOAD_JOB,
+    START_SINGLE_WINDOW_EXCEL_TEMPLATE_SAVE_TO_PATH_JOB,
     START_BLANK_BOOKING_SHEET_DOWNLOAD_JOB,
     START_BLANK_BOOKING_SHEET_SAVE_TO_PATH_JOB,
     START_INVOICE_BOOKING_SHEET_DOWNLOAD_JOB,
@@ -31,6 +33,7 @@ pub const OPERATIONS: &[Operation] = &[
     UPLOAD_AND_START_BOOKING_SHEET_CONVERT_DOWNLOAD_JOB,
 ];
 pub const LOCAL_OPERATIONS: &[Operation] = &[
+    START_SINGLE_WINDOW_EXCEL_TEMPLATE_SAVE_TO_PATH_JOB,
     PREVIEW_EXCEL_IMPORT,
     START_EXCEL_TEMPLATE_SAVE_TO_PATH_JOB,
     START_BLANK_BOOKING_SHEET_SAVE_TO_PATH_JOB,
@@ -84,6 +87,7 @@ pub fn upload(
     service: &NativeService,
     actor: &Actor,
     operation: Operation,
+    metadata: &Value,
     name: &str,
     bytes: &[u8],
 ) -> Result<Value> {
@@ -92,7 +96,7 @@ pub fn upload(
         return Err(error(413, "上传的 Excel 为空或超过 25 MiB。"));
     }
     if operation == PREVIEW_UPLOADED_EXCEL_IMPORT {
-        return preview(service, name, bytes);
+        return preview(service, name, bytes, &text(metadata, "schemeName"));
     }
     let replay = Replay::new(operation, &[], &serde_json::json!({})).with_input(name, bytes);
     let bytes = bytes.to_vec();
@@ -116,15 +120,37 @@ pub fn upload(
         },
     )
 }
-pub(super) fn preview(service: &NativeService, name: &str, bytes: &[u8]) -> Result<Value> {
+pub(super) fn preview(
+    service: &NativeService,
+    name: &str,
+    bytes: &[u8],
+    scheme: &str,
+) -> Result<Value> {
     source_name(name)?;
     if bytes.is_empty() || bytes.len() > export_doc_excel::MAX_INPUT {
         return Err(error(413, "上传的 Excel 为空或超过 25 MiB。"));
     }
-    let settings = settings::current(&service.store)?;
     let date = service.clock.now().map_err(unavailable)?.today.to_string();
-    let result = export_doc_excel::preview(bytes, name, &settings["excelImport"], &date, &check)
-        .map_err(invalid)?;
+    let settings = if scheme.is_empty() {
+        Value::Null
+    } else {
+        settings::current(&service.store)?
+    };
+    let mapping = if scheme.is_empty() {
+        None
+    } else {
+        let matches: Vec<_> = settings["excelImportSchemes"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|value| text(value, "schemeName") == scheme)
+            .collect();
+        if matches.len() != 1 {
+            return Err(invalid("手动导入方案不存在或名称重复，请重新选择。"));
+        }
+        Some(matches[0])
+    };
+    let result = export_doc_excel::preview(bytes, name, mapping, &date, &check).map_err(invalid)?;
     serde_json::to_value(result).map_err(Into::into)
 }
 pub fn handle(
@@ -141,7 +167,7 @@ pub fn handle(
             .and_then(|name| name.to_str())
             .ok_or_else(|| invalid("Excel 源文件名无效。"))?;
         let bytes = read(&path, export_doc_excel::MAX_INPUT)?;
-        return upload(service, actor, PREVIEW_UPLOADED_EXCEL_IMPORT, name, &bytes);
+        return preview(service, name, &bytes, &text(body, "schemeName"));
     }
     let destination = destination(body, LOCAL_OPERATIONS.contains(&operation))?;
     if destination.is_some() && service.provider()? != "SQLite" {
@@ -215,12 +241,22 @@ pub fn handle(
     } else {
         None
     };
-    let mut exporter_name = text(&settings["system"], "defaultTemplateExporterNameCn");
+    let single_window = [
+        START_SINGLE_WINDOW_EXCEL_TEMPLATE_DOWNLOAD_JOB,
+        START_SINGLE_WINDOW_EXCEL_TEMPLATE_SAVE_TO_PATH_JOB,
+    ]
+    .contains(&operation);
+    let mut exporter_name = if single_window {
+        "请填写出口商中文名称".into()
+    } else {
+        text(&settings["system"], "defaultTemplateExporterNameCn")
+    };
     if invoice.is_none() && exporter_name.trim().is_empty() {
         let mut names: Vec<_> = service
             .store
             .all("exporters")?
             .iter()
+            .filter(|exporter| auth::visible(actor, "document.reference-data", "view", exporter))
             .map(|exporter| text(exporter, "exporterNameCN"))
             .filter(|name| !name.trim().is_empty())
             .collect();
@@ -235,6 +271,8 @@ pub fn handle(
     let booking = ![
         START_EXCEL_TEMPLATE_DOWNLOAD_JOB,
         START_EXCEL_TEMPLATE_SAVE_TO_PATH_JOB,
+        START_SINGLE_WINDOW_EXCEL_TEMPLATE_DOWNLOAD_JOB,
+        START_SINGLE_WINDOW_EXCEL_TEMPLATE_SAVE_TO_PATH_JOB,
     ]
     .contains(&operation);
     let store = service.store.clone();
@@ -264,12 +302,7 @@ pub fn handle(
             }
             let invoice_id = invoice.as_ref().map(|invoice| i64::from(invoice.id));
             let bytes = if let Some(invoice) = invoice {
-                export_doc_excel::booking_from_invoice(
-                    &bytes,
-                    &invoice,
-                    &settings["excelImport"],
-                    &check,
-                )
+                export_doc_excel::booking_from_invoice(&bytes, &invoice, &check)
             } else {
                 export_doc_excel::blank_template(&bytes, &exporter_name, booking, &check)
             }

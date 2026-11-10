@@ -1,4 +1,4 @@
-import { type FormEvent, useRef, useState } from "react";
+import { type FormEvent, useLayoutEffect, useRef, useState } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import type { NavigateFunction } from "react-router-dom";
 import type { ApiInvoiceListItemDto, ExportDocManagerApiClient } from "../../../api/index.ts";
@@ -26,6 +26,8 @@ export function useInvoiceListActions({ client, queryClient, navigate, defaultEx
   const [transferSuccessMessage, setTransferSuccessMessage] = useState<string | null>(null);
   const [lastExportedPackagePath, setLastExportedPackagePath] = useState<string | null>(null);
   const excelImportInputRef = useRef<HTMLInputElement>(null);
+  const [excelSchemeName, setExcelSchemeName] = useState("");
+  useLayoutEffect(() => setExcelSchemeName(""), [client]);
   const copy = useScopedSave(String(canOperate), client);
   const file = useScopedSave(`${canOperate}:${canImportExcel}:${canExport}`, client);
   const [fileAction, setFileAction] = useState<FileAction>("preview");
@@ -135,8 +137,8 @@ export function useInvoiceListActions({ client, queryClient, navigate, defaultEx
       const filePath = uploadFile ? "" : await selectExcelFile();
       checkCurrent(); if (!uploadFile && !filePath) return;
       const response = uploadFile
-        ? await client.previewUploadedExcelImport({ fileName: uploadFile.name, body: uploadFile }, { signal })
-        : await client.previewExcelImport({ body: { filePath: filePath ?? "" } }, { signal });
+        ? await client.previewUploadedExcelImport({ fileName: uploadFile.name, schemeName: excelSchemeName || undefined, body: uploadFile }, { signal })
+        : await client.previewExcelImport({ body: { filePath: filePath ?? "", schemeName: excelSchemeName || undefined } }, { signal });
       checkCurrent();
       if (!response.invoice) throw new Error("Excel 已解析，但没有生成可用的发票草稿。请检查模板内容。");
       setTransferDraft(null); setTransferUploadFile(null);
@@ -154,7 +156,7 @@ export function useInvoiceListActions({ client, queryClient, navigate, defaultEx
     const path = lastExportedPackagePath;
     await runFile("open", async ({ checkCurrent }) => { setLastExportedPackagePath(path); await openPath(path); checkCurrent(); });
   }
-  return { copyDraft, closeCopyPanel, openCopyPanel, patchCopyDraft, submitCopyInvoice, copyBusy: copy.isSaving,
+  return { excelSchemeName, setExcelSchemeName, copyDraft, closeCopyPanel, openCopyPanel, patchCopyDraft, submitCopyInvoice, copyBusy: copy.isSaving,
     transferDraft, closeTransferPanel, transferUploadFile, transferSuccessMessage, lastExportedPackagePath, excelImportInputRef,
     transferBusy: file.isSaving, handleChooseImportTransferPackage, handlePreviewTransferPackage, handlePreviewTransferUpload,
     patchTransferDraft, submitTransferImport, handleExportTransferPackage, handleChooseExcelImport, handleExcelImportUpload, handleOpenLastExportedPackage,

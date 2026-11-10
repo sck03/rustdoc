@@ -66,7 +66,7 @@ export function findOfficialClientSentFiles(sentBox, payloads) {
 export async function verifyOfficialClientTransport({client,profile,detected,sourceId,output}) {
   assert(detected?.customsCooDirectories && detected?.agentConsignmentDirectories);
   const body = Object.fromEntries(['profileKey','profileName','companyScope','cardIdentifier','customsCooDirectories','agentConsignmentDirectories','canSubmitCustomsCoo','canSubmitAgentConsignment'].map(key=>[key,profile[key]]));
-  await client.saveSingleWindowClientProfile({body:{...body,...detected}});
+  const updated = await client.saveSingleWindowClientProfile({body:{...body,...detected,expectedVersion:profile.versionNumber}});
   try {
     const packagePath=path.join(output,'official-client-anonymous-acd.swpkg');
     const draft=await client.getAgentConsignmentDocument({sourceId});
@@ -78,5 +78,5 @@ export async function verifyOfficialClientTransport({client,profile,detected,sou
       90000,'Official client did not archive the anonymous payload to SentBox');
     const receipts=await client.collectSingleWindowClientReceipts({body:{batchId:handoff.trackingBatchId}});
     fs.writeFileSync(path.join(output,'official-client-transport.json'),JSON.stringify({batchReference:handoff.manifest.batchReference,sentFiles:sent,receiptFileCount:receipts.receiptFiles.length,businessAcceptanceConfirmed:false},null,2));
-  } finally { await client.saveSingleWindowClientProfile({body}); }
+  } finally { await client.saveSingleWindowClientProfile({body:{...body,expectedVersion:updated.profiles.find(item=>item.profileKey===profile.profileKey).versionNumber}}); }
 }

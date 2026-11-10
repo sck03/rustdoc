@@ -10,7 +10,8 @@ pub(super) fn visit(
     resource: &str,
     actions: &[&str],
     office: bool,
-    mut consume: impl FnMut(Value) -> Result<()>,
+    selection: &super::page::Selection<'_>,
+    mut consume: impl FnMut(Value) -> Result<bool>,
 ) -> Result<()> {
     let scoped = !matches!(resource, "office.rooms" | "office.supplies");
     let scopes: Vec<_> = actions
@@ -74,7 +75,29 @@ pub(super) fn visit(
         )
     })
     .collect();
-    let mut cursor = None;
+    // These queues have no deadline, so their display order is exactly physical id ASC.
+    // Date/instant and dynamic workflow queues retain their full semantic evaluation.
+    let source = if selection.include_summary {
+        ""
+    } else if kind == "invoices" {
+        "invoice-review"
+    } else {
+        selection.source
+    };
+    let ordered = !selection.include_summary
+        && matches!(
+            source,
+            "invoice-review" | "supply-approval" | "supply-collection"
+        );
+    let scan = export_doc_storage::WorklistScan {
+        source,
+        ascending: ordered,
+    };
+    let mut cursor = selection
+        .after
+        .filter(|after| ordered && after.source == source)
+        .map(|after| after.id);
+    let mut accepted = 0;
     loop {
         crate::operation::check()?;
         let (next, batch) = tx.scan_worklist(
@@ -83,10 +106,11 @@ pub(super) fn visit(
                 scopes: if scoped { &scopes } else { &[] },
                 company: office.then_some(actor.company.as_str()),
                 fields: &fields,
-                limit: 200,
+                limit: if ordered { selection.keep as i64 } else { 200 },
             },
             actor.id,
             &auth::data_scope(actor, "sales.customers", "view"),
+            &scan,
             cursor,
         )?;
         if batch.is_empty() {
@@ -105,11 +129,14 @@ pub(super) fn visit(
                 };
             }
             if visible {
-                consume(record)?;
+                accepted += usize::from(consume(record)?);
+                if ordered && accepted >= selection.keep {
+                    return Ok(());
+                }
             }
         }
         cursor = next;
-        if count < 200 {
+        if count < if ordered { selection.keep } else { 200 } {
             break;
         }
     }

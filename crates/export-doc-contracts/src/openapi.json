@@ -5824,8 +5824,15 @@
         "properties": {
           "filePath": {
             "type": "string"
+          },
+          "schemeName": {
+            "type": "string",
+            "maxLength": 100
           }
-        }
+        },
+        "required": [
+          "filePath"
+        ]
       },
       "ApiExcelImportPreviewResponse": {
         "type": "object",
@@ -15527,9 +15534,15 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "versionNumber": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
           }
         },
         "required": [
+          "versionNumber",
           "id",
           "stationKey",
           "profileKey",
@@ -15567,6 +15580,11 @@
           "customsCooDirectories": {
             "$ref": "#/components/schemas/ApiSingleWindowClientDirectories"
           },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
           "profileKey": {
             "type": "string"
           },
@@ -15575,6 +15593,7 @@
           }
         },
         "required": [
+          "expectedVersion",
           "profileKey",
           "profileName",
           "companyScope",
@@ -15599,6 +15618,9 @@
             "items": {
               "$ref": "#/components/schemas/ApiSingleWindowClientProfileDto"
             }
+          },
+          "savedProfileKey": {
+            "type": "string"
           },
           "storagePolicy": {
             "type": "string"
@@ -19220,6 +19242,11 @@
           "schemeName": {
             "type": "string"
           },
+          "sheetName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 31
+          },
           "shippingMarksCell": {
             "type": "string",
             "description": "唛头所在的Excel单元格位置，例如 A20"
@@ -19319,6 +19346,7 @@
           }
         },
         "required": [
+          "sheetName",
           "schemeName",
           "exporterNameCNCell",
           "exporterNameCell",
@@ -31679,10 +31707,6 @@
       "SystemSettings": {
         "type": "object",
         "properties": {
-          "appName": {
-            "type": "string",
-            "description": "显示在主界面标题栏的软件名称"
-          },
           "auditLogRetentionDays": {
             "type": [
               "integer",
@@ -31830,7 +31854,6 @@
           }
         },
         "required": [
-          "appName",
           "updaterEndpoint",
           "defaultTemplateExporterNameCn",
           "backupRetentionDays",
@@ -40774,7 +40797,6 @@
     "defaults": {
       "revision": 0,
       "system": {
-        "appName": "外贸业务综合管理系统",
         "updaterEndpoint": "",
         "defaultTemplateExporterNameCn": "",
         "backupRetentionDays": 0,
@@ -40817,6 +40839,7 @@
       },
       "paymentTemplates": [],
       "excelImport": {
+        "sheetName": "明细单",
         "schemeName": "Default",
         "exporterNameCNCell": "A1",
         "exporterNameCell": "B3",
@@ -40938,7 +40961,6 @@
       }
     },
     "labels": {
-      "system.appName": "软件名称",
       "system.updaterEndpoint": "软件更新地址",
       "system.defaultTemplateExporterNameCn": "默认出口商中文名",
       "system.backupRetentionDays": "数据备份保留天数",
@@ -124288,6 +124310,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "schemeName",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
           }
         ],
         "requestBody": {
@@ -124296,6 +124326,193 @@
             "application/octet-stream": {
               "schema": {
                 "$ref": "#/components/schemas/IFormFile"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/single-window/sources/excel/template/download": {
+      "post": {
+        "x-exportdoc-timeout-seconds": 30,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "StartSingleWindowExcelTemplateDownloadJob",
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackgroundJobSnapshot"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": {
+            "readModule": "document.single-window",
+            "writeModule": null,
+            "readAccessLevel": null,
+            "writeAccessLevel": null,
+            "selector": 0,
+            "disabled": false,
+            "overridesParent": false
+          },
+          "requirements": [
+            {
+              "resourceKey": "document.jobs",
+              "action": "view"
+            },
+            {
+              "resourceKey": "document.jobs",
+              "action": "operate"
+            }
+          ],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "document.single-window",
+                "actions": [
+                  "operate"
+                ],
+                "administratorOnly": false
+              },
+              {
+                "resourceKey": "document.jobs",
+                "actions": [
+                  "view"
+                ],
+                "administratorOnly": false
+              },
+              {
+                "resourceKey": "document.jobs",
+                "actions": [
+                  "operate"
+                ],
+                "administratorOnly": false
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ]
+      }
+    },
+    "/api/single-window/sources/excel/template/save-to-path": {
+      "post": {
+        "x-exportdoc-timeout-seconds": 30,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "StartSingleWindowExcelTemplateSaveToPathJob",
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackgroundJobSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": {
+            "readModule": "document.single-window",
+            "writeModule": null,
+            "readAccessLevel": null,
+            "writeAccessLevel": null,
+            "selector": 0,
+            "disabled": false,
+            "overridesParent": false
+          },
+          "requirements": [
+            {
+              "resourceKey": "document.jobs",
+              "action": "view"
+            },
+            {
+              "resourceKey": "document.jobs",
+              "action": "operate"
+            }
+          ],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "document.single-window",
+                "actions": [
+                  "operate"
+                ],
+                "administratorOnly": false
+              },
+              {
+                "resourceKey": "document.jobs",
+                "actions": [
+                  "view"
+                ],
+                "administratorOnly": false
+              },
+              {
+                "resourceKey": "document.jobs",
+                "actions": [
+                  "operate"
+                ],
+                "administratorOnly": false
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiExcelOutputRequest"
               }
             }
           }
@@ -129338,6 +129555,14 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "schemeName",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
             }
           }
         ],

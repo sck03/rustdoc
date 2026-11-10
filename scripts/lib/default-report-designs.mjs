@@ -93,7 +93,7 @@ function invoice() {
   final.elements=[
     element("special-terms","Flow",49,134,67,39,{label:"特殊条款（有内容时显示）",flowKind:"Conditional",block:{
       id:"special-terms-block",type:"Conditional",
-      condition:{fieldPath:"Invoice.SpecialTerms",operator:"HasValue",value:""},
+      conditions:[{fieldPath:"Invoice.SpecialTerms",operator:"HasValue",value:""}],
       content:{kind:"Field",fieldPath:"Invoice.SpecialTerms",label:"Special Terms",text:"",fallbackText:""},
       style:{fontSizePt:7,align:"Left",marginTopMm:0,marginBottomMm:0,marginLeftMm:0,marginRightMm:0},
       border:noBorder,

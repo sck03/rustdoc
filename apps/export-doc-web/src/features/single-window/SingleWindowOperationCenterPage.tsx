@@ -1,31 +1,28 @@
-import { FileInput } from "../../ui/FileInput.tsx";
 import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileInput as FileInputIcon, HardDrive, RefreshCw, Search, Server, Upload } from "lucide-react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { HardDrive, RefreshCw, Search, Server } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { ApiSingleWindowImportedPackageResponse, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
-import { getDesktopRuntimeContext, isDesktopBridgeAvailable, selectSingleWindowPackageFile } from "../../desktop/desktopBridge.ts";
-import { DesktopIconButton, readDesktopError } from "../../ui/DesktopPathActions.tsx";
+import { getDesktopRuntimeContext, isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
-import { PathField } from "../../ui/PathField.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { listPageSizeOptions, normalizeListPageSize } from "../../ui/listViewState.ts";
 import {
   batchStatusOptions,
   businessTypeOptions,
-  formatBatchStatus,
-  formatBusinessType,
   loadSingleWindowOperationCenterViewState,
   saveSingleWindowOperationCenterViewState,
 } from "./singleWindowOperationCenterModel.ts";
 import { FilterSelect, OperationCenterListActionsPanel, OperationCenterTable } from "./SingleWindowOperationCenterList.tsx";
 import { SingleWindowTabs } from "./SingleWindowNavigation.tsx";
 import { SingleWindowStationProfilePanel } from "./SingleWindowStationProfilePanel.tsx";
+
+import { StationSubmitPackageImportPanel, OfficeReceiptPackageImportPanel } from "./SingleWindowPackageImportPanels.tsx";
 
 export function SingleWindowOperationCenterPage({ client }: { client: ExportDocManagerApiClient }) {
   const permission = useModulePermission("document.single-window");
@@ -176,82 +173,5 @@ export function SingleWindowOperationCenterPage({ client }: { client: ExportDocM
         onPageSizeChange={(value) => { setPageSize(normalizeListPageSize(value)); setPageNumber(1); }}
       />
     </RecordWorkspace>
-  );
-}
-
-function StationSubmitPackageImportPanel({ client, canOperate }: { client: ExportDocManagerApiClient; canOperate: boolean }) {
-  const queryClient = useQueryClient();
-  const [packagePath, setPackagePath] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
-  const [result, setResult] = useState<ApiSingleWindowImportedPackageResponse | null>(null);
-
-  const profilesQuery = useQuery({
-    queryKey: queryKeys.singleWindowClientProfiles(),
-    queryFn: ({ signal }) => client.getSingleWindowClientProfiles({ signal }),
-    staleTime: 60_000,
-  });
-  const activeProfile = profilesQuery.data?.profiles.find((profile) => profile.isActive) ?? null;
-
-  const mutation = useMutation({
-    mutationFn: () => client.importSingleWindowSubmitPackage({ body: { packagePath: packagePath.trim(), keepWorkingDirectory: false } }),
-    onSuccess: async (response) => {
-      setResult(response);
-      setMessage(response.message || "提交包已绑定到本持卡机。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() });
-    },
-    onError: (error) => { setResult(null); setMessage(readApiError(error)); },
-  });
-
-  async function choosePackage() {
-    try {
-      const selected = await selectSingleWindowPackageFile();
-      if (selected) setPackagePath(selected);
-    } catch (error) {
-      setMessage(readDesktopError(error));
-    }
-  }
-
-  return (
-    <section className="form-section single-window-intake-card" aria-label="持卡机提交包导入">
-      <div className="section-header">
-        <div><h2>导入待办提交包</h2><span>导入时核对当前档案、公司抬头、业务类型和申报文件完整性</span></div>
-        <button className="command-button" type="button" disabled={!canOperate || mutation.isPending || !packagePath.trim() || !activeProfile} onClick={() => mutation.mutate()}><Upload size={17} aria-hidden="true" /><span>导入并绑定当前档案</span></button>
-      </div>
-      {activeProfile ? (
-        <InlineNotice tone="info" title="当前操作档案">
-          {activeProfile.profileName} · {activeProfile.companyScope} · {activeProfile.cardIdentifier}
-        </InlineNotice>
-      ) : <InlineNotice tone="warning">请先在上方创建并启用公司与操作卡档案。</InlineNotice>}
-      <PathField label="提交包文件" value={packagePath} disabled={!canOperate || mutation.isPending} actions={<DesktopIconButton title="选择提交包" disabled={!canOperate || mutation.isPending} onClick={() => void choosePackage()}><FileInputIcon size={17} aria-hidden="true" /></DesktopIconButton>} onChange={(value) => { setPackagePath(value); setMessage(null); }} />
-      {message ? <InlineNotice tone={mutation.isError ? "error" : "success"}>{message}</InlineNotice> : null}
-      {result ? <div className="single-window-import-summary"><strong>{result.manifest.invoiceNo || result.manifest.batchReference}</strong><span>{formatBusinessType(result.manifest.businessType)}</span><span>{result.manifest.companyScope}</span></div> : null}
-    </section>
-  );
-}
-
-function OfficeReceiptPackageImportPanel({ client, canOperate }: { client: ExportDocManagerApiClient; canOperate: boolean }) {
-  const queryClient = useQueryClient();
-  const [file, setFile] = useState<File | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-
-  const mutation = useMutation({
-    mutationFn: () => client.uploadSingleWindowReceiptPackage({ fileName: file?.name, keepWorkingDirectory: false, body: file ?? new Blob() }),
-    onSuccess: async (response) => {
-      setMessage(`回执包已归档，新增 ${response.persistedReceiptCount} 条回执，批次状态为“${formatBatchStatus(response.trackingStatus)}”。`);
-      setFile(null);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() });
-    },
-    onError: (error) => setMessage(readApiError(error)),
-  });
-
-  return (
-    <section className="form-section single-window-intake-card" aria-label="办公室回执包导入">
-      <div className="section-header">
-        <div><h2>导入持卡机回执包</h2><span>只接受能精确绑定原提交批次、公司抬头和原包摘要的 .swpkg</span></div>
-        <button className="command-button" type="button" disabled={!canOperate || mutation.isPending || !file} onClick={() => mutation.mutate()}><Upload size={17} aria-hidden="true" /><span>导入回执包</span></button>
-      </div>
-      <label className="form-field"><span className="form-field-label"><span>回执包文件</span></span><FileInput accept=".swpkg" disabled={!canOperate || mutation.isPending} onChange={(event) => { const nextFile = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; setFile(nextFile); setMessage(null); }} /></label>
-      {message ? <InlineNotice tone={mutation.isError ? "error" : "success"}>{message}</InlineNotice> : null}
-    </section>
   );
 }

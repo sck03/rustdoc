@@ -15,17 +15,22 @@ import React from 'react';import {createRoot} from 'react-dom/client';
 import {QueryClient,QueryClientProvider,useQuery} from '@tanstack/react-query';
 import {useReportTemplateSaveMutations} from ${src('features/reports/useReportTemplateSaveMutations.ts')};
 import {useReportTemplateFileMutations} from ${src('features/reports/useReportTemplateFileMutations.ts')};
+import {useReportTemplatePreviewMutations} from ${src('features/reports/useReportTemplatePreviewMutations.ts')};
 import {queryKeys} from ${src('api/queryKeys.ts')};
 window.calls=[];window.success=[];window.errors=[];window.refreshes=[];window.downloads=[];
 document.addEventListener('click',event=>{if(event.target instanceof HTMLAnchorElement){event.preventDefault();window.downloads.push(event.target.download);}});
 window.cache=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
 const clients=[0,1].map(owner=>new Proxy({}, {get:(_,method)=>(request,options)=>new Promise((resolve,reject)=>window.calls.push({owner,method,request,signal:options?.signal,resolve,reject}))}));
+const resetPreview=()=>{window.previewResult=null;};
 function App({scope,owner}) {
  const client=clients[owner];
  useQuery({queryKey:queryKeys.reportTemplates('ExportDocument'),queryFn:()=>new Promise((resolve,reject)=>window.refreshes.push({resolve,reject})),initialData:[],staleTime:Infinity});
  const common={client,reportType:'ExportDocument',selectedTemplatePath:scope,expectedRevision:'rev',onError:error=>window.errors.push(error.message)};
  const save=useReportTemplateSaveMutations({...common,expectedUserVersion:1,currentUserTemplate:null,content:'body',userTemplateName:'name',onDefaultTemplateSaved:saved=>window.success.push(saved),onUserTemplateSaved:saved=>window.success.push(saved)});
  const file=useReportTemplateFileMutations({...common,fileExportPath:'test.dtpl',onExported:()=>window.success.push('export'),onDownloaded:()=>window.success.push('download'),onImported:()=>window.success.push('import')});
+ const preview=useReportTemplatePreviewMutations({...common,mode:'sample',content:'draft',sampleProfile:'standard',canDesignTemplates:true,withSeal:false,previewInvoiceId:0,previewPaymentId:0,onReset:resetPreview,onPreviewed:value=>{window.previewResult=value;}});
+ window.preview=()=>preview.previewMutation.mutate(undefined);
+ window.previewPending=preview.previewMutation.isPending;
  window.save=()=>save.saveDefaultTemplateMutation.mutate(undefined);
  window.download=()=>file.downloadFileMutation.mutate();
  window.upload=()=>file.uploadFileMutation.mutate(new File(['x'.repeat(1024*1024)],'test.dtpl'));
@@ -88,6 +93,18 @@ try{
    await page.waitForFunction(n=>window.success.length===n+1&&!window.pending,n);
   }
   assert.equal(await page.evaluate(()=>window.cache.getMutationCache().getAll().length),0);
+ });
+ await scenario(async page=>{
+  await page.evaluate(()=>window.preview());await page.waitForFunction(()=>window.calls.length===1);
+  await page.evaluate(()=>window.calls[0].resolve({html:'x'.repeat(8*1024*1024),pageCount:1}));
+  await page.waitForFunction(()=>window.previewResult&&!window.previewPending);
+  assert.equal(await page.evaluate(()=>window.cache.getMutationCache().getAll().length),0);
+  await page.evaluate(()=>window.render('b.dtpl'));
+  await page.waitForFunction(()=>window.previewResult===null);
+  await page.evaluate(()=>window.preview());await page.waitForFunction(()=>window.calls.length===2);
+  await page.evaluate(()=>window.render('b.dtpl',1));await page.waitForFunction(()=>window.calls[1].signal.aborted);
+  await page.evaluate(()=>window.calls[1].resolve({html:'stale'}));
+  assert.equal(await page.evaluate(()=>window.previewResult),null);
  });
  console.log('Report template command UI: '+passed+' passed; '+output);
 }finally{await context.close();}

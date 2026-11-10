@@ -96,7 +96,6 @@ pub fn convert_booking(source: &[u8], check: Check<'_>) -> Result<Vec<u8>> {
 pub fn booking_from_invoice(
     template: &[u8],
     invoice: &ApiInvoiceDetailDto,
-    settings: &Value,
     check: Check<'_>,
 ) -> Result<Vec<u8>> {
     let invoice = InvoiceDraft::from_dto(invoice.clone()).build()?;
@@ -105,48 +104,34 @@ pub fn booking_from_invoice(
     }
     let mut workbook = Workbook::open(template, check)?;
     let value = serde_json::to_value(&invoice).map_err(|e| e.to_string())?;
-    for (key, setting) in mapping::HEADERS {
-        if let Some((row, col)) = settings[*setting].as_str().and_then(mapping::cell) {
-            workbook.sheet.set(row, col, &value[*key])?;
-        }
+    for &(key, row, col) in mapping::HEADERS {
+        workbook.sheet.set(row, col, &value[key])?;
     }
-    for (key, start, count) in mapping::MULTILINE {
-        if let Some((row, col)) = settings[*start].as_str().and_then(mapping::cell) {
-            let text = value[*key]
-                .as_str()
-                .unwrap_or("")
-                .replace("\r\n", "\n")
-                .replace('\r', "\n");
-            let lines: Vec<_> = text
-                .lines()
-                .map(str::trim)
-                .filter(|line| !line.is_empty())
-                .collect();
-            let capacity = settings[*count].as_u64().unwrap_or(1).clamp(1, 20) as usize;
-            // Preserve all address text even when it exceeds the configured rows.
-            for offset in 0..capacity {
-                let text = if offset == capacity - 1 {
-                    lines.get(offset..).unwrap_or(&[]).join("\n")
-                } else {
-                    lines.get(offset).copied().unwrap_or("").into()
-                };
-                workbook.sheet.set(row + offset as u32, col, &json!(text))?;
-            }
+    for &(key, row) in mapping::MULTILINE {
+        let text = value[key]
+            .as_str()
+            .unwrap_or("")
+            .replace("\r\n", "\n")
+            .replace('\r', "\n");
+        let lines: Vec<_> = text
+            .lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .collect();
+        for offset in 0..4 {
+            // The final cell retains any address lines beyond the template's four rows.
+            let text = if offset == 3 {
+                lines.get(offset..).unwrap_or(&[]).join("\n")
+            } else {
+                lines.get(offset).copied().unwrap_or("").into()
+            };
+            workbook.sheet.set(row + offset as u32, 2, &json!(text))?;
         }
     }
     if invoice.notify_party_mode == "SameAsConsignee" {
-        if let Some((row, col)) = settings["notifyPartyNameCell"]
-            .as_str()
-            .and_then(mapping::cell)
-        {
-            workbook.sheet.set(row, col, &json!("SAME AS CONSIGNEE"))?;
-        }
+        workbook.sheet.set(13, 2, &json!("SAME AS CONSIGNEE"))?;
     }
-    workbook.sheet.set(13, 15, &json!(invoice.shipment_date))?;
-    let start = settings["itemsStartRow"]
-        .as_u64()
-        .filter(|row| *row > 0 && *row <= 1000)
-        .ok_or("商品起始行配置无效。")? as u32;
+    let start = mapping::ITEMS_START_ROW;
     if let Some((at, added)) = workbook.sheet.extend(start, invoice.items.len())? {
         if let Some(names) = workbook.workbook.child_mut("definedNames") {
             for node in names
@@ -162,10 +147,7 @@ pub fn booking_from_invoice(
         check()?;
         let item = serde_json::to_value(item).map_err(|e| e.to_string())?;
         for column in ITEM_COLUMNS {
-            if let Some(col) = settings[format!("{}Col", column.key)]
-                .as_u64()
-                .filter(|col| *col > 0 && *col <= 128)
-            {
+            if let Some(col) = mapping::item_column(column.key) {
                 let value = if column.numeric {
                     let text = item[column.key]
                         .as_str()

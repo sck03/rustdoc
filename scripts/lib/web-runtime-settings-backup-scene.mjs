@@ -73,6 +73,10 @@ export function createSettingsBackupSmokeScene(runtime) {
 
     const excelUrl = buildSettingsSectionUrl(options.webUrl, "excelImport", "smokeExcelImportSettings");
     await page.send("Page.navigate", { url: excelUrl });
+    await waitForPageExpression(page, `(() => {
+      const summary = [...document.querySelectorAll('summary')].find(node => node.textContent === '高级导入方案');
+      if (!summary) return false; summary.parentElement.open = true; return true;
+    })()`, timeoutMs, "Advanced import schemes did not load");
     const excelExpectedText = [
       "设置",
       "Excel 导入",

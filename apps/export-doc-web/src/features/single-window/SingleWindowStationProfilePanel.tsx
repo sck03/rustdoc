@@ -1,252 +1,19 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Copy, CreditCard, Plus, RefreshCw, Save, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { ApiSingleWindowClientProfileDto, ExportDocManagerApiClient } from "../../api/index.ts";
-import { queryKeys } from "../../api/queryKeys.ts";
+import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { FieldShell, TextField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
-import { writeClipboardText } from "../../ui/clipboard.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
-import { emptyClientDirectories, SingleWindowClientDirectories } from "./SingleWindowClientDirectories.tsx";
-import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
+import { SingleWindowClientDirectories } from "./SingleWindowClientDirectories.tsx";
+import { NEW_PROFILE_KEY, useSingleWindowProfiles } from "./useSingleWindowProfiles.ts";
 
-const NEW_PROFILE_KEY = "__new__";
-
-export function SingleWindowStationProfilePanel({
-  client,
-  canOperate,
-}: {
-  client: ExportDocManagerApiClient;
-  canOperate: boolean;
+export function SingleWindowStationProfilePanel({ client, canOperate }: {
+  client: ExportDocManagerApiClient; canOperate: boolean;
 }) {
-  const queryClient = useQueryClient();
-  const [selectedProfileKey, setSelectedProfileKey] = useState("");
-  const [profileName, setProfileName] = useState("");
-  const [companyScope, setCompanyScope] = useState("");
-  const [cardIdentifier, setCardIdentifier] = useState("");
-  const [customsCooDirectories, setCustomsCooDirectories] = useState(emptyClientDirectories);
-  const [agentConsignmentDirectories, setAgentConsignmentDirectories] = useState(emptyClientDirectories);
-  const [canSubmitCustomsCoo, setCanSubmitCustomsCoo] = useState(true);
-  const [canSubmitAgentConsignment, setCanSubmitAgentConsignment] = useState(true);
-  const [message, setMessage] = useState<string | null>(null);
-  const [messageKind, setMessageKind] = useState<"success" | "error">("success");
-  const [desktopMessage, setDesktopMessage] = useState<string | null>(null);
-  const loadedProfileKeyRef = useRef("");
-
-  const profilesQuery = useQuery({
-    queryKey: queryKeys.singleWindowClientProfiles(),
-    queryFn: ({ signal }) => client.getSingleWindowClientProfiles({ signal }),
-    staleTime: 60_000,
-  });
-
-  const profiles = profilesQuery.data?.profiles ?? [];
-  const activeProfile = profiles.find((profile) => profile.isActive)
-    ?? profiles.find((profile) => profile.profileKey === profilesQuery.data?.activeProfileKey)
-    ?? null;
-  const selectedProfile = useMemo(
-    () => profiles.find((profile) => profile.profileKey === selectedProfileKey) ?? null,
-    [profiles, selectedProfileKey],
-  );
-  const currentDraftSnapshot = JSON.stringify({
-    profileName,
-    companyScope,
-    cardIdentifier,
-    customsCooDirectories,
-    agentConsignmentDirectories,
-    canSubmitCustomsCoo,
-    canSubmitAgentConsignment,
-  });
-  const persistedDraftSnapshot = JSON.stringify(selectedProfile ? {
-    profileName: selectedProfile.profileName ?? "",
-    companyScope: selectedProfile.companyScope ?? "",
-    cardIdentifier: selectedProfile.cardIdentifier ?? "",
-    customsCooDirectories: selectedProfile.customsCooDirectories,
-    agentConsignmentDirectories: selectedProfile.agentConsignmentDirectories,
-    canSubmitCustomsCoo: selectedProfile.canSubmitCustomsCoo,
-    canSubmitAgentConsignment: selectedProfile.canSubmitAgentConsignment,
-  } : {
-    profileName: "",
-    companyScope: "",
-    cardIdentifier: "",
-    customsCooDirectories: emptyClientDirectories(),
-    agentConsignmentDirectories: emptyClientDirectories(),
-    canSubmitCustomsCoo: true,
-    canSubmitAgentConsignment: true,
-  });
-  const hasUnsavedProfileChanges = canOperate && currentDraftSnapshot !== persistedDraftSnapshot;
-  const { confirmDiscardChanges } = useUnsavedChangesGuard({
-    isDirty: hasUnsavedProfileChanges,
-    message: "当前持卡机公司与操作卡档案有未保存的修改。",
-  });
-
-  useEffect(() => {
-    if (!profilesQuery.data) return;
-    if (profiles.length === 0) {
-      if (selectedProfileKey !== NEW_PROFILE_KEY) setSelectedProfileKey(NEW_PROFILE_KEY);
-      return;
-    }
-    if (selectedProfileKey === NEW_PROFILE_KEY) return;
-    if (!selectedProfileKey || !profiles.some((profile) => profile.profileKey === selectedProfileKey)) {
-      setSelectedProfileKey(activeProfile?.profileKey ?? profiles[0]?.profileKey ?? NEW_PROFILE_KEY);
-    }
-  }, [activeProfile?.profileKey, profiles, profiles.length, profilesQuery.data, selectedProfileKey]);
-
-  useEffect(() => {
-    const draftKey = selectedProfile?.profileKey ?? (selectedProfileKey === NEW_PROFILE_KEY ? NEW_PROFILE_KEY : "");
-    if (draftKey && loadedProfileKeyRef.current !== draftKey) {
-      loadedProfileKeyRef.current = draftKey;
-      if (selectedProfile) loadProfile(selectedProfile);
-      else resetDraft();
-      return;
-    }
-    if (hasUnsavedProfileChanges) return;
-    if (!selectedProfile) {
-      if (selectedProfileKey === NEW_PROFILE_KEY) resetDraft();
-      return;
-    }
-
-    loadProfile(selectedProfile);
-  }, [hasUnsavedProfileChanges, selectedProfile, selectedProfileKey]);
-
-  const saveMutation = useMutation({
-    mutationFn: () => client.saveSingleWindowClientProfile({
-      body: {
-        profileKey: selectedProfile?.profileKey ?? "",
-        profileName: profileName.trim(),
-        companyScope: companyScope.trim(),
-        cardIdentifier: cardIdentifier.trim(),
-        customsCooDirectories,
-        agentConsignmentDirectories,
-        canSubmitCustomsCoo,
-        canSubmitAgentConsignment,
-      },
-    }),
-    onSuccess: async (response) => {
-      queryClient.setQueryData(queryKeys.singleWindowClientProfiles(), response);
-      const savedProfile = response.profiles.find((profile) => selectedProfile
-        ? profile.profileKey === selectedProfile.profileKey
-        : !profiles.some(previous => previous.profileKey === profile.profileKey))
-        ?? null;
-      const nextProfileKey = savedProfile?.profileKey ?? NEW_PROFILE_KEY;
-      loadedProfileKeyRef.current = nextProfileKey;
-      setSelectedProfileKey(nextProfileKey);
-      if (savedProfile) loadProfile(savedProfile);
-      else resetDraft();
-      setMessage("操作档案已保存。");
-      setMessageKind("success");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowClientProfiles() });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setMessageKind("error");
-    },
-  });
-
-  const activateMutation = useMutation({
-    mutationFn: (profileKey: string) => client.activateSingleWindowClientProfile({ profileKey }),
-    onSuccess: async (response) => {
-      queryClient.setQueryData(queryKeys.singleWindowClientProfiles(), response);
-      const activatedProfile = response.profiles.find((profile) => profile.profileKey === response.activeProfileKey) ?? null;
-      loadedProfileKeyRef.current = activatedProfile?.profileKey ?? response.activeProfileKey;
-      setSelectedProfileKey(response.activeProfileKey);
-      if (activatedProfile) loadProfile(activatedProfile);
-      setMessage(response.message || "当前操作档案已切换。");
-      setMessageKind("success");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowClientProfiles() });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setMessageKind("error");
-    },
-  });
-
-  const isBusy = profilesQuery.isFetching || saveMutation.isPending || activateMutation.isPending;
-  const identityLocked = Boolean(selectedProfile);
-  const canSaveProfile = Boolean(
-    profileName.trim() &&
-    companyScope.trim() &&
-    cardIdentifier.trim() &&
-    (canSubmitCustomsCoo || canSubmitAgentConsignment),
-  );
-
-  function resetDraft() {
-    setProfileName("");
-    setCompanyScope("");
-    setCardIdentifier("");
-    setCustomsCooDirectories(emptyClientDirectories());
-    setAgentConsignmentDirectories(emptyClientDirectories());
-    setCanSubmitCustomsCoo(true);
-    setCanSubmitAgentConsignment(true);
-  }
-
-  function loadProfile(profile: ApiSingleWindowClientProfileDto) {
-    setProfileName(profile.profileName ?? "");
-    setCompanyScope(profile.companyScope ?? "");
-    setCardIdentifier(profile.cardIdentifier ?? "");
-    setCustomsCooDirectories(profile.customsCooDirectories);
-    setAgentConsignmentDirectories(profile.agentConsignmentDirectories);
-    setCanSubmitCustomsCoo(profile.canSubmitCustomsCoo);
-    setCanSubmitAgentConsignment(profile.canSubmitAgentConsignment);
-  }
-
-  async function changeSelectedProfile(nextProfileKey: string) {
-    if (nextProfileKey === selectedProfileKey) return;
-    if (hasUnsavedProfileChanges && !await confirmDiscardChanges("切换操作档案")) return;
-    setSelectedProfileKey(nextProfileKey);
-    setMessage(null);
-    setDesktopMessage(null);
-  }
-
-  async function startNewProfile() {
-    if (hasUnsavedProfileChanges && !await confirmDiscardChanges("新建操作档案")) return;
-    setSelectedProfileKey(NEW_PROFILE_KEY);
-    resetDraft();
-    setMessage(null);
-  }
-
-  async function refreshProfiles() {
-    if (hasUnsavedProfileChanges && !await confirmDiscardChanges("刷新操作档案")) return;
-    if (selectedProfile) loadProfile(selectedProfile);
-    else resetDraft();
-
-    const refreshed = await profilesQuery.refetch();
-    const refreshedProfiles = refreshed.data?.profiles ?? [];
-    const refreshedProfile = selectedProfileKey === NEW_PROFILE_KEY
-      ? null
-      : refreshedProfiles.find((profile) => profile.profileKey === selectedProfileKey)
-        ?? refreshedProfiles.find((profile) => profile.isActive)
-        ?? refreshedProfiles.find((profile) => profile.profileKey === refreshed.data?.activeProfileKey)
-        ?? refreshedProfiles[0]
-        ?? null;
-    const nextProfileKey = refreshedProfile?.profileKey ?? NEW_PROFILE_KEY;
-    loadedProfileKeyRef.current = nextProfileKey;
-    setSelectedProfileKey(nextProfileKey);
-    if (refreshedProfile) loadProfile(refreshedProfile);
-    else resetDraft();
-  }
-
-  async function activateProfile(profileKey: string) {
-    if (hasUnsavedProfileChanges && !await confirmDiscardChanges("切换当前操作卡")) return;
-    activateMutation.mutate(profileKey);
-  }
-
-  async function copyAssignmentCode() {
-    const code = selectedProfile?.stationAssignmentCode?.trim() ?? "";
-    if (!code) {
-      setMessage("当前档案尚未生成持卡机授权码，请先保存档案。");
-      setMessageKind("error");
-      return;
-    }
-
-    if (await writeClipboardText(code)) {
-      setMessage("持卡机授权码已复制。请只交给负责为该档案制单的办公室系统。");
-      setMessageKind("success");
-    } else {
-      setMessage("浏览器未允许写入剪贴板，请手动选择授权码复制。");
-      setMessageKind("error");
-    }
-  }
-
+  const { draft, change, profiles, profilesQuery, selectedProfile, selectedProfileKey, activeProfile,
+    message, messageKind, isBusy, identityLocked, canSaveProfile, save, changeSelectedProfile,
+    refreshProfiles, activateProfile, copyAssignmentCode, startNewProfile } = useSingleWindowProfiles(client, canOperate);
+  const { profileName, companyScope, cardIdentifier, customsCooDirectories, agentConsignmentDirectories,
+    canSubmitCustomsCoo, canSubmitAgentConsignment } = draft;
   return (
     <section className="form-section single-window-station-profile" aria-label="本机持卡机操作档案">
       <div className="section-header">
@@ -281,7 +48,7 @@ export function SingleWindowStationProfilePanel({
             className="command-button"
             type="button"
             disabled={!canOperate || isBusy || !canSaveProfile}
-            onClick={() => saveMutation.mutate()}
+            onClick={() => void save()}
           >
             <Save size={17} aria-hidden="true" />
             <span>保存档案</span>
@@ -292,7 +59,6 @@ export function SingleWindowStationProfilePanel({
       {!canOperate ? <PermissionNotice>当前权限仅允许查看操作档案，不能修改公司、操作卡或目录。</PermissionNotice> : null}
       {profilesQuery.isError ? <InlineNotice tone="error" title="操作档案加载失败">{readApiError(profilesQuery.error)}</InlineNotice> : null}
       {message ? <InlineNotice tone={messageKind}>{message}</InlineNotice> : null}
-      {desktopMessage ? <InlineNotice tone="error">{desktopMessage}</InlineNotice> : null}
 
       <div className="single-window-station-summary">
         <span><ShieldCheck size={16} aria-hidden="true" />本机独立运行</span>
@@ -319,15 +85,15 @@ export function SingleWindowStationProfilePanel({
           </select>
           )}
         </FieldShell>
-        <TextField label="档案名称" value={profileName} required disabled={!canOperate || isBusy} onChange={setProfileName} />
-        <TextField label="公司抬头" value={companyScope} required disabled={!canOperate || isBusy || identityLocked} onChange={setCompanyScope} />
+        <TextField label="档案名称" value={profileName} required disabled={!canOperate || isBusy} onChange={value => change("profileName", value)} />
+        <TextField label="公司抬头" value={companyScope} required disabled={!canOperate || isBusy || identityLocked} onChange={value => change("companyScope", value)} />
         <TextField
           label="操作卡标识"
           value={cardIdentifier}
           required
           disabled={!canOperate || isBusy || identityLocked}
           description="填写卡片编号、公司简称或内部资产编号；系统不保存卡密码。"
-          onChange={setCardIdentifier}
+          onChange={value => change("cardIdentifier", value)}
         />
       </div>
 
@@ -390,18 +156,18 @@ export function SingleWindowStationProfilePanel({
 
       <div className="single-window-capability-grid">
         <label className="single-window-capability-card">
-          <input type="checkbox" checked={canSubmitCustomsCoo} disabled={!canOperate || isBusy} onChange={(event) => setCanSubmitCustomsCoo(event.target.checked)} />
+          <input type="checkbox" checked={canSubmitCustomsCoo} disabled={!canOperate || isBusy} onChange={(event) => change("canSubmitCustomsCoo", event.target.checked)} />
           <span><strong>海关原产地证</strong><small>COO 提交与回执目录</small></span>
         </label>
         <label className="single-window-capability-card">
-          <input type="checkbox" checked={canSubmitAgentConsignment} disabled={!canOperate || isBusy} onChange={(event) => setCanSubmitAgentConsignment(event.target.checked)} />
+          <input type="checkbox" checked={canSubmitAgentConsignment} disabled={!canOperate || isBusy} onChange={(event) => change("canSubmitAgentConsignment", event.target.checked)} />
           <span><strong>报关代理委托</strong><small>ACD 提交与回执目录</small></span>
         </label>
       </div>
       <SingleWindowClientDirectories key={selectedProfileKey} value={{ customsCooDirectories, agentConsignmentDirectories }}
         disabled={!canOperate || isBusy} autoDetect={selectedProfileKey === NEW_PROFILE_KEY && !isBusy && canOperate}
         cooEnabled={canSubmitCustomsCoo} acdEnabled={canSubmitAgentConsignment}
-        onChange={next => { setCustomsCooDirectories(next.customsCooDirectories); setAgentConsignmentDirectories(next.agentConsignmentDirectories); }} />
+        onChange={next => { change("customsCooDirectories", next.customsCooDirectories); change("agentConsignmentDirectories", next.agentConsignmentDirectories); }} />
     </section>
   );
 }

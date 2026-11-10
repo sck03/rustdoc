@@ -40,18 +40,18 @@ fn condition_fixtures_use_exact_types_and_reject_invalid_rules_and_data() {
 }
 
 #[test]
-fn combinations_preserve_old_templates_bound_rule_count_and_report_all_errors() {
-    let source = json!({"id":"c", "condition":{"fieldPath":"Invoice.Currency","operator":"Equals","value":"USD"},
+fn combinations_require_rules_bound_count_and_report_all_errors() {
+    let source = json!({"id":"c", "conditions":[{"fieldPath":"Invoice.Currency","operator":"Equals","value":"USD"}],
         "content":{"kind":"Text","text":"conditional"},"style":{}});
     let mut block: ReportConditionalBlock = serde_json::from_value(source.clone()).unwrap();
     assert_eq!(block.match_mode, ConditionMatch::All);
-    assert!(block.additional_conditions.is_empty());
+    assert_eq!(block.conditions.len(), 1);
     assert!(
         block
             .matches(|rule| rule.matches(&json!("USD"), "USD"))
             .unwrap()
     );
-    block.additional_conditions.push(serde_json::from_value(json!({"fieldPath":"Invoice.TotalAmount","operator":"GreaterThan","value":"1000","comparisonType":"Number"})).unwrap());
+    block.conditions.push(serde_json::from_value(json!({"fieldPath":"Invoice.TotalAmount","operator":"GreaterThan","value":"1000","comparisonType":"Number"})).unwrap());
     let evaluate = |rule: &ConditionalRule| {
         if rule.field_path.ends_with("Currency") {
             rule.matches(&json!("USD"), "USD")
@@ -80,9 +80,11 @@ fn combinations_preserve_old_templates_bound_rule_count_and_report_all_errors() 
         serde_json::from_value::<ReportConditionalBlock>(encoded).unwrap(),
         block
     );
-    block.additional_conditions = vec![block.condition.clone(); 7];
+    block.conditions = vec![block.conditions[0].clone(); 8];
     block.validate_conditions().unwrap();
-    block.additional_conditions.push(block.condition.clone());
+    block.conditions.push(block.conditions[0].clone());
+    assert!(block.validate_conditions().is_err());
+    block.conditions.clear();
     assert!(block.validate_conditions().is_err());
     let mut unknown = source;
     unknown["matchMode"] = json!("Execute");

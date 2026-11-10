@@ -51,8 +51,61 @@ fn policy(action: &'static str) -> Policy {
     )
 }
 
+fn template_policy() -> Policy {
+    let mut policy = policy("operate");
+    policy.requirements = vec![
+        Requirement {
+            resource_key: "document.jobs",
+            action: "view",
+        },
+        Requirement {
+            resource_key: "document.jobs",
+            action: "operate",
+        },
+    ];
+    policy.access = super::policies::access(
+        "All",
+        &[
+            ("document.single-window", &["operate"], false),
+            ("document.jobs", &["view"], false),
+            ("document.jobs", &["operate"], false),
+        ],
+    );
+    policy
+}
+
 pub(super) fn endpoints() -> Vec<Endpoint> {
     vec![
+        route(
+            "post",
+            "/api/single-window/sources/excel/template/download",
+            "StartSingleWindowExcelTemplateDownloadJob",
+            super::responses::reply(
+                "202",
+                "application/json",
+                Some(r("BackgroundJobSnapshot")),
+                &[],
+                &["401", "403", "503"],
+            ),
+            template_policy(),
+            None,
+            None,
+        ),
+        route(
+            "post",
+            "/api/single-window/sources/excel/template/save-to-path",
+            "StartSingleWindowExcelTemplateSaveToPathJob",
+            super::responses::reply(
+                "202",
+                "application/json",
+                Some(r("BackgroundJobSnapshot")),
+                &[],
+                &["400", "401", "403", "503"],
+            ),
+            template_policy(),
+            None,
+            Some(r("ApiExcelOutputRequest")),
+        ),
         route(
             "get",
             "/api/single-window/sources",
@@ -90,7 +143,7 @@ pub(super) fn endpoints() -> Vec<Endpoint> {
             ("BearerAuth", vec![]),
             ("DesktopAccess", vec![]),
         ])])
-        .parameters(super::route_parameters::import_file_name())
+        .parameters(super::route_parameters::excel_import())
         .body(
             true,
             BTreeMap::from([(

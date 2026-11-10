@@ -16,10 +16,19 @@ export function SingleWindowSectionNav({
   return (
     <nav className="single-window-section-nav" aria-label={ariaLabel}>
       {items.map((item) => (
-        <a className="single-window-section-nav-item" href={`#${item.id}`} key={item.id}>
+        <button className="single-window-section-nav-item" type="button" key={item.id}
+          aria-controls={item.id}
+          onClick={() => {
+            const target = document.getElementById(item.id);
+            if (!target) return;
+            for (let element: HTMLElement | null = target; element; element = element.parentElement) {
+              if (element instanceof HTMLDetailsElement) element.open = true;
+            }
+            target.scrollIntoView({ block: "start", behavior: "auto" });
+          }}>
           <span>{item.label}</span>
           {item.badge ? <strong>{item.badge}</strong> : null}
-        </a>
+        </button>
       ))}
     </nav>
   );

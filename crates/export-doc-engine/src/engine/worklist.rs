@@ -44,6 +44,7 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                 "document.invoices",
                 &["view", "operate"],
                 false,
+                selection,
                 |r| {
                     group.push(
                         item(
@@ -73,6 +74,7 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                 "sales.follow-ups",
                 &["view", "complete"],
                 false,
+                selection,
                 |r| {
                     let next = text(&r, "nextAction");
                     group.push(
@@ -108,7 +110,9 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                 "office.rooms",
                 &["view"],
                 true,
+                selection,
                 |r| {
+                    let mut accepted = false;
                     let own = r["ownerUserId"] == actor.id;
                     match text(&r, "status").as_str() {
                         "Pending"
@@ -116,7 +120,7 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                                 && !own
                                 && super::oa::approval::authority(tx, actor, &r)?.is_some() =>
                         {
-                            approval.push(
+                            accepted |= approval.push(
                                 item(
                                     &r,
                                     text(&r, "title"),
@@ -146,7 +150,7 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                                 } else {
                                     (&mut returns, "endsAt", "待结束使用／归还钥匙")
                                 };
-                                group.push(
+                                accepted |= group.push(
                                     item(
                                         &r,
                                         text(&r, "title"),
@@ -161,7 +165,7 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                         }
                         _ => {}
                     }
-                    Ok(())
+                    Ok(accepted)
                 },
             )?;
         }
@@ -183,7 +187,9 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                 "office.supplies",
                 &["view"],
                 true,
+                selection,
                 |r| {
+                    let mut accepted = false;
                     let own = r["ownerUserId"] == actor.id;
                     match text(&r, "status").as_str() {
                         "Pending"
@@ -191,7 +197,7 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                                 && !own
                                 && super::oa::approval::authority(tx, actor, &r)?.is_some() =>
                         {
-                            approval.push(
+                            accepted |= approval.push(
                                 item(
                                     &r,
                                     format!("{} · 物品领用", text(&r, "applicantName")),
@@ -222,7 +228,7 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                                     text(&r, "purpose")
                                 );
                                 if collecting {
-                                    collection.push(
+                                    accepted |= collection.push(
                                         item(
                                             &r,
                                             text(&r, "supplyName"),
@@ -237,7 +243,7 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                                     && r["returnedQuantity"].as_i64().unwrap_or(0)
                                         < r["quantity"].as_i64().unwrap_or(0)
                                 {
-                                    returns.push(
+                                    accepted |= returns.push(
                                         item(
                                             &r,
                                             text(&r, "supplyName"),
@@ -253,7 +259,7 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                         }
                         _ => {}
                     }
-                    Ok(())
+                    Ok(accepted)
                 },
             )?;
         }
@@ -273,7 +279,9 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                 "office.people",
                 &["view", "view-details"],
                 true,
+                selection,
                 |r| {
+                    let mut accepted = false;
                     for (group, field, eligible) in [
                         (
                             &mut probation,
@@ -283,7 +291,7 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                         (&mut contract, "contractEndsOn", true),
                     ] {
                         if eligible && r[field].is_string() {
-                            group.push(
+                            accepted |= group.push(
                                 item(
                                     &r,
                                     text(&r, "fullName"),
@@ -296,7 +304,7 @@ fn groups(tx: &Connection, actor: &Actor, selection: &Selection<'_>) -> Result<V
                             )?;
                         }
                     }
-                    Ok(())
+                    Ok(accepted)
                 },
             )?;
         }

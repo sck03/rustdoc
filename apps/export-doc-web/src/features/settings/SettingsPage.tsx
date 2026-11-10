@@ -50,16 +50,14 @@ export function SettingsPage({
   canManageUsers,
   canUseDocumentWorkspace,
   isDesktopRuntime,
-  productName,
 }: {
   client: ExportDocManagerApiClient;
   canManageSettings: boolean;
   canManageUsers: boolean;
   canUseDocumentWorkspace: boolean;
   isDesktopRuntime: boolean;
-  productName: string;
 }) {
-  const model = useSettingsWorkspace({client,canManageSettings,canManageUsers,canUseDocumentWorkspace,isDesktopRuntime,productName});
+  const model = useSettingsWorkspace({client,canManageSettings,canManageUsers,canUseDocumentWorkspace,isDesktopRuntime});
   const { message, concurrencyMessage, successMessage, settings, isBusy, settingsQuery, handleReloadSettings, handleSubmit, activeCategoryConfig, hasUnsavedChanges, changedCategories, currentCategory, databaseProvider, updateSecrets, setUpdateSecrets, handleRestoreSystemDefaults, handleValidateSettings, availableSettingsCategories, setActiveCategory, healthQuery, patchSetting, secrets, canSelectDesktopDirectory, handleSelectDefaultExportDirectory, issuingAuthorityOptions, handleSingleWindowOrgCodeChange, handleSingleWindowFetchPlaceChange, handleSingleWindowAplAddChange, patchSettings, emailAddressCandidate, handleInferEmailServerConfig, handleTestEmailConnection, validationResult, handleApplyValidationFix, location } = model;
   const counts = changedSettingCounts(model.settings, model.baselineSettings);
   return (

@@ -1,23 +1,13 @@
 import { FileInput } from "../../../ui/FileInput.tsx";
 import { Field } from "../../../ui/primitives/Field.tsx";
-import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileSpreadsheet, Play, Save } from "lucide-react";
-import {
-  type BackgroundJobSnapshot,
-  ExportDocManagerApiClient,
-} from "../../../api/index.ts";
-import { queryKeys } from "../../../api/queryKeys.ts";
-import { isDesktopBridgeAvailable, selectExcelFile, selectSaveExcelPath } from "../../../desktop/desktopBridge.ts";
-import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../../ui/DesktopPathActions.tsx";
+import type { ExportDocManagerApiClient } from "../../../api/index.ts";
+import { DesktopIconButton, renderOpenPathAction } from "../../../ui/DesktopPathActions.tsx";
 import { Link } from "react-router-dom";
 import { PathField } from "../../../ui/PathField.tsx";
-import { readApiError } from "../../../ui/formUtils.ts";
-import { downloadJobResultWhenReady } from "../../../ui/downloadJobResult.ts";
 import { ViewJobButton } from "../../jobs/ViewJobButton.tsx";
 import { InlineNotice } from "../../../ui/PageState.tsx";
-import { readDefaultExportDirectory } from "../../settings/settingsPaths.ts";
-import { useAbortableOperation } from "../../../ui/useAbortableOperation.ts";
+import { buildBookingSheetFileName, useExcelTools } from "./useExcelTools.ts";
 
 export function ExcelToolsPanel({
   client,
@@ -28,240 +18,14 @@ export function ExcelToolsPanel({
   canOperate: boolean;
   canReadInvoices: boolean;
 }) {
-  const queryClient = useQueryClient();
-  const runAbortableOperation = useAbortableOperation();
-  const desktopAvailable = isDesktopBridgeAvailable();
-  const [message, setMessage] = useState<string | null>(null);
-  const [messageType, setMessageType] = useState<"success" | "error">("success");
-  const [lastCreatedJobId, setLastCreatedJobId] = useState<string | null>(null);
-  const [templateDestinationPath, setTemplateDestinationPath] = useState("");
-  const [blankBookingDestinationPath, setBlankBookingDestinationPath] = useState("");
-  const [convertSourcePath, setConvertSourcePath] = useState("");
-  const [convertDestinationPath, setConvertDestinationPath] = useState("");
-  const [convertUploadFile, setConvertUploadFile] = useState<File | null>(null);
-
-  const settingsQuery = useQuery({
-    queryKey: queryKeys.settings(),
-    queryFn: ({ signal }) => client.getSettings({ signal }),
-    staleTime: 5 * 60 * 1000,
-  });
-  const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
-
-  async function refreshJobs() {
-    await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
-  }
-
-  function showSuccess(value: string, jobId?: string) {
-    setMessage(value);
-    setMessageType("success");
-    setLastCreatedJobId(jobId ?? null);
-  }
-
-  function showError(value: string) {
-    setMessage(value);
-    setMessageType("error");
-    setLastCreatedJobId(null);
-  }
-
-  function handleMutationError(error: unknown) {
-    showError(readApiError(error));
-  }
-
-  async function handleJobAccepted(job: BackgroundJobSnapshot, label: string) {
-    showSuccess(`已创建${label}任务：${job.jobId}`, job.jobId);
-    await refreshJobs();
-  }
-
-  const templateExportMutation = useMutation({
-    mutationFn: async (destinationPath: string) => runAbortableOperation(async (signal) => {
-      const job = desktopAvailable
-        ? await client.startExcelTemplateSaveToPathJob({ body: { destinationPath } }, { signal })
-        : await client.startExcelTemplateDownloadJob({ signal });
-      if (!desktopAvailable) {
-        await downloadJobResultWhenReady(client, job, "导入数据模板.xlsx", { signal });
-      }
-      return job;
-    }),
-    onSuccess: async (job) => {
-      await handleJobAccepted(job, desktopAvailable ? "Excel 模板导出" : "Excel 模板下载");
-    },
-    onError: handleMutationError,
-  });
-
-  const blankBookingExportMutation = useMutation({
-    mutationFn: async (destinationPath: string) => runAbortableOperation(async (signal) => {
-      const job = desktopAvailable
-        ? await client.startBlankBookingSheetSaveToPathJob({ body: { destinationPath } }, { signal })
-        : await client.startBlankBookingSheetDownloadJob({ signal });
-      if (!desktopAvailable) {
-        await downloadJobResultWhenReady(client, job, "空白托单模板.xlsx", { signal });
-      }
-      return job;
-    }),
-    onSuccess: async (job) => {
-      await handleJobAccepted(job, "空白托单导出");
-    },
-    onError: handleMutationError,
-  });
-
-  const bookingConvertMutation = useMutation({
-    mutationFn: async ({ sourcePath, destinationPath, uploadFile }: { sourcePath: string; destinationPath: string; uploadFile?: File | null }) => runAbortableOperation(async (signal) => {
-      const job = desktopAvailable
-        ? await client.startBookingSheetConvertSaveToPathJob({ body: { sourcePath, destinationPath } }, { signal })
-        : await client.uploadAndStartBookingSheetConvertDownloadJob({
-            fileName: uploadFile?.name,
-            body: uploadFile ?? new Blob(),
-          }, { signal });
-      if (!desktopAvailable) {
-        const baseName = (uploadFile?.name || "BookingSheet").replace(/\.[^.]+$/, "");
-        await downloadJobResultWhenReady(client, job, `${baseName}-BookingSheet.xlsx`, { signal });
-      }
-      return job;
-    }),
-    onSuccess: async (job) => {
-      await handleJobAccepted(job, "托单转换");
-    },
-    onError: handleMutationError,
-  });
-
-  const isBusy =
-    templateExportMutation.isPending ||
-    blankBookingExportMutation.isPending ||
-    bookingConvertMutation.isPending;
-  const canExportTemplate = canOperate && !isBusy;
-  const canExportTemplateByPath = canOperate && Boolean(templateDestinationPath.trim()) && !isBusy;
-  const canExportBlankBooking = canOperate && !isBusy;
-  const canExportBlankBookingByPath = canOperate && Boolean(blankBookingDestinationPath.trim()) && !isBusy;
-  const canConvertBooking =
-    canOperate && (desktopAvailable ? !isBusy : Boolean(convertUploadFile) && !isBusy);
-  const canConvertBookingByPath = canOperate && Boolean(convertSourcePath.trim()) && Boolean(convertDestinationPath.trim()) && !isBusy;
-  async function pickConvertSource() {
-    try {
-      const selected = await selectExcelFile();
-      if (selected) {
-        setConvertSourcePath(selected);
-        setMessage(null);
-      }
-    } catch (error) {
-      showError(readDesktopError(error));
-    }
-  }
-
-  async function pickExcelDestination(defaultFileName: string, onChange: (value: string) => void) {
-    try {
-      const selected = await selectSaveExcelPath(defaultFileName, defaultExportDirectory);
-      if (selected) {
-        onChange(selected);
-        setMessage(null);
-      }
-    } catch (error) {
-      showError(readDesktopError(error));
-    }
-  }
-
-  async function chooseExcelDestination(defaultFileName: string) {
-    return selectSaveExcelPath(defaultFileName, defaultExportDirectory);
-  }
-
-  async function handleExportTemplate() {
-    if (!canExportTemplate) {
-      return;
-    }
-
-    if (desktopAvailable) {
-      try {
-        const destinationPath = await chooseExcelDestination("导入数据模板.xlsx");
-        if (!destinationPath) {
-          return;
-        }
-
-        setTemplateDestinationPath(destinationPath);
-        templateExportMutation.mutate(destinationPath);
-      } catch (error) {
-        showError(readDesktopError(error));
-      }
-      return;
-    }
-
-    templateExportMutation.mutate("");
-  }
-
-  function handleExportTemplateByPath() {
-    const destinationPath = templateDestinationPath.trim();
-    if (destinationPath && canExportTemplateByPath) {
-      templateExportMutation.mutate(destinationPath);
-    }
-  }
-
-  async function handleExportBlankBooking() {
-    if (!canExportBlankBooking) {
-      return;
-    }
-
-    if (desktopAvailable) {
-      try {
-        const destinationPath = await chooseExcelDestination("空白托单模板.xlsx");
-        if (!destinationPath) {
-          return;
-        }
-
-        setBlankBookingDestinationPath(destinationPath);
-        blankBookingExportMutation.mutate(destinationPath);
-      } catch (error) {
-        showError(readDesktopError(error));
-      }
-      return;
-    }
-
-    blankBookingExportMutation.mutate("");
-  }
-
-  function handleExportBlankBookingByPath() {
-    const destinationPath = blankBookingDestinationPath.trim();
-    if (destinationPath && canExportBlankBookingByPath) {
-      blankBookingExportMutation.mutate(destinationPath);
-    }
-  }
-
-  async function handleConvertBooking() {
-    if (!canConvertBooking) {
-      return;
-    }
-
-    if (desktopAvailable) {
-      try {
-        const sourcePath = await selectExcelFile();
-        if (!sourcePath) {
-          return;
-        }
-
-        const destinationPath = await chooseExcelDestination(buildBookingSheetFileName(sourcePath));
-        if (!destinationPath) {
-          return;
-        }
-
-        setConvertSourcePath(sourcePath);
-        setConvertDestinationPath(destinationPath);
-        bookingConvertMutation.mutate({ sourcePath, destinationPath });
-      } catch (error) {
-        showError(readDesktopError(error));
-      }
-      return;
-    }
-
-    if (convertUploadFile) {
-      bookingConvertMutation.mutate({ sourcePath: "", destinationPath: "", uploadFile: convertUploadFile });
-    }
-  }
-
-  function handleConvertBookingByPath() {
-    const sourcePath = convertSourcePath.trim();
-    const destinationPath = convertDestinationPath.trim();
-    if (sourcePath && destinationPath && canConvertBookingByPath) {
-      bookingConvertMutation.mutate({ sourcePath, destinationPath });
-    }
-  }
-
+  const {
+    desktopAvailable, message, messageType, lastCreatedJobId, setMessage, showError,
+    templateDestinationPath, setTemplateDestinationPath, blankBookingDestinationPath, setBlankBookingDestinationPath,
+    convertSourcePath, setConvertSourcePath, convertDestinationPath, setConvertDestinationPath, setConvertUploadFile,
+    isBusy, canExportTemplate, canExportBlankBooking, canExportTemplateByPath, canExportBlankBookingByPath, canConvertBooking, canConvertBookingByPath,
+    pickConvertSource, pickExcelDestination, handleExportTemplate, handleExportTemplateByPath, handleExportBlankBooking, handleExportBlankBookingByPath,
+    handleConvertBooking, handleConvertBookingByPath,
+  } = useExcelTools(client, canOperate);
   return (
     <section className="job-tool-panel" aria-label="Excel 模板与托单">
       <div className="tool-panel-heading">
@@ -450,23 +214,4 @@ export function ExcelToolsPanel({
       </fieldset>
     </section>
   );
-}
-
-function buildBookingSheetFileName(sourcePath: string) {
-  const baseName = sanitizeExcelFileBaseName(fileNameWithoutExtension(sourcePath));
-  return `${baseName || "订舱托单"}_订舱托单.xlsx`;
-}
-
-function fileNameFromPath(value: string) {
-  return value.split(/[\\/]/).filter(Boolean).at(-1) ?? value;
-}
-
-function fileNameWithoutExtension(value: string) {
-  const fileName = fileNameFromPath(value.trim());
-  const dotIndex = fileName.lastIndexOf(".");
-  return dotIndex > 0 ? fileName.slice(0, dotIndex) : fileName;
-}
-
-function sanitizeExcelFileBaseName(value: string) {
-  return value.trim().replace(/[<>:"/\\|?*\u0000-\u001f]+/g, "_").replace(/\s+/g, " ").slice(0, 80);
 }

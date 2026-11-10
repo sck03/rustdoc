@@ -172,14 +172,13 @@ fn original_v3_flow_blocks_validate_and_round_trip() {
         ReportBlock::Conditional(Box::new(crate::designer::ReportConditionalBlock {
             id: "conditional-1".into(),
             output: None,
-            condition: ConditionalRule {
+            conditions: vec![ConditionalRule {
                 field_path: "Invoice.Spare1".into(),
                 operator: ConditionOperator::HasValue,
                 value: String::new(),
                 comparison_type: Default::default(),
                 ignore_case: false,
-            },
-            additional_conditions: vec![],
+            }],
             match_mode: Default::default(),
             content: ConditionalContent {
                 kind: "Field".into(),

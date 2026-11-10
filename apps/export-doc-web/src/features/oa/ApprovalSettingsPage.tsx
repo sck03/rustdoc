@@ -9,7 +9,7 @@ import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
-import { businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
+import { ApprovalDelegationsEditor } from "./ApprovalDelegationsEditor.tsx";
 import { OfficeField, OfficeSubmit } from "../office/OfficeUi.tsx";
 import { useApprovalSettings, useApprovalSettingsDraft, type ApprovalAccount, type ApprovalSettingsField } from "./useApprovalSettings.ts";
 import { oaModules, personnelChangeLabels } from "./oaModel.ts";
@@ -51,13 +51,12 @@ function ApprovalSettingsEditor({ client, user, initial, accounts, handlers, uni
   const tab = editorTabs.find(item => item.key === params.get("tab"))?.key ?? "basic";
   const [simulating,setSimulating] = useState<OaApprovalRule|null>(null);
   const [publishing,setPublishing] = useState(false);
-  const { draft, setDraft, operation, formRef, changeRule, changeDelegate, save, publish, disable, remove, cancelActivation, reload, calendarInputs, changeCalendarInput, changedElsewhere } = useApprovalSettingsDraft(client, initial);
+  const { draft, setDraft, operation, formRef, changeRule, save, publish, disable, remove, cancelActivation, reload, calendarInputs, changeCalendarInput, changedElsewhere } = useApprovalSettingsDraft(client, initial);
   const index = draft.rules.findIndex(rule => rule.key === params.get("definition"));
   const rule = index >= 0 ? draft.rules[index] : null;
   const publication = rule && draft.publications.find(item => item.key === rule.key);
   const section: ApprovalSettingsField = view === "calendar" ? "calendar" : view === "handling" ? "handlingServices" : view === "delegations" ? "delegations" : view === "templates" ? "sheetTemplates" : "rules";
   const update = (patch: Record<string,string|null>) => setParams(current => { const next=new URLSearchParams(current);for(const [key,value] of Object.entries(patch)) { if(value===null) next.delete(key);else next.set(key,value); }return next; });
-  const accountOptions = <><option value={0}>请选择账号</option>{accounts.map(account => <option key={account.id} value={account.id}>{account.fullName} · {account.username} · {account.departmentId}</option>)}</>;
   const simulate = (publish: boolean) => { if(rule) { setPublishing(publish);setSimulating(rule); } };
   const addApplication = (source?:OaApprovalRule) => {
     const variant=createRequestKey().replace(/[^a-zA-Z0-9_]/g,"").slice(0,40),key=`general:${variant}`;
@@ -94,19 +93,8 @@ function ApprovalSettingsEditor({ client, user, initial, accounts, handlers, uni
         {view === "calendar" && <BusinessCalendarEditor dateInputs={calendarInputs} onDateInput={changeCalendarInput} disabled={operation.busy} value={draft.calendar} onChange={calendar => setDraft(value => ({...value,calendar}))} />}
         {view === "handling" && <HandlingServicesEditor services={draft.handlingServices ?? []} accounts={handlers} disabled={operation.busy} onChange={handlingServices => setDraft(value => ({...value,handlingServices}))} />}
         {view === "templates" && <ApprovalSheetTemplates client={client} settings={draft} disabled={operation.busy} onChange={sheetTemplates => setDraft(value => ({...value,sheetTemplates}))} />}
-        {view === "delegations" && <section className="oa-settings-section">
-          <p className="office-muted">代理仅在有效期内生效；每个节点分别签署并记录实际办理人。</p>
-          <div className="office-resource-grid">
-          {draft.delegations.map((item,index) => <section className="office-resource-card" key={item.key} aria-label={`代理 ${index+1}`}>
-            <OfficeField label="原审批人"><select value={item.principalUserId} onChange={event => changeDelegate(index,{principalUserId:Number(event.target.value)})}>{accountOptions}</select></OfficeField>
-            <OfficeField label="代理人"><select value={item.delegateUserId} onChange={event => changeDelegate(index,{delegateUserId:Number(event.target.value)})}>{accountOptions}</select></OfficeField>
-            {(["startsAt","endsAt"] as const).map(key => <OfficeField key={key} label={key === "startsAt" ? "代理开始时间" : "代理结束时间"}><input type="datetime-local" required value={toBusinessDateTimeLocalInput(item[key],user.businessTimeZone)} onChange={event => { try { changeDelegate(index,{[key]:businessDateTimeLocalInputToIso(event.target.value,user.businessTimeZone) ?? ""}); } catch(error) { event.target.setCustomValidity(readApiError(error));event.target.reportValidity(); } }} onInput={event => event.currentTarget.setCustomValidity("")} /></OfficeField>)}
-            <label className="checkbox-field"><input type="checkbox" checked={item.isActive} onChange={event => changeDelegate(index,{isActive:event.target.checked})} />启用代理</label>
-            <div className="office-card-actions"><Button type="button" onClick={() => setDraft(value => ({...value,delegations:value.delegations.filter((_,i) => i!==index)}))}>移除代理设置</Button></div>
-          </section>)}
-          </div>
-          <div className="office-card-actions"><Button type="button" disabled={draft.delegations.length >= 50} onClick={() => setDraft(value => ({...value,delegations:[...value.delegations,{key:createRequestKey(),principalUserId:0,delegateUserId:0,startsAt:new Date().toISOString(),endsAt:new Date(Date.now()+86400000).toISOString(),isActive:true}]}))}>添加代理</Button></div>
-        </section>}
+        {view === "delegations" && <ApprovalDelegationsEditor value={draft.delegations} accounts={accounts} timeZone={user.businessTimeZone}
+          onChange={delegations => setDraft(value => ({ ...value, delegations }))} />}
       </fieldset>
       {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
       <OfficeSubmit busy={operation.busy} disabled={view==="definitions"&&!rule} label={view === "definitions" ? "保存当前流程" : `保存${views.find(item => item.key === view)?.label}`}>

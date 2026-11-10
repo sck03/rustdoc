@@ -43,6 +43,7 @@ mod workflow_origin;
 mod worklist_query;
 pub use generic_query::ScopedQuery;
 pub use related_query::RelatedQuery;
+pub use worklist_query::WorklistScan;
 mod query_diagnostics;
 mod query_source;
 pub use query_diagnostics::QueryPlan;
@@ -433,7 +434,7 @@ delegate! {
     query_generic(query:&GenericQuery<'_>)->(i64, Vec<Value>);
     explain_query(query:&QueryPlan<'_>)->Value;
     scan_generic(query:&GenericQuery<'_>,before_id:Option<i64>)->(Option<i64>, Vec<Value>);
-    scan_worklist(query:&ScopedQuery<'_>,actor:i64,customer_scope:&DataScope<'_>,before_id:Option<i64>)->(Option<i64>,Vec<Value>);
+    scan_worklist(query:&ScopedQuery<'_>,actor:i64,customer_scope:&DataScope<'_>,scan:&WorklistScan<'_>,cursor:Option<i64>)->(Option<i64>,Vec<Value>);
     scan_records(query:&RecordQuery<'_>,before_id:Option<i64>)->(Option<i64>,Vec<Value>);
     resource_references(kind:&str,ids:Option<&[&str]>,before_id:Option<i64>,limit:i64)->(Option<i64>,Vec<Value>);
     ownership_counts(kinds:&[&str])->Vec<(Option<i64>,i64)>;

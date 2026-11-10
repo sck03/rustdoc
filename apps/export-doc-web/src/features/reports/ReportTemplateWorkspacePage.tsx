@@ -106,6 +106,7 @@ export function ReportTemplateWorkspacePage({
     readPreferredPreviewSampleProfile(initialReportType),
   );
   const [preview, setPreview] = useState<ApiReportTemplatePreviewResponse | null>(null);
+  const clearPreview = useCallback(() => setPreview(null), []);
   const [previewInvoiceId, setPreviewInvoiceId] = useState(() =>
     initialReportType === "PaymentVoucher" ? 0 : requestedPreviewSourceId,
   );
@@ -403,6 +404,7 @@ export function ReportTemplateWorkspacePage({
     withSeal: reportType === "ExportDocument" && (currentTemplate?.withSealDefault ?? true),
     previewInvoiceId,
     previewPaymentId,
+    onReset: clearPreview,
     onPreviewed: (response) => {
       setPreview(response);
       setWorkspaceMode("preview");

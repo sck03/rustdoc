@@ -96,7 +96,7 @@ pub fn upload(
 ) -> Result<Value> {
     if operation == PREVIEW_SINGLE_WINDOW_EXCEL_IMPORT {
         #[cfg(feature = "excel")]
-        return super::excel::preview(service, name, bytes);
+        return super::excel::preview(service, name, bytes, &records::text(metadata, "schemeName"));
         #[cfg(not(feature = "excel"))]
         return Err(error(501, "当前构建未启用 Excel 导入。"));
     }

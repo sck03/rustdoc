@@ -61,17 +61,14 @@ pub(super) fn audience(form: &FormDefinition, department: &str) -> bool {
 pub(super) fn catalog(tx: &Connection, actor: &Actor) -> Result<Value> {
     let settings = settings_store::registry(tx, &actor.company)?;
     let mut items = vec![];
-    for publication in settings["publications"]
+    let publications: Vec<_> = settings["publications"]
         .as_array()
         .into_iter()
         .flatten()
-        .filter(|p| p["enabled"] == true)
-    {
-        let key = text(publication, "key");
-        let Some(variant) = key.strip_prefix("general:") else {
-            continue;
-        };
-        let (rule, version) = definitions::published(tx, &actor.company, "general", variant)?;
+        .filter(|p| p["enabled"] == true && text(p, "key").starts_with("general:"))
+        .collect();
+    for (rule, version) in definitions::published_rules(tx, &actor.company, &publications)? {
+        let key = &rule.key;
         if let Some(form) = rule.form {
             if form.department_ids.is_empty()
                 || actor.admin

@@ -146,8 +146,7 @@ export type ReportGridDiagonalHeader = {
 
 export type ReportConditionalBlock = ReportBlockBase & {
   type: "Conditional";
-  condition: ReportConditionalRule;
-  additionalConditions?: ReportConditionalRule[];
+  conditions: ReportConditionalRule[];
   matchMode?: ReportConditionMatch;
   content: ReportConditionalContent;
   style: ReportTextStyle;

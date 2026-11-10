@@ -1,6 +1,5 @@
-import { useMutation } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import {
   ApiReportTemplatePreviewResponse,
   ExportDocManagerApiClient,
@@ -19,6 +18,7 @@ export function useReportTemplatePreviewMutations({
   previewInvoiceId,
   previewPaymentId,
   onPreviewed,
+  onReset,
   onError,
 }: {
   client: ExportDocManagerApiClient;
@@ -32,18 +32,17 @@ export function useReportTemplatePreviewMutations({
   previewInvoiceId: number;
   previewPaymentId: number;
   onPreviewed: (response: ApiReportTemplatePreviewResponse) => void;
+  onReset: () => void;
   onError: (error: unknown) => void;
 }) {
   const [previewFormat, setPreviewFormat] = useState<"Svg" | "PdfPage">("Svg");
   const [page, setPage] = useState({ pageIndex: 0, pageCount: 0, previewRevision: "" });
-  const scope = useMemo(() => ({ mode, reportType, selectedTemplatePath, content, sampleProfile, withSeal, canDesignTemplates, previewInvoiceId, previewPaymentId, previewFormat }),
-    [mode, reportType, selectedTemplatePath, content, sampleProfile, withSeal, canDesignTemplates, previewInvoiceId, previewPaymentId, previewFormat]);
-  useEffect(() => setPage({ pageIndex: 0, pageCount: 0, previewRevision: "" }), [scope]);
+  const scope = useMemo(() => ({ client, mode, reportType, selectedTemplatePath, content, sampleProfile, withSeal, canDesignTemplates, previewInvoiceId, previewPaymentId, previewFormat }),
+    [client, mode, reportType, selectedTemplatePath, content, sampleProfile, withSeal, canDesignTemplates, previewInvoiceId, previewPaymentId, previewFormat]);
+  useEffect(() => { setPage({ pageIndex: 0, pageCount: 0, previewRevision: "" }); onReset(); }, [scope, onReset]);
   type PageRequest = { pageIndex?: number; previewRevision?: string; content?: string };
-  const run = useAbortableOperation(scope, { cancelPrevious: true });
-  const previewMutation = useMutation({
-    gcTime: 0,
-    mutationFn: (target?: PageRequest) => run(async signal => {
+  const previewMutation = useScopedMutation(reportType, scope, {
+    mutationFn: async (target: PageRequest | undefined, signal) => {
       const request = { previewFormat, pageIndex: target?.pageIndex ?? 0, previewRevision: target?.previewRevision || undefined };
       const draft = target?.content ?? content;
       if (mode === "sample") {
@@ -59,12 +58,12 @@ export function useReportTemplatePreviewMutations({
       }
       const response = await client.previewInvoiceReportHtml({ invoiceId: previewInvoiceId, body: { ...body, reportType, withSeal } }, { signal });
       return { ...response, withSeal: response.withSeal ?? withSeal };
-    }),
+    },
     onSuccess: response => {
       setPage({ pageIndex: response.pageIndex ?? 0, pageCount: response.pageCount ?? 0, previewRevision: response.previewRevision ?? "" });
       onPreviewed(response);
     },
-    onError: error => { if (!isAbortError(error)) onError(error); },
+    onError,
   });
 
   return { previewMutation, previewFormat, setPreviewFormat, page };

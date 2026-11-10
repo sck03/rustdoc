@@ -88,7 +88,10 @@ enum Handler {
 fn registration(operation: &str) -> Option<(Handler, &'static str)> {
     Some(match operation {
         #[cfg(feature = "excel")]
-        "StartExcelTemplateDownloadJob" | "StartExcelTemplateSaveToPathJob" => {
+        "StartExcelTemplateDownloadJob"
+        | "StartExcelTemplateSaveToPathJob"
+        | "StartSingleWindowExcelTemplateDownloadJob"
+        | "StartSingleWindowExcelTemplateSaveToPathJob" => {
             (Handler::Excel, "StartExcelTemplateExportJob")
         }
         #[cfg(feature = "excel")]
@@ -291,7 +294,14 @@ pub(crate) fn execute(service: &NativeService, actor: &Actor, id: &str) -> Resul
                 let input = replay
                     .input
                     .ok_or_else(|| unavailable("重试工作簿缺失。"))?;
-                return excel::upload(service, actor, operation, &input.file_name, &input.content);
+                return excel::upload(
+                    service,
+                    actor,
+                    operation,
+                    &replay.body,
+                    &input.file_name,
+                    &input.content,
+                );
             }
             excel::handle(service, actor, operation, &parameters, &replay.body)
         }

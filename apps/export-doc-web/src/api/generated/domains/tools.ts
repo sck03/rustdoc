@@ -127,6 +127,7 @@ export default function createApi(transport: ApiTransport) {
     return transport.request<ApiExcelImportPreviewResponse>("POST", path, {
       query: {
         "fileName": request.fileName,
+        "schemeName": request.schemeName,
       },
       body: request.body,
       init,

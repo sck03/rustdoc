@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
@@ -49,23 +49,27 @@ export function useMasterDataPersistence({ client, config, record, isNew, record
       catch (error) { checkCurrent(); setMessage(`${config.label}已保存，但目录刷新失败：${readApiError(error)}`); }
     });
   }
-  const saveMutation = useMutation({
-    mutationFn: ({ submitted, body }: { submitted: MasterDataRecord; body: MasterDataRecord }) => persist(submitted,
+  const saveMutation = {
+    mutate: (input: { submitted: MasterDataRecord; body: MasterDataRecord }) => { void save(input).catch(onError); },
+  };
+  const save =
+    ({ submitted, body }: { submitted: MasterDataRecord; body: MasterDataRecord }) => persist(submitted,
       signal => isNew ? config.create(client, body, signal) : config.update(client, recordKey, body, signal),
-      isNew ? `${config.label}已创建。` : `${config.label}已保存。`),
-    onError,
-  });
-  const sealUploadMutation = useMutation({
-    mutationFn: ({ fieldName, file }: { fieldName: "docSealPath" | "customsSealPath"; file: File }) => {
+      isNew ? `${config.label}已创建。` : `${config.label}已保存。`);
+  const sealUploadMutation = {
+    mutate: (input: { fieldName: "docSealPath" | "customsSealPath"; file: File }) => { void uploadSeal(input).catch(onError); },
+  };
+  const uploadSeal = async ({ fieldName, file }: { fieldName: "docSealPath" | "customsSealPath"; file: File }) => {
       if (!record) throw new Error("出口商未加载，无法上传印章。");
       return persist(record, async signal => await client.uploadExporterSeal({
         id: numberValue(record.id), sealType: fieldName === "docSealPath" ? "document" : "customs", fileName: file.name, body: file,
       }, { signal }) as unknown as MasterDataRecord, fieldName === "docSealPath" ? "单证章已上传并保存。" : "报关章已上传并保存。");
-    },
-    onError,
-  });
-  const deleteMutation = useMutation({
-    mutationFn: () => boundary.run(async ({ signal, checkCurrent }) => {
+    };
+  const deleteMutation = {
+    isPending: boundary.isSaving,
+    mutate: () => { void remove().catch(error => { if (!isAbortError(error)) onDeleteError(); onError(error); }); },
+  };
+  const remove = () => boundary.run(async ({ signal, checkCurrent }) => {
       if (!record) throw new Error(`${config.label}未加载，无法删除。`);
       const response = await config.delete(client, record, recordKey, signal); checkCurrent();
       queries.removeQueries({ queryKey: queryKeys.masterDataRecord(config.key, recordKey) });
@@ -75,8 +79,6 @@ export function useMasterDataPersistence({ client, config, record, isNew, record
       catch (error) { checkCurrent(); successMessage += `目录刷新失败：${readApiError(error)}`; }
       checkCurrent();
       navigate(`/master-data/${config.key}`, { replace: true, state: { successMessage } });
-    }),
-    onError: error => { if (!isAbortError(error)) onDeleteError(); onError(error); },
-  });
+    });
   return { saveMutation, sealUploadMutation, deleteMutation, isSaving: boundary.isSaving };
 }

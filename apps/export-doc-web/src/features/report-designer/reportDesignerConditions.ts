@@ -31,8 +31,8 @@ export function conditionOperatorOptions(type: ReportComparisonType = "Text") {
   return conditionOperators.filter(operator => !(type === "Text" ? orderOperators : textOperators).includes(operator))
     .map(value => ({ value, label: type === "Date" && value in dateLabels ? dateLabels[value as keyof typeof dateLabels] : operatorLabels[value] }));
 }
-export function conditionRules(block: { condition: ReportConditionalRule; additionalConditions?: ReportConditionalRule[] }) {
-  return [block.condition, ...(block.additionalConditions ?? [])];
+export function conditionRules(block: { conditions: ReportConditionalRule[] }) {
+  return block.conditions;
 }
 export function conditionRuleIssue(rule: ReportConditionalRule, itemContext = false): string | undefined {
   const type = rule.comparisonType ?? "Text";
@@ -80,12 +80,11 @@ export function normalizeCondition(value: unknown, path: string, issues: ReportD
 }
 
 export function normalizeConditions(value: Record<string, unknown>, path: string, issues: ReportDesignerSchemaIssue[]) {
-  const extra = value.additionalConditions;
-  if (extra !== undefined && !Array.isArray(extra)) issues.push(createIssue("error", `${path}.additionalConditions`, "附加条件必须为数组。"));
-  if (Array.isArray(extra) && extra.length >= MAX_CONDITIONAL_RULES) issues.push(createIssue("error", path, `每个条件组件最多 ${MAX_CONDITIONAL_RULES} 条规则。`));
+  const rules = value.conditions;
+  if ("condition" in value || "additionalConditions" in value) issues.push(createIssue("error", path, "条件组件格式无效，请使用 conditions 规则数组。"));
+  if (!Array.isArray(rules) || !rules.length || rules.length > MAX_CONDITIONAL_RULES) issues.push(createIssue("error", `${path}.conditions`, `每个条件组件需要 1–${MAX_CONDITIONAL_RULES} 条规则。`));
   return {
-    condition: normalizeCondition(value.condition, `${path}.condition`, issues),
-    additionalConditions: Array.isArray(extra) ? extra.slice(0, MAX_CONDITIONAL_RULES - 1).map((rule, index) => normalizeCondition(rule, `${path}.additionalConditions[${index}]`, issues)) : [],
+    conditions: Array.isArray(rules) ? rules.slice(0, MAX_CONDITIONAL_RULES).map((rule, index) => normalizeCondition(rule, `${path}.conditions[${index}]`, issues)) : [],
     matchMode: strictEnum(value.matchMode, conditionMatchModes, "All", `${path}.matchMode`, issues, true),
   };
 }

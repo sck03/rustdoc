@@ -1276,7 +1276,8 @@ export interface ApiExcelImportItemTableAnalysisDto {
 }
 
 export interface ApiExcelImportPreviewRequest {
-  filePath?: string;
+  filePath: string;
+  schemeName?: string;
 }
 
 export interface ApiExcelImportPreviewResponse {
@@ -3364,6 +3365,7 @@ export interface ApiSingleWindowClientProfileDto {
   stationAssignmentCode: string;
   stationKey: string;
   updatedAt: string;
+  versionNumber: number;
 }
 
 export interface ApiSingleWindowClientProfileSaveRequest {
@@ -3373,6 +3375,7 @@ export interface ApiSingleWindowClientProfileSaveRequest {
   cardIdentifier: string;
   companyScope: string;
   customsCooDirectories: ApiSingleWindowClientDirectories;
+  expectedVersion: number;
   profileKey: string;
   profileName: string;
 }
@@ -3381,6 +3384,7 @@ export interface ApiSingleWindowClientProfilesResponse {
   activeProfileKey: string;
   message: string;
   profiles: ApiSingleWindowClientProfileDto[];
+  savedProfileKey?: string;
   storagePolicy: string;
 }
 
@@ -4156,6 +4160,7 @@ export interface ExcelImportSettings {
   portOfLoadingCell: string;
   quantityCol: number;
   schemeName: string;
+  sheetName: string;
   shippingMarksCell: string;
   styleNameCNCol: number;
   styleNameCol: number;
@@ -6762,7 +6767,6 @@ export interface SupplyRequestUpdateRequest {
 }
 
 export interface SystemSettings {
-  appName: string;
   auditLogRetentionDays: number;
   backupRetentionDays: number;
   databaseProvider: string;
@@ -9945,6 +9949,7 @@ export interface PreviewShippingMarkImageRequest {
 
 export interface PreviewSingleWindowExcelImportRequest {
   fileName?: string;
+  schemeName?: string;
   body: Blob;
 }
 
@@ -9973,6 +9978,7 @@ export interface PreviewSupplierImportRequest {
 
 export interface PreviewUploadedExcelImportRequest {
   fileName?: string;
+  schemeName?: string;
   body: Blob;
 }
 
@@ -10639,6 +10645,10 @@ export interface StartPdfMergeSaveToPathJobRequest {
 export interface StartRecoveryArchiveSaveToPathJobRequest {
   id: string;
   body: ApiRecoveryArchiveSaveRequest;
+}
+
+export interface StartSingleWindowExcelTemplateSaveToPathJobRequest {
+  body: ApiExcelOutputRequest;
 }
 
 export interface StocktakeOfficeSupplyRequest {

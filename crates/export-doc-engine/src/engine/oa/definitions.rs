@@ -29,14 +29,47 @@ pub(super) fn published(
                 .find(|p| p["key"] == key && p["enabled"] == true)
         })
         .ok_or_else(|| conflict("该业务尚未发布启用的审批流程，请管理员配置并发布。"))?;
-    let version = records::positive(publication, "version", "流程版本")?;
-    let snapshot = tx
-        .find_identity("oa-definition-version", &identity(company, &key, version))?
-        .ok_or_else(|| super::super::error::unavailable("已发布流程版本缺失。"))?;
-    let rule: ApprovalRule = serde_json::from_value(snapshot["definition"].clone())
-        .map_err(|_| super::super::error::unavailable("已发布流程定义损坏。"))?;
-    rule.validate().map_err(super::super::error::unavailable)?;
-    Ok((rule, version))
+    published_rules(tx, company, &[publication])?
+        .pop()
+        .ok_or_else(|| super::super::error::unavailable("已发布流程版本缺失。"))
+}
+
+/// Read the selected immutable versions in bounded batches within the caller's snapshot.
+pub(super) fn published_rules(
+    tx: &Connection,
+    company: &str,
+    publications: &[&Value],
+) -> Result<Vec<(ApprovalRule, i64)>> {
+    let identities = publications
+        .iter()
+        .map(|publication| {
+            Ok(identity(
+                company,
+                &text(publication, "key"),
+                records::positive(publication, "version", "流程版本")?,
+            ))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut snapshots = std::collections::BTreeMap::new();
+    for snapshot in tx.records_by_identities(
+        "oa-definition-version",
+        &identities,
+        &[("definition", "definition"), ("version", "version")],
+    )? {
+        let rule: ApprovalRule = serde_json::from_value(snapshot["definition"].clone())
+            .map_err(|_| super::super::error::unavailable("已发布流程定义损坏。"))?;
+        rule.validate().map_err(super::super::error::unavailable)?;
+        let version = records::positive(&snapshot, "version", "流程版本")?;
+        snapshots.insert(identity(company, &rule.key, version), (rule, version));
+    }
+    identities
+        .into_iter()
+        .map(|key| {
+            snapshots
+                .remove(&key)
+                .ok_or_else(|| super::super::error::unavailable("已发布流程版本缺失或重复。"))
+        })
+        .collect()
 }
 pub(super) fn change(
     tx: &Connection,

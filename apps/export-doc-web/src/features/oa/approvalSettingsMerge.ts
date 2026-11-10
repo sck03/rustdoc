@@ -18,3 +18,12 @@ export function acceptApprovalSection(saved: OaApprovalSettings, submitted: OaAp
   }
   return result;
 }
+
+export function sameDraftValue(a:unknown,b:unknown):boolean {
+  if(Object.is(a,b)) return true;
+  if(!a || !b || typeof a!=="object" || typeof b!=="object") return false;
+  if(Array.isArray(a)) return Array.isArray(b) && a.length===b.length && a.every((value,index)=>sameDraftValue(value,b[index]));
+  if(Array.isArray(b)) return false;
+  const left=a as Record<string,unknown>, right=b as Record<string,unknown>;
+  return Object.keys(left).length===Object.keys(right).length && Object.keys(left).every(key=>Object.hasOwn(right,key) && sameDraftValue(left[key],right[key]));
+}

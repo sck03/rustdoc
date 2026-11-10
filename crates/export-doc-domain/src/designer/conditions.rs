@@ -168,11 +168,13 @@ impl ConditionalRule {
 
 impl ReportConditionalBlock {
     pub fn conditions(&self) -> impl Iterator<Item = &ConditionalRule> {
-        std::iter::once(&self.condition).chain(&self.additional_conditions)
+        self.conditions.iter()
     }
     pub fn validate_conditions(&self) -> Result<(), String> {
-        if self.additional_conditions.len() >= MAX_CONDITIONAL_RULES {
-            return Err(format!("每个条件组件最多 {MAX_CONDITIONAL_RULES} 条规则。"));
+        if self.conditions.is_empty() || self.conditions.len() > MAX_CONDITIONAL_RULES {
+            return Err(format!(
+                "每个条件组件需要 1–{MAX_CONDITIONAL_RULES} 条规则。"
+            ));
         }
         for rule in self.conditions() {
             rule.validate()?;

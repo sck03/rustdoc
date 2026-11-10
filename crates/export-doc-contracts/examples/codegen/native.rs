@@ -1,4 +1,4 @@
-use super::{Operation, Result, array, quoted, required, text};
+use super::{Operation, Result, array, quoted, required};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{collections::BTreeSet, fmt::Write};
@@ -117,7 +117,10 @@ pub fn generate(document: &Value, operations: &[Operation<'_>]) -> Result<(Strin
     if array(&document["x-exportdoc-permissions"]["resources"]).is_empty() {
         return Err("Missing permission catalog".into());
     }
-    if text(&document["x-exportdoc-configuration"]["defaults"]["system"]["appName"]).is_empty() {
+    if document["x-exportdoc-configuration"]["defaults"]["system"]
+        .as_object()
+        .is_none_or(|defaults| defaults.is_empty())
+    {
         return Err("Missing configuration defaults".into());
     }
     let mut sorted: Vec<_> = operations.iter().collect();

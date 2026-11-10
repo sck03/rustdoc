@@ -16,7 +16,7 @@ export function ConditionalBlockProperties({
   const rules = conditionRules(block);
   const documentFields = fieldGroups.map(group => ({ ...group, fields: group.fields.filter(field => !field.value.startsWith("item.") && !["doc_seal_path", "customs_seal_path"].includes(field.value)) })).filter(group => group.fields.length);
   function commitRules(next: ReportConditionalRule[]) {
-    onCommit({ ...block, condition: next[0], additionalConditions: next.slice(1) });
+    onCommit({ ...block, conditions: next });
   }
 
   function updateContent(patch: Partial<ReportConditionalContent>) {
@@ -44,7 +44,7 @@ export function ConditionalBlockProperties({
           </div>
           <ConditionRuleProperties rule={rule} fieldGroups={documentFields} onChange={patch => commitRules(rules.map((item, position) => position === index ? { ...item, ...patch } : item))} />
         </div>)}
-        <button type="button" className="command-button secondary" disabled={rules.length >= MAX_CONDITIONAL_RULES} onClick={() => commitRules([...rules, { fieldPath: block.condition.fieldPath, operator: "HasValue", value: "" }])}>添加条件</button>
+        <button type="button" className="command-button secondary" disabled={rules.length >= MAX_CONDITIONAL_RULES} onClick={() => commitRules([...rules, { fieldPath: rules[0]?.fieldPath ?? "", operator: "HasValue", value: "" }])}>添加条件</button>
       </div>
       <div className="new-report-detail-style-group">
         <div className="new-report-detail-column-title">

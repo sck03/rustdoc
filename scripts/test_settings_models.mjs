@@ -167,7 +167,7 @@ for (const section of ["backup", "backupPolicy", "webDav", "postgresql", "backup
 }
 assert(navigation.readDocumentFieldGroup("?group=payment") === "payment", "payment group deep link");
 assert(navigation.readDocumentFieldGroup("?group=unknown") === "invoice", "invalid group fallback");
-const before = { revision: 1, system: { appName: "App", logRetentionDays: 30, documentFieldLabels: { invoice: { spare1: "旧名" }, item: {}, payment: {} } }, email: { smtpHost: "old" } };
+const before = { revision: 1, system: { logRetentionDays: 30, documentFieldLabels: { invoice: { spare1: "旧名" }, item: {}, payment: {} } }, email: { smtpHost: "old" } };
 const after = structuredClone(before);
 after.system.documentFieldLabels.invoice.spare1 = "新名"; after.email.smtpHost = "new";
 assert(JSON.stringify(draft.changedSettingsCategories(before, after).map(item => item.key)) === JSON.stringify(["documents", "communication"]), "changes across categories");

@@ -720,6 +720,8 @@ const operationDomains: Record<string, Domain> = {
   startPaymentVoucherPdfSaveToPathJob: "reports",
   startPdfMergeSaveToPathJob: "tools",
   startRecoveryArchiveSaveToPathJob: "disasterRecovery",
+  startSingleWindowExcelTemplateDownloadJob: "singleWindow",
+  startSingleWindowExcelTemplateSaveToPathJob: "singleWindow",
   stocktakeOfficeSupply: "office",
   submitExpenseRequest: "office",
   submitGeneralRequest: "office",

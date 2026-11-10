@@ -223,7 +223,7 @@ impl NativeService {
         }
         #[cfg(feature = "excel")]
         if excel::UPLOADS.contains(&operation) {
-            return excel::upload(self, &actor, operation, file_name, content);
+            return excel::upload(self, &actor, operation, &metadata, file_name, content);
         }
         #[cfg(feature = "excel")]
         if party_files::UPLOADS.contains(&operation) {

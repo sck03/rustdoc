@@ -203,7 +203,6 @@ export function AppWorkspaceRoutes({
               canManageUsers={user.capabilities.canManageUsers === true}
               canUseDocumentWorkspace={user.capabilities.canUseDocumentWorkspace === true}
               isDesktopRuntime={isDesktopBridgeAvailable()}
-              productName={activeProduct.productName}
             />
           }
         />

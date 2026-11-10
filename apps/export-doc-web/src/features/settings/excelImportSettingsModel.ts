@@ -9,6 +9,7 @@ type ExcelImportSettingsRecord = Record<string, unknown>;
 
 const defaultExcelImportSettings: ExcelImportSettingsRecord = {
   schemeName: "Default",
+  sheetName: "明细单",
   exporterNameCNCell: "A1",
   exporterNameCell: "B3",
   exporterAddressStartCell: "B4",

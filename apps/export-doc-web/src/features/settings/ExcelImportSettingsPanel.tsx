@@ -153,7 +153,13 @@ export function ExcelImportSettingsPanel({
   }
 
   return (
-    <section className="form-section excel-import-settings-section" aria-label="Excel 导入方案">
+    <section className="form-section" aria-label="Excel 导入">
+      <h2>Excel 导入</h2>
+      <p>默认智能识别；特殊客户表格可在导入时选择手动方案。</p>
+      <div className="field-grid"><TextSetting settings={settings} path={["system", "defaultTemplateExporterNameCn"]} label="默认出口商中文名" disabled={disabled} onChange={onChange} /></div>
+      <details><summary>高级导入方案</summary>
+      <p>方案只在导入时主动选择才生效。填写工作表名称；不用的列填 0、单元格留空，明细结束行 0 表示自动。保存方案后还需保存系统设置。</p>
+      <section className="excel-import-settings-section" aria-label="Excel 导入方案">
       <div className="section-header">
         <h2>Excel 导入方案</h2>
         <div className="toolbar-actions">
@@ -195,16 +201,14 @@ export function ExcelImportSettingsPanel({
           <span>{schemes.length} 个已保存方案</span>
           <span>{currentSchemeName || "未命名"}</span>
         </div>
-        <div className="form-section" aria-label="缺省资料">
-          <h3>缺省资料</h3>
-          <p className="form-field-description">Excel 导入缺少出口商中文名时使用，也用于 Excel 模板中的默认出口商资料。</p>
-          <div className="field-grid"><TextSetting settings={settings} path={["system", "defaultTemplateExporterNameCn"]} label="默认出口商中文名" disabled={disabled} onChange={onChange} /></div>
-        </div>
+        <div className="field-grid"><label><span>工作表名称</span><input value={readRecordString(currentSettings, "sheetName")} disabled={disabled} onChange={event => updateCurrentField("sheetName", event.target.value)} /></label></div>
         <ExcelImportFieldGroup title="出口商" fields={excelExporterMappingFields} settings={currentSettings} disabled={disabled} onChange={updateCurrentField} />
         <ExcelImportFieldGroup title="客户与通知方" fields={excelCustomerMappingFields} settings={currentSettings} disabled={disabled} onChange={updateCurrentField} />
         <ExcelImportFieldGroup title="发票与运输" fields={excelInvoiceMappingFields} settings={currentSettings} disabled={disabled} onChange={updateCurrentField} />
         <ExcelImportFieldGroup title="明细行与列" fields={excelItemMappingFields} settings={currentSettings} disabled={disabled} onChange={updateCurrentField} />
       </fieldset>
+      </section>
+      </details>
     </section>
   );
 }

@@ -81,8 +81,8 @@ export async function verifyDesktopConditionalReports({ run, request, token, cdp
   await wait("document.body.innerText.includes('私人模板已保存')");
   const saved = await request('GetUserReportTemplate', token, undefined, { id: cloned.body.id });
   const condition = JSON.parse(saved.body.contentHtml).layers.flatMap(layer => layer.elements).find(element => element.id === 'special-terms').block;
-  assert.equal(condition.additionalConditions[0].fieldPath, 'Invoice.Currency');
-  assert.equal(condition.additionalConditions[0].value, 'USD', JSON.stringify(saved.body));
+  assert.equal(condition.conditions[1].fieldPath, 'Invoice.Currency');
+  assert.equal(condition.conditions[1].value, 'USD', JSON.stringify(saved.body));
   await captureScreenshot(cdp, path.join(output, 'Full-conditional-designer.png'));
   const preview = await request('PreviewInvoiceReportHtml', token, { reportType: 'ExportDocument', templatePath: `user-template:${cloned.body.id}`, withSeal: true }, { invoiceId });
   assert.equal(preview.status, 200);

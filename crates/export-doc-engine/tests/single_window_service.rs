@@ -206,6 +206,7 @@ fn profile_at(f: &Fixture, directory_root: &std::path::Path) -> Value {
     );
     let value = call(f, SAVE_SINGLE_WINDOW_CLIENT_PROFILE, 0, Some(body));
     assert_eq!(value["profiles"].as_array().unwrap().len(), 1);
+    assert_eq!(value["savedProfileKey"], value["profiles"][0]["profileKey"]);
     assert!(value["profiles"][0].get("_secret").is_none());
     value["profiles"][0].clone()
 }
@@ -520,6 +521,7 @@ fn client_directories_reject_missing_relative_and_overlapping_locations() {
     {
         request[&key] = station[&key].clone();
     }
+    request["expectedVersion"] = station["versionNumber"].clone();
     for path in [
         "relative/OutBox".to_owned(),
         f.root.join("missing").to_string_lossy().into_owned(),
@@ -541,10 +543,22 @@ fn client_directories_reject_missing_relative_and_overlapping_locations() {
     }
     // Two cards may use the same official task folders; the active manifest binding remains mandatory.
     request["profileKey"] = json!("");
+    request["expectedVersion"] = json!(0);
     request["cardIdentifier"] = json!("SECOND-CARD");
     let result = call(&f, SAVE_SINGLE_WINDOW_CLIENT_PROFILE, 0, Some(request));
     assert_eq!(result["profiles"].as_array().unwrap().len(), 2);
+    assert_ne!(result["savedProfileKey"], station["profileKey"]);
+    assert_eq!(
+        result["profiles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|p| p["profileKey"] == result["savedProfileKey"])
+            .unwrap()["cardIdentifier"],
+        "SECOND-CARD"
+    );
     let mut disabled = station.clone();
+    disabled["expectedVersion"] = station["versionNumber"].clone();
     disabled["canSubmitCustomsCoo"] = json!(false);
     disabled["customsCooDirectories"]["outBox"] = json!(f.root.join("disconnected-device"));
     // Inactive task paths remain editable later and do not block the other task.
@@ -554,6 +568,53 @@ fn client_directories_reject_missing_relative_and_overlapping_locations() {
         SAVE_SINGLE_WINDOW_CLIENT_PROFILE,
         0,
         Some(contracts::dto(request_schema, disabled)),
+    );
+}
+
+#[test]
+fn client_profile_updates_reject_stale_and_missing_versions() {
+    let f = Fixture::new();
+    let station = profile(&f);
+    let mut request = contracts::dto(
+        contracts::schema("ApiSingleWindowClientProfileSaveRequest"),
+        station.clone(),
+    );
+    request["expectedVersion"] = station["versionNumber"].clone();
+    request["profileName"] = json!("Changed");
+    let saved = call(
+        &f,
+        SAVE_SINGLE_WINDOW_CLIENT_PROFILE,
+        0,
+        Some(request.clone()),
+    );
+    assert_eq!(
+        saved["profiles"][0]["versionNumber"].as_i64(),
+        Some(station["versionNumber"].as_i64().unwrap() + 1)
+    );
+    request["profileName"] = json!("Stale");
+    assert_eq!(
+        f.client()
+            .json::<Value>(
+                SAVE_SINGLE_WINDOW_CLIENT_PROFILE,
+                &[],
+                &[],
+                Some(request.clone())
+            )
+            .unwrap_err()
+            .status,
+        Some(409)
+    );
+    request.as_object_mut().unwrap().remove("expectedVersion");
+    assert_eq!(
+        f.client()
+            .json::<Value>(SAVE_SINGLE_WINDOW_CLIENT_PROFILE, &[], &[], Some(request))
+            .unwrap_err()
+            .status,
+        Some(400)
+    );
+    assert_eq!(
+        call(&f, GET_SINGLE_WINDOW_CLIENT_PROFILES, 0, None)["profiles"][0]["profileName"],
+        "Changed"
     );
 }
 

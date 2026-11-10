@@ -6,17 +6,8 @@ import { useOfficeOperation } from "../office/useOfficeData.ts";
 import { mergeSavedDraftFields } from "../../ui/recordDraftMerge.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { calendarDateInputs, calendarEditableFields, type CalendarDateInputs, type CalendarDateKey } from "./businessCalendarDraft.ts";
-import { acceptApprovalSection, editableFields, type ApprovalSettingsField } from "./approvalSettingsMerge.ts";
+import { acceptApprovalSection, editableFields, sameDraftValue, type ApprovalSettingsField } from "./approvalSettingsMerge.ts";
 export type { ApprovalSettingsField } from "./approvalSettingsMerge.ts";
-
-function sameDraftValue(a:unknown,b:unknown):boolean {
-  if(Object.is(a,b)) return true;
-  if(!a || !b || typeof a!=="object" || typeof b!=="object") return false;
-  if(Array.isArray(a)) return Array.isArray(b) && a.length===b.length && a.every((value,index)=>sameDraftValue(value,b[index]));
-  if(Array.isArray(b)) return false;
-  const left=a as Record<string,unknown>, right=b as Record<string,unknown>;
-  return Object.keys(left).length===Object.keys(right).length && Object.keys(left).every(key=>Object.hasOwn(right,key) && sameDraftValue(left[key],right[key]));
-}
 
 export type ApprovalAccount = { id: number; fullName: string; username: string; departmentId: string; contexts?: { id: string; name: string; departmentId: string }[] };
 export function useApprovalSettings(client: ExportDocManagerApiClient, user: ApiUserDto) {
@@ -34,7 +25,6 @@ export function useApprovalSettingsDraft(client: ExportDocManagerApiClient, init
   useEffect(() => { if (operation.error) formRef.current?.querySelectorAll("details").forEach(section => { section.open = true; }); }, [operation.error]);
   const { confirmDiscardChanges } = useUnsavedChangesGuard({ isDirty: editableFields.some(key=>!sameDraftValue(draft[key],baseline[key])) || !sameDraftValue(calendarInputs,calendarDateInputs(baseline.calendar)), message: "审批设置有未保存的修改。" });
   const changeRule = (index: number, change: Partial<OaApprovalSettings["rules"][number]>) => setDraft(value => ({ ...value, rules: value.rules.map((rule, i) => i === index ? { ...rule, ...change } : rule) }));
-  const changeDelegate = (index: number, change: Partial<OaApprovalSettings["delegations"][number]>) => setDraft(value => ({ ...value, delegations: value.delegations.map((item, i) => i === index ? { ...item, ...change } : item) }));
   const changeCalendarInput = (key: CalendarDateKey, text: string) => {
     setCalendarInputs(value => ({ ...value, [key]: text }));
     setDraft(value => value.calendar ? { ...value, calendar: { ...value.calendar, [key]: text.split(/[\s,;]+/).filter(Boolean) } } : value);
@@ -76,6 +66,7 @@ export function useApprovalSettingsDraft(client: ExportDocManagerApiClient, init
     if(attempt.current?.fingerprint!==fingerprint) {
       const submitted=submission("rules",definitionKey);
       const saved=await write(submitted,signal,"rules",definitionKey);
+      signal.throwIfAborted();
       const accepted=accept(saved,submitted,{field:"rules",definitionKey});
       attempt.current={fingerprint:fingerprintFor(saved),submitted:accepted,body:{expectedVersion:saved.versionNumber,expectedRevision:saved.revisions?.[`rule:${definitionKey}`]??0,definitionKey,samples,commandKey:createRequestKey(),...(activateAt?{activateAt}:{})}};
     }
@@ -104,5 +95,5 @@ export function useApprovalSettingsDraft(client: ExportDocManagerApiClient, init
     if (operation.busy || !await confirmDiscardChanges("重新载入审批设置")) return;
     await operation.run(signal => client.getOaApprovalSettings({ signal }), saved=>{attempt.current=null;setBaseline(saved);setDraft(saved);setCalendarInputs(calendarDateInputs(saved.calendar));});
   };
-  return { draft, setDraft, operation, formRef, changeRule, changeDelegate, save, publish, disable, remove, cancelActivation, reload, calendarInputs, changeCalendarInput, changedElsewhere: initial.versionNumber > baseline.versionNumber || Object.entries(initial.revisions ?? {}).some(([key,revision]) => revision > (baseline.revisions?.[key] ?? 0)) };
+  return { draft, setDraft, operation, formRef, changeRule, save, publish, disable, remove, cancelActivation, reload, calendarInputs, changeCalendarInput, changedElsewhere: initial.versionNumber > baseline.versionNumber || Object.entries(initial.revisions ?? {}).some(([key,revision]) => revision > (baseline.revisions?.[key] ?? 0)) };
 }

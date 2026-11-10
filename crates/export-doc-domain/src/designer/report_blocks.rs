@@ -134,9 +134,7 @@ pub struct ReportConditionalBlock {
     pub id: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output: Option<ReportBlockOutput>,
-    pub condition: ConditionalRule,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub additional_conditions: Vec<ConditionalRule>,
+    pub conditions: Vec<ConditionalRule>,
     #[serde(default, skip_serializing_if = "ConditionMatch::is_all")]
     pub match_mode: ConditionMatch,
     pub content: ConditionalContent,

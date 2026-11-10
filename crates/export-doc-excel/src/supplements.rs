@@ -43,6 +43,7 @@ fn warning(row: usize, message: &str) -> ApiExcelImportAnalysisIssueDto {
     }
 }
 
+#[derive(Default)]
 pub(crate) struct Tables {
     offset: usize,
     cells: Vec<Vec<String>>,
@@ -52,11 +53,7 @@ pub(crate) struct Tables {
 impl Tables {
     pub(crate) fn read(range: &Range<Data>, after_row: usize, check: Check<'_>) -> Result<Self> {
         let Some(end) = range.end() else {
-            return Ok(Self {
-                offset: 0,
-                cells: vec![],
-                headers: vec![],
-            });
+            return Ok(Self::default());
         };
         let mut cells = Vec::new();
         let mut headers = Vec::new();

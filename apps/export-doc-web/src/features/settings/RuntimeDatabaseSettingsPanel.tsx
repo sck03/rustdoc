@@ -23,7 +23,6 @@ export default function RuntimeDatabaseSettingsPanel({ settings, secrets, canMan
       <div className="section-header"><h2>常规与目录</h2></div>
       <fieldset className="settings-fieldset" disabled={disabled}>
         <div className="field-grid">
-          <TextSetting settings={settings} path={["system", "appName"]} label="软件名称" onChange={onChange} />
           <DirectorySetting settings={settings} path={["system", "defaultExportDirectory"]} label="默认导出目录" disabled={disabled} canSelectDirectory={canSelectDesktopDirectory} onChange={onChange} onSelectDirectory={onSelectDefaultExportDirectory} />
         </div>
       </fieldset>

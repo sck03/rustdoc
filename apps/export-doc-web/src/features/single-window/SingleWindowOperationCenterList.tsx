@@ -1,27 +1,23 @@
 import { Field } from "../../ui/primitives/Field.tsx";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Files, FolderInput, Send } from "lucide-react";
-import { type KeyboardEvent, useEffect, useState } from "react";
+import { type KeyboardEvent } from "react";
 import type {
   ExportDocManagerApiClient,
-  SingleWindowClientDispatchResult,
   SingleWindowOperationCenterRow,
-  SingleWindowReceiptCollectionResult,
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { selectSavePackagePath } from "../../desktop/desktopBridge.ts";
-import { readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
+import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { isDirectTableRowKeyboardEvent } from "../../ui/tableRowInteractions.ts";
+import { useSingleWindowBatchActions } from "./useSingleWindowBatchActions.ts";
 import { DetailItem } from "./SingleWindowOperationCenterTables.tsx";
 import {
-  buildReceiptPackageFileName,
   formatBatchStatus,
   formatBusinessType,
   formatDateTime,
-  invalidateSingleWindowBatchQueries,
   readDisplayText,
   resolveBusinessClientDirectories,
 } from "./singleWindowOperationCenterModel.ts";
@@ -61,7 +57,7 @@ export function OperationCenterTable({
   onOpen: (batchId: number) => void;
 }) {
   function handleRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, batchId: number) {
-    if (!isDirectTableRowKeyboardEvent(event)) return;
+    if (isBusy || !isDirectTableRowKeyboardEvent(event)) return;
     if (event.key === "Enter") {
       event.preventDefault();
       onOpen(batchId);
@@ -80,10 +76,11 @@ export function OperationCenterTable({
             <tr
               className={row.batchId === selectedBatchId ? "clickable-row selected-row" : "clickable-row"}
               key={row.batchId}
-              tabIndex={0}
+              tabIndex={isBusy ? -1 : 0}
+              aria-disabled={isBusy}
               aria-selected={row.batchId === selectedBatchId}
-              onClick={() => onSelect(row.batchId)}
-              onDoubleClick={() => onOpen(row.batchId)}
+              onClick={() => { if (!isBusy) onSelect(row.batchId); }}
+              onDoubleClick={() => { if (!isBusy) onOpen(row.batchId); }}
               onKeyDown={(event) => handleRowKeyDown(event, row.batchId)}
             >
               <td className="strong-cell" data-label="资料编号">{readDisplayText(row.invoiceNo)}</td>
@@ -95,7 +92,7 @@ export function OperationCenterTable({
               <td data-label="回执" title={row.lastReceiptMessage ?? ""}>{row.receiptCount > 0 ? `${row.receiptCount} · ${readDisplayText(row.lastReceiptCode)}` : "0"}</td>
               <td data-label="持卡档案">{readDisplayText(row.clientProfileName || row.assignedCardIdentifier)}</td>
               <td data-label="更新">{formatDateTime(row.updatedAt)}</td>
-              <td data-label="操作"><button className="icon-button compact-icon-button" type="button" title="打开批次详情" aria-label="打开批次详情" onClick={(event) => { event.stopPropagation(); onOpen(row.batchId); }}><Files size={15} aria-hidden="true" /></button></td>
+              <td data-label="操作"><button className="icon-button compact-icon-button" type="button" title="打开批次详情" aria-label="打开批次详情" disabled={isBusy} onClick={(event) => { event.stopPropagation(); onOpen(row.batchId); }}><Files size={15} aria-hidden="true" /></button></td>
             </tr>
           ))}
         </tbody>
@@ -117,78 +114,14 @@ export function OperationCenterListActionsPanel({
   isDesktopStation: boolean;
   onOpenDetail: () => void;
 }) {
-  const queryClient = useQueryClient();
-  const [message, setMessage] = useState<string | null>(null);
-  const [messageKind, setMessageKind] = useState<"success" | "error">("success");
-  const [savedReceiptPackagePath, setSavedReceiptPackagePath] = useState("");
-  const [dispatchResult, setDispatchResult] = useState<SingleWindowClientDispatchResult | null>(null);
-  const [receiptResult, setReceiptResult] = useState<SingleWindowReceiptCollectionResult | null>(null);
-
-  useEffect(() => {
-    setMessage(null);
-    setMessageKind("success");
-    setSavedReceiptPackagePath("");
-    setDispatchResult(null);
-    setReceiptResult(null);
-  }, [row.batchId]);
+  const { message, messageKind, setMessage, dispatchResult, receiptResult, savedReceiptPackagePath, isBusy, dispatch, collect } =
+    useSingleWindowBatchActions(client, row, canOperate && isDesktopStation);
 
   const profileQuery = useQuery({
     queryKey: queryKeys.singleWindowClientProfiles(),
     queryFn: ({ signal }) => client.getSingleWindowClientProfiles({ signal }),
     enabled: isDesktopStation,
     staleTime: 60_000,
-  });
-
-  const dispatchMutation = useMutation({
-    mutationFn: () => client.dispatchSingleWindowBatchToClient({ body: { batchId: row.batchId } }),
-    onSuccess: async (response) => {
-      setDispatchResult(response);
-      setMessage("申报文件已送入当前档案的待导入目录；这不代表官方客户端已经导入，请由操作员继续确认导入和提交。");
-      setMessageKind("success");
-      await invalidateSingleWindowBatchQueries(queryClient);
-    },
-    onError: (error) => {
-      setDispatchResult(null);
-      setMessage(readApiError(error));
-      setMessageKind("error");
-    },
-  });
-
-  const receiptMutation = useMutation({
-    mutationFn: async () => {
-      const collection = await client.collectSingleWindowClientReceipts({ body: { batchId: row.batchId } });
-      if (collection.receiptFiles.length === 0) {
-        throw new Error("当前档案的回执目录中尚未找到与当前批次精确匹配的回执文件。");
-      }
-
-      const targetPath = await selectSavePackagePath(buildReceiptPackageFileName(row));
-      if (!targetPath) return { collection, targetPath: "" };
-      await client.saveSingleWindowReceiptPackageToPath({
-        body: {
-          businessType: row.businessType,
-          batchReference: row.batchReference,
-          invoiceNo: row.invoiceNo,
-          receiptFiles: collection.receiptFiles,
-          packagePath: targetPath,
-        },
-      });
-      return { collection, targetPath };
-    },
-    onSuccess: async ({ collection, targetPath }) => {
-      setReceiptResult(collection);
-      setSavedReceiptPackagePath(targetPath);
-      setMessage(targetPath
-        ? "回执包已导出，请交回办公室系统导入归档。"
-        : "已找到回执文件，但未选择回执包保存位置。");
-      setMessageKind("success");
-      await invalidateSingleWindowBatchQueries(queryClient);
-    },
-    onError: (error) => {
-      setReceiptResult(null);
-      setSavedReceiptPackagePath("");
-      setMessage(error instanceof Error ? error.message : readDesktopError(error));
-      setMessageKind("error");
-    },
   });
 
   const profile = profileQuery.data?.profiles.find((item) => item.isActive) ?? null;
@@ -200,7 +133,6 @@ export function OperationCenterListActionsPanel({
   const directories = profile && isActiveProfileMatch ? resolveBusinessClientDirectories(profile, row.businessType) : null;
   const outBoxPath = directories?.outBox ?? "";
   const inBoxPath = directories?.inBox ?? "";
-  const isBusy = dispatchMutation.isPending || receiptMutation.isPending;
   const canDispatch = isActiveProfileMatch && row.status === "SubmitPackageImported";
   const canCollect = isActiveProfileMatch && ![
     "Preparing",
@@ -216,8 +148,8 @@ export function OperationCenterListActionsPanel({
         <div><h2>{isDesktopStation ? "当前持卡机任务" : "当前办公室批次"}</h2><span>{readDisplayText(row.batchReference)}</span></div>
         <div className="toolbar-actions">
           <button className="command-button secondary" type="button" disabled={isBusy} onClick={onOpenDetail}><Files size={17} aria-hidden="true" /><span>批次详情</span></button>
-          {isDesktopStation ? <button className="command-button" type="button" disabled={!canOperate || isBusy || !canDispatch} onClick={() => dispatchMutation.mutate()}><Send size={17} aria-hidden="true" /><span>送入官方客户端待办目录</span></button> : null}
-          {isDesktopStation ? <button className="command-button secondary" type="button" disabled={!canOperate || isBusy || !canCollect} onClick={() => receiptMutation.mutate()}><FolderInput size={17} aria-hidden="true" /><span>收集并导出回执</span></button> : null}
+          {isDesktopStation ? <button className="command-button" type="button" disabled={!canOperate || isBusy || !canDispatch} onClick={() => dispatch()}><Send size={17} aria-hidden="true" /><span>送入官方客户端待办目录</span></button> : null}
+          {isDesktopStation ? <button className="command-button secondary" type="button" disabled={!canOperate || isBusy || !canCollect} onClick={() => collect()}><FolderInput size={17} aria-hidden="true" /><span>收集并导出回执</span></button> : null}
         </div>
       </div>
 

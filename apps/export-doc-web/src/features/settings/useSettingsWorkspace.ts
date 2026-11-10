@@ -37,7 +37,6 @@ export function useSettingsWorkspace({
   canManageSettings,
   canUseDocumentWorkspace,
   isDesktopRuntime,
-  productName,
   operationMode,
 }: {
   client: ExportDocManagerApiClient;
@@ -45,7 +44,6 @@ export function useSettingsWorkspace({
   canManageUsers: boolean;
   canUseDocumentWorkspace: boolean;
   isDesktopRuntime: boolean;
-  productName: string;
   operationMode?: "maintenance";
 }) {
   const requestConfirmation = useConfirmation();
@@ -403,10 +401,7 @@ export function useSettingsWorkspace({
       return;
     }
 
-    patchSettings([
-      { path: ["system", "appName"], value: productName },
-      ...systemDefaultPatches,
-    ].filter(({ path }) => settingsCategoryForPath(path) === currentCategory
+    patchSettings(systemDefaultPatches.filter(({ path }) => settingsCategoryForPath(path) === currentCategory
       && path[1] !== "databaseProvider"
       && (path[1] !== "updaterEndpoint" || isDesktopRuntime)
       && (path[1] !== "sqliteDatabaseFileName" || databaseProvider === "sqlite")

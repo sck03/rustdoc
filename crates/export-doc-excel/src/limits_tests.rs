@@ -1,15 +1,11 @@
 use super::*;
 use calamine::Reader;
-use export_doc_contracts::contracts;
 use export_doc_domain::invoice::InvoiceDraft;
 use serde_json::json;
 use std::cell::Cell;
 
 fn check() -> Result<()> {
     Ok(())
-}
-fn settings() -> serde_json::Value {
-    contracts::contract()["configuration"]["defaults"]["excelImport"].clone()
 }
 fn small_workbook() -> Vec<u8> {
     table(
@@ -44,7 +40,7 @@ fn sparse_coordinates_are_rejected_before_dense_allocation_in_all_import_paths()
     );
     assert!(bytes.len() < 16 * 1024);
     for result in [
-        preview(&bytes, "sparse.xlsx", &settings(), "2026-10-25", &check).map(|_| ()),
+        preview(&bytes, "sparse.xlsx", None, "2026-10-25", &check).map(|_| ()),
         read_table_data(&bytes, "sparse.xlsx", 2000, &check).map(|_| ()),
         read_sheet_data(&bytes, "sparse.xlsx", "", 2000, &check).map(|_| ()),
     ] {
@@ -133,7 +129,7 @@ fn workbook_paths_keep_case_insensitive_lookup_but_reject_ambiguous_entries() {
             .collect(),
     );
     let bytes = mixed.finish(&check).unwrap();
-    let result = preview(&bytes, "mixed-case.xlsx", &settings(), "2026-10-25", &check).unwrap();
+    let result = preview(&bytes, "mixed-case.xlsx", None, "2026-10-25", &check).unwrap();
     assert!(result.success, "{:?}", result.errors);
     let mut package = archive::Package::open(&small_workbook(), &check).unwrap();
     let duplicate = package.get("xl/workbook.xml").unwrap().to_vec();
@@ -148,7 +144,7 @@ fn configured_numeric_shipment_dates_use_the_workbook_epoch() {
     let invoice = InvoiceDraft::demo("2026-10-25", "NUMERIC-SHIPMENT")
         .build()
         .unwrap();
-    let bytes = booking_from_invoice(template, &invoice, &settings(), &check).unwrap();
+    let bytes = booking_from_invoice(template, &invoice, &check).unwrap();
     for (epoch_1904, expected) in [(false, "2026-06-05"), (true, "2030-06-06")] {
         let mut package = archive::Package::open(&bytes, &check).unwrap();
         let path = "xl/worksheets/sheet1.xml";
@@ -167,14 +163,7 @@ fn configured_numeric_shipment_dates_use_the_workbook_epoch() {
             );
         }
         let bytes = package.finish(&check).unwrap();
-        let result = preview(
-            &bytes,
-            "numeric-date.xlsx",
-            &settings(),
-            "2026-10-25",
-            &check,
-        )
-        .unwrap();
+        let result = preview(&bytes, "numeric-date.xlsx", None, "2026-10-25", &check).unwrap();
         assert!(result.success, "{:?}", result.errors);
         assert_eq!(result.invoice.unwrap().shipment_date, expected);
     }

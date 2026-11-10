@@ -29,7 +29,7 @@ fn conditional_fields_use_native_visibility_and_fallback_rules() {
         flow_kind: "Conditional".into(),
         block: serde_json::from_value(json!({
             "id":"conditional", "type":"Conditional", "style":{},
-            "condition":{"fieldPath":"Invoice.SpecialTerms","operator":"HasValue","value":""},
+            "conditions":[{"fieldPath":"Invoice.SpecialTerms","operator":"HasValue","value":""}],
             "content":{"kind":"Field","fieldPath":"Invoice.ContractNo","label":"Contract","fallbackText":"NO-CONTRACT","text":""}
         })).unwrap(),
     };

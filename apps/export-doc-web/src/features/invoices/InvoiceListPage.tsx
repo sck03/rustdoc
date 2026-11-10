@@ -14,6 +14,7 @@ import { InvoiceTransferImportPanel } from "./InvoiceTransferImportPanel.tsx";
 import { InvoiceTable } from "./InvoiceTable.tsx";
 import { SingleWindowActionsPanel } from "./SingleWindowActionsPanel.tsx";
 import { useInvoiceListWorkspace } from "./hooks/useInvoiceListWorkspace.ts";
+import { ExcelImportModeSelect } from "../tools/excel/ExcelImportModeSelect.tsx";
 
 export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient }) {
   const {
@@ -27,7 +28,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
     transferBusy, openCopyPanel, openSingleWindowPanel, patchCopyDraft,
     submitCopyInvoice, handleExportTransferPackage, handleChooseImportTransferPackage, handleChooseExcelImport, handleExcelImportUpload,
     handlePreviewTransferPackage, handlePreviewTransferUpload, patchTransferDraft, submitTransferImport, handleOpenLastExportedPackage,
-    invoices, message, isBusy,
+    invoices, message, isBusy, excelSchemeName, setExcelSchemeName,
   } = useInvoiceListWorkspace({ client });
 
   return (
@@ -94,6 +95,10 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
           <button className="icon-button" type="button" title="重置搜索" aria-label="重置搜索" disabled={isBusy || (!keyword && !committedKeyword)} onClick={handleResetSearch}><X size={18} aria-hidden="true" /></button>
         </FilterBar>
       </PageHeader>
+      {workspaceDeviceCapabilities.canImportExport && invoicePermission.canOperate && excelPermission.canOperate &&
+        <details className="form-section"><summary>{excelSchemeName ? `Excel 导入：手动 · ${excelSchemeName}` : "特殊格式 Excel 导入"}</summary>
+          <ExcelImportModeSelect client={client} value={excelSchemeName} onChange={setExcelSchemeName} disabled={isBusy} />
+        </details>}
 
       {message ? <InlineNotice tone="error" title="发票操作未完成">{message}</InlineNotice> : null}
       {routeSuccessMessage ? <InlineNotice tone="success">{routeSuccessMessage}</InlineNotice> : null}

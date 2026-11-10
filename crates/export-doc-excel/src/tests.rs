@@ -1,6 +1,5 @@
 use super::*;
 use calamine::{Reader, open_workbook_auto_from_rs};
-use export_doc_contracts::contracts;
 use export_doc_domain::invoice::InvoiceDraft;
 use serde_json::json;
 use std::{collections::BTreeMap, io::Cursor};
@@ -10,15 +9,12 @@ const TEMPLATE: &[u8] =
 fn check() -> Result<()> {
     Ok(())
 }
-fn settings() -> serde_json::Value {
-    contracts::contract()["configuration"]["defaults"]["excelImport"].clone()
-}
 
 #[test]
 fn booking_uses_the_existing_layout_and_round_trips_exact_invoice_amounts() {
     let draft = InvoiceDraft::demo("2026-09-16", "XL-NATIVE-001");
     let invoice = draft.build().unwrap();
-    let bytes = booking_from_invoice(TEMPLATE, &invoice, &settings(), &check).unwrap();
+    let bytes = booking_from_invoice(TEMPLATE, &invoice, &check).unwrap();
     let original = archive::Package::open(TEMPLATE, &check).unwrap();
     let exported = archive::Package::open(&bytes, &check).unwrap();
     assert_eq!(
@@ -36,7 +32,7 @@ fn booking_uses_the_existing_layout_and_round_trips_exact_invoice_amounts() {
                     && col.attr("hidden") == Some("1"))
         );
     }
-    let preview = preview(&bytes, "托单.xlsx", &settings(), "2026-09-16", &check).unwrap();
+    let preview = preview(&bytes, "托单.xlsx", None, "2026-09-16", &check).unwrap();
     assert!(preview.success, "{preview:#?}");
     let imported = preview.invoice.as_ref().unwrap();
     assert_eq!(imported.invoice_no, invoice.invoice_no);
@@ -50,7 +46,7 @@ fn booking_uses_the_existing_layout_and_round_trips_exact_invoice_amounts() {
 #[test]
 fn reordered_columns_and_line_amount_driven_prices_are_preserved() {
     let data=table(&[("amount","金额"),("name","英文品名"),("quantity","数量"),("style","款号"),("price","单价"),("hs","HS 编码")],&[json!({"amount":5.000000000000001,"name":"COTTON & SILK SHIRT","quantity":3,"style":"00123","price":1.6600000000000001,"hs":"6109100000"})],&check).unwrap();
-    let result = preview(&data, "导入.xlsx", &settings(), "2026-09-16", &check).unwrap();
+    let result = preview(&data, "导入.xlsx", None, "2026-09-16", &check).unwrap();
     assert!(result.success, "{result:#?}");
     let invoice = result.invoice.unwrap();
     assert_eq!(invoice.items[0].style_no, "00123");
@@ -58,6 +54,64 @@ fn reordered_columns_and_line_amount_driven_prices_are_preserved() {
     assert_eq!(invoice.items[0].total_price.to_string(), "5");
     assert_eq!(invoice.items[0].price_calculation_mode, "LineAmountDriven");
     assert_eq!(invoice.items[0].unit_price.to_string(), "1.66667");
+}
+
+#[test]
+fn explicit_manual_mapping_imports_unrecognized_headers_without_changing_auto_detection() {
+    let bytes = table(
+        &[("a", "甲"), ("b", "乙"), ("c", "丙")],
+        &[json!({"a":"00123","b":"SHIRT","c":12})],
+        &check,
+    )
+    .unwrap();
+    assert!(
+        !preview(&bytes, "manual.xlsx", None, "2026-11-10", &check)
+            .unwrap()
+            .success
+    );
+    let mut mapping =
+        export_doc_contracts::contracts::contract()["configuration"]["defaults"]["excelImport"]
+            .clone();
+    for (key, value) in mapping.as_object_mut().unwrap() {
+        if key.ends_with("Col") {
+            *value = json!(0);
+        }
+        if key.ends_with("Cell") {
+            *value = json!("");
+        }
+    }
+    for (key, value) in [
+        ("sheetName", json!("导出数据")),
+        ("itemsStartRow", json!(2)),
+        ("styleNoCol", json!(1)),
+        ("styleNameCol", json!(2)),
+        ("quantityCol", json!(3)),
+    ] {
+        mapping[key] = value;
+    }
+    let result = preview(&bytes, "manual.xlsx", Some(&mapping), "2026-11-10", &check).unwrap();
+    assert!(result.success, "{:?}", result.errors);
+    let invoice = result.invoice.unwrap();
+    assert_eq!(invoice.items.len(), 1);
+    assert_eq!(invoice.items[0].style_no, "00123");
+    assert_eq!(invoice.items[0].quantity.to_string(), "12");
+    let scoped = table(
+        &[("a", "甲"), ("b", "乙"), ("c", "丙"), ("d", ""), ("e", ""), ("f", ""), ("g", ""), ("h", ""), ("i", "")],
+        &[
+            json!({"a":"00123","b":"SHIRT","c":12}),
+            json!({"a":"NAME/COMPO","d":"成分及英文名","e":"报关中文名","f":"提单HS编码","g":"品牌","h":"报关HS编码","i":"单位"}),
+            json!({"c":"00123","g":"OUTSIDE-MANUAL-RANGE"}),
+        ], &check,
+    ).unwrap();
+    mapping["itemsEndRow"] = json!(2);
+    let result = preview(&scoped, "manual.xlsx", Some(&mapping), "2026-11-10", &check).unwrap();
+    assert!(result.success, "{:?}", result.errors);
+    assert!(
+        result.invoice.unwrap().items[0].brand.is_empty(),
+        "manual disabled columns must not be filled by automatic supplements"
+    );
+    mapping["quantityCol"] = json!(129);
+    assert!(preview(&bytes, "manual.xlsx", Some(&mapping), "2026-11-10", &check).is_err());
 }
 
 #[test]
@@ -100,7 +154,7 @@ fn supplemental_tables_join_by_po_and_style_and_ignore_empty_formula_tails() {
         .0
         .insert("xl/worksheets/sheet1.xml".into(), sheet.into_bytes());
     let bytes = package.finish(&check).unwrap();
-    let result = preview(&bytes, "anonymous.xlsx", &settings(), "2026-10-09", &check).unwrap();
+    let result = preview(&bytes, "anonymous.xlsx", None, "2026-10-09", &check).unwrap();
     assert!(result.success, "{:?}", result.errors);
     let invoice = result.invoice.unwrap();
     assert_eq!(invoice.items.len(), 3);
@@ -127,7 +181,7 @@ fn supplemental_tables_join_by_po_and_style_and_ignore_empty_formula_tails() {
     let result = preview(
         &package.finish(&check).unwrap(),
         "epoch.xlsx",
-        &settings(),
+        None,
         "2026-10-09",
         &check,
     )
@@ -146,11 +200,11 @@ fn extending_the_detail_area_preserves_subtotals_and_footer() {
             item
         })
         .collect();
-    let bytes = booking_from_invoice(TEMPLATE, &invoice, &settings(), &check).unwrap();
+    let bytes = booking_from_invoice(TEMPLATE, &invoice, &check).unwrap();
     let mut workbook = open_workbook_auto_from_rs(Cursor::new(&bytes)).unwrap();
     let range = workbook.worksheet_range_at(0).unwrap().unwrap();
     assert_eq!(range.get_value((89, 9)).unwrap().to_string(), "70000");
-    let imported = preview(&bytes, "长托单.xlsx", &settings(), "2026-09-16", &check).unwrap();
+    let imported = preview(&bytes, "长托单.xlsx", None, "2026-09-16", &check).unwrap();
     assert!(imported.success, "{:?}", imported.errors);
     assert_eq!(imported.invoice.unwrap().items.len(), 70);
 }
@@ -196,14 +250,7 @@ fn import_ignores_empty_tail_records_but_rejects_real_out_of_bounds_content() {
     let formulas = workbook.worksheet_formula("Notes").unwrap();
     assert_eq!(formulas.get_value((65535, 9)).unwrap(), "H65536*I65536");
     assert!(formulas.get_value((65535, 10)).unwrap().ends_with("65536"));
-    let imported = preview(
-        fixture,
-        "last-row-formulas.xls",
-        &settings(),
-        "2026-09-29",
-        &check,
-    )
-    .unwrap();
+    let imported = preview(fixture, "last-row-formulas.xls", None, "2026-09-29", &check).unwrap();
     assert!(imported.success, "{:?}", imported.errors);
     assert_eq!(imported.invoice.unwrap().items.len(), 3);
     let report = imported.analysis_report.unwrap();
@@ -232,7 +279,7 @@ fn import_ignores_empty_tail_records_but_rejects_real_out_of_bounds_content() {
             .0
             .insert("xl/worksheets/sheet1.xml".into(), sheet.into_bytes());
         let bytes = package.finish(&check).unwrap();
-        let result = preview(&bytes, "empty-tail.xlsx", &settings(), "2026-09-29", &check);
+        let result = preview(&bytes, "empty-tail.xlsx", None, "2026-09-29", &check);
         if succeeds {
             let result = result.unwrap();
             assert!(result.success, "{:?}", result.errors);

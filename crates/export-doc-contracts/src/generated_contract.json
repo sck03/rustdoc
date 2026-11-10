@@ -1,11 +1,10 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "77cf924bd5b882dbf2fc63fd82e0cb65570261c0b5ffa26620ef7d778065bf51",
+  "digest": "cfddd80d6c048bad8330cad38340d2086f0f0ff2a389b7b053ce4b75ac87e58d",
   "configuration": {
     "defaults": {
       "revision": 0,
       "system": {
-        "appName": "外贸业务综合管理系统",
         "updaterEndpoint": "",
         "defaultTemplateExporterNameCn": "",
         "backupRetentionDays": 0,
@@ -48,6 +47,7 @@
       },
       "paymentTemplates": [],
       "excelImport": {
+        "sheetName": "明细单",
         "schemeName": "Default",
         "exporterNameCNCell": "A1",
         "exporterNameCell": "B3",
@@ -169,7 +169,6 @@
       }
     },
     "labels": {
-      "system.appName": "软件名称",
       "system.updaterEndpoint": "软件更新地址",
       "system.defaultTemplateExporterNameCn": "默认出口商中文名",
       "system.backupRetentionDays": "数据备份保留天数",
@@ -65135,6 +65134,14 @@
           "schema": {
             "type": "string"
           }
+        },
+        {
+          "name": "schemeName",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "maxLength": 100
+          }
         }
       ],
       "requestBody": {
@@ -65519,6 +65526,14 @@
           "in": "query",
           "schema": {
             "type": "string"
+          }
+        },
+        {
+          "name": "schemeName",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "maxLength": 100
           }
         }
       ],
@@ -80683,6 +80698,184 @@
       },
       "request": {
         "$ref": "#/components/schemas/ApiRecoveryArchiveSaveRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/BackgroundJobSnapshot"
+      },
+      "timeoutSeconds": 30
+    },
+    "StartSingleWindowExcelTemplateDownloadJob": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": {
+          "readModule": "document.single-window",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": null,
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [
+          {
+            "resourceKey": "document.jobs",
+            "action": "view"
+          },
+          {
+            "resourceKey": "document.jobs",
+            "action": "operate"
+          }
+        ],
+        "permissionBypass": false,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "document.single-window",
+              "actions": [
+                "operate"
+              ],
+              "administratorOnly": false
+            },
+            {
+              "resourceKey": "document.jobs",
+              "actions": [
+                "view"
+              ],
+              "administratorOnly": false
+            },
+            {
+              "resourceKey": "document.jobs",
+              "actions": [
+                "operate"
+              ],
+              "administratorOnly": false
+            }
+          ]
+        }
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": null,
+      "responses": {
+        "202": {
+          "description": "Accepted",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackgroundJobSnapshot"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "503": {
+          "description": "Service Unavailable"
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/BackgroundJobSnapshot"
+      },
+      "timeoutSeconds": 30
+    },
+    "StartSingleWindowExcelTemplateSaveToPathJob": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": {
+          "readModule": "document.single-window",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": null,
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [
+          {
+            "resourceKey": "document.jobs",
+            "action": "view"
+          },
+          {
+            "resourceKey": "document.jobs",
+            "action": "operate"
+          }
+        ],
+        "permissionBypass": false,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "document.single-window",
+              "actions": [
+                "operate"
+              ],
+              "administratorOnly": false
+            },
+            {
+              "resourceKey": "document.jobs",
+              "actions": [
+                "view"
+              ],
+              "administratorOnly": false
+            },
+            {
+              "resourceKey": "document.jobs",
+              "actions": [
+                "operate"
+              ],
+              "administratorOnly": false
+            }
+          ]
+        }
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiExcelOutputRequest"
+            }
+          }
+        }
+      },
+      "responses": {
+        "202": {
+          "description": "Accepted",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackgroundJobSnapshot"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request"
+        },
+        "401": {
+          "description": "Unauthorized"
+        },
+        "403": {
+          "description": "Forbidden"
+        },
+        "503": {
+          "description": "Service Unavailable"
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/ApiExcelOutputRequest"
       },
       "response": {
         "$ref": "#/components/schemas/BackgroundJobSnapshot"
@@ -99694,8 +99887,15 @@
       "properties": {
         "filePath": {
           "type": "string"
+        },
+        "schemeName": {
+          "type": "string",
+          "maxLength": 100
         }
-      }
+      },
+      "required": [
+        "filePath"
+      ]
     },
     "ApiExcelImportPreviewResponse": {
       "type": "object",
@@ -109383,9 +109583,15 @@
         "updatedAt": {
           "type": "string",
           "format": "date-time"
+        },
+        "versionNumber": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
         }
       },
       "required": [
+        "versionNumber",
         "id",
         "stationKey",
         "profileKey",
@@ -109423,6 +109629,11 @@
         "customsCooDirectories": {
           "$ref": "#/components/schemas/ApiSingleWindowClientDirectories"
         },
+        "expectedVersion": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
         "profileKey": {
           "type": "string"
         },
@@ -109431,6 +109642,7 @@
         }
       },
       "required": [
+        "expectedVersion",
         "profileKey",
         "profileName",
         "companyScope",
@@ -109455,6 +109667,9 @@
           "items": {
             "$ref": "#/components/schemas/ApiSingleWindowClientProfileDto"
           }
+        },
+        "savedProfileKey": {
+          "type": "string"
         },
         "storagePolicy": {
           "type": "string"
@@ -113068,6 +113283,11 @@
         "schemeName": {
           "type": "string"
         },
+        "sheetName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 31
+        },
         "shippingMarksCell": {
           "type": "string",
           "description": "唛头所在的Excel单元格位置，例如 A20"
@@ -113167,6 +113387,7 @@
         }
       },
       "required": [
+        "sheetName",
         "schemeName",
         "exporterNameCNCell",
         "exporterNameCell",
@@ -125282,10 +125503,6 @@
     "SystemSettings": {
       "type": "object",
       "properties": {
-        "appName": {
-          "type": "string",
-          "description": "显示在主界面标题栏的软件名称"
-        },
         "auditLogRetentionDays": {
           "type": [
             "integer",
@@ -125433,7 +125650,6 @@
         }
       },
       "required": [
-        "appName",
         "updaterEndpoint",
         "defaultTemplateExporterNameCn",
         "backupRetentionDays",

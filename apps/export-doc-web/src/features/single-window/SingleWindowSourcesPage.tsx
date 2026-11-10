@@ -8,6 +8,7 @@ import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { SingleWindowTabs } from "./SingleWindowNavigation.tsx";
 import { useSingleWindowSources } from "./useSingleWindowSources.ts";
+import { ExcelImportModeSelect } from "../tools/excel/ExcelImportModeSelect.tsx";
 import "../../styles/routes/single-window.css";
 
 export function SingleWindowSourcesPage({ client }: { client: ExportDocManagerApiClient }) {
@@ -19,9 +20,10 @@ export function SingleWindowSourcesPage({ client }: { client: ExportDocManagerAp
     {work.message && <InlineNotice tone="error">{work.message}</InlineNotice>}
     {work.success && <InlineNotice tone="success">{work.success}</InlineNotice>}
     {work.permission.canOperate && <form className="form-section" onSubmit={event => { event.preventDefault(); void work.create(); }}>
-      <div className="section-header"><h2>新建申报资料</h2></div>
+      <div className="section-header"><h2>新建申报资料</h2><button type="button" className="command-button secondary" disabled={work.busy || !work.canDownloadTemplate} title={work.canDownloadTemplate ? undefined : "需要文件任务的查看和操作权限"} onClick={() => void work.downloadTemplate()}>下载 Excel 模板</button></div>
       <div className="field-grid">
         <TextField label="资料编号 / 客户发票号" value={work.referenceNo} onChange={work.setReferenceNo} required disabled={work.busy} />
+        <ExcelImportModeSelect client={client} value={work.schemeName} onChange={work.changeScheme} disabled={work.busy} />
         <label className="form-field"><span className="form-field-label">客户 Excel（可选）</span><FileInput disabled={work.busy} accept=".xlsx,.xlsm,.xltx,.xltm,.xls"
           onChange={event => { work.select(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} /></label>
       </div>
@@ -34,6 +36,11 @@ export function SingleWindowSourcesPage({ client }: { client: ExportDocManagerAp
         </div>}
       <div className="form-actions"><button className="command-button" type="submit" disabled={work.busy || !work.referenceNo.trim() || Boolean(work.fileName && !imported?.success)}>创建申报资料</button></div>
       <p>不选择 Excel 可直接手工填写。产地证收货人、品名及明细单独保存。</p>
+      <details><summary>Excel 填写要求</summary>
+        <p>使用下载模板的“明细单”，保留第 18–19 行表头，从第 20 行填写商品；一行一个款式，勿合并明细单元格。款号、HS 编码按文本填写，数量、价格和重量只填数字，日期使用 YYYY-MM-DD。</p>
+        <p>至少填写款号或品名及数量。中文／英文品名、HS 编码、单位、箱数、重量、单价和金额应按实际资料补齐。公式需在 Excel 中计算并保存后再导入；多工作表会自动识别，上传后须核对预览。</p>
+        <p>Excel 提供申报基础资料；证书类型、原产地标准、生产商、申报单位与操作卡等仍须在代理委托／产地证中核对补录。进口方的特殊产地证品名和收货人可在产地证中单独修改。</p>
+      </details>
     </form>}
     <section className="form-section">
       <TextField label="查找资料" value={work.keyword} onChange={value => { work.setKeyword(value); work.setPage(1); }} />

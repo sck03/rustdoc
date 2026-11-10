@@ -129,8 +129,12 @@ pub fn handle(
     body: &Value,
 ) -> Result<Value> {
     local(service)?;
+    if operation == GET_SINGLE_WINDOW_CLIENT_PROFILES {
+        return service.store.read_for(actor, operation, &[], |tx, actor| {
+            response(tx, service, actor)
+        });
+    }
     service.store.transaction_for(actor, operation, &[], |tx, actor| {
-        if operation == GET_SINGLE_WINDOW_CLIENT_PROFILES { return response(tx,service,actor); }
         auth::authorize(actor, PERMISSION, "edit")?;
         let rows = store::all(tx, PROFILES)?;
         let mut value = if operation == ACTIVATE_SINGLE_WINDOW_CLIENT_PROFILE {
@@ -145,6 +149,9 @@ pub fn handle(
             let mut value = previous.cloned().unwrap_or_else(|| contracts::initial(contracts::schema("ApiSingleWindowClientProfileDto")));
             if let Some(previous) = previous {
                 if !auth::visible(actor,PERMISSION,"edit",previous) { return Err(error(403,"无权修改该档案。")); }
+                if body["expectedVersion"] != previous["versionNumber"] {
+                    return Err(error(409,"操作档案已被修改，请刷新后重新编辑。"));
+                }
                 if previous["companyScope"] != body["companyScope"] || previous["cardIdentifier"] != body["cardIdentifier"] {
                     return Err(error(409,"档案创建后不能更换公司抬头或操作卡，请新增档案。"));
                 }
@@ -157,6 +164,7 @@ pub fn handle(
             if !actor.admin && value["companyScope"] != actor.company { return Err(error(403,"无权为其它公司建立持卡机档案。")); }
             if body["canSubmitCustomsCoo"] != true && body["canSubmitAgentConsignment"] != true { return Err(invalid("请至少启用一种申报业务。")); }
             if previous.is_none() {
+                if body["expectedVersion"] != 0 { return Err(invalid("新增操作档案的预期版本必须为 0。")); }
                 if rows.len()>=100 { return Err(invalid("持卡机档案最多 100 个。")); }
                 let station = match tx.settings("sw-station")? {
                     Some(v) if prefixed(rules::text(&v,"key"),"SWS-") => v,
@@ -200,10 +208,12 @@ pub fn handle(
             value["isActive"]=json!(true);
         }
         let id=value["id"].as_i64().unwrap_or(0);
-        if id>0 { value["expectedVersion"]=value["versionNumber"].clone(); }
+        if id>0 { value["expectedVersion"]=if operation == ACTIVATE_SINGLE_WINDOW_CLIENT_PROFILE { value["versionNumber"].clone() } else { body["expectedVersion"].clone() }; }
         let scope=json!({"companyScope":value["companyScope"]});
         let identity=rules::text(&value,"profileKey").to_owned();
-        store::save_in_scope(tx,PROFILES,id,value,Some(identity),actor,"save",Some(&scope))?;
-        response(tx,service,actor)
+        store::save_in_scope(tx,PROFILES,id,value,Some(identity.clone()),actor,"save",Some(&scope))?;
+        let mut result = response(tx,service,actor)?;
+        result["savedProfileKey"] = json!(identity);
+        Ok(result)
     })
 }

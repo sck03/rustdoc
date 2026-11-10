@@ -28,7 +28,7 @@ export async function verifyConditionalUi({ page, url, read, waitFor, click, key
   await choose(1, "条件字段", "Invoice.Currency");
   await choose(1, "判断", "Equals");
   await value(1, "USD");
-  await waitFor(page, `${block}.condition.value==='USD'`);
+  await waitFor(page, `${block}.conditions[0].value==='USD'`);
   await add();
   await choose(2, "条件字段", "Invoice.TotalAmount");
   await choose(2, "比较类型", "Number");
@@ -50,13 +50,13 @@ export async function verifyConditionalUi({ page, url, read, waitFor, click, key
   await waitFor(page, "document.querySelector('[data-v3-element-id=special-terms]')");
   await selectBlock();
   assert.equal(await read(page, `${block}.matchMode`), "Any");
-  assert.deepEqual(await read(page, `${block}.additionalConditions.map(r=>[r.fieldPath,r.comparisonType,r.operator,r.value])`), [["Invoice.TotalAmount","Number","GreaterOrEqual","1000.50"],["Invoice.InvoiceDate","Date","LessOrEqual","2026-10-10"]]);
+  assert.deepEqual(await read(page, `${block}.conditions.slice(1).map(r=>[r.fieldPath,r.comparisonType,r.operator,r.value])`), [["Invoice.TotalAmount","Number","GreaterOrEqual","1000.50"],["Invoice.InvoiceDate","Date","LessOrEqual","2026-10-10"]]);
   await click(page, 'button[aria-label="删除条件 2"]');
-  await waitFor(page, `${block}.additionalConditions.length===1`);
+  await waitFor(page, `${block}.conditions.length===2`);
   await click(page, 'button[aria-label="撤销"]');
-  await waitFor(page, `${block}.additionalConditions.length===2`);
+  await waitFor(page, `${block}.conditions.length===3`);
   await captureScreenshot(page, path.join(output, "conditional-rules.png"), { captureBeyondViewport: false });
-  for (let count = 3; count < 8; count++) { await add(); await waitFor(page, `${block}.additionalConditions.length===${count}`); }
+  for (let count = 3; count < 8; count++) { await add(); await waitFor(page, `${block}.conditions.length===${count+1}`); }
   assert(await read(page, "[...document.querySelectorAll('.new-report-conditional-properties button')].find(e=>e.textContent.trim()==='添加条件').disabled"));
   assert.equal(await read(page, "document.querySelector('.report-designer-v3-inspector').scrollWidth <= document.querySelector('.report-designer-v3-inspector').clientWidth + 1"), true);
   await page.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: script.identifier });

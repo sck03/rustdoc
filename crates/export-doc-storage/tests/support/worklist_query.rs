@@ -59,7 +59,9 @@ pub fn exercise(db: &Connection) {
     let mut cursor = None;
     let mut found = vec![];
     loop {
-        let (next, rows) = db.scan_worklist(&query, 1, &scopes[0], cursor).unwrap();
+        let (next, rows) = db
+            .scan_worklist(&query, 1, &scopes[0], &Default::default(), cursor)
+            .unwrap();
         if rows.is_empty() {
             break;
         }
@@ -69,6 +71,42 @@ pub fn exercise(db: &Connection) {
     }
     ids.reverse();
     assert_eq!(found, ids);
+    let scan = export_doc_storage::WorklistScan {
+        source: "invoice-review",
+        ascending: true,
+    };
+    let after = ids[100];
+    let (_, page) = db
+        .scan_worklist(&query, 1, &scopes[0], &scan, Some(after))
+        .unwrap();
+    assert_eq!(
+        page.iter()
+            .map(|row| row["id"].as_i64().unwrap())
+            .collect::<Vec<_>>(),
+        ids.iter()
+            .rev()
+            .copied()
+            .filter(|id| *id > after)
+            .take(query.limit as usize)
+            .collect::<Vec<_>>()
+    );
+    let pending = insert(db, "supply-requests", json!({"status":"Pending"}), 1);
+    insert(db, "supply-requests", json!({"status":"Issued"}), 1);
+    query.kind = "supply-requests";
+    let (_, selected) = db
+        .scan_worklist(
+            &query,
+            1,
+            &scopes[0],
+            &export_doc_storage::WorklistScan {
+                source: "supply-approval",
+                ascending: true,
+            },
+            None,
+        )
+        .unwrap();
+    assert_eq!(selected.len(), 1);
+    assert_eq!(selected[0]["id"], pending);
     let visible = insert(db, "crm-customers", json!({"name":"可见客户"}), 1);
     let hidden = insert(db, "crm-customers", json!({"name":"不可见客户"}), 2);
     let follow = insert(
@@ -96,7 +134,9 @@ pub fn exercise(db: &Connection) {
         user_id: 1,
         ..Default::default()
     };
-    let (_, rows) = db.scan_worklist(&query, 1, &customer_scope, None).unwrap();
+    let (_, rows) = db
+        .scan_worklist(&query, 1, &customer_scope, &Default::default(), None)
+        .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["id"], follow);
     assert_eq!(rows[0]["customerName"], "可见客户");

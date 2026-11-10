@@ -51,6 +51,11 @@ pub(super) fn versioned_record_id() -> Vec<Parameter> { vec![p("id","path",Some(
 pub(super) fn status_keyword_page() -> Vec<Parameter> { vec![p("keyword","query",None,s()),p("status","query",None,s()),p("pageNumber","query",None,Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),p("pageSize","query",None,Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))] }
 #[rustfmt::skip]
 pub(super) fn import_file_name() -> Vec<Parameter> { vec![p("fileName","query",None,s())] }
+pub(super) fn excel_import() -> Vec<Parameter> {
+    let mut parameters = import_file_name();
+    parameters.push(p("schemeName", "query", None, s().max_length(100)));
+    parameters
+}
 #[rustfmt::skip]
 pub(super) fn download_token() -> Vec<Parameter> { vec![p("token","path",Some(true),s())] }
 #[rustfmt::skip]

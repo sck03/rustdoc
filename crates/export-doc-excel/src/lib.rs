@@ -2,6 +2,7 @@
 //! streams; hosts own authorization, paths, persistence and background tasks.
 mod archive;
 mod import;
+mod manual_mapping;
 mod mapping;
 mod reader;
 mod sheet;

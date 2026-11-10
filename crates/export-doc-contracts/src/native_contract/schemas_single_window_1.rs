@@ -47,20 +47,20 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiSingleWindowClientDispatchRequest",o(vec![("batchId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))]).required(vec!["batchId"])),
     ("ApiSingleWindowClientDirectories",o(vec![("outBox",s()),("sentBox",s()),("inBox",s()),("failBox",s())]).required(vec!["outBox","sentBox","inBox","failBox"])),
     ("ApiSingleWindowClientProfileDto",o(vec![
-        ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("stationKey",s()),("profileKey",s()),
+        ("versionNumber",i().minimum(num("1")).format("int64")),("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("stationKey",s()),("profileKey",s()),
         ("profileName",s()),("companyScope",s()),("cardIdentifier",s()),
         ("stationAssignmentCode",s()),("customsCooDirectories",r("ApiSingleWindowClientDirectories")),("agentConsignmentDirectories",r("ApiSingleWindowClientDirectories")),
         ("canSubmitCustomsCoo",b()),("canSubmitAgentConsignment",b()),("isEnabled",b()),
         ("isActive",b()),("updatedAt",s().format("date-time"))
-    ]).required(vec!["id","stationKey","profileKey","profileName","companyScope","cardIdentifier","stationAssignmentCode","customsCooDirectories","agentConsignmentDirectories","canSubmitCustomsCoo","canSubmitAgentConsignment","isEnabled","isActive","updatedAt"])),
+    ]).required(vec!["versionNumber","id","stationKey","profileKey","profileName","companyScope","cardIdentifier","stationAssignmentCode","customsCooDirectories","agentConsignmentDirectories","canSubmitCustomsCoo","canSubmitAgentConsignment","isEnabled","isActive","updatedAt"])),
     ("ApiSingleWindowClientProfileSaveRequest",o(vec![
-        ("profileKey",s()),("profileName",s()),("companyScope",s()),
+        ("expectedVersion",i().minimum(num("0")).format("int64")),("profileKey",s()),("profileName",s()),("companyScope",s()),
         ("cardIdentifier",s()),("customsCooDirectories",r("ApiSingleWindowClientDirectories")),("agentConsignmentDirectories",r("ApiSingleWindowClientDirectories")),
         ("canSubmitCustomsCoo",b()),("canSubmitAgentConsignment",b())
-    ]).required(vec!["profileKey","profileName","companyScope","cardIdentifier","customsCooDirectories","agentConsignmentDirectories","canSubmitCustomsCoo","canSubmitAgentConsignment"])),
+    ]).required(vec!["expectedVersion","profileKey","profileName","companyScope","cardIdentifier","customsCooDirectories","agentConsignmentDirectories","canSubmitCustomsCoo","canSubmitAgentConsignment"])),
     ("ApiSingleWindowClientProfilesResponse",o(vec![
         ("profiles",a(r("ApiSingleWindowClientProfileDto"))),("activeProfileKey",s()),("storagePolicy",s()),
-        ("message",s())
+        ("message",s()),("savedProfileKey",s())
     ]).required(vec!["profiles","activeProfileKey","storagePolicy","message"])),
     ("ApiSingleWindowHandoffPackageResponse",o(vec![
         ("success",b()),("packagePath",s()),("manifest",r("SingleWindowPackageManifest")),

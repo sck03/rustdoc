@@ -186,7 +186,7 @@ const maliciousFlow = api.normalizeReportDesignerV3Schema({
       block: {
         id: "unsafe-flow",
         type: "Conditional",
-        condition: { fieldPath: "Invoice.Nope;danger", operator: "HasValue", value: "" },
+        conditions: [{ fieldPath: "Invoice.Nope;danger", operator: "HasValue", value: "" }],
         content: { kind: "Text", text: "unsafe", fieldPath: "" },
         style: {},
       },
@@ -221,7 +221,7 @@ const conditionalText = "SPECIAL_TERMS_VISIBLE";
 const conditionalBlock = {
   id: "conditional-export-domain",
   type: "Conditional",
-  condition: { fieldPath: "Invoice.SpecialTerms", operator: "HasValue", value: "" },
+  conditions: [{ fieldPath: "Invoice.SpecialTerms", operator: "HasValue", value: "" }],
   content: { kind: "Text", text: conditionalText, fieldPath: "", label: "", fallbackText: "" },
   style: { fontSizePt: 9 },
 };
@@ -268,12 +268,12 @@ const paymentConditionalSchema = {
   reportType: "PaymentVoucher",
   layers: conditionalSchema.layers.map((layer) => layer.id === bodyLayer.id
     ? { ...layer, elements: layer.elements.map((element) => element.id === conditionalFlow.id
-      ? { ...element, block: { ...conditionalBlock, condition: { ...conditionalBlock.condition, fieldPath: "Invoice.SpecialTerms" } } }
+      ? { ...element, block: { ...conditionalBlock, conditions: [{ ...conditionalBlock.conditions[0], fieldPath: "Invoice.SpecialTerms" }] } }
       : element) }
     : layer),
 };
 const paymentConditionalValidation = api.normalizeReportDesignerV3Schema(paymentConditionalSchema, "PaymentVoucher");
-assert(paymentConditionalValidation.issues.some((issue) => issue.severity === "error" && issue.path.includes("condition.fieldPath")), "付款模板条件字段混用 Invoice.* 必须被业务域校验阻断");
+assert(paymentConditionalValidation.issues.some((issue) => issue.severity === "error" && issue.path.includes("conditions[0].fieldPath")), "付款模板条件字段混用 Invoice.* 必须被业务域校验阻断");
 assert(api.validateReportDesignerV3Draft(paymentConditionalSchema, "PaymentVoucher").blocked, "付款模板条件域错误必须阻断导出");
 
 const manyElementsLayer = {
