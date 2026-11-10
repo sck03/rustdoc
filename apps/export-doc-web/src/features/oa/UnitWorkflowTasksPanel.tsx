@@ -1,3 +1,4 @@
+import { Button } from "../../ui/Button.tsx";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient, UnitWorkflowTask, UnitTaskReassignment } from "../../api/index.ts";
@@ -18,9 +19,9 @@ export function UnitWorkflowTasksPanel({ client, user, accounts }: { client: Exp
   useServerPageNumber(query, page, setPage);
   return <details><summary>在途任务与职责交接</summary><p>包含待激活的后续任务。交接只改变未签署任务，保留原流程版本、申请资料与历史签署。</p>
     <OfficeField label="按责任人查看"><select value={assignee} onChange={e => { setAssignee(Number(e.target.value)); setPage(1); }}><option value={0}>全部责任人</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.fullName}</option>)}</select></OfficeField>
-    {query.isError ? <PageState tone="error" title="在途任务读取失败" description={readApiError(query.error)} action={<button type="button" onClick={() => void query.refetch()}>重试</button>} /> : query.isPending ? <PageState tone="loading" title="正在读取在途任务" /> : <>
+    {query.isError ? <PageState tone="error" title="在途任务读取失败" description={readApiError(query.error)} action={<Button type="button" onClick={() => void query.refetch()}>重试</Button>} /> : query.isPending ? <PageState tone="loading" title="正在读取在途任务" /> : <>
       {!query.data.items.length && <p>当前没有等待交接的在途任务。</p>}
-      {query.data.items.map(task => <div className="office-resource-card" key={`${task.requestId}:${task.taskKey}`}><strong>事项 #{task.requestId} · {task.nodeKey}</strong><p>{task.assigneeName} · {task.active ? "当前待办" : "等待前序节点"}{task.dueAt && ` · 到期 ${formatBusinessDateTime(task.dueAt, user.businessTimeZone)}`}</p>{task.identityAvailable === false && <p role="status">签署身份已失效，请安排移交或重新审核授权。</p>}{task.authorizationEndsAt && <p>身份到期：{formatBusinessDateTime(task.authorizationEndsAt, user.businessTimeZone)}</p>}<button type="button" className="command-button secondary" onClick={() => setEditing(task)}>移交任务</button></div>)}
+      {query.data.items.map(task => <div className="office-resource-card" key={`${task.requestId}:${task.taskKey}`}><strong>事项 #{task.requestId} · {task.nodeKey}</strong><p>{task.assigneeName} · {task.active ? "当前待办" : "等待前序节点"}{task.dueAt && ` · 到期 ${formatBusinessDateTime(task.dueAt, user.businessTimeZone)}`}</p>{task.identityAvailable === false && <p role="status">签署身份已失效，请安排移交或重新审核授权。</p>}{task.authorizationEndsAt && <p>身份到期：{formatBusinessDateTime(task.authorizationEndsAt, user.businessTimeZone)}</p>}<Button type="button" onClick={() => setEditing(task)}>移交任务</Button></div>)}
       <Pagination pageNumber={page} pageSize={20} totalCount={query.data.totalCount} isBusy={query.isFetching} onPageChange={setPage} />
     </>}
     {editing && <Handover client={client} task={editing} accounts={accounts} onClose={() => setEditing(null)} onSaved={() => setEditing(null)} />}

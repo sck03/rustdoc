@@ -72,7 +72,7 @@ fn publish(
         .find(|r| r["key"] == kind)
         .unwrap()["stages"] = stages;
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    let saved = fixture::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    let saved = fixture::save_settings(service, admin, settings).unwrap();
     fixture::request(
         service,
         admin,

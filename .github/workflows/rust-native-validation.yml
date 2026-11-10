@@ -53,6 +53,7 @@ on:
       - scripts/test_editor_state_regressions_ui.mjs
       - scripts/test_packing_credit_workspace_ui.mjs
       - scripts/test_native_*.mjs
+      - scripts/test_oa_*.mjs
       - scripts/lib/native-*.ps1
       - scripts/lib/*support*.ps1
       - scripts/lib/rust-*.ps1
@@ -106,7 +107,7 @@ jobs:
   core:
     name: Rust and web core quality
     needs: changes
-    if: needs.changes.outputs.rust == 'true'
+    if: needs.changes.outputs.rust == 'true' || needs.changes.outputs.office == 'true'
     runs-on: windows-latest
     timeout-minutes: 45
     env:
@@ -166,6 +167,8 @@ jobs:
           node scripts/test_oa_integration_completion_ui.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/test_oa_advanced_ui.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test_oa_custom_ui.mjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node scripts/test_permission_navigation_ui.mjs
           exit $LASTEXITCODE

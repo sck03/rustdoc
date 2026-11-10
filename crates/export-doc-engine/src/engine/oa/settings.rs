@@ -10,37 +10,12 @@ pub(in crate::engine) fn revoke_delegations(
     actor: &Actor,
     account: i64,
 ) -> Result<()> {
-    for mut settings in store::all(tx, STORAGE_KIND)? {
-        let mut changed = false;
-        for delegation in settings["delegations"].as_array_mut().into_iter().flatten() {
-            if delegation["isActive"] == true
-                && (delegation["principalUserId"] == account
-                    || delegation["delegateUserId"] == account)
-            {
-                delegation["isActive"] = json!(false);
-                changed = true;
-            }
-        }
-        if changed {
-            let id = records::positive(&settings, "id", "流程配置")?;
-            settings["expectedVersion"] = settings["versionNumber"].clone();
-            let scope = settings.clone();
-            let identity = text(&settings, "companyScope");
-            store::save_in_scope(
-                tx,
-                STORAGE_KIND,
-                id,
-                settings,
-                Some(identity),
-                actor,
-                "revoke-delegations",
-                Some(&scope),
-            )?;
-        }
-    }
-    Ok(())
+    super::settings_store::revoke_delegations(tx, actor, account)
 }
 fn response(tx: &Connection, company: &str, mut settings: Value) -> Result<Value> {
+    if !settings["revisions"].is_object() {
+        settings["revisions"] = json!({});
+    }
     settings["sheetFieldCatalog"] = sheet_templates::catalog();
     settings["sheetDefaultContent"] = json!(sheet_templates::default_content()?);
     settings["activations"] = json!(tx.workflow_activation_list(company, None)?);
@@ -63,7 +38,7 @@ fn default_rule(kind: &str, variant: &str, name: &str) -> Value {
         {"key":"executive","name":"公司领导审批","dependsOn":["department"],"source":"CompanyExecutive","approverUserIds":[],"decision":"All","selfApproval":"Reject","repeatedApprover":"Allow","conditions":[],"dueHours":48}
     ]})
 }
-fn defaults() -> Result<Vec<Value>> {
+pub(super) fn defaults() -> Result<Vec<Value>> {
     let mut rules: Vec<_> = [
         ("leave", "请假审批"),
         ("overtime", "加班审批"),
@@ -102,21 +77,7 @@ fn defaults() -> Result<Vec<Value>> {
     Ok(rules)
 }
 pub(in crate::engine) fn load(tx: &Connection, company: &str) -> Result<Value> {
-    let mut value = match tx.find_identity(STORAGE_KIND, &store::normalize(company))? {
-        Some(value) => value,
-        None => json!({"versionNumber":0,"rules":defaults()?,"publications":[],"delegations":[]}),
-    };
-    if value["calendar"].is_null() {
-        let mut calendar = export_doc_domain::business_calendar::BusinessCalendar::default();
-        calendar.time_zone = tx
-            .clock
-            .now()
-            .map_err(super::super::error::unavailable)?
-            .time_zone
-            .into();
-        value["calendar"] = serde_json::to_value(calendar)?;
-    }
-    Ok(value)
+    super::settings_store::load(tx, company)
 }
 fn account(tx: &Connection, actor: &Actor, id: i64) -> Result<Actor> {
     let user = super::super::units::approval_actor(tx, id, actor.edition, &actor.company)?;
@@ -202,6 +163,13 @@ pub(super) fn handle(
     if action == "settings-get" {
         return response(tx, &actor.company, previous);
     }
+    let patch = body;
+    let patched = if action == "settings-save" {
+        Some(super::settings_patch::merge(&previous, body)?)
+    } else {
+        None
+    };
+    let body = patched.as_ref().unwrap_or(body);
     if action == "settings-publish" {
         if previous["id"].as_i64().is_none_or(|id| id <= 0) {
             return Err(conflict("请先保存流程草稿，再通过样例仿真发布。"));
@@ -213,7 +181,7 @@ pub(super) fn handle(
             "PublishOaDefinition",
             body,
         )? {
-            return response(tx, &actor.company, previous);
+            return response(tx, &actor.company, load(tx, &actor.company)?);
         }
     }
     if previous["versionNumber"] == 0 {
@@ -227,29 +195,44 @@ pub(super) fn handle(
         action,
         "settings-publish" | "settings-disable" | "settings-schedule"
     ) {
+        let revision_key = format!("rule:{}", text(body, "definitionKey"));
+        if body["expectedRevision"].as_i64()
+            != Some(super::settings_patch::revision(&previous, &revision_key))
+        {
+            return Err(conflict("当前流程草稿已改变，请重新仿真后发布。"));
+        }
         super::definitions::change(tx, actor, &mut previous, action, body)?;
-        let id = previous["id"].as_i64().unwrap_or(0);
-        let saved = store::save(
-            tx,
-            STORAGE_KIND,
-            id,
-            previous,
-            Some(store::normalize(&actor.company)),
-            actor,
-            action,
-        )?;
+        if action != "settings-disable" {
+            super::settings_store::save(
+                tx,
+                actor,
+                &json!({"section":"rules","definitionKey":body["definitionKey"],"expectedRevision":body["expectedRevision"]}),
+                &previous,
+            )?;
+        }
+        let saved = super::settings_store::save_registry(tx, actor, previous, action)?;
         return response(tx, &actor.company, saved);
     }
     let rules = body["rules"]
         .as_array()
-        .filter(|r| r.len() == 13)
-        .ok_or_else(|| invalid("须配置全部申请类型的审批规则。"))?;
+        .filter(|r| (13..=113).contains(&r.len()))
+        .ok_or_else(|| invalid("须保留内置流程，自定义事项最多 100 个。"))?;
+    for builtin in defaults()? {
+        if !rules
+            .iter()
+            .any(|r| r["key"] == builtin["key"] && r["form"].is_null())
+        {
+            return Err(invalid("不能删除内置流程或替换其业务类型。"));
+        }
+    }
     let mut calendar = body
         .get("calendar")
         .filter(|c| !c.is_null())
         .cloned()
         .unwrap_or_else(|| previous["calendar"].clone());
-    calendar["version"] = json!(previous["versionNumber"].as_u64().unwrap_or(0) + 1);
+    if calendar != previous["calendar"] {
+        calendar["version"] = json!(previous["calendar"]["version"].as_u64().unwrap_or(0) + 1);
+    }
     serde_json::from_value::<export_doc_domain::business_calendar::BusinessCalendar>(
         calendar.clone(),
     )
@@ -276,6 +259,12 @@ pub(super) fn handle(
             return Err(invalid("流程编号与业务类型不一致或重复。"));
         }
         typed.validate_draft().map_err(invalid)?;
+        if previous["rules"]
+            .as_array()
+            .is_some_and(|items| items.iter().any(|old| old == rule))
+        {
+            continue;
+        }
         let resource = super::approval::resource(&kind).ok_or_else(|| invalid("申请类型无效。"))?;
         for stage in &typed.stages {
             let mut requirements = stage
@@ -326,8 +315,10 @@ pub(super) fn handle(
             delegation_window(&text(delegation, "startsAt"), &text(delegation, "endsAt"))
                 .map_err(invalid)?;
         if delegation["isActive"] == true {
-            account(tx, actor, principal)?;
-            account(tx, actor, delegate)?;
+            if previous["delegations"] != body["delegations"] {
+                account(tx, actor, principal)?;
+                account(tx, actor, delegate)?;
+            }
             if windows
                 .iter()
                 .any(|(p, a, b)| *p == principal && start < *b && *a < end)
@@ -337,14 +328,16 @@ pub(super) fn handle(
             windows.push((principal, start, end));
         }
     }
-    let mut value = contracts::dto(contracts::schema("OaApprovalSettingsSave"), body.clone());
+    let mut value = json!({"rules":body["rules"],"delegations":body["delegations"],"expectedVersion":body["expectedVersion"]});
     value["calendar"] = calendar;
     value["publications"] = previous["publications"].clone();
     value["sheetTemplates"] = body
         .get("sheetTemplates")
         .cloned()
         .unwrap_or_else(|| previous["sheetTemplates"].clone());
-    sheet_templates::validate(&value["sheetTemplates"])?;
+    if value["sheetTemplates"] != previous["sheetTemplates"] {
+        sheet_templates::validate(&value["sheetTemplates"])?;
+    }
     let mut services = body.get("handlingServices").cloned().unwrap_or_else(|| {
         previous
             .get("handlingServices")
@@ -364,18 +357,12 @@ pub(super) fn handle(
             .ok_or_else(|| invalid("办理分工必须为对象。"))?
             .remove("handlerNames");
     }
-    handling::validate(tx, actor, &services, &previous["handlingServices"])?;
+    if services != previous["handlingServices"] {
+        handling::validate(tx, actor, &services, &previous["handlingServices"])?;
+    }
     value["handlingServices"] = services;
     value["versionNumber"] = previous["versionNumber"].clone();
-    let saved = store::save(
-        tx,
-        STORAGE_KIND,
-        previous["id"].as_i64().unwrap_or(0),
-        value,
-        Some(store::normalize(&actor.company)),
-        actor,
-        "approval-settings",
-    )?;
+    let saved = super::settings_store::save(tx, actor, patch, &value)?;
     super::handling_handover::notify(tx, actor, &previous, &saved)?;
     response(tx, &actor.company, saved)
 }
@@ -398,10 +385,10 @@ pub(in crate::engine) fn delegates_for(
         .collect())
 }
 fn active_delegations(tx: &Connection, company: &str) -> Result<Vec<(i64, i64, String)>> {
-    let settings = load(tx, company)?;
+    let delegations = super::settings_store::section(tx, company, "delegations")?;
     let mut result = vec![];
     let now = chrono::Utc::now();
-    for d in settings["delegations"]
+    for d in delegations
         .as_array()
         .ok_or_else(|| super::super::error::unavailable("审批代理设置损坏。"))?
     {

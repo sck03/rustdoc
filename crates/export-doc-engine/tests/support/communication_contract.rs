@@ -430,7 +430,7 @@ pub fn exercise(service: &NativeService, admin: &str) -> i64 {
         json!([reviewer["id"]])
     )]);
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    let saved = workflow::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    let saved = workflow::save_settings(service, admin, settings).unwrap();
     workflow::request(
         service,
         admin,

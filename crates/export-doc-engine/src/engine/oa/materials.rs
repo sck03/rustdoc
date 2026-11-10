@@ -2,6 +2,10 @@
 use super::*;
 use export_doc_domain::approval::MaterialPolicy;
 const SYSTEM: &[&str] = &[
+    "formDefinition",
+    "definitionKey",
+    "definitionVersion",
+    "applicationName",
     "id",
     "kind",
     "status",
@@ -262,11 +266,16 @@ pub(in crate::engine) fn project_with_plan(
             if SYSTEM.contains(&key.as_str()) || key == "attachments" || key == "materialAccess" {
                 continue;
             }
-            if !allowed(&key, &policies) {
+            let policy_key = if key == "formDisplayValues" {
+                "formValues"
+            } else {
+                &key
+            };
+            if !allowed(policy_key, &policies) {
                 fields.remove(&key);
                 omitted.push(key);
             } else if let Some(v) = fields.get_mut(&key) {
-                filter(v, &key, &policies, restricted, &mut omitted);
+                filter(v, policy_key, &policies, restricted, &mut omitted);
             }
         }
     }

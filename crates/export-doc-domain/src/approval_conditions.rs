@@ -12,6 +12,8 @@ pub enum ConditionField {
     Category,
     PersonnelAction,
     Returnable,
+    FormText,
+    FormNumber,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ConditionOperator {
@@ -25,12 +27,15 @@ pub enum ConditionOperator {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ApprovalCondition {
+    #[serde(default)]
+    pub field_key: String,
     pub field: ConditionField,
     pub operator: ConditionOperator,
     pub value: String,
 }
 #[derive(Clone, Default)]
 pub struct ConditionContext {
+    pub form_values: crate::oa_form::FormValues,
     pub amount: Option<Decimal>,
     pub currency: String,
     pub duration: Option<Decimal>,
@@ -41,12 +46,21 @@ pub struct ConditionContext {
 }
 impl ApprovalCondition {
     pub fn validate(&self) -> Result<(), String> {
+        let custom = matches!(
+            self.field,
+            ConditionField::FormText | ConditionField::FormNumber
+        );
+        if custom && !crate::oa_form::field_key(&self.field_key)
+            || !custom && !self.field_key.is_empty()
+        {
+            return Err("自定义条件须引用有效的表单字段。".into());
+        }
         if self.value.is_empty() || self.value.chars().count() > 100 {
             return Err("流程条件值须为 1–100 字。".into());
         }
         if matches!(
             self.field,
-            ConditionField::Amount | ConditionField::Duration
+            ConditionField::Amount | ConditionField::Duration | ConditionField::FormNumber
         ) {
             let value =
                 Decimal::from_str(&self.value).map_err(|_| "金额和时长条件须为精确数字。")?;
@@ -64,6 +78,22 @@ impl ApprovalCondition {
     pub fn matches(&self, context: &ConditionContext) -> Result<bool, String> {
         self.validate()?;
         let ordering = match self.field {
+            ConditionField::FormNumber | ConditionField::FormText => {
+                let actual = context
+                    .form_values
+                    .get(&self.field_key)
+                    .and_then(serde_json::Value::as_str);
+                let Some(actual) = actual.filter(|v| !v.is_empty()) else {
+                    return Ok(false);
+                };
+                if self.field == ConditionField::FormNumber {
+                    Decimal::from_str(actual)
+                        .map_err(|_| "表单数字条件值无效。")?
+                        .cmp(&Decimal::from_str(&self.value).map_err(|_| "数字条件无效。")?)
+                } else {
+                    actual.cmp(self.value.as_str())
+                }
+            }
             ConditionField::Amount | ConditionField::Duration => {
                 let actual = if self.field == ConditionField::Amount {
                     context.amount

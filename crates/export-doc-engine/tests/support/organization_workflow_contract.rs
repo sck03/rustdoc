@@ -105,7 +105,7 @@ fn policy_with_samples(
         .find(|r| r["kind"] == kind)
         .unwrap() = rule;
     let key = rule_key(kind);
-    let saved = call(service, token, SAVE_OA_APPROVAL_SETTINGS, 0, Some(settings)).unwrap();
+    let saved = super::oa_contract::workflow::save_settings(service, token, settings).unwrap();
     call(
         service,
         token,

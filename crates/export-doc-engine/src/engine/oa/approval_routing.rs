@@ -10,13 +10,22 @@ use std::collections::HashSet;
 use std::str::FromStr;
 
 pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<()> {
+    super::custom_forms::validate(tx, actor, row, true)?;
     let kind = text(row, "kind");
     let variant = if kind == "personnel" {
         text(&row["personnelChange"], "action")
+    } else if kind == "general" {
+        text(row, "definitionKey")
+            .strip_prefix("general:")
+            .unwrap_or("")
+            .to_owned()
     } else {
         String::new()
     };
     let (rule, version) = super::definitions::published(tx, &actor.company, &kind, &variant)?;
+    if rule.form.is_some() && row["definitionVersion"].as_i64() != Some(version) {
+        return Err(conflict("事项已发布新版本，请按新表单重新发起申请。"));
+    }
     let hiring = kind == "personnel" && variant == "Hire";
     let employee = if kind == "personnel" && matches!(variant.as_str(), "Hire" | "Rehire") {
         super::personnel_changes::prepare(tx, actor, row, super::super::units::today(tx)?, false)?
@@ -55,6 +64,7 @@ pub(super) fn submit(tx: &Connection, actor: &Actor, row: &mut Value) -> Result<
         _ => None,
     };
     let context = ConditionContext {
+        form_values: super::custom_forms::values(row)?,
         amount: if text(row, "totalAmount").is_empty() {
             None
         } else {

@@ -167,6 +167,30 @@ impl ConditionGroup {
         }
         Ok(result)
     }
+
+    /// Whether any condition path remains possible with only a department known.
+    /// Other request fields are deliberately unknown during organization checks.
+    pub fn may_match_department(&self, department: &str) -> Result<bool, String> {
+        let context = crate::approval_conditions::ConditionContext {
+            department: department.into(),
+            ..Default::default()
+        };
+        for term in self.terms()? {
+            let mut possible = true;
+            for condition in term {
+                if condition.field == crate::approval_conditions::ConditionField::Department
+                    && !condition.matches(&context)?
+                {
+                    possible = false;
+                    break;
+                }
+            }
+            if possible {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

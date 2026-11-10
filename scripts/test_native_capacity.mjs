@@ -131,7 +131,7 @@ async function phase(size,key) {
     };
     const settings=await api('GetOaApprovalSettings',token);
     const activePolicy=await publishDefinitions(invoke,token,{...settings,rules:settings.rules.map(rule=>rule.key==='expense'?{...rule,stages:[{...approvalStage('capacity-review',reviewers.map(reviewer=>reviewer.id)),decision:'Any'}]}:rule)},['expense']);
-    const scheduled=await api('ScheduleOaDefinition',token,{expectedVersion:activePolicy.versionNumber,definitionKey:'expense',commandKey:randomUUID(),activateAt:new Date(Date.now()+10000).toISOString(),samples:[{employeeId:person.employee.id,appointmentId:person.organization.primaryAssignmentId,amount:'12.34',currency:'CNY',duration:'1',category:'Other',isReturnable:true}]});
+    const scheduled=await api('ScheduleOaDefinition',token,{expectedVersion:activePolicy.versionNumber,expectedRevision:activePolicy.revisions['rule:expense']??0,definitionKey:'expense',commandKey:randomUUID(),activateAt:new Date(Date.now()+10000).toISOString(),samples:[{employeeId:person.employee.id,appointmentId:person.organization.primaryAssignmentId,amount:'12.34',currency:'CNY',duration:'1',category:'Other',isReturnable:true}]});
     const activation=scheduled.activations.find(row=>row.definitionKey==='expense'&&row.state==='Pending');
     assert(activation,'Scheduled publication must persist a pending activation');
     // The existing shared worker checks each 60s; allow one check plus its

@@ -46,12 +46,7 @@ fn busy_document_generation_recovers_and_download_rechecks_private_material() {
         .find(|r| r["key"] == "general")
         .unwrap()["stages"] = json!([node, handling, document]);
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    let saved = fixture::request(
-        &service,
-        admin,
-        crate::generated_api::SAVE_OA_APPROVAL_SETTINGS,
-        Some(settings),
-    );
+    let saved = fixture::save_settings(&service, admin, settings).unwrap();
     fixture::request(
         &service,
         admin,

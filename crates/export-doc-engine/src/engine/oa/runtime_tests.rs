@@ -72,7 +72,7 @@ fn future_personnel_changes_and_reminders_survive_restart_without_duplicates() {
         }
     }
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    settings = workflow::request(&service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    settings = workflow::save_settings(&service, admin, settings).unwrap();
     for key in ["personnel:Transfer", "general"] {
         settings = workflow::request(
             &service,
@@ -299,9 +299,9 @@ fn scheduled_publication_and_hierarchical_escalation_are_durable_and_never_sign(
         .find(|r| r["key"] == "general")
         .unwrap()["stages"] = json!([stage]);
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    let settings = workflow::request(&service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    let settings = workflow::save_settings(&service, admin, settings).unwrap();
     let at = chrono::Utc::now() + chrono::Duration::minutes(2);
-    let body = json!({"expectedVersion":settings["versionNumber"],"definitionKey":"general","activateAt":at.to_rfc3339(),"commandKey":nonce().unwrap(),"samples":[{"employeeId":applicant["employee"]["id"],"appointmentId":applicant["organization"]["primaryAssignmentId"],"amount":"0","currency":"CNY","duration":"1","category":"Other"}]});
+    let body = json!({"expectedVersion":settings["versionNumber"],"expectedRevision":settings["revisions"]["rule:general"],"definitionKey":"general","activateAt":at.to_rfc3339(),"commandKey":nonce().unwrap(),"samples":[{"employeeId":applicant["employee"]["id"],"appointmentId":applicant["organization"]["primaryAssignmentId"],"amount":"0","currency":"CNY","duration":"1","category":"Other"}]});
     let scheduled = workflow::request(&service, admin, SCHEDULE_OA_DEFINITION, Some(body.clone()));
     let replayed = workflow::request(&service, admin, SCHEDULE_OA_DEFINITION, Some(body));
     assert_eq!(replayed["versionNumber"], scheduled["versionNumber"]);

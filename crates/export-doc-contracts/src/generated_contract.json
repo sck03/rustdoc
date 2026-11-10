@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "f5a5d461a93f25e232b0ea7022c93b2ce1897eefcfd1b2b33e1f9ef199df8b73",
+  "digest": "14d5e5bab8b69e1a9fdd377f984d0617e140176adc5591cb819347557fda22a9",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -52458,6 +52458,14 @@
           "schema": {
             "type": "boolean"
           }
+        },
+        {
+          "name": "definitionKey",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "maxLength": 80
+          }
         }
       ],
       "requestBody": null,
@@ -55364,6 +55372,138 @@
         "permission": "view"
       }
     },
+    "ListOaApplications": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.general",
+            "action": "view"
+          }
+        ],
+        "permissionBypass": false,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "office.general",
+              "actions": [
+                "view"
+              ],
+              "administratorOnly": false
+            }
+          ]
+        }
+      },
+      "office": {
+        "kind": "general",
+        "action": "application-catalog",
+        "resource": "office.general",
+        "permission": "view"
+      },
+      "parameters": [],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OaApplicationCatalog"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/OaApplicationCatalog"
+      },
+      "timeoutSeconds": 30
+    },
     "ListOaDefinitionVersions": {
       "policy": {
         "requiresAuthentication": true,
@@ -55522,6 +55662,176 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaDefinitionVersions"
+      },
+      "timeoutSeconds": 30
+    },
+    "ListOaFormReferences": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "office.general",
+            "action": "view"
+          }
+        ],
+        "permissionBypass": false,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "office.general",
+              "actions": [
+                "view"
+              ],
+              "administratorOnly": false
+            }
+          ]
+        }
+      },
+      "office": {
+        "kind": "general",
+        "action": "form-references",
+        "resource": "office.general",
+        "permission": "view"
+      },
+      "parameters": [
+        {
+          "name": "kind",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "Person",
+              "Department"
+            ]
+          },
+          "required": true
+        },
+        {
+          "name": "keyword",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        {
+          "name": "pageNumber",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OaFormReferencePage"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/OaFormReferencePage"
       },
       "timeoutSeconds": 30
     },
@@ -76150,7 +76460,7 @@
         "content": {
           "application/json": {
             "schema": {
-              "$ref": "#/components/schemas/OaApprovalSettingsSave"
+              "$ref": "#/components/schemas/OaSettingsPatch"
             }
           }
         }
@@ -76248,7 +76558,7 @@
         }
       },
       "request": {
-        "$ref": "#/components/schemas/OaApprovalSettingsSave"
+        "$ref": "#/components/schemas/OaSettingsPatch"
       },
       "response": {
         "$ref": "#/components/schemas/OaApprovalSettings"
@@ -115366,6 +115676,44 @@
         "source"
       ]
     },
+    "OaApplication": {
+      "type": "object",
+      "properties": {
+        "form": {
+          "$ref": "#/components/schemas/OaFormDefinition"
+        },
+        "key": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "key",
+        "name",
+        "version",
+        "form"
+      ]
+    },
+    "OaApplicationCatalog": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/OaApplication"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ]
+    },
     "OaApprovalCondition": {
       "type": "object",
       "properties": {
@@ -115378,8 +115726,14 @@
             "Department",
             "Category",
             "PersonnelAction",
-            "Returnable"
+            "Returnable",
+            "FormText",
+            "FormNumber"
           ]
+        },
+        "fieldKey": {
+          "type": "string",
+          "maxLength": 40
         },
         "operator": {
           "type": "string",
@@ -115900,6 +116254,16 @@
             }
           ]
         },
+        "form": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/OaFormDefinition"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "key": {
           "type": "string"
         },
@@ -115987,13 +116351,20 @@
             "$ref": "#/components/schemas/OaPublication"
           }
         },
+        "revisions": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
         "rules": {
           "type": "array",
           "items": {
             "$ref": "#/components/schemas/OaApprovalRule"
           },
           "minItems": 13,
-          "maxItems": 13
+          "maxItems": 113
         },
         "sheetDefaultContent": {
           "type": "string"
@@ -116018,52 +116389,6 @@
         "rules",
         "delegations",
         "publications"
-      ]
-    },
-    "OaApprovalSettingsSave": {
-      "type": "object",
-      "properties": {
-        "calendar": {
-          "$ref": "#/components/schemas/OaBusinessCalendar"
-        },
-        "delegations": {
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/OaApprovalDelegation"
-          },
-          "maxItems": 50
-        },
-        "expectedVersion": {
-          "type": "integer",
-          "format": "int64"
-        },
-        "handlingServices": {
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/OfficeHandlingService"
-          },
-          "maxItems": 100
-        },
-        "rules": {
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/OaApprovalRule"
-          },
-          "minItems": 13,
-          "maxItems": 13
-        },
-        "sheetTemplates": {
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/OaSheetTemplate"
-          },
-          "maxItems": 18
-        }
-      },
-      "required": [
-        "expectedVersion",
-        "rules",
-        "delegations"
       ]
     },
     "OaApprovalStage": {
@@ -116868,6 +117193,10 @@
         "definitionKey": {
           "type": "string"
         },
+        "expectedRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
         "expectedVersion": {
           "type": "integer",
           "format": "int64"
@@ -116875,6 +117204,7 @@
       },
       "required": [
         "expectedVersion",
+        "expectedRevision",
         "definitionKey"
       ]
     },
@@ -117129,6 +117459,243 @@
         "spentOn",
         "description",
         "amount"
+      ]
+    },
+    "OaFormColumn": {
+      "type": "object",
+      "properties": {
+        "currency": {
+          "type": "string",
+          "maxLength": 3
+        },
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]{1,40}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "Text",
+            "Multiline",
+            "Decimal",
+            "Money",
+            "Date",
+            "Select",
+            "Person",
+            "Department",
+            "Table"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "maxItems": 50,
+          "uniqueItems": true
+        },
+        "required": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "key",
+        "label",
+        "kind"
+      ]
+    },
+    "OaFormDefinition": {
+      "type": "object",
+      "properties": {
+        "attachmentRequired": {
+          "type": "boolean"
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "departmentIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "maxItems": 100,
+          "uniqueItems": true
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/OaFormField"
+          },
+          "minItems": 1,
+          "maxItems": 40
+        }
+      },
+      "required": [
+        "category",
+        "fields"
+      ]
+    },
+    "OaFormField": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/OaFormColumn"
+          },
+          "maxItems": 10
+        },
+        "currency": {
+          "type": "string",
+          "maxLength": 3
+        },
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_]{1,40}$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "Text",
+            "Multiline",
+            "Decimal",
+            "Money",
+            "Date",
+            "Select",
+            "Person",
+            "Department",
+            "Table"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "maxItems": 50,
+          "uniqueItems": true
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "visibleWhen": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/OaFormVisibility"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "key",
+        "label",
+        "kind"
+      ]
+    },
+    "OaFormReference": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ]
+    },
+    "OaFormReferencePage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/OaFormReference"
+          }
+        },
+        "pageNumber": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "pageSize": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "totalCount": {
+          "type": "integer",
+          "format": "int64"
+        }
+      },
+      "required": [
+        "items",
+        "totalCount",
+        "pageNumber",
+        "pageSize"
+      ]
+    },
+    "OaFormRow": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 2000
+      },
+      "maxProperties": 10
+    },
+    "OaFormValues": {
+      "type": "object",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": "string",
+            "maxLength": 2000
+          },
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OaFormRow"
+            },
+            "maxItems": 100
+          }
+        ]
+      },
+      "maxProperties": 40
+    },
+    "OaFormVisibility": {
+      "type": "object",
+      "properties": {
+        "equals": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "field": {
+          "type": "string",
+          "maxLength": 40
+        }
+      },
+      "required": [
+        "field",
+        "equals"
       ]
     },
     "OaFulfillmentTask": {
@@ -118139,6 +118706,10 @@
         "definitionKey": {
           "type": "string"
         },
+        "expectedRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
         "expectedVersion": {
           "type": "integer",
           "format": "int64"
@@ -118154,6 +118725,7 @@
       },
       "required": [
         "expectedVersion",
+        "expectedRevision",
         "definitionKey",
         "samples",
         "commandKey"
@@ -118195,6 +118767,10 @@
           "readOnly": true
         },
         "applicantJobTitle": {
+          "type": "string",
+          "readOnly": true
+        },
+        "applicationName": {
           "type": "string",
           "readOnly": true
         },
@@ -118253,6 +118829,14 @@
             "GBP"
           ]
         },
+        "definitionKey": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "definitionVersion": {
+          "type": "integer",
+          "format": "int64"
+        },
         "departmentId": {
           "type": "string"
         },
@@ -118277,6 +118861,17 @@
         "expectedVersion": {
           "type": "integer",
           "format": "int64"
+        },
+        "formDefinition": {
+          "$ref": "#/components/schemas/OaFormDefinition",
+          "readOnly": true
+        },
+        "formDisplayValues": {
+          "$ref": "#/components/schemas/OaFormValues",
+          "readOnly": true
+        },
+        "formValues": {
+          "$ref": "#/components/schemas/OaFormValues"
         },
         "fulfillmentState": {
           "type": "string",
@@ -118499,6 +119094,10 @@
     "OaRequestSave": {
       "type": "object",
       "properties": {
+        "applicationName": {
+          "type": "string",
+          "readOnly": true
+        },
         "appointmentId": {
           "type": "string"
         },
@@ -118523,6 +119122,14 @@
             "GBP"
           ]
         },
+        "definitionKey": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "definitionVersion": {
+          "type": "integer",
+          "format": "int64"
+        },
         "departmentId": {
           "type": "string",
           "description": "Choose an active primary or additional assignment when creating a request; defaults to the primary department.",
@@ -118535,6 +119142,17 @@
         "expectedVersion": {
           "type": "integer",
           "format": "int64"
+        },
+        "formDefinition": {
+          "$ref": "#/components/schemas/OaFormDefinition",
+          "readOnly": true
+        },
+        "formDisplayValues": {
+          "$ref": "#/components/schemas/OaFormValues",
+          "readOnly": true
+        },
+        "formValues": {
+          "$ref": "#/components/schemas/OaFormValues"
         },
         "handlingKey": {
           "type": "string"
@@ -118727,6 +119345,10 @@
         "definitionKey": {
           "type": "string"
         },
+        "expectedRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
         "expectedVersion": {
           "type": "integer",
           "format": "int64"
@@ -118742,10 +119364,67 @@
       },
       "required": [
         "expectedVersion",
+        "expectedRevision",
         "definitionKey",
         "samples",
         "commandKey",
         "activateAt"
+      ]
+    },
+    "OaSettingsPatch": {
+      "type": "object",
+      "properties": {
+        "calendar": {
+          "$ref": "#/components/schemas/OaBusinessCalendar"
+        },
+        "definitionKey": {
+          "type": "string"
+        },
+        "delegations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/OaApprovalDelegation"
+          },
+          "maxItems": 50
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "handlingServices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/OfficeHandlingService"
+          },
+          "maxItems": 100
+        },
+        "remove": {
+          "type": "boolean"
+        },
+        "rule": {
+          "$ref": "#/components/schemas/OaApprovalRule"
+        },
+        "section": {
+          "type": "string",
+          "enum": [
+            "rules",
+            "calendar",
+            "delegations",
+            "handlingServices",
+            "sheetTemplates"
+          ]
+        },
+        "sheetTemplates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/OaSheetTemplate"
+          },
+          "maxItems": 18
+        }
+      },
+      "required": [
+        "section",
+        "expectedRevision"
       ]
     },
     "OaSheetPreview": {
@@ -118837,6 +119516,9 @@
           "type": "integer",
           "format": "int64"
         },
+        "formValues": {
+          "$ref": "#/components/schemas/OaFormValues"
+        },
         "isReturnable": {
           "type": "boolean"
         },
@@ -118900,6 +119582,9 @@
         "employeeId": {
           "type": "integer",
           "format": "int64"
+        },
+        "formValues": {
+          "$ref": "#/components/schemas/OaFormValues"
         },
         "isReturnable": {
           "type": "boolean"
@@ -119300,6 +119985,10 @@
           "type": "string",
           "readOnly": true
         },
+        "applicationName": {
+          "type": "string",
+          "readOnly": true
+        },
         "appointmentId": {
           "type": "string"
         },
@@ -119348,6 +120037,14 @@
             "GBP"
           ]
         },
+        "definitionKey": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "definitionVersion": {
+          "type": "integer",
+          "format": "int64"
+        },
         "departmentId": {
           "type": "string"
         },
@@ -119367,6 +120064,17 @@
         "expectedVersion": {
           "type": "integer",
           "format": "int64"
+        },
+        "formDefinition": {
+          "$ref": "#/components/schemas/OaFormDefinition",
+          "readOnly": true
+        },
+        "formDisplayValues": {
+          "$ref": "#/components/schemas/OaFormValues",
+          "readOnly": true
+        },
+        "formValues": {
+          "$ref": "#/components/schemas/OaFormValues"
         },
         "handlerNames": {
           "type": "string"

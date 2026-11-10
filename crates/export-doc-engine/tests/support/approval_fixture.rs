@@ -36,6 +36,8 @@ pub fn call(
     let body = body.map(|value| {
         if op == PUBLISH_OA_DEFINITION {
             publication_body(service, token, value)
+        } else if matches!(op, SCHEDULE_OA_DEFINITION | DISABLE_OA_DEFINITION) {
+            definition_revision(service, token, value)
         } else {
             value
         }
@@ -72,13 +74,14 @@ pub fn dispatch(
     export_doc_contracts::validation::response(op.id, &value).unwrap();
     Ok(value)
 }
-pub fn publish_all(service: &NativeService, token: &str, mut settings: Value) -> Value {
+pub fn publish_builtins(service: &NativeService, token: &str, mut settings: Value) -> Value {
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    let mut saved = request(service, token, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    let mut saved = save_settings(service, token, settings).unwrap();
     let keys: Vec<_> = saved["rules"]
         .as_array()
         .unwrap()
         .iter()
+        .filter(|rule| rule["form"].is_null())
         .map(|r| r["key"].clone())
         .collect();
     for key in keys {
@@ -90,6 +93,54 @@ pub fn publish_all(service: &NativeService, token: &str, mut settings: Value) ->
         );
     }
     saved
+}
+/// Configure test scenarios through the same independent mutations as the editor.
+pub fn save_settings(
+    service: &NativeService,
+    token: &str,
+    desired: Value,
+) -> Result<Value, export_doc_engine::api::ApiError> {
+    let mut saved = call(service, token, GET_OA_APPROVAL_SETTINGS, 0, None)?;
+    for rule in desired["rules"].as_array().into_iter().flatten() {
+        if saved["rules"]
+            .as_array()
+            .is_some_and(|rules| rules.iter().any(|r| r == rule))
+        {
+            continue;
+        }
+        let key = rule["key"].as_str().unwrap();
+        saved = call(
+            service,
+            token,
+            SAVE_OA_APPROVAL_SETTINGS,
+            0,
+            Some(
+                json!({"section":"rules","definitionKey":key,"rule":rule,"expectedRevision":saved["revisions"][format!("rule:{key}")].as_i64().unwrap_or(0)}),
+            ),
+        )?;
+    }
+    for section in [
+        "delegations",
+        "handlingServices",
+        "sheetTemplates",
+        "calendar",
+    ] {
+        if desired
+            .get(section)
+            .is_some_and(|value| !value.is_null() && value != &saved[section])
+        {
+            saved = call(
+                service,
+                token,
+                SAVE_OA_APPROVAL_SETTINGS,
+                0,
+                Some(
+                    json!({"section":section,"expectedRevision":saved["revisions"][section].as_i64().unwrap_or(0),section:desired[section]}),
+                ),
+            )?;
+        }
+    }
+    Ok(saved)
 }
 pub fn configure(service: &NativeService, admin: &str, reviewer: i64) -> Value {
     // A published sample needs an applicant independent of the signing person.
@@ -104,10 +155,15 @@ pub fn configure(service: &NativeService, admin: &str, reviewer: i64) -> Value {
         ),
     );
     let mut settings = request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
-    for rule in settings["rules"].as_array_mut().unwrap() {
+    for rule in settings["rules"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .filter(|rule| rule["form"].is_null())
+    {
         rule["stages"] = json!([node("review", &[], "Named", json!([reviewer]))]);
     }
-    publish_all(service, admin, settings)
+    publish_builtins(service, admin, settings)
 }
 /// Exercise a formal change through its published workflow, never through a test bypass.
 pub fn personnel_change(
@@ -152,7 +208,7 @@ pub fn personnel_change(
         json!([reviewer_id])
     )]);
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    let saved = request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    let saved = save_settings(service, admin, settings).unwrap();
     request(
         service,
         admin,
@@ -393,6 +449,7 @@ pub fn decision_body(
 /// Old scenario fixtures now submit an explicit, successfully simulated sample.
 /// Negative publication tests call dispatch directly so no invalid request is repaired.
 pub fn publication_body(service: &NativeService, token: &str, mut body: Value) -> Value {
+    body = definition_revision(service, token, body);
     if body["commandKey"].as_str().is_none_or(|key| key.is_empty()) {
         body["commandKey"] = json!(nonce().unwrap());
     }
@@ -460,4 +517,14 @@ pub fn publication_body(service: &NativeService, token: &str, mut body: Value) -
 }
 fn text_value(value: &Value, key: &str) -> String {
     value[key].as_str().unwrap_or("").into()
+}
+fn definition_revision(service: &NativeService, token: &str, mut body: Value) -> Value {
+    if body.get("expectedRevision").is_none() {
+        if let Ok(bytes) = service.dispatch(GET_OA_APPROVAL_SETTINGS, &[], &[], None, token) {
+            let settings: Value = serde_json::from_slice(&bytes).unwrap();
+            let key = format!("rule:{}", body["definitionKey"].as_str().unwrap_or(""));
+            body["expectedRevision"] = json!(settings["revisions"][key].as_i64().unwrap_or(0));
+        }
+    }
+    body
 }

@@ -10,7 +10,7 @@ export function validationPlan(files, mode = 'quick', force = false) {
   const desktop=/^apps\/export-doc-tauri\//u;
   const rust=all||changed.some(file=>shared.test(file)||desktop.test(file)||/^apps\/exportdoc-ocr-rs\//u.test(file));
   const web=all||changed.some(file=>/^(?:apps\/export-doc-web\/|crates\/export-doc-contracts\/|Resources\/Fonts\/|Templates\/|scripts\/(?:test_[^/]+_ui\.mjs|test_permission_scheme_model\.mjs|test_frontend_|lib\/(?:chromium|web-runtime|child-process)|provision-report-fonts\.mjs))/u.test(file));
-  const office=all||changed.some(file=>/^crates\/(?:export-doc-engine\/src\/engine\/(?:oa\/|office|personnel|units|auth|account_permissions)|export-doc-domain\/src\/(?:permissions|units|approval)|export-doc-contracts\/src\/native_contract\/)/u.test(file)||/^apps\/export-doc-web\/src\/features\/(?:oa|office|organization|access-control)\//u.test(file));
+  const office=all||changed.some(file=>/^crates\/(?:export-doc-engine\/src\/engine\/(?:oa\/|office|personnel|units|auth|account_permissions)|export-doc-domain\/src\/(?:permissions|units|approval)|export-doc-contracts\/src\/native_contract\/)/u.test(file)||/^apps\/export-doc-web\/src\/features\/(?:oa|office|organization|access-control)\//u.test(file)||/^scripts\/test_oa_.*\.mjs$/u.test(file));
   return {rust,web,desktop:all||changed.some(file=>desktop.test(file)),desktopCheck:all||changed.some(file=>shared.test(file)||desktop.test(file)),office,full:mode==='full'};
 }
 function git(args) {

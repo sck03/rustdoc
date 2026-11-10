@@ -1,8 +1,6 @@
 //! Published routing obligations are checked against the same resolver used by submission.
 use super::*;
-use export_doc_domain::approval_policy::{
-    ApprovalRule, ApproverSource, ConditionContext, ConditionField,
-};
+use export_doc_domain::approval_policy::{ApprovalRule, ApproverSource};
 use std::collections::HashSet;
 
 pub(in crate::engine) fn company(tx: &Connection, actor: &Actor, company: &str) -> Result<()> {
@@ -66,7 +64,7 @@ pub(in crate::engine) fn organization_changed(
 }
 
 fn published_rules(tx: &Connection, company: &str) -> Result<Vec<ApprovalRule>> {
-    let settings = settings::load(tx, company)?;
+    let settings = settings_store::registry(tx, company)?;
     let mut rules = vec![];
     for publication in settings["publications"]
         .as_array()
@@ -85,20 +83,10 @@ fn applies_to_department(
     stage: &export_doc_domain::approval_policy::ApprovalStage,
     department: &str,
 ) -> Result<bool> {
-    let context = ConditionContext {
-        department: department.into(),
-        ..Default::default()
-    };
-    for condition in stage
-        .conditions
-        .iter()
-        .filter(|c| c.field == ConditionField::Department)
-    {
-        if !condition.matches(&context).map_err(invalid)? {
-            return Ok(false);
-        }
-    }
-    Ok(true)
+    stage
+        .expression()
+        .may_match_department(department)
+        .map_err(invalid)
 }
 
 /// A top-level employee may have no reporting edge. Removing a configured edge
@@ -146,6 +134,9 @@ pub(in crate::engine) fn personnel_changed(
                         .map_err(super::super::error::unavailable)?
                         .unwrap_or(false);
                     if still_active
+                        && rule.form.as_ref().is_none_or(|form| {
+                            custom_forms::audience(form, &appointment.department_id)
+                        })
                         && applies_to_department(stage, &appointment.department_id)?
                         && !super::super::personnel_organization::appointment_managers(
                             tx,
@@ -184,6 +175,9 @@ pub(super) fn rule(
 ) -> Result<()> {
     let compiled = super::subflows::compile(tx, company, rule)?;
     let rule = &compiled.rule;
+    if let Some(form) = &rule.form {
+        custom_forms::validate_definition(tx, company, form)?;
+    }
     let mut scope = actor.clone();
     scope.company = company.into();
     // Hire routing uses the prospective registration, whose reporting edges do
@@ -288,7 +282,13 @@ pub(super) fn rule(
         };
         let mut resolved = false;
         for (department, employee, appointment) in contexts {
-            if !department.is_empty() && !applies_to_department(stage, &department)? {
+            if !department.is_empty()
+                && (!applies_to_department(stage, &department)?
+                    || rule
+                        .form
+                        .as_ref()
+                        .is_some_and(|form| !custom_forms::audience(form, &department)))
+            {
                 continue;
             }
             let row = json!({"kind":rule.kind,"departmentId":department,"applicantAppointmentId":appointment});

@@ -22,15 +22,16 @@ export function useOaRequests(client: ExportDocManagerApiClient, user: ApiUserDt
   const [filter, setFilter] = useState({ view, status: completing ? "Approved" : approvalsOnly ? "Pending" : "" });
   const status = filter.view === view ? filter.status : completing ? "Approved" : approvalsOnly ? "Pending" : "";
   const api = oaApi(client, kind);
-  const key = ["office", "oa", kind, user.id, user.companyScope];
+  const definitionKey=kind==="general"?params.get("definition")??undefined:undefined;
+  const key = ["office", "oa", kind, user.id, user.companyScope, definitionKey];
   const query = useQuery({ queryKey: [...key, "list", page, mineOnly, status, financeOnly, approvalsOnly, handlingOnly], enabled: selected === 0 && oaAccess(user, kind, "view"),
-    queryFn: ({ signal }) => api.list({ pageNumber: page, pageSize: 20, mineOnly: completing || approvalsOnly ? false : mineOnly, status: status || undefined, financeOnly: kind === "expense" ? financeOnly : undefined, approvalsOnly, handlingOnly: kind !== "expense" ? handlingOnly : undefined }, { signal }),
-    refetchInterval: 30000, refetchIntervalInBackground: false });
+    queryFn: ({ signal }) => api.list({ definitionKey, pageNumber: page, pageSize: 20, mineOnly: completing || approvalsOnly ? false : mineOnly, status: status || undefined, financeOnly: kind === "expense" ? financeOnly : undefined, approvalsOnly, handlingOnly: kind !== "expense" ? handlingOnly : undefined }, { signal }),
+    refetchInterval: query=>query.state.error?false:30000, refetchIntervalInBackground: false });
   useServerPageNumber(query, page, setPage);
   const detail = useQuery({ queryKey: [...key, "detail", selected], enabled: selected > 0 && oaAccess(user, kind, "view"),
-    queryFn: ({ signal }) => api.get(selected, { signal }), refetchInterval: 30000, refetchIntervalInBackground: false });
+    queryFn: ({ signal }) => api.get(selected, { signal }), refetchInterval: query=>query.state.error||query.state.data&&["Completed","Cancelled","Rejected","Terminated"].includes(query.state.data.status)?false:30000, refetchIntervalInBackground: false });
   return { query, detail, selected, page, setPage, mineOnly, status, canReceive, financeOnly, canApprove, approvalsOnly,canHandle,handlingOnly,
-    changeView: (value: string) => { setParams({ view: value }); setPage(1); },
+    changeView: (value: string) => { setParams({ view: value, ...(definitionKey ? {definition:definitionKey} : {}) }); setPage(1); },
     select: (id: number) => setParams((current) => { const next = new URLSearchParams(current); next.delete("new"); next.delete("change"); next.delete("employeeId"); if (id) next.set("requestId", String(id)); else next.delete("requestId"); return next; }),
     changeMine: (value: boolean) => { setMine(value); setPage(1); }, changeStatus: (value: string) => { setFilter({ view, status: value }); setPage(1); } };
 }

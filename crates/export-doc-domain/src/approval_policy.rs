@@ -111,6 +111,8 @@ pub struct SubflowReference {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ApprovalRule {
     #[serde(default)]
+    pub form: Option<crate::oa_form::FormDefinition>,
+    #[serde(default)]
     pub calendar: Option<crate::business_calendar::BusinessCalendar>,
     pub key: String,
     pub kind: String,
@@ -235,6 +237,15 @@ impl ApprovalRule {
         self.check(false)
     }
     fn check(&self, publishing: bool) -> Result<(), String> {
+        if let Some(form) = &self.form {
+            if self.kind != "general"
+                || !crate::oa_form::field_key(&self.variant)
+                || self.key != format!("general:{}", self.variant)
+            {
+                return Err("自定义事项须使用独立的通用流程编号。".into());
+            }
+            form.validate()?;
+        }
         if let Some(calendar) = &self.calendar {
             calendar.validate()?;
         }
@@ -270,7 +281,7 @@ impl ApprovalRule {
         {
             return Err("人员流程须指定具体任职变动。".into());
         }
-        if self.kind != "personnel" && !self.variant.is_empty() {
+        if self.kind != "personnel" && self.form.is_none() && !self.variant.is_empty() {
             return Err("此业务不支持人员变动类型。".into());
         }
         if self.variant.len() > 80 || self.stages.is_empty() || self.stages.len() > 32 {
@@ -504,7 +515,11 @@ impl ApprovalRule {
                 return Err("批准前的节点不能依赖获批办理节点。".into());
             }
             let expression = node.expression();
-            for condition in expression.terms()?.into_iter().flatten() {
+            let mut condition_terms = expression.terms()?;
+            for branch in &node.branches {
+                condition_terms.extend(branch.condition.terms()?);
+            }
+            for condition in condition_terms.into_iter().flatten() {
                 condition.validate()?;
                 let applies = match condition.field {
                     ConditionField::Amount | ConditionField::Currency => {
@@ -517,6 +532,19 @@ impl ApprovalRule {
                     ConditionField::Category => matches!(self.kind.as_str(), "general" | "leave"),
                     ConditionField::Department => true,
                     ConditionField::Returnable => self.kind == "supply",
+                    ConditionField::FormText | ConditionField::FormNumber => {
+                        self.form.as_ref().is_some_and(|form| {
+                            form.fields.iter().any(|f| {
+                                f.key == condition.field_key
+                                    && f.kind != crate::oa_form::FieldKind::Table
+                                    && matches!(
+                                        f.kind,
+                                        crate::oa_form::FieldKind::Decimal
+                                            | crate::oa_form::FieldKind::Money
+                                    ) == (condition.field == ConditionField::FormNumber)
+                            })
+                        })
+                    }
                 };
                 if !applies {
                     return Err("条件字段不适用于本业务。".into());

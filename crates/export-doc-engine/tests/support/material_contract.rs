@@ -50,7 +50,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         .find(|r| r["key"] == "general")
         .unwrap()["stages"] = json!([node]);
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    let saved = workflow::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    let saved = workflow::save_settings(service, admin, settings).unwrap();
     workflow::request(
         service,
         admin,
@@ -210,7 +210,7 @@ fn activated_materials(
             .find(|r| r["key"] == "general")
             .unwrap()["stages"] = json!([first, second]);
         settings["expectedVersion"] = settings["versionNumber"].clone();
-        let saved = workflow::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+        let saved = workflow::save_settings(service, admin, settings).unwrap();
         workflow::request(
             service,
             admin,

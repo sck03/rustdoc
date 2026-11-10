@@ -27,6 +27,7 @@ pub mod invoice_columns;
 pub mod invoice_print_rows;
 pub mod invoice_query;
 pub mod oa;
+pub mod oa_form;
 pub mod organization;
 pub mod packing;
 pub mod party;

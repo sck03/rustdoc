@@ -79,7 +79,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         fixture::node("join", &["first", "parallel"], "Named", json!([last_id]))
     ]);
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    let settings = fixture::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    let settings = fixture::save_settings(service, admin, settings).unwrap();
     fixture::request(
         service,
         admin,
@@ -295,7 +295,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         .find(|r| r["key"] == "general")
         .unwrap()["stages"] = json!([collect]);
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    let saved = fixture::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    let saved = fixture::save_settings(service, admin, settings).unwrap();
     fixture::request(
         service,
         admin,
@@ -384,7 +384,7 @@ fn resource_collected_rejection(
         rule["stages"] = json!([node.clone()]);
     }
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    let mut saved = fixture::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    let mut saved = fixture::save_settings(service, admin, settings).unwrap();
     for kind in ["room", "supply"] {
         saved = fixture::request(
             service,
@@ -525,7 +525,7 @@ fn subflow_versions(
             .find(|r| r["key"] == "general")
             .unwrap()["stages"] = nodes;
         settings["expectedVersion"] = settings["versionNumber"].clone();
-        let saved = fixture::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+        let saved = fixture::save_settings(service, admin, settings).unwrap();
         let published = fixture::request(
             service,
             admin,

@@ -39,7 +39,7 @@ await withOfficeUi('oa-advanced-ui', async ({ output, url, operations, invoke, o
     { ...approvalStage('duty', [reviewer.user.id]), name: '职责审核' },
     { ...approvalStage('project', [projectReviewer.user.id], ['duty']), name: '项目复核' },
   ];
-  await invoke('SaveOaApprovalSettings', { ...settings, expectedVersion: settings.versionNumber }, {}, token);
+  await invoke('SaveOaApprovalSettings', { section:'rules',definitionKey:'general',rule:settings.rules.find(rule=>rule.key==='general'),expectedRevision:settings.revisions?.['rule:general']??0 }, {}, token);
 
   const admin = await openPage('oa-review', 'Review-2026-Test');
   await admin.goto(`${url}/#/office/approval-settings`);

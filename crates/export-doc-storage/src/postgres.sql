@@ -1,6 +1,6 @@
 CREATE TABLE schema_model (version BIGINT PRIMARY KEY,model TEXT NOT NULL,shape TEXT NOT NULL);
-CREATE TABLE schema_version (version BIGINT PRIMARY KEY CHECK(version = 16));
-INSERT INTO schema_version VALUES (16);
+CREATE TABLE schema_version (version BIGINT PRIMARY KEY CHECK(version = 17));
+INSERT INTO schema_version VALUES (17);
 -- The same compact, UTF-8 key order supplies bounded search metadata and fallback reads.
 CREATE FUNCTION exportdoc_record_text(value jsonb) RETURNS text
 LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
@@ -35,6 +35,7 @@ CREATE INDEX records_kind_id ON records(kind, id DESC);
 CREATE INDEX attachment_invoice ON records((body->'invoiceId')) WHERE kind='attachments';
 CREATE INDEX records_scope ON records(kind, company, department, owner_id);
 CREATE INDEX records_company_page ON records(kind, company, id DESC);
+CREATE INDEX records_oa_application ON records(kind, company, (body->>'definitionKey'), id DESC) WHERE kind='oa-general';
 CREATE TABLE organization_units (
     id BIGINT PRIMARY KEY REFERENCES records(id) ON DELETE CASCADE,
     code TEXT NOT NULL UNIQUE,

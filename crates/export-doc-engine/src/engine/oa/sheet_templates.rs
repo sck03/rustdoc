@@ -199,11 +199,14 @@ pub(super) fn select(settings: &Value, row: &Value) -> Result<Value> {
         defaults = self::defaults()?;
         &defaults
     };
-    let template = templates
+    let mut template = templates
         .as_array()
         .and_then(|values| values.iter().find(|v| v["key"] == key))
         .cloned()
         .ok_or_else(|| super::super::error::unavailable("审批单模板缺失。"))?;
     validate_design(&text(&template, "content"))?;
+    if !text(row, "applicationName").is_empty() {
+        template["name"] = json!(format!("{}审批单", text(row, "applicationName")));
+    }
     Ok(template)
 }

@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-10 自定义 OA：`npm --prefix apps/export-doc-web run test:oa-ui` 包含真实 HTTP/React 新建事项、表单设计、仿真发布、员工申请、审批、办理和 PDF 下载。先运行 `cargo build --locked -p export-doc-server --example office_review` 与前端构建；两库业务合同分别随工作区测试及 `test-native-postgres.ps1 -Scope Workflows` 验证。当前使用 schema 17，见[本批记录](../docs/2026-11-10自定义OA重构与验收.md)。
+
 > 2026-09-20：当前主线为 Tauri 2 + React + Rust。原 C# 行为和脚本从只读固定提交 `ba9dbdca72590b06c5f32740e4cd58d3027578da` 及 Git 历史对照；这里的正式构建不发布 ASP.NET sidecar，不要求 .NET SDK／Runtime，不使用 NPOI。
 
 ## 本地入口
@@ -8,7 +10,7 @@
 
 2026-11-09 知识库与资源回归：`test:concurrency-feedback` 纳入 `test_hs_example_workspaces_ui.mjs`，覆盖中文续编、卸载取消、选择时版本删除、删除期间字段锁和候选按需共享查询。SQLite 工具合同与 PostgreSQL `-Scope All` 复用实例版本/批删回滚/历史款式聚合场景。待办第二页起必须传上一页 `nextCursor`，筛选或页容量变化重新取首页。实现、验证及定向清理见[本批记录](../docs/2026-11-09知识库并发与有界资源修复记录.md)。
 
-2026-11-09 事务与资源收尾：`test:abortable-operations-ui` 增加发票列表的关闭、切换、卸载、迟到成功/失败与 StrictMode 回归；Storage 同一合同覆盖 SQLite/PostgreSQL 申报版本聚合。GitHub actionlint 固定版本归档缓存仍逐次校验摘要，网络 504 使用有界重试。当前数据库为 schema 16，详见[收尾记录](../docs/2026-11-09事务边界与资源收尾记录.md)。
+2026-11-09 事务与资源收尾：`test:abortable-operations-ui` 增加发票列表的关闭、切换、卸载、迟到成功/失败与 StrictMode 回归；Storage 同一合同覆盖 SQLite/PostgreSQL 申报版本聚合。GitHub actionlint 固定版本归档缓存仍逐次校验摘要，网络 504 使用有界重试。该批数据库为 schema 16，详见[收尾记录](../docs/2026-11-09事务边界与资源收尾记录.md)。
 
 2026-11-08 并发/性能回归：`test_party_save_workspace_ui.mjs` 使用真实 QueryClient 验证刷新错误传播，并覆盖主数据分类切换、版本删除与迟到响应；`test_invoice_editing_contracts.mjs` 核对不可变行投影与完整规范化等价，输出 5000 行文字编辑耗时。`test_native_desktop_editions.mjs <包父目录> Full --without-ocr --entry-rows-only` 还通过生成客户端与实际界面验证六类主数据版本删除，然后执行中文明细、撤销、保存回读及 PDF 场景；需先重新构建包含最新前端的对应测试包。
 
@@ -107,7 +109,7 @@ pwsh -NoProfile -File scripts/package-native-web-server.ps1 -Version 1.2.3 -NoPa
 
 桌面业务库统一位于 `App_Data/Database/exportdoc-native.db`，实例锁位于 `App_Data/Locks`。旧位置出现数据库或伴随文件时拒绝启动，不自动搬迁或覆盖；Database 目录仅有 WAL/SHM 时也拒绝初始化。重建使用明确的新 DataRoot，不要手工只移动正在使用的主文件。WebView 内部数据库保留在 `WebView` profile 中。
 
-便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 16，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
+便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 17，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
 
 Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便携包携带原版固定清单验证的微软离线安装器；缺少 WebView2 时显示安装／退出选择，保留取消、繁忙、超时和需重启处理。构建时核对微软签名、版本、大小和 SHA-256。Windows GNU 构建同时携带 `WebView2Loader.dll`。
 
@@ -141,9 +143,9 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 源码脚本的启动／更新经过：准备镜像 → 停 API → 等数据库就绪 → 独立维护容器初始化或校验当前基线 → 启 API 并检查就绪。构建及缺失镜像取得在停 API 前完成，失败不打断原应用；已有/离线镜像按 missing 策略复用。原 `compose.yml` 的维护服务仍由脚本显式运行，`-SkipBuild` 复用已有镜像。新版 `compose.image.yml` 则声明初始化完成依赖，支持直接 Compose 启动；升级时先 pull，再 down（不删卷）及 up。两种入口的恢复失败均保留 API 停止状态。
 
-应用 schema 与 PostgreSQL 软件主版本是两件事：当前只支持全新 schema 16，不迁移旧试验库。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。维护前保留需要的备份/完整迁移包。
+应用 schema 与 PostgreSQL 软件主版本是两件事：当前只支持全新 schema 17，不迁移旧试验库。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。维护前保留需要的备份/完整迁移包。
 
-首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接供初始化/恢复使用。桌面 SQLite 新库仍为 admin 空密码；当前仅支持全新 schema 16，不兼容此前试验库。
+首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接供初始化/恢复使用。桌面 SQLite 新库仍为 admin 空密码；当前仅支持全新 schema 17，不兼容此前试验库。
 
 ## 远端入口
 

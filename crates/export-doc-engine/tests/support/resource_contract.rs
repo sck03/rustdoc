@@ -47,7 +47,7 @@ pub(super) fn exercise(
         )]);
     }
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    settings = call(service, admin, SAVE_OA_APPROVAL_SETTINGS, 0, Some(settings)).unwrap();
+    settings = workflow::save_settings(service, admin, settings).unwrap();
     for key in ["room", "supply"] {
         settings = call(
             service,

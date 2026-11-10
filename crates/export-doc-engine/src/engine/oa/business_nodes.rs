@@ -75,6 +75,7 @@ pub(super) fn defaults(kind: &str, depends: &[String]) -> Result<Vec<ApprovalSta
                 &[issue.key.clone()],
             )?;
             returned.conditions = vec![export_doc_domain::approval_policy::ApprovalCondition {
+                field_key: String::new(),
                 field: export_doc_domain::approval_policy::ConditionField::Returnable,
                 operator: export_doc_domain::approval_policy::ConditionOperator::Equal,
                 value: "true".into(),

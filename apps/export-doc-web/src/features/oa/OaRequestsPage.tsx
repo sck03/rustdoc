@@ -13,6 +13,7 @@ import { oaAccess, oaKinds, oaModules, oaStatus, oaHandlingLabels, type OaKind }
 import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
 import { useConfirmUnsavedChanges } from "../../ui/unsavedChangesGuard.tsx";
 import { useOaRequests } from "./useOaRequests.ts";
+import { useOaApplications } from "./useOaApplications.ts";
 import "../../styles/routes/office.css";
 import "../../styles/routes/oa.css";
 
@@ -21,10 +22,12 @@ export function OaRequestsPage({ client, user, kind }: { client: ExportDocManage
   const navigate = useNavigate();
   const confirmDiscard = useConfirmUnsavedChanges();
   const [params, setParams] = useSearchParams();
+  const applications = useOaApplications(client,user,kind === "general" && params.has("definition"));
+  const applicationName = applications.data?.items.find(item=>item.key===params.get("definition"))?.name;
   const [editing, setEditing] = useState<OaRequest | "new" | null>(() => (params.get("new") === "true" || kind === "personnel" && params.has("change")) && oaAccess(user, kind, "create") ? "new" : null);
   function closeEditor() { setEditing(null); setParams(current => { const next = new URLSearchParams(current); next.delete("new"); next.delete("change"); next.delete("employeeId"); return next; }); }
   if (!oaAccess(user, kind, "view")) return <PageState tone="permission" title="没有此申请模块的查看权限" />;
-  const module = oaModules[kind];
+  const module = applicationName ? {...oaModules[kind],name:applicationName} : oaModules[kind];
   return <EditorWorkspace className="office-workspace oa-workspace" aria-label={module.name} title={model.selected ? "申请详情" : "申请列表"}
     actions={<Link to="/office/approvals">申请与审批中心</Link>}>
     <SegmentedNav label="申请类型" value={kind} items={oaKinds.filter(kind => oaAccess(user,kind,"view")).map(key => ({key,label:oaModules[key].name}))}

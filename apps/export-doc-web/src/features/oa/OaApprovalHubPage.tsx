@@ -26,7 +26,7 @@ export function OaApprovalHubPage({ client, user }: { client: ExportDocManagerAp
     <p className="oa-hub-eyebrow">{user.businessDate} · {user.fullName}</p>
     <SegmentedNav label="审批中心工作区" value={view} onChange={view => setParams({view})}
       items={[{key:"pending",label:<><ClipboardList size={18} aria-hidden="true" />审批与进度</>},{key:"handling",label:<><CheckCheck size={18} aria-hidden="true" />待我办理</>},{key:"start",label:<><FilePlus2 size={18} aria-hidden="true" />发起申请</>},{key:"requests",label:"我的申请"}]} />
-    {view === "requests" ? firstKind ? <Navigate to={`/office/requests/${firstKind}?view=requests&mineOnly=true`} replace /> : <PageState tone="permission" title="没有申请记录的查看权限" /> : view === "start" ? <OaApplicationCatalog user={user} resources={queues.filter(queue => ["rooms", "supplies"].includes(queue.kind) && !queue.handling)} /> : <>
+    {view === "requests" ? firstKind ? <Navigate to={`/office/requests/${firstKind}?view=requests&mineOnly=true`} replace /> : <PageState tone="permission" title="没有申请记录的查看权限" /> : view === "start" ? <OaApplicationCatalog client={client} user={user} resources={queues.filter(queue => ["rooms", "supplies"].includes(queue.kind) && !queue.handling)} /> : <>
       <p className="office-muted">{view === "handling" ? "已批准的事项按职责交接、验收或归档。批准与实际办理分别记录。" : "审批人查看当前待签任务；其他员工查看自己申请的审批进度。每类显示最近五项，可进入列表查看全部。"}</p>
       {!selected.length && <PageState tone="empty" title="当前身份没有待办理职责" description="可以在“发起申请”中提交申请，或查看申请记录。" />}
       {selected.length > 0 && !activeQueues.length && <PageState tone="empty" title="当前没有待处理事项" description="可发起新的申请，或展开下方分类查看历史记录。" />}

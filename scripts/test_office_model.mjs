@@ -55,9 +55,10 @@ assert.equal(office.shiftOfficeBookingEnd("2026-03-08T02:30", "America/New_York"
 assert.equal(office.shiftOfficeBookingEnd("2026-09-07T10:30", "Asia/Shanghai"), "2026-09-07T11:30");
 assert.equal(getDefaultWorkspaceRoute(user.capabilities), "/office/approvals", "Full employees enter their authorized application workspace");
 assert.equal(getDefaultWorkspaceRoute({...user.capabilities,productEdition:"Document"}),"/access-denied","shipping editions retain their fixed home boundary");
-assert(navigation.filterWorkspaceNavGroups(user.capabilities).some(group => group.key === "office"));
-assert(!navigation.filterWorkspaceNavGroups({ ...user.capabilities, moduleAccess: [] }).some(group => group.key === "office"), "module enablement alone does not grant navigation access");
-assert(navigation.filterWorkspaceNavGroups({ ...user.capabilities, isDesktopRuntime: true }).some(group => group.key === "office"));
+const hasApprovalEntry = capabilities => navigation.filterWorkspaceNavGroups(capabilities).some(group => group.items.some(item => item.to === "/office/approvals"));
+assert(hasApprovalEntry(user.capabilities));
+assert(!navigation.getWorkspaceRouteItems(navigation.filterWorkspaceNavGroups({ ...user.capabilities, moduleAccess: [] })).some(item => item.to === "/office/meeting-rooms"), "module enablement alone does not grant resource navigation access");
+assert(hasApprovalEntry({ ...user.capabilities, isDesktopRuntime: true }));
 for (const pathname of ["/office/meeting-rooms", "/office/supplies"]) {
   const args = { pathname, user, canManageSystem: false, isDesktopRuntime: false };
   assert(isRouteAccessAllowed(args));

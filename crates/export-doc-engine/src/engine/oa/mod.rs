@@ -14,6 +14,7 @@ mod organization_routing;
 mod simulation;
 pub(super) use simulation::{simulate, units as routing_units};
 mod commands;
+mod custom_forms;
 mod decisions;
 mod definition_queries;
 mod definitions;
@@ -34,6 +35,8 @@ mod request_projects;
 mod reservation_schedule;
 mod resource_requests;
 pub(in crate::engine) mod runtime;
+mod settings_patch;
+pub(in crate::engine) mod settings_store;
 mod subflows;
 pub(super) use resource_requests::{
     created as resource_created, event as resource_event, schedule as resource_document,
@@ -375,6 +378,12 @@ pub(super) fn handle(
     let execute = |tx: &Connection| {
         let actor = auth::refresh_actor_in(tx, actor)?;
         auth::authorize(&actor, &text(meta, "resource"), &text(meta, "permission"))?;
+        if action == "application-catalog" {
+            return custom_forms::catalog(tx, &actor);
+        }
+        if action == "form-references" {
+            return custom_forms::references(tx, &actor, query);
+        }
         if action == "project-options" {
             return request_projects::options(tx, &actor, query);
         }
@@ -497,6 +506,11 @@ pub(super) fn handle(
         }
         if action == "update" {
             mutable(&row)?;
+            if !text(&row, "definitionKey").is_empty()
+                && row["definitionVersion"] != body["definitionVersion"]
+            {
+                return Err(invalid("申请表单版本不能更换。"));
+            }
             materials::authorize_edit(tx, &actor, &row)?;
             if row["requestKey"] != body["requestKey"]
                 || (!text(body, "appointmentId").is_empty()
@@ -509,10 +523,17 @@ pub(super) fn handle(
             {
                 return Err(invalid("申请编号、变动类型和人员不能更换。"));
             }
+            if row["definitionKey"] != body["definitionKey"]
+                && !(text(&row, "definitionKey").is_empty()
+                    && text(body, "definitionKey").is_empty())
+            {
+                return Err(invalid("申请事项不能更换。"));
+            }
             let values = validation::fields(meta, body, today)?;
             for (key, value) in values.as_object().unwrap() {
                 row[key] = value.clone();
             }
+            custom_forms::validate(tx, &actor, &mut row, false)?;
             if meta["kind"] == "general" {
                 let category = text(&row, "category");
                 handling::select(tx, &actor, &mut row, &category, false)?;
@@ -707,6 +728,7 @@ fn create(
         row["applicantJobTitle"] = employee["jobTitle"].clone();
     }
     row["companyScope"] = json!(actor.company);
+    custom_forms::bind(tx, actor, &mut row)?;
     row["ownerUserId"] = json!(actor.id);
     row["_requesterContext"] = json!(actor.context);
     if meta["kind"] == "general" {

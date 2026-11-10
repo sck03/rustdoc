@@ -17,21 +17,23 @@ pub fn overlap(a: &ConditionGroup, b: &ConditionGroup) -> Result<bool, String> {
     Ok(false)
 }
 fn possible(term: &[&ApprovalCondition]) -> Result<bool, String> {
-    for field in [
-        ConditionField::Amount,
-        ConditionField::Duration,
-        ConditionField::Currency,
-        ConditionField::Department,
-        ConditionField::Category,
-        ConditionField::PersonnelAction,
-        ConditionField::Returnable,
-    ] {
+    for (index, sample) in term.iter().enumerate() {
+        if term[..index]
+            .iter()
+            .any(|prior| prior.field == sample.field && prior.field_key == sample.field_key)
+        {
+            continue;
+        }
+        let field = &sample.field;
         let conditions = term
             .iter()
             .copied()
-            .filter(|c| c.field == field)
+            .filter(|c| &c.field == field && c.field_key == sample.field_key)
             .collect::<Vec<_>>();
-        if matches!(field, ConditionField::Amount | ConditionField::Duration) {
+        if matches!(
+            field,
+            ConditionField::Amount | ConditionField::Duration | ConditionField::FormNumber
+        ) {
             let mut low = (Decimal::ZERO, true);
             let mut high: Option<(Decimal, bool)> = None;
             let mut excluded = vec![];

@@ -55,14 +55,7 @@ pub fn exercise(service: &NativeService, root: &str) {
     let mut settings = call(service, &admin_token, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
     let save_settings = |mut settings: Value| {
         settings["expectedVersion"] = settings["versionNumber"].clone();
-        call(
-            service,
-            &admin_token,
-            SAVE_OA_APPROVAL_SETTINGS,
-            0,
-            Some(settings),
-        )
-        .unwrap()
+        super::super::oa_contract::workflow::save_settings(service, &admin_token, settings).unwrap()
     };
     settings["handlingServices"] = json!([{"key":"seal","name":"公章","category":"Seal","handlerUserIds":[inherited["id"]],"isActive":true}]);
     settings = save_settings(settings);

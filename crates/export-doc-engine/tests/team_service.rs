@@ -13,6 +13,8 @@ mod approval_contract;
 mod business_contract;
 #[path = "support/communication_contract.rs"]
 mod communication_contract;
+#[path = "support/custom_oa_contract.rs"]
+mod custom_oa_contract;
 #[path = "support/handling_contract.rs"]
 mod handling_contract;
 #[path = "support/identity_contract.rs"]
@@ -122,6 +124,9 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
             .is_none()
     );
     let token = admin["accessToken"].as_str().unwrap();
+    phase("custom_oa_contract::exercise", || {
+        custom_oa_contract::exercise(&service, token)
+    });
     phase("advanced_workflow_contract::exercise", || {
         advanced_workflow_contract::exercise(&service, token)
     });

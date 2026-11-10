@@ -12,7 +12,7 @@ pub(super) fn published(
     kind: &str,
     variant: &str,
 ) -> Result<(ApprovalRule, i64)> {
-    let settings = settings::load(tx, company)?;
+    let settings = super::settings_store::registry(tx, company)?;
     let key = format!(
         "{kind}{}",
         if variant.is_empty() {
@@ -155,15 +155,6 @@ pub(super) fn activate_scheduled(tx: &Connection, actor: &Actor, entry: &Value) 
     } else {
         publications.push(value);
     }
-    let id = records::positive(&previous, "id", "流程配置")?;
-    store::save(
-        tx,
-        settings::STORAGE_KIND,
-        id,
-        previous,
-        Some(store::normalize(&actor.company)),
-        actor,
-        "scheduled-activation",
-    )?;
+    super::settings_store::save_registry(tx, actor, previous, "scheduled-activation")?;
     Ok(())
 }

@@ -52,6 +52,7 @@ mod schema_shapes;
 mod schemas_hs_1;
 mod schemas_invoices_1;
 mod schemas_maintenance_1;
+mod schemas_oa_forms;
 mod schemas_personnel_1;
 mod schemas_platform_1;
 mod schemas_platform_2;
@@ -76,6 +77,7 @@ pub(super) fn document() -> Value {
     schemas.extend(schemas_hs_1::entries());
     schemas.extend(schemas_personnel_1::entries());
     schemas.extend(schemas_workflow_1::entries());
+    schemas.extend(schemas_oa_forms::entries());
     let schemas: BTreeMap<_, _> = schemas.into_iter().collect();
     let mut endpoints = Vec::new();
     endpoints.extend(endpoints_session::entries());

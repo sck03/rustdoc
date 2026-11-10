@@ -1,5 +1,10 @@
 //! Shared query/path shapes. Requiredness, integer widths and bounds remain explicit.
 use super::model::*;
+pub(super) fn general_request_page() -> Vec<Parameter> {
+    let mut parameters = office_request_page();
+    parameters.push(p("definitionKey", "query", None, s().max_length(80)));
+    parameters
+}
 
 pub(super) fn single_window_source_id() -> Vec<Parameter> {
     vec![p(

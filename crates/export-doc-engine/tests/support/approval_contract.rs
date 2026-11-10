@@ -39,7 +39,7 @@ fn list(service: &NativeService, token: &str, finance: bool) -> Value {
 }
 fn settings(service: &NativeService, token: &str, mut value: Value) -> Value {
     value["expectedVersion"] = value["versionNumber"].clone();
-    let saved = call(service, token, SAVE_OA_APPROVAL_SETTINGS, 0, Some(value)).unwrap();
+    let saved = super::oa_contract::workflow::save_settings(service, token, value).unwrap();
     call(
         service,
         token,
@@ -264,7 +264,7 @@ pub fn exercise(service: &NativeService, root_admin: &str) {
         admin,
         DISABLE_OA_DEFINITION,
         0,
-        Some(json!({"expectedVersion":policy["versionNumber"],"definitionKey":"expense"})),
+        Some(json!({"expectedVersion":policy["versionNumber"],"expectedRevision":policy["revisions"]["rule:expense"],"definitionKey":"expense"})),
     )
     .unwrap();
     assert_eq!(disabled["publications"][0]["enabled"], false);

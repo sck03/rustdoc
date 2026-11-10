@@ -1,3 +1,4 @@
+import { Button } from "../../ui/Button.tsx";
 import { useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient, GetOaRequestProjectsRequest } from "../../api/index.ts";
@@ -29,7 +30,7 @@ export function WorkflowProjectPicker({ client, user, kind, employeeId, appointm
         {value && !projects.some(project => project.id === value) && <option value={value}>原项目待核对</option>}
         {projects.map(project => <option key={project.id} value={project.id}>{project.name} · {project.code}</option>)}
       </select></OfficeField>
-      {query.hasNextPage && <button type="button" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>加载更多项目</button>}
+      {query.hasNextPage && <Button type="button" disabled={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>加载更多项目</Button>}
       {query.isSuccess && !projects.length && <p>当前任职没有有效项目成员关系。</p>}
     </>}
   </details>;

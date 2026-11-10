@@ -118,7 +118,12 @@ pub fn exercise(service: &NativeService, root: &str) {
     let (other_reviewer, _) = super::oa_contract::workflow::reviewer(service, &admin);
     let mut policy = call(service, &admin, GET_OA_APPROVAL_SETTINGS, 0, None).unwrap();
     // This contract exercises service custody after a deliberately single-stage approval.
-    for rule in policy["rules"].as_array_mut().unwrap() {
+    for rule in policy["rules"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .filter(|rule| rule["form"].is_null())
+    {
         let reviewer = if matches!(rule["kind"].as_str(), Some("general" | "room" | "supply")) {
             users[4]["id"].clone()
         } else {
@@ -139,9 +144,9 @@ pub fn exercise(service: &NativeService, root: &str) {
     ]);
     let save_policy = |mut body: Value| {
         body["expectedVersion"] = body["versionNumber"].clone();
-        call(service, &admin, SAVE_OA_APPROVAL_SETTINGS, 0, Some(body)).unwrap()
+        super::oa_contract::workflow::save_settings(service, &admin, body).unwrap()
     };
-    policy = super::oa_contract::workflow::publish_all(service, &admin, policy);
+    policy = super::oa_contract::workflow::publish_builtins(service, &admin, policy);
     let body = |category: &str, key: &str| json!({"requestKey":nonce().unwrap(),"title":format!("{category}分工测试"),"reason":"审批后专岗办理","category":category,"handlingKey":key});
     let draft = call(
         service,
@@ -414,7 +419,7 @@ pub fn exercise(service: &NativeService, root: &str) {
     policy["handlingServices"] = json!([]);
     policy["expectedVersion"] = policy["versionNumber"].clone();
     assert_eq!(
-        call(service, &admin, SAVE_OA_APPROVAL_SETTINGS, 0, Some(policy))
+        super::oa_contract::workflow::save_settings(service, &admin, policy)
             .unwrap_err()
             .status,
         Some(409)

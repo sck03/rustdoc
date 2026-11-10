@@ -19,9 +19,22 @@ import { PersonnelChangeFields } from "./PersonnelChangeFields.tsx";
 import { personnelChangeLabels } from "./oaModel.ts";
 import { OaDepartmentPicker } from "./OaDepartmentPicker.tsx";
 import { WorkflowProjectPicker } from "./WorkflowProjectPicker.tsx";
+import { useOaApplications } from "./useOaApplications.ts";
+import { OaFormFields } from "./OaFormFields.tsx";
+import { PageState } from "../../ui/PageState.tsx";
+import { readApiError } from "../../ui/formUtils.ts";
 
 
-export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind; record?: OaRequest; onClose: () => void; onSaved: (record: OaRequest) => void }) {
+type Props={ client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind; record?: OaRequest; onClose: () => void; onSaved: (record: OaRequest) => void };
+export function OaRequestDialog(props:Props) {
+  const [params]=useSearchParams();
+  const key=props.kind==="general"&&!props.record?params.get("definition"):null;
+  const query=useOaApplications(props.client,props.user,Boolean(key));
+  const application=query.data?.items.find(item=>item.key===key);
+  if(key&&!application)return <OfficeDialog title="新建申请" onClose={props.onClose}><PageState tone={query.isPending?"loading":"error"} title={query.isPending?"正在读取申请表单":"此事项已停用、无权限或未发布"} description={query.isError?readApiError(query.error):undefined}/></OfficeDialog>;
+  return <RequestEditor {...props} application={application}/>;
+}
+function RequestEditor({ client, user, kind, record, onClose, onSaved, application }: Props&{application?:import("../../api/index.ts").OaApplication}) {
   const operation = useOaOperation(kind);
   const [purpose,setPurpose] = useState("Voucher");
   const [params] = useSearchParams();
@@ -39,6 +52,7 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
       return draft;
     }
       const draft = oaDraft(kind, user);
+      if(application){draft.definitionKey=application.key;draft.definitionVersion=application.version;draft.formValues={};draft.category="Other";}
       const action = params.get("change");
       if (kind === "personnel" && action && action !== "Hire" && Object.hasOwn(personnelChangeLabels, action)) {
         draft.employeeId = Number(params.get("employeeId")) || undefined;
@@ -48,6 +62,7 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
     });
   const [employee, setEmployee] = useState<PersonnelDirectoryRecord | null>(null);
   const [dirty, setDirty] = useState(false);
+  const form=record?.formDefinition??application?.form;
   const setDraft: Dispatch<SetStateAction<OaRequestSave>> = (value) => { setDirty(true); storeDraft(value); };
   useUnsavedChangesGuard({ isDirty: dirty, message: "申请有未保存的修改。" });
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -68,7 +83,7 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
         (current, entry, signal) => { const form = new FormData(); form.set("file", entry.file); form.set("purpose",purpose); form.set("expectedVersion", String(current.versionNumber)); return api.upload(current.id, form, { signal }); });
     }, (result) => { setDirty(false); onSaved(result); });
   }
-  return <OfficeDialog title={`${record ? "编辑" : "新建"}${oaModules[kind].name}`} onClose={onClose} {...operation} protectChanges hasChanges={dirty}>
+  return <OfficeDialog title={`${record ? "编辑" : "新建"}${record?.applicationName??application?.name??oaModules[kind].name}`} onClose={onClose} {...operation} protectChanges hasChanges={dirty}>
     <p className="office-muted">{oaModules[kind].description}填写资料并选择附件，一次保存草稿，核对后提交审批。</p>
     {operation.error && attachments.saved && <p role="status">资料已保存。待保存文件仍在下方，再次保存会继续处理；也可稍后从草稿回访。</p>}
     <form onSubmit={submit} onChangeCapture={() => setDirty(true)}><fieldset disabled={operation.busy} className="office-form-grid">
@@ -80,7 +95,7 @@ export function OaRequestDialog({ client, user, kind, record, onClose, onSaved }
       {(kind!=="personnel" || draft.personnelChange?.action!=="Hire")&&<WorkflowProjectPicker client={client} user={user} kind={kind} employeeId={record?.employeeId??employee?.id??draft.employeeId} appointmentId={draft.appointmentId} departmentId={draft.departmentId} value={draft.projectId} onChange={projectId=>setDraft(current=>({...current,projectId}))}/>}
       <OfficeField label="申请标题" wide><input required maxLength={150} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></OfficeField>
       <OfficeField label="申请说明" wide><textarea required rows={3} maxLength={2000} value={draft.reason} onChange={(event) => setDraft({ ...draft, reason: event.target.value })} /></OfficeField>
-      <OaTemporalFields draft={draft} setDraft={setDraft} timeZone={user.businessTimeZone} />
+      {form?<OaFormFields client={client} company={user.companyScope} form={form} values={draft.formValues??{}} onChange={formValues=>setDraft({...draft,formValues})}/>:<OaTemporalFields draft={draft} setDraft={setDraft} timeZone={user.businessTimeZone} />}
       {draft.category && <HandlingServicePicker client={client} user={user} category={draft.category} value={draft.handlingKey ?? ""} onChange={handlingKey => setDraft({ ...draft, handlingKey })} />}
       {(kind === "expense" || kind === "purchase") && <>
         <OfficeField label="币种"><select value={draft.currency} onChange={(event) => setDraft({ ...draft, currency: event.target.value as OaRequestSave["currency"] })}>{["CNY", "USD", "EUR", "HKD", "JPY", "GBP"].map((currency) => <option key={currency}>{currency}</option>)}</select></OfficeField>

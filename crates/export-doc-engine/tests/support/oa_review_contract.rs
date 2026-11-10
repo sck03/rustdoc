@@ -13,7 +13,7 @@ fn publish(service: &NativeService, admin: &str, node: Value) -> Value {
         .find(|r| r["key"] == "general")
         .unwrap()["stages"] = json!([node]);
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    let saved = fixture::request(service, admin, SAVE_OA_APPROVAL_SETTINGS, Some(settings));
+    let saved = fixture::save_settings(service, admin, settings).unwrap();
     fixture::request(
         service,
         admin,

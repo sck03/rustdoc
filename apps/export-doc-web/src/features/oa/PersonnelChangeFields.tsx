@@ -1,3 +1,4 @@
+import { Button } from "../../ui/Button.tsx";
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -35,7 +36,7 @@ export function PersonnelChangeFields({ client, user, draft, setDraft }: {
   </select>;
   return <>
     <p className="office-field-wide">变动类型：{personnelChangeLabels[change.action]}。最终批准前，现有人员与账号保持原状态；申请人及被变动人员不能审批本申请。</p>
-    {error && <InlineNotice tone="error" action={<button type="button" onClick={() => { void options.refetch(); if (!hire) void target.refetch(); }}>重新读取</button>}>{readApiError(error)}</InlineNotice>}
+    {error && <InlineNotice tone="error" action={<Button type="button" onClick={() => { void options.refetch(); if (!hire) void target.refetch(); }}>重新读取</Button>}>{readApiError(error)}</InlineNotice>}
     {hire ? <>
       <OfficeField label="工号（系统内唯一）"><input required maxLength={50} value={registration?.employeeNumber ?? ""} onChange={event => patch({ registration: { ...registration!, employeeNumber: event.target.value } })} /></OfficeField>
       <OfficeField label="姓名"><input required maxLength={100} value={registration?.profile.fullName ?? ""} onChange={event => patch({ registration: { ...registration!, profile: { ...registration!.profile, fullName: event.target.value } } })} /></OfficeField>
@@ -49,7 +50,7 @@ export function PersonnelChangeFields({ client, user, draft, setDraft }: {
     </> : <>
       {person ? <p className="office-field-wide">变动人员：{person.employee.fullName} · 工号 {person.employee.employeeNumber} · {person.employee.departmentName} · {person.employee.jobTitle} · {employmentStatusLabels[person.employee.status]}</p>
         : <p className="office-field-wide">{target.isFetching ? "正在读取人员档案…" : <>请从<Link to="/office/people">人员档案</Link>选择人员并发起变动。</>}</p>}
-      {person && change.expectedPersonnelVersion !== person.versionNumber && <InlineNotice tone="warning" action={<button type="button" onClick={() => patch({ expectedPersonnelVersion: person.versionNumber })}>已核对，采用最新档案版本</button>}>人员档案已变化，请核对当前任职与申请内容后更新版本。</InlineNotice>}
+      {person && change.expectedPersonnelVersion !== person.versionNumber && <InlineNotice tone="warning" action={<Button type="button" onClick={() => patch({ expectedPersonnelVersion: person.versionNumber })}>已核对，采用最新档案版本</Button>}>人员档案已变化，请核对当前任职与申请内容后更新版本。</InlineNotice>}
       <OfficeField label="生效日期"><input type="date" required min={person?.lastEffectiveDate} value={change.effectiveDate ?? user.businessDate} onChange={event => patch({ effectiveDate: event.target.value })} /></OfficeField>
       <p className="office-muted">未来日期的申请在批准后等待生效；生效时会重新核对人员版本与交接事项。</p>
       {change.action === "Transfer" && Boolean(person?.organization?.additionalAssignments.length) && <OfficeField label="主任职调整" wide><select value={change.primaryAppointmentId ?? ""} onChange={event => patch({ primaryAppointmentId: event.target.value })}><option value="">保留主任职，调整部门、岗位或兼任</option>{person?.organization?.additionalAssignments.filter(item => item.id && !item.endsOn).map(item => <option key={item.id} value={item.id}>改任 {item.companyCode} · {item.departmentName || item.departmentId} · {item.jobTitle}</option>)}</select></OfficeField>}

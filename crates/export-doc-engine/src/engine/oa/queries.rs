@@ -20,6 +20,15 @@ pub(super) fn list_with(
     let resource = text(meta, "resource");
     auth::authorize(actor, &resource, "view")?;
     let get = |name| crate::engine::request_values::find(query, name).unwrap_or("");
+    let definition_key = get("definitionKey");
+    if !definition_key.is_empty()
+        && (meta["kind"] != "general"
+            || !definition_key
+                .strip_prefix("general:")
+                .is_some_and(export_doc_domain::oa_form::field_key))
+    {
+        return Err(invalid("事项筛选编号无效。"));
+    }
     let handling = match get("handlingOnly") {
         "" | "false" => false,
         "true" if meta["kind"] != "expense" => true,
@@ -86,15 +95,24 @@ pub(super) fn list_with(
         return Err(error(403, "没有有效的申请数据访问范围。"));
     }
     let (page, size) = paging(query)?;
-    let handling_authority = if handling || finance {
-        Some(
-            super::queue_authority::QueueAuthority::new(tx, actor)?
-                .for_action(&resource, "complete"),
-        )
+    let local_authority = if authority.is_none()
+        && (handling || finance || approvals || actor.oa_assigned_only || !mine)
+    {
+        Some(super::queue_authority::QueueAuthority::new(tx, actor)?)
     } else {
         None
     };
-    let handling_keys = handling::keys(tx, actor, "office.general")?;
+    let authority = authority.or(local_authority.as_ref());
+    let handling_authority = if handling || finance {
+        authority.map(|value| value.for_action(&resource, "complete"))
+    } else {
+        None
+    };
+    let handling_keys = if meta["kind"] == "general" {
+        handling::keys(tx, actor, "office.general")?
+    } else {
+        vec![]
+    };
     let approvers = if approvals || actor.oa_assigned_only || !mine {
         match authority {
             Some(authority) => authority.approvers(&resource),
@@ -104,6 +122,7 @@ pub(super) fn list_with(
         vec![]
     };
     let (count, rows) = tx.query_records(&RecordQuery {
+        definition_key: (!definition_key.is_empty()).then_some(definition_key),
         restrictions: auth::object_scope_filters(actor, &resource, scope_permission),
         kind: &kind(meta),
         company: &actor.company,

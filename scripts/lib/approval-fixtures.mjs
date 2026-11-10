@@ -82,8 +82,19 @@ export function approvalStage(key, approverUserIds = [], dependsOn = [], source 
   return { key, name: key, dependsOn, source, approverUserIds, decision: 'All', selfApproval: 'Skip', repeatedApprover: 'Allow', conditions: [], dueHours: 48 };
 }
 
+export async function saveApprovalSettings(invoke, token, settings) {
+  let saved=await invoke('GetOaApprovalSettings',undefined,{},token);
+  for(const rule of settings.rules) {
+    if(JSON.stringify(saved.rules.find(item=>item.key===rule.key))===JSON.stringify(rule))continue;
+    saved=await invoke('SaveOaApprovalSettings',{section:'rules',definitionKey:rule.key,rule,expectedRevision:saved.revisions?.[`rule:${rule.key}`]??0},{},token);
+  }
+  for(const section of ['calendar','delegations','handlingServices','sheetTemplates']) {
+    if(settings[section]!==undefined&&JSON.stringify(saved[section])!==JSON.stringify(settings[section]))saved=await invoke('SaveOaApprovalSettings',{section,expectedRevision:saved.revisions?.[section]??0,[section]:settings[section]},{},token);
+  }
+  return saved;
+}
 export async function publishDefinitions(invoke, token, settings, keys, samplesByDefinition = {}) {
-  let saved = await invoke('SaveOaApprovalSettings', { ...settings, expectedVersion: settings.versionNumber }, {}, token);
+  let saved = await saveApprovalSettings(invoke, token, settings);
   let candidates;
   for (const definitionKey of keys) {
     const definition = saved.rules.find(rule => rule.key === definitionKey);
@@ -104,7 +115,7 @@ export async function publishDefinitions(invoke, token, settings, keys, samplesB
       }
       if (!samples) throw new AggregateError(failures, `No valid publication sample for ${definitionKey}`);
     }
-    saved = await invoke('PublishOaDefinition', { expectedVersion: saved.versionNumber, definitionKey, samples, commandKey: randomUUID() }, {}, token);
+    saved = await invoke('PublishOaDefinition', { expectedVersion: saved.versionNumber, expectedRevision: saved.revisions?.[`rule:${definitionKey}`] ?? 0, definitionKey, samples, commandKey: randomUUID() }, {}, token);
   }
   return saved;
 }

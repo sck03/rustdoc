@@ -236,7 +236,7 @@ pub fn exercise(service: &NativeService, root: &str) {
     let mut settings = get(service, admin, GET_OA_APPROVAL_SETTINGS, 0);
     settings["expectedVersion"] = settings["versionNumber"].clone();
     settings["delegations"] = json!([{"key":"independent-proxy","principalUserId":users[3]["id"],"delegateUserId":users[2]["id"],"startsAt":(chrono::Utc::now()-chrono::Duration::hours(1)).to_rfc3339(),"endsAt":(chrono::Utc::now()+chrono::Duration::days(1)).to_rfc3339(),"isActive":true}]);
-    call(service, admin, SAVE_OA_APPROVAL_SETTINGS, 0, Some(settings)).unwrap();
+    super::oa_contract::workflow::save_settings(service, admin, settings).unwrap();
     let pending = act(service, applicant, "general", "submit", &create(&a));
     let next = act(service, first, "general", "approve", &pending);
     assert_eq!(
@@ -272,7 +272,7 @@ pub fn exercise(service: &NativeService, root: &str) {
     let mut settings = get(service, admin, GET_OA_APPROVAL_SETTINGS, 0);
     settings["expectedVersion"] = settings["versionNumber"].clone();
     settings["delegations"] = json!([{"key":"first-actual-delegate","principalUserId":users[2]["id"],"delegateUserId":users[4]["id"],"startsAt":(chrono::Utc::now()-chrono::Duration::hours(1)).to_rfc3339(),"endsAt":(chrono::Utc::now()+chrono::Duration::days(1)).to_rfc3339(),"isActive":true}]);
-    call(service, admin, SAVE_OA_APPROVAL_SETTINGS, 0, Some(settings)).unwrap();
+    super::oa_contract::workflow::save_settings(service, admin, settings).unwrap();
     let delegate_login = login(4);
     let delegate = delegate_login["accessToken"].as_str().unwrap();
     let pending = act(service, applicant, "general", "submit", &create(&a));

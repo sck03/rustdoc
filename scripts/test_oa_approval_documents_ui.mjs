@@ -35,7 +35,7 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   coloredDesign.layers[0].elements[0].style.color = '#123456';
   coloredDesign.layers[0].elements[0].style.backgroundColor = '#abcdef';
   colored.sheetTemplates[0].content = JSON.stringify(coloredDesign);
-  await invoke('SaveOaApprovalSettings', { ...colored, expectedVersion: initial.versionNumber }, {}, token);
+  await invoke('SaveOaApprovalSettings', { section:'sheetTemplates',sheetTemplates:colored.sheetTemplates,expectedRevision:initial.revisions?.sheetTemplates??0 }, {}, token);
   const page = await openPage('oa-review', 'Review-2026-Test');
   await page.goto(`${url}/#/office/approval-settings`);
   const rule = await openDefinitionInUi(page, 'expense');

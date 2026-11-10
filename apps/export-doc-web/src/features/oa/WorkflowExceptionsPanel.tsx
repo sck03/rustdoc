@@ -1,3 +1,4 @@
+import { Button } from "../../ui/Button.tsx";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
@@ -17,7 +18,7 @@ export function WorkflowExceptionsPanel({client}:{client:ExportDocManagerApiClie
   const [page,setPage]=useState(1),[selected,setSelected]=useState<OaWorkflowException|null>(null);
   const query=useQuery({queryKey:["office","approval-settings","exceptions",page],queryFn:({signal})=>client.listOaWorkflowExceptions({pageNumber:page,pageSize:20},{signal}),refetchInterval:30000,refetchIntervalInBackground:false});
   useServerPageNumber(query, page, setPage, 20);
-  return <section className="office-resource-card" aria-label="流程异常队列"><h3>流程异常队列</h3><p className="office-muted">此处仅显示运行元数据。人员或授权失效先移交任务；系统动作可重新排队，执行时仍核对原业务授权。</p>{query.isError&&<InlineNotice tone="error">{readApiError(query.error)}</InlineNotice>}<ul>{query.data?.items.map(item=><li key={`${item.requestId}:${item.nodeKey}`}><strong>申请 #{item.requestId} · {item.nodeName}</strong> · {item.errorCode}<Link to={requestRoute(item)}>查看申请</Link>{item.nodeKind==="System"&&<button type="button" disabled={query.isFetching} onClick={()=>setSelected(item)}>重试系统动作</button>}{item.nodeKind==="Approval"&&<p>在下方未完成任务中选择合格接任身份。</p>}</li>)}</ul>{query.data&&!query.data.items.length&&<p>当前没有失败节点。</p>}<Pagination pageNumber={page} pageSize={20} totalCount={query.data?.totalCount ?? 0} isBusy={query.isFetching} onPageChange={setPage} />{selected&&<RetryDialog client={client} item={selected} onClose={()=>setSelected(null)}/>}</section>;
+  return <section className="office-resource-card" aria-label="流程异常队列"><h3>流程异常队列</h3><p className="office-muted">此处仅显示运行元数据。人员或授权失效先移交任务；系统动作可重新排队，执行时仍核对原业务授权。</p>{query.isError&&<InlineNotice tone="error">{readApiError(query.error)}</InlineNotice>}<ul>{query.data?.items.map(item=><li key={`${item.requestId}:${item.nodeKey}`}><strong>申请 #{item.requestId} · {item.nodeName}</strong> · {item.errorCode}<Link to={requestRoute(item)}>查看申请</Link>{item.nodeKind==="System"&&<Button type="button" disabled={query.isFetching} onClick={()=>setSelected(item)}>重试系统动作</Button>}{item.nodeKind==="Approval"&&<p>在下方未完成任务中选择合格接任身份。</p>}</li>)}</ul>{query.data&&!query.data.items.length&&<p>当前没有失败节点。</p>}<Pagination pageNumber={page} pageSize={20} totalCount={query.data?.totalCount ?? 0} isBusy={query.isFetching} onPageChange={setPage} />{selected&&<RetryDialog client={client} item={selected} onClose={()=>setSelected(null)}/>}</section>;
 }
 function RetryDialog({client,item,onClose}:{client:ExportDocManagerApiClient;item:OaWorkflowException;onClose:()=>void}) {
   const operation=useOfficeOperation([["office","approval-settings"],["unit-workflow-tasks"]],false);

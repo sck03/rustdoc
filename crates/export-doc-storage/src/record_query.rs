@@ -34,6 +34,13 @@ pub(super) fn sql(q: &RecordQuery<'_>, postgres: bool) -> QuerySql {
         bind(q.company.into(), "TEXT")
     );
     let mut scope = vec![];
+    if let Some(key) = q.definition_key {
+        filter += &format!(
+            " AND {}={}",
+            property("definitionKey", false),
+            bind(key.into(), "TEXT")
+        );
+    }
     if let Some(department) = q.department {
         scope.push(format!("r.department={}", bind(department.into(), "TEXT")));
     }
@@ -419,14 +426,14 @@ pub(crate) fn approval_condition(
 fn handler_origin_condition(postgres: bool, record: &str, user: &str) -> String {
     let key = format!("{record}.body->>'handlingKey'");
     let members = if postgres {
-        "records policy CROSS JOIN LATERAL jsonb_array_elements(policy.body->'handlingServices') service(value) CROSS JOIN LATERAL jsonb_array_elements_text(service.value->'handlerUserIds') handler(value)"
+        "records policy CROSS JOIN LATERAL jsonb_array_elements(policy.body->'value') service(value) CROSS JOIN LATERAL jsonb_array_elements_text(service.value->'handlerUserIds') handler(value)"
     } else {
-        "records policy JOIN json_each(policy.body,'$.handlingServices') service JOIN json_each(service.value,'$.handlerUserIds') handler"
+        "records policy JOIN json_each(policy.body,'$.value') service JOIN json_each(service.value,'$.handlerUserIds') handler"
     };
     // Keep historical actors as facts, while service handover revokes their
     // derived access in the same snapshot as list counts and pagination.
     format!(
-        "(COALESCE(assignment.origin->>'source','')<>'Handlers' OR assignment.administration=1 OR COALESCE({key},'')='' OR EXISTS(SELECT 1 FROM {members} WHERE policy.kind='oa-approval-settings' AND policy.company={record}.company AND service.value->>'key'={key} AND CAST(handler.value AS BIGINT)={user}))"
+        "(COALESCE(assignment.origin->>'source','')<>'Handlers' OR assignment.administration=1 OR COALESCE({key},'')='' OR EXISTS(SELECT 1 FROM {members} WHERE policy.kind='oa-setting-section' AND policy.body->>'key'='handlingServices' AND policy.company={record}.company AND service.value->>'key'={key} AND CAST(handler.value AS BIGINT)={user}))"
     )
 }
 pub(crate) fn node_access_condition(

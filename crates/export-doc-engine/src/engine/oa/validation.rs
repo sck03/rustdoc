@@ -102,6 +102,11 @@ pub(super) fn fields(meta: &Value, body: &Value, today: chrono::NaiveDate) -> Re
             );
         }
         "general" => {
+            for field in ["definitionKey", "definitionVersion", "formValues"] {
+                if let Some(value) = body.get(field) {
+                    row[field] = value.clone();
+                }
+            }
             let category = text(body, "category");
             if !["Seal", "Certificate", "IT", "Repair", "Other"].contains(&category.as_str()) {
                 return Err(invalid("请选择通用申请类别。"));
@@ -115,6 +120,15 @@ pub(super) fn fields(meta: &Value, body: &Value, today: chrono::NaiveDate) -> Re
 }
 
 pub(super) fn submission(tx: &Connection, row: &Value) -> Result<()> {
+    if let Some(form) = row.get("formDefinition").filter(|f| !f.is_null()) {
+        let form: export_doc_domain::oa_form::FormDefinition = serde_json::from_value(form.clone())
+            .map_err(|_| super::super::error::unavailable("申请表单版本损坏。"))?;
+        form.validate_values(&super::custom_forms::values(row)?, true)
+            .map_err(invalid)?;
+        if form.attachment_required && children(tx, row, "oa-attachment", 0, 1)?.0 == 0 {
+            return Err(invalid("请上传事项所需的附件。"));
+        }
+    }
     if row["kind"] == "expense" && children(tx, row, "oa-attachment", 0, 1)?.0 == 0 {
         return Err(invalid("请先上传至少一份报销凭证。"));
     }

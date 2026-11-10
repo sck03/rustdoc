@@ -105,10 +105,8 @@ pub(super) fn snapshot(
 }
 
 pub(in crate::engine) fn services(tx: &Connection, company: &str) -> Result<Vec<Value>> {
-    let settings = super::oa::settings::load(tx, company)?;
-    match settings.get("handlingServices") {
-        None => Ok(vec![]),
-        Some(Value::Array(rows)) => Ok(rows.clone()),
+    match super::oa::settings_store::section(tx, company, "handlingServices")? {
+        Value::Array(rows) => Ok(rows),
         _ => Err(unavailable("办理分工目录损坏。")),
     }
 }

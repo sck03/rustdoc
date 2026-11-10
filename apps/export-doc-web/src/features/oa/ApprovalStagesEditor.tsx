@@ -1,3 +1,4 @@
+import { Button } from "../../ui/Button.tsx";
 import type { ExportDocManagerApiClient,OaApprovalStage,OaApprovalRule,OaRoutingUnit } from "../../api/index.ts";
 import { useState } from "react";
 import type { ApprovalAccount } from "./useApprovalSettings.ts";
@@ -8,8 +9,8 @@ import { ApprovalMaterialPolicyEditor } from "./ApprovalMaterialPolicyEditor.tsx
 import { ApprovalSourcePicker,approvalSources } from "./ApprovalSourcePicker.tsx";
 import { WorkflowNodeSettings } from "./WorkflowNodeSettings.tsx";
 const initialStage=(dependsOn:string[]=[]):OaApprovalStage=>({key:createRequestKey(),name:"审批节点",kind:"Approval",phase:"Decision",dependsOn,source:"DepartmentManager",approverUserIds:[],decision:"All",selfApproval:"Skip",repeatedApprover:"Allow",conditions:[],dueHours:48});
-export type ApprovalStagesEditorProps={client:ExportDocManagerApiClient;stages:OaApprovalStage[];accounts:ApprovalAccount[];handlers:ApprovalAccount[];units:OaRoutingUnit[];currentCompanyCode:string;definitions:OaApprovalRule[];onChange:(stages:OaApprovalStage[])=>void};
-export function ApprovalStagesEditor({client,stages,accounts,handlers,units,currentCompanyCode,definitions,onChange}:ApprovalStagesEditorProps) {
+export type ApprovalStagesEditorProps={client:ExportDocManagerApiClient;stages:OaApprovalStage[];accounts:ApprovalAccount[];handlers:ApprovalAccount[];units:OaRoutingUnit[];currentCompanyCode:string;definitions:OaApprovalRule[];definition?:OaApprovalRule;onChange:(stages:OaApprovalStage[])=>void};
+export function ApprovalStagesEditor({client,stages,accounts,handlers,units,currentCompanyCode,definitions,definition,onChange}:ApprovalStagesEditorProps) {
   const [catalogUnits,setCatalogUnits]=useState<Record<string,number>>({});
   const ancestorIds=new Set(units.find(unit=>unit.code===currentCompanyCode)?.ancestorCompanyIds??[]);
   const patch=(index:number,change:Partial<OaApprovalStage>)=>onChange(stages.map((old,i)=>i===index?{...old,...change}:old));
@@ -22,7 +23,7 @@ export function ApprovalStagesEditor({client,stages,accounts,handlers,units,curr
       const unitId=ancestorCatalog?catalogUnits[stage.key]:stage.organizationRoute?.unitId??units.find(u=>u.code===currentCompanyCode)?.id;
       return <fieldset className="office-resource-card" key={stage.key}><legend>{index+1} · {stage.name}</legend>
         <OfficeField label="节点名称"><input required maxLength={100} value={stage.name} onChange={e=>patch(index,{name:e.target.value})}/></OfficeField>
-        <WorkflowNodeSettings client={client} stage={stage} stages={stages} onChange={change=>patch(index,change)} accounts={accounts} units={units} currentCompanyCode={currentCompanyCode} definitions={definitions}/>
+        <WorkflowNodeSettings definition={definition} client={client} stage={stage} stages={stages} onChange={change=>patch(index,change)} accounts={accounts} units={units} currentCompanyCode={currentCompanyCode} definitions={definitions}/>
         <div className="office-form-grid">
           {hasActors&&<><OfficeField label="责任人来源"><select value={stage.source} onChange={e=>patch(index,{source:e.target.value as OaApprovalStage["source"],sourceId:null,approverUserIds:[],organizationRoute:{mode:"Current",unitId:null}})}>{Object.entries(approvalSources).filter(([v])=>!approval||v!=="Requester"&&v!=="Handlers").map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></OfficeField>
             {routes&&<><OfficeField label="来源所属单位"><select value={stage.organizationRoute?.mode??"Current"} onChange={e=>patch(index,{sourceId:null,organizationRoute:{mode:e.target.value as "Current"|"Specified"|"Ancestor",unitId:null}})}><option value="Current">申请所在单位</option><option value="Specified">指定经营单位</option><option value="Ancestor">沿上级单位查找</option></select></OfficeField>
@@ -38,14 +39,14 @@ export function ApprovalStagesEditor({client,stages,accounts,handlers,units,curr
           {hasActors&&<OfficeField label="独立复核"><select value={stage.repeatedApprover} onChange={e=>patch(index,{repeatedApprover:e.target.value as OaApprovalStage["repeatedApprover"]})}><option value="Allow">允许兼任，逐节点记录</option><option value="Reject">要求独立自然人</option></select></OfficeField>}
           <OfficeField label="办理时限（小时）"><input required type="number" min={1} max={8760} step={1} value={stage.dueHours} onChange={e=>patch(index,{dueHours:Number(e.target.value)})}/></OfficeField><OfficeField label="时限计算"><select value={stage.deadlineMode??"Natural"} onChange={e=>patch(index,{deadlineMode:e.target.value as "Natural"|"Working"})}><option value="Natural">自然时长</option><option value="Working">公司工作时长</option></select></OfficeField>
         </div>
-        <details><summary>审查要点（{stage.reviewPoints?.length??0}）</summary>{(stage.reviewPoints??[]).map((point,i)=><div className="office-card-actions" key={i}><input required aria-label={`审批要点 ${i+1}`} maxLength={200} value={point} onChange={e=>patch(index,{reviewPoints:stage.reviewPoints?.map((p,j)=>i===j?e.target.value:p)})}/><button type="button" onClick={()=>patch(index,{reviewPoints:stage.reviewPoints?.filter((_,j)=>i!==j)})}>移除</button></div>)}<button type="button" disabled={(stage.reviewPoints?.length??0)>=12} onClick={()=>patch(index,{reviewPoints:[...(stage.reviewPoints??[]),""]})}>添加审批要点</button></details>
+        <details><summary>审查要点（{stage.reviewPoints?.length??0}）</summary>{(stage.reviewPoints??[]).map((point,i)=><div className="office-card-actions" key={i}><input required aria-label={`审批要点 ${i+1}`} maxLength={200} value={point} onChange={e=>patch(index,{reviewPoints:stage.reviewPoints?.map((p,j)=>i===j?e.target.value:p)})}/><Button type="button" onClick={()=>patch(index,{reviewPoints:stage.reviewPoints?.filter((_,j)=>i!==j)})}>移除</Button></div>)}<Button type="button" disabled={(stage.reviewPoints?.length??0)>=12} onClick={()=>patch(index,{reviewPoints:[...(stage.reviewPoints??[]),""]})}>添加审批要点</Button></details>
         <details><summary>前置节点（{stage.dependsOn.length}）</summary>{stages.filter(n=>n.key!==stage.key&&((stage.phase??"Decision")==="Fulfillment"||(n.phase??"Decision")==="Decision")).map(node=><label className="checkbox-field" key={node.key}><input type="checkbox" checked={stage.dependsOn.includes(node.key)} onChange={e=>patch(index,{dependsOn:e.target.checked?[...stage.dependsOn,node.key]:stage.dependsOn.filter(k=>k!==node.key)})}/>{node.name}</label>)}</details>
         {hasActors&&stage.source==="Named"&&<OfficeField label="责任账号（可多选）"><select multiple required value={stage.approverUserIds.map(String)} onChange={e=>patch(index,{approverUserIds:Array.from(e.target.selectedOptions,o=>Number(o.value))})}>{sourceAccounts.map(a=><option key={a.id} value={a.id}>{a.fullName} · {a.username}</option>)}</select></OfficeField>}
-        {hasActors&&<ApprovalMaterialPolicyEditor value={stage.materialPolicy} onChange={materialPolicy=>patch(index,{materialPolicy})}/>}
+        {hasActors&&<ApprovalMaterialPolicyEditor form={definition?.form??undefined} value={stage.materialPolicy} onChange={materialPolicy=>patch(index,{materialPolicy})}/>}
         {approval&&<ApprovalRevisionPolicyEditor value={stage.revisionPolicy} accounts={accounts} onChange={revisionPolicy=>patch(index,{revisionPolicy})}/>}
-        <button type="button" className="command-button secondary" disabled={stages.length===1||stages.some(n=>n.dependsOn.includes(stage.key)||(n.branches??[]).some(b=>b.target===stage.key))} onClick={()=>onChange(stages.filter((_,i)=>i!==index))}>移除节点</button>
+        <Button type="button" disabled={stages.length===1||stages.some(n=>n.dependsOn.includes(stage.key)||(n.branches??[]).some(b=>b.target===stage.key))} onClick={()=>onChange(stages.filter((_,i)=>i!==index))}>移除节点</Button>
       </fieldset>;
     })}
-    <button type="button" className="command-button secondary" disabled={stages.length>=32} onClick={()=>onChange([...stages,initialStage(stages.length?[stages[stages.length-1].key]:[])])}>添加流程节点</button>
+    <Button type="button" disabled={stages.length>=32} onClick={()=>onChange([...stages,initialStage(stages.length?[stages[stages.length-1].key]:[])])}>添加流程节点</Button>
   </div>;
 }

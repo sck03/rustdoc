@@ -1,3 +1,4 @@
+import { Button } from "../../ui/Button.tsx";
 import type { OaBusinessCalendar } from "../../api/index.ts";
 import { OfficeField } from "../office/OfficeUi.tsx";
 import type { CalendarDateInputs, CalendarDateKey } from "./businessCalendarDraft.ts";
@@ -8,8 +9,8 @@ export function BusinessCalendarEditor({value,onChange,dateInputs,onDateInput,di
   return <section className="office-resource-card" aria-label="公司工作日历"><h3>公司工作日历 · 版本 {value.version}</h3><fieldset disabled={disabled} className="office-form-grid">
     <OfficeField label="业务时区"><input required maxLength={100} value={value.timeZone} onChange={e=>patch({timeZone:e.target.value})}/></OfficeField>
     <div className="office-field-wide">{weekdays.map((label,index)=><label className="checkbox-field" key={label}><input type="checkbox" checked={value.workingWeekdays.includes(index+1)} onChange={e=>patch({workingWeekdays:e.target.checked?[...value.workingWeekdays,index+1].sort():value.workingWeekdays.filter(d=>d!==index+1)})}/>{label}</label>)}</div>
-    {value.intervals.map((interval,index)=><div className="office-card-actions office-field-wide" key={index}><label>开始 <input type="time" required value={interval.startsAt} onChange={e=>patch({intervals:value.intervals.map((v,i)=>i===index?{...v,startsAt:e.target.value}:v)})}/></label><label>结束 <input type="time" required value={interval.endsAt} onChange={e=>patch({intervals:value.intervals.map((v,i)=>i===index?{...v,endsAt:e.target.value}:v)})}/></label><button type="button" disabled={value.intervals.length===1} onClick={()=>patch({intervals:value.intervals.filter((_,i)=>i!==index)})}>移除时段</button></div>)}
-    <button type="button" disabled={value.intervals.length>=8} onClick={()=>patch({intervals:[...value.intervals,{startsAt:"18:00",endsAt:"19:00"}]})}>添加工作时段</button>
+    {value.intervals.map((interval,index)=><div className="office-card-actions office-field-wide" key={index}><label>开始 <input type="time" required value={interval.startsAt} onChange={e=>patch({intervals:value.intervals.map((v,i)=>i===index?{...v,startsAt:e.target.value}:v)})}/></label><label>结束 <input type="time" required value={interval.endsAt} onChange={e=>patch({intervals:value.intervals.map((v,i)=>i===index?{...v,endsAt:e.target.value}:v)})}/></label><Button type="button" disabled={value.intervals.length===1} onClick={()=>patch({intervals:value.intervals.filter((_,i)=>i!==index)})}>移除时段</Button></div>)}
+    <Button type="button" disabled={value.intervals.length>=8} onClick={()=>patch({intervals:[...value.intervals,{startsAt:"18:00",endsAt:"19:00"}]})}>添加工作时段</Button>
     <OfficeField label="节假日（每行 YYYY-MM-DD）"><textarea rows={5} value={dateInputs.holidays} onChange={event=>onDateInput("holidays",event.target.value)}/></OfficeField>
     <OfficeField label="调休工作日（每行 YYYY-MM-DD）"><textarea rows={5} value={dateInputs.additionalWorkingDays} onChange={event=>onDateInput("additionalWorkingDays",event.target.value)}/></OfficeField>
   </fieldset></section>;

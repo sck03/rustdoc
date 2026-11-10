@@ -67,7 +67,16 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, reviewer: &Request
         )]);
     }
     settings["expectedVersion"] = settings["versionNumber"].clone();
-    settings = admin(SAVE_OA_APPROVAL_SETTINGS, None, &[], Some(settings)).unwrap();
+    for rule in settings["rules"]
+        .as_array()
+        .unwrap()
+        .clone()
+        .into_iter()
+        .filter(|rule| matches!(rule["kind"].as_str(), Some("room" | "supply")))
+    {
+        let key = rule["key"].as_str().unwrap();
+        settings=admin(SAVE_OA_APPROVAL_SETTINGS,None,&[],Some(json!({"section":"rules","definitionKey":key,"rule":rule,"expectedRevision":settings["revisions"][format!("rule:{key}")].as_i64().unwrap_or(0)}))).unwrap();
+    }
     for key in ["room", "supply"] {
         settings = admin(
             PUBLISH_OA_DEFINITION,

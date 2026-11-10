@@ -68,7 +68,8 @@ await withOfficeUi('approval-ui', async ({ output, require, url, operations, inv
   const generalRule = await openDefinitionInUi(admin, 'general', '基本信息');
   await generalRule.getByLabel('流程名称', { exact: true }).fill('未保存的通用流程');
   const concurrent = await invoke('GetOaApprovalSettings', undefined, {}, token);
-  await invoke('SaveOaApprovalSettings', { ...concurrent, expectedVersion: concurrent.versionNumber }, {}, token);
+  const concurrentRule=concurrent.rules.find(rule=>rule.key==='general');
+  await invoke('SaveOaApprovalSettings', { section:'rules',definitionKey:'general',rule:{...concurrentRule,name:'并发修改通用流程'},expectedRevision:concurrent.revisions?.['rule:general']??0 }, {}, token);
   const conflict = admin.waitForResponse(response => response.url().endsWith('/api/office/approval-settings') && response.request().method() === 'PUT');
   await admin.getByRole('button', { name: '保存当前流程', exact: true }).click();
   assert.equal((await conflict).status(), 409);
@@ -80,7 +81,7 @@ await withOfficeUi('approval-ui', async ({ output, require, url, operations, inv
   await admin.getByRole('button', { name: '重新载入审批设置', exact: true }).click();
   await admin.getByRole('dialog').getByRole('button', { name: '重新载入审批设置', exact: true }).click();
   await admin.getByText('设置已被其他管理员修改。当前草稿已保留，请核对后重新载入最新设置。', { exact: true }).waitFor({ state: 'hidden' });
-  assert.equal(await generalRule.getByLabel('流程名称', { exact: true }).inputValue(), concurrent.rules.find(r => r.key === 'general').name);
+  assert.equal(await generalRule.getByLabel('流程名称', { exact: true }).inputValue(), '并发修改通用流程');
   await admin.evaluate(require('axe-core').source);
   assert.deepEqual(await admin.evaluate(async () => (await window.axe.run(document.querySelector('.oa-workspace'))).violations.filter(v => ['critical', 'serious'].includes(v.impact)).map(v => ({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))), []);
   await admin.screenshot({ path: path.join(output, 'approval-settings.png'), fullPage: true });

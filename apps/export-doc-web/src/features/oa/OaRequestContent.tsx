@@ -4,12 +4,14 @@ import { personnelChangeLabels } from "./oaModel.ts";
 import { expenseCategories } from "./OaLineEditor.tsx";
 import { generalCategories, leaveCategories } from "./OaTemporalFields.tsx";
 import { PersonnelOrganizationFacts } from "../office/PersonnelOrganizationEditor.tsx";
+import { OaFormFields } from "./OaFormFields.tsx";
 
 // Both current details and frozen submissions use the same read-only content.
 export function OaRequestContent({row,user}:{row:OaSubmittedRequest|OaRequest;user:ApiUserDto}) {
   return <section className="oa-detail-content" aria-label="申请内容"><h3>申请内容</h3>
     {row.projectName&&<p>申请项目：{row.projectName} · {row.projectCode}</p>}
     <div className="oa-reason"><h4>申请说明</h4><p>{row.reason ?? "申请说明未在当前材料权限内展示。"}</p></div>
+    {row.formDefinition&&<section aria-label="自定义事项资料"><h4>{row.applicationName}</h4><OaFormFields form={row.formDefinition} values={row.formValues??{}} displayValues={row.formDisplayValues}/></section>}
     {row.personnelChange && <dl className="oa-facts">
       <div><dt>变动类型</dt><dd>{row.personnelChange.action ? personnelChangeLabels[row.personnelChange.action] : "受限字段"}</dd></div>
       <div><dt>生效日期</dt><dd>{row.personnelChange.registration?.hireDate ?? row.personnelChange.effectiveDate}</dd></div>

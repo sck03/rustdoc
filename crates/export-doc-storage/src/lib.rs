@@ -165,6 +165,7 @@ pub struct NodeAccess {
 }
 #[derive(Default)]
 pub struct RecordQuery<'a> {
+    pub definition_key: Option<&'a str>,
     pub restrictions: Vec<ScopeFilter>,
     pub kind: &'a str,
     pub company: &'a str,

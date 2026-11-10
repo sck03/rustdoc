@@ -13,14 +13,9 @@ pub(super) fn exercise(
     let [admin, applicant, first, second, leader] = tokens;
     let save = |policy: &mut Value| {
         policy["expectedVersion"] = policy["versionNumber"].clone();
-        *policy = call(
-            service,
-            admin,
-            SAVE_OA_APPROVAL_SETTINGS,
-            0,
-            Some(policy.clone()),
-        )
-        .unwrap();
+        *policy =
+            super::super::oa_contract::workflow::save_settings(service, admin, policy.clone())
+                .unwrap();
     };
     policy["handlingServices"].as_array_mut().unwrap().push(json!({"key":"meeting","name":"会议接待","category":"Room","handlerUserIds":[users[2]["id"],users[3]["id"]],"isActive":true}));
     save(policy);

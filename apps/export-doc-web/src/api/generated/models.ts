@@ -4667,8 +4667,20 @@ export interface OaActorSelector {
   userIds?: number[];
 }
 
+export interface OaApplication {
+  form: OaFormDefinition;
+  key: string;
+  name: string;
+  version: number;
+}
+
+export interface OaApplicationCatalog {
+  items: OaApplication[];
+}
+
 export interface OaApprovalCondition {
-  field: "Amount" | "Currency" | "Duration" | "Department" | "Category" | "PersonnelAction" | "Returnable";
+  field: "Amount" | "Currency" | "Duration" | "Department" | "Category" | "PersonnelAction" | "Returnable" | "FormText" | "FormNumber";
+  fieldKey?: string;
   operator: "Equal" | "NotEqual" | "Greater" | "GreaterOrEqual" | "Less" | "LessOrEqual";
   value: string;
 }
@@ -4773,6 +4785,7 @@ export interface OaApprovalReassign {
 
 export interface OaApprovalRule {
   calendar?: OaBusinessCalendar | null;
+  form?: OaFormDefinition | null;
   key: string;
   kind: "leave" | "overtime" | "expense" | "travel" | "purchase" | "general" | "personnel" | "room" | "supply";
   name: string;
@@ -4788,20 +4801,12 @@ export interface OaApprovalSettings {
   expectedVersion?: number;
   handlingServices?: OfficeHandlingService[];
   publications: OaPublication[];
+  revisions?: Record<string, number>;
   rules: OaApprovalRule[];
   sheetDefaultContent?: string;
   sheetFieldCatalog?: ApiReportTemplateFieldCatalogResponse;
   sheetTemplates?: OaSheetTemplate[];
   versionNumber: number;
-}
-
-export interface OaApprovalSettingsSave {
-  calendar?: OaBusinessCalendar;
-  delegations: OaApprovalDelegation[];
-  expectedVersion: number;
-  handlingServices?: OfficeHandlingService[];
-  rules: OaApprovalRule[];
-  sheetTemplates?: OaSheetTemplate[];
 }
 
 export interface OaApprovalStage {
@@ -4952,6 +4957,7 @@ export interface OaDecisionPage {
 
 export interface OaDefinitionAction {
   definitionKey: string;
+  expectedRevision: number;
   expectedVersion: number;
 }
 
@@ -5018,6 +5024,54 @@ export interface OaExpenseLine {
   category: "Travel" | "Transport" | "Meals" | "Office" | "Other";
   description: string;
   spentOn: string;
+}
+
+export interface OaFormColumn {
+  currency?: string;
+  key: string;
+  kind: "Text" | "Multiline" | "Decimal" | "Money" | "Date" | "Select" | "Person" | "Department" | "Table";
+  label: string;
+  options?: string[];
+  required?: boolean;
+}
+
+export interface OaFormDefinition {
+  attachmentRequired?: boolean;
+  category: string;
+  departmentIds?: string[];
+  fields: OaFormField[];
+}
+
+export interface OaFormField {
+  columns?: OaFormColumn[];
+  currency?: string;
+  key: string;
+  kind: "Text" | "Multiline" | "Decimal" | "Money" | "Date" | "Select" | "Person" | "Department" | "Table";
+  label: string;
+  options?: string[];
+  required?: boolean;
+  visibleWhen?: OaFormVisibility | null;
+}
+
+export interface OaFormReference {
+  id: string;
+  name: string;
+}
+
+export interface OaFormReferencePage {
+  items: OaFormReference[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export type OaFormRow = Record<string, string>;
+
+export type OaFormValues = Record<string, string | OaFormRow[]>;
+
+export interface OaFormVisibility {
+  equals: string;
+  field: string;
 }
 
 export interface OaFulfillmentTask {
@@ -5305,6 +5359,7 @@ export interface OaPublication {
 export interface OaPublishAction {
   commandKey: string;
   definitionKey: string;
+  expectedRevision: number;
   expectedVersion: number;
   samples: OaSimulationSample[];
 }
@@ -5320,6 +5375,7 @@ export interface OaPurchaseLine {
 export interface OaRequest {
   applicantAppointmentId?: string;
   applicantJobTitle?: string;
+  applicationName?: string;
   appointmentId?: string;
   approvalDocument?: OaSubmission;
   approvalPlan?: OaApprovalPlan;
@@ -5331,6 +5387,8 @@ export interface OaRequest {
   companyScope?: string;
   createdAt: string;
   currency?: "CNY" | "USD" | "EUR" | "HKD" | "JPY" | "GBP";
+  definitionKey?: string;
+  definitionVersion?: number;
   departmentId: string;
   durationDays?: string;
   durationHours?: string;
@@ -5338,6 +5396,9 @@ export interface OaRequest {
   employeeName: string;
   employeeNumber?: string;
   expectedVersion?: number;
+  formDefinition?: OaFormDefinition;
+  formDisplayValues?: OaFormValues;
+  formValues?: OaFormValues;
   fulfillmentState?: "Pending" | "Active" | "Completed" | "Blocked" | "Suspended" | "Cancelled";
   handlerNames?: string;
   handlingKey?: string;
@@ -5379,12 +5440,18 @@ export interface OaRequestPage {
 }
 
 export interface OaRequestSave {
+  applicationName?: string;
   appointmentId?: string;
   category?: "Seal" | "Certificate" | "IT" | "Repair" | "Other";
   currency?: "CNY" | "USD" | "EUR" | "HKD" | "JPY" | "GBP";
+  definitionKey?: string;
+  definitionVersion?: number;
   departmentId?: string;
   employeeId?: number;
   expectedVersion?: number;
+  formDefinition?: OaFormDefinition;
+  formDisplayValues?: OaFormValues;
+  formValues?: OaFormValues;
   handlingKey?: string;
   leave?: OaLeave;
   lines?: OaExpenseLine[];
@@ -5434,8 +5501,21 @@ export interface OaScheduleAction {
   activateAt: string;
   commandKey: string;
   definitionKey: string;
+  expectedRevision: number;
   expectedVersion: number;
   samples: OaSimulationSample[];
+}
+
+export interface OaSettingsPatch {
+  calendar?: OaBusinessCalendar;
+  definitionKey?: string;
+  delegations?: OaApprovalDelegation[];
+  expectedRevision: number;
+  handlingServices?: OfficeHandlingService[];
+  remove?: boolean;
+  rule?: OaApprovalRule;
+  section: "rules" | "calendar" | "delegations" | "handlingServices" | "sheetTemplates";
+  sheetTemplates?: OaSheetTemplate[];
 }
 
 export interface OaSheetFields {
@@ -5482,6 +5562,7 @@ export interface OaSimulationRequest {
   definition: OaApprovalRule;
   duration: string;
   employeeId: number;
+  formValues?: OaFormValues;
   isReturnable?: boolean;
   projectId?: string | null;
   reporting?: OaSimulationReporting;
@@ -5499,6 +5580,7 @@ export interface OaSimulationSample {
   currency?: string;
   duration?: string;
   employeeId: number;
+  formValues?: OaFormValues;
   isReturnable?: boolean;
   projectId?: string | null;
   reporting?: OaSimulationReporting;
@@ -5587,6 +5669,7 @@ export interface OaSubmissionPage {
 export interface OaSubmittedRequest {
   applicantAppointmentId?: string;
   applicantJobTitle?: string;
+  applicationName?: string;
   appointmentId?: string;
   approvalPlan?: OaApprovalPlan;
   approvalRoutingNotes?: string[];
@@ -5596,12 +5679,17 @@ export interface OaSubmittedRequest {
   category?: "Seal" | "Certificate" | "IT" | "Repair" | "Other";
   createdAt: string;
   currency?: "CNY" | "USD" | "EUR" | "HKD" | "JPY" | "GBP";
+  definitionKey?: string;
+  definitionVersion?: number;
   departmentId: string;
   durationDays?: string;
   durationHours?: string;
   employeeId: number;
   employeeName: string;
   expectedVersion?: number;
+  formDefinition?: OaFormDefinition;
+  formDisplayValues?: OaFormValues;
+  formValues?: OaFormValues;
   handlerNames?: string;
   handlingKey?: string;
   handlingName?: string;
@@ -9302,6 +9390,7 @@ export interface ListGeneralRequestRequest {
   mineOnly?: boolean;
   approvalsOnly?: boolean;
   handlingOnly?: boolean;
+  definitionKey?: string;
 }
 
 export interface ListGeneralRequestWorkflowCandidatesRequest {
@@ -9438,6 +9527,13 @@ export interface ListNotificationsRequest {
 
 export interface ListOaDefinitionVersionsRequest {
   definitionKey: string;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListOaFormReferencesRequest {
+  kind: "Person" | "Department";
+  keyword?: string;
   pageNumber?: number;
   pageSize?: number;
 }
@@ -10337,7 +10433,7 @@ export interface SaveInvoiceTransferPackageToPathRequest {
 }
 
 export interface SaveOaApprovalSettingsRequest {
-  body: OaApprovalSettingsSave;
+  body: OaSettingsPatch;
 }
 
 export interface SavePositionRequest {

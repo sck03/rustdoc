@@ -7,7 +7,7 @@ const names = { personnel: "PersonnelChange", leave: "Leave", overtime: "Overtim
 export function oaApi(client: ExportDocManagerApiClient, kind: OaKind) {
   const name = names[kind];
   return {
-    list: (request: { pageNumber: number; pageSize: number; mineOnly: boolean; status?: string; financeOnly?: boolean; approvalsOnly?: boolean; handlingOnly?: boolean }, init?: ApiRequestInit) => client[`list${name}Request`](request, init),
+    list: (request: { pageNumber: number; pageSize: number; mineOnly: boolean; status?: string; financeOnly?: boolean; approvalsOnly?: boolean; handlingOnly?: boolean; definitionKey?:string }, init?: ApiRequestInit) => client[`list${name}Request`](request, init),
     get: (id: number, init?: ApiRequestInit) => client[`get${name}Request`]({ id }, init),
     previewApproval: (id: number, init?: ApiRequestInit) => client[`previewApprovalOf${name}Request`]({ id }, init),
     reassign: (id: number, body: ApprovalReassignInput, init?: ApiRequestInit) => client[`reassign${name}RequestApproval`]({ id, body:officeCommand(client,`${kind}:${id}:reassign`,body) }, init),

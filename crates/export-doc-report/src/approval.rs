@@ -16,6 +16,51 @@ fn time(value: &str) -> String {
 pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
     let request = &snapshot["request"];
     let mut summary = vec![];
+    if let Some(form) = request.get("formDefinition").filter(|f| !f.is_null()) {
+        let form: export_doc_domain::oa_form::FormDefinition = serde_json::from_value(form.clone())
+            .map_err(|_| crate::error::invalid("归档表单定义损坏。"))?;
+        for field in &form.fields {
+            let values = request
+                .get("formDisplayValues")
+                .unwrap_or(&request["formValues"]);
+            let value = &values[&field.key];
+            if let Some(value) = value.as_str() {
+                summary.push(format!(
+                    "{}：{}{}",
+                    field.label,
+                    value,
+                    if field.currency.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" {}", field.currency)
+                    }
+                ));
+            } else if let Some(rows) = value.as_array() {
+                summary.push(field.label.clone());
+                for (index, row) in rows.iter().enumerate() {
+                    let cells = field
+                        .columns
+                        .iter()
+                        .filter_map(|column| {
+                            row[&column.key].as_str().map(|v| {
+                                format!(
+                                    "{}：{}{}",
+                                    column.label,
+                                    v,
+                                    if column.currency.is_empty() {
+                                        String::new()
+                                    } else {
+                                        format!(" {}", column.currency)
+                                    }
+                                )
+                            })
+                        })
+                        .collect::<Vec<_>>();
+                    summary.push(format!("{}. {}", index + 1, cells.join(" · ")));
+                }
+            }
+        }
+    }
     let notice = text(snapshot, "materialProjectionNotice");
     if !notice.is_empty() {
         summary.push(notice);

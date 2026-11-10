@@ -12,6 +12,7 @@ assert.equal(validationPlan(['crates/export-doc-storage/src/sqlite.sql']).deskto
 assert.equal(validationPlan(['crates/export-doc-contracts/src/native_contract/endpoints_office.rs']).web,true);
 assert.equal(validationPlan(['scripts/test_permission_scheme_model.mjs']).web,true);
 assert.equal(validationPlan(['scripts/test_permission_scheme_model.mjs']).rust,false);
+assert.equal(validationPlan(['scripts/test_oa_custom_ui.mjs']).office,true);
 assert.equal(validationPlan(['apps/export-doc-tauri/src-tauri/src/lib.rs']).desktop,true);
 assert.equal(validationPlan(['Resources/Fonts/OpenSource/font-manifest.json']).web,true);
 assert.equal(validationPlan(['OcrModels/model.json']).rust,true);

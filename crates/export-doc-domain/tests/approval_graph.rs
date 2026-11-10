@@ -105,6 +105,7 @@ fn publication_checks_typed_business_fields_currency_and_no_implicit_approver() 
     let r = rule(&value);
     r.validate().unwrap();
     let mut c = ConditionContext {
+        form_values: Default::default(),
         amount: Some("100.00".parse().unwrap()),
         currency: "CNY".into(),
         duration: None,

@@ -20,7 +20,7 @@ pub(super) fn simulate_in(tx: &Connection, actor: &Actor, body: &Value) -> Resul
         .map_err(|_| invalid("流程定义无效。"))?;
     if rule.calendar.is_none() {
         rule.calendar = Some(
-            serde_json::from_value(settings::load(tx, &actor.company)?["calendar"].clone())
+            serde_json::from_value(settings_store::section(tx, &actor.company, "calendar")?)
                 .map_err(|_| super::super::error::unavailable("模拟日历缺失。"))?,
         );
     }
@@ -77,6 +77,7 @@ pub(super) fn simulate_in(tx: &Connection, actor: &Actor, body: &Value) -> Resul
         Ok(Some(value))
     };
     let context = ConditionContext {
+        form_values: super::custom_forms::values(body)?,
         amount: decimal("amount")?,
         currency: text(&body, "currency"),
         duration: decimal("duration")?,
@@ -88,6 +89,12 @@ pub(super) fn simulate_in(tx: &Connection, actor: &Actor, body: &Value) -> Resul
             .map(|value| value.to_string())
             .unwrap_or_default(),
     };
+    if let Some(form) = &rule.form {
+        form.validate_values(&context.form_values, true)
+            .map_err(invalid)?;
+        let mut sample = json!({"definitionKey":rule.key,"departmentId":appointment.department_id,"formDefinition":form,"formValues":context.form_values});
+        custom_forms::validate(tx, actor, &mut sample, true)?;
+    }
     let mut row = json!({"kind":rule.kind,"employeeId":person["id"],"departmentId":appointment.department_id,"applicantAppointmentId":appointment.id,"companyScope":actor.company,"ownerUserId":person["account"]["id"].as_i64().unwrap_or(0),"applicantAccountId":person["account"]["id"]});
     if rule.kind == "personnel" && rule.variant == "Hire" {
         row["employeeId"] = json!(0);

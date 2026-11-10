@@ -1,3 +1,4 @@
+import { Button } from "../../ui/Button.tsx";
 import { useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import type { ExportDocManagerApiClient, OaRequest, OaWorkflowCommandSave } from "../../api/index.ts";
@@ -16,7 +17,7 @@ const labels:Record<Command,string>={AddBefore:"前加签",AddAfter:"后加签",
 export function WorkflowOperations({client,row,disabled=false}:{client:ExportDocManagerApiClient;row:OaRequest|OfficeRequestRow;disabled?:boolean}) {
   const [opened,setOpened]=useState(false);
   if(!row.workflowActions?.length)return null;
-  return <><button type="button" className="command-button secondary" disabled={disabled} onClick={()=>setOpened(true)}>流程操作</button>{opened&&<WorkflowOperationDialog client={client} row={row} onClose={()=>setOpened(false)}/>}</>;
+  return <><Button type="button" disabled={disabled} onClick={()=>setOpened(true)}>流程操作</Button>{opened&&<WorkflowOperationDialog client={client} row={row} onClose={()=>setOpened(false)}/>}</>;
 }
 function WorkflowOperationDialog({client,row,onClose}:{client:ExportDocManagerApiClient;row:OaRequest|OfficeRequestRow;onClose:()=>void}) {
   const kind="meetingRoomId" in row?"room":"officeSupplyId" in row?"supply":row.kind;
@@ -44,8 +45,8 @@ function WorkflowOperationDialog({client,row,onClose}:{client:ExportDocManagerAp
         {choosing&&<OfficeField label="目标审批节点"><select required value={selected?.key??""} onChange={e=>{setTarget(e.target.value);setUsers([]);}}>{nodes.map(node=><option key={node.key} value={node.key}>{node.name}</option>)}</select></OfficeField>}
         {childCommand&&<><OfficeField label="目标子流程"><select required value={child?.key??""} onChange={e=>setSubflowKey(e.target.value)}>{subflows.map(flow=><option key={flow.key} value={flow.key}>{flow.definitionKey} · 版本 {flow.version} · {row.approvalPlan?.subflowProgress?.[flow.key]?.outcome}</option>)}</select></OfficeField>{command==="CompensateSubflow"&&child?.policy?.compensation==="ReturnResource"&&<OfficeField label="实际归还数量"><input type="number" required min={1} max={1000000} value={quantity} onChange={e=>setQuantity(Number(e.target.value))}/></OfficeField>}<p className="office-muted office-field-wide">补偿须如实登记已完成的现实动作；重试保留旧签署并建立新的执行代次。</p></>}
         {(adding||command==="RemoveSigner")&&<OfficeField label={adding?"新增审批人":"减去未签署人员"}><select multiple required value={users.map(String)} onChange={e=>setUsers(Array.from(e.target.selectedOptions,o=>Number(o.value)))}>{adding?accounts.data?.pages.flatMap(page=>page.users).map(a=><option key={a.id} value={a.id}>{a.fullName} · #{a.id}</option>):removable.map(a=><option key={a.taskKey} value={a.approverUserId}>{a.approverName}</option>)}</select></OfficeField>}
-        {adding&&accounts.hasNextPage&&<button type="button" className="command-button secondary" disabled={accounts.isFetchingNextPage} onClick={()=>void accounts.fetchNextPage()}>加载更多候选人</button>}
-        {accounts.isError&&<InlineNotice tone="error">{readApiError(accounts.error)} <button type="button" onClick={()=>void accounts.refetch()}>重试人员查询</button></InlineNotice>}
+        {adding&&accounts.hasNextPage&&<Button type="button" disabled={accounts.isFetchingNextPage} onClick={()=>void accounts.fetchNextPage()}>加载更多候选人</Button>}
+        {accounts.isError&&<InlineNotice tone="error">{readApiError(accounts.error)} <Button type="button" onClick={()=>void accounts.refetch()}>重试人员查询</Button></InlineNotice>}
         <OfficeField label="操作原因" wide><textarea required maxLength={500} value={note} onChange={e=>setNote(e.target.value)}/></OfficeField>
       </fieldset><OfficeSubmit busy={operation.busy} label={labels[command]} disabled={choosing&&!selected || childCommand&&!child || (adding||command==="RemoveSigner")&&!users.length}/>
     </form>

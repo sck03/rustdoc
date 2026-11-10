@@ -11,6 +11,9 @@ pub fn document() -> Value {
 }
 
 #[cfg(test)]
+#[path = "contract_custom_oa.rs"]
+mod custom_oa;
+#[cfg(test)]
 #[path = "contract_evolution.rs"]
 mod evolution;
 #[cfg(test)]
@@ -172,6 +175,7 @@ mod tests {
         }
         evolution::reviewed_versioning(&mut baseline);
         evolution::reviewed_independent_declarations(&mut baseline);
+        custom_oa::apply(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

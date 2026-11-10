@@ -30,6 +30,24 @@ use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 #[path = "support/advanced_workflow_contract.rs"]
 mod advanced_workflow_contract;
+#[path = "support/custom_oa_contract.rs"]
+mod custom_oa_contract;
+#[test]
+fn custom_applications_publish_submit_and_preserve_versions() {
+    let mut fixture = native_fixture::Fixture::new();
+    fixture.client.take();
+    let service = NativeService::open(fixture.paths.clone()).unwrap();
+    let login = oa_contract::call(
+        &service,
+        "",
+        LOGIN,
+        0,
+        Some(json!({"username":"admin","password":""})),
+    )
+    .unwrap();
+    custom_oa_contract::exercise(&service, login["accessToken"].as_str().unwrap());
+    service.close().unwrap();
+}
 #[test]
 fn advanced_duties_subflow_outputs_and_fulfillment_execute_on_sqlite() {
     let mut fixture = native_fixture::Fixture::new();
