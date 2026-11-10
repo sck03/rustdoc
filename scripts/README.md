@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-10 共享控件：`npm --prefix apps/export-doc-web run test:shared-control-layout-ui` 在真实 HTTP/React 中核对长文本、待办分页与文件按钮；需先构建 `office_review` 与前端。Full 桌面验收复用同一检查并增加操作档案对齐。`test_hs_transfer_ui.mjs` 纳入 `test:concurrency-feedback`；单一窗口工作区回归覆盖版本绑定、保存/导出互斥、卸载取消及迟到下载。见[本批记录](../docs/2026-11-10导出一致性与共享控件修复记录.md)。
+
 2026-11-10 自定义 OA：`npm --prefix apps/export-doc-web run test:oa-ui` 包含真实 HTTP/React 新建事项、表单设计、仿真发布、员工申请、审批、办理和 PDF 下载。先运行 `cargo build --locked -p export-doc-server --example office_review` 与前端构建；两库业务合同分别随工作区测试及 `test-native-postgres.ps1 -Scope Workflows` 验证。当前使用 schema 17，见[本批记录](../docs/2026-11-10自定义OA重构与验收.md)。
 
 > 2026-09-20：当前主线为 Tauri 2 + React + Rust。原 C# 行为和脚本从只读固定提交 `ba9dbdca72590b06c5f32740e4cd58d3027578da` 及 Git 历史对照；这里的正式构建不发布 ASP.NET sidecar，不要求 .NET SDK／Runtime，不使用 NPOI。

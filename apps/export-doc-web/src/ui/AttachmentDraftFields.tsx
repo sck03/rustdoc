@@ -1,3 +1,4 @@
+import { FileInput } from "./FileInput.tsx";
 import { InlineNotice } from "./PageState.tsx";
 import { useBlobUrl } from "./useBlobUrl.ts";
 import type { DraftAttachment, AttachmentSelectionPolicy } from "./useAttachmentDraft.ts";
@@ -20,7 +21,7 @@ export function AttachmentDraftFields({ draft, busy, kind = "document", label = 
   const completed = draft.completed?.filter(file => file.kind === kind) ?? [];
   const policy = { maxFiles: Math.max(0, 20 - existingFiles.length), maxTotalBytes: Math.max(0, 50 * 1024 * 1024 - existingFiles.reduce((sum, file) => sum + file.sizeBytes, 0)), ...selection };
   return <section className="attachment-draft office-field-wide" aria-label={label}>
-    <label className="office-field"><span>{label}{multiple ? "（可多选）" : ""}</span><input type="file" multiple={multiple} disabled={busy || document && policy.maxFiles === 0}
+    <label className="office-field"><span>{label}{multiple ? "（可多选）" : ""}</span><FileInput multiple={multiple} disabled={busy || document && policy.maxFiles === 0}
       accept={selection?.accept ?? (document ? documentAccept : ".png,.jpg,.jpeg")}
       onChange={event => { draft.select(kind, Array.from(event.target.files ?? []), multiple, selection?.maxBytes ?? (document ? 10 : 5) * 1024 * 1024, policy); event.target.value = ""; onChange?.(); }} /></label>
     <p className="office-muted">{selection?.description ?? (document ? documentDescription : "PNG、JPEG；每张 5 MiB。")}</p>

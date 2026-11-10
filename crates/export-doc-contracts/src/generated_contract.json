@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "14d5e5bab8b69e1a9fdd377f984d0617e140176adc5591cb819347557fda22a9",
+  "digest": "77cf924bd5b882dbf2fc63fd82e0cb65570261c0b5ffa26620ef7d778065bf51",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -46898,6 +46898,14 @@
       },
       "office": null,
       "parameters": [
+        {
+          "name": "includeSummary",
+          "in": "query",
+          "schema": {
+            "type": "boolean",
+            "default": true
+          }
+        },
         {
           "name": "cursor",
           "in": "query",
@@ -109979,6 +109987,10 @@
     "ApiSingleWindowSubmitPackageRequest": {
       "type": "object",
       "properties": {
+        "expectedDraftRevision": {
+          "type": "integer",
+          "minimum": 1
+        },
         "packagePath": {
           "type": "string",
           "default": ""
@@ -109987,7 +109999,10 @@
           "type": "string",
           "default": ""
         }
-      }
+      },
+      "required": [
+        "expectedDraftRevision"
+      ]
     },
     "ApiSingleWindowUnlockFieldsRequest": {
       "type": "object",
@@ -122133,10 +122148,8 @@
       },
       "required": [
         "items",
-        "totalCount",
         "pageNumber",
         "pageSize",
-        "totalPages",
         "hasPreviousPage",
         "hasNextPage"
       ]
@@ -126669,8 +126682,7 @@
       },
       "required": [
         "key",
-        "name",
-        "count"
+        "name"
       ]
     }
   }

@@ -1,3 +1,4 @@
+import { FileInput } from "../../ui/FileInput.tsx";
 import { Field, FilterBar } from "../../ui/primitives/Field.tsx";
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { type FormEvent, useEffect, useState } from "react";
@@ -247,7 +248,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
               />
             ) : (
               <form className="job-tool-panel" onSubmit={(event) => { event.preventDefault(); operations.clearFeedback(); operations.pdfMergeMutation.mutate(); }}>
-                <Field label="源 PDF"><input type="file" accept="application/pdf,.pdf" multiple disabled={isActionBusy} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; operations.setPdfUploadFiles(files); }} /></Field>
+                <Field label="源 PDF"><FileInput accept="application/pdf,.pdf" multiple disabled={isActionBusy} onChange={(event) => { const files = Array.from(event.currentTarget.files ?? []); event.currentTarget.value = ""; operations.setPdfUploadFiles(files); }} /></Field>
                 <div className="job-tool-submit-row"><span>{pdfUploadFiles.length} 个源文件</span><button className="solid action-button" type="submit" disabled={!canStartPdfMerge}><Play size={16} aria-hidden="true" /><span>合并并下载</span></button></div>
                 <div className="field-help">文件仅暂存在程序临时区，任务结束后自动清理。</div>
               </form>

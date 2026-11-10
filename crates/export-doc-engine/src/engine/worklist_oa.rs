@@ -5,12 +5,12 @@ use crate::engine::{
     oa::{self, approval},
 };
 
-pub(super) fn groups(
+pub(super) fn append_groups(
     tx: &Connection,
     actor: &Actor,
     selection: &Selection<'_>,
-) -> Result<Vec<Group>> {
-    let mut groups = vec![];
+    groups: &mut Vec<Group>,
+) -> Result<()> {
     let workflow_date = crate::engine::units::today(tx)?;
     for (kind, name) in [
         ("oa-personnel", "人员变动审批"),
@@ -26,6 +26,10 @@ pub(super) fn groups(
             continue;
         }
         let mut group = Group::new(kind, name);
+        if !selection.needs(&[kind], groups) {
+            groups.push(group);
+            continue;
+        }
         let principals = approval::queue_approvers(tx, actor, resource)?;
         let keys = if kind == "oa-general" {
             handling::keys(tx, actor, "office.general")?
@@ -122,5 +126,5 @@ pub(super) fn groups(
         }
         groups.push(group);
     }
-    Ok(groups)
+    Ok(())
 }

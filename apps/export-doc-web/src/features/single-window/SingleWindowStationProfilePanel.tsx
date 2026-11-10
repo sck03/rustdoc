@@ -3,7 +3,7 @@ import { Building2, Copy, CreditCard, Plus, RefreshCw, Save, ShieldCheck } from 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ApiSingleWindowClientProfileDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { TextField } from "../../ui/FormFields.tsx";
+import { FieldShell, TextField } from "../../ui/FormFields.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { writeClipboardText } from "../../ui/clipboard.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
@@ -302,8 +302,8 @@ export function SingleWindowStationProfilePanel({
       </div>
 
       <div className="field-grid single-window-station-fields">
-        <label className="form-field">
-          <span className="form-field-label"><span>正在编辑</span></span>
+        <FieldShell label="正在编辑" disabled={isBusy}>
+          {() => (
           <select
             aria-label="选择操作档案"
             value={selectedProfileKey}
@@ -317,7 +317,8 @@ export function SingleWindowStationProfilePanel({
               </option>
             ))}
           </select>
-        </label>
+          )}
+        </FieldShell>
         <TextField label="档案名称" value={profileName} required disabled={!canOperate || isBusy} onChange={setProfileName} />
         <TextField label="公司抬头" value={companyScope} required disabled={!canOperate || isBusy || identityLocked} onChange={setCompanyScope} />
         <TextField

@@ -1,3 +1,4 @@
+import { FileInput } from "../../ui/FileInput.tsx";
 import { Link } from "react-router-dom";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
@@ -21,7 +22,7 @@ export function SingleWindowSourcesPage({ client }: { client: ExportDocManagerAp
       <div className="section-header"><h2>新建申报资料</h2></div>
       <div className="field-grid">
         <TextField label="资料编号 / 客户发票号" value={work.referenceNo} onChange={work.setReferenceNo} required disabled={work.busy} />
-        <label className="form-field"><span className="form-field-label">客户 Excel（可选）</span><input type="file" disabled={work.busy} accept=".xlsx,.xlsm,.xltx,.xltm,.xls"
+        <label className="form-field"><span className="form-field-label">客户 Excel（可选）</span><FileInput disabled={work.busy} accept=".xlsx,.xlsm,.xltx,.xltm,.xls"
           onChange={event => { work.select(event.currentTarget.files?.[0]); event.currentTarget.value = ""; }} /></label>
       </div>
         {work.fileName && <div className="toolbar-actions"><span>{work.fileName}</span><button className="command-button secondary" type="button" disabled={work.busy} onClick={work.clearFile}>清除文件，手工录入</button></div>}

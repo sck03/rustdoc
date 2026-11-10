@@ -23,6 +23,7 @@ pub(super) fn reviewed_versioning(baseline: &mut Value) {
         .as_array_mut()
         .unwrap()
         .insert(0, json!("nextCursor"));
+    reviewed_export_and_worklist(baseline);
     reviewed_hs_examples(baseline);
     reviewed_client_directories(baseline);
     for name in ["ApiCustomsCooProducerProfileDto", "ApiContainerTypeDto"] {
@@ -88,6 +89,27 @@ pub(super) fn reviewed_versioning(baseline: &mut Value) {
     for name in ["pageNumber", "pageSize"] {
         parameters.push(json!({"name":name,"in":"query","schema":{"type":["integer","string"],"format":"int32","pattern":"^-?(?:0|[1-9]\\d*)$"}}));
     }
+}
+
+fn reviewed_export_and_worklist(baseline: &mut Value) {
+    let schemas = &mut baseline["components"]["schemas"];
+    let request = &mut schemas["ApiSingleWindowSubmitPackageRequest"];
+    request["properties"]["expectedDraftRevision"] = json!({"type":"integer","minimum":1});
+    request["required"] = json!(["expectedDraftRevision"]);
+    for (schema, fields) in [
+        (
+            "PagedResultOfWorklistItem",
+            &["totalCount", "totalPages"][..],
+        ),
+        ("WorklistSourceCount", &["count"][..]),
+    ] {
+        schemas[schema]["required"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|field| !fields.iter().any(|name| field == name));
+    }
+    baseline["paths"]["/api/worklist"]["get"]["parameters"].as_array_mut().unwrap().insert(0,
+        json!({"name":"includeSummary","in":"query","schema":{"type":"boolean","default":true}}));
 }
 
 fn reviewed_email_pagination(baseline: &mut Value) {

@@ -10,6 +10,7 @@ export default function createApi(transport: ApiTransport) {
     const path = "/api/worklist";
     return transport.request<WorklistPage>("GET", path, {
       query: {
+        "includeSummary": request.includeSummary,
         "cursor": request.cursor,
         "source": request.source,
         "due": request.due,

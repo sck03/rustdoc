@@ -301,7 +301,7 @@ export function AgentConsignmentPage({ client }: { client: ExportDocManagerApiCl
             />
           </section>
 
-          <SingleWindowHandoffPanel businessType="AgentConsignment" client={client} sourceId={parsedInvoiceId} canOperate={permission.canOperate} />
+          <SingleWindowHandoffPanel businessType="AgentConsignment" client={client} sourceId={parsedInvoiceId} canOperate={permission.canOperate} dirty={hasUnsavedDocumentChanges} busy={isBusy} draftRevision={Number(document?.draftRevision ?? 0)} workspace={workspace} />
         </form>
       ) : null}
 

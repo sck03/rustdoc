@@ -1,6 +1,52 @@
 //! Shared list/export selection applies scope and field searches before allocating rows.
 use crate::{Adapter, DataScope, GenericQuery, Result, generic_query, sql};
 use serde_json::Value;
+/// Bound and deduplicated lookups; callers validate business scope in the same snapshot.
+pub(crate) fn by_keys(
+    db: &(impl Adapter + ?Sized),
+    kind: &str,
+    numeric: bool,
+    keys: &[String],
+    fields: &[(&str, &str)],
+) -> Result<Vec<Value>> {
+    let pg = db.provider() == "PostgreSQL";
+    let mut keys: Vec<_> = keys
+        .iter()
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    if numeric {
+        keys.sort_by_key(|key| std::cmp::Reverse(key.parse::<i64>().expect("numeric record id")));
+    }
+    let mut result = vec![];
+    let projection = sql::projection(fields, pg)?;
+    for chunk in keys.chunks(200) {
+        crate::operation::check()?;
+        let mut values = vec![];
+        let bound_kind = sql::bind(&mut values, kind, pg);
+        let bound = chunk
+            .iter()
+            .map(|key| {
+                let value = sql::bind(&mut values, key, pg);
+                if numeric {
+                    format!("CAST({value} AS BIGINT)")
+                } else {
+                    value
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(",");
+        let column = if numeric { "id" } else { "identity" };
+        let query = crate::QuerySql {
+            source: crate::query_source::Source::for_kind(kind),
+            filter: format!("r.kind={bound_kind} AND r.{column} IN ({bound})"),
+            order: "r.id DESC".into(),
+            values,
+        };
+        result.extend(db.query_slice(&query, &projection, 0, 200)?);
+    }
+    Ok(result)
+}
 pub(crate) fn page(
     db: &(impl Adapter + ?Sized),
     query: &GenericQuery<'_>,

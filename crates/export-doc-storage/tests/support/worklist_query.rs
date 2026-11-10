@@ -100,5 +100,44 @@ pub fn exercise(db: &Connection) {
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0]["id"], follow);
     assert_eq!(rows[0]["customerName"], "可见客户");
+    let mut keys = vec![];
+    let mut batch_ids = vec![];
+    for index in 0..205 {
+        let key = format!("单位:'批量:{index}");
+        let mut value = json!({"versionNumber":1,"key":key,"ownerUserId":1});
+        let id = db
+            .insert(&RecordWrite {
+                kind: "batch-lookup",
+                identity: Some(&key),
+                body: &value,
+            })
+            .unwrap();
+        value["id"] = json!(id);
+        db.set_body(id, &value).unwrap();
+        batch_ids.push(id);
+        keys.push(key);
+    }
+    keys.extend(keys.clone());
+    keys.push("missing".into());
+    let rows = db
+        .records_by_identities("batch-lookup", &keys, &[("id", "id")])
+        .unwrap();
+    assert_eq!(rows.len(), 205);
+    assert!(rows.iter().all(|row| row.as_object().unwrap().len() == 1));
+    batch_ids.reverse();
+    let rows = db
+        .records_by_ids("batch-lookup", &batch_ids, &[("id", "id")])
+        .unwrap();
+    assert_eq!(
+        rows.iter()
+            .map(|row| row["id"].as_i64().unwrap())
+            .collect::<Vec<_>>(),
+        batch_ids
+    );
+    assert!(
+        db.records_by_identities("other-kind", &keys, &[])
+            .unwrap()
+            .is_empty()
+    );
     db.rollback().unwrap();
 }

@@ -41,6 +41,18 @@ fn custom_conditions_are_exact_and_independent_fields_do_not_alias() {
     .unwrap();
     let mut context = ConditionContext::default();
     assert!(!condition.matches(&context).unwrap());
+    for blank in ["", " ", "\t\n", "\u{3000}"] {
+        let mut optional_form = form();
+        optional_form
+            .fields
+            .iter_mut()
+            .for_each(|f| f.required = false);
+        context.form_values.insert("freight".into(), json!(blank));
+        optional_form
+            .validate_values(&context.form_values, true)
+            .unwrap();
+        assert!(!condition.matches(&context).unwrap());
+    }
     context
         .form_values
         .insert("freight".into(), json!("100.01"));

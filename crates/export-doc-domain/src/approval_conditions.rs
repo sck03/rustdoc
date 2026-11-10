@@ -82,8 +82,8 @@ impl ApprovalCondition {
                 let actual = context
                     .form_values
                     .get(&self.field_key)
-                    .and_then(serde_json::Value::as_str);
-                let Some(actual) = actual.filter(|v| !v.is_empty()) else {
+                    .and_then(crate::oa_form::nonblank);
+                let Some(actual) = actual else {
                     return Ok(false);
                 };
                 if self.field == ConditionField::FormNumber {

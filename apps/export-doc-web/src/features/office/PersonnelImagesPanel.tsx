@@ -1,3 +1,4 @@
+import { FileInput } from "../../ui/FileInput.tsx";
 import { useState } from "react";
 import type { ExportDocManagerApiClient, PersonnelImageKind, PersonnelImageRecord, PersonnelRecord } from "../../api/index.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
@@ -69,7 +70,7 @@ function PersonnelImageEditor({ client, id, kind, image, editable, busy, upload,
     {stored.error && <InlineNotice tone="error" title="图片加载失败" action={<button className="command-button secondary" type="button" onClick={stored.retry}>重试</button>}>{stored.error}</InlineNotice>}
     {selectionError && <InlineNotice tone="error" title="图片未选择">{selectionError}</InlineNotice>}
     {editable && <>
-      <label className="office-field"><span>选择{label}</span><input key={inputKey} type="file" accept="image/png,image/jpeg,.png,.jpg,.jpeg" disabled={busy}
+      <label className="office-field"><span>选择{label}</span><FileInput key={inputKey} accept="image/png,image/jpeg,.png,.jpg,.jpeg" disabled={busy}
         onChange={(event) => selectFile(event.target.files?.[0] ?? null)} /></label>
       {file && <p className="office-muted">待保存：{file.name}</p>}
       <div className="office-card-actions"><button type="button" className="command-button" disabled={busy || !file || Boolean(url && failedUrl === url)}

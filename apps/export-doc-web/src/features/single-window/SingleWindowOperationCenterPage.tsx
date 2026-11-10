@@ -1,6 +1,7 @@
+import { FileInput } from "../../ui/FileInput.tsx";
 import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { FileInput, HardDrive, RefreshCw, Search, Server, Upload } from "lucide-react";
+import { FileInput as FileInputIcon, HardDrive, RefreshCw, Search, Server, Upload } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ApiSingleWindowImportedPackageResponse, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -221,7 +222,7 @@ function StationSubmitPackageImportPanel({ client, canOperate }: { client: Expor
           {activeProfile.profileName} · {activeProfile.companyScope} · {activeProfile.cardIdentifier}
         </InlineNotice>
       ) : <InlineNotice tone="warning">请先在上方创建并启用公司与操作卡档案。</InlineNotice>}
-      <PathField label="提交包文件" value={packagePath} disabled={!canOperate || mutation.isPending} actions={<DesktopIconButton title="选择提交包" disabled={!canOperate || mutation.isPending} onClick={() => void choosePackage()}><FileInput size={17} aria-hidden="true" /></DesktopIconButton>} onChange={(value) => { setPackagePath(value); setMessage(null); }} />
+      <PathField label="提交包文件" value={packagePath} disabled={!canOperate || mutation.isPending} actions={<DesktopIconButton title="选择提交包" disabled={!canOperate || mutation.isPending} onClick={() => void choosePackage()}><FileInputIcon size={17} aria-hidden="true" /></DesktopIconButton>} onChange={(value) => { setPackagePath(value); setMessage(null); }} />
       {message ? <InlineNotice tone={mutation.isError ? "error" : "success"}>{message}</InlineNotice> : null}
       {result ? <div className="single-window-import-summary"><strong>{result.manifest.invoiceNo || result.manifest.batchReference}</strong><span>{formatBusinessType(result.manifest.businessType)}</span><span>{result.manifest.companyScope}</span></div> : null}
     </section>
@@ -249,7 +250,7 @@ function OfficeReceiptPackageImportPanel({ client, canOperate }: { client: Expor
         <div><h2>导入持卡机回执包</h2><span>只接受能精确绑定原提交批次、公司抬头和原包摘要的 .swpkg</span></div>
         <button className="command-button" type="button" disabled={!canOperate || mutation.isPending || !file} onClick={() => mutation.mutate()}><Upload size={17} aria-hidden="true" /><span>导入回执包</span></button>
       </div>
-      <label className="form-field"><span className="form-field-label"><span>回执包文件</span></span><input type="file" accept=".swpkg" disabled={!canOperate || mutation.isPending} onChange={(event) => { const nextFile = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; setFile(nextFile); setMessage(null); }} /></label>
+      <label className="form-field"><span className="form-field-label"><span>回执包文件</span></span><FileInput accept=".swpkg" disabled={!canOperate || mutation.isPending} onChange={(event) => { const nextFile = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; setFile(nextFile); setMessage(null); }} /></label>
       {message ? <InlineNotice tone={mutation.isError ? "error" : "success"}>{message}</InlineNotice> : null}
     </section>
   );

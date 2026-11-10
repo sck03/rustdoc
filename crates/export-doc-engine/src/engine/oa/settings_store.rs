@@ -2,6 +2,8 @@
 use super::*;
 const SECTION: &str = "oa-setting-section";
 const DRAFT: &str = "oa-definition-draft";
+// Retired keys are small point-lookup reservations, never part of settings reads.
+const RETIRED: &str = "oa-definition-retired";
 fn identity(company: &str, key: &str) -> String {
     store::normalize(&format!("{company}:{key}"))
 }
@@ -38,10 +40,12 @@ pub(super) fn load(tx: &Connection, company: &str) -> Result<Value> {
     value["revisions"] = json!({});
     for record in store::matching(tx, DRAFT, &[("companyScope", company.into())], &[])? {
         let key = text(&record, "key");
-        value["revisions"][format!("rule:{key}")] = record["versionNumber"].clone();
-        if record["value"].is_null() {
-            continue;
+        if !record["value"].is_object() {
+            return Err(super::super::error::unavailable(
+                "流程草稿记录损坏，请使用本版本的新数据库。",
+            ));
         }
+        value["revisions"][format!("rule:{key}")] = record["versionNumber"].clone();
         let rules = value["rules"]
             .as_array_mut()
             .ok_or_else(|| super::super::error::unavailable("流程目录损坏。"))?;
@@ -112,6 +116,9 @@ pub(super) fn save(
     };
     let identity = identity(&actor.company, key);
     let previous = tx.find_identity(kind, &identity)?;
+    if kind == DRAFT && previous.is_none() && tx.find_identity(RETIRED, &identity)?.is_some() {
+        return Err(conflict("该事项已删除，请新建事项，不要重用已删除的编号。"));
+    }
     let expected = patch["expectedRevision"]
         .as_i64()
         .ok_or_else(|| invalid("设置版本缺失。"))?;
@@ -139,13 +146,16 @@ pub(super) fn save(
         }
         store::save(
             tx,
-            kind,
-            id,
-            json!({"key":key,"value":null,"expectedVersion":expected}),
+            RETIRED,
+            0,
+            json!({"key":key}),
             Some(identity),
             actor,
             "remove-oa-definition",
         )?;
+        if !tx.delete(kind, id, expected)? {
+            return Err(conflict("草稿已改变或不存在。"));
+        }
     } else {
         let content = if section == "rules" {
             validated["rules"]

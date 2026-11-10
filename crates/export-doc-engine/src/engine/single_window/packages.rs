@@ -80,27 +80,21 @@ fn submit(
     id: i64,
     body: &Value,
 ) -> Result<Export> {
-    // Preserve the existing implicit first draft, but do not hold its transaction
-    // while reading attachments or constructing the archive.
-    let initial = service.store.read_for(actor, operation, &[], |tx, actor| {
-        documents::load(tx, actor, service, business, id, "operate")
-    })?;
-    if initial.stored.is_none() {
-        service
-            .store
-            .transaction_for(actor, operation, &[], |tx, actor| {
-                let loaded = documents::load(tx, actor, service, business, id, "operate")?;
-                if loaded.stored.is_none() {
-                    documents::save(tx, actor, service, business, id, &loaded.current, &loaded)?;
-                }
-                Ok(())
-            })?;
-    }
+    let expected = body["expectedDraftRevision"]
+        .as_i64()
+        .filter(|v| *v > 0)
+        .ok_or_else(|| invalid("请提供已保存并复核的草稿版本。"))?;
     let (invoice, loaded, assignment, version, attachments) =
         service.store.read_for(actor, operation, &[], |tx, actor| {
             let invoice = source(tx, actor, id, "operate")?;
             let loaded = documents::load(tx, actor, service, business, id, "view")?;
             let document = &loaded.current;
+            if loaded.stored.is_none() || document["draftRevision"].as_i64() != Some(expected) {
+                return Err(error(409, "草稿版本已改变，请重新读取、保存并复核后导出。"));
+            }
+            if document["sourceDiffCount"].as_i64().unwrap_or(0) > 0 {
+                return Err(error(409, "申报来源已改变，请保存并复核最新草稿后导出。"));
+            }
             let issues = rules::validation::review(business, document);
             if !issues.is_empty() {
                 return Err(invalid(format!(

@@ -107,7 +107,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("success",b()),("repairedGroupCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("review",r("SingleWindowExportReview")),
         ("message",s())
     ]).required(vec!["success","repairedGroupCount","review","message"])),
-    ("ApiSingleWindowSubmitPackageRequest",o(vec![("packagePath",s().default_value(serde_json::json!(""))),("stationAssignmentCode",s().default_value(serde_json::json!("")))])),
+    ("ApiSingleWindowSubmitPackageRequest",o(vec![("expectedDraftRevision",i().minimum(num("1"))),("packagePath",s().default_value(serde_json::json!(""))),("stationAssignmentCode",s().default_value(serde_json::json!("")))]).required(vec!["expectedDraftRevision"])),
     ("ApiSingleWindowUnlockFieldsRequest",o(vec![("fieldKeys",a(s()))])),
     ("CustomsCooDefaultProfile",o(vec![
         ("applName",s()),("applicant",s()),("applTel",s()),

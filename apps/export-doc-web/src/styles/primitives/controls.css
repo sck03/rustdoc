@@ -27,6 +27,19 @@ input:not([type="checkbox"]):not([type="radio"]), select, textarea {
   color: var(--edm-text); background: var(--edm-bg-surface); border: 1px solid var(--edm-line-strong); border-radius: var(--edm-radius-md);
 }
 textarea { padding: var(--edm-space-2) var(--edm-space-3); }
+[data-ui="file-input"] { position: relative; display: flex; align-items: center; gap: var(--edm-space-3); min-height: var(--edm-control-height); min-width: 0; padding: var(--edm-space-1); border: 1px solid var(--edm-line-strong); border-radius: var(--edm-radius-md); background: var(--edm-bg-surface); }
+[data-ui="file-input"] > input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+[data-file-button] {
+  display: inline-flex; flex-shrink: 0; align-items: center; min-height: var(--edm-control-height-sm); padding: 0 var(--edm-space-4);
+  font: inherit; font-weight: var(--edm-font-weight-medium); color: var(--edm-primary-700);
+  background: var(--edm-bg-hover); border: 1px solid var(--edm-line-strong); border-radius: var(--edm-radius-sm); cursor: pointer;
+}
+[data-file-selection] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--edm-font-weight-regular); }
+[data-ui="file-input"][data-disabled] { color: var(--edm-text-disabled); background: var(--edm-bg-disabled); }
+[data-ui="file-input"][data-disabled] > input { cursor: not-allowed; }
+[data-ui="file-input"][data-disabled] [data-file-button] { color: var(--edm-text-disabled); background: var(--edm-bg-disabled); }
+[data-ui="file-input"]:hover:not([data-disabled]) [data-file-button] { border-color: var(--edm-accent); }
+[data-ui="file-input"]:focus-within { outline: 2px solid var(--edm-accent); outline-offset: 2px; }
 input::placeholder, textarea::placeholder { color: var(--edm-text-tertiary); }
 input:focus, select:focus, textarea:focus { border-color: var(--edm-accent); box-shadow: var(--edm-shadow-focus); outline: 0; }
 input[readonly], textarea[readonly] { background: var(--edm-neutral-50); color: var(--edm-text-secondary); border-color: var(--edm-line); }

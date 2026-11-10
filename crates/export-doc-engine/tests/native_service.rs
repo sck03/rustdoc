@@ -475,6 +475,30 @@ fn worklist_preserves_source_counts_filtering_and_the_react_page_contract() {
         page["page"]["items"][0]["recordId"]
     );
     assert!(page["nextCursor"].is_null());
+    let light: Value = fixture
+        .client()
+        .json(
+            GET_WORKLIST,
+            &[],
+            &[
+                ("includeSummary", "false".into()),
+                ("pageSize", "1".into()),
+                ("pageNumber", "2".into()),
+                ("cursor", first["nextCursor"].as_str().unwrap().into()),
+            ],
+            None,
+        )
+        .unwrap();
+    export_doc_contracts::validation::response(GET_WORKLIST.id, &light).unwrap();
+    assert_eq!(light["page"]["items"], page["page"]["items"]);
+    assert!(light["page"].get("totalCount").is_none());
+    assert!(
+        light["sources"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|source| source.get("count").is_none())
+    );
     assert_eq!(
         fixture
             .client()

@@ -264,6 +264,8 @@ export function TextAreaField({
   disabled,
   className,
   description,
+  rows = 4,
+  placeholder,
   onChange,
 }: {
   label: string;
@@ -272,6 +274,8 @@ export function TextAreaField({
   disabled?: boolean;
   className?: string;
   description?: string;
+  rows?: number;
+  placeholder?: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -284,6 +288,8 @@ export function TextAreaField({
     >
       {(descriptionId) => (
       <textarea
+        rows={rows}
+        placeholder={placeholder}
         value={value ?? ""}
         required={required}
         disabled={disabled}

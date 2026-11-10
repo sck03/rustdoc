@@ -11,18 +11,22 @@ export function Pagination({
   isBusy,
   onPageChange,
   onPageSizeChange,
+  hasNextPage,
 }: {
   pageNumber: number;
   totalPages?: number;
-  totalCount: number;
+  totalCount?: number;
   pageSize: number;
   pageSizeOptions?: readonly number[];
   isBusy: boolean;
   onPageChange: (pageNumber: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
+  /** Cursor lists only permit known previous pages and the next cursor. */
+  hasNextPage?: boolean;
 }) {
-  const normalizedTotalPages = Math.max(totalPages || Math.ceil(totalCount / pageSize) || 1, 1);
-  const normalizedPageNumber = clampPageNumber(pageNumber, normalizedTotalPages);
+  const normalizedTotalPages = Math.max(totalPages || Math.ceil((totalCount ?? 0) / pageSize) || 1, 1);
+  const cursorMode = hasNextPage !== undefined;
+  const normalizedPageNumber = clampPageNumber(pageNumber, cursorMode ? Number.MAX_SAFE_INTEGER : normalizedTotalPages);
   const [goToPageText, setGoToPageText] = useState(String(normalizedPageNumber));
 
   useEffect(() => {
@@ -30,7 +34,7 @@ export function Pagination({
   }, [normalizedPageNumber]);
 
   function changePage(nextPageNumber: number) {
-    onPageChange(clampPageNumber(nextPageNumber, normalizedTotalPages));
+    onPageChange(clampPageNumber(nextPageNumber, cursorMode ? normalizedPageNumber + Number(hasNextPage) : normalizedTotalPages));
   }
 
   function submitGoToPage() {
@@ -54,11 +58,11 @@ export function Pagination({
   return (
     <footer className="pagination-bar" data-ui="pagination" role="navigation" aria-label="分页" aria-busy={isBusy}>
       <span>
-        第 {normalizedPageNumber} / {normalizedTotalPages} 页 · {totalCount} 条
+        第 {normalizedPageNumber}{!cursorMode && ` / ${normalizedTotalPages}`} 页{totalCount !== undefined && ` · ${totalCount} 条`}
       </span>
       {onPageSizeChange && pageSizeOptions.length > 1 ? <label className="page-size-control">
         <span>每页</span>
-        <select value={pageSize} disabled={isBusy} onChange={(event) => onPageSizeChange(Number(event.target.value))}>
+        <select aria-label="每页条数" value={pageSize} disabled={isBusy} onChange={(event) => onPageSizeChange(Number(event.target.value))}>
           {pageSizeOptions.map((value) => (
             <option key={value} value={value}>
               {value}
@@ -67,7 +71,7 @@ export function Pagination({
         </select>
         <span>条</span>
       </label> : <span>每页 {pageSize} 条</span>}
-      <label className="page-jump-control">
+      {!cursorMode && <label className="page-jump-control">
         <span>跳至</span>
         <input
           aria-label="跳转页"
@@ -80,7 +84,7 @@ export function Pagination({
         <Button disabled={isBusy} onClick={submitGoToPage}>
           跳转
         </Button>
-      </label>
+      </label>}
       <div className="pager-buttons">
         <Button disabled={isBusy || normalizedPageNumber <= 1} onClick={() => changePage(1)}>
           首页
@@ -89,17 +93,17 @@ export function Pagination({
           上一页
         </Button>
         <Button
-          disabled={isBusy || normalizedPageNumber >= normalizedTotalPages}
+          disabled={isBusy || (cursorMode ? !hasNextPage : normalizedPageNumber >= normalizedTotalPages)}
           onClick={() => changePage(normalizedPageNumber + 1)}
         >
           下一页
         </Button>
-        <Button
+        {!cursorMode && <Button
           disabled={isBusy || normalizedPageNumber >= normalizedTotalPages}
           onClick={() => changePage(normalizedTotalPages)}
         >
           末页
-        </Button>
+        </Button>}
       </div>
     </footer>
   );

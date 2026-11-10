@@ -175,7 +175,7 @@ fn viewing_another_source_does_not_authorize_implicit_export_drafts() {
                 DOWNLOAD_CUSTOMS_COO_SUBMIT_PACKAGE,
                 &parameters,
                 &[],
-                Some(json!({"stationAssignmentCode":""}))
+                Some(json!({"stationAssignmentCode":"","expectedDraftRevision":1}))
             )
             .unwrap_err()
             .status,
@@ -276,6 +276,16 @@ fn declaration_revision_locks_and_stable_source_items_survive_reorder() {
         .json::<Value>(UPDATE_INVOICE, &[("id", id.to_string())], &[], Some(source))
         .unwrap();
     let current = call(&f, GET_CUSTOMS_COO_DOCUMENT, id, None);
+    assert!(current["sourceDiffCount"].as_i64().unwrap() > 0);
+    let export_path = f.root.join("changed-source.swpkg");
+    assert_eq!(
+        f.client().json::<Value>(SAVE_CUSTOMS_COO_SUBMIT_PACKAGE_TO_PATH,
+            &[("sourceId", id.to_string())], &[],
+            Some(json!({"packagePath":export_path,"stationAssignmentCode":"","expectedDraftRevision":current["draftRevision"]})))
+            .unwrap_err().status,
+        Some(409)
+    );
+    assert!(!export_path.exists());
     let rows = current["items"].as_array().unwrap();
     assert_eq!(
         rows.iter()
@@ -319,7 +329,7 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
     let station = profile_at(&f, &external.root);
     let source = invoice(&f, "NATIVE-SW-HANDOFF");
     let id = source["id"].as_i64().unwrap();
-    acd(&f, id);
+    let saved = acd(&f, id);
     let review = call(&f, BUILD_AGENT_CONSIGNMENT_EXPORT_REVIEW, id, None);
     assert_eq!(review["totalErrorCount"], 0, "{review}");
     let package_path = f.root.join("submit.swpkg");
@@ -327,7 +337,9 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
         &f,
         SAVE_AGENT_CONSIGNMENT_SUBMIT_PACKAGE_TO_PATH,
         id,
-        Some(json!({"packagePath":package_path,"stationAssignmentCode":""})),
+        Some(
+            json!({"packagePath":package_path,"stationAssignmentCode":"","expectedDraftRevision":saved["draftRevision"]}),
+        ),
     );
     let batch = exported["trackingBatchId"].as_i64().unwrap();
     let bytes = std::fs::read(&package_path).unwrap();
@@ -440,6 +452,60 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
 }
 
 #[test]
+fn submit_packages_reject_missing_unsaved_and_stale_revisions_without_writing_files() {
+    let f = Fixture::new();
+    for (save, export) in [
+        (
+            SAVE_CUSTOMS_COO_DOCUMENT,
+            SAVE_CUSTOMS_COO_SUBMIT_PACKAGE_TO_PATH,
+        ),
+        (
+            SAVE_AGENT_CONSIGNMENT_DOCUMENT,
+            SAVE_AGENT_CONSIGNMENT_SUBMIT_PACKAGE_TO_PATH,
+        ),
+    ] {
+        let source = invoice(&f, export.id);
+        let id = source["id"].as_i64().unwrap();
+        let parameters = [("sourceId", id.to_string())];
+        let path = f.root.join(format!("{}.swpkg", export.id));
+        let mut request = json!({"packagePath":path,"stationAssignmentCode":""});
+        assert_eq!(
+            f.client()
+                .json::<Value>(export, &parameters, &[], Some(request.clone()))
+                .unwrap_err()
+                .status,
+            Some(400)
+        );
+        request["expectedDraftRevision"] = json!(1);
+        assert_eq!(
+            f.client()
+                .json::<Value>(export, &parameters, &[], Some(request.clone()))
+                .unwrap_err()
+                .status,
+            Some(409)
+        );
+        let mut draft = if save == SAVE_CUSTOMS_COO_DOCUMENT {
+            let mut draft = declarations::coo("RC", "JAPAN", "9005");
+            draft["sourceId"] = json!(id);
+            call(&f, save, id, Some(draft))["document"].clone()
+        } else {
+            acd(&f, id)
+        };
+        request["expectedDraftRevision"] = draft["draftRevision"].clone();
+        draft["expectedDraftRevision"] = draft["draftRevision"].clone();
+        call(&f, save, id, Some(draft));
+        assert_eq!(
+            f.client()
+                .json::<Value>(export, &parameters, &[], Some(request))
+                .unwrap_err()
+                .status,
+            Some(409)
+        );
+        assert!(!path.exists());
+    }
+}
+
+#[test]
 fn client_directories_reject_missing_relative_and_overlapping_locations() {
     let f = Fixture::new();
     let station = profile(&f);
@@ -504,12 +570,14 @@ fn first_coo_receipt_matches_certificate_without_batch_filename() {
     let id = source["id"].as_i64().unwrap();
     let mut draft = declarations::coo("RC", "JAPAN", "9005");
     draft["sourceId"] = json!(id);
-    call(&f, SAVE_CUSTOMS_COO_DOCUMENT, id, Some(draft));
+    let saved = call(&f, SAVE_CUSTOMS_COO_DOCUMENT, id, Some(draft));
     let exported = call(
         &f,
         SAVE_CUSTOMS_COO_SUBMIT_PACKAGE_TO_PATH,
         id,
-        Some(json!({"packagePath":f.root.join("coo.swpkg"),"stationAssignmentCode":""})),
+        Some(
+            json!({"packagePath":f.root.join("coo.swpkg"),"stationAssignmentCode":"","expectedDraftRevision":saved["document"]["draftRevision"]}),
+        ),
     );
     let batch = exported["trackingBatchId"].as_i64().unwrap();
     f.client()

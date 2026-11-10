@@ -368,7 +368,7 @@ export function CustomsCooPage({ client }: { client: ExportDocManagerApiClient }
             />
           </section>
 
-          <SingleWindowHandoffPanel businessType="CustomsCoo" client={client} sourceId={parsedInvoiceId} canOperate={permission.canOperate} />
+          <SingleWindowHandoffPanel businessType="CustomsCoo" client={client} sourceId={parsedInvoiceId} canOperate={permission.canOperate} dirty={hasUnsavedDocumentChanges} busy={isBusy} draftRevision={Number(document?.draftRevision ?? 0)} workspace={workspace} />
         </form>
       ) : null}
 

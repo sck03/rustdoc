@@ -3517,6 +3517,7 @@ export interface ApiSingleWindowSourceListResponse {
 }
 
 export interface ApiSingleWindowSubmitPackageRequest {
+  expectedDraftRevision: number;
   packagePath?: string;
   stationAssignmentCode?: string;
 }
@@ -6089,8 +6090,8 @@ export interface PagedResultOfWorklistItem {
   items: WorklistItem[];
   pageNumber: number;
   pageSize: number;
-  totalCount: number;
-  totalPages: number;
+  totalCount?: number;
+  totalPages?: number;
 }
 
 export interface PaymentTemplateItem {
@@ -7057,7 +7058,7 @@ export interface WorklistPage {
 }
 
 export interface WorklistSourceCount {
-  count: number;
+  count?: number;
   key: string;
   name: string;
 }
@@ -9121,6 +9122,7 @@ export interface GetUserReportTemplateHistoryRetentionRequest {
 }
 
 export interface GetWorklistRequest {
+  includeSummary?: boolean;
   cursor?: string;
   source?: string;
   due?: WorklistDueFilter;

@@ -24,9 +24,13 @@ pub fn exercise(service: &NativeService, admin: &str) {
     rule["form"] = json!({"category":"外贸业务","departmentIds":["GENERAL"],"attachmentRequired":false,"fields":[
         {"key":"customer","label":"客户","kind":"Text","required":true},
         {"key":"freight","label":"运费","kind":"Money","currency":"CNY","required":true},
+        {"key":"contact","label":"联系人","kind":"Person"},
+        {"key":"department","label":"联系部门","kind":"Department"},
         {"key":"samples","label":"样品明细","kind":"Table","required":true,"columns":[
             {"key":"name","label":"品名","kind":"Text","required":true},
-            {"key":"quantity","label":"数量","kind":"Decimal","required":true}
+            {"key":"quantity","label":"数量","kind":"Decimal","required":true},
+            {"key":"contact","label":"联系人","kind":"Person"},
+            {"key":"department","label":"联系部门","kind":"Department"}
         ]}
     ]});
     let patch = |rule: &Value, revision: i64| json!({"section":"rules","definitionKey":rule["key"],"rule":rule,"expectedRevision":revision});
@@ -62,13 +66,25 @@ pub fn exercise(service: &NativeService, admin: &str) {
     assert_eq!(saved["revisions"][format!("rule:{key}")], revision);
     let other_revision =
         saved["revisions"][format!("rule:{}", other["key"].as_str().unwrap())].clone();
-    w::request(
+    let removed = w::request(
         service,
         admin,
         SAVE_OA_APPROVAL_SETTINGS,
         Some(
             json!({"section":"rules","definitionKey":other["key"],"remove":true,"expectedRevision":other_revision}),
         ),
+    );
+    assert!(
+        removed["revisions"]
+            .get(format!("rule:{}", other["key"].as_str().unwrap()))
+            .is_none()
+    );
+    assert!(
+        !removed["rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["key"] == other["key"])
     );
     assert_eq!(
         w::call(
@@ -144,6 +160,36 @@ pub fn exercise(service: &NativeService, admin: &str) {
     )
     .unwrap();
     assert_eq!(draft["formDefinition"]["fields"][0]["label"], "客户");
+    let mut repeated = values.clone();
+    repeated["contact"] = json!(" \t");
+    repeated["department"] = json!(" \t");
+    repeated["samples"] = json!(vec![
+        json!({"name":"重复引用","quantity":"1","contact":person["employee"]["id"].to_string(),"department":"GENERAL"});
+        100
+    ]);
+    let repeated = call(
+        service,
+        admin,
+        operation("general", "create"),
+        0,
+        Some(create(repeated)),
+    )
+    .unwrap();
+    let display = &repeated["formDisplayValues"]["samples"];
+    assert_eq!(display.as_array().unwrap().len(), 100);
+    assert!(
+        display[0]["contact"]
+            .as_str()
+            .unwrap()
+            .contains("自定义事项申请人")
+    );
+    assert!(
+        display[0]["department"]
+            .as_str()
+            .unwrap()
+            .contains("GENERAL")
+    );
+    assert_eq!(display[0], display[99]);
     let id = draft["id"].as_i64().unwrap();
     let pending = call(
         service,
@@ -163,7 +209,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
         None,
     )
     .unwrap();
-    assert_eq!(page["totalCount"], 2);
+    assert_eq!(page["totalCount"], 3);
     assert!(
         page["items"]
             .as_array()

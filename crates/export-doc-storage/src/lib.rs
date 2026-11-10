@@ -379,6 +379,7 @@ delegate! {
     responsibility_appointments(unit:i64,responsibility:i64,project:Option<i64>,kind:&str,date:&str)->Vec<Value>;
     placement_appointments(unit:i64,source:&str,id:i64,date:&str)->Vec<Value>;
     records_by_ids(kind:&str,ids:&[i64],fields:&[(&str,&str)])->Vec<Value>;
+    records_by_identities(kind:&str,identities:&[String],fields:&[(&str,&str)])->Vec<Value>;
     unit_accounts(company:&str,date:&str,all:bool)->Vec<Value>;
     unit_account_page(company:&str,date:&str,all:bool,before:Option<i64>,limit:i64)->Vec<Value>;
     workflow_notification_account_page(company:&str,date:&str,before:Option<i64>,limit:i64)->Vec<Value>;

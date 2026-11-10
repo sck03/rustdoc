@@ -136,62 +136,13 @@ pub(super) fn validate(
     }
     let values = values(row)?;
     form.validate_values(&values, submitting).map_err(invalid)?;
-    row["formDisplayValues"] =
-        serde_json::to_value(display_values(tx, actor, &form.fields, &values)?)?;
+    row["formDisplayValues"] = serde_json::to_value(references::display_values(
+        tx,
+        actor,
+        &form.fields,
+        &values,
+    )?)?;
     Ok(())
 }
-fn display_values(
-    tx: &Connection,
-    actor: &Actor,
-    fields: &[export_doc_domain::oa_form::FormField],
-    values: &FormValues,
-) -> Result<FormValues> {
-    use export_doc_domain::oa_form::FieldKind;
-    let mut display = values.clone();
-    for field in fields {
-        let Some(value) = values.get(&field.key) else {
-            continue;
-        };
-        match field.kind {
-            FieldKind::Person if value.as_str().is_some_and(|v| !v.is_empty()) => {
-                let id = value
-                    .as_str()
-                    .and_then(|v| v.parse().ok())
-                    .ok_or_else(|| invalid("人员编号无效。"))?;
-                let person =
-                    super::super::personnel_organization::active_person(tx, &actor.company, id)?;
-                display.insert(
-                    field.key.clone(),
-                    json!(format!("{}（{id}）", text(&person["profile"], "fullName"))),
-                );
-            }
-            FieldKind::Department if value.as_str().is_some_and(|v| !v.is_empty()) => {
-                let identity =
-                    store::department_identity(&actor.company, value.as_str().unwrap_or(""))?;
-                let department = tx
-                    .find_identity("departments", &identity)?
-                    .filter(|d| d["isActive"] == true)
-                    .ok_or_else(|| invalid("请选择本单位的启用部门。"))?;
-                display.insert(
-                    field.key.clone(),
-                    json!(format!(
-                        "{}（{}）",
-                        text(&department, "name"),
-                        value.as_str().unwrap_or("")
-                    )),
-                );
-            }
-            FieldKind::Table => {
-                let mut rows = vec![];
-                for row in value.as_array().into_iter().flatten() {
-                    let values = serde_json::from_value(row.clone())
-                        .map_err(|_| invalid("明细格式无效。"))?;
-                    rows.push(display_values(tx, actor, &field.columns, &values)?);
-                }
-                display.insert(field.key.clone(), json!(rows));
-            }
-            _ => {}
-        }
-    }
-    Ok(display)
-}
+#[path = "custom_form_references.rs"]
+mod references;

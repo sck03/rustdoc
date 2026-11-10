@@ -21,6 +21,7 @@ import { verifyDesktopPersonnelDeletion } from './lib/native-personnel-deletion.
 import { verifyDesktopMaintenance } from './lib/native-maintenance-workflow.mjs';
 import { verifyDesktopBackupSave } from './lib/native-backup-save-checks.mjs';
 import { verifyDesktopHsExamples } from './lib/native-hs-examples.mjs';
+import { verifySharedControlLayout } from './lib/shared-control-layout.mjs';
 
 assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
 const repo = path.resolve(import.meta.dirname, '..');
@@ -139,6 +140,7 @@ for (const edition of selected) {
     assert(await run(`document.querySelector('.about-detail-grid')?.textContent.includes(${JSON.stringify('v' + marker.version)})`));
     assert(await run(`document.querySelector('.about-detail-grid')?.textContent.includes(${JSON.stringify(health.body.informationalVersion)})`));
     await captureScreenshot(cdp, path.join(output, `${edition}-about.png`));
+    if(edition==='Full') await verifySharedControlLayout({run,station:true,capture:name=>captureScreenshot(cdp,path.join(output,`${edition}-${name}.png`))});
     if (marker.ocr && !process.argv.includes('--blank-grid-only') && !process.argv.includes('--entry-rows-only')) await verifyDesktopOcr({ run, cdp, repo, output, context, token: login.body.accessToken, operations });
     if (process.argv.includes('--entry-rows-only')) {
       const { invoiceId } = await verifyDesktopEntryRows({ run, request, token: login.body.accessToken, cdp, output });

@@ -1,6 +1,7 @@
 import { ExternalAnchor } from "../../ui/ExternalAnchor.tsx";
 import "../../styles/features/hs-code-tools.css";
 import { useMutation } from "@tanstack/react-query";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { Eye,ExternalLink,FileSpreadsheet,Globe2,RefreshCw,Save,Search,Trash2,Upload,X } from "lucide-react";
 import { ChangeEvent,FormEvent,Fragment,useEffect,useRef,useState } from "react";
 import {
@@ -78,32 +79,38 @@ export function HsCodeToolsPanel({
     };
   }, []);
 
-  const importPathMutation = useMutation({
-    mutationFn: (filePath: string) =>
-      client.previewHsCodesImportFromPath({
+  const importScope = `hs-import:${workspace}:${disabled}:${importMode}:${importSourceName}:${importEffectiveYear}`;
+  const importPathMutation = useScopedMutation(importScope, client, {
+    mutationFn: async (_: void, signal) => {
+      const filePath = await selectExcelFile();
+      signal.throwIfAborted();
+      if (!filePath) return null;
+      return client.previewHsCodesImportFromPath({
         body: {
           filePath,
           mode: importMode,
           sourceName: importSourceName.trim(),
           effectiveYear: parseImportYear(importEffectiveYear),
         },
-      }),
+      }, { signal });
+    },
     onSuccess: (response) => {
+      if (!response) return;
       setImportPreview(response);
       showSuccess("文件分析完成，请核对识别结果和数据变更后再确认导入。");
     },
     onError: (error) => showError(readApiError(error)),
   });
 
-  const uploadImportMutation = useMutation({
-    mutationFn: (file: File) =>
+  const uploadImportMutation = useScopedMutation(importScope, client, {
+    mutationFn: (file: File, signal) =>
       client.previewHsCodesImportUpload({
         fileName: file.name,
         mode: importMode,
         sourceName: importSourceName.trim() || undefined,
         effectiveYear: parseImportYear(importEffectiveYear),
         body: file,
-      }),
+      }, { signal }),
     onSuccess: (response) => {
       setImportPreview(response);
       showSuccess("文件分析完成，请核对识别结果和数据变更后再确认导入。");
@@ -220,19 +227,8 @@ export function HsCodeToolsPanel({
     ? `${remoteResults.length} 条联网结果`
     : "本地库维护";
 
-  async function importFromDesktopPath() {
-    if (isBusy) {
-      return;
-    }
-
-    try {
-      const selected = await selectExcelFile();
-      if (selected) {
-        importPathMutation.mutate(selected);
-      }
-    } catch (error) {
-      showError(readApiError(error));
-    }
+  function importFromDesktopPath() {
+    if (!isBusy) importPathMutation.mutate();
   }
 
   function openImportWorkspace() {

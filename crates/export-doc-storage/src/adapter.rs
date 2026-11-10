@@ -97,34 +97,21 @@ pub(crate) trait Adapter: Send {
         ids: &[i64],
         fields: &[(&str, &str)],
     ) -> Result<Vec<Value>> {
-        let pg = self.provider() == "PostgreSQL";
-        let source = crate::query_source::Source::for_kind(kind);
-        let ids: Vec<_> = ids
-            .iter()
-            .copied()
-            .collect::<std::collections::BTreeSet<_>>()
-            .into_iter()
-            .rev()
-            .collect();
-        let mut result = vec![];
-        for ids in ids.chunks(200) {
-            operation::check()?;
-            let mut values = vec![];
-            let kind = sql::bind(&mut values, kind, pg);
-            let ids = ids
-                .iter()
-                .map(|id| format!("CAST({} AS BIGINT)", sql::bind(&mut values, id, pg)))
-                .collect::<Vec<_>>()
-                .join(",");
-            let query = QuerySql {
-                source,
-                filter: format!("r.kind={kind} AND r.id IN ({ids})"),
-                order: "r.id DESC".into(),
-                values,
-            };
-            result.extend(self.query_slice(&query, &sql::projection(fields, pg)?, 0, 200)?);
-        }
-        Ok(result)
+        crate::record_selection::by_keys(
+            self,
+            kind,
+            true,
+            &ids.iter().map(i64::to_string).collect::<Vec<_>>(),
+            fields,
+        )
+    }
+    fn records_by_identities(
+        &self,
+        kind: &str,
+        identities: &[String],
+        fields: &[(&str, &str)],
+    ) -> Result<Vec<Value>> {
+        crate::record_selection::by_keys(self, kind, false, identities, fields)
     }
 
     fn unit_accounts(&self, company: &str, date: &str, all: bool) -> Result<Vec<Value>> {

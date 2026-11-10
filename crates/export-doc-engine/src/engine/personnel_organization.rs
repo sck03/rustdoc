@@ -132,12 +132,16 @@ pub fn active_person(tx: &Connection, company: &str, id: i64) -> Result<Value> {
         return Err(invalid("负责人编号必须大于零。"));
     }
     let person = store::get(tx, "people", id)?;
-    if departments_in(tx, &person, company)?.is_empty()
+    validate_active_person(tx, company, &person)?;
+    Ok(person)
+}
+pub(super) fn validate_active_person(tx: &Connection, company: &str, person: &Value) -> Result<()> {
+    if departments_in(tx, person, company)?.is_empty()
         || !matches!(person["status"].as_str(), Some("Active" | "Probation"))
     {
         return Err(invalid("汇报负责人须为本公司的在职人员。"));
     }
-    Ok(person)
+    Ok(())
 }
 pub fn directory(tx: &Connection, company: &str) -> Result<Vec<Value>> {
     let mut result = vec![];

@@ -160,6 +160,10 @@ fn visible(field: &FormField, values: &FormValues) -> bool {
         .as_ref()
         .is_none_or(|c| values.get(&c.field).and_then(Value::as_str) == Some(c.equals.as_str()))
 }
+/// A blank scalar is absent in both form validation and workflow conditions.
+pub fn nonblank(value: &Value) -> Option<&str> {
+    value.as_str().filter(|value| !value.trim().is_empty())
+}
 fn validate_values(
     fields: &[FormField],
     values: &FormValues,
@@ -183,7 +187,7 @@ fn validate_values(
         {
             return Err(format!("{}的数据类型无效。", field.label));
         }
-        let absent = value.as_str().is_some_and(|v| v.trim().is_empty())
+        let absent = (value.is_string() && nonblank(value).is_none())
             || value.as_array().is_some_and(Vec::is_empty);
         if !visible(field, values) {
             if !absent {

@@ -23,7 +23,7 @@ function example(schema) {
 const source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\", "/"));
 const result = await require("esbuild").build({ write: false, bundle: true, format: "iife", platform: "browser", jsx: "automatic", loader: { ".css": "empty" }, logLevel: "silent",
   plugins: [{ name: "omit-independent-panels", setup(build) {
-    build.onLoad({ filter: /SingleWindow(Handoff|ExportReview)Panel\.tsx$/ }, args => ({ contents: `export function ${path.basename(args.path, ".tsx")}(){return null}`, loader: "tsx" }));
+    build.onLoad({ filter: /SingleWindowExportReviewPanel\.tsx$/ }, args => ({ contents: `export function ${path.basename(args.path, ".tsx")}(){return null}`, loader: "tsx" }));
   } }], stdin: { loader: "tsx", resolveDir: web, contents: `
 import React,{useState} from "react";import {createRoot} from "react-dom/client";
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
@@ -41,9 +41,10 @@ import {UnsavedChangesProvider,useHasUnsavedChanges} from ${source("ui/unsavedCh
 const initial={agent:${JSON.stringify(example(schemas.ApiAgentConsignmentDocumentDto))},coo:${JSON.stringify(example(schemas.ApiCustomsCooDocumentDto))}};
 const catalog=${JSON.stringify(example(schemas.SingleWindowReferenceCatalogModel))};
 const queries=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity},mutations:{retry:false}}});window.queries=queries;
-const records=new Map();window.pending=[];
+const records=new Map();window.pending=[];window.downloads=[];
+document.addEventListener('click',event=>{if(event.target instanceof HTMLAnchorElement){event.preventDefault();window.downloads.push(event.target.download);}});
 window.profileRows=[1,2].map(id=>({...${JSON.stringify(example(schemas.ApiSingleWindowClientProfileDto))},id,profileKey:'profile-'+id,profileName:'档案'+id,companyScope:'DEFAULT',cardIdentifier:'CARD-'+id,isEnabled:true,isActive:id===1,canSubmitCustomsCoo:true,canSubmitAgentConsignment:true}));
-if(window.mode==='directories'){window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>new Promise((resolve,reject)=>window.pending.push({command,args,resolve,reject}))};}
+if(window.mode==='directories'||window.desktop){window.isTauri=true;window.__TAURI_INTERNALS__={invoke:(command,args)=>new Promise((resolve,reject)=>window.pending.push({command,args,resolve,reject}))};}
 const get=id=>{if(!records.has(id))records.set(id,{...initial[window.mode],id:0,sourceId:id,draftRevision:0,expectedDraftRevision:0,copCusCode:'1234567890',gName:'initial',certNo:'initial'});return records.get(id)};
 const defer=(kind,request,init)=>new Promise((resolve,reject)=>window.pending.push({kind,request,signal:init.signal,resolve,reject}));
 const save=(r,i)=>defer('save',r,i),defaults=(r,i)=>defer('defaults',r,i);
@@ -59,6 +60,8 @@ const client={getAgentConsignmentDocument:async r=>get(r.sourceId),getCustomsCoo
   getAgentConsignmentLockedFields:async()=>{throw Error('locked fields unavailable')},getCustomsCooLockedFields:async()=>{throw Error('locked fields unavailable')},
   getCustomsCooEditorOptions:async()=>(${JSON.stringify(example(schemas.ApiCustomsCooEditorOptionsResponse))}),getCustomsCooIssuingAuthorities:async()=>({options:[]}),
   previewSingleWindowReferenceCatalogExcelImport:(r,i)=>defer('preview',r,i),
+  downloadCustomsCooSubmitPackage:(r,i)=>defer('export',r,i),downloadAgentConsignmentSubmitPackage:(r,i)=>defer('export',r,i),
+  saveCustomsCooSubmitPackageToPath:(r,i)=>defer('export',r,i),saveAgentConsignmentSubmitPackageToPath:(r,i)=>defer('export',r,i),
 };
 window.finish=(index=0)=>{const p=window.pending[index],saved={...p.request.body,id:101,draftRevision:p.request.body.expectedDraftRevision+1};records.set(p.request.sourceId,saved);p.resolve({document:saved,message:'saved'});};
 function Excel(){const [activeKey,setKey]=useState('countries'),[draft,setDraft]=useState(catalog),[notice,setNotice]=useState('');
@@ -77,20 +80,51 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
 ` } });
 const context = await require("playwright").chromium.launchPersistentContext(path.join(output, "Chrome"), { executablePath: locateChromeForTesting(root), headless: true });
 let passed = 0;
-async function scenario(mode, check) {
+async function scenario(mode, check, desktop=false) {
   const page = await context.newPage(), errors = [];
   page.setDefaultTimeout(10000); page.on("pageerror", error => errors.push(error.message));
   try {
     await page.setContent('<!doctype html><html lang="zh-CN"><div id="root"></div></html>');
-    await page.evaluate(mode => { window.mode = mode; }, mode); await page.addScriptTag({ content: result.outputFiles[0].text });
+    await page.evaluate(({mode,desktop}) => { window.mode = mode; window.desktop=desktop; }, {mode,desktop}); await page.addScriptTag({ content: result.outputFiles[0].text });
     await check(page); assert.deepEqual(errors, []); passed++;
   } catch (error) { await page.screenshot({ path: path.join(output, `failure-${passed}.png`), fullPage: true }); throw error; }
   finally { await page.close(); }
 }
 const submit = page => page.locator("form.entity-form").evaluate(form => { form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })); });
 try {
+  for(const mode of ['agent','coo']) {
+    await scenario(mode,async page=>{
+      const button=page.getByRole('button',{name:'下载提交包',exact:true});
+      await page.getByLabel('目标持卡机授权码').fill('assignment');
+      assert(await button.isDisabled(),'unsaved initial draft cannot export');
+      await submit(page);await page.waitForFunction(()=>window.pending.length===1);
+      await page.evaluate(()=>window.finish());await button.waitFor();
+      await page.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('下载提交包')).disabled);
+      await button.click();await page.waitForFunction(()=>window.pending.length===2);
+      assert.equal(await page.evaluate(()=>window.pending[1].request.body.expectedDraftRevision),1);
+      await submit(page);assert.equal(await page.evaluate(()=>window.pending.length),2,'save and export share the lock');
+      await page.evaluate(()=>window.hide());await page.waitForFunction(()=>window.pending[1].signal.aborted);
+      await page.evaluate(()=>window.pending[1].resolve(new Blob(['late'])));
+      await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,30)));
+      assert.equal(await page.evaluate(()=>window.downloads.length),0);
+      assert.equal(await page.evaluate(()=>window.queries.getMutationCache().getAll().length),0);
+    });
+    await scenario(mode,async page=>{
+      await page.getByLabel('目标持卡机授权码').fill('assignment');
+      await submit(page);await page.waitForFunction(()=>window.pending.length===1);await page.evaluate(()=>window.finish());
+      const button=page.getByRole('button',{name:'导出提交包',exact:true});
+      await page.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('导出提交包')).disabled);
+      await button.click();await page.waitForFunction(()=>window.pending.length===2);
+      await page.evaluate(()=>window.hide());
+      await page.evaluate(()=>window.pending[1].resolve('E:/late.swpkg'));
+      await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,30)));
+      assert.equal(await page.evaluate(()=>window.pending.length),2,'late dialog cannot start export');
+    },true);
+  }
   await scenario('profiles',async page=>{
+    await page.waitForFunction(()=>document.querySelector('input[aria-label="档案名称"]')?.value==='档案1'&&!window.dirty);
     await page.getByLabel('选择操作档案').selectOption('profile-2');
+    await page.waitForFunction(()=>document.querySelector('input[aria-label="档案名称"]')?.value==='档案2'&&!window.dirty);
     await page.getByLabel('ACD 发送目录 OutBox',{exact:true}).fill('F:/第二张卡');
     await page.getByRole('button',{name:'保存档案',exact:true}).click();
     await page.waitForFunction(()=>window.pending.length===1);

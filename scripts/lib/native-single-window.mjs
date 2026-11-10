@@ -118,10 +118,10 @@ export async function verifyDesktopSingleWindow({ run, cdp, output, token, invoi
   assert.equal((await client.getCustomsCooDocument({ sourceId: imported.id })).items.length, preview.invoice.items.length);
   const { profile, detected } = await verifyDesktopClientDirectories({run,cdp,output,client});
   const manualAcd = await client.getAgentConsignmentDocument({ sourceId });
-  await client.saveAgentConsignmentDocument({ sourceId, body: { ...manualAcd, copCusCode: 'TEST000001', gName: '测试货物', codeTS: '6109100010',
+  const savedAcd = await client.saveAgentConsignmentDocument({ sourceId, body: { ...manualAcd, copCusCode: 'TEST000001', gName: '测试货物', codeTS: '6109100010',
     declTotal: '100', ieDate: '20261109', tradeMode: '0110', oriCountry: '142', tradeCode: '1234567890', agentCode: '0987654321' } });
   const packagePath = path.join(output, 'desktop-manual.swpkg');
-  const handoff = await client.saveAgentConsignmentSubmitPackageToPath({ sourceId, body: { packagePath, stationAssignmentCode: profile.stationAssignmentCode } });
+  const handoff = await client.saveAgentConsignmentSubmitPackageToPath({ sourceId, body: { packagePath, stationAssignmentCode: profile.stationAssignmentCode, expectedDraftRevision: savedAcd.document.draftRevision } });
   assert(fs.statSync(packagePath).size > 0);
   await client.uploadSingleWindowSubmitPackage({ body: new Blob([fs.readFileSync(packagePath)]), fileName: 'desktop-manual.swpkg' });
   const dispatch = await client.dispatchSingleWindowBatchToClient({ body: { batchId: handoff.trackingBatchId } });

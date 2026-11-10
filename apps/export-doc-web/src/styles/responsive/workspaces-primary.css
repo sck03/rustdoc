@@ -6,11 +6,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .settings-category-panel .communication-settings-grid .email-body-template-field {
-    grid-column: auto;
-    grid-row: auto;
-  }
-
 }
 
 @media (min-width: 681px) and (max-width: 1180px) {
@@ -368,11 +363,6 @@
 
   .settings-textarea-field {
     grid-column: auto;
-  }
-
-  .communication-settings-grid .email-body-template-field {
-    grid-column: auto;
-    grid-row: auto;
   }
 
   .backup-action-grid {

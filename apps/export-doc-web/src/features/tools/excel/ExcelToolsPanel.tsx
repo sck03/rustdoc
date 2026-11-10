@@ -1,3 +1,4 @@
+import { FileInput } from "../../../ui/FileInput.tsx";
 import { Field } from "../../../ui/primitives/Field.tsx";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -374,8 +375,7 @@ export function ExcelToolsPanel({
           </div>
           {!desktopAvailable ? (
             <Field label="选择 Excel">
-              <input
-                type="file"
+              <FileInput
                 accept=".xlsx,.xlsm,.xltx,.xltm,.xls"
                 disabled={isBusy}
                 onChange={(event) => {

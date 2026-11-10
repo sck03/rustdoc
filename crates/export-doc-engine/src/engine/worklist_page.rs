@@ -8,6 +8,41 @@ pub(super) struct Selection<'a> {
     pub source: &'a str,
     pub keep: usize,
     pub after: Option<&'a Cursor>,
+    pub include_summary: bool,
+}
+// Stable concatenation order, also used to skip sources preceding the cursor.
+const SOURCES: &[&str] = &[
+    "invoice-review",
+    "customer-follow-up",
+    "meeting-approval",
+    "meeting-collection",
+    "meeting-return",
+    "supply-approval",
+    "supply-collection",
+    "supply-return",
+    "probation-end",
+    "contract-end",
+    "oa-personnel",
+    "oa-leave",
+    "oa-overtime",
+    "oa-expense",
+    "oa-travel",
+    "oa-purchase",
+    "oa-general",
+];
+impl Selection<'_> {
+    fn accepts(&self, key: &str) -> bool {
+        (self.source.is_empty() || self.source == key)
+            && self.after.is_none_or(|cursor| {
+                SOURCES.iter().position(|source| *source == key)
+                    >= SOURCES.iter().position(|source| *source == cursor.source)
+            })
+    }
+    pub fn needs(&self, keys: &[&str], previous: &[Group]) -> bool {
+        self.include_summary
+            || (previous.iter().map(|group| group.rows.len()).sum::<usize>() < self.keep
+                && keys.iter().any(|key| self.accepts(key)))
+    }
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -91,6 +126,9 @@ impl Group {
     }
     pub fn push(&mut self, mut value: Value, selection: &Selection<'_>) -> Result<()> {
         crate::operation::check()?;
+        if !selection.include_summary && !selection.accepts(self.key) {
+            return Ok(());
+        }
         let due = deadline(&value, selection.now)?;
         let included = match selection.due {
             "Overdue" => due.as_ref().is_some_and(|d| d.0),
@@ -102,7 +140,7 @@ impl Group {
             return Ok(());
         }
         self.count += 1;
-        if !selection.source.is_empty() && selection.source != self.key {
+        if !selection.accepts(self.key) {
             return Ok(());
         }
         value["source"] = json!(self.key);
@@ -157,6 +195,7 @@ mod tests {
             source: "",
             keep: 11,
             after: Some(&cursor),
+            include_summary: true,
         };
         let mut group = Group::new("test", "test");
         for id in (1..=10_000).rev() {

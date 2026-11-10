@@ -46,7 +46,7 @@ export function CommunicationSettingsPanel({ settings, secrets, canManageSetting
         <fieldset className="settings-fieldset" disabled={!canManageSettings || isBusy}>
           <div className="field-grid">
             <TextSetting settings={settings} path={["email", "documentEmailSubjectTemplate"]} label="单据邮件主题" onChange={onChange} />
-            <TextAreaSetting className="email-body-template-field" settings={settings} path={["email", "documentEmailBodyTemplate"]} label="单据邮件正文" onChange={onChange} />
+            <TextAreaSetting settings={settings} path={["email", "documentEmailBodyTemplate"]} label="单据邮件正文" onChange={onChange} />
           </div>
         </fieldset>
       </section>

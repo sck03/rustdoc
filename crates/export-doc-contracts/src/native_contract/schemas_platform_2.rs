@@ -6,7 +6,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("PagedResultOfOfficeStockMovementRecord",super::schema_shapes::paged_response("OfficeStockMovementRecord")),
     ("PagedResultOfOfficeSupplyRecord",super::schema_shapes::paged_response("OfficeSupplyRecord")),
     ("PagedResultOfOfficeSupplyRequestRecord",super::schema_shapes::paged_response("OfficeSupplyRequestRecord")),
-    ("PagedResultOfWorklistItem",super::schema_shapes::paged_response("WorklistItem")),
+    ("PagedResultOfWorklistItem",super::schema_shapes::paged_response("WorklistItem").required(vec!["items","pageNumber","pageSize","hasPreviousPage","hasNextPage"])),
     ("AccountSecurityResult",o(vec![
         ("accountId",s().pattern("^[1-9][0-9]{0,18}$")),("versionNumber",i().format("int64")),("isActive",b()),
         ("handoverRequired",b())
@@ -48,7 +48,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("page",r("PagedResultOfWorklistItem")),("sources",a(r("WorklistSourceCount"))),("businessDate",s().format("date")),
         ("asOf",s().format("date-time"))
     ]).required(vec!["nextCursor","page","sources","businessDate","asOf"])),
-    ("WorklistSourceCount",o(vec![("key",s()),("name",s()),("count",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))]).required(vec!["key","name","count"])),
+    ("WorklistSourceCount",o(vec![("key",s()),("name",s()),("count",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))]).required(vec!["key","name"])),
     ("OfficeHandlingService",o(vec![
         ("key",s()),("name",s()),("category",s().enumeration(Enumeration::Values(vec![serde_json::json!("Seal"),serde_json::json!("Certificate"),serde_json::json!("IT"),serde_json::json!("Repair"),serde_json::json!("Other"),serde_json::json!("Supply"),serde_json::json!("Room")]))),
         ("handlerUserIds",a(i().format("int64")).min_items(1).max_items(10)),("handlerNames",s()),("isActive",b())

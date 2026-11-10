@@ -1,5 +1,5 @@
 import { FolderOpen } from "lucide-react";
-import { NumberField, SelectField } from "../../ui/FormFields.tsx";
+import { FieldShell, NumberField, SelectField, TextAreaField } from "../../ui/FormFields.tsx";
 import { readBoolean, readNestedValue, readNumberValue } from "./settingsValueUtils.ts";
 import type { SettingsRecord } from "./settingsTypes.ts";
 
@@ -15,10 +15,9 @@ export function TextSetting({ settings, path, label, disabled, placeholder, list
   onChange: (path: string[], value: string) => void;
 }) {
   return (
-    <label className={className}>
-      <span>{label}</span>
-      <input value={readSettingString(settings, path)} disabled={disabled} placeholder={placeholder} list={list} maxLength={maxLength} onChange={(event) => onChange(path, event.target.value)} />
-    </label>
+    <FieldShell label={label} className={className} disabled={disabled}>
+      {() => <input value={readSettingString(settings, path)} disabled={disabled} placeholder={placeholder} list={list} maxLength={maxLength} onChange={(event) => onChange(path, event.target.value)} />}
+    </FieldShell>
   );
 }
 
@@ -56,10 +55,8 @@ export function TextAreaSetting({ settings, path, label, disabled, placeholder, 
   onChange: (path: string[], value: string) => void;
 }) {
   return (
-    <label className={className ? `textarea-field settings-textarea-field ${className}` : "textarea-field settings-textarea-field"}>
-      <span>{label}</span>
-      <textarea value={readSettingString(settings, path)} disabled={disabled} placeholder={placeholder} onChange={(event) => onChange(path, event.target.value)} />
-    </label>
+    <TextAreaField label={label} rows={7} className={className ? `settings-textarea-field ${className}` : "settings-textarea-field"}
+      value={readSettingString(settings, path)} disabled={disabled} placeholder={placeholder} onChange={value => onChange(path, value)} />
   );
 }
 

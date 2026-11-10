@@ -1,3 +1,4 @@
+import { FileInput } from "../../ui/FileInput.tsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, FileText, ShieldCheck, Upload } from "lucide-react";
@@ -321,9 +322,8 @@ export function InvoiceLetterOfCreditPanel({
                   : "浏览器只上传当前选择文件；服务端临时文件会立即删除，发票草稿仅保存原文件名。"}
             >
               {(descriptionId) => (
-                <input
+                <FileInput
                   key={invoice.id ?? 0}
-                  type="file"
                   accept={letterOfCreditAccept}
                   disabled={disabled || isImporting}
                   aria-describedby={descriptionId}

@@ -69,20 +69,23 @@ export function useInvoiceListSingleWindowOperations({ client, queryClient, defa
     await run("export", async ({ signal, checkCurrent }) => {
       const assignmentCode = stationAssignmentCode.trim();
       if (!assignmentCode) throw new Error("请先粘贴目标持卡机操作档案的授权码，再导出提交包。");
+      let expectedDraftRevision = review?.draftRevision ?? 0;
       if (!matchesSingleWindowReview(invoice.id, businessType, reviewInvoiceId, reviewBusinessType, review)) {
         const value = await client.getSingleWindowExportReview({ businessType, sourceId: invoice.id }, { signal });
         checkCurrent(); showReview(invoice, businessType, value);
         if (value.hasIssues || value.totalErrorCount > 0 || value.totalWarningCount > 0) return;
+        expectedDraftRevision = value.draftRevision;
       }
+      if (expectedDraftRevision <= 0) throw new Error("请先进入申报单据，保存并复核草稿后再导出。");
+      const body = { stationAssignmentCode: assignmentCode, expectedDraftRevision };
       if (isDesktopBridgeAvailable()) {
         const targetPath = await requestSingleWindowPackageSavePath(invoice, businessType, defaultExportDirectory);
         checkCurrent(); if (!targetPath) return;
         const response = businessType === "CustomsCoo"
-          ? await client.saveCustomsCooSubmitPackageToPath({ sourceId: invoice.id, body: { packagePath: targetPath, stationAssignmentCode: assignmentCode } }, { signal })
-          : await client.saveAgentConsignmentSubmitPackageToPath({ sourceId: invoice.id, body: { packagePath: targetPath, stationAssignmentCode: assignmentCode } }, { signal });
+          ? await client.saveCustomsCooSubmitPackageToPath({ sourceId: invoice.id, body: { ...body, packagePath: targetPath } }, { signal })
+          : await client.saveAgentConsignmentSubmitPackageToPath({ sourceId: invoice.id, body: { ...body, packagePath: targetPath } }, { signal });
         checkCurrent(); setPackagePath(response.packagePath || null); setMessage(response.message || "单一窗口提交包已导出。");
       } else {
-        const body = { stationAssignmentCode: assignmentCode };
         const blob = businessType === "CustomsCoo"
           ? await client.downloadCustomsCooSubmitPackage({ sourceId: invoice.id, body }, { signal })
           : await client.downloadAgentConsignmentSubmitPackage({ sourceId: invoice.id, body }, { signal });

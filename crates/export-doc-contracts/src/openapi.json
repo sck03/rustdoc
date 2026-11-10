@@ -16131,6 +16131,10 @@
       "ApiSingleWindowSubmitPackageRequest": {
         "type": "object",
         "properties": {
+          "expectedDraftRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
           "packagePath": {
             "type": "string",
             "default": ""
@@ -16139,7 +16143,10 @@
             "type": "string",
             "default": ""
           }
-        }
+        },
+        "required": [
+          "expectedDraftRevision"
+        ]
       },
       "ApiSingleWindowUnlockFieldsRequest": {
         "type": "object",
@@ -28538,10 +28545,8 @@
         },
         "required": [
           "items",
-          "totalCount",
           "pageNumber",
           "pageSize",
-          "totalPages",
           "hasPreviousPage",
           "hasNextPage"
         ]
@@ -33074,8 +33079,7 @@
         },
         "required": [
           "key",
-          "name",
-          "count"
+          "name"
         ]
       }
     }
@@ -130771,6 +130775,14 @@
           }
         ],
         "parameters": [
+          {
+            "name": "includeSummary",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
           {
             "name": "cursor",
             "in": "query",

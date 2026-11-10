@@ -1,3 +1,4 @@
+import { FileInput } from "../../ui/FileInput.tsx";
 import type { FormEvent } from "react";
 import { FileArchive, Upload, X } from "lucide-react";
 import type { InvoiceTransferConflictAction, InvoiceTransferImportDraft } from "./invoiceListModels.ts";
@@ -15,7 +16,7 @@ export function InvoiceTransferImportPanel({ draft, isBusy, uploadMode = false, 
     <div className="section-header"><h2>导入单据包</h2><button className="icon-button" type="button" title="关闭导入" aria-label="关闭导入" disabled={isBusy} onClick={onCancel}><X size={17} aria-hidden="true" /></button></div>
     <p className="field-help">先检查包内发票、商品条数和重复记录，再选择处理方式并导入。检查本身不会写入数据；票面预览请打开导入后的发票，进入“预览与导出”。</p>
     <form className="settings-form" onSubmit={onSubmit}>
-      <div className="field-grid">{uploadMode ? <label><span>单据包文件</span><input type="file" accept=".edpkg" disabled={isBusy} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; onUploadFileChange?.(file); }} /></label> : <label><span>单据包路径</span><input value={draft.packagePath} disabled={isBusy} onChange={(event) => onChange({ packagePath: event.target.value, previewResponse: null })} /></label>}</div>
+      <div className="field-grid">{uploadMode ? <label><span>单据包文件</span><FileInput accept=".edpkg" disabled={isBusy} onChange={(event) => { const file = event.currentTarget.files?.[0] ?? null; event.currentTarget.value = ""; onUploadFileChange?.(file); }} /></label> : <label><span>单据包路径</span><input value={draft.packagePath} disabled={isBusy} onChange={(event) => onChange({ packagePath: event.target.value, previewResponse: null })} /></label>}</div>
       {!uploadMode ? <div className="toolbar-actions"><button className="command-button secondary" type="button" disabled={isBusy} onClick={() => onPreview(draft.packagePath)}><FileArchive size={17} aria-hidden="true" /><span>{isBusy ? "处理中" : draft.previewResponse ? "重新检查单据包" : "检查单据包"}</span></button></div> : <div className="field-help">{uploadFile ? `已选择：${uploadFile.name}` : "选择文件后自动检查单据包。"}</div>}
       {draft.previewResponse ? <><InlineNotice title="单据包检查结果" tone={draft.previewResponse.checksumValid ? "success" : "error"}>{draft.previewResponse.checksumMessage || (draft.previewResponse.checksumValid ? "校验通过" : "校验失败")}</InlineNotice>
         {!draft.previewResponse.checksumValid ? <div className="field-help">为保护业务数据，完整性校验失败的单据包不会被导入。请向发送方重新取得可信文件。</div> : null}
