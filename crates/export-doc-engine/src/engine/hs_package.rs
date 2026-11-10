@@ -9,11 +9,13 @@ use super::{
 use crate::{contracts, operation, paths::valid_file_name};
 use export_doc_domain::hs as rules;
 use serde_json::{Value, json};
+use sha2::Digest;
 use std::{
     collections::{BTreeMap, BTreeSet},
     io::{Cursor, Write},
 };
 use zip::{ZipArchive, ZipWriter, write::SimpleFileOptions};
+mod io;
 const MAX_PACKAGE: u64 = 100 * 1024 * 1024;
 const MAX_EXPANDED: u64 = 300 * 1024 * 1024;
 const CONTENTS: &[(&str, &str)] = &[
@@ -40,7 +42,8 @@ fn projected(kind: &str, mut row: Value) -> Value {
     }
     row
 }
-pub fn export(service: &NativeService, query: &[(&str, String)]) -> Result<Vec<u8>> {
+pub fn export(service: &NativeService, actor: &Actor, query: &[(&str, String)]) -> Result<Vec<u8>> {
+    let _memory = service.jobs.reserve_download(MAX_PACKAGE as usize, true)?;
     let since = hs::read(query, "since");
     let since = if since.is_empty() {
         None
@@ -50,51 +53,66 @@ pub fn export(service: &NativeService, query: &[(&str, String)]) -> Result<Vec<u
                 .map_err(|_| invalid("增量导出起始时间无效。"))?,
         )
     };
-    let snapshots = service.store.read(|tx| {
-        CONTENTS
-            .iter()
-            .map(|(_, kind)| {
-                store::all(tx, kind)?
-                    .into_iter()
-                    .filter_map(|row| {
-                        if let Some(since) = since {
-                            let date = row[if *kind == hs::CODES {
-                                "updateTime"
-                            } else {
-                                "updatedAt"
-                            }]
-                            .as_str();
-                            match date.map(chrono::DateTime::parse_from_rfc3339) {
-                                Some(Ok(date)) if date < since => return None,
-                                Some(Err(_)) => {
-                                    return Some(Err(unavailable("知识记录更新时间无效。")));
-                                }
-                                _ => {}
-                            }
-                        }
-                        Some(Ok(projected(kind, row)))
-                    })
-                    .collect::<Result<Vec<_>>>()
-            })
-            .collect::<Result<Vec<_>>>()
-    })?;
-    let mut archive = ZipWriter::new(Cursor::new(Vec::new()));
+    let mut archive = ZipWriter::new_stream(crate::bounded_bytes::BoundedBytes {
+        bytes: Vec::new(),
+        limit: MAX_PACKAGE as usize,
+    });
     let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
     let mut checksums = BTreeMap::new();
     let mut total = 0_u64;
-    for ((name, _), rows) in CONTENTS.iter().zip(snapshots) {
-        operation::check()?;
-        let bytes = serde_json::to_vec(&rows)?;
-        total += bytes.len() as u64;
-        if bytes.len() as u64 > MAX_PACKAGE || total > MAX_EXPANDED {
-            return Err(invalid("知识包导出超过容量上限，请使用增量导出。"));
-        }
-        checksums.insert(name, media::digest(&bytes));
-        archive
-            .start_file(*name, options)
-            .map_err(|e| unavailable(e.to_string()))?;
-        archive.write_all(&bytes)?;
-    }
+    service.store.read_for(
+        actor,
+        crate::generated_api::EXPORT_HS_CODE_KNOWLEDGE,
+        query,
+        |tx, _| {
+            for (name, kind) in CONTENTS {
+                operation::check()?;
+                archive
+                    .start_file(*name, options)
+                    .map_err(|e| invalid(e.to_string()))?;
+                let budget = MAX_PACKAGE.min(MAX_EXPANDED - 256 * 1024 - total);
+                let mut writer = io::EntryWriter {
+                    output: &mut archive,
+                    remaining: budget,
+                    digest: sha2::Sha256::new(),
+                };
+                writer.write_all(b"[").map_err(|e| invalid(e.to_string()))?;
+                let mut count = 0;
+                let mut records = super::hs_queries::query(kind, &[]);
+                records.since = hs::read(query, "since");
+                super::hs_queries::visit(tx, &mut records, |row| {
+                    if count
+                        >= if *kind == hs::CODES {
+                            500_000
+                        } else {
+                            1_000_000
+                        }
+                    {
+                        return Err(invalid("知识包记录数量超过上限，请使用增量导出。"));
+                    }
+                    if count > 0 {
+                        writer.write_all(b",").map_err(|e| invalid(e.to_string()))?;
+                    }
+                    serde_json::to_writer(&mut writer, &projected(kind, row))
+                        .map_err(|e| invalid(e.to_string()))?;
+                    count += 1;
+                    Ok(())
+                })?;
+                writer.write_all(b"]").map_err(|e| invalid(e.to_string()))?;
+                total += budget - writer.remaining;
+                checksums.insert(
+                    name,
+                    writer
+                        .digest
+                        .finalize()
+                        .iter()
+                        .map(|b| format!("{b:02X}"))
+                        .collect::<String>(),
+                );
+            }
+            Ok(())
+        },
+    )?;
     let manifest = json!({"schemaVersion":"1.0","exportedAt":store::timestamp(),"since":since.map(|d|d.to_rfc3339()),"checksums":checksums});
     archive
         .start_file("manifest.json", options)
@@ -102,113 +120,34 @@ pub fn export(service: &NativeService, query: &[(&str, String)]) -> Result<Vec<u
     archive.write_all(&serde_json::to_vec(&manifest)?)?;
     let bytes = archive
         .finish()
-        .map_err(|e| unavailable(e.to_string()))?
-        .into_inner();
-    if bytes.len() as u64 > MAX_PACKAGE {
-        return Err(invalid("知识包超过 100 MiB。"));
-    }
+        .map_err(|e| invalid(e.to_string()))?
+        .into_inner()
+        .bytes;
     Ok(bytes)
 }
-fn read(bytes: &[u8]) -> Result<BTreeMap<String, Vec<Value>>> {
-    if bytes.is_empty() || bytes.len() as u64 > MAX_PACKAGE {
-        return Err(invalid("知识包为空或超过 100 MiB。"));
-    }
-    let mut archive =
-        ZipArchive::new(Cursor::new(bytes)).map_err(|e| invalid(format!("知识包无效：{e}")))?;
-    if archive.len() != 5 {
-        return Err(invalid("知识包须包含清单和四类知识文件。"));
-    }
-    let mut entries = BTreeMap::new();
-    let mut total = 0_u64;
-    for index in 0..archive.len() {
-        operation::check()?;
-        let mut entry = archive
-            .by_index(index)
-            .map_err(|e| invalid(e.to_string()))?;
-        let name = entry
-            .name()
-            .map_err(|cause| invalid(cause.to_string()))?
-            .into_owned();
-        if !(name == "manifest.json" || CONTENTS.iter().any(|(key, _)| *key == name))
-            || entries.contains_key(&name)
-            || entry.is_dir()
-            || entry
-                .unix_mode()
-                .is_some_and(|mode| mode & 0o170000 == 0o120000)
-        {
-            return Err(invalid("知识包包含不允许、重复或链接文件。"));
-        }
-        let maximum = if name == "manifest.json" {
-            256 * 1024
-        } else {
-            MAX_PACKAGE
-        };
-        total = total
-            .checked_add(entry.size())
-            .ok_or_else(|| invalid("知识包容量无效。"))?;
-        if entry.size() > maximum || total > MAX_EXPANDED {
-            return Err(invalid("知识包解压容量超过上限。"));
-        }
-        let data = super::archive::read_entry(&mut entry, maximum)?;
-        entries.insert(name, data);
-    }
-    let manifest: Value = serde_json::from_slice(
-        entries
-            .get("manifest.json")
-            .ok_or_else(|| invalid("缺少知识包清单。"))?,
-    )
-    .map_err(|e| invalid(e.to_string()))?;
-    if manifest["schemaVersion"] != "1.0" {
-        return Err(invalid("知识包版本无效。"));
-    }
-    chrono::DateTime::parse_from_rfc3339(manifest["exportedAt"].as_str().unwrap_or(""))
-        .map_err(|_| invalid("知识包导出时间无效。"))?;
-    let mut result = BTreeMap::new();
-    for (name, kind) in CONTENTS {
-        let bytes = entries
-            .get(*name)
-            .ok_or_else(|| invalid("缺少知识文件。"))?;
-        if !manifest["checksums"][*name]
-            .as_str()
-            .is_some_and(|digest| digest.eq_ignore_ascii_case(&media::digest(bytes)))
-        {
-            return Err(invalid("知识包校验和不匹配。"));
-        }
-        let rows: Vec<Value> =
-            serde_json::from_slice(bytes).map_err(|e| invalid(format!("知识记录无效：{e}")))?;
-        if rows.len()
-            > if *kind == hs::CODES {
-                500_000
-            } else {
-                1_000_000
-            }
-        {
-            return Err(invalid("知识包记录数量超过上限。"));
-        }
-        result.insert((*kind).into(), rows);
-    }
-    Ok(result)
-}
 pub fn import(service: &NativeService, actor: &Actor, name: &str, bytes: &[u8]) -> Result<Value> {
+    let _memory = service.jobs.reserve_download(MAX_PACKAGE as usize, true)?;
     if !valid_file_name(name) {
         return Err(invalid("知识包文件名无效。"));
     }
-    let content = read(bytes)?;
+    let (mut archive, manifest) = io::open(bytes)?;
     service.store.transaction_for(actor, crate::generated_api::IMPORT_HS_CODE_KNOWLEDGE, &[], |tx, actor|{
         let mut counters=BTreeMap::<&str,usize>::new();let mut unique=BTreeSet::new();
-        for mut row in content[hs::CODES].clone(){
+        let code_count=io::visit(&mut archive,&manifest,hs::CODES,|mut row| {
             operation::check()?;let code=rules::code(&text(&row,"code")).map_err(invalid)?;
             if !unique.insert(code.clone()){return Err(invalid("知识包包含重复编码。"));}
             let old=tx.find_identity(hs::CODES,&code)?;
             if let Some(old)=&old{
-                if old["status"]=="Active"&&(row["status"]!="Active"||row["effectiveYear"].as_i64()<old["effectiveYear"].as_i64()){continue;}
+                if old["status"]=="Active"&&(row["status"]!="Active"||row["effectiveYear"].as_i64()<old["effectiveYear"].as_i64()){return Ok(());}
                 row["expectedVersion"]=old["versionNumber"].clone();
             }
             *counters.entry(if old.is_some(){"updatedHsCodes"}else{"addedHsCodes"}).or_default()+=1;
             hs::save_code(tx,actor,&row,true)?;
-        }
+            Ok(())
+        })?;
         unique.clear();
-        for row in &content[hs::EXAMPLES]{
+        let example_count=io::visit(&mut archive,&manifest,hs::EXAMPLES,|row| {
+            let row=&row;
             operation::check()?;let raw=rules::code(&text(row,"rawReportedHsCode")).map_err(invalid)?;
             let fingerprint=rules::fingerprint(&[&raw,&text(row,"productName"),&text(row,"specification")]);
             if !unique.insert(fingerprint.clone()){return Err(invalid("知识包包含重复案例。"));}
@@ -224,11 +163,13 @@ pub fn import(service: &NativeService, actor: &Actor, name: &str, bytes: &[u8]) 
             for key in ["useCount","rejectedCount"]{let incoming=row[key].as_i64().unwrap_or(0);if incoming<0||incoming>i32::MAX as i64{return Err(invalid("案例学习次数无效。"));}merged[key]=json!(incoming.max(saved[key].as_i64().unwrap_or(0)));}
             if merged!=saved{store::save(tx,hs::EXAMPLES,saved["id"].as_i64().unwrap_or(0),merged,Some(fingerprint),actor,"edit")?;}
             *counters.entry(if old.is_some(){"updatedExamples"}else{"addedExamples"}).or_default()+=1;
-        }
+            Ok(())
+        })?;
+        let mut counts=BTreeMap::new();
         for (kind,counter) in [(hs::REPLACEMENTS,"addedReplacements"),(hs::FEEDBACK,"addedFeedback")]{
             unique.clear();
-            for row in &content[kind]{
-                operation::check()?;let mut row=row.clone();
+            let count=io::visit(&mut archive,&manifest,kind,|mut row| {
+                operation::check()?;
                 let fingerprint=if kind==hs::REPLACEMENTS{
                     let old=rules::code(&text(&row,"oldCode")).map_err(invalid)?;let new=rules::code(&text(&row,"newCode")).map_err(invalid)?;
                     row["oldCode"]=json!(old);row["newCode"]=json!(new);
@@ -241,12 +182,14 @@ pub fn import(service: &NativeService, actor: &Actor, name: &str, bytes: &[u8]) 
                     rules::fingerprint(&[&rules::text(&text(&row,"queryText")),&code,&text(&row,"productName"),&text(&row,"specification")])
                 };
                 if !unique.insert(fingerprint.clone()){return Err(invalid("知识包包含重复的替代或学习记录。"));}
-                if tx.find_identity(kind,&fingerprint.to_lowercase())?.is_some(){continue;}
+                if tx.find_identity(kind,&fingerprint.to_lowercase())?.is_some(){return Ok(());}
                 row["fingerprint"]=json!(fingerprint);row.as_object_mut().ok_or_else(||invalid("知识记录格式无效。"))?.remove("id");
                 store::save(tx,kind,0,row,Some(fingerprint),actor,"create")?;*counters.entry(counter).or_default()+=1;
-            }
+                Ok(())
+            })?;
+            counts.insert(kind,count);
         }
         let mut result=json!({"addedHsCodes":0,"updatedHsCodes":0,"addedExamples":0,"updatedExamples":0,"addedReplacements":0,"addedFeedback":0,"message":"HS 知识包已校验并导入。"});for (key,count) in counters{result[key]=json!(count);}
-        Ok(json!({"fileName":name,"hsCodeCount":content[hs::CODES].len(),"exampleCount":content[hs::EXAMPLES].len(),"replacementCount":content[hs::REPLACEMENTS].len(),"feedbackCount":content[hs::FEEDBACK].len(),"warnings":[],"result":result}))
+        Ok(json!({"fileName":name,"hsCodeCount":code_count,"exampleCount":example_count,"replacementCount":counts[hs::REPLACEMENTS],"feedbackCount":counts[hs::FEEDBACK],"warnings":[],"result":result}))
     })
 }

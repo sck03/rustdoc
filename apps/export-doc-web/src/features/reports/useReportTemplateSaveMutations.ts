@@ -1,4 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import {
   ApiReportTemplateContentDto,
   ApiUserReportTemplateDto,
@@ -34,8 +35,9 @@ export function useReportTemplateSaveMutations({
 }) {
   const queryClient = useQueryClient();
 
-  const saveDefaultTemplateMutation = useMutation({
-    mutationFn: (nextContent?: string) =>
+  const scope = `${reportType}:${selectedTemplatePath}`;
+  const saveDefaultTemplateMutation = useScopedMutation(scope, client, {
+    mutationFn: (nextContent: string | undefined, signal) =>
       client.saveReportTemplateContent({
         body: {
           reportType,
@@ -43,20 +45,17 @@ export function useReportTemplateSaveMutations({
           content: nextContent ?? content,
           expectedRevision,
         },
-      }),
-    onSuccess: async (saved) => {
+      }, { signal }),
+    onSuccess: (saved) => {
       queryClient.setQueryData(queryKeys.reportTemplateContent(reportType, saved.templatePath), saved);
       onDefaultTemplateSaved(saved);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.reportTemplateContent(reportType, selectedTemplatePath),
-      });
     },
+    refreshKeys: () => [queryKeys.reportTemplates(reportType)],
     onError,
   });
 
-  const saveUserTemplateMutation = useMutation({
-    mutationFn: (nextContent?: string) => {
+  const saveUserTemplateMutation = useScopedMutation(scope, client, {
+    mutationFn: (nextContent: string | undefined, signal) => {
       const current = currentUserTemplate;
       if (!current || !current.canEdit) {
         throw new Error("当前共享模板只读，请先复制为自己的模板。");
@@ -70,15 +69,13 @@ export function useReportTemplateSaveMutations({
           contentHtml: nextContent ?? content,
           expectedVersion: expectedUserVersion,
         },
-      });
+      }, { signal });
     },
-    onSuccess: async (saved) => {
+    onSuccess: (saved) => {
       queryClient.setQueryData(queryKeys.userReportTemplateContent(reportType, saved.id), saved);
       onUserTemplateSaved(saved);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplateVersions(saved.id) });
     },
+    refreshKeys: saved => [queryKeys.userReportTemplates(reportType), queryKeys.reportTemplates(reportType), queryKeys.userReportTemplateVersions(saved.id)],
     onError,
   });
 

@@ -1,4 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { ApiUserReportTemplateDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import {
@@ -33,64 +34,65 @@ export function useUserReportTemplateLifecycleMutations({
   currentUserTemplate: ApiUserReportTemplateDto | null;
   newTemplateName: string;
   onCreated: (created: ApiUserReportTemplateDto) => void;
-  onArchived: () => void | Promise<void>;
+  onArchived: () => void;
   onRestored: (saved: ApiUserReportTemplateDto) => void;
   onStatusUpdated: (saved: ApiUserReportTemplateDto, action: UserReportTemplateLifecycleAction) => void;
   onError: (error: unknown) => void;
 }) {
   const queryClient = useQueryClient();
 
-  async function invalidateTemplateQueries(saved?: ApiUserReportTemplateDto) {
-    if (saved) queryClient.setQueryData(queryKeys.userReportTemplateContent(reportType, saved.id), saved);
-    await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
-    await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
-    if (saved) {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplateVersions(saved.id) });
-    }
+  const scope = `${reportType}:${selectedTemplatePath}`;
+  const refreshKeys = (saved: ApiUserReportTemplateDto) => [
+    queryKeys.userReportTemplates(reportType), queryKeys.reportTemplates(reportType),
+    queryKeys.userReportTemplateVersions(saved.id),
+  ];
+  function cacheTemplate(saved: ApiUserReportTemplateDto) {
+    queryClient.setQueryData(queryKeys.userReportTemplateContent(reportType, saved.id), saved);
   }
-
-  async function handleCreated(created: ApiUserReportTemplateDto) {
+  function handleCreated(created: ApiUserReportTemplateDto) {
     queryClient.setQueryData(queryKeys.userReportTemplateContent(reportType, created.id), created);
     onCreated(created);
-    await invalidateTemplateQueries(created);
   }
 
-  const createBlankUserTemplateMutation = useMutation({
-    mutationFn: () => client.createUserReportTemplate({
+  const createBlankUserTemplateMutation = useScopedMutation(scope, client, {
+    mutationFn: (_: void, signal) => client.createUserReportTemplate({
       body: buildUserTemplateCreatePayload({
         reportType,
         name: newTemplateName,
       }),
-    }),
+    }, { signal }),
     onSuccess: handleCreated,
+    refreshKeys,
     onError,
   });
 
-  const cloneUserTemplateMutation = useMutation({
-    mutationFn: () => client.cloneUserReportTemplate({
+  const cloneUserTemplateMutation = useScopedMutation(scope, client, {
+    mutationFn: (_: void, signal) => client.cloneUserReportTemplate({
       body: buildUserTemplateClonePayload({
         reportType,
         selectedTemplatePath,
         selectedUserTemplateId,
         name: newTemplateName,
       }),
-    }),
+    }, { signal }),
     onSuccess: handleCreated,
+    refreshKeys,
     onError,
   });
 
-  const archiveUserTemplateMutation = useMutation({
-    mutationFn: (template: ApiUserReportTemplateDto) =>
-      client.archiveUserReportTemplate({ id: template.id, expectedVersion: template.versionNumber }),
-    onSuccess: async (saved) => {
-      await onArchived();
-      await invalidateTemplateQueries(saved);
+  const archiveUserTemplateMutation = useScopedMutation(scope, client, {
+    mutationFn: (template: ApiUserReportTemplateDto, signal) =>
+      client.archiveUserReportTemplate({ id: template.id, expectedVersion: template.versionNumber }, { signal }),
+    onSuccess: (saved) => {
+      cacheTemplate(saved);
+      onArchived();
     },
+    refreshKeys,
     onError,
   });
 
-  const restoreUserTemplateVersionMutation = useMutation({
-    mutationFn: (versionNumber: number) => {
+  const restoreUserTemplateVersionMutation = useScopedMutation(scope, client, {
+    mutationFn: (versionNumber: number, signal) => {
       if (!currentUserTemplate) {
         throw new Error("当前未选择可恢复的报表模板。");
       }
@@ -98,17 +100,18 @@ export function useUserReportTemplateLifecycleMutations({
         id: currentUserTemplate.id,
         versionNumber,
         body: { expectedVersion: currentUserTemplate.versionNumber },
-      });
+      }, { signal });
     },
-    onSuccess: async (saved) => {
+    onSuccess: (saved) => {
+      cacheTemplate(saved);
       onRestored(saved);
-      await invalidateTemplateQueries(saved);
     },
+    refreshKeys,
     onError,
   });
 
-  const updateUserTemplateStatusMutation = useMutation({
-    mutationFn: (action: UserReportTemplateLifecycleAction) => {
+  const updateUserTemplateStatusMutation = useScopedMutation(scope, client, {
+    mutationFn: (action: UserReportTemplateLifecycleAction, signal) => {
       if (!currentUserTemplate) {
         throw new Error("当前未选择可操作的报表模板。");
       }
@@ -116,19 +119,20 @@ export function useUserReportTemplateLifecycleMutations({
       const expectedVersion = currentUserTemplate.versionNumber;
       switch (action.kind) {
         case "publish":
-          return client.publishUserReportTemplate({ id, body: { expectedVersion } });
+          return client.publishUserReportTemplate({ id, body: { expectedVersion } }, { signal });
         case "share":
-          return client.shareUserReportTemplate({ id, body: { shareScope: action.shareScope, expectedVersion } });
+          return client.shareUserReportTemplate({ id, body: { shareScope: action.shareScope, expectedVersion } }, { signal });
         case "disable":
-          return client.disableUserReportTemplate({ id, body: { expectedVersion } });
+          return client.disableUserReportTemplate({ id, body: { expectedVersion } }, { signal });
         case "restore":
-          return client.restoreUserReportTemplate({ id, body: { expectedVersion } });
+          return client.restoreUserReportTemplate({ id, body: { expectedVersion } }, { signal });
       }
     },
-    onSuccess: async (saved, action) => {
+    onSuccess: (saved, action) => {
+      cacheTemplate(saved);
       onStatusUpdated(saved, action);
-      await invalidateTemplateQueries(saved);
     },
+    refreshKeys,
     onError,
   });
 

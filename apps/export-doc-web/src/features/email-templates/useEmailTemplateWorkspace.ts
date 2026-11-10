@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import type { ApiEmailTemplateDto, ApiEmailTemplateVersionDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ApiEmailTemplateDto, ApiEmailTemplateVersionDto, ApiEmailTemplateVersionSummaryDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useAbortableOperationController } from "../../ui/useAbortableOperation.ts";
 import { areEmailTemplateDraftsEqual, createEmptyEmailTemplateDraft, type EmailTemplateDraft } from "./emailTemplateModel.ts";
 
@@ -15,36 +15,46 @@ export function useEmailTemplateWorkspace(client: ExportDocManagerApiClient) {
   const [selected, setSelected] = useState<ApiEmailTemplateDto>();
   const [draft, setDraft] = useState(createEmptyEmailTemplateDraft);
   const [savedDraft, setSavedDraft] = useState(createEmptyEmailTemplateDraft);
-  const [versions, setVersions] = useState<ApiEmailTemplateVersionDto[]>([]);
-  const [selectedVersionNumber, setSelectedVersionNumber] = useState(0);
+  const [versions, setVersions] = useState<ApiEmailTemplateVersionSummaryDto[]>([]);
+  const [selectedVersion, setSelectedVersion] = useState<ApiEmailTemplateVersionDto>();
+  const [catalogPage, setCatalogPage] = useState({pageNumber:1,totalPages:1,totalCount:0});
+  const [historyPage, setHistoryPage] = useState({pageNumber:1,totalPages:1,totalCount:0});
   const [busy, setBusy] = useState(false);
   const current = useRef({ id: 0, generation: 0, pending: false, draft });
   current.current.draft = draft;
   const reads = useAbortableOperationController(client, { cancelPrevious: true });
   const history = useAbortableOperationController(client, { cancelPrevious: true });
+  const historyDetail = useAbortableOperationController(client, { cancelPrevious: true });
   const writes = useAbortableOperationController(client);
 
   function open(template?: ApiEmailTemplateDto, initial = template ? toDraft(template) : createEmptyEmailTemplateDraft()) {
-    writes.cancel(); history.cancel(); reads.cancel();
+    writes.cancel(); history.cancel(); historyDetail.cancel(); reads.cancel();
     current.current = { id: template?.id ?? 0, generation: current.current.generation + 1, pending: false, draft: initial };
     setSelected(template); setDraft(initial);
     setSavedDraft(template ? toDraft(template) : createEmptyEmailTemplateDraft());
-    setVersions([]); setSelectedVersionNumber(0); setBusy(false);
+    setVersions([]); setSelectedVersion(undefined); setHistoryPage({pageNumber:1,totalPages:1,totalCount:0}); setBusy(false);
   }
 
-  async function loadTemplates(query = { keyword: "", includeArchived: false }) {
-    const rows = await reads.run((signal) => client.listEmailTemplates(query, { signal }));
-    setTemplates(rows);
+  async function loadTemplates(query: {keyword:string;includeArchived:boolean;scope?:string;pageNumber?:number} = { keyword: "", includeArchived: false }) {
+    const page = await reads.run((signal) => client.listEmailTemplates({...query,pageNumber:query.pageNumber??1,pageSize:30}, { signal }));
+    setTemplates(page.items); setCatalogPage(page);
   }
 
-  async function loadVersions(templateId = current.current.id) {
+  async function loadVersion(versionNumber:number,templateId=current.current.id) {
+    const generation=current.current.generation;
+    setSelectedVersion(undefined);
+    const detail=await historyDetail.run(signal=>client.getEmailTemplateVersion({id:templateId,versionNumber},{signal}));
+    if (generation===current.current.generation && detail.emailTemplateId===templateId) setSelectedVersion(detail);
+  }
+
+  async function loadVersions(templateId = current.current.id,pageNumber=1) {
     if (!templateId || templateId !== current.current.id) return;
     const generation = current.current.generation;
-    setVersions([]); setSelectedVersionNumber(0);
-    const rows = await history.run((signal) => client.listEmailTemplateVersions({ id: templateId }, { signal }));
+    historyDetail.cancel(); setVersions([]); setSelectedVersion(undefined);
+    const page = await history.run((signal) => client.listEmailTemplateVersions({ id: templateId,pageNumber,pageSize:30 }, { signal }));
     if (generation !== current.current.generation) return;
-    setVersions(rows.filter((row) => row.emailTemplateId === templateId));
-    setSelectedVersionNumber(rows[0]?.versionNumber ?? 0);
+    setVersions(page.items.filter((row) => row.emailTemplateId === templateId)); setHistoryPage(page);
+    if (page.items[0]?.emailTemplateId===templateId) await loadVersion(page.items[0].versionNumber,templateId);
   }
 
   async function write(id: number, operation: (signal: AbortSignal) => Promise<ApiEmailTemplateDto>) {
@@ -55,18 +65,18 @@ export function useEmailTemplateWorkspace(client: ExportDocManagerApiClient) {
     try {
       const saved = await writes.run(operation);
       if (snapshot !== current.current) return undefined;
-      reads.cancel(); history.cancel();
+      reads.cancel(); history.cancel(); historyDetail.cancel();
       snapshot.id = saved.id;
       setSelected(saved);
-      setTemplates((rows) => [...rows.filter((row) => row.id !== saved.id), saved]);
+      setTemplates((rows) => rows.map(row=>row.id===saved.id?saved:row));
       setSavedDraft(toDraft(saved));
       setDraft((latest) => areEmailTemplateDraftsEqual(latest, submitted) ? toDraft(saved) : latest);
-      setVersions([]); setSelectedVersionNumber(0);
+      setVersions([]); setSelectedVersion(undefined);
       return saved;
     } finally {
       if (snapshot === current.current) { snapshot.pending = false; setBusy(false); }
     }
   }
 
-  return { templates, selected, draft, setDraft, savedDraft, versions, selectedVersionNumber, setSelectedVersionNumber, busy, open, loadTemplates, loadVersions, write };
+  return { templates, selected, draft, setDraft, savedDraft, versions, selectedVersion, catalogPage, historyPage, loadVersion, busy, open, loadTemplates, loadVersions, write };
 }

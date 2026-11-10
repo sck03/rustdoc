@@ -19,11 +19,13 @@ import { PermissionAccessProvider } from ${src('app/PermissionAccessContext.tsx'
 import { ConfirmationProvider } from ${src('ui/ConfirmationProvider.tsx')};
 import { UnsavedChangesProvider } from ${src('ui/unsavedChangesGuard.tsx')};
 const row=id=>({id,name:'Template '+id,category:'通用',subject:'Subject '+id,bodyHtml:'<p>Body</p>',status:'Draft',shareScope:'Private',versionNumber:3,canEdit:true,canRestore:true,canArchive:true});
-window.rows=[row(1),row(2)];window.saves=[];window.histories=[];window.restores=[];
+window.rows=[row(1),row(2)];window.saves=[];window.histories=[];window.restores=[];window.details=[];
 window.finishSave=()=>{ const p=window.saves.at(-1);const saved={...window.rows.find(r=>r.id===p.request.id),...p.request.body,id:p.request.id||3,versionNumber:p.request.body.expectedVersion+1,canEdit:true};window.rows=[...window.rows.filter(r=>r.id!==saved.id),saved];p.resolve(saved); };
-const client={listEmailTemplates:async()=>{if(window.failRefresh)throw new Error('refresh failed');return structuredClone(window.rows);},listEmailTemplateVariables:async()=>[],
+const paged=(items,pageNumber=1,totalCount=items.length)=>({items,pageNumber,pageSize:30,totalCount,totalPages:Math.max(1,Math.ceil(totalCount/30)),hasPreviousPage:pageNumber>1,hasNextPage:pageNumber*30<totalCount});
+const client={listEmailTemplates:async()=>{if(window.failRefresh)throw new Error('refresh failed');return paged(structuredClone(window.rows));},listEmailTemplateVariables:async()=>[],
 saveEmailTemplateDraft:(request,{signal})=>new Promise(resolve=>window.saves.push({request,signal,resolve})),createEmailTemplate:(request,{signal})=>new Promise(resolve=>window.saves.push({request:{...request,id:0},signal,resolve})),
-listEmailTemplateVersions:(request,{signal})=>new Promise(resolve=>window.histories.push({request,signal,resolve})),
+listEmailTemplateVersions:(request,{signal})=>new Promise(resolve=>window.histories.push({request,signal,resolve})).then(rows=>{window.versionRows=[...(window.versionRows??[]).filter(r=>r.emailTemplateId!==request.id),...rows];return paged(rows,request.pageNumber,window.historyTotal??rows.length);}),
+getEmailTemplateVersion:async(request,{signal})=>{if(window.deferDetails)return new Promise((resolve,reject)=>window.details.push({request,signal,resolve,reject}));const row=window.versionRows.find(r=>r.emailTemplateId===request.id&&r.versionNumber===request.versionNumber);return structuredClone(row);},
 restoreEmailTemplateVersion:async request=>{window.restores.push(request);return {...window.rows.find(r=>r.id===request.id),versionNumber:4};}};
 const permissions=['view','edit','restore','archive'].map(action=>({resourceKey:'sales.email-templates',action,dataScope:'all'}));
 createRoot(document.getElementById('root')).render(<MemoryRouter><PermissionAccessProvider permissions={permissions}><ConfirmationProvider><UnsavedChangesProvider><EmailTemplatePage client={client}/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider></MemoryRouter>);
@@ -89,6 +91,22 @@ try{
     await page.evaluate(()=>{window.histories[1].resolve([{id:22,emailTemplateId:2,versionNumber:2,subject:'Historical B',bodyHtml:'B',canRestore:true}]);window.histories[0].resolve([{id:12,emailTemplateId:1,versionNumber:2,subject:'Historical A',bodyHtml:'A',canRestore:true}]);});
     await page.waitForFunction(()=>document.querySelector('input[readonly]')?.value==='Historical B');
     assert.equal(await page.getByLabel('历史主题',{exact:true}).inputValue(),'Historical B');
+  });
+  await scenario(async(page,open)=>{
+    await page.evaluate(()=>{window.historyTotal=65;window.deferDetails=true;});
+    await open(1);await page.getByRole('tab',{name:'版本历史',exact:true}).click();
+    await page.waitForFunction(()=>window.histories.length===1);
+    await page.evaluate(()=>window.histories[0].resolve([{id:65,emailTemplateId:1,versionNumber:65,canRestore:true}]));
+    await page.waitForFunction(()=>window.details.length===1);
+    await page.getByRole('button',{name:'下一页',exact:true}).click();
+    await page.waitForFunction(()=>window.histories.length===2);
+    assert.equal(await page.evaluate(()=>window.histories[1].request.pageNumber),2);
+    assert.equal(await page.evaluate(()=>window.details[0].signal.aborted),true);
+    await page.evaluate(()=>window.histories[1].resolve([{id:35,emailTemplateId:1,versionNumber:35,canRestore:true}]));
+    await page.waitForFunction(()=>window.details.length===2);
+    await page.evaluate(()=>{window.details[1].resolve({id:35,emailTemplateId:1,versionNumber:35,subject:'Page 2 detail',bodyHtml:'body',canRestore:true});window.details[0].reject(new Error('late history failure'));});
+    await page.waitForFunction(()=>document.querySelector('input[readonly]')?.value==='Page 2 detail');
+    assert.equal(await page.getByText('late history failure',{exact:true}).count(),0);
   });
   console.log('Email template workspace UI: '+passed+' passed; '+output);
 }finally{await context.close();}

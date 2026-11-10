@@ -1,4 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import {
   ApiReportTemplateContentDto,
   ApiReportTemplateFileExportResponse,
@@ -30,19 +31,20 @@ export function useReportTemplateFileMutations({
   onError: (error: unknown) => void;
 }) {
   const queryClient = useQueryClient();
+  const scope = `${reportType}:${selectedTemplatePath}`;
 
-  const exportFileMutation = useMutation({
-    mutationFn: (filePath: string) => client.saveReportTemplateFileToPath({
+  const exportFileMutation = useScopedMutation(scope, client, {
+    mutationFn: (filePath: string, signal) => client.saveReportTemplateFileToPath({
       body: { reportType, templatePath: selectedTemplatePath, filePath },
-    }),
+    }, { signal }),
     onSuccess: onExported,
     onError,
   });
 
-  const downloadFileMutation = useMutation({
-    mutationFn: () => client.downloadReportTemplateFile({
+  const downloadFileMutation = useScopedMutation(scope, client, {
+    mutationFn: (_: void, signal) => client.downloadReportTemplateFile({
       body: { reportType, templatePath: selectedTemplatePath },
-    }),
+    }, { signal }),
     onSuccess: (blob) => {
       const fileName = fileNameFromPath(fileExportPath.trim()) || buildTemplateFileName(reportType);
       downloadBlob(blob, fileName.endsWith(".dtpl") ? fileName : `${fileName}.dtpl`);
@@ -51,39 +53,35 @@ export function useReportTemplateFileMutations({
     onError,
   });
 
-  async function invalidateTemplateQueries(templatePath: string) {
-    await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
-    if (templatePath) {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplateContent(reportType, templatePath) });
-    }
-    if (selectedTemplatePath && selectedTemplatePath !== templatePath) {
-      await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplateContent(reportType, selectedTemplatePath) });
-    }
+  function cacheTemplate(response: ApiReportTemplateContentDto) {
+    queryClient.setQueryData(queryKeys.reportTemplateContent(reportType, response.templatePath), response);
   }
 
-  const importFileMutation = useMutation({
-    mutationFn: (filePath: string) => client.importReportTemplateFile({
+  const importFileMutation = useScopedMutation(scope, client, {
+    mutationFn: (filePath: string, signal) => client.importReportTemplateFile({
       body: { reportType, templatePath: selectedTemplatePath, filePath, expectedRevision },
-    }),
-    onSuccess: async (response) => {
+    }, { signal }),
+    onSuccess: (response) => {
+      cacheTemplate(response);
       onImported(response, "path");
-      await invalidateTemplateQueries(response.templatePath);
     },
+    refreshKeys: () => [queryKeys.reportTemplates(reportType)],
     onError,
   });
 
-  const uploadFileMutation = useMutation({
-    mutationFn: (file: File) => client.uploadReportTemplateFile({
+  const uploadFileMutation = useScopedMutation(scope, client, {
+    mutationFn: (file: File, signal) => client.uploadReportTemplateFile({
       reportType,
       templatePath: selectedTemplatePath,
       expectedRevision,
       fileName: file.name,
       body: file,
-    }),
-    onSuccess: async (response) => {
+    }, { signal }),
+    onSuccess: (response) => {
+      cacheTemplate(response);
       onImported(response, "upload");
-      await invalidateTemplateQueries(response.templatePath);
     },
+    refreshKeys: () => [queryKeys.reportTemplates(reportType)],
     onError,
   });
 

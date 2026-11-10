@@ -1,6 +1,7 @@
 //! Explicit reviewed changes to the frozen served contract; never copy live output.
 use serde_json::{Value, json};
 pub(super) fn reviewed_versioning(baseline: &mut Value) {
+    reviewed_email_pagination(baseline);
     baseline["paths"]["/api/worklist"]["get"]["responses"]["400"] =
         json!({"description":"Bad Request"});
     baseline["components"]["schemas"]["ApiRuntimeJobMetrics"]["properties"]["retentionFailure"] =
@@ -86,6 +87,79 @@ pub(super) fn reviewed_versioning(baseline: &mut Value) {
             .unwrap();
     for name in ["pageNumber", "pageSize"] {
         parameters.push(json!({"name":name,"in":"query","schema":{"type":["integer","string"],"format":"int32","pattern":"^-?(?:0|[1-9]\\d*)$"}}));
+    }
+}
+
+fn reviewed_email_pagination(baseline: &mut Value) {
+    let bad_request =
+        baseline["paths"]["/api/email-templates/{id}/draft"]["put"]["responses"]["400"].clone();
+    let old_history = baseline["paths"]["/api/email-templates/{id}/versions"]["get"].clone();
+    let mut detail = old_history.clone();
+    detail["operationId"] = json!("GetEmailTemplateVersion");
+    detail["parameters"] = json!([
+        {"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int32"}},
+        {"name":"versionNumber","in":"path","required":true,"schema":{"type":"integer","minimum":1,"format":"int32"}}
+    ]);
+    detail["responses"]["200"]["content"]["application/json"]["schema"] =
+        json!({"$ref":"#/components/schemas/ApiEmailTemplateVersionDto"});
+    detail["responses"]["400"] = bad_request.clone();
+    baseline["paths"]["/api/email-templates/{id}/versions/{versionNumber}"] = json!({"get":detail});
+    for (path, schema) in [
+        (
+            "/api/email-templates",
+            "ApiPagedResponseOfApiEmailTemplateDto",
+        ),
+        (
+            "/api/email-templates/{id}/versions",
+            "ApiPagedResponseOfApiEmailTemplateVersionSummaryDto",
+        ),
+    ] {
+        let endpoint = &mut baseline["paths"][path]["get"];
+        endpoint["responses"]["400"] = bad_request.clone();
+        endpoint["responses"]["200"]["content"]["application/json"]["schema"] =
+            json!({"$ref":format!("#/components/schemas/{schema}")});
+        let params = endpoint["parameters"].as_array_mut().unwrap();
+        for name in ["pageNumber", "pageSize"] {
+            params.push(json!({"name":name,"in":"query","schema":{"type":["integer","string"],"format":"int32","pattern":"^-?(?:0|[1-9]\\d*)$"}}));
+        }
+        if path == "/api/email-templates" {
+            // Native catalogue composes keyword/page parameters before mail filters.
+            let category = params.remove(1);
+            let archived = params.remove(1);
+            params.extend([
+                category,
+                archived,
+                json!({"name":"scope","in":"query","schema":{"type":"string"}}),
+            ]);
+        }
+    }
+    let schemas = &mut baseline["components"]["schemas"];
+    let mut summary = schemas["ApiEmailTemplateVersionDto"].clone();
+    for key in ["bodyHtml", "subject", "category"] {
+        summary["properties"].as_object_mut().unwrap().remove(key);
+        summary["required"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|v| v != key);
+    }
+    for key in ["id", "emailTemplateId", "versionNumber"] {
+        summary["properties"][key] = json!({"type":"integer","format":"int32"});
+    }
+    schemas["ApiEmailTemplateVersionSummaryDto"] = summary;
+    for (name, item) in [
+        (
+            "ApiPagedResponseOfApiEmailTemplateDto",
+            "ApiEmailTemplateDto",
+        ),
+        (
+            "ApiPagedResponseOfApiEmailTemplateVersionSummaryDto",
+            "ApiEmailTemplateVersionSummaryDto",
+        ),
+    ] {
+        let mut page = schemas["ApiPagedResponseOfApiUserReportTemplateVersionDto"].clone();
+        page["properties"]["items"]["items"] =
+            json!({"$ref":format!("#/components/schemas/{item}")});
+        schemas[name] = page;
     }
 }
 

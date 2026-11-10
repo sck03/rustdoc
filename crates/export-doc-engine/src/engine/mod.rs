@@ -447,7 +447,7 @@ impl NativeService {
                 }
                 #[cfg(feature = "excel")]
                 if operation == EXPORT_HS_CODE_KNOWLEDGE {
-                    return hs_package::export(self, query);
+                    return hs_package::export(self, &actor, query);
                 }
                 #[cfg(feature = "excel")]
                 if hs_files::OPERATIONS.contains(&operation) {

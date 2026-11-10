@@ -338,6 +338,7 @@ const operationDomains: Record<string, Domain> = {
   getCustomsCooProducerProfile: "singleWindow",
   getDashboard: "dashboard",
   getDisasterRecoveryStatus: "backup",
+  getEmailTemplateVersion: "emailTemplates",
   getEmailToolStatus: "tools",
   getExpenseRequest: "office",
   getExpenseRequestCommandResult: "office",

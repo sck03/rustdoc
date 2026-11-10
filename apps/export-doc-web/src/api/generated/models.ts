@@ -1178,6 +1178,19 @@ export interface ApiEmailTemplateVersionDto {
   versionNumber: number;
 }
 
+export interface ApiEmailTemplateVersionSummaryDto {
+  canRestore: boolean;
+  changeType: string;
+  changedBy: string;
+  createdAt: string;
+  emailTemplateId: number;
+  id: number;
+  name: string;
+  shareScope: string;
+  status: string;
+  versionNumber: number;
+}
+
 export interface ApiEmailTestResponse {
   fromAddress: string;
   message: string;
@@ -2212,6 +2225,26 @@ export interface ApiPagedResponseOfApiEmailDeliveryDto {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   items: ApiEmailDeliveryDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface ApiPagedResponseOfApiEmailTemplateDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiEmailTemplateDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface ApiPagedResponseOfApiEmailTemplateVersionSummaryDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiEmailTemplateVersionSummaryDto[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
@@ -8661,6 +8694,11 @@ export interface GetCustomsCooProducerProfileRequest {
   id: number;
 }
 
+export interface GetEmailTemplateVersionRequest {
+  id: number;
+  versionNumber: number;
+}
+
 export interface GetExpenseRequestRequest {
   id: number;
 }
@@ -9210,12 +9248,17 @@ export interface ListEmailDeliveriesRequest {
 
 export interface ListEmailTemplateVersionsRequest {
   id: number;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListEmailTemplatesRequest {
   keyword?: string;
+  pageNumber?: number;
+  pageSize?: number;
   category?: string;
   includeArchived?: boolean;
+  scope?: string;
 }
 
 export interface ListEmploymentsRequest {

@@ -4,6 +4,12 @@ use std::collections::BTreeMap;
 
 #[rustfmt::skip]
 pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
+    ("ApiPagedResponseOfApiEmailTemplateDto",super::schema_shapes::paged_response("ApiEmailTemplateDto")),
+    ("ApiPagedResponseOfApiEmailTemplateVersionSummaryDto",super::schema_shapes::paged_response("ApiEmailTemplateVersionSummaryDto")),
+    ("ApiEmailTemplateVersionSummaryDto",o(vec![
+        ("id",i().format("int32")),("emailTemplateId",i().format("int32")),("versionNumber",i().format("int32")),
+        ("changeType",s()),("name",s()),("status",s()),("shareScope",s()),("changedBy",s()),("createdAt",s().format("date-time")),("canRestore",b())
+    ]).required(vec!["id","emailTemplateId","versionNumber","changeType","name","status","shareScope","changedBy","createdAt","canRestore"])),
     ("ApiEmailTemplateDraftRequest",o(vec![
         ("name",s().default_value(serde_json::json!(""))),("category",s().default_value(serde_json::json!(""))),("subject",s().default_value(serde_json::json!(""))),
         ("bodyHtml",s().default_value(serde_json::json!(""))),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("0"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))

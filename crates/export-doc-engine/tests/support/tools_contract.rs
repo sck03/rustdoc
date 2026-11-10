@@ -1,5 +1,8 @@
 use export_doc_engine::{api::ApiError, contracts, generated_api::*};
 use serde_json::{Value, json};
+#[cfg(feature = "mail")]
+#[path = "email_template_contract.rs"]
+mod email_template;
 #[path = "hs_examples_contract.rs"]
 mod hs_examples;
 #[path = "hs_maintenance_contract.rs"]
@@ -16,6 +19,8 @@ pub fn exercise(
         Option<Value>,
     ) -> Result<Value, ApiError>,
 ) {
+    #[cfg(feature = "mail")]
+    email_template::exercise(call);
     let reject = |response: Result<Value, ApiError>, expected| {
         assert_eq!(response.unwrap_err().status, Some(expected));
     };
@@ -94,6 +99,16 @@ pub fn exercise(
     let row = run(CREATE_HS_CODE, Some(code.clone())).unwrap();
     assert_eq!(row["code"], "6109100000");
     export_doc_contracts::validation::response(CREATE_HS_CODE.id, &row).unwrap();
+    let filtered = call(
+        LIST_HS_CODES,
+        &[],
+        &[("keyword", "棉制针织".into()), ("pageSize", "1".into())],
+        None,
+    )
+    .unwrap();
+    assert_eq!(filtered["items"][0]["id"], row["id"]);
+    assert_eq!(filtered["items"][0]["name"], row["name"]);
+    assert_eq!(filtered["items"][0]["requiresAnnualReview"], false);
     code["code"] = json!("6109100001");
     code["status"] = json!("Active");
     code["sourceName"] = json!("手工来源");

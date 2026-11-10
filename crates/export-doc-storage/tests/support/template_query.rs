@@ -216,5 +216,59 @@ pub fn exercise(c: &Connection) {
     assert_eq!(rows.len(), 5);
     assert_eq!(rows[0]["name"], "bulk-200");
     assert!(serde_json::to_vec(&rows).unwrap().len() < 2048);
+    let mail = insert(
+        c,
+        "email-templates",
+        json!({"name":" École ","category":" 通用 ","ownerUserId":7,"companyScope":"A","departmentId":"D","status":"Draft","shareScope":"Private","bodyHtml":payload,"versionNumber":1}),
+    );
+    assert!(
+        c.email_template_name_exists(7, 0, "e\u{301}cole", "通用")
+            .unwrap()
+    );
+    assert!(
+        !c.email_template_name_exists(7, mail, "école", "通用")
+            .unwrap()
+    );
+    assert!(!c.email_template_name_exists(8, 0, "école", "通用").unwrap());
+    let mut email = export_doc_storage::EmailTemplateQuery {
+        audience: TemplateAudience {
+            user_id: 7,
+            company: "A",
+            department: "D",
+            can_view: true,
+            shared: true,
+            ..Default::default()
+        },
+        edit_scope: export_doc_storage::DataScope {
+            all: true,
+            ..Default::default()
+        },
+        include_archived: false,
+        keyword: "正文不可",
+        category: "",
+        scope: "all",
+        offset: 0,
+        limit: 1,
+    };
+    assert_eq!(c.query_email_templates(&email).unwrap().0, 1);
+    email.offset = 1;
+    assert!(c.query_email_templates(&email).unwrap().1.is_empty());
+    email.offset = 0;
+    email.audience.user_id = 8;
+    assert_eq!(c.query_email_templates(&email).unwrap().0, 0);
+    email.audience.user_id = 7;
+    email.scope = "editable";
+    email.edit_scope.all = false;
+    assert_eq!(c.query_email_templates(&email).unwrap().0, 0);
+    let history = c
+        .query_template_versions(&TemplateVersionQuery {
+            kind: "email-templates",
+            template_id: ids[0],
+            offset: 0,
+            limit: 1,
+        })
+        .unwrap();
+    assert_eq!(history.0, 1);
+    assert!(!history.1[0].to_string().contains("正文"));
     c.rollback().unwrap();
 }

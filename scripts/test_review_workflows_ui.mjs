@@ -40,7 +40,7 @@ await withOfficeUi('review-workflows-ui',async({repo,output,require,url,invoke,o
   await page.getByText('邮件模板草稿已保存。',{exact:true}).waitFor();
   await page.getByRole('tab',{name:'版本历史',exact:true}).click();
   await page.getByRole('row').filter({has:page.getByText('V1',{exact:true})}).getByRole('button',{name:'查看',exact:true}).click();
-  assert.equal(await page.getByLabel('历史主题',{exact:true}).inputValue(),'Initial subject');
+  await page.getByLabel('历史主题',{exact:true}).and(page.locator('input[value="Initial subject"]')).waitFor();
   await page.getByRole('button',{name:'恢复此版本',exact:true}).click();
   await page.getByRole('button',{name:'确认恢复',exact:true}).click();
   await page.getByText('已从 V1 恢复，并生成 V3。',{exact:true}).waitFor();

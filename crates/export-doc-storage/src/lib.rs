@@ -56,7 +56,9 @@ pub mod metrics;
 pub mod operation;
 pub mod pool;
 pub mod postgres_privileges;
-pub use template_query::{ReportTemplateQuery, TemplateAudience, TemplateVersionQuery};
+pub use template_query::{
+    EmailTemplateQuery, ReportTemplateQuery, TemplateAudience, TemplateVersionQuery,
+};
 struct QuerySql {
     source: query_source::Source,
     filter: String,
@@ -418,6 +420,8 @@ delegate! {
     import_preview_usage(owner:i64)->ImportPreviewUsage;
     expired_import_previews(before:&str)->Vec<Value>;
     query_hs(query:&HsQuery<'_>)->Vec<Value>;
+    page_hs(query:&HsQuery<'_>)->(i64,Vec<Value>);
+    scan_hs(query:&HsQuery<'_>,after:Option<&Value>)->(Option<Value>,Vec<Value>);
     query_jobs(query:&JobQuery<'_>)->(i64,Vec<Value>);
     job_counts()->Value;
     job_output_bytes()->u64;
@@ -443,7 +447,8 @@ delegate! {
     query_template_versions(query: &TemplateVersionQuery<'_>)->(i64, Vec<Value>);
     template_history_usage(query:&TemplateVersionQuery<'_>,keep:i64)->TemplateHistoryUsage;
     template_history_candidates(query:&TemplateVersionQuery<'_>)->Vec<Value>;
-    query_email_template_versions(query: &TemplateVersionQuery<'_>)->(i64, Vec<Value>);
+    query_email_templates(query: &EmailTemplateQuery<'_>)->(i64, Vec<Value>);
+    email_template_name_exists(owner:i64,id:i64,name:&str,category:&str)->bool;
     template_version(kind:&str,id:i64,version:i64)->Option<Value>;
     query_communications(query: &CommunicationQuery<'_>)->(i64, Vec<Value>);
     checkpoint()->();

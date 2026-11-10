@@ -188,7 +188,30 @@ fn email_template_versions_preview_and_publication_preserve_original_workflow() 
     assert_eq!(draft["shareScope"], "Private");
     let versions = fixture.request(LIST_EMAIL_TEMPLATE_VERSIONS, Some(id), None);
     export_doc_contracts::validation::response(LIST_EMAIL_TEMPLATE_VERSIONS.id, &versions).unwrap();
-    assert_eq!(versions.as_array().unwrap().len(), 4);
+    assert_eq!(versions["totalCount"], 4);
+    assert_eq!(versions["items"].as_array().unwrap().len(), 4);
+    assert!(versions["items"][0].get("bodyHtml").is_none());
+    let historical: Value = fixture
+        .client()
+        .json(
+            GET_EMAIL_TEMPLATE_VERSION,
+            &[("id", id.to_string()), ("versionNumber", "1".into())],
+            &[],
+            None,
+        )
+        .unwrap();
+    export_doc_contracts::validation::response(GET_EMAIL_TEMPLATE_VERSION.id, &historical).unwrap();
+    assert_eq!(historical["bodyHtml"], template["bodyHtml"]);
+    let second: Value = fixture
+        .client()
+        .json(
+            LIST_EMAIL_TEMPLATE_VERSIONS,
+            &[("id", id.to_string())],
+            &[("pageNumber", "2".into()), ("pageSize", "2".into())],
+            None,
+        )
+        .unwrap();
+    assert_eq!(second["items"][0]["versionNumber"], 2);
     let restored: Value = fixture
         .client()
         .json(

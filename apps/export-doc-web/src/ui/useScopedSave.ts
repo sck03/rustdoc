@@ -17,6 +17,7 @@ export function useScopedSave(scope: string, owner: unknown) {
   useLayoutEffect(() => () => { active.current?.controller.abort(); active.current = null; }, []);
 
   async function run(operation: (context: { signal: AbortSignal; checkCurrent: () => void; continueInScope: (next: string) => void }) => Promise<void>) {
+    if (latest.current.scope !== scope || latest.current.owner !== owner) throw new DOMException("操作所属页面已变化。", "AbortError");
     if (active.current) throw new DOMException("保存操作正在进行。", "AbortError");
     const pending = { controller: new AbortController(), scopes: new Set([scope]), owner };
     active.current = pending; setSaving(true);
@@ -25,6 +26,7 @@ export function useScopedSave(scope: string, owner: unknown) {
       pending.controller.signal.throwIfAborted();
     };
     try {
+      checkCurrent();
       await operation({ signal: pending.controller.signal, checkCurrent, continueInScope: next => pending.scopes.add(next) });
       checkCurrent();
     } catch (error) {

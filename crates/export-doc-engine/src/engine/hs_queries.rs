@@ -10,14 +10,15 @@ pub(super) fn visit(
     query: &mut HsQuery<'_>,
     mut visit: impl FnMut(Value) -> Result<()>,
 ) -> Result<()> {
+    let mut cursor = None;
     loop {
         crate::operation::check()?;
-        let rows = tx.query_hs(query)?;
+        let (next, rows) = tx.scan_hs(query, cursor.as_ref())?;
         let length = rows.len() as i64;
         for row in rows {
             visit(row)?;
         }
-        query.offset += length;
+        cursor = next;
         if length < query.limit {
             return Ok(());
         }
@@ -30,6 +31,7 @@ pub(super) fn query<'a>(kind: &'a str, fields: &'a [(&'a str, &'a str)]) -> HsQu
         fields,
         current_year: None,
         prefix: "",
+        since: "",
         ranked_examples: false,
         offset: 0,
         limit: 200,
@@ -44,34 +46,71 @@ pub(super) fn page(
 ) -> Result<Value> {
     let filter = rules::text(hs::read(parameters, "keyword"));
     let (page_number, page_size, offset) = store::page_parameters(parameters);
+    if filter.is_empty() {
+        let mut query = query(kind, &[]);
+        query.offset = offset;
+        query.limit = page_size as i64;
+        let (count, mut items) = tx.page_hs(&query)?;
+        if kind == hs::CODES {
+            for row in &mut items {
+                hs::annotate_year(row, year);
+            }
+        }
+        return Ok(crate::contracts::page(
+            items,
+            count as usize,
+            page_number,
+            page_size,
+        ));
+    }
     let mut count = 0_i64;
-    let mut items = Vec::with_capacity(page_size);
-    visit(tx, &mut query(kind, &[]), |mut row| {
-        let fields = if kind == hs::CODES {
-            &["code", "name", "elements", "description"][..]
-        } else {
-            &[
-                "rawReportedHsCode",
-                "resolvedCurrentHsCode",
-                "productName",
-                "specification",
-            ][..]
-        };
-        if filter.is_empty()
-            || fields
-                .iter()
-                .any(|key| rules::text(&text(&row, key)).contains(&filter))
+    let mut ids = Vec::with_capacity(page_size);
+    let fields = if kind == hs::CODES {
+        &["code", "name", "elements", "description"][..]
+    } else {
+        &[
+            "rawReportedHsCode",
+            "resolvedCurrentHsCode",
+            "productName",
+            "specification",
+        ][..]
+    };
+    let projection: Vec<_> = std::iter::once(("id", "id"))
+        .chain(fields.iter().map(|key| (*key, *key)))
+        .collect();
+    visit(tx, &mut query(kind, &projection), |row| {
+        if fields
+            .iter()
+            .any(|key| rules::text(&text(&row, key)).contains(&filter))
         {
-            if count >= offset && items.len() < page_size {
-                if kind == hs::CODES {
-                    hs::annotate_year(&mut row, year);
-                }
-                items.push(row);
+            if count >= offset && ids.len() < page_size {
+                ids.push(
+                    row["id"]
+                        .as_i64()
+                        .ok_or_else(|| super::error::unavailable("HS 记录编号无效。"))?,
+                );
             }
             count += 1;
         }
         Ok(())
     })?;
+    let mut rows = tx
+        .records_by_ids(kind, &ids, &[])?
+        .into_iter()
+        .map(|row| (row["id"].as_i64().unwrap_or(0), row))
+        .collect::<std::collections::HashMap<_, _>>();
+    let items = ids
+        .into_iter()
+        .map(|id| {
+            let mut row = rows
+                .remove(&id)
+                .ok_or_else(|| super::error::unavailable("HS 查询快照记录缺失。"))?;
+            if kind == hs::CODES {
+                hs::annotate_year(&mut row, year);
+            }
+            Ok(row)
+        })
+        .collect::<Result<Vec<_>>>()?;
     let pages = (count as usize).div_ceil(page_size).max(1);
     Ok(
         json!({"items":items,"totalCount":count,"pageNumber":page_number,"pageSize":page_size,"totalPages":pages,"hasPreviousPage":page_number>1,"hasNextPage":page_number<pages}),

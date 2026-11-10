@@ -27,6 +27,7 @@ pub fn exercise(c: &Connection) {
         kind: "hs-codes",
         current_year: Some(2026),
         prefix: "6109",
+        since: "",
         ranked_examples: false,
         fields: &fields,
         offset: 3,
@@ -59,6 +60,7 @@ pub fn exercise(c: &Connection) {
             kind: "hs-examples",
             current_year: None,
             prefix: "6109",
+            since: "",
             ranked_examples: true,
             fields: &[],
             offset: 0,
@@ -72,8 +74,62 @@ pub fn exercise(c: &Connection) {
     );
     assert_eq!(examples[0]["useCount"], 204);
     assert_eq!(examples[0]["isManuallyVerified"], true);
+    for (kind, ranked) in [
+        ("hs-codes", false),
+        ("hs-examples", false),
+        ("hs-examples", true),
+    ] {
+        let mut q = HsQuery {
+            kind,
+            current_year: None,
+            prefix: "",
+            since: "",
+            ranked_examples: ranked,
+            fields: &[("id", "id")],
+            offset: 0,
+            limit: 2000,
+        };
+        let expected = c.query_hs(&q).unwrap();
+        assert_eq!(c.page_hs(&q).unwrap().0, expected.len() as i64);
+        q.limit = 17;
+        let mut actual = Vec::new();
+        let mut cursor = None;
+        loop {
+            let (next, rows) = c.scan_hs(&q, cursor.as_ref()).unwrap();
+            if rows.is_empty() {
+                break;
+            }
+            assert!(next != cursor, "scan must progress");
+            assert!(rows.iter().all(|row| row.as_object().unwrap().len() == 1));
+            actual.extend(rows);
+            cursor = next;
+        }
+        assert_eq!(actual, expected, "keyset scan preserves {kind} ordering");
+    }
 
     let mut ids = vec![];
+    for date in [
+        Some("2026-11-10T08:00:00.000000001+08:00"),
+        Some("2026-11-10T00:00:00Z"),
+        None,
+    ] {
+        insert(c, "hs-replacements", json!({"updatedAt":date}), 1);
+    }
+    let incremental = HsQuery {
+        kind: "hs-replacements",
+        since: "2026-11-10T00:00:00.000000001Z",
+        prefix: "",
+        current_year: None,
+        ranked_examples: false,
+        fields: &[("id", "id")],
+        offset: 0,
+        limit: 10,
+    };
+    assert_eq!(
+        c.page_hs(&incremental).unwrap().0,
+        2,
+        "incremental comparison respects offsets, nanoseconds and missing dates"
+    );
     for (n, owner) in [1, 1, 1, 2, 2].into_iter().enumerate() {
         let time = format!("2026-10-24T00:00:{n:02}Z");
         let id = insert(

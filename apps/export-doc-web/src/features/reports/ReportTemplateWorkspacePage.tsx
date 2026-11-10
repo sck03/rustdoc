@@ -317,14 +317,13 @@ export function ReportTemplateWorkspacePage({
       setNewUserTemplateName("");
       showFeedback("私人模板已创建，可继续设计，保存后直接个人使用。", "success");
     },
-    onArchived: async () => {
+    onArchived: () => {
       setSelectedUserTemplateId(0);
       setSelectedTemplatePath("");
       clearDocument();
       setRenameTemplateFileName("");
       setCurrentTemplateDisplayName("");
       showFeedback("模板已归档，可从归档列表恢复为草稿。", "success");
-      await templatesQuery.refetch();
     },
     onRestored: (saved) => {
       loadUser(saved, true);

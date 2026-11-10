@@ -12,6 +12,8 @@ use export_doc_mail::content;
 use serde_json::{Value, json};
 const KIND: &str = "email-templates";
 const PERMISSION: &str = "sales.email-templates";
+#[cfg(test)]
+mod tests;
 pub const OPERATIONS: &[Operation] = &[
     LIST_EMAIL_TEMPLATES,
     CREATE_EMAIL_TEMPLATE,
@@ -19,6 +21,7 @@ pub const OPERATIONS: &[Operation] = &[
     LIST_EMAIL_TEMPLATE_VARIABLES,
     PREVIEW_EMAIL_TEMPLATE,
     LIST_EMAIL_TEMPLATE_VERSIONS,
+    GET_EMAIL_TEMPLATE_VERSION,
     PUBLISH_EMAIL_TEMPLATE,
     SHARE_EMAIL_TEMPLATE,
     DISABLE_EMAIL_TEMPLATE,
@@ -70,13 +73,14 @@ fn persist(tx: &Connection, actor: &Actor, id: i64, mut row: Value, action: &str
     let name = store::normalize(&text(&row, "name"));
     let category = store::normalize(&text(&row, "category"));
     if row["status"] != "Archived"
-        && store::all(tx, KIND)?.iter().any(|r| {
-            r["id"].as_i64() != Some(id)
-                && r["ownerUserId"] == row["ownerUserId"]
-                && r["status"] != "Archived"
-                && store::normalize(&text(r, "name")) == name
-                && store::normalize(&text(r, "category")) == category
-        })
+        && tx.email_template_name_exists(
+            row["ownerUserId"]
+                .as_i64()
+                .ok_or_else(|| unavailable("邮件模板所有者无效。"))?,
+            id,
+            &name,
+            &category,
+        )?
     {
         return Err(conflict("同一分类下已经有同名邮件模板。"));
     }
@@ -127,18 +131,35 @@ pub fn handle(
             if keyword.chars().count() > 150 || category.chars().count() > 50 {
                 return Err(invalid("模板检索条件过长。"));
             }
-            let mut rows = store::all(tx, KIND)?;
-            rows.retain(|row| {
-                auth::template_visible(actor, PERMISSION, row)
-                    && (archived || row["status"] != "Archived")
-                    && (category.is_empty() || row["category"] == category)
-                    && ["name", "subject", "bodyHtml"]
-                        .iter()
-                        .any(|k| store::normalize(&text(row, k)).contains(&keyword))
-            });
-            rows.sort_by_key(|r| (text(r, "category"), text(r, "name")));
-            return Ok(json!(
-                rows.iter().map(|r| dto(actor, r)).collect::<Vec<_>>()
+            let scope = super::hs::read(query, "scope");
+            if !["", "all", "editable", "shared"].contains(&scope) {
+                return Err(invalid("邮件模板范围无效。"));
+            }
+            let (page, size, offset) = store::page_parameters(query);
+            let (total, rows) =
+                tx.query_email_templates(&export_doc_storage::EmailTemplateQuery {
+                    audience: export_doc_storage::TemplateAudience {
+                        user_id: actor.id,
+                        company: &actor.company,
+                        department: &actor.department,
+                        departments: &actor.departments,
+                        administrator: actor.admin,
+                        can_view: auth::authorize(actor, PERMISSION, "view").is_ok(),
+                        shared: auth::scope_rank(actor, PERMISSION, "view") >= 2,
+                    },
+                    edit_scope: auth::data_scope(actor, PERMISSION, "edit"),
+                    include_archived: archived,
+                    keyword: &keyword,
+                    category,
+                    scope,
+                    offset,
+                    limit: size as i64,
+                })?;
+            return Ok(contracts::page(
+                rows.iter().map(|r| dto(actor, r)).collect(),
+                total as usize,
+                page,
+                size,
             ));
         }
         let record_id = if operation == CREATE_EMAIL_TEMPLATE {
@@ -151,46 +172,47 @@ pub fn handle(
         } else {
             store::get(tx, KIND, record_id)?
         };
-        if operation == LIST_EMAIL_TEMPLATE_VERSIONS {
+        if matches!(
+            operation,
+            LIST_EMAIL_TEMPLATE_VERSIONS | GET_EMAIL_TEMPLATE_VERSION
+        ) {
             if !auth::template_visible(actor, PERMISSION, &row) {
                 return Err(error(403, "没有查看此邮件模板的权限。"));
             }
-            let mut versions = vec![];
-            let mut offset = 0;
-            loop {
-                crate::operation::check()?;
-                let (total, batch) =
-                    tx.query_email_template_versions(&export_doc_storage::TemplateVersionQuery {
-                        kind: KIND,
-                        template_id: record_id,
-                        offset,
-                        limit: 200,
-                    })?;
-                if batch.is_empty() {
-                    break;
+            let decorate = |mut value: Value, schema| {
+                value["emailTemplateId"] = json!(record_id);
+                value["canRestore"] = json!(auth::visible(actor, PERMISSION, "restore", &row));
+                contracts::project(contracts::schema(schema), value)
+            };
+            if operation == GET_EMAIL_TEMPLATE_VERSION {
+                let mut version = tx
+                    .template_version(KIND, record_id, version_number(parameters)?)?
+                    .ok_or_else(|| error(404, "邮件模板历史版本不存在。"))?;
+                let mut value = version["content"].take();
+                if !value.is_object() {
+                    return Err(unavailable("邮件模板历史损坏。"));
                 }
-                offset += batch.len() as i64;
-                for version in batch {
-                    let mut value = version["content"].clone();
-                    if !value.is_object() {
-                        return Err(unavailable("邮件模板历史损坏。"));
-                    }
-                    for key in ["id", "changeType", "changedBy", "createdAt"] {
-                        value[key] = version[key].clone();
-                    }
-                    value["emailTemplateId"] = json!(record_id);
-                    value["canRestore"] = json!(auth::visible(actor, PERMISSION, "restore", &row));
-                    versions.push(contracts::project(
-                        contracts::schema("ApiEmailTemplateVersionDto"),
-                        value,
-                    ));
+                for key in ["id", "changeType", "changedBy", "createdAt"] {
+                    value[key] = version[key].take();
                 }
-                if offset >= total {
-                    break;
-                }
+                return Ok(decorate(value, "ApiEmailTemplateVersionDto"));
             }
-            versions.sort_by_key(|r| std::cmp::Reverse(r["versionNumber"].as_i64().unwrap_or(0)));
-            return Ok(json!(versions));
+            let (page, size, offset) = store::page_parameters(query);
+            let (total, rows) =
+                tx.query_template_versions(&export_doc_storage::TemplateVersionQuery {
+                    kind: KIND,
+                    template_id: record_id,
+                    offset,
+                    limit: size as i64,
+                })?;
+            return Ok(contracts::page(
+                rows.into_iter()
+                    .map(|r| decorate(r, "ApiEmailTemplateVersionSummaryDto"))
+                    .collect(),
+                total as usize,
+                page,
+                size,
+            ));
         }
         let action = match operation {
             CREATE_EMAIL_TEMPLATE | SAVE_EMAIL_TEMPLATE_DRAFT => "edit",
@@ -236,11 +258,7 @@ pub fn handle(
             row["bodyHtml"] = json!(html);
             transition(&mut row, Action::SaveDraft)?;
         } else if operation == RESTORE_EMAIL_TEMPLATE_VERSION {
-            let version = super::hs::read(parameters, "versionNumber")
-                .parse::<i64>()
-                .ok()
-                .filter(|v| *v > 0)
-                .ok_or_else(|| invalid("历史版本号无效。"))?;
+            let version = version_number(parameters)?;
             if row["versionNumber"] == version {
                 return Ok(dto(actor, &row));
             }
@@ -282,12 +300,21 @@ pub fn handle(
     };
     if matches!(
         operation,
-        LIST_EMAIL_TEMPLATES | LIST_EMAIL_TEMPLATE_VERSIONS
+        LIST_EMAIL_TEMPLATES | LIST_EMAIL_TEMPLATE_VERSIONS | GET_EMAIL_TEMPLATE_VERSION
     ) {
-        service.store.read(|tx| handle(tx, actor))
+        service.store.read_for(actor, operation, query, handle)
     } else {
-        service.store.transaction_as(actor, handle)
+        service
+            .store
+            .transaction_for(actor, operation, query, handle)
     }
+}
+fn version_number(parameters: &[(&str, String)]) -> Result<i64> {
+    super::hs::read(parameters, "versionNumber")
+        .parse::<i64>()
+        .ok()
+        .filter(|v| *v > 0)
+        .ok_or_else(|| invalid("历史版本号无效。"))
 }
 fn crm_draft(
     service: &NativeService,
@@ -299,11 +326,11 @@ fn crm_draft(
         .ok()
         .filter(|id| *id > 0)
         .ok_or_else(|| invalid("客户编号无效。"))?;
-    service.store.read(|tx|{
+    service.store.read_for(actor,GET_CRM_EMAIL_VARIABLE_DRAFT,&[],|tx,actor|{
         let customer=store::get(tx,"crm-customers",customer_id)?;if !auth::visible(actor,"sales.customers","view",&customer){return Err(error(403,"没有读取此客户的权限。"));}
-        let mut contacts:Vec<_>=store::all(tx,"crm-contacts")?.into_iter().filter(|r|r["crmCustomerId"]==customer_id&&auth::visible(actor,"sales.contacts","view",r)).collect();
-        contacts.sort_by_key(|r|(r["isPrimary"]!=true,r["id"].as_i64().unwrap_or(0)));let contact=contacts.first();
-        let company=store::all(tx,"companies")?.into_iter().find(|r|r["code"]==actor.company&&r["isActive"]==true).map(|r|text(&r,"name")).unwrap_or_default();
+        let contacts=tx.export_primary_contacts("crm-contacts",&auth::data_scope(actor,"sales.contacts","view"),"crmCustomerId",&[customer_id])?;
+        let contact=contacts.first();
+        let company=tx.query_generic(&export_doc_storage::GenericQuery {kind:"companies",scope:export_doc_storage::DataScope {all:true,..Default::default()},filters:&[("code",actor.company.clone()),("isActive","true".into())],fields:&[("name","name")],limit:1,..Default::default()})?.1.first().map(|r|text(r,"name")).unwrap_or_default();
         Ok(json!({"crmCustomerId":customer_id,"crmContactId":contact.map(|r|r["id"].clone()),"toAddress":contact.map(|r|text(r,"email")).unwrap_or_default(),
             "variables":{"CustomerName":customer["name"],"ContactName":contact.map(|r|text(r,"name")).unwrap_or_default(),"CompanyName":company,"ProductName":"","QuotationNo":"","SenderName":actor.name,"Today":service.clock.now().map_err(unavailable)?.today.to_string()}}))
     })

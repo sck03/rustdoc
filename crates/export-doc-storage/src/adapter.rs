@@ -26,6 +26,8 @@ macro_rules! unsupported_operations {
 /// All business operations use this semantic storage boundary, never provider SQL.
 pub(crate) trait Adapter: Send {
     semantic_operations! {
+        email_template_name_exists(owner:i64,id:i64,name:&str,category:&str) -> bool => template_query::email_name_exists;
+        scan_hs(query: &HsQuery<'_>, after: Option<&Value>) -> (Option<Value>, Vec<Value>) => hs_query::scan;
         access_restrictions(kind: &str, id: i64, resolved: bool) -> Vec<Value> => access_scope::list;
         save_access_restriction(kind: &str, id: i64, body: &Value) -> Value => access_scope::save;
         permission_scheme_versions(scheme: i64, offset: i64, limit: i64) -> Value => permission_versions::versions;
@@ -63,6 +65,7 @@ pub(crate) trait Adapter: Send {
     }
     query_operations! {
         query_hs(&HsQuery<'_>) -> Vec<Value> => hs_query::build, query_slice;
+        page_hs(&HsQuery<'_>) -> (i64,Vec<Value>) => hs_query::build, query_page;
         query_generic(&GenericQuery<'_>) -> (i64, Vec<Value>) => generic_query::build, query_page;
         query_business(&BusinessQuery<'_>) -> (i64, Vec<Value>) => business_query::build, query_page;
         query_crm(&CrmQuery<'_>) -> (i64, Vec<Value>) => crm_query::build, query_page;
@@ -521,13 +524,10 @@ pub(crate) trait Adapter: Send {
             template_history_query::candidates(query, self.provider() == "PostgreSQL");
         self.query_slice(&sql, &projection, query.offset, query.limit)
     }
-    fn query_email_template_versions(
-        &self,
-        query: &TemplateVersionQuery<'_>,
-    ) -> Result<(i64, Vec<Value>)> {
+    fn query_email_templates(&self, query: &EmailTemplateQuery<'_>) -> Result<(i64, Vec<Value>)> {
         let pg = self.provider() == "PostgreSQL";
         self.query_page(
-            &template_query::versions(query, pg),
+            &template_query::email_catalog(query, pg),
             if pg { "r.body::text" } else { "r.body" },
             query.offset,
             query.limit,

@@ -139,6 +139,7 @@ pub fn exercise(c: &Connection) {
             kind: "hs-codes",
             current_year: year,
             prefix: "000000004",
+            since: "",
             ranked_examples: false,
             fields: &[("code", "code")],
             offset: 0,

@@ -1,4 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { ApiReportTemplateContentDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
@@ -35,26 +36,27 @@ export function useDefaultReportTemplateLifecycleMutations({
   onError: (error: unknown) => void;
 }) {
   const queryClient = useQueryClient();
+  const scope = `${reportType}:${selectedTemplatePath}`;
 
-  const createTemplateMutation = useMutation({
-    mutationFn: () =>
+  const createTemplateMutation = useScopedMutation(scope, client, {
+    mutationFn: (_: void, signal) =>
       client.createReportTemplate({
         body: {
           reportType,
           templatePath: newTemplateFileName.trim(),
           displayName: newTemplateDisplayName.trim(),
         },
-      }),
-    onSuccess: async (created) => {
+      }, { signal }),
+    onSuccess: (created) => {
       queryClient.setQueryData(queryKeys.reportTemplateContent(reportType, created.templatePath), created);
       onCreated(created);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
     },
+    refreshKeys: () => [queryKeys.reportTemplates(reportType)],
     onError,
   });
 
-  const renameTemplateMutation = useMutation({
-    mutationFn: () =>
+  const renameTemplateMutation = useScopedMutation(scope, client, {
+    mutationFn: (_: void, signal) =>
       client.renameReportTemplate({
         body: {
           reportType,
@@ -62,19 +64,18 @@ export function useDefaultReportTemplateLifecycleMutations({
           newTemplatePath: renameTemplateFileName.trim(),
           expectedRevision,
         },
-      }),
-    onSuccess: async (renamed) => {
+      }, { signal }),
+    onSuccess: (renamed) => {
       queryClient.removeQueries({ queryKey: queryKeys.reportTemplateContent(reportType, selectedTemplatePath) });
       queryClient.setQueryData(queryKeys.reportTemplateContent(reportType, renamed.templatePath), renamed);
       onRenamed(renamed);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
     },
+    refreshKeys: () => [queryKeys.reportTemplates(reportType), queryKeys.settings()],
     onError,
   });
 
-  const updateDisplayNameMutation = useMutation({
-    mutationFn: () =>
+  const updateDisplayNameMutation = useScopedMutation(scope, client, {
+    mutationFn: (_: void, signal) =>
       client.updateReportTemplateDisplayName({
         body: {
           reportType,
@@ -82,38 +83,37 @@ export function useDefaultReportTemplateLifecycleMutations({
           displayName: currentTemplateDisplayName.trim(),
           expectedRevision,
         },
-      }),
-    onSuccess: async (updated) => {
+      }, { signal }),
+    onSuccess: (updated) => {
       queryClient.setQueryData(queryKeys.reportTemplateContent(reportType, updated.templatePath), updated);
       onDisplayNameUpdated(updated);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
     },
+    refreshKeys: () => [queryKeys.reportTemplates(reportType)],
     onError,
   });
 
-  const setDefaultTemplateMutation = useMutation({
-    mutationFn: () =>
+  const setDefaultTemplateMutation = useScopedMutation(scope, client, {
+    mutationFn: (_: void, signal) =>
       client.setDefaultReportTemplate({
         body: {
           reportType,
           templatePath: selectedTemplatePath,
         },
-      }),
-    onSuccess: async (result) => {
+      }, { signal }),
+    onSuccess: (result) => {
       onDefaultSet(result.message);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.userReportTemplates(reportType) });
     },
+    refreshKeys: () => [queryKeys.settings(), queryKeys.userReportTemplates(reportType)],
     onError,
   });
 
-  const deleteTemplateMutation = useMutation({
-    mutationFn: () => client.deleteReportTemplate({ reportType, templatePath: selectedTemplatePath, expectedRevision }),
-    onSuccess: async () => {
+  const deleteTemplateMutation = useScopedMutation(scope, client, {
+    mutationFn: (_: void, signal) => client.deleteReportTemplate({ reportType, templatePath: selectedTemplatePath, expectedRevision }, { signal }),
+    onSuccess: () => {
       queryClient.removeQueries({ queryKey: queryKeys.reportTemplateContent(reportType, selectedTemplatePath) });
       onDeleted();
-      await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
     },
+    refreshKeys: () => [queryKeys.reportTemplates(reportType)],
     onError,
   });
 

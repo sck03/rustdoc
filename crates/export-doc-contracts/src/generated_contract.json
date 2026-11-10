@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "b404e64c832ad3e0664837098f1d89af9c42d26deccb2e870d11808948971a40",
+  "digest": "f5a5d461a93f25e232b0ea7022c93b2ce1897eefcfd1b2b33e1f9ef199df8b73",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -37135,6 +37135,104 @@
       },
       "timeoutSeconds": 30
     },
+    "GetEmailTemplateVersion": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "permissions": {
+          "readModule": "sales.email-templates",
+          "writeModule": null,
+          "readAccessLevel": null,
+          "writeAccessLevel": null,
+          "selector": 0,
+          "disabled": false,
+          "overridesParent": false
+        },
+        "requirements": [
+          {
+            "resourceKey": "sales.email-templates",
+            "action": "view"
+          }
+        ],
+        "permissionBypass": false,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "sales.email-templates",
+              "actions": [
+                "view"
+              ],
+              "administratorOnly": false
+            }
+          ]
+        }
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "required": true
+        },
+        {
+          "name": "versionNumber",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "required": true
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiEmailTemplateVersionDto"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found"
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/ApiEmailTemplateVersionDto"
+      },
+      "timeoutSeconds": 30
+    },
     "GetEmailToolStatus": {
       "policy": {
         "requiresAuthentication": true,
@@ -51205,6 +51303,30 @@
           }
         },
         {
+          "name": "pageNumber",
+          "in": "query",
+          "schema": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "schema": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          }
+        },
+        {
           "name": "category",
           "in": "query",
           "schema": {
@@ -51217,6 +51339,13 @@
           "schema": {
             "type": "boolean"
           }
+        },
+        {
+          "name": "scope",
+          "in": "query",
+          "schema": {
+            "type": "string"
+          }
         }
       ],
       "requestBody": null,
@@ -51226,10 +51355,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/ApiEmailTemplateDto"
-                }
+                "$ref": "#/components/schemas/ApiPagedResponseOfApiEmailTemplateDto"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
               }
             }
           }
@@ -51247,10 +51383,7 @@
       },
       "request": null,
       "response": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/ApiEmailTemplateDto"
-        }
+        "$ref": "#/components/schemas/ApiPagedResponseOfApiEmailTemplateDto"
       },
       "timeoutSeconds": 30
     },
@@ -51370,6 +51503,30 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
           "required": true
+        },
+        {
+          "name": "pageNumber",
+          "in": "query",
+          "schema": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "schema": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          }
         }
       ],
       "requestBody": null,
@@ -51379,10 +51536,17 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/ApiEmailTemplateVersionDto"
-                }
+                "$ref": "#/components/schemas/ApiPagedResponseOfApiEmailTemplateVersionSummaryDto"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
               }
             }
           }
@@ -51403,10 +51567,7 @@
       },
       "request": null,
       "response": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/ApiEmailTemplateVersionDto"
-        }
+        "$ref": "#/components/schemas/ApiPagedResponseOfApiEmailTemplateVersionSummaryDto"
       },
       "timeoutSeconds": 30
     },
@@ -98682,6 +98843,57 @@
         "canRestore"
       ]
     },
+    "ApiEmailTemplateVersionSummaryDto": {
+      "type": "object",
+      "properties": {
+        "canRestore": {
+          "type": "boolean"
+        },
+        "changeType": {
+          "type": "string"
+        },
+        "changedBy": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "emailTemplateId": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "id": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "name": {
+          "type": "string"
+        },
+        "shareScope": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "versionNumber": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "required": [
+        "id",
+        "emailTemplateId",
+        "versionNumber",
+        "changeType",
+        "name",
+        "status",
+        "shareScope",
+        "changedBy",
+        "createdAt",
+        "canRestore"
+      ]
+    },
     "ApiEmailTestResponse": {
       "type": "object",
       "properties": {
@@ -103495,6 +103707,122 @@
           "type": "array",
           "items": {
             "$ref": "#/components/schemas/ApiEmailDeliveryDto"
+          }
+        },
+        "pageNumber": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        },
+        "pageSize": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        },
+        "totalCount": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        },
+        "totalPages": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        }
+      },
+      "required": [
+        "items",
+        "totalCount",
+        "pageNumber",
+        "pageSize",
+        "totalPages",
+        "hasPreviousPage",
+        "hasNextPage"
+      ]
+    },
+    "ApiPagedResponseOfApiEmailTemplateDto": {
+      "type": "object",
+      "properties": {
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ApiEmailTemplateDto"
+          }
+        },
+        "pageNumber": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        },
+        "pageSize": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        },
+        "totalCount": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        },
+        "totalPages": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        }
+      },
+      "required": [
+        "items",
+        "totalCount",
+        "pageNumber",
+        "pageSize",
+        "totalPages",
+        "hasPreviousPage",
+        "hasNextPage"
+      ]
+    },
+    "ApiPagedResponseOfApiEmailTemplateVersionSummaryDto": {
+      "type": "object",
+      "properties": {
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ApiEmailTemplateVersionSummaryDto"
           }
         },
         "pageNumber": {

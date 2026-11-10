@@ -64,6 +64,45 @@ fn tariff_preview_is_single_use_detects_stale_changes_and_roundtrips_knowledge()
     let archive = client
         .bytes(EXPORT_HS_CODE_KNOWLEDGE, &[], &[], None, 1024 * 1024)
         .unwrap();
+    let future = client
+        .bytes(
+            EXPORT_HS_CODE_KNOWLEDGE,
+            &[],
+            &[("since", "2099-01-01T00:00:00Z".into())],
+            None,
+            1024 * 1024,
+        )
+        .unwrap();
+    let empty = native_fixture::Fixture::new();
+    let result = empty
+        .client()
+        .upload(
+            IMPORT_HS_CODE_KNOWLEDGE,
+            &[],
+            json!({}),
+            "future.zip",
+            &future,
+        )
+        .unwrap();
+    assert_eq!(result["hsCodeCount"], 0);
+    // A failure in the last member must roll back earlier codes and examples.
+    let broken = corrupt_last_checksum(&archive);
+    assert_eq!(
+        empty
+            .client()
+            .upload(
+                IMPORT_HS_CODE_KNOWLEDGE,
+                &[],
+                json!({}),
+                "broken.zip",
+                &broken
+            )
+            .unwrap_err()
+            .status,
+        Some(400)
+    );
+    let rolled_back: Value = empty.client().json(LIST_HS_CODES, &[], &[], None).unwrap();
+    assert_eq!(rolled_back["totalCount"], 0);
     let second = native_fixture::Fixture::new();
     let import = |bytes: &[u8]| {
         second
@@ -80,4 +119,27 @@ fn tariff_preview_is_single_use_detects_stale_changes_and_roundtrips_knowledge()
     assert!(import(&archive[..archive.len() / 2]).is_err());
     let after: Value = second.client().json(LIST_HS_CODES, &[], &[], None).unwrap();
     assert_eq!(after["totalCount"], 2);
+}
+
+#[cfg(feature = "excel")]
+fn corrupt_last_checksum(bytes: &[u8]) -> Vec<u8> {
+    use std::io::{Cursor, Read, Write};
+    let mut source = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+    let mut target = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    for index in 0..source.len() {
+        let mut entry = source.by_index(index).unwrap();
+        let name = entry.name().unwrap().into_owned();
+        let mut content = Vec::new();
+        entry.read_to_end(&mut content).unwrap();
+        if name == "manifest.json" {
+            let mut manifest: serde_json::Value = serde_json::from_slice(&content).unwrap();
+            manifest["checksums"]["search-feedback.json"] = serde_json::json!("invalid");
+            content = serde_json::to_vec(&manifest).unwrap();
+        }
+        target
+            .start_file(name, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        target.write_all(&content).unwrap();
+    }
+    target.finish().unwrap().into_inner()
 }

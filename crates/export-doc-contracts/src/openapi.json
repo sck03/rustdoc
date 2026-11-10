@@ -5291,6 +5291,57 @@
           "canRestore"
         ]
       },
+      "ApiEmailTemplateVersionSummaryDto": {
+        "type": "object",
+        "properties": {
+          "canRestore": {
+            "type": "boolean"
+          },
+          "changeType": {
+            "type": "string"
+          },
+          "changedBy": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "emailTemplateId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          },
+          "shareScope": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "versionNumber": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "id",
+          "emailTemplateId",
+          "versionNumber",
+          "changeType",
+          "name",
+          "status",
+          "shareScope",
+          "changedBy",
+          "createdAt",
+          "canRestore"
+        ]
+      },
       "ApiEmailTestResponse": {
         "type": "object",
         "properties": {
@@ -10118,6 +10169,122 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ApiEmailDeliveryDto"
+            }
+          },
+          "pageNumber": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
+          "pageSize": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
+          "totalCount": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
+          "totalPages": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          }
+        },
+        "required": [
+          "items",
+          "totalCount",
+          "pageNumber",
+          "pageSize",
+          "totalPages",
+          "hasPreviousPage",
+          "hasNextPage"
+        ]
+      },
+      "ApiPagedResponseOfApiEmailTemplateDto": {
+        "type": "object",
+        "properties": {
+          "hasNextPage": {
+            "type": "boolean"
+          },
+          "hasPreviousPage": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiEmailTemplateDto"
+            }
+          },
+          "pageNumber": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
+          "pageSize": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
+          "totalCount": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
+          "totalPages": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$"
+          }
+        },
+        "required": [
+          "items",
+          "totalCount",
+          "pageNumber",
+          "pageSize",
+          "totalPages",
+          "hasPreviousPage",
+          "hasNextPage"
+        ]
+      },
+      "ApiPagedResponseOfApiEmailTemplateVersionSummaryDto": {
+        "type": "object",
+        "properties": {
+          "hasNextPage": {
+            "type": "boolean"
+          },
+          "hasPreviousPage": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiEmailTemplateVersionSummaryDto"
             }
           },
           "pageNumber": {
@@ -46418,10 +46585,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ApiEmailTemplateDto"
-                  }
+                  "$ref": "#/components/schemas/ApiPagedResponseOfApiEmailTemplateDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }
@@ -46485,6 +46659,30 @@
             }
           },
           {
+            "name": "pageNumber",
+            "in": "query",
+            "schema": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$"
+            }
+          },
+          {
             "name": "category",
             "in": "query",
             "schema": {
@@ -46496,6 +46694,13 @@
             "in": "query",
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "schema": {
+              "type": "string"
             }
           }
         ]
@@ -47468,10 +47673,17 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ApiEmailTemplateVersionDto"
-                  }
+                  "$ref": "#/components/schemas/ApiPagedResponseOfApiEmailTemplateVersionSummaryDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
                 }
               }
             }
@@ -47537,6 +47749,134 @@
               "type": "integer",
               "format": "int32",
               "pattern": "^-?(?:0|[1-9]\\d*)$"
+            },
+            "required": true
+          },
+          {
+            "name": "pageNumber",
+            "in": "query",
+            "schema": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/email-templates/{id}/versions/{versionNumber}": {
+      "get": {
+        "x-exportdoc-timeout-seconds": 30,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "GetEmailTemplateVersion",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEmailTemplateVersionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": {
+            "readModule": "sales.email-templates",
+            "writeModule": null,
+            "readAccessLevel": null,
+            "writeAccessLevel": null,
+            "selector": 0,
+            "disabled": false,
+            "overridesParent": false
+          },
+          "requirements": [
+            {
+              "resourceKey": "sales.email-templates",
+              "action": "view"
+            }
+          ],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "sales.email-templates",
+                "actions": [
+                  "view"
+                ],
+                "administratorOnly": false
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "required": true
+          },
+          {
+            "name": "versionNumber",
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1
             },
             "required": true
           }

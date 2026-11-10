@@ -8,6 +8,7 @@ import {
 import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import type { ConfirmationRequest } from "../../ui/ConfirmationProvider.tsx";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { useReportTemplateFileMutations } from "./useReportTemplateFileMutations.ts";
 import { buildTemplateFileName, fileNameFromPath, type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
 
@@ -36,6 +37,10 @@ export function useReportTemplateFileWorkspace({
   const [exportPath, setExportPath] = useState(() => buildTemplateFileName(reportType));
   const [importPath, setImportPath] = useState("");
   const desktopAvailable = isDesktopBridgeAvailable();
+  const interaction = useScopedMutation(`${reportType}:${selectedTemplatePath}`, client, {
+    mutationFn: (action: (signal: AbortSignal) => Promise<void>, signal) => action(signal),
+    onError: error => showMessage(readDesktopError(error), "error"),
+  });
   const mutations = useReportTemplateFileMutations({
     client,
     reportType,
@@ -62,28 +67,26 @@ export function useReportTemplateFileWorkspace({
     );
   }
 
-  async function chooseExportPath() {
-    try {
+  function chooseExportPath() {
+    return interaction.mutateAsync(async signal => {
       const value = await requestExportPath();
+      signal.throwIfAborted();
       if (value) {
         setExportPath(value);
         showMessage(null, null);
       }
-    } catch (error) {
-      showMessage(readDesktopError(error), "error");
-    }
+    });
   }
 
-  async function chooseImportPath() {
-    try {
+  function chooseImportPath() {
+    return interaction.mutateAsync(async signal => {
       const value = await selectReportTemplateFile();
+      signal.throwIfAborted();
       if (value) {
         setImportPath(value);
         showMessage(null, null);
       }
-    } catch (error) {
-      showMessage(readDesktopError(error), "error");
-    }
+    });
   }
 
   async function confirmImport(hasChanges: boolean) {
@@ -95,30 +98,33 @@ export function useReportTemplateFileWorkspace({
     });
   }
 
-  async function importFile(canImport: boolean, hasChanges: boolean) {
-    if (!canImport || !await confirmImport(hasChanges)) return;
-    if (desktopAvailable) {
-      try {
+  function importFile(canImport: boolean, hasChanges: boolean) {
+    if (!canImport) return;
+    return interaction.mutateAsync(async signal => {
+      if (!await confirmImport(hasChanges)) return;
+      signal.throwIfAborted();
+      if (desktopAvailable) {
         const value = await selectReportTemplateFile();
+        signal.throwIfAborted();
         if (!value) return;
         setImportPath(value);
         mutations.importFileMutation.mutate(value);
-      } catch (error) {
-        showMessage(readDesktopError(error), "error");
+        return;
       }
-      return;
-    }
-    if (importPath.trim()) mutations.importFileMutation.mutate(importPath.trim());
+      if (importPath.trim()) mutations.importFileMutation.mutate(importPath.trim());
+    });
   }
 
   function exportFile(canExport: boolean) {
     if (!canExport) return;
     if (desktopAvailable) {
-      void requestExportPath().then((value) => {
+      interaction.mutate(async signal => {
+        const value = await requestExportPath();
+        signal.throwIfAborted();
         if (!value) return;
         setExportPath(value);
         mutations.exportFileMutation.mutate(value);
-      }).catch((error) => showMessage(readDesktopError(error), "error"));
+      });
       return;
     }
     mutations.downloadFileMutation.mutate();
@@ -131,8 +137,12 @@ export function useReportTemplateFileWorkspace({
   async function uploadFile(event: ChangeEvent<HTMLInputElement>, canUpload: boolean, hasChanges: boolean) {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
-    if (!file || !canUpload || !await confirmImport(hasChanges)) return;
-    mutations.uploadFileMutation.mutate(file);
+    if (!file || !canUpload) return;
+    return interaction.mutateAsync(async signal => {
+      if (!await confirmImport(hasChanges)) return;
+      signal.throwIfAborted();
+      mutations.uploadFileMutation.mutate(file);
+    });
   }
 
   return {

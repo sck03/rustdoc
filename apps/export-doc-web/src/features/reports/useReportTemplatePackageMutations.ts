@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import {
   ApiReportTemplatePackageExportResponse,
   ApiReportTemplatePackageImportResponse,
@@ -34,16 +34,15 @@ export function useReportTemplatePackageMutations({
   onImported: (response: ApiReportTemplatePackageImportResponse, source: "path" | "upload") => void;
   onError: (error: unknown) => void;
 }) {
-  const queryClient = useQueryClient();
-
-  const exportPackageMutation = useMutation({
-    mutationFn: (packagePath: string) => client.saveReportTemplatePackageToPath({ body: { packagePath } }),
+  const scope = `${reportType}:${selectedTemplatePath}`;
+  const exportPackageMutation = useScopedMutation(scope, client, {
+    mutationFn: (packagePath: string, signal) => client.saveReportTemplatePackageToPath({ body: { packagePath } }, { signal }),
     onSuccess: onExported,
     onError,
   });
 
-  const downloadPackageMutation = useMutation({
-    mutationFn: () => client.downloadReportTemplatePackage(),
+  const downloadPackageMutation = useScopedMutation(scope, client, {
+    mutationFn: (_: void, signal) => client.downloadReportTemplatePackage({ signal }),
     onSuccess: (blob) => {
       const fileName = fileNameFromPath(packageExportPath.trim()) || buildTemplatePackageFileName();
       downloadBlob(blob, fileName.endsWith(".edtpl") ? fileName : `${fileName}.edtpl`);
@@ -52,32 +51,23 @@ export function useReportTemplatePackageMutations({
     onError,
   });
 
-  async function invalidateTemplateQueries() {
-    await queryClient.invalidateQueries({ queryKey: queryKeys.reportTemplates(reportType) });
-    if (selectedTemplatePath) {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.reportTemplateContent(reportType, selectedTemplatePath),
-      });
-    }
-  }
-
-  const importPackageMutation = useMutation({
-    mutationFn: (packagePath: string) =>
-      client.importReportTemplatePackage({ body: { packagePath, strategy: importStrategy } }),
-    onSuccess: async (response) => {
+  const importPackageMutation = useScopedMutation(scope, client, {
+    mutationFn: (packagePath: string, signal) =>
+      client.importReportTemplatePackage({ body: { packagePath, strategy: importStrategy } }, { signal }),
+    onSuccess: (response) => {
       onImported(response, "path");
-      await invalidateTemplateQueries();
     },
+    refreshKeys: () => [queryKeys.reportTemplates(reportType)],
     onError,
   });
 
-  const uploadPackageMutation = useMutation({
-    mutationFn: (file: File) =>
-      client.uploadReportTemplatePackage({ strategy: importStrategy, fileName: file.name, body: file }),
-    onSuccess: async (response) => {
+  const uploadPackageMutation = useScopedMutation(scope, client, {
+    mutationFn: (file: File, signal) =>
+      client.uploadReportTemplatePackage({ strategy: importStrategy, fileName: file.name, body: file }, { signal }),
+    onSuccess: (response) => {
       onImported(response, "upload");
-      await invalidateTemplateQueries();
     },
+    refreshKeys: () => [queryKeys.reportTemplates(reportType)],
     onError,
   });
 

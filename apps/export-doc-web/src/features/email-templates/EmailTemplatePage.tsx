@@ -1,5 +1,5 @@
 import { EditorWorkspace } from "../../ui/layout/Workspaces.tsx";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ApiCrmCustomerDto, ApiEmailTemplateDto, ApiEmailTemplatePreviewDto, ApiEmailTemplateVariableDto, ApiEmailTemplateVersionDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -27,6 +27,7 @@ import { usePermission } from "../../app/PermissionAccessContext.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { EmailHtmlPreview, EmailRichTextEditor } from "../../ui/EmailRichTextEditor.tsx";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 
 type EmailTemplateTaskView = "directory" | "editor" | "variables" | "preview" | "history";
 type EmailTemplateScope = "all" | "editable" | "shared";
@@ -40,7 +41,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
   const requestConfirmation = useConfirmation();
   const navigate = useNavigate();
   const workspace = useEmailTemplateWorkspace(client);
-  const { templates, selected, draft: currentDraft, setDraft, savedDraft, versions, selectedVersionNumber, setSelectedVersionNumber, busy, loadVersions } = workspace;
+  const { templates, selected, draft: currentDraft, setDraft, savedDraft, versions, selectedVersion, catalogPage, historyPage, busy, loadVersions } = workspace;
   const runAbortableOperation = useAbortableOperation(selected?.id);
   const runCatalogOperation = useAbortableOperation(client);
   const [variables, setVariables] = useState<ApiEmailTemplateVariableDto[]>([]);
@@ -62,12 +63,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
   const [crmCustomerId, setCrmCustomerId] = useState(0);
   const [recipientAddress, setRecipientAddress] = useState("");
   const [view, setView] = useState<EmailTemplateTaskView>("directory");
-  const selectedVersion = versions.find((item) => item.versionNumber === selectedVersionNumber) ?? versions[0];
-  const visibleTemplates = useMemo(() => templates.filter((item) => {
-    if (scope === "editable") return item.canEdit;
-    if (scope === "shared") return item.shareScope !== "Private";
-    return true;
-  }), [scope, templates]);
+  function showReadError(error:unknown) {if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));}
   const canEdit = templateEditPermission.allowed && (!selected || selected.canEdit);
   const canDelete = selected?.canArchive === true;
   const isDirty = canEdit && !areEmailTemplateDraftsEqual(currentDraft, savedDraft);
@@ -76,8 +72,8 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     message: "当前邮件模板有未保存的修改。",
   });
 
-  async function loadTemplates(query = { keyword: keyword.trim(), includeArchived }) {
-    await workspace.loadTemplates(query);
+  async function loadTemplates(query = { keyword: keyword.trim(), includeArchived },pageNumber=1) {
+    await workspace.loadTemplates({...query,scope,pageNumber});
   }
 
   async function refreshAfterWrite(message: string) {
@@ -99,7 +95,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
     void Promise.all(requests).catch((error) => {
       if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error)));
     });
-  }, [client, crmViewPermission.allowed, includeArchived]);
+  }, [client, crmViewPermission.allowed, includeArchived, scope]);
 
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -284,7 +280,7 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
       { id: "variables", label: "变量设置", disabled: !templateViewPermission.allowed }, { id: "preview", label: "预览与套用", disabled: !templateViewPermission.allowed },
       { id: "history", label: "版本历史" },
     ]} />
-    {view === "directory" ? <section className="form-section" {...getTaskViewPanelProps(emailTemplateTabsId, "directory")}><div className="section-header"><h3>模板目录</h3><div className="section-header-actions"><span>{visibleTemplates.length} 个</span>{templateEditPermission.allowed ? <button className="primary-button" type="button" onClick={startNewTemplate}>新建模板</button> : null}</div></div>
+    {view === "directory" ? <section className="form-section" {...getTaskViewPanelProps(emailTemplateTabsId, "directory")}><div className="section-header"><h3>模板目录</h3><div className="section-header-actions"><span>{catalogPage.totalCount} 个</span>{templateEditPermission.allowed ? <button className="primary-button" type="button" onClick={startNewTemplate}>新建模板</button> : null}</div></div>
       <form className="toolbar" onSubmit={(event) => {
         event.preventDefault();
         void loadTemplates().catch((error) => {
@@ -297,9 +293,10 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
         <label className="checkbox-field"><input type="checkbox" checked={includeArchived} onChange={(event) => setIncludeArchived(event.target.checked)} />显示归档模板</label>
       </form>
       <ResponsiveTableFrame label="邮件模板列表" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>名称</th><th data-table-priority="secondary">分类</th><th>主题</th><th data-table-priority="secondary">状态与范围</th><th /></tr></thead><tbody>
-        {visibleTemplates.map((item) => <tr key={item.id}><td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.category}</td><td><TablePrimaryText value={item.subject} /></td><td data-table-priority="secondary"><div className="table-row-actions"><BusinessStatusBadge value={emailTemplateStatusLabel(item.status)} />{item.shareScope !== "Private" ? <BusinessStatusBadge value={emailTemplateShareScopeLabel(item.shareScope)} /> : null}</div></td><td><button className="secondary-button" type="button" onClick={() => openTemplate(item)}>{item.canEdit ? "编辑" : "查看"}</button></td></tr>)}
-        {!visibleTemplates.length ? <tr><td className="empty-cell" colSpan={5}><div className="empty-cell-content"><strong>{templates.length ? "当前范围没有模板" : "暂无邮件模板"}</strong>{templates.length ? <span>可切换模板范围，或调整搜索和归档状态条件。</span> : null}</div></td></tr> : null}
+        {templates.map((item) => <tr key={item.id}><td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.category}</td><td><TablePrimaryText value={item.subject} /></td><td data-table-priority="secondary"><div className="table-row-actions"><BusinessStatusBadge value={emailTemplateStatusLabel(item.status)} />{item.shareScope !== "Private" ? <BusinessStatusBadge value={emailTemplateShareScopeLabel(item.shareScope)} /> : null}</div></td><td><button className="secondary-button" type="button" onClick={() => openTemplate(item)}>{item.canEdit ? "编辑" : "查看"}</button></td></tr>)}
+        {!templates.length ? <tr><td className="empty-cell" colSpan={5}>当前范围没有模板。</td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
+      <Pagination {...catalogPage} pageSize={30} isBusy={busy} onPageChange={page=>{void loadTemplates(undefined,page).catch(showReadError);}} />
     </section> : null}
     {view === "editor" ? <form className="form-grid" onSubmit={save} {...getTaskViewPanelProps(emailTemplateTabsId, "editor")}>
         <div className="section-header"><h3>{selected ? "编辑模板" : "新建模板"}</h3><span>{isDirty ? "有未保存修改" : "已同步"}</span></div>
@@ -355,9 +352,10 @@ export function EmailTemplatePage({ client }: { client: ExportDocManagerApiClien
       </section> : null}
       {view === "history" ? <section className="form-section" {...getTaskViewPanelProps(emailTemplateTabsId, "history")}><div className="section-header"><div><h3>版本历史</h3><p className="section-description">每次实际保存都会追加快照；恢复旧版本时仍保留当前历史。</p></div><span>{selected ? `当前 V${selected.versionNumber}` : "未选择模板"}</span></div>
         <ResponsiveTableFrame label="邮件模板版本历史" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>版本</th><th>变更</th><th data-table-priority="secondary">操作账号</th><th data-table-priority="secondary">时间</th><th /></tr></thead><tbody>
-          {versions.map((item) => <tr key={item.id}><td><strong>V{item.versionNumber}</strong>{item.versionNumber === selected?.versionNumber ? " · 当前" : ""}</td><td>{item.changeType}</td><td data-table-priority="secondary">{item.changedBy || "本地用户"}</td><td data-table-priority="secondary">{new Date(item.createdAt).toLocaleString("zh-CN")}</td><td><button className="secondary-button" type="button" onClick={() => setSelectedVersionNumber(item.versionNumber)}>查看</button></td></tr>)}
+          {versions.map((item) => <tr key={item.id}><td><strong>V{item.versionNumber}</strong>{item.versionNumber === selected?.versionNumber ? " · 当前" : ""}</td><td>{item.changeType}</td><td data-table-priority="secondary">{item.changedBy || "本地用户"}</td><td data-table-priority="secondary">{new Date(item.createdAt).toLocaleString("zh-CN")}</td><td><button className="secondary-button" type="button" onClick={() => {void workspace.loadVersion(item.versionNumber).catch(showReadError);}}>查看</button></td></tr>)}
           {!versions.length ? <tr><td className="empty-cell" colSpan={5}>暂无可用版本历史。</td></tr> : null}
         </tbody></table></ResponsiveTableFrame>
+        <Pagination {...historyPage} pageSize={30} isBusy={busy} onPageChange={page=>{void loadVersions(selected?.id,page).catch(showReadError);}} />
         {selectedVersion ? <div className="form-grid"><div className="context-strip form-field-wide"><strong>V{selectedVersion.versionNumber} · {selectedVersion.changeType}</strong><span>{selectedVersion.category} · {emailTemplateStatusLabel(selectedVersion.status)} · {emailTemplateShareScopeLabel(selectedVersion.shareScope)}</span></div><label className="form-field-wide">历史主题<input readOnly value={selectedVersion.subject} /></label><div className="form-field-wide email-rich-text-field"><span className="email-rich-text-field-label">历史正文</span><EmailHtmlPreview html={selectedVersion.bodyHtml} title={`邮件模板 V${selectedVersion.versionNumber} 正文`} /><details className="email-html-advanced"><summary>查看高级 HTML</summary><textarea aria-label="历史邮件正文高级 HTML" rows={8} readOnly value={selectedVersion.bodyHtml} /></details></div><div className="form-actions form-field-wide"><button className="secondary-button" type="button" onClick={() => setView("editor")}>返回模板详情</button>{selectedVersion.canRestore && selectedVersion.versionNumber !== selected?.versionNumber ? <button className="primary-button" type="button" onClick={() => void restoreVersion(selectedVersion)}>恢复此版本</button> : null}</div></div> : null}
       </section> : null}
   </EditorWorkspace>;

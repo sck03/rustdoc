@@ -4,6 +4,8 @@
 
 ## 本地入口
 
+2026-11-10 模板回归：`test:report-template-draft-ui` 同时执行 `test_report_template_commands_ui.mjs`，使用真实 React/QueryClient 检查作用域取消、迟到结果、重复提交、非阻塞刷新和大文件命令缓存释放。`test:email-template-workspace-ui` 检查目录/历史分页及详情取消，`test:review-workflows-ui` 通过真实 HTTP 验证版本读取与恢复。`test-native-postgres.ps1 -Scope All` 的团队合同启用 `mail`，与 SQLite 共用邮件重名、目录分页及历史摘要/详情场景；Storage 双库合同覆盖授权筛选和 HS 游标/时间边界。知识包损坏回滚另由 `tools_service` 验证，详见[本批记录](../docs/2026-11-10模板作用域与资源优化记录.md)。
+
 2026-11-09 知识库与资源回归：`test:concurrency-feedback` 纳入 `test_hs_example_workspaces_ui.mjs`，覆盖中文续编、卸载取消、选择时版本删除、删除期间字段锁和候选按需共享查询。SQLite 工具合同与 PostgreSQL `-Scope All` 复用实例版本/批删回滚/历史款式聚合场景。待办第二页起必须传上一页 `nextCursor`，筛选或页容量变化重新取首页。实现、验证及定向清理见[本批记录](../docs/2026-11-09知识库并发与有界资源修复记录.md)。
 
 2026-11-09 事务与资源收尾：`test:abortable-operations-ui` 增加发票列表的关闭、切换、卸载、迟到成功/失败与 StrictMode 回归；Storage 同一合同覆盖 SQLite/PostgreSQL 申报版本聚合。GitHub actionlint 固定版本归档缓存仍逐次校验摘要，网络 504 使用有界重试。当前数据库为 schema 16，详见[收尾记录](../docs/2026-11-09事务边界与资源收尾记录.md)。
