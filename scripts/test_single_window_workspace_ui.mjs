@@ -363,8 +363,10 @@ try {
   await scenario("sources", async page => {
     await page.getByRole('button', { name: '下载 Excel 模板' }).click();
     await page.waitForFunction(() => window.pending.length === 1);
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].find(button => button.textContent.trim() === '下载 Excel 模板')?.disabled);
     await page.evaluate(() => window.changeClient());
-    await page.getByRole('button', { name: '下载 Excel 模板' }).waitFor();
+    // Visibility is unchanged by a client switch; wait for the old command to release its busy state.
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.trim() === '下载 Excel 模板' && !button.disabled));
     await page.evaluate(() => window.pending[0].resolve('E:/late.xlsx'));
     assert.equal(await page.evaluate(() => window.pending.length), 1, 'late save dialog must not start a job');
   }, true);
