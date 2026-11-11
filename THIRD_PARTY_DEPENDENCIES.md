@@ -430,7 +430,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | libloading | 0.9.0 | ISC | ocr, rust-workspace |
 | libm | 0.2.16 | MIT | rust-workspace |
 | libredox | 0.1.25 | MIT | rust-workspace |
-| libsqlite3-sys | 0.38.2 | MIT | rust-workspace |
+| libsqlite3-sys | 0.39.1 | MIT | rust-workspace |
 | linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | rust-workspace |
 | litemap | 0.8.3 | Unicode-3.0 | rust-workspace |
 | litrs | 1.0.1 | MIT OR Apache-2.0 | rust-workspace |
@@ -580,7 +580,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | ring | 0.17.14 | Apache-2.0 AND ISC | rust-workspace |
 | roxmltree | 0.20.0 | MIT OR Apache-2.0 | rust-workspace |
 | roxmltree | 0.21.1 | MIT OR Apache-2.0 | rust-workspace |
-| rusqlite | 0.40.2 | MIT | rust-workspace |
+| rusqlite | 0.41.1 | MIT | rust-workspace |
 | rust_decimal | 1.43.0 | MIT | rust-workspace |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 | rust-workspace |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT | rust-workspace |

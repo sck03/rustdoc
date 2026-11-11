@@ -289,7 +289,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | libloading | 0.9.0 | ISC | ocr, rust-workspace |
 | cargo | libm | 0.2.16 | MIT | rust-workspace |
 | cargo | libredox | 0.1.25 | MIT | rust-workspace |
-| cargo | libsqlite3-sys | 0.38.2 | MIT | rust-workspace |
+| cargo | libsqlite3-sys | 0.39.1 | MIT | rust-workspace |
 | cargo | linux-raw-sys | 0.12.1 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | rust-workspace |
 | cargo | litemap | 0.8.3 | Unicode-3.0 | rust-workspace |
 | cargo | litrs | 1.0.1 | MIT OR Apache-2.0 | rust-workspace |
@@ -439,7 +439,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | ring | 0.17.14 | Apache-2.0 AND ISC | rust-workspace |
 | cargo | roxmltree | 0.20.0 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | roxmltree | 0.21.1 | MIT OR Apache-2.0 | rust-workspace |
-| cargo | rusqlite | 0.40.2 | MIT | rust-workspace |
+| cargo | rusqlite | 0.41.1 | MIT | rust-workspace |
 | cargo | rust_decimal | 1.43.0 | MIT | rust-workspace |
 | cargo | rustc_version | 0.4.1 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | rustc-hash | 2.1.3 | Apache-2.0 OR MIT | rust-workspace |

@@ -53,10 +53,21 @@ impl From<rusqlite::Error> for Error {
     }
 }
 impl Sqlite {
+    fn configure(mut connection: SqliteConnection) -> Result<SqliteConnection> {
+        search::register(&connection)?;
+        connection.progress_handler(1000, Some(operation::cancelled as fn() -> bool))?;
+        Ok(connection)
+    }
+    fn read_verified(path: &Path) -> Result<SqliteConnection> {
+        let connection = Self::configure(SqliteConnection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )?)?;
+        Self::validate(&connection)?;
+        Ok(connection)
+    }
     pub fn prepare_restore_file(source: &Path, destination: &Path) -> Result<()> {
-        let source =
-            SqliteConnection::open_with_flags(source, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-        Self::validate(&source)?;
+        let source = Self::read_verified(source)?;
         // The caller supplies a managed scratch path; never overwrite a backup or business file.
         drop(
             std::fs::OpenOptions::new()
@@ -72,17 +83,12 @@ impl Sqlite {
         Ok(())
     }
     pub fn verify_file(path: &Path) -> Result<()> {
-        Self::validate(&SqliteConnection::open_with_flags(
-            path,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-        )?)
+        Self::read_verified(path).map(|_| ())
     }
     pub fn open(path: &Path) -> Result<Self> {
         let fresh = !path.try_exists()?;
-        let mut connection = SqliteConnection::open(path)?;
-        search::register(&connection)?;
+        let mut connection = Self::configure(SqliteConnection::open(path)?)?;
         connection.set_prepared_statement_cache_capacity(128);
-        connection.progress_handler(1000, Some(operation::cancelled as fn() -> bool))?;
         connection.busy_timeout(Duration::from_secs(5))?;
         connection.pragma_update(None, "foreign_keys", true)?;
         // Reject invalid existing files before changing their journal mode. Configure WAL before
@@ -186,9 +192,7 @@ impl Sqlite {
         Ok(version.expect("validated marker"))
     }
     fn validate(connection: &SqliteConnection) -> Result<()> {
-        search::register(connection)?;
         operation::check()?;
-        connection.progress_handler(1000, Some(operation::cancelled as fn() -> bool))?;
         Self::validate_structure(connection)?;
         let integrity: String = connection.query_cached("PRAGMA quick_check", [], |r| r.get(0))?;
         if integrity != "ok" {
@@ -688,27 +692,18 @@ impl Adapter for Sqlite {
     }
     fn backup(&self, path: &Path) -> Result<()> {
         let source = self.connection.borrow();
-        let mut target = SqliteConnection::open(path)?;
+        let mut target = Self::configure(SqliteConnection::open(path)?)?;
         copy(&source, &mut target)?;
         Self::validate(&target)
     }
     fn restore(&self, path: &Path) -> Result<()> {
-        let source =
-            SqliteConnection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-        Self::validate(&source)?;
-        if Self::version(&source)? != SCHEMA_VERSION {
-            return Err(Error::unavailable(
-                "请先在受管暂存目录升级备份，再替换当前业务库。",
-            ));
-        }
+        let source = Self::read_verified(path)?;
         let mut destination = self.connection.borrow_mut();
         copy(&source, &mut destination)?;
         Self::validate(&destination)
     }
     fn verify_backup(&self, path: &Path) -> Result<()> {
-        let source =
-            SqliteConnection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-        Self::validate(&source)
+        Self::verify_file(path)
     }
 }
 fn copy(source: &SqliteConnection, destination: &mut SqliteConnection) -> Result<()> {

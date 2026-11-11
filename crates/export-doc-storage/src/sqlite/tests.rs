@@ -6,11 +6,7 @@ use std::sync::{
 };
 
 fn memory() -> Sqlite {
-    let connection = SqliteConnection::open_in_memory().unwrap();
-    search::register(&connection).unwrap();
-    connection
-        .progress_handler(1000, Some(operation::cancelled as fn() -> bool))
-        .unwrap();
+    let connection = Sqlite::configure(SqliteConnection::open_in_memory().unwrap()).unwrap();
     Sqlite {
         connection: RefCell::new(connection),
     }

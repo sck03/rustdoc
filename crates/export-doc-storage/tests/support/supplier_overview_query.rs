@@ -13,6 +13,15 @@ fn insert(c: &Connection, kind: &str, mut body: Value, owner: i64, company: &str
 }
 pub fn exercise(c: &Connection) {
     c.begin().unwrap();
+    let scope = DataScope {
+        company_wide: true,
+        company: "SUPPLIER-Q",
+        user_id: 71,
+        ..Default::default()
+    };
+    let empty = c.supplier_overview(&scope).unwrap();
+    assert_eq!(empty["totalSuppliers"], 0);
+    assert_eq!(empty["items"], json!([]));
     let mut suppliers = vec![];
     for (name, owner, company) in [
         ("甲", 71, "SUPPLIER-Q"),
@@ -22,6 +31,9 @@ pub fn exercise(c: &Connection) {
     ] {
         suppliers.push(insert(c, "suppliers", json!({"name":name,"status":"Active","category":"制造","unusedLargeBody":"not projected"}), owner, company));
     }
+    let unassessed = c.supplier_overview(&scope).unwrap();
+    assert_eq!(unassessed["totalSuppliers"], 3);
+    assert_eq!(unassessed["items"], json!([]));
     for (supplier, date, quality, state, conclusion, notes) in [
         (0, "2026-10-20", 1, "Confirmed", "合格", json!("旧评价")),
         (0, "2026-10-29", 3, "Confirmed", "观察", json!("同日旧编号")),
@@ -49,12 +61,6 @@ pub fn exercise(c: &Connection) {
             },
         );
     }
-    let scope = DataScope {
-        company_wide: true,
-        company: "SUPPLIER-Q",
-        user_id: 71,
-        ..Default::default()
-    };
     let data = c.supplier_overview(&scope).unwrap();
     assert_eq!(data["totalSuppliers"], 3);
     let items = data["items"].as_array().unwrap();

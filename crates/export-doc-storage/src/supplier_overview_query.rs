@@ -73,8 +73,13 @@ pub(crate) fn build(scope: &DataScope<'_>, pg: bool) -> (String, Vec<String>) {
     } else {
         "json_group_array(json(item))"
     };
+    let items = format!(
+        "(SELECT {aggregate} FROM (SELECT {item} AS item FROM ranked a JOIN visible s ON s.id=CAST({parent} AS BIGINT) WHERE a.row_rank=1 ORDER BY {order}) items)"
+    );
+    // SQLite subqueries return SQL text; restore JSON explicitly at the parent boundary.
+    let items = if pg { items } else { format!("json({items})") };
     let body = format!(
-        "{object}('totalSuppliers',(SELECT COUNT(*) FROM visible),'invalidCount',(SELECT COUNT(*) FROM record_rows a WHERE a.kind='supplier-assessments' AND {confirmed}='Confirmed' AND ({invalid})),'items',(SELECT {aggregate} FROM (SELECT {item} AS item FROM ranked a JOIN visible s ON s.id=CAST({parent} AS BIGINT) WHERE a.row_rank=1 ORDER BY {order}) items))"
+        "{object}('totalSuppliers',(SELECT COUNT(*) FROM visible),'invalidCount',(SELECT COUNT(*) FROM record_rows a WHERE a.kind='supplier-assessments' AND {confirmed}='Confirmed' AND ({invalid})),'items',{items})"
     );
     let statement = format!(
         "WITH visible AS (SELECT r.id,r.body FROM record_rows r WHERE r.kind='suppliers' AND {visible}), ranked AS (SELECT a.id,a.body,ROW_NUMBER() OVER (PARTITION BY {parent} ORDER BY {date} DESC,a.id DESC) AS row_rank,COUNT(*) OVER (PARTITION BY {parent}) AS assessment_count FROM record_rows a WHERE a.kind='supplier-assessments' AND {confirmed}='Confirmed' AND CAST({parent} AS BIGINT) IN (SELECT id FROM visible)) SELECT {body}{}",

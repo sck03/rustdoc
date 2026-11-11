@@ -127,6 +127,19 @@ pub fn exercise(db: &Connection) {
         };
         assert_eq!(db.query_communications(&q).unwrap().0, expected);
     }
+    // Real notification pages combine permissions for several workflow kinds at once.
+    let mut scopes: Vec<_> = (0..12)
+        .map(|index| scope(&format!("oa-other-{index}"), 2, vec![], None))
+        .collect();
+    scopes.push(scope("oa-general", 2, vec![], None));
+    for scope in &mut scopes {
+        scope.workflow_date = Some(chrono::NaiveDate::from_ymd_opt(2026, 9, 30).unwrap());
+    }
+    let combined = CommunicationQuery {
+        view: CommunicationView::Notifications { scopes: &scopes },
+        ..q
+    };
+    assert_eq!(db.query_communications(&combined).unwrap().0, 1);
     // Finance status and department limits apply before counting and pagination.
     for (index, status) in ["Approved", "HandedOff", "Draft", "Pending", "Cancelled"]
         .iter()
