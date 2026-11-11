@@ -47,7 +47,8 @@ export function useReportExportDefaults({
     refreshKeys: (_, input) => input.kind === "save" ? [queryKeys.settings()] : [],
     onError: (error) => {
       const message = readApiError(error), conflict = isConcurrencyConflict(error);
-      setConcurrencyMessage(conflict ? message : null);
+      // A failed read cannot resolve the earlier version conflict.
+      if (conflict) setConcurrencyMessage(message);
       onFeedback(conflict ? "" : message, "error");
     },
   });

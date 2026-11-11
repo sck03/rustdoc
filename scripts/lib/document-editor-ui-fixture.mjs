@@ -108,7 +108,7 @@ window.__changePaymentOnServer=patch=>{payment={...payment,...patch,rowVersion:p
 function LocationProbe(){const current=useLocation(),navigate=useNavigate(),confirm=useConfirmUnsavedChanges();window.__navigate=navigate;window.__navigateGuarded=async target=>{if(await confirm('离开当前页面'))navigate(target);};window.__route=current.pathname+current.search;return null;}
 function ExportDefaultsFixture(){
   const query=useQuery({queryKey:['settings'],queryFn:()=>client.getSettings()});
-  const defaults=useReportExportDefaults({client,response:query.data,refetch:query.refetch,onFeedback:message=>{window.__feedback=message;}});
+  const defaults=useReportExportDefaults({client,response:query.data,onFeedback:message=>{window.__feedback=message;}});
   return <ReportExportDefaultsPanel {...defaults} isBusy={defaults.isBusy||query.isFetching} canManageSettings={!readonly} templates={[]}/>;
 }
 const grants=['document.invoices','document.payments','document.master-data','document.reports','document.excel'].map(moduleKey=>({moduleKey,accessLevel:readonly?'view':'manage'}));
