@@ -26,9 +26,11 @@ const deferred=(kind,request,init)=>new Promise((resolve,reject)=>window.request
 const project=id=>({id,versionNumber:1,name:id===2?"乙方案":"甲方案",containerType:"20GP",container:{length:589,width:235,height:239,volume:33.2,maxWeight:28000},rules:{allowRotation:true},cargoItems:[{name:id===2?"乙货物":"甲货物",length:60,width:40,height:40,weight:10,quantity:id===2?77:50}]});
 const client={listContainerPackingProjects:async()=>({projects:[project(1),project(2)]}),listContainerPackingContainerTypes:async()=>({containerTypes:[]}),
 getContainerPackingProject:(r,i)=>deferred("load",r,i),saveContainerPackingProject:(r,i)=>deferred("save",r,i),deleteContainerPackingProject:(r,i)=>deferred("delete",r,i),
+analyzeContainerPacking:(r,i)=>deferred("analyze",r,i),
 uploadLetterOfCreditDocument:(r,i)=>deferred("import",r,i),reviewLetterOfCreditCompliance:(r,i)=>deferred("review",r,i)};
 window.finish=index=>{const pending=window.requests[index];
 if(pending.kind==="load")pending.resolve({project:project(pending.request.id)});
+else if(pending.kind==="analyze")pending.resolve({analysis:null,diagnostic:"x".repeat(200000)});
 else if(pending.kind==="save")pending.resolve({id:pending.request.body.id||1,project:{...pending.request.body,id:pending.request.body.id||1,versionNumber:(pending.request.body.expectedVersion||0)+1}});
 else if(pending.kind==="import")pending.resolve({sourcePath:"甲信用证.txt",extractedText:"甲信用证正文",sourceDescription:"甲信用证"});
 else pending.resolve({contextSummary:"甲审核",reportText:"甲审核结果"});};
@@ -63,6 +65,20 @@ async function importCredit(page) {
   await page.waitForFunction(() => window.requests.length === 1);
 }
 try {
+  await scenario("packing", async page => {
+    for (let index = 0; index < 20; index++) {
+      await page.getByRole("button", { name: "立即生成效果图", exact: true }).click();
+      await page.waitForFunction(index => window.requests.length === index + 1, index);
+      await page.evaluate(index => window.finish(index), index);
+      await page.getByRole("button", { name: "立即生成效果图", exact: true }).waitFor();
+    }
+    assert.equal(await page.evaluate(() => window.queries.getMutationCache().getAll().length), 0);
+    await page.getByRole("button", { name: "立即生成效果图", exact: true }).click();
+    await page.waitForFunction(() => window.requests.length === 21);
+    await page.evaluate(() => window.hide()); await page.getByText("unmounted").waitFor();
+    assert.equal(await page.evaluate(() => window.requests[20].signal.aborted), true);
+    await page.evaluate(() => window.finish(20));
+  });
   await scenario("packing", async page => {
     await page.getByLabel("方案名称", { exact: true }).fill("提交名称");
     await page.getByRole("button", { name: "保存方案", exact: true }).click(); await page.waitForFunction(() => window.requests.length === 1);

@@ -179,6 +179,7 @@ pub fn generate(document: &Value, operations: &[Operation<'_>]) -> Result<(Strin
         }
         let mut contract = json!({"policy":op.value["x-exportdoc-policy"], "office":op.value["x-exportdoc-office"], "parameters":op.value.get("parameters").cloned().unwrap_or(json!([])), "requestBody":op.value["requestBody"], "responses":op.value["responses"], "request":request, "response":response});
         contract["timeoutSeconds"] = op.value["x-exportdoc-timeout-seconds"].clone();
+        contract["requiresProcessingSlot"] = op.value["x-exportdoc-processing-slot"].clone();
         if let Some(metadata) = op.value.get("x-exportdoc-communication") {
             contract["communication"] = metadata.clone();
         }

@@ -3,7 +3,7 @@ import { useReportTemplateDocument } from "./useReportTemplateDocument.ts";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import "../../styles/routes/reports.css";
 import { useLocation } from "react-router-dom";
-import { ApiReportTemplatePreviewResponse, ApiUserReportTemplateDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import { ApiUserReportTemplateDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useWorkspaceDeviceProfile } from "../../app/workspaceDevice.ts";
 import {
   isDesktopBridgeAvailable,
@@ -11,6 +11,7 @@ import {
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useScopedConfirmation } from "../../ui/useScopedConfirmation.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { WorkspaceDeviceNotice } from "../../ui/WorkspaceDeviceNotice.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
@@ -35,7 +36,8 @@ import { useUserReportTemplateLifecycleMutations } from "./useUserReportTemplate
 import { useDefaultReportTemplateLifecycleMutations } from "./useDefaultReportTemplateLifecycleMutations.ts";
 import { useReportTemplatePackageWorkspace } from "./useReportTemplatePackageWorkspace.ts";
 import { useReportTemplateFileWorkspace } from "./useReportTemplateFileWorkspace.ts";
-import { useReportTemplatePreviewMutations } from "./useReportTemplatePreviewMutations.ts";
+import { useReportTemplatePreview } from "./useReportTemplatePreview.ts";
+import { useReportTemplateReload } from "./useReportTemplateReload.ts";
 import {
   buildNewTemplateFileName,
   buildUserTemplateKey,
@@ -75,7 +77,7 @@ export function ReportTemplateWorkspacePage({
   const workspaceDeviceMode = workspaceDeviceProfile.mode;
   const workspaceDeviceCapabilities = workspaceDeviceProfile.capabilities;
   const isLimitedReportView = !workspaceDeviceCapabilities.canUseDenseWorkbench;
-  const requestConfirmation = useConfirmation();
+  const confirm = useConfirmation();
   const { availableReportTypeOptions, invoicePreviewPermission, paymentPreviewPermission } =
     useReportTemplateDocumentAccess(templateAccess.view);
   const location = useLocation();
@@ -93,6 +95,9 @@ export function ReportTemplateWorkspacePage({
   const [selectedTemplatePath, setSelectedTemplatePath] = useState("");
   const [savedTemplatePath, setSavedTemplatePath] = useState<string | null>(null);
   const [selectedUserTemplateId, setSelectedUserTemplateId] = useState(() => requestedUserTemplateId);
+  const confirmationScope = useMemo(() => ({ client, reportType, selectedTemplatePath, selectedUserTemplateId }),
+    [client, reportType, selectedTemplatePath, selectedUserTemplateId]);
+  const requestConfirmation = useScopedConfirmation(confirmationScope, confirm);
   const { document, hasUnsavedChanges: hasUnsavedTemplateChanges, loadFile, loadUser, clear: clearDocument,
     acceptName, readContent: readDesignerContent, setName: setCurrentTemplateDisplayName, setDraft: setDesignerDraft } = useReportTemplateDocument();
   const { content, path: contentTemplatePath, baseline: loadedContent, name: currentTemplateDisplayName,
@@ -105,15 +110,12 @@ export function ReportTemplateWorkspacePage({
   const [templatePreviewSampleProfile, setTemplatePreviewSampleProfile] = useState<ReportDesignerPreviewSampleProfile>(() =>
     readPreferredPreviewSampleProfile(initialReportType),
   );
-  const [preview, setPreview] = useState<ApiReportTemplatePreviewResponse | null>(null);
-  const clearPreview = useCallback(() => setPreview(null), []);
   const [previewInvoiceId, setPreviewInvoiceId] = useState(() =>
     initialReportType === "PaymentVoucher" ? 0 : requestedPreviewSourceId,
   );
   const [previewPaymentId, setPreviewPaymentId] = useState(() =>
     initialReportType === "PaymentVoucher" ? requestedPreviewSourceId : 0,
   );
-  useEffect(() => setPreview(null), [reportType, selectedTemplatePath, content, designerDraftContent, previewInvoiceId, previewPaymentId]);
   const [newTemplateFileName, setNewTemplateFileName] = useState(() => buildNewTemplateFileName(initialReportType));
   const [newTemplateDisplayName, setNewTemplateDisplayName] = useState("");
   const [newUserTemplateName, setNewUserTemplateName] = useState("");
@@ -163,13 +165,35 @@ export function ReportTemplateWorkspacePage({
   );
   const defaultTemplatePath = readDefaultReportTemplatePath(settingsQuery.data?.settings, reportType);
   const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
+  const { preview, generate: generatePreview, isPending: previewPending, clear: clearPreview,
+    previewFormat, setPreviewFormat, page: previewPage } = useReportTemplatePreview({
+    client,
+    reportType,
+    selectedTemplatePath,
+    content: designerDraftContent.trim() ? designerDraftContent : content,
+    sampleProfile: templatePreviewSampleProfile,
+    mode: templatePreviewMode,
+    canDesignTemplates,
+    withSeal: reportType === "ExportDocument" && (currentTemplate?.withSealDefault ?? true),
+    previewInvoiceId,
+    previewPaymentId,
+    onPreviewed: () => {
+      setWorkspaceMode("preview");
+      setMessage(null);
+      setMessageType(null);
+    },
+    onError: error => {
+      setMessage(readApiError(error));
+      setMessageType("error");
+    },
+  });
   const packageWorkspace = useReportTemplatePackageWorkspace({
     client,
     reportType,
     selectedTemplatePath,
     defaultExportDirectory,
     requestConfirmation,
-    clearPreview: () => setPreview(null),
+    clearPreview,
     showMessage: (nextMessage, nextType) => { setMessage(nextMessage); setMessageType(nextType); },
   });
 
@@ -182,7 +206,6 @@ export function ReportTemplateWorkspacePage({
   const exportDefaults = useReportExportDefaults({
     client,
     response: settingsQuery.data,
-    refetch: settingsQuery.refetch,
     onFeedback: showFeedback,
   });
 
@@ -196,8 +219,8 @@ export function ReportTemplateWorkspacePage({
   const handleTemplateFileImported = useCallback((template: NonNullable<typeof templateContentQuery.data>) => {
     setSelectedTemplatePath(template.templatePath);
     loadFile(template, true);
-    setPreview(null);
-  }, [loadFile]);
+    clearPreview();
+  }, [loadFile, clearPreview]);
   useEffect(() => {
     setRenameTemplateFileName(fileNameFromPath(contentTemplatePath));
   }, [contentTemplatePath]);
@@ -243,15 +266,16 @@ export function ReportTemplateWorkspacePage({
   });
 
   const clearSelectionFeedback = useCallback(() => {
-    setPreview(null);
+    clearPreview();
     setMessage(null);
     setMessageType(null);
-  }, []);
+  }, [clearPreview]);
 
-  const { confirmDiscardChanges } = useUnsavedChangesGuard({
+  const { confirmDiscardChanges: confirmDiscard } = useUnsavedChangesGuard({
     isDirty: hasUnsavedTemplateChanges,
     message: "当前报表模板有未保存的修改。",
   });
+  const confirmDiscardChanges = useScopedConfirmation(confirmationScope, confirmDiscard);
   const {
     handleReportTypeChange,
     handleTemplateChange,
@@ -367,14 +391,14 @@ export function ReportTemplateWorkspacePage({
         setRenameTemplateFileName(fileNameFromPath(created.templatePath));
         setNewTemplateFileName(buildNewTemplateFileName(reportType));
         setNewTemplateDisplayName("");
-        setPreview(null);
+        clearPreview();
         showFeedback("模板已新建。", "success");
       },
       onRenamed: (renamed) => {
         setSelectedTemplatePath(renamed.templatePath);
         loadFile(renamed, true);
         setRenameTemplateFileName(fileNameFromPath(renamed.templatePath));
-        setPreview(null);
+        clearPreview();
         showFeedback("模板文件名已更新。", "success");
       },
       onDisplayNameUpdated: (updated) => {
@@ -387,35 +411,20 @@ export function ReportTemplateWorkspacePage({
         clearDocument();
         setRenameTemplateFileName("");
         setCurrentTemplateDisplayName("");
-        setPreview(null);
+        clearPreview();
         showFeedback("模板已删除。", "success");
       },
       onError: (error) => showFeedback(readApiError(error), "error"),
     });
 
-  const { previewMutation, previewFormat, setPreviewFormat, page: previewPage } = useReportTemplatePreviewMutations({
-    client,
-    reportType,
-    selectedTemplatePath,
-    content: designerDraftContent.trim() ? designerDraftContent : content,
-    sampleProfile: templatePreviewSampleProfile,
-    mode: templatePreviewMode,
-    canDesignTemplates,
-    withSeal: reportType === "ExportDocument" && (currentTemplate?.withSealDefault ?? true),
-    previewInvoiceId,
-    previewPaymentId,
-    onReset: clearPreview,
-    onPreviewed: (response) => {
-      setPreview(response);
-      setWorkspaceMode("preview");
-      setMessage(null);
-      setMessageType(null);
+  const reloadTemplate = useReportTemplateReload({
+    client, reportType, selectedTemplatePath, selectedUserTemplateId,
+    onLoaded: result => {
+      if (result.kind === "user") loadUser(result.template, true);
+      else loadFile(result.template, true);
+      clearSelectionFeedback();
     },
-    onError: (error) => {
-      setPreview(null);
-      setMessage(readApiError(error));
-      setMessageType("error");
-    },
+    onError: error => showFeedback(readApiError(error), "error"),
   });
 
   const {
@@ -496,7 +505,8 @@ export function ReportTemplateWorkspacePage({
       restoreUserTemplateVersionMutation.isPending,
       updateUserTemplateStatusMutation.isPending,
       exportDefaults.isBusy,
-      previewMutation.isPending,
+      previewPending,
+      reloadTemplate.isPending,
     ],
     canManageTemplates,
     canDesignTemplates,
@@ -540,12 +550,12 @@ export function ReportTemplateWorkspacePage({
     reportType,
     selectedTemplateContentActive,
     selectedTemplatePath,
-    renderPreview: nextContent => previewMutation.mutate({ content: nextContent }),
+    renderPreview: nextContent => { void generatePreview({ content: nextContent }); },
     saveDefaultTemplateContent: (nextContent) => saveMutation.mutate(nextContent),
     saveUserTemplateContent: (nextContent) => saveUserTemplateMutation.mutate(nextContent),
     setMessage,
     setMessageType,
-    setPreview,
+    clearPreview,
     setTemplatePreviewMode,
     setTemplatePreviewSampleProfile,
     setWorkspaceMode,
@@ -612,22 +622,7 @@ export function ReportTemplateWorkspacePage({
       confirmDiscardChanges,
       requestConfirmation,
       exportDefaultsDirty: exportDefaults.isDirty,
-      refetchTemplates: async () => {
-        await Promise.all([templatesQuery.refetch(), userTemplatesQuery.refetch()]);
-        if (selectedUserTemplateId > 0) {
-          const users = await userTemplateContentQuery.refetch();
-          const selected = users.data;
-          if (users.isError || !selected) { showFeedback(users.isError ? readApiError(users.error) : "模板不存在或已无权访问，本地草稿已保留。", "error"); return; }
-          loadUser(selected, true);
-        } else {
-          const result = await templateContentQuery.refetch();
-          if (result.isError || !result.data) { showFeedback(readApiError(result.error), "error"); return; }
-          loadFile(result.data, true);
-        }
-        setPreview(null);
-        setMessage(null);
-        setMessageType(null);
-      },
+      refetchTemplates: () => reloadTemplate.mutateAsync(),
     });
 
   const selectionPanelProps = {
@@ -826,14 +821,12 @@ export function ReportTemplateWorkspacePage({
             sourceOptions={previewDocumentOptions}
             renderedHtml={renderedPreviewHtml}
             isBusy={isBusy}
-            canPreview={canRenderTemplatePreview}
             onModeChange={handleTemplatePreviewModeChange}
             onSampleProfileChange={handleTemplatePreviewSampleProfileChange}
             onSourceChange={handlePreviewSourceChange}
-            onPreview={handleRenderTemplatePreview}
             pdf={{ format: previewFormat, ...previewPage,
-              onFormatChange: format => { setPreviewFormat(format); setPreview(null); },
-              onPageChange: pageIndex => previewMutation.mutate({ pageIndex, previewRevision: previewPage.previewRevision }),
+              onFormatChange: setPreviewFormat,
+              onPageChange: pageIndex => { void generatePreview({ pageIndex, previewRevision: previewPage.previewRevision }); },
             }}
           />
         </div>

@@ -135,7 +135,6 @@ try {
   await navigate(`${url}/#/reports/templates?template=invoice_template.dtpl&invoiceId=${invoiceId}`);
   await wait("document.querySelector('.report-designer-v3-workspace')","Designer missing");
   await click("预览");
-  await click("样例预览");
   await wait("document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('<svg')","Native sample missing");
   const sample=await run("document.querySelector('iframe[title=模板预览]').srcdoc");
   assert.match(sample,/USD\d/);assert.doesNotMatch(sample,/{{/);
@@ -144,8 +143,8 @@ try {
   fs.writeFileSync(path.join(output,"sample.html"),sample);
   await captureScreenshot(page,path.join(output,"sample.png"));
   await click("当前单据");
-  await wait("[...document.querySelectorAll('button')].some(e=>e.textContent.trim()==='真实数据预览'&&!e.disabled)","Saved preview not ready");
-  await click("真实数据预览");
+  await wait("[...document.querySelectorAll('.report-template-designer-toolbar button')].some(e=>e.textContent.trim()==='预览'&&!e.disabled)","Saved preview not ready");
+  await click("预览");
   await wait("document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('UI-SEAL-001')","Saved invoice preview missing");
   const real=await run("document.querySelector('iframe[title=模板预览]').srcdoc");
   assert.match(real,/EUR11\.00/);assert.match(real,/EUR11011\.00/);

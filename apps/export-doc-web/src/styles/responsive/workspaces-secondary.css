@@ -178,15 +178,6 @@
     grid-template-columns: 1fr;
   }
 
-  .report-template-preview-actions {
-    justify-content: stretch;
-  }
-
-  .report-template-preview-actions .command-button {
-    width: 100%;
-    justify-content: center;
-  }
-
   .report-template-preview iframe {
     min-height: 420px;
   }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useQuery, useIsMutating } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient, HsCodeKnowledgeFeedbackInput } from "../../../api/index.ts";
 import { useModulePermission } from "../../../app/PermissionAccessContext.tsx";
@@ -10,6 +10,7 @@ import { useUnsavedChangesGuard } from "../../../ui/unsavedChangesGuard.tsx";
 import { isComposingKey } from "../../../ui/keyboardEvent.ts";
 import { useServerDraftSync } from "../../../ui/serverDraftSync.tsx";
 import { useConfirmation } from "../../../ui/ConfirmationProvider.tsx";
+import { useScopedConfirmation } from "../../../ui/useScopedConfirmation.ts";
 import { hasCustomOptionValue } from "../../custom-options/customOptionModel.ts";
 import { canDeleteInvoiceStatus, canUnverifyInvoiceStatus, canTransitionInvoiceStatus, createEmptyInvoice, getCounterpartInvoiceType, getInvoiceStatusActionLabel, getNextInvoiceStatus, isInvoiceEditableStatus, createInvoiceDetailsProjector, normalizeInvoiceForSave, normalizeInvoiceStatus, normalizeInvoiceType, readRouteInvoiceDraft, readRouteInvoiceImportAction, type RouteInvoiceImportAction, uppercaseInvoiceEnglishText } from "../invoiceModel.ts";
 import { areInvoiceDraftsEqual } from "../invoiceDraftEquality.ts";
@@ -19,7 +20,7 @@ import { useInvoiceEditorReferenceData } from "../useInvoiceEditorReferenceData.
 import { useInvoiceItemsWorkspace } from "../useInvoiceItemsWorkspace.ts";
 import { useInvoicePersistenceOperations } from "../useInvoicePersistenceOperations.ts";
 import { readInvoiceSaveContinuation } from "../invoiceSaveModel.ts";
-import { invoiceControlMutationKey } from "../invoiceCache.ts";
+import { useInvoiceControlOperations } from "../useInvoiceControlOperations.ts";
 import { readInvoiceEditorSection, type InvoiceEditorSectionId } from "../invoiceEditorSections.ts";
 
 
@@ -31,7 +32,7 @@ export function useInvoiceEditorWorkspace({ businessDate, client, mode }: {
 }) {
   const masterDataPermission = useModulePermission("document.master-data");
   const reportDesignPermission = useModulePermission("document.reports");
-  const requestConfirmation = useConfirmation();
+  const confirm = useConfirmation();
   const { invoiceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -79,7 +80,12 @@ export function useInvoiceEditorWorkspace({ businessDate, client, mode }: {
           routeInvoiceDraft.items?.length ?? 0
         }`
       : null;
-  const invoiceControlBusy = useIsMutating({ mutationKey: invoiceControlMutationKey(parsedInvoiceId) }) > 0;
+  const confirmationScope = useMemo(() => ({}), [client, parsedInvoiceId, isNew]);
+  const requestConfirmation = useScopedConfirmation(confirmationScope, confirm);
+  const { invoiceControlBusy, cloneInvoiceTypeMutation, deleteInvoiceMutation, statusTransitionMutation, unverifyInvoiceMutation } = useInvoiceControlOperations({
+    client, invoice, invoiceId: parsedInvoiceId, isNew, setInvoice, setMessage, setSuccessMessage,
+    setPendingHsFeedback, setPersistedInvoiceDraft, setPersistedInvoiceStatus,
+  });
   const isInvoiceEditable = invoicePermission.canOperate && !invoiceControlBusy
     && (isNew || isInvoiceEditableStatus(persistedInvoiceStatus || invoice?.status));
   const itemsWorkspace = useInvoiceItemsWorkspace({
@@ -116,14 +122,10 @@ export function useInvoiceEditorWorkspace({ businessDate, client, mode }: {
   } = useInvoiceEditorReferenceData(client, selectedCustomerId, selectedExporterId);
 
   const {
-    cloneInvoiceTypeMutation,
-    deleteInvoiceMutation,
     exporterSealMutation,
     refreshParties,
     saveCustomOptionMutation,
     saveInvoiceMutation,
-    statusTransitionMutation,
-    unverifyInvoiceMutation,
   } = useInvoicePersistenceOperations({
     client,
     invoice,

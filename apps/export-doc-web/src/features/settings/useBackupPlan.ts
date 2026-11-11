@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiBackupPlan, ApiBackupPlanSaveRequest, ApiBackupPlanStatus, ApiBackupS3Settings, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { startDownloadFromTicket } from "../../ui/downloadJobResult.ts";
 import { isDesktopBridgeAvailable, selectSaveFilePath } from "../../desktop/desktopBridge.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { backupPlanDraft, validateBackupPlan } from "./backupPlanModel.ts";
 import { isTerminalJob } from "../jobs/jobPresentation.ts";
@@ -52,31 +53,32 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
     }
   }, [job.data?.status, job.data?.jobId, queryClient]);
   const fail = (error: unknown) => { if (!isAbortError(error)) { setMessage(readApiError(error)); setSuccess(null); } };
-  const save = useMutation({
-    mutationFn: (body: ApiBackupPlanSaveRequest) => run((signal) => client.saveBackupPlan({ body }, { signal })),
+  const save = useScopedMutation("backup-plan-save", client, {
+    mutationFn: (body: ApiBackupPlanSaveRequest, signal) => client.saveBackupPlan({ body }, { signal }),
     onSuccess: (response, request) => {
       apply(response); setMessage(null); setSuccess("灾备设置已保存。");
       queryClient.setQueryData(queryKeys.backupPlan(), response);
       onSettingsSaved?.(response, request.expectedSettingsRevision);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.settings() });
     },
+    refreshKeys: () => [queryKeys.settings()],
     onError: fail,
   });
-  const start = useMutation({
-    mutationFn: (kind: "backup" | "test") => run((signal) => kind === "backup" ? client.runBackupPlan({ signal }) : client.testBackupReplica({ signal })),
+  const start = useScopedMutation("backup-plan-start", client, {
+    mutationFn: (kind: "backup" | "test", signal) => kind === "backup" ? client.runBackupPlan({ signal }) : client.testBackupReplica({ signal }),
     onSuccess: (job) => {
       setLastJobId(job.jobId); setMessage(null); setSuccess("任务已启动，关闭本页后仍会在后台继续。");
-      void queryClient.invalidateQueries({ queryKey: queryKeys.backupPlan() });
     },
+    refreshKeys: () => [queryKeys.backupPlan()],
     onError: fail,
   });
-  const cancel = useMutation({
-    mutationFn: () => run((signal) => client.cancelJob({ jobId: jobId! }, { signal })),
-    onSuccess: () => { setSuccess("已请求取消，已完成的本地备份会保留。"); void job.refetch(); },
+  const cancel = useScopedMutation(`backup-plan-cancel:${jobId}`, client, {
+    mutationFn: (_: void, signal) => client.cancelJob({ jobId: jobId! }, { signal }),
+    onSuccess: () => { setSuccess("已请求取消，已完成的本地备份会保留。"); },
+    refreshKeys: () => [["backup-plan-job", jobId]],
     onError: fail,
   });
-  const download = useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) => run(async (signal) => {
+  const download = useScopedMutation("backup-plan-download", client, {
+    mutationFn: async ({ id, name }: { id: string; name: string }, signal) => {
       if (isDesktopBridgeAvailable()) {
         const destinationPath = await selectSaveFilePath(name);
         signal.throwIfAborted();
@@ -85,12 +87,12 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
       }
       const ticket = await client.createRecoveryArchiveDownloadTicket({ id }, { signal });
       signal.throwIfAborted(); startDownloadFromTicket(client, ticket, name);
-    }),
+    },
     onSuccess: (job) => {
       if (!job) return;
       setLastJobId(job.jobId); setMessage(null); setSuccess("保存任务已启动。");
-      void queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
     },
+    refreshKeys: () => [queryKeys.jobsRoot()],
     onError: fail,
   });
   const busy = save.isPending || start.isPending || cancel.isPending || download.isPending;
@@ -113,9 +115,13 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
       save.mutate(request);
     },
     reload: async () => {
-      if (!await confirmDiscardChanges("重新加载灾备设置")) return;
-      const result = await query.refetch();
-      if (result.data && !result.isError) { apply(result.data); setMessage(null); setSuccess(null); }
+      try { await run(async signal => {
+        if (!await confirmDiscardChanges("重新加载灾备设置")) return;
+        signal.throwIfAborted();
+        const result = await query.refetch();
+        signal.throwIfAborted();
+        if (result.data && !result.isError) { apply(result.data); setMessage(null); setSuccess(null); }
+      }); } catch (error) { fail(error); }
     },
     start: (kind: "backup" | "test") => { if (!dirty && !busy && !activeJob) start.mutate(kind); },
     cancel: () => cancel.mutate(),

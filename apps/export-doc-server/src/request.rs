@@ -277,13 +277,10 @@ async fn execute(
         )
         .await?;
         backup_upload = Some((authorization, file));
-        body::Parsed {
-            body: None,
-            upload: None,
-            merge_uploads: vec![],
-        }
+        body::Parsed::default()
     } else {
         body::parse(
+            &state.body_resources,
             operation,
             Request::from_parts(parts, body),
             &parameters,
@@ -295,11 +292,13 @@ async fn execute(
         body,
         upload,
         merge_uploads,
+        reservation,
     } = parsed;
     let worker = tokio::task::spawn_blocking(move || {
         let _registration = registration;
         let _permit = permit;
         let _processing = processing;
+        let _body_reservation = reservation;
         scope
             .run_result(|| {
                 let parameters: Vec<_> = parameters

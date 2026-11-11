@@ -136,7 +136,7 @@ pub struct NativeService {
     license_gate: std::sync::Mutex<()>,
     license_cache: licensing::SignatureCache,
     #[cfg(feature = "ai")]
-    ai_budget: std::sync::atomic::AtomicUsize,
+    ai_reviewer: ai::Reviewer,
     packing_gate: std::sync::Mutex<()>,
     oa_document_gate: std::sync::Mutex<()>,
     #[cfg(feature = "ocr")]
@@ -390,7 +390,13 @@ impl NativeService {
                 }
                 #[cfg(feature = "ai")]
                 if operation == REVIEW_LETTER_OF_CREDIT_COMPLIANCE {
-                    return serde_json::to_vec(&ai::review(self, &body_value)?).map_err(Into::into);
+                    return serde_json::to_vec(&self.ai_reviewer.review(
+                        &self.store,
+                        &self.protector,
+                        &self.paths.cache_root,
+                        &body_value,
+                    )?)
+                    .map_err(Into::into);
                 }
                 if operation == IMPORT_LETTER_OF_CREDIT_DOCUMENT {
                     return serde_json::to_vec(&letter_of_credit::local(self, &body_value)?)

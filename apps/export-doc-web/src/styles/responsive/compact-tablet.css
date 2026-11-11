@@ -114,8 +114,4 @@
     grid-template-columns: minmax(220px, 280px) minmax(260px, 1fr);
   }
 
-  .report-template-preview-actions {
-    grid-column: 1 / -1;
-    justify-content: flex-end;
-  }
 }

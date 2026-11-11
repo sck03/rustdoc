@@ -43,8 +43,6 @@ export async function verifyDesktopDetailDesigner({ run, request, token, cdp, ou
   assert.equal(savedTable.columns[0].title, '桌面货物说明\nDescription');
   assert.deepEqual(savedTable.summaryRow, table.block.summaryRow);
   await run("[...document.querySelectorAll('[role=tab]')].find(node=>node.textContent.trim()==='预览').click(); true");
-  await wait("Boolean([...document.querySelectorAll('button')].find(node=>node.textContent.trim()==='样例预览'&&!node.disabled))");
-  await run("[...document.querySelectorAll('button')].find(node=>node.textContent.trim()==='样例预览').click(); true");
   await wait("Boolean(document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('桌面货物说明'))");
   await captureScreenshot(cdp, path.join(output, 'Full-detail-native-preview.png'));
   const invoice = catalog.body.find(item => item.templatePath.endsWith('invoice_template.dtpl'));

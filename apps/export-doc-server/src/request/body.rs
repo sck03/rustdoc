@@ -1,28 +1,38 @@
 //! Decode request bodies at the HTTP boundary, enforcing limits while reading.
 use super::error;
 use axum::{
-    body::{Body, Bytes},
-    extract::{DefaultBodyLimit, FromRequest, Multipart, Request, multipart::Field},
+    body::{Body, Bytes, HttpBody},
+    extract::{FromRequest, Multipart, Request, multipart::Field},
 };
 use export_doc_contracts::{contracts, generated_api::*};
 use export_doc_engine::{api::ApiError, engine::tasks::FileOutput};
 use serde_json::{Map, Value};
-use std::{
-    collections::HashMap,
-    sync::{Arc, LazyLock},
-};
+use std::{collections::HashMap, future::poll_fn, pin::Pin, sync::Arc, time::Duration};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
-// The blocking worker owns this slot through completion, including after a
-// disconnected caller drops its future. New bodies cannot accumulate behind it.
-static JSON_PARSERS: LazyLock<Arc<tokio::sync::Semaphore>> =
-    LazyLock::new(|| Arc::new(tokio::sync::Semaphore::new(4)));
+// Per-host budgets: slow receivers consume bounded input capacity, never parser
+// slots. The reservation follows the parsed value into the service worker.
+pub(crate) struct Resources {
+    memory: Arc<Semaphore>,
+    parsers: Arc<Semaphore>,
+}
+impl Default for Resources {
+    fn default() -> Self {
+        Self {
+            memory: Arc::new(Semaphore::new(64 * 1024)),
+            parsers: Arc::new(Semaphore::new(4)),
+        }
+    }
+}
 
 const MIB: usize = 1024 * 1024;
 const MAX_FIELD: usize = 65536;
+#[derive(Default)]
 pub(super) struct Parsed {
     pub body: Option<Value>,
     pub upload: Option<(String, Bytes)>,
     pub merge_uploads: Vec<FileOutput>,
+    pub reservation: Option<OwnedSemaphorePermit>,
 }
 
 fn catalog_upload(operation: Operation) -> bool {
@@ -42,10 +52,9 @@ pub(super) fn backup_upload(operation: Operation) -> bool {
     .contains(&operation)
 }
 pub(super) fn needs_processing_slot(operation: Operation) -> bool {
-    operation == RECOGNIZE_OCR_IMAGE
-        || contracts::contract()["operations"][operation.id]["requestBody"]["content"]
-            .as_object()
-            .is_some_and(|content| content.keys().any(|mime| !mime.contains("json")))
+    contracts::contract()["operations"][operation.id]["requiresProcessingSlot"]
+        .as_bool()
+        .expect("generated processing policy")
 }
 
 pub(crate) fn envelope_limit(operation: Operation) -> usize {
@@ -75,16 +84,22 @@ fn parameter(value: String, schema: &Value) -> Result<Value, ApiError> {
     }
 }
 
-async fn bytes(body: Body, limit: usize) -> Result<Bytes, ApiError> {
-    let mut request = Request::new(body);
-    DefaultBodyLimit::max(limit).apply(&mut request);
-    Bytes::from_request(request, &()).await.map_err(|cause| {
-        if cause.status().as_u16() == 413 {
-            error(413, "请求超过该操作的容量上限。")
-        } else {
-            error(400, "请求内容读取失败。")
+async fn bytes(mut body: Body, limit: usize, idle: Duration) -> Result<Bytes, ApiError> {
+    let mut content = Vec::new();
+    while let Some(frame) =
+        tokio::time::timeout(idle, poll_fn(|cx| Pin::new(&mut body).poll_frame(cx)))
+            .await
+            .map_err(|_| error(504, "请求读取空闲超过时限。"))?
+    {
+        let frame = frame.map_err(|_| error(400, "请求内容读取失败。"))?;
+        if let Ok(chunk) = frame.into_data() {
+            if chunk.len() > limit.saturating_sub(content.len()) {
+                return Err(error(413, "请求超过该操作的容量上限。"));
+            }
+            content.extend_from_slice(&chunk);
         }
-    })
+    }
+    Ok(Bytes::from(content))
 }
 
 fn multipart_error(cause: axum::extract::multipart::MultipartError) -> ApiError {
@@ -107,6 +122,7 @@ async fn field_bytes(mut field: Field<'_>, limit: usize, status: u16) -> Result<
 }
 
 pub(super) async fn parse(
+    resources: &Resources,
     operation: Operation,
     request: Request,
     parameters: &HashMap<String, String>,
@@ -128,11 +144,10 @@ pub(super) async fn parse(
     let binary = contract["requestBody"]["content"]
         .get("application/octet-stream")
         .is_some();
-    let mut result = Parsed {
-        body: None,
-        upload: None,
-        merge_uploads: Vec::new(),
-    };
+    let mut result = Parsed::default();
+    if contract["requestBody"].is_null() {
+        return Ok(result);
+    }
     if multipart {
         let mut form = Multipart::from_request(request, &())
             .await
@@ -202,7 +217,10 @@ pub(super) async fn parse(
         } else {
             25
         } * MIB;
-        result.upload = Some((filename, bytes(request.into_body(), limit).await?));
+        result.upload = Some((
+            filename,
+            bytes(request.into_body(), limit, Duration::from_secs(60)).await?,
+        ));
         let mut metadata = Map::new();
         for property in contract["parameters"].as_array().into_iter().flatten() {
             let Some(name) = property["name"].as_str().filter(|name| *name != "fileName") else {
@@ -217,63 +235,36 @@ pub(super) async fn parse(
         }
         result.body = Some(Value::Object(metadata));
     } else {
-        let permit = JSON_PARSERS
-            .clone()
-            .try_acquire_owned()
-            .map_err(|_| error(429, "请求解析繁忙，请稍后重试。"))?;
         let limit = contract["requestBody"]["x-exportdoc-max-bytes"]
             .as_u64()
             .and_then(|value| usize::try_from(value).ok())
             .unwrap_or(16 * MIB);
-        let bytes = bytes(request.into_body(), limit).await?;
+        let reservation = resources
+            .memory
+            .clone()
+            .try_acquire_many_owned(limit.div_ceil(1024) as u32)
+            .map_err(|_| error(429, "请求接收容量已满，请稍后重试。"))?;
+        let bytes = bytes(request.into_body(), limit, Duration::from_secs(10)).await?;
         if !bytes.is_empty() {
-            result.body = Some(
-                tokio::task::spawn_blocking(move || {
-                    let _permit = permit;
-                    serde_json::from_slice(&bytes).map_err(|_| error(400, "请求必须是有效 JSON。"))
-                })
-                .await
-                .map_err(|_| error(503, "请求解析未完成。"))??,
-            );
+            let permit = resources
+                .parsers
+                .clone()
+                .try_acquire_owned()
+                .map_err(|_| error(429, "请求解析繁忙，请稍后重试。"))?;
+            let (body, reservation) = tokio::task::spawn_blocking(move || {
+                let _permit = permit;
+                serde_json::from_slice(&bytes)
+                    .map(|body| (body, reservation))
+                    .map_err(|_| error(400, "请求必须是有效 JSON。"))
+            })
+            .await
+            .map_err(|_| error(503, "请求解析未完成。"))??;
+            result.body = Some(body);
+            result.reservation = Some(reservation);
         }
     }
     Ok(result)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[tokio::test]
-    async fn login_body_limit_cannot_be_bypassed_by_multipart_and_other_json_keeps_its_capacity() {
-        let parameters = HashMap::new();
-        let request = |content: String| Request::new(Body::from(content));
-        let oversized = parse(LOGIN, request(" ".repeat(4097)), &parameters, &[]).await;
-        assert_eq!(oversized.err().unwrap().status, Some(413));
-        let invalid = parse(LOGIN, request("{".into()), &parameters, &[]).await;
-        assert_eq!(invalid.err().unwrap().status, Some(400));
-        let mut form = request(String::new());
-        form.headers_mut().insert(
-            "content-type",
-            "multipart/form-data; boundary=test".parse().unwrap(),
-        );
-        assert_eq!(
-            parse(LOGIN, form, &parameters, &[])
-                .await
-                .err()
-                .unwrap()
-                .status,
-            Some(400)
-        );
-        let large = serde_json::json!({"text": "中".repeat(4096)}).to_string();
-        assert!(
-            parse(CREATE_INVOICE, request(large), &parameters, &[])
-                .await
-                .is_ok()
-        );
-        assert!(
-            parse(LOGIN, request("{}".into()), &parameters, &[])
-                .await
-                .is_ok()
-        );
-    }
-}
+mod tests;

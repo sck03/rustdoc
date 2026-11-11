@@ -80,7 +80,7 @@ impl NativeService {
             license_gate: Default::default(),
             license_cache: Default::default(),
             #[cfg(feature = "ai")]
-            ai_budget: Default::default(),
+            ai_reviewer: Default::default(),
             packing_gate: Default::default(),
             oa_document_gate: Default::default(),
             #[cfg(feature = "ocr")]
@@ -160,7 +160,7 @@ impl NativeService {
             license_gate: Default::default(),
             license_cache: Default::default(),
             #[cfg(feature = "ai")]
-            ai_budget: Default::default(),
+            ai_reviewer: Default::default(),
             packing_gate: Default::default(),
             oa_document_gate: Default::default(),
             #[cfg(feature = "ocr")]

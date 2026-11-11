@@ -178,6 +178,17 @@ impl Group {
 mod tests {
     use super::*;
     #[test]
+    fn fractional_deadlines_and_offsets_sort_chronologically() {
+        let now = BusinessClock::default().now().unwrap();
+        let key = |value| deadline(&json!({"dueAt": value}), &now).unwrap().unwrap().2;
+        assert!(key("2026-11-11T00:00:00Z") < key("2026-11-11T00:00:00.001Z"));
+        assert!(key("2026-11-11T00:00:00.1Z") < key("2026-11-11T00:00:00.101Z"));
+        assert_eq!(
+            key("2026-11-11T08:00:00+08:00"),
+            key("2026-11-11T00:00:00Z")
+        );
+    }
+    #[test]
     fn deep_cursor_keeps_one_page_and_orders_ties_without_duplicates() {
         let now = BusinessClock::default().now().unwrap();
         let cursor = Cursor {

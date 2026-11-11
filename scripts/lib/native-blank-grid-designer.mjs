@@ -132,8 +132,6 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   await run('window.scrollTo(0,0); true');
   await captureScreenshot(cdp, path.join(output, 'Full-blank-grid-designer.png'), { captureBeyondViewport: false });
   await run("[...document.querySelectorAll('[role=tab]')].find(node=>node.textContent.trim()==='预览').click(); true");
-  await wait("Boolean([...document.querySelectorAll('button')].find(node=>node.textContent.trim()==='样例预览'&&!node.disabled))");
-  await button('样例预览', 'body');
   await wait("Boolean(document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('<svg'))");
   const preview = await run("document.querySelector('iframe[title=模板预览]').srcdoc");
   fs.writeFileSync(path.join(output, 'desktop-blank-grid-preview.html'), preview);

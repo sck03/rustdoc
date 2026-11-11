@@ -41064,6 +41064,7 @@
     "/api/audit-logs": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41196,6 +41197,7 @@
     "/api/audit-logs/cleanup": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41267,6 +41269,7 @@
     "/api/audit-logs/delete": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41338,6 +41341,7 @@
     "/api/audit-logs/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41410,6 +41414,7 @@
     "/api/audit-logs/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41481,6 +41486,7 @@
     "/api/auth/login": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41588,6 +41594,7 @@
     "/api/auth/logout": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41626,6 +41633,7 @@
     "/api/auth/me": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41664,6 +41672,7 @@
     "/api/auth/renew": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41702,6 +41711,7 @@
     "/api/auth/unit-context": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41750,6 +41760,7 @@
     "/api/backup": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41806,6 +41817,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41867,6 +41879,7 @@
     "/api/backup/cleanup": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -41938,6 +41951,7 @@
     "/api/backup/disaster-recovery/create": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42012,6 +42026,7 @@
     "/api/backup/disaster-recovery/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42086,6 +42101,7 @@
     "/api/backup/disaster-recovery/status": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42144,6 +42160,7 @@
     "/api/backup/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42218,6 +42235,7 @@
     "/api/business-attachment-categories": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42282,6 +42300,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42344,6 +42363,7 @@
     "/api/business-attachment-categories/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42420,6 +42440,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42495,6 +42516,7 @@
     "/api/business-attachments": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42599,6 +42621,7 @@
     "/api/business-attachments/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42672,6 +42695,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42735,6 +42759,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42810,6 +42835,7 @@
     "/api/business-attachments/{id}/metadata": {
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42885,6 +42911,7 @@
     "/api/business-attachments/{id}/revisions/{revision}/content": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -42962,6 +42989,7 @@
     "/api/business-attachments/{id}/revisions/{revision}/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -43048,6 +43076,7 @@
     "/api/crm/customers": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -43127,6 +43156,7 @@
     "/api/crm/customers/batch-status": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -43206,6 +43236,7 @@
     "/api/crm/customers/export": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -43289,6 +43320,7 @@
     "/api/crm/customers/page": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -43395,6 +43427,7 @@
     "/api/crm/customers/{customerId}/contacts": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -43495,6 +43528,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -43586,6 +43620,7 @@
     "/api/crm/customers/{customerId}/contacts/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -43690,6 +43725,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -43794,6 +43830,7 @@
     "/api/crm/customers/{customerId}/contacts/{id}/set-primary": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -43901,6 +43938,7 @@
     "/api/crm/customers/{customerId}/email-variable-draft": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -43982,6 +44020,7 @@
     "/api/crm/customers/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -44076,6 +44115,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -44149,6 +44189,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -44243,6 +44284,7 @@
     "/api/crm/customers/{id}/deactivate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -44340,6 +44382,7 @@
     "/api/crm/customers/{id}/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -44437,6 +44480,7 @@
     "/api/crm/dashboard": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -44525,6 +44569,7 @@
     "/api/crm/follow-ups": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -44604,6 +44649,7 @@
     "/api/crm/follow-ups/page": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -44727,6 +44773,7 @@
     "/api/crm/follow-ups/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -44821,6 +44868,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -44915,6 +44963,7 @@
     "/api/crm/follow-ups/{id}/complete": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -45012,6 +45061,7 @@
     "/api/crm/follow-ups/{id}/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -45109,6 +45159,7 @@
     "/api/crm/follow-ups/{id}/transfer": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -45206,6 +45257,7 @@
     "/api/crm/import": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -45285,6 +45337,7 @@
     "/api/crm/import/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -45373,6 +45426,7 @@
     "/api/crm/opportunities": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -45471,6 +45525,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -45564,6 +45619,7 @@
     "/api/crm/opportunities/{id}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -45637,6 +45693,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -45742,6 +45799,7 @@
     "/api/crm/opportunities/{id}/archive": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -45837,6 +45895,7 @@
     "/api/crm/opportunities/{id}/history": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -45915,6 +45974,7 @@
     "/api/crm/opportunities/{id}/transition": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46020,6 +46080,7 @@
     "/api/custom-options/{optionType}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46093,6 +46154,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46178,6 +46240,7 @@
     "/api/dashboard": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46233,6 +46296,7 @@
     "/api/diagnostics/metrics": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46294,6 +46358,7 @@
     "/api/disaster-recovery/archives/downloads/{token}": {
       "get": {
         "x-exportdoc-timeout-seconds": 86400,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46356,6 +46421,7 @@
     "/api/disaster-recovery/archives/{id}/download-ticket": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46450,6 +46516,7 @@
     "/api/disaster-recovery/archives/{id}/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46554,6 +46621,7 @@
     "/api/disaster-recovery/archives/{id}/save-to-path-jobs": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46655,6 +46723,7 @@
     "/api/disaster-recovery/plan": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46737,6 +46806,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46831,6 +46901,7 @@
     "/api/disaster-recovery/plan/run": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46915,6 +46986,7 @@
     "/api/disaster-recovery/plan/test-replica": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -46999,6 +47071,7 @@
     "/api/email-templates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -47131,6 +47204,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -47231,6 +47305,7 @@
     "/api/email-templates/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -47321,6 +47396,7 @@
     "/api/email-templates/variables": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -47394,6 +47470,7 @@
     "/api/email-templates/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -47512,6 +47589,7 @@
     "/api/email-templates/{id}/disable": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -47627,6 +47705,7 @@
     "/api/email-templates/{id}/draft": {
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -47742,6 +47821,7 @@
     "/api/email-templates/{id}/publish": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -47857,6 +47937,7 @@
     "/api/email-templates/{id}/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -47972,6 +48053,7 @@
     "/api/email-templates/{id}/share": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -48087,6 +48169,7 @@
     "/api/email-templates/{id}/versions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -48206,6 +48289,7 @@
     "/api/email-templates/{id}/versions/{versionNumber}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -48310,6 +48394,7 @@
     "/api/email-templates/{id}/versions/{versionNumber}/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -48435,6 +48520,7 @@
     "/api/invoices": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -48538,6 +48624,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -48612,6 +48699,7 @@
     "/api/invoices/hs-codes/{code}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -48686,6 +48774,7 @@
     "/api/invoices/hs-knowledge/feedback": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -48757,6 +48846,7 @@
     "/api/invoices/hs-knowledge/search": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -48836,6 +48926,7 @@
     "/api/invoices/profit-analysis": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -48907,6 +48998,7 @@
     "/api/invoices/review": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -48977,6 +49069,7 @@
     "/api/invoices/seals/image": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -49051,6 +49144,7 @@
     "/api/invoices/shipping-marks/image": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -49125,6 +49219,7 @@
     "/api/invoices/shipping-marks/image/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -49202,6 +49297,7 @@
     "/api/invoices/transfer-package/import": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -49279,6 +49375,7 @@
     "/api/invoices/transfer-package/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -49356,6 +49453,7 @@
     "/api/invoices/transfer-package/upload/import": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -49453,6 +49551,7 @@
     "/api/invoices/transfer-package/upload/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -49536,6 +49635,7 @@
     "/api/invoices/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -49621,6 +49721,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -49695,6 +49796,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -49784,6 +49886,7 @@
     "/api/invoices/{id}/clone": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -49870,6 +49973,7 @@
     "/api/invoices/{id}/clone-type": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -49959,6 +50063,7 @@
     "/api/invoices/{id}/status": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -50051,6 +50156,7 @@
     "/api/invoices/{id}/status-history": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -50130,6 +50236,7 @@
     "/api/invoices/{id}/transfer-package/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -50215,6 +50322,7 @@
     "/api/invoices/{id}/transfer-package/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -50312,6 +50420,7 @@
     "/api/invoices/{id}/unverify": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -50401,6 +50510,7 @@
     "/api/invoices/{invoiceId}/attachments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -50481,6 +50591,7 @@
     "/api/jobs": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -50579,6 +50690,7 @@
     "/api/jobs/finished": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -50637,6 +50749,7 @@
     "/api/jobs/{jobId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -50709,6 +50822,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -50783,6 +50897,7 @@
     "/api/jobs/{jobId}/cancel": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -50857,6 +50972,7 @@
     "/api/jobs/{jobId}/download": {
       "get": {
         "x-exportdoc-timeout-seconds": 86400,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -50935,6 +51051,7 @@
     "/api/jobs/{jobId}/download-ticket": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -51009,6 +51126,7 @@
     "/api/jobs/{jobId}/retry": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -51089,6 +51207,7 @@
     "/api/master-data/customers": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -51154,6 +51273,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -51239,6 +51359,7 @@
     "/api/master-data/customers/page": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -51329,6 +51450,7 @@
     "/api/master-data/customers/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -51426,6 +51548,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -51504,6 +51627,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -51604,6 +51728,7 @@
     "/api/master-data/exporters": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -51669,6 +51794,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -51754,6 +51880,7 @@
     "/api/master-data/exporters/page": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -51844,6 +51971,7 @@
     "/api/master-data/exporters/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -51941,6 +52069,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -52019,6 +52148,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -52119,6 +52249,7 @@
     "/api/master-data/exporters/{id}/seals/{sealType}/upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -52261,6 +52392,7 @@
     "/api/master-data/hs-codes": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -52350,6 +52482,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -52427,6 +52560,7 @@
     "/api/master-data/hs-codes/by-id/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -52518,6 +52652,7 @@
     "/api/master-data/hs-codes/cleanup/commit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -52598,6 +52733,7 @@
     "/api/master-data/hs-codes/cleanup/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -52668,6 +52804,7 @@
     "/api/master-data/hs-codes/clear-all": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -52748,6 +52885,7 @@
     "/api/master-data/hs-codes/confirm-obsolete": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -52828,6 +52966,7 @@
     "/api/master-data/hs-codes/delete-batch": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -52908,6 +53047,7 @@
     "/api/master-data/hs-codes/fetch-remote-detail": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -52982,6 +53122,7 @@
     "/api/master-data/hs-codes/import-commit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -53062,6 +53203,7 @@
     "/api/master-data/hs-codes/import-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -53142,6 +53284,7 @@
     "/api/master-data/hs-codes/import-preview-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -53219,6 +53362,7 @@
     "/api/master-data/hs-codes/import-preview-upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -53328,6 +53472,7 @@
     "/api/master-data/hs-codes/import-upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -53414,6 +53559,7 @@
     "/api/master-data/hs-codes/obsolete/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -53484,6 +53630,7 @@
     "/api/master-data/hs-codes/remote-health": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -53542,6 +53689,7 @@
     "/api/master-data/hs-codes/resolve-remote-detail": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -53619,6 +53767,7 @@
     "/api/master-data/hs-codes/search-remote": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -53692,6 +53841,7 @@
     "/api/master-data/hs-codes/search-remote/capture": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -53766,6 +53916,7 @@
     "/api/master-data/hs-codes/{code}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -53838,6 +53989,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -53928,6 +54080,7 @@
     "/api/master-data/hs-knowledge/examples": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54017,6 +54170,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54097,6 +54251,7 @@
     "/api/master-data/hs-knowledge/examples/delete-batch": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54180,6 +54335,7 @@
     "/api/master-data/hs-knowledge/examples/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54265,6 +54421,7 @@
     "/api/master-data/hs-knowledge/export": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54337,6 +54494,7 @@
     "/api/master-data/hs-knowledge/feedback": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54408,6 +54566,7 @@
     "/api/master-data/hs-knowledge/history-candidates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54499,6 +54658,7 @@
     "/api/master-data/hs-knowledge/import": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54570,6 +54730,7 @@
     "/api/master-data/hs-knowledge/remote-candidates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54668,6 +54829,7 @@
     "/api/master-data/hs-knowledge/remote-candidates/reset": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54736,6 +54898,7 @@
     "/api/master-data/hs-knowledge/remote-candidates/review": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54810,6 +54973,7 @@
     "/api/master-data/hs-knowledge/remote-candidates/review-batch": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54881,6 +55045,7 @@
     "/api/master-data/hs-knowledge/search": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -54960,6 +55125,7 @@
     "/api/master-data/payees": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -55025,6 +55191,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -55110,6 +55277,7 @@
     "/api/master-data/payees/page": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -55200,6 +55368,7 @@
     "/api/master-data/payees/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -55297,6 +55466,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -55375,6 +55545,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -55475,6 +55646,7 @@
     "/api/master-data/ports": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -55540,6 +55712,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -55625,6 +55798,7 @@
     "/api/master-data/ports/page": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -55715,6 +55889,7 @@
     "/api/master-data/ports/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -55812,6 +55987,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -55890,6 +56066,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -55990,6 +56167,7 @@
     "/api/master-data/products": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -56087,6 +56265,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -56172,6 +56351,7 @@
     "/api/master-data/products/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -56269,6 +56449,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -56347,6 +56528,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -56447,6 +56629,7 @@
     "/api/master-data/units": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -56512,6 +56695,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -56597,6 +56781,7 @@
     "/api/master-data/units/page": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -56687,6 +56872,7 @@
     "/api/master-data/units/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -56784,6 +56970,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -56862,6 +57049,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -56962,6 +57150,7 @@
     "/api/office/announcements": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -57123,6 +57312,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -57271,6 +57461,7 @@
     "/api/office/announcements/departments": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -57409,6 +57600,7 @@
     "/api/office/announcements/manage": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -57565,6 +57757,7 @@
     "/api/office/announcements/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -57723,6 +57916,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -57871,6 +58065,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -58031,6 +58226,7 @@
     "/api/office/announcements/{id}/archive": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -58191,6 +58387,7 @@
     "/api/office/announcements/{id}/attachments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "Announcements and notifications"
         ],
@@ -58365,6 +58562,7 @@
     "/api/office/announcements/{id}/attachments/{attachmentId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -58533,6 +58731,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -58694,6 +58893,7 @@
     "/api/office/announcements/{id}/publish": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -58854,6 +59054,7 @@
     "/api/office/announcements/{id}/read": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -59014,6 +59215,7 @@
     "/api/office/announcements/{id}/receipts": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -59180,6 +59382,7 @@
     "/api/office/announcements/{id}/withdraw": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Announcements and notifications"
         ],
@@ -59340,6 +59543,7 @@
     "/api/office/applications": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -59478,6 +59682,7 @@
     "/api/office/applications/references": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -59655,6 +59860,7 @@
     "/api/office/approval-hub": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -59832,6 +60038,7 @@
     "/api/office/approval-settings": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -59968,6 +60175,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -60116,6 +60324,7 @@
     "/api/office/approval-settings/activations/{activationId}/cancel": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -60275,6 +60484,7 @@
     "/api/office/approval-settings/diff": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -60443,6 +60653,7 @@
     "/api/office/approval-settings/disable": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -60591,6 +60802,7 @@
     "/api/office/approval-settings/exceptions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -60748,6 +60960,7 @@
     "/api/office/approval-settings/publish": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -60896,6 +61109,7 @@
     "/api/office/approval-settings/retry-system": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -61044,6 +61258,7 @@
     "/api/office/approval-settings/routing-sources": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -61223,6 +61438,7 @@
     "/api/office/approval-settings/schedule": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -61371,6 +61587,7 @@
     "/api/office/approval-settings/sheet-preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -61519,6 +61736,7 @@
     "/api/office/approval-settings/versions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -61687,6 +61905,7 @@
     "/api/office/bookings": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -61915,6 +62134,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -62037,6 +62257,7 @@
     "/api/office/bookings/{id}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -62185,6 +62406,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -62320,6 +62542,7 @@
     "/api/office/bookings/{id}/approve": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -62454,6 +62677,7 @@
     "/api/office/bookings/{id}/attachments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "Office approvals"
         ],
@@ -62642,6 +62866,7 @@
     "/api/office/bookings/{id}/attachments/{attachmentId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -62810,6 +63035,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -62971,6 +63197,7 @@
     "/api/office/bookings/{id}/cancel": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -63105,6 +63332,7 @@
     "/api/office/bookings/{id}/commands/{commandKey}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -63265,6 +63493,7 @@
     "/api/office/bookings/{id}/decisions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -63447,6 +63676,7 @@
     "/api/office/bookings/{id}/draft": {
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -63607,6 +63837,7 @@
     "/api/office/bookings/{id}/fulfillment": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -63767,6 +63998,7 @@
     "/api/office/bookings/{id}/history": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -63915,6 +64147,7 @@
     "/api/office/bookings/{id}/issue-key": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -64049,6 +64282,7 @@
     "/api/office/bookings/{id}/reject": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -64183,6 +64417,7 @@
     "/api/office/bookings/{id}/return-key": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -64317,6 +64552,7 @@
     "/api/office/bookings/{id}/submissions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -64483,6 +64719,7 @@
     "/api/office/bookings/{id}/submissions/{submissionId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -64643,6 +64880,7 @@
     "/api/office/bookings/{id}/submissions/{submissionId}/bundle": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -64804,6 +65042,7 @@
     "/api/office/bookings/{id}/submissions/{submissionId}/generate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -64964,6 +65203,7 @@
     "/api/office/bookings/{id}/submissions/{submissionId}/pdf": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -65125,6 +65365,7 @@
     "/api/office/bookings/{id}/submit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -65285,6 +65526,7 @@
     "/api/office/bookings/{id}/workflow-candidates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -65445,6 +65687,7 @@
     "/api/office/bookings/{id}/workflow-commands": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -65605,6 +65848,7 @@
     "/api/office/expense-requests": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -65787,6 +66031,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -65935,6 +66180,7 @@
     "/api/office/expense-requests/{id}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -66083,6 +66329,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -66243,6 +66490,7 @@
     "/api/office/expense-requests/{id}/approval-preview": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -66393,6 +66641,7 @@
     "/api/office/expense-requests/{id}/approval-reassign": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -66553,6 +66802,7 @@
     "/api/office/expense-requests/{id}/approve": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -66713,6 +66963,7 @@
     "/api/office/expense-requests/{id}/attachments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "Office approvals"
         ],
@@ -66903,6 +67154,7 @@
     "/api/office/expense-requests/{id}/attachments/{attachmentId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -67071,6 +67323,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -67232,6 +67485,7 @@
     "/api/office/expense-requests/{id}/cancel": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -67392,6 +67646,7 @@
     "/api/office/expense-requests/{id}/commands/{commandKey}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -67552,6 +67807,7 @@
     "/api/office/expense-requests/{id}/complete": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -67712,6 +67968,7 @@
     "/api/office/expense-requests/{id}/decisions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -67894,6 +68151,7 @@
     "/api/office/expense-requests/{id}/fulfillment": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -68054,6 +68312,7 @@
     "/api/office/expense-requests/{id}/history": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -68220,6 +68479,7 @@
     "/api/office/expense-requests/{id}/reject": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -68380,6 +68640,7 @@
     "/api/office/expense-requests/{id}/remind": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -68540,6 +68801,7 @@
     "/api/office/expense-requests/{id}/return": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -68700,6 +68962,7 @@
     "/api/office/expense-requests/{id}/submissions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -68866,6 +69129,7 @@
     "/api/office/expense-requests/{id}/submissions/{submissionId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -69026,6 +69290,7 @@
     "/api/office/expense-requests/{id}/submissions/{submissionId}/bundle": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -69187,6 +69452,7 @@
     "/api/office/expense-requests/{id}/submissions/{submissionId}/generate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -69347,6 +69613,7 @@
     "/api/office/expense-requests/{id}/submissions/{submissionId}/pdf": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -69508,6 +69775,7 @@
     "/api/office/expense-requests/{id}/submit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -69668,6 +69936,7 @@
     "/api/office/expense-requests/{id}/verification": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -69828,6 +70097,7 @@
     "/api/office/expense-requests/{id}/void": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -69988,6 +70258,7 @@
     "/api/office/expense-requests/{id}/withdraw": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -70148,6 +70419,7 @@
     "/api/office/expense-requests/{id}/workflow-candidates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -70308,6 +70580,7 @@
     "/api/office/expense-requests/{id}/workflow-commands": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -70468,6 +70741,7 @@
     "/api/office/general-handling-services": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -70606,6 +70880,7 @@
     "/api/office/general-requests": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -70796,6 +71071,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -70944,6 +71220,7 @@
     "/api/office/general-requests/{id}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -71092,6 +71369,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -71252,6 +71530,7 @@
     "/api/office/general-requests/{id}/approval-preview": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -71402,6 +71681,7 @@
     "/api/office/general-requests/{id}/approval-reassign": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -71562,6 +71842,7 @@
     "/api/office/general-requests/{id}/approve": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -71722,6 +72003,7 @@
     "/api/office/general-requests/{id}/attachments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "Office approvals"
         ],
@@ -71912,6 +72194,7 @@
     "/api/office/general-requests/{id}/attachments/{attachmentId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -72080,6 +72363,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -72241,6 +72525,7 @@
     "/api/office/general-requests/{id}/cancel": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -72401,6 +72686,7 @@
     "/api/office/general-requests/{id}/commands/{commandKey}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -72561,6 +72847,7 @@
     "/api/office/general-requests/{id}/complete": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -72721,6 +73008,7 @@
     "/api/office/general-requests/{id}/decisions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -72903,6 +73191,7 @@
     "/api/office/general-requests/{id}/fulfillment": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -73063,6 +73352,7 @@
     "/api/office/general-requests/{id}/history": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -73229,6 +73519,7 @@
     "/api/office/general-requests/{id}/reject": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -73389,6 +73680,7 @@
     "/api/office/general-requests/{id}/remind": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -73549,6 +73841,7 @@
     "/api/office/general-requests/{id}/return": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -73709,6 +74002,7 @@
     "/api/office/general-requests/{id}/submissions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -73875,6 +74169,7 @@
     "/api/office/general-requests/{id}/submissions/{submissionId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -74035,6 +74330,7 @@
     "/api/office/general-requests/{id}/submissions/{submissionId}/bundle": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -74196,6 +74492,7 @@
     "/api/office/general-requests/{id}/submissions/{submissionId}/generate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -74356,6 +74653,7 @@
     "/api/office/general-requests/{id}/submissions/{submissionId}/pdf": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -74517,6 +74815,7 @@
     "/api/office/general-requests/{id}/submit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -74677,6 +74976,7 @@
     "/api/office/general-requests/{id}/void": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -74837,6 +75137,7 @@
     "/api/office/general-requests/{id}/withdraw": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -74997,6 +75298,7 @@
     "/api/office/general-requests/{id}/workflow-candidates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -75157,6 +75459,7 @@
     "/api/office/general-requests/{id}/workflow-commands": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -75317,6 +75620,7 @@
     "/api/office/leave-requests": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -75499,6 +75803,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -75647,6 +75952,7 @@
     "/api/office/leave-requests/{id}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -75795,6 +76101,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -75955,6 +76262,7 @@
     "/api/office/leave-requests/{id}/approval-preview": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -76105,6 +76413,7 @@
     "/api/office/leave-requests/{id}/approval-reassign": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -76265,6 +76574,7 @@
     "/api/office/leave-requests/{id}/approve": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -76425,6 +76735,7 @@
     "/api/office/leave-requests/{id}/attachments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "Office approvals"
         ],
@@ -76615,6 +76926,7 @@
     "/api/office/leave-requests/{id}/attachments/{attachmentId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -76783,6 +77095,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -76944,6 +77257,7 @@
     "/api/office/leave-requests/{id}/cancel": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -77104,6 +77418,7 @@
     "/api/office/leave-requests/{id}/commands/{commandKey}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -77264,6 +77579,7 @@
     "/api/office/leave-requests/{id}/complete": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -77424,6 +77740,7 @@
     "/api/office/leave-requests/{id}/decisions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -77606,6 +77923,7 @@
     "/api/office/leave-requests/{id}/fulfillment": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -77766,6 +78084,7 @@
     "/api/office/leave-requests/{id}/history": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -77932,6 +78251,7 @@
     "/api/office/leave-requests/{id}/reject": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -78092,6 +78412,7 @@
     "/api/office/leave-requests/{id}/remind": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -78252,6 +78573,7 @@
     "/api/office/leave-requests/{id}/return": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -78412,6 +78734,7 @@
     "/api/office/leave-requests/{id}/submissions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -78578,6 +78901,7 @@
     "/api/office/leave-requests/{id}/submissions/{submissionId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -78738,6 +79062,7 @@
     "/api/office/leave-requests/{id}/submissions/{submissionId}/bundle": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -78899,6 +79224,7 @@
     "/api/office/leave-requests/{id}/submissions/{submissionId}/generate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -79059,6 +79385,7 @@
     "/api/office/leave-requests/{id}/submissions/{submissionId}/pdf": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -79220,6 +79547,7 @@
     "/api/office/leave-requests/{id}/submit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -79380,6 +79708,7 @@
     "/api/office/leave-requests/{id}/void": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -79540,6 +79869,7 @@
     "/api/office/leave-requests/{id}/withdraw": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -79700,6 +80030,7 @@
     "/api/office/leave-requests/{id}/workflow-candidates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -79860,6 +80191,7 @@
     "/api/office/leave-requests/{id}/workflow-commands": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -80020,6 +80352,7 @@
     "/api/office/notifications": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -80183,6 +80516,7 @@
     "/api/office/notifications/read-all": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -80321,6 +80655,7 @@
     "/api/office/notifications/unread-count": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -80459,6 +80794,7 @@
     "/api/office/notifications/{id}/read": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -80609,6 +80945,7 @@
     "/api/office/overtime-requests": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -80791,6 +81128,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -80939,6 +81277,7 @@
     "/api/office/overtime-requests/{id}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -81087,6 +81426,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -81247,6 +81587,7 @@
     "/api/office/overtime-requests/{id}/approval-preview": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -81397,6 +81738,7 @@
     "/api/office/overtime-requests/{id}/approval-reassign": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -81557,6 +81899,7 @@
     "/api/office/overtime-requests/{id}/approve": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -81717,6 +82060,7 @@
     "/api/office/overtime-requests/{id}/attachments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "Office approvals"
         ],
@@ -81907,6 +82251,7 @@
     "/api/office/overtime-requests/{id}/attachments/{attachmentId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -82075,6 +82420,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -82236,6 +82582,7 @@
     "/api/office/overtime-requests/{id}/cancel": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -82396,6 +82743,7 @@
     "/api/office/overtime-requests/{id}/commands/{commandKey}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -82556,6 +82904,7 @@
     "/api/office/overtime-requests/{id}/complete": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -82716,6 +83065,7 @@
     "/api/office/overtime-requests/{id}/decisions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -82898,6 +83248,7 @@
     "/api/office/overtime-requests/{id}/fulfillment": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -83058,6 +83409,7 @@
     "/api/office/overtime-requests/{id}/history": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -83224,6 +83576,7 @@
     "/api/office/overtime-requests/{id}/reject": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -83384,6 +83737,7 @@
     "/api/office/overtime-requests/{id}/remind": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -83544,6 +83898,7 @@
     "/api/office/overtime-requests/{id}/return": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -83704,6 +84059,7 @@
     "/api/office/overtime-requests/{id}/submissions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -83870,6 +84226,7 @@
     "/api/office/overtime-requests/{id}/submissions/{submissionId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -84030,6 +84387,7 @@
     "/api/office/overtime-requests/{id}/submissions/{submissionId}/bundle": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -84191,6 +84549,7 @@
     "/api/office/overtime-requests/{id}/submissions/{submissionId}/generate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -84351,6 +84710,7 @@
     "/api/office/overtime-requests/{id}/submissions/{submissionId}/pdf": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -84512,6 +84872,7 @@
     "/api/office/overtime-requests/{id}/submit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -84672,6 +85033,7 @@
     "/api/office/overtime-requests/{id}/void": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -84832,6 +85194,7 @@
     "/api/office/overtime-requests/{id}/withdraw": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -84992,6 +85355,7 @@
     "/api/office/overtime-requests/{id}/workflow-candidates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -85152,6 +85516,7 @@
     "/api/office/overtime-requests/{id}/workflow-commands": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -85312,6 +85677,7 @@
     "/api/office/people": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -85476,6 +85842,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -85598,6 +85965,7 @@
     "/api/office/people/options": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -85731,6 +86099,7 @@
     "/api/office/people/reporting-options": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -85894,6 +86263,7 @@
     "/api/office/people/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -86020,6 +86390,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -86143,6 +86514,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -86278,6 +86650,7 @@
     "/api/office/people/{id}/account": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -86413,6 +86786,7 @@
     "/api/office/people/{id}/account/unlink": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -86548,6 +86922,7 @@
     "/api/office/people/{id}/accounts": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -86704,6 +87079,7 @@
     "/api/office/people/{id}/attachments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "Personnel"
         ],
@@ -86880,6 +87256,7 @@
     "/api/office/people/{id}/attachments/{attachmentId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Personnel"
         ],
@@ -87040,6 +87417,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Personnel"
         ],
@@ -87193,6 +87571,7 @@
     "/api/office/people/{id}/avatar": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -87319,6 +87698,7 @@
     "/api/office/people/{id}/clearance": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -87444,6 +87824,7 @@
     "/api/office/people/{id}/history": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -87593,6 +87974,7 @@
     "/api/office/people/{id}/images/{kind}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -87737,6 +88119,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -87869,6 +88252,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -88017,6 +88401,7 @@
     "/api/office/personnel-requests": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -88192,6 +88577,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -88340,6 +88726,7 @@
     "/api/office/personnel-requests/{id}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -88488,6 +88875,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -88648,6 +89036,7 @@
     "/api/office/personnel-requests/{id}/approval-preview": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -88798,6 +89187,7 @@
     "/api/office/personnel-requests/{id}/approval-reassign": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -88958,6 +89348,7 @@
     "/api/office/personnel-requests/{id}/approve": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -89118,6 +89509,7 @@
     "/api/office/personnel-requests/{id}/attachments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "Office approvals"
         ],
@@ -89308,6 +89700,7 @@
     "/api/office/personnel-requests/{id}/attachments/{attachmentId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -89476,6 +89869,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -89637,6 +90031,7 @@
     "/api/office/personnel-requests/{id}/cancel": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -89797,6 +90192,7 @@
     "/api/office/personnel-requests/{id}/cancel-execution": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -89957,6 +90353,7 @@
     "/api/office/personnel-requests/{id}/commands/{commandKey}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -90117,6 +90514,7 @@
     "/api/office/personnel-requests/{id}/decisions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -90299,6 +90697,7 @@
     "/api/office/personnel-requests/{id}/execution": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -90459,6 +90858,7 @@
     "/api/office/personnel-requests/{id}/fulfillment": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -90619,6 +91019,7 @@
     "/api/office/personnel-requests/{id}/history": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -90785,6 +91186,7 @@
     "/api/office/personnel-requests/{id}/reject": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -90945,6 +91347,7 @@
     "/api/office/personnel-requests/{id}/remind": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -91105,6 +91508,7 @@
     "/api/office/personnel-requests/{id}/return": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -91265,6 +91669,7 @@
     "/api/office/personnel-requests/{id}/submissions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -91431,6 +91836,7 @@
     "/api/office/personnel-requests/{id}/submissions/{submissionId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -91591,6 +91997,7 @@
     "/api/office/personnel-requests/{id}/submissions/{submissionId}/bundle": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -91752,6 +92159,7 @@
     "/api/office/personnel-requests/{id}/submissions/{submissionId}/generate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -91912,6 +92320,7 @@
     "/api/office/personnel-requests/{id}/submissions/{submissionId}/pdf": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -92073,6 +92482,7 @@
     "/api/office/personnel-requests/{id}/submit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -92233,6 +92643,7 @@
     "/api/office/personnel-requests/{id}/withdraw": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -92393,6 +92804,7 @@
     "/api/office/personnel-requests/{id}/workflow-candidates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -92553,6 +92965,7 @@
     "/api/office/personnel-requests/{id}/workflow-commands": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -92713,6 +93126,7 @@
     "/api/office/purchase-requests": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -92895,6 +93309,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -93043,6 +93458,7 @@
     "/api/office/purchase-requests/{id}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -93191,6 +93607,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -93351,6 +93768,7 @@
     "/api/office/purchase-requests/{id}/approval-preview": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -93501,6 +93919,7 @@
     "/api/office/purchase-requests/{id}/approval-reassign": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -93661,6 +94080,7 @@
     "/api/office/purchase-requests/{id}/approve": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -93821,6 +94241,7 @@
     "/api/office/purchase-requests/{id}/attachments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "Office approvals"
         ],
@@ -94011,6 +94432,7 @@
     "/api/office/purchase-requests/{id}/attachments/{attachmentId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -94179,6 +94601,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -94340,6 +94763,7 @@
     "/api/office/purchase-requests/{id}/cancel": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -94500,6 +94924,7 @@
     "/api/office/purchase-requests/{id}/commands/{commandKey}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -94660,6 +95085,7 @@
     "/api/office/purchase-requests/{id}/complete": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -94820,6 +95246,7 @@
     "/api/office/purchase-requests/{id}/decisions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -95002,6 +95429,7 @@
     "/api/office/purchase-requests/{id}/fulfillment": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -95162,6 +95590,7 @@
     "/api/office/purchase-requests/{id}/history": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -95328,6 +95757,7 @@
     "/api/office/purchase-requests/{id}/reject": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -95488,6 +95918,7 @@
     "/api/office/purchase-requests/{id}/remind": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -95648,6 +96079,7 @@
     "/api/office/purchase-requests/{id}/return": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -95808,6 +96240,7 @@
     "/api/office/purchase-requests/{id}/submissions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -95974,6 +96407,7 @@
     "/api/office/purchase-requests/{id}/submissions/{submissionId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -96134,6 +96568,7 @@
     "/api/office/purchase-requests/{id}/submissions/{submissionId}/bundle": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -96295,6 +96730,7 @@
     "/api/office/purchase-requests/{id}/submissions/{submissionId}/generate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -96455,6 +96891,7 @@
     "/api/office/purchase-requests/{id}/submissions/{submissionId}/pdf": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -96616,6 +97053,7 @@
     "/api/office/purchase-requests/{id}/submit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -96776,6 +97214,7 @@
     "/api/office/purchase-requests/{id}/void": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -96936,6 +97375,7 @@
     "/api/office/purchase-requests/{id}/withdraw": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -97096,6 +97536,7 @@
     "/api/office/purchase-requests/{id}/workflow-candidates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -97256,6 +97697,7 @@
     "/api/office/purchase-requests/{id}/workflow-commands": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -97416,6 +97858,7 @@
     "/api/office/request-projects": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -97619,6 +98062,7 @@
     "/api/office/room-handling-services": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -97757,6 +98201,7 @@
     "/api/office/rooms": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -97907,6 +98352,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -98029,6 +98475,7 @@
     "/api/office/rooms/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -98155,6 +98602,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -98290,6 +98738,7 @@
     "/api/office/rooms/{id}/availability": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -98435,6 +98884,7 @@
     "/api/office/supplies": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -98592,6 +99042,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -98714,6 +99165,7 @@
     "/api/office/supplies/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -98840,6 +99292,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -98975,6 +99428,7 @@
     "/api/office/supplies/{id}/movements": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -99123,6 +99577,7 @@
     "/api/office/supplies/{id}/restock": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -99257,6 +99712,7 @@
     "/api/office/supplies/{id}/stocktake": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -99391,6 +99847,7 @@
     "/api/office/supply-handling-services": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -99529,6 +99986,7 @@
     "/api/office/supply-requests": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -99757,6 +100215,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -99879,6 +100338,7 @@
     "/api/office/supply-requests/{id}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -100027,6 +100487,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -100162,6 +100623,7 @@
     "/api/office/supply-requests/{id}/approve": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -100296,6 +100758,7 @@
     "/api/office/supply-requests/{id}/attachments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "Office approvals"
         ],
@@ -100484,6 +100947,7 @@
     "/api/office/supply-requests/{id}/attachments/{attachmentId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -100652,6 +101116,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -100813,6 +101278,7 @@
     "/api/office/supply-requests/{id}/cancel": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -100947,6 +101413,7 @@
     "/api/office/supply-requests/{id}/commands/{commandKey}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -101107,6 +101574,7 @@
     "/api/office/supply-requests/{id}/decisions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -101289,6 +101757,7 @@
     "/api/office/supply-requests/{id}/draft": {
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -101449,6 +101918,7 @@
     "/api/office/supply-requests/{id}/fulfillment": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -101609,6 +102079,7 @@
     "/api/office/supply-requests/{id}/history": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -101757,6 +102228,7 @@
     "/api/office/supply-requests/{id}/issue": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -101891,6 +102363,7 @@
     "/api/office/supply-requests/{id}/reject": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -102025,6 +102498,7 @@
     "/api/office/supply-requests/{id}/return": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -102159,6 +102633,7 @@
     "/api/office/supply-requests/{id}/submissions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -102325,6 +102800,7 @@
     "/api/office/supply-requests/{id}/submissions/{submissionId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -102485,6 +102961,7 @@
     "/api/office/supply-requests/{id}/submissions/{submissionId}/bundle": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -102646,6 +103123,7 @@
     "/api/office/supply-requests/{id}/submissions/{submissionId}/generate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -102806,6 +103284,7 @@
     "/api/office/supply-requests/{id}/submissions/{submissionId}/pdf": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -102967,6 +103446,7 @@
     "/api/office/supply-requests/{id}/submit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -103127,6 +103607,7 @@
     "/api/office/supply-requests/{id}/workflow-candidates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -103287,6 +103768,7 @@
     "/api/office/supply-requests/{id}/workflow-commands": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -103447,6 +103929,7 @@
     "/api/office/travel-requests": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -103629,6 +104112,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -103777,6 +104261,7 @@
     "/api/office/travel-requests/{id}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -103925,6 +104410,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -104085,6 +104571,7 @@
     "/api/office/travel-requests/{id}/approval-preview": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -104235,6 +104722,7 @@
     "/api/office/travel-requests/{id}/approval-reassign": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -104395,6 +104883,7 @@
     "/api/office/travel-requests/{id}/approve": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -104555,6 +105044,7 @@
     "/api/office/travel-requests/{id}/attachments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "Office approvals"
         ],
@@ -104745,6 +105235,7 @@
     "/api/office/travel-requests/{id}/attachments/{attachmentId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -104913,6 +105404,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -105074,6 +105566,7 @@
     "/api/office/travel-requests/{id}/cancel": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -105234,6 +105727,7 @@
     "/api/office/travel-requests/{id}/commands/{commandKey}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -105394,6 +105888,7 @@
     "/api/office/travel-requests/{id}/complete": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -105554,6 +106049,7 @@
     "/api/office/travel-requests/{id}/decisions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -105736,6 +106232,7 @@
     "/api/office/travel-requests/{id}/fulfillment": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -105896,6 +106393,7 @@
     "/api/office/travel-requests/{id}/history": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -106062,6 +106560,7 @@
     "/api/office/travel-requests/{id}/reject": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -106222,6 +106721,7 @@
     "/api/office/travel-requests/{id}/remind": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -106382,6 +106882,7 @@
     "/api/office/travel-requests/{id}/return": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -106542,6 +107043,7 @@
     "/api/office/travel-requests/{id}/submissions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -106708,6 +107210,7 @@
     "/api/office/travel-requests/{id}/submissions/{submissionId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -106868,6 +107371,7 @@
     "/api/office/travel-requests/{id}/submissions/{submissionId}/bundle": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -107029,6 +107533,7 @@
     "/api/office/travel-requests/{id}/submissions/{submissionId}/generate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -107189,6 +107694,7 @@
     "/api/office/travel-requests/{id}/submissions/{submissionId}/pdf": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -107350,6 +107856,7 @@
     "/api/office/travel-requests/{id}/submit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -107510,6 +108017,7 @@
     "/api/office/travel-requests/{id}/void": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -107670,6 +108178,7 @@
     "/api/office/travel-requests/{id}/withdraw": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -107830,6 +108339,7 @@
     "/api/office/travel-requests/{id}/workflow-candidates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -107990,6 +108500,7 @@
     "/api/office/travel-requests/{id}/workflow-commands": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "Office approvals"
         ],
@@ -108150,6 +108661,7 @@
     "/api/organization-directory": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -108272,6 +108784,7 @@
     "/api/organization-directory/companies": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -108404,6 +108917,7 @@
     "/api/organization-directory/companies/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -108539,6 +109053,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -108683,6 +109198,7 @@
     "/api/organization-directory/companies/{id}/impact": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -108817,6 +109333,7 @@
     "/api/organization-directory/departments": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -108949,6 +109466,7 @@
     "/api/organization-directory/departments/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -109084,6 +109602,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -109228,6 +109747,7 @@
     "/api/organization-directory/managers": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -109391,6 +109911,7 @@
     "/api/organization/access-restrictions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -109528,6 +110049,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -109655,6 +110177,7 @@
     "/api/organization/account-security": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -109782,6 +110305,7 @@
     "/api/organization/approval-simulation": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -109905,6 +110429,7 @@
     "/api/organization/employments": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -110048,6 +110573,7 @@
     "/api/organization/identity-candidates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -110199,6 +110725,7 @@
     "/api/organization/permission-versions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -110343,6 +110870,7 @@
     "/api/organization/permission-versions/apply": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -110470,6 +110998,7 @@
     "/api/organization/permission-versions/definition": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -110624,6 +111153,7 @@
     "/api/organization/permission-versions/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -110751,6 +111281,7 @@
     "/api/organization/permission-versions/publish": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -110878,6 +111409,7 @@
     "/api/organization/positions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -111019,6 +111551,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -111146,6 +111679,7 @@
     "/api/organization/projects": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -111287,6 +111821,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -111414,6 +111949,7 @@
     "/api/organization/responsibilities": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -111555,6 +112091,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -111682,6 +112219,7 @@
     "/api/organization/routing-units": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -111795,6 +112333,7 @@
     "/api/organization/unit-access": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -111915,6 +112454,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -112047,6 +112587,7 @@
     "/api/organization/unit-approvers": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -112169,6 +112710,7 @@
     "/api/organization/unit-members": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -112323,6 +112865,7 @@
     "/api/organization/unit-schemes": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -112443,6 +112986,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -112575,6 +113119,7 @@
     "/api/organization/unit-tasks": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -112715,6 +113260,7 @@
     "/api/organization/unit-tasks/reassign": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -112847,6 +113393,7 @@
     "/api/organization/workflow-summary": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -112987,6 +113534,7 @@
     "/api/payments": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -113073,6 +113621,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -113158,6 +113707,7 @@
     "/api/payments/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -113254,6 +113804,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -113332,6 +113883,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -113432,6 +113984,7 @@
     "/api/permission-templates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -113492,6 +114045,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -113594,6 +114148,7 @@
     "/api/permission-templates/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -113698,6 +114253,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -113812,6 +114368,7 @@
     "/api/postgresql-maintenance/backups": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -113854,6 +114411,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -113907,6 +114465,7 @@
     "/api/postgresql-maintenance/backups/download-ticket": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -113980,6 +114539,7 @@
     "/api/postgresql-maintenance/backups/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 86400,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -114060,6 +114620,7 @@
     "/api/postgresql-maintenance/backups/upload-restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 86400,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -114166,6 +114727,7 @@
     "/api/postgresql-maintenance/restore-plan": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -114229,6 +114791,7 @@
     "/api/query/invoices": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -114402,6 +114965,7 @@
     "/api/query/invoices/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -114478,6 +115042,7 @@
     "/api/query/invoices/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -114557,6 +115122,7 @@
     "/api/reports/invoices/draft/html-preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -114639,6 +115205,7 @@
     "/api/reports/invoices/pdf-zip/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -114715,6 +115282,7 @@
     "/api/reports/invoices/pdf-zip/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -114794,6 +115362,7 @@
     "/api/reports/invoices/{invoiceId}/document-email": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -114902,6 +115471,7 @@
     "/api/reports/invoices/{invoiceId}/document-package/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -114990,6 +115560,7 @@
     "/api/reports/invoices/{invoiceId}/document-package/html-preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -115084,6 +115655,7 @@
     "/api/reports/invoices/{invoiceId}/document-package/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -115175,6 +115747,7 @@
     "/api/reports/invoices/{invoiceId}/html-preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -115269,6 +115842,7 @@
     "/api/reports/invoices/{invoiceId}/pdf/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -115357,6 +115931,7 @@
     "/api/reports/invoices/{invoiceId}/pdf/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -115448,6 +116023,7 @@
     "/api/reports/payments/draft/html-preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -115530,6 +116106,7 @@
     "/api/reports/payments/{paymentId}/html-preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -115624,6 +116201,7 @@
     "/api/reports/payments/{paymentId}/pdf/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -115712,6 +116290,7 @@
     "/api/reports/payments/{paymentId}/pdf/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -115803,6 +116382,7 @@
     "/api/reports/templates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -115882,6 +116462,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -115975,6 +116556,7 @@
     "/api/reports/templates/content": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -116083,6 +116665,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -116172,6 +116755,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -116268,6 +116852,7 @@
     "/api/reports/templates/default": {
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -116364,6 +116949,7 @@
     "/api/reports/templates/display-name": {
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -116460,6 +117046,7 @@
     "/api/reports/templates/fields": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -116538,6 +117125,7 @@
     "/api/reports/templates/file/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -116624,6 +117212,7 @@
     "/api/reports/templates/file/import": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -116720,6 +117309,7 @@
     "/api/reports/templates/file/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -116805,6 +117395,7 @@
     "/api/reports/templates/file/upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -116940,6 +117531,7 @@
     "/api/reports/templates/package/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -117013,6 +117605,7 @@
     "/api/reports/templates/package/import": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -117109,6 +117702,7 @@
     "/api/reports/templates/package/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -117191,6 +117785,7 @@
     "/api/reports/templates/package/upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -117300,6 +117895,7 @@
     "/api/reports/templates/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -117379,6 +117975,7 @@
     "/api/reports/templates/rename": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -117475,6 +118072,7 @@
     "/api/reports/templates/storage-check": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -117552,6 +118150,7 @@
     "/api/reports/templates/v3/contract": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -117618,6 +118217,7 @@
     "/api/reports/templates/v3/resources": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -117707,6 +118307,7 @@
     "/api/reports/templates/v3/resources/upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -117808,6 +118409,7 @@
     "/api/reports/templates/v3/resources/{resourceId}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -117894,6 +118496,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -117977,6 +118580,7 @@
     "/api/reports/user-templates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -118098,6 +118702,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -118204,6 +118809,7 @@
     "/api/reports/user-templates/clone": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -118310,6 +118916,7 @@
     "/api/reports/user-templates/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -118422,6 +119029,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -118500,6 +119108,7 @@
     "/api/reports/user-templates/{id}/disable": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -118611,6 +119220,7 @@
     "/api/reports/user-templates/{id}/draft": {
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -118722,6 +119332,7 @@
     "/api/reports/user-templates/{id}/publish": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -118833,6 +119444,7 @@
     "/api/reports/user-templates/{id}/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -118944,6 +119556,7 @@
     "/api/reports/user-templates/{id}/share": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -119055,6 +119668,7 @@
     "/api/reports/user-templates/{id}/versions": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -119170,6 +119784,7 @@
     "/api/reports/user-templates/{id}/versions/cleanup/commit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -119280,6 +119895,7 @@
     "/api/reports/user-templates/{id}/versions/cleanup/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -119390,6 +120006,7 @@
     "/api/reports/user-templates/{id}/versions/retention": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -119491,6 +120108,7 @@
     "/api/reports/user-templates/{id}/versions/{versionNumber}/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -119612,6 +120230,7 @@
     "/api/server-migration/authorization": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -119686,6 +120305,7 @@
     "/api/server-migration/packages": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -119760,6 +120380,7 @@
     "/api/server-migration/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 86400,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -119874,6 +120495,7 @@
     "/api/server-migration/status": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -119932,6 +120554,7 @@
     "/api/settings": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -119968,6 +120591,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -120060,6 +120684,7 @@
     "/api/settings/validate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -120142,6 +120767,7 @@
     "/api/shared-database/ownership": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -120186,6 +120812,7 @@
     "/api/shared-database/ownership/transfer": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -120252,6 +120879,7 @@
     "/api/single-window/acd/{sourceId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -120332,6 +120960,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -120424,6 +121053,7 @@
     "/api/single-window/acd/{sourceId}/build-defaults": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -120506,6 +121136,7 @@
     "/api/single-window/acd/{sourceId}/export-review": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -120588,6 +121219,7 @@
     "/api/single-window/acd/{sourceId}/locked-fields": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -120670,6 +121302,7 @@
     "/api/single-window/acd/{sourceId}/submit-package/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -120763,6 +121396,7 @@
     "/api/single-window/acd/{sourceId}/submit-package/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -120855,6 +121489,7 @@
     "/api/single-window/acd/{sourceId}/unlock-fields": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -120947,6 +121582,7 @@
     "/api/single-window/client-profiles": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -121009,6 +121645,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -121106,6 +121743,7 @@
     "/api/single-window/client-profiles/{profileKey}/activate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -121183,6 +121821,7 @@
     "/api/single-window/client/collect-receipts": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -121283,6 +121922,7 @@
     "/api/single-window/client/dispatch": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -121383,6 +122023,7 @@
     "/api/single-window/coo/editor-options": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -121438,6 +122079,7 @@
     "/api/single-window/coo/issuing-authorities": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -121493,6 +122135,7 @@
     "/api/single-window/coo/producer-profiles": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -121579,6 +122222,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -121664,6 +122308,7 @@
     "/api/single-window/coo/producer-profiles/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -121769,6 +122414,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -121854,6 +122500,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -121961,6 +122608,7 @@
     "/api/single-window/coo/{sourceId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -122041,6 +122689,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -122133,6 +122782,7 @@
     "/api/single-window/coo/{sourceId}/build-defaults": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -122215,6 +122865,7 @@
     "/api/single-window/coo/{sourceId}/export-review": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -122297,6 +122948,7 @@
     "/api/single-window/coo/{sourceId}/locked-fields": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -122379,6 +123031,7 @@
     "/api/single-window/coo/{sourceId}/submit-package/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -122472,6 +123125,7 @@
     "/api/single-window/coo/{sourceId}/submit-package/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -122564,6 +123218,7 @@
     "/api/single-window/coo/{sourceId}/unlock-fields": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -122656,6 +123311,7 @@
     "/api/single-window/export-review/{businessType}/{sourceId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -122746,6 +123402,7 @@
     "/api/single-window/export-review/{businessType}/{sourceId}/repair": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -122846,6 +123503,7 @@
     "/api/single-window/operation-center": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -122948,6 +123606,7 @@
     "/api/single-window/operation-center/{batchId}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -123028,6 +123687,7 @@
     "/api/single-window/packages/import": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -123108,6 +123768,7 @@
     "/api/single-window/packages/upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -123208,6 +123869,7 @@
     "/api/single-window/receipts/download-package": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -123286,6 +123948,7 @@
     "/api/single-window/receipts/import": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -123366,6 +124029,7 @@
     "/api/single-window/receipts/save-package-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -123443,6 +124107,7 @@
     "/api/single-window/receipts/upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -123543,6 +124208,7 @@
     "/api/single-window/reference-catalog": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -123617,6 +124283,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -123673,6 +124340,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -123750,6 +124418,7 @@
     "/api/single-window/reference-catalog/excel/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -123982,6 +124651,7 @@
     "/api/single-window/reference-catalog/import-json": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -124072,6 +124742,7 @@
     "/api/single-window/sources": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -124164,6 +124835,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -124241,6 +124913,7 @@
     "/api/single-window/sources/excel/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -124335,6 +125008,7 @@
     "/api/single-window/sources/excel/template/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -124422,6 +125096,7 @@
     "/api/single-window/sources/excel/template/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -124522,6 +125197,7 @@
     "/api/suppliers": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -124601,6 +125277,7 @@
     "/api/suppliers/assessment-overview": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -124667,6 +125344,7 @@
     "/api/suppliers/export": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -124750,6 +125428,7 @@
     "/api/suppliers/import": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -124829,6 +125508,7 @@
     "/api/suppliers/import/preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -124917,6 +125597,7 @@
     "/api/suppliers/page": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -125023,6 +125704,7 @@
     "/api/suppliers/product-options": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -125122,6 +125804,7 @@
     "/api/suppliers/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -125216,6 +125899,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -125289,6 +125973,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -125383,6 +126068,7 @@
     "/api/suppliers/{id}/admit": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -125477,6 +126163,7 @@
     "/api/suppliers/{id}/deactivate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -125571,6 +126258,7 @@
     "/api/suppliers/{id}/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -125665,6 +126353,7 @@
     "/api/suppliers/{supplierId}/assessments": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -125744,6 +126433,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -125838,6 +126528,7 @@
     "/api/suppliers/{supplierId}/assessments/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -125942,6 +126633,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -126046,6 +126738,7 @@
     "/api/suppliers/{supplierId}/assessments/{id}/confirm": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -126155,6 +126848,7 @@
     "/api/suppliers/{supplierId}/contacts": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -126255,6 +126949,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -126349,6 +127044,7 @@
     "/api/suppliers/{supplierId}/contacts/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -126453,6 +127149,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -126557,6 +127254,7 @@
     "/api/suppliers/{supplierId}/contacts/{id}/set-primary": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -126661,6 +127359,7 @@
     "/api/suppliers/{supplierId}/products": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -126761,6 +127460,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -126855,6 +127555,7 @@
     "/api/suppliers/{supplierId}/products/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -126959,6 +127660,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127063,6 +127765,7 @@
     "/api/suppliers/{supplierId}/products/{id}/deactivate": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127167,6 +127870,7 @@
     "/api/suppliers/{supplierId}/products/{id}/restore": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127271,6 +127975,7 @@
     "/api/support-package/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127334,6 +128039,7 @@
     "/api/support-package/save-to-runtime": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127394,6 +128100,7 @@
     "/api/system/data-maintenance/invoices/{id}": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127484,6 +128191,7 @@
     "/api/system/data-maintenance/invoices/{id}/purge": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127594,6 +128302,7 @@
     "/api/system/license": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127632,6 +128341,7 @@
     "/api/system/license/register": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127700,6 +128410,7 @@
     "/api/system/logs/cleanup": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127761,6 +128472,7 @@
     "/api/system/shutdown-maintenance": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127808,6 +128520,7 @@
     "/api/tools/container-packing/analyze": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127879,6 +128592,7 @@
     "/api/tools/container-packing/container-types": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -127935,6 +128649,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128009,6 +128724,7 @@
     "/api/tools/container-packing/container-types/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128098,6 +128814,7 @@
     "/api/tools/container-packing/pdf/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128173,6 +128890,7 @@
     "/api/tools/container-packing/pdf/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128250,6 +128968,7 @@
     "/api/tools/container-packing/projects": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128320,6 +129039,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128394,6 +129114,7 @@
     "/api/tools/container-packing/projects/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128481,6 +129202,7 @@
       },
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128557,6 +129279,7 @@
     "/api/tools/email/deliveries": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128666,6 +129389,7 @@
     "/api/tools/email/send": {
       "post": {
         "x-exportdoc-timeout-seconds": 65,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128763,6 +129487,7 @@
     "/api/tools/email/server-suggestion": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128839,6 +129564,7 @@
     "/api/tools/email/status": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128902,6 +129628,7 @@
     "/api/tools/email/test-connection": {
       "post": {
         "x-exportdoc-timeout-seconds": 65,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -128971,6 +129698,7 @@
     "/api/tools/excel/booking-sheet/blank/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129029,6 +129757,7 @@
     "/api/tools/excel/booking-sheet/blank/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129103,6 +129832,7 @@
     "/api/tools/excel/booking-sheet/convert/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129177,6 +129907,7 @@
     "/api/tools/excel/booking-sheet/convert/upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129257,6 +129988,7 @@
     "/api/tools/excel/booking-sheet/from-invoice/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129334,6 +130066,7 @@
     "/api/tools/excel/booking-sheet/from-invoice/{invoiceId}/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129410,6 +130143,7 @@
     "/api/tools/excel/import-preview": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129487,6 +130221,7 @@
     "/api/tools/excel/import-preview-upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129581,6 +130316,7 @@
     "/api/tools/excel/template/download": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129639,6 +130375,7 @@
     "/api/tools/excel/template/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129713,6 +130450,7 @@
     "/api/tools/exchange-rates": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129783,6 +130521,7 @@
     "/api/tools/exchange-rates/available-currencies": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129844,6 +130583,7 @@
     "/api/tools/letter-of-credit/import": {
       "post": {
         "x-exportdoc-timeout-seconds": 600,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -129937,6 +130677,7 @@
     "/api/tools/letter-of-credit/import-upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 600,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -130039,6 +130780,7 @@
     "/api/tools/letter-of-credit/review": {
       "post": {
         "x-exportdoc-timeout-seconds": 125,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -130129,6 +130871,7 @@
     "/api/tools/ocr/preview-image": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -130219,6 +130962,7 @@
     "/api/tools/ocr/recognize-image": {
       "post": {
         "x-exportdoc-timeout-seconds": 95,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -130302,6 +131046,7 @@
     "/api/tools/ocr/recognize-image-upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 95,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -130396,6 +131141,7 @@
     "/api/tools/pdf/merge/save-to-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -130486,6 +131232,7 @@
     "/api/tools/pdf/merge/upload": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": true,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -130573,6 +131320,7 @@
     "/api/users": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -130633,6 +131381,7 @@
       },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -130735,6 +131484,7 @@
     "/api/users/{id}": {
       "delete": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -130849,6 +131599,7 @@
       },
       "put": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -130963,6 +131714,7 @@
     "/api/worklist": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -131060,6 +131812,7 @@
     "/downloads/jobs/{token}": {
       "get": {
         "x-exportdoc-timeout-seconds": 86400,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -131122,6 +131875,7 @@
     "/downloads/postgresql-backups/{token}": {
       "get": {
         "x-exportdoc-timeout-seconds": 86400,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -131190,6 +131944,7 @@
     "/healthz": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -131223,6 +131978,7 @@
     "/livez": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -131247,6 +132003,7 @@
       },
       "head": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -131273,6 +132030,7 @@
     "/readyz": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],
@@ -131300,6 +132058,7 @@
       },
       "head": {
         "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
         ],

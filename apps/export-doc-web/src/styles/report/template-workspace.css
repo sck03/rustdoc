@@ -41,7 +41,7 @@
 
 .report-template-preview-toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 320px) minmax(260px, 1fr) auto;
+  grid-template-columns: minmax(220px, 280px) auto minmax(220px, 1fr);
   align-items: end;
   gap: 12px;
   min-width: 0;
@@ -54,18 +54,6 @@
 .report-template-preview-mode-tabs {
   align-self: end;
   margin-bottom: 0;
-}
-
-.report-template-preview-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-  min-width: 0;
-}
-
-.report-template-preview-actions .command-button {
-  flex: 0 0 auto;
 }
 
 .report-template-management-workspace {

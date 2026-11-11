@@ -324,7 +324,7 @@ fn sqlite_transactions_blobs_and_backup_use_one_database() {
 fn test_directory_cleanup_retries_transient_handles_and_reports_persistent_locks() {
     use std::{os::windows::fs::OpenOptionsExt, time::Duration};
 
-    for transient in [true, false] {
+    for release_after in [Some(100), Some(2200), None] {
         let root = test_workspace::create("storage-tests");
         let file = fs::OpenOptions::new()
             .write(true)
@@ -332,15 +332,16 @@ fn test_directory_cleanup_retries_transient_handles_and_reports_persistent_locks
             .share_mode(0)
             .open(root.join("scanner-held.db"))
             .unwrap();
-        if transient {
+        if let Some(delay_ms) = release_after {
             let released = std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_millis(100));
+                std::thread::sleep(Duration::from_millis(delay_ms));
                 drop(file);
             });
             test_workspace::remove(&root).unwrap();
             released.join().unwrap();
         } else {
-            let error = test_workspace::remove(&root).unwrap_err();
+            let error =
+                test_workspace::remove_with_timeout(&root, Duration::from_millis(100)).unwrap_err();
             assert_eq!(error.raw_os_error(), Some(32));
             assert!(root.exists());
             drop(file);

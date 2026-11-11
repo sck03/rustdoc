@@ -14,9 +14,10 @@ import { ExportDocManagerApiClient } from "../../../api/index.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
 import { readApiError } from "../../../ui/formUtils.ts";
 import { useConfirmation } from "../../../ui/ConfirmationProvider.tsx";
+import { useScopedConfirmation } from "../../../ui/useScopedConfirmation.ts";
+import { useTransientPreview } from "../../../ui/useTransientPreview.ts";
 import {
   type ContainerPackingAnalyzeMode,
-  type ContainerPackingAnalyzeVariables,
   type ContainerPackingCargoRow,
   type ContainerPackingFormState,
   type ContainerPackingRenderModeValue,
@@ -44,7 +45,7 @@ export function ContainerPackingPanel({
   canOperate: boolean;
   canManage: boolean;
 }) {
-  const requestConfirmation = useConfirmation();
+  const requestConfirmation = useScopedConfirmation(client, useConfirmation());
   const queryClient = useQueryClient();
   const [response, setResponse] =
     useState<ApiContainerPackingAnalyzeResponse | null>(null);
@@ -62,8 +63,7 @@ export function ContainerPackingPanel({
   >("disabled");
   const [autoRefreshText, setAutoRefreshText] = useState("自动分析已关闭，修改后请点击“立即刷新”。");
   const autoRefreshTimerRef = useRef<number | null>(null);
-  const latestAnalyzeSequenceRef = useRef(0);
-  const activeAnalyzeControllerRef = useRef<AbortController | null>(null);
+  useEffect(() => { setResponse(null); setAnalysisDimensions(null); }, [client]);
 
   const {
     currentProjectId, projectName, selectedProjectId, container, rules, cargoRows,
@@ -119,19 +119,13 @@ export function ContainerPackingPanel({
     autoRefreshText,
   );
 
-  const analyzeMutation = useMutation({
-    mutationFn: ({ request, signal }: ContainerPackingAnalyzeVariables) =>
-      client.analyzeContainerPacking({
-        body: request,
-      }, { signal }),
-    onSuccess: (nextResponse, variables) => {
-      if (
-        variables.sequence !== latestAnalyzeSequenceRef.current ||
-        variables.request !== latestAnalysisRequestRef.current
-      ) {
-        return;
-      }
-
+  const analysisScope = useMemo(() => ({}), [client, analysisRequest]);
+  const analyze = useTransientPreview(analysisScope,
+    async (signal, variables: { request: ApiContainerPackingAnalyzeRequest; mode: ContainerPackingAnalyzeMode }) => ({
+      nextResponse: await client.analyzeContainerPacking({ body: variables.request }, { signal }), variables,
+    }),
+    error => { setAutoRefreshState("error"); setAutoRefreshText("分析失败。"); setMessage(readApiError(error)); },
+    ({ nextResponse, variables }) => {
       setResponse(nextResponse);
       const analyzedContainer = variables.request.container;
       if (!analyzedContainer) {
@@ -149,35 +143,7 @@ export function ContainerPackingPanel({
       if (variables.mode === "manual") {
         setMessage("装箱分析完成。");
       }
-    },
-    onError: (error, variables) => {
-      if (
-        variables.sequence !== latestAnalyzeSequenceRef.current ||
-        variables.request !== latestAnalysisRequestRef.current
-      ) {
-        return;
-      }
-
-      setAutoRefreshState("error");
-      setAutoRefreshText("分析失败。");
-      setMessage(readApiError(error));
-    },
-    onSettled: (_data, _error, variables) => {
-      if (activeAnalyzeControllerRef.current?.signal === variables.signal) {
-        activeAnalyzeControllerRef.current = null;
-      }
-    },
-  });
-
-  useEffect(() => {
-    latestAnalyzeSequenceRef.current += 1;
-    activeAnalyzeControllerRef.current?.abort();
-    activeAnalyzeControllerRef.current = null;
-  }, [analysisRequest]);
-
-  useEffect(() => () => {
-    activeAnalyzeControllerRef.current?.abort();
-  }, []);
+    });
 
   useEffect(() => {
     if (autoRefreshTimerRef.current) {
@@ -220,7 +186,7 @@ export function ContainerPackingPanel({
     analysisRequest,
     autoRefreshEnabled,
     canAnalyze,
-    validCargoRows.length,
+    validCargoRows.length, client,
   ]);
 
   const saveContainerTypeMutation = useMutation({
@@ -371,11 +337,6 @@ export function ContainerPackingPanel({
       autoRefreshTimerRef.current = null;
     }
 
-    const sequence = latestAnalyzeSequenceRef.current + 1;
-    latestAnalyzeSequenceRef.current = sequence;
-    activeAnalyzeControllerRef.current?.abort();
-    const controller = new AbortController();
-    activeAnalyzeControllerRef.current = controller;
     setAutoRefreshState("running");
     setAutoRefreshText(
       mode === "auto"
@@ -386,12 +347,7 @@ export function ContainerPackingPanel({
       setMessage(null);
     }
 
-    analyzeMutation.mutate({
-      mode,
-      request,
-      sequence,
-      signal: controller.signal,
-    });
+    void analyze.generate({ mode, request });
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -453,7 +409,7 @@ export function ContainerPackingPanel({
   const visibleMessage = message ?? queryMessage;
   const hasVisibleError =
     Boolean(queryMessage) ||
-    analyzeMutation.isError ||
+    autoRefreshState === "error" ||
     saveProjectMutation.isError ||
     loadProjectMutation.isError ||
     deleteProjectMutation.isError ||
@@ -467,7 +423,7 @@ export function ContainerPackingPanel({
       canManage={canManage} canOperate={canOperate}
       canSaveContainerType={canSaveContainerType} canSaveProject={canSaveProject} cargoRows={cargoRows}
       container={container} containerTypes={containerTypes} currentProjectId={currentProjectId}
-      hasVisibleError={hasVisibleError} isAnalyzing={analyzeMutation.isPending} isDeletingContainerType={deleteContainerTypeMutation.isPending}
+      hasVisibleError={hasVisibleError} isAnalyzing={analyze.isPending} isDeletingContainerType={deleteContainerTypeMutation.isPending}
       isDeletingProject={deleteProjectMutation.isPending} isLoadingProject={loadProjectMutation.isPending}
       isRefreshingProjects={projectsQuery.isFetching} isSavingContainerType={saveContainerTypeMutation.isPending}
       isSavingProject={isSaving} onAddCargo={addCargoRow} onAnalyze={runContainerPackingAnalysis}

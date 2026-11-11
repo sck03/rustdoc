@@ -59,7 +59,6 @@ await withOfficeUi('template-private-ui', async ({ output, url, invoke, openPage
   await page.getByText('私人模板已保存，可直接用于自己的打印和导出，无需发布。', { exact: true }).waitFor();
   await page.screenshot({ path: path.join(output, 'private-design-saved.png'), fullPage: true });
   await page.getByRole('tab', { name: '预览', exact: true }).click();
-  await page.getByRole('button', { name: '样例预览', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('iframe[title="模板预览"]')?.srcdoc.includes('<svg'));
   await page.screenshot({ path: path.join(output, 'private-native-preview.png'), fullPage: true });
   const catalog = await invoke('ListReportTemplates', undefined, {}, ownerSession.accessToken);
@@ -99,7 +98,6 @@ await withOfficeUi('template-private-ui', async ({ output, url, invoke, openPage
   assert.deepEqual(savedTable.summaryRow, detail.block.summaryRow);
   await page.screenshot({ path: path.join(output, 'private-detail-style-saved.png'), fullPage: true });
   await page.getByRole('tab', { name: '预览', exact: true }).click();
-  await page.getByRole('button', { name: '样例预览', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('iframe[title="模板预览"]')?.srcdoc.includes('<svg'));
   assert((await page.locator('iframe[title="模板预览"]').getAttribute('srcdoc')).includes('货物说明（验收）'));
   await page.screenshot({ path: path.join(output, 'private-detail-native-preview.png'), fullPage: true });

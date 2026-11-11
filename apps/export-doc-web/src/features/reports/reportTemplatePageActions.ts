@@ -62,7 +62,7 @@ export function createReportTemplatePageActions({
   workspaceHasUnappliedDesignerChanges: boolean;
   previewContent: string;
   readPreviewContent?: () => string | null;
-  saveNewDesignerContent: (content: string) => Promise<void>;
+  saveNewDesignerContent: (content: string) => void;
   saveUserTemplate: () => void;
   saveDefaultTemplate: () => void;
   exportDefaults: {
@@ -171,7 +171,7 @@ export function createReportTemplatePageActions({
     const nextContent = readPreviewContent ? readPreviewContent() : previewContent;
     if (nextContent === null) return;
     if (workspaceHasUnappliedDesignerChanges) {
-      void saveNewDesignerContent(nextContent);
+      saveNewDesignerContent(nextContent);
     } else if (isUserTemplate) {
       saveUserTemplate();
     } else {

@@ -89,8 +89,13 @@ pub(super) fn viewable(
     if matches!(resource, "office.rooms" | "office.supplies") {
         return handling::resource_access(tx, actor, resource, "view", row, false);
     }
-    Ok(scope_viewable(tx, actor, resource, row)?
-        && (!actor.oa_assigned_only || assigned_to(tx, actor, resource, row)?))
+    if actor.oa_assigned_only {
+        return Ok(row["companyScope"] == actor.company
+            && auth::authorize(actor, resource, "view").is_ok()
+            && auth::restriction_allows(actor, resource, "view", row, true)
+            && assigned_to(tx, actor, resource, row)?);
+    }
+    scope_viewable(tx, actor, resource, row)
 }
 pub(super) fn assigned_to(
     tx: &Connection,
@@ -154,14 +159,14 @@ pub(super) fn scope_viewable(
     Ok(row["companyScope"] == actor.company
         && auth::authorize(actor, resource, "view").is_ok()
         && auth::restriction_allows(actor, resource, "view", row, true)
-        && (assigned_to(tx, actor, resource, row)?
-            || auth::visible(actor, resource, "view", row)
+        && (auth::visible(actor, resource, "view", row)
             || (resource == "office.expenses"
                 && FINANCE_STATUSES.contains(&text(row, "status").as_str())
                 && auth::visible(actor, resource, "complete", row))
             || (resource == "office.general"
                 && handling::GENERAL_STATES.contains(&text(row, "status").as_str())
-                && handling::can_handle(tx, actor, row, resource)?)))
+                && handling::can_handle(tx, actor, row, resource)?)
+            || assigned_to(tx, actor, resource, row)?))
 }
 fn access(tx: &Connection, actor: &Actor, meta: &Value, row: &Value) -> Result<()> {
     let resource = text(meta, "resource");

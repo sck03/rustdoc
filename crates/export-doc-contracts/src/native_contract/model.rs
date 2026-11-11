@@ -254,6 +254,8 @@ pub struct Foundation {
 pub struct Operation {
     #[serde(rename = "x-exportdoc-timeout-seconds")]
     pub timeout_seconds: u64,
+    #[serde(rename = "x-exportdoc-processing-slot")]
+    pub processing_slot: bool,
     pub tags: Vec<&'static str>,
     #[serde(rename = "operationId")]
     pub id: &'static str,
@@ -296,6 +298,13 @@ pub fn ep(
         path,
         operation: Operation {
             timeout_seconds: crate::request_limits::seconds(id),
+            processing_slot: matches!(
+                id,
+                "RecognizeOcrImage"
+                    | "SaveShippingMarkImage"
+                    | "SaveInvoiceSealImage"
+                    | "PreviewShippingMarkImage"
+            ),
             tags: vec!["ExportDocManager.Api"],
             id,
             responses,
@@ -323,6 +332,7 @@ impl Endpoint {
         self
     }
     pub fn body(mut self, required: bool, content: Content) -> Self {
+        self.operation.processing_slot |= content.keys().any(|mime| !mime.contains("json"));
         self.operation.body = Some(RequestBody {
             required,
             content,

@@ -1,5 +1,4 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { ApiReportTemplatePreviewResponse } from "../../api/index.ts";
 import { hasValidReportDesignerV3Schema } from "../report-designer/reportDesignerV3TemplateParser.ts";
 import type { ReportDesignerPreviewSampleProfile } from "../report-designer/reportDesignerPreviewSamples.ts";
 import {
@@ -27,7 +26,7 @@ export function useReportTemplateEditingActions({
   saveUserTemplateContent,
   setMessage,
   setMessageType,
-  setPreview,
+  clearPreview,
   setTemplatePreviewMode,
   setTemplatePreviewSampleProfile,
   setWorkspaceMode,
@@ -47,21 +46,12 @@ export function useReportTemplateEditingActions({
   saveUserTemplateContent: (content: string) => void;
   setMessage: Dispatch<SetStateAction<string | null>>;
   setMessageType: Dispatch<SetStateAction<MessageType>>;
-  setPreview: Dispatch<SetStateAction<ApiReportTemplatePreviewResponse | null>>;
+  clearPreview: () => void;
   setTemplatePreviewMode: Dispatch<SetStateAction<TemplatePreviewMode>>;
   setTemplatePreviewSampleProfile: Dispatch<SetStateAction<ReportDesignerPreviewSampleProfile>>;
   setWorkspaceMode: Dispatch<SetStateAction<TemplateWorkspaceMode>>;
 }) {
-  async function confirmStructuredTemplateOverwrite() {
-    if (hasValidReportDesignerV3Schema(content)) {
-      return true;
-    }
-    setMessage("模板格式无效，不能保存。请重新加载或新建 .dtpl 模板。");
-    setMessageType("error");
-    return false;
-  }
-
-  async function handleSaveNewReportDesignerContent(nextContent: string) {
+  function handleSaveNewReportDesignerContent(nextContent: string) {
     if (!selectedTemplatePath || !selectedTemplateContentActive) {
       return;
     }
@@ -70,11 +60,13 @@ export function useReportTemplateEditingActions({
       setMessageType("error");
       return;
     }
-    if (!await confirmStructuredTemplateOverwrite()) {
+    if (!hasValidReportDesignerV3Schema(content)) {
+      setMessage("模板格式无效，不能保存。请重新加载或新建 .dtpl 模板。");
+      setMessageType("error");
       return;
     }
 
-    setPreview(null);
+    clearPreview();
     setMessage(null);
     setMessageType(null);
     if (isUserTemplate) {
@@ -87,14 +79,14 @@ export function useReportTemplateEditingActions({
   function handleTemplatePreviewModeChange(nextMode: TemplatePreviewMode) {
     setTemplatePreviewMode(nextMode);
     setWorkspaceMode("preview");
-    setPreview(null);
+    clearPreview();
     setMessage(null);
     setMessageType(null);
   }
 
   function handleTemplatePreviewSampleProfileChange(value: string) {
     setTemplatePreviewSampleProfile(normalizePreviewSampleProfile(value, reportType));
-    setPreview(null);
+    clearPreview();
     setMessage(null);
     setMessageType(null);
   }

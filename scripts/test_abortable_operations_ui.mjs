@@ -28,7 +28,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { SupplierProductLinksPanel } from ${source('features/suppliers/SupplierProductLinksPanel.tsx')};
   import { SupplierAssessmentsPanel } from ${source('features/suppliers/SupplierAssessmentsPanel.tsx')};
   import { SalesOpportunityPage } from ${source('features/opportunities/SalesOpportunityPage.tsx')};
-  import { useReportTemplatePreviewMutations } from ${source('features/reports/useReportTemplatePreviewMutations.ts')};
+  import { useReportTemplatePreview } from ${source('features/reports/useReportTemplatePreview.ts')};
   import { InvoiceReportPreviewPanel } from ${source('features/invoices/InvoiceReportPreviewPanel.tsx')};
   import { useInvoiceDocumentPackageWorkspace } from ${source('features/invoices/useInvoiceDocumentPackageWorkspace.ts')};
   import { useInvoiceListSingleWindowOperations } from ${source('features/invoices/useInvoiceListSingleWindowOperations.ts')};
@@ -85,22 +85,22 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
       <button onClick={() => setRevision(value=>value+1)}>刷新模板目录</button>
       <button onClick={workspace.previewPackage}>组合预览</button><output>{workspace.preview?.items?.[0]?.html ?? ''}</output></>;
   }
-  function Preview({ scope, allowed }) {
-    const [formatMode, setMode] = useState('sample');
-    const [reportType, setReportType] = useState('ExportDocument');
-    const previewClient = {
+  const previewClient = {
       previewReportTemplateContent: (input, options) => lookup(input, options, 'sample'),
       previewInvoiceReportHtml: (input, options) => lookup(input, options, 'invoice'),
       previewPaymentVoucherHtml: (input, options) => lookup(input, options, 'payment'),
-    };
-    const { previewMutation, page, setPreviewFormat } = useReportTemplatePreviewMutations({
+  };
+  function Preview({ scope, allowed }) {
+    const [formatMode, setMode] = useState('sample');
+    const [reportType, setReportType] = useState('ExportDocument');
+    const { generate, page, setPreviewFormat } = useReportTemplatePreview({
       client: previewClient, reportType, selectedTemplatePath: 'builtin:template.dtpl', content: 'draft-'+scope,
       sampleProfile: 'sample', mode: formatMode, canDesignTemplates: allowed, withSeal: true,
       previewInvoiceId: 7, previewPaymentId: 9,
       onPreviewed: response => window.completed.push(response), onError: error => window.results.push(error.message),
     });
-    return <><button onClick={() => previewMutation.mutate({content:'committed-'+scope})}>生成预览</button>
-      <button onClick={() => previewMutation.mutate({pageIndex:1,previewRevision:page.previewRevision})}>预览下一页</button>
+    return <><button onClick={() => void generate({content:'committed-'+scope})}>生成预览</button>
+      <button onClick={() => void generate({pageIndex:1,previewRevision:page.previewRevision})}>预览下一页</button>
       <button onClick={() => setMode('savedSource')}>当前单据</button>
       <button onClick={() => setReportType('PaymentVoucher')}>付款模板</button>
       <button onClick={() => setPreviewFormat('PdfPage')}>实际PDF</button>
@@ -180,7 +180,7 @@ try {
       await check(page);
       assert.deepEqual(errors, []);
       results.push(name);
-    } catch (error) { failures.push(`${name}: ${error.message}`); console.error(name, await page.evaluate(() => ({location:window.currentLocation, pending:window.pending.map(p=>({aborted:p.signal?.aborted})),message:window.invoiceList?.message,errors:document.body.innerText}))); }
+    } catch (error) { failures.push(`${name}: ${error.message}; page errors: ${errors.join('; ')}`); console.error(name, await page.evaluate(() => ({location:window.currentLocation, pending:window.pending.map(p=>({aborted:p.signal?.aborted})),message:window.invoiceList?.message,errors:document.body.innerText}))); }
     finally { await page.close(); }
   }
   for (const boundary of ['close', 'switch', 'unmount']) for (const reject of [false, true]) {

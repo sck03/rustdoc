@@ -1,6 +1,5 @@
 import { ExternalAnchor } from "../../ui/ExternalAnchor.tsx";
 import "../../styles/features/hs-code-tools.css";
-import { useMutation } from "@tanstack/react-query";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { Eye,ExternalLink,FileSpreadsheet,Globe2,RefreshCw,Save,Search,Trash2,Upload,X } from "lucide-react";
 import { ChangeEvent,FormEvent,Fragment,useEffect,useRef,useState } from "react";
@@ -77,7 +76,7 @@ export function HsCodeToolsPanel({
     return () => {
       remoteDetailRequestRef.current += 1;
     };
-  }, []);
+  }, [client, disabled]);
 
   const importScope = `hs-import:${workspace}:${disabled}:${importMode}:${importSourceName}:${importEffectiveYear}`;
   const importPathMutation = useScopedMutation(importScope, client, {
@@ -118,31 +117,32 @@ export function HsCodeToolsPanel({
     onError: (error) => showError(readApiError(error)),
   });
 
-  const commitImportMutation = useMutation({
-    mutationFn: (token: string) => client.commitHsCodesImport({ body: { token } }),
-    onSuccess: async (response) => {
+  const commandScope = `hs-tools:${disabled}`;
+  const commitImportMutation = useScopedMutation(commandScope, client, {
+    mutationFn: (token: string, signal) => client.commitHsCodesImport({ body: { token } }, { signal }),
+    onSuccess: (response) => {
       showSuccess(response.message);
       setImportPreview(null);
       setWorkspace(mode === "hub" ? "none" : mode);
-      await onLocalDataChanged();
     },
+    refresh: onLocalDataChanged,
     onError: (error) => showError(readApiError(error)),
   });
 
-  const remoteHealthMutation = useMutation({
-    mutationFn: () => client.getHsCodeRemoteHealth(),
+  const remoteHealthMutation = useScopedMutation(commandScope, client, {
+    mutationFn: (_: void, signal) => client.getHsCodeRemoteHealth({ signal }),
     onSuccess: (response) => setRemoteHealth(response.message),
     onError: (error) => setRemoteHealth(readApiError(error)),
   });
 
-  const remoteSearchMutation = useMutation({
-    mutationFn: (request: { keyword: string; requestId: number }) =>
+  const remoteSearchMutation = useScopedMutation(commandScope, client, {
+    mutationFn: (request: { keyword: string; requestId: number }, signal) =>
       client.captureRemoteHsCodes({
         body: {
           keyword: request.keyword,
         },
-      }),
-    onSuccess: async (response, request) => {
+      }, { signal }),
+    onSuccess: (response, request) => {
       if (!isCurrentRemoteDetailRequest(request.requestId)) {
         return;
       }
@@ -151,10 +151,6 @@ export function HsCodeToolsPanel({
       const pendingDetailCount = items.filter(shouldFetchRemoteHsCodeDetail).length;
       setRemoteResults(items);
       setExpandedResultKey(null);
-      await onRemoteCandidatesChanged?.();
-      if (!isCurrentRemoteDetailRequest(request.requestId)) {
-        return;
-      }
 
       if (pendingDetailCount > 0) {
         showSuccess(`联网查询完成：找到 ${response.standardCodeCount ?? items.length} 条当前编码，${response.declarationExampleCount ?? 0} 条申报实例已进入候选池；其中 ${pendingDetailCount} 条编码可按需补全详情。`);
@@ -169,47 +165,44 @@ export function HsCodeToolsPanel({
             : "联网查询完成，未找到当前编码或申报实例。",
       );
     },
-    onError: (error, request) => {
-      if (isCurrentRemoteDetailRequest(request.requestId)) {
-        showError(readApiError(error));
-      }
-    },
+    refresh: onRemoteCandidatesChanged,
+    onError: error => showError(readApiError(error)),
   });
 
-  const fetchDetailMutation = useMutation({
-    mutationFn: (item: ApiHsCodeDto) => client.resolveRemoteHsCodeDetail({ body: normalizeHsCodeDtoForRequest(item) }),
-    onSuccess: async (response, item) => {
+  const fetchDetailMutation = useScopedMutation(commandScope, client, {
+    mutationFn: (item: ApiHsCodeDto, signal) => client.resolveRemoteHsCodeDetail({ body: normalizeHsCodeDtoForRequest(item) }, { signal }),
+    onSuccess: (response, item) => {
       setRemoteResults((current) => applyHsCodeRemoteDetailResolution(current, item, response));
       setExpandedResultKey(null);
       showSuccess(response.message || `已补全 ${item.code} 的远程详情。`);
-      await onRemoteCandidatesChanged?.();
     },
+    refresh: onRemoteCandidatesChanged,
     onError: (error) => showError(readApiError(error)),
   });
 
-  const saveRemoteMutation = useMutation({
-    mutationFn: (item: ApiHsCodeDto) => client.createHsCode({ body: normalizeHsCodeDtoForSave(item) }),
-    onSuccess: async (response, item) => {
+  const saveRemoteMutation = useScopedMutation(commandScope, client, {
+    mutationFn: (item: ApiHsCodeDto, signal) => client.createHsCode({ body: normalizeHsCodeDtoForSave(item) }, { signal }),
+    onSuccess: (response, item) => {
       setRemoteResults((current) => replaceHsCodeResult(current, item, response));
       showSuccess(`HS编码 ${response.code || item.code} 已保存为本地参考资料，导入年度税则后才会标记为当前有效。`);
-      await onLocalDataChanged();
     },
+    refresh: onLocalDataChanged,
     onError: (error) => showError(readApiError(error)),
   });
 
-  const clearAllMutation = useMutation({
-    mutationFn: (confirmation: string) =>
+  const clearAllMutation = useScopedMutation(commandScope, client, {
+    mutationFn: (confirmation: string, signal) =>
       client.clearAllHsCodes({
         body: { confirmation },
-      }),
-    onSuccess: async (response) => {
+      }, { signal }),
+    onSuccess: (response) => {
       showSuccess(response.message || "本地HS编码库已清空。");
       remoteDetailRequestRef.current += 1;
       setRemoteResults([]);
       setClearAllConfirmOpen(false);
       setClearAllConfirmation("");
-      await onLocalDataChanged();
     },
+    refresh: onLocalDataChanged,
     onError: (error) => showError(readApiError(error)),
   });
 

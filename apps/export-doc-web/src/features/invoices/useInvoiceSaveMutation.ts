@@ -7,7 +7,7 @@ import { isConcurrencyConflict, readApiError } from "../../ui/formUtils.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { normalizeInvoiceForSave, normalizeInvoiceStatus } from "./invoiceModel.ts";
 import { reconcileSavedInvoice, remainingHsFeedback } from "./invoiceSaveModel.ts";
-import { invalidateInvoiceViews } from "./invoiceCache.ts";
+import { invoiceViewKeys } from "./invoiceCache.ts";
 
 type TextSetter = Dispatch<SetStateAction<string | null>>;
 export type InvoicePersistenceOptions = {
@@ -27,10 +27,9 @@ export function useInvoiceSaveMutation(options: InvoicePersistenceOptions) {
   const latest = useRef({ scope, invoice, feedback: options.pendingHsFeedback ?? [] });
   latest.current = { scope, invoice, feedback: options.pendingHsFeedback ?? [] };
   return useScopedMutation("invoice-save", scope, {
-    mutationFn: async (body: ApiInvoiceDetailDto, signal) => {
-        const response = await (isNew ? client.createInvoice({ body }, { signal }) : client.updateInvoice({ id: invoiceId, body }, { signal }));
-        signal.throwIfAborted();
-        if (latest.current.scope !== scope || !latest.current.invoice) throw new DOMException("单据已切换。", "AbortError");
+    mutationFn: (body: ApiInvoiceDetailDto, signal) => isNew ? client.createInvoice({ body }, { signal }) : client.updateInvoice({ id: invoiceId, body }, { signal }),
+    onSuccess: (response, body) => {
+        if (!latest.current.invoice) return;
         const reconciled = reconcileSavedInvoice(latest.current.invoice, body, response.invoice);
         const feedback = remainingHsFeedback(latest.current.feedback, body.pendingHsFeedback ?? []);
         setInvoice(reconciled.invoice);
@@ -44,12 +43,9 @@ export function useInvoiceSaveMutation(options: InvoicePersistenceOptions) {
         queryClient.setQueryData(queryKeys.invoice(response.id), response.invoice);
         if (isNew) navigate(`/invoices/${response.id}`, { replace: true, state: { successMessage: success,
           ...(reconciled.changed || feedback.length ? { invoiceSaveContinuation: { invoice: reconciled.invoice, feedback } } : {}) } });
-        try {
-          await invalidateInvoiceViews(queryClient, response.id);
-        } catch (error) {
-          if (!signal.aborted && latest.current.scope === scope) setMessage(`发票已保存，但关联列表刷新失败：${readApiError(error)}`);
-        }
     },
+    refreshKeys: response => invoiceViewKeys(response.id),
+    onRefreshError: error => setMessage(`发票已保存，但关联列表刷新失败：${readApiError(error)}`),
     onError: error => {
       const message = readApiError(error);
       setMessage(isConcurrencyConflict(error) ? null : message);

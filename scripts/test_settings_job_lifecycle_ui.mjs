@@ -16,11 +16,13 @@ import {MemoryRouter} from 'react-router-dom';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {useSettingsWorkspace} from ${src('features/settings/useSettingsWorkspace.ts')};
 import {useBackupManagement} from ${src('features/settings/useBackupManagement.ts')};
+import {useBackupPlan} from ${src('features/settings/useBackupPlan.ts')};
 import {useJobCenterOperations} from ${src('features/jobs/useJobCenterOperations.ts')};
 import {ConfirmationProvider} from ${src('ui/ConfirmationProvider.tsx')};
 import {UnsavedChangesProvider} from ${src('ui/unsavedChangesGuard.tsx')};
 import {queryKeys} from ${src('api/queryKeys.ts')};
 window.calls=[]; window.notices=[];
+const backupStatus={revision:1,settingsRevision:1,plan:{enabled:false,time:'03:00',retentionCount:7,retentionDays:0,replicaMode:'None',s3:{}},webDav:{enabled:false,url:'',userName:''},encryptionPasswordSet:false};
 window.cache=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity},mutations:{retry:false}}});
 window.seed=owner=>{
  window.cache.setQueryData(queryKeys.settings(),{settings:{system:{marker:owner}},secrets:{},storagePolicy:'test'});
@@ -30,12 +32,14 @@ const clients=[0,1].map(owner=>new Proxy({}, {get:(_,method)=>(request,options)=
  if(method==='getSettings')return Promise.resolve({settings:{system:{marker:owner}},secrets:{},storagePolicy:'test'});
  if(method==='listDatabaseBackups')return Promise.resolve({backups:[],backupRoot:'test'});
  if(method==='getHealth')return Promise.resolve({databaseProviderKey:'sqlite'});
+ if(method==='getBackupPlan')return Promise.resolve(backupStatus);
  return new Promise((resolve,reject)=>window.calls.push({owner,method,request,signal:options?.signal??request?.signal,resolve,reject}));
 }}));
 function App({owner}){
  const client=clients[owner];
  const settings=useSettingsWorkspace({client,canManageSettings:true,canManageUsers:true,canUseDocumentWorkspace:true,isDesktopRuntime:false});
  const backup=useBackupManagement(client,true);
+ const plan=useBackupPlan(client,true); window.plan=plan;
  const jobs=useJobCenterOperations({client,canOperate:true,canManage:true,canCreateInvoiceReportZip:false,desktopAvailable:false,defaultExportDirectory:'',jobsCount:1,reportTemplates:[],configuredReportTemplatePath:'',focusJob:(...args)=>window.notices.push(args),clearFocusedJob:()=>window.notices.push('clear')});
  window.actions={save:settings.save,backup:backup.createBackup,cancel:()=>jobs.handleCancelJob({jobId:'one',title:'测试任务',canCancel:true}),retry:()=>jobs.retryMutation.mutate('one')};
  window.pending=settings.isBusy||backup.isBusy||jobs.isBusy;
@@ -60,6 +64,16 @@ async function scenario(check) {
   } finally { await page.close(); }
 }
 try {
+  await scenario(async page => {
+    await page.waitForFunction(() => Boolean(window.plan.draft));
+    await page.evaluate(() => { window.plan.setPassword('test-secret-12345'); window.plan.setConfirmation('test-secret-12345'); });
+    await page.waitForFunction(() => window.plan.draft.encryptionPassword === 'test-secret-12345');
+    await page.evaluate(() => window.plan.save());
+    await page.waitForFunction(() => window.calls.some(call => call.method === 'saveBackupPlan'));
+    await page.evaluate(() => window.calls.find(call => call.method === 'saveBackupPlan').resolve({revision:2,settingsRevision:2,plan:{enabled:false,time:'03:00',retentionCount:7,retentionDays:0,replicaMode:'None',s3:{}},webDav:{enabled:false,url:'',userName:''},encryptionPasswordSet:true}));
+    await page.waitForFunction(() => !window.plan.busy && window.plan.draft.encryptionPassword === '');
+    assert.equal(await page.evaluate(() => window.cache.getMutationCache().getAll().length), 0);
+  });
   for (const command of ['save', 'backup', 'retry']) for (const departure of ['owner', 'unmount']) for (const outcome of ['success', 'failure']) await scenario(async page => {
     await page.evaluate(command => window.actions[command](), command);
     await page.waitForFunction(() => window.calls.length === 1);

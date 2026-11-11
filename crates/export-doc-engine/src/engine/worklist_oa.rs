@@ -12,6 +12,7 @@ pub(super) fn append_groups(
     groups: &mut Vec<Group>,
 ) -> Result<()> {
     let workflow_date = crate::engine::units::today(tx)?;
+    let mut authority = None;
     for (kind, name) in [
         ("oa-personnel", "人员变动审批"),
         ("oa-leave", "请假审批与销假"),
@@ -30,7 +31,10 @@ pub(super) fn append_groups(
             groups.push(group);
             continue;
         }
-        let principals = approval::queue_approvers(tx, actor, resource)?;
+        if authority.is_none() {
+            authority = Some(oa::queue_authority::QueueAuthority::new(tx, actor)?);
+        }
+        let principals = authority.as_ref().unwrap().approvers(resource);
         let keys = if kind == "oa-general" {
             handling::keys(tx, actor, "office.general")?
         } else {
@@ -69,7 +73,9 @@ pub(super) fn append_groups(
                 }
                 let own = row["ownerUserId"] == actor.id;
                 let status = text(&row, "status");
-                let complete = if kind == "oa-general" {
+                let complete = if status != "Approved" {
+                    false
+                } else if kind == "oa-general" {
                     handling::can_handle(tx, actor, &row, "office.general")?
                 } else {
                     auth::visible(actor, resource, "complete", &row)
@@ -95,13 +101,23 @@ pub(super) fn append_groups(
                 };
                 let instant = if status == "Pending" {
                     let plan = approval::plan(&row)?;
-                    json!(plan.as_ref().and_then(|p| {
-                        p.current_indices()
-                            .iter()
-                            .map(|i| p.nodes[p.steps[*i].stage].due_at.clone())
-                            .filter(|d| !d.is_empty())
-                            .min()
-                    }))
+                    let deadlines = plan
+                        .as_ref()
+                        .map(|p| {
+                            p.current_indices()
+                                .into_iter()
+                                .map(|i| &p.nodes[p.steps[i].stage].due_at)
+                                .filter(|d| !d.is_empty())
+                                .map(|d| {
+                                    DateTime::parse_from_rfc3339(d)
+                                        .map(|d| d.to_utc())
+                                        .map_err(|_| unavailable("审批截止时间损坏。"))
+                                })
+                                .collect::<Result<Vec<_>>>()
+                        })
+                        .transpose()?
+                        .unwrap_or_default();
+                    json!(deadlines.into_iter().min().map(|d| d.to_rfc3339()))
                 } else if status == "Approved" && kind == "oa-overtime" {
                     row["overtime"]["endsAt"].clone()
                 } else {

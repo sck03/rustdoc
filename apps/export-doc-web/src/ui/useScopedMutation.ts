@@ -9,6 +9,8 @@ export function useScopedMutation<Result, Input = void>(scope: string, owner: un
   mutationFn(input: Input, signal: AbortSignal): Promise<Result>;
   onSuccess?(result: Result, input: Input): void;
   refreshKeys?(result: Result, input: Input): readonly QueryKey[];
+  refresh?(result: Result, input: Input): Promise<unknown> | undefined;
+  onRefreshError?(error: unknown): void;
   onError(error: unknown): void;
 }) {
   const save = useScopedSave(scope, owner);
@@ -27,10 +29,15 @@ export function useScopedMutation<Result, Input = void>(scope: string, owner: un
         const keys = options.refreshKeys?.(result, input) ?? [];
         options.onSuccess?.(result, input);
         // Start every refresh before yielding; an old command cannot invalidate a new session.
-        void Promise.all(keys.map(queryKey => cache.invalidateQueries({ queryKey }, { throwOnError: true })))
+        const refreshes = keys.map(queryKey => cache.invalidateQueries({ queryKey }, { throwOnError: true }));
+        // Convert synchronous callback failures into refresh failures too.
+        try { refreshes.push(Promise.resolve(options.refresh?.(result, input)).then(() => {})); }
+        catch (error) { refreshes.push(Promise.reject(error)); }
+        void Promise.all(refreshes)
           .catch(error => {
             if (submitted === generation.current && scope === latest.current.scope && owner === latest.current.owner && !isAbortError(error)) {
-              options.onError(new Error(`操作已完成，刷新失败：${readApiError(error)}`));
+              if (options.onRefreshError) options.onRefreshError(error);
+              else options.onError(new Error(`操作已完成，刷新失败：${readApiError(error)}`));
             }
           });
       });

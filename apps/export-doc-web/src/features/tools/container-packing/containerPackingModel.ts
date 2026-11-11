@@ -12,16 +12,6 @@ export type ContainerPackingRenderModeValue = "OutlineOnly" | "FullGrid";
 
 export type ContainerPackingAnalyzeMode = "manual" | "auto";
 
-export type ContainerPackingAnalyzeVariables = {
-  mode: ContainerPackingAnalyzeMode;
-
-  request: ApiContainerPackingAnalyzeRequest;
-
-  sequence: number;
-
-  signal: AbortSignal;
-};
-
 export type ContainerPackingCargoRow = {
   id: string;
 

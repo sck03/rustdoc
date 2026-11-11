@@ -1,4 +1,3 @@
-import { Eye } from "lucide-react";
 import { Button } from "../../ui/Button.tsx";
 import { SelectField } from "../../ui/FormFields.tsx";
 import { FilterBar } from "../../ui/primitives/Field.tsx";
@@ -14,11 +13,9 @@ export function ReportTemplatePreviewWorkspace({
   sourceOptions,
   renderedHtml,
   isBusy,
-  canPreview,
   onModeChange,
   onSampleProfileChange,
   onSourceChange,
-  onPreview,
   pdf,
 }: {
   mode: TemplatePreviewMode;
@@ -28,11 +25,9 @@ export function ReportTemplatePreviewWorkspace({
   sourceOptions: Array<{ value: string; label: string }>;
   renderedHtml: string;
   isBusy: boolean;
-  canPreview: boolean;
   onModeChange: (mode: TemplatePreviewMode) => void;
   onSampleProfileChange: (value: string) => void;
   onSourceChange: (value: string) => void;
-  onPreview: () => void;
   pdf: { format: "Svg" | "PdfPage"; pageIndex: number; pageCount: number; onFormatChange: (format: "Svg" | "PdfPage") => void; onPageChange: (index: number) => void };
 }) {
   return (
@@ -60,11 +55,6 @@ export function ReportTemplatePreviewWorkspace({
             onChange={onSourceChange}
           />
         )}
-        <div className="report-template-preview-actions">
-          <Button disabled={!canPreview} onClick={onPreview} icon={<Eye size={18} aria-hidden="true" />}>
-            {mode === "savedSource" ? "真实数据预览" : "样例预览"}
-          </Button>
-        </div>
       </FilterBar>
       <div className="report-template-preview report-template-preview-full">
         {pdf.format === "PdfPage" && pdf.pageCount > 0 ? <div className="report-template-preview-pagination" role="group" aria-label="PDF 预览翻页">

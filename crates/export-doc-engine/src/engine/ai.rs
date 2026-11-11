@@ -1,78 +1,90 @@
 use super::{
-    NativeService,
     error::{Result, error, invalid, unavailable},
     settings,
+    store::Store,
 };
 use crate::{api::ApiError, controlled_process};
 use serde_json::{Value, json};
-use std::{process::Command, time::Duration};
+use std::{path::Path, process::Command, time::Duration};
+#[derive(Default)]
+pub(super) struct Reviewer {
+    budget: std::sync::atomic::AtomicUsize,
+}
 struct Permit<'a>(&'a std::sync::atomic::AtomicUsize);
 impl Drop for Permit<'_> {
     fn drop(&mut self) {
         self.0.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
     }
 }
-fn acquire(budget: &std::sync::atomic::AtomicUsize) -> Result<Permit<'_>> {
-    crate::operation::check()?;
-    budget
-        .compare_exchange(
-            0,
-            1,
-            std::sync::atomic::Ordering::AcqRel,
-            std::sync::atomic::Ordering::Acquire,
-        )
-        .map_err(|_| error(429, "AI 审查正在执行，请稍后重试。"))?;
-    Ok(Permit(budget))
-}
-pub fn review(service: &NativeService, body: &Value) -> Result<Value> {
-    let _permit = acquire(&service.ai_budget)?;
-    export_doc_contracts::validation::structure(
-        crate::contracts::schema("ApiInvoiceDetailDto"),
-        &body["invoice"],
-    )
-    .map_err(invalid)?;
-    let review = export_doc_domain::letter_of_credit::context(&body["invoice"]).map_err(invalid)?;
-    let settings = settings::current(&service.store)?;
-    let ai = &settings["ai"];
-    let text = |key| ai[key].as_str().unwrap_or("").to_owned();
-    let request = export_doc_ai::Request {
-        endpoint: text("apiEndpoint"),
-        model: text("modelName"),
-        api_key: settings::credential(&service.store, &service.protector, "/ai/apiKey")?
-            .to_string(),
-        system_prompt: text("systemPrompt"),
-        content: review.content,
-    };
-    export_doc_ai::endpoint(&request.endpoint).map_err(|e| ApiError {
-        status: Some(e.status),
-        message: e.message,
-        diagnostic: Some("ai-transport"),
-    })?;
-    let mut command = Command::new(std::env::current_exe()?);
-    command
-        .arg("--ai-review-worker")
-        .current_dir(&service.paths.cache_root)
-        .env_remove("EXPORTDOCMANAGER_MASTER_KEY");
-    let output = controlled_process::run(
-        &mut command,
-        serde_json::to_vec(&request)?,
-        5 * 1024 * 1024,
-        Duration::from_secs(120),
-    )?;
-    if !output.status.success() {
-        return Err(unavailable("AI 工作进程未能完成请求。"));
+impl Reviewer {
+    fn acquire(&self) -> Result<Permit<'_>> {
+        crate::operation::check()?;
+        self.budget
+            .compare_exchange(
+                0,
+                1,
+                std::sync::atomic::Ordering::AcqRel,
+                std::sync::atomic::Ordering::Acquire,
+            )
+            .map_err(|_| error(429, "AI 审查正在执行，请稍后重试。"))?;
+        Ok(Permit(&self.budget))
     }
-    let report: std::result::Result<String, export_doc_ai::Error> =
-        serde_json::from_slice(&output.stdout)
-            .map_err(|_| unavailable("AI 工作进程返回无效响应。"))?;
-    let report = report.map_err(|e| ApiError {
-        status: Some(e.status),
-        message: e.message,
-        diagnostic: Some("ai-transport"),
-    })?;
-    Ok(
-        json!({"reportText":report,"contextSummary":review.summary,"letterOfCreditContentTruncated":review.truncated,"storagePolicy":"只向系统设置中的 AI 服务提交当前发票／信用证草稿，审查结果不自动写入发票。"}),
-    )
+    pub fn review(
+        &self,
+        store: &Store,
+        protector: &crate::secrets::Protector,
+        cache_root: &Path,
+        body: &Value,
+    ) -> Result<Value> {
+        let _permit = self.acquire()?;
+        export_doc_contracts::validation::structure(
+            crate::contracts::schema("ApiInvoiceDetailDto"),
+            &body["invoice"],
+        )
+        .map_err(invalid)?;
+        let review =
+            export_doc_domain::letter_of_credit::context(&body["invoice"]).map_err(invalid)?;
+        let settings = settings::current(store)?;
+        let ai = &settings["ai"];
+        let text = |key| ai[key].as_str().unwrap_or("").to_owned();
+        let request = export_doc_ai::Request {
+            endpoint: text("apiEndpoint"),
+            model: text("modelName"),
+            api_key: settings::credential(store, protector, "/ai/apiKey")?.to_string(),
+            system_prompt: text("systemPrompt"),
+            content: review.content,
+        };
+        export_doc_ai::endpoint(&request.endpoint).map_err(|e| ApiError {
+            status: Some(e.status),
+            message: e.message,
+            diagnostic: Some("ai-transport"),
+        })?;
+        let mut command = Command::new(std::env::current_exe()?);
+        command
+            .arg("--ai-review-worker")
+            .current_dir(cache_root)
+            .env_remove("EXPORTDOCMANAGER_MASTER_KEY");
+        let output = controlled_process::run(
+            &mut command,
+            serde_json::to_vec(&request)?,
+            5 * 1024 * 1024,
+            Duration::from_secs(120),
+        )?;
+        if !output.status.success() {
+            return Err(unavailable("AI 工作进程未能完成请求。"));
+        }
+        let report: std::result::Result<String, export_doc_ai::Error> =
+            serde_json::from_slice(&output.stdout)
+                .map_err(|_| unavailable("AI 工作进程返回无效响应。"))?;
+        let report = report.map_err(|e| ApiError {
+            status: Some(e.status),
+            message: e.message,
+            diagnostic: Some("ai-transport"),
+        })?;
+        Ok(
+            json!({"reportText":report,"contextSummary":review.summary,"letterOfCreditContentTruncated":review.truncated,"storagePolicy":"只向系统设置中的 AI 服务提交当前发票／信用证草稿，审查结果不自动写入发票。"}),
+        )
+    }
 }
 
 #[cfg(test)]
@@ -80,18 +92,18 @@ mod tests {
     use super::*;
     #[test]
     fn budget_is_instance_scoped_and_released_on_failure_or_cancel() {
-        let budget = Default::default();
-        let permit = acquire(&budget).unwrap();
-        assert_eq!(acquire(&budget).err().unwrap().status, Some(429));
-        assert!(acquire(&Default::default()).is_ok());
+        let reviewer = Reviewer::default();
+        let permit = reviewer.acquire().unwrap();
+        assert_eq!(reviewer.acquire().err().unwrap().status, Some(429));
+        assert!(Reviewer::default().acquire().is_ok());
         drop(permit);
-        assert!(acquire(&budget).is_ok());
+        assert!(reviewer.acquire().is_ok());
         let scope = crate::operation::OperationScope::new(Duration::from_secs(1));
         scope.cancel();
         assert_eq!(
-            scope.run(|| acquire(&budget)).err().unwrap().status,
+            scope.run(|| reviewer.acquire()).err().unwrap().status,
             Some(504)
         );
-        assert!(acquire(&budget).is_ok());
+        assert!(reviewer.acquire().is_ok());
     }
 }

@@ -85,6 +85,7 @@ async function input(selector, value) {
   await read(`(()=>{const node=document.querySelector(${JSON.stringify(selector)});const proto=node instanceof HTMLSelectElement?HTMLSelectElement.prototype:node instanceof HTMLInputElement?HTMLInputElement.prototype:HTMLTextAreaElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(node,${JSON.stringify(value)});node.dispatchEvent(new Event('input',{bubbles:true}));node.dispatchEvent(new Event('change',{bubbles:true}));})()`);
 }
 async function editText(value, confirm = true) {
+ await waitFor(`document.querySelector(${JSON.stringify(editor)})`);
  await read(`document.querySelector(${JSON.stringify(editor)}).dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`);
  const selector='textarea[aria-label="在画布编辑文字"]';
  await waitFor(`document.querySelector(${JSON.stringify(selector)})`);
@@ -98,6 +99,7 @@ async function open(scenario, file = false) {
   await page.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await page.send("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/?scenario=${scenario}#/reports/templates?reportType=ExportDocument&${file ? "template=invoice_template.dtpl" : "userTemplateId=23"}` });
   await waitFor("document.querySelector('.report-template-layout')"); await settle();
+  await waitFor(`document.querySelector(${JSON.stringify(editor)})`);
 }
 async function record(name) { assert.deepEqual(await read("window.__errors"), [], name); results.push(name); }
 try {

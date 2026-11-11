@@ -83,6 +83,32 @@ pub(super) fn read(
     id: &str,
     paths: Option<&crate::paths::RuntimePaths>,
 ) -> Result<RasterImage> {
+    snapshot(tx, actor, id, paths)?.validate()
+}
+// Own the authorized bytes so decoding does not require a database lease.
+struct ImageSnapshot {
+    image: RasterImage,
+    digest: String,
+}
+impl ImageSnapshot {
+    fn validate(self) -> Result<RasterImage> {
+        if media::digest(&self.image.bytes) != self.digest {
+            return Err(unavailable("图片资源内容校验失败。"));
+        }
+        let media_type = media::image_type(&self.image.bytes, MAX_RESOURCE)
+            .map_err(|_| unavailable("已保存的图片损坏。"))?;
+        if media_type != self.image.media_type {
+            return Err(unavailable("图片类型与记录不一致。"));
+        }
+        Ok(self.image)
+    }
+}
+fn snapshot(
+    tx: &Connection,
+    actor: &Actor,
+    id: &str,
+    paths: Option<&crate::paths::RuntimePaths>,
+) -> Result<ImageSnapshot> {
     let entry = find(tx, id)?;
     if !actor.admin
         && !owns(actor, &entry)
@@ -92,9 +118,12 @@ pub(super) fn read(
     {
         return Err(error(403, "没有读取此图片的权限。"));
     }
-    read_entry(tx, &entry)
+    snapshot_entry(tx, &entry)
 }
 fn read_entry(tx: &Connection, entry: &Value) -> Result<RasterImage> {
+    snapshot_entry(tx, entry)?.validate()
+}
+fn snapshot_entry(tx: &Connection, entry: &Value) -> Result<ImageSnapshot> {
     let id = entry["id"]
         .as_i64()
         .ok_or_else(|| unavailable("图片资源记录损坏。"))?;
@@ -112,21 +141,18 @@ fn read_entry(tx: &Connection, entry: &Value) -> Result<RasterImage> {
     let blob = tx
         .blob(id, KIND)?
         .ok_or_else(|| unavailable("图片资源内容缺失。"))?;
-    if media::digest(&blob.content) != text(entry, "sha256")
-        || blob.digest != text(entry, "sha256")
+    if blob.digest != text(entry, "sha256")
         || blob.media_type != text(entry, "mediaType")
         || blob.content.len() as u64 != entry["byteLength"].as_u64().unwrap_or(0)
     {
         return Err(unavailable("图片资源内容校验失败。"));
     }
-    let media_type = media::image_type(&blob.content, MAX_RESOURCE)
-        .map_err(|_| unavailable("已保存的图片损坏。"))?;
-    if media_type != blob.media_type {
-        return Err(unavailable("图片类型与记录不一致。"));
-    }
-    Ok(RasterImage {
-        media_type: blob.media_type,
-        bytes: blob.content,
+    Ok(ImageSnapshot {
+        digest: blob.digest,
+        image: RasterImage {
+            media_type: blob.media_type,
+            bytes: blob.content,
+        },
     })
 }
 fn response(record: &Value) -> Value {
@@ -229,7 +255,8 @@ pub fn handle(
             auth::authorize(actor, "document.invoices", "view")?;
             let path = text(body, "imagePath");
             let id = stored_id(&path, "Files/ShippingMarks/")?;
-            let image = read(&store.connection()?, actor, id, None)?;
+            let image = snapshot(&store.connection()?, actor, id, None)?;
+            let image = image.validate()?;
             Ok(
                 json!({"imagePath":path,"fileName":id,"contentType":image.media_type,"sizeBytes":image.bytes.len(),"dataUrl":image.data_url()?,"storagePolicy":"受控唛头预览"}),
             )
@@ -331,12 +358,13 @@ pub fn download(
 ) -> Result<FileOutput> {
     let id = parameter_id(parameters)?;
     let _access = report_template_files::storage_read_lock(&service.paths)?;
-    let image = read(
+    let image = snapshot(
         &service.store.connection()?,
         actor,
         id,
         Some(&service.paths),
     )?;
+    let image = image.validate()?;
     Ok(FileOutput {
         file_name: id.into(),
         media_type: image.media_type,

@@ -20,6 +20,10 @@ pub fn create(namespace: &str) -> PathBuf {
 /// Call after database handles have left scope. Windows scanners can briefly
 /// retain a file without delete sharing; persistent or unrelated errors fail.
 pub fn remove(root: &Path) -> io::Result<()> {
+    remove_with_timeout(root, Duration::from_secs(10))
+}
+
+pub fn remove_with_timeout(root: &Path, timeout: Duration) -> io::Result<()> {
     let started = Instant::now();
     loop {
         match fs::remove_dir_all(root) {
@@ -28,7 +32,7 @@ pub fn remove(root: &Path) -> io::Result<()> {
             Err(error)
                 if cfg!(windows)
                     && matches!(error.raw_os_error(), Some(32 | 33))
-                    && started.elapsed() < Duration::from_secs(2) =>
+                    && started.elapsed() < timeout =>
             {
                 std::thread::sleep(Duration::from_millis(25));
             }

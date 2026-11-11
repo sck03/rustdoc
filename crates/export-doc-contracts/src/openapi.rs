@@ -93,9 +93,9 @@ mod tests {
         });
         for path in baseline["paths"].as_object_mut().unwrap().values_mut() {
             for operation in path.as_object_mut().unwrap().values_mut() {
-                if let Some(id) = operation["operationId"].as_str() {
+                if let Some(id) = operation["operationId"].as_str().map(str::to_owned) {
                     operation["x-exportdoc-timeout-seconds"] =
-                        serde_json::json!(crate::request_limits::seconds(id));
+                        serde_json::json!(crate::request_limits::seconds(&id));
                 }
             }
         }
@@ -176,6 +176,25 @@ mod tests {
         evolution::reviewed_versioning(&mut baseline);
         evolution::reviewed_independent_declarations(&mut baseline);
         custom_oa::apply(&mut baseline);
+        // Apply resource metadata after the reviewed endpoint/body changes, so
+        // newly added binary and multipart inputs receive the same admission rule.
+        for path in baseline["paths"].as_object_mut().unwrap().values_mut() {
+            for operation in path.as_object_mut().unwrap().values_mut() {
+                if let Some(id) = operation["operationId"].as_str() {
+                    operation["x-exportdoc-processing-slot"] = serde_json::json!(
+                        matches!(
+                            id,
+                            "RecognizeOcrImage"
+                                | "SaveShippingMarkImage"
+                                | "SaveInvoiceSealImage"
+                                | "PreviewShippingMarkImage"
+                        ) || operation["requestBody"]["content"].as_object().is_some_and(
+                            |content| content.keys().any(|mime| !mime.contains("json"))
+                        )
+                    );
+                }
+            }
+        }
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

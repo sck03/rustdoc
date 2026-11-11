@@ -329,7 +329,9 @@ fn deadline(item: &Value, now: &BusinessTime) -> Result<Option<(bool, bool, Stri
         return Ok(Some((
             instant < now.utc_now,
             instant >= now.utc_now && instant <= now.utc_now + Duration::days(30),
-            instant.to_utc().to_rfc3339(),
+            instant
+                .to_utc()
+                .to_rfc3339_opts(chrono::SecondsFormat::Nanos, true),
         )));
     }
     Ok(None)

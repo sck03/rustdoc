@@ -35,13 +35,13 @@ export async function verifyReportPdfPreview({ repo, output, api, url, headers, 
   assert.equal(anonymous.status, 401);
 
   await run(`(()=>{const select=[...document.querySelectorAll('select')].find(node=>[...node.options].some(option=>option.value==='PdfPage'));select.value='PdfPage';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
-  await click('真实数据预览');
+  await click('预览');
   await wait("document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('data:image/png;base64,')",'Actual PDF page did not reach React');
   await captureScreenshot(page, path.join(output, 'actual-pdf-preview-ui.png'));
 
   await click('样例数据');
   await run(`(()=>{const select=[...document.querySelectorAll('select')].find(node=>[...node.options].some(option=>option.value==='exportLongItems'));select.value='exportLongItems';select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
-  await click('样例预览');
+  await click('预览');
   const controls = 'document.querySelector(\'[aria-label="PDF 预览翻页"]\')';
   const pageNumber = `${controls}?.querySelector('[aria-live="polite"]')?.textContent`;
   await wait(`${pageNumber}?.startsWith('1 / ') && ![...${controls}.querySelectorAll('button')].find(button=>button.textContent==='下一页').disabled`, 'Multi-page PDF controls missing');
