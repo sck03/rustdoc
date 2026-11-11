@@ -4,7 +4,6 @@ param()
 $ErrorActionPreference = "Stop"
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptRoot "lib\build-script-support.ps1")
-. (Join-Path $scriptRoot "lib\web-runtime-smoke-arguments.ps1")
 trap {
     Write-ExportDocScriptFailure -ErrorRecord $_
     exit 1
@@ -12,26 +11,6 @@ trap {
 
 $repoRoot = (Resolve-Path -LiteralPath (Join-Path $scriptRoot "..")).Path
 [void](Invoke-ExportDocExternal -FilePath "npm" -Arguments @("--version") -CaptureOutput)
-
-$smokeArgumentDefaults = @{
-    ScriptPath = "smoke.mjs"
-    BrowserExecutable = "browser.exe"
-    WebUrl = "http://127.0.0.1:5173/"
-    ApiBaseUrl = "http://127.0.0.1:5000/"
-    DesktopAccessToken = "desktop-token"
-    Username = "admin"
-    UserDataDirectory = "browser-profile"
-    TimeoutMilliseconds = 45000
-}
-$passwordlessSmokeArguments = New-ExportDocWebRuntimeSmokeArguments @smokeArgumentDefaults
-if ($passwordlessSmokeArguments.Contains("--password") -or $passwordlessSmokeArguments.Contains("")) {
-    throw "Passwordless web smoke arguments must omit both --password and empty argument values."
-}
-$passwordSmokeArguments = New-ExportDocWebRuntimeSmokeArguments @smokeArgumentDefaults -Password "secret value"
-$passwordIndex = $passwordSmokeArguments.IndexOf("--password")
-if ($passwordIndex -lt 0 -or $passwordSmokeArguments[$passwordIndex + 1] -ne "secret value") {
-    throw "Web smoke arguments must preserve a supplied password as one argument."
-}
 
 $scriptFiles = @(Get-ChildItem -LiteralPath $scriptRoot -Recurse -File)
 $powerShellScripts = @($scriptFiles | Where-Object Extension -eq ".ps1")

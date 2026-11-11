@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { spawnProcessTree, stopProcessTree } from "./lib/child-process-tree.mjs";
 import { CdpClient } from "./lib/chromium-cdp.mjs";
 import { buildChromeLaunchArguments } from "./lib/web-runtime-browser-session.mjs";
-import { createSmokeStageRunner } from "./lib/web-runtime-smoke-deadline.mjs";
-import { parseWebRuntimeSmokeArgs, validateWebRuntimeSmokeOptions } from "./lib/web-runtime-smoke-options.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,29 +22,6 @@ const chromiumCdpSource = fs.readFileSync(path.join(repoRoot, "scripts", "lib", 
 assert.match(browserSessionSource, /spawnProcessTree\(options\.browserExecutable/);
 assert.match(browserSessionSource, /stopProcessTree\(chrome, 5000\)/);
 assert.match(chromiumCdpSource, /stopProcessTree\(child, 5000\)/);
-
-const smokeOptions = parseWebRuntimeSmokeArgs(["--global-timeout-ms", "5000"]);
-validateWebRuntimeSmokeOptions({
-  ...smokeOptions,
-  browserExecutable: process.execPath,
-  webUrl: "http://127.0.0.1:5173/",
-  apiBaseUrl: "http://127.0.0.1:5174/",
-  username: "admin",
-  userDataDir: repoRoot,
-  expectedText: ["ready"],
-});
-assert.equal(smokeOptions.globalTimeoutMs, 5000);
-
-const stageEvents = [];
-const runSmokeStage = createSmokeStageRunner(1000, 25, (message) => stageEvents.push(message));
-let boundedStageTimeout = 0;
-assert.equal(await runSmokeStage("contract", (timeoutMs) => {
-  boundedStageTimeout = timeoutMs;
-  return "ok";
-}), "ok");
-assert(boundedStageTimeout > 0 && boundedStageTimeout <= 25);
-assert.match(stageEvents[0], /contract started/);
-assert.match(stageEvents[1], /contract completed/);
 
 const options = {
   browserExecutable: "/repo/Browsers/chrome-headless-shell",

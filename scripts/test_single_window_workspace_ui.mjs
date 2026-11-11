@@ -32,6 +32,7 @@ import {HashRouter,Routes,Route,useNavigate} from "react-router-dom";
 import {AgentConsignmentPage} from ${source("features/single-window/AgentConsignmentPage.tsx")};
 import {CustomsCooPage} from ${source("features/single-window/CustomsCooPage.tsx")};
 import {SingleWindowSourcesPage} from ${source("features/single-window/SingleWindowSourcesPage.tsx")};
+import {InvoiceListPage} from ${source("features/invoices/InvoiceListPage.tsx")};
 import {SingleWindowClientDirectories,emptyClientDirectories} from ${source("features/single-window/SingleWindowClientDirectories.tsx")};
 import {OperationCenterListActionsPanel} from ${source("features/single-window/SingleWindowOperationCenterList.tsx")};
 import {SingleWindowStationProfilePanel} from ${source("features/single-window/SingleWindowStationProfilePanel.tsx")};
@@ -51,7 +52,7 @@ const get=id=>{if(!records.has(id))records.set(id,{...initial[window.mode],id:0,
 const defer=(kind,request,init)=>new Promise((resolve,reject)=>window.pending.push({kind,request,signal:init.signal,resolve,reject}));
 const save=(r,i)=>defer('save',r,i),defaults=(r,i)=>defer('defaults',r,i);
 const client={getAgentConsignmentDocument:async r=>get(r.sourceId),getCustomsCooDocument:async r=>get(r.sourceId),
-  getSettings:async()=>({settings:{excelImportSchemes:[{schemeName:'客户专用'}]}}),
+  getSettings:async()=>({settings:{system:{defaultExportDirectory:''},excelImportSchemes:[{schemeName:'客户专用'}]}}),
   getSingleWindowClientProfiles:async()=>({profiles:window.profileRows,activeProfileKey:'profile-1'}),
   saveSingleWindowClientProfile:(r,i)=>defer('profile',r,i),
   activateSingleWindowClientProfile:(r,i)=>defer('activate',r,i),
@@ -59,6 +60,9 @@ const client={getAgentConsignmentDocument:async r=>get(r.sourceId),getCustomsCoo
   collectSingleWindowClientReceipts:(r,i)=>defer('collect',r,i),
   saveSingleWindowReceiptPackageToPath:(r,i)=>defer('receipt-save',r,i),
   listSingleWindowSources:async()=>({items:[],totalCount:0}),
+  listInvoices:async()=>({items:[],totalCount:0,pageNumber:1,pageSize:50,totalPages:0}),
+  startExcelTemplateDownloadJob:i=>defer('invoice-template',{},i),
+  startExcelTemplateSaveToPathJob:(r,i)=>defer('invoice-template-save',r,i),
   previewSingleWindowExcelImport:(r,i)=>defer('source-preview',r,i),
   createSingleWindowSource:(r,i)=>defer('source-create',r,i),
   startSingleWindowExcelTemplateDownloadJob:i=>defer('source-template',{},i),
@@ -86,8 +90,9 @@ function Batch({client,enabled}){const [id,setId]=useState(1);window.setBatch=se
 function Harness(){const navigate=useNavigate(),[shown,setShown]=useState(true),[enabled,setEnabled]=useState(true),[jobsEnabled,setJobsEnabled]=useState(true),[owner,setOwner]=useState(client);
   window.navigate=navigate;window.hide=()=>setShown(false);window.revoke=()=>setEnabled(false);window.revokeJobs=()=>setJobsEnabled(false);window.changeClient=()=>setOwner({...client});window.dirty=useHasUnsavedChanges();
  const permissions=['view',...(enabled?['operate','manage']:[])].map(action=>({resourceKey:'document.single-window',action,dataScope:'all'}));
+  if(window.mode==='invoice') for(const resourceKey of ['document.invoices','document.excel']) permissions.push(...['view',...(enabled?['operate']:[])].map(action=>({resourceKey,action,dataScope:'all'})));
   if(jobsEnabled) permissions.push(...['view','operate'].map(action=>({resourceKey:'document.jobs',action,dataScope:'own'})));
- return <PermissionAccessProvider permissions={permissions}>{!shown?<span>closed</span>:window.mode==='batch'?<Batch client={owner} enabled={enabled}/>:window.mode==='profiles'?<SingleWindowStationProfilePanel client={owner} canOperate={enabled}/>:window.mode==='directories'?<Directories enabled={enabled}/>:window.mode==='sources'?<SingleWindowSourcesPage client={owner}/>:window.mode==='excel'?<Excel/>:<Routes><Route path="/:sourceId" element={window.mode==='agent'?<AgentConsignmentPage client={owner}/>:<CustomsCooPage client={owner}/>}/></Routes>}</PermissionAccessProvider>;
+ return <PermissionAccessProvider permissions={permissions}>{!shown?<span>closed</span>:window.mode==='batch'?<Batch client={owner} enabled={enabled}/>:window.mode==='profiles'?<SingleWindowStationProfilePanel client={owner} canOperate={enabled}/>:window.mode==='directories'?<Directories enabled={enabled}/>:window.mode==='invoice'?<InvoiceListPage client={owner}/>:window.mode==='sources'?<SingleWindowSourcesPage client={owner}/>:window.mode==='excel'?<Excel/>:<Routes><Route path="/:sourceId" element={window.mode==='agent'?<AgentConsignmentPage client={owner}/>:<CustomsCooPage client={owner}/>}/></Routes>}</PermissionAccessProvider>;
 }
 createRoot(document.getElementById('root')).render(<QueryClientProvider client={queries}><HashRouter><ConfirmationProvider><UnsavedChangesProvider><Harness/></UnsavedChangesProvider></ConfirmationProvider></HashRouter></QueryClientProvider>);
 ` } });
@@ -306,7 +311,7 @@ try {
     await page.locator('input[type="file"]').setInputFiles({ name:'manual.xlsx',mimeType:'application/octet-stream',buffer:Buffer.from('manual') });
     await page.waitForFunction(() => window.pending.length === 1);
     assert.equal(await page.evaluate(() => window.pending[0].request.schemeName), '客户专用');
-    await page.evaluate(() => window.pending[0].resolve({success:true,errors:[],invoice:{items:[]}}));
+    await page.evaluate(() => window.pending[0].resolve({result:{success:true,errors:[],invoice:{items:[]}}}));
     await page.getByText('已识别 0 行商品，请核对后创建。').waitFor();
     await page.getByLabel('Excel 识别方式').selectOption('');
     assert.equal(await page.getByText(/已识别/).count(), 0);
@@ -330,6 +335,38 @@ try {
     assert.equal(await page.getByRole('button', { name: '创建申报资料' }).isDisabled(), true);
     await page.getByRole('button', { name: '清除文件，手工录入' }).click();
     assert.equal(await page.getByRole('button', { name: '创建申报资料' }).isEnabled(), true);
+    assert.equal(await page.locator('[data-file-selection]').textContent(), '未选择文件');
+  });
+  await scenario("sources", async page => {
+    await page.getByLabel('资料编号 / 客户发票号').fill('FACTORY-COO');
+    await page.locator('input[type=file]').setInputFiles({name:'coo.xlsx',mimeType:'application/octet-stream',buffer:Buffer.from('fixture')});
+    await page.waitForFunction(()=>window.pending.length===1);
+    assert.equal(await page.locator('[data-file-selection]').textContent(), 'coo.xlsx');
+    assert.equal(await page.getByText('coo.xlsx', {exact:true}).count(), 1);
+    const invoice={items:[{styleNameCN:'测试货物',styleName:'TEST GOODS',quantity:'10',hsCode:'6109100000'}]};
+    const coo={certType:'RC',items:[{prdcEtpsName:'测试工厂',prdcEtpsConcEr:'张三',prdcEtpsTel:'0574-12345678',ciqRegNo:'012345678',producer:'TEST FACTORY\nCHINA',fobValue:'90.12345'}]};
+    await page.evaluate(value=>window.pending[0].resolve(value),{result:{success:true,errors:[],invoice},coo});
+    await page.getByText('测试工厂',{exact:true}).waitFor();
+    await page.getByText('90.12345',{exact:true}).waitFor();
+    await page.getByRole('button',{name:'创建申报资料'}).click();
+    await page.waitForFunction(()=>window.pending.length===2);
+    assert.deepEqual(await page.evaluate(()=>window.pending[1].request.body),{referenceNo:'FACTORY-COO',invoice,coo});
+  });
+  await scenario('invoice',async page=>{
+    await page.getByRole('button',{name:'下载报关 Excel 模板',exact:true}).click();
+    await page.waitForFunction(()=>window.pending.length===1);
+    assert.equal(await page.evaluate(()=>window.pending[0].kind),'invoice-template');
+    await page.evaluate(()=>window.pending[0].resolve({jobId:'invoice-template',status:'Succeeded'}));
+    await page.getByText('导入模板已下载。',{exact:true}).waitFor();
+    assert.deepEqual(await page.evaluate(()=>window.downloads),['invoice-import-template.xlsx']);
+  });
+  for(const action of ['changeClient','revokeJobs']) await scenario('invoice',async page=>{
+    await page.getByRole('button',{name:'下载报关 Excel 模板',exact:true}).click();
+    await page.waitForFunction(()=>window.pending.length===1);
+    await page.evaluate(action=>window[action](),action);
+    await page.waitForFunction(()=>window.pending[0].signal.aborted);
+    await page.evaluate(()=>window.pending[0].resolve({jobId:'obsolete',status:'Succeeded'}));
+    assert.equal(await page.evaluate(()=>window.downloads.length),0);
   });
   await scenario("sources", async page => {
     await page.getByLabel("资料编号 / 客户发票号").fill("STALE-CUSTOMER");
@@ -337,22 +374,22 @@ try {
     await page.waitForFunction(() => window.pending.length === 1);
     await page.evaluate(() => window.changeClient());
     await page.waitForFunction(() => window.pending[0].signal.aborted);
-    await page.evaluate(() => window.pending[0].resolve({ success:true, errors:[], invoice:{items:[]} }));
+    await page.evaluate(() => window.pending[0].resolve({ result:{success:true, errors:[], invoice:{items:[]}} }));
     assert.equal(await page.getByLabel("资料编号 / 客户发票号").inputValue(), "");
     assert.equal(await page.getByText(/已识别/).count(), 0);
   });
   await scenario("sources", async page => {
-    await page.getByRole('button', { name: '下载 Excel 模板' }).click();
+    await page.getByRole('button', { name: '下载产地证 Excel 模板' }).click();
     await page.waitForFunction(() => window.pending.length === 1);
     assert.equal(await page.evaluate(() => window.pending[0].kind), 'source-template');
     await page.evaluate(() => window.pending[0].resolve({jobId:'template',status:'Succeeded'}));
     await page.getByText('导入模板已下载。', { exact:true }).waitFor();
-    assert.deepEqual(await page.evaluate(() => window.downloads), ['单一窗口申报资料模板.xlsx']);
+    assert.deepEqual(await page.evaluate(() => window.downloads), ['单一窗口产地证导入模板.xlsx']);
     assert.equal(await page.evaluate(() => window.queries.getMutationCache().getAll().length), 0);
   });
   for (const action of ['hide', 'changeClient', 'revoke', 'revokeJobs']) await scenario("sources", async page => {
     await page.getByLabel('资料编号 / 客户发票号').fill('KEEP-DRAFT');
-    await page.getByRole('button', { name: '下载 Excel 模板' }).click();
+    await page.getByRole('button', { name: '下载产地证 Excel 模板' }).click();
     await page.waitForFunction(() => window.pending.length === 1);
     await page.evaluate(action => window[action](), action);
     await page.waitForFunction(() => window.pending[0].signal.aborted);
@@ -361,12 +398,12 @@ try {
     if(action==='revokeJobs') assert.equal(await page.getByLabel('资料编号 / 客户发票号').inputValue(), 'KEEP-DRAFT');
   });
   await scenario("sources", async page => {
-    await page.getByRole('button', { name: '下载 Excel 模板' }).click();
+    await page.getByRole('button', { name: '下载产地证 Excel 模板' }).click();
     await page.waitForFunction(() => window.pending.length === 1);
-    await page.waitForFunction(() => [...document.querySelectorAll('button')].find(button => button.textContent.trim() === '下载 Excel 模板')?.disabled);
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].find(button => button.textContent.trim() === '下载产地证 Excel 模板')?.disabled);
     await page.evaluate(() => window.changeClient());
     // Visibility is unchanged by a client switch; wait for the old command to release its busy state.
-    await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.trim() === '下载 Excel 模板' && !button.disabled));
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.textContent.trim() === '下载产地证 Excel 模板' && !button.disabled));
     await page.evaluate(() => window.pending[0].resolve('E:/late.xlsx'));
     assert.equal(await page.evaluate(() => window.pending.length), 1, 'late save dialog must not start a job');
   }, true);

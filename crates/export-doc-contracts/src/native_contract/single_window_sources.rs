@@ -1,5 +1,6 @@
-//! Independent declaration sources share the invoice import projection, not invoice persistence.
+//! Independent declaration sources retain COO data separately from invoice fields.
 use super::model::*;
+use serde_json::json;
 use std::collections::BTreeMap;
 
 pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
@@ -9,8 +10,52 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
             o(vec![
                 ("referenceNo", s().min_length(1).max_length(100)),
                 ("invoice", r("ApiInvoiceDetailDto")),
+                ("coo", r("ApiSingleWindowCooImportDto")),
             ])
             .required(vec!["referenceNo"]),
+        ),
+        (
+            "ApiSingleWindowExcelImportPreviewResponse",
+            o(vec![
+                ("result", r("ApiExcelImportPreviewResponse")),
+                ("coo", r("ApiSingleWindowCooImportDto")),
+            ])
+            .required(vec!["result"]),
+        ),
+        (
+            "ApiSingleWindowCooImportDto",
+            o(vec![
+                ("certType", s().max_length(2)),
+                ("transDetails", s().max_length(630)),
+                ("producer", s().max_length(1000)),
+                (
+                    "items",
+                    a(r("ApiSingleWindowCooImportItemDto")).max_items(5000),
+                ),
+            ])
+            .required(vec!["items"]),
+        ),
+        (
+            "ApiSingleWindowCooImportItemDto",
+            o(vec![
+                ("fobValue", s().max_length(25)),
+                ("oriCriteria", s().max_length(20)),
+                ("oriCriteriaRef", s().max_length(10)),
+                ("oriCriteriaSub", s().max_length(1)),
+                ("goodsDesc", s().max_length(1000)),
+                ("ciqRegNo", s().max_length(10)),
+                ("prdcEtpsName", s().max_length(400)),
+                ("prdcEtpsConcEr", s().max_length(20)),
+                ("prdcEtpsTel", s().max_length(20)),
+                ("producer", s().max_length(1000)),
+                ("producerTel", s().max_length(50)),
+                ("producerFax", s().max_length(50)),
+                ("producerEmail", s().max_length(50)),
+                (
+                    "producerSertFlag",
+                    s().enumeration(Enumeration::Values(vec![json!(""), json!("N"), json!("Y")])),
+                ),
+            ]),
         ),
         (
             "ApiSingleWindowSourceDto",
@@ -133,7 +178,7 @@ pub(super) fn endpoints() -> Vec<Endpoint> {
             "/api/single-window/sources/excel/preview",
             "PreviewSingleWindowExcelImport",
             super::responses::json(
-                r("ApiExcelImportPreviewResponse"),
+                r("ApiSingleWindowExcelImportPreviewResponse"),
                 &[],
                 &["400", "401", "403", "413"],
             ),

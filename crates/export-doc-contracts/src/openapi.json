@@ -15633,6 +15633,112 @@
           "message"
         ]
       },
+      "ApiSingleWindowCooImportDto": {
+        "type": "object",
+        "properties": {
+          "certType": {
+            "type": "string",
+            "maxLength": 2
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiSingleWindowCooImportItemDto"
+            },
+            "maxItems": 5000
+          },
+          "producer": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "transDetails": {
+            "type": "string",
+            "maxLength": 630
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "ApiSingleWindowCooImportItemDto": {
+        "type": "object",
+        "properties": {
+          "ciqRegNo": {
+            "type": "string",
+            "maxLength": 10
+          },
+          "fobValue": {
+            "type": "string",
+            "maxLength": 25
+          },
+          "goodsDesc": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "oriCriteria": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "oriCriteriaRef": {
+            "type": "string",
+            "maxLength": 10
+          },
+          "oriCriteriaSub": {
+            "type": "string",
+            "maxLength": 1
+          },
+          "prdcEtpsConcEr": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "prdcEtpsName": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "prdcEtpsTel": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "producer": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "producerEmail": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "producerFax": {
+            "type": "string",
+            "maxLength": 50
+          },
+          "producerSertFlag": {
+            "type": "string",
+            "enum": [
+              "",
+              "N",
+              "Y"
+            ]
+          },
+          "producerTel": {
+            "type": "string",
+            "maxLength": 50
+          }
+        }
+      },
+      "ApiSingleWindowExcelImportPreviewResponse": {
+        "type": "object",
+        "properties": {
+          "coo": {
+            "$ref": "#/components/schemas/ApiSingleWindowCooImportDto"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ApiExcelImportPreviewResponse"
+          }
+        },
+        "required": [
+          "result"
+        ]
+      },
       "ApiSingleWindowHandoffPackageResponse": {
         "type": "object",
         "properties": {
@@ -16093,6 +16199,9 @@
       "ApiSingleWindowSourceCreateRequest": {
         "type": "object",
         "properties": {
+          "coo": {
+            "$ref": "#/components/schemas/ApiSingleWindowCooImportDto"
+          },
           "invoice": {
             "$ref": "#/components/schemas/ApiInvoiceDetailDto"
           },
@@ -124924,7 +125033,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiExcelImportPreviewResponse"
+                  "$ref": "#/components/schemas/ApiSingleWindowExcelImportPreviewResponse"
                 }
               }
             }

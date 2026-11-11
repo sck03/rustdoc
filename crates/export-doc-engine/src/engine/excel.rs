@@ -126,6 +126,15 @@ pub(super) fn preview(
     bytes: &[u8],
     scheme: &str,
 ) -> Result<Value> {
+    preview_for(service, name, bytes, scheme, false)
+}
+pub(super) fn preview_for(
+    service: &NativeService,
+    name: &str,
+    bytes: &[u8],
+    scheme: &str,
+    single_window: bool,
+) -> Result<Value> {
     source_name(name)?;
     if bytes.is_empty() || bytes.len() > export_doc_excel::MAX_INPUT {
         return Err(error(413, "上传的 Excel 为空或超过 25 MiB。"));
@@ -150,8 +159,15 @@ pub(super) fn preview(
         }
         Some(matches[0])
     };
-    let result = export_doc_excel::preview(bytes, name, mapping, &date, &check).map_err(invalid)?;
-    serde_json::to_value(result).map_err(Into::into)
+    if single_window {
+        let result = export_doc_excel::preview_single_window(bytes, name, mapping, &date, &check)
+            .map_err(invalid)?;
+        serde_json::to_value(result).map_err(Into::into)
+    } else {
+        let result =
+            export_doc_excel::preview(bytes, name, mapping, &date, &check).map_err(invalid)?;
+        serde_json::to_value(result).map_err(Into::into)
+    }
 }
 pub fn handle(
     service: &NativeService,
@@ -213,6 +229,42 @@ pub fn handle(
             },
         );
     }
+    if [
+        START_SINGLE_WINDOW_EXCEL_TEMPLATE_DOWNLOAD_JOB,
+        START_SINGLE_WINDOW_EXCEL_TEMPLATE_SAVE_TO_PATH_JOB,
+    ]
+    .contains(&operation)
+    {
+        let template = service
+            .paths
+            .app_root
+            .join("Resources/ExcelTemplates/single-window-coo-template.xlsx");
+        let bytes = read(&template, export_doc_excel::MAX_INPUT)
+            .map_err(|cause| unavailable(format!("产地证 Excel 模板不可用：{cause}")))?;
+        let store = service.store.clone();
+        let task_actor = actor.clone();
+        return service.jobs.start_replayable(
+            actor,
+            operation,
+            "ExcelTemplateExport",
+            "导出产地证导入模板",
+            Some(replay),
+            move |_| {
+                auth::authorize_operation(
+                    &auth::refresh_actor(&store, &task_actor)?,
+                    operation,
+                    &[],
+                )?;
+                let mut output = TaskOutput::file(
+                    "单一窗口产地证导入模板.xlsx".into(),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    bytes,
+                );
+                output.destination = destination;
+                Ok(output)
+            },
+        );
+    }
     let settings = settings::current(&service.store)?;
     let template = service
         .paths
@@ -241,16 +293,7 @@ pub fn handle(
     } else {
         None
     };
-    let single_window = [
-        START_SINGLE_WINDOW_EXCEL_TEMPLATE_DOWNLOAD_JOB,
-        START_SINGLE_WINDOW_EXCEL_TEMPLATE_SAVE_TO_PATH_JOB,
-    ]
-    .contains(&operation);
-    let mut exporter_name = if single_window {
-        "请填写出口商中文名称".into()
-    } else {
-        text(&settings["system"], "defaultTemplateExporterNameCn")
-    };
+    let mut exporter_name = text(&settings["system"], "defaultTemplateExporterNameCn");
     if invoice.is_none() && exporter_name.trim().is_empty() {
         let mut names: Vec<_> = service
             .store
@@ -271,8 +314,6 @@ pub fn handle(
     let booking = ![
         START_EXCEL_TEMPLATE_DOWNLOAD_JOB,
         START_EXCEL_TEMPLATE_SAVE_TO_PATH_JOB,
-        START_SINGLE_WINDOW_EXCEL_TEMPLATE_DOWNLOAD_JOB,
-        START_SINGLE_WINDOW_EXCEL_TEMPLATE_SAVE_TO_PATH_JOB,
     ]
     .contains(&operation);
     let store = service.store.clone();

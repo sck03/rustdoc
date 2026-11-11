@@ -158,7 +158,11 @@ function Add-ExportDocRustPackageResources {
     foreach ($name in @('NotoSansCJKsc-Regular.otf', 'NotoSansCJKsc-Medium.otf', 'NotoSansCJKsc-Bold.otf', 'NotoSerifCJKsc-Regular.otf', 'OFL-Noto-CJK.txt', 'font-manifest.json')) {
         $copies[(Join-Path $repositoryRoot "Resources/Fonts/OpenSource/$name")] = "Resources/Fonts/OpenSource/$name"
     }
-    if ($DocumentResources) { $copies[(Join-Path $repositoryRoot 'Resources/ExcelTemplates/invoice-import-template.xlsx')] = 'Resources/ExcelTemplates/invoice-import-template.xlsx' }
+    if ($DocumentResources) {
+        foreach ($template in @('invoice-import-template.xlsx', 'single-window-coo-template.xlsx')) {
+            $copies[(Join-Path $repositoryRoot "Resources/ExcelTemplates/$template")] = "Resources/ExcelTemplates/$template"
+        }
+    }
     if ([string]::IsNullOrWhiteSpace($PdfiumPath)) {
         $platform = if ($env:OS -eq 'Windows_NT') { 'win32' } elseif ($IsMacOS) { 'macos' } else { 'linux' }
         $ridPlatform = if ($env:OS -eq 'Windows_NT') { 'win' } elseif ($IsMacOS) { 'osx' } else { 'linux' }

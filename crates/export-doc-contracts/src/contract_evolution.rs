@@ -92,6 +92,43 @@ pub(super) fn reviewed_versioning(baseline: &mut Value) {
     }
 }
 
+fn reviewed_coo_import(baseline: &mut Value) {
+    baseline["paths"]["/api/single-window/sources/excel/preview"]["post"]["responses"]["200"]["content"]
+        ["application/json"]["schema"] =
+        json!({"$ref":"#/components/schemas/ApiSingleWindowExcelImportPreviewResponse"});
+    let schemas = &mut baseline["components"]["schemas"];
+    schemas["ApiSingleWindowSourceCreateRequest"]["properties"]["coo"] =
+        json!({"$ref":"#/components/schemas/ApiSingleWindowCooImportDto"});
+    schemas["ApiSingleWindowExcelImportPreviewResponse"] = json!({"type":"object","properties":{
+        "result":{"$ref":"#/components/schemas/ApiExcelImportPreviewResponse"},"coo":{"$ref":"#/components/schemas/ApiSingleWindowCooImportDto"}},"required":["result"]});
+    schemas["ApiSingleWindowCooImportDto"] = json!({"type":"object","properties":{
+        "certType":{"type":"string","maxLength":2},"transDetails":{"type":"string","maxLength":630},"producer":{"type":"string","maxLength":1000},
+        "items":{"type":"array","items":{"$ref":"#/components/schemas/ApiSingleWindowCooImportItemDto"},"maxItems":5000}},"required":["items"]});
+    let mut properties = serde_json::Map::new();
+    for (key, maximum) in [
+        ("fobValue", 25),
+        ("oriCriteria", 20),
+        ("oriCriteriaRef", 10),
+        ("oriCriteriaSub", 1),
+        ("goodsDesc", 1000),
+        ("ciqRegNo", 10),
+        ("prdcEtpsName", 400),
+        ("prdcEtpsConcEr", 20),
+        ("prdcEtpsTel", 20),
+        ("producer", 1000),
+        ("producerTel", 50),
+        ("producerFax", 50),
+        ("producerEmail", 50),
+    ] {
+        properties.insert(key.into(), json!({"type":"string","maxLength":maximum}));
+    }
+    properties.insert(
+        "producerSertFlag".into(),
+        json!({"type":"string","enum":["","N","Y"]}),
+    );
+    schemas["ApiSingleWindowCooImportItemDto"] = json!({"type":"object","properties":properties});
+}
+
 fn reviewed_profile_versions_and_product_identity(baseline: &mut Value) {
     let mapping = &mut baseline["components"]["schemas"]["ExcelImportSettings"];
     mapping["properties"]["sheetName"] = json!({"type":"string","minLength":1,"maxLength":31});
@@ -453,4 +490,5 @@ pub(super) fn reviewed_independent_declarations(baseline: &mut Value) {
         "id":{"type":"integer","format":"int64"},"invoiceNo":{"type":"string"},"sourceKind":{"type":"string"},"createdAt":{"type":"string","format":"date-time"}},"required":["id","invoiceNo","sourceKind","createdAt"]});
     schemas["ApiSingleWindowSourceListResponse"] = json!({"type":"object","properties":{
         "items":{"type":"array","items":{"$ref":"#/components/schemas/ApiSingleWindowSourceDto"}},"totalCount":{"type":"integer","format":"int64"}},"required":["items","totalCount"]});
+    reviewed_coo_import(baseline);
 }

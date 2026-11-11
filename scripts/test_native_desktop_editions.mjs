@@ -46,6 +46,7 @@ for (const edition of selected) {
   if (edition === 'Full') { assert.equal(marker.localTest, true); assert.equal(marker.database, 'SQLite'); }
   assert.equal(fs.existsSync(path.join(appRoot, 'sidecar/ocr/exportdoc-ocr.exe')), marker.ocr);
   assert.equal(fs.existsSync(path.join(appRoot, 'Resources/ExcelTemplates/invoice-import-template.xlsx')), marker.documentResources);
+  assert.equal(fs.existsSync(path.join(appRoot, 'Resources/ExcelTemplates/single-window-coo-template.xlsx')), marker.documentResources);
   const port = await getFreePort();
   const child = spawnProcessTree(path.join(appRoot, 'ExportDocManager.exe'), ['--app-root', appRoot, '--data-root', path.join(output, edition)], {
     cwd: appRoot, windowsHide: true, stdio: 'ignore', env: { ...process.env,

@@ -8,16 +8,17 @@ import { downloadBlob } from "../../../ui/downloadBlob.ts";
 import { readApiError } from "../../../ui/formUtils.ts";
 import { isAbortError } from "../../../ui/useAbortableOperation.ts";
 import { useScopedSave } from "../../../ui/useScopedSave.ts";
+import { downloadExcelTemplate } from "../../tools/excel/downloadExcelTemplate.ts";
 import { requestPackageOpenPath, requestPackageSavePath } from "../invoiceListDesktopPaths.ts";
 import { sanitizePackageFileName } from "../invoiceListFileNames.ts";
 import { buildDefaultCopyInvoiceNo, buildExcelImportRouteSuccessMessage, createEmptyInvoiceTransferImportDraft, createInvoiceTransferImportDraft, normalizeRequiredPackagePath, validateInvoiceCopyDraft, validateInvoiceTransferImportDraft, type InvoiceTransferImportDraft, type InvoiceCopyDraft } from "../invoiceListModels.ts";
 
-type Options = { client: ExportDocManagerApiClient; queryClient: QueryClient; navigate: NavigateFunction; defaultExportDirectory: string; canOperate: boolean; canImportExcel: boolean; canExport: boolean };
+type Options = { client: ExportDocManagerApiClient; queryClient: QueryClient; navigate: NavigateFunction; defaultExportDirectory: string; canOperate: boolean; canImportExcel: boolean; canDownloadExcelTemplate: boolean; canExport: boolean };
 type Context = { signal: AbortSignal; checkCurrent: () => void };
 type FileAction = "preview" | "import" | "export" | "excel" | "open";
 
 /** List actions own their dialogs, temporary files and navigation lifetime. */
-export function useInvoiceListActions({ client, queryClient, navigate, defaultExportDirectory, canOperate, canImportExcel, canExport }: Options) {
+export function useInvoiceListActions({ client, queryClient, navigate, defaultExportDirectory, canOperate, canImportExcel, canDownloadExcelTemplate, canExport }: Options) {
   const [copyDraft, setCopyDraft] = useState<InvoiceCopyDraft | null>(null);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const [transferDraft, setTransferDraft] = useState<InvoiceTransferImportDraft | null>(null);
@@ -29,7 +30,7 @@ export function useInvoiceListActions({ client, queryClient, navigate, defaultEx
   const [excelSchemeName, setExcelSchemeName] = useState("");
   useLayoutEffect(() => setExcelSchemeName(""), [client]);
   const copy = useScopedSave(String(canOperate), client);
-  const file = useScopedSave(`${canOperate}:${canImportExcel}:${canExport}`, client);
+  const file = useScopedSave(`${canOperate}:${canImportExcel}:${canDownloadExcelTemplate}:${canExport}`, client);
   const [fileAction, setFileAction] = useState<FileAction>("preview");
   const refresh = () => Promise.all([queryKeys.invoicesRoot(), queryKeys.queryInvoicesRoot(), queryKeys.dashboard()].map(queryKey => queryClient.invalidateQueries({ queryKey })));
 
@@ -151,6 +152,13 @@ export function useInvoiceListActions({ client, queryClient, navigate, defaultEx
     else { clearFileResult(); excelImportInputRef.current?.click(); }
   }
   function handleExcelImportUpload(uploadFile: File | undefined) { if (uploadFile) void importExcel(uploadFile); }
+  async function handleDownloadExcelTemplate() {
+    if (!canDownloadExcelTemplate || file.isSaving) return;
+    await runFile("excel", async context => {
+      const result = await downloadExcelTemplate(client, "invoice", context, defaultExportDirectory);
+      if (result) setTransferSuccessMessage(result);
+    });
+  }
   async function handleOpenLastExportedPackage() {
     if (!lastExportedPackagePath) return;
     const path = lastExportedPackagePath;
@@ -159,6 +167,6 @@ export function useInvoiceListActions({ client, queryClient, navigate, defaultEx
   return { excelSchemeName, setExcelSchemeName, copyDraft, closeCopyPanel, openCopyPanel, patchCopyDraft, submitCopyInvoice, copyBusy: copy.isSaving,
     transferDraft, closeTransferPanel, transferUploadFile, transferSuccessMessage, lastExportedPackagePath, excelImportInputRef,
     transferBusy: file.isSaving, handleChooseImportTransferPackage, handlePreviewTransferPackage, handlePreviewTransferUpload,
-    patchTransferDraft, submitTransferImport, handleExportTransferPackage, handleChooseExcelImport, handleExcelImportUpload, handleOpenLastExportedPackage,
+    patchTransferDraft, submitTransferImport, handleExportTransferPackage, handleChooseExcelImport, handleExcelImportUpload, handleDownloadExcelTemplate, handleOpenLastExportedPackage,
     actionMessage: copyMessage ?? transferMessage, actionsBusy: copy.isSaving || file.isSaving };
 }

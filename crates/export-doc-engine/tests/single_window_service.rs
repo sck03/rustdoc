@@ -132,8 +132,13 @@ fn independent_sources_enforce_ownership_without_invoice_permissions() {
                 bytes,
             )
             .unwrap();
-        assert_eq!(preview["success"], true, "{preview}");
-        assert!(!preview["invoice"]["items"].as_array().unwrap().is_empty());
+        assert_eq!(preview["result"]["success"], true, "{preview}");
+        assert!(
+            !preview["result"]["invoice"]["items"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
         assert_eq!(
             owner
                 .json::<Value>(LIST_SINGLE_WINDOW_SOURCES, &[], &[], None)

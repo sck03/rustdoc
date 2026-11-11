@@ -95,7 +95,7 @@ export async function verifyDesktopSingleWindow({ run, cdp, output, token, invoi
     results.push({ kind, continuedInput: true, imeRoundtrip: true, draftRevision: (await read()).draftRevision });
   }
   const workbook = path.resolve(import.meta.dirname, '../../crates/export-doc-excel/tests/fixtures/last-row-formulas.xls');
-  const preview = await client.previewSingleWindowExcelImport({ fileName: 'customer-format.xls', body: new Blob([fs.readFileSync(workbook)]) });
+  const {result: preview} = await client.previewSingleWindowExcelImport({ fileName: 'customer-format.xls', body: new Blob([fs.readFileSync(workbook)]) });
   assert.equal(preview.success, true, JSON.stringify(preview.errors));
   const { settings } = await client.getSettings();
   const scheme = { ...settings.excelImport, ...preview.analysisReport.itemTable.columns,
@@ -122,6 +122,16 @@ export async function verifyDesktopSingleWindow({ run, cdp, output, token, invoi
   await wait(`${mode}?.querySelector('option[value="Desktop-Excel"]')`);
   assert.equal(await run(`${mode}.value`), '');
   await selectMode('Desktop-Excel');
+  const invoiceTemplate=path.join(output,'invoice-import-template.xlsx');
+  await withNativeFilePicker({run,command:'select_save_excel_path',destination:invoiceTemplate},async()=>{
+    await run("[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='下载报关 Excel 模板').click(); true");
+    await wait("document.body.textContent.includes('导入模板已保存。')");
+  });
+  // Invoice export applies the configured exporter and recalculation metadata.
+  const downloadedInvoiceTemplate = await client.previewUploadedExcelImport({ fileName: 'invoice-import-template.xlsx', body: new Blob([fs.readFileSync(invoiceTemplate)]) });
+  assert.deepEqual(downloadedInvoiceTemplate.analysisReport.sheets.map(sheet => sheet.name), ['明细单']);
+  assert.equal(downloadedInvoiceTemplate.success, false, 'A blank template must not create product rows');
+  assert.equal(downloadedInvoiceTemplate.invoice?.items.length ?? 0, 0);
   await captureScreenshot(cdp, path.join(output, 'Full-invoice-excel-mode.png'), { captureBeyondViewport: false });
   await withNativeFilePicker({run,command:'select_excel_file',destination:workbook}, async () => {
     await run("[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='导入 Excel').click(); true");
@@ -134,13 +144,14 @@ export async function verifyDesktopSingleWindow({ run, cdp, output, token, invoi
   await run("location.hash='#/single-window/sources'; true");
   const sourceField = "[...document.querySelectorAll('label')].find(e=>e.textContent.includes('资料编号 / 客户发票号'))?.querySelector('input')";
   await waitFor(() => run(`(()=>{[...document.querySelectorAll('[role="dialog"] button')].find(e=>e.textContent.trim()==='离开当前编辑页')?.click(); return Boolean(${sourceField});})()`), 30000, 'Invoice import draft did not close');
-  assert(await run("[...document.querySelectorAll('button')].some(e=>e.textContent==='下载 Excel 模板'&&!e.disabled)"));
+  assert(await run("[...document.querySelectorAll('button')].some(e=>e.textContent==='下载产地证 Excel 模板'&&!e.disabled)"));
   const templatePath = path.join(output, 'single-window-import-template.xlsx');
   await withNativeFilePicker({run,command:'select_save_excel_path',destination:templatePath}, async () => {
-    await run("[...document.querySelectorAll('button')].find(e=>e.textContent==='下载 Excel 模板').click(); true");
+    await run("[...document.querySelectorAll('button')].find(e=>e.textContent==='下载产地证 Excel 模板').click(); true");
     await wait("document.body.textContent.includes('导入模板已保存。')");
   });
   assert(fs.readFileSync(templatePath).subarray(0, 2).equals(Buffer.from('PK')));
+  assert(fs.readFileSync(templatePath).equals(fs.readFileSync(path.resolve(import.meta.dirname,'../../Resources/ExcelTemplates/single-window-coo-template.xlsx'))));
   await wait(`${mode}?.querySelector('option[value="Desktop-Excel"]')`);
   assert.equal(await run(`${mode}.value`), '');
   await selectMode('Desktop-Excel');
@@ -178,6 +189,37 @@ export async function verifyDesktopSingleWindow({ run, cdp, output, token, invoi
   const imported = await client.createSingleWindowSource({ body: { referenceNo: 'DESKTOP-EXCEL-DECLARATION', invoice: preview.invoice } });
   assert.equal(imported.sourceKind, 'Excel');
   assert.equal((await client.getCustomsCooDocument({ sourceId: imported.id })).items.length, preview.invoice.items.length);
+  await run("location.hash='#/single-window/sources'; true");
+  await wait(sourceField);
+  const cooWorkbook = path.resolve(import.meta.dirname, '../../crates/export-doc-excel/tests/fixtures/single-window-coo.xlsx');
+  const { root: cooRoot } = await cdp.send('DOM.getDocument');
+  const { nodeId: cooInput } = await cdp.send('DOM.querySelector', { nodeId: cooRoot.nodeId, selector: 'input[type=file]' });
+  await cdp.send('DOM.setFileInputFiles', { nodeId: cooInput, files: [cooWorkbook] });
+  await wait("document.body.textContent.includes('已识别 1 行商品') && document.body.textContent.includes('测试工厂') && document.body.textContent.includes('90.12345')");
+  assert.equal(await run("document.querySelector('[data-file-selection]').textContent"), 'single-window-coo.xlsx');
+  await run(`${sourceField}.focus(); ${sourceField}.select(); true`);
+  await cdp.send('Input.insertText', { text: 'DESKTOP-COO-TEMPLATE' });
+  await captureScreenshot(cdp, path.join(output, 'Full-single-window-coo-import.png'), { captureBeyondViewport: false });
+  await run("[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='创建申报资料').click(); true");
+  await wait("document.body.textContent.includes('申报资料已创建')");
+  const cooSources = await client.listSingleWindowSources({ keyword: 'DESKTOP-COO-TEMPLATE' });
+  assert.equal(cooSources.items.length, 1);
+  const cooSourceId = cooSources.items[0].id;
+  const cooDocument = await client.getCustomsCooDocument({ sourceId: cooSourceId });
+  assert.equal(cooDocument.certType, 'RC');
+  assert.equal(cooDocument.fobValue, '90.12345');
+  assert.equal(cooDocument.items.length, 1);
+  const cooItem = cooDocument.items[0];
+  assert.equal(cooItem.prdcEtpsName, '测试工厂');
+  assert.equal(cooItem.prdcEtpsConcEr, '张三');
+  assert.equal(cooItem.prdcEtpsTel, '0574-12345678');
+  assert.equal(cooItem.ciqRegNo, '012345678');
+  assert.match(cooItem.producer, /TEST FACTORY LTD\./);
+  assert.match(cooItem.producer, /3 FACTORY ROAD, CHINA/);
+  assert.equal(cooItem.goodsUnit, '件');
+  assert.equal(cooItem.goodsOriginCountryEn, 'CHINA');
+  assert.equal((await client.getAgentConsignmentDocument({ sourceId: cooSourceId })).declTotal, '101.25');
+  await assert.rejects(client.getInvoice({ id: cooSourceId }), error => error.status === 404);
   const { profile, detected } = await verifyDesktopClientDirectories({run,cdp,output,client});
   const manualAcd = await client.getAgentConsignmentDocument({ sourceId });
   const savedAcd = await client.saveAgentConsignmentDocument({ sourceId, body: { ...manualAcd, copCusCode: 'TEST000001', gName: '测试货物', codeTS: '6109100010',
@@ -192,5 +234,5 @@ export async function verifyDesktopSingleWindow({ run, cdp, output, token, invoi
     await verifyOfficialClientTransport({client,profile,detected,sourceId,output});
   }
   fs.writeFileSync(path.join(output, 'single-window-results.json'), JSON.stringify({ catalogVersionConflict: true, producerVersionConflict: true, manualSource: true, independentConsignee: true,
-    excelPreviewRows: preview.invoice.items.length, manualExcelUiAndInvoiceUpload: true, templateDownload: true, swpkgExportImportDispatch: true, results }, null, 2));
+    excelPreviewRows: preview.invoice.items.length, cooTemplateUiRoundtrip: true, manualExcelUiAndInvoiceUpload: true, templateDownload: true, swpkgExportImportDispatch: true, results }, null, 2));
 }

@@ -2,6 +2,8 @@
 pub mod catalog;
 pub mod draft;
 pub mod mapping;
+mod source_import;
+pub use source_import::validate as validate_import;
 pub mod validation;
 pub mod xml;
 use crate::contracts;

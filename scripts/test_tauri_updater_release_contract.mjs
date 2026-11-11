@@ -7,6 +7,12 @@ const config = JSON.parse(read("apps/export-doc-tauri/src-tauri/tauri.conf.json"
 const permissions = read("apps/export-doc-tauri/src-tauri/capabilities/main.json");
 const build = read("scripts/run-tauri-build.mjs");
 const runtime = read("apps/export-doc-tauri/src-tauri/src/tauri_updater_commands.rs");
+assert.equal(config.app.security.dangerousDisableAssetCspModification, undefined, "Tauri CSP injection remains enabled");
+assert.doesNotMatch(read("apps/export-doc-web/index.html"), /<style\b/iu, "static bootstrap CSS must be external so it does not add a style nonce to dynamic report frames");
+for (const policy of [config.app.security.csp, config.app.security.devCsp]) {
+  assert.match(policy, /(?:^|;\s*)style-src 'self' 'unsafe-inline'(?:;|$)/u);
+  assert.match(policy, /(?:^|;\s*)script-src 'self'(?:;|$)/u);
+}
 assert.deepEqual(config.plugins.updater.endpoints, []);
 assert.equal(config.plugins.updater.pubkey, "");
 assert.deepEqual(config.bundle.windows.webviewInstallMode, { type: "downloadBootstrapper", silent: true });

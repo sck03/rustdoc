@@ -1637,6 +1637,7 @@ dependencies = [
  "exportdoc-excel-analyzer",
  "quick-xml",
  "rust_decimal",
+ "serde",
  "serde_json",
  "unicode-normalization",
  "zip",

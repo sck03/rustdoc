@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ApiExcelImportPreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ApiSingleWindowExcelImportPreviewResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { useScopedSave } from "../../ui/useScopedSave.ts";
 import { useTransientPreview } from "../../ui/useTransientPreview.ts";
@@ -8,8 +8,7 @@ import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { isAbortError } from "../../ui/useAbortableOperation.ts";
 import { readApiError } from "../../ui/formUtils.ts";
-import { isDesktopBridgeAvailable, selectSaveExcelPath } from "../../desktop/desktopBridge.ts";
-import { downloadJobResultWhenReady, waitForJobCompletion } from "../../ui/downloadJobResult.ts";
+import { downloadExcelTemplate } from "../tools/excel/downloadExcelTemplate.ts";
 
 const rootKey = ["single-window", "sources"] as const;
 export function useSingleWindowSources(client: ExportDocManagerApiClient) {
@@ -27,7 +26,7 @@ export function useSingleWindowSources(client: ExportDocManagerApiClient) {
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const save = useScopedSave(`single-window-source:${canDownloadTemplate}`, owner);
-  const preview = useTransientPreview<ApiExcelImportPreviewResponse, File>(previewOwner,
+  const preview = useTransientPreview<ApiSingleWindowExcelImportPreviewResponse, File>(previewOwner,
     (signal, file) => client.previewSingleWindowExcelImport({ fileName: file.name, schemeName: schemeName || undefined, body: file }, { signal }),
     error => setMessage(readApiError(error)));
   const query = useQuery({ queryKey: [...rootKey, page, keyword],
@@ -41,14 +40,14 @@ export function useSingleWindowSources(client: ExportDocManagerApiClient) {
   const busy = save.isSaving || preview.isPending;
   async function create() {
     if (!permission.canOperate || busy || !referenceNo.trim()) return;
-    if (fileName && (!preview.preview?.success || !preview.preview.invoice)) {
+    if (fileName && (!preview.preview?.result.success || !preview.preview.result.invoice)) {
       setMessage("请重新选择可识别的 Excel，或清除文件后手工录入。"); return;
     }
     setMessage(null); setSuccess(null);
     try {
       await save.run(async ({ signal, checkCurrent }) => {
         await client.createSingleWindowSource({ body: { referenceNo: referenceNo.trim(),
-          ...(preview.preview?.invoice ? { invoice: preview.preview.invoice } : {}) } }, { signal });
+          ...(preview.preview?.result.invoice ? { invoice: preview.preview.result.invoice, coo: preview.preview.coo } : {}) } }, { signal });
         checkCurrent(); setReferenceNo(""); clearFile(); setSchemeName("");
         setSuccess("申报资料已创建，可分别填写代理委托和原产地证。");
         try { await cache.invalidateQueries({ queryKey: rootKey }); }
@@ -64,18 +63,9 @@ export function useSingleWindowSources(client: ExportDocManagerApiClient) {
   async function downloadTemplate() {
     if (!canDownloadTemplate || busy) return;
     try {
-      await save.run(async ({ signal, checkCurrent }) => {
-        const fileName = "单一窗口申报资料模板.xlsx";
-        const desktop = isDesktopBridgeAvailable();
-        const path = desktop ? await selectSaveExcelPath(fileName) : undefined;
-        checkCurrent();
-        if (desktop && !path) return;
-        const job = path
-          ? await client.startSingleWindowExcelTemplateSaveToPathJob({ body: { destinationPath: path } }, { signal })
-          : await client.startSingleWindowExcelTemplateDownloadJob({ signal });
-        if (path) await waitForJobCompletion(client, job, { signal });
-        else await downloadJobResultWhenReady(client, job, fileName, { signal });
-        checkCurrent(); setMessage(null); setSuccess(path ? "导入模板已保存。" : "导入模板已下载。");
+      await save.run(async context => {
+        const result = await downloadExcelTemplate(client, "coo", context);
+        if (result) { setMessage(null); setSuccess(result); }
       });
     } catch (error) { if (!isAbortError(error)) setMessage(readApiError(error)); }
   }

@@ -1,0 +1,28 @@
+html,
+body {
+  margin: 0;
+  background: #f4f6f9;
+  color: #18283e;
+  font: 14px/22px "Noto Sans CJK SC", sans-serif;
+}
+
+#startup-skeleton {
+  min-height: 100dvh;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 16px;
+}
+
+#startup-skeleton strong {
+  font-size: 26px;
+  line-height: 34px;
+}
+
+#startup-skeleton div {
+  height: 4px;
+  width: 240px;
+  margin: auto;
+  background: #245da8;
+  border-radius: 999px;
+}

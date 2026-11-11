@@ -67,6 +67,17 @@ pub fn handle(
     };
     snapshot["invoiceNo"] = json!(reference);
     snapshot["sourceKind"] = json!(if imported { "Excel" } else { "Manual" });
+    if let Some(coo) = body.get("coo") {
+        rules::validate_import(coo).map_err(invalid)?;
+        let rows = snapshot["items"].as_array().map_or(0, Vec::len);
+        if !imported || coo["items"].as_array().map(Vec::len) != Some(rows) {
+            return Err(invalid("产地证补充资料必须与导入商品逐行对应。"));
+        }
+        snapshot["coo"] = contracts::dto(
+            contracts::schema("ApiSingleWindowCooImportDto"),
+            coo.clone(),
+        );
+    }
     // Excel preview IDs are not business identities. Assign stable identities within this snapshot.
     if let Some(items) = snapshot["items"].as_array_mut() {
         if items.len() > 5000 {

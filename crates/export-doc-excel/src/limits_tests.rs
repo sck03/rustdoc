@@ -154,13 +154,13 @@ fn configured_numeric_shipment_dates_use_the_workbook_epoch() {
         package.0.insert(path.into(), sheet.0.bytes().unwrap());
         if epoch_1904 {
             let path = "xl/workbook.xml";
-            let source = String::from_utf8(package.get(path).unwrap().to_vec()).unwrap();
-            package.0.insert(
-                path.into(),
-                source
-                    .replace("<sheets>", "<workbookPr date1904=\"1\"/><sheets>")
-                    .into_bytes(),
-            );
+            let mut root = xml::Node::parse(package.get(path).unwrap()).unwrap();
+            if root.child("workbookPr").is_none() {
+                let properties = root.named("workbookPr");
+                root.children.insert(0, xml::Part::Node(properties));
+            }
+            root.child_mut("workbookPr").unwrap().set("date1904", "1");
+            package.0.insert(path.into(), root.bytes().unwrap());
         }
         let bytes = package.finish(&check).unwrap();
         let result = preview(&bytes, "numeric-date.xlsx", None, "2026-10-25", &check).unwrap();

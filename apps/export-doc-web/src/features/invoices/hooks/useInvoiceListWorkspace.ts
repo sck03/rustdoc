@@ -44,7 +44,8 @@ export function useInvoiceListWorkspace({ client }: { client: ExportDocManagerAp
   });
   const settingsQuery = useQuery({ queryKey: queryKeys.settings(), queryFn: ({ signal }) => client.getSettings({ signal }), staleTime: 5 * 60 * 1000 });
   const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
-  const actions = useInvoiceListActions({ client, queryClient, navigate, defaultExportDirectory, canOperate: invoicePermission.canOperate, canImportExcel: excelPermission.canOperate, canExport: invoicePackageExportPermission.allowed });
+  const canDownloadExcelTemplate = excelPermission.canOperate && jobPermission.canView && jobPermission.canOperate && workspaceDeviceCapabilities.canImportExport;
+  const actions = useInvoiceListActions({ client, queryClient, navigate, defaultExportDirectory, canOperate: invoicePermission.canOperate, canImportExcel: excelPermission.canOperate, canDownloadExcelTemplate, canExport: invoicePackageExportPermission.allowed });
   const singleWindow = useInvoiceListSingleWindowOperations({ client, queryClient, defaultExportDirectory, canView: singleWindowPermission.canView, canOperate: singleWindowPermission.canOperate, canExportBookingSheet: excelPermission.canOperate });
   useServerPageNumber(invoicesQuery, pageNumber, setPageNumber);
   useEffect(() => { saveListViewState(invoiceListViewStateStorageKey, { keyword: committedKeyword, pageSize }); }, [committedKeyword, pageSize]);
@@ -53,7 +54,7 @@ export function useInvoiceListWorkspace({ client }: { client: ExportDocManagerAp
   function handleResetSearch() { setKeyword(""); setCommittedKeyword(""); setPageNumber(1); }
   function handlePageSizeChange(value: number) { setPageSize(normalizeListPageSize(value)); setPageNumber(1); }
 
-  return { ...actions, invoicePermission, excelPermission, singleWindowPermission, batchInvoices, setBatchInvoices,
+  return { ...actions, canDownloadExcelTemplate, invoicePermission, excelPermission, singleWindowPermission, batchInvoices, setBatchInvoices,
     invoicePackageExportPermission, workspaceDeviceMode, workspaceDeviceCapabilities, canAuthorizeBatchExport, canBatchExport,
     keyword, setKeyword, committedKeyword, pageNumber, setPageNumber, pageSize, navigate, routeSuccessMessage, invoicesQuery,
     singleWindow, handleSearch, handleResetSearch, handlePageSizeChange, openSingleWindowPanel: singleWindow.open,

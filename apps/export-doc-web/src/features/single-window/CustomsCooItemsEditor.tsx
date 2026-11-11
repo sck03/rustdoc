@@ -214,7 +214,7 @@ export function CooItemsEditor({
               {showGoodsProducerContactFields ? <CooDatalistField label="生产商电话" value={item.producerTel} options={previousValueOptions("producerTel")} disabled={disabled} onChange={(value) => onChangeItem(activeIndex, { producerTel: value })} /> : null}
               {showGoodsProducerContactFields ? <CooDatalistField label="生产商传真" value={item.producerFax} options={previousValueOptions("producerFax")} disabled={disabled} onChange={(value) => onChangeItem(activeIndex, { producerFax: value })} /> : null}
               {showGoodsProducerContactFields ? <CooDatalistField label="生产商邮箱" value={item.producerEmail} options={previousValueOptions("producerEmail")} disabled={disabled} onChange={(value) => onChangeItem(activeIndex, { producerEmail: value })} /> : null}
-              {showGoodsProducerContactFields ? <CooSelectField label="生产商保密" value={item.producerSertFlag} options={editorOptions.producerSecretOptions} disabled={disabled} onChange={(value) => onChangeItem(activeIndex, { producerSertFlag: value.toUpperCase() })} /> : null}
+              {showGoodsProducerDescription ? <CooSelectField label="生产商保密" value={item.producerSertFlag} options={editorOptions.producerSecretOptions} disabled={disabled} onChange={(value) => onChangeItem(activeIndex, { producerSertFlag: value.toUpperCase() })} /> : null}
             </div>
           </section>
         </div>

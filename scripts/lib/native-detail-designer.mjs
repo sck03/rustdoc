@@ -44,7 +44,16 @@ export async function verifyDesktopDetailDesigner({ run, request, token, cdp, ou
   assert.deepEqual(savedTable.summaryRow, table.block.summaryRow);
   await run("[...document.querySelectorAll('[role=tab]')].find(node=>node.textContent.trim()==='预览').click(); true");
   await wait("Boolean(document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('桌面货物说明'))");
-  await captureScreenshot(cdp, path.join(output, 'Full-detail-native-preview.png'));
+  await verifyPreviewGeometry(cdp, '.report-page');
+  await run('window.scrollTo(0,0); document.activeElement?.blur(); true');
+  await captureScreenshot(cdp, path.join(output, 'Full-detail-native-preview.png'), { captureBeyondViewport: false });
+  await run("const select=[...document.querySelectorAll('select')].find(node=>[...node.options].some(option=>option.value==='PdfPage'));select.value='PdfPage';select.dispatchEvent(new Event('change',{bubbles:true}));true");
+  await wait("Boolean([...document.querySelectorAll('[role=tab]')].find(node=>node.textContent.trim()==='预览'&&!node.disabled))");
+  await run("[...document.querySelectorAll('[role=tab]')].find(node=>node.textContent.trim()==='预览').click(); true");
+  await wait("Boolean(document.querySelector('iframe[title=模板预览]')?.srcdoc.includes('data:image/png;base64,'))");
+  await verifyPreviewGeometry(cdp, 'img');
+  await run('window.scrollTo(0,0); document.activeElement?.blur(); true');
+  await captureScreenshot(cdp, path.join(output, 'Full-detail-pdf-preview.png'), { captureBeyondViewport: false });
   const invoice = catalog.body.find(item => item.templatePath.endsWith('invoice_template.dtpl'));
   assert(invoice, 'Commercial invoice template available');
   const invoiceCopy = await request('CloneUserReportTemplate', token, {
@@ -88,4 +97,40 @@ export async function verifyDesktopDetailDesigner({ run, request, token, cdp, ou
   await wait(`${left} === ${initialLeft} && document.querySelector(${JSON.stringify(totalSelector)}).style.willChange === ''`);
   await wait(`document.querySelector('.report-designer-v3-header').textContent.includes('与已载入模板一致')`);
   await captureScreenshot(cdp, path.join(output, 'Full-designer-drag-cancelled.png'), { captureBeyondViewport: false });
+}
+
+async function verifyPreviewGeometry(cdp, selector) {
+  let diagnostics;
+  try {
+    await waitFor(async () => {
+      const { frameTree } = await cdp.send('Page.getFrameTree');
+      diagnostics = frameTree;
+      let frameId = frameTree.childFrames?.find(item => item.frame.url === 'about:srcdoc')?.frame.id;
+      let sessionId;
+      if (!frameId) {
+        // Sandboxed srcdoc can run in a separate WebView2 renderer process.
+        const { targetInfos } = await cdp.send('Target.getTargets');
+        const target = targetInfos.find(item => item.type === 'iframe' && item.url === 'about:srcdoc' && item.parentFrameId === frameTree.frame.id);
+        if (!target) return false;
+        ({ sessionId } = await cdp.send('Target.attachToTarget', { targetId: target.targetId, flatten: true }));
+        frameId = target.targetId;
+      }
+      try {
+        const { executionContextId } = await cdp.send('Page.createIsolatedWorld', { frameId, worldName: 'report-layout-validation' }, sessionId);
+        const response = await cdp.send('Runtime.evaluate', { contextId: executionContextId, returnByValue: true, expression: `(() => {
+          const page = document.querySelector(${JSON.stringify(selector)});
+          if (!page || (page instanceof HTMLImageElement && !page.complete)) return false;
+          const box = page.getBoundingClientRect();
+          const viewport = document.documentElement.clientWidth;
+          return { background: getComputedStyle(document.body).backgroundColor, left: box.left, width: box.width, viewport };
+        })()` }, sessionId);
+        diagnostics = response;
+        const geometry = response.result.value;
+        return geometry && geometry.background === 'rgb(232, 235, 237)' && geometry.width > 0 && geometry.width <= geometry.viewport &&
+          Math.abs(geometry.left - (geometry.viewport - geometry.width) / 2) < 1;
+      } finally {
+        if (sessionId) await cdp.send('Target.detachFromTarget', { sessionId });
+      }
+    }, 15000, 'Packaged SVG/PDF preview must retain its CSS, paper width and horizontal centering');
+  } catch (error) { throw new Error(`${error.message}: ${JSON.stringify(diagnostics)}`); }
 }

@@ -207,11 +207,14 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 | `rust-native-web-server-release.yml` | React + Rust PostgreSQL 服务包；选择系统、架构、版本号及 GitHub Release 开关 |
 | `rust-native-container-release.yml` | Docker 版本号与 x64／ARM64／all；验证同一镜像后按 publish 选择发布 GHCR，publish_latest 单独控制 |
 | `release-script-validation.yml` | 自动检查发布参数、版本同步、发布冲突、脚本语法及 workflow 语法 |
-| `rust-native-validation.yml` | Rust 测试、生成契约、依赖边界与跨平台构建／容器验收 |
+| `rust-native-validation.yml` | 自动按改动运行 Rust 单元／契约及前端回归；手工选择 full |
+| `native-full-validation.yml` | 内部 workflow_call：集成、doc-test、全部特性、跨平台包与容器验收，无第二个手工入口 |
 | `dependency-governance.yml` | npm／Cargo／原生资源的许可与 SBOM；不调用 .NET |
 | `browser-compatibility.yml` | 仅手工 Firefox／WebKit 验收 |
 
 Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公钥和私钥，私钥不写仓库。便携包不执行安装器更新。不执行 Windows Authenticode、Developer ID 或 Apple 公证。未实跑的 CI／系统／架构不写成已通过。
+
+2026-11-11：quick 与 full 的 Rust core 不重复执行；OA HTTP／React 集成归 full Windows x64。编译缓存带源码 SHA 并按相同锁图恢复，避免一直复用不可更新的旧缓存；打包复用该作业已构建的前端。旧 smoke-web-runtime-diagnostics 及其专属场景链、旧 PDF 指标比对链和仓库初始化脚本已退役。仍使用的 Chromium／桌面公共工具、当前 UI 回归、正式 PDF 测试与 updater 发布入口保留。证据见[本批记录](../docs/2026-11-11模板预览与CI优化记录.md)。
 
 桌面和 Web 共用 `native-package-reusable.yml`，该内部工作流不提供手工运行入口。`version` 接受 `0.1.2`、`v0.1.2`、`0.1.2-beta.1`，同时进入 Rust/npm/Tauri、包内标记和归档名称。只改 CI checkout，不自动提交版本文件。已有不同源码的 GitHub Release 标签或不同内容的同名附件拒绝覆盖。完整参数及下载步骤见[工作流手册](../docs/GitHub%20Actions工作流用途与运行手册.md)。
 

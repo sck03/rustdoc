@@ -3388,6 +3388,35 @@ export interface ApiSingleWindowClientProfilesResponse {
   storagePolicy: string;
 }
 
+export interface ApiSingleWindowCooImportDto {
+  certType?: string;
+  items: ApiSingleWindowCooImportItemDto[];
+  producer?: string;
+  transDetails?: string;
+}
+
+export interface ApiSingleWindowCooImportItemDto {
+  ciqRegNo?: string;
+  fobValue?: string;
+  goodsDesc?: string;
+  oriCriteria?: string;
+  oriCriteriaRef?: string;
+  oriCriteriaSub?: string;
+  prdcEtpsConcEr?: string;
+  prdcEtpsName?: string;
+  prdcEtpsTel?: string;
+  producer?: string;
+  producerEmail?: string;
+  producerFax?: string;
+  producerSertFlag?: "" | "N" | "Y";
+  producerTel?: string;
+}
+
+export interface ApiSingleWindowExcelImportPreviewResponse {
+  coo?: ApiSingleWindowCooImportDto;
+  result: ApiExcelImportPreviewResponse;
+}
+
 export interface ApiSingleWindowHandoffPackageResponse {
   manifest: SingleWindowPackageManifest;
   message: string;
@@ -3504,6 +3533,7 @@ export interface ApiSingleWindowRepairGroupsResponse {
 }
 
 export interface ApiSingleWindowSourceCreateRequest {
+  coo?: ApiSingleWindowCooImportDto;
   invoice?: ApiInvoiceDetailDto;
   referenceNo: string;
 }

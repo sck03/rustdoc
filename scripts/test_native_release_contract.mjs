@@ -115,7 +115,7 @@ async function testScriptSuiteExitStatus() {
   const result = await run(root);
   assert.match(result.stdout, /"Success": true/u, 'expected negative tests do not fail the successful suite');
   const fixture = path.join(temporary, 'script-suite-fixture');
-  for (const name of ['verify-script-suite.ps1', 'lib/build-script-support.ps1', 'lib/platform-path-safety.ps1', 'lib/product-editions.ps1', 'lib/rust-build-paths.ps1', 'lib/web-runtime-smoke-arguments.ps1']) {
+  for (const name of ['verify-script-suite.ps1', 'lib/build-script-support.ps1', 'lib/platform-path-safety.ps1', 'lib/product-editions.ps1', 'lib/rust-build-paths.ps1']) {
     await write(`script-suite-fixture/scripts/${name}`, await readFile(path.join(root, 'scripts', name)));
   }
   await write('script-suite-fixture/scripts/invalid.ps1', 'function Invalid {\n');

@@ -222,8 +222,7 @@ pub fn defaults(
         out[key] = json!(text(invoice, source));
     }
     out["aplDate"] = json!(today);
-    out["fobValue"] = json!(decimal(&invoice["totalAmount"], 2)?);
-    out["totalAmt"] = out["fobValue"].clone();
+    out["totalAmt"] = json!(decimal(&invoice["totalAmount"], 2)?);
     let credit = first(&[
         text(invoice, "exporterCreditCode"),
         text(exporter, "creditCode"),
@@ -304,6 +303,9 @@ pub fn defaults(
     );
     let terms = text(invoice, "tradeTerms").to_uppercase();
     out["priceTerms"] = json!(terms.split([' ', '(']).next().unwrap_or(""));
+    if out["priceTerms"] == "FOB" {
+        out["fobValue"] = out["totalAmt"].clone();
+    }
     let currency = catalog::find(catalog, "currencies", text(invoice, "currency"));
     out["curr"] = json!(currency.map(|c| text(c, "alphaCode")).unwrap_or(""));
     let trade = text(invoice, "supervisionMode");
@@ -368,6 +370,16 @@ pub fn defaults(
                 .unwrap_or("")
         );
     }
+    out["items"] = json!(
+        invoice["items"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .enumerate()
+            .map(|(i, item)| goods(item, invoice, catalog, i + 1))
+            .collect::<Result<Vec<_>, _>>()?
+    );
+    super::source_import::apply(&mut out, invoice)?;
     out["certNo"] = json!(cert_no(
         "",
         text(&out, "certType"),
@@ -376,15 +388,6 @@ pub fn defaults(
         today,
         today
     ));
-    out["items"] = json!(
-        invoice["items"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .enumerate()
-            .map(|(i, item)| goods(item, invoice, exporter, catalog, i + 1))
-            .collect::<Result<Vec<_>, _>>()?
-    );
     Ok(out)
 }
 fn acd(
@@ -442,13 +445,7 @@ fn acd(
     out["consignTele"] = json!(phone(text(exporter, "phone")));
     Ok(())
 }
-fn goods(
-    item: &Value,
-    invoice: &Value,
-    exporter: &Value,
-    catalog: &Value,
-    index: usize,
-) -> Result<Value, String> {
+fn goods(item: &Value, invoice: &Value, catalog: &Value, index: usize) -> Result<Value, String> {
     let mut row = contracts::initial(contracts::schema("ApiCustomsCooItemDto"));
     row["sourceItemId"] = item["id"].clone();
     row["sourceStyleNo"] = json!(text(item, "styleNo"));
@@ -468,9 +465,16 @@ fn goods(
         ("grossWt", "gwTotal"),
         ("netWt", "nwTotal"),
         ("invValue", "totalPrice"),
-        ("fobValue", "totalPrice"),
     ] {
         row[key] = json!(decimal(&item[source], 2)?);
+    }
+    if text(invoice, "tradeTerms")
+        .to_uppercase()
+        .split([' ', '('])
+        .next()
+        == Some("FOB")
+    {
+        row["fobValue"] = row["invValue"].clone();
     }
     row["invPrice"] = json!(decimal(
         &item["unitPrice"],
@@ -499,12 +503,6 @@ fn goods(
         text(item, "origin"),
         "englishName"
     ));
-    row["prdcEtpsName"] = json!(first(&[
-        text(invoice, "exporterNameCN"),
-        text(exporter, "exporterNameCN")
-    ]));
-    row["prdcEtpsConcEr"] = json!(text(exporter, "contactPerson"));
-    row["prdcEtpsTel"] = json!(phone(text(exporter, "phone")));
     row["invNo"] = json!(text(invoice, "invoiceNo"));
     row["goodsDesc"] = json!(goods_description(&row));
     Ok(row)

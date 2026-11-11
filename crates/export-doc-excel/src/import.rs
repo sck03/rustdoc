@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use std::{collections::BTreeMap, str::FromStr};
 use unicode_normalization::UnicodeNormalization;
 
-fn import_date(raw: &str) -> Option<chrono::NaiveDate> {
+pub(crate) fn import_date(raw: &str) -> Option<chrono::NaiveDate> {
     // Require a four-digit year before chrono parsing, whose %Y is permissive.
     let separator = ['-', '/', '.'].into_iter().find(|c| raw.contains(*c))?;
     let parts: Vec<_> = raw.split(separator).collect();
@@ -82,7 +82,7 @@ fn score(value: f32) -> Decimal {
     Decimal::from_str(&format!("{value:.4}")).unwrap_or_default()
 }
 
-fn numeric_date(
+pub(crate) fn numeric_date(
     range: &Range<Data>,
     key: &str,
     row: usize,
@@ -107,7 +107,11 @@ fn numeric_date(
 
 // BIFF files can retain formatted/empty records through row 65536. Count
 // content, not formatting, and keep original coordinates for field mappings.
-fn content_range(range: Range<Data>, total: &mut usize, check: Check<'_>) -> Result<Range<Data>> {
+pub(crate) fn content_range(
+    range: Range<Data>,
+    total: &mut usize,
+    check: Check<'_>,
+) -> Result<Range<Data>> {
     let Some((row_offset, col_offset)) = range.start() else {
         return Ok(range);
     };
@@ -164,11 +168,32 @@ pub fn preview(
     business_date: &str,
     check: Check<'_>,
 ) -> Result<ApiExcelImportPreviewResponse> {
+    parse(
+        crate::reader::open(bytes, check)?,
+        name,
+        manual,
+        business_date,
+        check,
+    )
+    .map(|parsed| parsed.response)
+}
+
+pub(crate) struct Parsed {
+    pub response: ApiExcelImportPreviewResponse,
+    pub source_rows: Vec<usize>,
+}
+
+pub(crate) fn parse(
+    mut workbook: Sheets<std::io::Cursor<&[u8]>>,
+    name: &str,
+    manual: Option<&Value>,
+    business_date: &str,
+    check: Check<'_>,
+) -> Result<Parsed> {
     check()?;
     let manual = manual
         .map(crate::manual_mapping::ManualMapping::read)
         .transpose()?;
-    let mut workbook = crate::reader::open(bytes, check)?;
     let epoch = match &workbook {
         Sheets::Xls(book) => Some(book.has_1904_epoch()),
         Sheets::Xlsx(book) => Some(book.has_1904_epoch()),
@@ -238,24 +263,27 @@ pub fn preview(
                 )
             },
         );
-        return Ok(ApiExcelImportPreviewResponse {
-            source_path: name.into(),
-            success: false,
-            errors: vec![message.clone()],
-            analysis_report: Some(ApiExcelImportAnalysisReportDto {
-                schema_version: "excel-analysis-rs/0.2".into(),
-                analyzer_id: "rust-calamine".into(),
-                sheets: analyses,
-                issues: vec![ApiExcelImportAnalysisIssueDto {
-                    severity: "Error".into(),
-                    code: "MissingItemTable".into(),
-                    message,
+        return Ok(Parsed {
+            source_rows: vec![],
+            response: ApiExcelImportPreviewResponse {
+                source_path: name.into(),
+                success: false,
+                errors: vec![message.clone()],
+                analysis_report: Some(ApiExcelImportAnalysisReportDto {
+                    schema_version: "excel-analysis-rs/0.2".into(),
+                    analyzer_id: "rust-calamine".into(),
+                    sheets: analyses,
+                    issues: vec![ApiExcelImportAnalysisIssueDto {
+                        severity: "Error".into(),
+                        code: "MissingItemTable".into(),
+                        message,
+                        ..Default::default()
+                    }],
                     ..Default::default()
-                }],
+                }),
+                storage_policy: "解析未生成可用草稿，没有写入业务数据。".into(),
                 ..Default::default()
-            }),
-            storage_policy: "解析未生成可用草稿，没有写入业务数据。".into(),
-            ..Default::default()
+            },
         });
     };
     let detected = analysis.table.as_ref().ok_or("缺少表格识别结果。")?;
@@ -375,6 +403,7 @@ pub fn preview(
         crate::supplements::Tables::read(&range, detected.data_start_row, check)?
     };
     let mut source_fields = vec![];
+    let mut source_rows = vec![];
     let start = detected.data_start_row;
     let end = range.end().unwrap().0 as usize + 1;
     let end = manual
@@ -448,6 +477,7 @@ pub fn preview(
             continue;
         }
         draft.rows.push(row);
+        source_rows.push(row_index);
         source_fields.push(changed);
         if draft.rows.len() > MAX_ROWS {
             return Err(format!("商品明细超过 {MAX_ROWS} 行。"));
@@ -504,34 +534,37 @@ pub fn preview(
             })
             .collect::<Vec<_>>(),
     );
-    Ok(ApiExcelImportPreviewResponse {
-        source_path: name.into(),
-        success: errors.is_empty(),
-        invoice: Some(invoice),
-        customer,
-        exporter,
-        analysis_report: Some(ApiExcelImportAnalysisReportDto {
-            schema_version: "excel-analysis-rs/0.2".into(),
-            analyzer_id: "rust-calamine".into(),
-            selected_worksheet_name: analysis.name.clone(),
-            confidence: score(analysis.confidence),
-            sheets: analyses,
-            fields,
-            item_table: Some(ApiExcelImportItemTableAnalysisDto {
-                worksheet_name: analysis.name,
-                header_row: detected.header_start_row as i64,
-                header_depth: detected.header_depth as i64,
-                data_start_row: start as i64,
-                confidence: score(detected.confidence),
-                columns: serde_json::from_value(mapped).map_err(|e| e.to_string())?,
+    Ok(Parsed {
+        source_rows,
+        response: ApiExcelImportPreviewResponse {
+            source_path: name.into(),
+            success: errors.is_empty(),
+            invoice: Some(invoice),
+            customer,
+            exporter,
+            analysis_report: Some(ApiExcelImportAnalysisReportDto {
+                schema_version: "excel-analysis-rs/0.2".into(),
+                analyzer_id: "rust-calamine".into(),
+                selected_worksheet_name: analysis.name.clone(),
+                confidence: score(analysis.confidence),
+                sheets: analyses,
+                fields,
+                item_table: Some(ApiExcelImportItemTableAnalysisDto {
+                    worksheet_name: analysis.name,
+                    header_row: detected.header_start_row as i64,
+                    header_depth: detected.header_depth as i64,
+                    data_start_row: start as i64,
+                    confidence: score(detected.confidence),
+                    columns: serde_json::from_value(mapped).map_err(|e| e.to_string())?,
+                    ..Default::default()
+                }),
+                issues,
                 ..Default::default()
             }),
-            issues,
+            errors,
+            storage_policy: "仅在内存中解析为待核对草稿；确认保存前不写入业务数据库。".into(),
             ..Default::default()
-        }),
-        errors,
-        storage_policy: "仅在内存中解析为待核对草稿；确认保存前不写入业务数据库。".into(),
-        ..Default::default()
+        },
     })
 }
 fn is_total(value: &str) -> bool {

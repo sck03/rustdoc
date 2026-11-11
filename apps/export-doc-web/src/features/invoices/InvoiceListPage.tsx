@@ -1,5 +1,5 @@
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
-import { FileSpreadsheet, FolderOpen, Plus, RefreshCw, Search, Upload, X } from "lucide-react";
+import { Download, FileSpreadsheet, FolderOpen, Plus, RefreshCw, Search, Upload, X } from "lucide-react";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
@@ -28,7 +28,7 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
     transferBusy, openCopyPanel, openSingleWindowPanel, patchCopyDraft,
     submitCopyInvoice, handleExportTransferPackage, handleChooseImportTransferPackage, handleChooseExcelImport, handleExcelImportUpload,
     handlePreviewTransferPackage, handlePreviewTransferUpload, patchTransferDraft, submitTransferImport, handleOpenLastExportedPackage,
-    invoices, message, isBusy, excelSchemeName, setExcelSchemeName,
+    invoices, message, isBusy, excelSchemeName, setExcelSchemeName, canDownloadExcelTemplate, handleDownloadExcelTemplate,
   } = useInvoiceListWorkspace({ client });
 
   return (
@@ -52,6 +52,10 @@ export function InvoiceListPage({ client }: { client: ExportDocManagerApiClient 
           >
             <FileSpreadsheet size={17} aria-hidden="true" />
             <span>导入 Excel</span>
+          </button> : null}
+          {workspaceDeviceCapabilities.canImportExport && excelPermission.canOperate ? <button className="command-button secondary" type="button"
+            disabled={isBusy || !canDownloadExcelTemplate} title={canDownloadExcelTemplate ? undefined : "需要文件任务的查看和操作权限"} onClick={() => void handleDownloadExcelTemplate()}>
+            <Download size={17} aria-hidden="true" /><span>下载报关 Excel 模板</span>
           </button> : null}
           <input
             ref={excelImportInputRef}
