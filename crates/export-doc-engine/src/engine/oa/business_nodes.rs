@@ -1,8 +1,9 @@
 //! The existing thirteen request adapters declare their default fulfillment graph.
 use super::*;
 use export_doc_domain::{
-    approval_graph::{HandlingAction, NodeKind, SystemAction},
-    approval_policy::ApprovalStage,
+    approval::ApprovalDecision,
+    approval_graph::{ApproverSource, HandlingAction, NodeKind, Phase, SystemAction},
+    approval_policy::{ApprovalStage, RepeatedApprover, SelfApproval},
 };
 fn node(
     key: &str,
@@ -12,9 +13,42 @@ fn node(
     system: SystemAction,
     depends: &[String],
 ) -> Result<ApprovalStage> {
-    Ok(serde_json::from_value(
-        json!({"key":format!("builtin-fulfillment-{key}"),"name":name,"kind":kind,"phase":"Fulfillment","dependsOn":depends,"source":if kind==NodeKind::System{"Named"}else{"Handlers"},"approverUserIds":[],"decision":"All","selfApproval":"Skip","repeatedApprover":"Allow","conditions":[],"dueHours":48,"handlingAction":action,"systemAction":system,"allowAdministration":kind==NodeKind::Handling}),
-    )?)
+    Ok(ApprovalStage {
+        key: format!("builtin-fulfillment-{key}"),
+        name: name.into(),
+        kind,
+        phase: Phase::Fulfillment,
+        depends_on: depends.into(),
+        source: if kind == NodeKind::System {
+            ApproverSource::Named
+        } else {
+            ApproverSource::Handlers
+        },
+        decision: ApprovalDecision::All,
+        self_approval: SelfApproval::Skip,
+        repeated_approver: RepeatedApprover::Allow,
+        due_hours: 48,
+        handling_action: action,
+        system_action: system,
+        allow_administration: kind == NodeKind::Handling,
+        pair_key: Default::default(),
+        source_id: None,
+        condition_logic: Default::default(),
+        condition_groups: vec![],
+        branches: vec![],
+        escalations: vec![],
+        material_policy: Default::default(),
+        subflow: None,
+        runtime_calendar_key: String::new(),
+        layout: None,
+        deadline_mode: Default::default(),
+        organization_route: Default::default(),
+        review_points: vec![],
+        approver_user_ids: vec![],
+        voting: Default::default(),
+        conditions: vec![],
+        revision_policy: Default::default(),
+    })
 }
 pub(super) fn defaults(kind: &str, depends: &[String]) -> Result<Vec<ApprovalStage>> {
     use HandlingAction::*;

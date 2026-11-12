@@ -57,6 +57,7 @@ mod licensing;
 mod lifecycle;
 mod maintenance;
 mod media;
+mod operation_lock;
 mod request_values;
 pub use media::{SEAL_LIMIT, read_seal_image};
 pub mod oa;

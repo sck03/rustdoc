@@ -412,8 +412,14 @@ pub(super) fn execute(
             }
         }
         _ => {
-            let revision: RevisionKind =
-                serde_json::from_value(json!(command)).map_err(|_| invalid("未知流程修订。"))?;
+            let revision = match command {
+                "AddBefore" => RevisionKind::AddBefore,
+                "AddAfter" => RevisionKind::AddAfter,
+                "AddParallel" => RevisionKind::AddParallel,
+                "RemoveSigner" => RevisionKind::RemoveSigner,
+                "ReturnToNode" => RevisionKind::ReturnToNode,
+                _ => return Err(invalid("未知流程修订。")),
+            };
             let target = input.target_node_key.as_deref().unwrap_or("").trim();
             records::required_text(target, "目标节点", 180)?;
             let manager =

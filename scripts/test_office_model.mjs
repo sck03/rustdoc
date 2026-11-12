@@ -14,6 +14,7 @@ const bundle = path.join(output, "model.mjs");
 await require("esbuild").build({ stdin: { contents: `
   export * as office from ${source("features/office/officeModel.ts")};
   export * as oa from ${source("features/oa/oaModel.ts")};
+  export { formReferenceLabels } from ${source("features/oa/oaFormModel.ts")};
   export * as personnel from ${source("features/office/personnelModel.ts")};
   export * as organization from ${source("features/organization/organizationModel.ts")};
   export * as communication from ${source("features/communication/communicationModel.ts")};
@@ -22,7 +23,13 @@ await require("esbuild").build({ stdin: { contents: `
   export { isRouteAccessAllowed } from ${source("app/routeAccess.ts")};
   export { createRequestKey } from ${source("ui/createRequestKey.ts")};
 `, loader: "ts", resolveDir: web }, bundle: true, platform: "node", format: "esm", outfile: bundle, logLevel: "silent" });
-const { office, oa, personnel, organization, communication, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey } = await import(pathToFileURL(bundle).href);
+const { office, oa, personnel, organization, communication, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey, formReferenceLabels } = await import(pathToFileURL(bundle).href);
+const labels = formReferenceLabels({ fields: [{ key: "people", kind: "Table", columns: [{ key: "person", kind: "Person" }, { key: "department", kind: "Department" }] }] },
+  { people: [{ person: "1", department: "1" }, { person: "2", department: "2" }] },
+  { people: [{ person: "甲", department: "甲部门" }, { person: "乙", department: "乙部门" }] });
+assert.equal(labels.get("Person:2"), "乙", "removing or moving the first table row preserves the second person's label");
+assert.equal(labels.get("Department:2"), "乙部门", "person and department IDs cannot collide");
+assert.equal(labels.get("Person:3"), undefined, "a changed reference must not inherit an old label");
 const grants = scope => ["office.rooms", "office.supplies"].flatMap(resourceKey =>
   ["view", "create", "cancel", "approve", "issue", "return", "restock", "manage"].map(action => ({ resourceKey, action, dataScope: scope })));
 const modules = enabledModules => ({ enabledModules, moduleAccess: enabledModules.map(moduleKey => ({ moduleKey, accessLevel: "view" })) });

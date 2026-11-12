@@ -16,11 +16,15 @@ await withOfficeUi('oa-custom-ui', async ({ output, url, operations, invoke, ope
       const violations = await page.evaluate(async selector => (await window.axe.run(document.querySelector(selector), { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa'] } })).violations.map(v => ({ id: v.id, targets: v.nodes.map(n => n.target) })), selector);
       assert.deepEqual(violations, [], `${name}: accessibility at ${width}`);
       presentation.push({ name, width, passed: true });
-      if (width !== 1024) await page.screenshot({ path: path.join(output, `${name}-${width}.png`), fullPage: true });
+      if (width !== 1024) {
+        await page.evaluate(async () => { window.scrollTo(0, 0); await new Promise(requestAnimationFrame); });
+        await page.screenshot({ path: path.join(output, `${name}-${width}.png`), fullPage: true });
+      }
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
   }
   const token = (await invoke('Login', { username: 'oa-review', password: 'Review-2026-Test' })).accessToken;
+  await invoke('CreateOrganizationDepartment', { code: 'SAMPLE', name: '样品部', companyCode: 'DEFAULT', isActive: true }, {}, token);
   const password = 'Custom-UI-2026';
   async function employee(name, actions) {
     const user = (await invoke('createUserAccount', {
@@ -45,6 +49,10 @@ await withOfficeUi('oa-custom-ui', async ({ output, url, operations, invoke, ope
   const definition = admin.locator('section[data-definition-key]');
   await definition.getByRole('tab', { name: '申请表单', exact: true }).click();
   await definition.getByLabel('事项分类', { exact: true }).fill('外贸业务');
+  const scope = definition.getByRole('region', { name: '适用部门', exact: true });
+  await scope.getByRole('checkbox', { name: /（GENERAL）/ }).check();
+  await scope.getByRole('checkbox', { name: /（SAMPLE）/ }).check();
+  assert.equal(await scope.getByRole('checkbox', { checked: true }).count(), 2, 'multiple departments survive ordinary selection');
   await definition.getByLabel('字段名称', { exact: true }).fill('客户名称');
   await definition.getByLabel('必填', { exact: true }).check();
   await definition.getByRole('button', { name: '添加字段', exact: true }).click();
@@ -93,6 +101,11 @@ await withOfficeUi('oa-custom-ui', async ({ output, url, operations, invoke, ope
   const row = await response.json();
   assert.equal(row.definitionKey, key);
   await dialog.waitFor({ state: 'hidden' });
+  await staff.getByRole('button', { name: '编辑草稿', exact: true }).click();
+  const edited = staff.getByRole('dialog');
+  assert.match(await edited.getByLabel('收件部门', { exact: true }).inputValue(), /（GENERAL）/, 'saved references retain their snapshot names while editing');
+  await edited.getByRole('button', { name: '保存草稿', exact: true }).click();
+  await edited.waitFor({ state: 'hidden' });
   await staff.getByRole('button', { name: '提交审批', exact: true }).click();
   const submit = staff.getByRole('dialog');
   await submit.locator('textarea').fill('请审核样品');

@@ -1,3 +1,4 @@
+import { officePolling } from "../../api/queryPollingPolicy.ts";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
@@ -34,7 +35,7 @@ export function useOfficeDirectory<T extends { id: number }>(user: ApiUserDto, k
     queryKey: ["office", kind, "resources", user.id, user.companyScope, search, includeInactive, lowStockOnly, paging.pageNumber, paging.pageSize],
     queryFn: ({ signal }) => load({ keyword: search || undefined, includeInactive, lowStockOnly,
       pageNumber: paging.pageNumber, pageSize: paging.pageSize }, signal),
-    refetchInterval: 30000, refetchIntervalInBackground: false,
+    ...officePolling,
   });
   const commitSearch = () => { setSearch(keyword.trim()); paging.resetPage(); };
   useServerPageNumber(query, paging.pageNumber, paging.setPageNumber);
@@ -56,7 +57,7 @@ export function useMeetingAvailability(client: ExportDocManagerApiClient, user: 
       if (!range) throw new Error("请选择有效日期。");
       return client.getMeetingRoomAvailability({ id: roomId, ...range }, { signal });
     },
-    enabled: Boolean(range), refetchInterval: 30000, refetchIntervalInBackground: false,
+    enabled: Boolean(range), ...officePolling,
   });
   return { range, query };
 }
@@ -128,8 +129,7 @@ export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUs
       const input = { mineOnly, status: status || undefined, handlingOnly, approvalsOnly, pageNumber: paging.pageNumber, pageSize: paging.pageSize, ...focus };
       return kind === "rooms" ? client.listMeetingBookings(input, { signal }) : client.listOfficeSupplyRequests(input, { signal });
     },
-    refetchInterval: 30000,
-    refetchIntervalInBackground: false,
+    ...officePolling,
   });
   const showRequests = (nextStatus: string, handling = false, approvals = false) => {
     setSearch({ view: "requests", status: nextStatus, ...(handling ? { handlingOnly: "true" } : {}), ...(approvals ? { approvalsOnly: "true" } : {}) });

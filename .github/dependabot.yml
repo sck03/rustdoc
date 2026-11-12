@@ -3,8 +3,9 @@ updates:
   - package-ecosystem: cargo
     directories: ["/", "/apps/exportdoc-ocr-rs", "/tools/excel-analyzer-rs"]
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
+      time: "02:00"
+      timezone: Asia/Shanghai
     open-pull-requests-limit: 5
     versioning-strategy: increase
     groups:
@@ -16,8 +17,9 @@ updates:
   - package-ecosystem: npm
     directories: ["/apps/export-doc-web", "/apps/export-doc-tauri"]
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
+      time: "02:00"
+      timezone: Asia/Shanghai
     open-pull-requests-limit: 5
     versioning-strategy: increase
     groups:
@@ -29,6 +31,7 @@ updates:
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
-      interval: weekly
-      day: monday
+      interval: monthly
+      time: "02:00"
+      timezone: Asia/Shanghai
     open-pull-requests-limit: 3

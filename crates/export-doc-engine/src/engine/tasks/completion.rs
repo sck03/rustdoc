@@ -1,20 +1,19 @@
 //! Keep terminal snapshots and publication recovery behind one boundary.
 use crate::engine::error::{Result, unavailable};
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard, TryLockError};
-use std::time::{Duration, Instant};
+use crate::engine::operation_lock::{OperationLock, ReadGuard, WriteGuard};
+use std::time::Duration;
 
 #[derive(Default)]
-pub(super) struct Completion(RwLock<Option<String>>);
+pub(super) struct Completion(OperationLock<Option<String>>);
 
 impl Completion {
     pub(super) fn health(&self) -> Result<()> {
-        match self.0.try_read() {
-            Ok(guard) => match guard.as_ref() {
+        match self.0.try_read()? {
+            Some(guard) => match guard.as_ref() {
                 Some(failure) => Err(unavailable(failure.clone())),
                 None => Ok(()),
             },
-            Err(TryLockError::WouldBlock) => Ok(()),
-            Err(TryLockError::Poisoned(_)) => Err(unavailable("任务发布状态异常。")),
+            None => Ok(()),
         }
     }
 
@@ -39,47 +38,23 @@ impl Completion {
         })
     }
 
-    fn write(&self) -> Result<RwLockWriteGuard<'_, Option<String>>> {
-        let deadline = Instant::now() + Duration::from_secs(30);
-        loop {
-            crate::operation::check()?;
-            match self.0.try_write() {
-                Ok(guard) => return Ok(guard),
-                Err(TryLockError::Poisoned(_)) => return Err(unavailable("任务发布状态异常。")),
-                Err(TryLockError::WouldBlock) if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(5));
-                }
-                Err(TryLockError::WouldBlock) => return Err(unavailable("任务发布等待超过时限。")),
-            }
-        }
+    fn write(&self) -> Result<WriteGuard<'_, Option<String>>> {
+        self.0.write(Duration::from_secs(30))
     }
 
-    pub(super) fn read(&self) -> Result<RwLockReadGuard<'_, Option<String>>> {
-        let deadline = Instant::now() + Duration::from_secs(30);
-        loop {
-            crate::operation::check()?;
-            match self.0.try_read() {
-                Ok(guard) => {
-                    if let Some(failure) = guard.as_ref() {
-                        return Err(unavailable(failure.clone()));
-                    }
-                    return Ok(guard);
-                }
-                Err(TryLockError::Poisoned(_)) => return Err(unavailable("任务发布状态异常。")),
-                Err(TryLockError::WouldBlock) if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_millis(5));
-                }
-                Err(TryLockError::WouldBlock) => {
-                    return Err(unavailable("任务正在完成输出清理，请稍后重试。"));
-                }
-            }
+    pub(super) fn read(&self) -> Result<ReadGuard<'_, Option<String>>> {
+        let guard = self.0.read(Duration::from_secs(30))?;
+        if let Some(failure) = guard.as_ref() {
+            return Err(unavailable(failure.clone()));
         }
+        Ok(guard)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Instant;
 
     #[test]
     fn completion_wait_is_cancellable_and_terminal_work_outlives_cancellation() {

@@ -1,4 +1,5 @@
 use super::error::{Result, conflict, error, unavailable};
+use super::operation_lock::{OperationLock, WriteGuard};
 use crate::{contracts, paths::RuntimePaths};
 use chrono::Utc;
 #[cfg(feature = "postgres")]
@@ -9,10 +10,7 @@ use export_doc_storage::{
     pool::{Lease, Pool},
 };
 use serde_json::{Value, json};
-use std::{
-    fs::File,
-    sync::{Mutex, MutexGuard, TryLockError},
-};
+use std::{fs::File, time::Duration};
 use unicode_normalization::UnicodeNormalization;
 mod sqlite_layout;
 
@@ -22,7 +20,7 @@ pub struct Store {
     pub(crate) data_root: std::path::PathBuf,
     pub(crate) cache_root: std::path::PathBuf,
     connection: Pool,
-    writes: Mutex<()>,
+    writes: OperationLock<()>,
     write_waits: Metrics,
     transactions: Metrics,
     #[cfg(feature = "postgres")]
@@ -88,7 +86,7 @@ impl Store {
             data_root: paths.data_root.clone(),
             cache_root: paths.cache_root.clone(),
             connection: Pool::single(connection),
-            writes: Mutex::new(()),
+            writes: OperationLock::default(),
             write_waits: Default::default(),
             transactions: Default::default(),
             #[cfg(feature = "postgres")]
@@ -121,23 +119,11 @@ impl Store {
         }
         self.connection.health().map_err(Into::into)
     }
-    fn write_guard(&self) -> Result<MutexGuard<'_, ()>> {
+    fn write_guard(&self) -> Result<WriteGuard<'_, ()>> {
         let observation = self.write_waits.start();
-        loop {
-            crate::operation::check()?;
-            match self.writes.try_lock() {
-                Ok(guard) => {
-                    observation.finish(true);
-                    return Ok(guard);
-                }
-                Err(TryLockError::Poisoned(_)) => {
-                    return Err(unavailable("数据库写入协调状态异常。"));
-                }
-                Err(TryLockError::WouldBlock) => {
-                    std::thread::sleep(std::time::Duration::from_millis(10))
-                }
-            }
-        }
+        let guard = self.writes.write(Duration::from_secs(30))?;
+        observation.finish(true);
+        Ok(guard)
     }
     #[cfg(feature = "postgres")]
     pub fn open_postgres(paths: &RuntimePaths, connection_string: &str) -> Result<Self> {
@@ -155,7 +141,7 @@ impl Store {
             data_root: paths.data_root.clone(),
             cache_root: paths.cache_root.clone(),
             connection: Pool::postgres(connection_string, options)?,
-            writes: Mutex::new(()),
+            writes: OperationLock::default(),
             write_waits: Default::default(),
             transactions: Default::default(),
             postgres_connection: Some(zeroize::Zeroizing::new(connection_string.into())),

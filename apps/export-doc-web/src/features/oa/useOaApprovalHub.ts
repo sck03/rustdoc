@@ -1,3 +1,4 @@
+import { officePolling } from "../../api/queryPollingPolicy.ts";
 import { useQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { oaAccess, oaKinds, oaModules, oaHandlingLabels, type OaKind } from "./oaModel.ts";
@@ -31,7 +32,7 @@ export function useOaApprovalHub(client: ExportDocManagerApiClient, user: ApiUse
     queryKey: ["office", "oa", "hub", user.id, user.companyScope],
     queryFn: ({ signal }) => client.getOaApprovalHub({}, { signal }),
     enabled: queues.length > 0, staleTime: 30000,
-    refetchInterval: 30000, refetchIntervalInBackground: false,
+    ...officePolling,
   });
   return queues.map(queue => ({ ...queue, query: { ...query, data: query.data?.entries.find(entry => entry.kind === queue.kind && entry.finance === queue.finance && entry.handling === queue.handling && entry.status === queue.status)?.page } }));
 }

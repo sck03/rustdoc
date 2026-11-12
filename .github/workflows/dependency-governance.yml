@@ -3,7 +3,8 @@ name: Dependency security and SBOM governance
 on:
   workflow_dispatch:
   schedule:
-    - cron: "23 2 * * *"
+    - cron: "23 2 * * 1"
+    - cron: "23 2 * * 0,2-6"
   push:
     branches: [main]
     paths:
@@ -78,6 +79,7 @@ jobs:
     env:
       CARGO_HOME: ${{ github.workspace }}/.codex-runtime/cargo-home
       npm_config_cache: ${{ github.workspace }}/.codex-runtime/npm-cache
+      FULL_GOVERNANCE: ${{ github.event_name != 'schedule' || github.event.schedule == '23 2 * * 1' }}
 
     steps:
       - name: Checkout
@@ -97,28 +99,43 @@ jobs:
           toolchain: 1.99.1
 
       - uses: ./.github/actions/prepare-web
+        if: env.FULL_GOVERNANCE == 'true'
+
+      - name: Restore Cargo source cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
+        with:
+          path: |
+            ${{ env.CARGO_HOME }}/registry
+            ${{ env.CARGO_HOME }}/git
+          key: dependency-sources-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Restore locked dependency graphs
         id: restore
         run: |
-          npm ci --prefix apps/export-doc-tauri
           cargo fetch --locked
-          cargo fetch --locked --manifest-path apps/exportdoc-ocr-rs/Cargo.toml
-          cargo fetch --locked --manifest-path tools/excel-analyzer-rs/Cargo.toml
+          if [ "$FULL_GOVERNANCE" = "true" ]; then
+            npm ci --prefix apps/export-doc-tauri
+            cargo fetch --locked --manifest-path apps/exportdoc-ocr-rs/Cargo.toml
+            cargo fetch --locked --manifest-path tools/excel-analyzer-rs/Cargo.toml
+          fi
 
       - name: Validate Node 26 and artifact Action policy
         run: node scripts/verify-github-workflow-actions.mjs
 
       - name: Verify active source and dependency boundaries
+        if: env.FULL_GOVERNANCE == 'true'
         run: node scripts/verify-dependency-policy.mjs
 
       - name: Run dependency policy regression tests
+        if: env.FULL_GOVERNANCE == 'true'
         run: |
           node scripts/test_dependency_policy.mjs
           node scripts/test_dependency_audit.mjs
 
       - name: Audit npm production dependencies
-        run: npm --prefix apps/export-doc-web run audit:production
+        run: |
+          node scripts/audit-npm-production.mjs apps/export-doc-web
+          node scripts/audit-npm-production.mjs apps/export-doc-tauri
 
       - name: Restore reviewed RustSec tool
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
@@ -146,11 +163,11 @@ jobs:
           exit "$status"
 
       - name: Generate SPDX, CycloneDX and third-party inventory
-        if: ${{ !cancelled() && steps.restore.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.restore.outcome == 'success' && env.FULL_GOVERNANCE == 'true' }}
         run: node scripts/generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository
 
       - name: Recheck generated dependency evidence
-        if: ${{ !cancelled() && steps.restore.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.restore.outcome == 'success' && env.FULL_GOVERNANCE == 'true' }}
         run: node scripts/verify-dependency-policy.mjs --generated-only
 
       - name: Upload dependency governance evidence

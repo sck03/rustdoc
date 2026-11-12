@@ -69,4 +69,4 @@
 
 布局定义为 Resources/ExcelTemplates/single-window-coo-layout.json；排版维护在 scripts/lib/excel-template-layout.mjs，由维护环境注入电子表格工具运行，不进入应用运行依赖。两份模板共用色板与排版常量，色值读取前端正式 tokens。原生模板通过明确布局建立映射，商品计算继续复用 export-doc-excel，复用已解码的商品工作表；COO 补充 DTO 来自原生 API 契约。Engine 保存授权来源快照，Domain 校验长度、十进制、商品对齐并组合草稿，沿用 schema 17。
 
-回归入口：export-doc-excel 单元测试、crates/export-doc-engine/tests/single_window_excel.rs、scripts/test_single_window_workspace_ui.mjs 与 scripts/test_native_desktop_editions.mjs。本批实际执行情况见[模板与依赖稳定性记录](./2026-11-12模板与依赖稳定性修复记录.md)。
+回归入口：export-doc-excel 单元测试、crates/export-doc-engine/tests/single_window_excel.rs、scripts/test_single_window_workspace_ui.mjs 与 scripts/test_native_desktop_editions.mjs。本批实际执行情况见[模板与依赖稳定性记录](./archive/2026-11/2026-11-12模板与依赖稳定性修复记录.md)。

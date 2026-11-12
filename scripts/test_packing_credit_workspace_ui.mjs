@@ -24,7 +24,7 @@ window.requests=[];
 const queries=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:30000},mutations:{retry:false}}});window.queries=queries;
 const deferred=(kind,request,init)=>new Promise((resolve,reject)=>window.requests.push({kind,request,signal:init.signal,resolve,reject}));
 const project=id=>({id,versionNumber:1,name:id===2?"乙方案":"甲方案",containerType:"20GP",container:{length:589,width:235,height:239,volume:33.2,maxWeight:28000},rules:{allowRotation:true},cargoItems:[{name:id===2?"乙货物":"甲货物",length:60,width:40,height:40,weight:10,quantity:id===2?77:50}]});
-const client={listContainerPackingProjects:async()=>({projects:[project(1),project(2)]}),listContainerPackingContainerTypes:async()=>({containerTypes:[]}),
+const client={listContainerPackingProjects:async(_request,init)=>window.delayDirectory?deferred("directory",{},init):({projects:[project(1),project(2)]}),listContainerPackingContainerTypes:async()=>({containerTypes:[]}),
 getContainerPackingProject:(r,i)=>deferred("load",r,i),saveContainerPackingProject:(r,i)=>deferred("save",r,i),deleteContainerPackingProject:(r,i)=>deferred("delete",r,i),
 analyzeContainerPacking:(r,i)=>deferred("analyze",r,i),
 uploadLetterOfCreditDocument:(r,i)=>deferred("import",r,i),reviewLetterOfCreditCompliance:(r,i)=>deferred("review",r,i)};
@@ -65,6 +65,35 @@ async function importCredit(page) {
   await page.waitForFunction(() => window.requests.length === 1);
 }
 try {
+  await scenario("packing", async page => {
+    await load(page, 1);
+    await page.evaluate(() => { window.delayDirectory = true; });
+    await page.getByRole("button", { name: "保存方案", exact: true }).click();
+    await page.waitForFunction(() => window.requests.length === 2);
+    await page.evaluate(() => window.finish(1));
+    await page.waitForFunction(() => window.requests.some(request => request.kind === "directory"));
+    await page.getByRole("button", { name: "加载方案", exact: true }).click();
+    await page.waitForFunction(() => window.requests.length === 4);
+    await page.evaluate(() => window.finish(3));
+    await page.getByText("装柜方案已加载。", { exact: true }).waitFor();
+    await page.evaluate(async () => { window.requests[2].reject(new Error("旧保存刷新失败")); await new Promise(resolve => setTimeout(resolve, 0)); });
+    assert.equal(await page.getByText(/旧保存刷新失败/).count(), 0, "reloading the same record cancels obsolete command feedback");
+    await page.getByText("装柜方案已加载。", { exact: true }).waitFor();
+  });
+  await scenario("packing", async page => {
+    await page.getByLabel("方案名称", { exact: true }).fill("保存后继续");
+    await page.evaluate(() => { window.delayDirectory = true; });
+    await page.getByRole("button", { name: "保存方案", exact: true }).click();
+    await page.waitForFunction(() => window.requests.length === 1);
+    await page.evaluate(() => window.finish(0));
+    await page.waitForFunction(() => window.requests.some(request => request.kind === "directory"));
+    await page.waitForFunction(() => !window.dirty);
+    assert.equal(await page.getByRole("button", { name: "保存方案", exact: true }).isEnabled(), true, "directory refresh must not retain the save lock");
+    assert.equal(await page.evaluate(() => window.queries.getMutationCache().getAll().length), 0);
+    await page.evaluate(() => window.requests.find(request => request.kind === "directory").reject(new Error("目录离线")));
+    await page.getByText(/操作已完成，但方案目录刷新失败/).waitFor();
+    assert.equal(await page.getByLabel("方案名称", { exact: true }).inputValue(), "保存后继续");
+  });
   await scenario("packing", async page => {
     for (let index = 0; index < 20; index++) {
       await page.getByRole("button", { name: "立即生成效果图", exact: true }).click();

@@ -1,6 +1,12 @@
 import { useState, type FormEvent, type Dispatch, type SetStateAction } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { ApiUserDto, ExportDocManagerApiClient, OaRequest, OaRequestSave, PersonnelDirectoryRecord } from "../../api/index.ts";
+import type {
+  ApiUserDto,
+  ExportDocManagerApiClient,
+  OaRequest,
+  OaRequestSave,
+  PersonnelDirectoryRecord,
+} from "../../api/index.ts";
 import { businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "../office/OfficeUi.tsx";
@@ -24,19 +30,42 @@ import { OaFormFields } from "./OaFormFields.tsx";
 import { PageState } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 
-
-type Props={ client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind; record?: OaRequest; onClose: () => void; onSaved: (record: OaRequest) => void };
-export function OaRequestDialog(props:Props) {
-  const [params]=useSearchParams();
-  const key=props.kind==="general"&&!props.record?params.get("definition"):null;
-  const query=useOaApplications(props.client,props.user,Boolean(key));
-  const application=query.data?.items.find(item=>item.key===key);
-  if(key&&!application)return <OfficeDialog title="新建申请" onClose={props.onClose}><PageState tone={query.isPending?"loading":"error"} title={query.isPending?"正在读取申请表单":"此事项已停用、无权限或未发布"} description={query.isError?readApiError(query.error):undefined}/></OfficeDialog>;
-  return <RequestEditor {...props} application={application}/>;
+type Props = {
+  client: ExportDocManagerApiClient;
+  user: ApiUserDto;
+  kind: OaKind;
+  record?: OaRequest;
+  onClose: () => void;
+  onSaved: (record: OaRequest) => void;
+};
+export function OaRequestDialog(props: Props) {
+  const [params] = useSearchParams();
+  const key = props.kind === "general" && !props.record ? params.get("definition") : null;
+  const query = useOaApplications(props.client, props.user, Boolean(key));
+  const application = query.data?.items.find((item) => item.key === key);
+  if (key && !application)
+    return (
+      <OfficeDialog title="新建申请" onClose={props.onClose}>
+        <PageState
+          tone={query.isPending ? "loading" : "error"}
+          title={query.isPending ? "正在读取申请表单" : "此事项已停用、无权限或未发布"}
+          description={query.isError ? readApiError(query.error) : undefined}
+        />
+      </OfficeDialog>
+    );
+  return <RequestEditor {...props} application={application} />;
 }
-function RequestEditor({ client, user, kind, record, onClose, onSaved, application }: Props&{application?:import("../../api/index.ts").OaApplication}) {
+function RequestEditor({
+  client,
+  user,
+  kind,
+  record,
+  onClose,
+  onSaved,
+  application,
+}: Props & { application?: import("../../api/index.ts").OaApplication }) {
   const operation = useOaOperation(kind);
-  const [purpose,setPurpose] = useState("Voucher");
+  const [purpose, setPurpose] = useState("Voucher");
   const [params] = useSearchParams();
   const attachments = useAttachmentDraft(record);
   const [draft, storeDraft] = useState<OaRequestSave>(() => {
@@ -46,63 +75,230 @@ function RequestEditor({ client, user, kind, record, onClose, onSaved, applicati
       if (record.materialAccess?.isPartial) throw new Error("当前仅能查看部分材料，不能编辑完整申请。");
       const draft = structuredClone(record) as OaRequestSave;
       draft.expectedVersion = record.versionNumber;
-      if (draft.overtime) draft.overtime = { ...draft.overtime,
-        startsAt: toBusinessDateTimeLocalInput(draft.overtime.startsAt, user.businessTimeZone),
-        endsAt: toBusinessDateTimeLocalInput(draft.overtime.endsAt, user.businessTimeZone) };
+      if (draft.overtime)
+        draft.overtime = {
+          ...draft.overtime,
+          startsAt: toBusinessDateTimeLocalInput(draft.overtime.startsAt, user.businessTimeZone),
+          endsAt: toBusinessDateTimeLocalInput(draft.overtime.endsAt, user.businessTimeZone),
+        };
       return draft;
     }
-      const draft = oaDraft(kind, user);
-      if(application){draft.definitionKey=application.key;draft.definitionVersion=application.version;draft.formValues={};draft.category="Other";}
-      const action = params.get("change");
-      if (kind === "personnel" && action && action !== "Hire" && Object.hasOwn(personnelChangeLabels, action)) {
-        draft.employeeId = Number(params.get("employeeId")) || undefined;
-        draft.personnelChange = { action: action as keyof typeof personnelChangeLabels, effectiveDate: user.businessDate, onProbation: true };
-      }
-      return draft;
-    });
+    const draft = oaDraft(kind, user);
+    if (application) {
+      draft.definitionKey = application.key;
+      draft.definitionVersion = application.version;
+      draft.formValues = {};
+      draft.category = "Other";
+    }
+    const action = params.get("change");
+    if (kind === "personnel" && action && action !== "Hire" && Object.hasOwn(personnelChangeLabels, action)) {
+      draft.employeeId = Number(params.get("employeeId")) || undefined;
+      draft.personnelChange = {
+        action: action as keyof typeof personnelChangeLabels,
+        effectiveDate: user.businessDate,
+        onProbation: true,
+      };
+    }
+    return draft;
+  });
   const [employee, setEmployee] = useState<PersonnelDirectoryRecord | null>(null);
   const [dirty, setDirty] = useState(false);
-  const form=record?.formDefinition??application?.form;
-  const setDraft: Dispatch<SetStateAction<OaRequestSave>> = (value) => { setDirty(true); storeDraft(value); };
+  const form = record?.formDefinition ?? application?.form;
+  const setDraft: Dispatch<SetStateAction<OaRequestSave>> = (value) => {
+    setDirty(true);
+    storeDraft(value);
+  };
   useUnsavedChangesGuard({ isDirty: dirty, message: "申请有未保存的修改。" });
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (record?.materialAccess?.isPartial || kind !== "personnel" && !record && !canIdentifyOfficeApplicant(user)) return;
-    void operation.run((signal) => {
-      const body: OaRequestSave = { ...draft, employeeId: kind === "personnel" ? draft.employeeId : record?.employeeId ?? employee?.id };
-      if (body.personnelChange?.registration) body.personnelChange = { ...body.personnelChange, registration: { ...body.personnelChange.registration, requestKey: body.requestKey } };
-      if (draft.overtime) {
-        const startsAt = businessDateTimeLocalInputToIso(draft.overtime.startsAt, user.businessTimeZone);
-        const endsAt = businessDateTimeLocalInputToIso(draft.overtime.endsAt, user.businessTimeZone);
-        if (!startsAt || !endsAt) throw new Error("请填写完整加班时段。");
-        body.overtime = { ...draft.overtime, startsAt, endsAt };
-      }
-      const api = oaApi(client, kind);
-      return attachments.save(JSON.stringify(body), signal,
-        (current, signal) => current ? api.update(current.id, { ...body, expectedVersion: current.versionNumber }, { signal }) : api.create(body, { signal }),
-        (current, entry, signal) => { const form = new FormData(); form.set("file", entry.file); form.set("purpose",purpose); form.set("expectedVersion", String(current.versionNumber)); return api.upload(current.id, form, { signal }); });
-    }, (result) => { setDirty(false); onSaved(result); });
+    if (record?.materialAccess?.isPartial || (kind !== "personnel" && !record && !canIdentifyOfficeApplicant(user)))
+      return;
+    void operation.run(
+      (signal) => {
+        const body: OaRequestSave = {
+          ...draft,
+          employeeId: kind === "personnel" ? draft.employeeId : (record?.employeeId ?? employee?.id),
+        };
+        if (body.personnelChange?.registration)
+          body.personnelChange = {
+            ...body.personnelChange,
+            registration: { ...body.personnelChange.registration, requestKey: body.requestKey },
+          };
+        if (draft.overtime) {
+          const startsAt = businessDateTimeLocalInputToIso(draft.overtime.startsAt, user.businessTimeZone);
+          const endsAt = businessDateTimeLocalInputToIso(draft.overtime.endsAt, user.businessTimeZone);
+          if (!startsAt || !endsAt) throw new Error("请填写完整加班时段。");
+          body.overtime = { ...draft.overtime, startsAt, endsAt };
+        }
+        const api = oaApi(client, kind);
+        return attachments.save(
+          JSON.stringify(body),
+          signal,
+          (current, signal) =>
+            current
+              ? api.update(current.id, { ...body, expectedVersion: current.versionNumber }, { signal })
+              : api.create(body, { signal }),
+          (current, entry, signal) => {
+            const form = new FormData();
+            form.set("file", entry.file);
+            form.set("purpose", purpose);
+            form.set("expectedVersion", String(current.versionNumber));
+            return api.upload(current.id, form, { signal });
+          },
+        );
+      },
+      (result) => {
+        setDirty(false);
+        onSaved(result);
+      },
+    );
   }
-  return <OfficeDialog title={`${record ? "编辑" : "新建"}${record?.applicationName??application?.name??oaModules[kind].name}`} onClose={onClose} {...operation} protectChanges hasChanges={dirty}>
-    <p className="office-muted">{oaModules[kind].description}填写资料并选择附件，一次保存草稿，核对后提交审批。</p>
-    {operation.error && attachments.saved && <p role="status">资料已保存。待保存文件仍在下方，再次保存会继续处理；也可稍后从草稿回访。</p>}
-    <form onSubmit={submit} onChangeCapture={() => setDirty(true)}><fieldset disabled={operation.busy} className="office-form-grid">
-      {kind !== "personnel" && user.capabilities.canManageUsers && !record && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={(value) => { setEmployee(value); setDirty(true); }} disabled={operation.busy} />}
-      {kind !== "personnel" && !record && <OfficeApplicantIdentity user={user} />}
-      {kind !== "personnel" && !record && <OaDepartmentPicker client={client} user={user} employeeId={employee?.id} value={draft.appointmentId} onChange={appointment => setDraft(current => ({ ...current, departmentId:appointment.departmentId, appointmentId:appointment.id, projectId:null }))} />}
-      {kind !== "personnel" && record && <p className="office-field-wide">申请人：{requestPersonLabel(record.employeeName, record)}</p>}
-      {kind === "personnel" && <PersonnelChangeFields client={client} user={user} draft={draft} setDraft={setDraft} />}
-      {(kind!=="personnel" || draft.personnelChange?.action!=="Hire")&&<WorkflowProjectPicker client={client} user={user} kind={kind} employeeId={record?.employeeId??employee?.id??draft.employeeId} appointmentId={draft.appointmentId} departmentId={draft.departmentId} value={draft.projectId} onChange={projectId=>setDraft(current=>({...current,projectId}))}/>}
-      <OfficeField label="申请标题" wide><input required maxLength={150} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} /></OfficeField>
-      <OfficeField label="申请说明" wide><textarea required rows={3} maxLength={2000} value={draft.reason} onChange={(event) => setDraft({ ...draft, reason: event.target.value })} /></OfficeField>
-      {form?<OaFormFields client={client} company={user.companyScope} form={form} values={draft.formValues??{}} onChange={formValues=>setDraft({...draft,formValues})}/>:<OaTemporalFields draft={draft} setDraft={setDraft} timeZone={user.businessTimeZone} />}
-      {draft.category && <HandlingServicePicker client={client} user={user} category={draft.category} value={draft.handlingKey ?? ""} onChange={handlingKey => setDraft({ ...draft, handlingKey })} />}
-      {(kind === "expense" || kind === "purchase") && <>
-        <OfficeField label="币种"><select value={draft.currency} onChange={(event) => setDraft({ ...draft, currency: event.target.value as OaRequestSave["currency"] })}>{["CNY", "USD", "EUR", "HKD", "JPY", "GBP"].map((currency) => <option key={currency}>{currency}</option>)}</select></OfficeField>
-        <OaLineEditor draft={draft} setDraft={setDraft} purchase={kind === "purchase"} businessDate={user.businessDate} />
-      </>}
-      <OfficeField label="本批附件用途"><select value={purpose} onChange={event=>setPurpose(event.target.value)}><option value="ReimbursementForm">报销单</option><option value="Voucher">发票／其他凭证</option><option value="Supporting">补充资料</option></select></OfficeField>
-      <AttachmentDraftFields draft={attachments} busy={operation.busy} existingFiles={attachments.saved?.attachments} onChange={() => setDirty(true)} />
-    </fieldset><OfficeSubmit busy={operation.busy} label="保存草稿" disabled={kind === "personnel" ? draft.personnelChange?.action !== "Hire" && !draft.personnelChange?.expectedPersonnelVersion : !record && (!canIdentifyOfficeApplicant(user) || user.capabilities.canManageUsers && !employee)} /></form>
-  </OfficeDialog>;
+  return (
+    <OfficeDialog
+      title={`${record ? "编辑" : "新建"}${record?.applicationName ?? application?.name ?? oaModules[kind].name}`}
+      onClose={onClose}
+      {...operation}
+      protectChanges
+      hasChanges={dirty}
+    >
+      <p className="office-muted">{oaModules[kind].description}填写资料并选择附件，一次保存草稿，核对后提交审批。</p>
+      {operation.error && attachments.saved && (
+        <p role="status">资料已保存。待保存文件仍在下方，再次保存会继续处理；也可稍后从草稿回访。</p>
+      )}
+      <form onSubmit={submit} onChangeCapture={() => setDirty(true)}>
+        <fieldset disabled={operation.busy} className="office-form-grid">
+          {kind !== "personnel" && user.capabilities.canManageUsers && !record && (
+            <OfficeEmployeePicker
+              client={client}
+              user={user}
+              value={employee}
+              onChange={(value) => {
+                setEmployee(value);
+                setDirty(true);
+              }}
+              disabled={operation.busy}
+            />
+          )}
+          {kind !== "personnel" && !record && <OfficeApplicantIdentity user={user} />}
+          {kind !== "personnel" && !record && (
+            <OaDepartmentPicker
+              client={client}
+              user={user}
+              employeeId={employee?.id}
+              value={draft.appointmentId}
+              onChange={(appointment) =>
+                setDraft((current) => ({
+                  ...current,
+                  departmentId: appointment.departmentId,
+                  appointmentId: appointment.id,
+                  projectId: null,
+                }))
+              }
+            />
+          )}
+          {kind !== "personnel" && record && (
+            <p className="office-field-wide">申请人：{requestPersonLabel(record.employeeName, record)}</p>
+          )}
+          {kind === "personnel" && (
+            <PersonnelChangeFields client={client} user={user} draft={draft} setDraft={setDraft} />
+          )}
+          {(kind !== "personnel" || draft.personnelChange?.action !== "Hire") && (
+            <WorkflowProjectPicker
+              client={client}
+              user={user}
+              kind={kind}
+              employeeId={record?.employeeId ?? employee?.id ?? draft.employeeId}
+              appointmentId={draft.appointmentId}
+              departmentId={draft.departmentId}
+              value={draft.projectId}
+              onChange={(projectId) => setDraft((current) => ({ ...current, projectId }))}
+            />
+          )}
+          <OfficeField label="申请标题" wide>
+            <input
+              required
+              maxLength={150}
+              value={draft.title}
+              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+            />
+          </OfficeField>
+          <OfficeField label="申请说明" wide>
+            <textarea
+              required
+              rows={3}
+              maxLength={2000}
+              value={draft.reason}
+              onChange={(event) => setDraft({ ...draft, reason: event.target.value })}
+            />
+          </OfficeField>
+          {form ? (
+            <OaFormFields
+              client={client}
+              company={user.companyScope}
+              form={form}
+              values={draft.formValues ?? {}}
+              referenceValues={record?.formValues}
+              displayValues={record?.formDisplayValues}
+              onChange={(formValues) => setDraft({ ...draft, formValues })}
+            />
+          ) : (
+            <OaTemporalFields draft={draft} setDraft={setDraft} timeZone={user.businessTimeZone} />
+          )}
+          {draft.category && (
+            <HandlingServicePicker
+              client={client}
+              user={user}
+              category={draft.category}
+              value={draft.handlingKey ?? ""}
+              onChange={(handlingKey) => setDraft({ ...draft, handlingKey })}
+            />
+          )}
+          {(kind === "expense" || kind === "purchase") && (
+            <>
+              <OfficeField label="币种">
+                <select
+                  value={draft.currency}
+                  onChange={(event) =>
+                    setDraft({ ...draft, currency: event.target.value as OaRequestSave["currency"] })
+                  }
+                >
+                  {["CNY", "USD", "EUR", "HKD", "JPY", "GBP"].map((currency) => (
+                    <option key={currency}>{currency}</option>
+                  ))}
+                </select>
+              </OfficeField>
+              <OaLineEditor
+                draft={draft}
+                setDraft={setDraft}
+                purchase={kind === "purchase"}
+                businessDate={user.businessDate}
+              />
+            </>
+          )}
+          <OfficeField label="本批附件用途">
+            <select value={purpose} onChange={(event) => setPurpose(event.target.value)}>
+              <option value="ReimbursementForm">报销单</option>
+              <option value="Voucher">发票／其他凭证</option>
+              <option value="Supporting">补充资料</option>
+            </select>
+          </OfficeField>
+          <AttachmentDraftFields
+            draft={attachments}
+            busy={operation.busy}
+            existingFiles={attachments.saved?.attachments}
+            onChange={() => setDirty(true)}
+          />
+        </fieldset>
+        <OfficeSubmit
+          busy={operation.busy}
+          label="保存草稿"
+          disabled={
+            kind === "personnel"
+              ? draft.personnelChange?.action !== "Hire" && !draft.personnelChange?.expectedPersonnelVersion
+              : !record && (!canIdentifyOfficeApplicant(user) || (user.capabilities.canManageUsers && !employee))
+          }
+        />
+      </form>
+    </OfficeDialog>
+  );
 }

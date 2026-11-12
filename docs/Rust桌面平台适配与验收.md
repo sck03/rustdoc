@@ -8,7 +8,7 @@
 
 ## 平台边界
 
-2026-11-07 本批 Windows x64 GNU / locked Release 的 Document、Sales、Full 包为 `artifacts/refactor-desktop/ExportDocManager.Tauri.{Document,Sales,Full}`，运行标识均为 `0.1.2+git.abd46f540947`。三版实际 WebView2、版别权限和退出检查通过；Full 完整业务/OCR/设计器及 16 页 PDF 渲染检查通过，正常/重复/宿主异常退出与独立窗口回归中每实例六个 WebView2 进程归零。普通字段真实拼音提交与汇率、表格数量逐键小数输入通过；表格中文/全角数字另经 WebView 组合输入验证。Windows 原生捕获仍报 `0x80004002`，表格系统候选提交时的自动化失焦待复验，不将 CDP 组合或中文粘贴等同完整系统 IME 验收。具体证据见[本次台账](./2026-11-06重构实施与验收记录.md)。
+2026-11-07 本批 Windows x64 GNU / locked Release 的 Document、Sales、Full 包为 `artifacts/refactor-desktop/ExportDocManager.Tauri.{Document,Sales,Full}`，运行标识均为 `0.1.2+git.abd46f540947`。三版实际 WebView2、版别权限和退出检查通过；Full 完整业务/OCR/设计器及 16 页 PDF 渲染检查通过，正常/重复/宿主异常退出与独立窗口回归中每实例六个 WebView2 进程归零。普通字段真实拼音提交与汇率、表格数量逐键小数输入通过；表格中文/全角数字另经 WebView 组合输入验证。Windows 原生捕获仍报 `0x80004002`，表格系统候选提交时的自动化失焦待复验，不将 CDP 组合或中文粘贴等同完整系统 IME 验收。具体证据见[本次台账](./archive/2026-11/2026-11-06重构实施与验收记录.md)。
 
 | 平台 | Rust target | 显示组件 | 验收边界 |
 | --- | --- | --- | --- |
@@ -68,7 +68,7 @@ OCR 同样按目标 OS/架构组装 Rust worker、ONNX 和模型。2026-10-15 �
 
 2026-10-31 schema 11 完整重构的三个 Windows x64 GNU / Debug 包位于 `artifacts/oa-completion-desktop/ExportDocManager.Tauri.Document`、`ExportDocManager.Tauri.Sales` 和 `ExportDocManager.Tauri.Full`。三版分别通过真实 Tauri/React 窗口回归；Document/Full 包含 OCR，Sales 按产品清单裁剪。Full 覆盖中文字段输入、表格编辑、空白 V3 设计、人员账号关联及删除保护、权限变更重新登录、附件、维护和实际输出。16 份/16 页 PDF 全部渲染查看；窄自定义纸张只验证尺寸保存及既有裁切，不计自动重排。运行依赖图 434 项通过，包含 Tauri/SQLite，不包含 PostgreSQL 服务端适配器或退役 GUI。正常/重复/异常/独立窗口退出全部通过，每实例 6 个 WebView2 进程归零、HTTP 关闭。
 
-上述包由提交前的工作树构建，运行标识中的 `e9c1aa8a` 是父提交，不能当作本批源码提交号。原始日志及精选证据在 `.codex-runtime/oa-completion-20261031/`。文本经真实 WebView2 注入并验证，不等于 Windows 系统 IME 候选窗实测；computer-use 的 `@oai/sky` 缺失，此项明确保留为待验。MSVC 发布、其他 OS/架构 GUI、实体打印和 Docker daemon 生命周期未新增验收。当前精确通过范围见[本轮台账](./OA重构验收与功能保留台账.md)。
+上述包由提交前的工作树构建，运行标识中的 `e9c1aa8a` 是父提交，不能当作本批源码提交号。原始日志及精选证据在 `.codex-runtime/oa-completion-20261031/`。文本经真实 WebView2 注入并验证，不等于 Windows 系统 IME 候选窗实测；computer-use 的 `@oai/sky` 缺失，此项明确保留为待验。MSVC 发布、其他 OS/架构 GUI、实体打印和 Docker daemon 生命周期未新增验收。当前精确通过范围见[本轮台账](./archive/2026-11/OA重构验收与功能保留台账.md)。
 
 2026-11-01 审查整改后的三版 Windows x64 GNU / Release / SQLite 包为 `artifacts/oa-review-desktop/ExportDocManager.Tauri.{Document,Sales,Full}`，标识 `0.1.2+git.89f66742bc4b` 为构建时父提交，包含本批工作树实现。三版 WebView2、Full 包内七组 OCR、PDFium 与正常/重复/异常/独立窗口退出通过；各实例六个 WebView2 进程归零、HTTP 关闭。依赖图 434 项，Tauri 2.12.5/SQLite。16 页桌面 PDF 已渲染检查，窄纸张沿用既有裁切边界；主程序各 33.1 MiB，三包共约 386 MiB。过期 Debug 程序/资源按摘要清理，旧 App_Data 保留，详细清单及回执见本日[进度](./程序改进重构进度文档.md)。
 
@@ -78,7 +78,7 @@ OCR 同样按目标 OS/架构组装 Rust worker、ONNX 和模型。2026-10-15 �
 
 三版当前程序位于 `artifacts/native-desktop/ExportDocManager.Tauri.{Document,Sales,Full}`，均为 Windows x64 GNU / locked Release / SQLite。Document、Sales、Full 的最终真实 WebView2 回执分别为 `desktop-1793871230932`、`desktop-1793871240228`、`desktop-1793871769529`。Document/Sales 运行标识为 `0.1.2+git.543c0b3255f9`，Full 为 `0.1.2+git.c873f16e78a8`，以实际包的标识区分构建批次。Document/Full 含 OCR，Sales 按版别清单裁剪；Full 仍仅为单机测试包。
 
-Full 的流程分区、保存/载入操作区与模板对齐另经实际桌面布局回归，退出后 HTTP 关闭。16 份 PDF/16 页全部渲染查看，正常票面及内容已约束在纸内的小纸张样例无裁切。账号撤权重新登录、制单回读和模板回读的测试刷新改用 CDP `Page.reload`，避免执行上下文销毁导致的脚本超时；业务断言和时限保持。最终摘要及临时输出清理回执见[二期记录](./二期重构验收与清理记录.md)。本批不增加 MSVC 发布、其它 OS/架构 GUI、系统 IME、多显示器 DPI、实体打印或正式安装器升级的通过声明。
+Full 的流程分区、保存/载入操作区与模板对齐另经实际桌面布局回归，退出后 HTTP 关闭。16 份 PDF/16 页全部渲染查看，正常票面及内容已约束在纸内的小纸张样例无裁切。账号撤权重新登录、制单回读和模板回读的测试刷新改用 CDP `Page.reload`，避免执行上下文销毁导致的脚本超时；业务断言和时限保持。最终摘要及临时输出清理回执见[二期记录](./archive/2026-11/二期重构验收与清理记录.md)。本批不增加 MSVC 发布、其它 OS/架构 GUI、系统 IME、多显示器 DPI、实体打印或正式安装器升级的通过声明。
 
 ## 2026-09-28 Windows 退出清理
 

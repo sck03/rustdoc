@@ -1,30 +1,34 @@
 # 脚本使用说明
 
+OA 管理员和用户手册：`node scripts/generate-oa-manuals.mjs` 从 `docs/manuals` 的 Markdown 生成两份同名 PDF，使用现有 Playwright 和受管 Noto 字体；中间文件写入 `artifacts/oa-manuals`。首次准备前端依赖和报表字体，截图使用当前 `test_oa_custom_ui.mjs` 的匿名界面，分别保存为 `docs/manuals/images/form-designer.png`、`request-details.png`；更新后逐页检查中文、分页和完整性。阅读入口见[OA 手册](../docs/人员组织权限与OA操作手册.md)。
+
+普通依赖版本检查按月；完整依赖治理在每周一及相关改动/手动触发时执行，其余日期仅漏洞审计。GLib 的动态安全更新失败不受普通版本检查计划控制，详见[安全检查](../docs/依赖更新与安全检查.md)。
+
 2026-11-12：依赖治理增加 SPDX 语法解析与 npm 审计状态回归；Dependabot 提出更新 PR，每日安全审计固定并缓存 cargo-audit 0.23.0。许可、兼容性和 notices 处理见[更新规则](../docs/依赖更新与安全检查.md)。Excel 排版维护模块为 `scripts/lib/excel-template-layout.mjs`：在维护环境导入电子表格工具，调用 `buildExcelTemplates(toolkit, repositoryRoot, evidenceDirectory)`，不增加客户运行依赖；保持输入坐标并按[填写说明](../docs/单一窗口Excel导入说明.md)验收。
 
-2026-11-11：`test:invoice-editing` 增加控制命令串行、确认后卸载及非阻塞刷新回归；装柜／灾备测试核对无历史 mutation 保留。HTTP 正文测试覆盖慢接收、输入预算、取消及图片通道；Storage 清理只对 Windows 临时共享／锁冲突有界重试。GitHub 故障、安全升级与本批验收见[记录](../docs/2026-11-11操作生命周期与资源预算修复记录.md)。
+2026-11-11：`test:invoice-editing` 增加控制命令串行、确认后卸载及非阻塞刷新回归；装柜／灾备测试核对无历史 mutation 保留。HTTP 正文测试覆盖慢接收、输入预算、取消及图片通道；Storage 清理只对 Windows 临时共享／锁冲突有界重试。GitHub 故障、安全升级与本批验收见[记录](../docs/archive/2026-11/2026-11-11操作生命周期与资源预算修复记录.md)。
 
-2026-11-10 会话与资源：`npm --prefix apps/export-doc-web run test:settings-models` 包含设置、备份和任务中心的真实 React／QueryClient 生命周期检查；`test:invoice-editing` 增加 5000 行连续保存不保留 mutation 输入／响应的回归。项目待办限制进入两库共用办理合同；HTTP 上传空间和暂存清理随工作区测试执行。实现、验收与清理边界见[本批记录](../docs/2026-11-10会话权限与上传资源优化记录.md)。
+2026-11-10 会话与资源：`npm --prefix apps/export-doc-web run test:settings-models` 包含设置、备份和任务中心的真实 React／QueryClient 生命周期检查；`test:invoice-editing` 增加 5000 行连续保存不保留 mutation 输入／响应的回归。项目待办限制进入两库共用办理合同；HTTP 上传空间和暂存清理随工作区测试执行。实现、验收与清理边界见[本批记录](../docs/archive/2026-11/2026-11-10会话权限与上传资源优化记录.md)。
 
-2026-11-10 稳定性与 Excel：单一窗口“申报资料 → 下载 Excel 模板”提供正式导入样式；默认智能识别，发票和申报资料均可在每次导入时选择手动方案。方案在“系统设置 → Excel 导入 → 高级导入方案”管理。完整字段与限制见[Excel 导入说明](../docs/单一窗口Excel导入说明.md)，本批门禁和清理记录见[稳定性与资源精简记录](../docs/2026-11-10稳定性与资源精简记录.md)。`test_single_window_workspace_ui.mjs` 验证分区定位、版本冲突及作用域取消；`test_native_desktop_editions.mjs` 的 Full 场景验证真实桌面模板保存、Excel 方案上传和中文输入。
+2026-11-10 稳定性与 Excel：单一窗口“申报资料 → 下载 Excel 模板”提供正式导入样式；默认智能识别，发票和申报资料均可在每次导入时选择手动方案。方案在“系统设置 → Excel 导入 → 高级导入方案”管理。完整字段与限制见[Excel 导入说明](../docs/单一窗口Excel导入说明.md)，本批门禁和清理记录见[稳定性与资源精简记录](../docs/archive/2026-11/2026-11-10稳定性与资源精简记录.md)。`test_single_window_workspace_ui.mjs` 验证分区定位、版本冲突及作用域取消；`test_native_desktop_editions.mjs` 的 Full 场景验证真实桌面模板保存、Excel 方案上传和中文输入。
 
-2026-11-10 共享控件：`npm --prefix apps/export-doc-web run test:shared-control-layout-ui` 在真实 HTTP/React 中核对长文本、待办分页与文件按钮；需先构建 `office_review` 与前端。Full 桌面验收复用同一检查并增加操作档案对齐。`test_hs_transfer_ui.mjs` 纳入 `test:concurrency-feedback`；单一窗口工作区回归覆盖版本绑定、保存/导出互斥、卸载取消及迟到下载。见[本批记录](../docs/2026-11-10导出一致性与共享控件修复记录.md)。
+2026-11-10 共享控件：`npm --prefix apps/export-doc-web run test:shared-control-layout-ui` 在真实 HTTP/React 中核对长文本、待办分页与文件按钮；需先构建 `office_review` 与前端。Full 桌面验收复用同一检查并增加操作档案对齐。`test_hs_transfer_ui.mjs` 纳入 `test:concurrency-feedback`；单一窗口工作区回归覆盖版本绑定、保存/导出互斥、卸载取消及迟到下载。见[本批记录](../docs/archive/2026-11/2026-11-10导出一致性与共享控件修复记录.md)。
 
-2026-11-10 自定义 OA：`npm --prefix apps/export-doc-web run test:oa-ui` 包含真实 HTTP/React 新建事项、表单设计、仿真发布、员工申请、审批、办理和 PDF 下载。先运行 `cargo build --locked -p export-doc-server --example office_review` 与前端构建；两库业务合同分别随工作区测试及 `test-native-postgres.ps1 -Scope Workflows` 验证。当前使用 schema 17，见[本批记录](../docs/2026-11-10自定义OA重构与验收.md)。
+2026-11-10 自定义 OA：`npm --prefix apps/export-doc-web run test:oa-ui` 包含真实 HTTP/React 新建事项、表单设计、仿真发布、员工申请、审批、办理和 PDF 下载。先运行 `cargo build --locked -p export-doc-server --example office_review` 与前端构建；两库业务合同分别随工作区测试及 `test-native-postgres.ps1 -Scope Workflows` 验证。当前使用 schema 17，见[本批记录](../docs/archive/2026-11/2026-11-10自定义OA重构与验收.md)。
 
 > 2026-09-20：当前主线为 Tauri 2 + React + Rust。原 C# 行为和脚本从只读固定提交 `ba9dbdca72590b06c5f32740e4cd58d3027578da` 及 Git 历史对照；这里的正式构建不发布 ASP.NET sidecar，不要求 .NET SDK／Runtime，不使用 NPOI。
 
 ## 本地入口
 
-2026-11-10 模板回归：`test:report-template-draft-ui` 同时执行 `test_report_template_commands_ui.mjs`，使用真实 React/QueryClient 检查作用域取消、迟到结果、重复提交、非阻塞刷新和大文件命令缓存释放。`test:email-template-workspace-ui` 检查目录/历史分页及详情取消，`test:review-workflows-ui` 通过真实 HTTP 验证版本读取与恢复。`test-native-postgres.ps1 -Scope All` 的团队合同启用 `mail`，与 SQLite 共用邮件重名、目录分页及历史摘要/详情场景；Storage 双库合同覆盖授权筛选和 HS 游标/时间边界。知识包损坏回滚另由 `tools_service` 验证，详见[本批记录](../docs/2026-11-10模板作用域与资源优化记录.md)。
+2026-11-10 模板回归：`test:report-template-draft-ui` 同时执行 `test_report_template_commands_ui.mjs`，使用真实 React/QueryClient 检查作用域取消、迟到结果、重复提交、非阻塞刷新和大文件命令缓存释放。`test:email-template-workspace-ui` 检查目录/历史分页及详情取消，`test:review-workflows-ui` 通过真实 HTTP 验证版本读取与恢复。`test-native-postgres.ps1 -Scope All` 的团队合同启用 `mail`，与 SQLite 共用邮件重名、目录分页及历史摘要/详情场景；Storage 双库合同覆盖授权筛选和 HS 游标/时间边界。知识包损坏回滚另由 `tools_service` 验证，详见[本批记录](../docs/archive/2026-11/2026-11-10模板作用域与资源优化记录.md)。
 
-2026-11-09 知识库与资源回归：`test:concurrency-feedback` 纳入 `test_hs_example_workspaces_ui.mjs`，覆盖中文续编、卸载取消、选择时版本删除、删除期间字段锁和候选按需共享查询。SQLite 工具合同与 PostgreSQL `-Scope All` 复用实例版本/批删回滚/历史款式聚合场景。待办第二页起必须传上一页 `nextCursor`，筛选或页容量变化重新取首页。实现、验证及定向清理见[本批记录](../docs/2026-11-09知识库并发与有界资源修复记录.md)。
+2026-11-09 知识库与资源回归：`test:concurrency-feedback` 纳入 `test_hs_example_workspaces_ui.mjs`，覆盖中文续编、卸载取消、选择时版本删除、删除期间字段锁和候选按需共享查询。SQLite 工具合同与 PostgreSQL `-Scope All` 复用实例版本/批删回滚/历史款式聚合场景。待办第二页起必须传上一页 `nextCursor`，筛选或页容量变化重新取首页。实现、验证及定向清理见[本批记录](../docs/archive/2026-11/2026-11-09知识库并发与有界资源修复记录.md)。
 
-2026-11-09 事务与资源收尾：`test:abortable-operations-ui` 增加发票列表的关闭、切换、卸载、迟到成功/失败与 StrictMode 回归；Storage 同一合同覆盖 SQLite/PostgreSQL 申报版本聚合。GitHub actionlint 固定版本归档缓存仍逐次校验摘要，网络 504 使用有界重试。该批数据库为 schema 16，详见[收尾记录](../docs/2026-11-09事务边界与资源收尾记录.md)。
+2026-11-09 事务与资源收尾：`test:abortable-operations-ui` 增加发票列表的关闭、切换、卸载、迟到成功/失败与 StrictMode 回归；Storage 同一合同覆盖 SQLite/PostgreSQL 申报版本聚合。GitHub actionlint 固定版本归档缓存仍逐次校验摘要，网络 504 使用有界重试。该批数据库为 schema 16，详见[收尾记录](../docs/archive/2026-11/2026-11-09事务边界与资源收尾记录.md)。
 
 2026-11-08 并发/性能回归：`test_party_save_workspace_ui.mjs` 使用真实 QueryClient 验证刷新错误传播，并覆盖主数据分类切换、版本删除与迟到响应；`test_invoice_editing_contracts.mjs` 核对不可变行投影与完整规范化等价，输出 5000 行文字编辑耗时。`test_native_desktop_editions.mjs <包父目录> Full --without-ocr --entry-rows-only` 还通过生成客户端与实际界面验证六类主数据版本删除，然后执行中文明细、撤销、保存回读及 PDF 场景；需先重新构建包含最新前端的对应测试包。
 
-2026-11-08 编辑恢复回归：`test:invoice-editing` 增加 `test_editor_recovery_ui.mjs`，验证真实发票工作区的显式重载、失败保留、切换记录、5000 行表头复用与备份 404 停止轮询。`test:abortable-operations-ui` 验证当前预览取消后可重试，`test:report-designer-v3` 验证缺失必要打印字段明确拒绝。旧数据库快照 WebDAV 入口和五条 API 已移除，使用完整加密灾备的“异机副本”。本批验证与清理见[记录](../docs/2026-11-08编辑恢复与资源边界修复记录.md)。
+2026-11-08 编辑恢复回归：`test:invoice-editing` 增加 `test_editor_recovery_ui.mjs`，验证真实发票工作区的显式重载、失败保留、切换记录、5000 行表头复用与备份 404 停止轮询。`test:abortable-operations-ui` 验证当前预览取消后可重试，`test:report-designer-v3` 验证缺失必要打印字段明确拒绝。旧数据库快照 WebDAV 入口和五条 API 已移除，使用完整加密灾备的“异机副本”。本批验证与清理见[记录](../docs/archive/2026-11/2026-11-08编辑恢复与资源边界修复记录.md)。
 
 2026-11-08 网络与会话回归：`test-native-postgres.ps1 -Scope All -PostgresBin <PostgreSQL 18 bin>` 增加握手停滞、查询取消、连接复用与网络黑洞测试，使用隔离集群和独立账号。每条 Cargo 命令的默认预算为 3600 秒（含编译），避免完整团队流程接近 30 分钟时被旧预算截断，仍可通过 `-TimeoutSeconds` 指定。`test_api_client_request_contracts.mjs` 检查超时分类及长操作预算；`test_authentication_failure_events.mjs` 和真实 `test_unit_identity_ui.mjs` 覆盖注销失败保留会话、成功撤销及身份隔离。Vite 开发代理同时覆盖 `/api`、`/downloads`、健康探针和 `/openapi`。
 
@@ -216,7 +220,7 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 
 Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公钥和私钥，私钥不写仓库。便携包不执行安装器更新。不执行 Windows Authenticode、Developer ID 或 Apple 公证。未实跑的 CI／系统／架构不写成已通过。
 
-2026-11-11：quick 与 full 的 Rust core 不重复执行；OA HTTP／React 集成归 full Windows x64。编译缓存带源码 SHA 并按相同锁图恢复，避免一直复用不可更新的旧缓存；打包复用该作业已构建的前端。旧 smoke-web-runtime-diagnostics 及其专属场景链、旧 PDF 指标比对链和仓库初始化脚本已退役。仍使用的 Chromium／桌面公共工具、当前 UI 回归、正式 PDF 测试与 updater 发布入口保留。证据见[本批记录](../docs/2026-11-11模板预览与CI优化记录.md)。
+2026-11-11：quick 与 full 的 Rust core 不重复执行；OA HTTP／React 集成归 full Windows x64。编译缓存带源码 SHA 并按相同锁图恢复，避免一直复用不可更新的旧缓存；打包复用该作业已构建的前端。旧 smoke-web-runtime-diagnostics 及其专属场景链、旧 PDF 指标比对链和仓库初始化脚本已退役。仍使用的 Chromium／桌面公共工具、当前 UI 回归、正式 PDF 测试与 updater 发布入口保留。证据见[本批记录](../docs/archive/2026-11/2026-11-11模板预览与CI优化记录.md)。
 
 桌面和 Web 共用 `native-package-reusable.yml`，该内部工作流不提供手工运行入口。`version` 接受 `0.1.2`、`v0.1.2`、`0.1.2-beta.1`，同时进入 Rust/npm/Tauri、包内标记和归档名称。只改 CI checkout，不自动提交版本文件。已有不同源码的 GitHub Release 标签或不同内容的同名附件拒绝覆盖。完整参数及下载步骤见[工作流手册](../docs/GitHub%20Actions工作流用途与运行手册.md)。
 
@@ -326,6 +330,6 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntime
 
 ## 2026-11-09 单一窗口验证补充
 
-独立申报补充：`test_single_window_workspace_ui.mjs` 同时验证手工建档、失败 Excel 不静默建空档、切换客户端后取消旧预览。真实桌面脚本追加从“申报资料”手工创建、独立收货人保存和客户 XLS 预览/建档；SQLite/PostgreSQL 共用 `single_window_sources_contract`。匿名 XML 生成与 XSD 校验命令、ACD 参考文件重复 Curr 差异及真实发送边界见[联调记录](../docs/2026-11-09独立申报与联调记录.md)。
+独立申报补充：`test_single_window_workspace_ui.mjs` 同时验证手工建档、失败 Excel 不静默建空档、切换客户端后取消旧预览。真实桌面脚本追加从“申报资料”手工创建、独立收货人保存和客户 XLS 预览/建档；SQLite/PostgreSQL 共用 `single_window_sources_contract`。匿名 XML 生成与 XSD 校验命令、ACD 参考文件重复 Curr 差异及真实发送边界见[联调记录](../docs/archive/2026-11/2026-11-09独立申报与联调记录.md)。
 
 `npm --prefix apps/export-doc-web run test:concurrency-feedback` 包含 `test_single_window_workspace_ui.mjs`，覆盖两类单据保存续编、重复提交、切换/卸载/撤权/客户端变化、保存成功后锁定字段读取失败，以及参考目录 Excel 迟到响应与缓存释放。`test_native_desktop_editions.mjs <packagesRoot> Full --without-ocr --entry-rows-only` 在实际 Tauri/WebView2 中追加版本冲突、保存响应暂停期间续编、中文输入和保存回读，沿用原有表格/设计器/PDF 验证；必须先用当前前端重建桌面宿主。

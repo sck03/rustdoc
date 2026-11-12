@@ -1,3 +1,4 @@
+import { officePolling } from "../../api/queryPollingPolicy.ts";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
@@ -28,21 +29,21 @@ export function useAnnouncements(client: ExportDocManagerApiClient, user: ApiUse
   const query = useQuery({ queryKey: [...key, "announcements", page, unread, manage], enabled: allowed,
     queryFn: ({ signal }) => manage ? client.manageAnnouncements({ pageNumber: page, pageSize: 20 }, { signal })
         : client.listAnnouncements({ pageNumber: page, pageSize: 20, unreadOnly: unread }, { signal }),
-    refetchInterval: 30000, refetchIntervalInBackground: false });
+    ...officePolling });
   const detail = useQuery({ queryKey: [...key, "announcement", selected], enabled: allowed && selected > 0,
-    queryFn: ({ signal }) => client.getAnnouncement({ id: selected }, { signal }), refetchInterval: 30000, refetchIntervalInBackground: false });
+    queryFn: ({ signal }) => client.getAnnouncement({ id: selected }, { signal }), ...officePolling });
   useServerPageNumber(query, page, filters.setPage);
   return { ...filters, query, detail };
 }
 export function useNotifications(client: ExportDocManagerApiClient, user: ApiUserDto) {
   const filters = useFilters();
   const query = useQuery({ queryKey: ["office", "communication", user.id, user.companyScope, user.departmentId, "inbox", filters.page, filters.unread], enabled: communicationAccess(user, "notifications"),
-    queryFn: ({ signal }) => client.listNotifications({ pageNumber: filters.page, pageSize: 20, unreadOnly: filters.unread }, { signal }), refetchInterval: 30000, refetchIntervalInBackground: false });
+    queryFn: ({ signal }) => client.listNotifications({ pageNumber: filters.page, pageSize: 20, unreadOnly: filters.unread }, { signal }), ...officePolling });
   useServerPageNumber(query, filters.page, filters.setPage);
   return { ...filters, query };
 }
 export function useNotificationCount(client: ExportDocManagerApiClient, user: ApiUserDto) {
   return useQuery({ queryKey: ["office", "communication", user.id, user.companyScope, user.departmentId, "unread-count"],
     enabled: communicationAccess(user, "notifications"), queryFn: ({ signal }) => client.getNotificationUnreadCount({ signal }),
-    refetchInterval: 30000, refetchIntervalInBackground: false });
+    ...officePolling });
 }

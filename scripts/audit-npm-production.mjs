@@ -12,6 +12,7 @@ const npmCommand = npmExecPath ? process.execPath : "npm";
 const npmArguments = [
   ...(npmExecPath ? [npmExecPath] : []),
   "audit",
+  "--package-lock-only",
   "--omit=dev",
   "--audit-level=high",
   "--json",

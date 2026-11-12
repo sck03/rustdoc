@@ -17,40 +17,238 @@ import { useOaApplications } from "./useOaApplications.ts";
 import "../../styles/routes/office.css";
 import "../../styles/routes/oa.css";
 
-export function OaRequestsPage({ client, user, kind }: { client: ExportDocManagerApiClient; user: ApiUserDto; kind: OaKind }) {
+export function OaRequestsPage({
+  client,
+  user,
+  kind,
+}: {
+  client: ExportDocManagerApiClient;
+  user: ApiUserDto;
+  kind: OaKind;
+}) {
   const model = useOaRequests(client, user, kind);
   const navigate = useNavigate();
   const confirmDiscard = useConfirmUnsavedChanges();
   const [params, setParams] = useSearchParams();
-  const applications = useOaApplications(client,user,kind === "general" && params.has("definition"));
-  const applicationName = applications.data?.items.find(item=>item.key===params.get("definition"))?.name;
-  const [editing, setEditing] = useState<OaRequest | "new" | null>(() => (params.get("new") === "true" || kind === "personnel" && params.has("change")) && oaAccess(user, kind, "create") ? "new" : null);
-  function closeEditor() { setEditing(null); setParams(current => { const next = new URLSearchParams(current); next.delete("new"); next.delete("change"); next.delete("employeeId"); return next; }); }
+  const applications = useOaApplications(client, user, kind === "general" && params.has("definition"));
+  const applicationName = applications.data?.items.find((item) => item.key === params.get("definition"))?.name;
+  const [editing, setEditing] = useState<OaRequest | "new" | null>(() =>
+    (params.get("new") === "true" || (kind === "personnel" && params.has("change"))) && oaAccess(user, kind, "create")
+      ? "new"
+      : null,
+  );
+  function closeEditor() {
+    setEditing(null);
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      next.delete("new");
+      next.delete("change");
+      next.delete("employeeId");
+      return next;
+    });
+  }
   if (!oaAccess(user, kind, "view")) return <PageState tone="permission" title="没有此申请模块的查看权限" />;
-  const module = applicationName ? {...oaModules[kind],name:applicationName} : oaModules[kind];
-  return <EditorWorkspace className="office-workspace oa-workspace" aria-label={module.name} title={model.selected ? "申请详情" : "申请列表"}
-    actions={<Link to="/office/approvals">申请与审批中心</Link>}>
-    <SegmentedNav label="申请类型" value={kind} items={oaKinds.filter(kind => oaAccess(user,kind,"view")).map(key => ({key,label:oaModules[key].name}))}
-      onChange={async kind => { if (await confirmDiscard("切换申请类型")) navigate(`/office/requests/${kind}?view=requests&mineOnly=${model.mineOnly}`); }} />
-    {model.selected ? <>
-      <button type="button" className="command-button secondary" onClick={() => model.select(0)}>返回申请列表</button>
-      {model.detail.isPending ? <PageState tone="loading" title="正在读取申请" /> : model.detail.isError ? <PageState tone="error" title="申请读取失败" description={readApiError(model.detail.error)} action={<button className="command-button" type="button" onClick={() => void model.detail.refetch()}>重新读取</button>} />
-        : model.detail.data && <OaRequestDetails key={model.detail.data.id} client={client} user={user} row={model.detail.data} onEdit={() => setEditing(model.detail.data!)} />}
-    </> : <>
-      {(model.canReceive || model.canApprove || model.canHandle) && <nav className="office-tabs" aria-label="申请工作区"><button type="button" aria-pressed={!model.financeOnly && !model.approvalsOnly && !model.handlingOnly} onClick={() => model.changeView("requests")}>申请记录</button>{model.canApprove && <button type="button" aria-pressed={model.approvalsOnly} onClick={() => model.changeView("approvals")}>待我审批</button>}{model.canReceive && <button type="button" aria-pressed={model.financeOnly} onClick={() => model.changeView("finance")}>财务接收</button>}{model.canHandle && <button type="button" aria-pressed={model.handlingOnly} onClick={() => model.changeView("handling")}>{oaHandlingLabels[kind]}</button>}</nav>}
-      {model.financeOnly && <p className="office-muted">核对已批准报销单的明细、凭证和审批记录，确认后登记接收；付款由独立财务软件办理。</p>}
-      {model.financeOnly && <OaApprovalVerification client={client} user={user} onOpen={model.select} />}
-      {model.handlingOnly && <p className="office-muted">审批全部通过后，按职责完成交付、验收或归档；用印、证明及其他已分工事项由指定人员办理。</p>}
-      <div className="office-toolbar oa-toolbar">
-        {!model.financeOnly && !model.approvalsOnly && !model.handlingOnly && <label className="checkbox-field"><input type="checkbox" checked={model.mineOnly} onChange={(event) => model.changeMine(event.target.checked)} />仅本人提交</label>}
-        <label className="office-field"><span>状态</span><select value={model.status} onChange={(event) => model.changeStatus(event.target.value)}>{!model.financeOnly && !model.approvalsOnly && !model.handlingOnly && <option value="">全部状态</option>}{Object.entries(oaStatus).filter(([key]) => model.approvalsOnly ? key === "Pending" : model.handlingOnly ? key === "Approved" : model.financeOnly ? ["Approved", "HandedOff"].includes(key) : kind === "expense" ? key !== "Completed" : key !== "HandedOff").map(([key, label]) => <option key={key} value={key}>{model.financeOnly && key === "Approved" ? "待财务接收" : label}</option>)}</select></label>
-        <button type="button" className="command-button secondary" disabled={model.query.isFetching} onClick={() => void model.query.refetch()}>刷新</button>
-        {!model.financeOnly && oaAccess(user, kind, "create") && <button type="button" className="command-button" onClick={() => setEditing("new")}>新建{module.name}</button>}
-      </div>
-      <OfficeQueryState query={model.query} emptyTitle="当前筛选下没有申请" />
-      <div className="office-resource-grid">{model.query.data?.items.map((row) => <article key={row.id} className="office-resource-card"><div className="office-card-heading"><h2><button className="oa-title-button" type="button" onClick={() => model.select(row.id)}>{row.title}</button></h2><span className="office-badge" data-state={row.status}>{oaStatus[row.status]}</span></div><p>{requestPersonLabel(row.employeeName, row)} · {row.departmentId}</p><p className="office-muted">#{row.id} {row.totalAmount && ` · ${row.currency} ${row.totalAmount}`}{row.durationDays && ` · ${row.durationDays} 天`}{row.durationHours && ` · ${row.durationHours} 小时`}</p></article>)}</div>
-      {(model.query.data?.totalCount ?? 0) > 0 && <div className="office-card-actions"><button className="command-button secondary" type="button" disabled={model.page <= 1 || model.query.isFetching} onClick={() => model.setPage(model.page - 1)}>上一页</button><span>第 {model.page} 页 · 共 {model.query.data?.totalCount ?? 0} 条</span><button className="command-button secondary" type="button" disabled={model.query.isFetching || model.page * 20 >= (model.query.data?.totalCount ?? 0)} onClick={() => model.setPage(model.page + 1)}>下一页</button></div>}
-    </>}
-    {editing && <OaRequestDialog client={client} user={user} kind={kind} record={editing === "new" ? undefined : editing} onClose={closeEditor} onSaved={(row) => { setEditing(null); model.select(row.id); }} />}
-  </EditorWorkspace>;
+  const module = applicationName ? { ...oaModules[kind], name: applicationName } : oaModules[kind];
+  return (
+    <EditorWorkspace
+      className="office-workspace oa-workspace"
+      aria-label={module.name}
+      title={model.selected ? "申请详情" : "申请列表"}
+      actions={<Link to="/office/approvals">申请与审批中心</Link>}
+    >
+      <SegmentedNav
+        label="申请类型"
+        value={kind}
+        items={oaKinds
+          .filter((kind) => oaAccess(user, kind, "view"))
+          .map((key) => ({ key, label: oaModules[key].name }))}
+        onChange={async (kind) => {
+          if (await confirmDiscard("切换申请类型"))
+            navigate(`/office/requests/${kind}?view=requests&mineOnly=${model.mineOnly}`);
+        }}
+      />
+      {model.selected ? (
+        <>
+          <button type="button" className="command-button secondary" onClick={() => model.select(0)}>
+            返回申请列表
+          </button>
+          {model.detail.isPending ? (
+            <PageState tone="loading" title="正在读取申请" />
+          ) : model.detail.isError ? (
+            <PageState
+              tone="error"
+              title="申请读取失败"
+              description={readApiError(model.detail.error)}
+              action={
+                <button className="command-button" type="button" onClick={() => void model.detail.refetch()}>
+                  重新读取
+                </button>
+              }
+            />
+          ) : (
+            model.detail.data && (
+              <OaRequestDetails
+                key={model.detail.data.id}
+                client={client}
+                user={user}
+                row={model.detail.data}
+                onEdit={() => setEditing(model.detail.data!)}
+              />
+            )
+          )}
+        </>
+      ) : (
+        <>
+          {(model.canReceive || model.canApprove || model.canHandle) && (
+            <nav className="office-tabs" aria-label="申请工作区">
+              <button
+                type="button"
+                aria-pressed={!model.financeOnly && !model.approvalsOnly && !model.handlingOnly}
+                onClick={() => model.changeView("requests")}
+              >
+                申请记录
+              </button>
+              {model.canApprove && (
+                <button type="button" aria-pressed={model.approvalsOnly} onClick={() => model.changeView("approvals")}>
+                  待我审批
+                </button>
+              )}
+              {model.canReceive && (
+                <button type="button" aria-pressed={model.financeOnly} onClick={() => model.changeView("finance")}>
+                  财务接收
+                </button>
+              )}
+              {model.canHandle && (
+                <button type="button" aria-pressed={model.handlingOnly} onClick={() => model.changeView("handling")}>
+                  {oaHandlingLabels[kind]}
+                </button>
+              )}
+            </nav>
+          )}
+          {model.financeOnly && (
+            <p className="office-muted">
+              核对已批准报销单的明细、凭证和审批记录，确认后登记接收；付款由独立财务软件办理。
+            </p>
+          )}
+          {model.financeOnly && <OaApprovalVerification client={client} user={user} onOpen={model.select} />}
+          {model.handlingOnly && (
+            <p className="office-muted">
+              审批全部通过后，按职责完成交付、验收或归档；用印、证明及其他已分工事项由指定人员办理。
+            </p>
+          )}
+          <div className="office-toolbar oa-toolbar">
+            {!model.financeOnly && !model.approvalsOnly && !model.handlingOnly && (
+              <label className="checkbox-field">
+                <input
+                  type="checkbox"
+                  checked={model.mineOnly}
+                  onChange={(event) => model.changeMine(event.target.checked)}
+                />
+                仅本人提交
+              </label>
+            )}
+            <label className="office-field">
+              <span>状态</span>
+              <select value={model.status} onChange={(event) => model.changeStatus(event.target.value)}>
+                {!model.financeOnly && !model.approvalsOnly && !model.handlingOnly && (
+                  <option value="">全部状态</option>
+                )}
+                {Object.entries(oaStatus)
+                  .filter(([key]) =>
+                    model.approvalsOnly
+                      ? key === "Pending"
+                      : model.handlingOnly
+                        ? key === "Approved"
+                        : model.financeOnly
+                          ? ["Approved", "HandedOff"].includes(key)
+                          : kind === "expense"
+                            ? key !== "Completed"
+                            : key !== "HandedOff",
+                  )
+                  .map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {model.financeOnly && key === "Approved" ? "待财务接收" : label}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="command-button secondary"
+              disabled={model.query.isFetching}
+              onClick={() => void model.query.refetch()}
+            >
+              刷新
+            </button>
+            {!model.financeOnly && oaAccess(user, kind, "create") && (
+              <button type="button" className="command-button" onClick={() => setEditing("new")}>
+                新建{module.name}
+              </button>
+            )}
+          </div>
+          <OfficeQueryState query={model.query} emptyTitle="当前筛选下没有申请" />
+          <div className="office-resource-grid">
+            {model.query.data?.items.map((row) => (
+              <article key={row.id} className="office-resource-card">
+                <div className="office-card-heading">
+                  <h2>
+                    <button className="oa-title-button" type="button" onClick={() => model.select(row.id)}>
+                      {row.title}
+                    </button>
+                  </h2>
+                  <span className="office-badge" data-state={row.status}>
+                    {oaStatus[row.status]}
+                  </span>
+                </div>
+                <p>
+                  {requestPersonLabel(row.employeeName, row)} · {row.departmentId}
+                </p>
+                <p className="office-muted">
+                  #{row.id} {row.totalAmount && ` · ${row.currency} ${row.totalAmount}`}
+                  {row.durationDays && ` · ${row.durationDays} 天`}
+                  {row.durationHours && ` · ${row.durationHours} 小时`}
+                </p>
+              </article>
+            ))}
+          </div>
+          {(model.query.data?.totalCount ?? 0) > 0 && (
+            <div className="office-card-actions">
+              <button
+                className="command-button secondary"
+                type="button"
+                disabled={model.page <= 1 || model.query.isFetching}
+                onClick={() => model.setPage(model.page - 1)}
+              >
+                上一页
+              </button>
+              <span>
+                第 {model.page} 页 · 共 {model.query.data?.totalCount ?? 0} 条
+              </span>
+              <button
+                className="command-button secondary"
+                type="button"
+                disabled={model.query.isFetching || model.page * 20 >= (model.query.data?.totalCount ?? 0)}
+                onClick={() => model.setPage(model.page + 1)}
+              >
+                下一页
+              </button>
+            </div>
+          )}
+        </>
+      )}
+      {editing && (
+        <OaRequestDialog
+          client={client}
+          user={user}
+          kind={kind}
+          record={editing === "new" ? undefined : editing}
+          onClose={closeEditor}
+          onSaved={(row) => {
+            setEditing(null);
+            model.select(row.id);
+          }}
+        />
+      )}
+    </EditorWorkspace>
+  );
 }

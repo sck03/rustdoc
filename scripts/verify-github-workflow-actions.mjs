@@ -91,6 +91,10 @@ if (!new RegExp(`channel\\s*=\\s*["']${requiredRustToolchain.replaceAll(".", "\\
 
 const dependencyWorkflowPath = path.join(workflowRoot, "dependency-governance.yml");
 const dependencyWorkflow = readFileSync(dependencyWorkflowPath, "utf8");
+const dependabot = readFileSync(path.join(repositoryRoot, ".github/dependabot.yml"), "utf8");
+const intervals = [...dependabot.matchAll(/interval:\s*(\w+)/gu)].map(match => match[1]);
+if (intervals.length !== 3 || intervals.some(interval => interval !== "monthly")) failures.push("Dependabot ordinary version checks must be monthly for all three ecosystems.");
+if (!dependencyWorkflow.includes('cron: "23 2 * * 1"') || !dependencyWorkflow.includes('cron: "23 2 * * 0,2-6"') || !dependencyWorkflow.includes("env.FULL_GOVERNANCE == 'true'")) failures.push("Dependency governance requires weekly full evidence and daily vulnerability checks.");
 if (!dependencyWorkflow.includes("generate-dependency-governance.mjs artifacts/dependency-governance --release --verify-repository")) {
   failures.push("dependency-governance.yml: dependency inventory must enforce release licenses and repository notice consistency.");
 }

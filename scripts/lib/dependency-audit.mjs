@@ -1,10 +1,10 @@
 import { createRequire } from "node:module";
 
 const require = createRequire(new URL("../../apps/export-doc-web/package.json", import.meta.url));
-const parseSpdx = require("spdx-expression-parse");
 
 // Every offered license must remain reviewed; approval is not legal advice.
 export function isApprovedLicenseExpression(expression, approved) {
+  const parseSpdx = require("spdx-expression-parse");
   try {
     const visit = node => node.conjunction
       ? visit(node.left) && visit(node.right)
