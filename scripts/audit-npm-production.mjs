@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { classifyNpmAudit } from "./lib/dependency-audit.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packageRoot = process.argv[2]
@@ -24,25 +25,17 @@ const audit = spawnSync(
     encoding: "utf8",
     windowsHide: true,
     shell: !npmExecPath && process.platform === "win32",
+    timeout: 120_000,
+    maxBuffer: 8 * 1024 * 1024,
   },
 );
 
-if (audit.error) throw audit.error;
-const report = parseAuditReport(audit.stdout);
-const vulnerabilities = Object.values(report.vulnerabilities || {});
-if ((audit.status ?? 1) === 0 && vulnerabilities.length === 0) {
-  process.stdout.write(`npm production audit passed: ${path.relative(repositoryRoot, packageRoot)}.\n`);
-  process.exit(0);
-}
-
-process.stderr.write(`${JSON.stringify(report, null, 2)}\n`);
-process.stderr.write(`npm production audit failed: ${path.relative(repositoryRoot, packageRoot)}.\n`);
-process.exit(audit.status ?? 1);
-
-function parseAuditReport(output) {
-  const text = String(output || "").trim();
-  if (!text) return {};
-  const jsonStart = text.indexOf("{");
-  if (jsonStart < 0) throw new Error(`npm audit did not return JSON: ${text}`);
-  return JSON.parse(text.slice(jsonStart));
+try {
+  const result = classifyNpmAudit(audit);
+  if (result.state !== "passed") process.stderr.write(`${JSON.stringify(result.report, null, 2)}\n`);
+  process.stdout.write(`npm production audit ${result.state}: ${path.relative(repositoryRoot, packageRoot)} (blocks high/critical).\n`);
+  process.exitCode = result.exitCode;
+} catch (error) {
+  process.stderr.write(`npm production audit execution failed: ${error.message}\n`);
+  process.exitCode = 2;
 }

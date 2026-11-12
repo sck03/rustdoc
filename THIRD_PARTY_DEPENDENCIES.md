@@ -5,7 +5,7 @@ Generated from committed npm/Cargo lock files, Cargo metadata and signed native-
 Runtime image boundary: PostgreSQL client tools and their native library closure ship in web/server packages under Tools/PostgreSQL with license texts. The database server remains a separate OS/container input. Rust containers do not include .NET or a browser rendering service.
 The rust-workspace scope covers the complete locked desktop/server/build/test graph across supported platforms. It is not a desktop runtime inventory; the desktop feature closure is checked separately by verify-native-desktop.mjs.
 
-## npm (133)
+## npm (136)
 
 | Package | Version | Declared license | Used by |
 |---|---:|---|---|
@@ -136,6 +136,9 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | scheduler | 0.28.0 | MIT | web |
 | set-cookie-parser | 2.7.3 | MIT | web |
 | source-map-js | 1.2.2 | BSD-3-Clause | web |
+| spdx-exceptions | 2.5.0 | CC-BY-3.0 | web |
+| spdx-expression-parse | 5.0.0 | MIT | web |
+| spdx-license-ids | 3.0.24 | CC0-1.0 | web |
 | three | 0.186.1 | MIT | web |
 | tinyglobby | 0.2.17 | MIT | web |
 | typescript | 7.0.2 | Apache-2.0 | web |
@@ -584,7 +587,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | rust_decimal | 1.43.0 | MIT | rust-workspace |
 | rustc_version | 0.4.1 | MIT OR Apache-2.0 | rust-workspace |
 | rustc-hash | 2.1.3 | Apache-2.0 OR MIT | rust-workspace |
-| rustix | 1.1.5 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | rust-workspace |
+| rustix | 1.1.6 | Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT | rust-workspace |
 | rustls | 0.23.46 | Apache-2.0 OR ISC OR MIT | rust-workspace |
 | rustls-native-certs | 0.8.5 | Apache-2.0 OR ISC OR MIT | rust-workspace |
 | rustls-pki-types | 1.15.1 | MIT OR Apache-2.0 | rust-workspace |

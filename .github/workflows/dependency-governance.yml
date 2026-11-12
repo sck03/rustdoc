@@ -3,7 +3,7 @@ name: Dependency security and SBOM governance
 on:
   workflow_dispatch:
   schedule:
-    - cron: "23 2 * * 1"
+    - cron: "23 2 * * *"
   push:
     branches: [main]
     paths:
@@ -22,6 +22,12 @@ on:
       - "scripts/generate-dependency-governance.mjs"
       - "scripts/verify-dependency-policy.mjs"
       - "scripts/test_dependency_policy.mjs"
+      - "scripts/test_dependency_audit.mjs"
+      - "scripts/lib/dependency-audit.mjs"
+      - "scripts/lib/cargo-paths.mjs"
+      - "scripts/test_cargo_paths.mjs"
+      - "scripts/audit-npm-production.mjs"
+      - ".github/dependabot.yml"
       - "scripts/verify-github-workflow-actions.mjs"
       - ".github/actions/**"
       - "scripts/verify-font-license-policy.mjs"
@@ -45,6 +51,12 @@ on:
       - "scripts/generate-dependency-governance.mjs"
       - "scripts/verify-dependency-policy.mjs"
       - "scripts/test_dependency_policy.mjs"
+      - "scripts/test_dependency_audit.mjs"
+      - "scripts/lib/dependency-audit.mjs"
+      - "scripts/lib/cargo-paths.mjs"
+      - "scripts/test_cargo_paths.mjs"
+      - "scripts/audit-npm-production.mjs"
+      - ".github/dependabot.yml"
       - "scripts/verify-github-workflow-actions.mjs"
       - ".github/actions/**"
       - "scripts/verify-font-license-policy.mjs"
@@ -97,26 +109,39 @@ jobs:
       - name: Validate Node 26 and artifact Action policy
         run: node scripts/verify-github-workflow-actions.mjs
 
-      - name: Verify exact dependency policy pins
+      - name: Verify active source and dependency boundaries
         run: node scripts/verify-dependency-policy.mjs
 
       - name: Run dependency policy regression tests
-        run: node scripts/test_dependency_policy.mjs
+        run: |
+          node scripts/test_dependency_policy.mjs
+          node scripts/test_dependency_audit.mjs
 
       - name: Audit npm production dependencies
         run: npm --prefix apps/export-doc-web run audit:production
 
+      - name: Restore reviewed RustSec tool
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
+        with:
+          path: ${{ github.workspace }}/.codex-runtime/cargo-audit
+          key: cargo-audit-0.23.0-${{ runner.os }}-${{ runner.arch }}
+
       - name: Install RustSec cargo-audit
-        run: cargo install cargo-audit --locked --root "$CARGO_HOME"
+        run: |
+          tool="$GITHUB_WORKSPACE/.codex-runtime/cargo-audit"
+          if [ ! -x "$tool/bin/cargo-audit" ] || [ "$("$tool/bin/cargo-audit" --version)" != "cargo-audit 0.23.0" ]; then
+            cargo install cargo-audit --version 0.23.0 --locked --root "$tool" --force
+          fi
+          echo "$tool/bin" >> "$GITHUB_PATH"
 
       - name: Audit Rust lock files
         run: |
           mkdir -p artifacts/dependency-governance
           node scripts/verify-rustsec-glib-exception.mjs
           status=0
-          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --ignore RUSTSEC-2024-0429 --file Cargo.lock --json > artifacts/dependency-governance/rustsec-workspace.json || status=1
-          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file apps/exportdoc-ocr-rs/Cargo.lock --json > artifacts/dependency-governance/rustsec-ocr.json || status=1
-          "$CARGO_HOME/bin/cargo-audit" audit --deny unsound --deny yanked --file tools/excel-analyzer-rs/Cargo.lock --json > artifacts/dependency-governance/rustsec-excel.json || status=1
+          "$GITHUB_WORKSPACE/.codex-runtime/cargo-audit/bin/cargo-audit" audit --deny unsound --deny yanked --ignore RUSTSEC-2024-0429 --file Cargo.lock --json > artifacts/dependency-governance/rustsec-workspace.json || status=1
+          "$GITHUB_WORKSPACE/.codex-runtime/cargo-audit/bin/cargo-audit" audit --deny unsound --deny yanked --file apps/exportdoc-ocr-rs/Cargo.lock --json > artifacts/dependency-governance/rustsec-ocr.json || status=1
+          "$GITHUB_WORKSPACE/.codex-runtime/cargo-audit/bin/cargo-audit" audit --deny unsound --deny yanked --file tools/excel-analyzer-rs/Cargo.lock --json > artifacts/dependency-governance/rustsec-excel.json || status=1
           node scripts/summarize-rustsec-reports.mjs artifacts/dependency-governance/rustsec-{workspace,ocr,excel}.json
           exit "$status"
 

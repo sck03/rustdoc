@@ -1,5 +1,10 @@
 import path from 'node:path';
 
+export function cargoEnvironment(repositoryRoot, environment = process.env) {
+  return { ...environment, CARGO_HOME: environment.CARGO_HOME?.trim()
+    ? environment.CARGO_HOME : path.join(repositoryRoot, '.codex-runtime/cargo-home') };
+}
+
 export function cargoArtifactDirectory(repositoryRoot, environment = process.env, profile = 'debug') {
   const target = environment.CARGO_TARGET_DIR?.trim() ? environment.CARGO_TARGET_DIR : 'target';
   return path.join(path.resolve(repositoryRoot, target), environment.CARGO_BUILD_TARGET || '',

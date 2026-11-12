@@ -8,6 +8,8 @@ import {
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isApprovedLicenseExpression as approveExpression } from "./lib/dependency-audit.mjs";
+import { cargoEnvironment } from "./lib/cargo-paths.mjs";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const argumentsList = process.argv.slice(2);
@@ -25,6 +27,9 @@ const approvedLicenseIdentifiers = new Set([
   "BSD-2-Clause",
   "BSD-3-Clause",
   "BSL-1.0",
+  // spdx-exceptions contains the SPDX identifier dataset, not application code.
+  // CC BY 3.0 permits commercial redistribution with attribution (see notices).
+  "CC-BY-3.0",
   "CC-BY-4.0",
   "CC0-1.0",
   "CDLA-Permissive-2.0",
@@ -33,7 +38,6 @@ const approvedLicenseIdentifiers = new Set([
   "LGPL-2.1-or-later",
   "LGPL-3.0-only",
   "LicenseRef-SQLite-Public-Domain",
-  "LLVM-exception",
   "MIT",
   "MIT-0",
   "MPL-2.0",
@@ -88,15 +92,6 @@ writeFileSync(
 writeFileSync(path.join(outputRoot, "THIRD_PARTY_NOTICES.md"), notices, "utf8");
 writeFileSync(path.join(outputRoot, "THIRD_PARTY_DEPENDENCIES.md"), inventory, "utf8");
 
-if (writeRepository) {
-  writeFileSync(path.join(repositoryRoot, "THIRD_PARTY_NOTICES.md"), notices, "utf8");
-  writeFileSync(path.join(repositoryRoot, "THIRD_PARTY_DEPENDENCIES.md"), inventory, "utf8");
-}
-if (verifyRepository) {
-  verifyGeneratedFile("THIRD_PARTY_NOTICES.md", notices);
-  verifyGeneratedFile("THIRD_PARTY_DEPENDENCIES.md", inventory);
-}
-
 const unresolved = ordered.filter((item) => item.license === "NOASSERTION");
 const disallowed = ordered.filter((item) => !isApprovedLicenseExpression(item.license));
 if (releaseMode && (unresolved.length > 0 || disallowed.length > 0)) {
@@ -109,6 +104,15 @@ if (releaseMode && (unresolved.length > 0 || disallowed.length > 0)) {
   throw new Error(
     `Release dependency license policy failed for ${details.length} component(s):\n${details.join("\n")}`,
   );
+}
+
+if (writeRepository) {
+  writeFileSync(path.join(repositoryRoot, "THIRD_PARTY_NOTICES.md"), notices, "utf8");
+  writeFileSync(path.join(repositoryRoot, "THIRD_PARTY_DEPENDENCIES.md"), inventory, "utf8");
+}
+if (verifyRepository) {
+  verifyGeneratedFile("THIRD_PARTY_NOTICES.md", notices);
+  verifyGeneratedFile("THIRD_PARTY_DEPENDENCIES.md", inventory);
 }
 
 process.stdout.write(
@@ -126,11 +130,9 @@ function collectNpmLock(scope, relativePath) {
     const installedPackageJson = path.join(path.dirname(lockPath), packagePath, "package.json");
     let installedLicense = "";
     if (existsSync(installedPackageJson)) {
-      try {
-        installedLicense = JSON.parse(readFileSync(installedPackageJson, "utf8")).license;
-      } catch {
-        installedLicense = "";
-      }
+      const installed = JSON.parse(readFileSync(installedPackageJson, "utf8"));
+      if (installed.version !== entry.version) throw new Error(`Installed ${name}@${installed.version} differs from lock ${entry.version}; run npm ci before license verification.`);
+      installedLicense = installed.license;
     }
     addComponent({
       ecosystem: "npm",
@@ -148,7 +150,7 @@ function collectCargoMetadata(scope, relativeManifestPath) {
   const result = spawnSync(
     "cargo",
     ["metadata", "--locked", "--format-version", "1", "--manifest-path", relativeManifestPath],
-    { cwd: repositoryRoot, encoding: "utf8", windowsHide: true, maxBuffer: 64 * 1024 * 1024 },
+    { cwd: repositoryRoot, env: cargoEnvironment(repositoryRoot), encoding: "utf8", windowsHide: true, timeout: 120_000, maxBuffer: 64 * 1024 * 1024 },
   );
   if (result.error) throw result.error;
   if (result.status !== 0) {
@@ -276,7 +278,9 @@ function buildNotices(items) {
     );
   }
 
-  lines.push("", "## Reviewed source patch", "",
+  lines.push("", "## SPDX identifier dataset attribution", "",
+    "spdx-exceptions copies SPDX exception identifiers from the SPDX specification. Copyright © 2010–2015 Linux Foundation and its Contributors. Licensed under Creative Commons Attribution 3.0 Unported: https://creativecommons.org/licenses/by/3.0/ . The identifier data is used without modification by the build-time license parser. SPDX is a trademark of the Linux Foundation.",
+    "", "## Reviewed source patch", "",
     "calamine 0.37.0 includes the BIFF8 row-index overflow correction. The application and standalone analyzer use the same source; archive checksum and patch provenance are recorded in third_party/README.md.",
     "", readRequiredText("third_party/calamine-0.37.0/LICENSE-MIT.md"));
   const usedExtractedLicenses = resolveUsedExtractedLicenses(items);
@@ -382,7 +386,6 @@ function normalizeLicense(value) {
   if (Array.isArray(value) && value.length) return value.map(normalizeLicense).join(" AND ");
   if (typeof value !== "string" || !value.trim()) return "NOASSERTION";
   let normalized = value.replaceAll(/\s+/gu, " ").trim();
-  if (/^MIT\s+OR\s+SEE LICENSE/iu.test(normalized)) return "MIT";
   if (/SEE LICENSE/iu.test(normalized)) return "NOASSERTION";
   normalized = normalized
     .replaceAll("Apache 2.0", "Apache-2.0")
@@ -393,10 +396,7 @@ function normalizeLicense(value) {
 }
 
 function isApprovedLicenseExpression(expression) {
-  if (expression === "NOASSERTION") return false;
-  const identifiers = String(expression).match(/[A-Za-z0-9][A-Za-z0-9.+-]*/gu) || [];
-  return identifiers.length > 0 && identifiers.every((identifier) =>
-    ["AND", "OR", "WITH"].includes(identifier.toUpperCase()) || approvedLicenseIdentifiers.has(identifier));
+  return approveExpression(expression, approvedLicenseIdentifiers);
 }
 
 function npmPurl(name, version) {

@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { cargoEnvironment } from "./lib/cargo-paths.mjs";
 
 // RUSTSEC-2024-0429 affects VariantStrIter, not all GLib operations. Tauri 2's
 // GTK3 stack is pinned to glib 0.18.5; fixed glib >=0.20 is API-incompatible.
@@ -9,7 +10,7 @@ import { spawnSync } from "node:child_process";
 // upstream memory unsafety is fixed. See the workflow manual's risk decision.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const result = spawnSync("cargo", ["metadata", "--locked", "--format-version", "1"], {
-  cwd: root, encoding: "utf8", maxBuffer: 32 * 1024 * 1024, timeout: 120_000, windowsHide: true,
+  cwd: root, env: cargoEnvironment(root), encoding: "utf8", maxBuffer: 32 * 1024 * 1024, timeout: 120_000, windowsHide: true,
 });
 if (result.error) throw result.error;
 if (result.status !== 0) throw new Error(`Cannot inspect locked dependency sources: ${result.stderr}`);
