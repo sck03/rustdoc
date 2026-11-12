@@ -59,7 +59,7 @@ const client={getAgentConsignmentDocument:async r=>get(r.sourceId),getCustomsCoo
   dispatchSingleWindowBatchToClient:(r,i)=>defer('dispatch',r,i),
   collectSingleWindowClientReceipts:(r,i)=>defer('collect',r,i),
   saveSingleWindowReceiptPackageToPath:(r,i)=>defer('receipt-save',r,i),
-  listSingleWindowSources:async()=>({items:[],totalCount:0}),
+  listSingleWindowSources:async()=>window.deferSourceRefresh?new Promise((resolve,reject)=>window.sourceRefresh={resolve,reject}):({items:[],totalCount:0}),
   listInvoices:async()=>({items:[],totalCount:0,pageNumber:1,pageSize:50,totalPages:0}),
   startExcelTemplateDownloadJob:i=>defer('invoice-template',{},i),
   startExcelTemplateSaveToPathJob:(r,i)=>defer('invoice-template-save',r,i),
@@ -351,6 +351,28 @@ try {
     await page.getByRole('button',{name:'创建申报资料'}).click();
     await page.waitForFunction(()=>window.pending.length===2);
     assert.deepEqual(await page.evaluate(()=>window.pending[1].request.body),{referenceNo:'FACTORY-COO',invoice,coo});
+    await page.evaluate(()=>{window.deferSourceRefresh=true;window.pending[1].resolve({id:123});});
+    await page.getByText('申报资料已创建，可分别填写代理委托和原产地证。',{exact:true}).waitFor();
+    await page.waitForFunction(()=>Boolean(window.sourceRefresh));
+    await page.getByLabel('资料编号 / 客户发票号').fill('NEXT-DRAFT');
+    assert(await page.getByRole('button',{name:'创建申报资料'}).isEnabled(), 'Background list refresh must not lock the next draft');
+    await page.evaluate(()=>window.sourceRefresh.reject(Error('list unavailable')));
+    await page.getByText(/已创建，但列表刷新失败/).waitFor();
+    assert.equal(await page.getByLabel('资料编号 / 客户发票号').inputValue(),'NEXT-DRAFT');
+    assert.equal(await page.evaluate(()=>window.queries.getMutationCache().getAll().length),0);
+  });
+  await scenario('sources',async page=>{
+    await page.locator('input[type=file]').setInputFiles({name:'large.xlsx',mimeType:'application/octet-stream',buffer:Buffer.from('fixture')});
+    await page.waitForFunction(()=>window.pending.length===1);
+    await page.evaluate(()=>window.pending[0].resolve({result:{success:true,errors:[],invoice:{items:Array.from({length:51},(_,i)=>({styleNameCN:'货物'+(i+1),styleName:'GOODS '+(i+1),quantity:'1',hsCode:'6109100000'}))}},coo:{items:Array.from({length:51},(_,i)=>({prdcEtpsName:'工厂'+(i+1)}))}}));
+    await page.getByText('货物1',{exact:true}).waitFor();
+    const form=page.locator('.single-window-source-form');
+    await form.getByRole('button',{name:'下一页',exact:true}).click();
+    await page.getByText('货物51',{exact:true}).waitFor();
+    await page.getByText('工厂51',{exact:true}).waitFor();
+    assert.equal(await page.getByText('工厂1',{exact:true}).count(),0,'Preview pagination must preserve COO row alignment');
+    await page.getByRole('button',{name:'清除文件，手工录入'}).click();
+    assert.equal(await page.getByText('货物51',{exact:true}).count(),0);
   });
   await scenario('invoice',async page=>{
     await page.getByRole('button',{name:'下载报关 Excel 模板',exact:true}).click();

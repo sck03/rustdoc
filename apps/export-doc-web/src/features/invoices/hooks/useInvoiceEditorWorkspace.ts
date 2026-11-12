@@ -5,6 +5,7 @@ import type { ApiInvoiceDetailDto, ApiUnitDto, ExportDocManagerApiClient, HsCode
 import { useModulePermission } from "../../../app/PermissionAccessContext.tsx";
 import { useWorkspaceDeviceProfile } from "../../../app/workspaceDevice.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
+import { largeDocumentQueryOptions } from "../../../api/queryRetention.ts";
 import { normalizeText, readApiError, readRouteSuccessMessage } from "../../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../../ui/unsavedChangesGuard.tsx";
 import { isComposingKey } from "../../../ui/keyboardEvent.ts";
@@ -99,6 +100,7 @@ export function useInvoiceEditorWorkspace({ businessDate, client, mode }: {
   });
 
   const invoiceQuery = useQuery({
+    ...largeDocumentQueryOptions,
     queryKey: queryKeys.invoice(parsedInvoiceId),
     queryFn: ({ signal }) => client.getInvoice({ id: parsedInvoiceId }, { signal }),
     enabled: !isNew && isInvoiceIdValid,

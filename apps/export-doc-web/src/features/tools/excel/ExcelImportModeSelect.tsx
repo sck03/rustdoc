@@ -18,6 +18,5 @@ export function ExcelImportModeSelect({ client, value, onChange, disabled }: {
       </select>
     </label>
     {query.isError && <span role="alert">导入方案读取失败：{readApiError(query.error)}</span>}
-    {!query.isPending && !query.isError && !names.length && <span className="form-field-description">特殊格式可在系统设置 → Excel 导入 → 高级导入方案中配置。</span>}
   </div>;
 }

@@ -18,6 +18,9 @@ on:
       - eng/native-runtime-packages.json
       - tools/excel-analyzer-rs/**
       - scripts/test_*.mjs
+      - scripts/check_*.mjs
+      - scripts/baselines/**
+      - scripts/provision-report-fonts.mjs
       - scripts/lib/**
       - scripts/github/native-validation-plan.mjs
       - .github/actions/**
@@ -51,6 +54,9 @@ on:
       - tests/ReportTemplateFixtures/**
       - third_party/**
       - scripts/test_*.mjs
+      - scripts/check_*.mjs
+      - scripts/baselines/**
+      - scripts/provision-report-fonts.mjs
       - scripts/lib/**
       - scripts/github/native-validation-plan.mjs
       - scripts/provision-*.ps1
@@ -166,6 +172,7 @@ jobs:
           chromium: 'true'
       - run: npm --prefix apps/export-doc-web run build
       - run: npm --prefix apps/export-doc-web run test:style-governance
+      - run: npm --prefix apps/export-doc-web run test:source-size-governance
       - run: npm --prefix apps/export-doc-web run test:accessibility-contracts
       - run: npm --prefix apps/export-doc-web run test:permission-contracts
       - run: npm --prefix apps/export-doc-web run test:scale-contracts

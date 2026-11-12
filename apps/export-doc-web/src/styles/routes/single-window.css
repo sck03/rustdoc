@@ -5,15 +5,14 @@
 @import "../coo-review.css" layer(route);
 
 @layer route {
-  .single-window-source-form { display: grid; gap: 1rem; }
+  .single-window-source-form { display: grid; gap: var(--edm-space-4); }
   .single-window-source-form h2 { margin: 0; }
-  .single-window-source-reference { width: min(100%, 32rem); }
-  .single-window-source-import { display: grid; grid-template-columns: minmax(16rem, 1fr) minmax(16rem, 1fr); gap: 1rem 1.5rem; align-items: start; max-width: 66rem; }
+  .single-window-source-import { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--edm-space-4); align-items: end; }
   .single-window-source-import .form-field { min-width: 0; margin: 0; }
-  .single-window-source-import .form-field > label { display: grid; gap: .5rem; }
+  .single-window-source-import .form-field > label { display: grid; gap: var(--edm-space-2); }
   .single-window-source-import input, .single-window-source-import select { width: 100%; }
-  .single-window-source-form .form-actions { margin: 0; }
-  @media (max-width: 760px) {
+  .single-window-source-form .form-actions { margin: 0; justify-content: space-between; flex-wrap: wrap; gap: var(--edm-space-3); }
+  @media (max-width: 680px) {
     .single-window-source-import { grid-template-columns: minmax(0, 1fr); }
   }
 }

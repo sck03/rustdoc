@@ -167,7 +167,7 @@ pub fn preview(
             mapping[format!("{}Col", field.key)] = json!(col + 1);
         }
     }
-    let mut parsed = import::parse(workbook, name, Some(&mapping), business_date, check)?;
+    let mut parsed = import::parse_decoded(&items, epoch, name, &mapping, business_date, check)?;
     let mut coo = json!({"items":[]});
     let mut default_origin = String::new();
     let mut header = parsed
@@ -203,23 +203,15 @@ pub fn preview(
         check()?;
         let values = row_values(&items, *row, &layout.items);
         if let Some(header) = &mut header {
-            // Invoice defaults must not replace the declared COO origin or units.
+            // Professional per-item origin and Chinese units are completed after import.
             let invoice_item = &mut header["items"][index];
-            let origin = text(&values, "origin");
-            invoice_item["origin"] = json!(if origin.is_empty() {
-                default_origin.as_str()
-            } else {
-                origin
-            });
+            invoice_item["origin"] = json!(default_origin);
             for (english, chinese) in [("unitEN", "unitCN"), ("ctnUnitEN", "ctnUnitCN")] {
                 let unit_en = text(&values, english);
-                let unit_cn = text(&values, chinese);
                 invoice_item[english] = json!(unit_en);
-                invoice_item[chinese] = json!(if unit_cn.is_empty() {
-                    export_doc_domain::single_window::mapping::unit(unit_en, false)
-                } else {
-                    unit_cn.into()
-                });
+                invoice_item[chinese] = json!(export_doc_domain::single_window::mapping::unit(
+                    unit_en, false
+                ));
             }
         }
         if text(&values, "quantity").is_empty() && parsed.response.errors.len() < 100 {
@@ -272,7 +264,7 @@ pub fn preview(
                 .any(|value| value != "")
         {
             parsed.response.errors.push(format!(
-                "商品明细第 {row} 行未能导入，请填写品名或款号及有效数量。"
+                "商品明细第 {row} 行未能导入，请填写品名及有效数量。"
             ));
             if parsed.response.errors.len() >= 100 {
                 break;

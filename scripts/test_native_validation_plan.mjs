@@ -10,6 +10,7 @@ assert.equal(validationPlan(['crates/export-doc-contracts/src/native_contract/en
 assert.equal(validationPlan(['scripts/test_permission_scheme_model.mjs']).web,true);
 assert.equal(validationPlan(['scripts/test_permission_scheme_model.mjs']).rust,false);
 assert.equal(validationPlan(['scripts/test_oa_custom_ui.mjs']).web,true);
+for (const input of ['scripts/check_frontend_style_governance.mjs', 'scripts/check_source_size_governance.mjs', 'scripts/baselines/source-size-governance.json', 'scripts/provision-report-fonts.mjs']) assert.equal(validationPlan([input]).web, true, input);
 assert.equal(validationPlan(['apps/export-doc-tauri/src-tauri/src/lib.rs']).desktop,true);
 assert.equal(validationPlan(['Resources/Fonts/OpenSource/font-manifest.json']).web,true);
 assert.equal(validationPlan(['OcrModels/model.json']).rust,true);

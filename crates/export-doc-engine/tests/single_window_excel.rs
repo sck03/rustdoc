@@ -113,7 +113,7 @@ fn standalone_template_permissions_and_fixed_mapping_roundtrip() {
             &[],
             json!({}),
             "coo.xlsx",
-            &coo_fixture::filled(&[(1, "B22", "THAILAND"), (2, "F4", "KGS")]),
+            &coo_fixture::filled(&[(1, "B22", "THAILAND"), (2, "E4", "KGS")]),
         )
         .unwrap();
     assert_eq!(imported["result"]["success"], true, "{imported}");
@@ -153,7 +153,7 @@ fn standalone_template_permissions_and_fixed_mapping_roundtrip() {
     assert_eq!(document["items"][0]["ciqRegNo"], "012345678");
     assert_eq!(document["items"][0]["goodsUnit"], "千克");
     assert_eq!(document["items"][0]["goodsOriginCountryEn"], "THAILAND");
-    assert_eq!(document["items"][1]["goodsOriginCountryEn"], "VIETNAM");
+    assert_eq!(document["items"][1]["goodsOriginCountryEn"], "THAILAND");
     assert_eq!(
         document["items"][0]["producer"],
         "TEST FACTORY ONE LTD.\n3 FACTORY ROAD, CHINA"
@@ -161,6 +161,31 @@ fn standalone_template_permissions_and_fixed_mapping_roundtrip() {
     assert_eq!(document["items"][1]["prdcEtpsConcEr"], "李四");
     assert_eq!(document["items"][0]["sourceItemId"], 1);
     assert_eq!(document["items"][1]["sourceItemId"], 2);
+    assert_eq!(document["items"][0]["oriCriteria"], "");
+    assert!(
+        document["items"][0]["goodsDesc"]
+            .as_str()
+            .unwrap()
+            .contains("COTTON SHIRTS")
+    );
+    let mut completed = document.clone();
+    completed["expectedDraftRevision"] = document["draftRevision"].clone();
+    completed["items"][0]["oriCriteria"] = json!("WO");
+    completed["items"][0]["goodsDesc"] = json!("TWO CARTONS OF COTTON SHIRTS");
+    completed["items"][1]["goodsOriginCountryEn"] = json!("VIETNAM");
+    let saved: Value = editor
+        .json(
+            SAVE_CUSTOMS_COO_DOCUMENT,
+            &source_path,
+            &[],
+            Some(completed),
+        )
+        .unwrap();
+    assert_eq!(saved["document"]["items"][0]["oriCriteria"], "WO");
+    assert_eq!(
+        saved["document"]["items"][1]["goodsOriginCountryEn"],
+        "VIETNAM"
+    );
     let agent: Value = editor
         .json(GET_AGENT_CONSIGNMENT_DOCUMENT, &source_path, &[], None)
         .unwrap();

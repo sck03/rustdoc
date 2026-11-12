@@ -145,6 +145,12 @@ export async function verifyDesktopSingleWindow({ run, cdp, output, token, invoi
   const sourceField = "[...document.querySelectorAll('label')].find(e=>e.textContent.includes('资料编号 / 客户发票号'))?.querySelector('input')";
   await waitFor(() => run(`(()=>{[...document.querySelectorAll('[role="dialog"] button')].find(e=>e.textContent.trim()==='离开当前编辑页')?.click(); return Boolean(${sourceField});})()`), 30000, 'Invoice import draft did not close');
   assert(await run("[...document.querySelectorAll('button')].some(e=>e.textContent==='下载产地证 Excel 模板'&&!e.disabled)"));
+  const sourceLayout = await run(`(()=>{const form=document.querySelector('.single-window-source-form');const tops=[...form.querySelectorAll('.single-window-source-import input,.single-window-source-import select,.single-window-source-import [data-ui="file-input"]')].filter(e=>e.type!=='file').map(e=>e.getBoundingClientRect().top);const actions=[...form.querySelectorAll('.form-actions button')].map(e=>e.getBoundingClientRect());return {width:innerWidth,tops,actions:actions.map(r=>({top:r.top,right:r.right})),overflow:document.documentElement.scrollWidth>innerWidth};})()`);
+  if (sourceLayout.width > 680) {
+    assert(Math.max(...sourceLayout.tops)-Math.min(...sourceLayout.tops)<4, 'Source inputs must align on one row');
+    assert(Math.max(...sourceLayout.actions.map(r=>r.top))-Math.min(...sourceLayout.actions.map(r=>r.top))<4, 'Source actions must share one row');
+  }
+  assert.equal(sourceLayout.overflow, false, 'Source form must fit the viewport');
   const templatePath = path.join(output, 'single-window-import-template.xlsx');
   await withNativeFilePicker({run,command:'select_save_excel_path',destination:templatePath}, async () => {
     await run("[...document.querySelectorAll('button')].find(e=>e.textContent==='下载产地证 Excel 模板').click(); true");

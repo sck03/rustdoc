@@ -10,7 +10,7 @@ export function validationPlan(files, mode = 'quick', force = false) {
   const desktop=/^apps\/export-doc-tauri\//u;
   const ocr=all||changed.some(file=>/^(?:apps\/exportdoc-ocr-rs\/|OcrModels\/|eng\/native-runtime-packages\.json)/u.test(file));
   const rust=all||ocr||changed.some(file=>shared.test(file)||desktop.test(file));
-  const web=all||changed.some(file=>/^(?:apps\/export-doc-web\/|crates\/export-doc-contracts\/|Resources\/Fonts\/|Templates\/|scripts\/(?:test_.*\.mjs|lib\/.*\.(?:mjs|ts)|provision-report-fonts\.mjs))/u.test(file));
+  const web=all||changed.some(file=>/^(?:apps\/export-doc-web\/|crates\/export-doc-contracts\/|Resources\/Fonts\/|Templates\/|scripts\/(?:(?:test_|check_).*\.mjs|baselines\/|lib\/.*\.(?:mjs|ts)|provision-report-fonts\.mjs))/u.test(file));
   return {rust,web,desktop:all||changed.some(file=>desktop.test(file)),desktopCheck:all||changed.some(file=>shared.test(file)||desktop.test(file)),ocr,full:mode==='full'};
 }
 function git(args) {

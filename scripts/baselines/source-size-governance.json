@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-11-11",
-  "reviewNotes": "2026-11-11 lifecycle and admission review: against 45ccb693, scoped commands remove 38 net web lines; native sources add 273 lines including 194 HTTP body regression lines, deadline ordering checks and declared resource metadata, while consolidating SQLite connection setup. Native integration/codegen support adds 12 lines, including empty supplier JSON aggregation in both databases, and automation adds 126 lines. Advance only these reviewed net deltas; preserve per-file limits, growth allowances and previously consumed headroom. 2026-11-10 session and upload review: scoped commands remove 11 net web production lines; 332 native production lines isolate prevalidated image registration and concurrent upload disk budgets, including embedded streaming/cancellation regressions, while removing unused code-based record scans. Shared project-scope regressions add 104 native test lines and React lifecycle/5000-line mutation-cache regressions add 107 automation lines. Only these reviewed net deltas advance aggregate baselines; per-file limits and growth allowances remain unchanged. 2026-11-10 stability and explicit Excel fallback review: diff against HEAD removes 164 web production lines by extracting scoped workspace actions; 482 net native production lines implement manual mapping, template permissions, profile CAS and saved identity, batched OA reads and worklist cursors, including frozen-contract and embedded regression coverage; 285 native test/example lines and 196 automation lines cover real import/export, authorization, concurrency, navigation and cancellation. Aggregate baselines move only by these reviewed net deltas; growth allowances and per-file limits are unchanged. 2026-11-10 export/resource review: compared with HEAD, 36 net web lines reuse scoped file operations, Chinese file selection and shared cursor controls; 193 native-production lines isolate batched OA references and declare export/paging contracts; 189 native-test and 271 automation lines cover cancellation, version/source conflicts, reference batching, keyboard uploads and shared UI geometry. Only these reviewed net additions advance the aggregate baselines; existing headroom, growth allowances and per-file limits are unchanged. 2026-11-10 integration fixture review: 11 native-test lines constrain the built-in publication fixture to built-in definitions, preserving independently exercised custom definitions in the shared PostgreSQL database. 2026-11-10 scoped baseline review: 22 net web lines extract the shared settings-acceptance function so unrelated response revisions cannot overwrite dirty drafts without a conflict. Existing growth allowance and file limits remain unchanged. 2026-11-10 OA design review: 35 additional automation lines verify real custom designer, reference picker and completed request at 1440/1024/390 widths with axe and overflow checks, plus deletion preserving unrelated unsaved drafts. Existing aggregate headroom and per-file limits remain unchanged. 2026-11-09: reviewed independent declaration sources, shared Excel parsing and record storage. Subsequently reviewed official-client directory discovery, a pure whitelisted settings parser reusing bounded XML validation, eight independent paths and explicit frozen-contract replacement. Removed common-root concatenation and duplicate XML checks; host IO remains in Tauri and directory fields are extracted from the profile panel. Native baseline records the reviewed 118-line net addition. Automation baseline adds only the reviewed 13 net lines for timestamp-renamed SentBox correlation with manifest size and SHA-256; validated against actual official archives and rejected mismatches. Per-file limits, remaining headroom and subsequent growth allowances remain unchanged. 2026-11-09 stability follow-up: reviewed 237 native-production lines (including co-located tests and rustfmt-expanded authorization closures), 98 native contract-test lines, and 101 automation lines for transaction revalidation, dispatch state preservation, SQL version aggregation, real stale-operation regressions and verified actionlint download caching. Invoice action extraction removes duplicate mutation lifecycle code. Only reviewed net increments update aggregate baselines; existing headroom, per-file limits and growth allowances remain unchanged. 2026-11-09 HS and bounded-work review: explicit instance versions and cursor contracts, bounded history reads, dispatch/receipt prepare-commit separation and independent task retention. Reviewed net additions: Rust native production 362; Rust native tests and examples 167; repository automation source default 136 (including real Tauri/React HS conflict and delete verification). Per-file limits, existing headroom and growth allowances remain unchanged. 2026-11-10 template and package review: shared scoped commands replace duplicated mutation lifecycle/cache handling; storage owns email pagination and a shared index-aligned HS sort definition; bounded archive IO is isolated from transactional business processing. Reviewed net additions from Git HEAD: Rust native production 558 (including contracts and co-located regressions), Rust tests/examples 278, automation 111. Update only these net increments; preserve prior headroom consumption, per-file limits and growth allowances. 2026-11-10 custom OA: reviewed a bounded domain form model, typed contract projection, independent settings CAS/tombstones, current-company reference selection and reuse of the existing request/runtime/report pipeline. Net additions from HEAD: native production 1162, native tests/examples 394, automation 139. New modules own separate responsibilities; aggregate baselines add only these reviewed increments while preserving prior headroom consumption, per-file limits and growth allowances.",
+  "updatedAt": "2026-11-12",
+  "reviewNotes": "2026-11-12: reviewed the template/source import and security/resource changes since 41d5cf2b. Shared decoded-range parsing removes duplicate worksheet IO; compact templates use a maintained authoring module and shared tokens; query snapshots release on detach; render admission uses notification; security checks parse SPDX and distinguish execution failures. Native source counts include associated import and cancellation regressions. Move aggregate baselines only by these measured net changes, preserving existing per-file caps and growth headroom: [{\"rule\":\"repository web production default\",\"delta\":105},{\"rule\":\"Rust native production\",\"delta\":834},{\"rule\":\"Rust native tests and examples\",\"delta\":247},{\"rule\":\"repository automation source default\",\"delta\":-13995},{\"rule\":\"Rust native delivery automation\",\"delta\":-21},{\"rule\":\"GitHub workflow default\",\"delta\":36}]. 2026-11-11 lifecycle and admission review: against 45ccb693, scoped commands remove 38 net web lines; native sources add 273 lines including 194 HTTP body regression lines, deadline ordering checks and declared resource metadata, while consolidating SQLite connection setup. Native integration/codegen support adds 12 lines, including empty supplier JSON aggregation in both databases, and automation adds 126 lines. Advance only these reviewed net deltas; preserve per-file limits, growth allowances and previously consumed headroom. 2026-11-10 session and upload review: scoped commands remove 11 net web production lines; 332 native production lines isolate prevalidated image registration and concurrent upload disk budgets, including embedded streaming/cancellation regressions, while removing unused code-based record scans. Shared project-scope regressions add 104 native test lines and React lifecycle/5000-line mutation-cache regressions add 107 automation lines. Only these reviewed net deltas advance aggregate baselines; per-file limits and growth allowances remain unchanged. 2026-11-10 stability and explicit Excel fallback review: diff against HEAD removes 164 web production lines by extracting scoped workspace actions; 482 net native production lines implement manual mapping, template permissions, profile CAS and saved identity, batched OA reads and worklist cursors, including frozen-contract and embedded regression coverage; 285 native test/example lines and 196 automation lines cover real import/export, authorization, concurrency, navigation and cancellation. Aggregate baselines move only by these reviewed net deltas; growth allowances and per-file limits are unchanged. 2026-11-10 export/resource review: compared with HEAD, 36 net web lines reuse scoped file operations, Chinese file selection and shared cursor controls; 193 native-production lines isolate batched OA references and declare export/paging contracts; 189 native-test and 271 automation lines cover cancellation, version/source conflicts, reference batching, keyboard uploads and shared UI geometry. Only these reviewed net additions advance the aggregate baselines; existing headroom, growth allowances and per-file limits are unchanged. 2026-11-10 integration fixture review: 11 native-test lines constrain the built-in publication fixture to built-in definitions, preserving independently exercised custom definitions in the shared PostgreSQL database. 2026-11-10 scoped baseline review: 22 net web lines extract the shared settings-acceptance function so unrelated response revisions cannot overwrite dirty drafts without a conflict. Existing growth allowance and file limits remain unchanged. 2026-11-10 OA design review: 35 additional automation lines verify real custom designer, reference picker and completed request at 1440/1024/390 widths with axe and overflow checks, plus deletion preserving unrelated unsaved drafts. Existing aggregate headroom and per-file limits remain unchanged. 2026-11-09: reviewed independent declaration sources, shared Excel parsing and record storage. Subsequently reviewed official-client directory discovery, a pure whitelisted settings parser reusing bounded XML validation, eight independent paths and explicit frozen-contract replacement. Removed common-root concatenation and duplicate XML checks; host IO remains in Tauri and directory fields are extracted from the profile panel. Native baseline records the reviewed 118-line net addition. Automation baseline adds only the reviewed 13 net lines for timestamp-renamed SentBox correlation with manifest size and SHA-256; validated against actual official archives and rejected mismatches. Per-file limits, remaining headroom and subsequent growth allowances remain unchanged. 2026-11-09 stability follow-up: reviewed 237 native-production lines (including co-located tests and rustfmt-expanded authorization closures), 98 native contract-test lines, and 101 automation lines for transaction revalidation, dispatch state preservation, SQL version aggregation, real stale-operation regressions and verified actionlint download caching. Invoice action extraction removes duplicate mutation lifecycle code. Only reviewed net increments update aggregate baselines; existing headroom, per-file limits and growth allowances remain unchanged. 2026-11-09 HS and bounded-work review: explicit instance versions and cursor contracts, bounded history reads, dispatch/receipt prepare-commit separation and independent task retention. Reviewed net additions: Rust native production 362; Rust native tests and examples 167; repository automation source default 136 (including real Tauri/React HS conflict and delete verification). Per-file limits, existing headroom and growth allowances remain unchanged. 2026-11-10 template and package review: shared scoped commands replace duplicated mutation lifecycle/cache handling; storage owns email pagination and a shared index-aligned HS sort definition; bounded archive IO is isolated from transactional business processing. Reviewed net additions from Git HEAD: Rust native production 558 (including contracts and co-located regressions), Rust tests/examples 278, automation 111. Update only these net increments; preserve prior headroom consumption, per-file limits and growth allowances. 2026-11-10 custom OA: reviewed a bounded domain form model, typed contract projection, independent settings CAS/tombstones, current-company reference selection and reuse of the existing request/runtime/report pipeline. Net additions from HEAD: native production 1162, native tests/examples 394, automation 139. New modules own separate responsibilities; aggregate baselines add only these reviewed increments while preserving prior headroom consumption, per-file limits and growth allowances.",
   "rules": [
     {
       "name": "repository web production default",
@@ -10,9 +10,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 86156,
+      "baselineAggregateLines": 86261,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 86356,
+      "maximumAggregateLines": 86461,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 105604,
+      "baselineAggregateLines": 106438,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 105679,
+      "maximumAggregateLines": 106513,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 32060,
+      "baselineAggregateLines": 32307,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 32180,
+      "maximumAggregateLines": 32427,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 42371,
+      "baselineAggregateLines": 28376,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 42521,
+      "maximumAggregateLines": 28526,
       "reportFiles": false
     },
     {
@@ -82,9 +82,9 @@
       "filePattern": "^(?:.+\\.(?:mjs|ps1|cmd|yml|yaml|sh)|Dockerfile)$",
       "relativePathPattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)|deploy/rust-native/[^/]+|\\.github/workflows/rust-native-validation\\.yml)$",
       "maximumLines": 350,
-      "baselineAggregateLines": 2288,
+      "baselineAggregateLines": 2267,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 2363,
+      "maximumAggregateLines": 2342,
       "reportFiles": false
     },
     {
@@ -93,9 +93,9 @@
       "filePattern": "^.+\\.(?:yml|yaml)$",
       "excludePattern": "^\\.github/workflows/rust-native-validation\\.yml$",
       "maximumLines": 800,
-      "baselineAggregateLines": 1019,
+      "baselineAggregateLines": 1055,
       "maximumAggregateGrowthLines": 20,
-      "maximumAggregateLines": 1039,
+      "maximumAggregateLines": 1075,
       "reportFiles": false
     },
     {

@@ -1,9 +1,16 @@
+@import "./tokens/color.css";
+@import "./tokens/type.css";
+@import "./tokens/radius.css";
+@import "./tokens/space.css";
+
 html,
 body {
   margin: 0;
-  background: #f4f6f9;
-  color: #18283e;
-  font: 14px/22px "Noto Sans CJK SC", sans-serif;
+  background: var(--edm-neutral-75);
+  color: var(--edm-ink-950);
+  font-family: var(--edm-font-sans);
+  font-size: var(--edm-font-size-md);
+  line-height: var(--edm-line-height-md);
 }
 
 #startup-skeleton {
@@ -11,18 +18,18 @@ body {
   display: grid;
   place-content: center;
   text-align: center;
-  gap: 16px;
+  gap: var(--edm-space-4);
 }
 
 #startup-skeleton strong {
-  font-size: 26px;
-  line-height: 34px;
+  font-size: var(--edm-font-size-2xl);
+  line-height: var(--edm-line-height-2xl);
 }
 
 #startup-skeleton div {
   height: 4px;
   width: 240px;
   margin: auto;
-  background: #245da8;
-  border-radius: 999px;
+  background: var(--edm-primary-550);
+  border-radius: var(--edm-radius-full);
 }

@@ -20,10 +20,9 @@
     {"key":"certType","label":"证书类型代码","target":"coo","note":"例如 C（一般原产地证）、E（东盟）、RC（RCEP）；可在程序中选择"},
     {"key":"transDetails","label":"运输细节","target":"coo","note":"英文运输路线、船名航次等；未填时由港口与运输方式组合"},
     {"key":"producer","label":"证书生产商描述","target":"coo","note":"按证书要求填写英文名称、地址；留空时组合本票引用的生产企业"},
-    {"key":"defaultOrigin","label":"默认原产国","target":"default","note":"同一原产国只填此处，明细可覆盖。实际中国原产填 CHINA，不以出口国推定"}
+    {"key":"defaultOrigin","label":"默认原产国","target":"default","note":"实际中国原产填 CHINA；不同原产国由操作员导入后逐项核对，不以出口国推定"}
   ],
   "items": [
-    {"key":"styleNo","label":"款号","target":"invoice"},
     {"key":"styleNameCN","label":"中文品名","target":"invoice"},
     {"key":"styleName","label":"英文品名","target":"invoice"},
     {"key":"hsCode","label":"HS 编码","target":"invoice"},
@@ -31,18 +30,10 @@
     {"key":"unitEN","label":"英文单位","target":"invoice"},
     {"key":"cartons","label":"包装件数","target":"invoice","format":"number"},
     {"key":"ctnUnitEN","label":"包装单位","target":"invoice"},
-    {"key":"gwTotal","label":"总毛重（kg）","target":"invoice","format":"number"},
-    {"key":"nwTotal","label":"总净重（kg）","target":"invoice","format":"number"},
     {"key":"unitPrice","label":"单价","target":"invoice","format":"number"},
     {"key":"totalPrice","label":"发票金额","target":"invoice","format":"number"},
     {"key":"fobValue","label":"FOB 值","target":"coo","format":"number"},
-    {"key":"producerKey","label":"生产企业编号","target":"link"},
-    {"key":"oriCriteria","label":"原产地标准","target":"coo"},
-    {"key":"oriCriteriaRef","label":"原产标准辅助项","target":"coo"},
-    {"key":"oriCriteriaSub","label":"原产标准子项","target":"coo"},
-    {"key":"goodsDesc","label":"货物英文描述","target":"coo"},
-    {"key":"origin","label":"原产国","target":"invoice"},
-    {"key":"unitCN","label":"中文单位","target":"invoice"}
+    {"key":"producerKey","label":"生产企业编号","target":"link"}
   ],
   "producers": [
     {"key":"producerKey","label":"生产企业编号","target":"link"},

@@ -43,6 +43,7 @@ TestResults/
 *.cache
 *.log
 *~RF*.TMP
+~$*.xlsx
 .codex-format-*
 deploy/container/.env
 deploy/browser-server/browser-server.env.path

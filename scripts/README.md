@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-12：依赖治理增加 SPDX 语法解析与 npm 审计状态回归；Dependabot 提出更新 PR，每日安全审计固定并缓存 cargo-audit 0.23.0。许可、兼容性和 notices 处理见[更新规则](../docs/依赖更新与安全检查.md)。Excel 排版维护模块为 `scripts/lib/excel-template-layout.mjs`：在维护环境导入电子表格工具，调用 `buildExcelTemplates(toolkit, repositoryRoot, evidenceDirectory)`，不增加客户运行依赖；保持输入坐标并按[填写说明](../docs/单一窗口Excel导入说明.md)验收。
+
 2026-11-11：`test:invoice-editing` 增加控制命令串行、确认后卸载及非阻塞刷新回归；装柜／灾备测试核对无历史 mutation 保留。HTTP 正文测试覆盖慢接收、输入预算、取消及图片通道；Storage 清理只对 Windows 临时共享／锁冲突有界重试。GitHub 故障、安全升级与本批验收见[记录](../docs/2026-11-11操作生命周期与资源预算修复记录.md)。
 
 2026-11-10 会话与资源：`npm --prefix apps/export-doc-web run test:settings-models` 包含设置、备份和任务中心的真实 React／QueryClient 生命周期检查；`test:invoice-editing` 增加 5000 行连续保存不保留 mutation 输入／响应的回归。项目待办限制进入两库共用办理合同；HTTP 上传空间和暂存清理随工作区测试执行。实现、验收与清理边界见[本批记录](../docs/2026-11-10会话权限与上传资源优化记录.md)。

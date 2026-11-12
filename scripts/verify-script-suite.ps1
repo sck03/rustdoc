@@ -45,6 +45,7 @@ $dependencyPolicyScript = Join-Path $scriptRoot "verify-dependency-policy.mjs"
 Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyScript) -WorkingDirectory $repoRoot
 $dependencyPolicyTestScript = Join-Path $scriptRoot "test_dependency_policy.mjs"
 Invoke-ExportDocExternal -FilePath "node" -Arguments @($dependencyPolicyTestScript) -WorkingDirectory $repoRoot
+Invoke-ExportDocExternal -FilePath "node" -Arguments @('scripts/test_dependency_audit.mjs') -WorkingDirectory $repoRoot
 foreach ($test in @('assert-tauri-command-permissions.ps1', 'test_generated_artifact_protection.ps1', 'test_rust_build_paths.ps1', 'test_native_docker_lifecycle.ps1', 'test_native_docker_runtime.ps1', 'test_postgresql_macos_client.ps1')) {
     # Negative subprocess tests must not leak their expected LASTEXITCODE into the CI host.
     Invoke-ExportDocExternal -FilePath (Resolve-ExportDocPowerShellExecutable) `
@@ -52,6 +53,7 @@ foreach ($test in @('assert-tauri-command-permissions.ps1', 'test_generated_arti
         -WorkingDirectory $repoRoot
 }
 Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_cargo_paths.mjs') -WorkingDirectory $repoRoot
+Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_query_retention.mjs') -WorkingDirectory $repoRoot
 Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_verified_download.mjs') -WorkingDirectory $repoRoot
 $bashPath = Get-Command bash -CommandType Application -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty Source

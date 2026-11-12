@@ -8,7 +8,7 @@ use export_doc_domain::{
 use exportdoc_excel_analyzer::{SheetAnalysis, analyze_cells};
 use rust_decimal::Decimal;
 use serde_json::{Value, json};
-use std::{collections::BTreeMap, str::FromStr};
+use std::{borrow::Cow, collections::BTreeMap, str::FromStr};
 use unicode_normalization::UnicodeNormalization;
 
 pub(crate) fn import_date(raw: &str) -> Option<chrono::NaiveDate> {
@@ -190,10 +190,6 @@ pub(crate) fn parse(
     business_date: &str,
     check: Check<'_>,
 ) -> Result<Parsed> {
-    check()?;
-    let manual = manual
-        .map(crate::manual_mapping::ManualMapping::read)
-        .transpose()?;
     let epoch = match &workbook {
         Sheets::Xls(book) => Some(book.has_1904_epoch()),
         Sheets::Xlsx(book) => Some(book.has_1904_epoch()),
@@ -201,21 +197,68 @@ pub(crate) fn parse(
         _ => None,
     };
     let names = workbook.sheet_names().to_vec();
+    let mut total_cells = 0;
+    parse_sheets(
+        names,
+        |sheet| {
+            let range = workbook
+                .worksheet_range(sheet)
+                .map_err(|e| format!("工作表 {sheet} 无法读取：{e}"))?;
+            content_range(range, &mut total_cells, check).map(Cow::Owned)
+        },
+        epoch,
+        name,
+        manual,
+        business_date,
+        check,
+    )
+}
+
+/// Reuse the validated COO range without decoding or copying its cells again.
+pub(crate) fn parse_decoded(
+    range: &Range<Data>,
+    epoch: Option<bool>,
+    name: &str,
+    mapping: &Value,
+    business_date: &str,
+    check: Check<'_>,
+) -> Result<Parsed> {
+    let sheet = crate::manual_mapping::ManualMapping::read(mapping)?.sheet;
+    parse_sheets(
+        vec![sheet],
+        |_| Ok(Cow::Borrowed(range)),
+        epoch,
+        name,
+        Some(mapping),
+        business_date,
+        check,
+    )
+}
+
+fn parse_sheets<'a>(
+    names: Vec<String>,
+    mut read: impl FnMut(&str) -> Result<Cow<'a, Range<Data>>>,
+    epoch: Option<bool>,
+    name: &str,
+    manual: Option<&Value>,
+    business_date: &str,
+    check: Check<'_>,
+) -> Result<Parsed> {
+    check()?;
+    let manual = manual
+        .map(crate::manual_mapping::ManualMapping::read)
+        .transpose()?;
     if names.len() > 64 {
         return Err("Excel 工作表超过 64 个。".into());
     }
     let mut analyses = Vec::new();
-    let mut selected: Option<(Range<Data>, SheetAnalysis)> = None;
-    let mut total_cells = 0_usize;
+    let mut selected: Option<(Cow<'a, Range<Data>>, SheetAnalysis)> = None;
     for name in names {
         check()?;
         if manual.as_ref().is_some_and(|mapping| name != mapping.sheet) {
             continue;
         }
-        let range = workbook
-            .worksheet_range(&name)
-            .map_err(|e| format!("工作表 {name} 无法读取：{e}"))?;
-        let range = content_range(range, &mut total_cells, check)?;
+        let range = read(&name)?;
         let (height, width) = range.get_size();
         if range.is_empty() {
             continue;

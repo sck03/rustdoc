@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
+import { largeDocumentQueryOptions } from "../../api/queryRetention.ts";
 import { previewSourcePageSize, type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
@@ -43,6 +44,7 @@ export function useReportTemplateWorkspaceQueries({
   });
 
   const userTemplateContentQuery = useQuery({
+    ...largeDocumentQueryOptions,
     queryKey: queryKeys.userReportTemplateContent(reportType, selectedUserTemplateId),
     queryFn: ({ signal }) => client.getUserReportTemplate({ id: selectedUserTemplateId }, { signal }),
     enabled: enabled && selectedUserTemplateId > 0,
@@ -84,6 +86,7 @@ export function useReportTemplateWorkspaceQueries({
   });
 
   const templateContentQuery = useQuery({
+    ...largeDocumentQueryOptions,
     queryKey: queryKeys.reportTemplateContent(reportType, selectedTemplatePath),
     queryFn: ({ signal }) => client.getReportTemplateContent({ reportType, templatePath: selectedTemplatePath }, { signal }),
     enabled: enabled && Boolean(selectedTemplatePath) && selectedUserTemplateId <= 0 && !selectedTemplatePath.startsWith("user-template:"),
