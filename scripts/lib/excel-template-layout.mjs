@@ -62,6 +62,15 @@ export async function buildExcelTemplates({ Workbook, SpreadsheetFile, FileBlob 
     if (field.format === "date") base.getCell(index + 2, 1).setNumberFormat("yyyy-mm-dd");
     if (/Address|shippingMarks|transDetails|producer$/.test(field.key) || field.note?.length > 35) base.getCell(index + 2, 1).format.rowHeight = 30;
   }
+  // 1860 px leaves room for row headings and the scrollbar on a 1920 px screen.
+  // Keep short codes compact and give names/addresses the remaining input space.
+  const columnWidths = {
+    styleNameCN: 320, styleName: 430, hsCode: 120, quantity: 120, unitEN: 110,
+    cartons: 120, ctnUnitEN: 110, unitPrice: 120, totalPrice: 140, fobValue: 140,
+    producerKey: 130, prdcEtpsName: 260, producerNameEN: 310, producerAddressEN: 360,
+    ciqRegNo: 140, prdcEtpsConcEr: 90, prdcEtpsTel: 110, producerTel: 110,
+    producerFax: 110, producerEmail: 150, producerSertFlag: 90,
+  };
   function table(sheet, fields, title, note, name) {
     sheet.getRangeByIndexes(0, 0, 1, fields.length).merge();
     sheet.getRange("A1").values = [[title]];
@@ -72,11 +81,11 @@ export async function buildExcelTemplates({ Workbook, SpreadsheetFile, FileBlob 
     sheet.getRangeByIndexes(2, 0, 1, fields.length).values = [fields.map(field => field.label)];
     for (const [column, field] of fields.entries()) {
       const range = sheet.getRangeByIndexes(2, column, 101, 1);
-      range.format.columnWidthPx = /Address|goodsDesc/.test(field.key) ? 200 : /Name|Email/.test(field.key) ? 140 : /producerKey|Criteria|Tel|Fax/.test(field.key) ? 105 : 85;
+      range.format.columnWidthPx = columnWidths[field.key] ?? 110;
       range.format.numberFormat = field.format === "number" ? "#,##0.#####" : "@";
       sheet.getRangeByIndexes(3, column, 100, 1).format.horizontalAlignment = field.format === "number" ? "right" : "left";
     }
-    sheet.getRangeByIndexes(2, 0, 1, fields.length).format = { fill: palette.heading, font: { color: "#FFFFFF", bold: true }, wrapText: true, horizontalAlignment: "center", rowHeight: 30 };
+    sheet.getRangeByIndexes(2, 0, 1, fields.length).format = { fill: palette.heading, font: { color: "#FFFFFF", bold: true }, wrapText: false, horizontalAlignment: "center", rowHeight: 30 };
     sheet.getRangeByIndexes(3, 0, 100, fields.length).format = { fill: palette.input, borders: { insideHorizontal: { style: "thin", color: palette.border } } };
     sheet.freezePanes.freezeRows(3);
     sheet.tables.add(`A3:${String.fromCharCode(64 + fields.length)}103`, true, name);
@@ -112,7 +121,7 @@ export async function buildExcelTemplates({ Workbook, SpreadsheetFile, FileBlob 
   sheet.getRange("A20:X61").format.borders = { preset: "all", style: "thin", color: palette.border };
   for (let row = 21; row <= 60; row += 2) sheet.getRange(`B${row}:X${row}`).format.fill = "#FFFFFF";
   sheet.getRange("A61:X61").format = { fill: palette.soft, font: { bold: true }, rowHeight: 20 };
-  const widths = [145,70,70,160,120,130,70,80,80,65,55,55,55,55,32,32,32,60,55,65,55,65,65,75];
+  const widths = [145,74,74,210,130,170,76,80,80,65,55,55,55,55,32,32,32,60,55,65,55,65,65,75];
   for (const [column, width] of widths.entries()) sheet.getRangeByIndexes(0, column, 61, 1).format.columnWidthPx = width;
   sheet.freezePanes.unfreeze();
   sheet.freezePanes.freezeRows(2);

@@ -32,7 +32,7 @@ for (const item of packages) {
     }
   }
 }
-console.log(`RUSTSEC-2024-0429 exception preconditions checked: glib 0.18.5 / tauri 2.12.5, ${scanned} Rust files. Upstream issue remains unfixed.`);
+console.log(`RUSTSEC-2024-0429 exception preconditions checked: glib 0.18.5 / tauri 2.12.5, ${scanned} Rust files. GLib >=0.20 fixes the issue; the GTK3-compatible 0.18 branch remains affected.`);
 
 function* rustFiles(directory) {
   for (const item of readdirSync(directory, { withFileTypes: true })) {
