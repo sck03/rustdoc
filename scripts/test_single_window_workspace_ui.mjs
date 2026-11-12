@@ -136,6 +136,7 @@ try {
       await page.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).find(b=>b.textContent.includes('导出提交包')).disabled);
       await button.click();await page.waitForFunction(()=>window.pending.length===2);
       await page.evaluate(()=>window.hide());
+      await page.getByText('closed',{exact:true}).waitFor();
       await page.evaluate(()=>window.pending[1].resolve('E:/late.swpkg'));
       await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,30)));
       assert.equal(await page.evaluate(()=>window.pending.length),2,'late dialog cannot start export');
@@ -250,6 +251,8 @@ try {
   for(const action of ['hide','revoke']) await scenario('directories', async page => {
     await page.waitForFunction(() => window.pending.length===1);
     await page.evaluate(action => window[action](), action);
+    if (action==='hide') await page.getByText('closed',{exact:true}).waitFor();
+    else await page.getByLabel('COO 发送目录 OutBox',{exact:true}).and(page.locator(':disabled')).waitFor();
     await page.evaluate(found => window.pending[0].resolve(found), detected);
     assert.equal(await page.getByText('已读取客户端任务目录，请核对后保存。').count(),0);
     assert.equal(await page.evaluate(() => window.directoryValue.customsCooDirectories.outBox),'');
