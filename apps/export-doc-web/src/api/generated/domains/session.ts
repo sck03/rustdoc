@@ -9,13 +9,27 @@ export default function createApi(transport: ApiTransport) {
   downloadJobResultWithTicket(request: DownloadJobResultWithTicketRequest, init?: ApiRequestInit): Promise<Blob> {
     init = { timeoutMs: 86400000, ...init };
     const path = `/downloads/jobs/${encodePath(request.token)}`;
-    return transport.request<Blob>("GET", path, { init });
+    return transport.request<Blob>("GET", path, {
+      init: {
+        ...init,
+        headers: mergeHeaders(init?.headers, {
+          "Range": request.Range === undefined ? undefined : String(request.Range),
+        }),
+      },
+    });
   },
 
   downloadPostgreSqlPhysicalBackupWithTicket(request: DownloadPostgreSqlPhysicalBackupWithTicketRequest, init?: ApiRequestInit): Promise<Blob> {
     init = { timeoutMs: 86400000, ...init };
     const path = `/downloads/postgresql-backups/${encodePath(request.token)}`;
-    return transport.request<Blob>("GET", path, { init });
+    return transport.request<Blob>("GET", path, {
+      init: {
+        ...init,
+        headers: mergeHeaders(init?.headers, {
+          "Range": request.Range === undefined ? undefined : String(request.Range),
+        }),
+      },
+    });
   },
 
   login(request: LoginRequest, init?: ApiRequestInit): Promise<ApiLoginResponse> {

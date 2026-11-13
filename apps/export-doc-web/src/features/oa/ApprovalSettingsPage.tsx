@@ -183,7 +183,7 @@ function ApprovalSettingsEditor({
           <fieldset disabled={operation.busy} className="office-form-grid">
             <legend>{views.find((item) => item.key === view)?.label}</legend>
             {view === "definitions" && !rule && (
-              <Button type="button" disabled={draft.rules.length >= 113} onClick={() => addApplication()}>
+              <Button type="button" onClick={() => addApplication()}>
                 新建审批事项
               </Button>
             )}
@@ -292,7 +292,7 @@ function ApprovalSettingsEditor({
             )}
             {view === "definitions" && rule?.form && (
               <div className="office-card-actions">
-                <Button disabled={draft.rules.length >= 113} onClick={() => addApplication(rule)}>
+                <Button onClick={() => addApplication(rule)}>
                   复制为新事项
                 </Button>
                 {!publication && (

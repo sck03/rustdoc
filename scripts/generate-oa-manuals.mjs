@@ -63,6 +63,8 @@ const manifest = [];
 try {
   for (const [name, label, screenshot] of [["OA管理员手册", "ADMIN", "form-designer.png"], ["OA用户手册", "USER", "request-details.png"]]) {
     const source = fs.readFileSync(path.join(sourceRoot, `${name}.md`), "utf8");
+    const date = source.match(/版本日期：(\d{4}-\d{2}-\d{2})/u)?.[1];
+    if (!date) throw new Error(`${name}: source revision date is required`);
     const sections = source.split(/^---\s*$/mu).map((section, index) => `<section class="${index ? "chapter" : "cover"}">${markdown(section)}</section>`);
     const screenshotPath = path.join(sourceRoot, "images", screenshot);
     if (!fs.existsSync(screenshotPath)) throw new Error(`Current anonymous UI evidence is required: ${screenshotPath}`);
@@ -75,7 +77,7 @@ try {
       await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].map(image => image.decode())); });
       const pdf = path.join(sourceRoot, `${name}.pdf`);
       await page.pdf({ path: pdf, preferCSSPageSize: true, printBackground: true, tagged: true, outline: true, displayHeaderFooter: true,
-        headerTemplate: '<div></div>', footerTemplate: `<div style="font-size:8px;width:100%;margin:0 18mm;color:#607080;display:flex;justify-content:space-between"><span>ExportDocManager / OA ${label} / 2026-11-12</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>` });
+        headerTemplate: '<div></div>', footerTemplate: `<div style="font-size:8px;width:100%;margin:0 18mm;color:#607080;display:flex;justify-content:space-between"><span>ExportDocManager / OA ${label} / ${date}</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>` });
       manifest.push({ file: path.relative(root, pdf), bytes: fs.statSync(pdf).size, sourceSha256: createHash("sha256").update(source).digest("hex"), expectedPages: sections.length });
     } finally { await page.close(); }
   }

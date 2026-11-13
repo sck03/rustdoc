@@ -248,7 +248,16 @@ pub(super) fn project(
     };
     let plan = if detail { None } else { approval::plan(&row)? };
     row["attachments"] = if detail {
-        json!(children(tx, &row, "oa-attachment", 0, 20)?.1)
+        json!(
+            children(
+                tx,
+                &row,
+                "oa-attachment",
+                0,
+                crate::engine::file_store::policy::MAX_REQUEST_FILES
+            )?
+            .1
+        )
     } else {
         json!([])
     };

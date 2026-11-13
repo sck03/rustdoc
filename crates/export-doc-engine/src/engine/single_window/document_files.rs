@@ -1,16 +1,16 @@
 use super::*;
+use crate::engine::file_store::PreparedObject;
 use export_doc_single_window::digest;
-use export_doc_storage::BlobWrite;
 use std::collections::BTreeMap;
 
 const PREFIX: &str = "sw-attachment:";
 pub const SINGLE: usize = 8 * 1024 * 1024;
 
 pub fn prepare(
-    tx: &Connection,
+    store: &store::Store,
     document_id: i64,
     body: &mut Value,
-) -> Result<BTreeMap<String, Vec<u8>>> {
+) -> Result<BTreeMap<String, PreparedObject>> {
     let mut files = BTreeMap::new();
     let mut total = 0;
     let Some(rows) = body["attachments"].as_array_mut() else {
@@ -26,11 +26,13 @@ pub fn prepare(
             if !export_doc_single_window::hex(hash, 64) {
                 return Err(invalid("附件资源编号无效。"));
             }
-            tx.blob(document_id, path)?
-                .ok_or_else(|| error(404, "单证附件不存在。"))?
-                .content
+            let info = store
+                .connection()?
+                .file_info(document_id, path)?
+                .ok_or_else(|| error(404, "单证附件不存在。"))?;
+            store.files.load(&info, SINGLE)?.content
         } else {
-            if tx.provider() != "SQLite" {
+            if store.provider()? != "SQLite" {
                 return Err(invalid("网页申报不能读取服务器本地文件。"));
             }
             super::super::media::read_local(std::path::Path::new(path), SINGLE)?
@@ -53,17 +55,21 @@ pub fn prepare(
         row["filePath"] = json!(key);
         row["fileExistsAtBuild"] = json!(true);
         row["sortOrder"] = json!(index + 1);
-        files.insert(key, bytes);
+        files.insert(key, store.files.prepare(&bytes)?);
     }
     Ok(files)
 }
 
-pub fn persist(tx: &Connection, document: &Value, files: &BTreeMap<String, Vec<u8>>) -> Result<()> {
+pub fn persist(
+    tx: &Connection,
+    document: &Value,
+    files: &BTreeMap<String, PreparedObject>,
+) -> Result<()> {
     let id = document["id"]
         .as_i64()
         .ok_or_else(|| unavailable("单证编号损坏。"))?;
-    for (key, bytes) in files {
-        if tx.blob(id, key)?.is_some() {
+    for (key, prepared) in files {
+        if tx.file_info(id, key)?.is_some() {
             continue;
         }
         let row = document["attachments"]
@@ -72,15 +78,13 @@ pub fn persist(tx: &Connection, document: &Value, files: &BTreeMap<String, Vec<u
             .flatten()
             .find(|r| r["filePath"] == *key)
             .ok_or_else(|| unavailable("附件元数据缺失。"))?;
-        tx.insert_blob(&BlobWrite {
-            kind: key,
-            record_id: id,
-            file_name: rules::text(row, "fileName"),
-            media_type: rules::text(row, "mediaType"),
-            digest: &digest(bytes),
-            content: bytes,
-            created_at: &store::timestamp(),
-        })?;
+        tx.publish_file(
+            prepared,
+            key,
+            id,
+            rules::text(row, "fileName"),
+            rules::text(row, "mediaType"),
+        )?;
     }
     Ok(())
 }

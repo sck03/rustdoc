@@ -14,6 +14,7 @@ import { readSettingsCategoryFromSearch, readSettingsPanelLabelFromSearch } from
 import { useSettingsWorkspace } from "./useSettingsWorkspace.ts";
 
 const LazyRuntimeDatabaseSettingsPanel = lazy(() => import("./RuntimeDatabaseSettingsPanel.tsx"));
+const LazyFileStorageSettingsPanel = lazy(() => import("./FileStorageSettingsPanel.tsx"));
 const LazyDocumentSettingsPanel = lazy(() => import("./DocumentSettingsPanel.tsx"));
 const LazyExcelImportSettingsPanel = lazy(() => import("./ExcelImportSettingsPanel.tsx"));
 const LazyExchangeRateSettingsPanel = lazy(() => import("./ExchangeRateSettingsPanel.tsx"));
@@ -109,6 +110,7 @@ export function SettingsPage({
                 action={healthQuery.isError ? <button className="command-button secondary" type="button" onClick={() => void healthQuery.refetch()}>重试运行状态</button> : undefined} />}
               {validationResult && <SettingsValidationPanel result={validationResult} disabled={isBusy || !canManageSettings} onApplyAutoFix={handleApplyValidationFix} />}
               <Suspense fallback={<PageState tone="loading" title="正在加载设置分类" />}>
+              {currentCategory === "runtime" && canManageSettings && <LazyFileStorageSettingsPanel client={client} canManage={canManageSettings} />}
               {currentCategory === "runtime" ? (
                 <LazyRuntimeDatabaseSettingsPanel
                   settings={settings}

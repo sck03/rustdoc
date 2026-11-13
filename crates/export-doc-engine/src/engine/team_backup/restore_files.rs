@@ -21,6 +21,13 @@ pub(super) fn install(paths: &RuntimePaths, staging: &Path, sqlite: bool) -> Res
     let mut targets = vec![
         (package::KEY, Some(package::KEY)),
         ("Templates", Some("Templates")),
+        ("Files", Some("Files")),
+        ("Configuration/file-migration.json", None),
+        ("Configuration/FileUploads", None),
+        (
+            "Configuration/file-storage.json",
+            Some("Configuration/file-storage.json"),
+        ),
     ];
     if sqlite {
         targets.extend([
@@ -86,6 +93,10 @@ pub(super) fn rollback(paths: &RuntimePaths, staging: &Path) -> Result<()> {
             entry.target.as_str(),
             package::KEY
                 | "Templates"
+                | "Files"
+                | "Configuration/file-migration.json"
+                | "Configuration/FileUploads"
+                | "Configuration/file-storage.json"
                 | package::SQLITE
                 | "Database/exportdoc-native.db-wal"
                 | "Database/exportdoc-native.db-shm"

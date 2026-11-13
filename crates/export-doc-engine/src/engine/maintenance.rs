@@ -117,6 +117,7 @@ pub fn list(store: &Store, paths: &RuntimePaths, actor: &Actor) -> Result<Value>
 }
 pub fn create(store: &Store, paths: &RuntimePaths, actor: &Actor) -> Result<PathBuf> {
     auth::authorize(actor, "system.backup", "manage")?;
+    let _backup = super::team_backup::package::lock(paths)?;
     create_verified(store, paths)
 }
 fn create_verified(store: &Store, paths: &RuntimePaths) -> Result<PathBuf> {
@@ -134,6 +135,11 @@ fn create_verified(store: &Store, paths: &RuntimePaths) -> Result<PathBuf> {
     let result = (|| {
         paths::ensure_safe_absolute(&temporary).map_err(invalid)?;
         store.connection()?.backup(&temporary)?;
+        let snapshot = export_doc_storage::Connection::sqlite(&temporary)?;
+        super::file_store::incremental::capture(store, &temporary, &target, |cursor| {
+            Ok(snapshot.file_objects(cursor, 200, false)?)
+        })?;
+        drop(snapshot);
         paths::ensure_safe_absolute(&target).map_err(invalid)?;
         fs::rename(&temporary, &target)?;
         Ok(target)
@@ -145,6 +151,7 @@ fn create_verified(store: &Store, paths: &RuntimePaths) -> Result<PathBuf> {
 }
 pub fn restore(store: &Store, paths: &RuntimePaths, actor: &Actor, body: &Value) -> Result<()> {
     auth::authorize(actor, "system.backup", "manage")?;
+    let _backup = super::team_backup::package::lock(paths)?;
     let name = body["backupFileName"].as_str().unwrap_or("");
     if !paths::valid_file_name(name)
         || Path::new(name)
@@ -159,6 +166,7 @@ pub fn restore(store: &Store, paths: &RuntimePaths, actor: &Actor, body: &Value)
     let source_path = root(paths)?.join(name);
     paths::ensure_safe_absolute(&source_path).map_err(invalid)?;
     store.connection()?.verify_backup(&source_path)?;
+    super::file_store::incremental::restore(&store.files, &source_path)?;
     let working = paths
         .cache_root
         .join("DatabaseRestore")
@@ -168,6 +176,11 @@ pub fn restore(store: &Store, paths: &RuntimePaths, actor: &Actor, body: &Value)
     let result: Result<()> = (|| {
         let snapshot = working.join("restore.sqlite3");
         export_doc_storage::prepare_sqlite_restore(&source_path, &snapshot)?;
+        let backup = export_doc_storage::Connection::sqlite(&snapshot)?;
+        store
+            .files
+            .verify_inventory(|cursor| Ok(backup.file_objects(cursor, 200, false)?))?;
+        drop(backup);
         // Upgrade the snapshot first; an incompatible backup cannot replace the running database.
         create_verified(store, paths)?;
         let connection = store.connection()?;
@@ -183,6 +196,7 @@ pub fn restore(store: &Store, paths: &RuntimePaths, actor: &Actor, body: &Value)
 
 pub fn cleanup(store: &Store, paths: &RuntimePaths, actor: &Actor, body: &Value) -> Result<Value> {
     auth::authorize(actor, "system.backup", "manage")?;
+    let _backup = super::team_backup::package::lock(paths)?;
     let days = body["daysToKeep"]
         .as_i64()
         .filter(|days| (1..=3650).contains(days))
@@ -211,9 +225,14 @@ pub fn cleanup(store: &Store, paths: &RuntimePaths, actor: &Actor, body: &Value)
             .ok_or_else(|| invalid("备份文件名无效。"))?;
         let candidate = root(paths)?.join(name);
         paths::ensure_safe_absolute(&candidate).map_err(invalid)?;
-        fs::remove_file(candidate)?;
+        fs::remove_file(&candidate)?;
+        let manifest = candidate.with_extension("objects.jsonl");
+        if manifest.try_exists()? {
+            fs::remove_file(manifest)?;
+        }
         removed += 1;
     }
+    super::file_store::incremental::collect(&root(paths)?, &paths.cache_root.join("FileStaging"))?;
     let mut result = list(store, paths, actor)?;
     result["success"] = json!(true);
     result["message"] = json!(format!(

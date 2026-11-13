@@ -1360,6 +1360,45 @@ export interface ApiExporterDto {
   swiftCode: string;
 }
 
+export interface ApiFileStorageMigrationRequest {
+  cancel?: boolean;
+  directory?: string;
+  expectedVersion?: number;
+  kind?: string;
+  resume?: boolean;
+  s3?: ApiBackupS3Settings;
+  secret?: string;
+  token?: string;
+}
+
+export interface ApiFileStoragePolicy {
+  fileBytes: number;
+  quotaBytes: number;
+  requestBytes: number;
+  requestFiles: number;
+}
+
+export interface ApiFileStoragePolicyRequest {
+  expectedVersion: number;
+  policy: ApiFileStoragePolicy;
+}
+
+export interface ApiFileStorageStatus {
+  directory?: string;
+  fileCount?: number;
+  healthMessage?: string;
+  healthy?: boolean;
+  kind?: string;
+  logicalBytes?: number;
+  migrationPending?: boolean;
+  physicalBytes?: number;
+  policy?: ApiFileStoragePolicy;
+  registeredRoots?: string[];
+  s3?: ApiBackupS3Settings;
+  unreferencedBytes?: number;
+  versionNumber?: number;
+}
+
 export interface ApiHealthResponse {
   appRoot: string;
   checkedAt: string;
@@ -4046,7 +4085,10 @@ export interface BusinessAttachmentDelete {
 export interface BusinessAttachmentDetails {
   attachment: BusinessAttachmentRecord;
   eventCount: number;
+  eventNextCursor?: number | null;
   events: BusinessAttachmentEventRecord[];
+  revisionCount?: number;
+  revisionNextCursor?: number | null;
   revisions: BusinessAttachmentRevisionRecord[];
 }
 
@@ -4070,7 +4112,7 @@ export interface BusinessAttachmentMetadataUpdate {
 export interface BusinessAttachmentPage {
   canUpload: boolean;
   fileBytesLimit: number;
-  invoiceBytesLimit: number;
+  invoiceBytesLimit: number | null;
   page: PagedResultOfBusinessAttachmentRecord;
   usedBytes?: number | null;
 }
@@ -6250,6 +6292,12 @@ export interface PersonnelAttachment {
   sizeBytes: number;
 }
 
+export interface PersonnelAttachmentPage {
+  items: PersonnelAttachment[];
+  nextCursor?: string | null;
+  totalCount: number;
+}
+
 export interface PersonnelClearance {
   approvalCount?: number;
   businessDataCount?: number;
@@ -6381,6 +6429,7 @@ export interface PersonnelProfile {
 export interface PersonnelRecord {
   account?: null | PersonnelAccountRecord;
   approvalRequiredActions?: ("Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire")[];
+  attachmentCount?: number;
   attachments?: PersonnelAttachment[];
   canCorrectRegistration: boolean;
   canDelete: boolean;
@@ -8405,96 +8454,115 @@ export interface DownloadAgentConsignmentSubmitPackageRequest {
 export interface DownloadAnnouncementAttachmentRequest {
   id: number;
   attachmentId: number;
+  Range?: string;
 }
 
 export interface DownloadApprovalOfExpenseRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadApprovalOfGeneralRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadApprovalOfLeaveRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadApprovalOfMeetingBookingRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadApprovalOfOfficeSupplyRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadApprovalOfOvertimeRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadApprovalOfPersonnelChangeRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadApprovalOfPurchaseRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadApprovalOfTravelRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadAttachmentOfExpenseRequestRequest {
   id: number;
   attachmentId: number;
+  Range?: string;
 }
 
 export interface DownloadAttachmentOfGeneralRequestRequest {
   id: number;
   attachmentId: number;
+  Range?: string;
 }
 
 export interface DownloadAttachmentOfLeaveRequestRequest {
   id: number;
   attachmentId: number;
+  Range?: string;
 }
 
 export interface DownloadAttachmentOfMeetingBookingRequest {
   id: number;
   attachmentId: number;
+  Range?: string;
 }
 
 export interface DownloadAttachmentOfOfficeSupplyRequestRequest {
   id: number;
   attachmentId: number;
+  Range?: string;
 }
 
 export interface DownloadAttachmentOfOvertimeRequestRequest {
   id: number;
   attachmentId: number;
+  Range?: string;
 }
 
 export interface DownloadAttachmentOfPersonnelChangeRequestRequest {
   id: number;
   attachmentId: number;
+  Range?: string;
 }
 
 export interface DownloadAttachmentOfPurchaseRequestRequest {
   id: number;
   attachmentId: number;
+  Range?: string;
 }
 
 export interface DownloadAttachmentOfTravelRequestRequest {
   id: number;
   attachmentId: number;
+  Range?: string;
 }
 
 export interface DownloadAuditLogsRequest {
@@ -8504,6 +8572,7 @@ export interface DownloadAuditLogsRequest {
 export interface DownloadBusinessAttachmentRequest {
   id: number;
   revision: number;
+  Range?: string;
 }
 
 export interface DownloadContainerPackingPdfRequest {
@@ -8521,64 +8590,77 @@ export interface DownloadInvoiceTransferPackageRequest {
 
 export interface DownloadJobResultRequest {
   jobId: string;
+  Range?: string;
 }
 
 export interface DownloadJobResultWithTicketRequest {
   token: string;
+  Range?: string;
 }
 
 export interface DownloadMaterialsOfExpenseRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadMaterialsOfGeneralRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadMaterialsOfLeaveRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadMaterialsOfMeetingBookingRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadMaterialsOfOfficeSupplyRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadMaterialsOfOvertimeRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadMaterialsOfPersonnelChangeRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadMaterialsOfPurchaseRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadMaterialsOfTravelRequestRequest {
   id: number;
   submissionId: number;
+  Range?: string;
 }
 
 export interface DownloadPersonnelAttachmentRequest {
   id: number;
   attachmentId: string;
+  Range?: string;
 }
 
 export interface DownloadPostgreSqlPhysicalBackupWithTicketRequest {
   token: string;
+  Range?: string;
 }
 
 export interface DownloadQueriedInvoicesRequest {
@@ -8587,6 +8669,7 @@ export interface DownloadQueriedInvoicesRequest {
 
 export interface DownloadRecoveryArchiveWithTicketRequest {
   token: string;
+  Range?: string;
 }
 
 export interface DownloadReportTemplateFileRequest {
@@ -8595,6 +8678,7 @@ export interface DownloadReportTemplateFileRequest {
 
 export interface DownloadReportTemplateV3ImageResourceRequest {
   resourceId: string;
+  Range?: string;
 }
 
 export interface DownloadSingleWindowReceiptPackageRequest {
@@ -8708,15 +8792,18 @@ export interface ExecuteTravelRequestWorkflowRequest {
 export interface ExportCrmCustomersRequest {
   keyword?: string;
   status?: string;
+  Range?: string;
 }
 
 export interface ExportHsCodeKnowledgeRequest {
   since?: string;
+  Range?: string;
 }
 
 export interface ExportSuppliersRequest {
   keyword?: string;
   status?: string;
+  Range?: string;
 }
 
 export interface FetchRemoteHsCodeDetailRequest {
@@ -8787,6 +8874,8 @@ export interface GetAnnouncementRequest {
 
 export interface GetBusinessAttachmentRequest {
   id: number;
+  revisionBefore?: number;
+  eventBefore?: number;
 }
 
 export interface GetContainerPackingProjectRequest {
@@ -8982,6 +9071,7 @@ export interface GetPersonnelRequest {
 
 export interface GetPersonnelAvatarRequest {
   id: number;
+  Range?: string;
 }
 
 export interface GetPersonnelChangeRequestRequest {
@@ -9006,6 +9096,7 @@ export interface GetPersonnelHistoryRequest {
 export interface GetPersonnelImageRequest {
   id: number;
   kind: PersonnelImageKind;
+  Range?: string;
 }
 
 export interface GetPersonnelOptionsRequest {
@@ -9660,6 +9751,11 @@ export interface ListPersonnelAccountOptionsRequest {
   pageSize?: number;
 }
 
+export interface ListPersonnelAttachmentsRequest {
+  id: number;
+  after?: string;
+}
+
 export interface ListPersonnelChangeRequestRequest {
   pageNumber?: number;
   pageSize?: number;
@@ -9949,6 +10045,7 @@ export interface PreviewOaApprovalSheetRequest {
 
 export interface PreviewOcrImageRequest {
   filePath?: string;
+  Range?: string;
 }
 
 export interface PreviewOrganizationCompanyChangeRequest {
@@ -10617,6 +10714,10 @@ export interface StartExcelTemplateSaveToPathJobRequest {
   body: ApiExcelOutputRequest;
 }
 
+export interface StartFileStorageMigrationRequest {
+  body: ApiFileStorageMigrationRequest;
+}
+
 export interface StartInvoiceBookingSheetDownloadJobRequest {
   invoiceId: number;
 }
@@ -10845,6 +10946,10 @@ export interface UpdateExpenseRequestRequest {
 export interface UpdateExporterRequest {
   id: number;
   body: ApiExporterDto;
+}
+
+export interface UpdateFileStoragePolicyRequest {
+  body: ApiFileStoragePolicyRequest;
 }
 
 export interface UpdateGeneralRequestRequest {

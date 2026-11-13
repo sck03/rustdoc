@@ -1,5 +1,7 @@
 use export_doc_engine::{api::ApiError, engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
+#[path = "personnel_files_contract.rs"]
+mod files_contract;
 #[path = "approval_fixture.rs"]
 mod workflow;
 
@@ -119,6 +121,7 @@ fn unlink_roundtrip(service: &NativeService, admin: &str, person: Value) -> Valu
 }
 
 pub fn exercise(service: &NativeService, admin: &str) {
+    files_contract::exercise(service, admin);
     let suffix = nonce().unwrap();
     let body = json!({"requestKey":suffix,"employeeNumber":format!("AUDIT-{}", &suffix[..8]),"departmentId":"GENERAL","jobTitle":"业务员","employmentType":"FullTime","hireDate":"2026-09-01","onProbation":false,"profile":{"fullName":"资料校验"},
         "account":{"id":1,"role":"Admin"},"attachments":[{"id":"forged"}],"images":[{"kind":"Avatar","contentHash":"forged"}]});

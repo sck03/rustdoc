@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+核对日期：2026-11-13。当前使用全新 schema 18；旧实验库须另存后显式新建 DataRoot/数据库。日常文件已独立于数据库，完整迁机必须包含文件对象；下文带日期的旧验收条目不替代当前参数和能力。GitHub 入口与 quick/full 差异见[工作流手册](../docs/GitHub%20Actions工作流用途与运行手册.md)。
+
 OA 管理员和用户手册：`node scripts/generate-oa-manuals.mjs` 从 `docs/manuals` 的 Markdown 生成两份同名 PDF，使用现有 Playwright 和受管 Noto 字体；中间文件写入 `artifacts/oa-manuals`。首次准备前端依赖和报表字体，截图使用当前 `test_oa_custom_ui.mjs` 的匿名界面，分别保存为 `docs/manuals/images/form-designer.png`、`request-details.png`；更新后逐页检查中文、分页和完整性。阅读入口见[OA 手册](../docs/人员组织权限与OA操作手册.md)。
 
 普通依赖版本检查按月；完整依赖治理在每周一及相关改动/手动触发时执行，其余日期仅漏洞审计。GLib 的动态安全更新失败不受普通版本检查计划控制，详见[安全检查](../docs/依赖更新与安全检查.md)。
@@ -14,7 +16,7 @@ OA 管理员和用户手册：`node scripts/generate-oa-manuals.mjs` 从 `docs/m
 
 2026-11-10 共享控件：`npm --prefix apps/export-doc-web run test:shared-control-layout-ui` 在真实 HTTP/React 中核对长文本、待办分页与文件按钮；需先构建 `office_review` 与前端。Full 桌面验收复用同一检查并增加操作档案对齐。`test_hs_transfer_ui.mjs` 纳入 `test:concurrency-feedback`；单一窗口工作区回归覆盖版本绑定、保存/导出互斥、卸载取消及迟到下载。见[本批记录](../docs/archive/2026-11/2026-11-10导出一致性与共享控件修复记录.md)。
 
-2026-11-10 自定义 OA：`npm --prefix apps/export-doc-web run test:oa-ui` 包含真实 HTTP/React 新建事项、表单设计、仿真发布、员工申请、审批、办理和 PDF 下载。先运行 `cargo build --locked -p export-doc-server --example office_review` 与前端构建；两库业务合同分别随工作区测试及 `test-native-postgres.ps1 -Scope Workflows` 验证。当前使用 schema 17，见[本批记录](../docs/archive/2026-11/2026-11-10自定义OA重构与验收.md)。
+2026-11-10 自定义 OA：`npm --prefix apps/export-doc-web run test:oa-ui` 包含真实 HTTP/React 新建事项、表单设计、仿真发布、员工申请、审批、办理和 PDF 下载。先运行 `cargo build --locked -p export-doc-server --example office_review` 与前端构建；两库业务合同分别随工作区测试及 `test-native-postgres.ps1 -Scope Workflows` 验证。该批使用 schema 17，见[本批记录](../docs/archive/2026-11/2026-11-10自定义OA重构与验收.md)。
 
 > 2026-09-20：当前主线为 Tauri 2 + React + Rust。原 C# 行为和脚本从只读固定提交 `ba9dbdca72590b06c5f32740e4cd58d3027578da` 及 Git 历史对照；这里的正式构建不发布 ASP.NET sidecar，不要求 .NET SDK／Runtime，不使用 NPOI。
 
@@ -42,6 +44,7 @@ OA 管理员和用户手册：`node scripts/generate-oa-manuals.mjs` 从 `docs/m
 | `run-native.cmd`／`.ps1` | 默认启动 Document；`-Edition Sales` 或 `-Edition Full` 启动业务员版或 Full SQLite 测试包，`-AppRoot` 可指定包目录 |
 | `package-native-web-server.ps1` | 原版 React 构建、Rust HTTP 服务、报表与可选 OCR 资源；目标数据库 PostgreSQL 18 |
 | `run-native-docker.cmd`／`.ps1` | React + Rust HTTP + PostgreSQL 18 容器构建、启动和停止 |
+| `uninstall-native-docker.cmd` | 复用源码部署的原 RuntimeRoot，等同 `run-native-docker.ps1 -Uninstall`；移除本部署容器/网络并保留数据 |
 
 普通用户只运行 `scripts/` 根入口；`lib/`、`prepare-*`、`verify-*`、`assert-*` 为内部组合部件。
 
@@ -51,7 +54,7 @@ OA 管理员和用户手册：`node scripts/generate-oa-manuals.mjs` 从 `docs/m
 | --- | --- |
 | 根部 build/run/package 入口 | 用户构建、启动与打包；cmd 复用统一 PowerShell 宿主 |
 | `lib/` | 构建、受管路径、部署生命周期、浏览器会话和界面场景等共享实现，不直接运行 |
-| `github/` | 仓库初始化、公开源码检查及正式发布/镜像提升，仍被工作流引用 |
+| `github/` | 变更范围判定、公开源码检查及正式发布/镜像提升，供工作流复用；旧仓库初始化入口已退役 |
 | `baselines/` | 源码与样式规模门禁，属于版本控制输入，不是临时测试报告 |
 | `test_*`、`verify-*` | 模型、真实界面、平台与工程验证；不是安装运行依赖 |
 | `prepare-*`、`provision-*` | 从中央清单准备并校验受管资源，供构建/发布复用 |
@@ -123,7 +126,7 @@ pwsh -NoProfile -File scripts/package-native-web-server.ps1 -Version 1.2.3 -NoPa
 
 桌面业务库统一位于 `App_Data/Database/exportdoc-native.db`，实例锁位于 `App_Data/Locks`。旧位置出现数据库或伴随文件时拒绝启动，不自动搬迁或覆盖；Database 目录仅有 WAL/SHM 时也拒绝初始化。重建使用明确的新 DataRoot，不要手工只移动正在使用的主文件。WebView 内部数据库保留在 `WebView` profile 中。
 
-便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 17，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
+便携包重复构建保留已有 `App_Data`。当前只接受全新 schema 18，旧库和旧 schema 备份不兼容；只有数据库不存在才初始化，空文件或损坏库不覆盖。需要重建时退出旧程序，保留需要的原目录及备份，再显式使用新 DataRoot；不要修改版本标记。初始化错误及 panic 显示错误和日志位置，日志为 `App_Data/Logs/tauri-bootstrap-error.log` 或 `tauri-errors.log`；不可写时明确提示。
 
 Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便携包携带原版固定清单验证的微软离线安装器；缺少 WebView2 时显示安装／退出选择，保留取消、繁忙、超时和需重启处理。构建时核对微软签名、版本、大小和 SHA-256。Windows GNU 构建同时携带 `WebView2Loader.dll`。
 
@@ -145,6 +148,23 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 ## 网页与 Docker
 
+文件存储管理见[文件与容量](../docs/文件存储与容量管理.md)：`--file-store-root archive=<现存独立目录>` 或 `EXPORTDOCMANAGER_FILE_STORE_ROOTS` 登记扩容位置，Compose 挂载参考 `deploy/rust-native/file-storage.override.example.yml`。默认保留数据卸载使用 `scripts/uninstall-native-docker.cmd`；Linux 部署可使用服务器 `--print-uninstall` 输出对应目录的卸载脚本。默认不删数据库卷、附件、密钥、备份或共享镜像。普通数据库快照必须连同 `.objects.jsonl` 和 `Objects/` 保留。
+
+`npm --prefix apps/export-doc-web run test:file-storage-ui` 使用已按当前源码构建的 `office_review`，验证真实 React/HTTP 存储设置、附件分页、Range、迁移和身份故障；生成数据位于隔离的 `artifacts/file-storage-ui`。
+
+仓库根的最小联调顺序如下。Cargo 命令串行完成；不要在测试或 doc-test 运行中启动另一项 Cargo 编译。若需边打包边跑 UI，将已完成构建的 `office_review.exe` 复制到 `.codex-runtime` 内独立目录，再用 `EXPORTDOC_OFFICE_REVIEW_BINARY` 指定该副本。
+
+```powershell
+$env:CARGO_HOME = Join-Path $PWD '.codex-runtime/cargo-home'
+$env:npm_config_cache = Join-Path $PWD '.codex-runtime/npm-cache'
+npm --prefix apps/export-doc-web ci
+npm --prefix apps/export-doc-web run build
+cargo build --locked -p export-doc-server --example office_review
+npm --prefix apps/export-doc-web run test:file-storage-ui
+```
+
+源码部署卸载示例：`.\scripts\uninstall-native-docker.cmd -RuntimeRoot <原绝对目录> -NoPause`。`-Uninstall` 是 `-Stop` 的同义参数，不提供彻底删库或清除远端 S3 的开关。镜像部署使用同一镜像的 `--print-uninstall` 生成部署目录内 `uninstall.sh`，Linux 执行 `sh ./uninstall.sh`；不要用仓库源码入口卸载另一个 Compose 项目。独立文件挂载的应用和 restore 服务必须使用同一配置，具体合并命令见[Docker 指南](../docs/Docker容器部署与启动指南.md)。
+
 普通用户从[Docker 部署指南](../docs/Docker容器部署与启动指南.md)或[独立网页版指南](../docs/网页版部署与启动指南.md)开始；备份、换机和故障恢复按[服务器恢复指南](../docs/服务器备份迁移与恢复指南.md)执行。这里集中维护脚本参数及开发验证，不重复完整操作步骤。
 
 新版已发布镜像可直接执行 `docker run --rm <image> --print-compose > compose.yml`，再 `docker compose up -d --wait`。该入口自动准备 `config`／`data` 并完成初始化，默认发布局域网端口；不需要仓库源码或宿主脚本。网页发布包新增 `--setup-web`，后续自动读取 RuntimeConfig 和相邻 Web 目录。下面的 PowerShell Docker 参数属于已有源码部署及开发流程，不能混用新旧目录接管旧数据。
@@ -157,9 +177,9 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 源码脚本的启动／更新经过：准备镜像 → 停 API → 等数据库就绪 → 独立维护容器初始化或校验当前基线 → 启 API 并检查就绪。构建及缺失镜像取得在停 API 前完成，失败不打断原应用；已有/离线镜像按 missing 策略复用。原 `compose.yml` 的维护服务仍由脚本显式运行，`-SkipBuild` 复用已有镜像。新版 `compose.image.yml` 则声明初始化完成依赖，支持直接 Compose 启动；升级时先 pull，再 down（不删卷）及 up。两种入口的恢复失败均保留 API 停止状态。
 
-应用 schema 与 PostgreSQL 软件主版本是两件事：当前只支持全新 schema 17，不迁移旧试验库。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。维护前保留需要的备份/完整迁移包。
+应用 schema 与 PostgreSQL 软件主版本是两件事：当前只支持全新 schema 18，不迁移旧试验库。PostgreSQL 18 的补丁镜像升级保留现有卷，但不能将镜像改成 19 后直接复用旧卷；主版本升级须另行安排 PostgreSQL 原生迁移、兼容验证与停机恢复演练。维护前保留需要的备份/完整迁移包。
 
-首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接供初始化/恢复使用。桌面 SQLite 新库仍为 admin 空密码；当前仅支持全新 schema 17，不兼容此前试验库。
+首次浏览器管理员用 `admin`、自定 8—128 字符密码及该目录的 `bootstrap-token.txt` 初始化。日常服务只持有 PostgreSQL 18 业务连接，维护连接供初始化/恢复使用。桌面 SQLite 新库仍为 admin 空密码；当前仅支持全新 schema 18，不兼容此前试验库。
 
 ## 远端入口
 
@@ -192,8 +212,8 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 ### 备份、迁移与恢复
 
 - “日常灾备”默认关闭，可手工执行或按业务时区每天／每周生成完整加密包。“异机副本”选择 WebDAV／S3 并测试写入、回读和删除。新包及副本成功后执行受管保留策略，副本失败保留本地包和旧备份。内建为完整快照，增量和 WAL/PITR 由数据库运维另行配置。
-- 桌面 `.edmrecovery` 灾备包包含 SQLite 快照、Security 主密钥和 DataRoot/Templates；从本机明确选择的文件校验并暂存后，退出重开即可恢复。启动先取得实例锁，校验暂存内容，保存原文件并记录替换日志；失败停止启动，保留恢复目录。
-- PostgreSQL API 沿用“物理备份”名称，实际为 `pg_dump` custom-format `.dump`。完整包另含主密钥和用户模板。完整包仅接受 ZIP64／v2 认证分块格式，上传下载及摘要使用固定缓冲和受管磁盘，不设置固定总容量额度；v1 包明确拒绝，不自动转换或覆盖。磁盘余量、存储协议及 24 小时任务时限仍适用。
+- 桌面 `.edmrecovery` 灾备包包含 SQLite 快照、Security 主密钥、DataRoot/Templates 和 `FileObjects.pack`；从本机明确选择的文件校验并暂存后，退出重开即可恢复。启动先取得实例锁，校验暂存内容，保存原文件并记录替换日志；失败停止启动，保留恢复目录。
+- PostgreSQL API 沿用“物理备份”名称，实际为 `pg_dump` custom-format `.dump`。完整包另含主密钥、用户模板及 `FileObjects.pack`。本地数据库快照配套 `.objects.jsonl` 清单与邻接 `Objects/` 仓库，不可只搬运 dump。完整包仅接受 ZIP64／v2 认证分块格式，上传下载及摘要使用固定缓冲和受管磁盘，不设置固定总容量额度；v1 包明确拒绝，不自动转换或覆盖。尚无完整包分卷，磁盘余量、存储协议及 24 小时任务时限仍适用。
 - 服务器在界面完成密码/确认及暂存后，停止正常 API，使用同一个 AppRoot/DataRoot 执行 `ExportDocManager.Server --app-root <AppRoot> --data-root <DataRoot> --restore-pending`。维护进程需提供 `EXPORTDOCMANAGER_POSTGRES_CONNECTION`、独立 `EXPORTDOCMANAGER_POSTGRES_MAINTENANCE_CONNECTION` 和 NOLOGIN 所有者 `EXPORTDOCMANAGER_POSTGRES_OWNER`；两种连接须指向同一数据库，均可使用对应 `_FILE`。命令完成即退出，再以业务连接启动 API。
 - 新镜像部署依次执行 `docker compose stop application`、`docker compose run --rm --no-deps restore`、`docker compose up -d --no-deps --wait application`；每条成功后再执行下一条。旧源码入口继续使用 `scripts/run-native-docker.ps1 -RestorePending -NoPause` 及原 RuntimeRoot。普通 API 不持维护密钥，失败保留停止状态、待恢复标记及安全副本。
 - 服务端现有完整包可在网页按编号暂存恢复；外部大包可用 `--import-migration <绝对包路径> --package-password-file <私有密码文件>`，在 API 停止后通过独立维护锁导入并恢复。命令保持原 AppRoot／DataRoot 和维护连接。
@@ -201,7 +221,7 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 - 主密钥、暂存目录与恢复前副本使用共同的 Windows 私有 ACL／Unix 0700 目录边界。环境变量提供主密钥的部署明确拒绝独立密钥包操作，须由管理员安排密钥迁移。
 - 网页包随附 `Tools/PostgreSQL` 客户端和许可；版本、来源及 Windows SHA-256 在 `eng/native-runtime-packages.json`。Linux 客户端采用官方 bookworm 资源以避免在 Ubuntu 24.04 上引入更高 glibc 要求；容器使用 trixie 资源。macOS 构建机先安装 PostgreSQL 18 Homebrew formula，版本须与中央清单一致。
 
-`pg_dump`/`pg_restore` 从应用/维护容器通过数据库连接工作，不需要把数据库目录挂给 API，也不需要浏览器执行 `docker exec`。`postgres_data` 是数据库原始数据卷，`app_data` 含 Security、用户文件模板、任务输出和备份；换机不能只迁移数据库卷而漏掉应用数据和私有配置。正常停止不删除卷，禁止用 `down -v` 作为更新或恢复步骤。完整迁移包覆盖业务库、主密钥和用户模板，任务临时输出不属于完整业务迁移承诺；不能直接复制正在运行的 PostgreSQL 原始数据目录作为可靠备份。
+`pg_dump`/`pg_restore` 从应用/维护容器通过数据库连接工作，不需要把数据库目录挂给 API，也不需要浏览器执行 `docker exec`。`postgres_data` 是数据库原始数据卷，`app_data` 含 Security、用户文件模板、任务输出和备份；换机不能只迁移数据库卷而漏掉应用数据和私有配置。正常停止不删除卷，禁止用 `down -v` 作为更新或恢复步骤。完整迁移包覆盖业务库、主密钥、用户模板和文件对象，任务临时输出不属于完整业务迁移承诺；不能直接复制正在运行的 PostgreSQL 原始数据目录作为可靠备份。
 
 ### GitHub 构建产物
 
@@ -214,7 +234,7 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 | `rust-native-container-release.yml` | Docker 版本号与 x64／ARM64／all；验证同一镜像后按 publish 选择发布 GHCR，publish_latest 单独控制 |
 | `release-script-validation.yml` | 自动检查发布参数、版本同步、发布冲突、脚本语法及 workflow 语法 |
 | `rust-native-validation.yml` | 自动按改动运行 Rust 单元／契约及前端回归；手工选择 full |
-| `native-full-validation.yml` | 内部 workflow_call：集成、doc-test、全部特性、跨平台包与容器验收，无第二个手工入口 |
+| `native-full-validation.yml` | 内部 workflow_call：集成、doc-test、全部特性、Windows OA/文件存储 HTTP+React、跨平台包与容器验收，无第二个手工入口 |
 | `dependency-governance.yml` | npm／Cargo／原生资源的许可与 SBOM；不调用 .NET |
 | `browser-compatibility.yml` | 仅手工 Firefox／WebKit 验收 |
 

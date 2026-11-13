@@ -13,9 +13,12 @@ mod business_query;
 pub use audit_query::AuditQuery;
 mod crm_query;
 pub use crm_query::{CrmList, CrmQuery};
+mod attachment_history;
 mod communication;
+mod file_catalog;
 mod generic_query;
 pub use business_query::{BusinessList, BusinessQuery};
+pub use file_catalog::{FileInfo, FileObject, FileWrite};
 mod hs_query;
 mod import_preview_query;
 pub use import_preview_query::ImportPreviewUsage;
@@ -34,10 +37,13 @@ mod supplier_overview_query;
 pub use job_query::{JobOutputRetention, JobQuery, JobRetention};
 pub use office_query::OfficeQuery;
 pub use personnel_query::PersonnelQuery;
+mod record_projection;
 mod record_query;
 mod record_selection;
 mod related_query;
+mod resource_index;
 mod resource_query;
+pub use resource_index::ResourceQuery;
 mod single_window_query;
 mod workflow_origin;
 mod worklist_query;
@@ -367,6 +373,21 @@ impl Connection {
     }
 }
 delegate! {
+    insert_file(file:&FileWrite<'_>)->();
+    file_info(record:i64,kind:&str)->Option<FileInfo>;
+    file_page(record:i64,prefix:&str,after:&str,limit:i64)->(i64,Vec<FileInfo>);
+    delete_files(record:i64,kind:Option<&str>)->();
+    file_objects(after:&str,limit:i64,unused:bool)->Vec<FileObject>;
+    file_statistics()->Value;
+    file_usage(company:&str)->u64;
+    file_owner_company(record:i64)->String;
+    pending_file_copies(identity:&str)->Vec<FileObject>;
+    locate_file(identity:&str,digest:&str)->();
+    query_resources(query:&ResourceQuery<'_>)->(i64,Vec<Value>);
+    append_attachment_history(record:i64,kind:&str,body:&Value)->();
+    attachment_history(record:i64,kind:&str,before:Option<i64>,limit:i64)->Value;
+    file_is_referenced(digest:&str)->bool;
+    remove_unused_file(digest:&str)->();
     access_restrictions(kind:&str,id:i64,resolved:bool)->Vec<Value>;
     save_access_restriction(kind:&str,id:i64,body:&Value)->Value;
     permission_scheme_versions(scheme:i64,offset:i64,limit:i64)->Value;

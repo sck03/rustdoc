@@ -26,6 +26,21 @@ macro_rules! unsupported_operations {
 /// All business operations use this semantic storage boundary, never provider SQL.
 pub(crate) trait Adapter: Send {
     semantic_operations! {
+        insert_file(file:&FileWrite<'_>)->() => file_catalog::insert;
+        file_info(record:i64,kind:&str)->Option<FileInfo> => file_catalog::get;
+        file_page(record:i64,prefix:&str,after:&str,limit:i64)->(i64,Vec<FileInfo>) => file_catalog::page;
+        delete_files(record:i64,kind:Option<&str>)->() => file_catalog::remove;
+        file_objects(after:&str,limit:i64,unused:bool)->Vec<FileObject> => file_catalog::objects;
+        file_statistics()->Value => file_catalog::statistics;
+        file_usage(company:&str)->u64 => file_catalog::usage;
+        file_owner_company(record:i64)->String => file_catalog::owner_company;
+        pending_file_copies(identity:&str)->Vec<FileObject> => file_catalog::pending_copies;
+        locate_file(identity:&str,digest:&str)->() => file_catalog::locate;
+        query_resources(query:&ResourceQuery<'_>)->(i64,Vec<Value>) => resource_index::catalogue;
+        append_attachment_history(record:i64,kind:&str,body:&Value)->() => attachment_history::append;
+        attachment_history(record:i64,kind:&str,before:Option<i64>,limit:i64)->Value => attachment_history::page;
+        file_is_referenced(digest:&str)->bool => file_catalog::referenced;
+        remove_unused_file(digest:&str)->() => file_catalog::remove_unused;
         email_template_name_exists(owner:i64,id:i64,name:&str,category:&str) -> bool => template_query::email_name_exists;
         scan_hs(query: &HsQuery<'_>, after: Option<&Value>) -> (Option<Value>, Vec<Value>) => hs_query::scan;
         access_restrictions(kind: &str, id: i64, resolved: bool) -> Vec<Value> => access_scope::list;

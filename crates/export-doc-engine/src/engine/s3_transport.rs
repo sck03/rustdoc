@@ -1,9 +1,6 @@
-//! S3-compatible replicas: official AWS SigV4, explicit credentials and controlled transport.
-use super::{
-    error::{Result, invalid, unavailable},
-    hex,
-};
-use crate::engine::backup_io;
+//! S3-compatible immutable objects: official AWS SigV4, explicit credentials and controlled transport.
+use super::error::{Result, invalid, unavailable};
+use crate::{engine::backup_io, paths::hex};
 use aws_credential_types::Credentials;
 use aws_sigv4::{
     http_request::{self, SignableBody, SignableRequest, SigningSettings},
@@ -23,7 +20,7 @@ const CONTROL_TIMEOUT: Duration = Duration::from_secs(30);
 const RESPONSE_LIMIT: u64 = 256 * 1024;
 const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
-pub(super) fn validate(settings: &S3Settings) -> Result<url::Url> {
+pub(in crate::engine) fn validate(settings: &S3Settings) -> Result<url::Url> {
     let url = url::Url::parse(&settings.endpoint).map_err(|_| invalid("S3 端点地址无效。"))?;
     if !settings.path_style && matches!(url.host(), Some(url::Host::Ipv4(_) | url::Host::Ipv6(_))) {
         return Err(invalid("使用 IP 地址的 S3 端点请选择路径寻址。"));
@@ -80,7 +77,7 @@ pub(super) fn validate(settings: &S3Settings) -> Result<url::Url> {
     Ok(url)
 }
 
-pub(super) struct Target {
+pub(in crate::engine) struct Target {
     settings: S3Settings,
     endpoint: url::Url,
     repository: String,
@@ -88,7 +85,7 @@ pub(super) struct Target {
     agent: ureq::Agent,
 }
 impl Target {
-    pub(super) fn new(
+    pub(in crate::engine) fn new(
         settings: S3Settings,
         repository: &str,
         secret: &str,
@@ -103,7 +100,7 @@ impl Target {
             secret,
             (!token.is_empty()).then(|| token.to_owned()),
             None,
-            "exportdoc-backup",
+            "exportdoc-storage",
         );
         Ok(Self {
             settings,
@@ -116,7 +113,7 @@ impl Target {
             ),
         })
     }
-    pub(super) fn identity(&self) -> String {
+    pub(in crate::engine) fn identity(&self) -> String {
         format!(
             "S3:{}:{}",
             self.url("").expect("validated S3 target"),
@@ -215,11 +212,11 @@ impl Target {
             .map_err(|_| unavailable("S3 请求失败或超时，请检查端点、连接和权限。"))?;
         response_text(response)
     }
-    pub(super) fn delete(&self, name: &str) -> Result<()> {
+    pub(in crate::engine) fn delete(&self, name: &str) -> Result<()> {
         self.control(&self.agent, "DELETE", &self.url(name)?, &[])
             .map(|_| ())
     }
-    pub(super) fn upload(
+    pub(in crate::engine) fn upload(
         &self,
         path: &Path,
         name: &str,
@@ -250,6 +247,33 @@ impl Target {
         if actual != (size, digest.into()) {
             return Err(unavailable("S3 副本大小或 SHA-256 校验失败。"));
         }
+        Ok(())
+    }
+    pub(in crate::engine) fn upload_file(
+        &self,
+        file: &mut std::fs::File,
+        name: &str,
+        size: u64,
+        digest: &str,
+    ) -> Result<()> {
+        self.multipart_file(file, name, size)?;
+        self.verify(name, size, digest)
+    }
+    pub(in crate::engine) fn download(
+        &self,
+        name: &str,
+        output: &mut impl std::io::Write,
+        limit: u64,
+    ) -> Result<()> {
+        let request = self.request("GET", &self.url(name)?, (), None, EMPTY_HASH)?;
+        let mut response = self
+            .agent
+            .run(request)
+            .map_err(|_| unavailable("S3 文件读取失败或超时。"))?;
+        if response.status().as_u16() != 200 {
+            return Err(unavailable("S3 文件对象不可读。"));
+        }
+        backup_io::copy_and_hash(&mut response.body_mut().as_reader(), output, limit)?;
         Ok(())
     }
 }

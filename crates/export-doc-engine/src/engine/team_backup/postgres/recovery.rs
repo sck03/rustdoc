@@ -192,7 +192,17 @@ pub fn apply_pending(
             restore(&endpoint, &tools.pg_restore, &source, owner)?;
             lease.finish(owner, &application.username)?;
             if migrated.is_some() {
+                crate::engine::file_store::verify_local_inventory(&staging, |cursor| {
+                    Ok(lease.file_objects(cursor)?)
+                })?;
                 restore_files::install(paths, &staging, false)?;
+            } else {
+                let registered = !lease.file_objects("")?.is_empty();
+                let files = crate::engine::file_store::FileStore::open(paths, registered)?;
+                if source.with_extension("objects.jsonl").try_exists()? {
+                    crate::engine::file_store::incremental::restore(&files, &source)?;
+                }
+                files.verify_inventory(|cursor| Ok(lease.file_objects(cursor)?))?;
             }
             Ok(())
         })();

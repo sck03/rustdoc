@@ -1,5 +1,6 @@
 //! Owned report resources, shipping marks and seals. Metadata and bytes share
 //! the business transaction, so backups and restores retain the same images.
+mod catalog;
 mod references;
 mod registration;
 use super::{
@@ -82,25 +83,24 @@ pub(super) fn read(
     actor: &Actor,
     id: &str,
     paths: Option<&crate::paths::RuntimePaths>,
-) -> Result<RasterImage> {
-    snapshot(tx, actor, id, paths)?.validate()
+) -> Result<ImageSnapshot> {
+    snapshot(tx, actor, id, paths)
 }
-// Own the authorized bytes so decoding does not require a database lease.
-struct ImageSnapshot {
-    image: RasterImage,
-    digest: String,
+pub(super) struct ImageSnapshot {
+    info: export_doc_storage::FileInfo,
 }
 impl ImageSnapshot {
-    fn validate(self) -> Result<RasterImage> {
-        if media::digest(&self.image.bytes) != self.digest {
-            return Err(unavailable("图片资源内容校验失败。"));
-        }
-        let media_type = media::image_type(&self.image.bytes, MAX_RESOURCE)
+    pub(super) fn validate(self, store: &Store) -> Result<RasterImage> {
+        let output = store.files.load(&self.info, MAX_RESOURCE)?;
+        let media_type = media::image_type(&output.content, MAX_RESOURCE)
             .map_err(|_| unavailable("已保存的图片损坏。"))?;
-        if media_type != self.image.media_type {
+        if media_type != output.media_type {
             return Err(unavailable("图片类型与记录不一致。"));
         }
-        Ok(self.image)
+        Ok(RasterImage {
+            media_type: output.media_type,
+            bytes: output.content,
+        })
     }
 }
 fn snapshot(
@@ -120,40 +120,25 @@ fn snapshot(
     }
     snapshot_entry(tx, &entry)
 }
-fn read_entry(tx: &Connection, entry: &Value) -> Result<RasterImage> {
-    snapshot_entry(tx, entry)?.validate()
+fn read_entry(tx: &Connection, entry: &Value) -> Result<ImageSnapshot> {
+    snapshot_entry(tx, entry)
 }
 fn snapshot_entry(tx: &Connection, entry: &Value) -> Result<ImageSnapshot> {
     let id = entry["id"]
         .as_i64()
         .ok_or_else(|| unavailable("图片资源记录损坏。"))?;
     let info = tx
-        .blob_info(id, KIND)?
+        .file_info(id, KIND)?
         .ok_or_else(|| unavailable("图片资源内容缺失。"))?;
-    if info.size == 0
-        || info.size > MAX_RESOURCE as u64
-        || info.size != entry["byteLength"].as_u64().unwrap_or(0)
-        || info.digest != text(entry, "sha256")
+    if info.object.size == 0
+        || info.object.size > MAX_RESOURCE as u64
+        || info.object.size != entry["byteLength"].as_u64().unwrap_or(0)
+        || info.object.digest != text(entry, "sha256")
         || info.media_type != text(entry, "mediaType")
     {
         return Err(unavailable("图片资源元数据或容量无效。"));
     }
-    let blob = tx
-        .blob(id, KIND)?
-        .ok_or_else(|| unavailable("图片资源内容缺失。"))?;
-    if blob.digest != text(entry, "sha256")
-        || blob.media_type != text(entry, "mediaType")
-        || blob.content.len() as u64 != entry["byteLength"].as_u64().unwrap_or(0)
-    {
-        return Err(unavailable("图片资源内容校验失败。"));
-    }
-    Ok(ImageSnapshot {
-        digest: blob.digest,
-        image: RasterImage {
-            media_type: blob.media_type,
-            bytes: blob.content,
-        },
-    })
+    Ok(ImageSnapshot { info })
 }
 fn response(record: &Value) -> Value {
     json!({"id":record["resourceId"],"mediaType":record["mediaType"],"byteLength":record["byteLength"],"sha256":record["sha256"],"altText":record["altText"],"storagePolicy":"受控图片和归属保存在业务数据库，随备份恢复。"})
@@ -172,7 +157,7 @@ pub fn upload(
     }
     if operation == UPLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE {
         auth::authorize(actor, "document.report-resources", "upload")?;
-        let image = ValidatedImage::new(bytes, MAX_RESOURCE)?;
+        let image = ValidatedImage::new(store, bytes, MAX_RESOURCE)?;
         return store.transaction_as(actor, |tx, actor| {
             auth::authorize(actor, "document.report-resources", "upload")?;
             image.register(tx, actor, name).map(|v| response(&v))
@@ -185,7 +170,7 @@ pub fn upload(
         "customs" | "Customs" => "customsSealPath",
         _ => return Err(invalid("印章类别只能是 document 或 customs。")),
     };
-    let image = ValidatedImage::new(bytes, 5 * 1024 * 1024)?;
+    let image = ValidatedImage::new(store, bytes, 5 * 1024 * 1024)?;
     store.transaction_as(actor, |tx, actor| {
         let mut exporter = store::get(tx, "exporters", id)?;
         if !auth::visible(actor, "document.master-data", "edit", &exporter) {
@@ -232,7 +217,7 @@ pub fn handle(
             let bytes = STANDARD
                 .decode(encoded)
                 .map_err(|_| invalid("唛头图片编码无效。"))?;
-            let image = ValidatedImage::new(&bytes, 5 * 1024 * 1024)?;
+            let image = ValidatedImage::new(store, &bytes, 5 * 1024 * 1024)?;
             if kind != format!("data:{}", image.media_type()) {
                 return Err(invalid("图片内容与声明类型不一致。"));
             }
@@ -256,47 +241,12 @@ pub fn handle(
             let path = text(body, "imagePath");
             let id = stored_id(&path, "Files/ShippingMarks/")?;
             let image = snapshot(&store.connection()?, actor, id, None)?;
-            let image = image.validate()?;
+            let image = image.validate(store)?;
             Ok(
                 json!({"imagePath":path,"fileName":id,"contentType":image.media_type,"sizeBytes":image.bytes.len(),"dataUrl":image.data_url()?,"storagePolicy":"受控唛头预览"}),
             )
         }
-        QUERY_REPORT_TEMPLATE_V3_IMAGE_RESOURCES => {
-            let _access = report_template_files::storage_read_lock(&service.paths)?;
-            let tx = store.connection()?;
-            let entries = tx.all(KIND)?;
-            let foreign: Vec<_> = entries
-                .iter()
-                .filter(|entry| !actor.admin && !owns(actor, entry))
-                .filter_map(|entry| entry["resourceId"].as_str())
-                .collect();
-            let readable =
-                References::query(&tx, actor, Some(&service.paths), Some(&foreign))?.readable;
-            let mut items = vec![];
-            for entry in entries {
-                let id = text(&entry, "resourceId");
-                let own = owns(actor, &entry);
-                if !actor.admin && !own && !readable.contains(&id) {
-                    continue;
-                }
-                items.push(json!({"id":entry["resourceId"],"mediaType":entry["mediaType"],"byteLength":entry["byteLength"],"sha256":entry["sha256"],"ownsUpload":own}));
-            }
-            let mut page = store::paged(items, query);
-            let targets: Vec<_> = page["items"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(|item| item["id"].as_str())
-                .collect();
-            let references = References::query(&tx, actor, Some(&service.paths), Some(&targets))?;
-            for item in page["items"].as_array_mut().into_iter().flatten() {
-                let referenced = references.all.contains(item["id"].as_str().unwrap());
-                item["isReferenced"] = json!(referenced);
-                item["canRecycle"] =
-                    json!((actor.admin || item["ownsUpload"] == true) && !referenced);
-            }
-            Ok(page)
-        }
+        QUERY_REPORT_TEMPLATE_V3_IMAGE_RESOURCES => catalog::query(service, actor, query),
         RECYCLE_REPORT_TEMPLATE_V3_IMAGE_RESOURCE => {
             let id = parameter_id(parameters)?;
             let _access = report_template_files::storage_lock(&service.paths)?;
@@ -306,7 +256,7 @@ pub fn handle(
                 if !actor.admin && !owns(actor, &entry) {
                     return Err(error(403, "只能回收自己上传的图片。"));
                 }
-                if References::load(tx, actor, Some(&service.paths))?
+                if References::query(tx, actor, Some(&service.paths), Some(&[id]))?
                     .all
                     .contains(id)
                 {
@@ -364,7 +314,7 @@ pub fn download(
         id,
         Some(&service.paths),
     )?;
-    let image = image.validate()?;
+    let image = image.validate(&service.store)?;
     Ok(FileOutput {
         file_name: id.into(),
         media_type: image.media_type,
@@ -398,6 +348,7 @@ pub fn validate_exporter(tx: &Connection, actor: &Actor, value: &Value) -> Resul
     }
     Ok(())
 }
+pub(super) type ImagePlan = std::collections::BTreeMap<String, ImageSnapshot>;
 pub fn hydrate(
     store: &Store,
     paths: &crate::paths::RuntimePaths,
@@ -406,26 +357,23 @@ pub fn hydrate(
     content: Option<&[u8]>,
 ) -> Result<()> {
     let _access = report_template_files::storage_read_lock(paths)?;
-    let tx = store.connection()?;
-    hydrate_in(&tx, paths, actor, data, content)
+    let plan = store.read(|tx| hydrate_in(tx, paths, actor, data, content))?;
+    load_plan(store, data, plan)
 }
 pub(super) fn hydrate_in(
     tx: &Connection,
     paths: &crate::paths::RuntimePaths,
     actor: &Actor,
-    data: &mut ReportData,
+    data: &ReportData,
     content: Option<&[u8]>,
-) -> Result<()> {
-    if data.text("Invoice.ShippingMarksType") == "Image" {
-        let reference = data.text("Invoice.ShippingMarksImage");
-        let id = stored_id(&reference, "Files/ShippingMarks/")?;
-        if !data.images.contains_key("Invoice.ShippingMarks") {
-            insert_snapshot_image(
-                data,
-                "Invoice.ShippingMarks".into(),
-                read(tx, actor, id, None)?,
-            )?;
-        }
+) -> Result<ImagePlan> {
+    let mut plan = ImagePlan::new();
+    if data.text("Invoice.ShippingMarksType") == "Image"
+        && !data.images.contains_key("Invoice.ShippingMarks")
+    {
+        let path = data.text("Invoice.ShippingMarksImage");
+        let id = stored_id(&path, "Files/ShippingMarks/")?;
+        plan.insert("Invoice.ShippingMarks".into(), read(tx, actor, id, None)?);
     }
     if data.root["ShowSeal"] == true {
         for (source, fallback, field) in [
@@ -445,21 +393,39 @@ pub(super) fn hydrate_in(
             } else {
                 source
             });
-            if !path.is_empty() {
-                let id = stored_id(&path, "Files/Seals/")?;
-                if !data.images.contains_key(field) {
-                    insert_snapshot_image(data, field.into(), read(tx, actor, id, None)?)?;
-                }
+            if !path.is_empty() && !data.images.contains_key(field) {
+                plan.insert(
+                    field.into(),
+                    read(tx, actor, stored_id(&path, "Files/Seals/")?, None)?,
+                );
             }
         }
     }
     if let Some(content) = content {
         template_images(tx, actor, content, Some(paths), |id, entry| {
             if !data.images.contains_key(&id) {
-                insert_snapshot_image(data, id, read_entry(tx, entry)?)?;
+                plan.insert(id, read_entry(tx, entry)?);
             }
             Ok(())
         })?;
+    }
+    Ok(plan)
+}
+pub(super) fn load_plan(store: &Store, data: &mut ReportData, plan: ImagePlan) -> Result<()> {
+    let total: u64 = plan
+        .values()
+        .map(|image| image.info.object.size)
+        .sum::<u64>()
+        + data
+            .images
+            .values()
+            .map(|image| image.bytes.len() as u64)
+            .sum::<u64>();
+    if total > MAX_SNAPSHOT_IMAGES as u64 {
+        return Err(error(429, "报表图片快照超过 128 MiB，请减少模板或图片。"));
+    }
+    for (key, image) in plan {
+        insert_snapshot_image(data, key, image.validate(store)?)?;
     }
     Ok(())
 }

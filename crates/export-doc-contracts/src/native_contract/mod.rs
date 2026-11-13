@@ -40,6 +40,7 @@ mod endpoints_system;
 mod endpoints_tools;
 mod endpoints_users;
 mod endpoints_worklist;
+mod file_storage;
 mod metadata;
 mod metadata_configuration;
 mod metadata_permissions;
@@ -66,6 +67,7 @@ use std::collections::BTreeMap;
 
 pub(super) fn document() -> Value {
     let mut schemas = Vec::new();
+    schemas.extend(file_storage::schemas());
     schemas.extend(schemas_platform_1::entries());
     schemas.extend(schemas_platform_2::entries());
     schemas.extend(schemas_invoices_1::entries());
@@ -80,6 +82,7 @@ pub(super) fn document() -> Value {
     schemas.extend(schemas_oa_forms::entries());
     let schemas: BTreeMap<_, _> = schemas.into_iter().collect();
     let mut endpoints = Vec::new();
+    endpoints.extend(file_storage::endpoints());
     endpoints.extend(endpoints_session::entries());
     endpoints.extend(endpoints_system::entries());
     endpoints.extend(endpoints_business_attachments::entries());
@@ -115,7 +118,68 @@ pub(super) fn document() -> Value {
     endpoints.extend(endpoints_diagnostics::entries());
     endpoints.extend(endpoints_disaster_recovery::entries());
     let mut paths = BTreeMap::<&str, BTreeMap<&str, model::Operation>>::new();
-    for endpoint in endpoints {
+    for mut endpoint in endpoints {
+        if matches!(
+            endpoint.operation.id,
+            "UploadBusinessAttachment" | "UploadPersonnelAttachment"
+        ) || endpoint
+            .operation
+            .office
+            .as_ref()
+            .is_some_and(|capability| capability.action == "upload")
+            || endpoint
+                .operation
+                .communication
+                .as_ref()
+                .is_some_and(|capability| capability.action == "upload")
+        {
+            if let Some(body) = &mut endpoint.operation.body {
+                body.max_bytes = Some(100 * 1024 * 1024);
+            }
+        }
+        if endpoint.operation.id == "GetBusinessAttachment" {
+            for name in ["revisionBefore", "eventBefore"] {
+                endpoint
+                    .operation
+                    .parameters
+                    .get_or_insert_with(Vec::new)
+                    .push(model::p(
+                        name,
+                        "query",
+                        None,
+                        model::i().format("int64").minimum(model::num("1")),
+                    ));
+            }
+        }
+        if endpoint.method == "get" {
+            if let Some(response) = endpoint
+                .operation
+                .responses
+                .get("200")
+                .filter(|response| {
+                    response
+                        .content
+                        .as_ref()
+                        .is_some_and(|content| content.keys().any(|mime| !mime.contains("json")))
+                })
+                .cloned()
+            {
+                endpoint.operation.responses.insert(
+                    "206",
+                    model::Response {
+                        description: "Partial Content",
+                        ..response
+                    },
+                );
+                let (status, response) = responses::error("416");
+                endpoint.operation.responses.insert(status, response);
+                endpoint
+                    .operation
+                    .parameters
+                    .get_or_insert_with(Vec::new)
+                    .push(model::p("Range", "header", None, model::s()));
+            }
+        }
         assert!(
             paths
                 .entry(endpoint.path)

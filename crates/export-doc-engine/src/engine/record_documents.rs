@@ -8,7 +8,6 @@ use super::{
 };
 use crate::engine::store::Connection;
 use crate::generated_api::Operation;
-use export_doc_storage::BlobWrite;
 use serde_json::{Value, json};
 
 fn metadata(op: Operation) -> Option<&'static Value> {
@@ -67,38 +66,45 @@ pub(in crate::engine) fn upload(
     parameters: &[(&str, String)],
     body: &Value,
     file_name: &str,
-    bytes: &[u8],
+    input: &mut (impl std::io::BufRead + std::io::Seek),
+    size: u64,
 ) -> Result<Value> {
     let meta = metadata(operation).ok_or_else(|| invalid("未知文档附件操作。"))?;
     if meta["action"] != "upload" {
         return Err(invalid("该操作不能上传附件。"));
     }
-    let (name, media_type) = media::document_type(file_name, bytes)?;
     let purpose = match text(body, "purpose").as_str() {
         "" | "Voucher" => "Voucher",
         "ReimbursementForm" => "ReimbursementForm",
         "Supporting" => "Supporting",
         _ => return Err(invalid("附件用途无效。")),
     };
-    let digest = media::digest(bytes);
     let classification = match text(body, "classification").as_str() {
         "" | "Internal" => "Internal",
         "Restricted" => "Restricted",
         _ => return Err(invalid("附件材料级别无效。")),
     };
+    service.store.read(|tx| {
+        current(tx, actor, meta, records::id(parameters)?).and_then(|(_, row)| mutable(meta, &row))
+    })?;
+    let (name, media_type, prepared) =
+        super::document_upload::prepare(&service.store, file_name, input, size, true)?;
+    let digest = prepared.object.digest.as_str();
     service.store.transaction(|tx| {
         let (actor,row)=current(tx,actor,meta,records::id(parameters)?)?;
         mutable(meta,&row)?;
         if !announcement(meta){oa::materials::attachment(tx,&actor,&row,&json!({"classification":classification}))?;}
         let kind=attachment_kind(meta);
-        let (count,existing)=communication::children(tx,&row,kind,0,20)?;
+        let (count,existing)=communication::children(tx,&row,kind, 0, crate::engine::file_store::policy::MAX_REQUEST_FILES)?;
         if let Some(existing) = existing.iter().find(|item| item["digest"]==digest) {
             if existing["fileName"] == name { return project(tx,&actor,meta,row); }
             return Err(conflict("该凭证已上传，请勿重复添加。"));
         }
         store::check_version(&row,store::expected(body))?;
-        let size: u64=existing.iter().map(|v| v["sizeBytes"].as_u64().unwrap_or(0)).sum();
-        if count>=20 || size+bytes.len() as u64>50*1024*1024 { return Err(invalid("每份记录最多 20 个附件、合计 50 MiB。")); }
+        let existing_size: u64=existing.iter().map(|v| v["sizeBytes"].as_u64().unwrap_or(0)).sum();
+        let policy = service.store.files.configuration()?.policy;
+        policy.check_upload(size)?;
+        policy.check_request(count as usize + 1, existing_size + size)?;
         let identity = format!("{}:{digest}",row["id"]);
         if !announcement(meta) && let Some(mut retained) = tx.find_identity(kind,&identity)? {
             if retained["requestId"] != 0 || retained["sourceRequestId"] != row["id"] || retained["fileName"] != name { return Err(conflict("同一原始文件已有历史引用，请保留原文件名。")); }
@@ -109,8 +115,8 @@ pub(in crate::engine) fn upload(
             store::save_in_scope(tx,kind,id,retained,Some(identity),&actor,"reattach",Some(&row))?;
             return save(tx,&actor,meta,row,"upload",&name);
         }
-        let record=store::save_in_scope(tx,kind,0,json!({"requestId":row["id"],"sourceRequestId":row["id"],"fileName":name,"mediaType":media_type,"sizeBytes":bytes.len(),"digest":digest,"purpose":purpose,"classification":classification}),Some(identity),&actor,"upload",Some(&row))?;
-        tx.insert_blob(&BlobWrite {kind,record_id:records::positive(&record,"id","附件")?,file_name:&name,media_type,digest:&digest,content:bytes,created_at:&store::timestamp()})?;
+        let record=store::save_in_scope(tx,kind,0,json!({"requestId":row["id"],"sourceRequestId":row["id"],"fileName":name,"mediaType":media_type,"sizeBytes":size,"digest":digest,"purpose":purpose,"classification":classification}),Some(identity),&actor,"upload",Some(&row))?;
+        tx.publish_file(&prepared,kind,records::positive(&record,"id","附件")?,&name,media_type)?;
         save(tx,&actor,meta,row,"upload",&name)
     })
 }
@@ -186,26 +192,36 @@ pub(in crate::engine) fn download(
     operation: Operation,
     parameters: &[(&str, String)],
 ) -> Result<FileOutput> {
+    let info = download_info(service, actor, operation, parameters)?;
+    let output = service.store.files.load(&info, media::DOCUMENT_LIMIT)?;
+    if download_info(service, actor, operation, parameters)? != info {
+        return Err(super::error::conflict("附件已变化，请重新读取。"));
+    }
+    Ok(output)
+}
+pub(in crate::engine) fn download_info(
+    service: &NativeService,
+    actor: &Actor,
+    operation: Operation,
+    parameters: &[(&str, String)],
+) -> Result<export_doc_storage::FileInfo> {
     let meta = metadata(operation).ok_or_else(|| invalid("未知附件下载。"))?;
-    service.store.read(|tx| {
+    let info = service.store.read(|tx| {
         let (current_actor, row) = current(tx, actor, meta, records::id(parameters)?)?;
         let attachment = attachment(tx, meta, &row, parameters)?;
         if !announcement(meta) {
             oa::materials::attachment(tx, &current_actor, &row, &attachment)?;
         }
         let blob = tx
-            .blob(
+            .file_info(
                 records::positive(&attachment, "id", "附件")?,
                 attachment_kind(meta),
             )?
             .ok_or_else(|| unavailable("附件内容缺失。"))?;
-        if media::digest(&blob.content) != blob.digest || attachment["digest"] != blob.digest {
+        if attachment["digest"] != blob.object.digest {
             return Err(unavailable("附件摘要校验失败。"));
         }
-        Ok(FileOutput {
-            file_name: blob.file_name,
-            media_type: blob.media_type,
-            content: blob.content,
-        })
-    })
+        Ok(blob)
+    })?;
+    Ok(info)
 }

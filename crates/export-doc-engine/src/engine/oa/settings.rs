@@ -215,8 +215,8 @@ pub(super) fn handle(
     }
     let rules = body["rules"]
         .as_array()
-        .filter(|r| (13..=113).contains(&r.len()))
-        .ok_or_else(|| invalid("须保留内置流程，自定义事项最多 100 个。"))?;
+        .filter(|r| r.len() >= 13)
+        .ok_or_else(|| invalid("须保留内置流程。"))?;
     for builtin in defaults()? {
         if !rules
             .iter()
@@ -296,8 +296,7 @@ pub(super) fn handle(
     }
     let delegations = body["delegations"]
         .as_array()
-        .filter(|d| d.len() <= 50)
-        .ok_or_else(|| invalid("代理记录最多 50 条。"))?;
+        .ok_or_else(|| invalid("代理记录格式无效。"))?;
     let mut keys = HashSet::new();
     let mut windows = vec![];
     for delegation in delegations {

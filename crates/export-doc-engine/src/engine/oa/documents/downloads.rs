@@ -1,11 +1,11 @@
-//! Read blobs in one authorized snapshot; hashing and compression release the connection.
+//! Capture authorized metadata; stream immutable files outside database transactions.
 use super::*;
-use crate::engine::backup_io::{Download, Reservation};
+use crate::engine::backup_io::Download;
+use std::io::{Seek, SeekFrom, Write};
 #[cfg(test)]
 #[path = "downloads/tests.rs"]
 mod tests;
 const PDF_LIMIT: usize = 16 * 1024 * 1024;
-const ARCHIVE_LIMIT: usize = 64 * 1024 * 1024;
 pub(in crate::engine) fn download(
     service: &NativeService,
     actor: &Actor,
@@ -75,28 +75,61 @@ pub(in crate::engine) fn prepare(
             reservation,
         });
     }
-    let (files, file_name, media_type, pdf_digest, mut reservation) = service
+    let source = service
         .store
-        .read(|tx| gather(service, tx, actor, meta, parameters))?;
-    for (_, bytes, expected) in &files {
-        crate::operation::check()?;
-        if !expected.is_empty() && media::digest(bytes) != *expected {
-            return Err(unavailable("历史审批材料完整性校验失败。"));
+        .read(|tx| gather(tx, actor, meta, parameters))?;
+    let direct = meta["action"] == "document-download";
+    let output = if direct {
+        let entry = &source.files[0];
+        Download::File {
+            file_name: source.file_name.clone(),
+            media_type: "application/pdf".into(),
+            file: read_source(service, entry)?,
+            size: entry.info.size,
         }
-    }
-    let content = if meta["action"] == "document-download" {
-        files
-            .into_iter()
-            .next()
-            .ok_or_else(|| unavailable("审批单缺失。"))?
-            .1
     } else {
-        let mut archive = export_doc_report::DocumentArchive::new();
-        for (name, bytes, _) in files {
+        let file =
+            crate::paths::anonymous_file(&service.paths.cache_root.join("ApprovalDownloads"))
+                .map_err(unavailable)?;
+        let mut archive = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored)
+            .large_file(true);
+        for (index, entry) in source.files.iter().enumerate() {
             crate::operation::check()?;
-            archive.add(&name, &bytes)?;
+            let mut file = read_source(service, entry)?;
+            let name = if index == 0 {
+                entry.info.file_name.clone()
+            } else {
+                format!("{index:02}-{}", entry.info.file_name)
+            };
+            if !crate::paths::valid_file_name(&name) {
+                return Err(unavailable("历史材料文件名无效。"));
+            }
+            archive
+                .start_file(name, options)
+                .map_err(|e| unavailable(e.to_string()))?;
+            crate::engine::backup_io::copy_chunks(
+                &mut file,
+                &mut archive,
+                entry.info.size,
+                |_| {},
+            )?;
         }
-        archive.finish()?
+        archive
+            .start_file("审批材料清单.json", options)
+            .map_err(|e| unavailable(e.to_string()))?;
+        archive.write_all(&source.manifest)?;
+        let mut file = archive.finish().map_err(|e| unavailable(e.to_string()))?;
+        file.flush()?;
+        let size = file.metadata()?.len();
+        file.seek(SeekFrom::Start(0))?;
+        Download::File {
+            file_name: source.file_name.clone(),
+            media_type: "application/zip".into(),
+            file,
+            size,
+        }
     };
     service.store.read(|tx| {
         let (actor, row) = current(tx, actor, meta, records::id(parameters)?)?;
@@ -106,33 +139,40 @@ pub(in crate::engine) fn prepare(
         {
             return Err(error(403, "材料授权已变化，请重新下载。"));
         }
-        if tx
-            .blob_info(submissions::id(parameters)?, submissions::PDF)?
-            .is_none_or(|i| i.digest != pdf_digest)
-        {
-            return Err(conflict("审批单已重新生成，请重新下载。"));
+        for entry in &source.files {
+            if tx
+                .blob_info(entry.id, &entry.kind)?
+                .is_none_or(|i| i.digest != entry.info.digest || i.size != entry.info.size)
+            {
+                return Err(conflict("审批材料已变化，请重新下载。"));
+            }
         }
         Ok(())
     })?;
-    reservation.shrink_to(content.len());
-    Ok(Download::Memory {
-        output: FileOutput {
-            file_name,
-            media_type,
-            content,
-        },
-        reservation,
-    })
+    Ok(output)
 }
-type Source = (
-    Vec<(String, Vec<u8>, String)>,
-    String,
-    String,
-    String,
-    Reservation,
-);
+
+struct Entry {
+    id: i64,
+    kind: String,
+    info: export_doc_storage::BlobInfo,
+}
+struct Source {
+    files: Vec<Entry>,
+    file_name: String,
+    manifest: Vec<u8>,
+}
+fn read_source(service: &NativeService, entry: &Entry) -> Result<std::fs::File> {
+    let blob = service.store.read(|tx| {
+        tx.file_info(entry.id, &entry.kind)?
+            .ok_or_else(|| unavailable("历史材料原文件缺失。"))
+    })?;
+    if blob.object.size != entry.info.size || blob.object.digest != entry.info.digest {
+        return Err(unavailable("历史审批材料完整性校验失败。"));
+    }
+    service.store.files.open_object(&blob.object)
+}
 fn gather(
-    service: &NativeService,
     tx: &Connection,
     actor: &Actor,
     meta: &Value,
@@ -154,91 +194,49 @@ fn gather(
         return Err(unavailable("审批单下载大小无效。"));
     }
     let direct = meta["action"] == "document-download";
-    let mut sources = vec![(
+    let file_name = if direct {
+        pdf.file_name.clone()
+    } else {
+        format!(
+            "审批材料-{}-v{}.zip",
+            row["id"], snapshot["submissionNumber"]
+        )
+    };
+    let mut files = vec![Entry {
         id,
-        submissions::PDF.to_owned(),
-        pdf.digest.clone(),
-        pdf.size,
-    )];
-    let mut total = pdf.size;
-    let mut manifest = vec![];
-    if !direct {
+        kind: submissions::PDF.into(),
+        info: pdf,
+    }];
+    let manifest = if direct {
+        Vec::new()
+    } else {
         let attachments = snapshot["request"]["attachments"]
             .as_array()
-            .filter(|a| a.len() <= 20)
             .ok_or_else(|| unavailable("提交附件清单损坏。"))?;
         for attachment in attachments {
             let attachment_id = records::positive(attachment, "id", "附件")?;
             let info = tx
                 .blob_info(attachment_id, "oa-attachment")?
                 .ok_or_else(|| unavailable("历史附件元数据缺失。"))?;
-            if info.size > media::DOCUMENT_LIMIT as u64 || attachment["digest"] != info.digest {
+            if info.size == 0
+                || info.size > media::DOCUMENT_LIMIT as u64
+                || attachment["digest"] != info.digest
+            {
                 return Err(unavailable("历史附件元数据不一致。"));
             }
-            total = total
-                .checked_add(info.size)
-                .ok_or_else(|| invalid("材料归档超过容量。"))?;
-            sources.push((
-                attachment_id,
-                "oa-attachment".into(),
-                info.digest,
-                info.size,
-            ));
+            files.push(Entry {
+                id: attachment_id,
+                kind: "oa-attachment".into(),
+                info,
+            });
         }
-        manifest = serde_json::to_vec_pretty(
+        serde_json::to_vec_pretty(
             &json!({"submission":submissions::project(tx,snapshot.clone(),false)?,"attachments":attachments}),
-        )?;
-        total = total
-            .checked_add(manifest.len() as u64)
-            .ok_or_else(|| invalid("材料归档超过容量。"))?;
-        if total > ARCHIVE_LIMIT as u64 {
-            return Err(invalid("审批材料归档累计超过 64 MiB。"));
-        }
-    }
-    let reservation = service
-        .jobs
-        .reserve_download(total as usize * if direct { 1 } else { 2 }, !direct)?;
-    let mut files = vec![];
-    let mut direct_name = String::new();
-    let mut direct_media = String::new();
-    for (index, (id, kind, digest, size)) in sources.into_iter().enumerate() {
-        crate::operation::check()?;
-        let blob = tx
-            .blob(id, &kind)?
-            .ok_or_else(|| unavailable("历史材料原文件缺失。"))?;
-        if blob.content.len() as u64 != size || blob.digest != digest {
-            return Err(unavailable("历史材料内容与元数据不一致。"));
-        }
-        if index == 0 {
-            direct_name = blob.file_name.clone();
-            direct_media = blob.media_type.clone();
-        }
-        let name = if index == 0 {
-            blob.file_name
-        } else {
-            format!("{index:02}-{}", blob.file_name)
-        };
-        files.push((name, blob.content, digest));
-    }
-    if !direct {
-        files.push(("审批材料清单.json".into(), manifest, String::new()));
-    }
-    Ok((
+        )?
+    };
+    Ok(Source {
         files,
-        if direct {
-            direct_name
-        } else {
-            format!(
-                "审批材料-{}-v{}.zip",
-                row["id"], snapshot["submissionNumber"]
-            )
-        },
-        if direct {
-            direct_media
-        } else {
-            "application/zip".into()
-        },
-        pdf.digest,
-        reservation,
-    ))
+        file_name,
+        manifest,
+    })
 }

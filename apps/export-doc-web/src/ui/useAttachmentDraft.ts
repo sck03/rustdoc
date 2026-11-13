@@ -29,7 +29,7 @@ export function useAttachmentDraft<R>(initial?: R) {
     const remaining = multiple ? files : files.filter(file => file.kind !== kind);
     const next = [...remaining, ...(multiple ? selected : selected.slice(0, 1)).map(file => ({ key: createRequestKey(), kind, file }))];
     const documents = next.filter(file => file.kind === "document");
-    const maxFiles = policy.maxFiles ?? 20, maxTotalBytes = policy.maxTotalBytes ?? 50 * 1024 * 1024;
+    const maxFiles = policy.maxFiles ?? 0, maxTotalBytes = policy.maxTotalBytes ?? 0;
     if (documents.length > maxFiles || documents.reduce((sum, item) => sum + item.file.size, 0) > maxTotalBytes) {
       setSelectionError(`当前最多再选 ${maxFiles} 个文档附件、合计 ${(maxTotalBytes / 1024 / 1024).toFixed(1)} MiB。`); return;
     }

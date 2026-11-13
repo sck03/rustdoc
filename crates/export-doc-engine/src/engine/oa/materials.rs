@@ -431,7 +431,16 @@ pub(in crate::engine) fn history(
     keyword: &str,
 ) -> Result<Vec<Value>> {
     let mut request = row.clone();
-    request["attachments"] = json!(children(tx, row, "oa-attachment", 0, 20)?.1);
+    request["attachments"] = json!(
+        children(
+            tx,
+            row,
+            "oa-attachment",
+            0,
+            crate::engine::file_store::policy::MAX_REQUEST_FILES
+        )?
+        .1
+    );
     let partial = project(tx, actor, row, request)?["materialAccess"]["isPartial"] == true;
     if partial && !keyword.is_empty() {
         return Err(error(403, "当前材料权限不支持按详细历史内容检索。"));

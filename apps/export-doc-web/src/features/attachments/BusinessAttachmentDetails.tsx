@@ -6,7 +6,8 @@ import { InlineNotice } from "../../ui/PageState.tsx";
 import { attachmentVersionLabel, canPreviewAttachment, fileSizeLabel } from "./attachmentModel.ts";
 import { BusinessAttachmentMetadataForm } from "./BusinessAttachmentMetadataForm.tsx";
 
-export function BusinessAttachmentDetails({ details, categories, busy, editing, onEditingChange, timeZone, onClose, onReplace, onUpdate, onRead, onEdit, onDelete }: {
+export function BusinessAttachmentDetails({ details, categories, busy, editing, onEditingChange, timeZone, onClose, onReplace, onUpdate, onRead, onEdit, onDelete, historyNavigation }: {
+  historyNavigation: { revisionBefore?: number; eventBefore?: number; setRevisionBefore: (value: number | null) => void; setEventBefore: (value: number | null) => void };
   details: AttachmentDetails; busy: boolean; timeZone: string; onClose: () => void; onReplace: () => void;
   editing: boolean; onEditingChange: (editing: boolean) => void;
   categories: BusinessAttachmentCategoryRecord[];
@@ -59,9 +60,10 @@ export function BusinessAttachmentDetails({ details, categories, busy, editing, 
         {canPreviewAttachment(version.contentType) && <button type="button" className="command-button secondary" disabled={busy} onClick={() => onRead(version, true)}>预览</button>}
         {item.canEdit && !item.isArchived && version.revision !== item.currentRevision && <button type="button" className="command-button secondary" disabled={busy || editing} onClick={() => void update(version.revision, false)}>设为有效版本</button>}</div>
     </li>)}</ol>
+    <div className="business-records-actions"><button type="button" className="command-button secondary" disabled={busy || !historyNavigation.revisionBefore} onClick={() => historyNavigation.setRevisionBefore(null)}>最新版本</button><button type="button" className="command-button secondary" disabled={busy || !details.revisionNextCursor} onClick={() => historyNavigation.setRevisionBefore(details.revisionNextCursor ?? null)}>更早版本</button></div>
     {details.events.length > 0 && <details><summary>资料操作记录（共 {details.eventCount} 条，显示最近 {details.events.length} 条）</summary>
       <ul className="business-records-list">{details.events.map((event, index) => <li key={index} className="attachment-version">
         <p>{date(event.createdAt)} · {event.actorName} · {event.action === "Edit" ? "修正信息" : event.action === "Archive" ? "停用" : event.action === "Restore" ? "恢复" : `确认 v${event.revision}`}</p><p>{event.note}</p>
-      </li>)}</ul></details>}
+      </li>)}</ul><div className="business-records-actions"><button type="button" className="command-button secondary" disabled={busy || !historyNavigation.eventBefore} onClick={() => historyNavigation.setEventBefore(null)}>最新记录</button><button type="button" className="command-button secondary" disabled={busy || !details.eventNextCursor} onClick={() => historyNavigation.setEventBefore(details.eventNextCursor ?? null)}>更早记录</button></div></details>}
   </section>;
 }

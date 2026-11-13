@@ -31,7 +31,7 @@ export function ApprovalDelegationsEditor({ value, accounts, timeZone, onChange 
         <div className="office-card-actions"><Button type="button" onClick={() => onChange(value.filter((_, i) => i !== index))}>移除代理设置</Button></div>
       </section>)}
     </div>
-    <div className="office-card-actions"><Button type="button" disabled={value.length >= 50} onClick={() => onChange([...value, {
+    <div className="office-card-actions"><Button type="button" onClick={() => onChange([...value, {
       key: createRequestKey(), principalUserId: 0, delegateUserId: 0, startsAt: new Date().toISOString(),
       endsAt: new Date(Date.now() + 86400000).toISOString(), isActive: true,
     }])}>添加代理</Button></div>

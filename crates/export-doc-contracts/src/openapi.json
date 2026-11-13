@@ -6231,6 +6231,145 @@
           "rowVersion"
         ]
       },
+      "ApiFileStorageMigrationRequest": {
+        "type": "object",
+        "properties": {
+          "cancel": {
+            "type": "boolean"
+          },
+          "directory": {
+            "type": "string"
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "kind": {
+            "type": "string"
+          },
+          "resume": {
+            "type": "boolean"
+          },
+          "s3": {
+            "$ref": "#/components/schemas/ApiBackupS3Settings"
+          },
+          "secret": {
+            "type": "string",
+            "maxLength": 4096
+          },
+          "token": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        },
+        "additionalProperties": false
+      },
+      "ApiFileStoragePolicy": {
+        "type": "object",
+        "properties": {
+          "fileBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "quotaBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "requestBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "requestFiles": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fileBytes",
+          "requestBytes",
+          "requestFiles",
+          "quotaBytes"
+        ],
+        "additionalProperties": false
+      },
+      "ApiFileStoragePolicyRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "policy": {
+            "$ref": "#/components/schemas/ApiFileStoragePolicy"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "policy"
+        ],
+        "additionalProperties": false
+      },
+      "ApiFileStorageStatus": {
+        "type": "object",
+        "properties": {
+          "directory": {
+            "type": "string"
+          },
+          "fileCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "healthMessage": {
+            "type": "string"
+          },
+          "healthy": {
+            "type": "boolean"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "logicalBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "migrationPending": {
+            "type": "boolean"
+          },
+          "physicalBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "policy": {
+            "$ref": "#/components/schemas/ApiFileStoragePolicy"
+          },
+          "registeredRoots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "s3": {
+            "$ref": "#/components/schemas/ApiBackupS3Settings"
+          },
+          "unreferencedBytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "versionNumber": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
       "ApiHealthResponse": {
         "type": "object",
         "properties": {
@@ -18615,11 +18754,29 @@
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
+          "eventNextCursor": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          },
           "events": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/BusinessAttachmentEventRecord"
             }
+          },
+          "revisionCount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "revisionNextCursor": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
           },
           "revisions": {
             "type": "array",
@@ -18725,6 +18882,7 @@
           },
           "invoiceBytesLimit": {
             "type": [
+              "null",
               "integer",
               "string"
             ],
@@ -22635,8 +22793,7 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/OaApprovalDelegation"
-            },
-            "maxItems": 50
+            }
           },
           "expectedVersion": {
             "type": "integer",
@@ -22667,8 +22824,7 @@
             "items": {
               "$ref": "#/components/schemas/OaApprovalRule"
             },
-            "minItems": 13,
-            "maxItems": 113
+            "minItems": 13
           },
           "sheetDefaultContent": {
             "type": "string"
@@ -25863,8 +26019,7 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/OaApprovalDelegation"
-            },
-            "maxItems": 50
+            }
           },
           "expectedRevision": {
             "type": "integer",
@@ -29258,6 +29413,31 @@
           "sizeBytes"
         ]
       },
+      "PersonnelAttachmentPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PersonnelAttachment"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "totalCount",
+          "items"
+        ]
+      },
       "PersonnelClearance": {
         "type": "object",
         "properties": {
@@ -29876,6 +30056,10 @@
               ]
             },
             "readOnly": true
+          },
+          "attachmentCount": {
+            "type": "integer",
+            "format": "int64"
           },
           "attachments": {
             "type": "array",
@@ -42863,6 +43047,24 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "revisionBefore",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "eventBefore",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
           }
         ]
       },
@@ -43036,6 +43238,27 @@
                 }
               }
             }
+          },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-exportdoc-policy": {
@@ -43091,6 +43314,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -43362,11 +43592,32 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-exportdoc-policy": {
@@ -43419,6 +43670,13 @@
           {
             "name": "status",
             "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
             "schema": {
               "type": "string"
             }
@@ -46484,8 +46742,29 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found"
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           },
           "426": {
             "description": "Upgrade Required"
@@ -46523,6 +46802,13 @@
               "type": "string"
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -48626,6 +48912,688 @@
         }
       }
     },
+    "/api/file-storage": {
+      "get": {
+        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "GetFileStorage",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiFileStorageStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": false,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.settings",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "system.settings",
+                "actions": [
+                  "manage"
+                ],
+                "administratorOnly": true
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ]
+      }
+    },
+    "/api/file-storage/migrations": {
+      "post": {
+        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "StartFileStorageMigration",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackgroundJobSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": false,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.settings",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "system.settings",
+                "actions": [
+                  "manage"
+                ],
+                "administratorOnly": true
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiFileStorageMigrationRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file-storage/policy": {
+      "get": {
+        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "GetFileStoragePolicy",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiFileStoragePolicy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": false,
+          "permissions": null,
+          "requirements": [],
+          "permissionBypass": true,
+          "access": {
+            "bypass": true
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ]
+      },
+      "put": {
+        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "UpdateFileStoragePolicy",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiFileStorageStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": false,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.settings",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "system.settings",
+                "actions": [
+                  "manage"
+                ],
+                "administratorOnly": true
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiFileStoragePolicyRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/file-storage/reconcile": {
+      "post": {
+        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "ReconcileFileStorage",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackgroundJobSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": false,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.settings",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "system.settings",
+                "actions": [
+                  "manage"
+                ],
+                "administratorOnly": true
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ]
+      }
+    },
+    "/api/file-storage/verify": {
+      "post": {
+        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "VerifyFileStorage",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackgroundJobSnapshot"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": false,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "system.settings",
+              "action": "manage"
+            }
+          ],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "system.settings",
+                "actions": [
+                  "manage"
+                ],
+                "administratorOnly": true
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ]
+      }
+    },
     "/api/invoices": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
@@ -50693,7 +51661,8 @@
                 "$ref": "#/components/schemas/ApiAttachmentUploadForm"
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 104857600
         }
       }
     },
@@ -51098,6 +52067,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request"
           },
@@ -51106,6 +52086,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           },
           "426": {
             "description": "Upgrade Required"
@@ -51153,6 +52143,13 @@
               "type": "string"
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -54547,11 +55544,32 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/vnd.exportdocmanager.hs-knowledge+zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-exportdoc-policy": {
@@ -54595,6 +55613,13 @@
             "schema": {
               "type": "string",
               "format": "date-time"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
             }
           }
         ]
@@ -58658,7 +59683,8 @@
                 ]
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 104857600
         },
         "x-exportdoc-communication": {
           "kind": "announcement",
@@ -58857,6 +59883,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -58899,6 +59936,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -58989,6 +60036,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-communication": {
@@ -62962,7 +64016,8 @@
                 ]
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 104857600
         },
         "x-exportdoc-office": {
           "kind": "room",
@@ -63161,6 +64216,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -63203,6 +64269,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -63293,6 +64369,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -65006,6 +66089,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -65048,6 +66142,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -65138,6 +66242,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -65329,6 +66440,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -65371,6 +66493,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -65461,6 +66593,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -67250,7 +68389,8 @@
                 ]
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 104857600
         },
         "x-exportdoc-office": {
           "kind": "expense",
@@ -67449,6 +68589,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -67491,6 +68642,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -67581,6 +68742,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -69416,6 +70584,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -69458,6 +70637,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -69548,6 +70737,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -69739,6 +70935,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -69781,6 +70988,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -69871,6 +71088,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -72290,7 +73514,8 @@
                 ]
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 104857600
         },
         "x-exportdoc-office": {
           "kind": "general",
@@ -72489,6 +73714,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -72531,6 +73767,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -72621,6 +73867,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -74456,6 +75709,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -74498,6 +75762,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -74588,6 +75862,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -74779,6 +76060,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -74821,6 +76113,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -74911,6 +76213,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -77022,7 +78331,8 @@
                 ]
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 104857600
         },
         "x-exportdoc-office": {
           "kind": "leave",
@@ -77221,6 +78531,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -77263,6 +78584,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -77353,6 +78684,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -79188,6 +80526,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -79230,6 +80579,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -79320,6 +80679,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -79511,6 +80877,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -79553,6 +80930,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -79643,6 +81030,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -82347,7 +83741,8 @@
                 ]
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 104857600
         },
         "x-exportdoc-office": {
           "kind": "overtime",
@@ -82546,6 +83941,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -82588,6 +83994,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -82678,6 +84094,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -84513,6 +85936,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -84555,6 +85989,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -84645,6 +86089,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -84836,6 +86287,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -84878,6 +86340,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -84968,6 +86440,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -87186,6 +88665,157 @@
       }
     },
     "/api/office/people/{id}/attachments": {
+      "get": {
+        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
+        "tags": [
+          "Personnel"
+        ],
+        "operationId": "ListPersonnelAttachments",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonnelAttachmentPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "permissions": null,
+          "requirements": [
+            {
+              "resourceKey": "office.people",
+              "action": "view-details"
+            }
+          ],
+          "permissionBypass": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "office.people",
+                "actions": [
+                  "view-details"
+                ],
+                "administratorOnly": false
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "required": true
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        ]
+      },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": true,
@@ -87358,7 +88988,8 @@
                 ]
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 104857600
         }
       }
     },
@@ -87543,6 +89174,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -87585,6 +89227,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -87673,6 +89325,13 @@
               "type": "string"
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -87688,6 +89347,17 @@
         "responses": {
           "200": {
             "description": "OK",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content",
             "content": {
               "application/octet-stream": {
                 "schema": {
@@ -87729,6 +89399,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -87800,6 +89480,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -88245,6 +89932,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -88277,6 +89975,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -88356,6 +90064,13 @@
               "$ref": "#/components/schemas/PersonnelImageKind"
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       },
@@ -89796,7 +91511,8 @@
                 ]
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 104857600
         },
         "x-exportdoc-office": {
           "kind": "personnel",
@@ -89995,6 +91711,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -90037,6 +91764,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -90127,6 +91864,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -92123,6 +93867,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -92165,6 +93920,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -92255,6 +94020,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -92446,6 +94218,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -92488,6 +94271,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -92578,6 +94371,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -94528,7 +96328,8 @@
                 ]
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 104857600
         },
         "x-exportdoc-office": {
           "kind": "purchase",
@@ -94727,6 +96528,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -94769,6 +96581,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -94859,6 +96681,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -96694,6 +98523,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -96736,6 +98576,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -96826,6 +98676,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -97017,6 +98874,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -97059,6 +98927,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -97149,6 +99027,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -101043,7 +102928,8 @@
                 ]
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 104857600
         },
         "x-exportdoc-office": {
           "kind": "supply",
@@ -101242,6 +103128,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -101284,6 +103181,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -101374,6 +103281,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -103087,6 +105001,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -103129,6 +105054,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -103219,6 +105154,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -103410,6 +105352,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -103452,6 +105405,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -103542,6 +105505,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -105331,7 +107301,8 @@
                 ]
               }
             }
-          }
+          },
+          "x-exportdoc-max-bytes": 104857600
         },
         "x-exportdoc-office": {
           "kind": "travel",
@@ -105530,6 +107501,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -105572,6 +107554,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -105662,6 +107654,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -107497,6 +109496,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -107539,6 +109549,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -107629,6 +109649,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -107820,6 +109847,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -107862,6 +109900,16 @@
           },
           "409": {
             "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
             "content": {
               "application/json": {
                 "schema": {
@@ -107952,6 +110000,13 @@
               "minimum": 1
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "x-exportdoc-office": {
@@ -118622,6 +120677,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request"
           },
@@ -118630,6 +120696,16 @@
           },
           "404": {
             "description": "Not Found"
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           },
           "503": {
             "description": "Service Unavailable"
@@ -118682,6 +120758,13 @@
               "type": "string"
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -125470,11 +127553,32 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized"
           },
           "403": {
             "description": "Forbidden"
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-exportdoc-policy": {
@@ -125527,6 +127631,13 @@
           {
             "name": "status",
             "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
             "schema": {
               "type": "string"
             }
@@ -130997,6 +133108,17 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
           "400": {
             "description": "Bad Request"
           },
@@ -131011,6 +133133,16 @@
           },
           "413": {
             "description": "Payload Too Large"
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           },
           "503": {
             "description": "Service Unavailable",
@@ -131061,6 +133193,13 @@
           {
             "name": "filePath",
             "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Range",
+            "in": "header",
             "schema": {
               "type": "string"
             }
@@ -131938,8 +134077,29 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found"
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           },
           "426": {
             "description": "Upgrade Required"
@@ -131977,6 +134137,13 @@
               "type": "string"
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }
@@ -132001,8 +134168,29 @@
               }
             }
           },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not Found"
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           },
           "426": {
             "description": "Upgrade Required"
@@ -132046,6 +134234,13 @@
               "type": "string"
             },
             "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ]
       }

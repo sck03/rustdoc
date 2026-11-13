@@ -35,6 +35,7 @@
     "test:input-method-ui": "node ../../scripts/test_input_method_ui.mjs",
     "test:invoice-text-normalization": "node ../../scripts/test_invoice_text_normalization_model.mjs",
     "test:settings-models": "node ../../scripts/test_settings_models.mjs && node ../../scripts/test_settings_job_lifecycle_ui.mjs",
+    "test:file-storage-ui": "node ../../scripts/test_file_storage_ui.mjs",
     "test:shared-control-layout-ui": "node ../../scripts/test_shared_control_layout_ui.mjs",
     "test:exchange-rate-ui": "node ../../scripts/test_exchange_rate_ui.mjs",
     "test:about-ui": "node ../../scripts/test_about_page_ui.mjs",

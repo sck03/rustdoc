@@ -7,7 +7,7 @@ param(
     [string]$Version,
     [switch]$SkipBuild,
     [switch]$PrepareOnly,
-    [switch]$Stop,
+    [Alias('Uninstall')][switch]$Stop,
     [switch]$RestorePending,
     [switch]$NoPause
 )
@@ -40,6 +40,7 @@ if ($PrepareOnly) {
     $arguments = @('compose', '--project-name', 'exportdoc-rust-native', '--file', (Join-Path $repositoryRoot 'deploy/rust-native/compose.yml'))
     Invoke-ExportDocDockerLifecycle -Docker $docker -ComposeArguments $arguments -Environment $environment `
         -WorkingDirectory $repositoryRoot -SkipBuild:$SkipBuild -Stop:$Stop -RestorePending:$RestorePending
-    if (-not $Stop) { Write-Host "Native web application: http://${BindAddress}:$Port" }
+    if ($Stop) { Write-Host "Deployment containers and network removed. Data, configuration, backups and images retained: $runtimePath" }
+    else { Write-Host "Native web application: http://${BindAddress}:$Port" }
 }
 Wait-ExportDocInteractiveExit -Enabled $interactiveLaunch -ExitCode 0

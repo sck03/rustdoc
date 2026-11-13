@@ -1,6 +1,6 @@
 use super::*;
+use crate::engine::file_store::PreparedObject;
 use export_doc_single_window::{Package, digest, package::describe};
-use export_doc_storage::BlobWrite;
 use std::collections::{BTreeMap, BTreeSet};
 
 pub fn parse(
@@ -103,6 +103,7 @@ pub struct PreparedReceipts<'a> {
     business: Business,
     parsed: Vec<Value>,
     hashes: Vec<String>,
+    objects: Vec<PreparedObject>,
 }
 
 pub fn prepare<'a>(service: &NativeService, package: &'a Package) -> Result<PreparedReceipts<'a>> {
@@ -110,10 +111,12 @@ pub fn prepare<'a>(service: &NativeService, package: &'a Package) -> Result<Prep
         Business::parse(rules::text(&package.manifest, "businessType")).map_err(invalid)?;
     let mut parsed = Vec::with_capacity(package.files.len());
     let mut hashes = Vec::with_capacity(package.files.len());
+    let mut objects = Vec::with_capacity(package.files.len());
     for (name, bytes) in &package.files {
         crate::operation::check()?;
         parsed.push(parse(service, business, bytes, name)?);
         hashes.push(digest(bytes));
+        objects.push(service.store.files.prepare(bytes)?);
     }
     primary(&parsed)?;
     let reference = references(&parsed, "")?;
@@ -125,6 +128,7 @@ pub fn prepare<'a>(service: &NativeService, package: &'a Package) -> Result<Prep
         business,
         parsed,
         hashes,
+        objects,
     })
 }
 
@@ -148,7 +152,7 @@ pub fn import(
     let mut hashes: BTreeSet<String> = serde_json::from_value(row["_receiptHashes"].clone())
         .map_err(|_| unavailable("回执归档索引损坏。"))?;
     let mut count = 0;
-    for (((_, bytes), receipt), hash) in package.files.iter().zip(parsed).zip(&prepared.hashes) {
+    for ((object, receipt), hash) in prepared.objects.iter().zip(parsed).zip(&prepared.hashes) {
         crate::operation::check()?;
         if !hashes.insert(hash.clone()) {
             continue;
@@ -162,15 +166,13 @@ pub fn import(
             .as_array_mut()
             .ok_or_else(|| unavailable("回执历史损坏。"))?
             .push(record);
-        tx.insert_blob(&BlobWrite {
-            kind: &format!("sw-receipt:{hash}"),
-            record_id: row["id"].as_i64().unwrap_or(0),
-            file_name: rules::text(receipt, "sourceFileName"),
-            media_type: "application/xml",
-            digest: &hash,
-            content: bytes,
-            created_at: &store::timestamp(),
-        })?;
+        tx.publish_file(
+            object,
+            &format!("sw-receipt:{hash}"),
+            row["id"].as_i64().unwrap_or(0),
+            rules::text(receipt, "sourceFileName"),
+            "application/xml",
+        )?;
         count += 1;
     }
     let changed = tracking::add_package(&mut row, m, "Imported")?;

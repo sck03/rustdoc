@@ -92,6 +92,7 @@ pub fn save(
     invoice_id: i64,
     body: &Value,
     loaded: &Loaded,
+    files: &std::collections::BTreeMap<String, crate::engine::file_store::PreparedObject>,
 ) -> Result<Value> {
     validation::structure(business, body).map_err(invalid)?;
     let invoice = source(tx, actor, invoice_id, "edit")?;
@@ -112,19 +113,6 @@ pub fn save(
         ));
     }
     let mut body = contracts::dto(contracts::schema(business.schema()), body.clone());
-    let files = if business == Business::Coo {
-        document_files::prepare(
-            tx,
-            loaded
-                .stored
-                .as_ref()
-                .and_then(|v| v["id"].as_i64())
-                .unwrap_or(0),
-            &mut body,
-        )?
-    } else {
-        Default::default()
-    };
     for (key, value) in body.as_object_mut().into_iter().flatten() {
         if let Some(raw) = value.as_str() {
             if !key.starts_with('_') {
@@ -192,7 +180,7 @@ pub fn save(
         if id == 0 { "create" } else { "edit" },
         Some(&invoice),
     )?;
-    document_files::persist(tx, &saved, &files)?;
+    document_files::persist(tx, &saved, files)?;
     if business == Business::Coo {
         references::remember(tx, actor, &saved)?;
     }

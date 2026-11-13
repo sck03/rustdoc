@@ -1,6 +1,6 @@
 # GitHub Actions 工作流用途与运行手册
 
-> 2026-09-25。Rust 发布按原 C# 项目的独立产品入口组织，共用 Rust 构建逻辑；不运行 dotnet restore/publish。
+核对日期：2026-11-13。当前为 Tauri + React + Rust，数据库基线为 schema 18。以下入口以本仓库 `.github/workflows` 和 `scripts/github` 为准；源码推送、平台验收和正式发布分别执行。
 
 ## 发布入口
 
@@ -50,6 +50,10 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 
 先查看第一个失败步骤及完整日志。依赖安全错误、下载故障、工具链和平台编译问题分别处理；取消、ignored、静态语法通过不计为运行验收。
 
+文件存储改动进入 Rust 单元/契约回归；在 `validation_mode=full` 中，Windows x64 完成当前 `office_review` 构建后依次运行 `test:oa-ui` 和 `test:file-storage-ui`。后者验证存储设置、55 份人事附件分页、HTTP Range、迁移及身份标记故障。日常 quick 不执行这组真实 HTTP/React 集成；完整 S3 厂商、外置磁盘故障和百万条容量仍需专项环境，不能将该测试描述为已经覆盖。
+
+本地复现使用[脚本说明](../scripts/README.md)中的仓库缓存与串行 Cargo 顺序，真实 PostgreSQL 18 运行 `test-native-postgres.ps1 -PostgresBin <bin目录> -Scope All`。普通 `cargo test` 中被 ignored 的实库测试不计通过。GitHub 每个作业有独立 workspace，作业内不得让共享 target 的 Cargo 编译与测试同时运行。
+
 2026-11-11 调整日常校验范围：纯文档提交不启动 Rust 构建；React 改动执行前端构建、无障碍、缩放、视觉与编辑/取消回归。Rust quick 运行后端库单元测试和生成契约，Tauri 宿主变动另跑宿主测试，共用 Rust 变动检查桌面组合根。完整集成、doc-test、全部特性与 OA HTTP/React 集中在手工 full 验证；选择 full 时不再重复 quick core。编译缓存按工具链和锁图恢复，并以源码 SHA 保存新结果；恢复缓存不等于检查通过。打包复用同一作业已构建的前端。
 
 从本工作流 Run workflow 选择 `validation_mode=full`，才执行完整工作区、全部特性及 [内部平台验收组合](../.github/workflows/native-full-validation.yml)中的五种桌面、四种服务包和两种容器目标。full 组合只接受 workflow_call，没有第二个用户入口；发布工作流及其实际验收保持。日常前端和 Rust 分开并行，独立脚本/依赖门禁继续保留。
@@ -58,7 +62,7 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 
 2026-10-25 复核 [run 40121278583](https://github.com/sck03/rustdoc/actions/runs/40121278583/job/120953136194)：主锁图的 `ctutils 0.4.3` 命中新公告 `RUSTSEC-2026-0385`，涉及非常量时间掩码/比较；OCR/Excel 图未命中。独立升级到 `0.4.4` 并重生成 notices，原 MIT/Apache-2.0 许可及既有 GLib 例外保持。审计步骤保留原 JSON 报告并输出依赖、公告和修复版本摘要，不用忽略公告消除失败。主工作区库存标为 `rust-workspace`，与桌面实际运行图分别检查。
 
-2026-10-30 起，日常 Rust 验证使用 `cargo test --locked --workspace --exclude export-doc-tauri`，宿主按变更单独测试；手动 full 使用完整工作区及全部特性，独立 OCR 工程继续分别执行。原生库清单、字体、模板、工具链和相关准备脚本加入对应 paths 过滤，避免这些构建输入单独变化时遗漏门禁；Firefox/WebKit 仍仅手工执行。
+历史上 2026-10-30 的日常 Rust 验证曾运行完整非 Tauri 工作区；2026-11-11 已改为 quick 库单元测试及契约、full 完整集成，以上文当前分工为准。原生库清单、字体、模板、工具链和相关准备脚本仍参与路径判定；Firefox/WebKit 仅手工执行。
 
 同日 [run 40167194980](https://github.com/sck03/rustdoc/actions/runs/40167194980/job/121090563126) 的新增嵌套 Git 保护回归在 Linux 清理隐藏 `.git` 夹具时失败。清理精确的自建夹具使用 `-Force`，Windows 也将该夹具标为 Hidden 以覆盖同一边界；正式包的 Git 保护规则不放宽。
 

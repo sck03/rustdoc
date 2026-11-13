@@ -116,7 +116,7 @@ pub(in crate::engine) fn prepare_batch(
     action: &str,
 ) -> Result<Vec<PreparedReport>> {
     let _lock = report_template_files::storage_lock(paths)?;
-    store.read(|tx| {
+    let (mut groups, plans, templates) = store.read(|tx| {
         let actor = auth::refresh_actor_in(tx, actor)?;
         let source = subject_in(
             tx,
@@ -152,6 +152,7 @@ pub(in crate::engine) fn prepare_batch(
                 .map_err(|cause| invalid(cause.to_string()))?;
         }
         let mut groups = BTreeMap::<bool, ReportData>::new();
+        let mut plans = BTreeMap::<bool, report_assets::ImagePlan>::new();
         let mut templates = Vec::with_capacity(requests.len());
         for request in requests {
             crate::operation::check()?;
@@ -183,38 +184,43 @@ pub(in crate::engine) fn prepare_batch(
                 kind,
                 true,
             )?;
-            report_assets::hydrate_in(
+            let plan = report_assets::hydrate_in(
                 tx,
                 paths,
                 &actor,
                 groups.get_mut(&seal).expect("prepared data"),
                 Some(template.content()),
             )?;
-            let retained: usize = groups
-                .values()
-                .flat_map(|data| data.images.values())
-                .map(|image| image.bytes.len())
-                .sum();
-            if retained > 128 * 1024 * 1024 {
-                return Err(error(
-                    429,
-                    "本批报表图片快照超过 128 MiB，请减少模板或图片。",
-                ));
-            }
+            plans.entry(seal).or_default().extend(plan);
             templates.push((seal, template));
         }
-        let groups: BTreeMap<_, _> = groups
-            .into_iter()
-            .map(|(seal, data)| (seal, Arc::new(data)))
-            .collect();
-        Ok(templates
-            .into_iter()
-            .map(|(seal, template)| PreparedReport {
-                data: groups[&seal].clone(),
-                template,
-            })
-            .collect())
-    })
+        Ok((groups, plans, templates))
+    })?;
+    for (seal, plan) in plans {
+        report_assets::load_plan(store, groups.get_mut(&seal).expect("prepared data"), plan)?;
+    }
+    let retained: usize = groups
+        .values()
+        .flat_map(|data| data.images.values())
+        .map(|image| image.bytes.len())
+        .sum();
+    if retained > 128 * 1024 * 1024 {
+        return Err(error(
+            429,
+            "本批报表图片快照超过 128 MiB，请减少模板或图片。",
+        ));
+    }
+    let groups: BTreeMap<_, _> = groups
+        .into_iter()
+        .map(|(seal, data)| (seal, Arc::new(data)))
+        .collect();
+    Ok(templates
+        .into_iter()
+        .map(|(seal, template)| PreparedReport {
+            data: groups[&seal].clone(),
+            template,
+        })
+        .collect())
 }
 
 pub(super) fn validate_access(

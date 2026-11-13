@@ -9,6 +9,17 @@ import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export const usePersonnelOperation = () => useOfficeOperation(identityQueryRoots);
 
+export function usePersonnelAttachments(client: ExportDocManagerApiClient, id: number, version: number) {
+  const [cursors, setCursors] = useState<string[]>([""]);
+  const after = cursors.at(-1)!;
+  const query = useQuery({ queryKey: ["office", "people", "attachments", id, version, after],
+    queryFn: ({ signal }) => client.listPersonnelAttachments({ id, after: after || undefined }, { signal }) });
+  return { query, canPrevious: cursors.length > 1,
+    previous: () => setCursors(current => current.slice(0, -1)),
+    next: () => { if (query.data?.nextCursor) setCursors(current => [...current, query.data!.nextCursor!]); },
+  };
+}
+
 export function usePersonnelDirectory(client: ExportDocManagerApiClient, user: ApiUserDto, directoryOnly = false, enabled = true, employeeId?: number) {
   const list = useDirectoryLocation("people", 24);
   const { params, update } = useRouteQuery();

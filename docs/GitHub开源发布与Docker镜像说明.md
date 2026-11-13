@@ -1,6 +1,6 @@
 # GitHub 开源发布与 Docker 镜像说明
 
-> 2026-10-14。当前交付为 React + Rust，桌面使用 Tauri；旧 ASP.NET/Chromium sidecar 发布入口已经退役。
+核对日期：2026-11-13。当前交付为 React + Rust，桌面使用 Tauri；旧 ASP.NET/Chromium sidecar 发布入口已经退役。
 
 ## 公开边界
 
@@ -27,6 +27,8 @@
 React 静态资源与 Rust API 在同一个应用容器，PostgreSQL 在独立容器；只发布应用 HTTP 端口，数据库通过内部网络访问。`initialize`/`restore` 为一次性维护服务，由公开入口在停 API 后运行；应用镜像不包含 PostgreSQL 服务端，只包含备份恢复所需客户端。构建上下文按 Dockerfile 输入列出允许路径，排除旧部署、桌面离线安装器、文档、测试产物与本机私密配置；这减少构建传输，不代表已删除正常运行所需的 OCR/字体或减小其镜像体积。
 
 桌面 SQLite 不能代替团队 PostgreSQL。当前支持单 API、多浏览器用户，不支持把多个 API 指向同一业务库当作高可用部署。数据库、受管文件、备份与配置一起按现有恢复流程验证。
+
+当前只接受全新 schema 18，不自动升级旧实验库。永久附件和图片保存于本地/S3 对象存储，PostgreSQL 保存元数据与引用；完整包包含文件对象，普通快照必须配套清单和对象仓库。独立磁盘挂载同时配置 application 与 restore，参考 `deploy/rust-native/file-storage.override.example.yml`。新版镜像的 `--print-uninstall` 输出保留数据的卸载脚本；源码部署使用 `scripts/uninstall-native-docker.cmd`。具体命令见[Docker 指南](./Docker容器部署与启动指南.md)。
 
 `rust-native-container-release.yml` 接受版本号、x64/ARM64/all、publish 和 publish_latest。每个原生 runner 只构建一次，启动、认证/文件任务与重启持久化均验证该镜像；通过后发布临时唯一标签并记录 digest。所有所选架构通过后，按 digest 合并 `ghcr.io/<owner>/exportdoc-rust-native:<version>`。只有显式选中 publish_latest 的全部架构稳定版才更新 latest；已有不同内容的版本标签拒绝覆盖。
 

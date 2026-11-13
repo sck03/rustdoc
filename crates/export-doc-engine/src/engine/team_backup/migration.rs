@@ -139,6 +139,7 @@ pub(super) fn create_package(
                 let dump = working.join("database.dump");
                 postgres::dump_to(&store, &protector, &tools.pg_dump, &dump)?;
                 let package = package::create(
+                    &store,
                     &paths,
                     &protector,
                     &dump,

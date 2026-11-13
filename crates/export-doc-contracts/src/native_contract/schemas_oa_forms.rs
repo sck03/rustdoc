@@ -129,7 +129,7 @@ pub(super) fn entries() -> Vec<(&'static str, Schema)> {
                 ("remove", b()),
                 ("rule", r("OaApprovalRule")),
                 ("calendar", r("OaBusinessCalendar")),
-                ("delegations", a(r("OaApprovalDelegation")).max_items(50)),
+                ("delegations", a(r("OaApprovalDelegation"))),
                 (
                     "handlingServices",
                     a(r("OfficeHandlingService")).max_items(100),

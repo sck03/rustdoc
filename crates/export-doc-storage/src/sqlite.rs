@@ -463,7 +463,7 @@ impl Adapter for Sqlite {
         )
     }
     fn insert(&self, r: &RecordWrite<'_>) -> Result<i64> {
-        crate::identity_runtime::atomic(self, r.kind, || {
+        crate::record_projection::atomic(self, r.kind, || {
             let stored = crate::identity_runtime::document(
                 r.kind,
                 &crate::workflow_runtime::document(r.kind, r.body),
@@ -474,12 +474,12 @@ impl Adapter for Sqlite {
                 c.execute("INSERT INTO records(kind,identity,version,owner_id,company,department,body) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![r.kind,r.identity,b["versionNumber"].as_i64(),b["ownerUserId"].as_i64(),b["companyScope"].as_str().unwrap_or(""),b["departmentId"].as_str().unwrap_or(""),serde_json::to_string(b)?])?;
                 c.last_insert_rowid()
             };
-            crate::identity_runtime::persist(self, id, r.kind, r.body)?;
+            crate::record_projection::persist(self, id, r.kind, r.body)?;
             Ok(id)
         })
     }
     fn update(&self, id: i64, expected: i64, r: &RecordWrite<'_>) -> Result<bool> {
-        crate::identity_runtime::atomic(self, r.kind, || {
+        crate::record_projection::atomic(self, r.kind, || {
             let stored = crate::identity_runtime::document(
                 r.kind,
                 &crate::workflow_runtime::document(r.kind, r.body),
@@ -487,7 +487,7 @@ impl Adapter for Sqlite {
             let b = &stored;
             let changed=self.connection.borrow().execute("UPDATE records SET identity=?1,version=?2,body=?3,owner_id=?4,company=?5,department=?6 WHERE kind=?7 AND id=?8 AND version=?9",params![r.identity,b["versionNumber"].as_i64(),serde_json::to_string(b)?,b["ownerUserId"].as_i64(),b["companyScope"].as_str().unwrap_or(""),b["departmentId"].as_str().unwrap_or(""),r.kind,id,expected])?==1;
             if changed {
-                crate::identity_runtime::persist(self, id, r.kind, r.body)?;
+                crate::record_projection::persist(self, id, r.kind, r.body)?;
             }
             Ok(changed)
         })
@@ -498,7 +498,7 @@ impl Adapter for Sqlite {
             [id],
             |row| row.get(0),
         )?;
-        crate::identity_runtime::atomic(self, &kind, || {
+        crate::record_projection::atomic(self, &kind, || {
             let stored = crate::identity_runtime::document(
                 &kind,
                 &crate::workflow_runtime::document(&kind, body),
@@ -514,6 +514,7 @@ impl Adapter for Sqlite {
             if crate::identity_runtime::supports(&kind) {
                 crate::identity_runtime::project(self, id)?;
             }
+            crate::resource_index::persist(self, id, &kind, body)?;
             Ok(())
         })
     }
@@ -656,7 +657,7 @@ impl Adapter for Sqlite {
         Ok(())
     }
     fn attachment_bytes(&self, invoice_id: i64) -> Result<i64> {
-        Ok(self.connection.borrow().query_cached("SELECT COALESCE(SUM(length(f.content)),0) FROM files f JOIN records r ON r.id=f.record_id WHERE r.kind='attachments' AND json_extract(r.body,'$.invoiceId')=?1",[invoice_id],|r|r.get(0))?)
+        Ok(self.connection.borrow().query_cached("SELECT COALESCE(SUM(o.size_bytes),0) FROM file_versions f JOIN file_objects o ON o.digest=f.digest JOIN records r ON r.id=f.record_id WHERE r.kind='attachments' AND json_extract(r.body,'$.invoiceId')=?1",[invoice_id],|r|r.get(0))?)
     }
     fn insert_blob(&self, b: &BlobWrite<'_>) -> Result<()> {
         self.connection.borrow().execute("INSERT INTO files(kind,record_id,file_name,media_type,digest,content,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![b.kind,b.record_id,b.file_name,b.media_type,b.digest,b.content,b.created_at])?;

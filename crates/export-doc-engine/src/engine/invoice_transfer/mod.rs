@@ -221,7 +221,7 @@ fn import(
         .map(|(name, bytes)| {
             Ok((
                 name.as_str(),
-                report_assets::ValidatedImage::new(bytes, 5 * 1024 * 1024)?,
+                report_assets::ValidatedImage::new(&service.store, bytes, 5 * 1024 * 1024)?,
             ))
         })
         .collect::<Result<BTreeMap<_, _>>>()?;
@@ -272,7 +272,7 @@ fn collect_image(
     field: &str,
     asset: &str,
     prefix: &str,
-    assets: &mut BTreeMap<String, Vec<u8>>,
+    assets: &mut BTreeMap<String, report_assets::ImageSnapshot>,
 ) -> Result<()> {
     let reference = text(record, field);
     if reference.is_empty() {
@@ -281,10 +281,7 @@ fn collect_image(
     let id = reference
         .strip_prefix(prefix)
         .ok_or_else(|| invalid("单据图片不是受管资源。"))?;
-    assets.insert(
-        asset.into(),
-        report_assets::read(tx, actor, id, None)?.bytes,
-    );
+    assets.insert(asset.into(), report_assets::read(tx, actor, id, None)?);
     Ok(())
 }
 fn export(
@@ -293,7 +290,7 @@ fn export(
     operation: Operation,
     id: i64,
 ) -> Result<Vec<u8>> {
-    let package = service.store.read_for(actor, operation, &[], |tx, actor| {
+    let (mut package, assets) = service.store.read_for(actor, operation, &[], |tx, actor| {
         let source = store::get(tx, "invoices", id)?;
         if !auth::visible(actor, "document.invoices", "view", &source)
             || !auth::visible(actor, "document.invoice-output", "export-zip", &source)
@@ -352,14 +349,22 @@ fn export(
         }
         let mut invoice = clean("ApiInvoiceDetailDto", source);
         invoice["letterOfCreditSourcePath"] = json!("");
-        Ok(Package {
-            invoice,
-            customer: customer.map(|v| clean("ApiCustomerDto", v)),
-            exporter: exporter.map(|v| clean("ApiExporterDto", v)),
+        Ok((
+            Package {
+                invoice,
+                customer: customer.map(|v| clean("ApiCustomerDto", v)),
+                exporter: exporter.map(|v| clean("ApiExporterDto", v)),
+                assets: BTreeMap::new(),
+                checksum_valid: true,
+            },
             assets,
-            checksum_valid: true,
-        })
+        ))
     })?;
+    for (name, image) in assets {
+        package
+            .assets
+            .insert(name, image.validate(&service.store)?.bytes);
+    }
     package::write(&package)
 }
 pub fn upload(

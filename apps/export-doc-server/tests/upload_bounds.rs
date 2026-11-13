@@ -133,16 +133,16 @@ fn unfinished_upload(
     eof: bool,
 ) -> String {
     let mut stream = TcpStream::connect(address).unwrap();
-    let timeout = Some(Duration::from_secs(3));
+    let timeout = Some(Duration::from_secs(10));
     stream.set_read_timeout(timeout).unwrap();
     stream.set_write_timeout(timeout).unwrap();
     write!(stream, "POST {path} HTTP/1.1\r\nHost: {address}\r\nAuthorization: Bearer {token}\r\nContent-Type: {content}\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n{:x}\r\n", prefix.len()).unwrap();
-    let mut chunk = Vec::with_capacity(prefix.len() + 2);
-    chunk.extend_from_slice(prefix);
-    chunk.extend_from_slice(b"\r\n");
     // A bounded reader can reject this chunk before the client finishes sending.
     // Preserve that response; the status assertion below still requires HTTP.
-    if let Err(error) = stream.write_all(&chunk) {
+    if let Err(error) = stream
+        .write_all(prefix)
+        .and_then(|()| stream.write_all(b"\r\n"))
+    {
         assert!(
             matches!(
                 error.kind(),
@@ -180,9 +180,13 @@ async fn uploads_reject_oversized_fields_before_consuming_the_rest_of_the_reques
     let token = login["accessToken"].as_str().unwrap().to_owned();
     // Exercise a declared multipart endpoint. CRM import accepts a raw file body.
     let attachment_path = UPLOAD_BUSINESS_ATTACHMENT.path.replace("{invoiceId}", "1");
+    let file_limit = export_doc_contracts::contracts::contract()["operations"]
+        [UPLOAD_BUSINESS_ATTACHMENT.id]["requestBody"]["x-exportdoc-max-bytes"]
+        .as_u64()
+        .unwrap() as usize;
     let mut bytes =
         b"--test\r\nContent-Disposition: form-data; name=file; filename=huge.csv\r\n\r\n".to_vec();
-    bytes.resize(34 * 1024 * 1024, b'x');
+    bytes.resize(file_limit + 2 * 1024 * 1024, b'x');
     bytes.extend_from_slice(b"\r\n--test--\r\n");
     let response = app
         .clone()
@@ -214,7 +218,7 @@ async fn uploads_reject_oversized_fields_before_consuming_the_rest_of_the_reques
         field.resize(field.len() + 65536 + 128, b'x');
         let metadata = unfinished_upload(address, &token, &attachment_path, "multipart/form-data; boundary=test", &field, false);
         let mut file = b"--test\r\nContent-Disposition: form-data; name=file; filename=huge.csv\r\n\r\n".to_vec();
-        file.resize(file.len() + 16 * 1024 * 1024 + 128, b'x');
+        file.resize(file.len() + file_limit + 128, b'x');
         let oversized = unfinished_upload(address, &token, &attachment_path, "multipart/form-data; boundary=test", &file, false);
         let mut files = Vec::new();
         for _ in 0..101 {

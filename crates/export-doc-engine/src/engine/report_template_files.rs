@@ -136,16 +136,30 @@ pub(super) fn resource_access(
     paths: &RuntimePaths,
     actor: &Actor,
 ) -> Result<std::collections::HashMap<String, bool>> {
+    Ok(resource_types(paths)?
+        .into_iter()
+        .map(|(id, kinds)| {
+            let visible = kinds
+                .iter()
+                .any(|kind| report_templates::policy::demand_catalog(actor, kind).is_ok());
+            (id, visible)
+        })
+        .collect())
+}
+
+pub(super) fn resource_types(
+    paths: &RuntimePaths,
+) -> Result<std::collections::HashMap<String, std::collections::HashSet<String>>> {
     let mut ids = std::collections::HashMap::new();
     package::visit_template_files(paths, |path, bytes| {
         crate::operation::check()?;
         let kind = kind_of_category(path.split('/').next().unwrap_or(""));
         let design = report_templates::validate_bytes(kind, &bytes)
             .map_err(|_| unavailable("文件模板资源索引损坏，已停止图片操作。"))?;
-        let visible = report_templates::policy::demand_catalog(actor, kind).is_ok();
         for resource in design.resources {
-            let accessible = ids.entry(resource.id).or_insert(false);
-            *accessible |= visible;
+            ids.entry(resource.id)
+                .or_insert_with(std::collections::HashSet::new)
+                .insert(kind.to_owned());
         }
         Ok(())
     })?;

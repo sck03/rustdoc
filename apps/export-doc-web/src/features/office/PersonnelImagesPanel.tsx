@@ -35,7 +35,7 @@ export function PersonnelImagesPanel({ client, record, operation, onPendingChang
     <div className="personnel-images">{(Object.keys(imageLabels) as PersonnelImageKind[]).map((kind) =>
       <PersonnelImageEditor key={kind} client={client} id={record.employee.id} kind={kind} image={record.images.find((item) => item.kind === kind)}
         editable={record.canEdit} busy={operation.busy} upload={upload} remove={() => void remove(kind)} onPendingChange={onPendingChange} />)}</div>
-    <PersonnelAttachments client={client} record={record} />
+    <PersonnelAttachments key={record.employee.id} client={client} record={record} />
   </div>;
 }
 

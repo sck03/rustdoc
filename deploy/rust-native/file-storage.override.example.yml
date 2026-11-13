@@ -1,0 +1,20 @@
+# Copy to compose.file-storage.yml; set FILE_STORAGE_PATH to an existing mount.
+# The host administrator grants UID/GID 10001 access before starting the service.
+x-file-store: &file-store
+  type: bind
+  source: '${FILE_STORAGE_PATH:?Set FILE_STORAGE_PATH to an existing file storage directory}'
+  target: /srv/exportdoc-files
+  bind:
+    create_host_path: false
+services:
+  application:
+    environment:
+      EXPORTDOCMANAGER_FILE_STORE_ROOTS: '{"attachments":"/srv/exportdoc-files"}'
+    volumes:
+      - *file-store
+  restore:
+    environment:
+      EXPORTDOCMANAGER_FILE_STORE_ROOTS: '{"attachments":"/srv/exportdoc-files"}'
+    volumes:
+      - *file-store
+    networks: [database, web]

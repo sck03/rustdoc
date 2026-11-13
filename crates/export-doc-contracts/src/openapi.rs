@@ -17,6 +17,9 @@ mod custom_oa;
 #[path = "contract_evolution.rs"]
 mod evolution;
 #[cfg(test)]
+#[path = "contract_file_storage.rs"]
+mod file_storage;
+#[cfg(test)]
 mod tests {
     use super::*;
     fn difference(path: &str, actual: &Value, expected: &Value) -> Option<String> {
@@ -195,6 +198,7 @@ mod tests {
                 }
             }
         }
+        file_storage::apply(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

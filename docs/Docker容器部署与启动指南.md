@@ -2,7 +2,7 @@
 
 产品界面名称为“业务协同平台”，与独立网页多用户版一致。Docker 表示部署方式；镜像地址、容器服务名和数据目录保持原有规则。分版名称及界面规范见[产品命名规范](./前端视觉与产品命名规范.md)。
 
-> 2026-10-16。适用于包含 `--print-compose`／`--prepare-docker` 的新版 Rust 镜像。React 网页和 Rust API 在应用容器中，PostgreSQL 18 在独立数据库容器中。无需下载源码、安装 Rust、Node 或 PowerShell。
+核对日期：2026-11-13。适用于包含 `--print-compose`、`--print-uninstall` 和 `--prepare-docker` 的 Rust 镜像。React 网页和 Rust API 在应用容器中，PostgreSQL 18 在独立数据库容器中。无需下载源码、安装 Rust、Node 或 PowerShell。当前只接受全新 schema 18，旧实验数据库必须另存并显式建立新库，不能直接覆盖升级。
 
 ## 1. 拉取镜像并启动
 
@@ -18,7 +18,7 @@ docker compose up -d --wait
 
 新版配置的常驻容器名为 `exportdoc-application`、`exportdoc-postgres`。原名称末尾的 `-1` 是 Compose 自动分配的第一个实例编号，不是异常。现在使用 `${COMPOSE_PROJECT_NAME}-服务名` 显式命名；另建隔离部署时指定不同项目名和端口即可，既有部署不可为改名字而换项目名或数据库卷。当前架构只支持单 API 实例，不用 `--scale application` 扩容。
 
-`setup` 准备配置及目录，`initialize` 执行数据库初始化或兼容升级；它们成功退出后不再占用进程、CPU 或运行内存。确认上面的 `up --wait` 成功、两项常驻服务 healthy，且初始化退出码均为 0 后，可清理停止的容器：
+`setup` 准备配置及目录，`initialize` 初始化新数据库或验证现有基线；它们成功退出后不再占用进程、CPU 或运行内存。确认上面的 `up --wait` 成功、两项常驻服务 healthy，且初始化退出码均为 0 后，可清理停止的容器：
 
 ```sh
 docker compose ps -a
@@ -53,10 +53,11 @@ docker run --rm ghcr.io/sck03/exportdoc-rust-native:<已发布版本> --print-co
 | `config/postgres` | 首次建库脚本及数据库凭据 | 仅 PostgreSQL 使用 |
 | `data/Backups` | 完整灾备、迁移包、数据库快照 | 管理员可直接搬运加密备份；也可网页下载 |
 | `data/Templates`、`data/Security` | 用户文件模板、凭据主密钥 | 必须保留；完整加密包会包含 |
+| `data/Files`、`data/Configuration/file-storage.json` | 默认附件对象和存储配置；可迁移到独立磁盘或 S3 | 通过“文件与存储”维护；不能按缓存删除 |
 | `data/Logs`、`data/Cache` | 日志、受管运行缓存 | 通过维护功能检查，勿混入业务资料 |
 | Compose 的 `postgres_data` 卷 | PostgreSQL 原始数据库目录 | 由 PostgreSQL 管理，不复制运行中的原始文件代替备份 |
 
-业务单据、账号、图片、OA 附件、数据库模板和历史记录保存在 PostgreSQL 中。`data` 目录不是数据库卷的替代品。恢复材料至少应包含完整加密包及其密码，部署配置另存。
+业务单据、账号、模板、历史及文件引用保存在 PostgreSQL 中；附件和图片的字节保存于本地/S3 文件存储。`data` 目录不是数据库卷的替代品，数据库 dump 也不能代替附件对象。恢复材料应包含完整加密包及其密码，部署配置另存；搬运普通快照时须一并搬运同名 `.objects.jsonl` 清单和邻接 `Objects/` 仓库。
 
 应用以 UID/GID `10001` 运行，初始化服务只在准备目录时使用必要的权限。Linux 管理员可用 `sudo` 操作主机目录；若迁入已有 `data`，应先核对来源和所有者。程序拒绝接管非空且所有者错误的目录，也不会在已有配置损坏时重新生成密码。
 
@@ -114,7 +115,7 @@ docker compose down
 docker compose up -d --wait
 ```
 
-`down` 不加 `-v`，保留数据库卷和主机目录。先拉取成功再停止旧服务。初始化服务持维护权限执行版本兼容升级，业务 API 只获得业务权限；初始化失败时不会继续启动 API。数据库升级后，不能只换回旧镜像就认定回退完成。
+`down` 不加 `-v`，保留数据库卷和主机目录。先拉取成功再停止旧服务。初始化服务使用维护权限核对当前 schema 和模型，业务 API 只获得业务权限；旧库或初始化失败时不会继续启动 API。当前没有旧 schema 兼容升级链，不能只换回旧镜像就认定回退完成。
 
 已有 `-1` 名称的部署采用新版命名时，在原目录保存旧配置并创建完整备份，用旧配置执行 `down`（不加 `-v`），再合并新版镜像输出的 `container_name` 配置；保留原项目名、镜像选择、端口、挂载及卷。重新 `up -d --wait` 后核对登录和业务数据，再按第一节清理成功退出的初始化容器。只推送源码不会修改已安装容器或已发布镜像。
 
@@ -142,3 +143,29 @@ docker compose up -d --no-deps --wait application
 ## 6. 已有源码脚本部署
 
 旧 `scripts/run-native-docker.ps1` 入口仍供已经采用它的部署和开发验证使用，继续使用原 RuntimeRoot、项目名和卷。它不是新版镜像安装的前置条件。不要直接在已有生产库旁启动上述空目录方案；切换部署方式应先创建完整迁移包，在隔离目标恢复并验收。源码构建参数见 [scripts/README](../scripts/README.md)。
+
+## 7. 独立附件磁盘与 S3
+
+系统设置 → 文件与存储默认使用 `data/Files`。扩容本地磁盘时，先由管理员挂载并创建真实目录，授予 UID/GID 10001 访问权限。将[挂载示例](../deploy/rust-native/file-storage.override.example.yml)保存到部署目录的 `compose.file-storage.yml`，在同目录 `.env` 设置 `FILE_STORAGE_PATH=/srv/exportdoc-attachments`，将示例路径改为实际存在的目录。
+
+```sh
+docker compose -f compose.yml -f compose.file-storage.yml config --quiet
+docker compose -f compose.yml -f compose.file-storage.yml up -d --wait
+```
+
+示例向 application 与 restore 同时登记 `attachments` 位置，且禁止 Docker 自动创建不存在的宿主目录。在“迁移存储”选择该位置或输入 `@attachments`，执行核验并迁移。复制可继续，切换时短暂停止业务写入；源文件保留。后续启动和恢复仍使用同样两个 `-f` 参数，不能漏掉恢复容器的挂载。挂载消失或身份标记不符会报错，不接管同名空目录。
+
+远程存储选择 S3，填写 endpoint、bucket、region、前缀和凭据。S3 无需宿主磁盘挂载，但应用和恢复环境都须能访问对象服务；凭据使用主密钥加密，不从状态接口返回。实际厂商兼容性、网络故障和容量须独立验收。默认单文件 100 MiB；浏览器目前没有断点续传，完整包也没有分卷，详见[容量与运维边界](./文件存储与容量管理.md)。
+
+## 8. 卸载与重装
+
+Linux 镜像部署在原 `compose.yml` 所在目录，用实际部署的同一镜像版本生成并运行卸载脚本：
+
+```sh
+docker run --rm ghcr.io/sck03/exportdoc-rust-native:<已发布版本> --print-uninstall > uninstall.sh
+sh ./uninstall.sh
+```
+
+脚本移除本部署容器和网络，保留数据库卷、附件、配置、主密钥、备份与镜像。Windows 或不使用 shell 的部署可在原目录执行 `docker compose --file compose.yml --profile maintenance down`；使用挂载扩展时加上同一 `--file compose.file-storage.yml`。重复执行不会把数据清空；不要加 `-v` 或运行全局 prune。
+
+仓库源码部署使用 `.\scripts\uninstall-native-docker.cmd -RuntimeRoot <原目录> -NoPause`，或 `run-native-docker.ps1 -Uninstall`；它针对源码脚本的固定项目，不能用于另一个镜像安装项目。重装复用原目录、配置、项目名和同一受支持 schema 的卷；彻底删除数据属于单独运维操作，本入口不提供该开关。

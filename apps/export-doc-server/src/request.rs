@@ -1,6 +1,6 @@
 use crate::{ServerState, response};
-mod backup;
 pub(super) mod body;
+mod upload_file;
 use axum::{
     body::Body,
     extract::{FromRequestParts, Path, Request},
@@ -32,6 +32,18 @@ impl Drop for Cancellation {
 pub async fn handle(state: ServerState, operation: Operation, request: Request) -> Response<Body> {
     let mut span = state.telemetry.start(operation.id);
     let request_id = span.id().to_owned();
+    // Without a matching validator, If-Range requires a complete representation.
+    let range = if request.method() == axum::http::Method::GET
+        && !request.headers().contains_key(axum::http::header::IF_RANGE)
+    {
+        request
+            .headers()
+            .get(axum::http::header::RANGE)
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_owned)
+    } else {
+        None
+    };
     let result = tokio::select! {
         result = tokio::time::timeout(Duration::from_secs(request_seconds(operation) + 5), execute(state.clone(), operation, request)) =>
             result.unwrap_or_else(|_| Err(error(504, "请求读取或处理超过时限。"))),
@@ -48,12 +60,13 @@ pub async fn handle(state: ServerState, operation: Operation, request: Request) 
                             state.requests.queued(),
                         );
                         reply.bytes = value.to_string().into_bytes();
-                        response::success(operation, reply, &state, &request_id)
+                        response::success(operation, reply, &state, &request_id, range.as_deref())
+                            .await
                     }
                     Err(_) => response::error(error(503, "运行指标响应无效。")),
                 }
             } else {
-                response::success(operation, reply, &state, &request_id)
+                response::success(operation, reply, &state, &request_id, range.as_deref()).await
             }
         }
         Err(error) => {
@@ -270,27 +283,30 @@ async fn execute(
         })
         .await
         .map_err(|_| error(503, "上传授权任务中断。"))??;
-        let file = backup::receive(
+        let file = upload_file::receive(
             body,
             &state.service.paths.cache_root,
             state.upload_space.clone(),
+            export_doc_engine::engine::backup_io::MAX_FILE_BYTES,
         )
         .await?;
         backup_upload = Some((authorization, file));
         body::Parsed::default()
     } else {
-        body::parse(
+        body::parse_with_files(
             &state.body_resources,
             operation,
             Request::from_parts(parts, body),
             &parameters,
             &query,
+            Some((&state.service.paths.cache_root, state.upload_space.clone())),
         )
         .await?
     };
     let body::Parsed {
         body,
         upload,
+        document,
         merge_uploads,
         reservation,
     } = parsed;
@@ -388,6 +404,19 @@ async fn execute(
                     .map(response::Reply::bytes)
                     .map_err(|_| error(503, "文件任务响应编码失败。"));
                 }
+                if let Some((name, file)) = document {
+                    let value = state.service.upload_document_file(
+                        operation,
+                        &parameters,
+                        body.unwrap_or(Value::Null),
+                        &name,
+                        file,
+                        &token,
+                    )?;
+                    return serde_json::to_vec(&value)
+                        .map(response::Reply::bytes)
+                        .map_err(|_| error(503, "上传结果编码失败。"));
+                }
                 if let Some((name, bytes)) = upload {
                     let value = state.service.upload(
                         operation,
@@ -418,7 +447,8 @@ async fn execute(
                             )
                             .map(response::Reply::file);
                     }
-                    if operation == DOWNLOAD_PERSONNEL_ATTACHMENT
+                    if [DOWNLOAD_PERSONNEL_ATTACHMENT, DOWNLOAD_BUSINESS_ATTACHMENT]
+                        .contains(&operation)
                         || export_doc_engine::engine::oa::is_download(operation)
                         || export_doc_engine::engine::communication::is_download(operation)
                         || [DOWNLOAD_REPORT_TEMPLATE_PACKAGE, DOWNLOAD_SUPPORT_PACKAGE]

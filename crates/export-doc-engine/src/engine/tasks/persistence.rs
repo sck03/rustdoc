@@ -201,6 +201,18 @@ pub(super) fn finish_controlled(
 ) -> Result<()> {
     let mut published = false;
     let mut prepared = false;
+    let (result, prepared_archive) = match result {
+        Ok(output) => match output
+            .archive
+            .as_ref()
+            .map(|archive| store.files.prepare(&archive.file.content))
+            .transpose()
+        {
+            Ok(prepared) => (Ok(output), prepared),
+            Err(cause) => (Err(cause), None),
+        },
+        Err(cause) => (Err(cause), None),
+    };
     let result = store.transaction(|connection| {
         let mut job = checked(connection, actor, id)?;
         if !active(&job) {
@@ -235,7 +247,7 @@ pub(super) fn finish_controlled(
                     if let Some(archive) = output.archive {
                         if connection.blob_info(archive.record_id,archive.kind)?.is_some() { return Err(conflict("归档文件已经存在，不能覆盖。")); }
                         let file = archive.file;
-                        connection.insert_blob(&BlobWrite { kind:archive.kind,record_id:archive.record_id,file_name:&file.file_name,media_type:&file.media_type,digest:&digest(&file.content),content:&file.content,created_at:&store::timestamp() })?;
+                        connection.publish_file(prepared_archive.as_ref().expect("prepared archive"),archive.kind,archive.record_id,&file.file_name,&file.media_type)?;
                     }
                     if output.managed_file.is_some() {
                         job["outputPath"] = job["_managedOutput"]["fileName"].clone();

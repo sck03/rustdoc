@@ -1,7 +1,7 @@
 use super::*;
 use export_doc_storage::{ReportTemplateQuery, TemplateAudience, TemplateVersionQuery};
 
-fn audience(actor: &Actor, output: bool) -> TemplateAudience<'_> {
+pub(crate) fn audience(actor: &Actor, output: bool) -> TemplateAudience<'_> {
     let permission = if output { policy::CATALOG } else { PERMISSION };
     TemplateAudience {
         user_id: actor.id,

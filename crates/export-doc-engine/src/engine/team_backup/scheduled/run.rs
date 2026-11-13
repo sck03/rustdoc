@@ -60,6 +60,7 @@ pub(super) fn start(
                             store.connection()?.backup(&snapshot)?;
                         }
                         let package = package::create(
+                            &store,
                             &paths,
                             &protector,
                             &snapshot,

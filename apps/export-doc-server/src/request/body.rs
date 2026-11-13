@@ -14,12 +14,14 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 // slots. The reservation follows the parsed value into the service worker.
 pub(crate) struct Resources {
     memory: Arc<Semaphore>,
+    uploads: Arc<Semaphore>,
     parsers: Arc<Semaphore>,
 }
 impl Default for Resources {
     fn default() -> Self {
         Self {
             memory: Arc::new(Semaphore::new(64 * 1024)),
+            uploads: Arc::new(Semaphore::new(200 * 1024)),
             parsers: Arc::new(Semaphore::new(4)),
         }
     }
@@ -31,6 +33,7 @@ const MAX_FIELD: usize = 65536;
 pub(super) struct Parsed {
     pub body: Option<Value>,
     pub upload: Option<(String, Bytes)>,
+    pub document: Option<(String, std::fs::File)>,
     pub merge_uploads: Vec<FileOutput>,
     pub reservation: Option<OwnedSemaphorePermit>,
 }
@@ -60,6 +63,12 @@ pub(super) fn needs_processing_slot(operation: Operation) -> bool {
 pub(crate) fn envelope_limit(operation: Operation) -> usize {
     if backup_upload(operation) {
         return export_doc_engine::engine::backup_io::MAX_FILE_BYTES as usize;
+    }
+    if let Some(limit) =
+        contracts::contract()["operations"][operation.id]["requestBody"]["x-exportdoc-max-bytes"]
+            .as_u64()
+    {
+        return limit as usize + MIB;
     }
     (if operation == UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
         129
@@ -102,7 +111,7 @@ async fn bytes(mut body: Body, limit: usize, idle: Duration) -> Result<Bytes, Ap
     Ok(Bytes::from(content))
 }
 
-fn multipart_error(cause: axum::extract::multipart::MultipartError) -> ApiError {
+pub(super) fn multipart_error(cause: axum::extract::multipart::MultipartError) -> ApiError {
     if cause.status().as_u16() == 413 {
         error(413, "上传超过该操作的容量上限。")
     } else {
@@ -121,13 +130,27 @@ async fn field_bytes(mut field: Field<'_>, limit: usize, status: u16) -> Result<
     Ok(bytes)
 }
 
-pub(super) async fn parse(
+#[cfg(test)]
+async fn parse(
     resources: &Resources,
     operation: Operation,
     request: Request,
     parameters: &HashMap<String, String>,
     query: &[(String, String)],
 ) -> Result<Parsed, ApiError> {
+    parse_with_files(resources, operation, request, parameters, query, None).await
+}
+
+pub(super) async fn parse_with_files(
+    resources: &Resources,
+    operation: Operation,
+    request: Request,
+    parameters: &HashMap<String, String>,
+    query: &[(String, String)],
+    storage: Option<(&std::path::Path, Arc<crate::temporary_space::Budget>)>,
+) -> Result<Parsed, ApiError> {
+    let storage = storage
+        .filter(|_| export_doc_engine::engine::NativeService::accepts_document_upload(operation));
     let multipart = request
         .headers()
         .get("content-type")
@@ -145,6 +168,22 @@ pub(super) async fn parse(
         .get("application/octet-stream")
         .is_some();
     let mut result = Parsed::default();
+    let upload_limit = contract["requestBody"]["x-exportdoc-max-bytes"]
+        .as_u64()
+        .map(|v| v as usize);
+    if multipart || binary {
+        result.reservation = Some(
+            resources
+                .uploads
+                .clone()
+                .try_acquire_many_owned(if storage.is_some() {
+                    8 * 1024
+                } else {
+                    envelope_limit(operation).div_ceil(1024).min(200 * 1024) as u32
+                })
+                .map_err(|_| error(429, "文件接收容量已满，请稍后重试。"))?,
+        );
+    }
     if contract["requestBody"].is_null() {
         return Ok(result);
     }
@@ -172,12 +211,26 @@ pub(super) async fn parse(
                         content,
                     });
                 } else {
-                    if result.upload.is_some() {
+                    if result.upload.is_some() || result.document.is_some() {
                         return Err(error(400, "每次只能上传一个文件。"));
                     }
-                    let limit = if catalog_upload(operation) { 100 } else { 16 } * MIB;
-                    result.upload =
-                        Some((filename, Bytes::from(field_bytes(field, limit, 413).await?)));
+                    let limit = upload_limit
+                        .unwrap_or(if catalog_upload(operation) { 100 } else { 16 } * MIB);
+                    if let Some((root, budget)) = &storage {
+                        result.document = Some((
+                            filename,
+                            super::upload_file::receive_field(
+                                field,
+                                root,
+                                budget.clone(),
+                                limit as u64,
+                            )
+                            .await?,
+                        ));
+                    } else {
+                        result.upload =
+                            Some((filename, Bytes::from(field_bytes(field, limit, 413).await?)));
+                    }
                 }
             } else {
                 if metadata.len() >= 32 || metadata.contains_key(&name) {
@@ -217,10 +270,28 @@ pub(super) async fn parse(
         } else {
             25
         } * MIB;
-        result.upload = Some((
-            filename,
-            bytes(request.into_body(), limit, Duration::from_secs(60)).await?,
-        ));
+        if let Some((root, budget)) = &storage {
+            result.document = Some((
+                filename,
+                super::upload_file::receive(
+                    request.into_body(),
+                    root,
+                    budget.clone(),
+                    upload_limit.unwrap_or(limit) as u64,
+                )
+                .await?,
+            ));
+        } else {
+            result.upload = Some((
+                filename,
+                bytes(
+                    request.into_body(),
+                    upload_limit.unwrap_or(limit),
+                    Duration::from_secs(60),
+                )
+                .await?,
+            ));
+        }
         let mut metadata = Map::new();
         for property in contract["parameters"].as_array().into_iter().flatten() {
             let Some(name) = property["name"].as_str().filter(|name| *name != "fileName") else {

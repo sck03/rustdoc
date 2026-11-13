@@ -62,6 +62,7 @@ impl Configuration {
         let executable = env::current_exe().map_err(|error| error.to_string())?;
         let mut app_root = executable.parent().ok_or("程序目录无效。")?.to_path_buf();
         let mut data_root = None;
+        let mut file_roots = Vec::new();
         let mut web_root = None;
         let mut endpoint_file = None;
         let mut bind: SocketAddr = "127.0.0.1:5188".parse().unwrap();
@@ -76,6 +77,9 @@ impl Configuration {
                 "--app-root" => app_root = PathBuf::from(args.next().ok_or("缺少 AppRoot。")?),
                 "--data-root" => {
                     data_root = Some(PathBuf::from(args.next().ok_or("缺少 DataRoot。")?))
+                }
+                "--file-store-root" => {
+                    file_roots.push(args.next().ok_or("缺少存储位置 NAME=PATH。")?)
                 }
                 "--web-root" => {
                     web_root = Some(PathBuf::from(args.next().ok_or("缺少网页目录。")?))
@@ -120,7 +124,21 @@ impl Configuration {
             .map(|path| file_secret("迁移包密码", path))
             .transpose()?
             .unwrap_or_default();
-        let paths = RuntimePaths::server(&app_root, &data_root)?;
+        let mut paths = RuntimePaths::server(&app_root, &data_root)?;
+        if let Some(value) = env::var_os("EXPORTDOCMANAGER_FILE_STORE_ROOTS") {
+            let roots: std::collections::BTreeMap<String, String> =
+                serde_json::from_str(&value.to_string_lossy())
+                    .map_err(|_| "文件存储位置环境配置必须是名称到绝对目录的 JSON 对象。")?;
+            for (name, path) in roots {
+                paths.register_file_storage_root(&name, PathBuf::from(path))?;
+            }
+        }
+        for entry in file_roots {
+            let (name, path) = entry
+                .split_once('=')
+                .ok_or("存储位置须使用 NAME=PATH 格式。")?;
+            paths.register_file_storage_root(name, PathBuf::from(path))?;
+        }
         let config_root = app_root.join("RuntimeConfig");
         let config_marker = config_root.join("deployment.json");
         ensure_safe_absolute(&config_marker)?;

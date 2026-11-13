@@ -15,6 +15,7 @@ use std::{
 pub(super) const KEY: &str = "Security/native-master-key.bin";
 pub(super) const SQLITE: &str = crate::paths::SQLITE_DATABASE_RELATIVE_PATH;
 pub(super) const POSTGRES: &str = "Database/postgresql-physical.dump";
+pub(super) const OBJECTS: &str = "FileObjects.pack";
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Manifest {
@@ -23,7 +24,7 @@ pub(super) struct Manifest {
     database: String,
     pub files: Vec<sealed::ManifestFile>,
 }
-pub(super) fn lock(paths: &RuntimePaths) -> Result<fs::File> {
+pub(in crate::engine) fn lock(paths: &RuntimePaths) -> Result<fs::File> {
     let path = paths.data_root.join("Locks").join("backup-restore.lock");
     paths::ensure_safe_absolute(&path).map_err(invalid)?;
     fs::create_dir_all(path.parent().unwrap())?;
@@ -47,6 +48,7 @@ pub(super) fn private_directory(path: &Path) -> Result<()> {
     crate::secrets::private_directory(path).map_err(unavailable)
 }
 pub(super) fn create(
+    store: &super::super::store::Store,
     paths: &RuntimePaths,
     protector: &crate::secrets::Protector,
     database: &Path,
@@ -72,6 +74,9 @@ pub(super) fn create(
         (entry.to_owned(), database.to_path_buf()),
         (KEY.to_owned(), key),
     ];
+    let objects = working.join(OBJECTS);
+    super::super::file_store::export_archive(store, &objects)?;
+    sources.push((OBJECTS.into(), objects));
     collect(
         &paths.data_root,
         &paths.data_root.join("Templates"),
@@ -103,6 +108,7 @@ pub(super) fn create(
         .write(true)
         .open(&payload_path)?;
     sealed::zip_payload(&entries, file)?;
+    fs::remove_file(working.join(OBJECTS))?;
     let target = working.join("sealed-package.bin");
     let mut output = fs::OpenOptions::new()
         .create_new(true)
@@ -110,6 +116,7 @@ pub(super) fn create(
         .open(&target)?;
     sealed::seal_to(magic, password, fs::File::open(&payload_path)?, &mut output)?;
     output.sync_all()?;
+    fs::remove_file(payload_path)?;
     Ok(target)
 }
 fn collect(root: &Path, directory: &Path, sources: &mut Vec<(String, PathBuf)>) -> Result<()> {
@@ -171,8 +178,13 @@ pub(super) fn stage(
         let entries = sealed::unpack(fs::File::open(&archive_path)?, &staging)?;
         fs::remove_file(archive_path)?;
         validate_entries(&read_manifest(&staging)?, &entries, database)?;
+        super::super::file_store::restore_archive(&staging.join(OBJECTS), &staging)?;
         if database == SQLITE {
             export_doc_storage::verify_sqlite_backup(&staging.join(SQLITE))?;
+            let db = export_doc_storage::Connection::sqlite(&staging.join(SQLITE))?;
+            super::super::file_store::verify_local_inventory(&staging, |cursor| {
+                Ok(db.file_objects(cursor, 200, false)?)
+            })?;
         }
         crate::operation::check()?;
         sealed::atomic_write(
@@ -215,7 +227,10 @@ fn validate_manifest(manifest: &Manifest, database: &str) -> Result<()> {
             .name
             .split('/')
             .any(|part| !paths::valid_file_name(part))
-            || (file.name != database && file.name != KEY && !file.name.starts_with("Templates/"))
+            || (file.name != database
+                && file.name != KEY
+                && file.name != OBJECTS
+                && !file.name.starts_with("Templates/"))
         {
             return Err(invalid("包包含不支持的文件或非法路径。"));
         }
@@ -239,8 +254,11 @@ fn validate_entries(
         || !entries
             .iter()
             .any(|entry| entry.name == KEY && entry.size_bytes == 32)
+        || !entries
+            .iter()
+            .any(|entry| entry.name == OBJECTS && entry.size_bytes > 0)
     {
-        return Err(invalid("包缺少有效数据库或主密钥。"));
+        return Err(invalid("包缺少有效数据库、文件对象或主密钥。"));
     }
     Ok(())
 }
@@ -270,6 +288,14 @@ pub(super) fn staged(marker: &Path, database: &str) -> Result<Option<PathBuf>> {
         entries.push(entry);
     }
     validate_entries(&manifest, &entries, database)?;
+    super::super::file_store::restore_archive(&staging.join(OBJECTS), &staging)?;
+    if database == SQLITE {
+        export_doc_storage::verify_sqlite_backup(&staging.join(SQLITE))?;
+        let db = export_doc_storage::Connection::sqlite(&staging.join(SQLITE))?;
+        super::super::file_store::verify_local_inventory(&staging, |cursor| {
+            Ok(db.file_objects(cursor, 200, false)?)
+        })?;
+    }
     Ok(Some(staging))
 }
 
@@ -287,14 +313,15 @@ mod tests {
                 (export_doc_storage::SCHEMA_VERSION, true),
                 (export_doc_storage::SCHEMA_VERSION + 1, false),
             ] {
-                let mut entries: Vec<_> = [(database, vec![1]), (KEY, vec![2; 32])]
-                    .into_iter()
-                    .map(|(name, bytes)| sealed::ManifestFile {
-                        name: name.to_owned(),
-                        size_bytes: bytes.len() as u64,
-                        sha256: super::super::sha256_hex(&bytes),
-                    })
-                    .collect();
+                let mut entries: Vec<_> =
+                    [(database, vec![1]), (KEY, vec![2; 32]), (OBJECTS, vec![3])]
+                        .into_iter()
+                        .map(|(name, bytes)| sealed::ManifestFile {
+                            name: name.to_owned(),
+                            size_bytes: bytes.len() as u64,
+                            sha256: super::super::sha256_hex(&bytes),
+                        })
+                        .collect();
                 let manifest = Manifest {
                     schema_version: 1,
                     database_schema: version,

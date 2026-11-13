@@ -40,9 +40,10 @@ pub fn detail(tx: &Connection, actor: &Actor, mut record: Value) -> Result<Value
     super::personnel_privacy::hydrate(tx, &mut record)?;
     record["organization"] = super::personnel_organization::project(tx, &record)?;
     record["account"] = super::personnel_accounts::current_account(tx, &record)?;
-    if record.get("attachments").is_none() {
-        record["attachments"] = json!([]);
-    }
+    let files =
+        super::personnel_files::page(tx, super::records::positive(&record, "id", "人员")?, "")?;
+    record["attachments"] = files["items"].clone();
+    record["attachmentCount"] = files["totalCount"].clone();
     record["employee"] = employee(tx, actor, &record)?;
     let editable = actor.admin || record["status"] != "Departed";
     let required_actions = super::oa::personnel_changes::required_actions();

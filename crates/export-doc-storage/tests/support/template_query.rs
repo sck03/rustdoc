@@ -12,7 +12,7 @@ fn insert(c: &Connection, kind: &str, mut body: Value) -> i64 {
 
 pub fn exercise(c: &Connection) {
     c.begin().unwrap();
-    let payload = "正文不可出现在列表".repeat(4096);
+    let payload = json!({"resources":[],"text":"正文不可出现在列表".repeat(4096)}).to_string();
     let mut ids = Vec::new();
     for (name, owner, company, department, status, scope, kind) in [
         ("A-私有", 7, "A", "D", "Draft", "Private", "ExportDocument"),

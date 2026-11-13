@@ -4,6 +4,8 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 use unicode_normalization::UnicodeNormalization;
+mod temporary;
+pub use temporary::anonymous_file;
 
 pub const SQLITE_DATABASE_RELATIVE_PATH: &str = "Database/exportdoc-native.db";
 
@@ -14,9 +16,34 @@ pub struct RuntimePaths {
     pub log_root: PathBuf,
     pub cache_root: PathBuf,
     pub font_path: PathBuf,
+    pub file_storage_roots: std::collections::BTreeMap<String, PathBuf>,
 }
 
 impl RuntimePaths {
+    /// The composition root registers existing mount points; web clients only
+    /// select these stable names and cannot introduce arbitrary host paths.
+    pub fn register_file_storage_root(&mut self, name: &str, path: PathBuf) -> Result<(), String> {
+        if name.is_empty()
+            || name.len() > 64
+            || !name
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_'))
+            || self.file_storage_roots.contains_key(name)
+        {
+            return Err("文件存储位置编号无效或重复。".into());
+        }
+        ensure_safe_absolute(&path)?;
+        if !path.is_dir()
+            || path.starts_with(&self.data_root)
+            || self.data_root.starts_with(&path)
+            || path.starts_with(&self.app_root)
+            || self.app_root.starts_with(&path)
+        {
+            return Err("独立文件存储必须是程序和数据目录之外的现有目录。".into());
+        }
+        self.file_storage_roots.insert(name.into(), path);
+        Ok(())
+    }
     pub fn sqlite_database_path(&self) -> PathBuf {
         self.data_root.join(SQLITE_DATABASE_RELATIVE_PATH)
     }
@@ -55,6 +82,7 @@ impl RuntimePaths {
             log_root,
             cache_root,
             font_path,
+            file_storage_roots: Default::default(),
         })
     }
     pub fn pdfium_path(&self) -> PathBuf {

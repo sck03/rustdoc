@@ -27,6 +27,40 @@ impl NativeService {
         parameters: &[(&str, String)],
         token: &str,
     ) -> Result<backup_io::Download> {
+        use crate::generated_api::{DOWNLOAD_BUSINESS_ATTACHMENT, DOWNLOAD_PERSONNEL_ATTACHMENT};
+        if [DOWNLOAD_BUSINESS_ATTACHMENT, DOWNLOAD_PERSONNEL_ATTACHMENT].contains(&operation)
+            || super::oa::is_download(operation)
+                && super::oa::metadata(operation).is_some_and(|m| m["action"] == "download")
+            || super::communication::is_download(operation)
+        {
+            let capture = || {
+                self.with_download_access(operation, token, |actor| match operation {
+                    DOWNLOAD_BUSINESS_ATTACHMENT => {
+                        let id = super::records::id(parameters)?;
+                        let revision = super::request_values::find(parameters, "revision")
+                            .and_then(|v| v.parse().ok())
+                            .ok_or_else(|| super::error::invalid("缺少有效资料版本号。"))?;
+                        super::attachments::download_info(
+                            &self.store,
+                            actor,
+                            operation,
+                            id,
+                            revision,
+                        )
+                    }
+                    DOWNLOAD_PERSONNEL_ATTACHMENT => {
+                        super::personnel_files::download_info(&self.store, actor, parameters)
+                    }
+                    _ => super::record_documents::download_info(self, actor, operation, parameters),
+                })
+            };
+            let info = capture()?;
+            let download = self.store.files.download(&info)?;
+            if capture()? != info {
+                return Err(super::error::conflict("文件已变化，请重新下载。"));
+            }
+            return Ok(download);
+        }
         if super::oa::metadata(operation).is_some_and(|m| {
             matches!(
                 m["action"].as_str(),

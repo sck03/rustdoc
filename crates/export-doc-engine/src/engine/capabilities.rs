@@ -141,6 +141,7 @@ impl NativeService {
             || report_template_files::OPERATIONS.contains(&operation)
             || licensing::OPERATIONS.contains(&operation)
             || team_backup::OPERATIONS.contains(&operation)
+            || file_store::admin::OPERATIONS.contains(&operation)
             || sales::OPERATIONS.contains(&operation)
             || crm::OPERATIONS.contains(&operation)
             || related_records::OPERATIONS.contains(&operation)
@@ -168,6 +169,17 @@ impl NativeService {
         content: &[u8],
         token: &str,
     ) -> Result<Value> {
+        if Self::accepts_document_upload(operation) {
+            return self.upload_document_reader(
+                operation,
+                parameters,
+                metadata,
+                file_name,
+                &mut std::io::Cursor::new(content),
+                content.len() as u64,
+                token,
+            );
+        }
         let _access = crate::engine::maintenance::acquire_read(&self.maintenance)?;
         let actor = self.sessions.actor(&self.store, token)?;
         self.authorize_operation(&actor, operation, &[])?;
@@ -175,11 +187,6 @@ impl NativeService {
         if invoice_transfer::UPLOADS.contains(&operation) {
             return invoice_transfer::upload(
                 self, &actor, operation, &metadata, file_name, content,
-            );
-        }
-        if oa::metadata(operation).is_some() || communication::metadata(operation).is_some() {
-            return record_documents::upload(
-                self, &actor, operation, parameters, &metadata, file_name, content,
             );
         }
         if team_backup::UPLOADS.contains(&operation) {
@@ -230,25 +237,9 @@ impl NativeService {
             return party_files::upload(self, &actor, operation, file_name, content);
         }
         match operation {
-            UPLOAD_PERSONNEL_ATTACHMENT => personnel_files::upload(
-                &self.store,
-                &actor,
-                parameters,
-                &metadata,
-                file_name,
-                content,
-            ),
             UPLOAD_PERSONNEL_IMAGE => {
                 personnel::upload(&self.store, &actor, parameters, metadata, content)
             }
-            UPLOAD_BUSINESS_ATTACHMENT => attachments::upload(
-                &self.store,
-                &actor,
-                records::id(parameters)?,
-                metadata,
-                file_name,
-                content,
-            ),
             _ => Err(unsupported("此文件上传尚未完成原生迁移。")),
         }
         .map(|value| contracts::dto(contracts::response(operation.id), value))

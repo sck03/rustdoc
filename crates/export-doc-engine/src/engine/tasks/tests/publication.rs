@@ -221,18 +221,27 @@ fn business_archive_is_atomic_cancelable_and_survives_task_cleanup() {
         let blob = store
             .connection()
             .unwrap()
-            .blob(record_id, "oa-approval-pdf")
+            .file_info(record_id, "oa-approval-pdf")
             .unwrap();
         if scenario == "ready" {
-            assert_eq!(blob.unwrap().content, b"%PDF-archive");
+            assert_eq!(
+                store.files.load(&blob.unwrap(), 1024).unwrap().content,
+                b"%PDF-archive"
+            );
             persistence::delete(&store, &fixture.actor, id).unwrap();
             persistence::recover(&store).unwrap();
             assert_eq!(
                 store
-                    .connection()
-                    .unwrap()
-                    .blob(record_id, "oa-approval-pdf")
-                    .unwrap()
+                    .files
+                    .load(
+                        &store
+                            .connection()
+                            .unwrap()
+                            .file_info(record_id, "oa-approval-pdf")
+                            .unwrap()
+                            .unwrap(),
+                        1024
+                    )
                     .unwrap()
                     .content,
                 b"%PDF-archive"

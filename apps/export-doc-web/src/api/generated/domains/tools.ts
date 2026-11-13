@@ -118,7 +118,12 @@ export default function createApi(transport: ApiTransport) {
       query: {
         "filePath": request.filePath,
       },
-      init,
+      init: {
+        ...init,
+        headers: mergeHeaders(init?.headers, {
+          "Range": request.Range === undefined ? undefined : String(request.Range),
+        }),
+      },
     });
   },
 

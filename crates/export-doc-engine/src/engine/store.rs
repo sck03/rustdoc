@@ -15,6 +15,7 @@ use unicode_normalization::UnicodeNormalization;
 mod sqlite_layout;
 
 pub struct Store {
+    pub(crate) files: super::file_store::FileStore,
     pub(crate) clock: crate::clock::BusinessClock,
     pub(crate) edition: export_doc_domain::permissions::ProductEdition,
     pub(crate) data_root: std::path::PathBuf,
@@ -32,6 +33,7 @@ pub struct Store {
 pub struct Connection<'a> {
     inner: Lease<'a>,
     pub(crate) clock: &'a crate::clock::BusinessClock,
+    files: Option<&'a super::file_store::FileStore>,
 }
 impl<'a> std::ops::Deref for Connection<'a> {
     type Target = export_doc_storage::Connection;
@@ -41,7 +43,63 @@ impl<'a> std::ops::Deref for Connection<'a> {
 }
 impl<'a> Connection<'a> {
     pub(crate) fn new(inner: Lease<'a>, clock: &'a crate::clock::BusinessClock) -> Self {
-        Self { inner, clock }
+        Self {
+            inner,
+            clock,
+            files: None,
+        }
+    }
+    pub(crate) fn publish_file(
+        &self,
+        prepared: &super::file_store::PreparedObject,
+        kind: &str,
+        record_id: i64,
+        file_name: &str,
+        media_type: &str,
+    ) -> Result<()> {
+        let files = self.files.ok_or_else(|| unavailable("文件存储未配置。"))?;
+        files.check_prepared(prepared)?;
+        self.inner.insert_file(&export_doc_storage::FileWrite {
+            kind,
+            record_id,
+            file_name,
+            media_type,
+            object: &prepared.object,
+            created_at: &timestamp(),
+        })?;
+        self.inner
+            .locate_file(&prepared.identity, &prepared.object.digest)?;
+        let quota = files.configuration()?.policy.quota_bytes;
+        if quota > 0 {
+            let company = self.inner.file_owner_company(record_id)?;
+            if self.inner.file_usage(&company)? > quota {
+                return Err(conflict("所属组织的文件容量已达到配额，请联系管理员。"));
+            }
+        }
+        Ok(())
+    }
+    pub fn blob_info(
+        &self,
+        id: i64,
+        kind: &str,
+    ) -> export_doc_storage::Result<Option<export_doc_storage::BlobInfo>> {
+        if let Some(file) = self.inner.file_info(id, kind)? {
+            return Ok(Some(export_doc_storage::BlobInfo {
+                file_name: file.file_name,
+                media_type: file.media_type,
+                digest: file.object.digest,
+                size: file.object.size,
+            }));
+        }
+        self.inner.blob_info(id, kind)
+    }
+    pub fn delete_blob(&self, id: i64, kind: &str) -> export_doc_storage::Result<()> {
+        self.inner.delete_files(id, Some(kind))?;
+        self.inner.delete_blob(id, kind)
+    }
+    pub fn delete_blobs(&self, id: i64) -> export_doc_storage::Result<()> {
+        self.inner.delete_files(id, None)?;
+        self.inner.delete_blobs(id)
     }
 }
 #[derive(Clone, Debug)]
@@ -80,7 +138,12 @@ impl Store {
         let database_path = paths.sqlite_database_path();
         super::team_backup::disaster::apply_pending(paths)?;
         let connection = export_doc_storage::Connection::sqlite(&database_path)?;
+        let files = super::file_store::FileStore::open(
+            paths,
+            !connection.file_objects("", 1, false)?.is_empty(),
+        )?;
         Ok(Self {
+            files,
             clock: Default::default(),
             edition: Default::default(),
             data_root: paths.data_root.clone(),
@@ -104,7 +167,9 @@ impl Store {
             .connection
             .acquire(|| crate::operation::check().is_err());
         crate::operation::check()?;
-        Ok(Connection::new(connection?, &self.clock))
+        let mut connection = Connection::new(connection?, &self.clock);
+        connection.files = Some(&self.files);
+        Ok(connection)
     }
     pub fn metrics(&self) -> Value {
         let mut value = self.connection.snapshot();
@@ -125,6 +190,10 @@ impl Store {
         observation.finish(true);
         Ok(guard)
     }
+    pub(crate) fn with_writes_paused<T>(&self, action: impl FnOnce() -> Result<T>) -> Result<T> {
+        let _guard = self.write_guard()?;
+        action()
+    }
     #[cfg(feature = "postgres")]
     pub fn open_postgres(paths: &RuntimePaths, connection_string: &str) -> Result<Self> {
         Self::open_postgres_with_pool(paths, connection_string, PoolOptions::default())
@@ -135,12 +204,18 @@ impl Store {
         connection_string: &str,
         options: PoolOptions,
     ) -> Result<Self> {
+        let connection = Pool::postgres(connection_string, options)?;
+        let registered = !connection
+            .acquire(|| false)?
+            .file_objects("", 1, false)?
+            .is_empty();
         Ok(Self {
+            files: super::file_store::FileStore::open(paths, registered)?,
             clock: Default::default(),
             edition: Default::default(),
             data_root: paths.data_root.clone(),
             cache_root: paths.cache_root.clone(),
-            connection: Pool::postgres(connection_string, options)?,
+            connection,
             writes: OperationLock::default(),
             write_waits: Default::default(),
             transactions: Default::default(),

@@ -16,7 +16,14 @@ fn capture(tx: &Connection, actor: &Actor, row: &mut Value, number: i64) -> Resu
     let mut request = row.clone();
     request["status"] = json!("Pending");
     request["versionNumber"] = json!(store::expected(row) + 1);
-    let attachments = children(tx, row, "oa-attachment", 0, 20)?.1;
+    let attachments = children(
+        tx,
+        row,
+        "oa-attachment",
+        0,
+        crate::engine::file_store::policy::MAX_REQUEST_FILES,
+    )?
+    .1;
     for attachment in &attachments {
         let mut retained = attachment.clone();
         retained["retained"] = json!(true);

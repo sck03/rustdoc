@@ -69,6 +69,10 @@ impl MaintenanceLease {
     pub fn validate(&mut self) -> Result<()> {
         validate_schema(&mut self.client)
     }
+    pub fn file_objects(&mut self, after: &str) -> Result<Vec<crate::FileObject>> {
+        self.client.query("SELECT digest,size_bytes FROM file_objects WHERE digest>$1 ORDER BY digest LIMIT 200", &[&after])?
+            .into_iter().map(|row| Ok(crate::FileObject { digest: row.try_get(0)?, size: u64::try_from(row.try_get::<_,i64>(1)?).map_err(|_| Error::unavailable("文件对象长度无效。"))? })).collect()
+    }
     pub fn finish(&mut self, owner: &str, application: &str) -> Result<()> {
         crate::postgres_privileges::role_name(owner)?;
         let grants = crate::postgres_privileges::grants(application)?;

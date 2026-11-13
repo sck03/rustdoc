@@ -9,14 +9,6 @@ pub(super) struct References {
 }
 
 impl References {
-    pub fn load(
-        tx: &Connection,
-        actor: &Actor,
-        paths: Option<&crate::paths::RuntimePaths>,
-    ) -> Result<Self> {
-        Self::query(tx, actor, paths, None)
-    }
-
     pub fn query(
         tx: &Connection,
         actor: &Actor,

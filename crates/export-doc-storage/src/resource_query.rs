@@ -9,6 +9,7 @@ pub(crate) fn build(kind: &str, ids: Option<&[&str]>, pg: bool) -> Result<(Query
             "id",
             "companyScope",
             "departmentId",
+            "projectId",
             "ownerUserId",
             "shippingMarksType",
             "shippingMarksImage",
@@ -19,6 +20,7 @@ pub(crate) fn build(kind: &str, ids: Option<&[&str]>, pg: bool) -> Result<(Query
             "id",
             "companyScope",
             "departmentId",
+            "projectId",
             "ownerUserId",
             "docSealPath",
             "customsSealPath",
@@ -68,48 +70,9 @@ pub(crate) fn build(kind: &str, ids: Option<&[&str]>, pg: bool) -> Result<(Query
         } else {
             format!("SELECT value FROM json_each({parameter})")
         };
-        let references = if matches!(kind, "report-templates" | "template-versions") {
-            let content = sql::field(
-                if kind == "template-versions" {
-                    "content.contentHtml"
-                } else {
-                    "contentHtml"
-                },
-                pg,
-            );
-            if pg {
-                format!(
-                    "EXISTS(SELECT 1 FROM jsonb_array_elements(CAST({content} AS jsonb)->'resources') resource WHERE resource->>'id' IN ({targets}))"
-                )
-            } else {
-                format!(
-                    "EXISTS(SELECT 1 FROM json_each({content},'$.resources') resource WHERE json_extract(resource.value,'$.id') IN ({targets}))"
-                )
-            }
-        } else {
-            let source = if pg {
-                format!("jsonb_array_elements_text(CAST({parameter} AS jsonb)) AS targets(value)")
-            } else {
-                format!("json_each({parameter})")
-            };
-            let mut checks = ["docSealPath", "customsSealPath"]
-                .map(|field| {
-                    format!(
-                        "{} IN (SELECT 'Files/Seals/' || value FROM {source})",
-                        sql::field(field, pg)
-                    )
-                })
-                .to_vec();
-            if kind == "invoices" {
-                checks.push(format!(
-                    "({}='Image' AND {} IN (SELECT 'Files/ShippingMarks/' || value FROM {source}))",
-                    sql::field("shippingMarksType", pg),
-                    sql::field("shippingMarksImage", pg)
-                ));
-            }
-            checks.join(" OR ")
-        };
-        filter += &format!(" AND ({references})");
+        filter += &format!(
+            " AND EXISTS(SELECT 1 FROM report_resource_links l WHERE l.source_id=r.id AND l.resource_id IN ({targets}))"
+        );
     }
     Ok((
         QuerySql {

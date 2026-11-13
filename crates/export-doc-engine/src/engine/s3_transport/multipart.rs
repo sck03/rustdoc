@@ -24,8 +24,10 @@ fn part_size(size: u64) -> Result<u64> {
 
 impl Target {
     pub(super) fn multipart(&self, path: &Path, name: &str, size: u64) -> Result<()> {
+        self.multipart_file(&mut fs::File::open(path)?, name, size)
+    }
+    pub(super) fn multipart_file(&self, file: &mut fs::File, name: &str, size: u64) -> Result<()> {
         let part_size = part_size(size)?;
-        let mut file = fs::File::open(path)?;
         if size == 0 || file.metadata()?.len() != size {
             return Err(invalid("本地灾备包为空或大小已变化。"));
         }
@@ -47,7 +49,7 @@ impl Target {
                 let length = part_size.min(size - offset);
                 file.seek(SeekFrom::Start(offset))?;
                 let (actual, hash) = backup_io::copy_and_hash(
-                    &mut Read::by_ref(&mut file).take(length),
+                    &mut Read::by_ref(file).take(length),
                     &mut std::io::sink(),
                     length,
                 )?;
@@ -61,7 +63,7 @@ impl Target {
                 for attempt in 0..3 {
                     crate::operation::check()?;
                     file.seek(SeekFrom::Start(offset))?;
-                    let mut part = Read::by_ref(&mut file).take(length);
+                    let mut part = Read::by_ref(file).take(length);
                     let request = self.request(
                         "PUT",
                         &url,

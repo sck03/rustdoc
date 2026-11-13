@@ -102,7 +102,10 @@ pub fn handle(
             };
             Ok((row, profile, outbox, archive))
         })?;
-    let package = archive.as_ref().map(tracking::decode_archive).transpose()?;
+    let package = archive
+        .as_ref()
+        .map(|info| tracking::decode_archive(service, info))
+        .transpose()?;
     drop(archive);
     if let Some(package) = &package {
         tracking::verify(service, &snapshot, &package.manifest, false)?;

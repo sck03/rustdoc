@@ -5,6 +5,8 @@ export const queryKeys = {
     ["crm-customers", { keyword, status, pageNumber, pageSize }] as const,
   crmCustomersRoot: () => ["crm-customers"] as const,
   backups: () => ["backups"] as const,
+  fileStorage: () => ["file-storage"] as const,
+  fileStoragePolicy: () => ["file-storage-policy"] as const,
   backupPlan: () => ["scheduled-recovery-plan"] as const,
   auditLogs: (
     pageNumber: number,

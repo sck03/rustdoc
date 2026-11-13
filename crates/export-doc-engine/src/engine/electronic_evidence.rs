@@ -1,16 +1,23 @@
 //! Preserve bounded electronic originals without interpreting or executing them.
 use super::error::{Result, invalid};
+#[cfg(test)]
 use std::io::Cursor;
+use std::io::{BufRead, Read, Seek};
 
 pub(super) fn xml(bytes: &[u8]) -> Result<String> {
+    xml_reader(bytes)
+}
+pub(super) fn xml_reader(input: impl BufRead) -> Result<String> {
     use quick_xml::events::Event;
-    let mut reader = quick_xml::Reader::from_reader(bytes);
+    let mut reader = quick_xml::Reader::from_reader(input);
+    let mut buffer = Vec::new();
     let mut depth = 0usize;
     let mut root = None;
     loop {
         crate::operation::check()?;
+        buffer.clear();
         let event = reader
-            .read_event()
+            .read_event_into(&mut buffer)
             .map_err(|_| invalid("电子凭证 XML 结构损坏。"))?;
         let empty = matches!(&event, Event::Empty(_));
         match event {
@@ -61,9 +68,13 @@ pub(super) fn xml(bytes: &[u8]) -> Result<String> {
     root.ok_or_else(|| invalid("XML 缺少根元素。"))
 }
 
-pub(super) fn ofd(bytes: &[u8]) -> Result<()> {
+#[cfg(test)]
+fn ofd(bytes: &[u8]) -> Result<()> {
+    ofd_reader(Cursor::new(bytes))
+}
+pub(super) fn ofd_reader(input: impl Read + Seek) -> Result<()> {
     let mut archive =
-        zip::ZipArchive::new(Cursor::new(bytes)).map_err(|_| invalid("OFD 不是有效 ZIP 容器。"))?;
+        zip::ZipArchive::new(input).map_err(|_| invalid("OFD 不是有效 ZIP 容器。"))?;
     if archive.len() > 2048 {
         return Err(invalid("OFD 内部文件过多。"));
     }

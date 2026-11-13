@@ -1,4 +1,6 @@
 import { FileInput } from "./FileInput.tsx";
+import { useFileUploadPolicy } from "./FileUploadPolicy.tsx";
+import { readApiError } from "./formUtils.ts";
 import { InlineNotice } from "./PageState.tsx";
 import { useBlobUrl } from "./useBlobUrl.ts";
 import type { DraftAttachment, AttachmentSelectionPolicy } from "./useAttachmentDraft.ts";
@@ -16,15 +18,20 @@ export function AttachmentDraftFields({ draft, busy, kind = "document", label = 
   renderFileDetails?: (entry: DraftAttachment) => ReactNode;
 }) {
   const document = kind === "document";
+  const limits = useFileUploadPolicy(document && !selection);
+  const storagePolicy = limits.data;
+  const policyUnavailable = document && !selection && !storagePolicy;
   const multiple = selection?.multiple ?? document;
   const files = draft.files.filter(file => file.kind === kind);
   const completed = draft.completed?.filter(file => file.kind === kind) ?? [];
-  const policy = { maxFiles: Math.max(0, 20 - existingFiles.length), maxTotalBytes: Math.max(0, 50 * 1024 * 1024 - existingFiles.reduce((sum, file) => sum + file.sizeBytes, 0)), ...selection };
+  const policy = { maxFiles: Math.max(0, (storagePolicy?.requestFiles ?? 0) - existingFiles.length), maxTotalBytes: Math.max(0, (storagePolicy?.requestBytes ?? 0) - existingFiles.reduce((sum, file) => sum + file.sizeBytes, 0)), ...selection };
   return <section className="attachment-draft office-field-wide" aria-label={label}>
-    <label className="office-field"><span>{label}{multiple ? "（可多选）" : ""}</span><FileInput multiple={multiple} disabled={busy || document && policy.maxFiles === 0}
+    <label className="office-field"><span>{label}{multiple ? "（可多选）" : ""}</span><FileInput multiple={multiple} disabled={busy || policyUnavailable || document && policy.maxFiles === 0}
       accept={selection?.accept ?? (document ? documentAccept : ".png,.jpg,.jpeg")}
-      onChange={event => { draft.select(kind, Array.from(event.target.files ?? []), multiple, selection?.maxBytes ?? (document ? 10 : 5) * 1024 * 1024, policy); event.target.value = ""; onChange?.(); }} /></label>
+      onChange={event => { draft.select(kind, Array.from(event.target.files ?? []), multiple, selection?.maxBytes ?? (document ? storagePolicy?.fileBytes ?? 0 : 5 * 1024 * 1024), policy); event.target.value = ""; onChange?.(); }} /></label>
     <p className="office-muted">{selection?.description ?? (document ? documentDescription : "PNG、JPEG；每张 5 MiB。")}</p>
+    {document && !selection && storagePolicy && <p className="office-muted">每个最多 {storagePolicy.fileBytes / 1024 / 1024} MiB；当前最多再选 {policy.maxFiles} 个，合计 {(policy.maxTotalBytes / 1024 / 1024).toFixed(1)} MiB。</p>}
+    {document && !selection && limits.isError && <InlineNotice tone="error" action={<button type="button" className="command-button secondary" onClick={() => void limits.refetch()}>重新读取限制</button>}>{readApiError(limits.error)}</InlineNotice>}
     {(files.length > 0 || completed.length > 0) && <p role="status">待保存 {files.length} 个{completed.length > 0 ? ` · 本次已保存 ${completed.length} 个` : ""}</p>}
     <ul>{files.map(entry => <li key={entry.key} className="office-card-actions">
       {files.length === 1 && <DraftImage file={entry.file} />}<span>{entry.file.name} · {draft.uploadingKey === entry.key ? "正在上传…" : draft.failedKey === entry.key ? "未完成，可重试" : "待保存"}</span>

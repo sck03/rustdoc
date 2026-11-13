@@ -169,7 +169,7 @@ pub(super) fn catalog(q: &ReportTemplateQuery<'_>, postgres: bool) -> QuerySql {
         }.into(),
     }
 }
-fn audience_filter(
+pub(crate) fn audience_filter(
     a: &TemplateAudience<'_>,
     postgres: bool,
     values: &mut Vec<String>,

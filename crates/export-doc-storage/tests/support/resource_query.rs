@@ -3,6 +3,7 @@ use serde_json::json;
 pub fn exercise(c: &Connection) {
     c.begin().unwrap();
     let source = json!({"version":3,"resources":[{"id":"img-sample.png"}],"largeText":"private-body".repeat(4096)}).to_string();
+    let mut template_record_id = None;
     for (kind, mut body) in [
         (
             "invoices",
@@ -17,10 +18,16 @@ pub fn exercise(c: &Connection) {
             json!({"id":3,"companyScope":"REF-Q","templateKind":"report-templates","templateId":2,"content":{"contentHtml":source}}),
         ),
     ] {
+        if kind == "template-versions" {
+            body["templateId"] = json!(template_record_id.unwrap());
+        }
         body["versionNumber"] = json!(1);
         body["ownerUserId"] = json!(1);
         body["departmentId"] = json!("A");
-        c.insert(&RecordWrite::unkeyed(kind, &body)).unwrap();
+        let record_id = c.insert(&RecordWrite::unkeyed(kind, &body)).unwrap();
+        if kind == "report-templates" {
+            template_record_id = Some(record_id);
+        }
         let (_, rows) = c.resource_references(kind, None, None, 200).unwrap();
         let row = rows.iter().find(|row| row["id"] == body["id"]).unwrap();
         assert!(!row.to_string().contains("private-body"));

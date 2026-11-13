@@ -107,7 +107,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("canTransition",b()),("canLinkAccount",b()),("images",a(r("PersonnelImageRecord"))),
         ("canDelete",b().default_value(serde_json::json!(false))),("canCorrectRegistration",b().default_value(serde_json::json!(false))),("deleteRestriction",s().default_value(serde_json::json!(""))),
         ("organization",r("PersonnelOrganization")),("companyScope",s().read_only(true)),("approvalRequiredActions",a(s().enumeration(Enumeration::Values(vec![serde_json::json!("Hire"),serde_json::json!("Confirm"),serde_json::json!("Transfer"),serde_json::json!("Depart"),serde_json::json!("Rehire")]))).read_only(true)),
-        ("attachments",a(r("PersonnelAttachment")))
+        ("attachments",a(r("PersonnelAttachment"))),("attachmentCount",i().format("int64"))
     ]).required(vec!["employee","profile","employmentType","hireDate","lastEffectiveDate","deleteRestriction","canCorrectRegistration","canDelete","versionNumber","canEdit","canTransition","canLinkAccount","images"])),
     ("PersonnelRegistrationCorrection",Schema::default().properties(BTreeMap::from([
         ("employeeNumber",s()),("departmentId",s()),("jobTitle",s()),
@@ -148,6 +148,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("userId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("expectedAccountVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("reason",s().min_length(1).max_length(500))
     ]).required(vec!["expectedVersion","userId","expectedAccountVersion","reason"])),
+    ("PersonnelAttachmentPage",o(vec![("totalCount",i().format("int64")),("items",a(r("PersonnelAttachment"))),("nextCursor",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])))]).required(vec!["totalCount","items"])),
     ("PersonnelAttachment",o(vec![
         ("id",s()),("fileName",s()),("mediaType",s()),
         ("sizeBytes",i().format("int64")),("purpose",s().enumeration(Enumeration::Values(vec![serde_json::json!("ReimbursementForm"),serde_json::json!("Voucher"),serde_json::json!("Supporting")]))),("digest",s())

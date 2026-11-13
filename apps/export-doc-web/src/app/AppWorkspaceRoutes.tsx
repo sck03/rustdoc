@@ -1,4 +1,5 @@
 import { RecordWorkspace } from "../ui/layout/Workspaces.tsx";
+import { FileUploadPolicyProvider } from "../ui/FileUploadPolicy.tsx";
 import { type ComponentType, lazy, type LazyExoticComponent, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../api/index.ts";
@@ -108,7 +109,7 @@ export function AppWorkspaceRoutes({
   const reportTemplateAccess = resolveReportTemplateAccess((action) =>
     hasPermission(permissions, permissionResources.reportTemplates, action));
   return (
-    <Suspense fallback={<RouteLoadingPanel />}>
+    <FileUploadPolicyProvider client={client}><Suspense fallback={<RouteLoadingPanel />}>
       <Routes>
         <Route path="/" element={<Navigate to={defaultRoute} replace />} />
         <Route path="/dashboard" element={user.capabilities.canUseDocumentWorkspace
@@ -212,7 +213,7 @@ export function AppWorkspaceRoutes({
           canUseDocumentWorkspace={user.capabilities.canUseDocumentWorkspace === true} isDesktopRuntime={isDesktopBridgeAvailable()} productName={activeProduct.productName} />} />
         <Route path="*" element={<Navigate to={defaultRoute} replace />} />
       </Routes>
-    </Suspense>
+    </Suspense></FileUploadPolicyProvider>
   );
 }
 

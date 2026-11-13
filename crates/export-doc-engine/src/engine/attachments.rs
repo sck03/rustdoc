@@ -1,18 +1,15 @@
 use super::{
     auth,
     error::{Result, conflict, error, invalid, unavailable},
-    media::digest,
     records::{required, text},
     store::{self, Actor, Store},
 };
 use crate::{contracts, generated_api::*, paths};
-use export_doc_storage::{AuditWrite, BlobWrite};
+use export_doc_storage::AuditWrite;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
-use unicode_normalization::UnicodeNormalization;
 
-pub const FILE_LIMIT: usize = 16 * 1024 * 1024;
-pub const INVOICE_LIMIT: i64 = 256 * 1024 * 1024;
+pub const FILE_LIMIT: usize = super::file_store::policy::MAX_UPLOAD_BYTES as usize;
 pub const OPERATIONS: &[Operation] = &[
     LIST_BUSINESS_ATTACHMENTS,
     GET_BUSINESS_ATTACHMENT,
@@ -43,20 +40,17 @@ pub fn upload(
     invoice_id: i64,
     metadata: Value,
     file_name: &str,
-    bytes: &[u8],
+    input: &mut (impl std::io::BufRead + std::io::Seek),
+    size: u64,
 ) -> Result<Value> {
-    let name = file_name.nfc().collect::<String>();
-    if !paths::valid_file_name(&name) {
-        return Err(invalid("资料文件名无效。"));
-    }
-    if bytes.is_empty() || bytes.len() > FILE_LIMIT {
-        return Err(invalid("每个归档文件须为 1 字节至 16 MiB。"));
-    }
     required(&metadata, "title", "资料名称", 200)?;
     required(&metadata, "uploadKey", "上传编号", 100)?;
-    let hash = digest(bytes);
     let attachment_id = metadata["attachmentId"].as_i64().unwrap_or(0);
     let category_id = metadata["categoryId"].as_i64().unwrap_or(0);
+    store.read(|tx| invoice_in(tx, actor, invoice_id, "operate"))?;
+    let (name, content_type, prepared) =
+        super::document_upload::prepare(store, file_name, input, size, false)?;
+    let hash = prepared.object.digest.as_str();
     store.transaction_as(actor, |transaction, actor|{
         let invoice = invoice_in(transaction, actor, invoice_id, "operate")?;
         let category = store::get(transaction,"attachment-categories",category_id)?;
@@ -66,9 +60,7 @@ pub fn upload(
             if existing["invoiceId"]==invoice_id&&existing["lastDigest"]==hash{return Ok(existing.clone());}
             return Err(conflict("同一上传编号已用于不同内容。"));
         }
-        if attachment_id==0&&transaction.query_generic(&export_doc_storage::GenericQuery {kind:"attachments",scope:export_doc_storage::DataScope {all:true,..Default::default()},filters:&[("invoiceId",invoice_id.to_string())],keyword:"",search_root:None,fields:&[("id","id")],offset:0,limit:1})?.0>=100{return Err(conflict("每张发票最多归档 100 份资料。"));}
-        let used=transaction.attachment_bytes(invoice_id)?;
-        if used+bytes.len() as i64>INVOICE_LIMIT{return Err(conflict("这张发票的归档资料超过 256 MiB 容量。"));}
+        store.files.configuration()?.policy.check_upload(size)?;
         let mut record=if attachment_id>0{
             let previous=store::get(transaction,"attachments",attachment_id)?;
             if previous["invoiceId"]!=invoice_id{return Err(invalid("不能改变资料所属发票。"));}
@@ -78,15 +70,14 @@ pub fn upload(
             store::check_version(&previous,store::expected(&metadata))?;previous
         }else{contracts::initial(contracts::schema("BusinessAttachmentRecord"))};
         let revision=record["latestRevision"].as_i64().unwrap_or(0)+1;
-        if revision>50{return Err(conflict("每份资料最多保留 50 个版本。"));}
         record["invoiceId"]=json!(invoice_id);record["invoiceNo"]=invoice["invoiceNo"].clone();record["invoiceType"]=invoice["type"].clone();record["customerName"]=invoice["customerNameEN"].clone();
         for key in ["title","poNumber","styleNo"]{record[key]=json!(text(&metadata,key));}record["categoryId"]=json!(category_id);
         record["categoryName"]=category["name"].clone();record["latestRevision"]=json!(revision);record["lastUploadKey"]=metadata["uploadKey"].clone();record["lastDigest"]=json!(hash);record["canEdit"]=json!(true);record["canDelete"]=json!(actor.admin);
-        let content_type=match std::path::Path::new(&name).extension().and_then(|value|value.to_str()).unwrap_or("").to_ascii_lowercase().as_str(){"pdf"=>"application/pdf","png"=>"image/png","jpg"|"jpeg"=>"image/jpeg","txt"=>"text/plain",_=>"application/octet-stream"};
-        let revision_record=json!({"revision":revision,"fileName":name,"contentType":content_type,"length":bytes.len(),"sha256":hash,"uploadedBy":actor.name,"note":text(&metadata,"note"),"createdAt":store::timestamp()});
-        if !record["revisions"].is_array(){record["revisions"]=json!([]);}record["revisions"].as_array_mut().unwrap().push(revision_record);
+        let revision_record=json!({"revision":revision,"fileName":name,"contentType":content_type,"length":size,"sha256":hash,"uploadedBy":actor.name,"note":text(&metadata,"note"),"createdAt":store::timestamp()});
+        record.as_object_mut().unwrap().remove("revisions");
         let record=store::save_in_scope(transaction,"attachments",attachment_id,record,None,actor,"upload",Some(&invoice))?;
-        transaction.insert_blob(&BlobWrite{kind:&format!("attachment:{revision}"),record_id:record["id"].as_i64().unwrap_or(0),file_name:&name,media_type:content_type,digest:&hash,content:bytes,created_at:&store::timestamp()})?;
+        transaction.publish_file(&prepared,&format!("attachment:{revision}"),record["id"].as_i64().unwrap_or(0),&name,content_type)?;
+        transaction.append_attachment_history(record["id"].as_i64().unwrap(),"revision",&revision_record)?;
         Ok(record)
     })
 }
@@ -97,6 +88,23 @@ pub fn read(
     id: i64,
     revision: i64,
 ) -> Result<(Value, Vec<u8>)> {
+    let file = download_info(store, actor, operation, id, revision)?;
+    let output = store.files.load(&file, FILE_LIMIT)?;
+    if download_info(store, actor, operation, id, revision)? != file {
+        return Err(conflict("资料版本已变化，请重新读取。"));
+    }
+    Ok((
+        json!({"fileName":output.file_name,"contentType":output.media_type}),
+        output.content,
+    ))
+}
+pub fn download_info(
+    store: &Store,
+    actor: &Actor,
+    operation: Operation,
+    id: i64,
+    revision: i64,
+) -> Result<export_doc_storage::FileInfo> {
     let file = store.read_for(actor, operation, &[], |tx, actor| {
         let record = store::get(tx, "attachments", id)?;
         invoice_in(tx, actor, parent_invoice_id(&record)?, "view")?;
@@ -108,19 +116,14 @@ pub fn read(
             return Err(unavailable("资料内容容量无效，已停止下载。"));
         }
         let file = tx
-            .blob(id, &kind)?
+            .file_info(id, &kind)?
             .ok_or_else(|| unavailable("资料内容缺失，已停止下载。"))?;
-        if file.content.len() as u64 != info.size {
+        if file.object.size != info.size {
             return Err(unavailable("资料内容长度不一致，已停止下载。"));
         }
         Ok(file)
     })?;
-    let (name, content_type, expected_digest, bytes) =
-        (file.file_name, file.media_type, file.digest, file.content);
-    if digest(&bytes) != expected_digest {
-        return Err(unavailable("资料内容校验失败，已停止下载。"));
-    }
-    Ok((json!({"fileName":name,"contentType":content_type}), bytes))
+    Ok(file)
 }
 pub fn handle(
     store: &Store,
@@ -169,7 +172,7 @@ pub fn handle(
                 if !auth::visible(actor, "document.invoices", "view", invoice) { return Err(error(403, "没有访问此发票资料的权限。")); }
                 (Some(tx.attachment_bytes(id)?), auth::visible(actor, "document.invoices", "operate", invoice))
             } else { (None, auth::authorize(actor,"document.invoices","operate").is_ok()) };
-            Ok(json!({"page":contracts::page(items,total as usize,page,size),"canUpload":can_upload,"usedBytes":used,"fileBytesLimit":FILE_LIMIT,"invoiceBytesLimit":INVOICE_LIMIT}))
+            Ok(json!({"page":contracts::page(items,total as usize,page,size),"canUpload":can_upload,"usedBytes":used,"fileBytesLimit":store.files.configuration()?.policy.file_bytes,"invoiceBytesLimit":Value::Null}))
         })?
     } else if operation == GET_BUSINESS_ATTACHMENT {
         let id = super::records::id(parameters)?;
@@ -179,12 +182,13 @@ pub fn handle(
             set_permissions(&mut record, actor, &parent);
             let category_id = record["categoryId"].as_i64().ok_or_else(|| unavailable("资料分类编号无效。"))?;
             record["categoryName"] = store::get(tx, "attachment-categories", category_id)?["name"].clone();
-            let events = match record.get("events") {
-                None => &[][..],
-                Some(Value::Array(events)) => events.as_slice(),
-                _ => return Err(unavailable("资料事件历史无效。")),
+            validate_metadata(&record)?;
+            let cursor = |name| -> Result<Option<i64>> {
+                crate::engine::request_values::find(query,name).map(|value|value.parse::<i64>().ok().filter(|value|*value>0).ok_or_else(||invalid("资料历史游标无效。"))).transpose()
             };
-            Ok(json!({"attachment":record,"revisions":record["revisions"],"eventCount":events.len(),"events":events}))
+            let revisions = tx.attachment_history(id,"revision",cursor("revisionBefore")?,30)?;
+            let events = tx.attachment_history(id,"event",cursor("eventBefore")?,30)?;
+            Ok(json!({"attachment":record,"revisions":revisions["items"],"revisionCount":revisions["totalCount"],"revisionNextCursor":revisions["nextCursor"],"eventCount":events["totalCount"],"events":events["items"],"eventNextCursor":events["nextCursor"]}))
         })?
     } else if operation == DOWNLOAD_BUSINESS_ATTACHMENT
         || operation == SAVE_BUSINESS_ATTACHMENT_TO_PATH
@@ -266,7 +270,7 @@ pub fn handle(
                         } else {
                             "Confirm"
                         };
-                        append_event(&mut record, actor, event_action, &body)?;
+                        append_event(transaction, &record, actor, event_action, &body)?;
                         record["currentRevision"] = body["currentRevision"].clone();
                         record["isArchived"] = body["isArchived"].clone();
                     } else {
@@ -283,7 +287,7 @@ pub fn handle(
                             record[key] = body[key].clone();
                         }
                         record["categoryName"] = category["name"].clone();
-                        append_event(&mut record, actor, "Edit", &body)?;
+                        append_event(transaction, &record, actor, "Edit", &body)?;
                     }
                     store::save(
                         transaction,
@@ -341,15 +345,21 @@ fn indexed_records(
         })
         .collect()
 }
-fn append_event(record: &mut Value, actor: &Actor, action: &str, body: &Value) -> Result<()> {
-    let events = record
-        .as_object_mut()
-        .ok_or_else(|| unavailable("资料记录格式无效。"))?
-        .entry("events")
-        .or_insert_with(|| json!([]))
-        .as_array_mut()
-        .ok_or_else(|| unavailable("资料事件历史无效。"))?;
-    events.push(json!({"action":action,"revision":body["currentRevision"],"actorName":actor.name,"note":text(body,"note"),"createdAt":store::timestamp()}));
+fn validate_metadata(record: &Value) -> Result<()> {
+    if record.get("events").is_some() || record.get("revisions").is_some() {
+        return Err(unavailable("资料记录含有无效的内嵌历史。"));
+    }
+    Ok(())
+}
+fn append_event(
+    tx: &store::Connection<'_>,
+    record: &Value,
+    actor: &Actor,
+    action: &str,
+    body: &Value,
+) -> Result<()> {
+    validate_metadata(record)?;
+    tx.append_attachment_history(record["id"].as_i64().ok_or_else(||unavailable("资料编号无效。"))?,"event",&json!({"action":action,"revision":body["currentRevision"],"actorName":actor.name,"note":text(body,"note"),"createdAt":store::timestamp()}))?;
     Ok(())
 }
 #[cfg(test)]

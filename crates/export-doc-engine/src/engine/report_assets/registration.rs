@@ -1,16 +1,16 @@
 //! Decode and hash immutable input before acquiring the business write transaction.
 use super::*;
-use export_doc_storage::BlobWrite;
 
 pub(in crate::engine) struct ValidatedImage<'a> {
     bytes: &'a [u8],
     media_type: &'static str,
     hash: String,
     id: String,
+    prepared: super::super::file_store::PreparedObject,
 }
 
 impl<'a> ValidatedImage<'a> {
-    pub fn new(bytes: &'a [u8], limit: usize) -> Result<Self> {
+    pub fn new(store: &Store, bytes: &'a [u8], limit: usize) -> Result<Self> {
         crate::operation::check()?;
         let media_type = media::image_type(bytes, limit)?;
         let hash = media::digest(bytes);
@@ -26,6 +26,7 @@ impl<'a> ValidatedImage<'a> {
             media_type,
             hash,
             id,
+            prepared: store.files.prepare(bytes)?,
         })
     }
 
@@ -39,6 +40,7 @@ impl<'a> ValidatedImage<'a> {
             media_type,
             hash,
             id,
+            prepared,
         } = self;
         if let Some(mut previous) = tx.find_identity(KIND, id)? {
             let record_id = previous["id"]
@@ -55,13 +57,6 @@ impl<'a> ValidatedImage<'a> {
                 || previous["mediaType"] != *media_type
             {
                 return Err(unavailable("图片资源元数据或容量无效。"));
-            }
-            let blob = tx
-                .blob(record_id, KIND)?
-                .ok_or_else(|| unavailable("图片资源内容缺失。"))?;
-            // Equality with validated bytes proves integrity without decoding or hashing again.
-            if blob.content != *bytes || blob.digest != *hash || blob.media_type != *media_type {
-                return Err(unavailable("图片资源内容校验失败。"));
             }
             if owns(actor, &previous) {
                 return Ok(previous);
@@ -80,22 +75,6 @@ impl<'a> ValidatedImage<'a> {
                 "image-own",
             );
         }
-        if tx
-            .query_generic(&export_doc_storage::GenericQuery {
-                kind: KIND,
-                scope: export_doc_storage::DataScope {
-                    all: true,
-                    ..Default::default()
-                },
-                fields: &[("id", "id")],
-                limit: 1,
-                ..Default::default()
-            })?
-            .0
-            >= 1000
-        {
-            return Err(conflict("图片资源已达到 1000 个，请回收未使用图片后重试。"));
-        }
         let record = store::save(
             tx,
             KIND,
@@ -105,15 +84,13 @@ impl<'a> ValidatedImage<'a> {
             actor,
             "image-upload",
         )?;
-        tx.insert_blob(&BlobWrite {
-            kind: KIND,
-            record_id: record["id"].as_i64().unwrap(),
-            file_name: id,
+        tx.publish_file(
+            prepared,
+            KIND,
+            record["id"].as_i64().unwrap(),
+            id,
             media_type,
-            digest: hash,
-            content: bytes,
-            created_at: &store::timestamp(),
-        })?;
+        )?;
         Ok(record)
     }
 }

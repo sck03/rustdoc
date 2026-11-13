@@ -3,15 +3,15 @@ import { attachmentUploadForm } from "./documentAttachments.ts";
 import { useAttachmentDraft } from "./useAttachmentDraft.ts";
 
 /** Existing records use the same sequential, version-aware queue as their editors. */
-export function AttachmentUploadPanel<R extends { versionNumber: number; attachments?: { sizeBytes: number }[] }>({ record, upload, operation, label = "上传附件" }: {
-  record: R; label?: string;
+export function AttachmentUploadPanel<R extends { versionNumber: number; attachments?: { sizeBytes: number }[] }>({ record, upload, operation, label = "上传附件", limitPerRecord = true }: {
+  record: R; label?: string; limitPerRecord?: boolean;
   operation: { busy: boolean; run: <T>(work: (signal: AbortSignal) => Promise<T>, done: (value: T) => void) => Promise<void> };
   upload: (record: R, body: FormData, signal: AbortSignal) => Promise<R>;
 }) {
   const draft = useAttachmentDraft(record);
   const latest = draft.saved && draft.saved.versionNumber > record.versionNumber ? draft.saved : record;
   return <div>
-    <AttachmentDraftFields draft={draft} busy={operation.busy} label={label} existingFiles={latest.attachments} />
+    <AttachmentDraftFields draft={draft} busy={operation.busy} label={label} existingFiles={limitPerRecord ? latest.attachments : undefined} />
     {draft.failedKey && <p role="status">已保存文件会保留，重试继续处理剩余文件。</p>}
     <button className="command-button" type="button" disabled={operation.busy || !draft.files.length} onClick={() => void operation.run(signal =>
       draft.save(String(record.versionNumber), signal, async () => record, (current, entry, signal) => {

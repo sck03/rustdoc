@@ -1,7 +1,7 @@
 PRAGMA foreign_keys = ON;
 CREATE TABLE schema_model (version INTEGER PRIMARY KEY,model TEXT NOT NULL,shape TEXT NOT NULL);
-CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 17));
-INSERT INTO schema_version VALUES (17);
+CREATE TABLE schema_version (version INTEGER PRIMARY KEY CHECK(version = 18));
+INSERT INTO schema_version VALUES (18);
 CREATE TABLE records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL,
@@ -112,6 +112,47 @@ CREATE TABLE files (
     created_at TEXT NOT NULL
 );
 CREATE INDEX files_record ON files(kind, record_id);
+CREATE TABLE file_objects (
+    digest TEXT PRIMARY KEY CHECK(length(digest)=64),
+    size_bytes INTEGER NOT NULL CHECK(size_bytes>0),
+    created_at TEXT NOT NULL
+);
+CREATE TABLE file_versions (
+    record_id INTEGER NOT NULL REFERENCES records(id) ON DELETE RESTRICT,
+    kind TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    media_type TEXT NOT NULL,
+    digest TEXT NOT NULL REFERENCES file_objects(digest) ON DELETE RESTRICT,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY(record_id,kind)
+);
+CREATE INDEX file_versions_object ON file_versions(digest);
+CREATE TABLE attachment_history (
+    record_id INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK(kind IN ('revision','event')),
+    sequence INTEGER NOT NULL CHECK(sequence>0),
+    body TEXT NOT NULL CHECK(json_valid(body) AND json_type(body)='object'),
+    PRIMARY KEY(record_id,kind,sequence)
+);
+CREATE TABLE report_resource_links (
+    source_id INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+    owner_record_id INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+    source_kind TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
+    PRIMARY KEY(source_id,resource_id)
+);
+CREATE INDEX report_resource_links_resource ON report_resource_links(resource_id,owner_record_id);
+CREATE TABLE report_resource_uploaders (
+    resource_record_id INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL,
+    PRIMARY KEY(resource_record_id,user_id)
+);
+CREATE INDEX report_resource_uploaders_actor ON report_resource_uploaders(user_id,resource_record_id);
+CREATE TABLE file_locations (
+    storage_identity TEXT NOT NULL,
+    digest TEXT NOT NULL REFERENCES file_objects(digest) ON DELETE CASCADE,
+    PRIMARY KEY(storage_identity,digest)
+);
 
 
 CREATE INDEX records_status_page ON records(kind, json_extract(body,'$.status'), id DESC);

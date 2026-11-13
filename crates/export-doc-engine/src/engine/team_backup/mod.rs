@@ -32,11 +32,11 @@ pub mod cloud;
 pub mod disaster;
 pub mod migration;
 pub mod ownership;
-mod package;
+pub(in crate::engine) mod package;
 pub mod postgres;
 mod restore_files;
 #[cfg(feature = "s3-backup")]
-mod s3;
+use super::s3_transport as s3;
 pub(in crate::engine) mod scheduled;
 mod scratch;
 mod sealed;
@@ -93,10 +93,10 @@ pub(super) const ACTION_RESTORE_DATABASE: &str = "restore-database";
 pub(super) const ACTION_RESTORE_SERVER: &str = "restore-server";
 const MAX_PASSWORD_CHARS: usize = 1024;
 const MIN_PACKAGE_PASSWORD_CHARS: usize = 8;
-pub(super) const PG_STORAGE_POLICY: &str = "PostgreSQL 团队库物理备份默认写入运行数据根 Backups/PostgreSQL/，优先使用程序根 Tools/PostgreSQL/bin 下的 pg_dump/pg_restore/psql；custom-format .dump 包含完整业务数据但本身不加密，复制到外部介质前必须使用受控加密存储；不把 PostgreSQL 工具或备份默认放到系统 C 盘、AppData 或 ProgramData。";
+pub(super) const PG_STORAGE_POLICY: &str = "PostgreSQL 快照保存在 Backups/PostgreSQL/，须连同对应 .objects.jsonl 清单和 Objects/ 文件库保留；单独 .dump 不含附件原件且不加密。异机恢复请使用完整加密迁移包。工具使用受管 Tools/PostgreSQL/bin。";
 pub(super) const PLAN_STORAGE_POLICY: &str = "PostgreSQL 还原计划写入运行数据根 Backups/PostgreSQL/RestorePlans/，仅供管理员复核后离线执行。日常恢复请使用界面暂存与 --restore-pending 维护流程，它同时校验数据库版本、实例锁和权限；生成脚本本身不会恢复数据。";
-pub(super) const MIGRATION_STORAGE_POLICY: &str = "服务器迁移包写入运行数据根 Backups/ServerMigration/，包含 PostgreSQL 数据库、凭据主密钥和用户文件模板，整体密码加密。暂存后必须停止应用并运行 --restore-pending 维护命令，成功后再启动；普通重启不会自动恢复。";
-pub(super) const DISASTER_STORAGE_POLICY: &str = "持卡机灾备包默认写入运行数据根 DisasterRecovery/，包含当前 SQLite 数据库快照与本机主密钥，使用密码派生的 AES-256-GCM 密封；包与密码必须分开保管，并至少复制一份到脱机介质。";
+pub(super) const MIGRATION_STORAGE_POLICY: &str = "服务器迁移包保存在 Backups/ServerMigration/，包含数据库、永久文件对象、主密钥和用户模板，整体密码加密。暂存后停止应用并运行 --restore-pending，核验成功后再启动；普通重启不会自动恢复。";
+pub(super) const DISASTER_STORAGE_POLICY: &str = "灾备包保存在 DisasterRecovery/，包含 SQLite 快照、永久文件对象、主密钥和用户模板，使用密码派生的 AES-256-GCM 密封；包与密码分开保管，并至少复制一份到脱机介质。";
 pub(super) const OWNERSHIP_STORAGE_POLICY: &str = "共享库归属改派只更新发票、付款报销、客户、出口商、收款人、CRM、供应商、商机、邮件/报表模板和装柜方案的 ownerUserId、departmentId、companyScope 归属字段；关联子记录继续随所属业务聚合访问，不移动附件、不生成导出目录、不读取用户显式导出文件。";
 
 // --- 受管目录与路径辅助。所有写入必须落在受管根目录内。 ---

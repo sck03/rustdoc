@@ -315,6 +315,12 @@ pub(super) fn create_backup(service: &NativeService, actor: &Actor) -> Result<Va
                     )));
                 }
                 crate::paths::ensure_safe_absolute(&target).map_err(invalid)?;
+                crate::engine::file_store::incremental::capture(
+                    &store,
+                    &temporary,
+                    &target,
+                    |cursor| Ok(store.connection()?.file_objects(cursor, 200, false)?),
+                )?;
                 fs::rename(&temporary, &target)?;
                 if !target.is_file() || fs::metadata(&target)?.len() == 0 {
                     return Err(unavailable("pg_dump 未生成有效的物理备份文件。"));

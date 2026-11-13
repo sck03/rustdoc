@@ -265,8 +265,8 @@
 
 .settings-path-control {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 34px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--edm-space-2);
   align-items: center;
   min-width: 0;
 }

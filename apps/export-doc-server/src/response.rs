@@ -8,6 +8,7 @@ use export_doc_contracts::{contracts, generated_api::Operation};
 use export_doc_engine::api::ApiError;
 use export_doc_engine::engine::tasks::FileOutput;
 use serde_json::json;
+mod range;
 
 pub struct Reply {
     pub bytes: Vec<u8>,
@@ -101,11 +102,12 @@ pub fn is_download(operation: Operation) -> bool {
         })
 }
 
-pub fn success(
+pub async fn success(
     operation: Operation,
     mut reply: Reply,
     state: &crate::ServerState,
     request_id: &str,
+    range_header: Option<&str>,
 ) -> Response<Body> {
     let responses = &contracts::contract()["operations"][operation.id]["responses"];
     let success = responses
@@ -116,46 +118,94 @@ pub fn success(
         .and_then(|m| m.keys().next())
         .map(String::as_str)
         .unwrap_or("application/json");
-    let mut response =
-        if reply.stream.is_some() || reply.file.is_some() || reply.memory_reservation.is_some() {
-            use tokio::io::AsyncReadExt;
-            let permit = match reply
-                .download_permit
-                .take()
-                .or_else(|| state.downloads.clone().try_acquire_owned().ok())
-            {
-                Some(permit) => permit,
-                None => return error(crate::request::error(429, "下载正在处理，请稍后重试。")),
-            };
-            let (source, size): (Box<dyn tokio::io::AsyncRead + Unpin + Send>, u64) =
-                if let Some((file, size)) = reply.stream {
-                    (Box::new(tokio::fs::File::from_std(file).take(size)), size)
-                } else {
-                    let size = reply.bytes.len() as u64;
-                    (
-                        crate::download_body::memory_source(reply.bytes, reply.memory_reservation),
-                        size,
-                    )
-                };
-            let mut response = Response::new(crate::download_body::body(
-                source,
-                size,
-                permit,
-                state.telemetry.clone(),
-                request_id.to_owned(),
-                state.shutdown.clone(),
-            ));
-            response
-                .headers_mut()
-                .insert(header::CONTENT_LENGTH, size.into());
-            response
-        } else {
-            Response::new(Body::from(reply.bytes))
+    let mut selected_range = None;
+    let is_file = reply.file.is_some();
+    let mut response = if reply.stream.is_some()
+        || reply.file.is_some()
+        || reply.memory_reservation.is_some()
+    {
+        use tokio::io::{AsyncReadExt, AsyncSeekExt};
+        let full_size = reply
+            .stream
+            .as_ref()
+            .map(|(_, size)| *size)
+            .unwrap_or(reply.bytes.len() as u64);
+        let selection = match range::select(if is_file { range_header } else { None }, full_size) {
+            Ok(value) => value,
+            Err(()) => {
+                let mut response = error(crate::request::error(416, "请求的文件范围无效。"));
+                response.headers_mut().insert(
+                    header::CONTENT_RANGE,
+                    format!("bytes */{full_size}").parse().unwrap(),
+                );
+                return response;
+            }
         };
+        let (offset, length) = selection
+            .as_ref()
+            .map(|r| (r.start, r.length))
+            .unwrap_or((0, full_size));
+        if selection.is_some() {
+            selected_range = Some(format!(
+                "bytes {offset}-{}/{full_size}",
+                offset + length - 1
+            ));
+        }
+        let permit = match reply
+            .download_permit
+            .take()
+            .or_else(|| state.downloads.clone().try_acquire_owned().ok())
+        {
+            Some(permit) => permit,
+            None => return error(crate::request::error(429, "下载正在处理，请稍后重试。")),
+        };
+        let (source, size): (Box<dyn tokio::io::AsyncRead + Unpin + Send>, u64) =
+            if let Some((file, _)) = reply.stream {
+                let mut file = tokio::fs::File::from_std(file);
+                if offset > 0 && file.seek(std::io::SeekFrom::Start(offset)).await.is_err() {
+                    return error(crate::request::error(503, "文件范围读取失败。"));
+                }
+                (Box::new(file.take(length)), length)
+            } else {
+                (
+                    crate::download_body::memory_source_at(
+                        reply.bytes,
+                        reply.memory_reservation,
+                        offset,
+                    ),
+                    length,
+                )
+            };
+        let mut response = Response::new(crate::download_body::body(
+            source,
+            size,
+            permit,
+            state.telemetry.clone(),
+            request_id.to_owned(),
+            state.shutdown.clone(),
+        ));
+        response
+            .headers_mut()
+            .insert(header::CONTENT_LENGTH, size.into());
+        response
+    } else {
+        Response::new(Body::from(reply.bytes))
+    };
     if let Some((status, _)) = success {
         if let Ok(status) = status.parse::<u16>() {
             *response.status_mut() = StatusCode::from_u16(status).unwrap_or(StatusCode::OK);
         }
+    }
+    if is_file {
+        response
+            .headers_mut()
+            .insert(header::ACCEPT_RANGES, "bytes".parse().unwrap());
+    }
+    if let Some(range) = selected_range {
+        *response.status_mut() = StatusCode::PARTIAL_CONTENT;
+        response
+            .headers_mut()
+            .insert(header::CONTENT_RANGE, range.parse().unwrap());
     }
     let content_type = reply
         .file

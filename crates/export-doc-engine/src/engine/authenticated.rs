@@ -21,6 +21,9 @@ impl NativeService {
             return result;
         }
         match operation {
+            operation if file_store::admin::OPERATIONS.contains(&operation) => {
+                file_store::admin::handle(self, actor, operation, &body_value)
+            }
             LOGOUT => {
                 self.sessions.logout(token)?;
                 Ok(json!({"success":true}))
@@ -44,6 +47,9 @@ impl NativeService {
             }
             LIST_PERSONNEL => personnel_queries::directory(&self.store, actor, &self.clock, query),
             GET_PERSONNEL => personnel_queries::read(&self.store, actor, records::id(parameters)?),
+            LIST_PERSONNEL_ATTACHMENTS => {
+                personnel_files::list(&self.store, actor, records::id(parameters)?, query)
+            }
             GET_PERSONNEL_HISTORY => {
                 personnel_queries::history(&self.store, actor, records::id(parameters)?, query)
             }

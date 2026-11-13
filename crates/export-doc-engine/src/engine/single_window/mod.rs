@@ -172,6 +172,25 @@ pub fn handle(
         return serde_json::to_vec(&contracts::dto(contracts::response(operation.id), value))
             .map_err(Into::into);
     }
+    let mut prepared_body = body.clone();
+    let mut prepared_files = std::collections::BTreeMap::new();
+    if operation == SAVE_CUSTOMS_COO_DOCUMENT {
+        let loaded = service.store.read_for(actor, operation, &[], |tx, actor| {
+            let id = parameter(parameters, "sourceId")
+                .parse::<i64>()
+                .ok()
+                .filter(|id| *id > 0)
+                .ok_or_else(|| invalid("请选择有效来源发票。"))?;
+            documents::load(tx, actor, service, Business::Coo, id, "edit")
+        })?;
+        let document_id = loaded
+            .stored
+            .as_ref()
+            .and_then(|v| v["id"].as_i64())
+            .unwrap_or(0);
+        prepared_files = document_files::prepare(&service.store, document_id, &mut prepared_body)?;
+    }
+    let body = &prepared_body;
     let work = |tx: &Connection, actor: &Actor| {
         let business = if [
             GET_CUSTOMS_COO_DOCUMENT,
@@ -212,7 +231,16 @@ pub fn handle(
             ),
             SAVE_CUSTOMS_COO_DOCUMENT | SAVE_AGENT_CONSIGNMENT_DOCUMENT => {
                 source(tx, actor, id, "edit")?;
-                let saved = documents::save(tx, actor, service, business, id, body, &loaded)?;
+                let saved = documents::save(
+                    tx,
+                    actor,
+                    service,
+                    business,
+                    id,
+                    body,
+                    &loaded,
+                    &prepared_files,
+                )?;
                 Ok(
                     json!({"success":true,"id":saved["id"],"document":saved,"message":"单证草稿已保存。"}),
                 )
@@ -238,8 +266,16 @@ pub fn handle(
                         &loaded.current,
                         &loaded.locks,
                     );
-                    loaded.current =
-                        documents::save(tx, actor, service, business, id, &updated, &loaded)?;
+                    loaded.current = documents::save(
+                        tx,
+                        actor,
+                        service,
+                        business,
+                        id,
+                        &updated,
+                        &loaded,
+                        &prepared_files,
+                    )?;
                 }
                 Ok(
                     json!({"success":true,"changedCount":changed,"document":loaded.current,"lockedFields":rules::draft::details(business,&loaded.current,&loaded.defaults,&loaded.locks)["fields"],"message":format!("已恢复 {changed} 个字段的建议值。")}),
@@ -259,6 +295,7 @@ pub fn handle(
                         id,
                         &loaded.current,
                         &loaded,
+                        &prepared_files,
                     )?;
                 }
                 Ok(

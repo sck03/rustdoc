@@ -9,11 +9,19 @@ use std::{
 const IMAGE_COMPOSE: &str = include_str!("../../../deploy/rust-native/compose.image.yml");
 const POSTGRES_INIT: &str = include_str!("../../../deploy/rust-native/postgres-init.sh");
 const POSTGRES_ROLES: &str = include_str!("../../../deploy/rust-native/postgres-roles.sql");
+const UNINSTALL: &str = include_str!("../../../deploy/rust-native/uninstall.sh");
 const DEFAULT_IMAGE: &str = "ghcr.io/sck03/exportdoc-rust-native:latest";
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 pub fn command(args: &[String]) -> Option<Result<()>> {
     match args.first().map(String::as_str) {
+        Some("--print-uninstall") => Some((|| {
+            if args.len() != 1 {
+                return Err("用法：--print-uninstall".into());
+            }
+            std::io::stdout().lock().write_all(UNINSTALL.as_bytes())?;
+            Ok(())
+        })()),
         Some("--print-compose") => Some((|| {
             if args.len() > 2 {
                 return Err("用法：--print-compose [镜像名称:版本]".into());

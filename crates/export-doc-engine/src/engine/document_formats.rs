@@ -1,12 +1,12 @@
 //! Bounded validation of Office containers; documents are never executed/rendered.
 use super::error::{Result, invalid};
-use std::io::{Cursor, Read};
+use std::io::{Read, Seek};
 
-pub(super) fn office_type(extension: &str, bytes: &[u8]) -> Result<&'static str> {
+pub(super) fn office_type(extension: &str, input: impl Read + Seek) -> Result<&'static str> {
     match extension {
         "docx" => {
             ooxml(
-                bytes,
+                input,
                 "word/document.xml",
                 "document",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
@@ -15,22 +15,22 @@ pub(super) fn office_type(extension: &str, bytes: &[u8]) -> Result<&'static str>
         }
         "xlsx" => {
             ooxml(
-                bytes,
+                input,
                 "xl/workbook.xml",
                 "workbook",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
             )?;
             Ok("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         }
-        "doc" | "xls" => compound(extension, bytes),
+        "doc" | "xls" => compound(extension, input),
         _ => Err(invalid(
             "只支持 PDF、PNG、JPEG、Word（DOC/DOCX）和 Excel（XLS/XLSX）。",
         )),
     }
 }
-fn ooxml(bytes: &[u8], part: &str, root: &str, content_type: &str) -> Result<()> {
-    let mut archive = zip::ZipArchive::new(Cursor::new(bytes))
-        .map_err(|_| invalid("Office 文档不是有效的 ZIP 容器。"))?;
+fn ooxml(input: impl Read + Seek, part: &str, root: &str, content_type: &str) -> Result<()> {
+    let mut archive =
+        zip::ZipArchive::new(input).map_err(|_| invalid("Office 文档不是有效的 ZIP 容器。"))?;
     if archive.len() > 2048 {
         return Err(invalid("Office 文档内部文件过多。"));
     }
@@ -109,9 +109,8 @@ fn ooxml(bytes: &[u8], part: &str, root: &str, content_type: &str) -> Result<()>
     }
     Ok(())
 }
-fn compound(extension: &str, bytes: &[u8]) -> Result<&'static str> {
-    let mut file = cfb::CompoundFile::open(Cursor::new(bytes))
-        .map_err(|_| invalid("DOC/XLS 复合文档损坏。"))?;
+fn compound(extension: &str, input: impl Read + Seek) -> Result<&'static str> {
+    let mut file = cfb::CompoundFile::open(input).map_err(|_| invalid("DOC/XLS 复合文档损坏。"))?;
     let path = if extension == "doc" {
         "WordDocument"
     } else if file.is_stream("Workbook") {

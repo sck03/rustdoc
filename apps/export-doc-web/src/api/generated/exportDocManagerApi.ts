@@ -16,6 +16,7 @@ import type { Api as DashboardApi } from './domains/dashboard.ts';
 import type { Api as DiagnosticsApi } from './domains/diagnostics.ts';
 import type { Api as DisasterRecoveryApi } from './domains/disasterRecovery.ts';
 import type { Api as EmailTemplatesApi } from './domains/emailTemplates.ts';
+import type { Api as FileStorageApi } from './domains/fileStorage.ts';
 import type { Api as InvoicesApi } from './domains/invoices.ts';
 import type { Api as JobsApi } from './domains/jobs.ts';
 import type { Api as MasterDataApi } from './domains/masterData.ts';
@@ -41,7 +42,7 @@ import type { Api as UsersApi } from './domains/users.ts';
 import type { Api as WorkflowApi } from './domains/workflow.ts';
 import type { Api as WorklistApi } from './domains/worklist.ts';
 
-export interface ExportDocManagerApiClient extends AuditLogsApi, BackupApi, BusinessAttachmentCategoriesApi, BusinessAttachmentsApi, CommunicationApi, CrmApi, CustomOptionsApi, DashboardApi, DiagnosticsApi, DisasterRecoveryApi, EmailTemplatesApi, InvoicesApi, JobsApi, MasterDataApi, OfficeApi, OrganizationApi, OrganizationDirectoryApi, PaymentsApi, PermissionTemplatesApi, PersonnelApi, PostgresqlMaintenanceApi, QueryApi, ReportsApi, ServerMigrationApi, SessionApi, SettingsApi, SharedDatabaseApi, SingleWindowApi, SuppliersApi, SupportPackageApi, SystemApi, ToolsApi, UsersApi, WorkflowApi, WorklistApi {}
+export interface ExportDocManagerApiClient extends AuditLogsApi, BackupApi, BusinessAttachmentCategoriesApi, BusinessAttachmentsApi, CommunicationApi, CrmApi, CustomOptionsApi, DashboardApi, DiagnosticsApi, DisasterRecoveryApi, EmailTemplatesApi, FileStorageApi, InvoicesApi, JobsApi, MasterDataApi, OfficeApi, OrganizationApi, OrganizationDirectoryApi, PaymentsApi, PermissionTemplatesApi, PersonnelApi, PostgresqlMaintenanceApi, QueryApi, ReportsApi, ServerMigrationApi, SessionApi, SettingsApi, SharedDatabaseApi, SingleWindowApi, SuppliersApi, SupportPackageApi, SystemApi, ToolsApi, UsersApi, WorkflowApi, WorklistApi {}
 
 const loaders = {
   auditLogs: () => import('./domains/auditLogs.ts'),
@@ -55,6 +56,7 @@ const loaders = {
   diagnostics: () => import('./domains/diagnostics.ts'),
   disasterRecovery: () => import('./domains/disasterRecovery.ts'),
   emailTemplates: () => import('./domains/emailTemplates.ts'),
+  fileStorage: () => import('./domains/fileStorage.ts'),
   invoices: () => import('./domains/invoices.ts'),
   jobs: () => import('./domains/jobs.ts'),
   masterData: () => import('./domains/masterData.ts'),
@@ -343,6 +345,8 @@ const operationDomains: Record<string, Domain> = {
   getExpenseRequest: "office",
   getExpenseRequestCommandResult: "office",
   getExporter: "masterData",
+  getFileStorage: "fileStorage",
+  getFileStoragePolicy: "fileStorage",
   getGeneralRequest: "office",
   getGeneralRequestCommandResult: "office",
   getHsCode: "masterData",
@@ -509,6 +513,7 @@ const operationDomains: Record<string, Domain> = {
   listPermissionTemplates: "permissionTemplates",
   listPersonnel: "personnel",
   listPersonnelAccountOptions: "personnel",
+  listPersonnelAttachments: "personnel",
   listPersonnelChangeRequest: "office",
   listPersonnelChangeRequestWorkflowCandidates: "office",
   listPersonnelReportingOptions: "personnel",
@@ -603,6 +608,7 @@ const operationDomains: Record<string, Domain> = {
   reassignTravelRequestApproval: "office",
   reassignUnitWorkflowTask: "organization",
   recognizeOcrImage: "tools",
+  reconcileFileStorage: "fileStorage",
   recordHsCodeKnowledgeFeedback: "masterData",
   recordInvoiceHsCodeKnowledgeFeedback: "invoices",
   recycleReportTemplateV3ImageResource: "reports",
@@ -707,6 +713,7 @@ const operationDomains: Record<string, Domain> = {
   startBookingSheetConvertSaveToPathJob: "tools",
   startExcelTemplateDownloadJob: "tools",
   startExcelTemplateSaveToPathJob: "tools",
+  startFileStorageMigration: "fileStorage",
   startInvoiceBookingSheetDownloadJob: "tools",
   startInvoiceBookingSheetSaveToPathJob: "tools",
   startInvoiceDocumentEmailJob: "reports",
@@ -757,6 +764,7 @@ const operationDomains: Record<string, Domain> = {
   updateDraftOfOfficeSupplyRequest: "office",
   updateExpenseRequest: "office",
   updateExporter: "masterData",
+  updateFileStoragePolicy: "fileStorage",
   updateGeneralRequest: "office",
   updateHsCode: "masterData",
   updateInvoice: "invoices",
@@ -814,6 +822,7 @@ const operationDomains: Record<string, Domain> = {
   uploadSingleWindowSubmitPackage: "singleWindow",
   validateSettings: "settings",
   verifyExpenseApproval: "office",
+  verifyFileStorage: "fileStorage",
   voidExpenseRequest: "office",
   voidGeneralRequest: "office",
   voidLeaveRequest: "office",

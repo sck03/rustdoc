@@ -12,7 +12,7 @@ fn insert(tx: &Connection, kind: &str, template: i64, number: i64, content: &str
 }
 pub fn exercise(tx: &Connection) {
     tx.begin().unwrap();
-    let content = "多字节正文".repeat(4096);
+    let content = json!({"resources":[],"text":"多字节正文".repeat(4096)}).to_string();
     for number in 1..=25 {
         insert(tx, "report-templates", 202, number, &content);
     }

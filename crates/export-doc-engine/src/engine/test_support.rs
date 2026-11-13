@@ -27,6 +27,7 @@ impl ScratchDirectory {
             cache_root: self.0.join("Cache"),
             log_root: self.0.join("Logs"),
             font_path: self.0.join("font.otf"),
+            file_storage_roots: Default::default(),
         }
     }
     pub(crate) fn service(&self) -> TestService {

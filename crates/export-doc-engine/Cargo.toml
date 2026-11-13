@@ -17,7 +17,8 @@ mail = ["dep:export-doc-mail"]
 ocr = []
 ai = ["dep:export-doc-ai"]
 single-window = ["dep:export-doc-single-window"]
-s3-backup = ["dep:aws-sigv4", "dep:aws-credential-types"]
+s3-storage = ["dep:aws-sigv4", "dep:aws-credential-types"]
+s3-backup = ["s3-storage"]
 
 [dependencies]
 export-doc-single-window = { path = "../export-doc-single-window", optional = true }

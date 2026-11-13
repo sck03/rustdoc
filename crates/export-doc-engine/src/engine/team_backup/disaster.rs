@@ -75,6 +75,7 @@ pub(super) fn create_package(
                 let snapshot = working.join("snapshot.sqlite3");
                 store.connection()?.backup(&snapshot)?;
                 let package = package::create(
+                    &store,
                     &paths,
                     &protector,
                     &snapshot,

@@ -45,6 +45,7 @@ try {
     Assert-OriginalFiles $original
     $unprepared = Join-Path $fixture 'unprepared'
     Invoke-Runtime -Path $unprepared -Mode '-RestorePending' -ExpectedFailure 'No prepared'
+    Invoke-Runtime -Path $unprepared -Mode '-Uninstall' -ExpectedFailure 'No prepared'
     if (Test-Path -LiteralPath $unprepared) { throw 'Restore created a replacement deployment identity.' }
     Write-Host 'Docker runtime contracts passed: repeat preparation, missing/corrupt credentials, and unprepared restore.'
 } finally {

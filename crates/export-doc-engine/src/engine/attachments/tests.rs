@@ -62,7 +62,8 @@ fn fixture() -> Fixture {
         invoice,
         json!({"title":"读取测试","uploadKey":"fixture","categoryId":category}),
         "fixture.bin",
-        b"fixture",
+        &mut std::io::Cursor::new(b"fixture"),
+        7,
     )
     .unwrap();
     Fixture {
@@ -114,18 +115,17 @@ fn oversized_stored_attachment_is_rejected_and_extension_case_is_preserved() {
     )
     .unwrap();
     assert_eq!(fs::read(&destination).unwrap(), b"fixture");
-    let bytes = vec![1; FILE_LIMIT + 1];
+    let mut prepared = f.store.files.prepare(b"oversized metadata").unwrap();
+    prepared.object.size = FILE_LIMIT as u64 + 1;
     f.store
         .transaction(|tx| {
-            tx.insert_blob(&BlobWrite {
-                kind: "attachment:2",
-                record_id: f.id,
-                file_name: "oversized.bin",
-                media_type: "application/octet-stream",
-                digest: &digest(&bytes),
-                content: &bytes,
-                created_at: &store::timestamp(),
-            })?;
+            tx.publish_file(
+                &prepared,
+                "attachment:2",
+                f.id,
+                "oversized.bin",
+                "application/octet-stream",
+            )?;
             Ok(())
         })
         .unwrap();
@@ -186,4 +186,42 @@ fn corrupt_attachment_events_are_not_reported_as_an_empty_history() {
     assert_eq!(saved["events"], "corrupted");
     assert_eq!(saved["isArchived"], false);
     assert_eq!(saved["versionNumber"], before["versionNumber"]);
+}
+
+#[test]
+fn historical_revisions_pass_fifty_without_growing_the_business_record() {
+    let f = fixture();
+    let mut current = store::get(&f.store.connection().unwrap(), "attachments", f.id).unwrap();
+    for revision in 2..=65 {
+        let bytes = format!("version {revision}");
+        current = upload(&f.store,&f.actor,current["invoiceId"].as_i64().unwrap(),
+            json!({"attachmentId":f.id,"expectedVersion":current["versionNumber"],"title":current["title"],"categoryId":current["categoryId"],"uploadKey":format!("revision-{revision}")}),
+            "fixture.bin", &mut std::io::Cursor::new(bytes.as_bytes()), bytes.len() as u64).unwrap();
+    }
+    let metadata = store::get(&f.store.connection().unwrap(), "attachments", f.id).unwrap();
+    assert!(metadata.get("revisions").is_none());
+    assert_eq!(metadata["latestRevision"], 65);
+    let first = f.invoke_json(GET_BUSINESS_ATTACHMENT, Value::Null).unwrap();
+    assert_eq!(first["revisionCount"], 65);
+    assert_eq!(first["revisions"].as_array().unwrap().len(), 30);
+    assert_eq!(first["revisions"][0]["revision"], 65);
+    let second: Value = serde_json::from_slice(
+        &handle(
+            &f.store,
+            &f.actor,
+            GET_BUSINESS_ATTACHMENT,
+            &[("id", f.id.to_string())],
+            &[("revisionBefore", first["revisionNextCursor"].to_string())],
+            Value::Null,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(second["revisions"][0]["revision"], 35);
+    assert_eq!(
+        read(&f.store, &f.actor, DOWNLOAD_BUSINESS_ATTACHMENT, f.id, 1)
+            .unwrap()
+            .1,
+        b"fixture"
+    );
 }

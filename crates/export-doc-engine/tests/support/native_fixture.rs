@@ -40,6 +40,7 @@ impl Fixture {
             cache_root: root.join("Cache"),
             log_root: root.join("Logs"),
             font_path: root.join("NotoSansCJKsc-Regular.otf"),
+            file_storage_roots: Default::default(),
         };
         let client = ApiClient::native_edition(paths.clone(), Default::default(), edition)
             .unwrap()

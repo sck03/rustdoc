@@ -119,7 +119,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("startsAt",s().format("date-time")),("endsAt",s().format("date-time")),("isActive",b())
     ]).required(vec!["key","principalUserId","delegateUserId","startsAt","endsAt","isActive"])),
     ("OaApprovalSettings",o(vec![
-        ("expectedVersion",i().format("int64")),("rules",a(r("OaApprovalRule")).min_items(13).max_items(113)),("delegations",a(r("OaApprovalDelegation")).max_items(50)),
+        ("expectedVersion",i().format("int64")),("rules",a(r("OaApprovalRule")).min_items(13)),("delegations",a(r("OaApprovalDelegation"))),
         ("versionNumber",i().format("int64")),("revisions",ty(Primitive::Object).additional(Additional::Schema(Box::new(i().format("int64"))))),("publications",a(r("OaPublication"))),("handlingServices",a(r("OfficeHandlingService")).max_items(100)),
         ("sheetTemplates",a(r("OaSheetTemplate")).max_items(18)),("sheetFieldCatalog",r("ApiReportTemplateFieldCatalogResponse")),("sheetDefaultContent",s()),
         ("calendar",r("OaBusinessCalendar")),("activations",a(r("OaActivation")).max_items(100))

@@ -24,12 +24,22 @@ impl AsyncRead for MemorySource {
         Pin::new(&mut self.inner).poll_read(cx, buffer)
     }
 }
-pub(crate) fn memory_source(
+#[cfg(test)]
+fn memory_source(
     bytes: Vec<u8>,
     reservation: Option<export_doc_engine::engine::backup_io::Reservation>,
 ) -> Box<dyn AsyncRead + Unpin + Send> {
+    memory_source_at(bytes, reservation, 0)
+}
+pub(crate) fn memory_source_at(
+    bytes: Vec<u8>,
+    reservation: Option<export_doc_engine::engine::backup_io::Reservation>,
+    offset: u64,
+) -> Box<dyn AsyncRead + Unpin + Send> {
+    let mut inner = std::io::Cursor::new(bytes);
+    inner.set_position(offset);
     Box::new(MemorySource {
-        inner: std::io::Cursor::new(bytes),
+        inner,
         _reservation: reservation,
     })
 }
@@ -80,7 +90,7 @@ pub(crate) fn body(
         Transfer {
             telemetry,
             idle: Duration::from_secs(60),
-            total: Duration::from_secs(3600),
+            total: Duration::from_secs(export_doc_contracts::request_limits::TRANSFER_SECONDS),
             request_id,
             shutdown,
         },

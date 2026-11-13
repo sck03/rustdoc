@@ -31,7 +31,7 @@ export function DirectorySetting({ settings, path, label, disabled, canSelectDir
   onSelectDirectory: () => void;
 }) {
   return (
-    <label>
+    <label className="form-field-wide">
       <span>{label}</span>
       <div className="settings-path-control">
         <input className="settings-path-input" value={readSettingString(settings, path)} disabled={disabled} onChange={(event) => onChange(path, event.target.value)} />

@@ -1,5 +1,5 @@
 use super::*;
-use export_doc_single_window::{Package, authentication, digest};
+use export_doc_single_window::{Package, authentication};
 
 pub fn import(
     service: &NativeService,
@@ -39,7 +39,11 @@ pub fn import(
     } else {
         Some(receipts::prepare(service, &package)?)
     };
-    let archive_hash = if submit { digest(bytes) } else { String::new() };
+    let archive = if submit {
+        Some(service.store.files.prepare(bytes)?)
+    } else {
+        None
+    };
     let (row, parsed, count) =
         service
             .store
@@ -109,7 +113,13 @@ pub fn import(
                     }
                     tracking::bind(service, &mut row, &profiles::secret(service, &profile)?)?;
                     row = tracking::save(tx, actor, row, Some(&profile))?;
-                    tracking::archive(tx, &row, bytes, &archive_hash)?;
+                    tracking::archive(
+                        tx,
+                        &row,
+                        archive
+                            .as_ref()
+                            .ok_or_else(|| unavailable("提交包暂存缺失。"))?,
+                    )?;
                 }
                 Ok((row, Vec::new(), 0))
             })?;

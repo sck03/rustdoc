@@ -28,7 +28,7 @@ pub const UPLOADS: &[Operation] = &[
     UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
     UPLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
 ];
-pub const POLICY: &str = "申报快照、提交包及回执保存在当前业务数据库，附件随备份恢复。";
+pub const POLICY: &str = "申报文件已归档，完整备份包含原件。";
 
 fn manifest(
     business: Business,
@@ -135,18 +135,15 @@ fn submit(
                     .ok_or_else(|| unavailable("申报单证编号损坏。"))?;
                 let key = rules::text(row, "filePath");
                 let info = tx
-                    .blob_info(document_id, key)?
+                    .file_info(document_id, key)?
                     .ok_or_else(|| error(404, "单证附件不存在，请重新选择并保存。"))?;
                 total = total
-                    .checked_add(info.size)
+                    .checked_add(info.object.size)
                     .ok_or_else(|| invalid("附件容量超限。"))?;
                 if total > 50 * 1024 * 1024 {
                     return Err(invalid("附件总容量最多 50 MiB。"));
                 }
-                let blob = tx
-                    .blob(document_id, key)?
-                    .ok_or_else(|| unavailable("单证附件内容缺失。"))?;
-                attachments.push((row.clone(), blob));
+                attachments.push((row.clone(), info));
             }
             Ok((invoice, loaded, assignment, version, attachments))
         })?;
@@ -167,11 +164,9 @@ fn submit(
         vec![describe(&name, &payload, "application/xml", "申报业务报文").map_err(invalid)?];
     files.insert(name, payload);
     let mut descriptors = Vec::new();
-    for (index, (row, blob)) in attachments.into_iter().enumerate() {
+    for (index, (row, info)) in attachments.into_iter().enumerate() {
         crate::operation::check()?;
-        if digest(&blob.content) != blob.digest {
-            return Err(unavailable("附件摘要校验失败。"));
-        }
+        let blob = service.store.files.load(&info, document_files::SINGLE)?;
         let name = format!(
             "attachments/{:03}_{}",
             index + 1,
@@ -209,7 +204,7 @@ fn submit(
     let secret = rules::text(&assignment, "authenticationSecret");
     let package = Package::seal(m, files, secret, &tracking::check).map_err(invalid)?;
     let bytes = package.encode(&tracking::check).map_err(invalid)?;
-    let archive_hash = digest(&bytes);
+    let prepared = service.store.files.prepare(&bytes)?;
     let manifest = package.manifest;
     let row = service
         .store
@@ -239,7 +234,7 @@ fn submit(
             tracking::bind(service, &mut row, secret)?;
             tracking::add_package(&mut row, &manifest, "Exported")?;
             let row = tracking::save(tx, actor, row, Some(&invoice))?;
-            tracking::archive(tx, &row, &bytes, &archive_hash)?;
+            tracking::archive(tx, &row, &prepared)?;
             Ok(row)
         })?;
     Ok(Export {

@@ -5,7 +5,6 @@ use super::{
     store::{self, Actor, Store},
 };
 use crate::{contracts, generated_api::*};
-use export_doc_storage::BlobWrite;
 use serde_json::{Value, json};
 
 /// Initialize a direct hire and resolve retries without duplicating personnel records.
@@ -142,6 +141,10 @@ pub(super) fn persist(
         value["account"] = contracts::dto(contracts::schema("PersonnelAccountRecord"), user);
     }
     let identity = records::text(&value, "employeeNumber");
+    if let Some(object) = value.as_object_mut() {
+        object.remove("attachments");
+        object.remove("attachmentCount");
+    }
     let scope = (id == 0 && value["approvalRequestId"].is_number()).then(|| value.clone());
     let saved = store::save_in_scope(
         tx,
@@ -248,6 +251,8 @@ pub fn upload(
     let kind = image_kind(parameters)?;
     let content_type = media::image_type(bytes, 5 * 1024 * 1024)?;
     let hash = media::digest(bytes);
+    store.read(|tx| person(tx, actor, id, "edit"))?;
+    let prepared = store.files.prepare(bytes)?;
     store.transaction_as(actor, |tx, actor| {
         let mut person = person(tx, actor, id, "edit")?;
         if person["status"] == "Departed" && !actor.admin { return Err(conflict("离职人员的图片须由管理员修正。")); }
@@ -261,7 +266,7 @@ pub fn upload(
         if kind == "Avatar" { person["employee"]["avatarHash"] = json!(hash); }
         let file_kind = format!("personnel:{kind}");
         tx.delete_blob(id, &file_kind)?;
-        tx.insert_blob(&BlobWrite { kind:&file_kind,record_id:id,file_name:kind,media_type:content_type,digest:&hash,content:bytes,created_at:&store::timestamp() })?;
+        tx.publish_file(&prepared,&file_kind,id,kind,content_type)?;
         save(tx, actor, id, person, "image-upload", "")
     })
 }
@@ -297,13 +302,10 @@ pub fn handle(
             let blob = store.read(|tx| {
                 let actor = auth::refresh_actor_in(tx, actor)?;
                 person(tx, &actor, id, action)?;
-                tx.blob(id, &format!("personnel:{kind}"))?
+                tx.file_info(id, &format!("personnel:{kind}"))?
                     .ok_or_else(|| error(404, "人员图片不存在。"))
             })?;
-            if media::digest(&blob.content) != blob.digest {
-                return Err(unavailable("人员图片内容校验失败。"));
-            }
-            return Ok(blob.content);
+            return Ok(store.files.load(&blob, 5 * 1024 * 1024)?.content);
         }
         DELETE_PERSONNEL_IMAGE => {
             let kind = image_kind(parameters)?;

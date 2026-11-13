@@ -74,7 +74,16 @@ pub(in crate::engine) fn project(
     detail: bool,
 ) -> Result<Value> {
     row["attachments"] = if detail {
-        json!(children(tx, &row, "announcement-attachment", 0, 20)?.1)
+        json!(
+            children(
+                tx,
+                &row,
+                "announcement-attachment",
+                0,
+                crate::engine::file_store::policy::MAX_REQUEST_FILES
+            )?
+            .1
+        )
     } else {
         json!([])
     };
@@ -231,7 +240,15 @@ pub(super) fn handle(
                 return Err(conflict("公告已有发布历史或回执，不能删除。"));
             }
         }
-        for attachment in children(tx, &row, "announcement-attachment", 0, 20)?.1 {
+        for attachment in children(
+            tx,
+            &row,
+            "announcement-attachment",
+            0,
+            crate::engine::file_store::policy::MAX_REQUEST_FILES,
+        )?
+        .1
+        {
             crate::operation::check()?;
             let file = records::positive(&attachment, "id", "附件")?;
             tx.delete_blobs(file)?;

@@ -43,7 +43,7 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
     actions={<>{invoiceId && <Link className="command-button secondary" to={`/invoices/${invoiceId}`}>返回单据</Link>}
         {catalog?.canManage && <button type="button" className="command-button secondary" disabled={model.busy || editorOpen} onClick={() => setManagingCategories(true)}>管理分类</button>}
         {data?.canUpload && <button type="button" className="command-button" disabled={model.busy || editorOpen || !catalog} onClick={() => model.setUploadMode("new")}><Plus size={16} aria-hidden="true" />上传资料</button>}</>}>
-    {data?.usedBytes != null && <p className="business-records-muted">本单已使用 {fileSizeLabel(data.usedBytes)} / {fileSizeLabel(data.invoiceBytesLimit)}，包含所有历史版本与停用资料。资料随数据库备份保存。</p>}
+    {data?.usedBytes != null && <p className="business-records-muted">本单资料共 {fileSizeLabel(data.usedBytes)}，包含历史版本与停用资料。</p>}
     {model.error && <InlineNotice tone="error" title="操作未完成">{model.error}</InlineNotice>}
     {model.message && <InlineNotice tone="success">{model.message}</InlineNotice>}
     {model.categories.isError && <InlineNotice tone="error" title="分类加载失败" action={<button className="command-button secondary" type="button" onClick={() => void model.categories.refetch()}>重新加载分类</button>}>{readApiError(model.categories.error)}</InlineNotice>}
@@ -57,7 +57,7 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
         !data.canUpload ? <PageState tone="permission" title="不能上传到这张发票" description="当前账号没有本单的资料上传权限。"
           action={<button className="command-button secondary" type="button" onClick={() => model.setUploadMode(null)}>关闭上传</button>} /> :
           <BusinessAttachmentUploadForm key={uploadMode} invoiceId={uploadInvoiceId} attachment={uploadAttachment} categories={categories}
-            maximumBytes={data.fileBytesLimit} remainingBytes={Math.max(0, data.invoiceBytesLimit - (data.usedBytes ?? 0))} busy={model.busy} onUpload={model.upload} onSave={model.saveUploads} onClose={() => model.setUploadMode(null)} /> : null}
+            maximumBytes={data.fileBytesLimit} remainingBytes={data.invoiceBytesLimit == null ? Number.MAX_SAFE_INTEGER : Math.max(0, data.invoiceBytesLimit - (data.usedBytes ?? 0))} busy={model.busy} onUpload={model.upload} onSave={model.saveUploads} onClose={() => model.setUploadMode(null)} /> : null}
     <div className="business-records-content" hidden={model.selectedId !== null}>
     <form className="toolbar business-records-toolbar" role="search" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
       <div className="search-form"><Search size={17} aria-hidden="true" />
@@ -88,7 +88,7 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
     </div>
     {model.selectedId !== null && (model.details.isPending ? <PageState tone="loading" title="正在读取版本" /> : model.details.isError ?
       <PageState tone="error" title="版本读取失败" description={readApiError(model.details.error)} /> : selected && <BusinessAttachmentDetails key={selected.attachment.id}
-        details={selected} categories={categories} editing={editingMetadata} onEditingChange={setEditingMetadata}
+        details={selected} historyNavigation={model.historyNavigation} categories={categories} editing={editingMetadata} onEditingChange={setEditingMetadata}
         busy={model.busy || uploadMode !== null || managingCategories || !catalog} timeZone={user.businessTimeZone} onClose={() => model.setSelectedId(null)}
         onEdit={model.editMetadata} onDelete={model.remove} onReplace={() => model.setUploadMode("revision")} onRead={(version, show) => void model.read(version, show)} onUpdate={model.update} />)}
     {preview && <BusinessAttachmentPreview blob={preview.blob} name={preview.name} onClose={() => model.setPreview(null)} />}

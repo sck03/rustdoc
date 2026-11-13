@@ -292,6 +292,7 @@ mod tests {
             cache_root: root.join("Cache"),
             log_root: root.join("Logs"),
             font_path: root.join("font.otf"),
+            file_storage_roots: Default::default(),
         };
         let store = Store::open(&paths).unwrap();
         store

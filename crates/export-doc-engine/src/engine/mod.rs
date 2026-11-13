@@ -24,6 +24,7 @@ mod dashboard;
 mod diagnostics;
 mod document_formats;
 mod document_packages;
+mod document_upload;
 mod downloads;
 mod electronic_evidence;
 #[cfg(feature = "mail")]
@@ -35,6 +36,7 @@ pub mod error;
 pub mod excel;
 #[cfg(feature = "exchange-rates")]
 mod exchange;
+mod file_store;
 mod handling;
 mod hs;
 #[cfg(feature = "excel")]
@@ -59,6 +61,8 @@ mod maintenance;
 mod media;
 mod operation_lock;
 mod request_values;
+#[cfg(feature = "s3-storage")]
+mod s3_transport;
 pub use media::{SEAL_LIMIT, read_seal_image};
 pub mod oa;
 #[cfg(feature = "ocr")]
@@ -102,7 +106,7 @@ mod supplier_overview;
 pub mod tasks;
 mod team_backup;
 #[cfg(test)]
-mod test_support;
+pub(crate) mod test_support;
 mod units;
 mod workflow_tasks;
 pub use team_backup::UploadAuthorization;

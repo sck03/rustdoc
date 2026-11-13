@@ -228,7 +228,7 @@ fn busy_document_generation_recovers_and_download_rechecks_private_material() {
         .unwrap();
     let result = service
         .store
-        .read(|tx| gather(&service, tx, &actor, meta, &parameters));
+        .read(|tx| gather(tx, &actor, meta, &parameters));
     assert_eq!(
         result.err().unwrap().status,
         Some(403),
