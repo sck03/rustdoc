@@ -74,6 +74,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadAgentConsignmentSubmitPackage(request: DownloadAgentConsignmentSubmitPackageRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/single-window/acd/${encodePath(request.sourceId)}/submit-package/download`;
     return transport.request<Blob>("POST", path, {
       body: request.body,
@@ -82,6 +83,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadCustomsCooSubmitPackage(request: DownloadCustomsCooSubmitPackageRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/single-window/coo/${encodePath(request.sourceId)}/submit-package/download`;
     return transport.request<Blob>("POST", path, {
       body: request.body,
@@ -90,6 +92,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadSingleWindowReceiptPackage(request: DownloadSingleWindowReceiptPackageRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = "/api/single-window/receipts/download-package";
     return transport.request<Blob>("POST", path, {
       body: request.body,

@@ -7,8 +7,11 @@ use export_doc_storage::{FileInfo, FileObject};
 use serde::{Deserialize, Serialize};
 pub(super) mod admin;
 mod archive;
+mod cache;
+mod credentials;
 pub(super) mod incremental;
 mod journal;
+mod migration;
 pub(super) mod policy;
 mod remote;
 #[cfg(test)]
@@ -57,6 +60,7 @@ pub enum Backend {
 pub struct Configuration {
     pub version: u32,
     pub revision: u64,
+    pub credential_revision: u64,
     pub identity: String,
     pub backend: Backend,
     pub policy: Policy,
@@ -66,6 +70,11 @@ pub struct PreparedObject {
     pub(super) identity: String,
     _lease: journal::UploadLease,
 }
+impl PreparedObject {
+    pub(super) fn intent_path(&self) -> PathBuf {
+        self._lease.path.clone()
+    }
+}
 pub struct FileStore {
     root: PathBuf,
     roots: std::collections::BTreeMap<String, PathBuf>,
@@ -74,6 +83,10 @@ pub struct FileStore {
     protector: crate::secrets::Protector,
     state: RwLock<Configuration>,
     uploads: journal::Uploads,
+    space: std::sync::Arc<crate::temporary_space::Budget>,
+    downloads: cache::Cache,
+    #[cfg(feature = "s3-storage")]
+    agent: ureq::Agent,
 }
 impl FileStore {
     pub fn open(paths: &RuntimePaths, registered: bool) -> Result<Self> {
@@ -97,6 +110,7 @@ impl FileStore {
             let config = Configuration {
                 version: 1,
                 revision: 1,
+                credential_revision: 1,
                 identity: paths::nonce().map_err(unavailable)?,
                 backend: Backend::Local {
                     directory: "Files".into(),
@@ -130,8 +144,23 @@ impl FileStore {
             protector: crate::secrets::Protector::new(&paths.data_root),
             state: RwLock::new(config),
             uploads: Default::default(),
+            space: paths.disk_space.clone(),
+            downloads: cache::Cache::open(&paths.cache_root.join("FileDownloads"))?,
+            #[cfg(feature = "s3-storage")]
+            agent: export_doc_network::storage_pooled_agent(
+                std::time::Duration::from_secs(super::backup_io::TIMEOUT_SECONDS),
+                || crate::operation::check().is_ok(),
+            ),
         };
-        store.health()?;
+        // Keep the authenticated administration surface available when remote
+        // credentials expire. Every remote file operation still fails closed.
+        let config = store.configuration()?;
+        match &config.backend {
+            Backend::Local { .. } => store.local_identity(&config)?,
+            Backend::S3 { .. } => {
+                store.target(&config)?;
+            }
+        }
         Ok(store)
     }
     pub fn configuration(&self) -> Result<Configuration> {
@@ -174,7 +203,12 @@ impl FileStore {
                 .unprotect("file-storage-token", token)
                 .map_err(unavailable)?
         };
-        remote::Target::new(settings.clone(), &config.identity, &secret, &token)
+        let target = remote::Target::new(settings.clone(), &config.identity, &secret, &token)?;
+        #[cfg(feature = "s3-storage")]
+        let target = target
+            .with_agent(self.agent.clone())
+            .with_journal(self.configuration_path.parent().unwrap().join("S3Uploads"));
+        Ok(target)
     }
     pub fn health(&self) -> Result<()> {
         let state = self.configuration()?;
@@ -264,18 +298,20 @@ impl FileStore {
         Ok(path)
     }
     pub fn prepare(&self, bytes: &[u8]) -> Result<PreparedObject> {
-        self.prepare_reader(&mut &*bytes, bytes.len() as u64)
+        self.prepare_reader(&mut std::io::Cursor::new(bytes), bytes.len() as u64)
     }
-    pub fn prepare_reader(&self, input: &mut impl Read, limit: u64) -> Result<PreparedObject> {
+    pub fn prepare_reader(
+        &self,
+        input: &mut (impl Read + Seek),
+        limit: u64,
+    ) -> Result<PreparedObject> {
         let config = self.configuration()?;
-        let mut scratch =
-            paths::anonymous_file(&self.cache.join("FileStaging")).map_err(unavailable)?;
-        let (size, digest) = super::backup_io::copy_and_hash(input, &mut scratch, limit)?;
+        input.seek(SeekFrom::Start(0))?;
+        let (size, digest) = super::backup_io::copy_and_hash(input, &mut std::io::sink(), limit)?;
         let object = FileObject { size, digest };
         validate(&object)?;
         let lease = self.begin_upload(&config, &object)?;
-        scratch.flush()?;
-        scratch.seek(SeekFrom::Start(0))?;
+        input.seek(SeekFrom::Start(0))?;
         match &config.backend {
             Backend::Local { .. } => {
                 self.local_identity(&config)?;
@@ -286,9 +322,18 @@ impl FileStore {
                     crate::secrets::private_directory(path.parent().unwrap())
                         .map_err(unavailable)?;
                     paths::atomic_write_with(&path, |output| {
-                        super::backup_io::copy_and_hash(&mut scratch, output, object.size)
-                            .map(|_| ())
-                            .map_err(|e| e.to_string())
+                        let mut output = self
+                            .space
+                            .at(path.parent().unwrap().to_path_buf())
+                            .writer(output)
+                            .map_err(|e| e.to_string())?;
+                        let actual =
+                            super::backup_io::copy_and_hash(input, &mut output, object.size)
+                                .map_err(|e| e.to_string())?;
+                        if actual != (object.size, object.digest.clone()) {
+                            return Err("源文件在写入时发生变化。".into());
+                        }
+                        Ok(())
                     })
                     .map_err(unavailable)?;
                 }
@@ -296,7 +341,7 @@ impl FileStore {
             Backend::S3 { .. } => {
                 self.check_identity(&config)?;
                 self.target(&config)?.upload_file(
-                    &mut scratch,
+                    input,
                     &object.digest,
                     object.size,
                     &object.digest,
@@ -325,12 +370,7 @@ impl FileStore {
                     .map_err(|_| unavailable("已登记文件对象缺失或不可读。"))?
             }
             Backend::S3 { .. } => {
-                let mut file = paths::anonymous_file(&self.cache.join("FileDownloads"))
-                    .map_err(unavailable)?;
-                self.target(&config)?
-                    .download(&object.digest, &mut file, object.size)?;
-                file.seek(SeekFrom::Start(0))?;
-                file
+                return self.downloads.download(self, &config, object);
             }
         };
         verify(&mut file, object)?;

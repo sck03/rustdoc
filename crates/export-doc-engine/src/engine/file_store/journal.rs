@@ -7,6 +7,7 @@ use std::{
 };
 pub(super) type Uploads = Arc<Mutex<BTreeMap<String, (String, String)>>>;
 pub(super) struct UploadLease {
+    pub(super) path: PathBuf,
     token: String,
     active: Uploads,
 }
@@ -37,6 +38,7 @@ impl FileStore {
     ) -> Result<UploadLease> {
         let token = paths::nonce().map_err(unavailable)?;
         let lease = UploadLease {
+            path: self.journal_root().join(format!("{token}.json")),
             token: token.clone(),
             active: self.uploads.clone(),
         };
@@ -67,6 +69,17 @@ impl FileStore {
         paths::ensure_safe_absolute(&root).map_err(unavailable)?;
         crate::secrets::private_directory(&root).map_err(unavailable)?;
         let config = self.configuration()?;
+        #[cfg(feature = "s3-storage")]
+        if matches!(&config.backend, Backend::S3 { .. }) {
+            self.target(&config)?.recover_uploads(|name| {
+                Ok(self
+                    .uploads
+                    .lock()
+                    .map_err(|_| unavailable("文件上传状态异常。"))?
+                    .values()
+                    .any(|(id, digest)| id == &config.identity && digest == name))
+            })?;
+        }
         let mut reclaimed = 0u64;
         for entry in fs::read_dir(&root)? {
             crate::operation::check()?;

@@ -3,7 +3,12 @@
 use serde_json::Value;
 
 pub(super) fn apply(baseline: &mut Value) {
-    for line in include_str!("../tests/fixtures/file-storage-contract-changes.jsonl").lines() {
+    for line in include_str!("../tests/fixtures/file-storage-contract-changes.jsonl")
+        .lines()
+        .chain(
+            include_str!("../tests/fixtures/file-storage-stability-contract-changes.jsonl").lines(),
+        )
+    {
         let change: Value = serde_json::from_str(line).unwrap();
         let path = change["path"].as_array().unwrap();
         let mut parent = &mut *baseline;

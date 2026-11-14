@@ -113,6 +113,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   exportSuppliers(request: ExportSuppliersRequest = {}, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = "/api/suppliers/export";
     return transport.request<Blob>("GET", path, {
       query: {

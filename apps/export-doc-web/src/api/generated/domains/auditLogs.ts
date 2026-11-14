@@ -23,6 +23,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadAuditLogs(request: DownloadAuditLogsRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = "/api/audit-logs/download";
     return transport.request<Blob>("POST", path, {
       body: request.body,

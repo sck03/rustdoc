@@ -50,6 +50,7 @@ pub(in crate::engine) fn stage_restore(
                 return Err(unavailable("备份文件已变化，已拒绝恢复。"));
             }
             package::stage(
+                &paths.disk_space,
                 &if pg {
                     migration::marker_path(&paths)?
                 } else {

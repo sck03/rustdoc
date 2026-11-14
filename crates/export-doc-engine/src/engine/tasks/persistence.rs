@@ -187,30 +187,37 @@ pub fn finish(store: &Store, actor: &Actor, id: &str, result: Result<TaskOutput>
     let mut publication = None;
     let result = result.and_then(|output| {
         publication = super::output::prepare(store, id, &output)?;
-        Ok(output)
+        prepare_output(store, output)
     });
     finish_controlled(store, actor, id, result, None, publication)
+}
+pub(super) struct PreparedOutput {
+    output: TaskOutput,
+    archive: Option<crate::engine::file_store::PreparedObject>,
+}
+
+/// Remote uploads run in the cancellable execution scope, before the shared
+/// completion lock. Terminal persistence only authorizes and publishes metadata.
+pub(super) fn prepare_output(store: &Store, output: TaskOutput) -> Result<PreparedOutput> {
+    let archive = output
+        .archive
+        .as_ref()
+        .map(|archive| store.files.prepare(&archive.file.content))
+        .transpose()?;
+    Ok(PreparedOutput { output, archive })
 }
 pub(super) fn finish_controlled(
     store: &Store,
     actor: &Actor,
     id: &str,
-    result: Result<TaskOutput>,
+    result: Result<PreparedOutput>,
     canceled: Option<&std::sync::atomic::AtomicBool>,
     mut publication: Option<super::output::Publication>,
 ) -> Result<()> {
     let mut published = false;
     let mut prepared = false;
     let (result, prepared_archive) = match result {
-        Ok(output) => match output
-            .archive
-            .as_ref()
-            .map(|archive| store.files.prepare(&archive.file.content))
-            .transpose()
-        {
-            Ok(prepared) => (Ok(output), prepared),
-            Err(cause) => (Err(cause), None),
-        },
+        Ok(prepared) => (Ok(prepared.output), prepared.archive),
         Err(cause) => (Err(cause), None),
     };
     let result = store.transaction(|connection| {

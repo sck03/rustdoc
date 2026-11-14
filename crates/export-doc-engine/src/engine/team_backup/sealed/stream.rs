@@ -194,6 +194,7 @@ mod tests {
         let entries = super::super::unpack(
             fs::File::open(archive).unwrap(),
             &workspace.0.join("unpacked"),
+            &std::sync::Arc::new(crate::temporary_space::Budget::new(workspace.0.clone())),
         )
         .unwrap();
         assert_eq!(entries[0].size_bytes, size);

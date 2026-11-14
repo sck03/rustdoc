@@ -3,7 +3,7 @@ mod storage;
 pub use addresses::public_address;
 use std::net::IpAddr;
 use std::time::Duration;
-pub use storage::storage_agent;
+pub use storage::{storage_agent, storage_pooled_agent};
 use ureq::unversioned::{
     resolver::{DefaultResolver, ResolvedSocketAddrs, Resolver},
     transport::NextTimeout,

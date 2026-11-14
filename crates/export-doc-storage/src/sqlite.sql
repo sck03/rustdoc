@@ -113,6 +113,7 @@ CREATE TABLE files (
 );
 CREATE INDEX files_record ON files(kind, record_id);
 CREATE TABLE file_objects (
+    reference_count BIGINT NOT NULL DEFAULT 0 CHECK(reference_count>=0),
     digest TEXT PRIMARY KEY CHECK(length(digest)=64),
     size_bytes INTEGER NOT NULL CHECK(size_bytes>0),
     created_at TEXT NOT NULL
@@ -127,6 +128,50 @@ CREATE TABLE file_versions (
     PRIMARY KEY(record_id,kind)
 );
 CREATE INDEX file_versions_object ON file_versions(digest);
+CREATE TABLE file_storage_totals (
+    id INTEGER PRIMARY KEY CHECK(id=1),
+    file_count BIGINT NOT NULL CHECK(file_count>=0),
+    physical_bytes BIGINT NOT NULL CHECK(physical_bytes>=0),
+    logical_bytes BIGINT NOT NULL CHECK(logical_bytes>=0),
+    referenced_bytes BIGINT NOT NULL CHECK(referenced_bytes>=0)
+);
+INSERT INTO file_storage_totals VALUES(1,0,0,0,0);
+CREATE TABLE file_usage_totals (
+    company TEXT PRIMARY KEY,
+    logical_bytes BIGINT NOT NULL CHECK(logical_bytes>=0)
+);
+CREATE TRIGGER file_object_added AFTER INSERT ON file_objects BEGIN
+    UPDATE file_storage_totals SET file_count=file_count+1, physical_bytes=physical_bytes+NEW.size_bytes WHERE id=1;
+END;
+CREATE TRIGGER file_object_removed AFTER DELETE ON file_objects BEGIN
+    UPDATE file_storage_totals SET file_count=file_count-1, physical_bytes=physical_bytes-OLD.size_bytes WHERE id=1;
+END;
+CREATE TRIGGER file_version_added AFTER INSERT ON file_versions BEGIN
+    UPDATE file_storage_totals SET logical_bytes=logical_bytes+(SELECT size_bytes FROM file_objects WHERE digest=NEW.digest),
+        referenced_bytes=referenced_bytes+(SELECT CASE WHEN reference_count=0 THEN size_bytes ELSE 0 END FROM file_objects WHERE digest=NEW.digest) WHERE id=1;
+    UPDATE file_objects SET reference_count=reference_count+1 WHERE digest=NEW.digest;
+    INSERT INTO file_usage_totals(company,logical_bytes)
+        SELECT COALESCE(json_extract(r.body,'$.companyScope'),''),o.size_bytes FROM records r JOIN file_objects o ON o.digest=NEW.digest WHERE r.id=NEW.record_id
+        ON CONFLICT(company) DO UPDATE SET logical_bytes=logical_bytes+excluded.logical_bytes;
+END;
+CREATE TRIGGER file_version_removed AFTER DELETE ON file_versions BEGIN
+    UPDATE file_storage_totals SET logical_bytes=logical_bytes-(SELECT size_bytes FROM file_objects WHERE digest=OLD.digest),
+        referenced_bytes=referenced_bytes-(SELECT CASE WHEN reference_count=1 THEN size_bytes ELSE 0 END FROM file_objects WHERE digest=OLD.digest) WHERE id=1;
+    UPDATE file_objects SET reference_count=reference_count-1 WHERE digest=OLD.digest;
+    UPDATE file_usage_totals SET logical_bytes=logical_bytes-(SELECT size_bytes FROM file_objects WHERE digest=OLD.digest)
+        WHERE company=(SELECT COALESCE(json_extract(body,'$.companyScope'),'') FROM records WHERE id=OLD.record_id);
+END;
+CREATE TRIGGER file_version_immutable BEFORE UPDATE ON file_versions BEGIN
+    SELECT RAISE(ABORT,'file versions are immutable');
+END;
+CREATE TRIGGER file_owner_changed AFTER UPDATE OF body ON records
+WHEN COALESCE(json_extract(OLD.body,'$.companyScope'),'')<>COALESCE(json_extract(NEW.body,'$.companyScope'),'') BEGIN
+    UPDATE file_usage_totals SET logical_bytes=logical_bytes-(SELECT COALESCE(SUM(o.size_bytes),0) FROM file_versions v JOIN file_objects o ON o.digest=v.digest WHERE v.record_id=NEW.id)
+        WHERE company=COALESCE(json_extract(OLD.body,'$.companyScope'),'');
+    INSERT INTO file_usage_totals(company,logical_bytes)
+        SELECT COALESCE(json_extract(NEW.body,'$.companyScope'),''),COALESCE(SUM(o.size_bytes),0) FROM file_versions v JOIN file_objects o ON o.digest=v.digest WHERE v.record_id=NEW.id
+        ON CONFLICT(company) DO UPDATE SET logical_bytes=logical_bytes+excluded.logical_bytes;
+END;
 CREATE TABLE attachment_history (
     record_id INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
     kind TEXT NOT NULL CHECK(kind IN ('revision','event')),
@@ -148,6 +193,15 @@ CREATE TABLE report_resource_uploaders (
     PRIMARY KEY(resource_record_id,user_id)
 );
 CREATE INDEX report_resource_uploaders_actor ON report_resource_uploaders(user_id,resource_record_id);
+CREATE TABLE file_migrations (storage_identity TEXT PRIMARY KEY);
+CREATE TABLE file_migration_queue (
+    storage_identity TEXT NOT NULL REFERENCES file_migrations(storage_identity) ON DELETE CASCADE,
+    digest TEXT NOT NULL REFERENCES file_objects(digest) ON DELETE CASCADE,
+    PRIMARY KEY(storage_identity,digest)
+);
+CREATE TRIGGER queue_file_migrations AFTER INSERT ON file_objects BEGIN
+    INSERT INTO file_migration_queue(storage_identity,digest) SELECT storage_identity,NEW.digest FROM file_migrations;
+END;
 CREATE TABLE file_locations (
     storage_identity TEXT NOT NULL,
     digest TEXT NOT NULL REFERENCES file_objects(digest) ON DELETE CASCADE,

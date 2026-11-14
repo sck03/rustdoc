@@ -54,8 +54,8 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["enabled","frequency","time","weekday","retentionCount","retentionDays","replicaMode","verifyReplica","s3"]).additional(Additional::Allowed(false))),
     ("ApiBackupS3Settings",o(vec![
         ("endpoint",s().max_length(2048)),("region",s().default_value(serde_json::json!("us-east-1")).max_length(64)),("bucket",s().max_length(63)),
-        ("prefix",s().default_value(serde_json::json!("ExportDocManager")).max_length(512)),("accessKeyId",s().max_length(256)),("pathStyle",b().default_value(serde_json::json!(true)))
-    ]).required(vec!["endpoint","region","bucket","prefix","accessKeyId","pathStyle"]).additional(Additional::Allowed(false))),
+        ("prefix",s().default_value(serde_json::json!("ExportDocManager")).max_length(512)),("accessKeyId",s().max_length(256)),("addressing",s().default_value(serde_json::json!("virtualHost")).enumeration(Enumeration::Values(vec![serde_json::json!("path"),serde_json::json!("virtualHost"),serde_json::json!("bucketHost")])))
+    ]).required(vec!["endpoint","region","bucket","prefix","accessKeyId","addressing"]).additional(Additional::Allowed(false))),
     ("ApiBackupWebDavSettings",o(vec![("enabled",b()),("url",s().max_length(2048)),("userName",s().max_length(256))]).required(vec!["enabled","url","userName"]).additional(Additional::Allowed(false))),
     ("ApiBackupPlanSaveRequest",o(vec![
         ("expectedRevision",i().minimum(num("0")).format("int64")),("expectedSettingsRevision",i().minimum(num("0")).format("int64")),("plan",r("ApiBackupPlan")),

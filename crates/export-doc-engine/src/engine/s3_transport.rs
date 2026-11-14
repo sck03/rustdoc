@@ -6,7 +6,7 @@ use aws_sigv4::{
     http_request::{self, SignableBody, SignableRequest, SigningSettings},
     sign::v4,
 };
-use export_doc_domain::backup_plan::S3Settings;
+use export_doc_domain::backup_plan::{S3Addressing, S3Settings};
 use sha2::{Digest, Sha256};
 use std::{
     io::Read,
@@ -14,7 +14,10 @@ use std::{
     time::{Duration, SystemTime},
 };
 use ureq::http::{Request, Response};
+mod journal;
 mod multipart;
+#[cfg(test)]
+mod tests;
 
 const CONTROL_TIMEOUT: Duration = Duration::from_secs(30);
 const RESPONSE_LIMIT: u64 = 256 * 1024;
@@ -22,8 +25,20 @@ const EMPTY_HASH: &str = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca49599
 
 pub(in crate::engine) fn validate(settings: &S3Settings) -> Result<url::Url> {
     let url = url::Url::parse(&settings.endpoint).map_err(|_| invalid("S3 端点地址无效。"))?;
-    if !settings.path_style && matches!(url.host(), Some(url::Host::Ipv4(_) | url::Host::Ipv6(_))) {
+    if settings.addressing != S3Addressing::Path
+        && matches!(url.host(), Some(url::Host::Ipv4(_) | url::Host::Ipv6(_)))
+    {
         return Err(invalid("使用 IP 地址的 S3 端点请选择路径寻址。"));
+    }
+    if url.path() != "/" && !url.path().is_empty() {
+        return Err(invalid("S3 服务地址不能包含路径，请使用对象前缀。"));
+    }
+    if settings.addressing == S3Addressing::Path
+        && url
+            .host_str()
+            .is_some_and(|host| host.ends_with(".aliyuncs.com") || host.ends_with(".myqcloud.com"))
+    {
+        return Err(invalid("阿里云 OSS 与腾讯云 COS 请选择虚拟主机寻址。"));
     }
     if !matches!(url.scheme(), "https" | "http")
         || url.host_str().is_none()
@@ -83,8 +98,13 @@ pub(in crate::engine) struct Target {
     repository: String,
     credentials: Credentials,
     agent: ureq::Agent,
+    journal: Option<std::path::PathBuf>,
 }
 impl Target {
+    pub(super) fn with_agent(mut self, agent: ureq::Agent) -> Self {
+        self.agent = agent;
+        self
+    }
     pub(in crate::engine) fn new(
         settings: S3Settings,
         repository: &str,
@@ -103,6 +123,7 @@ impl Target {
             "exportdoc-storage",
         );
         Ok(Self {
+            journal: None,
             settings,
             endpoint,
             repository: repository.into(),
@@ -114,18 +135,14 @@ impl Target {
         })
     }
     pub(in crate::engine) fn identity(&self) -> String {
-        format!(
-            "S3:{}:{}",
-            self.url("").expect("validated S3 target"),
-            self.settings.access_key_id
-        )
+        format!("S3:{}", self.url("").expect("validated S3 target"))
     }
     fn url(&self, name: &str) -> Result<url::Url> {
         if !name.is_empty() && !crate::paths::valid_file_name(name) {
             return Err(invalid("S3 对象文件名无效。"));
         }
         let mut url = self.endpoint.clone();
-        if !self.settings.path_style {
+        if self.settings.addressing == S3Addressing::VirtualHost {
             let host = format!("{}.{}", self.settings.bucket, url.host_str().unwrap());
             url.set_host(Some(&host))
                 .map_err(|_| invalid("S3 虚拟主机地址无效，请使用路径寻址。"))?;
@@ -135,7 +152,7 @@ impl Target {
                 .path_segments_mut()
                 .map_err(|_| invalid("S3 地址不能包含对象路径。"))?;
             segments.pop_if_empty();
-            if self.settings.path_style {
+            if self.settings.addressing == S3Addressing::Path {
                 segments.push(&self.settings.bucket);
             }
             for part in self
@@ -224,13 +241,13 @@ impl Target {
         digest: &str,
         verify: bool,
     ) -> Result<()> {
-        self.multipart(path, name, size)?;
+        self.put_file(&mut std::fs::File::open(path)?, name, size, digest)?;
         if verify {
             self.verify(name, size, digest)?;
         }
         Ok(())
     }
-    fn verify(&self, name: &str, size: u64, digest: &str) -> Result<()> {
+    pub(super) fn verify(&self, name: &str, size: u64, digest: &str) -> Result<()> {
         let request = self.request("GET", &self.url(name)?, (), None, EMPTY_HASH)?;
         let mut response = self
             .agent
@@ -251,12 +268,12 @@ impl Target {
     }
     pub(in crate::engine) fn upload_file(
         &self,
-        file: &mut std::fs::File,
+        file: &mut (impl Read + std::io::Seek),
         name: &str,
         size: u64,
         digest: &str,
     ) -> Result<()> {
-        self.multipart_file(file, name, size)?;
+        self.put_file(file, name, size, digest)?;
         self.verify(name, size, digest)
     }
     pub(in crate::engine) fn download(
@@ -264,7 +281,7 @@ impl Target {
         name: &str,
         output: &mut impl std::io::Write,
         limit: u64,
-    ) -> Result<()> {
+    ) -> Result<(u64, String)> {
         let request = self.request("GET", &self.url(name)?, (), None, EMPTY_HASH)?;
         let mut response = self
             .agent
@@ -273,8 +290,7 @@ impl Target {
         if response.status().as_u16() != 200 {
             return Err(unavailable("S3 文件对象不可读。"));
         }
-        backup_io::copy_and_hash(&mut response.body_mut().as_reader(), output, limit)?;
-        Ok(())
+        backup_io::copy_and_hash(&mut response.body_mut().as_reader(), output, limit)
     }
 }
 

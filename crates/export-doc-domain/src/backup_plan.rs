@@ -22,7 +22,14 @@ pub struct S3Settings {
     pub bucket: String,
     pub prefix: String,
     pub access_key_id: String,
-    pub path_style: bool,
+    pub addressing: S3Addressing,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum S3Addressing {
+    Path,
+    VirtualHost,
+    BucketHost,
 }
 impl Default for S3Settings {
     fn default() -> Self {
@@ -32,7 +39,7 @@ impl Default for S3Settings {
             bucket: String::new(),
             prefix: "ExportDocManager".into(),
             access_key_id: String::new(),
-            path_style: true,
+            addressing: S3Addressing::VirtualHost,
         }
     }
 }

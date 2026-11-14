@@ -297,7 +297,16 @@ pub fn ep(
         method,
         path,
         operation: Operation {
-            timeout_seconds: crate::request_limits::seconds(id),
+            timeout_seconds: if responses.values().any(|response| {
+                response
+                    .content
+                    .as_ref()
+                    .is_some_and(|content| content.keys().any(|mime| !mime.contains("json")))
+            }) {
+                crate::request_limits::TRANSFER_SECONDS
+            } else {
+                crate::request_limits::seconds(id)
+            },
             processing_slot: matches!(
                 id,
                 "RecognizeOcrImage"

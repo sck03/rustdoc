@@ -1,6 +1,6 @@
 # GitHub Actions 工作流用途与运行手册
 
-核对日期：2026-11-13。当前为 Tauri + React + Rust，数据库基线为 schema 18。以下入口以本仓库 `.github/workflows` 和 `scripts/github` 为准；源码推送、平台验收和正式发布分别执行。
+核对日期：2026-11-14。当前为 Tauri + React + Rust，数据库基线为 schema 18。以下入口以本仓库 `.github/workflows` 和 `scripts/github` 为准；源码推送、平台验收和正式发布分别执行。
 
 ## 发布入口
 
@@ -49,6 +49,8 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 | [浏览器兼容](../.github/workflows/browser-compatibility.yml) | 仅手工 Firefox/WebKit，不加入普通提交检查 |
 
 先查看第一个失败步骤及完整日志。依赖安全错误、下载故障、工具链和平台编译问题分别处理；取消、ignored、静态语法通过不计为运行验收。
+
+2026-11-14 复核 [运行 43404507392](https://github.com/sck03/rustdoc/actions/runs/43404507392/job/131815508870)：附件异步回归没有注入 `FileUploadPolicyProvider` 及策略客户端，界面报“文件上传服务未配置”，两个容量场景超时。夹具现显式提供 20 份测试容量并等待策略加载，再检查容量边界与部分成功后的版本；未改变产品默认容量或放宽断言。本机 72 个取消/异步场景通过。Dependabot 的 GLib 兼容性阻塞另见[依赖安全记录](./依赖更新与安全检查.md)。
 
 文件存储改动进入 Rust 单元/契约回归；在 `validation_mode=full` 中，Windows x64 完成当前 `office_review` 构建后依次运行 `test:oa-ui` 和 `test:file-storage-ui`。后者验证存储设置、55 份人事附件分页、HTTP Range、迁移及身份标记故障。日常 quick 不执行这组真实 HTTP/React 集成；完整 S3 厂商、外置磁盘故障和百万条容量仍需专项环境，不能将该测试描述为已经覆盖。
 

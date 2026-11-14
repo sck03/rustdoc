@@ -1,6 +1,6 @@
 # 账号、组织与 OA 新基线数据字典
 
-核对日期：2026-11-13。本文描述源码中的 schema 18；永久文件与引用见[文件存储与容量管理](./文件存储与容量管理.md)；自定义事项和独立设置版本见[本批记录](./archive/2026-11/2026-11-10自定义OA重构与验收.md)。独立申报资料及 `sourceId` 新基线见[联调记录](./archive/2026-11/2026-11-09独立申报与联调记录.md)，schema 14/13/12 的历史结果见[重构实施记录](./archive/2026-11/2026-11-06重构实施与验收记录.md)、[二期记录](./archive/2026-11/二期重构验收与清理记录.md)和[OA 执行记录](./archive/2026-11/OA重构验收与功能保留台账.md)。SQLite 桌面与 PostgreSQL 18 团队服务使用同一用例和规则，各自的物理 DDL、模型指纹分别计算。
+核对日期：2026-11-14。本文描述源码中的 schema 18；永久文件与引用见[文件存储与容量管理](./文件存储与容量管理.md)；自定义事项和独立设置版本见[本批记录](./archive/2026-11/2026-11-10自定义OA重构与验收.md)。独立申报资料及 `sourceId` 新基线见[联调记录](./archive/2026-11/2026-11-09独立申报与联调记录.md)，schema 14/13/12 的历史结果见[重构实施记录](./archive/2026-11/2026-11-06重构实施与验收记录.md)、[二期记录](./archive/2026-11/二期重构验收与清理记录.md)和[OA 执行记录](./archive/2026-11/OA重构验收与功能保留台账.md)。SQLite 桌面与 PostgreSQL 18 团队服务使用同一用例和规则，各自的物理 DDL、模型指纹分别计算。
 
 ## 基线与唯一来源
 
@@ -37,9 +37,11 @@ schema 13 定稿同时统一两库的规范化检索键序与 PostgreSQL 结构�
 | 表 / 字段 | 含义和约束 |
 | --- | --- |
 | `records.id/kind/version` | 受管记录编号、资源类型、乐观并发版本；保留原销售、制单、付款等独立业务种类 |
-| `file_objects.digest/size_bytes` | SHA-256 不可变物理对象和长度，文件内容不进入业务 BLOB |
+| `file_objects.digest/size_bytes/reference_count` | SHA-256 不可变物理对象、长度和事务维护的引用计数，文件内容不进入业务 BLOB |
 | `file_versions.record_id/kind/digest` | 业务记录/文件角色唯一引用，保存原文件名、类型与创建时间；读取权限从所属业务记录判断 |
-| `file_locations.storage_identity/digest` | 迁移已经核验的对象位置，切换前仍重新核验目标内容 |
+| `file_locations.storage_identity/digest` | 迁移已经核验的对象位置；恢复迁移时在写锁外重新核验 |
+| `file_storage_totals` / `file_usage_totals` | 全局物理/引用容量及组织配额汇总，对象、引用与组织变动的触发器在同一事务内维护 |
+| `file_migrations` / `file_migration_queue` | 活动迁移及待复制对象；并发新增对象自动入队，核验后出队，空队列时短锁切换 |
 | `attachment_history.record_id/kind/sequence` | 资料修订和操作历史，按独立序号游标分页；不随主记录 JSON 重写全部历史 |
 | `files` | 临时任务输入/输出等既有生命周期 BLOB，永久业务附件不再使用此表 |
 | `organization_units.id/parent_id` | 稳定经营单位 ID 及层级；已有代码不改写，名称可编辑 |

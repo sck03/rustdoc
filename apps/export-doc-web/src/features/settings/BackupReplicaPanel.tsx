@@ -1,4 +1,5 @@
 import type { BackupPlanController } from "./useBackupPlan.ts";
+import { S3AddressingField } from "./S3AddressingField.tsx";
 
 function SecretField({ label, value, saved, onChange }: { label: string; value: string | null; saved: boolean; onChange: (value: string | null) => void }) {
   return <div className="backup-secret-field">
@@ -30,7 +31,7 @@ export function BackupReplicaPanel({ controller: c, disabled }: { controller: Ba
           <SecretField label="Secret Access Key" value={c.draft.s3SecretAccessKey} saved={c.status.s3SecretAccessKeySet} onChange={(value) => c.updateSecret("s3SecretAccessKey", value)} />
         </div>
         <details className="maintenance-advanced-details"><summary>寻址方式与临时凭证</summary>
-          <label className="checkbox-field"><input type="checkbox" checked={s3.pathStyle} onChange={(event) => c.updateS3("pathStyle", event.target.checked)} /><span>使用路径寻址（适用于多数 NAS／MinIO）</span></label>
+          <S3AddressingField value={s3.addressing} onChange={value => c.updateS3("addressing", value)} />
           <SecretField label="Session Token" value={c.draft.s3SessionToken} saved={c.status.s3SessionTokenSet} onChange={(value) => c.updateSecret("s3SessionToken", value)} />
           <p className="settings-helper-text">长期凭证通常不需要 Session Token。临时凭证过期后需要更新。</p>
         </details>

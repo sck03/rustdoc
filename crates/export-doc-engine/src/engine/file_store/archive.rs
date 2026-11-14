@@ -32,10 +32,15 @@ pub(in crate::engine) fn verify_local_inventory(
 }
 
 pub(in crate::engine) fn export(store: &super::super::store::Store, path: &Path) -> Result<()> {
-    let mut output = fs::OpenOptions::new()
+    let mut output_file = fs::OpenOptions::new()
         .create_new(true)
         .write(true)
         .open(path)?;
+    let mut output = store
+        .files
+        .space
+        .at(path.parent().unwrap().to_path_buf())
+        .writer(&mut output_file)?;
     output.write_all(MAGIC)?;
     let policy = serde_json::to_vec(&store.files.configuration()?.policy)?;
     output.write_all(&(policy.len() as u32).to_le_bytes())?;
@@ -60,10 +65,15 @@ pub(in crate::engine) fn export(store: &super::super::store::Store, path: &Path)
         }
     }
     output.write_all(&[0; 64])?;
-    output.sync_all()?;
+    drop(output);
+    output_file.sync_all()?;
     Ok(())
 }
-pub(in crate::engine) fn restore_archive(archive: &Path, staging: &Path) -> Result<()> {
+pub(in crate::engine) fn restore_archive(
+    archive: &Path,
+    staging: &Path,
+    space: &std::sync::Arc<crate::temporary_space::Budget>,
+) -> Result<()> {
     let mut input = fs::File::open(archive)?;
     let mut magic = vec![0; MAGIC.len()];
     input.read_exact(&mut magic)?;
@@ -110,9 +120,13 @@ pub(in crate::engine) fn restore_archive(archive: &Path, staging: &Path) -> Resu
         paths::ensure_safe_absolute(&path).map_err(invalid)?;
         crate::secrets::private_directory(path.parent().unwrap()).map_err(unavailable)?;
         paths::atomic_write_with(&path, |output| {
+            let mut output = space
+                .at(path.parent().unwrap().to_path_buf())
+                .writer(output)
+                .map_err(|e| e.to_string())?;
             let actual = super::super::backup_io::copy_and_hash(
                 &mut Read::by_ref(&mut input).take(object.size),
-                output,
+                &mut output,
                 object.size,
             )
             .map_err(|e| e.to_string())?;
@@ -133,6 +147,7 @@ pub(in crate::engine) fn restore_archive(archive: &Path, staging: &Path) -> Resu
     let config = Configuration {
         version: 1,
         revision: 1,
+        credential_revision: 1,
         identity,
         backend: Backend::Local {
             directory: "Files".into(),

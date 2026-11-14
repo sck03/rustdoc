@@ -150,7 +150,7 @@ Windows 在创建 Tauri 窗口前检查系统最低版本和 WebView2。x64 便�
 
 文件存储管理见[文件与容量](../docs/文件存储与容量管理.md)：`--file-store-root archive=<现存独立目录>` 或 `EXPORTDOCMANAGER_FILE_STORE_ROOTS` 登记扩容位置，Compose 挂载参考 `deploy/rust-native/file-storage.override.example.yml`。默认保留数据卸载使用 `scripts/uninstall-native-docker.cmd`；Linux 部署可使用服务器 `--print-uninstall` 输出对应目录的卸载脚本。默认不删数据库卷、附件、密钥、备份或共享镜像。普通数据库快照必须连同 `.objects.jsonl` 和 `Objects/` 保留。
 
-`npm --prefix apps/export-doc-web run test:file-storage-ui` 使用已按当前源码构建的 `office_review`，验证真实 React/HTTP 存储设置、附件分页、Range、迁移和身份故障；生成数据位于隔离的 `artifacts/file-storage-ui`。
+`npm --prefix apps/export-doc-web run test:file-storage-ui` 使用已按当前源码构建的 `office_review`，验证真实 React/HTTP 存储设置、附件分页、Range、本地及 S3 协议夹具迁移、缓存复用、凭据失效/原地轮换、授权与窄屏无障碍；生成数据位于隔离的 `artifacts/file-storage-ui`。协议夹具不替代真实厂商兼容性验收。
 
 仓库根的最小联调顺序如下。Cargo 命令串行完成；不要在测试或 doc-test 运行中启动另一项 Cargo 编译。若需边打包边跑 UI，将已完成构建的 `office_review.exe` 复制到 `.codex-runtime` 内独立目录，再用 `EXPORTDOC_OFFICE_REVIEW_BINARY` 指定该副本。
 

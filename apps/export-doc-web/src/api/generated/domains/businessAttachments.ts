@@ -15,6 +15,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadBusinessAttachment(request: DownloadBusinessAttachmentRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/business-attachments/${encodePath(request.id)}/revisions/${encodePath(request.revision)}/content`;
     return transport.request<Blob>("GET", path, {
       init: {

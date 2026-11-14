@@ -11,7 +11,7 @@ pub(super) use crate::engine::test_support::{
     ScratchDirectory as Workspace, administrator as admin,
 };
 use crate::paths::nonce;
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{fs, path::PathBuf};
 
 pub(super) fn open_service(workspace: &Workspace) -> TestService {
     TestService::open(workspace.paths())
@@ -123,7 +123,12 @@ fn zip_payload_unpack_and_manifest_agree() {
     zip_payload(&entries, &mut payload).unwrap();
     let payload = payload.into_inner();
     let extracted = working.join("extracted");
-    let unpacked = unpack(std::io::Cursor::new(&payload), &extracted).unwrap();
+    let unpacked = unpack(
+        std::io::Cursor::new(&payload),
+        &extracted,
+        &std::sync::Arc::new(crate::temporary_space::Budget::new(working.clone())),
+    )
+    .unwrap();
     assert_eq!(unpacked.len(), 2);
     assert_eq!(
         fs::read(extracted.join("Database/a.bin")).unwrap(),

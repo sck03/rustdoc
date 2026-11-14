@@ -49,6 +49,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadInvoiceTransferPackage(request: DownloadInvoiceTransferPackageRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/invoices/${encodePath(request.id)}/transfer-package/download`;
     return transport.request<Blob>("POST", path, { init });
   },
@@ -206,6 +207,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadBusinessAttachment(request: UploadBusinessAttachmentRequest, init?: ApiRequestInit): Promise<BusinessAttachmentRecord> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/invoices/${encodePath(request.invoiceId)}/attachments`;
     return transport.request<BusinessAttachmentRecord>("POST", path, {
       body: request.body,

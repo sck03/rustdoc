@@ -764,6 +764,7 @@ const operationDomains: Record<string, Domain> = {
   updateDraftOfOfficeSupplyRequest: "office",
   updateExpenseRequest: "office",
   updateExporter: "masterData",
+  updateFileStorageCredentials: "fileStorage",
   updateFileStoragePolicy: "fileStorage",
   updateGeneralRequest: "office",
   updateHsCode: "masterData",

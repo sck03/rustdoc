@@ -34,6 +34,7 @@ pub struct Connection<'a> {
     inner: Lease<'a>,
     pub(crate) clock: &'a crate::clock::BusinessClock,
     files: Option<&'a super::file_store::FileStore>,
+    file_intents: std::cell::RefCell<Vec<std::path::PathBuf>>,
 }
 impl<'a> std::ops::Deref for Connection<'a> {
     type Target = export_doc_storage::Connection;
@@ -47,6 +48,7 @@ impl<'a> Connection<'a> {
             inner,
             clock,
             files: None,
+            file_intents: Default::default(),
         }
     }
     pub(crate) fn publish_file(
@@ -76,6 +78,7 @@ impl<'a> Connection<'a> {
                 return Err(conflict("所属组织的文件容量已达到配额，请联系管理员。"));
             }
         }
+        self.file_intents.borrow_mut().push(prepared.intent_path());
         Ok(())
     }
     pub fn blob_info(
@@ -256,6 +259,13 @@ impl Store {
             Err(error) => connection.rollback().map_err(Into::into).and(Err(error)),
         };
         observation.finish(result.is_ok());
+        if commit && result.is_ok() {
+            // A failed/indeterminate commit keeps its intents for reconciliation.
+            // Unlink failure is recoverable maintenance, never a failed business commit.
+            for path in connection.file_intents.borrow().iter() {
+                let _ = std::fs::remove_file(path);
+            }
+        }
         result
     }
     /// Apply the same relational validators in a write snapshot, then always

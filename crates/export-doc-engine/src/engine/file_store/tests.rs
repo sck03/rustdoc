@@ -2,6 +2,8 @@ use super::*;
 use crate::engine::{store::Store, test_support::ScratchDirectory};
 use export_doc_storage::RecordWrite;
 use serde_json::json;
+#[cfg(feature = "s3-storage")]
+mod s3;
 
 fn record(store: &Store, prepared: &PreparedObject) -> Result<i64> {
     store.transaction(|tx| {
@@ -120,10 +122,29 @@ fn migration_resumes_verified_copies_and_rejects_an_old_prepared_upload() {
     store.files.initialize_target(&target).unwrap();
     store.files.initialize_target(&target).unwrap();
     let (mut count, mut bytes) = (0, 0);
-    admin::copy_pending(&store, &target, false, &mut count, &mut bytes).unwrap();
+    store
+        .transaction(|tx| {
+            tx.begin_file_migration(&target.identity)?;
+            Ok(())
+        })
+        .unwrap();
+    migration::copy_pending(&store, &target, &mut count, &mut bytes).unwrap();
     assert_eq!((count, bytes), (1, 5));
-    admin::copy_pending(&store, &target, false, &mut count, &mut bytes).unwrap();
+    migration::copy_pending(&store, &target, &mut count, &mut bytes).unwrap();
     assert_eq!((count, bytes), (1, 5));
+    let concurrent = store.files.prepare(b"concurrent").unwrap();
+    record(&store, &concurrent).unwrap();
+    assert_eq!(
+        store
+            .connection()
+            .unwrap()
+            .pending_file_copies(&target.identity)
+            .unwrap()
+            .len(),
+        1
+    );
+    migration::copy_pending(&store, &target, &mut count, &mut bytes).unwrap();
+    assert_eq!((count, bytes), (2, 15));
     store
         .with_writes_paused(|| store.files.activate(target))
         .unwrap();
@@ -173,7 +194,7 @@ fn recovery_pack_verifies_every_database_object_and_detects_missing_content() {
     let pack = root.0.join("objects.pack");
     export_archive(&store, &pack).unwrap();
     let staging = root.0.join("Restored");
-    restore_archive(&pack, &staging).unwrap();
+    restore_archive(&pack, &staging, &root.paths().disk_space).unwrap();
     let scan = |cursor: &str| Ok(store.connection()?.file_objects(cursor, 200, false)?);
     verify_local_inventory(&staging, scan).unwrap();
     let object_path = staging

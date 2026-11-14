@@ -121,6 +121,7 @@ CREATE TABLE files (
 );
 CREATE INDEX files_record ON files(kind, record_id);
 CREATE TABLE file_objects (
+    reference_count BIGINT NOT NULL DEFAULT 0 CHECK(reference_count>=0),
     digest TEXT PRIMARY KEY CHECK(length(digest)=64),
     size_bytes BIGINT NOT NULL CHECK(size_bytes>0),
     created_at TEXT NOT NULL
@@ -135,6 +136,61 @@ CREATE TABLE file_versions (
     PRIMARY KEY(record_id,kind)
 );
 CREATE INDEX file_versions_object ON file_versions(digest);
+CREATE TABLE file_storage_totals (
+    id INTEGER PRIMARY KEY CHECK(id=1),
+    file_count BIGINT NOT NULL CHECK(file_count>=0),
+    physical_bytes BIGINT NOT NULL CHECK(physical_bytes>=0),
+    logical_bytes BIGINT NOT NULL CHECK(logical_bytes>=0),
+    referenced_bytes BIGINT NOT NULL CHECK(referenced_bytes>=0)
+);
+INSERT INTO file_storage_totals VALUES(1,0,0,0,0);
+CREATE TABLE file_usage_totals (
+    company TEXT PRIMARY KEY,
+    logical_bytes BIGINT NOT NULL CHECK(logical_bytes>=0)
+);
+CREATE FUNCTION account_file_object() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='INSERT' THEN
+        UPDATE file_storage_totals SET file_count=file_count+1,physical_bytes=physical_bytes+NEW.size_bytes WHERE id=1;
+    ELSE
+        UPDATE file_storage_totals SET file_count=file_count-1,physical_bytes=physical_bytes-OLD.size_bytes WHERE id=1;
+    END IF;
+    RETURN NULL;
+END;
+$$;
+CREATE TRIGGER file_object_accounting AFTER INSERT OR DELETE ON file_objects FOR EACH ROW EXECUTE FUNCTION account_file_object();
+CREATE FUNCTION account_file_version() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE item file_versions%ROWTYPE; amount BIGINT; refs BIGINT; scope TEXT; direction BIGINT;
+BEGIN
+    IF TG_OP='UPDATE' THEN RAISE EXCEPTION 'file versions are immutable'; END IF;
+    IF TG_OP='INSERT' THEN item:=NEW; direction:=1; ELSE item:=OLD; direction:=-1; END IF;
+    SELECT size_bytes,reference_count INTO STRICT amount,refs FROM file_objects WHERE digest=item.digest FOR UPDATE;
+    SELECT COALESCE(body->>'companyScope','') INTO STRICT scope FROM records WHERE id=item.record_id;
+    UPDATE file_storage_totals SET logical_bytes=logical_bytes+direction*amount,
+        referenced_bytes=referenced_bytes+CASE WHEN direction=1 AND refs=0 THEN amount WHEN direction=-1 AND refs=1 THEN -amount ELSE 0 END WHERE id=1;
+    UPDATE file_objects SET reference_count=reference_count+direction WHERE digest=item.digest;
+    IF direction=1 THEN
+        INSERT INTO file_usage_totals(company,logical_bytes) VALUES(scope,amount)
+            ON CONFLICT(company) DO UPDATE SET logical_bytes=file_usage_totals.logical_bytes+EXCLUDED.logical_bytes;
+    ELSE
+        UPDATE file_usage_totals SET logical_bytes=logical_bytes-amount WHERE company=scope;
+    END IF;
+    RETURN NULL;
+END;
+$$;
+CREATE TRIGGER file_version_accounting AFTER INSERT OR DELETE OR UPDATE ON file_versions FOR EACH ROW EXECUTE FUNCTION account_file_version();
+CREATE FUNCTION account_file_owner() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE amount BIGINT;
+BEGIN
+    SELECT COALESCE(SUM(o.size_bytes),0) INTO amount FROM file_versions v JOIN file_objects o ON o.digest=v.digest WHERE v.record_id=NEW.id;
+    UPDATE file_usage_totals SET logical_bytes=logical_bytes-amount WHERE company=COALESCE(OLD.body->>'companyScope','');
+    INSERT INTO file_usage_totals(company,logical_bytes) VALUES(COALESCE(NEW.body->>'companyScope',''),amount)
+        ON CONFLICT(company) DO UPDATE SET logical_bytes=file_usage_totals.logical_bytes+EXCLUDED.logical_bytes;
+    RETURN NULL;
+END;
+$$;
+CREATE TRIGGER file_owner_accounting AFTER UPDATE OF body ON records FOR EACH ROW
+    WHEN (COALESCE(OLD.body->>'companyScope','')<>COALESCE(NEW.body->>'companyScope','')) EXECUTE FUNCTION account_file_owner();
 CREATE TABLE attachment_history (
     record_id BIGINT NOT NULL REFERENCES records(id) ON DELETE CASCADE,
     kind TEXT NOT NULL CHECK(kind IN ('revision','event')),
@@ -156,6 +212,19 @@ CREATE TABLE report_resource_uploaders (
     PRIMARY KEY(resource_record_id,user_id)
 );
 CREATE INDEX report_resource_uploaders_actor ON report_resource_uploaders(user_id,resource_record_id);
+CREATE TABLE file_migrations (storage_identity TEXT PRIMARY KEY);
+CREATE TABLE file_migration_queue (
+    storage_identity TEXT NOT NULL REFERENCES file_migrations(storage_identity) ON DELETE CASCADE,
+    digest TEXT NOT NULL REFERENCES file_objects(digest) ON DELETE CASCADE,
+    PRIMARY KEY(storage_identity,digest)
+);
+CREATE FUNCTION queue_file_migration() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO file_migration_queue(storage_identity,digest) SELECT storage_identity,NEW.digest FROM file_migrations;
+    RETURN NULL;
+END;
+$$;
+CREATE TRIGGER queue_file_migrations AFTER INSERT ON file_objects FOR EACH ROW EXECUTE FUNCTION queue_file_migration();
 CREATE TABLE file_locations (
     storage_identity TEXT NOT NULL,
     digest TEXT NOT NULL REFERENCES file_objects(digest) ON DELETE CASCADE,

@@ -11,6 +11,7 @@ pub const SQLITE_DATABASE_RELATIVE_PATH: &str = "Database/exportdoc-native.db";
 
 #[derive(Clone)]
 pub struct RuntimePaths {
+    pub disk_space: std::sync::Arc<crate::temporary_space::Budget>,
     pub app_root: PathBuf,
     pub data_root: PathBuf,
     pub log_root: PathBuf,
@@ -77,6 +78,9 @@ impl RuntimePaths {
             .join("NotoSansCJKsc-Regular.otf");
         ensure_safe_absolute(&font_path)?;
         Ok(Self {
+            disk_space: std::sync::Arc::new(crate::temporary_space::Budget::new(
+                cache_root.clone(),
+            )),
             app_root: app_root.to_path_buf(),
             data_root: data_root.to_path_buf(),
             log_root,

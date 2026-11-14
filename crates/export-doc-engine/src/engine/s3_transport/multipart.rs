@@ -1,8 +1,5 @@
 use super::*;
-use std::{
-    fs,
-    io::{Seek, SeekFrom},
-};
+use std::io::{Seek, SeekFrom};
 
 const MIB: u64 = 1024 * 1024;
 const MAX_PARTS: u64 = 10_000;
@@ -23,12 +20,42 @@ fn part_size(size: u64) -> Result<u64> {
 }
 
 impl Target {
-    pub(super) fn multipart(&self, path: &Path, name: &str, size: u64) -> Result<()> {
-        self.multipart_file(&mut fs::File::open(path)?, name, size)
+    pub(super) fn put_file(
+        &self,
+        file: &mut (impl Read + Seek),
+        name: &str,
+        size: u64,
+        digest: &str,
+    ) -> Result<()> {
+        if size == 0 || file.seek(SeekFrom::End(0))? != size {
+            return Err(invalid("上传文件为空或大小已变化。"));
+        }
+        if size > 8 * MIB {
+            return self.multipart_file(file, name, size);
+        }
+        file.seek(SeekFrom::Start(0))?;
+        let mut body = Read::by_ref(file).take(size);
+        let request = self.request(
+            "PUT",
+            &self.url(name)?,
+            ureq::SendBody::from_reader(&mut body),
+            Some(size),
+            digest,
+        )?;
+        let response = self
+            .agent
+            .run(request)
+            .map_err(|_| unavailable("S3 上传失败或超时。"))?;
+        response_text(response).map(|_| ())
     }
-    pub(super) fn multipart_file(&self, file: &mut fs::File, name: &str, size: u64) -> Result<()> {
+    pub(super) fn multipart_file(
+        &self,
+        file: &mut (impl Read + Seek),
+        name: &str,
+        size: u64,
+    ) -> Result<()> {
         let part_size = part_size(size)?;
-        if size == 0 || file.metadata()?.len() != size {
+        if size == 0 || file.seek(SeekFrom::End(0))? != size {
             return Err(invalid("本地灾备包为空或大小已变化。"));
         }
         let object = self.url(name)?;
@@ -41,6 +68,13 @@ impl Target {
         }
         let mut session = object.clone();
         session.query_pairs_mut().append_pair("uploadId", &id);
+        let journal = match self.remember_upload(name, &id) {
+            Ok(path) => path,
+            Err(cause) => {
+                self.abort_upload(&session)?;
+                return Err(cause);
+            }
+        };
         let result = (|| {
             let mut parts = Vec::new();
             let mut offset = 0;
@@ -116,25 +150,15 @@ impl Target {
             Ok(())
         })();
         if result.is_err() {
-            let cleanup = crate::operation::OperationScope::detached(CONTROL_TIMEOUT).run(|| {
-                let agent = export_doc_network::storage_agent(
-                    CONTROL_TIMEOUT,
-                    crate::operation::cancellation_flag(),
-                );
-                let request = self.request("DELETE", &session, (), None, EMPTY_HASH)?;
-                let response = agent
-                    .run(request)
-                    .map_err(|_| unavailable("S3 中止分段上传失败。"))?;
-                if response.status().as_u16() == 404 {
-                    return Ok(());
-                }
-                response_text(response).map(|_| ())
-            });
+            let cleanup = self.abort_upload(&session);
             if cleanup.is_err() {
                 return Err(unavailable(
                     "S3 分段上传失败且未能中止；本地备份已保留，请检查存储连接及未完成分段。",
                 ));
             }
+        }
+        if let Some(path) = journal {
+            std::fs::remove_file(path)?;
         }
         result
     }

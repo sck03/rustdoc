@@ -13,6 +13,7 @@ pub use export_doc_storage::maintenance;
 pub mod operation;
 pub mod paths;
 pub mod pdf;
+pub mod temporary_space;
 
 pub mod secrets;
 

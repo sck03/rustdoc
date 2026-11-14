@@ -33,7 +33,11 @@ impl Target {
                         &secret,
                         &token,
                     )
-                    .map(Self::S3)
+                    .map(|target| {
+                        Self::S3(
+                            target.with_journal(store.data_root.join("Configuration/S3Uploads")),
+                        )
+                    })
                 }
                 #[cfg(not(feature = "s3-backup"))]
                 Err(unsupported("此构建未包含 S3 备份模块。"))
@@ -62,7 +66,10 @@ impl Target {
             Self::None => Ok(()),
             Self::WebDav(target) => target.upload(path, name, size, digest, verify),
             #[cfg(feature = "s3-backup")]
-            Self::S3(target) => target.upload(path, name, size, digest, verify),
+            Self::S3(target) => {
+                target.recover_uploads(|_| Ok(false))?;
+                target.upload(path, name, size, digest, verify)
+            }
         }
     }
     pub(super) fn delete(&self, name: &str) -> Result<()> {

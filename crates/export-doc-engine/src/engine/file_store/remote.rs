@@ -19,7 +19,7 @@ impl Target {
     }
     pub fn upload_file(
         &self,
-        _: &mut std::fs::File,
+        _: &mut (impl std::io::Read + std::io::Seek),
         _: &str,
         _: u64,
         _: &str,
@@ -28,7 +28,12 @@ impl Target {
             "当前构建未启用 S3 文件存储。",
         ))
     }
-    pub fn download(&self, _: &str, _: &mut impl std::io::Write, _: u64) -> super::Result<()> {
+    pub fn download(
+        &self,
+        _: &str,
+        _: &mut impl std::io::Write,
+        _: u64,
+    ) -> super::Result<(u64, String)> {
         Err(crate::engine::error::unsupported(
             "当前构建未启用 S3 文件存储。",
         ))

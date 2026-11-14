@@ -11,7 +11,7 @@ mod shutdown;
 pub use service_shutdown::close_service;
 pub use shutdown::{Shutdown, serve};
 mod telemetry;
-mod temporary_space;
+use export_doc_engine::temporary_space;
 mod web;
 const MAX_REQUESTS: usize = 16;
 const MAX_QUEUED_REQUESTS: usize = 16;
@@ -65,9 +65,7 @@ fn compose_router(
     let telemetry = Arc::new(telemetry::Telemetry::new(service.paths.log_root.clone()));
     let shutdown = Shutdown::default();
     let state = ServerState {
-        upload_space: Arc::new(temporary_space::Budget::new(
-            service.paths.cache_root.clone(),
-        )),
+        upload_space: service.paths.disk_space.clone(),
         telemetry,
         service,
         requests: Arc::new(admission::Admission::new(

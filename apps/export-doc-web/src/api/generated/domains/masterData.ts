@@ -211,6 +211,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   exportHsCodeKnowledge(request: ExportHsCodeKnowledgeRequest = {}, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = "/api/master-data/hs-knowledge/export";
     return transport.request<Blob>("GET", path, {
       query: {

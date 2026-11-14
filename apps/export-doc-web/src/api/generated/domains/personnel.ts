@@ -41,6 +41,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadPersonnelAttachment(request: DownloadPersonnelAttachmentRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/people/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -58,6 +59,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   getPersonnelAvatar(request: GetPersonnelAvatarRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/people/${encodePath(request.id)}/avatar`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -86,6 +88,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   getPersonnelImage(request: GetPersonnelImageRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/people/${encodePath(request.id)}/images/${encodePath(request.kind)}`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -183,6 +186,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadPersonnelAttachment(request: UploadPersonnelAttachmentRequest, init?: ApiRequestInit): Promise<PersonnelRecord> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/people/${encodePath(request.id)}/attachments`;
     return transport.request<PersonnelRecord>("POST", path, {
       body: request.body,

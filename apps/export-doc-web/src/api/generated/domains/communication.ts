@@ -47,6 +47,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadAnnouncementAttachment(request: DownloadAnnouncementAttachmentRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/announcements/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -146,6 +147,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadAnnouncementAttachment(request: UploadAnnouncementAttachmentRequest, init?: ApiRequestInit): Promise<Announcement> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/announcements/${encodePath(request.id)}/attachments`;
     return transport.request<Announcement>("POST", path, {
       body: request.body,

@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "6381f7f45c8664a1b806bd3c6afd7a79371b2f1566a9d8b145137072b0ca7fd2",
+  "digest": "926e0f7b9f41edd670250dedb2b2683e21107cb9bd7d464dc7b7c0de7ab51dd7",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -25797,7 +25797,7 @@
         "$ref": "#/components/schemas/ApiSingleWindowSubmitPackageRequest"
       },
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadAnnouncementAttachment": {
@@ -25973,7 +25973,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false,
       "communication": {
         "kind": "announcement",
@@ -26160,7 +26160,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadApprovalOfGeneralRequest": {
@@ -26341,7 +26341,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadApprovalOfLeaveRequest": {
@@ -26522,7 +26522,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadApprovalOfMeetingBooking": {
@@ -26703,7 +26703,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadApprovalOfOfficeSupplyRequest": {
@@ -26884,7 +26884,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadApprovalOfOvertimeRequest": {
@@ -27065,7 +27065,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadApprovalOfPersonnelChangeRequest": {
@@ -27246,7 +27246,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadApprovalOfPurchaseRequest": {
@@ -27427,7 +27427,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadApprovalOfTravelRequest": {
@@ -27608,7 +27608,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadAttachmentOfExpenseRequest": {
@@ -27789,7 +27789,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadAttachmentOfGeneralRequest": {
@@ -27970,7 +27970,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadAttachmentOfLeaveRequest": {
@@ -28151,7 +28151,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadAttachmentOfMeetingBooking": {
@@ -28332,7 +28332,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadAttachmentOfOfficeSupplyRequest": {
@@ -28513,7 +28513,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadAttachmentOfOvertimeRequest": {
@@ -28694,7 +28694,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadAttachmentOfPersonnelChangeRequest": {
@@ -28875,7 +28875,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadAttachmentOfPurchaseRequest": {
@@ -29056,7 +29056,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadAttachmentOfTravelRequest": {
@@ -29237,7 +29237,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadAuditLogs": {
@@ -29304,7 +29304,7 @@
         "$ref": "#/components/schemas/ApiAuditLogFilterRequest"
       },
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadBusinessAttachment": {
@@ -29402,7 +29402,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadContainerPackingPdf": {
@@ -29472,7 +29472,7 @@
         "$ref": "#/components/schemas/ApiContainerPackingPdfRequest"
       },
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadCustomsCooSubmitPackage": {
@@ -29559,7 +29559,7 @@
         "$ref": "#/components/schemas/ApiSingleWindowSubmitPackageRequest"
       },
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadInvoiceTransferPackage": {
@@ -29637,7 +29637,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadJobResult": {
@@ -30001,7 +30001,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadMaterialsOfGeneralRequest": {
@@ -30182,7 +30182,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadMaterialsOfLeaveRequest": {
@@ -30363,7 +30363,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadMaterialsOfMeetingBooking": {
@@ -30544,7 +30544,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadMaterialsOfOfficeSupplyRequest": {
@@ -30725,7 +30725,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadMaterialsOfOvertimeRequest": {
@@ -30906,7 +30906,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadMaterialsOfPersonnelChangeRequest": {
@@ -31087,7 +31087,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadMaterialsOfPurchaseRequest": {
@@ -31268,7 +31268,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadMaterialsOfTravelRequest": {
@@ -31449,7 +31449,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadPersonnelAttachment": {
@@ -31623,7 +31623,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadPostgreSqlPhysicalBackupWithTicket": {
@@ -31951,7 +31951,7 @@
         "$ref": "#/components/schemas/ApiReportTemplateFileDownloadRequest"
       },
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadReportTemplatePackage": {
@@ -32018,7 +32018,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadReportTemplateV3ImageResource": {
@@ -32122,7 +32122,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadSingleWindowReceiptPackage": {
@@ -32195,7 +32195,7 @@
         "$ref": "#/components/schemas/ApiSingleWindowReceiptPackageExportRequest"
       },
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "DownloadSupportPackage": {
@@ -35375,7 +35375,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "ExportHsCodeKnowledge": {
@@ -35468,7 +35468,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "ExportSuppliers": {
@@ -35572,7 +35572,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "FetchRemoteHsCodeDetail": {
@@ -39112,7 +39112,7 @@
       "response": {
         "$ref": "#/components/schemas/ApiFileStorageStatus"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 120,
       "requiresProcessingSlot": false
     },
     "GetFileStoragePolicy": {
@@ -43665,7 +43665,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "GetPersonnelChangeRequest": {
@@ -44382,7 +44382,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "GetPersonnelOptions": {
@@ -66536,7 +66536,7 @@
       },
       "request": null,
       "response": null,
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": false
     },
     "PreviewOrganizationCompanyChange": {
@@ -87336,6 +87336,125 @@
       "timeoutSeconds": 30,
       "requiresProcessingSlot": false
     },
+    "UpdateFileStorageCredentials": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": false,
+        "permissions": null,
+        "requirements": [
+          {
+            "resourceKey": "system.settings",
+            "action": "manage"
+          }
+        ],
+        "permissionBypass": false,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "system.settings",
+              "actions": [
+                "manage"
+              ],
+              "administratorOnly": true
+            }
+          ]
+        }
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiFileStorageCredentialsRequest"
+            }
+          }
+        }
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiFileStorageStatus"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/ApiFileStorageCredentialsRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/ApiFileStorageStatus"
+      },
+      "timeoutSeconds": 120,
+      "requiresProcessingSlot": false
+    },
     "UpdateFileStoragePolicy": {
       "policy": {
         "requiresAuthentication": true,
@@ -91354,7 +91473,7 @@
       "response": {
         "$ref": "#/components/schemas/Announcement"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": true,
       "communication": {
         "kind": "announcement",
@@ -91544,7 +91663,7 @@
       "response": {
         "$ref": "#/components/schemas/OaRequest"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": true
     },
     "UploadAttachmentToGeneralRequest": {
@@ -91728,7 +91847,7 @@
       "response": {
         "$ref": "#/components/schemas/OaRequest"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": true
     },
     "UploadAttachmentToLeaveRequest": {
@@ -91912,7 +92031,7 @@
       "response": {
         "$ref": "#/components/schemas/OaRequest"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": true
     },
     "UploadAttachmentToMeetingBooking": {
@@ -92094,7 +92213,7 @@
       "response": {
         "$ref": "#/components/schemas/MeetingBookingRecord"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": true
     },
     "UploadAttachmentToOfficeSupplyRequest": {
@@ -92276,7 +92395,7 @@
       "response": {
         "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": true
     },
     "UploadAttachmentToOvertimeRequest": {
@@ -92460,7 +92579,7 @@
       "response": {
         "$ref": "#/components/schemas/OaRequest"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": true
     },
     "UploadAttachmentToPersonnelChangeRequest": {
@@ -92644,7 +92763,7 @@
       "response": {
         "$ref": "#/components/schemas/OaRequest"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": true
     },
     "UploadAttachmentToPurchaseRequest": {
@@ -92828,7 +92947,7 @@
       "response": {
         "$ref": "#/components/schemas/OaRequest"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": true
     },
     "UploadAttachmentToTravelRequest": {
@@ -93012,7 +93131,7 @@
       "response": {
         "$ref": "#/components/schemas/OaRequest"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": true
     },
     "UploadBusinessAttachment": {
@@ -93087,7 +93206,7 @@
       "response": {
         "$ref": "#/components/schemas/BusinessAttachmentRecord"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": true
     },
     "UploadExporterSeal": {
@@ -93658,7 +93777,7 @@
       "response": {
         "$ref": "#/components/schemas/PersonnelRecord"
       },
-      "timeoutSeconds": 30,
+      "timeoutSeconds": 86400,
       "requiresProcessingSlot": true
     },
     "UploadPersonnelImage": {
@@ -98277,6 +98396,15 @@
           "type": "string",
           "maxLength": 256
         },
+        "addressing": {
+          "type": "string",
+          "default": "virtualHost",
+          "enum": [
+            "path",
+            "virtualHost",
+            "bucketHost"
+          ]
+        },
         "bucket": {
           "type": "string",
           "maxLength": 63
@@ -98284,10 +98412,6 @@
         "endpoint": {
           "type": "string",
           "maxLength": 2048
-        },
-        "pathStyle": {
-          "type": "boolean",
-          "default": true
         },
         "prefix": {
           "type": "string",
@@ -98306,7 +98430,7 @@
         "bucket",
         "prefix",
         "accessKeyId",
-        "pathStyle"
+        "addressing"
       ],
       "additionalProperties": false
     },
@@ -103032,6 +103156,35 @@
         "rowVersion"
       ]
     },
+    "ApiFileStorageCredentialsRequest": {
+      "type": "object",
+      "properties": {
+        "accessKeyId": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "expectedVersion": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
+        "secret": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "token": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "expectedVersion",
+        "accessKeyId",
+        "secret",
+        "token"
+      ],
+      "additionalProperties": false
+    },
     "ApiFileStorageMigrationRequest": {
       "type": "object",
       "properties": {
@@ -103117,6 +103270,11 @@
     "ApiFileStorageStatus": {
       "type": "object",
       "properties": {
+        "credentialVersion": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
         "directory": {
           "type": "string"
         },

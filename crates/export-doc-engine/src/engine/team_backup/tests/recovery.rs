@@ -114,7 +114,14 @@ fn staged_package_rejects_path_traversal_before_reading_external_files() {
     let workspace = Workspace::new();
     let marker = workspace.0.join("pending.json");
     fs::write(&marker, br#"{"stagingDirectoryName":"../../escape"}"#).unwrap();
-    assert!(package::staged(&marker, package::SQLITE).is_err());
+    assert!(
+        package::staged(
+            &marker,
+            package::SQLITE,
+            &std::sync::Arc::new(crate::temporary_space::Budget::new(workspace.0.clone()))
+        )
+        .is_err()
+    );
 }
 
 #[test]

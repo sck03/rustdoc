@@ -55,7 +55,13 @@ pub(in crate::engine) fn capture(
                         crate::secrets::private_directory(path.parent().unwrap())
                             .map_err(unavailable)?;
                         paths::atomic_write_with(&path, |out| {
-                            backup_io::copy_and_hash(&mut source, out, object.size)
+                            let mut out = store
+                                .files
+                                .space
+                                .at(path.parent().unwrap().to_path_buf())
+                                .writer(out)
+                                .map_err(|e| e.to_string())?;
+                            backup_io::copy_and_hash(&mut source, &mut out, object.size)
                                 .map_err(|e| e.to_string())
                                 .and_then(|actual| {
                                     if actual == (object.size, object.digest.clone()) {

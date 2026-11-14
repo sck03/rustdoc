@@ -74,6 +74,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadReportTemplateFile(request: DownloadReportTemplateFileRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = "/api/reports/templates/file/download";
     return transport.request<Blob>("POST", path, {
       body: request.body,
@@ -82,11 +83,13 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadReportTemplatePackage(init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = "/api/reports/templates/package/download";
     return transport.request<Blob>("POST", path, { init });
   },
 
   downloadReportTemplateV3ImageResource(request: DownloadReportTemplateV3ImageResourceRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/reports/templates/v3/resources/${encodePath(request.resourceId)}`;
     return transport.request<Blob>("GET", path, {
       init: {

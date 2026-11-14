@@ -129,7 +129,7 @@ pub fn apply_pending(
         if physical_marker.try_exists()? && migration_marker.try_exists()? {
             return Err(invalid("发现相互冲突的恢复计划，已停止恢复。"));
         }
-        let migrated = package::staged(&migration_marker, package::POSTGRES)?;
+        let migrated = package::staged(&migration_marker, package::POSTGRES, &paths.disk_space)?;
         let (marker, source, staging) = if let Some(staging) = migrated.as_ref() {
             (
                 migration_marker,

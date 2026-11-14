@@ -57,7 +57,20 @@ impl Resolver for StorageResolver {
 }
 
 #[derive(Debug)]
-struct StorageConnector(Arc<AtomicBool>);
+struct StorageConnector(Cancellation);
+#[derive(Clone, Debug)]
+enum Cancellation {
+    Fixed(Arc<AtomicBool>),
+    Current(fn() -> bool),
+}
+impl Cancellation {
+    fn active(&self) -> bool {
+        match self {
+            Self::Fixed(flag) => !flag.load(Ordering::Acquire),
+            Self::Current(check) => check(),
+        }
+    }
+}
 impl Connector for StorageConnector {
     type Out = StorageTransport;
     fn connect(
@@ -77,10 +90,10 @@ impl Connector for StorageConnector {
 #[derive(Debug)]
 struct StorageTransport {
     inner: Box<dyn Transport>,
-    canceled: Arc<AtomicBool>,
+    canceled: Cancellation,
 }
-fn check(canceled: &AtomicBool) -> Result<(), ureq::Error> {
-    if canceled.load(Ordering::Acquire) {
+fn check(canceled: &Cancellation) -> Result<(), ureq::Error> {
+    if !canceled.active() {
         Err(std::io::Error::new(std::io::ErrorKind::Interrupted, "存储传输已取消。").into())
     } else {
         Ok(())
@@ -103,7 +116,7 @@ impl Transport for StorageTransport {
         self.inner.await_input(bounded(timeout))
     }
     fn is_open(&mut self) -> bool {
-        !self.canceled.load(Ordering::Acquire) && self.inner.is_open()
+        self.canceled.active() && self.inner.is_open()
     }
     fn is_tls(&self) -> bool {
         self.inner.is_tls()
@@ -113,7 +126,16 @@ impl Transport for StorageTransport {
 pub fn storage_agent(timeout: Duration, canceled: Arc<AtomicBool>) -> ureq::Agent {
     ureq::Agent::with_parts(
         client_config(timeout, true),
-        StorageConnector(canceled),
+        StorageConnector(Cancellation::Fixed(canceled)),
+        StorageResolver,
+    )
+}
+/// A pooled socket consults its current caller, never the cancellation token
+/// of the request that originally established the connection.
+pub fn storage_pooled_agent(timeout: Duration, active: fn() -> bool) -> ureq::Agent {
+    ureq::Agent::with_parts(
+        client_config(timeout, true),
+        StorageConnector(Cancellation::Current(active)),
         StorageResolver,
     )
 }

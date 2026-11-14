@@ -32,6 +32,9 @@ pub(crate) trait Adapter: Send {
         delete_files(record:i64,kind:Option<&str>)->() => file_catalog::remove;
         file_objects(after:&str,limit:i64,unused:bool)->Vec<FileObject> => file_catalog::objects;
         file_statistics()->Value => file_catalog::statistics;
+        verify_file_accounting()->() => file_catalog::verify_accounting;
+        begin_file_migration(identity:&str)->() => file_catalog::begin_migration;
+        end_file_migration(identity:&str)->() => file_catalog::end_migration;
         file_usage(company:&str)->u64 => file_catalog::usage;
         file_owner_company(record:i64)->String => file_catalog::owner_company;
         pending_file_copies(identity:&str)->Vec<FileObject> => file_catalog::pending_copies;

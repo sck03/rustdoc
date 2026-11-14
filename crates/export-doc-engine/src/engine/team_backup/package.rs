@@ -107,14 +107,25 @@ pub(super) fn create(
         .create_new(true)
         .write(true)
         .open(&payload_path)?;
-    sealed::zip_payload(&entries, file)?;
+    sealed::zip_payload(
+        &entries,
+        paths.disk_space.at(working.to_path_buf()).writer(file)?,
+    )?;
     fs::remove_file(working.join(OBJECTS))?;
     let target = working.join("sealed-package.bin");
     let mut output = fs::OpenOptions::new()
         .create_new(true)
         .write(true)
         .open(&target)?;
-    sealed::seal_to(magic, password, fs::File::open(&payload_path)?, &mut output)?;
+    sealed::seal_to(
+        magic,
+        password,
+        fs::File::open(&payload_path)?,
+        &mut paths
+            .disk_space
+            .at(working.to_path_buf())
+            .writer(&mut output)?,
+    )?;
     output.sync_all()?;
     fs::remove_file(payload_path)?;
     Ok(target)
@@ -150,6 +161,7 @@ fn collect(root: &Path, directory: &Path, sources: &mut Vec<(String, PathBuf)>) 
     Ok(())
 }
 pub(super) fn stage(
+    space: &std::sync::Arc<crate::temporary_space::Budget>,
     marker: &Path,
     magic: &[u8],
     password: &str,
@@ -172,13 +184,18 @@ pub(super) fn stage(
             .create_new(true)
             .write(true)
             .open(&archive_path)?;
-        sealed::open_to(magic, password, content, &mut archive)?;
+        sealed::open_to(
+            magic,
+            password,
+            content,
+            &mut space.at(staging.clone()).writer(&mut archive)?,
+        )?;
         archive.sync_all()?;
         drop(archive);
-        let entries = sealed::unpack(fs::File::open(&archive_path)?, &staging)?;
+        let entries = sealed::unpack(fs::File::open(&archive_path)?, &staging, space)?;
         fs::remove_file(archive_path)?;
         validate_entries(&read_manifest(&staging)?, &entries, database)?;
-        super::super::file_store::restore_archive(&staging.join(OBJECTS), &staging)?;
+        super::super::file_store::restore_archive(&staging.join(OBJECTS), &staging, space)?;
         if database == SQLITE {
             export_doc_storage::verify_sqlite_backup(&staging.join(SQLITE))?;
             let db = export_doc_storage::Connection::sqlite(&staging.join(SQLITE))?;
@@ -262,7 +279,11 @@ fn validate_entries(
     }
     Ok(())
 }
-pub(super) fn staged(marker: &Path, database: &str) -> Result<Option<PathBuf>> {
+pub(super) fn staged(
+    marker: &Path,
+    database: &str,
+    space: &std::sync::Arc<crate::temporary_space::Budget>,
+) -> Result<Option<PathBuf>> {
     paths::ensure_safe_absolute(marker).map_err(invalid)?;
     if !marker.try_exists()? {
         return Ok(None);
@@ -288,7 +309,7 @@ pub(super) fn staged(marker: &Path, database: &str) -> Result<Option<PathBuf>> {
         entries.push(entry);
     }
     validate_entries(&manifest, &entries, database)?;
-    super::super::file_store::restore_archive(&staging.join(OBJECTS), &staging)?;
+    super::super::file_store::restore_archive(&staging.join(OBJECTS), &staging, space)?;
     if database == SQLITE {
         export_doc_storage::verify_sqlite_backup(&staging.join(SQLITE))?;
         let db = export_doc_storage::Connection::sqlite(&staging.join(SQLITE))?;

@@ -20,6 +20,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import { useAbortableOperation } from ${source('ui/useAbortableOperation.ts')};
   import { useOfficeOperation } from ${source('features/office/useOfficeData.ts')};
   import { AttachmentUploadPanel } from ${source('ui/AttachmentUploadPanel.tsx')};
+  import { FileUploadPolicyProvider } from ${source('ui/FileUploadPolicy.tsx')};
   import { ExporterSealField } from ${source('features/master-data/ExporterSealField.tsx')};
   import { MemoryRouter, useLocation } from 'react-router-dom';
   import { ConfirmationProvider } from ${source('ui/ConfirmationProvider.tsx')};
@@ -50,6 +51,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
     cloneInvoice: lookup, importUploadedInvoiceTransferPackage: lookup,
     listReportTemplates: async () => [{templatePath:'builtin:invoice_template.dtpl',displayName:'发票',withSealDefault:true}],
     getSettings: async () => ({}),
+    getFileStoragePolicy: async () => ({ fileBytes: 10 * 1024 * 1024, requestBytes: 100 * 1024 * 1024, requestFiles: 20 }),
     previewInvoiceReportDraftHtml: lookup, previewInvoiceReportHtml: lookup, previewInvoiceDocumentPackageHtml: lookup,
     listSupplierAssessments: (input, options) => lookup(input, options, 'assessment-list'),
     createSupplierAssessment: (input, options) => lookup(input, options, 'assessment-create'),
@@ -153,7 +155,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   for (const resourceKey of ['document.invoices','document.excel','document.single-window']) for (const action of ['view','create','edit','operate']) permissions.push({ resourceKey, action, dataScope:'all' });
   permissions.push(...['preview','print'].map(action=>({resourceKey:'document.invoice-output',action,dataScope:'all'})),{resourceKey:'common.report-catalog',action:'view',dataScope:'all'});
   createRoot(document.getElementById('root')).render(<React.StrictMode><MemoryRouter initialEntries={['/?view=editor']}><QueryClientProvider client={queries}>
-    <PermissionAccessProvider permissions={permissions} subject={{id:1,companyScope:'DEFAULT',departmentId:'GENERAL'}}><ConfirmationProvider><UnsavedChangesProvider><App/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider>
+    <PermissionAccessProvider permissions={permissions} subject={{id:1,companyScope:'DEFAULT',departmentId:'GENERAL'}}><ConfirmationProvider><UnsavedChangesProvider><FileUploadPolicyProvider client={client}><App/></FileUploadPolicyProvider></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider>
   </QueryClientProvider></MemoryRouter></React.StrictMode>);
 ` }, outfile: bundle, bundle: true, platform: 'browser', format: 'iife', jsx: 'automatic', logLevel: 'silent' });
 
@@ -468,6 +470,7 @@ try {
   }
   await scenario('attachment-capacity-follows-refreshed-record', 'attachments', async page => {
     const picker = page.locator('input[type=file]');
+    await page.getByText(/当前最多再选 0 个，合计/).waitFor();
     assert.equal(await picker.isDisabled(), true);
     await page.evaluate(() => { window.attachmentRecord = { versionNumber: 2, attachments: window.attachmentRecord.attachments.slice(1) }; });
     await page.getByRole('button', { name: '刷新附件记录' }).click();
@@ -479,6 +482,7 @@ try {
   });
   await scenario('attachment-partial-upload-retains-newer-capacity-and-version', 'attachments-partial', async page => {
     const picker = page.locator('input[type=file]');
+    await page.waitForFunction(() => !document.querySelector('input[type=file]').disabled);
     await picker.setInputFiles(['first.pdf', 'second.pdf'].map(attachmentFile));
     await page.getByRole('button', { name: '上传所选附件（2）', exact: true }).click();
     await page.getByText('第二个附件未完成', { exact: true }).waitFor();

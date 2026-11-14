@@ -23,6 +23,7 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
             "ApiFileStorageStatus",
             o(vec![
                 ("versionNumber", bytes()),
+                ("credentialVersion", bytes()),
                 ("kind", s()),
                 ("directory", s()),
                 ("registeredRoots", a(s())),
@@ -47,6 +48,17 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
             .additional(Additional::Allowed(false)),
         ),
         (
+            "ApiFileStorageCredentialsRequest",
+            o(vec![
+                ("expectedVersion", bytes()),
+                ("accessKeyId", s().max_length(256)),
+                ("secret", s().max_length(4096)),
+                ("token", s().max_length(4096)),
+            ])
+            .required(vec!["expectedVersion", "accessKeyId", "secret", "token"])
+            .additional(Additional::Allowed(false)),
+        ),
+        (
             "ApiFileStorageMigrationRequest",
             o(vec![
                 ("expectedVersion", bytes()),
@@ -64,6 +76,13 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
 }
 pub(super) fn endpoints() -> Vec<Endpoint> {
     [
+        (
+            "put",
+            "/api/file-storage/credentials",
+            "UpdateFileStorageCredentials",
+            "ApiFileStorageStatus",
+            Some("ApiFileStorageCredentialsRequest"),
+        ),
         (
             "get",
             "/api/file-storage",

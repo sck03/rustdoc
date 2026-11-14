@@ -383,6 +383,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadApprovalOfExpenseRequest(request: DownloadApprovalOfExpenseRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/expense-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/pdf`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -395,6 +396,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadApprovalOfGeneralRequest(request: DownloadApprovalOfGeneralRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/general-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/pdf`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -407,6 +409,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadApprovalOfLeaveRequest(request: DownloadApprovalOfLeaveRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/leave-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/pdf`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -419,6 +422,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadApprovalOfMeetingBooking(request: DownloadApprovalOfMeetingBookingRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/bookings/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/pdf`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -431,6 +435,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadApprovalOfOfficeSupplyRequest(request: DownloadApprovalOfOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/supply-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/pdf`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -443,6 +448,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadApprovalOfOvertimeRequest(request: DownloadApprovalOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/pdf`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -455,6 +461,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadApprovalOfPersonnelChangeRequest(request: DownloadApprovalOfPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/personnel-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/pdf`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -467,6 +474,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadApprovalOfPurchaseRequest(request: DownloadApprovalOfPurchaseRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/purchase-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/pdf`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -479,6 +487,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadApprovalOfTravelRequest(request: DownloadApprovalOfTravelRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/travel-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/pdf`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -491,6 +500,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadAttachmentOfExpenseRequest(request: DownloadAttachmentOfExpenseRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/expense-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -503,6 +513,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadAttachmentOfGeneralRequest(request: DownloadAttachmentOfGeneralRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/general-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -515,6 +526,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadAttachmentOfLeaveRequest(request: DownloadAttachmentOfLeaveRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/leave-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -527,6 +539,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadAttachmentOfMeetingBooking(request: DownloadAttachmentOfMeetingBookingRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/bookings/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -539,6 +552,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadAttachmentOfOfficeSupplyRequest(request: DownloadAttachmentOfOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/supply-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -551,6 +565,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadAttachmentOfOvertimeRequest(request: DownloadAttachmentOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -563,6 +578,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadAttachmentOfPersonnelChangeRequest(request: DownloadAttachmentOfPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/personnel-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -575,6 +591,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadAttachmentOfPurchaseRequest(request: DownloadAttachmentOfPurchaseRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/purchase-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -587,6 +604,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadAttachmentOfTravelRequest(request: DownloadAttachmentOfTravelRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/travel-requests/${encodePath(request.id)}/attachments/${encodePath(request.attachmentId)}`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -599,6 +617,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadMaterialsOfExpenseRequest(request: DownloadMaterialsOfExpenseRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/expense-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/bundle`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -611,6 +630,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadMaterialsOfGeneralRequest(request: DownloadMaterialsOfGeneralRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/general-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/bundle`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -623,6 +643,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadMaterialsOfLeaveRequest(request: DownloadMaterialsOfLeaveRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/leave-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/bundle`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -635,6 +656,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadMaterialsOfMeetingBooking(request: DownloadMaterialsOfMeetingBookingRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/bookings/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/bundle`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -647,6 +669,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadMaterialsOfOfficeSupplyRequest(request: DownloadMaterialsOfOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/supply-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/bundle`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -659,6 +682,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadMaterialsOfOvertimeRequest(request: DownloadMaterialsOfOvertimeRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/bundle`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -671,6 +695,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadMaterialsOfPersonnelChangeRequest(request: DownloadMaterialsOfPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/personnel-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/bundle`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -683,6 +708,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadMaterialsOfPurchaseRequest(request: DownloadMaterialsOfPurchaseRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/purchase-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/bundle`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -695,6 +721,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadMaterialsOfTravelRequest(request: DownloadMaterialsOfTravelRequestRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/travel-requests/${encodePath(request.id)}/submissions/${encodePath(request.submissionId)}/bundle`;
     return transport.request<Blob>("GET", path, {
       init: {
@@ -2201,6 +2228,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadAttachmentToExpenseRequest(request: UploadAttachmentToExpenseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/expense-requests/${encodePath(request.id)}/attachments`;
     return transport.request<OaRequest>("POST", path, {
       body: request.body,
@@ -2209,6 +2237,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadAttachmentToGeneralRequest(request: UploadAttachmentToGeneralRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/general-requests/${encodePath(request.id)}/attachments`;
     return transport.request<OaRequest>("POST", path, {
       body: request.body,
@@ -2217,6 +2246,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadAttachmentToLeaveRequest(request: UploadAttachmentToLeaveRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/leave-requests/${encodePath(request.id)}/attachments`;
     return transport.request<OaRequest>("POST", path, {
       body: request.body,
@@ -2225,6 +2255,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadAttachmentToMeetingBooking(request: UploadAttachmentToMeetingBookingRequest, init?: ApiRequestInit): Promise<MeetingBookingRecord> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/bookings/${encodePath(request.id)}/attachments`;
     return transport.request<MeetingBookingRecord>("POST", path, {
       body: request.body,
@@ -2233,6 +2264,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadAttachmentToOfficeSupplyRequest(request: UploadAttachmentToOfficeSupplyRequestRequest, init?: ApiRequestInit): Promise<OfficeSupplyRequestRecord> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/supply-requests/${encodePath(request.id)}/attachments`;
     return transport.request<OfficeSupplyRequestRecord>("POST", path, {
       body: request.body,
@@ -2241,6 +2273,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadAttachmentToOvertimeRequest(request: UploadAttachmentToOvertimeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/overtime-requests/${encodePath(request.id)}/attachments`;
     return transport.request<OaRequest>("POST", path, {
       body: request.body,
@@ -2249,6 +2282,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadAttachmentToPersonnelChangeRequest(request: UploadAttachmentToPersonnelChangeRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/personnel-requests/${encodePath(request.id)}/attachments`;
     return transport.request<OaRequest>("POST", path, {
       body: request.body,
@@ -2257,6 +2291,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadAttachmentToPurchaseRequest(request: UploadAttachmentToPurchaseRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/purchase-requests/${encodePath(request.id)}/attachments`;
     return transport.request<OaRequest>("POST", path, {
       body: request.body,
@@ -2265,6 +2300,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   uploadAttachmentToTravelRequest(request: UploadAttachmentToTravelRequestRequest, init?: ApiRequestInit): Promise<OaRequest> {
+    init = { timeoutMs: 86400000, ...init };
     const path = `/api/office/travel-requests/${encodePath(request.id)}/attachments`;
     return transport.request<OaRequest>("POST", path, {
       body: request.body,

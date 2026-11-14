@@ -35,6 +35,9 @@ impl Fixture {
         fs::create_dir_all(root.join("Cache")).unwrap();
         fs::create_dir_all(root.join("Logs")).unwrap();
         let paths = RuntimePaths {
+            disk_space: std::sync::Arc::new(export_doc_engine::temporary_space::Budget::new(
+                root.join("Cache"),
+            )),
             app_root: root.clone(),
             data_root: root.clone(),
             cache_root: root.join("Cache"),

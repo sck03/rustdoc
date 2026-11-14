@@ -308,7 +308,7 @@ impl Jobs {
                     scope.run_result(|| {
                         let output = work(&flag)?;
                         publication = output::prepare(&store, &worker_id, &output)?;
-                        Ok(output)
+                        persistence::prepare_output(&store, output)
                     })
                 }))
                 .unwrap_or_else(|_| Err(unavailable("文件处理异常终止，未发布输出。")));

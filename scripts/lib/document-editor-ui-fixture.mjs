@@ -51,7 +51,7 @@ const saveInvoice=(name,input,init)=>{
 };
 window.__finishInvoiceSave=(index=0)=>window.__invoiceSaves[index].resolve();
 const conflict=()=>new ApiError(409,'Conflict',JSON.stringify({message:'数据已被其他用户更新，请重新加载最新设置后再保存。'}));
-let backupPlan={revision:0,plan:{enabled:false,frequency:'Daily',time:'02:00',weekday:1,retentionCount:14,retentionDays:0,replicaMode:'None',verifyReplica:true,s3:{endpoint:'',region:'us-east-1',bucket:'',prefix:'ExportDocManager',accessKeyId:'',pathStyle:true}},encryptionPasswordSet:false,webDavPasswordSet:false,s3SecretAccessKeySet:false,s3SessionTokenSet:false,s3Available:true,timeZone:'Asia/Shanghai',nextRunAt:null,runningJobId:null,lastRunAt:null,lastResult:'NotRun',lastError:'',archives:[]};
+let backupPlan={revision:0,plan:{enabled:false,frequency:'Daily',time:'02:00',weekday:1,retentionCount:14,retentionDays:0,replicaMode:'None',verifyReplica:true,s3:{endpoint:'',region:'us-east-1',bucket:'',prefix:'ExportDocManager',accessKeyId:'',addressing:'virtualHost'}},encryptionPasswordSet:false,webDavPasswordSet:false,s3SecretAccessKeySet:false,s3SessionTokenSet:false,s3Available:true,timeZone:'Asia/Shanghai',nextRunAt:null,runningJobId:null,lastRunAt:null,lastResult:'NotRun',lastError:'',archives:[]};
 const backupStatus=()=>({...backupPlan,settingsRevision:settings.revision,webDav:{enabled:settings.webDav.enabled,url:settings.webDav.url,userName:settings.webDav.userName||''}});
 const savePayment=(name,input)=>{
   if(name==='updatePayment'&&input.body.rowVersion!==payment.rowVersion)return Promise.reject(conflict());

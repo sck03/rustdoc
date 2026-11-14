@@ -93,6 +93,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   exportCrmCustomers(request: ExportCrmCustomersRequest = {}, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = "/api/crm/customers/export";
     return transport.request<Blob>("GET", path, {
       query: {

@@ -177,7 +177,7 @@ pub(crate) fn pending_copies(
     } else {
         "json_object"
     };
-    rows(db, &format!("SELECT {constructor}('digest',o.digest,'size',o.size_bytes) AS body FROM file_objects o WHERE NOT EXISTS(SELECT 1 FROM file_locations l WHERE l.digest=o.digest AND l.storage_identity={identity}) ORDER BY o.digest LIMIT 200"), &values)?
+    rows(db, &format!("SELECT {constructor}('digest',o.digest,'size',o.size_bytes) AS body FROM file_migration_queue q JOIN file_objects o ON o.digest=q.digest WHERE q.storage_identity={identity} ORDER BY q.digest LIMIT 200"), &values)?
         .into_iter().map(|value| serde_json::from_value(value).map_err(Into::into)).collect()
 }
 pub(crate) fn locate(db: &(impl Adapter + ?Sized), identity: &str, digest: &str) -> Result<()> {
@@ -186,6 +186,32 @@ pub(crate) fn locate(db: &(impl Adapter + ?Sized), identity: &str, digest: &str)
     let identity = sql::bind(&mut values, identity, pg);
     let digest = sql::bind(&mut values, digest, pg);
     db.execute_statement(&format!("INSERT INTO file_locations(storage_identity,digest) VALUES({identity},{digest}) ON CONFLICT DO NOTHING"), &values)?;
+    db.execute_statement(
+        &format!(
+            "DELETE FROM file_migration_queue WHERE storage_identity={identity} AND digest={digest}"
+        ),
+        &values,
+    )?;
+    Ok(())
+}
+pub(crate) fn begin_migration(db: &(impl Adapter + ?Sized), identity: &str) -> Result<()> {
+    let mut values = vec![];
+    let identity = sql::bind(&mut values, identity, db.provider() == "PostgreSQL");
+    db.execute_statement(
+        &format!("INSERT INTO file_migrations VALUES({identity}) ON CONFLICT DO NOTHING"),
+        &values,
+    )?;
+    // A resumed run validates existing targets again, outside the application gate.
+    db.execute_statement(&format!("INSERT INTO file_migration_queue SELECT {identity},digest FROM file_objects WHERE true ON CONFLICT DO NOTHING"), &values)?;
+    Ok(())
+}
+pub(crate) fn end_migration(db: &(impl Adapter + ?Sized), identity: &str) -> Result<()> {
+    let mut values = vec![];
+    let identity = sql::bind(&mut values, identity, db.provider() == "PostgreSQL");
+    db.execute_statement(
+        &format!("DELETE FROM file_migrations WHERE storage_identity={identity}"),
+        &values,
+    )?;
     Ok(())
 }
 pub(crate) fn referenced(db: &(impl Adapter + ?Sized), digest: &str) -> Result<bool> {
@@ -227,7 +253,7 @@ pub(crate) fn statistics(db: &(impl Adapter + ?Sized)) -> Result<serde_json::Val
     } else {
         "json_object"
     };
-    db.query_json(&format!("SELECT CAST({constructor}('fileCount',COUNT(*),'physicalBytes',COALESCE(SUM(size_bytes),0),'unreferencedBytes',COALESCE(SUM(CASE WHEN NOT EXISTS(SELECT 1 FROM file_versions v WHERE v.digest=o.digest) THEN size_bytes ELSE 0 END),0),'logicalBytes',(SELECT COALESCE(SUM(f.size_bytes),0) FROM file_versions v JOIN file_objects f ON f.digest=v.digest)) AS TEXT) FROM file_objects o"), &[])
+    db.query_json(&format!("SELECT CAST({constructor}('fileCount',file_count,'physicalBytes',physical_bytes,'unreferencedBytes',physical_bytes-referenced_bytes,'logicalBytes',logical_bytes) AS TEXT) FROM file_storage_totals WHERE id=1"), &[])
 }
 
 pub(crate) fn owner_company(db: &(impl Adapter + ?Sized), record: i64) -> Result<String> {
@@ -251,7 +277,25 @@ pub(crate) fn usage(db: &(impl Adapter + ?Sized), company: &str) -> Result<u64> 
     let pg = db.provider() == "PostgreSQL";
     let mut values = vec![];
     let company = sql::bind(&mut values, company, pg);
-    let scope = sql::field("companyScope", pg);
-    db.query_json(&format!("SELECT CAST(COALESCE(SUM(o.size_bytes),0) AS TEXT) FROM file_versions v JOIN file_objects o ON o.digest=v.digest JOIN records r ON r.id=v.record_id WHERE {scope}={company}"), &values)?
+    db.query_json(&format!("SELECT CAST(COALESCE((SELECT logical_bytes FROM file_usage_totals WHERE company={company}),0) AS TEXT)"), &values)?
         .as_u64().ok_or_else(|| Error::unavailable("文件容量统计无效。"))
+}
+
+pub(crate) fn verify_accounting(db: &(impl Adapter + ?Sized)) -> Result<()> {
+    let scope = sql::field("companyScope", db.provider() == "PostgreSQL");
+    let inconsistent = db.query_json(&format!("SELECT CAST(COUNT(*) AS TEXT) FROM (
+        SELECT 1 AS mismatch FROM file_objects o WHERE reference_count<>(SELECT COUNT(*) FROM file_versions v WHERE v.digest=o.digest)
+        UNION ALL SELECT 1 FROM file_storage_totals WHERE id=1 AND (
+            file_count<>(SELECT COUNT(*) FROM file_objects) OR physical_bytes<>(SELECT COALESCE(SUM(size_bytes),0) FROM file_objects) OR
+            referenced_bytes<>(SELECT COALESCE(SUM(size_bytes),0) FROM file_objects o WHERE EXISTS(SELECT 1 FROM file_versions v WHERE v.digest=o.digest)) OR
+            logical_bytes<>(SELECT COALESCE(SUM(o.size_bytes),0) FROM file_versions v JOIN file_objects o ON o.digest=v.digest))
+        UNION ALL SELECT 1 FROM (SELECT company,SUM(amount) AS difference FROM (
+            SELECT COALESCE({scope},'') AS company,o.size_bytes AS amount FROM file_versions v JOIN file_objects o ON o.digest=v.digest JOIN records r ON r.id=v.record_id
+            UNION ALL SELECT company,-logical_bytes AS amount FROM file_usage_totals
+        ) contributions GROUP BY company HAVING SUM(amount)<>0) groups
+    ) mismatches"), &[])?;
+    if inconsistent.as_u64() != Some(0) {
+        return Err(Error::unavailable("文件容量账目不一致，请核对数据库。"));
+    }
+    Ok(())
 }

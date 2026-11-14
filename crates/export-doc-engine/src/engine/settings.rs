@@ -287,6 +287,9 @@ mod tests {
         ));
         std::fs::create_dir_all(&root).unwrap();
         let paths = RuntimePaths {
+            disk_space: std::sync::Arc::new(crate::temporary_space::Budget::new(
+                root.join("Cache"),
+            )),
             app_root: root.clone(),
             data_root: root.clone(),
             cache_root: root.join("Cache"),

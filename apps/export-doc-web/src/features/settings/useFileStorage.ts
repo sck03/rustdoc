@@ -7,8 +7,9 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { isTerminalJob } from "../jobs/jobPresentation.ts";
+import { queryPollingInterval } from "../../api/queryPollingPolicy.ts";
 
-const emptyTarget = (): ApiFileStorageMigrationRequest => ({ kind: "local", directory: "", s3: { endpoint: "", bucket: "", region: "us-east-1", prefix: "", accessKeyId: "", pathStyle: true } });
+const emptyTarget = (): ApiFileStorageMigrationRequest => ({ kind: "local", directory: "", s3: { endpoint: "", bucket: "", region: "us-east-1", prefix: "", accessKeyId: "", addressing: "virtualHost" } });
 
 export function useFileStorage(client: ExportDocManagerApiClient, enabled: boolean) {
   const cache = useQueryClient();
@@ -25,7 +26,7 @@ export function useFileStorage(client: ExportDocManagerApiClient, enabled: boole
   const query = useQuery({ queryKey: queryKeys.fileStorage(), queryFn: ({ signal }) => client.getFileStorage({ signal }), enabled });
   const job = useQuery({
     queryKey: ["file-storage-job", jobId], queryFn: ({ signal }) => client.getJob({ jobId: jobId! }, { signal }),
-    enabled: enabled && Boolean(jobId), refetchInterval: q => q.state.error || isTerminalJob(q.state.data?.status) ? false : 2000,
+    enabled: enabled && Boolean(jobId), refetchInterval: q => isTerminalJob(q.state.data?.status) ? false : q.state.error ? queryPollingInterval(q) : 2000,
     refetchIntervalInBackground: false,
   });
   const active = Boolean(jobId && !isTerminalJob(job.data?.status));

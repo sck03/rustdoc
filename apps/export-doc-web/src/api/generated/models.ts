@@ -339,9 +339,9 @@ export interface ApiBackupRestoreRequest {
 
 export interface ApiBackupS3Settings {
   accessKeyId: string;
+  addressing: "path" | "virtualHost" | "bucketHost";
   bucket: string;
   endpoint: string;
-  pathStyle: boolean;
   prefix: string;
   region: string;
 }
@@ -1360,6 +1360,13 @@ export interface ApiExporterDto {
   swiftCode: string;
 }
 
+export interface ApiFileStorageCredentialsRequest {
+  accessKeyId: string;
+  expectedVersion: number;
+  secret: string;
+  token: string;
+}
+
 export interface ApiFileStorageMigrationRequest {
   cancel?: boolean;
   directory?: string;
@@ -1384,6 +1391,7 @@ export interface ApiFileStoragePolicyRequest {
 }
 
 export interface ApiFileStorageStatus {
+  credentialVersion?: number;
   directory?: string;
   fileCount?: number;
   healthMessage?: string;
@@ -7158,7 +7166,7 @@ export const ApiBackupPlanDefaults = {
 } as const satisfies Partial<ApiBackupPlan>;
 
 export const ApiBackupS3SettingsDefaults = {
-  pathStyle: true,
+  addressing: "virtualHost",
   prefix: "ExportDocManager",
   region: "us-east-1",
 } as const satisfies Partial<ApiBackupS3Settings>;
@@ -10946,6 +10954,10 @@ export interface UpdateExpenseRequestRequest {
 export interface UpdateExporterRequest {
   id: number;
   body: ApiExporterDto;
+}
+
+export interface UpdateFileStorageCredentialsRequest {
+  body: ApiFileStorageCredentialsRequest;
 }
 
 export interface UpdateFileStoragePolicyRequest {

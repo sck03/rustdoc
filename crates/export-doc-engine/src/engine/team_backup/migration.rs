@@ -31,6 +31,7 @@ pub fn stage_file(
     postgres::ensure_no_pending(paths)?;
     let _lease = export_doc_storage::PostgresMaintenanceLease::acquire(maintenance, owner)?;
     package::stage(
+        &paths.disk_space,
         &marker_path(paths)?,
         MAGIC,
         password,
@@ -194,6 +195,7 @@ pub(super) fn stage_restore_upload(
     let _gate = package::lock(&service.paths)?;
     postgres::ensure_no_pending(&service.paths)?;
     package::stage(
+        &service.paths.disk_space,
         &marker_path(&service.paths)?,
         MAGIC,
         password,

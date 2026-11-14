@@ -133,6 +133,7 @@ pub(super) fn document() -> Value {
                 .as_ref()
                 .is_some_and(|capability| capability.action == "upload")
         {
+            endpoint.operation.timeout_seconds = crate::request_limits::TRANSFER_SECONDS;
             if let Some(body) = &mut endpoint.operation.body {
                 body.max_bytes = Some(100 * 1024 * 1024);
             }

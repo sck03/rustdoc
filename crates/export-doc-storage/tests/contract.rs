@@ -7,6 +7,8 @@ mod capacity_query;
 mod communication_query;
 #[path = "support/crm_query.rs"]
 mod crm_query;
+#[path = "support/file_accounting.rs"]
+mod file_accounting;
 #[path = "support/foundation_query.rs"]
 mod foundation_query;
 #[path = "support/import_preview_query.rs"]
@@ -152,6 +154,7 @@ fn single_window_versions(connection: &Connection) {
 }
 
 fn roundtrip(connection: &Connection) {
+    file_accounting::exercise(connection);
     single_window_versions(connection);
     worklist_query::exercise(connection);
     query_plans::exercise(connection);

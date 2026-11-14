@@ -59,7 +59,11 @@ pub(super) fn zip_payload(entries: &[Entry<'_>], output: impl Write + Seek) -> R
 }
 
 /// 把字节数组解包到目标目录，返回解出的文件名清单。解包前必须已通过密封校验。
-pub(super) fn unpack(payload: impl Read + Seek, destination: &Path) -> Result<Vec<ManifestFile>> {
+pub(super) fn unpack(
+    payload: impl Read + Seek,
+    destination: &Path,
+    space: &std::sync::Arc<crate::temporary_space::Budget>,
+) -> Result<Vec<ManifestFile>> {
     crate::paths::ensure_safe_absolute(destination).map_err(invalid)?;
     fs::create_dir_all(destination)?;
     let mut archive = zip::ZipArchive::new(payload)
@@ -76,11 +80,8 @@ pub(super) fn unpack(payload: impl Read + Seek, destination: &Path) -> Result<Ve
             .checked_add(entry.size())
             .ok_or_else(|| invalid("包展开大小超出可表示范围。"))
     })?;
-    if expanded > fs2::available_space(destination)? {
-        return Err(unavailable(
-            "恢复暂存目录剩余空间不足以展开此备份，请释放空间或改用容量足够的受管数据目录。",
-        ));
-    }
+    let budget = space.at(destination.to_path_buf());
+    drop(budget.reserve(expanded)?);
     let mut names = std::collections::BTreeSet::new();
     let mut total = 0_u64;
     for index in 0..archive.len() {
@@ -127,7 +128,8 @@ pub(super) fn unpack(payload: impl Read + Seek, destination: &Path) -> Result<Ve
             .write(true)
             .create_new(true)
             .open(&path)?;
-        let (size_bytes, sha256) = copy_and_hash(&mut file, &mut output, remaining)?;
+        let (size_bytes, sha256) =
+            copy_and_hash(&mut file, &mut budget.writer(&mut output)?, remaining)?;
         output.sync_all()?;
         total += size_bytes;
         entries.push(ManifestFile {

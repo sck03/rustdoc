@@ -1,6 +1,6 @@
 //! Account for concurrent, unwritten upload bytes on the injected cache volume.
-use crate::request::error;
-use export_doc_engine::api::ApiError;
+use crate::api::ApiError;
+use crate::engine::error::error;
 use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -8,17 +8,35 @@ use std::{
 
 const HEADROOM: u64 = 256 * 1024 * 1024;
 
-pub(crate) struct Budget {
+#[derive(Debug)]
+pub struct Budget {
     root: PathBuf,
-    pending: Mutex<u64>,
+    pending: Arc<Mutex<u64>>,
 }
 
 impl Budget {
     pub fn new(root: PathBuf) -> Self {
         Self {
             root,
-            pending: Mutex::new(0),
+            pending: Arc::new(Mutex::new(0)),
         }
+    }
+    /// All destinations of this runtime share pending reservations. Counting
+    /// separate volumes conservatively cannot spend the database's headroom.
+    pub fn at(&self, root: PathBuf) -> Arc<Self> {
+        Arc::new(Self {
+            root,
+            pending: self.pending.clone(),
+        })
+    }
+    pub fn writer<W: std::io::Write>(
+        self: &Arc<Self>,
+        output: W,
+    ) -> Result<SpaceWriter<W>, ApiError> {
+        Ok(SpaceWriter {
+            output,
+            reservation: self.reserve(0)?,
+        })
     }
 
     pub fn reserve(self: &Arc<Self>, bytes: u64) -> Result<Reservation, ApiError> {
@@ -31,9 +49,32 @@ impl Budget {
     }
 }
 
-pub(crate) struct Reservation {
+pub struct Reservation {
     budget: Arc<Budget>,
     remaining: u64,
+}
+pub struct SpaceWriter<W> {
+    output: W,
+    reservation: Reservation,
+}
+impl<W: std::io::Write> std::io::Write for SpaceWriter<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.reservation
+            .ensure(bytes.len() as u64)
+            .map_err(std::io::Error::other)?;
+        let written = self.output.write(bytes)?;
+        self.output.flush()?;
+        self.reservation.committed(written as u64);
+        Ok(written)
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.output.flush()
+    }
+}
+impl<W: std::io::Seek> std::io::Seek for SpaceWriter<W> {
+    fn seek(&mut self, position: std::io::SeekFrom) -> std::io::Result<u64> {
+        self.output.seek(position)
+    }
 }
 
 impl Reservation {

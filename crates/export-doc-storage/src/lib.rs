@@ -379,6 +379,9 @@ delegate! {
     delete_files(record:i64,kind:Option<&str>)->();
     file_objects(after:&str,limit:i64,unused:bool)->Vec<FileObject>;
     file_statistics()->Value;
+    verify_file_accounting()->();
+    begin_file_migration(identity:&str)->();
+    end_file_migration(identity:&str)->();
     file_usage(company:&str)->u64;
     file_owner_company(record:i64)->String;
     pending_file_copies(identity:&str)->Vec<FileObject>;

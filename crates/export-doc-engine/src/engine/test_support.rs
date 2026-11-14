@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+pub(crate) mod replica_fixture;
 
 pub(crate) fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -22,6 +23,9 @@ impl ScratchDirectory {
     }
     pub(crate) fn paths(&self) -> crate::paths::RuntimePaths {
         crate::paths::RuntimePaths {
+            disk_space: std::sync::Arc::new(crate::temporary_space::Budget::new(
+                self.0.join("Cache"),
+            )),
             app_root: self.0.clone(),
             data_root: self.0.clone(),
             cache_root: self.0.join("Cache"),

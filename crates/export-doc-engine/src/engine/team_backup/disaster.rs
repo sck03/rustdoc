@@ -142,6 +142,7 @@ pub(super) fn restore_package(
             let _gate = package::lock(&paths)?;
             crate::paths::ensure_safe_absolute(&path).map_err(invalid)?;
             package::stage(
+                &paths.disk_space,
                 &marker(&paths)?,
                 MAGIC,
                 &password,
@@ -169,7 +170,7 @@ pub(super) fn restore_package(
 }
 pub fn apply_pending(paths: &RuntimePaths) -> Result<()> {
     let marker = marker(paths)?;
-    let Some(staging) = package::staged(&marker, package::SQLITE)? else {
+    let Some(staging) = package::staged(&marker, package::SQLITE, &paths.disk_space)? else {
         return Ok(());
     };
     let _gate = package::lock(paths)?;

@@ -11,6 +11,7 @@ pub fn seconds(operation: &str) -> u64 {
         | "DownloadRecoveryArchiveWithTicket"
         | "RestorePostgreSqlPhysicalBackup" => TRANSFER_SECONDS,
         "UploadLetterOfCreditDocument" | "ImportLetterOfCreditDocument" => 600,
+        "UpdateFileStorageCredentials" | "GetFileStorage" => 120,
         "ReviewLetterOfCreditCompliance" => 125,
         "UploadOcrImage" | "RecognizeOcrImage" => 95,
         "SendEmail" | "TestEmailConnection" => 65,
@@ -30,6 +31,10 @@ mod tests {
             ("RecognizeOcrImage", 95),
             ("SendEmail", 65),
             ("DownloadJobResult", 86400),
+            ("UploadPersonnelAttachment", 86400),
+            ("UploadBusinessAttachment", 86400),
+            ("DownloadPersonnelAttachment", 86400),
+            ("UpdateFileStorageCredentials", 120),
         ] {
             let operation = document["paths"]
                 .as_object()

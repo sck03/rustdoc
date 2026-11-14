@@ -35,6 +35,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   downloadContainerPackingPdf(request: DownloadContainerPackingPdfRequest, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = "/api/tools/container-packing/pdf/download";
     return transport.request<Blob>("POST", path, {
       body: request.body,
@@ -113,6 +114,7 @@ export default function createApi(transport: ApiTransport) {
   },
 
   previewOcrImage(request: PreviewOcrImageRequest = {}, init?: ApiRequestInit): Promise<Blob> {
+    init = { timeoutMs: 86400000, ...init };
     const path = "/api/tools/ocr/preview-image";
     return transport.request<Blob>("GET", path, {
       query: {
