@@ -52,6 +52,8 @@ Windows 桌面两架构使用各自 MSVC runner；Linux 两架构分别使用 Ub
 
 2026-11-14 复核 [运行 43404507392](https://github.com/sck03/rustdoc/actions/runs/43404507392/job/131815508870)：附件异步回归没有注入 `FileUploadPolicyProvider` 及策略客户端，界面报“文件上传服务未配置”，两个容量场景超时。夹具现显式提供 20 份测试容量并等待策略加载，再检查容量边界与部分成功后的版本；未改变产品默认容量或放宽断言。本机 72 个取消/异步场景通过。Dependabot 的 GLib 兼容性阻塞另见[依赖安全记录](./依赖更新与安全检查.md)。
 
+修复提交 `b148b778` 的[云端验证 43573103271](https://github.com/sck03/rustdoc/actions/runs/43573103271)已成功，包含此前失败的 Chromium 回归及前端构建/布局、Rust 单元/契约/桌面组合检查；[发布脚本验证 43573103248](https://github.com/sck03/rustdoc/actions/runs/43573103248)同步通过。手动 full 矩阵未触发。
+
 文件存储改动进入 Rust 单元/契约回归；在 `validation_mode=full` 中，Windows x64 完成当前 `office_review` 构建后依次运行 `test:oa-ui` 和 `test:file-storage-ui`。后者验证存储设置、55 份人事附件分页、HTTP Range、迁移及身份标记故障。日常 quick 不执行这组真实 HTTP/React 集成；完整 S3 厂商、外置磁盘故障和百万条容量仍需专项环境，不能将该测试描述为已经覆盖。
 
 本地复现使用[脚本说明](../scripts/README.md)中的仓库缓存与串行 Cargo 顺序，真实 PostgreSQL 18 运行 `test-native-postgres.ps1 -PostgresBin <bin目录> -Scope All`。普通 `cargo test` 中被 ignored 的实库测试不计通过。GitHub 每个作业有独立 workspace，作业内不得让共享 target 的 Cargo 编译与测试同时运行。
