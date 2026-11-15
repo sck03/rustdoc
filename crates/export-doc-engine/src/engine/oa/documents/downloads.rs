@@ -6,14 +6,6 @@ use std::io::{Seek, SeekFrom, Write};
 #[path = "downloads/tests.rs"]
 mod tests;
 const PDF_LIMIT: usize = 16 * 1024 * 1024;
-pub(in crate::engine) fn download(
-    service: &NativeService,
-    actor: &Actor,
-    operation: Operation,
-    parameters: &[(&str, String)],
-) -> Result<FileOutput> {
-    prepare(service, actor, operation, parameters)?.into_memory()
-}
 pub(in crate::engine) fn prepare(
     service: &NativeService,
     actor: &Actor,
@@ -88,39 +80,14 @@ pub(in crate::engine) fn prepare(
             size: entry.info.size,
         }
     } else {
-        let file =
+        let mut file =
             crate::paths::anonymous_file(&service.paths.cache_root.join("ApprovalDownloads"))
                 .map_err(unavailable)?;
-        let mut archive = zip::ZipWriter::new(file);
-        let options = zip::write::SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Stored)
-            .large_file(true);
-        for (index, entry) in source.files.iter().enumerate() {
-            crate::operation::check()?;
-            let mut file = read_source(service, entry)?;
-            let name = if index == 0 {
-                entry.info.file_name.clone()
-            } else {
-                format!("{index:02}-{}", entry.info.file_name)
-            };
-            if !crate::paths::valid_file_name(&name) {
-                return Err(unavailable("历史材料文件名无效。"));
-            }
-            archive
-                .start_file(name, options)
-                .map_err(|e| unavailable(e.to_string()))?;
-            crate::engine::backup_io::copy_chunks(
-                &mut file,
-                &mut archive,
-                entry.info.size,
-                |_| {},
-            )?;
-        }
-        archive
-            .start_file("审批材料清单.json", options)
-            .map_err(|e| unavailable(e.to_string()))?;
-        archive.write_all(&source.manifest)?;
-        let mut file = archive.finish().map_err(|e| unavailable(e.to_string()))?;
+        write_bundle(
+            service.paths.disk_space.writer(&mut file)?,
+            &source,
+            |entry| read_source(service, entry),
+        )?;
         file.flush()?;
         let size = file.metadata()?.len();
         file.seek(SeekFrom::Start(0))?;
@@ -161,6 +128,41 @@ struct Source {
     files: Vec<Entry>,
     file_name: String,
     manifest: Vec<u8>,
+}
+fn write_bundle(
+    output: impl Write + Seek,
+    source: &Source,
+    mut read: impl FnMut(&Entry) -> Result<std::fs::File>,
+) -> Result<()> {
+    let mut archive = zip::ZipWriter::new(output);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Stored)
+        .large_file(true);
+    for (index, entry) in source.files.iter().enumerate() {
+        crate::operation::check()?;
+        let mut file = read(entry)?;
+        if !crate::paths::valid_file_name(&entry.info.file_name) {
+            return Err(unavailable("历史材料文件名无效。"));
+        }
+        let name = if index == 0 {
+            entry.info.file_name.clone()
+        } else {
+            format!("{index:02}/{}", entry.info.file_name)
+        };
+        archive
+            .start_file(name, options)
+            .map_err(|e| unavailable(e.to_string()))?;
+        crate::engine::backup_io::copy_chunks(&mut file, &mut archive, entry.info.size, |_| {})?;
+    }
+    archive
+        .start_file("审批材料清单.json", options)
+        .map_err(|e| unavailable(e.to_string()))?;
+    archive.write_all(&source.manifest)?;
+    archive
+        .finish()
+        .map_err(|e| unavailable(e.to_string()))?
+        .flush()?;
+    Ok(())
 }
 fn read_source(service: &NativeService, entry: &Entry) -> Result<std::fs::File> {
     let blob = service.store.read(|tx| {

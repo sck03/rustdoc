@@ -1,3 +1,4 @@
+import { queryPollingInterval } from "../../api/queryPollingPolicy.ts";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -34,7 +35,7 @@ export function usePersonnelDirectory(client: ExportDocManagerApiClient, user: A
     queryKey: ["office", "people", "directory", user.id, user.companyScope, search, departmentId, status, attentionOnly, paging.pageNumber, paging.pageSize],
     queryFn: ({ signal }) => client.listPersonnel({ keyword: search || undefined, departmentId: departmentId || undefined,
       status: status || undefined, attentionOnly, pageNumber: paging.pageNumber, pageSize: paging.pageSize }, { signal }),
-    refetchInterval: 60000, refetchIntervalInBackground: false,
+    refetchInterval: query => queryPollingInterval(query, 60_000), refetchIntervalInBackground: false,
     enabled,
   });
   useServerPageNumber(query, paging.pageNumber, paging.setPageNumber);
@@ -54,7 +55,7 @@ export function usePersonnelRecord(client: ExportDocManagerApiClient, user: ApiU
 
 export function usePersonnelClearance(client: ExportDocManagerApiClient, user: ApiUserDto, id: number) {
   return useQuery({ queryKey: ["office", "people", "clearance", user.id, user.companyScope, id],
-    queryFn: ({ signal }) => client.getPersonnelClearance({ id }, { signal }), refetchInterval: 15000, refetchIntervalInBackground: false });
+    queryFn: ({ signal }) => client.getPersonnelClearance({ id }, { signal }), refetchInterval: query => queryPollingInterval(query, 15_000), refetchIntervalInBackground: false });
 }
 
 export function usePersonnelHistory(client: ExportDocManagerApiClient, user: ApiUserDto, id: number) {

@@ -12,6 +12,8 @@ const HEADROOM: u64 = 256 * 1024 * 1024;
 pub struct Budget {
     root: PathBuf,
     pending: Arc<Mutex<u64>>,
+    #[cfg(test)]
+    available: Option<u64>,
 }
 
 impl Budget {
@@ -19,6 +21,8 @@ impl Budget {
         Self {
             root,
             pending: Arc::new(Mutex::new(0)),
+            #[cfg(test)]
+            available: None,
         }
     }
     /// All destinations of this runtime share pending reservations. Counting
@@ -27,6 +31,8 @@ impl Budget {
         Arc::new(Self {
             root,
             pending: self.pending.clone(),
+            #[cfg(test)]
+            available: self.available,
         })
     }
     pub fn writer<W: std::io::Write>(
@@ -46,6 +52,13 @@ impl Budget {
         };
         reservation.ensure(bytes)?;
         Ok(reservation)
+    }
+    #[cfg(test)]
+    pub(crate) fn with_available(root: PathBuf, available: u64) -> Self {
+        Self {
+            available: Some(available),
+            ..Self::new(root)
+        }
     }
 }
 
@@ -84,6 +97,10 @@ impl Reservation {
             .pending
             .lock()
             .map_err(|_| error(503, "上传空间预算不可用。"))?;
+        #[cfg(test)]
+        if let Some(available) = budget.available {
+            return self.ensure_available(&mut pending, bytes, available);
+        }
         let available =
             fs2::available_space(&budget.root).map_err(|_| error(503, "无法检查上传暂存空间。"))?;
         self.ensure_available(&mut pending, bytes, available)

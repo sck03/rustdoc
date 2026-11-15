@@ -3,6 +3,80 @@ use super::*;
 mod fixture;
 
 #[test]
+fn bundles_keep_valid_long_names_and_refuse_to_consume_disk_headroom() {
+    use std::{
+        fs,
+        io::{Cursor, Read},
+        sync::Arc,
+    };
+    let directory = crate::engine::test_support::ScratchDirectory::new();
+    let input = directory.0.join("source.bin");
+    fs::write(&input, b"content").unwrap();
+    let names = [
+        "approval.pdf".to_owned(),
+        format!("{}.pdf", "a".repeat(176)),
+        format!("{}.xml", "文".repeat(83)),
+    ];
+    let source = Source {
+        files: names
+            .iter()
+            .enumerate()
+            .map(|(index, name)| Entry {
+                id: index as i64,
+                kind: String::new(),
+                info: export_doc_storage::BlobInfo {
+                    file_name: name.clone(),
+                    media_type: "application/octet-stream".into(),
+                    size: 7,
+                    digest: String::new(),
+                },
+            })
+            .collect(),
+        file_name: "bundle.zip".into(),
+        manifest: b"{}".to_vec(),
+    };
+    let budget = Arc::new(crate::temporary_space::Budget::with_available(
+        directory.0.clone(),
+        512 * 1024 * 1024,
+    ));
+    let mut output = Cursor::new(Vec::new());
+    write_bundle(budget.writer(&mut output).unwrap(), &source, |_| {
+        Ok(fs::File::open(&input)?)
+    })
+    .unwrap();
+    let mut zip = zip::ZipArchive::new(Cursor::new(output.into_inner())).unwrap();
+    assert_eq!(zip.len(), 4);
+    for (index, name) in names.iter().enumerate() {
+        let entry_name = if index == 0 {
+            name.clone()
+        } else {
+            format!("{index:02}/{name}")
+        };
+        let mut content = String::new();
+        zip.by_name(&entry_name)
+            .unwrap()
+            .read_to_string(&mut content)
+            .unwrap();
+        assert_eq!(content, "content");
+    }
+    let low = Arc::new(crate::temporary_space::Budget::with_available(
+        directory.0.clone(),
+        256 * 1024 * 1024,
+    ));
+    let mut output = Cursor::new(Vec::new());
+    assert!(
+        write_bundle(low.writer(&mut output).unwrap(), &source, |_| Ok(
+            fs::File::open(&input)?
+        ))
+        .is_err()
+    );
+    assert!(
+        output.into_inner().is_empty(),
+        "ZIP headers must obey the same disk budget as attachment bytes"
+    );
+}
+
+#[test]
 fn busy_document_generation_recovers_and_download_rechecks_private_material() {
     let directory = crate::engine::test_support::ScratchDirectory::new();
     let service = directory.service();

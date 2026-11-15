@@ -9,6 +9,7 @@ pub(super) mod admin;
 mod archive;
 mod cache;
 mod credentials;
+mod flights;
 pub(super) mod incremental;
 mod journal;
 mod migration;
@@ -16,6 +17,7 @@ pub(super) mod policy;
 mod remote;
 #[cfg(test)]
 mod tests;
+mod verification;
 pub(super) use archive::verify_local_inventory;
 pub(super) use archive::{export as export_archive, restore_archive};
 use std::{
@@ -85,6 +87,7 @@ pub struct FileStore {
     uploads: journal::Uploads,
     space: std::sync::Arc<crate::temporary_space::Budget>,
     downloads: cache::Cache,
+    verified: verification::Verified,
     #[cfg(feature = "s3-storage")]
     agent: ureq::Agent,
 }
@@ -146,6 +149,7 @@ impl FileStore {
             uploads: Default::default(),
             space: paths.disk_space.clone(),
             downloads: cache::Cache::open(&paths.cache_root.join("FileDownloads"))?,
+            verified: Default::default(),
             #[cfg(feature = "s3-storage")]
             agent: export_doc_network::storage_pooled_agent(
                 std::time::Duration::from_secs(super::backup_io::TIMEOUT_SECONDS),
@@ -363,19 +367,14 @@ impl FileStore {
     pub fn open_object(&self, object: &FileObject) -> Result<fs::File> {
         validate(object)?;
         let config = self.configuration()?;
-        let mut file = match &config.backend {
+        match &config.backend {
             Backend::Local { .. } => {
                 self.local_identity(&config)?;
-                fs::File::open(self.object_path(&config, object)?)
-                    .map_err(|_| unavailable("已登记文件对象缺失或不可读。"))?
+                self.verified
+                    .open(&self.object_path(&config, object)?, object)
             }
-            Backend::S3 { .. } => {
-                return self.downloads.download(self, &config, object);
-            }
-        };
-        verify(&mut file, object)?;
-        file.seek(SeekFrom::Start(0))?;
-        Ok(file)
+            Backend::S3 { .. } => self.downloads.download(self, &config, object),
+        }
     }
     pub fn load(&self, info: &FileInfo, limit: usize) -> Result<super::tasks::FileOutput> {
         if info.object.size > limit as u64 {

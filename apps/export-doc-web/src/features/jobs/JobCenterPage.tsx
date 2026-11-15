@@ -1,3 +1,4 @@
+import { queryPollingInterval } from "../../api/queryPollingPolicy.ts";
 import { FileInput } from "../../ui/FileInput.tsx";
 import { Field, FilterBar } from "../../ui/primitives/Field.tsx";
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
@@ -67,7 +68,7 @@ export function JobCenterPage({ client }: { client: ExportDocManagerApiClient })
       pageSize,
     }, { signal }),
     placeholderData: keepPreviousData,
-    refetchInterval: (query) => !query.state.error && hasActiveJobs(query.state.data?.items) ? 2_000 : false,
+    refetchInterval: (query) => queryPollingInterval(query, hasActiveJobs(query.state.data?.items) ? 2_000 : false),
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
   });

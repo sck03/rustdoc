@@ -26,7 +26,7 @@ export function useFileStorage(client: ExportDocManagerApiClient, enabled: boole
   const query = useQuery({ queryKey: queryKeys.fileStorage(), queryFn: ({ signal }) => client.getFileStorage({ signal }), enabled });
   const job = useQuery({
     queryKey: ["file-storage-job", jobId], queryFn: ({ signal }) => client.getJob({ jobId: jobId! }, { signal }),
-    enabled: enabled && Boolean(jobId), refetchInterval: q => isTerminalJob(q.state.data?.status) ? false : q.state.error ? queryPollingInterval(q) : 2000,
+    enabled: enabled && Boolean(jobId), refetchInterval: q => isTerminalJob(q.state.data?.status) ? false : queryPollingInterval(q, 2000),
     refetchIntervalInBackground: false,
   });
   const active = Boolean(jobId && !isTerminalJob(job.data?.status));

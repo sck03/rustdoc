@@ -6,8 +6,14 @@ use super::{
 };
 use crate::generated_api::{
     DOWNLOAD_JOB_RESULT, DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
-    DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET, Operation,
+    DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET, DOWNLOAD_REPORT_TEMPLATE_FILE,
+    DOWNLOAD_REPORT_TEMPLATE_PACKAGE, DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
+    DOWNLOAD_SUPPORT_PACKAGE, Operation,
 };
+
+#[cfg(test)]
+#[path = "downloads/tests/buffered.rs"]
+mod tests;
 
 impl NativeService {
     fn with_download_access<T>(
@@ -71,11 +77,36 @@ impl NativeService {
                 super::oa::prepare_download(self, actor, operation, parameters)
             });
         }
-        let output = self.download_file(operation, parameters, token)?;
-        let reservation = self.jobs.reserve_download(output.content.len(), false)?;
-        Ok(backup_io::Download::Memory {
-            output,
-            reservation,
+        self.with_download_access(operation, token, |actor| {
+            // Admit the peak working set before reading or compressing. Retain
+            // the Vec's allocated capacity until the HTTP response is dropped.
+            let working_mib = match operation {
+                DOWNLOAD_REPORT_TEMPLATE_PACKAGE => 128,
+                DOWNLOAD_REPORT_TEMPLATE_FILE => 20,
+                DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE => 64,
+                DOWNLOAD_SUPPORT_PACKAGE => 32,
+                _ => return Err(unsupported("此操作不是文件下载。")),
+            };
+            let mut reservation = self
+                .jobs
+                .reserve_download(working_mib * 1024 * 1024, true)?;
+            let output = match operation {
+                DOWNLOAD_REPORT_TEMPLATE_FILE | DOWNLOAD_REPORT_TEMPLATE_PACKAGE => {
+                    super::report_template_files::download(self, actor, operation, parameters)?
+                }
+                DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE => {
+                    super::report_assets::download(self, actor, parameters)?
+                }
+                _ => super::licensing::download(self, actor, operation, parameters)?,
+            };
+            if output.content.capacity() > working_mib * 1024 * 1024 {
+                return Err(super::error::unavailable("下载结果超过预留容量。"));
+            }
+            reservation.shrink_to(output.content.capacity());
+            Ok(backup_io::Download::Memory {
+                output,
+                reservation,
+            })
         })
     }
     pub fn prepare_job_download(&self, job_id: &str, token: &str) -> Result<backup_io::Download> {

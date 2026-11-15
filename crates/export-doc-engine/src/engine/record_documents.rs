@@ -1,10 +1,9 @@
 use super::{
     NativeService, communication,
     error::{Result, conflict, error, invalid, unavailable},
-    media, oa,
+    oa,
     records::{self, required, text},
     store::{self, Actor},
-    tasks::FileOutput,
 };
 use crate::engine::store::Connection;
 use crate::generated_api::Operation;
@@ -186,19 +185,6 @@ pub(super) fn remove(
     )
 }
 
-pub(in crate::engine) fn download(
-    service: &NativeService,
-    actor: &Actor,
-    operation: Operation,
-    parameters: &[(&str, String)],
-) -> Result<FileOutput> {
-    let info = download_info(service, actor, operation, parameters)?;
-    let output = service.store.files.load(&info, media::DOCUMENT_LIMIT)?;
-    if download_info(service, actor, operation, parameters)? != info {
-        return Err(super::error::conflict("附件已变化，请重新读取。"));
-    }
-    Ok(output)
-}
 pub(in crate::engine) fn download_info(
     service: &NativeService,
     actor: &Actor,

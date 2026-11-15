@@ -1,3 +1,4 @@
+import { queryPollingInterval } from "../../api/queryPollingPolicy.ts";
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
@@ -58,7 +59,7 @@ export function usePostgreSqlMaintenance(
     queryKey: queryKeys.serverMigrationStatus(),
     queryFn: ({ signal }) => client.getServerMigrationStatus({ signal }),
     enabled: canManageSettings,
-    refetchInterval: (query) => (canManageSettings && query.state.data?.pendingRestore ? 5_000 : false),
+    refetchInterval: (query) => canManageSettings ? queryPollingInterval(query, query.state.data?.pendingRestore ? 5_000 : false) : false,
   });
 
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { queryPollingInterval } from "../../api/queryPollingPolicy.ts";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -15,7 +16,7 @@ export function OaApprovalVerification({ client, user, onOpen }: { client: Expor
   const query = useQuery({ queryKey: ["office", "oa", "expense", user.id, user.companyScope, "verification", reference],
     enabled: reference !== null, retry: false, staleTime: 0, gcTime: 0,
     queryFn: ({ signal }) => client.verifyExpenseApproval(reference!, { signal }),
-    refetchInterval: reference ? 30000 : false, refetchIntervalInBackground: false });
+    refetchInterval: query => reference ? queryPollingInterval(query) : false, refetchIntervalInBackground: false });
   const result = reference ? query.data : undefined;
   return <section className="office-resource-card" aria-label="核对纸质审批单">
     <h3>核对纸质审批单</h3>

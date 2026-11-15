@@ -1,11 +1,30 @@
 //! Durable upload intents bridge immutable object publication and SQL commit.
 //! An interrupted upload remains observable until the administrator reconciles it.
 use super::*;
+#[cfg(test)]
+#[path = "tests/journal.rs"]
+mod tests;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     sync::{Arc, Mutex},
 };
-pub(super) type Uploads = Arc<Mutex<BTreeMap<String, (String, String)>>>;
+pub(super) type Uploads = Arc<Mutex<Activity>>;
+#[derive(Default)]
+pub(super) struct Activity {
+    uploads: BTreeMap<String, (String, String)>,
+    collecting: BTreeSet<(String, String)>,
+}
+struct CollectionLease {
+    key: (String, String),
+    active: Uploads,
+}
+impl Drop for CollectionLease {
+    fn drop(&mut self) {
+        if let Ok(mut active) = self.active.lock() {
+            active.collecting.remove(&self.key);
+        }
+    }
+}
 pub(super) struct UploadLease {
     pub(super) path: PathBuf,
     token: String,
@@ -14,7 +33,7 @@ pub(super) struct UploadLease {
 impl Drop for UploadLease {
     fn drop(&mut self) {
         if let Ok(mut active) = self.active.lock() {
-            active.remove(&self.token);
+            active.uploads.remove(&self.token);
         }
     }
 }
@@ -42,13 +61,20 @@ impl FileStore {
             token: token.clone(),
             active: self.uploads.clone(),
         };
-        self.uploads
-            .lock()
-            .map_err(|_| unavailable("文件上传状态异常。"))?
-            .insert(
-                token.clone(),
-                (config.identity.clone(), object.digest.clone()),
-            );
+        {
+            let mut active = self
+                .uploads
+                .lock()
+                .map_err(|_| unavailable("文件上传状态异常。"))?;
+            let key = (config.identity.clone(), object.digest.clone());
+            if active.collecting.contains(&key) {
+                return Err(super::super::error::error(
+                    429,
+                    "相同文件正在回收，请稍后重试上传。",
+                ));
+            }
+            active.uploads.insert(token.clone(), key);
+        }
         let root = self.journal_root();
         paths::ensure_safe_absolute(&root).map_err(unavailable)?;
         crate::secrets::private_directory(&root).map_err(unavailable)?;
@@ -62,8 +88,9 @@ impl FileStore {
         .map_err(unavailable)?;
         Ok(lease)
     }
-    /// Caller holds the backup/migration locks and application write gate.
-    /// Physical deletes finish before SQL metadata is removed. A retry is safe.
+    /// Caller holds the backup/migration locks. Only reference checks and metadata
+    /// writes use the application gate; a per-object lease excludes new uploads.
+    /// Intents and unreferenced SQL rows survive an interrupted physical delete.
     pub(super) fn reconcile(&self, store: &super::super::store::Store) -> Result<u64> {
         let root = self.journal_root();
         paths::ensure_safe_absolute(&root).map_err(unavailable)?;
@@ -76,6 +103,7 @@ impl FileStore {
                     .uploads
                     .lock()
                     .map_err(|_| unavailable("文件上传状态异常。"))?
+                    .uploads
                     .values()
                     .any(|(id, digest)| id == &config.identity && digest == name))
             })?;
@@ -88,36 +116,37 @@ impl FileStore {
             if path.extension().is_none_or(|e| e != "json") {
                 continue;
             }
-            let intent: Intent = serde_json::from_reader(fs::File::open(&path)?.take(4096))
+            let file = match fs::File::open(&path) {
+                Ok(file) => file,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(e.into()),
+            };
+            let intent: Intent = serde_json::from_reader(file.take(4096))
                 .map_err(|_| unavailable("文件上传回收记录损坏。"))?;
             validate(&intent.object)?;
-            let active = self
-                .uploads
-                .lock()
-                .map_err(|_| unavailable("文件上传状态异常。"))?;
-            if active.values().any(|(identity, digest)| {
-                identity == &intent.identity && digest == &intent.object.digest
-            }) {
-                continue;
-            }
-            let referenced = store
-                .connection()?
-                .file_is_referenced(&intent.object.digest)?;
-            if referenced {
-                fs::remove_file(path)?;
-                continue;
-            }
             // Old locations remain rollback material after migration; never
             // infer that an object there may be deleted from today's metadata.
             if intent.identity != config.identity {
                 continue;
             }
-            self.remove_object(&config, &intent.object)?;
-            store
-                .connection()?
-                .remove_unused_file(&intent.object.digest)?;
-            fs::remove_file(path)?;
-            reclaimed += intent.object.size;
+            if self.collect(store, &config, &intent.object)? {
+                reclaimed += intent.object.size;
+            }
+            // A live upload owns its intent until commit or abandonment.
+            let active = self
+                .uploads
+                .lock()
+                .map_err(|_| unavailable("文件上传状态异常。"))?;
+            if !active
+                .uploads
+                .contains_key(path.file_stem().and_then(|s| s.to_str()).unwrap_or(""))
+            {
+                match fs::remove_file(path) {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => return Err(e.into()),
+                }
+            }
         }
         let mut cursor = String::new();
         loop {
@@ -128,25 +157,53 @@ impl FileStore {
             for object in objects {
                 crate::operation::check()?;
                 cursor = object.digest.clone();
-                let active = self
-                    .uploads
-                    .lock()
-                    .map_err(|_| unavailable("文件上传状态异常。"))?;
-                if active
-                    .values()
-                    .any(|(id, digest)| id == &config.identity && digest == &object.digest)
-                {
-                    continue;
+                if self.collect(store, &config, &object)? {
+                    reclaimed += object.size;
                 }
-                if store.connection()?.file_is_referenced(&object.digest)? {
-                    continue;
-                }
-                self.remove_object(&config, &object)?;
-                store.connection()?.remove_unused_file(&object.digest)?;
-                reclaimed += object.size;
             }
         }
         Ok(reclaimed)
+    }
+    fn claim_collection(
+        &self,
+        store: &super::super::store::Store,
+        config: &Configuration,
+        object: &FileObject,
+    ) -> Result<Option<CollectionLease>> {
+        store.with_writes_paused(|| {
+            let mut active = self
+                .uploads
+                .lock()
+                .map_err(|_| unavailable("文件上传状态异常。"))?;
+            let key = (config.identity.clone(), object.digest.clone());
+            if active.uploads.values().any(|value| value == &key)
+                || active.collecting.contains(&key)
+                || store.connection()?.file_is_referenced(&object.digest)?
+            {
+                return Ok(None);
+            }
+            active.collecting.insert(key.clone());
+            Ok(Some(CollectionLease {
+                key,
+                active: self.uploads.clone(),
+            }))
+        })
+    }
+    fn collect(
+        &self,
+        store: &super::super::store::Store,
+        config: &Configuration,
+        object: &FileObject,
+    ) -> Result<bool> {
+        let Some(_lease) = self.claim_collection(store, config, object)? else {
+            return Ok(false);
+        };
+        self.remove_object(config, object)?;
+        store.transaction(|tx| {
+            tx.remove_unused_file(&object.digest)?;
+            Ok(())
+        })?;
+        Ok(true)
     }
     fn remove_object(&self, config: &Configuration, object: &FileObject) -> Result<()> {
         match &config.backend {

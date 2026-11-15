@@ -42,9 +42,7 @@ fn immutable_objects_deduplicate_bytes_without_merging_business_references() {
             Ok(())
         })
         .unwrap();
-    store
-        .with_writes_paused(|| store.files.reconcile(&store))
-        .unwrap();
+    store.files.reconcile(&store).unwrap();
     let info = store
         .connection()
         .unwrap()
@@ -58,9 +56,7 @@ fn immutable_objects_deduplicate_bytes_without_merging_business_references() {
             Ok(())
         })
         .unwrap();
-    store
-        .with_writes_paused(|| store.files.reconcile(&store))
-        .unwrap();
+    store.files.reconcile(&store).unwrap();
     assert_eq!(
         store.connection().unwrap().file_statistics().unwrap()["fileCount"],
         0
@@ -74,21 +70,12 @@ fn rolled_back_upload_is_recovered_only_after_its_active_lease_ends() {
     let store = Store::open(&root.paths()).unwrap();
     let prepared = store.files.prepare(b"abandoned").unwrap();
     let object = prepared.object.clone();
-    store
-        .with_writes_paused(|| store.files.reconcile(&store))
-        .unwrap();
+    store.files.reconcile(&store).unwrap();
     assert!(store.files.open_object(&object).is_ok());
     drop(prepared);
-    store
-        .with_writes_paused(|| store.files.reconcile(&store))
-        .unwrap();
+    store.files.reconcile(&store).unwrap();
     assert!(store.files.open_object(&object).is_err());
-    assert_eq!(
-        store
-            .with_writes_paused(|| store.files.reconcile(&store))
-            .unwrap(),
-        0
-    );
+    assert_eq!(store.files.reconcile(&store).unwrap(), 0);
 }
 
 #[test]
@@ -240,9 +227,7 @@ fn incremental_snapshots_reuse_objects_and_restore_after_primary_collection() {
             Ok(())
         })
         .unwrap();
-    store
-        .with_writes_paused(|| store.files.reconcile(&store))
-        .unwrap();
+    store.files.reconcile(&store).unwrap();
     assert!(store.files.open_object(&object).is_err());
     incremental::restore(&store.files, &first).unwrap();
     assert!(store.files.open_object(&object).is_ok());
@@ -314,9 +299,7 @@ fn backup_collection_preserves_all_recovery_points_and_fails_closed_on_bad_inven
             Ok(())
         })
         .unwrap();
-    store
-        .with_writes_paused(|| store.files.reconcile(&store))
-        .unwrap();
+    store.files.reconcile(&store).unwrap();
     let empty = save("empty.sqlite3");
     let path = backups
         .join("Objects")

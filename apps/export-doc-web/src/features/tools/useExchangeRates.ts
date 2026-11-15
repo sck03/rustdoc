@@ -1,3 +1,4 @@
+import { queryPollingInterval } from "../../api/queryPollingPolicy.ts";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
@@ -19,7 +20,7 @@ export function useExchangeRates(client: ExportDocManagerApiClient) {
     enabled: Boolean(configuration),
     staleTime: 30_000,
     retry: false,
-    refetchInterval: query => (query.state.data?.autoRefreshEnabled ?? configuration?.autoRefreshEnabled) ? 60_000 : false,
+    refetchInterval: query => queryPollingInterval(query, (query.state.data?.autoRefreshEnabled ?? configuration?.autoRefreshEnabled) ? 60_000 : false),
     refetchIntervalInBackground: false,
   });
   const refresh = useMutation({

@@ -1,3 +1,4 @@
+import { queryPollingInterval } from "../../api/queryPollingPolicy.ts";
 import { Button } from "../../ui/Button.tsx";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -21,7 +22,7 @@ export function ApprovalDocument({api,user,row,scope,submissionId = row.submissi
   const [preview,setPreview] = useState<Blob|null>(null);
   const url = useBlobUrl(preview);
   const query = useQuery({queryKey:["office","approval-document",scope,user.id,user.contextId,row.id,submissionId,row.versionNumber],enabled:Boolean(submissionId),
-    queryFn:({signal})=>api.submission(row.id,submissionId!,{signal}),refetchInterval: query => !query.state.error && query.state.data?.documentStatus === "Running" ? 1500 : false,refetchIntervalInBackground:false});
+    queryFn:({signal})=>api.submission(row.id,submissionId!,{signal}),refetchInterval: query => queryPollingInterval(query, query.state.data?.documentStatus === "Running" ? 1500 : false),refetchIntervalInBackground:false});
   if (!submissionId) return ["Approved","HandedOff","Completed","InUse","Issued","Returned"].includes(row.status) ? <p className="office-muted">此历史申请未保存提交快照，无法生成可追溯的正式审批单。</p> : null;
   const document = query.data;
   const partial=document?.materialAccess?.isPartial??false;

@@ -137,10 +137,12 @@ try {
     await page.clock.install();
     await page.evaluate(() => window.remoteSettings({ autoRefreshEnabled: true }));
     await page.waitForFunction(() => window.requests.at(-1).configuration.autoRefreshEnabled);
-    await page.evaluate(() => window.requests.at(-1).reject(new Error('initial source error')));
+    await page.evaluate(() => window.requests.at(-1).reject(new TypeError('initial source error')));
     await page.getByText(/initial source error/).waitFor();
     const failed = await page.evaluate(() => window.requests.length);
-    await page.clock.fastForward(60_001);
+    await page.clock.fastForward(30_000);
+    assert.equal(await page.evaluate(() => window.requests.length), failed, 'Network failures wait for backoff');
+    await page.clock.fastForward(30_001);
     await page.waitForFunction(n => window.requests.length > n, failed);
     await resolve(page, quote({ autoRefreshEnabled: true }));
     await page.getByRole('cell', { name: '美元', exact: true }).waitFor();

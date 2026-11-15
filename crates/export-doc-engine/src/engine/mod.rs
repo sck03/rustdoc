@@ -183,16 +183,6 @@ impl NativeService {
             "manage",
         )
     }
-    pub fn download_report_resource(
-        &self,
-        parameters: &[(&str, String)],
-        token: &str,
-    ) -> Result<tasks::FileOutput> {
-        let _access = crate::engine::maintenance::acquire_read(&self.maintenance)?;
-        let actor = self.sessions.actor(&self.store, token)?;
-        self.authorize_operation(&actor, DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE, &[])?;
-        report_assets::download(self, &actor, parameters)
-    }
     /// Direct file downloads that are not backed by a persisted job result.
     pub fn download_file(
         &self,
@@ -200,30 +190,8 @@ impl NativeService {
         parameters: &[(&str, String)],
         token: &str,
     ) -> Result<tasks::FileOutput> {
-        let _access = crate::engine::maintenance::acquire_read(&self.maintenance)?;
-        let actor = self.sessions.actor(&self.store, token)?;
-        self.authorize_operation(&actor, operation, &[])?;
-        if oa::metadata(operation).is_some_and(|meta| {
-            matches!(
-                meta["action"].as_str(),
-                Some("document-download" | "bundle-download")
-            )
-        }) {
-            return oa::download(self, &actor, operation, parameters);
-        }
-        if oa::is_download(operation) || communication::is_download(operation) {
-            return record_documents::download(self, &actor, operation, parameters);
-        }
-        if operation == DOWNLOAD_PERSONNEL_ATTACHMENT {
-            return personnel_files::download(&self.store, &actor, parameters);
-        }
-        match operation {
-            DOWNLOAD_REPORT_TEMPLATE_FILE | DOWNLOAD_REPORT_TEMPLATE_PACKAGE => {
-                report_template_files::download(self, &actor, operation, parameters)
-            }
-            DOWNLOAD_SUPPORT_PACKAGE => licensing::download(self, &actor, operation, parameters),
-            _ => Err(unsupported("此下载尚未完成原生迁移。")),
-        }
+        self.prepare_file_download(operation, parameters, token)?
+            .into_memory()
     }
     pub fn dispatch_with_bootstrap(
         &self,

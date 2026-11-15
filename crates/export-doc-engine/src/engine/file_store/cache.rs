@@ -1,12 +1,13 @@
 //! Process-local verified objects. Independent handles serve overlapping Range
 //! requests; eviction unlinks only files created by this cache instance.
 use super::*;
-use std::{collections::BTreeMap, sync::Mutex, time::SystemTime};
+use crate::paths::file_stamp;
+use std::{collections::BTreeMap, sync::Mutex};
 const CAPACITY: u64 = 256 * 1024 * 1024;
 struct Entry {
     path: PathBuf,
     size: u64,
-    modified: SystemTime,
+    stamp: Option<file_stamp::Stamp>,
     used: u64,
 }
 impl Drop for Entry {
@@ -21,7 +22,10 @@ struct State {
     size: u64,
 }
 #[derive(Default)]
-pub(super) struct Cache(Mutex<State>);
+pub(super) struct Cache {
+    state: Mutex<State>,
+    flights: super::flights::Flights,
+}
 impl Cache {
     pub(super) fn open(root: &Path) -> Result<Self> {
         paths::ensure_safe_absolute(root).map_err(unavailable)?;
@@ -45,7 +49,7 @@ impl Cache {
     }
     pub(super) fn get(&self, object: &FileObject) -> Result<Option<fs::File>> {
         let mut state = self
-            .0
+            .state
             .lock()
             .map_err(|_| unavailable("文件缓存状态异常。"))?;
         state.used = state.used.wrapping_add(1);
@@ -54,15 +58,19 @@ impl Cache {
             return Ok(None);
         };
         paths::ensure_safe_absolute(&entry.path).map_err(unavailable)?;
-        let file = fs::File::open(&entry.path)?;
-        let metadata = file.metadata()?;
-        if metadata.len() != object.size || metadata.modified()? != entry.modified {
+        let file = match fs::File::open(&entry.path) {
+            Ok(file) => Some(file),
+            Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => None,
+            Err(cause) => return Err(cause.into()),
+        };
+        let stamp = file.as_ref().map(file_stamp::read).transpose()?;
+        if stamp.as_ref().is_none_or(|stamp| stamp.size != object.size) || stamp != entry.stamp {
             let old = state.entries.remove(&object.digest).unwrap();
             state.size -= old.size;
             return Ok(None);
         }
         entry.used = used;
-        Ok(Some(file))
+        Ok(file)
     }
     pub(super) fn download(
         &self,
@@ -76,6 +84,13 @@ impl Cache {
         if object.size > CAPACITY {
             return store.download_uncached(config, object);
         }
+        let flight = self.flights.get(&object.digest)?;
+        let _filling = flight.write(std::time::Duration::from_secs(
+            super::super::backup_io::TIMEOUT_SECONDS,
+        ))?;
+        if let Some(file) = self.get(object)? {
+            return Ok(file);
+        }
         let root = store.cache.join("FileDownloads");
         paths::ensure_safe_absolute(&root).map_err(unavailable)?;
         crate::secrets::private_directory(&root).map_err(unavailable)?;
@@ -88,14 +103,14 @@ impl Cache {
         let mut entry = Entry {
             path,
             size: object.size,
-            modified: SystemTime::UNIX_EPOCH,
+            stamp: None,
             used: 0,
         };
         store.download_into(config, object, &mut file)?;
-        entry.modified = file.metadata()?.modified()?;
+        entry.stamp = Some(file_stamp::read(&file)?);
         file.seek(SeekFrom::Start(0))?;
         let mut state = self
-            .0
+            .state
             .lock()
             .map_err(|_| unavailable("文件缓存状态异常。"))?;
         if let Some(old) = state.entries.remove(&object.digest) {
@@ -150,7 +165,11 @@ impl FileStore {
         let config = self.configuration()?;
         match config.backend {
             Backend::Local { .. } => {
-                self.open_object(object)?;
+                self.local_identity(&config)?;
+                verify(
+                    &mut fs::File::open(self.object_path(&config, object)?)?,
+                    object,
+                )?;
             }
             Backend::S3 { .. } => {
                 let actual = self.target(&config)?.download(

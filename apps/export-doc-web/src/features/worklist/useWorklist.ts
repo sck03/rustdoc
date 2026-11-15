@@ -1,3 +1,4 @@
+import { queryPollingInterval } from "../../api/queryPollingPolicy.ts";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient, WorklistDueFilter } from "../../api/index.ts";
@@ -13,13 +14,13 @@ export function useWorklist(client: ExportDocManagerApiClient, user: ApiUserDto)
     queryKey: ["worklist", user.id, user.contextId, user.permissionSchemeVersion, "summary", due],
     queryFn: ({ signal }) => client.getWorklist({ due, pageSize: 1, includeSummary: true }, { signal }),
     staleTime: 60_000,
-    refetchInterval: state => pageNumber === 1 && state.state.status !== "error" ? 60_000 : false,
+    refetchInterval: query => pageNumber === 1 ? queryPollingInterval(query, 60_000) : false,
     refetchIntervalInBackground: false,
   });
   const query = useQuery({
     queryKey: ["worklist", user.id, user.contextId, user.permissionSchemeVersion, source, due, cursors.at(-1), pageSize],
     queryFn: ({ signal }) => client.getWorklist({ source: source || undefined, due, pageNumber, pageSize, cursor: cursors.at(-1), includeSummary: false }, { signal }),
-    refetchInterval: state => pageNumber === 1 && state.state.status !== "error" ? 60_000 : false,
+    refetchInterval: query => pageNumber === 1 ? queryPollingInterval(query, 60_000) : false,
     refetchIntervalInBackground: false,
   });
   const first = () => setCursors([undefined]);

@@ -1,3 +1,4 @@
+import { queryPollingInterval } from "../../api/queryPollingPolicy.ts";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiBackupPlan, ApiBackupPlanSaveRequest, ApiBackupPlanStatus, ApiBackupS3Settings, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -28,7 +29,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
     queryKey: queryKeys.backupPlan(),
     queryFn: ({ signal }) => client.getBackupPlan({ signal }),
     enabled: canManage,
-    refetchInterval: (query) => query.state.error ? false : query.state.data?.runningJobId ? 3_000 : query.state.data?.plan.enabled ? 30_000 : false,
+    refetchInterval: (query) => queryPollingInterval(query, query.state.data?.runningJobId ? 3_000 : query.state.data?.plan.enabled ? 30_000 : false),
     refetchIntervalInBackground: false,
   });
   const apply = (status: ApiBackupPlanStatus) => {
@@ -41,7 +42,7 @@ export function useBackupPlan(client: ExportDocManagerApiClient, canManage: bool
     queryKey: ["backup-plan-job", jobId],
     queryFn: ({ signal }) => client.getJob({ jobId: jobId! }, { signal }),
     enabled: Boolean(jobId) && canManage,
-    refetchInterval: (query) => query.state.error || isTerminalJob(query.state.data?.status) ? false : 2_000,
+    refetchInterval: (query) => isTerminalJob(query.state.data?.status) ? false : queryPollingInterval(query, 2_000),
     refetchIntervalInBackground: false,
   });
   const activeJob = Boolean(jobId && !isTerminalJob(job.data?.status) && !job.isError);

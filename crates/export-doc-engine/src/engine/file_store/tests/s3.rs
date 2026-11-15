@@ -2,17 +2,7 @@ use super::*;
 use crate::engine::test_support::{administrator, replica_fixture::Fixture};
 use export_doc_domain::backup_plan::{S3Addressing, S3Settings};
 
-#[test]
-fn remote_archive_upload_does_not_hold_the_task_completion_gate() {
-    use crate::engine::tasks::{ArchiveOutput, FileOutput, Jobs, TaskOutput};
-    use std::{
-        sync::{Arc, atomic::Ordering},
-        time::{Duration, Instant},
-    };
-    let root = ScratchDirectory::new();
-    let store = Arc::new(Store::open(&root.paths()).unwrap());
-    crate::engine::auth::seed(&store).unwrap();
-    let fixture = Fixture::start(root.0.clone(), true, false, None);
+fn use_remote_fixture(store: &Store, fixture: &Fixture) -> Configuration {
     let mut config = store.files.configuration().unwrap();
     config.backend = Backend::S3 {
         settings: S3Settings {
@@ -31,6 +21,21 @@ fn remote_archive_upload_does_not_hold_the_task_completion_gate() {
     };
     store.files.initialize_target(&config).unwrap();
     store.files.activate(config.clone()).unwrap();
+    config
+}
+
+#[test]
+fn remote_archive_upload_does_not_hold_the_task_completion_gate() {
+    use crate::engine::tasks::{ArchiveOutput, FileOutput, Jobs, TaskOutput};
+    use std::{
+        sync::{Arc, atomic::Ordering},
+        time::{Duration, Instant},
+    };
+    let root = ScratchDirectory::new();
+    let store = Arc::new(Store::open(&root.paths()).unwrap());
+    crate::engine::auth::seed(&store).unwrap();
+    let fixture = Fixture::start(root.0.clone(), true, false, None);
+    let config = use_remote_fixture(&store, &fixture);
     let jobs = Jobs::with_retention(store.clone(), Default::default()).unwrap();
     let actor = administrator();
     let id = store.transaction(|tx| Ok(tx.insert(&RecordWrite::unkeyed("file-test", &json!({"companyScope":"DEFAULT","versionNumber":1,"ownerUserId":1,"departmentId":"GENERAL"})))?)).unwrap();
@@ -119,30 +124,30 @@ fn small_objects_cache_integrity_and_credentials_share_one_namespace() {
     let store = Store::open(&root.paths()).unwrap();
     crate::engine::auth::seed(&store).unwrap();
     let fixture = Fixture::start(root.0.clone(), true, false, None);
-    let mut config = store.files.configuration().unwrap();
-    config.backend = Backend::S3 {
-        settings: S3Settings {
-            endpoint: format!("http://{}", fixture.address),
-            bucket: "fixture-bucket".into(),
-            access_key_id: "fixture-access".into(),
-            addressing: S3Addressing::Path,
-            ..Default::default()
-        },
-        secret: store
-            .files
-            .protector
-            .protect("file-storage-secret", "fixture-secret")
-            .unwrap(),
-        token: String::new(),
-    };
-    store.files.initialize_target(&config).unwrap();
-    store.files.activate(config.clone()).unwrap();
+    let config = use_remote_fixture(&store, &fixture);
     let prepared = store.files.prepare(b"verified object").unwrap();
     record(&store, &prepared).unwrap();
     assert!(
         !prepared.intent_path().exists(),
         "committed upload intent must be removed"
     );
+    let ready = std::sync::Barrier::new(8);
+    std::thread::scope(|threads| {
+        let readers: Vec<_> = (0..8)
+            .map(|_| {
+                threads.spawn(|| {
+                    ready.wait();
+                    let mut file = store.files.open_object(&prepared.object).unwrap();
+                    let mut content = Vec::new();
+                    file.read_to_end(&mut content).unwrap();
+                    assert_eq!(content, b"verified object");
+                })
+            })
+            .collect();
+        for reader in readers {
+            reader.join().unwrap();
+        }
+    });
     let mut first = store.files.open_object(&prepared.object).unwrap();
     let mut second = store.files.open_object(&prepared.object).unwrap();
     first.seek(SeekFrom::Start(9)).unwrap();
@@ -229,4 +234,44 @@ fn expired_remote_credentials_do_not_prevent_authenticated_recovery_startup() {
     drop(store);
     let reopened = Store::open(&root.paths()).unwrap();
     assert!(reopened.files.health().is_err());
+}
+
+#[test]
+fn slow_remote_collection_allows_unrelated_writes_and_blocks_same_object_upload() {
+    use std::{
+        sync::atomic::Ordering,
+        time::{Duration, Instant},
+    };
+    let root = ScratchDirectory::new();
+    let store = Store::open(&root.paths()).unwrap();
+    let fixture = Fixture::start(root.0.clone(), true, false, None);
+    use_remote_fixture(&store, &fixture);
+    let upload = store.files.prepare(b"orphan").unwrap();
+    drop(upload);
+    fixture.hold_delete.store(true, Ordering::Release);
+    std::thread::scope(|threads| {
+        let collecting = threads.spawn(|| store.files.reconcile(&store));
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !fixture.delete_started.load(Ordering::Acquire) {
+            assert!(Instant::now() < deadline);
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let saved = crate::operation::OperationScope::new(Duration::from_millis(500)).run(|| {
+            store.transaction(|tx| {
+                Ok(tx.insert(&RecordWrite::unkeyed(
+                    "file-test",
+                    &json!({"companyScope":"ACME","versionNumber":1,"ownerUserId":1,"departmentId":"GENERAL"}),
+                ))?)
+            })
+        });
+        let upload = store.files.prepare(b"orphan");
+        fixture.hold_delete.store(false, Ordering::Release);
+        assert!(
+            saved.is_ok(),
+            "S3 latency must not hold the application write gate: {saved:?}"
+        );
+        assert_eq!(upload.err().unwrap().status, Some(429));
+        assert_eq!(collecting.join().unwrap().unwrap(), 6);
+    });
+    fixture.finish();
 }

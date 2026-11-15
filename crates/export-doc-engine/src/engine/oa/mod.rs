@@ -73,7 +73,7 @@ pub fn is_download(operation: Operation) -> bool {
         )
     })
 }
-pub(super) use documents::{download, prepare as prepare_download};
+pub(super) use documents::prepare as prepare_download;
 fn kind(meta: &Value) -> String {
     resource_requests::resource_kind(meta)
         .map(str::to_owned)

@@ -3,8 +3,8 @@ import { shouldRetryQueryFailure } from "./queryRetryPolicy.ts";
 type PollingQuery = { state: { error: unknown; fetchFailureCount: number } };
 
 /** Permanent failures need an explicit retry; transient failures keep bounded recovery. */
-export function queryPollingInterval({ state }: PollingQuery): number | false {
-  if (!state.error) return 30_000;
+export function queryPollingInterval({ state }: PollingQuery, interval: number | false = 30_000): number | false {
+  if (!state.error) return interval;
   if (!shouldRetryQueryFailure(0, state.error)) return false;
   return Math.min(30_000 * 2 ** Math.max(1, state.fetchFailureCount), 300_000);
 }

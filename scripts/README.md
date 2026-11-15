@@ -254,7 +254,9 @@ Tauri updater 默认没有端点或公钥，签名发布须显式配置受信公
 
 `npm --prefix apps/export-doc-web run test:invoice-editing` 读取与 Rust 共用的金额夹具，验证精确运算、TSV 和保存基线，再运行真实 React hook 的延迟、切换、卸载、刷新失败、重复提交与精确商品查询。`test:document-editor-ui` 另检查实际发票页面的新建跳转和二次保存。普通 Rust/Chromium CI 已加入这些回归及 Clippy；Firefox/WebKit 继续保留手动入口。
 
-实际 PDF 页图回归可设置 `EXPORTDOCMANAGER_REVIEW_APP_ROOT` 为本批组装的应用包根，直接复用包内受管 PDFium、字体和模板；`office_review` 的第二个可选参数对应此 AppRoot，第一个参数仍是独立测试 DataRoot，React 静态文件继续来自仓库构建。缺少原生库时专项明确失败。
+2026-11-15：`test:query-retry-policy` 在内存中打包真实 QueryObserver，验证临时失败恢复、业务刷新频率、终态与权限错误停止、卸载清理，不生成临时测试入口。Rust `file_store` 回归包括并发缓存、变更戳、取消与慢 S3 删除；OA 下载回归覆盖长文件名和低磁盘空间拒绝，下载入口回归覆盖分配前预算和响应释放。
+
+实际 PDF 页图回归可设置 `EXPORTDOCMANAGER_REVIEW_APP_ROOT` 为本批组装的应用包根，直接复用包内受管 PDFium、字体和模板；`office_review` 的第二个可选参数对应此 AppRoot，第一个参数仍是独立测试 DataRoot，React 静态文件继续来自仓库构建。缺少原生库时专项明确失败。发票报表回归也使用共享宿主解析器，支持 `EXPORTDOC_OFFICE_REVIEW_BINARY` 指向已编译的隔离副本。
 
 `test:concurrency-feedback` 另运行客户/供应商与联系人保存的真实 React 回归，覆盖保存期间继续输入、新建编号与并发版本、重复提交、切换/卸载、迟到响应和刷新失败；共用保存 hook 不通过清空草稿规避冲突。导入预检在同一业务库中保留 30 分钟，单次边界保持；待提交内容另限每账号 200 份/128 MiB、全局 2000 份/256 MiB，满额返回 429。提交成功即事务化释放正文，重复提交仍明确拒绝。
 

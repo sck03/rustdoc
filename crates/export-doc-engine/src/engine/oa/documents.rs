@@ -216,4 +216,4 @@ fn snapshot_number(tx: &Connection, id: i64) -> Result<i64> {
 
 #[path = "documents/downloads.rs"]
 mod downloads;
-pub(in crate::engine) use downloads::{download, prepare};
+pub(in crate::engine) use downloads::prepare;

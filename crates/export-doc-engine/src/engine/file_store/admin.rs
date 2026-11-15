@@ -100,7 +100,7 @@ pub(in crate::engine) fn handle(
             let mut count = 0u64;
             let mut bytes = 0u64;
             if operation == RECONCILE_FILE_STORAGE {
-                bytes = store.with_writes_paused(|| {
+                store.with_writes_paused(|| {
                     let actor = store.read(|tx| auth::refresh_actor_in(tx, &administrator))?;
                     if !actor.admin {
                         return Err(super::super::error::error(403, "管理员权限已撤销。"));
@@ -113,8 +113,9 @@ pub(in crate::engine) fn handle(
                     {
                         return Err(conflict("请先完成未结束的文件迁移。"));
                     }
-                    store.files.reconcile(&store)
+                    Ok(())
                 })?;
+                bytes = store.files.reconcile(&store)?;
             } else if operation == VERIFY_FILE_STORAGE {
                 store.read(|tx| {
                     tx.verify_file_accounting()?;

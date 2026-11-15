@@ -437,7 +437,7 @@ async fn execute(
                         .map_err(|_| error(400, "模板下载请求格式无效。"))?;
                         return state
                             .service
-                            .download_file(
+                            .prepare_file_download(
                                 operation,
                                 &[
                                     ("reportType", request.report_type.unwrap_or_default()),
@@ -445,7 +445,7 @@ async fn execute(
                                 ],
                                 &token,
                             )
-                            .map(response::Reply::file);
+                            .map(response::Reply::download);
                     }
                     if [DOWNLOAD_PERSONNEL_ATTACHMENT, DOWNLOAD_BUSINESS_ATTACHMENT]
                         .contains(&operation)
@@ -462,8 +462,8 @@ async fn execute(
                     if operation == DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE {
                         return state
                             .service
-                            .download_report_resource(&parameters, &token)
-                            .map(response::Reply::file);
+                            .prepare_file_download(operation, &parameters, &token)
+                            .map(response::Reply::download);
                     }
                     let preview_memory = if [
                         PREVIEW_REPORT_TEMPLATE_CONTENT,

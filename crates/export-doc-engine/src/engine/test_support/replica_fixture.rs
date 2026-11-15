@@ -19,6 +19,10 @@ pub(crate) struct Fixture {
     pub(crate) hold_put: Arc<AtomicBool>,
     #[cfg(feature = "s3-storage")]
     pub(crate) put_started: Arc<AtomicBool>,
+    #[cfg(feature = "s3-storage")]
+    pub(crate) hold_delete: Arc<AtomicBool>,
+    #[cfg(feature = "s3-storage")]
+    pub(crate) delete_started: Arc<AtomicBool>,
     stop: Arc<AtomicBool>,
     handle: Option<JoinHandle<Vec<String>>>,
 }
@@ -38,6 +42,10 @@ impl Fixture {
         let put_started = Arc::new(AtomicBool::new(false));
         let hold = hold_put.clone();
         let started = put_started.clone();
+        let hold_delete = Arc::new(AtomicBool::new(false));
+        let delete_started = Arc::new(AtomicBool::new(false));
+        let deleting = hold_delete.clone();
+        let deletion_started = delete_started.clone();
         let handle = std::thread::spawn(move || {
             let mut calls = Vec::new();
             let deadline = Instant::now() + Duration::from_secs(45);
@@ -177,6 +185,10 @@ impl Fixture {
                     let code = if matches!(method, "MKCOL" | "MOVE") {
                         201
                     } else if method == "DELETE" {
+                        deletion_started.store(true, Ordering::Release);
+                        while deleting.load(Ordering::Acquire) && !stopped.load(Ordering::Acquire) {
+                            std::thread::sleep(Duration::from_millis(5));
+                        }
                         204
                     } else {
                         200
@@ -197,6 +209,10 @@ impl Fixture {
             hold_put,
             #[cfg(feature = "s3-storage")]
             put_started,
+            #[cfg(feature = "s3-storage")]
+            hold_delete,
+            #[cfg(feature = "s3-storage")]
+            delete_started,
             address,
             stop,
             handle: Some(handle),
