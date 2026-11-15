@@ -36,11 +36,12 @@ pub(in crate::engine) fn export(store: &super::super::store::Store, path: &Path)
         .create_new(true)
         .write(true)
         .open(path)?;
-    let mut output = store
+    let output = store
         .files
         .space
         .at(path.parent().unwrap().to_path_buf())
         .writer(&mut output_file)?;
+    let mut output = std::io::BufWriter::with_capacity(64 * 1024, output);
     output.write_all(MAGIC)?;
     let policy = serde_json::to_vec(&store.files.configuration()?.policy)?;
     output.write_all(&(policy.len() as u32).to_le_bytes())?;
@@ -65,6 +66,7 @@ pub(in crate::engine) fn export(store: &super::super::store::Store, path: &Path)
         }
     }
     output.write_all(&[0; 64])?;
+    output.flush()?;
     drop(output);
     output_file.sync_all()?;
     Ok(())

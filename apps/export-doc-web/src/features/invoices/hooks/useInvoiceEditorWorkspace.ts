@@ -106,13 +106,6 @@ export function useInvoiceEditorWorkspace({ businessDate, client, mode }: {
     enabled: !isNew && isInvoiceIdValid,
   });
 
-  const statusHistoryQuery = useQuery({
-    queryKey: queryKeys.invoiceStatusHistory(parsedInvoiceId),
-    queryFn: ({ signal }) => client.listInvoiceStatusHistory({ id: parsedInvoiceId }, { signal }),
-    enabled: !isNew && isInvoiceIdValid,
-    staleTime: 30 * 1000,
-  });
-
   const selectedCustomerId = invoice?.customerId ?? 0;
   const selectedExporterId = invoice?.exporterId ?? 0;
   const {
@@ -551,7 +544,7 @@ export function useInvoiceEditorWorkspace({ businessDate, client, mode }: {
     singleWindowPermission, message, setMessage, successMessage, setSuccessMessage,
     concurrencyMessage, setIsLetterOfCreditBusy, persistedInvoiceStatus, cancelReason, setCancelReason,
     isCancelReasonDialogOpen, parsedInvoiceId, isNew, isInvoiceIdValid, isInvoiceEditable,
-    itemsWorkspace, invoiceQuery, statusHistoryQuery, selectedCustomerQuery, selectedExporterQuery,
+    itemsWorkspace, invoiceQuery, selectedCustomerQuery, selectedExporterQuery,
     settingsQuery, cloneInvoiceTypeMutation, exporterSealMutation, refreshParties, saveInvoiceMutation,
     statusTransitionMutation, unverifyInvoiceMutation, products, units, invoiceCustomOptions,
     selectedCustomerEmail, isBusy, isPartyBusy, partyMessage, productMessage,

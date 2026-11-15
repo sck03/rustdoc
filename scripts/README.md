@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-15：`test_review_boundaries_ui.mjs` 纳入 `test:settings-models`，验证真实 React 下的利润草稿失效/迟到结果、恢复密码无操作缓存、仅发送权限和历史游标分页。发票状态事件合同在 `business_contract` 中同时供 SQLite 与 PostgreSQL 团队测试使用；网络期限测试遍历全部最终生成元数据。当前 schema 18 模型指纹已随状态历史基线更新，旧实验库仍拒绝打开。
+
 核对日期：2026-11-13。当前使用全新 schema 18；旧实验库须另存后显式新建 DataRoot/数据库。日常文件已独立于数据库，完整迁机必须包含文件对象；下文带日期的旧验收条目不替代当前参数和能力。GitHub 入口与 quick/full 差异见[工作流手册](../docs/GitHub%20Actions工作流用途与运行手册.md)。
 
 OA 管理员和用户手册：`node scripts/generate-oa-manuals.mjs` 从 `docs/manuals` 的 Markdown 生成两份同名 PDF，使用现有 Playwright 和受管 Noto 字体；中间文件写入 `artifacts/oa-manuals`。首次准备前端依赖和报表字体，截图使用当前 `test_oa_custom_ui.mjs` 的匿名界面，分别保存为 `docs/manuals/images/form-designer.png`、`request-details.png`；更新后逐页检查中文、分页和完整性。阅读入口见[OA 手册](../docs/人员组织权限与OA操作手册.md)。

@@ -41,6 +41,8 @@ pub(crate) trait Adapter: Send {
         locate_file(identity:&str,digest:&str)->() => file_catalog::locate;
         query_resources(query:&ResourceQuery<'_>)->(i64,Vec<Value>) => resource_index::catalogue;
         append_attachment_history(record:i64,kind:&str,body:&Value)->() => attachment_history::append;
+        append_invoice_status(event:&InvoiceStatusEvent)->() => invoice_status_history::append;
+        invoice_status_history(record:i64,before:Option<i64>,limit:i64)->Value => invoice_status_history::page;
         attachment_history(record:i64,kind:&str,before:Option<i64>,limit:i64)->Value => attachment_history::page;
         file_is_referenced(digest:&str)->bool => file_catalog::referenced;
         remove_unused_file(digest:&str)->() => file_catalog::remove_unused;

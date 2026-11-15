@@ -1,6 +1,7 @@
 //! Explicit reviewed changes to the frozen served contract; never copy live output.
 use serde_json::{Value, json};
 pub(super) fn reviewed_versioning(baseline: &mut Value) {
+    reviewed_status_history_and_email_status(baseline);
     reviewed_profile_versions_and_product_identity(baseline);
     reviewed_email_pagination(baseline);
     baseline["paths"]["/api/worklist"]["get"]["responses"]["400"] =
@@ -90,6 +91,28 @@ pub(super) fn reviewed_versioning(baseline: &mut Value) {
     for name in ["pageNumber", "pageSize"] {
         parameters.push(json!({"name":name,"in":"query","schema":{"type":["integer","string"],"format":"int32","pattern":"^-?(?:0|[1-9]\\d*)$"}}));
     }
+}
+
+fn reviewed_status_history_and_email_status(baseline: &mut Value) {
+    baseline["components"]["schemas"]["ApiInvoiceStatusHistoryPage"] = json!({
+        "type":"object","properties":{
+            "items":{"type":"array","items":{"$ref":"#/components/schemas/ApiInvoiceStatusHistoryDto"}},
+            "nextCursor":{"type":["null","integer"],"format":"int64"}
+        },"required":["items","nextCursor"]
+    });
+    let history = &mut baseline["paths"]["/api/invoices/{id}/status-history"]["get"];
+    history["responses"]["200"]["content"]["application/json"]["schema"] =
+        json!({"$ref":"#/components/schemas/ApiInvoiceStatusHistoryPage"});
+    history["parameters"].as_array_mut().unwrap().extend([
+        json!({"name":"beforeId","in":"query","schema":{"type":"integer","format":"int64","minimum":1}}),
+        json!({"name":"limit","in":"query","schema":{"type":"integer","format":"int32","minimum":1,"maximum":200}}),
+    ]);
+    let policy = &mut baseline["paths"]["/api/tools/email/status"]["get"]["x-exportdoc-policy"];
+    policy["requirements"] = json!([]);
+    policy["access"] = json!({"match":"Any","resources":[
+        {"resourceKey":"common.email-delivery","actions":["send"],"administratorOnly":false},
+        {"resourceKey":"common.email-delivery","actions":["view-delivery"],"administratorOnly":false}
+    ]});
 }
 
 fn reviewed_coo_import(baseline: &mut Value) {

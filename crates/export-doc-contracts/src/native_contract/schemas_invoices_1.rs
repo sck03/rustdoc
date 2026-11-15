@@ -160,6 +160,10 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("success",b()),("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("isUpdate",b()),
         ("invoice",r("ApiInvoiceDetailDto"))
     ]).required(vec!["success","id","isUpdate","invoice"])),
+    ("ApiInvoiceStatusHistoryPage",o(vec![
+        ("items",a(r("ApiInvoiceStatusHistoryDto"))),
+        ("nextCursor",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer])).format("int64"))
+    ]).required(vec!["items","nextCursor"])),
     ("ApiInvoiceStatusHistoryDto",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("invoiceId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("fromStatus",s()),
         ("toStatus",s()),("note",s()),("changedByUserId",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),

@@ -119,6 +119,25 @@ pub(super) fn document() -> Value {
     endpoints.extend(endpoints_disaster_recovery::entries());
     let mut paths = BTreeMap::<&str, BTreeMap<&str, model::Operation>>::new();
     for mut endpoint in endpoints {
+        if endpoint.operation.id == "ListInvoiceStatusHistory" {
+            endpoint.operation.parameters.as_mut().unwrap().extend([
+                model::p(
+                    "beforeId",
+                    "query",
+                    None,
+                    model::i().format("int64").minimum(model::num("1")),
+                ),
+                model::p(
+                    "limit",
+                    "query",
+                    None,
+                    model::i()
+                        .format("int32")
+                        .minimum(model::num("1"))
+                        .maximum(model::num("200")),
+                ),
+            ]);
+        }
         if matches!(
             endpoint.operation.id,
             "UploadBusinessAttachment" | "UploadPersonnelAttachment"

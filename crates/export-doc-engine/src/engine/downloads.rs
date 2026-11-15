@@ -81,6 +81,8 @@ impl NativeService {
             // Admit the peak working set before reading or compressing. Retain
             // the Vec's allocated capacity until the HTTP response is dropped.
             let working_mib = match operation {
+                #[cfg(feature = "excel")]
+                crate::generated_api::EXPORT_HS_CODE_KNOWLEDGE => 128,
                 DOWNLOAD_REPORT_TEMPLATE_PACKAGE => 128,
                 DOWNLOAD_REPORT_TEMPLATE_FILE => 20,
                 DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE => 64,
@@ -91,6 +93,12 @@ impl NativeService {
                 .jobs
                 .reserve_download(working_mib * 1024 * 1024, true)?;
             let output = match operation {
+                #[cfg(feature = "excel")]
+                crate::generated_api::EXPORT_HS_CODE_KNOWLEDGE => super::tasks::FileOutput {
+                    file_name: "HS知识库.zip".into(),
+                    media_type: "application/vnd.exportdocmanager.hs-knowledge+zip".into(),
+                    content: super::hs_package::export(self, actor, parameters)?,
+                },
                 DOWNLOAD_REPORT_TEMPLATE_FILE | DOWNLOAD_REPORT_TEMPLATE_PACKAGE => {
                     super::report_template_files::download(self, actor, operation, parameters)?
                 }

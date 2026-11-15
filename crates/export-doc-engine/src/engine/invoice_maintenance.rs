@@ -343,12 +343,12 @@ mod tests {
         assert_eq!(result["success"], true);
         assert_eq!(result["previousStatus"], "Cancelled");
         assert!(fixture.store.get("invoices", fixture.invoice_id).is_err());
-        let logs = store::history(
-            &fixture.store.connection().unwrap(),
-            "invoices",
-            fixture.invoice_id,
-        )
-        .unwrap();
+        let logs = fixture
+            .store
+            .connection()
+            .unwrap()
+            .history(Some("invoices"), Some(fixture.invoice_id))
+            .unwrap();
         assert!(
             logs.iter()
                 .any(|entry| entry["action"] == "MaintenancePurge")

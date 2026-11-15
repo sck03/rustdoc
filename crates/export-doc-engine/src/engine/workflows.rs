@@ -159,9 +159,19 @@ pub fn action(
         let saved=store::save(transaction,kind,if cloning{0}else{id},value,identity,actor,action)?;
         if ["report-templates","email-templates"].contains(&kind){store::save(transaction,"template-versions",0,json!({"templateKind":kind,"templateId":saved["id"],"content":saved,"note":text(&body,"note")}),None,actor,"version")?;}
         if kind == "invoices" {
+            transaction.append_invoice_status(&export_doc_storage::InvoiceStatusEvent {
+                id: saved["versionNumber"].as_i64().ok_or_else(|| super::error::unavailable("发票版本缺失。"))?,
+                invoice_id: id,
+                from_status: state,
+                to_status: text(&saved, "status"),
+                note: text(&body, "note"),
+                changed_by_user_id: actor.id,
+                changed_by_username: text(&store::get(transaction, "users", actor.id)?, "username"),
+                changed_at: text(&saved, "updatedAt"),
+            })?;
             let dto: ApiInvoiceDetailDto = serde_json::from_value(saved)?;
             let invoice = InvoiceDraft::from_dto(dto).build().map_err(invalid)?;
-            return Ok(json!({"success":true,"id":invoice.id,"message":"操作完成","invoice":invoice}));
+            return Ok(json!({"success":true,"id":invoice.id,"isUpdate":true,"message":"操作完成","invoice":invoice}));
         }
         Ok(saved)
     })

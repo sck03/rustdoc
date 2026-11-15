@@ -1,6 +1,14 @@
 //! Execution budgets shared by the HTTP host and generated browser clients.
 pub const TRANSFER_SECONDS: u64 = 24 * 60 * 60;
 
+/// The generated contract includes capability and binary-response overrides.
+pub fn execution_seconds(operation: &str) -> u64 {
+    crate::contracts::contract()["operations"][operation]["timeoutSeconds"]
+        .as_u64()
+        .filter(|seconds| *seconds > 0)
+        .expect("generated operation execution budget")
+}
+
 pub fn seconds(operation: &str) -> u64 {
     match operation {
         "StageServerMigrationRestore"
@@ -24,6 +32,19 @@ mod tests {
     #[test]
     fn long_running_operations_publish_their_execution_budgets() {
         let document = crate::openapi::document();
+        for operation in document["paths"]
+            .as_object()
+            .unwrap()
+            .values()
+            .flat_map(|path| path.as_object().unwrap().values())
+        {
+            let id = operation["operationId"].as_str().unwrap();
+            assert_eq!(
+                super::execution_seconds(id),
+                operation["x-exportdoc-timeout-seconds"].as_u64().unwrap(),
+                "{id}"
+            );
+        }
         for (id, expected) in [
             ("getHealth", 30),
             ("UploadLetterOfCreditDocument", 600),

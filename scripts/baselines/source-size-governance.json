@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-15",
-  "reviewNotes": "2026-11-15 lifecycle review against cd1fc0fe: unify budgeted downloads and polling; replace global-I/O collection with object leases; isolate handle stamps, bounded verification and per-object cache admission; remove duplicate download adapters and share protocol fixtures. Tests live under dedicated test modules; UI regressions use current attachment and retry contracts. Measured net line deltas: web +8, Rust production +320, Rust tests/examples +197, automation +64. Advance aggregate baselines by these deltas only; per-file caps and growth headroom are unchanged. Implementation, validation and limits: docs/archive/2026-11/2026-11-15资源生命周期与重构清理.md. Earlier review notes remain in Git history.",
+  "reviewNotes": "2026-11-15 complete review against f1cb7018: typed transactional invoice-status facts and cursor paging replace generic audit projection; final-contract deadlines, bounded S3 cache and buffered disk writers fix lifecycle costs; email/restore reuse scoped mutations and profit preview cancels obsolete drafts. Removed dead history wrapper and UI prop chain. Reviewed net physical line deltas: web -45, Rust production +285 (including inline regressions), Rust tests/examples +91, automation +148. Advance aggregate snapshots by these measured deltas only; keep every per-file cap and growth allowance unchanged. New storage module owns SQL, shared provider tests and real HTTP/React checks verify semantics. Details: docs/archive/2026-11/2026-11-15完整续查修复与清理.md. Earlier reviews remain in Git history.",
   "rules": [
     {
       "name": "repository web production default",
@@ -10,9 +10,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 88664,
+      "baselineAggregateLines": 88619,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 88864,
+      "maximumAggregateLines": 88819,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 111487,
+      "baselineAggregateLines": 111772,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 111562,
+      "maximumAggregateLines": 111847,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 32732,
+      "baselineAggregateLines": 32823,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 32852,
+      "maximumAggregateLines": 32943,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 28804,
+      "baselineAggregateLines": 28952,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 28954,
+      "maximumAggregateLines": 29102,
       "reportFiles": false
     },
     {

@@ -1,4 +1,4 @@
-//! Independent evaluation of the original annotations protects compiled access semantics.
+//! Independent evaluation of annotations and reviewed changes protects access semantics.
 use export_doc_domain::{
     contracts,
     generated_api::*,
@@ -57,6 +57,11 @@ fn prior_decision(
                         .iter()
                         .any(|g| g.resource_key == key && g.action == prior_action(key, action)))
     };
+    // Reviewed status access supports sending without granting delivery history.
+    if op == GET_EMAIL_TOOL_STATUS {
+        return allows("common.email-delivery", "send")
+            || allows("common.email-delivery", "view-delivery");
+    }
     if let Some(requirements) = policy["requirements"]
         .as_array()
         .filter(|items| !items.is_empty())

@@ -9074,6 +9074,28 @@
           "changedAt"
         ]
       },
+      "ApiInvoiceStatusHistoryPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiInvoiceStatusHistoryDto"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ]
+      },
       "ApiInvoiceStatusTransitionRequest": {
         "type": "object",
         "properties": {
@@ -51406,10 +51428,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ApiInvoiceStatusHistoryDto"
-                  }
+                  "$ref": "#/components/schemas/ApiInvoiceStatusHistoryPage"
                 }
               }
             }
@@ -51468,6 +51487,25 @@
               "pattern": "^-?(?:0|[1-9]\\d*)$"
             },
             "required": true
+          },
+          {
+            "name": "beforeId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 200
+            }
           }
         ]
       }
@@ -131979,16 +132017,18 @@
             "disabled": false,
             "overridesParent": false
           },
-          "requirements": [
-            {
-              "resourceKey": "common.email-delivery",
-              "action": "view-delivery"
-            }
-          ],
+          "requirements": [],
           "permissionBypass": false,
           "access": {
-            "match": "All",
+            "match": "Any",
             "resources": [
+              {
+                "resourceKey": "common.email-delivery",
+                "actions": [
+                  "send"
+                ],
+                "administratorOnly": false
+              },
               {
                 "resourceKey": "common.email-delivery",
                 "actions": [

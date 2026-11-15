@@ -459,10 +459,20 @@ async fn execute(
                             .prepare_file_download(operation, &parameters, &token)
                             .map(response::Reply::download);
                     }
-                    if operation == DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE {
+                    if operation == DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE
+                        || operation == EXPORT_HS_CODE_KNOWLEDGE
+                    {
                         return state
                             .service
-                            .prepare_file_download(operation, &parameters, &token)
+                            .prepare_file_download(
+                                operation,
+                                if operation == EXPORT_HS_CODE_KNOWLEDGE {
+                                    &query
+                                } else {
+                                    &parameters
+                                },
+                                &token,
+                            )
                             .map(response::Reply::download);
                     }
                     let preview_memory = if [
@@ -542,16 +552,6 @@ async fn execute(
                             export_doc_engine::engine::tasks::FileOutput {
                                 file_name: "装柜现场作业单.pdf".into(),
                                 media_type: "application/pdf".into(),
-                                content: result,
-                            },
-                        ));
-                    }
-                    if operation == EXPORT_HS_CODE_KNOWLEDGE {
-                        return Ok(response::Reply::file(
-                            export_doc_engine::engine::tasks::FileOutput {
-                                file_name: "HS知识库.zip".into(),
-                                media_type: "application/vnd.exportdocmanager.hs-knowledge+zip"
-                                    .into(),
                                 content: result,
                             },
                         ));
@@ -665,5 +665,5 @@ mod header_tests {
 }
 
 fn request_seconds(operation: Operation) -> u64 {
-    export_doc_contracts::request_limits::seconds(operation.id)
+    export_doc_contracts::request_limits::execution_seconds(operation.id)
 }

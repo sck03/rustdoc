@@ -1,8 +1,7 @@
 import { ClipboardList, Copy, FileText, RotateCcw } from "lucide-react";
-import type { ApiInvoiceDetailDto, ApiInvoiceStatusHistoryDto } from "../../api/index.ts";
+import type { ApiInvoiceDetailDto } from "../../api/index.ts";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { DateField, EditableComboField, NumberField, SelectField, TextField } from "../../ui/FormFields.tsx";
-import { InlineNotice } from "../../ui/PageState.tsx";
 import { DocumentSpareFieldsPanel } from "../../ui/DocumentSpareFieldsPanel.tsx";
 import { getCustomOptions, type CustomOptionMap } from "../custom-options/customOptionModel.ts";
 import {
@@ -29,9 +28,6 @@ export function InvoiceBasicInfoPanel({
   isTransitionStatusBusy,
   onTransitionStatus,
   onCancelStatus,
-  statusHistory,
-  statusHistoryLoading,
-  statusHistoryMessage,
   onChange,
   onCloneInvoiceType,
   onUnverifyInvoice,
@@ -59,9 +55,6 @@ export function InvoiceBasicInfoPanel({
   onCancelStatus: () => void;
   onOpenCustomsCoo: () => void;
   onOpenAgentConsignment: () => void;
-  statusHistory?: ApiInvoiceStatusHistoryDto[];
-  statusHistoryLoading?: boolean;
-  statusHistoryMessage?: string | null;
   customOptions?: CustomOptionMap;
   onCommitCustomOption?: (optionType: string, value: string) => void;
 }) {
@@ -159,29 +152,6 @@ export function InvoiceBasicInfoPanel({
         />
       </div>
       <DocumentSpareFieldsPanel group="invoice" label="发票备用字段" value={invoice} onChange={onChange} disabled={!isEditable} />
-      {statusHistory !== undefined || statusHistoryLoading || statusHistoryMessage ? (
-        <details className="invoice-status-history">
-          <summary>状态记录{statusHistory?.length ? `（${statusHistory.length}）` : ""}</summary>
-          {statusHistoryLoading ? <p className="form-field-description">正在加载状态记录…</p> : null}
-          {statusHistoryMessage ? <InlineNotice tone="warning">{statusHistoryMessage}</InlineNotice> : null}
-          {!statusHistoryLoading && !statusHistoryMessage && !(statusHistory?.length) ? (
-            <p className="form-field-description">暂时没有状态变更记录。</p>
-          ) : null}
-          {statusHistory?.length ? (
-            <ol className="invoice-status-history-list">
-              {statusHistory.map((entry) => (
-                <li key={entry.id}>
-                  <div>
-                    <strong>{getInvoiceStatusLabel(entry.fromStatus)} → {getInvoiceStatusLabel(entry.toStatus)}</strong>
-                    <span>{entry.note || "未填写备注"}</span>
-                  </div>
-                  <small>{entry.changedByUsername || "系统"} · {new Date(entry.changedAt).toLocaleString("zh-CN", { hour12: false })}</small>
-                </li>
-              ))}
-            </ol>
-          ) : null}
-        </details>
-      ) : null}
     </section>
   );
 }

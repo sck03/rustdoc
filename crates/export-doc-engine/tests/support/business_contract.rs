@@ -37,6 +37,7 @@ fn version(row: &Value) -> Value {
 
 /// Provider-independent regressions for the complete customer/supplier workflow.
 pub fn exercise(request: &Request<'_>) {
+    invoice_status_history(request);
     for (create, update, get, delete, fields) in [
         (
             CREATE_CUSTOMER,
@@ -394,5 +395,71 @@ pub fn exercise(request: &Request<'_>) {
         .unwrap_err()
         .status,
         Some(409)
+    );
+}
+
+fn invoice_status_history(request: &Request<'_>) {
+    let draft = export_doc_engine::invoice::InvoiceDraft::demo("2026-11-15", &nonce().unwrap())
+        .build()
+        .unwrap();
+    let created = save(request, CREATE_INVOICE, &[], json!(draft));
+    let path = [("id", created["id"].to_string())];
+    let mut invoice = created["invoice"].clone();
+    let mut last_before = Value::Null;
+    for (operation, target, reason) in [
+        (TRANSITION_INVOICE_STATUS, "Verified", "核对通过"),
+        (UNVERIFY_INVOICE, "Draft", "修正商品资料"),
+        (TRANSITION_INVOICE_STATUS, "Cancelled", "客户取消订单"),
+    ] {
+        let old_version = invoice["rowVersion"].clone();
+        let body = json!({"targetStatus":target,"rowVersion":old_version,"note":reason});
+        let saved = read(request, operation, &path, &[], Some(body.clone()));
+        invoice = saved["invoice"].clone();
+        let history = read(
+            request,
+            LIST_INVOICE_STATUS_HISTORY,
+            &path,
+            &[("limit", "1".into())],
+            None,
+        );
+        assert_eq!(history["items"][0]["toStatus"], target);
+        assert_eq!(history["items"][0]["note"], reason);
+        assert!(
+            !history["items"][0]["changedByUsername"]
+                .as_str()
+                .unwrap()
+                .is_empty()
+        );
+        chrono::DateTime::parse_from_rfc3339(history["items"][0]["changedAt"].as_str().unwrap())
+            .unwrap();
+        assert_eq!(
+            request(operation, &path, &[], Some(body))
+                .unwrap_err()
+                .status,
+            Some(409)
+        );
+        last_before = history["nextCursor"].clone();
+    }
+    let history = read(
+        request,
+        LIST_INVOICE_STATUS_HISTORY,
+        &path,
+        &[("limit", "2".into()), ("beforeId", last_before.to_string())],
+        None,
+    );
+    assert_eq!(history["items"].as_array().unwrap().len(), 2);
+    assert_eq!(history["items"][0]["toStatus"], "Draft");
+    assert_eq!(history["items"][1]["fromStatus"], "Draft");
+    assert!(history["nextCursor"].is_null());
+    assert_eq!(
+        request(
+            LIST_INVOICE_STATUS_HISTORY,
+            &path,
+            &[("limit", "201".into())],
+            None
+        )
+        .unwrap_err()
+        .status,
+        Some(400)
     );
 }

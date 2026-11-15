@@ -79,6 +79,12 @@ CREATE TABLE history (
     note TEXT NOT NULL
 );
 CREATE INDEX history_record ON history(kind, record_id, id DESC);
+CREATE TABLE invoice_status_history (
+    invoice_id INTEGER NOT NULL,
+    version INTEGER NOT NULL CHECK(version > 0),
+    body TEXT NOT NULL CHECK(json_valid(body)),
+    PRIMARY KEY(invoice_id, version)
+);
 CREATE TABLE audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     kind TEXT NOT NULL,

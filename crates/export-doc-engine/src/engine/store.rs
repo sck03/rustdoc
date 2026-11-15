@@ -609,10 +609,6 @@ fn identify_record(body: &mut Value, kind: &str, id: i64) {
     }
 }
 
-pub fn history(connection: &Connection, kind: &str, id: i64) -> Result<Vec<Value>> {
-    Ok(connection.history(Some(kind), Some(id))?)
-}
-
 pub fn paged(mut items: Vec<Value>, query: &[(&str, String)]) -> Value {
     let query_value = |name: &str| crate::engine::request_values::find(query, name).unwrap_or("");
     let keyword = normalize(query_value("keyword"));

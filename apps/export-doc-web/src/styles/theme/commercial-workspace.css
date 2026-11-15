@@ -365,33 +365,6 @@ html[data-interface-density="compact"] :where(th, td) {
   content: "";
 }
 
-.invoice-status-history {
-  margin-top: 16px;
-  overflow: hidden;
-  background: var(--edm-primary-25);
-  border: 1px solid var(--edm-ink-200);
-  border-radius: var(--edm-radius-lg);
-}
-
-.invoice-status-history > summary {
-  padding: 12px 12px;
-  color: var(--edm-ink-700);
-  font-size: var(--edm-font-size-sm);
-  line-height: var(--edm-line-height-sm);
-  font-weight: var(--edm-font-weight-medium);
-  cursor: pointer;
-  user-select: none;
-}
-
-.invoice-status-history[open] > summary {
-  border-bottom: 1px solid var(--edm-ink-200);
-}
-
-.invoice-status-history > .form-field-description,
-.invoice-status-history > .inline-notice {
-  margin: 12px;
-}
-
 .invoice-status-history-list {
   display: grid;
   gap: 0;

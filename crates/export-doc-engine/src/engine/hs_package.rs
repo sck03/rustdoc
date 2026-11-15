@@ -43,7 +43,6 @@ fn projected(kind: &str, mut row: Value) -> Value {
     row
 }
 pub fn export(service: &NativeService, actor: &Actor, query: &[(&str, String)]) -> Result<Vec<u8>> {
-    let _memory = service.jobs.reserve_download(MAX_PACKAGE as usize, true)?;
     let since = hs::read(query, "since");
     let since = if since.is_empty() {
         None

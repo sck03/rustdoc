@@ -14,6 +14,8 @@ pub use audit_query::AuditQuery;
 mod crm_query;
 pub use crm_query::{CrmList, CrmQuery};
 mod attachment_history;
+mod invoice_status_history;
+pub use invoice_status_history::InvoiceStatusEvent;
 mod communication;
 mod file_catalog;
 mod generic_query;
@@ -388,6 +390,8 @@ delegate! {
     locate_file(identity:&str,digest:&str)->();
     query_resources(query:&ResourceQuery<'_>)->(i64,Vec<Value>);
     append_attachment_history(record:i64,kind:&str,body:&Value)->();
+    append_invoice_status(event:&InvoiceStatusEvent)->();
+    invoice_status_history(record:i64,before:Option<i64>,limit:i64)->Value;
     attachment_history(record:i64,kind:&str,before:Option<i64>,limit:i64)->Value;
     file_is_referenced(digest:&str)->bool;
     remove_unused_file(digest:&str)->();

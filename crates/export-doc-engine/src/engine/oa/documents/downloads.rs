@@ -134,7 +134,7 @@ fn write_bundle(
     source: &Source,
     mut read: impl FnMut(&Entry) -> Result<std::fs::File>,
 ) -> Result<()> {
-    let mut archive = zip::ZipWriter::new(output);
+    let mut archive = zip::ZipWriter::new(std::io::BufWriter::with_capacity(64 * 1024, output));
     let options = zip::write::SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Stored)
         .large_file(true);

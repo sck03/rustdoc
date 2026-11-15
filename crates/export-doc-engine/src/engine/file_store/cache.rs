@@ -2,13 +2,16 @@
 //! requests; eviction unlinks only files created by this cache instance.
 use super::*;
 use crate::paths::file_stamp;
-use std::{collections::BTreeMap, sync::Mutex};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    sync::{Arc, Mutex},
+};
 const CAPACITY: u64 = 256 * 1024 * 1024;
+const MAX_ENTRIES: usize = 1024;
 struct Entry {
     path: PathBuf,
     size: u64,
     stamp: Option<file_stamp::Stamp>,
-    used: u64,
 }
 impl Drop for Entry {
     fn drop(&mut self) {
@@ -17,9 +20,38 @@ impl Drop for Entry {
 }
 #[derive(Default)]
 struct State {
-    entries: BTreeMap<String, Entry>,
+    entries: BTreeMap<String, (u64, Arc<Entry>)>,
+    order: BTreeSet<(u64, String)>,
     used: u64,
     size: u64,
+}
+impl State {
+    fn remove(&mut self, key: &str) -> Option<Arc<Entry>> {
+        let (used, entry) = self.entries.remove(key)?;
+        self.order.remove(&(used, key.to_owned()));
+        self.size -= entry.size;
+        Some(entry)
+    }
+    fn touch(&mut self, key: &str) {
+        let Some((used, _)) = self.entries.get_mut(key) else {
+            return;
+        };
+        self.order.remove(&(*used, key.to_owned()));
+        self.used = self.used.wrapping_add(1);
+        *used = self.used;
+        self.order.insert((*used, key.to_owned()));
+    }
+    fn insert(&mut self, key: String, entry: Arc<Entry>) -> Vec<Arc<Entry>> {
+        let mut removed: Vec<_> = self.remove(&key).into_iter().collect();
+        while self.size + entry.size > CAPACITY || self.entries.len() >= MAX_ENTRIES {
+            let oldest = self.order.first().unwrap().1.clone();
+            removed.push(self.remove(&oldest).unwrap());
+        }
+        self.size += entry.size;
+        self.entries.insert(key.clone(), (0, entry));
+        self.touch(&key);
+        removed
+    }
 }
 #[derive(Default)]
 pub(super) struct Cache {
@@ -48,13 +80,14 @@ impl Cache {
         Ok(Self::default())
     }
     pub(super) fn get(&self, object: &FileObject) -> Result<Option<fs::File>> {
-        let mut state = self
+        let entry = self
             .state
             .lock()
-            .map_err(|_| unavailable("文件缓存状态异常。"))?;
-        state.used = state.used.wrapping_add(1);
-        let used = state.used;
-        let Some(entry) = state.entries.get_mut(&object.digest) else {
+            .map_err(|_| unavailable("文件缓存状态异常。"))?
+            .entries
+            .get(&object.digest)
+            .map(|(_, entry)| entry.clone());
+        let Some(entry) = entry else {
             return Ok(None);
         };
         paths::ensure_safe_absolute(&entry.path).map_err(unavailable)?;
@@ -64,12 +97,24 @@ impl Cache {
             Err(cause) => return Err(cause.into()),
         };
         let stamp = file.as_ref().map(file_stamp::read).transpose()?;
+        let mut state = self
+            .state
+            .lock()
+            .map_err(|_| unavailable("文件缓存状态异常。"))?;
+        let current = state
+            .entries
+            .get(&object.digest)
+            .is_some_and(|(_, value)| Arc::ptr_eq(value, &entry));
         if stamp.as_ref().is_none_or(|stamp| stamp.size != object.size) || stamp != entry.stamp {
-            let old = state.entries.remove(&object.digest).unwrap();
-            state.size -= old.size;
+            let old = current.then(|| state.remove(&object.digest));
+            drop(state);
+            drop(old);
             return Ok(None);
         }
-        entry.used = used;
+        if current {
+            state.touch(&object.digest);
+        }
+        drop(state);
         Ok(file)
     }
     pub(super) fn download(
@@ -104,7 +149,6 @@ impl Cache {
             path,
             size: object.size,
             stamp: None,
-            used: 0,
         };
         store.download_into(config, object, &mut file)?;
         entry.stamp = Some(file_stamp::read(&file)?);
@@ -113,23 +157,10 @@ impl Cache {
             .state
             .lock()
             .map_err(|_| unavailable("文件缓存状态异常。"))?;
-        if let Some(old) = state.entries.remove(&object.digest) {
-            state.size -= old.size;
-        }
-        while state.size + object.size > CAPACITY {
-            let oldest = state
-                .entries
-                .iter()
-                .min_by_key(|(_, entry)| entry.used)
-                .map(|(key, _)| key.clone())
-                .unwrap();
-            let old = state.entries.remove(&oldest).unwrap();
-            state.size -= old.size;
-        }
-        state.used = state.used.wrapping_add(1);
-        entry.used = state.used;
-        state.size += object.size;
-        state.entries.insert(object.digest.clone(), entry);
+        let removed = state.insert(object.digest.clone(), Arc::new(entry));
+        drop(state);
+        // Existing readers retain their own entry until open/verification finishes.
+        drop(removed);
         Ok(file)
     }
 }
@@ -183,5 +214,45 @@ impl FileStore {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn entry(size: u64) -> Arc<Entry> {
+        Arc::new(Entry {
+            path: PathBuf::new(),
+            size,
+            stamp: None,
+        })
+    }
+    #[test]
+    fn cache_bounds_small_entries_and_evicts_in_usage_order() {
+        let mut state = State::default();
+        let first = entry(1);
+        state.insert("first".into(), first.clone());
+        for index in 0..MAX_ENTRIES - 1 {
+            state.insert(index.to_string(), entry(1));
+        }
+        state.touch("first");
+        let removed = state.insert("next".into(), entry(1));
+        assert_eq!(removed.len(), 1);
+        assert!(!state.entries.contains_key("0"));
+        assert!(state.entries.contains_key("first"));
+        assert_eq!(state.entries.len(), MAX_ENTRIES);
+        assert_eq!(state.order.len(), MAX_ENTRIES);
+        let removed = state.insert("large".into(), entry(CAPACITY));
+        assert_eq!(removed.len(), MAX_ENTRIES);
+        assert_eq!(state.entries.len(), 1);
+        assert_eq!(state.order.len(), 1);
+        assert_eq!(state.size, CAPACITY);
+        assert_eq!(
+            Arc::strong_count(&first),
+            2,
+            "evicted file stays owned until deletion outside the state lock"
+        );
+        drop(removed);
+        assert_eq!(Arc::strong_count(&first), 1);
     }
 }

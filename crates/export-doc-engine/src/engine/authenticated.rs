@@ -122,11 +122,29 @@ impl NativeService {
                 let resource = catalog::resource(kind).unwrap();
                 auth::authorize(actor, resource.permission, "view")?;
                 let id = records::id(parameters)?;
-                let record = self.store.get(kind, id)?;
-                if !auth::visible(actor, resource.permission, "view", &record) {
-                    return Err(error(403, "没有读取历史的权限。"));
+                let number = |key, default| -> Result<i64> {
+                    let value = super::request_values::find(query, key).unwrap_or("");
+                    if value.is_empty() {
+                        return Ok(default);
+                    }
+                    value
+                        .parse::<i64>()
+                        .ok()
+                        .filter(|n| *n > 0)
+                        .ok_or_else(|| super::error::invalid("状态记录分页参数无效。"))
+                };
+                let limit = number("limit", 50)?;
+                if limit > 200 {
+                    return Err(super::error::invalid("状态记录每页最多 200 条。"));
                 }
-                Ok(json!(store::history(&self.store.connection()?, kind, id)?))
+                let before = number("beforeId", i64::MAX)?;
+                self.store.read_for(actor, operation, query, |tx, actor| {
+                    let record = store::get(tx, kind, id)?;
+                    if !auth::visible(actor, resource.permission, "view", &record) {
+                        return Err(error(403, "没有读取历史的权限。"));
+                    }
+                    Ok(tx.invoice_status_history(id, Some(before), limit)?)
+                })
             }
             GET_SETTINGS => settings::read(&self.store, actor),
             UPDATE_SETTINGS | VALIDATE_SETTINGS => {

@@ -32,7 +32,7 @@ export function InvoiceEditorPage({
     singleWindowPermission, message, setMessage, successMessage, setSuccessMessage,
     concurrencyMessage, setIsLetterOfCreditBusy, persistedInvoiceStatus, cancelReason, setCancelReason,
     isCancelReasonDialogOpen, parsedInvoiceId, isNew, isInvoiceIdValid, isInvoiceEditable,
-    itemsWorkspace, invoiceQuery, statusHistoryQuery, selectedCustomerQuery, selectedExporterQuery,
+    itemsWorkspace, invoiceQuery, selectedCustomerQuery, selectedExporterQuery,
     settingsQuery, cloneInvoiceTypeMutation, exporterSealMutation, refreshParties, saveInvoiceMutation,
     statusTransitionMutation, unverifyInvoiceMutation, products, units, invoiceCustomOptions,
     selectedCustomerEmail, isBusy, isPartyBusy, partyMessage, productMessage,
@@ -174,9 +174,6 @@ export function InvoiceEditorPage({
             selectedExporter={selectedExporterQuery.data}
             selectedCustomerEmail={selectedCustomerEmail}
             customOptions={invoiceCustomOptions}
-            statusHistory={statusHistoryQuery.data}
-            statusHistoryLoading={statusHistoryQuery.isFetching}
-            statusHistoryMessage={statusHistoryQuery.isError ? readApiError(statusHistoryQuery.error) : null}
             itemsPanel={invoiceItemsPanel}
             cloneInvoiceTypeLabel={cloneInvoiceTypeLabel}
             isEditable={isInvoiceEditable}

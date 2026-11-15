@@ -222,6 +222,14 @@ impl NativeService {
         body: Option<Value>,
         token: &str,
     ) -> Result<Vec<u8>> {
+        #[cfg(feature = "excel")]
+        if operation == EXPORT_HS_CODE_KNOWLEDGE {
+            crate::operation::check()?;
+            return self
+                .prepare_file_download(operation, query, token)?
+                .into_memory()
+                .map(|output| output.content);
+        }
         if operation == RESTORE_DATABASE_BACKUP {
             let actor = self.session_actor_for_operation(token, operation)?;
             self.authorize_operation(&actor, operation, query)?;
@@ -423,10 +431,6 @@ impl NativeService {
                         &body_value,
                     )?)
                     .map_err(Into::into);
-                }
-                #[cfg(feature = "excel")]
-                if operation == EXPORT_HS_CODE_KNOWLEDGE {
-                    return hs_package::export(self, &actor, query);
                 }
                 #[cfg(feature = "excel")]
                 if hs_files::OPERATIONS.contains(&operation) {

@@ -1988,6 +1988,11 @@ export interface ApiInvoiceStatusHistoryDto {
   toStatus: string;
 }
 
+export interface ApiInvoiceStatusHistoryPage {
+  items: ApiInvoiceStatusHistoryDto[];
+  nextCursor: number | null;
+}
+
 export interface ApiInvoiceStatusTransitionRequest {
   note?: string;
   rowVersion?: string;
@@ -9596,6 +9601,8 @@ export interface ListHsCodesRequest {
 
 export interface ListInvoiceStatusHistoryRequest {
   id: number;
+  beforeId?: number;
+  limit?: number;
 }
 
 export interface ListInvoicesRequest {

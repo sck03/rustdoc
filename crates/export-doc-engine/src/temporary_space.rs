@@ -7,6 +7,7 @@ use std::{
 };
 
 const HEADROOM: u64 = 256 * 1024 * 1024;
+const WRITE_RESERVATION: u64 = 1024 * 1024;
 
 #[derive(Debug)]
 pub struct Budget {
@@ -72,9 +73,11 @@ pub struct SpaceWriter<W> {
 }
 impl<W: std::io::Write> std::io::Write for SpaceWriter<W> {
     fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        self.reservation
-            .ensure(bytes.len() as u64)
-            .map_err(std::io::Error::other)?;
+        if bytes.len() as u64 > self.reservation.remaining {
+            self.reservation
+                .ensure((bytes.len() as u64).max(WRITE_RESERVATION))
+                .map_err(std::io::Error::other)?;
+        }
         let written = self.output.write(bytes)?;
         self.output.flush()?;
         self.reservation.committed(written as u64);
@@ -92,6 +95,9 @@ impl<W: std::io::Seek> std::io::Seek for SpaceWriter<W> {
 
 impl Reservation {
     pub fn ensure(&mut self, bytes: u64) -> Result<(), ApiError> {
+        if bytes > 0 && bytes <= self.remaining {
+            return Ok(());
+        }
         let budget = self.budget.clone();
         let mut pending = budget
             .pending
@@ -148,6 +154,31 @@ impl Drop for Reservation {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn writer_reserves_in_blocks_and_releases_unwritten_capacity() {
+        use std::io::Write;
+        let budget = Arc::new(Budget::with_available(
+            PathBuf::new(),
+            HEADROOM + WRITE_RESERVATION,
+        ));
+        let mut writer = budget.writer(std::io::sink()).unwrap();
+        writer.write_all(&[1; 32]).unwrap();
+        assert_eq!(*budget.pending.lock().unwrap(), WRITE_RESERVATION - 32);
+        writer.write_all(&[2; 32]).unwrap();
+        assert_eq!(*budget.pending.lock().unwrap(), WRITE_RESERVATION - 64);
+        drop(writer);
+        assert_eq!(*budget.pending.lock().unwrap(), 0);
+        let budget = Arc::new(Budget::with_available(PathBuf::new(), HEADROOM));
+        assert!(
+            budget
+                .writer(std::io::sink())
+                .unwrap()
+                .write_all(&[1])
+                .is_err()
+        );
+        assert_eq!(*budget.pending.lock().unwrap(), 0);
+    }
 
     #[test]
     fn concurrent_uploads_account_for_remaining_bytes_and_release_on_failure() {

@@ -29,6 +29,38 @@ await withOfficeUi('review-workflows-ui',async({repo,output,require,url,invoke,o
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
   await page.setViewportSize({width:1440,height:1000});
   await verifyBusinessWorkspaceLayouts({ page, invoke, token, url, output, businessDate: login.user.businessDate, require });
+  const statusDraft={...createEmptyInvoice(login.user.businessDate),invoiceNo:'STATUS-REVIEW',exporterNameEN:'Sample exporter',customerNameEN:'Sample customer',currency:'USD',destinationCountry:'NETHERLANDS',portOfLoading:'NINGBO',portOfDestination:'ROTTERDAM',
+    items:[{...createEmptyInvoiceItem(),styleNo:'SAMPLE',styleName:'Sample product',hsCode:'6109100010',quantity:10,unitPrice:10,totalPrice:100}]};
+  const created=await invoke('CreateInvoice',statusDraft,{},token), id=created.id;
+  let statusInvoice=created.invoice;
+  for(const [operation,targetStatus,note] of [['TransitionInvoiceStatus','Verified','核对通过'],['UnverifyInvoice','Draft','修正商品资料']]) {
+    statusInvoice=(await invoke(operation,{rowVersion:statusInvoice.rowVersion,...(operation==='TransitionInvoiceStatus'?{targetStatus}:{}),note},{id},token)).invoice;
+  }
+  const recent=await invoke('ListInvoiceStatusHistory',undefined,{id,limit:1},token);
+  assert.equal(recent.items[0].note,'修正商品资料');assert(recent.nextCursor);
+  const previous=await invoke('ListInvoiceStatusHistory',undefined,{id,limit:1,beforeId:recent.nextCursor},token);
+  assert.equal(previous.items[0].note,'核对通过');assert.equal(previous.nextCursor,null);
+  const historyRequests=[];
+  const historyRoute=`/api/invoices/${id}/status-history`;
+  page.on('request',request=>{if(request.url().includes(historyRoute))historyRequests.push(request.url());});
+  await page.goto(`${url}/#/invoices/${id}?section=basic`);
+  await page.getByRole('button',{name:'作废',exact:true}).waitFor();
+  assert.equal(historyRequests.length,0,'collapsed history does not query');
+  await page.getByText('状态记录',{exact:true}).click();
+  await page.getByText('修正商品资料',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'作废',exact:true}).click();
+  await page.getByRole('textbox',{name:'作废原因',exact:true}).fill('客户取消订单，保留原因');
+  await page.getByRole('button',{name:'继续作废',exact:true}).click();
+  await page.getByRole('button',{name:'确认已作废',exact:true}).click();
+  await page.locator('.invoice-status-history-list').getByText('客户取消订单，保留原因',{exact:true}).waitFor();
+  const history=await invoke('ListInvoiceStatusHistory',undefined,{id},token);
+  assert.equal(history.items.length,3);assert.equal(history.items[0].changedByUsername,'oa-review');
+  assert(!Number.isNaN(Date.parse(history.items[0].changedAt)));
+  assert(historyRequests.length>=2,'status transition refreshes visible history');
+  await page.locator('.invoice-status-history-list').screenshot({path:path.join(output,'invoice-status-history.png')});
+  await page.setViewportSize({width:390,height:844});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);
+  await page.setViewportSize({width:1440,height:1000});
   await page.goto(url+'/#/crm/email-templates');
   await page.getByRole('button',{name:'新建模板',exact:true}).click();
   await page.getByLabel('模板名称',{exact:true}).fill('完整邮件流程验证');

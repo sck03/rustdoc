@@ -1,7 +1,7 @@
 import { RecordWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "../../styles/email.css";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Paperclip, RefreshCw, Send, Settings, Trash2 } from "lucide-react";
 import {
@@ -21,6 +21,7 @@ import { readEmailDraftNavigationState } from "./emailDraftNavigation.ts";
 import { EmailRichTextEditor } from "../../ui/EmailRichTextEditor.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { EmailDeliveryHistory } from "./EmailDeliveryHistory.tsx";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 
 type MessageState = {
   kind: "success" | "error";
@@ -28,7 +29,7 @@ type MessageState = {
 };
 
 export function EmailPage({ client, businessTimeZone }: { client: ExportDocManagerApiClient; businessTimeZone: string }) {
-  const queries = useQueryClient();
+  const queryClient = useQueryClient();
   const sendPermission = usePermission(permissionResources.emailDelivery, permissionActions.send);
   const deliveryViewPermission = usePermission(permissionResources.emailDelivery, permissionActions.viewDelivery);
   const { canManageSettings } = usePermissionCapabilities();
@@ -58,7 +59,7 @@ export function EmailPage({ client, businessTimeZone }: { client: ExportDocManag
   const statusQuery = useQuery({
     queryKey: queryKeys.emailStatus(),
     queryFn: ({ signal }) => client.getEmailToolStatus({ signal }),
-    enabled: deliveryViewPermission.allowed,
+    enabled: sendPermission.allowed || deliveryViewPermission.allowed,
   });
 
 
@@ -68,8 +69,8 @@ export function EmailPage({ client, businessTimeZone }: { client: ExportDocManag
     }
   }, [statusQuery.error, statusQuery.isError]);
 
-  const sendMutation = useMutation({
-    mutationFn: () =>
+  const sendMutation = useScopedMutation("email-compose", client, {
+    mutationFn: (_: void, signal) =>
       client.sendEmail({
         "Idempotency-Key": deliveryAttemptRef.current.id,
         body: {
@@ -78,7 +79,7 @@ export function EmailPage({ client, businessTimeZone }: { client: ExportDocManag
           body,
           attachmentPaths: isDesktopRuntime ? attachmentPaths : [],
         },
-      }),
+      }, { signal }),
     onSuccess: (response) => {
       if (response.success) {
         setLastSentDraftSnapshot(submittedDraftSnapshotRef.current);
@@ -87,12 +88,12 @@ export function EmailPage({ client, businessTimeZone }: { client: ExportDocManag
         kind: response.success ? "success" : "error",
         text: response.message || "邮件发送完成。",
       });
-      if (deliveryViewPermission.allowed) void queries.invalidateQueries({ queryKey: queryKeys.emailDeliveries() });
     },
     onError: (error) => {
       setMessage({ kind: "error", text: readApiError(error) });
-      if (deliveryViewPermission.allowed) void queries.invalidateQueries({ queryKey: queryKeys.emailDeliveries() });
+      if (deliveryViewPermission.allowed) void queryClient.invalidateQueries({ queryKey: queryKeys.emailDeliveries() });
     },
+    refreshKeys: () => deliveryViewPermission.allowed ? [queryKeys.emailDeliveries()] : [],
   });
 
   const status = statusQuery.data ?? null;

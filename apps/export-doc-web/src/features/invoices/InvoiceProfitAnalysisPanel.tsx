@@ -1,6 +1,5 @@
-import { useMutation } from "@tanstack/react-query";
 import { Calculator, ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ApiInvoiceDetailDto,
   ApiInvoiceProfitAnalysisResponse,
@@ -9,6 +8,7 @@ import {
 import { readApiError } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { normalizeInvoiceForSave } from "./invoiceModel.ts";
+import { useTransientPreview } from "../../ui/useTransientPreview.ts";
 
 const emptyAnalysis: ApiInvoiceProfitAnalysisResponse = {
   currency: "",
@@ -41,18 +41,14 @@ export function InvoiceProfitAnalysisPanel({
   disabled: boolean;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const profitMutation = useMutation({
-    mutationFn: () =>
-      client.analyzeInvoiceProfit({
-        body: {
-          invoice: normalizeInvoiceForSave(invoice, invoiceId),
-        },
-      }),
-  });
-
-  const analysis = profitMutation.data ?? emptyAnalysis;
-  const isBusy = profitMutation.isPending;
-  const message = profitMutation.isError ? readApiError(profitMutation.error) : null;
+  const scope = useMemo(() => ({ client, invoice, invoiceId, disabled }), [client, invoice, invoiceId, disabled]);
+  const [failure, setFailure] = useState<{ scope: unknown; text: string } | null>(null);
+  const preview = useTransientPreview(scope,
+    signal => client.analyzeInvoiceProfit({ body: { invoice: normalizeInvoiceForSave(invoice, invoiceId) } }, { signal }),
+    error => setFailure({ scope, text: readApiError(error) }));
+  const analysis = preview.preview ?? emptyAnalysis;
+  const isBusy = preview.isPending;
+  const message = failure?.scope === scope ? failure.text : null;
 
   const metrics = [
     ["销售总额", analysis.salesTotalText],
@@ -76,7 +72,7 @@ export function InvoiceProfitAnalysisPanel({
             <button
               className="command-button secondary"
               type="button"
-              onClick={() => profitMutation.mutate()}
+              onClick={() => { setFailure(null); void preview.generate(); }}
               disabled={disabled || isBusy}
               title="计算利润分析"
             >

@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
-import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import type { BackupPlanController } from "./useBackupPlan.ts";
 import { formatBytes, formatRuntimeDate } from "./settingsFormatters.ts";
 
 export function BackupArchiveRestorePanel({ client, controller: c, disabled, postgres, selectedId }: {
   client: ExportDocManagerApiClient; controller: BackupPlanController; disabled: boolean; postgres: boolean; selectedId: string;
 }) {
-  const run = useAbortableOperation(client);
   const [id, setId] = useState(selectedId);
   const [password, setPassword] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
@@ -18,8 +16,8 @@ export function BackupArchiveRestorePanel({ client, controller: c, disabled, pos
   const [message, setMessage] = useState<string | null>(null);
   useEffect(() => { setId(selectedId); }, [selectedId]);
   useEffect(() => { setPassword(""); setAdminPassword(""); setConfirmation(""); setMessage(null); }, [id]);
-  const restore = useMutation({
-    mutationFn: () => run((signal) => client.stageRecoveryArchiveRestore({ id, body: { password, adminPassword, confirmationText: confirmation as "MIGRATE" | "RECOVER" } }, { signal })),
+  const restore = useScopedMutation(`recovery:${id}`, client, {
+    mutationFn: (_: void, signal) => client.stageRecoveryArchiveRestore({ id, body: { password, adminPassword, confirmationText: confirmation as "MIGRATE" | "RECOVER" } }, { signal }),
     onSuccess: (job) => { c.trackJob(job.jobId); setPassword(""); setAdminPassword(""); setConfirmation(""); setMessage(null); },
     onError: (error) => { setMessage(readApiError(error)); setPassword(""); setAdminPassword(""); },
   });
@@ -36,6 +34,6 @@ export function BackupArchiveRestorePanel({ client, controller: c, disabled, pos
       <label><span>恢复确认文本</span><input value={confirmation} placeholder={confirm} onChange={(event) => setConfirmation(event.target.value)} /></label>
     </div></fieldset>
     <button className="command-button danger" type="button" disabled={busy || !id || !password || (postgres && !adminPassword) || confirmation !== confirm} onClick={() => restore.mutate()}>校验并安排完整恢复</button>
-    <p className="settings-helper-text">{postgres ? "校验任务成功后，管理员停止应用并运行恢复维护命令，再启动应用。普通重启不会执行恢复。" : "校验任务成功后，退出并重新打开桌面程序。"}恢复前会保留原数据副本；旧备份可按受支持的数据库版本逐步升级。</p>
+    <p className="settings-helper-text">{postgres ? "校验任务成功后，管理员停止应用并运行恢复维护命令，再启动应用。普通重启不会执行恢复。" : "校验任务成功后，退出并重新打开桌面程序。"}恢复前会保留原数据副本；仅接受当前数据库模型的备份。</p>
   </section>;
 }

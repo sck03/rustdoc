@@ -4,7 +4,6 @@ import type {
   ApiCustomerDto,
   ApiExporterDto,
   ApiInvoiceDetailDto,
-  ApiInvoiceStatusHistoryDto,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
 import type { CustomOptionMap } from "../custom-options/customOptionModel.ts";
@@ -16,6 +15,7 @@ import { InvoiceShippingTermsPanel } from "./InvoiceShippingTermsPanel.tsx";
 import { InvoiceEditorNavigation } from "./InvoiceEditorNavigation.tsx";
 import { InvoiceLetterOfCreditPanel } from "./InvoiceLetterOfCreditPanel.tsx";
 import { InvoiceProfitAnalysisPanel } from "./InvoiceProfitAnalysisPanel.tsx";
+import { InvoiceStatusHistory } from "./InvoiceStatusHistory.tsx";
 import { InvoiceAmountAdjustmentsPanel } from "./InvoiceAmountAdjustmentsPanel.tsx";
 import { InvoiceReportPreviewPanel } from "./InvoiceReportPreviewPanel.tsx";
 import { InvoiceEditorSection } from "./InvoiceEditorSection.tsx";
@@ -35,9 +35,6 @@ type InvoiceEditorDocumentSectionsProps = {
   selectedExporter?: ApiExporterDto;
   selectedCustomerEmail: string;
   customOptions: CustomOptionMap;
-  statusHistory?: ApiInvoiceStatusHistoryDto[];
-  statusHistoryLoading: boolean;
-  statusHistoryMessage: string | null;
   itemsPanel: ReactNode;
   cloneInvoiceTypeLabel: string;
   isEditable: boolean;
@@ -88,9 +85,6 @@ export function InvoiceEditorDocumentSections({
   selectedExporter,
   selectedCustomerEmail,
   customOptions,
-  statusHistory,
-  statusHistoryLoading,
-  statusHistoryMessage,
   itemsPanel,
   cloneInvoiceTypeLabel,
   isEditable,
@@ -170,11 +164,9 @@ export function InvoiceEditorDocumentSections({
           onOpenAgentConsignment={onOpenAgentConsignment}
           customOptions={customOptions}
           onCommitCustomOption={onCommitCustomOption}
-          statusHistory={statusHistory}
-          statusHistoryLoading={statusHistoryLoading}
-          statusHistoryMessage={statusHistoryMessage}
         />
 
+        <InvoiceStatusHistory key={invoiceId} client={client} invoiceId={invoiceId} />
         <InvoicePartiesPanel
           invoice={invoice}
           client={client}

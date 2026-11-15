@@ -30,6 +30,25 @@ fn buffered_downloads_reserve_before_reading_and_release_after_delivery() {
         Some(429)
     );
     drop(held);
+    #[cfg(feature = "excel")]
+    {
+        let download = service
+            .prepare_file_download(crate::generated_api::EXPORT_HS_CODE_KNOWLEDGE, &[], token)
+            .unwrap();
+        assert!(
+            service
+                .jobs
+                .reserve_download(128 * 1024 * 1024, true)
+                .is_err()
+        );
+        drop(download);
+        assert!(
+            service
+                .jobs
+                .reserve_download(128 * 1024 * 1024, true)
+                .is_ok()
+        );
+    }
     let download = service
         .prepare_file_download(DOWNLOAD_REPORT_TEMPLATE_PACKAGE, &[], token)
         .unwrap();
