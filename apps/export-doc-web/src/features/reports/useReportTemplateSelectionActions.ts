@@ -1,6 +1,5 @@
 import { Dispatch, SetStateAction } from "react";
 import {
-  buildNewTemplateFileName,
   fileNameFromPath,
   readPreferredPreviewSampleProfile,
   type ReportTypeOption,
@@ -14,10 +13,6 @@ export function useReportTemplateSelectionActions({
   setReportType,
   setSelectedUserTemplateId,
   setSelectedTemplatePath,
-  setNewTemplateFileName,
-  setNewTemplateDisplayName,
-  setNewUserTemplateName,
-  setRenameTemplateFileName,
   setTemplatePreviewSampleProfile,
   setPreviewInvoiceId,
   setPreviewPaymentId,
@@ -29,10 +24,6 @@ export function useReportTemplateSelectionActions({
   setReportType: Dispatch<SetStateAction<ReportTypeOption>>;
   setSelectedUserTemplateId: Dispatch<SetStateAction<number>>;
   setSelectedTemplatePath: Dispatch<SetStateAction<string>>;
-  setNewTemplateFileName: Dispatch<SetStateAction<string>>;
-  setNewTemplateDisplayName: Dispatch<SetStateAction<string>>;
-  setNewUserTemplateName: Dispatch<SetStateAction<string>>;
-  setRenameTemplateFileName: Dispatch<SetStateAction<string>>;
   setTemplatePreviewSampleProfile: Dispatch<SetStateAction<ReportDesignerPreviewSampleProfile>>;
   setPreviewInvoiceId: Dispatch<SetStateAction<number>>;
   setPreviewPaymentId: Dispatch<SetStateAction<number>>;
@@ -51,10 +42,6 @@ export function useReportTemplateSelectionActions({
     setSelectedUserTemplateId(0);
     setSelectedTemplatePath("");
     clearLoadedTemplateContent();
-    setNewTemplateFileName(buildNewTemplateFileName(nextReportType));
-    setNewTemplateDisplayName("");
-    setNewUserTemplateName("");
-    setRenameTemplateFileName("");
     setTemplatePreviewSampleProfile(readPreferredPreviewSampleProfile(nextReportType));
   }
 

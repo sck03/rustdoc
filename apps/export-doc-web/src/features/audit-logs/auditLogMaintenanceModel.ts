@@ -19,7 +19,7 @@ export function hasActiveAuditLogFilters(filters: AuditLogFilters) {
 
 export function describeAuditLogFilters(filters: AuditLogFilters, labels: AuditLogFilterLabels = {}) {
   const descriptions: string[] = [];
-  appendDescription(descriptions, filters.invoiceKeyword, (value) => `发票包含“${value}”`);
+  appendDescription(descriptions, filters.invoiceKeyword, (value) => `现存发票号包含“${value}”`);
   appendDescription(descriptions, filters.entityName, (value) => `实体为“${labels.entityLabels?.[value] || value}”`);
   appendDescription(descriptions, filters.action, (value) => `动作为“${labels.actionLabels?.[value] || value}”`);
   appendDescription(descriptions, filters.userId, (value) => `操作人包含“${value}”`);

@@ -441,6 +441,7 @@ delegate! {
     append_workflow_operation(entry:&Value)->();
     save_workflow_state(request:i64,revision:i64,progress:&WorkflowProgress<'_>,plan:&Value,active_tasks:&[String])->();
     query_audits(query:&AuditQuery<'_>)->(i64,Vec<Value>);
+    query_audit_ids(query:&AuditQuery<'_>)->Vec<i64>;
     query_ordered_records(query:&GenericQuery<'_>,order:RecordOrder)->(i64,Vec<Value>);
     record_exists(kind:&str,filters:&[(&str,String)])->bool;
     organization_referenced(reference:OrganizationReference,code:&str,company:&str,exclude:i64,kinds:&[&str])->bool;

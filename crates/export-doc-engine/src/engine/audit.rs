@@ -1,4 +1,4 @@
-//! Audit queries and maintenance never delete or query business history.
+//! Audit maintenance leaves business history intact; invoice filters resolve current numbers.
 #[cfg(test)]
 mod tests;
 #[allow(unused_imports)]
@@ -137,6 +137,28 @@ impl Criteria {
             || self.start.is_some()
             || self.end.is_some()
     }
+    fn query(
+        &self,
+        offset: usize,
+        limit: usize,
+        count_all: bool,
+        before_id: Option<i64>,
+    ) -> export_doc_storage::AuditQuery<'_> {
+        export_doc_storage::AuditQuery {
+            invoice: &self.invoice,
+            entity: &self.entity,
+            action: &self.action,
+            user: &self.user,
+            keyword: &self.keyword,
+            start: self.start,
+            end: self.end,
+            entities: ENTITIES,
+            offset: i64::try_from(offset).unwrap_or(i64::MAX),
+            limit: limit as i64,
+            count_all,
+            before_id,
+        }
+    }
 }
 fn project(event: Value) -> Value {
     let kind = text(&event, "kind");
@@ -173,20 +195,7 @@ fn select(
     count_all: bool,
     before_id: Option<i64>,
 ) -> Result<(Vec<Value>, usize)> {
-    let (total, events) = tx.query_audits(&export_doc_storage::AuditQuery {
-        invoice: &criteria.invoice,
-        entity: &criteria.entity,
-        action: &criteria.action,
-        user: &criteria.user,
-        keyword: &criteria.keyword,
-        start: criteria.start,
-        end: criteria.end,
-        entities: ENTITIES,
-        offset: i64::try_from(offset).unwrap_or(i64::MAX),
-        limit: limit as i64,
-        count_all,
-        before_id,
-    })?;
+    let (total, events) = tx.query_audits(&criteria.query(offset, limit, count_all, before_id))?;
     let rows = events.into_iter().map(project).collect::<Vec<_>>();
     Ok((rows, total as usize))
 }
@@ -362,18 +371,22 @@ pub fn handle(
         .store
         .transaction_for(actor, operation, query, |tx, actor| {
             let mut count = 0;
-            scan(tx, &criteria, limit, |rows| {
-                let ids: Vec<_> = rows
-                    .iter()
-                    .map(|row| {
-                        row["id"]
-                            .as_i64()
-                            .ok_or_else(|| super::error::unavailable("审计编号损坏。"))
-                    })
-                    .collect::<Result<_>>()?;
+            let mut before = i64::MAX;
+            while count < limit {
+                crate::operation::check()?;
+                let ids = tx.query_audit_ids(&criteria.query(
+                    0,
+                    (limit - count).min(2000),
+                    false,
+                    Some(before),
+                ))?;
+                let Some(&next) = ids.last() else { break };
+                if next <= 0 || next >= before {
+                    return Err(super::error::unavailable("审计清理游标损坏。"));
+                }
                 count += tx.delete_audits(&ids)?;
-                Ok(())
-            })?;
+                before = next;
+            }
             if count > 0 {
                 tx.append_audit_details(
                     &AuditWrite {

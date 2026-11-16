@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-11-15",
-  "reviewNotes": "2026-11-15 complete review against f1cb7018: typed transactional invoice-status facts and cursor paging replace generic audit projection; final-contract deadlines, bounded S3 cache and buffered disk writers fix lifecycle costs; email/restore reuse scoped mutations and profit preview cancels obsolete drafts. Removed dead history wrapper and UI prop chain. Reviewed net physical line deltas: web -45, Rust production +285 (including inline regressions), Rust tests/examples +91, automation +148. Advance aggregate snapshots by these measured deltas only; keep every per-file cap and growth allowance unchanged. New storage module owns SQL, shared provider tests and real HTTP/React checks verify semantics. Details: docs/archive/2026-11/2026-11-15完整续查修复与清理.md. Earlier reviews remain in Git history.",
+  "updatedAt": "2026-11-16",
+  "reviewNotes": "2026-11-16 lifecycle and workload refinement against 6d7161f6: scoped commands, bounded supplier queries, separate contact workspace and template commands, audit ID projection and HTTP admission ownership. Aggregate snapshots advance only by reviewed physical deltas [[\"repository web production default\",-62],[\"Rust native production\",190],[\"Rust native tests and examples\",57],[\"repository automation source default\",352],[\"Rust native delivery automation\",148],[\"customs COO workspace components\",-244]]. Per-file limits and growth allowances are unchanged. Regression and Windows process/React workload evidence: docs/archive/2026-11/2026-11-16审计与编辑生命周期修复.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -10,9 +10,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 88619,
+      "baselineAggregateLines": 88557,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 88819,
+      "maximumAggregateLines": 88757,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 111772,
+      "baselineAggregateLines": 111962,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 111847,
+      "maximumAggregateLines": 112037,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 32823,
+      "baselineAggregateLines": 32880,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 32943,
+      "maximumAggregateLines": 33000,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 28952,
+      "baselineAggregateLines": 29304,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 29102,
+      "maximumAggregateLines": 29454,
       "reportFiles": false
     },
     {
@@ -82,9 +82,9 @@
       "filePattern": "^(?:.+\\.(?:mjs|ps1|cmd|yml|yaml|sh)|Dockerfile)$",
       "relativePathPattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)|deploy/rust-native/[^/]+|\\.github/workflows/rust-native-validation\\.yml)$",
       "maximumLines": 350,
-      "baselineAggregateLines": 2300,
+      "baselineAggregateLines": 2448,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 2375,
+      "maximumAggregateLines": 2523,
       "reportFiles": false
     },
     {
@@ -257,7 +257,7 @@
       "directory": "apps/export-doc-web/src/features/single-window",
       "filePattern": "^(?:CustomsCoo|customsCoo|useCustomsCoo).+\\.(?:tsx|ts)$",
       "maximumLines": 780,
-      "maximumAggregateLines": 3350
+      "maximumAggregateLines": 3106
     },
     {
       "name": "container packing workspace components",

@@ -5,11 +5,11 @@ import { patchRouteQuery, type RouteQueryPatch } from "./routeQueryState.ts";
 export function useRouteQuery() {
   const location = useLocation();
   const navigate = useNavigate();
-  const current = useRef({ locationKey: location.key, search: location.search });
+  const current = useRef({ location, search: location.search });
   // Local draft renders can occur before the router commits a navigation.
-  // Only a new history entry may replace the pending query, otherwise a
-  // following view change could lose the object ID written just before it.
-  if (current.current.locationKey !== location.key) current.current = { locationKey: location.key, search: location.search };
+  // A committed location replaces the pending query. Hash edits can retain a
+  // history key, while local draft renders retain the same location object.
+  if (current.current.location !== location) current.current = { location, search: location.search };
   const update = useCallback((patch: RouteQueryPatch, replace = true) => {
     const search = patchRouteQuery(current.current.search, patch);
     current.current.search = search;

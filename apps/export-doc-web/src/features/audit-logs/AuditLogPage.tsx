@@ -34,7 +34,7 @@ export function AuditLogPage({
     <ListWorkspace className="audit-log-surface" aria-label="审计日志">
       <form className="toolbar audit-log-toolbar" onSubmit={handleSearch}>
         <FilterBar className="audit-log-filter-bar" label="审计筛选条件">
-          <Field label="发票" className="audit-log-text-filter">
+          <Field label="现存发票号" className="audit-log-text-filter">
             <input value={invoiceKeyword} onChange={(event) => setInvoiceKeyword(event.target.value)} />
           </Field>
           <Field label="实体">

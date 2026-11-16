@@ -289,6 +289,16 @@ impl Adapter for Postgres {
             serde_json::from_str(&row.try_get::<_, String>(1)?)?,
         ))
     }
+    fn query_audit_ids(&self, query: &AuditQuery<'_>) -> Result<Vec<i64>> {
+        let (sql, values) = audit_query::ids(query, true);
+        let parameters: Vec<&(dyn ::tokio_postgres::types::ToSql + Sync)> =
+            values.iter().map(|value| value as _).collect();
+        self.client
+            .query(&sql, &parameters)?
+            .into_iter()
+            .map(|row| row.try_get(0).map_err(Into::into))
+            .collect()
+    }
     fn attachment_category_counts(
         &self,
         company: &str,

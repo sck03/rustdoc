@@ -1,5 +1,7 @@
 use crate::{ServerState, response};
 pub(super) mod body;
+#[cfg(test)]
+mod lifecycle_tests;
 mod upload_file;
 use axum::{
     body::Body,
@@ -9,7 +11,7 @@ use axum::{
 use export_doc_contracts::{contracts, generated_api::*};
 use export_doc_engine::{api::ApiError, operation::OperationScope};
 use serde_json::Value;
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 pub(super) fn error(status: u16, message: &str) -> ApiError {
     ApiError {
@@ -107,7 +109,7 @@ async fn execute(
             }
         }
     }
-    let permit = state.requests.acquire(&state.telemetry).await?;
+    let permit = Arc::new(state.requests.acquire(&state.telemetry).await?);
     let download_permit = if response::is_download(operation) {
         Some(
             state
@@ -226,8 +228,10 @@ async fn execute(
         let authentication_token = token.clone();
         let authentication_scope = scope.clone();
         let authentication_registration = registration.clone();
+        let authentication_permit = permit.clone();
         tokio::task::spawn_blocking(move || {
             let _registration = authentication_registration;
+            let _permit = authentication_permit;
             authentication_scope.run_result(|| {
                 service
                     .session_actor_for_operation(&authentication_token, operation)
@@ -268,7 +272,11 @@ async fn execute(
             .map(|(key, value)| (key.clone(), value.clone()))
             .collect();
         let upload_scope = scope.clone();
+        let upload_registration = registration.clone();
+        let upload_permit = permit.clone();
         let authorization = tokio::task::spawn_blocking(move || {
+            let _registration = upload_registration;
+            let _permit = upload_permit;
             upload_scope.run_result(|| {
                 service.begin_backup_upload(
                     operation,

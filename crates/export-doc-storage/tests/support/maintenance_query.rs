@@ -119,18 +119,23 @@ pub fn exercise(connection: &Connection) {
     connection.rollback().unwrap();
 
     connection.begin().unwrap();
+    let invoice = insert(
+        connection,
+        "invoices",
+        json!({"invoiceNo":"Needle-业务票号"}),
+    );
     for index in 0..300 {
-        connection.append_audit_details(&AuditWrite { kind: "invoices", record_id: 991, version: index + 1,
+        connection.append_audit_details(&AuditWrite { kind: "invoices", record_id: invoice, version: index + 1,
             action: if index % 2 == 0 { "create" } else { "edit" }, actor_id: 7,
             occurred_at: &format!("2026-10-26T09:00:00.{index:09}+08:00"), note: "" },
-            &json!({"oldValues":null,"newValues":{"invoiceNo":format!("needle-{index}"),"large":"x".repeat(1000)}})).unwrap();
+            &json!({"oldValues":null,"newValues":{"invoiceNo":"[TEXT length=11 sha256=REDACTED]","large":"x".repeat(1000)}})).unwrap();
     }
     let mut query = AuditQuery {
         invoice: "needle",
         entity: "Invoice",
         action: "Added",
         user: "7",
-        keyword: "NEEDLE",
+        keyword: "REDACTED",
         start: None,
         end: None,
         entities: &[("invoices", "Invoice", "发票")],
@@ -142,9 +147,40 @@ pub fn exercise(connection: &Connection) {
     let (total, rows) = connection.query_audits(&query).unwrap();
     assert_eq!(total, 150);
     assert_eq!(rows.len(), 3);
+    let invoice_only = AuditQuery {
+        entity: "",
+        action: "",
+        user: "",
+        keyword: "",
+        ..query
+    };
+    assert_eq!(connection.query_audits(&invoice_only).unwrap().0, 300);
+    assert_eq!(connection.query_audit_ids(&invoice_only).unwrap().len(), 3);
     assert_eq!(rows[0]["versionNumber"], 297);
     assert_eq!(rows[0]["body"]["oldValues"], Value::Null);
     assert!(serde_json::to_vec(&rows).unwrap().len() < 5000);
+    assert_eq!(
+        connection.query_audit_ids(&query).unwrap(),
+        rows.iter()
+            .map(|row| row["id"].as_i64().unwrap())
+            .collect::<Vec<_>>()
+    );
+    query.before_id = rows.last().unwrap()["id"].as_i64();
+    assert!(
+        connection
+            .query_audit_ids(&query)
+            .unwrap()
+            .iter()
+            .all(|id| *id < query.before_id.unwrap())
+    );
+    query.before_id = None;
+    query.invoice = "REDACTED";
+    assert_eq!(
+        connection.query_audits(&query).unwrap().0,
+        0,
+        "invoice filter must not search audit body text"
+    );
+    query.invoice = "needle";
     query.start = Some(
         chrono::DateTime::parse_from_rfc3339("2026-10-26T01:00:00.000000250Z")
             .unwrap()
@@ -154,6 +190,14 @@ pub fn exercise(connection: &Connection) {
     assert_eq!(connection.query_audits(&query).unwrap().0, 25);
     query.end = query.start;
     assert_eq!(connection.query_audits(&query).unwrap().0, 1);
+    let mut changed = connection.get("invoices", invoice).unwrap().unwrap();
+    changed["invoiceNo"] = json!("Renamed-业务票号");
+    connection.set_body(invoice, &changed).unwrap();
+    assert!(connection.query_audit_ids(&query).unwrap().is_empty());
+    query.invoice = "RENAMED";
+    assert_eq!(connection.query_audit_ids(&query).unwrap().len(), 1);
+    connection.delete("invoices", invoice, 1).unwrap();
+    assert!(connection.query_audit_ids(&query).unwrap().is_empty());
     query.invoice = "";
     query.entity = "";
     query.action = "";
@@ -164,6 +208,15 @@ pub fn exercise(connection: &Connection) {
     assert_eq!(connection.query_audits(&query).unwrap().0, 300);
     query.count_all = false;
     assert_eq!(connection.query_audits(&query).unwrap().1.len(), 3);
+    let ids = connection.query_audit_ids(&query).unwrap();
+    assert_eq!(connection.delete_audits(&ids).unwrap(), 3);
+    assert!(
+        connection
+            .query_audit_ids(&query)
+            .unwrap()
+            .iter()
+            .all(|id| !ids.contains(id))
+    );
     connection
         .append_audit(&AuditWrite {
             kind: "invoices",
@@ -177,6 +230,10 @@ pub fn exercise(connection: &Connection) {
         .unwrap();
     assert_eq!(
         connection.query_audits(&query).unwrap_err().kind,
+        ErrorKind::Unavailable
+    );
+    assert_eq!(
+        connection.query_audit_ids(&query).unwrap_err().kind,
         ErrorKind::Unavailable
     );
     connection.rollback().unwrap();

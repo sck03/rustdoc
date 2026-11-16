@@ -1,24 +1,26 @@
+import { useQueryClient } from "@tanstack/react-query";
+import { largeDocumentQueryOptions } from "../../api/queryRetention.ts";
+import { useSupplierProfile } from "./useSupplierProfile.ts";
+import { SupplierContactsWorkspace } from "./SupplierContactsWorkspace.tsx";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
+import { useScopedConfirmation } from "../../ui/useScopedConfirmation.ts";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { FilterBar } from "../../ui/primitives/Field.tsx";
-import { useEffect, useState, type FormEvent } from "react";
-import { useVersionedRecordDraft } from "../../ui/useVersionedRecordDraft.ts";
-import { useScopedSave } from "../../ui/useScopedSave.ts";
-import { runRecordAction } from "../../ui/runRecordAction.ts";
+import { useEffect, useMemo } from "react";
 import { useFileImportWorkspace } from "../../ui/useFileImportWorkspace.ts";
-import { isAbortError } from "../../ui/useAbortableOperation.ts";
 import { ServerDraftUpdateNotice } from "../../ui/serverDraftSync.tsx";
-import type { ApiSupplierContactDto, ApiSupplierDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { currentLocalDateInputValue, readApiError } from "../../ui/formUtils.ts";
 import { SupplierProductLinksPanel } from "./SupplierProductLinksPanel.tsx";
 import { SupplierAssessmentsPanel } from "./SupplierAssessmentsPanel.tsx";
 import { SupplierAssessmentOverview } from "./SupplierAssessmentOverview.tsx";
 import { TaskViewTabs, getTaskViewPanelProps } from "../../ui/TaskViewTabs.tsx";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
-import { OperationFeedback, errorFeedback, requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { OperationFeedback, errorFeedback, successFeedback } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { usePermission } from "../../app/PermissionAccessContext.tsx";
 import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
@@ -55,51 +57,38 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
   const canEditAssessment = usePermission(permissionResources.supplierAssessments, permissionActions.edit).allowed;
   const canApproveAssessment = usePermission(permissionResources.supplierAssessments, permissionActions.approve).allowed;
   const canDeleteAssessment = usePermission(permissionResources.supplierAssessments, permissionActions.delete).allowed;
-  const requestConfirmation = useConfirmation();
-  const [suppliers, setSuppliers] = useState<ApiSupplierDto[]>([]);
-  const [contacts, setContacts] = useState<ApiSupplierContactDto[]>([]);
+  const cache = useQueryClient();
   const { params, update: updateRoute } = useRouteQuery();
   const supplierId = readRouteId(params.get("supplierId")) ?? 0;
-  const setSupplierId = (id: number) => updateRoute({ supplierId: id || null });
-  const [contactId, setContactId] = useState(0);
   const newSupplier = params.get("new") === "true";
   const setNewSupplier = (value: boolean) => updateRoute({ new: value });
   const { keywordInput, setKeywordInput, keyword, setKeyword, status, setStatus, pageNumber, setPageNumber, pageSize, setPageSize } = useDirectoryLocation();
-  const [revision, setRevision] = useState(0);
-  const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
-  const [contactPageNumber, setContactPageNumber] = useState(1);
-  const [contactPageSize, setContactPageSize] = useState(20);
-  const [contactTotalCount, setContactTotalCount] = useState(0);
-  const [contactTotalPages, setContactTotalPages] = useState(1);
   const view = readRouteChoice<SupplierTaskView>(params.get("view"), ["overview", "directory", "profile", "contacts", "products", "assessments", "import"], "directory");
   const setView = (value: SupplierTaskView) => updateRoute({ view: value }, false);
-  const [contactView, setContactView] = useState<"directory" | "editor">("directory");
-  const supplierDraft = useVersionedRecordDraft(`supplier:${supplierId}`, suppliers.find((item) => item.id === supplierId), ["name", "countryRegion", "category", "website", "mainProducts", "notes"]);
-  const contactDraft = useVersionedRecordDraft(`supplier:${supplierId}:contact:${contactId}`, contacts.find((item) => item.id === contactId), ["name", "title", "email", "phone", "instantMessaging"]);
-  const supplierDraftDirty = supplierDraft.isDirty, contactDraftDirty = contactDraft.isDirty;
-  const supplierSave = useScopedSave(`supplier:${supplierId}:${view}`, client);
-  const contactSave = useScopedSave(`supplier:${supplierId}:contact:${contactId}:${view}:${contactView}`, client);
+  const discard = useConfirmUnsavedChanges();
+  const confirmationScope = useMemo(() => ({ client, supplierId, newSupplier, view }), [client, supplierId, newSupplier, view]);
+  const confirmDiscardChanges = useScopedConfirmation(confirmationScope, discard);
+  const { query: supplierQuery, draft: supplierDraft, command: supplierCommand, feedback, setFeedback, save: saveSupplier } = useSupplierProfile({
+    client, supplierId, newSupplier, view,
+    access: { create: canCreateSupplier, edit: canEditSupplier, admit: canAdmitSupplier, deactivate: canDeactivateSupplier, delete: canDeleteSupplier },
+    confirmDiscard: confirmDiscardChanges,
+    onSelect: (id, deleted) => updateRoute({ supplierId: id || null, new: false, ...(deleted ? { view: "directory" } : {}) }),
+  });
   const { preview: importPreview, busy, importing, feedback: importFeedback, select: previewImport, commit: confirmImport } = useFileImportWorkspace({
     owner: client, enabled: canImportSupplier && view === "import",
     preview: (file, signal) => client.previewSupplierImport({ fileName: file.name, body: file }, { signal }),
     commit: (value, signal) => client.importSuppliers({ body: { previewId: value.previewId } }, { signal }),
     describe: result => `已导入 ${result.createdSuppliers} 家供应商、${result.createdContacts} 位联系人，跳过 ${result.skippedRows} 行。`,
-    onImported: async () => { setRevision(value => value + 1); },
+    onImported: async () => { await cache.invalidateQueries({ queryKey: ["suppliers"] }); },
   });
   const selectedSupplier = supplierDraft.record;
-  const selectedContact = contactDraft.record;
-  const confirmDiscardChanges = useConfirmUnsavedChanges();
-  useUnsavedChangesGuard({
-    isDirty: supplierDraftDirty || contactDraftDirty,
-    message: "当前供应商或联系人资料有未保存的修改。",
-  });
-  useEffect(() => { supplierDraft.reset(); contactDraft.reset(); }, [view]);
+  useUnsavedChangesGuard({ isDirty: supplierDraft.isDirty, message: "当前供应商资料有未保存的修改。" });
+  useEffect(() => { supplierDraft.reset(); }, [view]);
 
   async function changeView(nextView: SupplierTaskView) {
     if (nextView === view) return true;
     if (!await confirmDiscardChanges("切换供应商工作区")) return false;
     supplierDraft.reset();
-    contactDraft.reset();
     if (view === "profile" && newSupplier) setNewSupplier(false);
     setView(nextView);
     return true;
@@ -108,201 +97,41 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
   async function beginNewSupplier() {
     if (!await confirmDiscardChanges("新建供应商")) return;
     supplierDraft.reset();
-    contactDraft.reset();
-    setSupplierId(0);
-    setNewSupplier(true);
-    setView("profile");
+    updateRoute({ supplierId: null, new: true, view: "profile" }, false);
   }
 
-  async function changeContactView(nextView: "directory" | "editor") {
-    if (nextView === contactView) return true;
-    if (!await confirmDiscardChanges("切换联系人视图")) return false;
-    contactDraft.reset();
-    setContactView(nextView);
-    return true;
-  }
-
-  async function selectContact(nextContactId: number) {
-    if (nextContactId === contactId && contactView === "editor") return;
-    if (!await confirmDiscardChanges("切换联系人")) return;
-    contactDraft.reset();
-    setContactId(nextContactId);
-    setContactView("editor");
-  }
-
-  async function openSupplier(item: ApiSupplierDto) {
-    setSuppliers((current) => [item, ...current.filter((supplier) => supplier.id !== item.id)]);
-    setSupplierId(item.id);
-    setContactPageNumber(1);
-    setNewSupplier(false);
-    setView("profile");
+  async function openSupplier(id: number, nextView = "profile") {
+    if (!await confirmDiscardChanges("打开供应商")) return;
+    supplierDraft.reset();
+    updateRoute({ supplierId: id, new: false, view: nextView }, false);
   }
 
   const pageQuery = usePagedDirectoryQuery(
-    ["suppliers", keyword, status, pageNumber, pageSize, revision],
+    ["suppliers", keyword, status, pageNumber, pageSize],
     (signal) => client.querySuppliers({ keyword, status, pageNumber, pageSize }, { signal }),
+    view === "directory", largeDocumentQueryOptions,
   );
   const page = pageQuery.data ?? null;
 
-  useEffect(() => {
-    if (!supplierId || newSupplier || selectedSupplier) return;
-    const controller = new AbortController();
-    void client.getSupplier({ id: supplierId }, { signal: controller.signal })
-      .then((item) => { if (!controller.signal.aborted) setSuppliers([item]); })
-      .catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
-    return () => controller.abort();
-  }, [client, supplierId, newSupplier, selectedSupplier]);
-  useEffect(() => {
-    if (!supplierId || !canViewContacts) {
-      setContacts([]);
-      setContactTotalCount(0);
-      setContactTotalPages(1);
-      return;
-    }
-    const controller = new AbortController();
-    setContacts([]);
-    setContactView("directory");
-    void client.querySupplierContacts(
-      { supplierId, pageNumber: contactPageNumber, pageSize: contactPageSize },
-      { signal: controller.signal },
-    ).then((page) => {
-      if (controller.signal.aborted) return;
-      setContacts(page.items);
-      setContactTotalCount(page.totalCount);
-      setContactTotalPages(page.totalPages);
-      setContactId((current) => page.items.some((item) => item.id === current) ? current : page.items[0]?.id ?? 0);
-    }).catch((error: unknown) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
-    return () => controller.abort();
-  }, [client, contactPageNumber, contactPageSize, supplierId, canViewContacts]);
-
-  async function reloadContacts(preferred?: ApiSupplierContactDto, signal?: AbortSignal) {
-    if (!supplierId) return;
-    const page = await client.querySupplierContacts({ supplierId, pageNumber: contactPageNumber, pageSize: contactPageSize }, { signal });
-    signal?.throwIfAborted();
-    setContacts(preferred && !page.items.some(item => item.id === preferred.id) ? [preferred, ...page.items] : page.items.map(item => item.id === preferred?.id ? preferred : item));
-    setContactTotalCount(page.totalCount);
-    setContactTotalPages(page.totalPages);
-    setContactId(preferred?.id ?? page.items[0]?.id ?? 0);
-  }
-
-  async function saveSupplier(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (newSupplier ? !canCreateSupplier : !canEditSupplier) return;
-    const submitted = { ...supplierDraft.values };
-    const id = newSupplier ? 0 : selectedSupplier?.id ?? 0;
-    const body = { id, ...Object.fromEntries(Object.entries(submitted).map(([key, value]) => [key, value.trim()])) as typeof submitted,
-      expectedVersion: id > 0 ? selectedSupplier?.versionNumber ?? 0 : 0 };
-    try {
-      await supplierSave.run(async ({ signal, checkCurrent, continueInScope }) => {
-        const saved = id ? await client.updateSupplier({ id, body }, { signal }) : await client.createSupplier({ body }, { signal });
-        checkCurrent(); continueInScope(`supplier:${saved.id}:${view}`);
-        supplierDraft.acceptSaved(saved, submitted, `supplier:${saved.id}`);
-        setSuppliers(current => [saved, ...current.filter(item => item.id !== saved.id)]);
-        updateRoute({ supplierId: saved.id, new: false });
-        setRevision(value => value + 1); setFeedback(successFeedback(id ? "供应商已更新。" : "供应商已建立。"));
-      });
-    } catch (error) { if (!isAbortError(error)) setFeedback(requestErrorFeedback(error)); }
-  }
-
-  async function changeSupplierStatus(action: "admit" | "deactivate" | "restore") {
-    if (!selectedSupplier || (action === "admit" ? !canAdmitSupplier : !canDeactivateSupplier)) return;
-    const labels = {
-      admit: ["准入供应商", "确认该供应商已经完成准入审核并进入合作中状态吗？", "供应商已准入。"],
-      deactivate: ["停用供应商", "停用会保留联系人、供货关系和评价历史，确定继续吗？", "供应商已停用。"],
-      restore: ["恢复供应商", "恢复后供应商将回到考察中状态，确定继续吗？", "供应商已恢复考察。"],
-    } as const;
-    const [title, description, successMessage] = labels[action];
-    const submitted = { ...supplierDraft.values };
-    const request = { id: selectedSupplier.id, body: { expectedVersion: selectedSupplier.versionNumber } };
-    await runRecordAction(supplierSave, setFeedback, {
-      confirm: [() => requestConfirmation({ title, description, confirmLabel: title, tone: action === "deactivate" ? "danger" : undefined }), () => confirmDiscardChanges(title)],
-      request: signal => action === "admit" ? client.admitSupplier(request, { signal }) : action === "restore" ? client.restoreSupplier(request, { signal }) : client.deactivateSupplier(request, { signal }),
-      apply: saved => {
-        supplierDraft.acceptSaved(saved, submitted);
-        setSuppliers(current => [saved, ...current.filter(item => item.id !== saved.id)]);
-        setRevision(value => value + 1);
-      },
-      success: successMessage,
-    });
-  }
-
-  async function deleteSupplier() {
-    if (!canDeleteSupplier || !selectedSupplier) return;
-    await runRecordAction(supplierSave, setFeedback, {
-      confirm: [() => requestConfirmation({ title: "删除供应商", description: `确定删除供应商“${selectedSupplier.name}”吗？`, details: ["只有没有供货关系和评价的供应商才能删除。", "联系人会随供应商一并删除；有业务历史时请使用“停用供应商”。"], confirmLabel: "确认删除", tone: "danger" }), () => confirmDiscardChanges("删除供应商")],
-      request: signal => client.deleteSupplier({ id: selectedSupplier.id, expectedVersion: selectedSupplier.versionNumber }, { signal }),
-      apply: (_, { continueInScope }) => {
-        continueInScope("supplier:0:directory"); supplierDraft.reset(); contactDraft.reset(); setSuppliers([]);
-        updateRoute({ supplierId: null, view: "directory" }); setRevision(value => value + 1);
-      },
-      success: "供应商已删除。",
-    });
-  }
-
-  async function saveContact(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if ((selectedContact ? !canEditContact : !canCreateContact) || !supplierId) return;
-    const submitted = { ...contactDraft.values }; const id = selectedContact?.id ?? 0;
-    const body = { id, supplierCompanyId: supplierId, ...Object.fromEntries(Object.entries(submitted).map(([key, value]) => [key, value.trim()])) as typeof submitted,
-      expectedVersion: id > 0 ? selectedContact?.versionNumber ?? 0 : 0 };
-    try {
-      await contactSave.run(async ({ signal, checkCurrent, continueInScope }) => {
-        const saved = id ? await client.updateSupplierContact({ supplierId, id, body }, { signal }) : await client.createSupplierContact({ supplierId, body }, { signal });
-        checkCurrent(); continueInScope(`supplier:${supplierId}:contact:${saved.id}:${view}:editor`);
-        contactDraft.acceptSaved(saved, submitted, `supplier:${supplierId}:contact:${saved.id}`);
-        setContacts(current => [saved, ...current.filter(item => item.id !== saved.id)]); setContactId(saved.id);
-        setContactView("editor"); setFeedback(successFeedback(id ? "联系人已更新。" : "联系人已添加。"));
-        try { await reloadContacts(saved, signal); }
-        catch (error) { checkCurrent(); setFeedback(warningFeedback(`联系人已保存，但目录刷新失败：${readApiError(error)}`)); }
-      });
-    } catch (error) { if (!isAbortError(error)) setFeedback(requestErrorFeedback(error)); }
-  }
-
-  async function setPrimaryContact() {
-    if (!canSetPrimaryContact || !selectedContact) return;
-    const submitted = { ...contactDraft.values };
-    await runRecordAction(contactSave, setFeedback, {
-      confirm: [() => confirmDiscardChanges("设为主要联系人")],
-      request: signal => client.setPrimarySupplierContact({ supplierId, id: selectedContact.id, body: { expectedVersion: selectedContact.versionNumber } }, { signal }),
-      apply: saved => { contactDraft.acceptSaved(saved, submitted); setContacts(current => current.map(item => item.id === saved.id ? saved : { ...item, isPrimary: false })); },
-      refresh: reloadContacts,
-      success: "主要联系人已切换。",
-    });
-  }
-
-  async function deleteContact() {
-    if (!canDeleteContact || !selectedContact) return;
-    await runRecordAction(contactSave, setFeedback, {
-      confirm: [() => requestConfirmation({ title: "删除供应商联系人", description: `确定删除联系人“${selectedContact.name}”吗？`, confirmLabel: "确认删除", tone: "danger" }), () => confirmDiscardChanges("删除联系人")],
-      request: signal => client.deleteSupplierContact({ supplierId, id: selectedContact.id, expectedVersion: selectedContact.versionNumber }, { signal }),
-      apply: (_, { continueInScope }) => {
-        continueInScope(`supplier:${supplierId}:contact:0:${view}:directory`);
-        setContacts(current => current.filter(item => item.id !== selectedContact.id));
-        contactDraft.reset(); setContactId(0); setContactView("directory");
-      },
-      refresh: (_, signal) => reloadContacts(undefined, signal),
-      success: "联系人已删除。",
-    });
-  }
-
-  async function exportRows() {
-    if (!canExportSupplier) return;
-    try {
-      const blob = await client.exportSuppliers({ keyword, status });
-      downloadBlob(blob, `suppliers-${currentLocalDateInputValue()}.xlsx`);
-      setFeedback(successFeedback("供应商 Excel 已生成。"));
-    } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
-  }
+  useServerPageNumber(pageQuery, pageNumber, setPageNumber, pageSize);
+  const exportCommand = useScopedMutation<void>(JSON.stringify([view, keyword, status]), client, {
+    mutationFn: async (_, signal, { checkCurrent }) => {
+      if (!canExportSupplier) return;
+      const blob = await client.exportSuppliers({ keyword, status }, { signal });
+      checkCurrent(); downloadBlob(blob, `suppliers-${currentLocalDateInputValue()}.xlsx`);
+    },
+    onSuccess: () => setFeedback(successFeedback("供应商 Excel 已生成。")),
+    onError: error => setFeedback(errorFeedback(readApiError(error))),
+  });
 
   return <ListWorkspace >
-    <OperationFeedback feedback={view === "import" ? importFeedback : feedback} />
-    {(view === "profile" ? supplierDraft : contactDraft).hasPendingServerVersion ? <ServerDraftUpdateNotice
-      entityLabel={view === "profile" ? "供应商" : "联系人"}
-      onKeepLocal={(view === "profile" ? supplierDraft : contactDraft).keepLocalDraft}
+    <OperationFeedback feedback={view === "import" ? importFeedback : feedback ?? (supplierQuery.isError ? errorFeedback(readApiError(supplierQuery.error)) : null)} />
+    {view === "profile" && supplierDraft.hasPendingServerVersion ? <ServerDraftUpdateNotice
+      entityLabel="供应商"
+      onKeepLocal={supplierDraft.keepLocalDraft}
       onLoadServer={() => { void (async () => {
         if (!await confirmDiscardChanges("载入服务器版本")) return;
-        (view === "profile" ? supplierDraft : contactDraft).loadServerVersion();
-        supplierDraft.reset();
-        contactDraft.reset();
+        supplierDraft.loadServerVersion();
       })(); }}
     /> : null}
     {!canCreateSupplier && !canEditSupplier && !canCreateContact && !canEditContact && !canEditProductLink && !canCreateAssessment && !canEditAssessment
@@ -317,13 +146,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
       ...(canViewProducts ? [{ id: "products" as const, label: "供应产品" }] : []), ...(canViewAssessments ? [{ id: "assessments" as const, label: "评价" }] : []),
     ]} />}
     {!newSupplier && ["profile", "contacts", "products", "assessments"].includes(view) && !selectedSupplier && <PageState tone={feedback ? "error" : supplierId ? "loading" : "empty"} title={supplierId ? "正在定位供应商资料" : "请从目录选择供应商"} />}
-    {view === "overview" && canViewAssessments ? <div {...getTaskViewPanelProps(supplierTabsId, "overview")}><SupplierAssessmentOverview client={client} onOpenSupplier={async (id) => {
-      try {
-        const item = await client.getSupplier({ id });
-        setSuppliers((current) => [item, ...current.filter((supplier) => supplier.id !== item.id)]);
-        setSupplierId(item.id); setNewSupplier(false); setView("assessments");
-      } catch (error) { setFeedback(errorFeedback(readApiError(error))); }
-    }} /></div> : null}
+    {view === "overview" && canViewAssessments ? <div {...getTaskViewPanelProps(supplierTabsId, "overview")}><SupplierAssessmentOverview client={client} onOpenSupplier={id => openSupplier(id, "assessments")} /></div> : null}
     {view === "import" && canImportSupplier ? <section className="form-section" aria-label="导入供应商"><div className="section-header"><h3>导入供应商</h3><span>CSV/XLSX 最多 5000 行、10 MB</span></div>
       <div className="form-actions">
         {canImportSupplier ? <label className="secondary-button">选择导入文件<input type="file" hidden disabled={importing} accept=".csv,.xlsx,.xlsm" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; previewImport(file); }} /></label> : null}
@@ -335,9 +158,9 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
         </tbody></table></ResponsiveTableFrame></> : null}
     </section> : null}
     {view === "directory" ? <section className="form-section" {...getTaskViewPanelProps(supplierTabsId, "directory")}>
-      <PageHeader title="供应商目录" count={page?.totalCount} unit="家" description="查找供货单位，打开资料后维护联系人、供应产品和评价。" actions={<>
+      <PageHeader title="供应商目录" count={page?.totalCount} unit="家" actions={<>
         {canImportSupplier && <button className="secondary-button" type="button" onClick={() => void changeView("import")}>导入供应商</button>}
-        {canExportSupplier && <button className="secondary-button" type="button" onClick={() => void exportRows()}>导出当前筛选</button>}
+        {canExportSupplier && <button className="secondary-button" type="button" disabled={exportCommand.isPending} onClick={() => exportCommand.mutate()}>导出当前筛选</button>}
         {canCreateSupplier && <button className="primary-button" type="button" onClick={() => void beginNewSupplier()}>新建供应商</button>}
       </>}>
       <FilterBar className="list-workspace-filters" label="筛选供应商目录" onSubmit={(event) => { event.preventDefault(); setKeyword(keywordInput.trim()); setPageNumber(1); }}>
@@ -348,40 +171,24 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
       </PageHeader>
       {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}
       <ResponsiveTableFrame label="供应商目录" mobileLayout="scroll" busy={pageQuery.isFetching}><table className="data-table responsive-data-table"><thead><tr><th>供应商</th><th data-table-priority="secondary">分类</th><th data-table-priority="secondary">主要产品</th><th>状态</th><th /></tr></thead><tbody>
-        {(page?.items ?? []).map((item) => <tr key={item.id}><td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.category || "-"}</td><td data-table-priority="secondary">{item.mainProducts || "-"}</td><td><BusinessStatusBadge value={item.status} /></td><td><button className="secondary-button" type="button" onClick={() => void openSupplier(item)}>打开</button></td></tr>)}
+        {(page?.items ?? []).map((item) => <tr key={item.id}><td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.category || "-"}</td><td data-table-priority="secondary">{item.mainProducts || "-"}</td><td><BusinessStatusBadge value={item.status} /></td><td><button className="secondary-button" type="button" onClick={() => void openSupplier(item.id)}>打开</button></td></tr>)}
         {!pageQuery.isFetching && !pageQuery.isError && !page?.items.length ? <tr><td className="empty-cell" colSpan={5}><div className="empty-cell-content"><strong>暂无供应商</strong><span>{canCreateSupplier ? "先建立供应商资料，再按需添加联系人和关联供应产品。" : "当前没有可查看的供应商。"}</span>{canCreateSupplier ? <div className="form-actions"><button className="secondary-button" type="button" onClick={() => void beginNewSupplier()}>建立第一家供应商</button>{canImportSupplier ? <button className="secondary-button" type="button" onClick={() => void changeView("import")}>从文件导入</button> : null}</div> : null}</div></td></tr> : null}
       </tbody></table></ResponsiveTableFrame>
       <Pagination pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />
     </section> : null}
     {view === "profile" && (newSupplier || selectedSupplier) ? <form className="form-grid" onSubmit={saveSupplier} {...(newSupplier ? { "aria-label": "新建供应商" } : getTaskViewPanelProps(supplierTabsId, "profile"))}>
         <div className="section-heading-row"><h3>{newSupplier ? "新建供应商" : canEditSupplier ? "供应商资料" : "查看供应商"}</h3></div>
-        <fieldset className="permission-fieldset form-field-wide" disabled={newSupplier ? !canCreateSupplier : !canEditSupplier}>
+        <fieldset className="permission-fieldset form-field-wide" disabled={supplierCommand.isPending || (newSupplier ? !canCreateSupplier : !canEditSupplier)}>
         <label>名称<input name="name" required {...supplierDraft.field("name")} /></label><label>国家/地区<input name="countryRegion" {...supplierDraft.field("countryRegion")} /></label>
         <label>分类<input name="category" {...supplierDraft.field("category")} /></label><label>网站<input name="website" {...supplierDraft.field("website")} /></label>
         {!newSupplier ? <label>当前状态<input value={selectedSupplier?.status ?? ""} readOnly /></label> : null}
         <label className="form-field-wide">主要产品<input name="mainProducts" {...supplierDraft.field("mainProducts")} /></label><label className="form-field-wide">备注<textarea name="notes" {...supplierDraft.field("notes")} /></label>
         </fieldset>
-        <div className="form-actions">{(newSupplier ? canCreateSupplier : canEditSupplier) ? <button className="primary-button" type="submit" disabled={supplierSave.isSaving}>保存供应商</button> : null}{!newSupplier && selectedSupplier?.status === "考察中" && canAdmitSupplier ? <button className="secondary-button" type="button" disabled={supplierSave.isSaving} onClick={() => void changeSupplierStatus("admit")}>确认准入</button> : null}{!newSupplier && selectedSupplier && selectedSupplier.status !== "停用" && canDeactivateSupplier ? <button className="secondary-button" type="button" disabled={supplierSave.isSaving} onClick={() => void changeSupplierStatus("deactivate")}>停用供应商</button> : null}{!newSupplier && selectedSupplier && (selectedSupplier.status === "停用" || selectedSupplier.status === "暂停") && canDeactivateSupplier ? <button className="secondary-button" type="button" disabled={supplierSave.isSaving} onClick={() => void changeSupplierStatus("restore")}>恢复考察</button> : null}{!newSupplier && selectedSupplier && canViewContacts ? <button className="secondary-button" type="button" onClick={() => void changeView("contacts")}>{canCreateContact || canEditContact ? "管理联系人" : "查看联系人"}</button> : null}{!newSupplier && selectedSupplier && canDeleteSupplier ? <button className="secondary-button danger-button" type="button" disabled={supplierSave.isSaving} onClick={() => void deleteSupplier()}>删除</button> : null}</div>
+        <div className="form-actions">{(newSupplier ? canCreateSupplier : canEditSupplier) ? <button className="primary-button" type="submit" disabled={supplierCommand.isPending}>保存供应商</button> : null}{!newSupplier && selectedSupplier?.status === "考察中" && canAdmitSupplier ? <button className="secondary-button" type="button" disabled={supplierCommand.isPending} onClick={() => void supplierCommand.mutate("admit")}>确认准入</button> : null}{!newSupplier && selectedSupplier && selectedSupplier.status !== "停用" && canDeactivateSupplier ? <button className="secondary-button" type="button" disabled={supplierCommand.isPending} onClick={() => void supplierCommand.mutate("deactivate")}>停用供应商</button> : null}{!newSupplier && selectedSupplier && (selectedSupplier.status === "停用" || selectedSupplier.status === "暂停") && canDeactivateSupplier ? <button className="secondary-button" type="button" disabled={supplierCommand.isPending} onClick={() => void supplierCommand.mutate("restore")}>恢复考察</button> : null}{!newSupplier && selectedSupplier && canViewContacts ? <button className="secondary-button" type="button" onClick={() => void changeView("contacts")}>{canCreateContact || canEditContact ? "管理联系人" : "查看联系人"}</button> : null}{!newSupplier && selectedSupplier && canDeleteSupplier ? <button className="secondary-button danger-button" type="button" disabled={supplierCommand.isPending} onClick={() => void supplierCommand.mutate("delete")}>删除</button> : null}</div>
       </form> : null}
-    {view === "contacts" && canViewContacts && selectedSupplier && !newSupplier ? <section className="form-section supplier-contact-workspace" {...getTaskViewPanelProps(supplierTabsId, "contacts")}>
-      <div className="section-header"><div><h3>{contactView === "directory" ? "供应商联系人目录" : selectedContact ? "编辑供应商联系人" : "新增供应商联系人"}</h3><p className="section-description">联系人只归属 {selectedSupplier.name}，不写入客户 CRM。</p></div><span>{contactTotalCount} 位</span></div>
-      {contactView === "directory" ? <>
-        <div className="section-header-actions supplier-contact-directory-actions"><button className="secondary-button" type="button" onClick={() => void changeView("profile")}>返回供应商资料</button>{canCreateContact ? <button className="primary-button" type="button" onClick={() => void selectContact(0)}>新增联系人</button> : null}</div>
-        <ResponsiveTableFrame label="供应商联系人" mobileLayout="scroll"><table className="data-table responsive-data-table"><thead><tr><th>联系人</th><th data-table-priority="secondary">职位</th><th>邮箱</th><th data-table-priority="secondary">电话</th><th>类型</th><th /></tr></thead><tbody>
-          {contacts.map((item) => <tr key={item.id}><td><TablePrimaryText value={item.name} /></td><td data-table-priority="secondary">{item.title || "-"}</td><td><TablePrimaryText value={item.email} /></td><td data-table-priority="secondary">{item.phone || "-"}</td><td>{item.isPrimary ? <BusinessStatusBadge value="主要联系人" /> : "普通联系人"}</td><td><button className="secondary-button" type="button" onClick={() => void selectContact(item.id)}>{canEditContact ? "编辑" : "查看"}</button></td></tr>)}
-          {!contacts.length ? <tr><td className="empty-cell" colSpan={6}><div className="empty-cell-content"><strong>尚未建立供应商联系人</strong><span>{canCreateContact ? "需要记录询价、交期或付款沟通对象时，再添加联系人。" : "当前供应商还没有联系人。"}</span>{canCreateContact ? <button className="primary-button" type="button" onClick={() => void selectContact(0)}>添加第一位联系人</button> : null}</div></td></tr> : null}
-        </tbody></table></ResponsiveTableFrame>
-        <Pagination pageNumber={contactPageNumber} totalPages={contactTotalPages} totalCount={contactTotalCount} pageSize={contactPageSize} pageSizeOptions={[20, 50, 100]} isBusy={false} onPageChange={setContactPageNumber} onPageSizeChange={(value) => { setContactPageSize(value); setContactPageNumber(1); }} />
-      </> : <form className="form-grid" onSubmit={saveContact}>
-        <div className="section-heading-row"><h4>{selectedContact ? "编辑联系人资料" : "新增联系人资料"}</h4><button className="secondary-button" type="button" onClick={() => void changeContactView("directory")}>返回联系人目录</button></div>
-        <div className="form-field-wide context-strip"><strong>{selectedSupplier.name}</strong><span>联系人只归属当前供应商，不写入客户 CRM。</span></div>
-        <fieldset className="permission-fieldset form-field-wide" disabled={selectedContact ? !canEditContact : !canCreateContact}>
-        <label>姓名<input name="contactName" required {...contactDraft.field("name")} /></label><label>职位<input name="title" {...contactDraft.field("title")} /></label><label>邮箱<input name="email" type="email" {...contactDraft.field("email")} /></label>
-        <label>电话<input name="phone" {...contactDraft.field("phone")} /></label><label>即时通讯<input name="instantMessaging" {...contactDraft.field("instantMessaging")} /></label>{selectedContact ? <label>联系人角色<input value={selectedContact.isPrimary ? "主要联系人" : "普通联系人"} readOnly /></label> : null}
-        </fieldset>
-        <div className="form-actions">{(selectedContact ? canEditContact : canCreateContact) ? <button className="primary-button" type="submit" disabled={!supplierId || contactSave.isSaving}>保存联系人</button> : null}{selectedContact && !selectedContact.isPrimary && canSetPrimaryContact ? <button className="secondary-button" type="button" disabled={contactSave.isSaving} onClick={() => void setPrimaryContact()}>设为主要联系人</button> : null}{selectedContact && canDeleteContact ? <button className="secondary-button danger-button" type="button" disabled={contactSave.isSaving} onClick={() => void deleteContact()}>删除</button> : null}</div>
-      </form>}
-    </section> : null}
+    {view === "contacts" && canViewContacts && selectedSupplier && !newSupplier && <SupplierContactsWorkspace
+      key={selectedSupplier.id} client={client} selectedSupplier={selectedSupplier} canCreateContact={canCreateContact}
+      canEditContact={canEditContact} canSetPrimaryContact={canSetPrimaryContact} canDeleteContact={canDeleteContact} changeView={changeView} />}
     {view === "products" && canViewProducts && selectedSupplier && !newSupplier ? <div {...getTaskViewPanelProps(supplierTabsId, "products")}><SupplierProductLinksPanel client={client} supplierId={selectedSupplier.id} supplierName={selectedSupplier.name} canEdit={canEditProductLink} canDeactivate={canDeactivateProductLink} canDelete={canDeleteProductLink} /></div> : null}
     {view === "assessments" && canViewAssessments && selectedSupplier && !newSupplier ? <div {...getTaskViewPanelProps(supplierTabsId, "assessments")}><SupplierAssessmentsPanel businessDate={businessDate} client={client} supplierId={selectedSupplier.id} supplierName={selectedSupplier.name} canCreate={canCreateAssessment} canEdit={canEditAssessment} canApprove={canApproveAssessment} canDelete={canDeleteAssessment} /></div> : null}
   </ListWorkspace>;

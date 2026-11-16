@@ -20,9 +20,7 @@ pub(crate) fn build(query: &AuditQuery<'_>, pg: bool) -> (QuerySql, String) {
     let names = query
         .entities
         .iter()
-        .filter(|_| {
-            !query.entity.is_empty() || !query.keyword.is_empty() || !query.invoice.is_empty()
-        })
+        .filter(|_| !query.entity.is_empty() || !query.keyword.is_empty())
         .map(|(kind, name, _)| {
             let kind = sql::bind(&mut values, kind, pg);
             let name = sql::bind(&mut values, name, pg);
@@ -68,12 +66,6 @@ pub(crate) fn build(query: &AuditQuery<'_>, pg: bool) -> (QuerySql, String) {
             format!("({entity})||' '||r.record_id||' '||r.actor_id||' '||({old})||' '||({new})"),
             query.keyword,
         ),
-        (
-            format!(
-                "CASE WHEN ({entity})='Invoice' THEN CAST(r.record_id AS TEXT) ELSE '' END||' '||({old})||' '||({new})"
-            ),
-            query.invoice,
-        ),
     ] {
         if !value.is_empty() {
             filters.push(sql::contains(
@@ -82,6 +74,14 @@ pub(crate) fn build(query: &AuditQuery<'_>, pg: bool) -> (QuerySql, String) {
                 pg,
             ));
         }
+    }
+    if !query.invoice.is_empty() {
+        // Resolve the current business number without retaining unredacted text in audits.
+        // Deleted invoices remain searchable through the other audit criteria.
+        let number = sql::field_from("invoice.body", "invoiceNo", pg);
+        let needle = sql::bind(&mut values, query.invoice, pg);
+        let matches = sql::contains(&number, &needle, pg);
+        filters.push(format!("r.kind='invoices' AND EXISTS (SELECT 1 FROM records invoice WHERE invoice.id=r.record_id AND invoice.kind='invoices' AND {matches})"));
     }
     let (seconds, nanos) = sql::instant_order("r.occurred_at", pg);
     // Parse selected timestamps even when the caller supplied no time range.
@@ -110,5 +110,19 @@ pub(crate) fn build(query: &AuditQuery<'_>, pg: bool) -> (QuerySql, String) {
             values,
         },
         projection,
+    )
+}
+
+pub(crate) fn ids(query: &AuditQuery<'_>, pg: bool) -> (String, Vec<String>) {
+    let (sql, _) = build(query, pg);
+    (
+        format!(
+            "SELECT r.id FROM audit_logs r WHERE {} ORDER BY {} LIMIT {} OFFSET {}",
+            sql.filter,
+            sql.order,
+            query.limit.clamp(1, 2_000),
+            query.offset.max(0)
+        ),
+        sql.values,
     )
 }

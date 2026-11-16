@@ -1,26 +1,17 @@
-import { FormEvent, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Pencil, Plus, RefreshCw, Save, Search, Trash2 } from "lucide-react";
 import {
-  ApiCustomsCooProducerProfileDto,
   ApiCustomsCooProducerProfileInputDto,
   ExportDocManagerApiClient,
 } from "../../api/index.ts";
-import { queryKeys } from "../../api/queryKeys.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
-import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { Dialog } from "../../ui/primitives/Dialog.tsx";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
-import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
-type ProducerProfileDraft = Required<ApiCustomsCooProducerProfileInputDto> & {
-  id: number;
-  versionNumber: number;
-};
+import { useProducerProfileWorkspace } from "./hooks/useProducerProfileWorkspace.ts";
+import { readProfileValue } from "./producerProfileModel.ts";
 
 export function CustomsCooProducerProfileDialog({
   client,
@@ -35,179 +26,12 @@ export function CustomsCooProducerProfileDialog({
   onApply: (profile: ApiCustomsCooProducerProfileInputDto) => void;
   onClose: () => void;
 }) {
-  const requestConfirmation = useConfirmation();
-  const queryClient = useQueryClient();
-  const [keyword, setKeyword] = useState("");
-  const [committedKeyword, setCommittedKeyword] = useState("");
-  const [pageNumber, setPageNumber] = useState(1);
-  const pageSize = 50;
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [draft, setDraft] = useState<ProducerProfileDraft>(() => toDraft(currentProfile));
-  const [cleanDraft, setCleanDraft] = useState<ProducerProfileDraft>(() => toDraft(currentProfile));
-  const [message, setMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const profilesQuery = useQuery({
-    queryKey: [...queryKeys.singleWindowCustomsCooProducerProfiles(committedKeyword.trim()), pageNumber, pageSize],
-    queryFn: ({ signal }) =>
-      client.listCustomsCooProducerProfiles({
-        keyword: committedKeyword.trim() || undefined,
-        pageNumber, pageSize,
-      }, { signal }),
-  });
-
-  const saveMutation = useMutation({
-    mutationFn: (nextDraft: ProducerProfileDraft) => {
-      const body = { profile: normalizeProfileInput(nextDraft), expectedVersion: nextDraft.id > 0 ? nextDraft.versionNumber : undefined };
-      return nextDraft.id > 0
-        ? client.updateCustomsCooProducerProfile({ id: nextDraft.id, body })
-        : client.createCustomsCooProducerProfile({ body });
-    },
-    onSuccess: async (response) => {
-      const savedDraft = toDraft(response.profile);
-      setSelectedId(response.id);
-      setDraft(savedDraft);
-      setCleanDraft(savedDraft);
-      setMessage(null);
-      setSuccessMessage(response.message || "生产企业资料已保存。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowCustomsCooProducerProfilesRoot() });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (profile: ProducerProfileDraft) => client.deleteCustomsCooProducerProfile({ id: profile.id, expectedVersion: profile.versionNumber }),
-    onSuccess: async () => {
-      const nextDraft = toDraft(currentProfile);
-      setSelectedId(null);
-      setDraft(nextDraft);
-      setCleanDraft(nextDraft);
-      setMessage(null);
-      setSuccessMessage("生产企业资料已删除。");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowCustomsCooProducerProfilesRoot() });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const profiles = profilesQuery.data?.items ?? [];
-  useServerPageNumber(profilesQuery, pageNumber, setPageNumber, pageSize);
-  const isBusy = profilesQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
-  const selectedCount = selectedId ? 1 : 0;
-  const isDraftDirty = !producerProfileDraftEquals(draft, cleanDraft);
-
-  useUnsavedChangesGuard({
-    isDirty: isDraftDirty,
-    message: "生产企业资料有未保存的修改。",
-  });
-
-  function handleSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setCommittedKeyword(keyword.trim());
-    setPageNumber(1);
-  }
-
-  async function beginCreate() {
-    if (!await confirmDiscardDraft("新增资料")) {
-      return;
-    }
-
-    const nextDraft = toDraft(currentProfile);
-    setSelectedId(null);
-    setDraft(nextDraft);
-    setCleanDraft(nextDraft);
-    setMessage(null);
-    setSuccessMessage(null);
-  }
-
-  async function selectProfile(profile: ApiCustomsCooProducerProfileDto) {
-    const isSameProfile = selectedId === profile.id && draft.id === profile.id;
-    const actionLabel = isSameProfile ? "重新载入当前资料" : "切换资料";
-    if (!await confirmDiscardDraft(actionLabel)) {
-      return;
-    }
-
-    loadProfile(profile);
-  }
-
-  function loadProfile(profile: ApiCustomsCooProducerProfileDto) {
-    const nextDraft = toDraft(profile);
-    setSelectedId(profile.id);
-    setDraft(nextDraft);
-    setCleanDraft(nextDraft);
-    setMessage(null);
-    setSuccessMessage(null);
-  }
-
-  async function handleClose() {
-    if (await confirmDiscardDraft("关闭弹窗")) {
-      onClose();
-    }
-  }
-
-  function handleSave(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!hasProducerIdentity(draft)) {
-      setMessage("生产企业代码或生产企业名称至少填写一个。");
-      setSuccessMessage(null);
-      return;
-    }
-
-    saveMutation.mutate(draft);
-  }
-
-  async function handleDelete() {
-    if (!selectedId || selectedId <= 0 || isBusy) {
-      return;
-    }
-
-    if (!await confirmDiscardDraft("删除资料")) {
-      return;
-    }
-
-    const displayName = buildProfileDisplayName(draft);
-    if (!await requestConfirmation({ title: "删除生产企业资料", description: `确定要删除生产企业资料“${displayName}”吗？`, confirmLabel: "确认删除", tone: "danger" })) {
-      return;
-    }
-
-    deleteMutation.mutate(draft);
-  }
-
-  async function handleApplyDraft() {
-    if (!hasProducerIdentity(draft) && !draft.producer.trim()) {
-      setMessage("当前编辑区没有可回填的生产企业资料。");
-      setSuccessMessage(null);
-      return;
-    }
-
-    if (isDraftDirty && !await requestConfirmation({ title: "套用未保存资料", description: "生产企业资料有未保存的修改。", details: ["继续套用只会回填当前货项，不会保存到资料库。"], confirmLabel: "继续套用" })) {
-      return;
-    }
-
-    onApply(normalizeProfileInput(draft));
-  }
-
-  async function applyListProfile(profile: ApiCustomsCooProducerProfileDto) {
-    if (!await confirmDiscardDraft("套用列表资料")) {
-      return;
-    }
-
-    onApply(normalizeProfileInput(toDraft(profile)));
-  }
-
-  async function confirmDiscardDraft(actionLabel: string) {
-    if (!isDraftDirty) {
-      return true;
-    }
-
-    return requestConfirmation({ title: "放弃未保存修改", description: `继续${actionLabel}会丢失生产企业资料的未保存修改。`, confirmLabel: `继续${actionLabel}` });
-  }
-
+  const {
+    keyword, setKeyword, pageNumber, setPageNumber, pageSize, selectedId, draft, setDraft,
+    message, successMessage, profilesQuery, profiles, isBusy, selectedCount,
+    handleSearch, beginCreate, selectProfile, handleClose, handleSave, handleDelete,
+    handleApplyDraft, applyListProfile,
+  } = useProducerProfileWorkspace({ client, currentProfile, rowLabel, onApply, onClose });
   return (
     <Dialog title="生产企业资料" description={`共 ${profilesQuery.data?.totalCount ?? 0} 条资料`} size="full" busy={isBusy} onClose={() => void handleClose()} closeLabel="关闭">
       <div className="producer-profile-dialog">
@@ -268,6 +92,7 @@ export function CustomsCooProducerProfileDialog({
                     <tr
                       key={profile.id}
                       className={selectedId === profile.id ? "producer-profile-row-selected" : undefined}
+                      aria-disabled={isBusy}
                       onClick={() => selectProfile(profile)}
                     >
                       <td className="item-action-cell">
@@ -419,73 +244,4 @@ function ProfileSelect({
       </select>
     </label>
   );
-}
-
-function toDraft(profile: ApiCustomsCooProducerProfileInputDto | ApiCustomsCooProducerProfileDto): ProducerProfileDraft {
-  return {
-    id: "id" in profile ? profile.id : 0,
-    versionNumber: "versionNumber" in profile ? profile.versionNumber : 0,
-    ciqRegNo: profile.ciqRegNo ?? "",
-    prdcEtpsName: profile.prdcEtpsName ?? "",
-    prdcEtpsConcEr: profile.prdcEtpsConcEr ?? "",
-    prdcEtpsTel: profile.prdcEtpsTel ?? "",
-    producer: profile.producer ?? "",
-    producerTel: profile.producerTel ?? "",
-    producerFax: profile.producerFax ?? "",
-    producerEmail: profile.producerEmail ?? "",
-    producerSertFlag: profile.producerSertFlag ?? "",
-    lastInvoiceNo: profile.lastInvoiceNo ?? "",
-    lastContractNo: profile.lastContractNo ?? "",
-    lastSourceStyleNo: profile.lastSourceStyleNo ?? "",
-  };
-}
-
-function normalizeProfileInput(profile: ApiCustomsCooProducerProfileInputDto): ApiCustomsCooProducerProfileInputDto {
-  return {
-    ciqRegNo: normalizeUpper(profile.ciqRegNo),
-    prdcEtpsName: normalizeText(profile.prdcEtpsName),
-    prdcEtpsConcEr: normalizeText(profile.prdcEtpsConcEr),
-    prdcEtpsTel: normalizeText(profile.prdcEtpsTel),
-    producer: normalizeText(profile.producer),
-    producerTel: normalizeText(profile.producerTel),
-    producerFax: normalizeText(profile.producerFax),
-    producerEmail: normalizeText(profile.producerEmail),
-    producerSertFlag: normalizeUpper(profile.producerSertFlag),
-    lastInvoiceNo: normalizeText(profile.lastInvoiceNo),
-    lastContractNo: normalizeText(profile.lastContractNo),
-    lastSourceStyleNo: normalizeText(profile.lastSourceStyleNo),
-  };
-}
-
-function producerProfileDraftEquals(left: ProducerProfileDraft, right: ProducerProfileDraft) {
-  return JSON.stringify(toComparableProducerProfileDraft(left)) === JSON.stringify(toComparableProducerProfileDraft(right));
-}
-
-function toComparableProducerProfileDraft(profile: ProducerProfileDraft) {
-  return {
-    id: profile.id || 0,
-    ...normalizeProfileInput(profile),
-  };
-}
-
-function hasProducerIdentity(profile: ApiCustomsCooProducerProfileInputDto) {
-  return Boolean(profile.ciqRegNo?.trim() || profile.prdcEtpsName?.trim());
-}
-
-function buildProfileDisplayName(profile: ApiCustomsCooProducerProfileInputDto) {
-  const code = profile.ciqRegNo?.trim() ?? "";
-  const name = profile.prdcEtpsName?.trim() ?? "";
-  return code && name ? `${code} - ${name}` : name || code || "未命名";
-}
-
-function readProfileValue(value?: string) {
-  return value?.trim() ? value : "-";
-}
-
-function normalizeText(value?: string) {
-  return value?.trim() ?? "";
-}
-
-function normalizeUpper(value?: string) {
-  return normalizeText(value).toUpperCase();
 }

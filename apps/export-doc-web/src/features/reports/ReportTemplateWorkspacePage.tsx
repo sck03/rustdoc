@@ -1,6 +1,7 @@
+import { useReportTemplateCommands } from "./useReportTemplateCommands.ts";
 import { EditorWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { useReportTemplateDocument } from "./useReportTemplateDocument.ts";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import "../../styles/routes/reports.css";
 import { useLocation } from "react-router-dom";
 import { ApiUserReportTemplateDto, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -25,21 +26,15 @@ import { useReportTemplateSelectionSync } from "./useReportTemplateSelectionSync
 import { deriveReportTemplateFeedback, deriveReportTemplateWorkspaceState } from "./reportTemplateWorkspaceState.ts";
 import { useReportTemplateSelectionActions } from "./useReportTemplateSelectionActions.ts";
 import { ReportTemplateFeedback } from "./ReportTemplateFeedback.tsx";
-import { reportTemplateShareScopeLabel } from "./ReportTemplateUserPanel.tsx";
 import { ReportTemplateManagementWorkspace } from "./ReportTemplateManagementWorkspace.tsx";
 import { ReportTemplateManagementView } from "./ReportTemplateManagementView.tsx";
 import { useReportTemplateWorkspaceNavigation } from "./useReportTemplateWorkspaceNavigation.ts";
 import { useReportTemplateWorkspaceQueries } from "./useReportTemplateWorkspaceQueries.ts";
 import { useReportTemplateDocumentAccess } from "./useReportTemplateDocumentAccess.ts";
-import { useReportTemplateSaveMutations } from "./useReportTemplateSaveMutations.ts";
-import { useUserReportTemplateLifecycleMutations } from "./useUserReportTemplateLifecycleMutations.ts";
-import { useDefaultReportTemplateLifecycleMutations } from "./useDefaultReportTemplateLifecycleMutations.ts";
 import { useReportTemplatePackageWorkspace } from "./useReportTemplatePackageWorkspace.ts";
 import { useReportTemplateFileWorkspace } from "./useReportTemplateFileWorkspace.ts";
 import { useReportTemplatePreview } from "./useReportTemplatePreview.ts";
-import { useReportTemplateReload } from "./useReportTemplateReload.ts";
 import {
-  buildNewTemplateFileName,
   buildUserTemplateKey,
   fileNameFromPath,
   readPreferredPreviewSampleProfile,
@@ -98,8 +93,9 @@ export function ReportTemplateWorkspacePage({
   const confirmationScope = useMemo(() => ({ client, reportType, selectedTemplatePath, selectedUserTemplateId }),
     [client, reportType, selectedTemplatePath, selectedUserTemplateId]);
   const requestConfirmation = useScopedConfirmation(confirmationScope, confirm);
+  const editor = useReportTemplateDocument();
   const { document, hasUnsavedChanges: hasUnsavedTemplateChanges, loadFile, loadUser, clear: clearDocument,
-    acceptName, readContent: readDesignerContent, setName: setCurrentTemplateDisplayName, setDraft: setDesignerDraft } = useReportTemplateDocument();
+    readContent: readDesignerContent, setName: setCurrentTemplateDisplayName, setDraft: setDesignerDraft } = editor;
   const { content, path: contentTemplatePath, baseline: loadedContent, name: currentTemplateDisplayName,
     baselineName: persistedDisplayName, revision: expectedRevision, userVersion: expectedUserVersion } = document;
   const designerDraftContent = document.draft.content;
@@ -116,10 +112,6 @@ export function ReportTemplateWorkspacePage({
   const [previewPaymentId, setPreviewPaymentId] = useState(() =>
     initialReportType === "PaymentVoucher" ? requestedPreviewSourceId : 0,
   );
-  const [newTemplateFileName, setNewTemplateFileName] = useState(() => buildNewTemplateFileName(initialReportType));
-  const [newTemplateDisplayName, setNewTemplateDisplayName] = useState("");
-  const [newUserTemplateName, setNewUserTemplateName] = useState("");
-  const [renameTemplateFileName, setRenameTemplateFileName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"success" | "error" | null>(null);
   const desktopAvailable = isDesktopBridgeAvailable();
@@ -221,9 +213,6 @@ export function ReportTemplateWorkspacePage({
     loadFile(template, true);
     clearPreview();
   }, [loadFile, clearPreview]);
-  useEffect(() => {
-    setRenameTemplateFileName(fileNameFromPath(contentTemplatePath));
-  }, [contentTemplatePath]);
 
   const fileWorkspace = useReportTemplateFileWorkspace({
     client,
@@ -286,10 +275,6 @@ export function ReportTemplateWorkspacePage({
     setReportType,
     setSelectedUserTemplateId,
     setSelectedTemplatePath,
-    setNewTemplateFileName,
-    setNewTemplateDisplayName,
-    setNewUserTemplateName,
-    setRenameTemplateFileName,
     setTemplatePreviewSampleProfile,
     setPreviewInvoiceId,
     setPreviewPaymentId,
@@ -298,134 +283,13 @@ export function ReportTemplateWorkspacePage({
     confirmDiscardChanges,
   });
 
-  const { saveDefaultTemplateMutation: saveMutation, saveUserTemplateMutation } = useReportTemplateSaveMutations({
-    client,
-    reportType,
-    selectedTemplatePath,
-    expectedRevision,
-    expectedUserVersion,
-    currentUserTemplate,
-    content,
-    userTemplateName: currentTemplateDisplayName,
-    onDefaultTemplateSaved: (saved) => {
-      setSelectedTemplatePath(saved.templatePath);
-      loadFile(saved, true);
-      setSavedTemplatePath(saved.templatePath);
-      showFeedback("模板已保存。", "success");
-    },
-    onUserTemplateSaved: (saved) => {
-      loadUser(saved, true);
-      setRenameTemplateFileName(saved.name);
-      showFeedback("私人模板已保存，可直接用于自己的打印和导出，无需发布。", "success");
-    },
-    onError: (error) => showFeedback(readApiError(error), "error"),
-  });
-
-  const {
-    createBlankUserTemplateMutation,
-    cloneUserTemplateMutation,
-    archiveUserTemplateMutation,
-    restoreUserTemplateVersionMutation,
-    updateUserTemplateStatusMutation,
-  } = useUserReportTemplateLifecycleMutations({
-    client,
-    reportType,
-    selectedTemplatePath,
-    selectedUserTemplateId,
-    currentUserTemplate,
-    newTemplateName: newUserTemplateName,
-    onCreated: (created) => {
-      setSelectedUserTemplateId(created.id);
-      setSelectedTemplatePath(buildUserTemplateKey(created.id));
-      loadUser(created, true);
-      setRenameTemplateFileName(created.name);
-      setNewUserTemplateName("");
-      showFeedback("私人模板已创建，可继续设计，保存后直接个人使用。", "success");
-    },
-    onArchived: () => {
-      setSelectedUserTemplateId(0);
-      setSelectedTemplatePath("");
-      clearDocument();
-      setRenameTemplateFileName("");
-      setCurrentTemplateDisplayName("");
-      showFeedback("模板已归档，可从归档列表恢复为草稿。", "success");
-    },
-    onRestored: (saved) => {
-      loadUser(saved, true);
-      setRenameTemplateFileName(saved.name);
-      showFeedback(`已恢复到版本 ${saved.versionNumber}，请检查后继续编辑。`, "success");
-    },
-    onStatusUpdated: (saved, action) => {
-      loadUser(saved, true);
-      const nextMessage = action.kind === "publish"
-        ? "模板已发布，当前仍按原共享范围可见；可另行选择共享范围。"
-        : action.kind === "disable"
-          ? "模板已停用，不再用于正式输出。"
-          : action.kind === "restore"
-            ? saved.status === "Draft" ? "归档模板已恢复为私有草稿。" : "模板已恢复发布。"
-            : `共享范围已更新：${reportTemplateShareScopeLabel(saved.shareScope)}`;
-      showFeedback(nextMessage, "success");
-    },
-    onError: (error) => showFeedback(readApiError(error), "error"),
-  });
-
-  const {
-    createTemplateMutation,
-    renameTemplateMutation,
-    updateDisplayNameMutation,
-    setDefaultTemplateMutation,
-    deleteTemplateMutation,
-  } =
-    useDefaultReportTemplateLifecycleMutations({
-      client,
-      reportType,
-      selectedTemplatePath,
-      expectedRevision,
-      newTemplateFileName,
-      newTemplateDisplayName,
-      currentTemplateDisplayName,
-      renameTemplateFileName,
-      onCreated: (created) => {
-        setSelectedTemplatePath(created.templatePath);
-        loadFile(created, true);
-        setRenameTemplateFileName(fileNameFromPath(created.templatePath));
-        setNewTemplateFileName(buildNewTemplateFileName(reportType));
-        setNewTemplateDisplayName("");
-        clearPreview();
-        showFeedback("模板已新建。", "success");
-      },
-      onRenamed: (renamed) => {
-        setSelectedTemplatePath(renamed.templatePath);
-        loadFile(renamed, true);
-        setRenameTemplateFileName(fileNameFromPath(renamed.templatePath));
-        clearPreview();
-        showFeedback("模板文件名已更新。", "success");
-      },
-      onDisplayNameUpdated: (updated) => {
-        acceptName(updated.displayName, updated.revision);
-        showFeedback("模板显示名称已更新，文件名保持不变。", "success");
-      },
-      onDefaultSet: (nextMessage) => showFeedback(nextMessage, "success"),
-      onDeleted: () => {
-        setSelectedTemplatePath("");
-        clearDocument();
-        setRenameTemplateFileName("");
-        setCurrentTemplateDisplayName("");
-        clearPreview();
-        showFeedback("模板已删除。", "success");
-      },
-      onError: (error) => showFeedback(readApiError(error), "error"),
+  const { newTemplateFileName, newTemplateDisplayName, newUserTemplateName, renameTemplateFileName,
+    setNewTemplateFileName, setNewTemplateDisplayName, setNewUserTemplateName, setRenameTemplateFileName,
+    saveMutation, saveUserTemplateMutation, createBlankUserTemplateMutation, cloneUserTemplateMutation, archiveUserTemplateMutation, restoreUserTemplateVersionMutation, updateUserTemplateStatusMutation, createTemplateMutation, renameTemplateMutation, updateDisplayNameMutation, setDefaultTemplateMutation, deleteTemplateMutation, reloadTemplate, isPending: templateCommandPending } = useReportTemplateCommands({
+      client, reportType, selectedTemplatePath, selectedUserTemplateId, setSelectedTemplatePath,
+      setSelectedUserTemplateId, setSavedTemplatePath, currentUserTemplate, editor,
+      clearPreview, clearSelectionFeedback, showFeedback,
     });
-
-  const reloadTemplate = useReportTemplateReload({
-    client, reportType, selectedTemplatePath, selectedUserTemplateId,
-    onLoaded: result => {
-      if (result.kind === "user") loadUser(result.template, true);
-      else loadFile(result.template, true);
-      clearSelectionFeedback();
-    },
-    onError: error => showFeedback(readApiError(error), "error"),
-  });
 
   const {
     isUserTemplate,
@@ -479,16 +343,12 @@ export function ReportTemplateWorkspacePage({
     previewInvoiceId,
     previewPaymentId,
     busyFlags: [
+      templateCommandPending,
       templatesQuery.isLoading,
       userTemplatesQuery.isLoading,
       userTemplateContentQuery.isLoading,
       settingsQuery.isLoading,
       templateContentQuery.isLoading,
-      createTemplateMutation.isPending,
-      renameTemplateMutation.isPending,
-      updateDisplayNameMutation.isPending,
-      setDefaultTemplateMutation.isPending,
-      deleteTemplateMutation.isPending,
       packageWorkspace.exportPackageMutation.isPending,
       packageWorkspace.downloadPackageMutation.isPending,
       packageWorkspace.importPackageMutation.isPending,
@@ -497,16 +357,8 @@ export function ReportTemplateWorkspacePage({
       fileWorkspace.downloadFileMutation.isPending,
       fileWorkspace.importFileMutation.isPending,
       fileWorkspace.uploadFileMutation.isPending,
-      saveMutation.isPending,
-      saveUserTemplateMutation.isPending,
-      createBlankUserTemplateMutation.isPending,
-      cloneUserTemplateMutation.isPending,
-      archiveUserTemplateMutation.isPending,
-      restoreUserTemplateVersionMutation.isPending,
-      updateUserTemplateStatusMutation.isPending,
       exportDefaults.isBusy,
       previewPending,
-      reloadTemplate.isPending,
     ],
     canManageTemplates,
     canDesignTemplates,

@@ -266,6 +266,15 @@ impl Adapter for Sqlite {
         )?;
         Ok((count, serde_json::from_str(&rows)?))
     }
+    fn query_audit_ids(&self, query: &AuditQuery<'_>) -> Result<Vec<i64>> {
+        let (sql, values) = audit_query::ids(query, false);
+        let connection = self.connection.borrow();
+        let mut statement = connection.prepare_cached(&sql)?;
+        statement
+            .query_map(rusqlite::params_from_iter(values.iter()), |row| row.get(0))?
+            .map(|row| row.map_err(Into::into))
+            .collect()
+    }
     fn attachment_category_counts(
         &self,
         company: &str,
