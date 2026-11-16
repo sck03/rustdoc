@@ -75,7 +75,12 @@ pub(super) fn create(
         (KEY.to_owned(), key),
     ];
     let objects = working.join(OBJECTS);
-    super::super::file_store::export_archive(store, &objects)?;
+    if entry == SQLITE {
+        let snapshot = export_doc_storage::Connection::sqlite_read_only(database)?;
+        super::super::file_store::export_snapshot(store, &objects, &snapshot)?;
+    } else {
+        super::super::file_store::export_archive(store, &objects)?;
+    }
     sources.push((OBJECTS.into(), objects));
     collect(
         &paths.data_root,
@@ -168,6 +173,57 @@ pub(super) fn stage(
     content: impl Read,
     database: &str,
 ) -> Result<()> {
+    let prepared = prepare(space, marker, magic, password, content, database)?;
+    sealed::atomic_write(marker, &prepared.marker_content(None)?)
+}
+pub(in crate::engine) struct PreparedRestore {
+    staging: PathBuf,
+    pub(in crate::engine) marker: PathBuf,
+}
+impl PreparedRestore {
+    pub(super) fn into_task(
+        self,
+        lock: fs::File,
+        action: &'static str,
+        detail: &str,
+    ) -> super::tasks::TaskOutput {
+        let note = detail.to_owned();
+        super::tasks::TaskOutput {
+            file: None,
+            destination: None,
+            directory: None,
+            managed_file: None,
+            archive: None,
+            detail: note.clone(),
+            publication: Some(
+                super::tasks::PublicationCheck::new(move |tx, actor| {
+                    super::audit_in(tx, actor, action, &note)
+                })
+                .with_restore(self)
+                .with_file_lock(lock),
+            ),
+        }
+    }
+    pub(in crate::engine) fn marker_content(&self, job: Option<&str>) -> Result<Vec<u8>> {
+        serde_json::to_vec(&serde_json::json!({"stagingDirectoryName":self.staging.file_name().unwrap().to_string_lossy(),
+            "scheduledAtUtc":chrono::Utc::now().to_rfc3339(),"jobId":job})).map_err(Into::into)
+    }
+}
+impl Drop for PreparedRestore {
+    fn drop(&mut self) {
+        if self.marker.try_exists().is_ok_and(|exists| !exists) {
+            let _ = fs::remove_dir_all(&self.staging);
+        }
+    }
+}
+pub(super) fn prepare(
+    space: &std::sync::Arc<crate::temporary_space::Budget>,
+    marker: &Path,
+    magic: &[u8],
+    password: &str,
+    content: impl Read,
+    database: &str,
+) -> Result<PreparedRestore> {
     if std::env::var_os("EXPORTDOCMANAGER_MASTER_KEY").is_some() {
         return Err(invalid(
             "当前部署使用环境主密钥，请先由管理员切换到恢复包的文件密钥模式。",
@@ -204,17 +260,59 @@ pub(super) fn stage(
             })?;
         }
         crate::operation::check()?;
-        sealed::atomic_write(
-            marker,
-            &serde_json::to_vec(
-                &serde_json::json!({"stagingDirectoryName":staging.file_name().unwrap().to_string_lossy(),"scheduledAtUtc":chrono::Utc::now().to_rfc3339()}),
-            )?,
-        )
+        Ok(PreparedRestore {
+            staging: staging.clone(),
+            marker: marker.to_path_buf(),
+        })
     })();
     if result.is_err() {
         let _ = fs::remove_dir_all(&staging);
     }
     result
+}
+/// Called under the package/instance lock before any database or file replacement.
+pub(super) fn confirm_task_marker(
+    cache: &Path,
+    marker: &Path,
+    succeeded: impl FnOnce(&str) -> Result<bool>,
+) -> Result<bool> {
+    if !marker.try_exists()? {
+        return Ok(false);
+    }
+    let mut value = super::scratch::read_json(marker)?;
+    let Some(job) = value["jobId"].as_str() else {
+        return Ok(true);
+    };
+    if job.len() != 32 || !job.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(invalid("恢复任务标识无效。"));
+    }
+    if value["taskCommitted"] == true {
+        super::tasks::resolve_control(cache, marker, job, true)?;
+        return Ok(true);
+    }
+    let committed = succeeded(job)?;
+    super::tasks::resolve_control(cache, marker, job, committed)?;
+    if !committed {
+        if marker.try_exists()? {
+            fs::remove_file(marker)?;
+        }
+        return Ok(false);
+    }
+    value["taskCommitted"] = serde_json::json!(true);
+    sealed::atomic_write(marker, &serde_json::to_vec(&value)?)?;
+    Ok(true)
+}
+/// A durable decision survives task-history pruning before the next restart.
+pub(in crate::engine) fn commit_task_marker(marker: &Path, job: &str) -> Result<()> {
+    let mut value = super::scratch::read_json(marker)?;
+    if value["jobId"] != job {
+        return Err(unavailable("恢复标记与已提交任务不匹配。"));
+    }
+    if value["taskCommitted"] != true {
+        value["taskCommitted"] = serde_json::json!(true);
+        sealed::atomic_write(marker, &serde_json::to_vec(&value)?)?;
+    }
+    Ok(())
 }
 const MAX_MANIFEST_BYTES: usize = 4 * 1024 * 1024;
 fn read_manifest(staging: &Path) -> Result<Manifest> {
@@ -288,8 +386,7 @@ pub(super) fn staged(
     if !marker.try_exists()? {
         return Ok(None);
     }
-    let value: serde_json::Value =
-        serde_json::from_slice(&fs::read(marker)?).map_err(|_| invalid("恢复标记无效。"))?;
+    let value = super::scratch::read_json(marker)?;
     let name = value["stagingDirectoryName"]
         .as_str()
         .filter(|name| name.starts_with("pending-") && paths::valid_file_name(name))
@@ -309,7 +406,7 @@ pub(super) fn staged(
         entries.push(entry);
     }
     validate_entries(&manifest, &entries, database)?;
-    super::super::file_store::restore_archive(&staging.join(OBJECTS), &staging, space)?;
+    super::super::file_store::verify_archive(&staging.join(OBJECTS), &staging, space)?;
     if database == SQLITE {
         export_doc_storage::verify_sqlite_backup(&staging.join(SQLITE))?;
         let db = export_doc_storage::Connection::sqlite(&staging.join(SQLITE))?;
@@ -323,6 +420,125 @@ pub(super) fn staged(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn restore_publication_obeys_cancellation_and_final_authorization() {
+        use crate::{
+            engine::test_support::{ScratchDirectory, administrator},
+            generated_api::*,
+        };
+        use std::{
+            sync::mpsc,
+            time::{Duration, Instant},
+        };
+        for scenario in ["success", "cancel", "denied"] {
+            let root = ScratchDirectory::new();
+            let service = root.service();
+            let paths = root.paths();
+            let directory = paths.data_root.join("DisasterRecovery");
+            fs::create_dir_all(&directory).unwrap();
+            let guard = lock(&paths).unwrap();
+            let staging = super::super::scratch::create(&directory, "pending-").unwrap();
+            let marker = directory.join(".pending-restore.json");
+            let prepared = PreparedRestore {
+                staging: staging.clone(),
+                marker: marker.clone(),
+            };
+            assert!(!marker.exists());
+            let (release, wait) = mpsc::channel();
+            let job = service
+                .jobs
+                .start(
+                    &administrator(),
+                    GET_JOB,
+                    "Restore",
+                    "恢复提交",
+                    move |_| {
+                        wait.recv_timeout(Duration::from_secs(5)).unwrap();
+                        Ok(prepared.into_task(guard, "restore-test", "恢复提交"))
+                    },
+                )
+                .unwrap();
+            let id = job["jobId"].as_str().unwrap();
+            if scenario == "cancel" {
+                service
+                    .jobs
+                    .operation(CANCEL_JOB, &administrator(), id)
+                    .unwrap();
+            }
+            if scenario == "denied" {
+                service
+                    .store
+                    .transaction(|tx| {
+                        let actor = administrator();
+                        let mut user = crate::engine::store::get(tx, "users", actor.id)?;
+                        user["isActive"] = serde_json::json!(false);
+                        crate::engine::store::save(
+                            tx,
+                            "users",
+                            actor.id,
+                            user,
+                            Some(actor.name.clone()),
+                            &actor,
+                            "disable",
+                        )?;
+                        Ok(())
+                    })
+                    .unwrap();
+            }
+            release.send(()).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            loop {
+                let job = service.jobs.get(&administrator(), id).unwrap();
+                if job["status"] != "Running" {
+                    assert_eq!(
+                        job["status"],
+                        match scenario {
+                            "success" => "Succeeded",
+                            "cancel" => "Canceled",
+                            _ => "Failed",
+                        }
+                    );
+                    break;
+                }
+                assert!(Instant::now() < deadline);
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert_eq!(marker.exists(), scenario == "success");
+            assert_eq!(staging.exists(), scenario == "success");
+            if scenario == "success" {
+                service
+                    .jobs
+                    .operation(DELETE_JOB, &administrator(), id)
+                    .unwrap();
+                assert!(confirm_task_marker(&paths.cache_root, &marker, |_| Ok(true)).unwrap());
+                assert!(
+                    confirm_task_marker(&paths.cache_root, &marker, |_| panic!(
+                        "must not query replaced DB"
+                    ))
+                    .unwrap()
+                );
+            }
+            service.close().unwrap();
+        }
+    }
+
+    #[test]
+    fn failed_task_marker_is_removed_and_unknown_commit_stops_recovery() {
+        let root = crate::engine::test_support::ScratchDirectory::new();
+        let marker = root.paths().data_root.join("marker.json");
+        let bytes = serde_json::to_vec(&serde_json::json!({"jobId":"a".repeat(32)})).unwrap();
+        fs::write(&marker, &bytes).unwrap();
+        assert!(
+            confirm_task_marker(&root.paths().cache_root, &marker, |_| Err(unavailable(
+                "DB offline"
+            )))
+            .is_err()
+        );
+        assert_eq!(fs::read(&marker).unwrap(), bytes);
+        assert!(!confirm_task_marker(&root.paths().cache_root, &marker, |_| Ok(false)).unwrap());
+        assert!(!marker.exists());
+    }
 
     #[test]
     fn recovery_manifests_accept_supported_versions_and_still_verify_payloads() {

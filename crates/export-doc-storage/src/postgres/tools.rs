@@ -69,6 +69,17 @@ impl MaintenanceLease {
     pub fn validate(&mut self) -> Result<()> {
         validate_schema(&mut self.client)
     }
+    pub fn recovery_job_succeeded(&mut self, id: &str) -> Result<bool> {
+        self.validate()?;
+        let row = self
+            .client
+            .query_opt(
+                "SELECT body->>'status' FROM records WHERE kind='background-jobs' AND identity=$1",
+                &[&id],
+            )?
+            .ok_or_else(|| Error::unavailable("恢复任务提交记录缺失。"))?;
+        Ok(row.try_get::<_, String>(0)? == "Succeeded")
+    }
     pub fn file_objects(&mut self, after: &str) -> Result<Vec<crate::FileObject>> {
         self.client.query("SELECT digest,size_bytes FROM file_objects WHERE digest>$1 ORDER BY digest LIMIT 200", &[&after])?
             .into_iter().map(|row| Ok(crate::FileObject { digest: row.try_get(0)?, size: u64::try_from(row.try_get::<_,i64>(1)?).map_err(|_| Error::unavailable("文件对象长度无效。"))? })).collect()

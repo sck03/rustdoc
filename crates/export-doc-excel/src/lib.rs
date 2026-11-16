@@ -16,7 +16,9 @@ mod workbook;
 mod xml;
 pub use import::preview;
 pub use single_window::preview as preview_single_window;
-pub use workbook::{blank_template, booking_from_invoice, convert_booking, table, table_stream};
+pub use workbook::{
+    blank_template, booking_from_invoice, convert_booking, table, table_stream, write_table,
+};
 
 pub const MAX_INPUT: usize = 25 * 1024 * 1024;
 pub type Result<T> = std::result::Result<T, String>;

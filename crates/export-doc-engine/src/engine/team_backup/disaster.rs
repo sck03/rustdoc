@@ -141,7 +141,7 @@ pub(super) fn restore_package(
             auth::authorize_operation(&actor, RESTORE_DISASTER_RECOVERY_PACKAGE, &[])?;
             let _gate = package::lock(&paths)?;
             crate::paths::ensure_safe_absolute(&path).map_err(invalid)?;
-            package::stage(
+            let prepared = package::prepare(
                 &paths.disk_space,
                 &marker(&paths)?,
                 MAGIC,
@@ -149,33 +149,35 @@ pub(super) fn restore_package(
                 fs::File::open(path)?,
                 package::SQLITE,
             )?;
-            super::audit(
-                &store,
-                &actor,
+            Ok(prepared.into_task(
+                _gate,
                 "restore-disaster-recovery",
-                "已校验并暂存，等待重启",
-            )?;
-            Ok(TaskOutput {
-                file: None,
-                managed_file: None,
-                publication: None,
-                archive: None,
-                destination: None,
-                directory: None,
-                detail: "恢复已暂存。请立即退出并重新打开程序，恢复前原数据会保存在恢复目录。"
-                    .into(),
-            })
+                "恢复已暂存。请立即退出并重新打开程序，恢复前原数据会保存在恢复目录。",
+            ))
         },
     )
 }
 pub fn apply_pending(paths: &RuntimePaths) -> Result<()> {
     let marker = marker(paths)?;
+    let _gate = package::lock(paths)?;
+    if !package::confirm_task_marker(&paths.cache_root, &marker, |job| {
+        let db = export_doc_storage::Connection::sqlite_read_only(&paths.sqlite_database_path())?;
+        let row = db
+            .find_identity("background-jobs", job)?
+            .ok_or_else(|| unavailable("恢复任务提交记录缺失，已停止恢复。"))?;
+        Ok(row["status"] == "Succeeded")
+    })? {
+        return Ok(());
+    }
     let Some(staging) = package::staged(&marker, package::SQLITE, &paths.disk_space)? else {
         return Ok(());
     };
-    let _gate = package::lock(paths)?;
     export_doc_storage::verify_sqlite_backup(&staging.join(package::SQLITE))?;
-    restore_files::install(paths, &staging, true)?;
+    let snapshot =
+        export_doc_storage::Connection::sqlite_read_only(&staging.join(package::SQLITE))?;
+    restore_files::install(paths, &staging, true, |cursor| {
+        Ok(snapshot.file_objects(cursor, 200, false)?)
+    })?;
     fs::remove_file(marker)?;
     Ok(())
 }

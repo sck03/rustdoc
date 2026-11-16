@@ -7,6 +7,33 @@ fn file_output(path: &std::path::Path, bytes: &[u8]) -> TaskOutput {
     output
 }
 
+#[test]
+fn restore_control_receipts_resolve_before_database_replacement() {
+    for committed in [false, true] {
+        let fixture = Fixture::new();
+        let store = fixture.store();
+        let target = fixture.root.0.join(".pending-restore.json");
+        let job = persistence::create(&store, &fixture.actor, "Restore", "恢复发布回执").unwrap();
+        let id = job["jobId"].as_str().unwrap();
+        let bytes =
+            serde_json::to_vec(&json!({"jobId":id,"stagingDirectoryName":"pending-test"})).unwrap();
+        drop(output::publish(&store, id, &file_output(&target, &bytes)).unwrap());
+        // Simulate exit after filesystem publication, on either side of the DB commit.
+        output::resolve_control(&fixture.paths.cache_root, &target, id, committed).unwrap();
+        assert_eq!(target.exists(), committed);
+        assert!(
+            !fixture
+                .paths
+                .cache_root
+                .join("TaskPublications")
+                .join(id)
+                .exists()
+        );
+        output::recover(&store).unwrap();
+        assert_eq!(target.exists(), committed);
+    }
+}
+
 fn directory_output(path: &std::path::Path, files: &[(&str, &[u8])]) -> TaskOutput {
     TaskOutput {
         file: None,

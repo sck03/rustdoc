@@ -11,7 +11,9 @@ pub(super) use crate::engine::test_support::{
     ScratchDirectory as Workspace, administrator as admin,
 };
 use crate::paths::nonce;
-use std::{fs, path::PathBuf};
+use std::fs;
+#[cfg(feature = "postgres")]
+use std::path::PathBuf;
 
 pub(super) fn open_service(workspace: &Workspace) -> TestService {
     TestService::open(workspace.paths())

@@ -49,7 +49,7 @@ pub(in crate::engine) fn stage_restore(
             {
                 return Err(unavailable("备份文件已变化，已拒绝恢复。"));
             }
-            package::stage(
+            let prepared = package::prepare(
                 &paths.disk_space,
                 &if pg {
                     migration::marker_path(&paths)?
@@ -69,26 +69,15 @@ pub(in crate::engine) fn stage_restore(
                     package::SQLITE
                 },
             )?;
-            super::super::audit(
-                &store,
-                &actor,
+            Ok(prepared.into_task(
+                _gate,
                 "stage-recovery-archive",
-                "已校验并暂存完整恢复，等待维护窗口执行。",
-            )?;
-            Ok(tasks::TaskOutput {
-                managed_file: None,
-                publication: None,
-                archive: None,
-                file: None,
-                destination: None,
-                directory: None,
-                detail: if pg {
+                if pg {
                     "完整恢复已暂存。请停止应用，执行 --restore-pending 维护命令后启动。"
                 } else {
                     "完整恢复已暂存。请退出并重新打开桌面程序。"
-                }
-                .into(),
-            })
+                },
+            ))
         },
     )
 }

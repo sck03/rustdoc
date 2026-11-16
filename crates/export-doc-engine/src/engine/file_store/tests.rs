@@ -179,11 +179,26 @@ fn recovery_pack_verifies_every_database_object_and_detects_missing_content() {
     let prepared = store.files.prepare(b"backup bytes").unwrap();
     record(&store, &prepared).unwrap();
     let pack = root.0.join("objects.pack");
-    export_archive(&store, &pack).unwrap();
+    let snapshot_path = root.0.join("snapshot.sqlite3");
+    store.connection().unwrap().backup(&snapshot_path).unwrap();
+    let snapshot = export_doc_storage::Connection::sqlite_read_only(&snapshot_path).unwrap();
+    let later = store.files.prepare(b"added after snapshot").unwrap();
+    record(&store, &later).unwrap();
+    export_snapshot(&store, &pack, &snapshot).unwrap();
     let staging = root.0.join("Restored");
     restore_archive(&pack, &staging, &root.paths().disk_space).unwrap();
-    let scan = |cursor: &str| Ok(store.connection()?.file_objects(cursor, 200, false)?);
+    let scan = |cursor: &str| Ok(snapshot.file_objects(cursor, 200, false)?);
     verify_local_inventory(&staging, scan).unwrap();
+    assert!(
+        !staging
+            .join("Files/objects")
+            .join(&later.object.digest[..2])
+            .join(&later.object.digest)
+            .exists()
+    );
+    let identity = fs::read(staging.join("Files/.store-id")).unwrap();
+    verify_archive(&pack, &staging, &root.paths().disk_space).unwrap();
+    assert_eq!(fs::read(staging.join("Files/.store-id")).unwrap(), identity);
     let object_path = staging
         .join("Files/objects")
         .join(&prepared.object.digest[..2])

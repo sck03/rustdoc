@@ -29,9 +29,65 @@ fn buffered_downloads_reserve_before_reading_and_release_after_delivery() {
             .status,
         Some(429)
     );
+    assert_eq!(
+        service
+            .prepare_generated_download(
+                crate::generated_api::EXPORT_SUPPLIERS,
+                &[],
+                &[],
+                None,
+                token
+            )
+            .err()
+            .unwrap()
+            .status,
+        Some(429)
+    );
+    assert_eq!(
+        service
+            .prepare_generated_download(
+                crate::generated_api::EXPORT_SUPPLIERS,
+                &[],
+                &[],
+                None,
+                "invalid-session"
+            )
+            .err()
+            .unwrap()
+            .status,
+        Some(401)
+    );
     drop(held);
     #[cfg(feature = "excel")]
     {
+        let download = service
+            .prepare_generated_download(
+                crate::generated_api::EXPORT_SUPPLIERS,
+                &[],
+                &[],
+                None,
+                token,
+            )
+            .unwrap();
+        assert!(
+            service
+                .jobs
+                .reserve_download(128 * 1024 * 1024, true)
+                .is_err()
+        );
+        drop(download);
+        let audit = service
+            .prepare_generated_download(
+                crate::generated_api::DOWNLOAD_AUDIT_LOGS,
+                &[],
+                &[],
+                Some(json!({})),
+                token,
+            )
+            .unwrap();
+        assert!(matches!(audit, backup_io::Download::File { .. }));
+        let bytes = audit.into_memory().unwrap().content;
+        assert!(bytes.starts_with(b"PK"));
         let download = service
             .prepare_file_download(crate::generated_api::EXPORT_HS_CODE_KNOWLEDGE, &[], token)
             .unwrap();

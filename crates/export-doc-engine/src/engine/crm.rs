@@ -326,10 +326,7 @@ pub fn batch_status(store: &Store, actor: &Actor, body: &Value) -> Result<Value>
     }
     let affected = store.transaction_as(actor, |transaction, actor| {
         let mut count = 0;
-        for mut row in store::all(transaction, "crm-customers")?
-            .into_iter()
-            .filter(|row| ids.contains(&row["id"].as_i64().unwrap_or(0)))
-        {
+        for mut row in transaction.records_by_ids("crm-customers", &ids, &[])? {
             if !auth::visible(actor, "sales.customers", "deactivate", &row) {
                 continue;
             }

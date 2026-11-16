@@ -24,6 +24,16 @@ pub const OPERATIONS: &[Operation] = &[
 ];
 #[cfg(feature = "excel")]
 pub const EXPORTS: &[Operation] = &[DOWNLOAD_AUDIT_LOGS, SAVE_AUDIT_LOGS_TO_PATH];
+#[cfg(feature = "excel")]
+mod export;
+#[cfg(feature = "excel")]
+pub(super) fn download(
+    service: &NativeService,
+    actor: &Actor,
+    body: &Value,
+) -> Result<super::backup_io::Download> {
+    export::prepare(service, actor, DOWNLOAD_AUDIT_LOGS, &[], body).map(|(download, _)| download)
+}
 pub const ENTITIES: &[(&str, &str, &str)] = &[
     ("invoices", "Invoice", "发票"),
     ("customers", "Customer", "单证客户"),
@@ -199,6 +209,7 @@ fn select(
     let rows = events.into_iter().map(project).collect::<Vec<_>>();
     Ok((rows, total as usize))
 }
+#[cfg(feature = "excel")]
 fn scan(
     tx: &Connection,
     criteria: &Criteria,
@@ -280,52 +291,9 @@ pub fn handle(
     }
     #[cfg(feature = "excel")]
     if EXPORTS.contains(&operation) {
-        let criteria = Criteria::parse(body)?;
-        let limit = body["maxCount"]
-            .as_u64()
-            .filter(|value| *value > 0)
-            .unwrap_or(50_000)
-            .min(50_000) as usize;
-        let (bytes, count) = service
-            .store
-            .read_for(actor, operation, query, |tx, _actor| {
-                let mut count = 0;
-                let mut source_error = None;
-                let bytes = export_doc_excel::table_stream(
-                    &[
-                        ("id", "编号"),
-                        ("entityName", "实体"),
-                        ("entityId", "业务编号"),
-                        ("action", "操作"),
-                        ("userId", "操作人"),
-                        ("timestamp", "时间"),
-                        ("oldValues", "原值"),
-                        ("newValues", "新值"),
-                    ],
-                    |emit| match scan(tx, &criteria, limit, |rows| {
-                        for row in rows {
-                            emit(row).map_err(invalid)?;
-                        }
-                        Ok(())
-                    }) {
-                        Ok(amount) => {
-                            count = amount;
-                            Ok(())
-                        }
-                        Err(cause) => {
-                            source_error = Some(cause);
-                            Err("审计导出未完成。".into())
-                        }
-                    },
-                    &|| crate::operation::check().map_err(|error| error.to_string()),
-                );
-                if let Some(cause) = source_error {
-                    return Err(cause);
-                }
-                Ok((bytes.map_err(invalid)?, count))
-            })?;
+        let (download, count) = export::prepare(service, actor, operation, query, body)?;
         if operation == DOWNLOAD_AUDIT_LOGS {
-            return Ok(bytes);
+            return Ok(download.into_memory()?.content);
         }
         if service.provider()? != "SQLite" {
             return Err(error(403, "服务器不支持本机保存路径。"));
@@ -342,7 +310,21 @@ pub fn handle(
         {
             return Err(invalid("请选择合法的 .xlsx 输出文件。"));
         }
-        crate::paths::atomic_write(&path, &bytes).map_err(unavailable)?;
+        let super::backup_io::Download::File { mut file, .. } = download else {
+            return Err(unavailable("审计导出文件状态无效。"));
+        };
+        crate::paths::atomic_write_with(&path, |output| {
+            let mut output = service
+                .paths
+                .disk_space
+                .at(path.parent().unwrap().to_path_buf())
+                .writer(output)
+                .map_err(|e| e.to_string())?;
+            super::backup_io::copy_chunks(&mut file, &mut output, u64::MAX, |_| {})
+                .map(|_| ())
+                .map_err(|e| e.to_string())
+        })
+        .map_err(unavailable)?;
         return serde_json::to_vec(&command(count, &path.to_string_lossy(), "审计日志已导出"))
             .map_err(Into::into);
     }

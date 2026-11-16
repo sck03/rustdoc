@@ -293,9 +293,7 @@ pub fn validate(
             if id > 0
                 && (value["unit"] != previous["unit"]
                     || value["isReturnable"] != previous["isReturnable"])
-                && store::all(connection, "supply-requests")?
-                    .iter()
-                    .any(|request| request["officeSupplyId"] == id)
+                && has_reference(connection, "supply-requests", "officeSupplyId", id)?
             {
                 return Err(conflict(
                     "已有领用记录，不能更改计量单位或归还类型，请另建物品。",
@@ -465,20 +463,7 @@ pub fn deletion_restriction(connection: &Connection, id: i64) -> Result<Option<&
 }
 
 fn has_reference(connection: &Connection, kind: &str, field: &str, id: i64) -> Result<bool> {
-    Ok(connection
-        .query_generic(&export_doc_storage::GenericQuery {
-            kind,
-            scope: export_doc_storage::DataScope {
-                all: true,
-                ..Default::default()
-            },
-            filters: &[(field, id.to_string())],
-            fields: &[("id", "id")],
-            limit: 1,
-            ..Default::default()
-        })?
-        .0
-        > 0)
+    Ok(connection.record_exists(kind, &[(field, id.to_string())])?)
 }
 
 fn validate_identity(profile: &Value) -> Result<()> {

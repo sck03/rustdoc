@@ -349,7 +349,12 @@ export default function createApi(transport: ApiTransport) {
     const path = `/api/reports/invoices/${encodePath(request.invoiceId)}/document-email`;
     return transport.request<BackgroundJobSnapshot>("POST", path, {
       body: request.body,
-      init,
+      init: {
+        ...init,
+        headers: mergeHeaders(init?.headers, {
+          "Idempotency-Key": request["Idempotency-Key"] === undefined ? undefined : String(request["Idempotency-Key"]),
+        }),
+      },
     });
   },
 

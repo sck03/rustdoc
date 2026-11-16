@@ -1,7 +1,6 @@
 import { Plus, RefreshCw, Save, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
-import { ConfirmationDialog } from "../../ui/ConfirmationDialog.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
@@ -17,7 +16,7 @@ import { PersonnelOrganizationFacts } from "../office/PersonnelOrganizationEdito
 
 export function UserManagementPanel({ client, canManageUsers }: { client: ExportDocManagerApiClient; canManageUsers: boolean }) {
   const { draft, setDraft, selectedUserId, users, search, setSearch, roles, permissionTemplates, availableCompanies, availableDepartments,
-    employee, selectedTemplate, selectedRole, message, successMessage, deleteTarget, setDeleteTarget, deleteMutation,
+    employee, selectedTemplate, selectedRole, message, successMessage,
     isBusy, refreshUsers, beginNew, saveUser, deleteSelectedUser, selectUser, patchDraft, changeRole, changeCompany } = useUserManagement(client, canManageUsers);
   if (!canManageUsers) return null;
   return (
@@ -205,26 +204,6 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
 
       <p className="section-description">公司和部门在 <Link to="/system/organization">组织架构</Link> 中统一维护。</p>
 
-      {deleteTarget ? (
-        <ConfirmationDialog
-          title="删除账号"
-          description={`确定删除账号“${deleteTarget.username}”吗？`}
-          details={[
-            "删除后该账号将立即无法登录。",
-            "如果账号已有发票或付款等业务数据，系统会阻止删除并提示改为停用。",
-          ]}
-          confirmLabel="删除账号"
-          isBusy={deleteMutation.isPending}
-          onCancel={() => setDeleteTarget(null)}
-          onConfirm={() => {
-            if (deleteTarget.id > 0) {
-              deleteMutation.mutate({ id: deleteTarget.id, expectedVersion: deleteTarget.versionNumber }, {
-                onSettled: () => setDeleteTarget(null),
-              });
-            }
-          }}
-        />
-      ) : null}
     </section>
   );
 }

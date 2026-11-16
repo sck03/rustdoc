@@ -129,6 +129,17 @@ pub fn apply_pending(
         if physical_marker.try_exists()? && migration_marker.try_exists()? {
             return Err(invalid("发现相互冲突的恢复计划，已停止恢复。"));
         }
+        if !physical_marker.try_exists()? && !migration_marker.try_exists()? {
+            return Ok(());
+        }
+        let mut lease = export_doc_storage::PostgresMaintenanceLease::acquire(maintenance, owner)?;
+        if migration_marker.try_exists()?
+            && !package::confirm_task_marker(&paths.cache_root, &migration_marker, |job| {
+                Ok(lease.recovery_job_succeeded(job)?)
+            })?
+        {
+            return Ok(());
+        }
         let migrated = package::staged(&migration_marker, package::POSTGRES, &paths.disk_space)?;
         let (marker, source, staging) = if let Some(staging) = migrated.as_ref() {
             (
@@ -176,7 +187,6 @@ pub fn apply_pending(
         if !tools.ready() {
             return Err(unavailable("PostgreSQL 18 客户端工具缺失。"));
         }
-        let mut lease = export_doc_storage::PostgresMaintenanceLease::acquire(maintenance, owner)?;
         package::private_directory(&staging)?;
         let safety = staging.join("before-restore.dump");
         if !safety.try_exists()? {
@@ -195,7 +205,9 @@ pub fn apply_pending(
                 crate::engine::file_store::verify_local_inventory(&staging, |cursor| {
                     Ok(lease.file_objects(cursor)?)
                 })?;
-                restore_files::install(paths, &staging, false)?;
+                restore_files::install(paths, &staging, false, |cursor| {
+                    Ok(lease.file_objects(cursor)?)
+                })?;
             } else {
                 let registered = !lease.file_objects("")?.is_empty();
                 let files = crate::engine::file_store::FileStore::open(paths, registered)?;

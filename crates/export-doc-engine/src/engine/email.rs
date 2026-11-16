@@ -247,20 +247,7 @@ fn deliver(
         recipient, subject, html, digests
     ]))?);
     let message = transport::message(config, recipient, subject, html, files).map_err(invalid)?;
-    let delivery_id = parameters
-        .iter()
-        .find(|(key, _)| key.eq_ignore_ascii_case("Idempotency-Key"))
-        .map(|(_, value)| value.trim().to_owned())
-        .filter(|s| !s.is_empty())
-        .unwrap_or(paths::nonce().map_err(unavailable)?);
-    if !(8..=120).contains(&delivery_id.len())
-        || !delivery_id.is_ascii()
-        || delivery_id.chars().any(char::is_control)
-    {
-        return Err(invalid(
-            "Idempotency-Key 必须为 8 至 120 个可显示 ASCII 字符。",
-        ));
-    }
+    let delivery_id = delivery_key(parameters)?;
     let identity = format!("{}:{delivery_id}", actor.id);
     let attempt=store.transaction_as(actor, |tx, actor|{
         if kind == "ConnectionTest" {
@@ -324,6 +311,23 @@ fn deliver(
     )
 }
 const DEFAULT_DOCUMENT_EMAIL_SUBJECT: &str = "Export Documents for Invoice {InvoiceNo}";
+fn delivery_key(parameters: &[(&str, String)]) -> Result<String> {
+    let key = parameters
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case("Idempotency-Key"))
+        .map(|(_, value)| value.trim())
+        .filter(|value| !value.is_empty());
+    let id = match key {
+        Some(key) => key.to_owned(),
+        None => paths::nonce().map_err(unavailable)?,
+    };
+    if !(8..=120).contains(&id.len()) || !id.is_ascii() || id.chars().any(char::is_control) {
+        return Err(invalid(
+            "Idempotency-Key 必须为 8 至 120 个可显示 ASCII 字符。",
+        ));
+    }
+    Ok(id)
+}
 const DEFAULT_DOCUMENT_EMAIL_BODY: &str =
     "Dear Customer,\r\n\r\nPlease find the attached export documents.\r\n\r\nBest regards,";
 
@@ -349,9 +353,13 @@ fn document_email(
     let invoice_no = invoice["invoiceNo"].as_str().unwrap_or("").to_owned();
     let customer_id = invoice["customerId"].as_i64().unwrap_or(0);
     let task_actor = actor.clone();
-    let idempotency = media::digest(&serde_json::to_vec(&json!([
-        invoice_id, &to, &subject, &html, merged, items
-    ]))?);
+    let idempotency = delivery_key(parameters)?;
+    let mut retry_parameters: Vec<_> = parameters
+        .iter()
+        .filter(|(key, _)| !key.eq_ignore_ascii_case("Idempotency-Key"))
+        .cloned()
+        .collect();
+    retry_parameters.push(("Idempotency-Key", idempotency.clone()));
     let store = service.store.clone();
     let paths = service.paths.clone();
     let fonts = service.report_fonts.clone();
@@ -371,11 +379,10 @@ fn document_email(
         START_INVOICE_DOCUMENT_EMAIL_JOB,
         "ReportDocumentEmail",
         "发票单据邮件发送",
-        Some(Replay::new(
-            START_INVOICE_DOCUMENT_EMAIL_JOB,
-            parameters,
-            body,
-        )),
+        Some(
+            Replay::new(START_INVOICE_DOCUMENT_EMAIL_JOB, &retry_parameters, body)
+                .with_sensitive_fields(&["body"])?,
+        ),
         move |cancelled| {
             let actor = auth::refresh_actor(&store, &task_actor)?;
             auth::authorize_operation(&actor, START_INVOICE_DOCUMENT_EMAIL_JOB, &[])?;

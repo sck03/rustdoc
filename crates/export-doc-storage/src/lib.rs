@@ -285,6 +285,12 @@ impl Connection {
     pub fn sqlite(path: &Path) -> Result<Self> {
         Ok(Self::from_adapter(Box::new(sqlite::Sqlite::open(path)?)))
     }
+    /// Existing, verified snapshots and startup recovery receipts; never creates or migrates a file.
+    pub fn sqlite_read_only(path: &Path) -> Result<Self> {
+        Ok(Self::from_adapter(Box::new(
+            sqlite::Sqlite::open_read_only(path)?,
+        )))
+    }
     #[cfg(feature = "postgres")]
     pub fn postgres(connection_string: &str) -> Result<Self> {
         Ok(Self::from_adapter(Box::new(postgres::Postgres::open(

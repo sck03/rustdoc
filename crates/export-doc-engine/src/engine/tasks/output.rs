@@ -41,6 +41,8 @@ enum Phase {
 #[serde(deny_unknown_fields)]
 struct Receipt {
     schema: u8,
+    #[serde(default)]
+    control: bool,
     directory: bool,
     job: String,
     target: PathBuf,
@@ -123,6 +125,31 @@ pub(super) fn publish(store: &Store, id: &str, output: &TaskOutput) -> Result<Op
 
 /// Copy and verify output before entering the database publication transaction.
 pub(super) fn prepare(store: &Store, id: &str, output: &TaskOutput) -> Result<Option<Publication>> {
+    if let Some(restore) = output
+        .publication
+        .as_ref()
+        .and_then(|check| check.restore.as_ref())
+    {
+        let marker = TaskOutput {
+            file: Some(super::FileOutput {
+                file_name: ".pending-restore.json".into(),
+                media_type: "application/json".into(),
+                content: restore.marker_content(Some(id))?,
+            }),
+            destination: Some(restore.marker.clone()),
+            detail: String::new(),
+            directory: None,
+            managed_file: None,
+            publication: None,
+            archive: None,
+        };
+        let mut publication = prepare(store, id, &marker)?;
+        if let Some(publication) = &mut publication {
+            publication.receipt.control = true;
+            write_receipt(publication)?;
+        }
+        return Ok(publication);
+    }
     if let Some(file) = output
         .file
         .as_ref()
@@ -253,6 +280,7 @@ pub(super) fn prepare(store: &Store, id: &str, output: &TaskOutput) -> Result<Op
         root,
         receipt: Receipt {
             schema: 2,
+            control: false,
             directory: output.directory.is_some(),
             job: id.into(),
             target,
@@ -358,6 +386,12 @@ impl Publication {
     fn commit_inner(&mut self) -> Result<()> {
         self.receipt.phase = Phase::Committed;
         write_receipt(self)?;
+        if self.receipt.control {
+            crate::engine::team_backup::package::commit_task_marker(
+                &self.receipt.target,
+                &self.receipt.job,
+            )?;
+        }
         if self.receipt.directory && owned(&self.receipt.target, &self.receipt.job)? {
             fs::remove_file(self.receipt.target.join(OWNER))?;
         }
@@ -532,6 +566,93 @@ fn remove_journal_directory(root: &Path) -> Result<()> {
     Ok(())
 }
 
+fn read_publication(directory: &Path, id: &str) -> Result<Publication> {
+    paths::ensure_safe_absolute(directory).map_err(unavailable)?;
+    let path = directory.join("manifest.json");
+    paths::ensure_safe_absolute(&path).map_err(unavailable)?;
+    if fs::metadata(&path)?.len() > 64 * 1024 {
+        return Err(unavailable("输出恢复清单超限。"));
+    }
+    let receipt: Receipt = serde_json::from_slice(&fs::read(path)?)?;
+    let hex = |value: &str| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit());
+    let mut names = BTreeSet::new();
+    if receipt.schema != 2
+        || receipt.control
+            && (receipt.directory
+                || receipt.previous.is_some()
+                || receipt.target.file_name().and_then(|v| v.to_str())
+                    != Some(".pending-restore.json"))
+        || receipt.job != id
+        || receipt.parts.is_empty()
+        || receipt.parts.len() > 21
+        || receipt.parts.iter().any(|part| {
+            !paths::valid_file_name(&part.name)
+                || part.name == OWNER
+                || !names.insert(part.name.to_lowercase())
+                || part.size == 0
+                || receipt.directory && part.size > 64 * 1024 * 1024
+                || !hex(&part.digest)
+        })
+        || receipt
+            .previous
+            .as_ref()
+            .is_some_and(|prior| prior.size > 64 * 1024 * 1024 || !hex(&prior.digest))
+    {
+        return Err(unavailable("输出恢复清单无效，已保留现场。"));
+    }
+    paths::ensure_safe_absolute(&receipt.target).map_err(unavailable)?;
+    if let Some(stage) = &receipt.stage {
+        let expected = receipt
+            .target
+            .parent()
+            .ok_or_else(|| unavailable("输出恢复父目录无效。"))?
+            .join(format!(".exportdoc-batch-{id}"));
+        if stage != &expected || receipt.directory && receipt.previous.is_some() {
+            return Err(unavailable("输出恢复暂存路径不匹配。"));
+        }
+    } else {
+        return Err(unavailable("输出恢复缺少暂存目录。"));
+    }
+    if !receipt.directory
+        && (receipt.parts.len() != 1
+            || receipt.target.file_name().and_then(|name| name.to_str())
+                != Some(receipt.parts[0].name.as_str()))
+    {
+        return Err(unavailable("输出恢复文件不匹配。"));
+    }
+    Ok(Publication {
+        root: directory.to_path_buf(),
+        receipt,
+    })
+}
+
+pub(in crate::engine) fn resolve_control(
+    cache: &Path,
+    marker: &Path,
+    id: &str,
+    committed: bool,
+) -> Result<()> {
+    if !job_id(id) {
+        return Err(unavailable("恢复任务标识无效。"));
+    }
+    let root = cache.join("TaskPublications").join(id);
+    paths::ensure_safe_absolute(&root).map_err(unavailable)?;
+    if !root.try_exists()? {
+        return Ok(());
+    }
+    let mut publication = read_publication(&root, id)?;
+    if publication.receipt.target != marker
+        || publication.receipt.directory
+        || publication.receipt.previous.is_some()
+    {
+        return Err(unavailable("恢复标记与任务发布回执不一致。"));
+    }
+    if committed {
+        publication.commit()
+    } else {
+        publication.rollback()
+    }
+}
 pub(super) fn recover(store: &Store) -> Result<()> {
     let root = journal_root(store);
     paths::ensure_safe_absolute(&root).map_err(unavailable)?;
@@ -573,59 +694,10 @@ pub(super) fn recover(store: &Store) -> Result<()> {
             remove_journal_directory(&directory)?;
             continue;
         }
-        if fs::metadata(&path)?.len() > 64 * 1024 {
-            return Err(unavailable("输出恢复清单超限。"));
-        }
-        let receipt: Receipt = serde_json::from_slice(&fs::read(path)?)?;
-        let hex =
-            |value: &str| value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit());
-        let mut names = BTreeSet::new();
-        if receipt.schema != 2
-            || receipt.job != id
-            || receipt.parts.is_empty()
-            || receipt.parts.len() > 21
-            || receipt.parts.iter().any(|part| {
-                !paths::valid_file_name(&part.name)
-                    || part.name == OWNER
-                    || !names.insert(part.name.to_lowercase())
-                    || part.size == 0
-                    || receipt.directory && part.size > 64 * 1024 * 1024
-                    || !hex(&part.digest)
-            })
-            || receipt
-                .previous
-                .as_ref()
-                .is_some_and(|prior| prior.size > 64 * 1024 * 1024 || !hex(&prior.digest))
-        {
-            return Err(unavailable("输出恢复清单无效，已保留现场。"));
-        }
-        paths::ensure_safe_absolute(&receipt.target).map_err(unavailable)?;
-        if let Some(stage) = &receipt.stage {
-            let expected = receipt
-                .target
-                .parent()
-                .ok_or_else(|| unavailable("输出恢复父目录无效。"))?
-                .join(format!(".exportdoc-batch-{id}"));
-            if stage != &expected || receipt.directory && receipt.previous.is_some() {
-                return Err(unavailable("输出恢复暂存路径不匹配。"));
-            }
-        } else {
-            return Err(unavailable("输出恢复缺少暂存目录。"));
-        }
-        if !receipt.directory
-            && (receipt.parts.len() != 1
-                || receipt.target.file_name().and_then(|name| name.to_str())
-                    != Some(receipt.parts[0].name.as_str()))
-        {
-            return Err(unavailable("输出恢复文件不匹配。"));
-        }
+        let mut publication = read_publication(&directory, &id)?;
         let job = store.connection()?.find_identity(persistence::KIND, &id)?;
-        let committed = matches!(receipt.phase, Phase::Committed)
+        let committed = matches!(publication.receipt.phase, Phase::Committed)
             || job.as_ref().is_some_and(|job| job["status"] == "Succeeded");
-        let mut publication = Publication {
-            root: directory,
-            receipt,
-        };
         if committed {
             publication.commit()?;
         } else if job.is_some() {

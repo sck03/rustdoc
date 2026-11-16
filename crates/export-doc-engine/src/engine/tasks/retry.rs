@@ -138,6 +138,9 @@ pub(crate) struct Replay {
     operation: String,
     parameters: Vec<(String, String)>,
     body: Value,
+    pub(super) sensitive_key: Option<String>,
+    #[serde(skip)]
+    pub(super) sensitive: Option<Value>,
     #[serde(skip)]
     input: Option<FileOutput>,
 }
@@ -150,8 +153,28 @@ impl Replay {
                 .map(|(key, value)| ((*key).into(), value.clone()))
                 .collect(),
             body: body.clone(),
+            sensitive_key: None,
+            sensitive: None,
             input: None,
         }
+    }
+    pub fn with_sensitive_fields(mut self, keys: &[&str]) -> Result<Self> {
+        let mut fields = serde_json::Map::new();
+        if let Some(body) = self.body.as_object_mut() {
+            for key in keys {
+                if let Some(value) = body.remove(*key) {
+                    fields.insert((*key).into(), value);
+                }
+            }
+        }
+        if !fields.is_empty() {
+            if serde_json::to_vec(&fields)?.len() > 64 * 1024 {
+                return Err(invalid("敏感任务输入超过容量上限。"));
+            }
+            self.sensitive_key = Some(crate::paths::nonce().map_err(unavailable)?);
+            self.sensitive = Some(Value::Object(fields));
+        }
+        Ok(self)
     }
     #[cfg(feature = "excel")]
     pub fn with_input(mut self, name: &str, bytes: &[u8]) -> Self {
@@ -263,7 +286,26 @@ fn read(store: &Store, actor: &Actor, id: &str) -> Result<(Replay, Source)> {
 
 pub(crate) fn execute(service: &NativeService, actor: &Actor, id: &str) -> Result<Value> {
     let _preparation = service.jobs.prepare_retry()?;
-    let (replay, source) = read(&service.store, actor, id)?;
+    let (mut replay, source) = read(&service.store, actor, id)?;
+    if let Some(key) = &replay.sensitive_key {
+        let fields = service
+            .jobs
+            .runtime
+            .lock()
+            .map_err(|_| unavailable("文件任务状态异常。"))?
+            .sensitive
+            .get(key)?;
+        replay
+            .body
+            .as_object_mut()
+            .ok_or_else(|| unavailable("任务重试参数损坏。"))?
+            .extend(
+                fields
+                    .as_object()
+                    .ok_or_else(|| unavailable("敏感任务输入损坏。"))?
+                    .clone(),
+            );
+    }
     let operation = ALL_OPERATIONS
         .iter()
         .find(|op| op.id == replay.operation)
@@ -282,7 +324,7 @@ pub(crate) fn execute(service: &NativeService, actor: &Actor, id: &str) -> Resul
     }
     let (handler, _) = registration(operation.id)
         .ok_or_else(|| conflict("此任务不能自动重试，请回到原功能重新提交。"))?;
-    with_source(source, || match handler {
+    let result = with_source(source, || match handler {
         #[cfg(feature = "excel")]
         Handler::InvoiceQuery => {
             crate::engine::invoice_query::export(service, actor, operation, &replay.body)
@@ -319,5 +361,17 @@ pub(crate) fn execute(service: &NativeService, actor: &Actor, id: &str) -> Resul
         Handler::Email => {
             crate::engine::email::handle(service, actor, operation, &parameters, &[], &replay.body)
         }
-    })
+    });
+    if result.is_ok() {
+        if let Some(key) = replay.sensitive_key {
+            service
+                .jobs
+                .runtime
+                .lock()
+                .map_err(|_| unavailable("文件任务状态异常。"))?
+                .sensitive
+                .remove(&key);
+        }
+    }
+    result
 }

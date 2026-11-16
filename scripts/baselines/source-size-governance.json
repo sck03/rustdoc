@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-16",
-  "reviewNotes": "2026-11-16 lifecycle and workload refinement against 6d7161f6: scoped commands, bounded supplier queries, separate contact workspace and template commands, audit ID projection and HTTP admission ownership. Aggregate snapshots advance only by reviewed physical deltas [[\"repository web production default\",-62],[\"Rust native production\",190],[\"Rust native tests and examples\",57],[\"repository automation source default\",352],[\"Rust native delivery automation\",148],[\"customs COO workspace components\",-244]]. Per-file limits and growth allowances are unchanged. Regression and Windows process/React workload evidence: docs/archive/2026-11/2026-11-16审计与编辑生命周期修复.md.",
+  "reviewNotes": "2026-11-16 session/download/restore fixes against 7e5c1b4d: reuse scoped commands, download admission, task publication journals, indexed selections and bounded disk writers; stream audit snapshots and Excel output, retain sensitive replay input only in memory. Advance prior baselines only by reviewed physical deltas: web production -34, Rust native production +797 (including colocated regression tests), Rust native tests and examples +226, repository automation +93. Existing aggregate drift, per-file limits and growth allowances are unchanged. Evidence: docs/archive/2026-11/2026-11-16会话下载与恢复完整修复.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -10,9 +10,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 88557,
+      "baselineAggregateLines": 88523,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 88757,
+      "maximumAggregateLines": 88723,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 111962,
+      "baselineAggregateLines": 112759,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 112037,
+      "maximumAggregateLines": 112834,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 32880,
+      "baselineAggregateLines": 33106,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 33000,
+      "maximumAggregateLines": 33226,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 29304,
+      "baselineAggregateLines": 29397,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 29454,
+      "maximumAggregateLines": 29547,
       "reportFiles": false
     },
     {

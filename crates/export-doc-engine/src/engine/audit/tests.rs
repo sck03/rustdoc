@@ -24,6 +24,24 @@ fn bounded_cleanup_crosses_batches_without_removing_business_records() {
             Ok(())
         })
         .unwrap();
+    #[cfg(feature = "excel")]
+    {
+        use std::io::{Cursor, Read};
+        let output = download(&service, &actor, &json!({"entityName":"cleanup-canary"})).unwrap();
+        assert!(matches!(
+            output,
+            crate::engine::backup_io::Download::File { .. }
+        ));
+        let mut archive =
+            zip::ZipArchive::new(Cursor::new(output.into_memory().unwrap().content)).unwrap();
+        let mut sheet = String::new();
+        archive
+            .by_name("xl/worksheets/sheet1.xml")
+            .unwrap()
+            .read_to_string(&mut sheet)
+            .unwrap();
+        assert_eq!(sheet.matches("<row ").count(), 2106);
+    }
     for (limit, expected) in [(2001, 2001), (2001, 104), (2001, 0)] {
         let result: Value = serde_json::from_slice(
             &handle(
@@ -57,6 +75,39 @@ fn bounded_cleanup_crosses_batches_without_removing_business_records() {
             Ok(())
         })
         .unwrap();
+}
+
+#[cfg(feature = "excel")]
+#[test]
+fn audit_export_capacity_is_a_validation_error() {
+    let directory = crate::engine::test_support::ScratchDirectory::new();
+    let service = directory.service();
+    let actor = auth::current_actor(&service.store, 1).unwrap();
+    service
+        .store
+        .transaction(|tx| {
+            tx.append_audit_details(
+                &AuditWrite {
+                    kind: "export-canary",
+                    record_id: 1,
+                    version: 1,
+                    action: "edit",
+                    actor_id: actor.id,
+                    occurred_at: "2026-11-16T00:00:00Z",
+                    note: "",
+                },
+                &json!({"newValues":{"summary":"x".repeat(40000)}}),
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(
+        download(&service, &actor, &json!({"entityName":"export-canary"}))
+            .err()
+            .unwrap()
+            .status,
+        Some(400)
+    );
 }
 
 #[test]

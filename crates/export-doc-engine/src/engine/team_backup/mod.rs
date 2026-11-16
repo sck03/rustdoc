@@ -188,21 +188,27 @@ pub(super) fn validate_package_password(password: &str) -> Result<()> {
     Ok(())
 }
 pub(super) fn audit(store: &Store, actor: &Actor, action: &str, note: &str) -> Result<()> {
-    store.transaction(|connection| {
-        connection.append_audit_details(
-            &AuditWrite {
-                kind: "team-backup",
-                record_id: 0,
-                version: 1,
-                action,
-                actor_id: actor.id,
-                occurred_at: &super::store::timestamp(),
-                note,
-            },
-            &json!({}),
-        )?;
-        Ok(())
-    })
+    store.transaction(|connection| audit_in(connection, actor, action, note))
+}
+fn audit_in(
+    connection: &super::store::Connection,
+    actor: &Actor,
+    action: &str,
+    note: &str,
+) -> Result<()> {
+    connection.append_audit_details(
+        &AuditWrite {
+            kind: "team-backup",
+            record_id: 0,
+            version: 1,
+            action,
+            actor_id: actor.id,
+            occurred_at: &super::store::timestamp(),
+            note,
+        },
+        &json!({}),
+    )?;
+    Ok(())
 }
 #[cfg(test)]
 pub(super) fn sha256_hex(bytes: &[u8]) -> String {

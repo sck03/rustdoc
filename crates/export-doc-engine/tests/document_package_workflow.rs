@@ -248,8 +248,43 @@ fn document_packages_preview_export_and_email_share_template_rendering() {
     assert_eq!(repeated.status, "Succeeded");
     assert_eq!(
         fixture.request(LIST_EMAIL_DELIVERIES, None, None)["totalCount"],
-        1
+        2
     );
+    peer.body
+        .recv_timeout(std::time::Duration::from_secs(6))
+        .unwrap();
+    let body = json!({"items":items,"includeMergedPdf":false,"toAddress":"package@example.invalid","subject":"explicit attempt","body":"PRIVATE-DOCUMENT-BODY-CANARY"});
+    for _ in 0..2 {
+        let job: BackgroundJobSnapshot = fixture
+            .client()
+            .json(
+                START_INVOICE_DOCUMENT_EMAIL_JOB,
+                &[
+                    ("invoiceId", invoice_id.to_string()),
+                    ("Idempotency-Key", "document-attempt-0001".into()),
+                ],
+                &[],
+                Some(body.clone()),
+            )
+            .unwrap();
+        jobs::wait_for_completion(fixture.client(), job, &AtomicBool::new(false)).unwrap();
+    }
+    peer.body
+        .recv_timeout(std::time::Duration::from_secs(6))
+        .unwrap();
+    assert!(
+        peer.body.try_recv().is_err(),
+        "same attempt must not deliver twice"
+    );
+    for name in ["exportdoc-native.db", "exportdoc-native.db-wal"] {
+        if let Ok(bytes) = fs::read(fixture.root.join("Database").join(name)) {
+            assert!(
+                !bytes
+                    .windows(b"PRIVATE-DOCUMENT-BODY-CANARY".len())
+                    .any(|b| b == b"PRIVATE-DOCUMENT-BODY-CANARY")
+            );
+        }
+    }
 
     let fallback = start_job(
         &fixture,
@@ -261,7 +296,7 @@ fn document_packages_preview_export_and_email_share_template_rendering() {
         jobs::wait_for_completion(fixture.client(), fallback, &AtomicBool::new(false)).unwrap();
     assert_eq!(fell_back.status, "Succeeded");
     let after = fixture.request(LIST_EMAIL_DELIVERIES, None, None);
-    assert_eq!(after["totalCount"], 2);
+    assert_eq!(after["totalCount"], 4);
     assert_eq!(after["items"][0]["recipient"], "package@example.invalid");
     assert_eq!(after["items"][0]["subject"], "客户邮箱回退");
 
@@ -291,6 +326,6 @@ fn document_packages_preview_export_and_email_share_template_rendering() {
         "retry must not open a second SMTP delivery after an uncertain acknowledgement"
     );
     let deliveries = fixture.request(LIST_EMAIL_DELIVERIES, None, None);
-    assert_eq!(deliveries["totalCount"], 3);
+    assert_eq!(deliveries["totalCount"], 5);
     assert_eq!(deliveries["items"][0]["status"], "Uncertain");
 }

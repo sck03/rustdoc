@@ -31,6 +31,8 @@ pub struct FileOutput {
 }
 
 mod managed_output;
+mod sensitive;
+pub(in crate::engine) use output::resolve_control;
 pub struct TaskOutput {
     pub(crate) archive: Option<ArchiveOutput>,
     pub managed_file: Option<ManagedOutput>,
@@ -47,15 +49,24 @@ pub(crate) struct ArchiveOutput {
     pub file: FileOutput,
 }
 pub struct PublicationCheck {
+    pub(super) restore: Option<super::team_backup::package::PreparedRestore>,
     check: Box<dyn Fn(&Connection, &Actor) -> Result<()> + Send>,
     _file_lock: Option<std::fs::File>,
 }
 impl PublicationCheck {
     pub(crate) fn new(check: impl Fn(&Connection, &Actor) -> Result<()> + Send + 'static) -> Self {
         Self {
+            restore: None,
             check: Box::new(check),
             _file_lock: None,
         }
+    }
+    pub(in crate::engine) fn with_restore(
+        mut self,
+        restore: super::team_backup::package::PreparedRestore,
+    ) -> Self {
+        self.restore = Some(restore);
+        self
     }
     pub(crate) fn with_file_lock(mut self, file: std::fs::File) -> Self {
         self._file_lock = Some(file);
@@ -110,6 +121,7 @@ impl TaskOutput {
 
 #[derive(Default)]
 struct Runtime {
+    sensitive: sensitive::Inputs,
     workers: Vec<JoinHandle<()>>,
     active: HashMap<String, OperationScope>,
     preparing_retries: usize,
@@ -292,6 +304,14 @@ impl Jobs {
             })?;
             return Err(unavailable("程序正在关闭，任务已保留失败回执。"));
         }
+        let sensitive_key = replay
+            .as_ref()
+            .and_then(|replay| replay.sensitive_key.clone());
+        if let Some((key, fields)) =
+            replay.and_then(|replay| replay.sensitive_key.zip(replay.sensitive))
+        {
+            runtime.sensitive.insert(key, fields);
+        }
         admission.bind(&mut runtime, &job_id);
         let store = self.store.clone();
         let state = self.runtime.clone();
@@ -312,6 +332,7 @@ impl Jobs {
                     })
                 }))
                 .unwrap_or_else(|_| Err(unavailable("文件处理异常终止，未发布输出。")));
+                let succeeded = result.is_ok();
                 // Persist terminal state outside the canceled execution scope.
                 let finished = completion.finish(|| {
                     persistence::finish_controlled(
@@ -334,6 +355,14 @@ impl Jobs {
                     None
                 };
                 if let Ok(mut runtime) = state.lock() {
+                    if succeeded
+                        && finished.is_ok()
+                        && !flag.load(std::sync::atomic::Ordering::Acquire)
+                    {
+                        if let Some(key) = &sensitive_key {
+                            runtime.sensitive.remove(key);
+                        }
+                    }
                     runtime.retention_failure = maintenance;
                     runtime.active.remove(&worker_id);
                     if let Err(cause) = finished {

@@ -29,7 +29,7 @@ impl Reply {
             memory_reservation: None,
         }
     }
-    pub fn file(file: FileOutput) -> Self {
+    fn file(file: FileOutput) -> Self {
         Self {
             bytes: file.content,
             file: Some((file.file_name, file.media_type)),

@@ -330,12 +330,6 @@ async fn execute(
                     .map(|(k, v)| (k.as_str(), v.clone()))
                     .collect();
                 let query: Vec<_> = query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
-                if operation == PREVIEW_OCR_IMAGE {
-                    return state
-                        .service
-                        .preview_ocr_image(&query, &token)
-                        .map(response::Reply::file);
-                }
                 if operation == DOWNLOAD_JOB_RESULT_WITH_TICKET {
                     let ticket = parameters
                         .iter()
@@ -438,6 +432,18 @@ async fn execute(
                         .map(response::Reply::bytes)
                         .map_err(|_| error(503, "上传结果编码失败。"))
                 } else {
+                    if export_doc_engine::engine::NativeService::is_generated_download(operation) {
+                        return state
+                            .service
+                            .prepare_generated_download(
+                                operation,
+                                &parameters,
+                                &query,
+                                body,
+                                &token,
+                            )
+                            .map(response::Reply::download);
+                    }
                     if operation == DOWNLOAD_REPORT_TEMPLATE_FILE {
                         let request: DownloadReportTemplateFileBody = serde_json::from_value(
                             body.ok_or_else(|| error(400, "缺少模板下载请求。"))?,
@@ -554,62 +560,6 @@ async fn execute(
                     }
                     if operation == LOGOUT {
                         state.tickets.revoke(&token)?;
-                    }
-                    if operation == DOWNLOAD_CONTAINER_PACKING_PDF {
-                        return Ok(response::Reply::file(
-                            export_doc_engine::engine::tasks::FileOutput {
-                                file_name: "装柜现场作业单.pdf".into(),
-                                media_type: "application/pdf".into(),
-                                content: result,
-                            },
-                        ));
-                    }
-                    if operation == DOWNLOAD_INVOICE_TRANSFER_PACKAGE {
-                        return Ok(response::Reply::file(
-                            export_doc_engine::engine::tasks::FileOutput {
-                                file_name: "单据.edpkg".into(),
-                                media_type: "application/zip".into(),
-                                content: result,
-                            },
-                        ));
-                    }
-                    if [
-                        DOWNLOAD_CUSTOMS_COO_SUBMIT_PACKAGE,
-                        DOWNLOAD_AGENT_CONSIGNMENT_SUBMIT_PACKAGE,
-                        DOWNLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
-                    ]
-                    .contains(&operation)
-                    {
-                        return Ok(response::Reply::file(
-                            export_doc_engine::engine::tasks::FileOutput {
-                                file_name: if operation == DOWNLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE {
-                                    "单一窗口回执包.zip"
-                                } else {
-                                    "单一窗口提交包.zip"
-                                }
-                                .into(),
-                                media_type: "application/zip".into(),
-                                content: result,
-                            },
-                        ));
-                    }
-                    if [DOWNLOAD_AUDIT_LOGS, EXPORT_CRM_CUSTOMERS, EXPORT_SUPPLIERS]
-                        .contains(&operation)
-                    {
-                        return Ok(response::Reply::file(
-                        export_doc_engine::engine::tasks::FileOutput {
-                            file_name: match operation {
-                                EXPORT_CRM_CUSTOMERS => "CRM客户.xlsx",
-                                EXPORT_SUPPLIERS => "供应商.xlsx",
-                                _ => "AuditLogs.xlsx",
-                            }
-                            .into(),
-                            media_type:
-                                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                                    .into(),
-                            content: result,
-                        },
-                    ));
                     }
                     Ok(response::Reply::bytes(result))
                 }

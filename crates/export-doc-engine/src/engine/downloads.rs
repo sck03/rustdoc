@@ -10,6 +10,7 @@ use crate::generated_api::{
     DOWNLOAD_REPORT_TEMPLATE_PACKAGE, DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
     DOWNLOAD_SUPPORT_PACKAGE, Operation,
 };
+mod generated;
 
 #[cfg(test)]
 #[path = "downloads/tests/buffered.rs"]

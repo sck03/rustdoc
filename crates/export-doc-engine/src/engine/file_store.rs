@@ -19,7 +19,9 @@ mod remote;
 mod tests;
 mod verification;
 pub(super) use archive::verify_local_inventory;
-pub(super) use archive::{export as export_archive, restore_archive};
+pub(super) use archive::{
+    export as export_archive, export_snapshot, restore_archive, verify_archive,
+};
 use std::{
     fs,
     io::{Read, Seek, SeekFrom, Write},

@@ -117818,6 +117818,13 @@
               "pattern": "^-?(?:0|[1-9]\\d*)$"
             },
             "required": true
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "requestBody": {

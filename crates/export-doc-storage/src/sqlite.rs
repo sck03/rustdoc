@@ -53,6 +53,11 @@ impl From<rusqlite::Error> for Error {
     }
 }
 impl Sqlite {
+    pub fn open_read_only(path: &Path) -> Result<Self> {
+        Ok(Self {
+            connection: RefCell::new(Self::read_verified(path)?),
+        })
+    }
     fn configure(mut connection: SqliteConnection) -> Result<SqliteConnection> {
         search::register(&connection)?;
         connection.progress_handler(1000, Some(operation::cancelled as fn() -> bool))?;

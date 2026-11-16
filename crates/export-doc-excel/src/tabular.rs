@@ -1,33 +1,28 @@
 //! Sequential OOXML output avoids retaining a second DOM for large audit exports.
 use crate::{Check, Result, mapping::address};
 use serde_json::Value;
-use std::fmt::Write;
+use std::fmt::Write as _;
+use std::io::Write;
 
-pub fn sheet(columns: &[(&str, &str)], rows: &[Value], check: Check<'_>) -> Result<Vec<u8>> {
-    sheet_stream(
-        columns,
-        |emit| {
-            for row in rows {
-                emit(row)?;
-            }
-            Ok(())
-        },
-        check,
-    )
-}
-pub fn sheet_stream(
+pub fn write_sheet(
     columns: &[(&str, &str)],
     source: impl FnOnce(&mut dyn FnMut(&Value) -> Result<()>) -> Result<()>,
+    output: &mut impl Write,
     check: Check<'_>,
-) -> Result<Vec<u8>> {
+) -> Result<()> {
     if columns.is_empty() || columns.len() > 128 {
         return Err("导出表格超过容量上限。".into());
     }
     let mut xml = String::from(
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultColWidth="18" defaultRowHeight="20"/><sheetData>"#,
     );
+    let mut total = xml.len();
+    output
+        .write_all(xml.as_bytes())
+        .map_err(|e| e.to_string())?;
     let mut row = |number: u32, values: Vec<Value>| -> Result<()> {
         check()?;
+        xml.clear();
         write!(&mut xml, "<row r=\"{number}\">").expect("String writer");
         for (index, value) in values.into_iter().enumerate() {
             let reference = address(number, index as u32 + 1);
@@ -61,9 +56,13 @@ pub fn sheet_stream(
             }
         }
         xml.push_str("</row>");
-        if xml.len() > 120 * 1024 * 1024 {
+        total += xml.len();
+        if total > 120 * 1024 * 1024 {
             return Err("导出表格解压容量超过 120 MiB，请缩小筛选范围。".into());
         }
+        output
+            .write_all(xml.as_bytes())
+            .map_err(|e| e.to_string())?;
         Ok(())
     };
     row(
@@ -85,6 +84,7 @@ pub fn sheet_stream(
         )?;
         Ok(())
     })?;
+    xml.clear();
     xml.push_str("</sheetData>");
     write!(
         &mut xml,
@@ -92,5 +92,5 @@ pub fn sheet_stream(
         address(count as u32 + 1, columns.len() as u32)
     )
     .expect("String writer");
-    Ok(xml.into_bytes())
+    output.write_all(xml.as_bytes()).map_err(|e| e.to_string())
 }

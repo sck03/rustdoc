@@ -238,7 +238,7 @@ pub(super) fn finish_controlled(
             // Serialize cancellation against final publication. A cancel after
             // this transaction sees a completed task and cannot relabel it.
             let result = result.and_then(|output| {
-                if output.file.is_some() || output.directory.is_some() || output.managed_file.is_some() || output.archive.is_some() {
+                if output.file.is_some() || output.directory.is_some() || output.managed_file.is_some() || output.archive.is_some() || output.publication.is_some() {
                     let current = authorize_output(connection, actor, &job)?;
                     if let Some(check) = &output.publication { check.validate(connection, &current)?; }
                     if let Some(path) = &output.managed_file {

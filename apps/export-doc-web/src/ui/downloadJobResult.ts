@@ -1,5 +1,6 @@
 import { ApiDownloadTicket, BackgroundJobSnapshot, ExportDocManagerApiClient } from "../api/index.ts";
 import { startBrowserDownload } from "./downloadBlob.ts";
+import { queryRetryDelay, shouldRetryQueryFailure } from "../api/queryRetryPolicy.ts";
 
 const terminalStatuses = new Set(["succeeded", "failed", "canceled"]);
 
@@ -45,6 +46,7 @@ export async function waitForJobCompletion(
   const remainingTime = () => Math.max(0, deadline - performance.now());
   const timeoutError = () => new Error(options.timeoutMessage || "任务仍在运行，可稍后到“文件任务”查看结果。");
   let currentPollIntervalMs = initialPollIntervalMs;
+  let consecutiveFailures = 0;
   let job = acceptedJob;
 
   while (!terminalStatuses.has(job.status.toLowerCase())) {
@@ -67,10 +69,13 @@ export async function waitForJobCompletion(
 
     try {
       job = await client.getJob({ jobId: job.jobId }, { signal, timeoutMs: Math.ceil(remainingTime()) });
+      consecutiveFailures = 0;
     } catch (error) {
       throwIfAborted(signal);
       if (remainingTime() <= 0 || (error instanceof Error && error.name === "TimeoutError")) throw timeoutError();
-      throw error;
+      if (!shouldRetryQueryFailure(consecutiveFailures, error)) throw error;
+      currentPollIntervalMs = queryRetryDelay(consecutiveFailures++);
+      continue;
     }
     currentPollIntervalMs = Math.min(
       maximumPollIntervalMs,

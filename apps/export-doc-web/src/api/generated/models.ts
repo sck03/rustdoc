@@ -10743,6 +10743,7 @@ export interface StartInvoiceBookingSheetSaveToPathJobRequest {
 
 export interface StartInvoiceDocumentEmailJobRequest {
   invoiceId: number;
+  "Idempotency-Key"?: string;
   body: ApiInvoiceDocumentEmailRequest;
 }
 

@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "aff403c71ef9011ebbeaaf4be78a92a9ed290b4cc1b4bfbc0917feeb53234985",
+  "digest": "61aca5ef53156b0235274080fe085f9bad7f45e05365394af0a6b1ab31c15d18",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -82215,6 +82215,13 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
           "required": true
+        },
+        {
+          "name": "Idempotency-Key",
+          "in": "header",
+          "schema": {
+            "type": "string"
+          }
         }
       ],
       "requestBody": {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   ApiReportTemplateDto,
@@ -12,6 +12,8 @@ import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { useTransientPreview } from "../../ui/useTransientPreview.ts";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
+import { createRequestKey } from "../../ui/createRequestKey.ts";
 import {
   buildBatchExportConfigDraft,
   buildDocumentEmailBody,
@@ -175,9 +177,14 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     },
     onError: (error) => feedback.showError(readApiError(error)),
   });
-  const emailMutation = useMutation({
-    mutationFn: () => runAbortableOperation((signal) => client.startInvoiceDocumentEmailJob({
+  const emailScope = useMemo(() => ({}), [client, invoiceId, options.sourceRevision, selectionKey,
+    emailIncludeMergedPdf, emailToAddress, emailSubject, emailBody]);
+  const deliveryAttempt = useRef({ scope: emailScope, id: createRequestKey() });
+  if (deliveryAttempt.current.scope !== emailScope) deliveryAttempt.current = { scope: emailScope, id: createRequestKey() };
+  const emailMutation = useScopedMutation(`invoice-email:${invoiceId}`, emailScope, {
+    mutationFn: (_: void, signal) => client.startInvoiceDocumentEmailJob({
       invoiceId,
+      "Idempotency-Key": deliveryAttempt.current.id,
       body: {
         items: selectedItems,
         includeMergedPdf: emailIncludeMergedPdf,
@@ -185,11 +192,12 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
         subject: emailSubject.trim(),
         body: emailBody,
       },
-    }, { signal })),
-    onSuccess: async (job) => {
+    }, { signal }),
+    onSuccess: (job) => {
+      deliveryAttempt.current.id = createRequestKey();
       feedback.showJob(`已创建单据邮件任务：${job.jobId}`, job.jobId);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
     },
+    refreshKeys: () => [queryKeys.jobsRoot()],
     onError: (error) => feedback.showError(readApiError(error)),
   });
   function clearGeneratedOutput() {

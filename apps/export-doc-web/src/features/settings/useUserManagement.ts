@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiUserAccountDto, ApiUserListResponse, ApiUserSaveRequest, ExportDocManagerApiClient } from "../../api/index.ts";
 import { identityQueryRoots, queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -8,20 +8,23 @@ import { type UserDraft, createEmptyDraft, createDraftFromUser, buildUserDraftSn
 import { getRolePresentation } from "../../app/userRoles.ts";
 import { useRouteQuery } from "../../ui/useRouteQuery.ts";
 import { readRouteId } from "../../ui/routeQueryState.ts";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
+import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+
+type UserCommand = { kind: "save"; body: ApiUserSaveRequest } | { kind: "delete" } | { kind: "refresh" } | { kind: "new" } | { kind: "select"; user: ApiUserAccountDto };
 
 export function useUserManagement(client: ExportDocManagerApiClient, canManageUsers: boolean) {
   const queryClient = useQueryClient();
   const { params } = useRouteQuery();
   const requestedUserId = readRouteId(params.get("userId"));
-  const refreshIdentity = () => Promise.all([...identityQueryRoots, ["office"], ["worklist"]]
-    .map(queryKey => queryClient.invalidateQueries({ queryKey })));
+  const acceptedRoute = useRef<number | null | undefined>(undefined);
+  const requestConfirmation = useConfirmation();
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<UserDraft>(() => createEmptyDraft("OfficeEmployee"));
   const [persistedDraftSnapshot, setPersistedDraftSnapshot] = useState(() => buildUserDraftSnapshot(createEmptyDraft("OfficeEmployee")));
   const [message, setMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<ApiUserAccountDto | null>(null);
 
   const usersQuery = useQuery({
     queryKey: queryKeys.users(),
@@ -42,16 +45,24 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
   const currentDraftSnapshot = useMemo(() => buildUserDraftSnapshot(draft), [draft]);
   const hasUnsavedUserChanges = Boolean(
     canManageUsers &&
-    selectedUserId != null &&
     currentDraftSnapshot !== persistedDraftSnapshot,
   );
 
   useEffect(() => {
     if (!canManageUsers || !usersQuery.data) return;
-    const matching = usersQuery.data.users.find(user => user.id === (selectedUserId ?? requestedUserId));
-    const next = matching ?? (selectedUserId == null ? usersQuery.data.users[0] : undefined);
-    if (next && (selectedUserId == null || (!hasUnsavedUserChanges && next.versionNumber > draft.versionNumber))) {
+    // A committed navigation has passed the shared unsaved-changes guard.
+    const routeChanged = acceptedRoute.current !== requestedUserId;
+    acceptedRoute.current = requestedUserId;
+    const matching = usersQuery.data.users.find(user => user.id === (routeChanged ? requestedUserId : selectedUserId));
+    const next = matching ?? (routeChanged && requestedUserId == null ? usersQuery.data.users[0] : undefined);
+    if (next && (routeChanged || (!hasUnsavedUserChanges && next.versionNumber > draft.versionNumber))) {
       applyUser(next);
+    } else if (routeChanged && requestedUserId != null && !next) {
+      setSelectedUserId(null);
+      const empty = createEmptyDraft("OfficeEmployee");
+      setDraft(empty);
+      setPersistedDraftSnapshot(buildUserDraftSnapshot(empty));
+      setMessage("所选用户不存在或已不可见。");
     }
   }, [canManageUsers, selectedUserId, usersQuery.data, requestedUserId, hasUnsavedUserChanges, draft.versionNumber]);
 
@@ -62,68 +73,69 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
     }
   }, [usersQuery.error, usersQuery.isError]);
 
-  const saveMutation = useMutation({
-    mutationFn: (body: ApiUserSaveRequest) =>
-      draft.id > 0
-        ? client.updateUserAccount({ id: draft.id, body })
-        : client.createUserAccount({ body }),
-    onSuccess: async (response) => {
-      const savedDraft = createDraftFromUser(response.user);
-      setSelectedUserId(response.user.id);
-      setDraft(savedDraft);
-      setPersistedDraftSnapshot(buildUserDraftSnapshot(savedDraft));
-      setMessage(null);
-      setSuccessMessage(response.message || "用户已保存。");
-      queryClient.setQueryData<ApiUserListResponse | undefined>(queryKeys.users(), (current) =>
-        upsertUserList(current, response.user, roles),
-      );
-      await refreshIdentity();
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (target: { id: number; expectedVersion: number }) =>
-      client.deleteUserAccount(target),
-    onSuccess: async (response) => {
-      const emptyDraft = createEmptyDraft("OfficeEmployee");
-      setSelectedUserId(null);
-      setDraft(emptyDraft);
-      setPersistedDraftSnapshot(buildUserDraftSnapshot(emptyDraft));
-      setMessage(null);
-      setSuccessMessage(response.message || "用户已删除。");
-      await refreshIdentity();
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
   const { confirmDiscardChanges } = useUnsavedChangesGuard({
     isDirty: hasUnsavedUserChanges,
     message: "当前用户账号有未保存的修改。",
   });
 
-  const isBusy = usersQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
-
-  async function beginNew() {
-    if (!await confirmDiscardChanges("新建用户")) {
-      return;
-    }
-
-    const emptyDraft = createEmptyDraft("OfficeEmployee");
-    emptyDraft.permissionTemplateId = permissionTemplates.find(t => t.isSystem && t.code === "OfficeEmployee")?.id ?? null;
-    emptyDraft.permissionSchemeVersion=permissionTemplates.find(t=>t.id===emptyDraft.permissionTemplateId)?.publishedVersion??null;
-    setSelectedUserId(0);
-    setDraft(emptyDraft);
-    setPersistedDraftSnapshot(buildUserDraftSnapshot(emptyDraft));
-    setMessage(null);
-    setSuccessMessage(null);
-  }
+  const scopeFor = (id: number | null) => `users:${canManageUsers}:${requestedUserId}:${id}`;
+  const command = useScopedMutation<boolean, UserCommand>(scopeFor(selectedUserId), client, {
+    mutationFn: async (action, signal, { checkCurrent, continueInScope }) => {
+      if (!canManageUsers) return false;
+      if (action.kind !== "save") {
+        if (action.kind === "select" && action.user.id === selectedUserId) return false;
+        if (!await confirmDiscardChanges({ new: "新建用户", select: "切换用户", refresh: "刷新用户列表", delete: "删除当前用户" }[action.kind])) return false;
+        checkCurrent();
+      }
+      const accept = (next: UserDraft, id: number | null = next.id) => {
+        continueInScope(scopeFor(id));
+        setSelectedUserId(id); setDraft(next); setPersistedDraftSnapshot(buildUserDraftSnapshot(next));
+        setMessage(null); setSuccessMessage(null);
+      };
+      if (action.kind === "new") {
+        const next = createEmptyDraft("OfficeEmployee");
+        const template = permissionTemplates.find(t => t.isSystem && t.code === "OfficeEmployee");
+        next.permissionTemplateId = template?.id ?? null;
+        next.permissionSchemeVersion = template?.publishedVersion ?? null;
+        accept(next); return false;
+      }
+      if (action.kind === "select") { accept(createDraftFromUser(action.user)); return false; }
+      if (action.kind === "refresh") {
+        await queryClient.cancelQueries({ queryKey: queryKeys.users() }); checkCurrent();
+        const response = await client.listUsers({ signal }); checkCurrent();
+        queryClient.setQueryData(queryKeys.users(), response);
+        const user = response.users.find(user => user.id === selectedUserId);
+        if (user) accept(createDraftFromUser(user));
+        return false;
+      }
+      if (action.kind === "delete") {
+        const target = users.find(user => user.id === draft.id);
+        if (!target) throw new Error("请选择服务器列表中的用户。");
+        if (!await requestConfirmation({ title: "删除账号", description: `确定删除账号“${target.username}”吗？`,
+          details: ["删除后该账号将立即无法登录。", "已有业务数据的账号不能删除，请改为停用。"], confirmLabel: "删除账号", tone: "danger" })) return false;
+        checkCurrent();
+        const response = await client.deleteUserAccount({ id: target.id, expectedVersion: target.versionNumber }, { signal }); checkCurrent();
+        await queryClient.cancelQueries({ queryKey: queryKeys.users() }); checkCurrent();
+        queryClient.setQueryData<ApiUserListResponse>(queryKeys.users(), current => current && ({ ...current, users: current.users.filter(user => user.id !== target.id) }));
+        accept(createEmptyDraft("OfficeEmployee"), null);
+        setSuccessMessage(response.message || "用户已删除。");
+      } else {
+        const response = draft.id > 0
+          ? await client.updateUserAccount({ id: draft.id, body: action.body }, { signal })
+          : await client.createUserAccount({ body: action.body }, { signal });
+        checkCurrent();
+        await queryClient.cancelQueries({ queryKey: queryKeys.users() }); checkCurrent();
+        queryClient.setQueryData<ApiUserListResponse>(queryKeys.users(), current => upsertUserList(current, response.user, roles));
+        accept(createDraftFromUser(response.user));
+        setSuccessMessage(response.message || "用户已保存。");
+      }
+      return true;
+    },
+    refreshKeys: changed => changed ? [...identityQueryRoots, ["office"], ["worklist"]] : [],
+    onError: error => { setMessage(readApiError(error)); setSuccessMessage(null); },
+  });
+  const isBusy = usersQuery.isFetching || command.isPending;
+  const beginNew = () => command.mutate({ kind: "new" });
 
   function applyUser(user: ApiUserAccountDto) {
     const nextDraft = createDraftFromUser(user);
@@ -134,27 +146,8 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
     setSuccessMessage(null);
   }
 
-  async function selectUser(user: ApiUserAccountDto) {
-    if (isBusy || user.id === selectedUserId || !await confirmDiscardChanges(`切换到用户“${user.username}”`)) {
-      return;
-    }
-
-    applyUser(user);
-  }
-
-  async function refreshUsers() {
-    if (!await confirmDiscardChanges("刷新用户列表")) {
-      return;
-    }
-
-    const result = await usersQuery.refetch();
-    if (!result.isError && selectedUserId && selectedUserId > 0) {
-      const refreshedUser = result.data?.users.find((user) => user.id === selectedUserId);
-      if (refreshedUser) {
-        applyUser(refreshedUser);
-      }
-    }
-  }
+  const selectUser = (user: ApiUserAccountDto) => command.mutate({ kind: "select", user });
+  const refreshUsers = () => command.mutate({ kind: "refresh" });
 
   function patchDraft<K extends keyof UserDraft>(key: K, value: UserDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -203,7 +196,7 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
       return;
     }
 
-    saveMutation.mutate({
+    command.mutate({ kind: "save", body: {
       username: draft.username.trim(),
       fullName: draft.fullName.trim(),
       role: draft.role,
@@ -217,35 +210,16 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
       isActive: draft.isActive,
       resetPassword: draft.resetPassword,
       expectedVersion: draft.id > 0 ? draft.versionNumber : 0,
-    });
+    } });
   }
 
-  async function deleteSelectedUser() {
-    if (draft.id <= 0) {
-      setMessage("请选择要删除的用户。");
-      setSuccessMessage(null);
-      return;
-    }
-
-    if (!await confirmDiscardChanges("删除当前用户")) {
-      return;
-    }
-
-    const persistedUser = users.find((user) => user.id === draft.id);
-    if (!persistedUser) {
-      setMessage("当前用户已不在服务器列表中，请刷新后重试。");
-      setSuccessMessage(null);
-      return;
-    }
-
-    setDeleteTarget(persistedUser);
-  }
+  const deleteSelectedUser = () => command.mutate({ kind: "delete" });
 
   const searchText = search.normalize("NFKC").trim().toLowerCase();
   const filteredUsers = users.filter(user => [user.username, user.fullName, getRolePresentation(user.role).label,
     user.permissionTemplateName, user.companyScope, user.departmentId, user.employee?.employeeNumber].join(" ").normalize("NFKC").toLowerCase().includes(searchText));
   const employee = users.find(user => user.id === draft.id)?.employee;
   return { draft, setDraft, selectedUserId, users: filteredUsers, search, setSearch, roles, permissionTemplates, availableCompanies, availableDepartments,
-    employee, selectedTemplate, selectedRole, message, successMessage, deleteTarget, setDeleteTarget, deleteMutation,
+    employee, selectedTemplate, selectedRole, message, successMessage,
     isBusy, refreshUsers, beginNew, saveUser, deleteSelectedUser, selectUser, patchDraft, changeRole, changeCompany };
 }

@@ -13,7 +13,7 @@ const src = name => JSON.stringify(path.join(web, 'src', name).replaceAll('\\', 
 const bundle = path.join(output, 'app.js');
 await require('esbuild').build({ stdin: { resolveDir: web, loader: 'tsx', contents: `
 import React,{useState} from 'react'; import {createRoot} from 'react-dom/client';
-import {MemoryRouter} from 'react-router-dom'; import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import {MemoryRouter,useNavigate} from 'react-router-dom'; import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {InvoiceProfitAnalysisPanel} from ${src('features/invoices/InvoiceProfitAnalysisPanel.tsx')};
 import {InvoiceStatusHistory} from ${src('features/invoices/InvoiceStatusHistory.tsx')};
 import {BackupArchiveRestorePanel} from ${src('features/settings/BackupArchiveRestorePanel.tsx')};
@@ -23,22 +23,34 @@ import {PermissionAccessProvider} from ${src('app/PermissionAccessContext.tsx')}
 import {ConfirmationProvider} from ${src('ui/ConfirmationProvider.tsx')};
 import {UnsavedChangesProvider} from ${src('ui/unsavedChangesGuard.tsx')};
 import {queryKeys} from ${src('api/queryKeys.ts')};
+import {useUserManagement} from ${src('features/settings/useUserManagement.ts')};
+import {useInvoiceDocumentPackageWorkspace} from ${src('features/invoices/useInvoiceDocumentPackageWorkspace.ts')};
 window.deliveryKey=queryKeys.emailDeliveries();
 window.calls=[]; window.jobs=[]; window.historyCalls=[];
 window.cache=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
 const deferred=(kind,request,{signal})=>new Promise((resolve,reject)=>window.calls.push({kind,request,signal,resolve,reject}));
+window.userKey=queryKeys.users();
+window.userData={users:[1,2].map(id=>({id,username:'admin'+id,fullName:'账号'+id,role:'Admin',versionNumber:1,isActive:true,disabledModules:[],companyScope:'DEFAULT',departmentId:'GENERAL'})),roles:['Admin'],permissionTemplates:[],companies:[],departments:[]};
+window.cache.setQueryDefaults(window.userKey,{staleTime:Infinity});
+window.cache.setQueryData(window.userKey,window.userData);
+const accountClient={listUsers:i=>deferred('users',{},i),updateUserAccount:(r,i)=>deferred('save-user',r,i),createUserAccount:(r,i)=>deferred('create-user',r,i),deleteUserAccount:(r,i)=>deferred('delete-user',r,i)};
+const nextClient={...accountClient};
+const documentClient={...accountClient,startInvoiceDocumentEmailJob:(r,i)=>deferred('document-email',r,i)};
+const emptyTemplates=[];
+function Accounts({session}){window.navigate=useNavigate();window.user=useUserManagement(session?nextClient:accountClient,true);return <div>{window.user.message}<input aria-label="Account" value={window.user.draft.username} onChange={e=>window.user.patchDraft('username',e.target.value)}/></div>;}
+function DocumentEmail(){window.package=useInvoiceDocumentPackageWorkspace({client:documentClient,invoiceId:7,previewAllowed:true,templates:emptyTemplates,desktopAvailable:false,defaultExportDirectory:'',feedback:{clear(){},showError(){},showJob(){},showStatus(){}},onPreviewGenerated(){}});return <div>document email</div>;}
 const client={analyzeInvoiceProfit:(r,i)=>deferred('profit',r,i),stageRecoveryArchiveRestore:(r,i)=>deferred('restore',r,i),sendEmail:(r,i)=>deferred('send',r,i),
 getEmailToolStatus:async()=>({isConfigured:true,fromAddress:'review@example.invalid',fromDisplayName:'测试发件人',smtpHost:'example.invalid',smtpPort:465,enableSsl:true}),
 listInvoiceStatusHistory:async request=>{window.historyCalls.push(request);return {items:[{id:request.beforeId?1:2,invoiceId:7,fromStatus:'Draft',toStatus:'Verified',note:request.beforeId?'早期原因':'最近原因',changedByUsername:'历史操作人',changedAt:'2026-11-15T00:00:00Z'}],nextCursor:request.beforeId?null:2};}};
 const controller={activeJob:false,status:{archives:[{id:'one',createdAt:'2026-11-15T00:00:00Z',sizeBytes:100}]},trackJob:id=>window.jobs.push(id)};
-function Harness({mode}){const [invoice,setInvoice]=useState(()=>createEmptyInvoice('2026-11-15'));
+function Harness({mode,session}){const [invoice,setInvoice]=useState(()=>createEmptyInvoice('2026-11-15'));
 window.edit=()=>setInvoice(value=>({...value,remarks:(value.remarks||'')+'changed'}));
-return mode==='profit'?<InvoiceProfitAnalysisPanel client={client} invoice={invoice} invoiceId={7} disabled={false}/>:
+return mode==='users'?<Accounts session={session}/>:mode==='document-email'?<DocumentEmail/>:mode==='profit'?<InvoiceProfitAnalysisPanel client={client} invoice={invoice} invoiceId={7} disabled={false}/>:
 mode==='restore'?<BackupArchiveRestorePanel client={client} controller={controller} disabled={false} postgres={true} selectedId="one"/>:
 mode==='history'?<InvoiceStatusHistory client={client} invoiceId={7}/>:
 mode==='email'?<EmailPage client={client} businessTimeZone="Asia/Shanghai"/>:<div>closed</div>;}
 const app=createRoot(document.getElementById('root'));
-window.render=(mode,delivery=false)=>app.render(<MemoryRouter><QueryClientProvider client={window.cache}><PermissionAccessProvider permissions={['send',...(delivery?['view-delivery']:[])].map(action=>({resourceKey:'common.email-delivery',action,dataScope:'all'}))}><ConfirmationProvider><UnsavedChangesProvider><Harness key={mode} mode={mode}/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider></QueryClientProvider></MemoryRouter>);
+window.render=(mode,delivery=false,session=0)=>app.render(<MemoryRouter><QueryClientProvider client={window.cache}><PermissionAccessProvider permissions={['send',...(delivery?['view-delivery']:[])].map(action=>({resourceKey:'common.email-delivery',action,dataScope:'all'}))}><ConfirmationProvider><UnsavedChangesProvider><Harness key={mode} mode={mode} session={session}/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider></QueryClientProvider></MemoryRouter>);
 ` }, outfile: bundle, bundle: true, platform: 'browser', format: 'iife', jsx: 'automatic', logLevel: 'silent' });
 const context = await require('playwright').chromium.launchPersistentContext(path.join(output, 'Chrome'), { executablePath: locateChromeForTesting(root), headless: true });
 let passed = 0;
@@ -49,9 +61,78 @@ async function scenario(mode, check) {
     await page.setContent('<!doctype html><html lang="zh-CN"><title>操作边界回归</title><div id="root"></div></html>');
     await page.addScriptTag({ path: bundle }); await page.evaluate(mode => window.render(mode), mode);
     await check(page); assert.deepEqual(errors, []); passed++;
+  } catch(error) { throw new Error(mode+': '+error.message+'; page errors: '+errors.join('; '),{cause:error});
   } finally { await page.close(); }
 }
 try {
+  await scenario('users', async page => {
+    await page.waitForFunction(() => window.user.selectedUserId === 1);
+    await page.evaluate(() => window.navigate('/?userId=2'));
+    await page.waitForFunction(() => window.user.selectedUserId === 2);
+    await page.evaluate(() => window.user.beginNew());
+    await page.waitForFunction(() => window.user.draft.id === 0);
+    await page.evaluate(() => window.navigate('/?userId=1'));
+    await page.waitForFunction(() => window.user.selectedUserId === 1);
+    await page.evaluate(() => window.user.patchDraft('resetPassword','ACCOUNT-SECRET-2026'));
+    await page.waitForFunction(() => window.user.draft.resetPassword !== '');
+    await page.evaluate(() => { window.user.saveUser(); window.user.saveUser(); });
+    await page.waitForFunction(() => window.calls.length === 1);
+    assert.equal(await page.evaluate(() => window.cache.getMutationCache().getAll().length), 0);
+    await page.evaluate(() => window.calls[0].resolve({user:{...window.userData.users[0],versionNumber:2},message:'saved'}));
+    await page.waitForFunction(() => window.user.draft.resetPassword === '');
+    assert.equal(await page.evaluate(() => window.user.selectedUserId), 1);
+  });
+  await scenario('document-email', async page => {
+    await page.waitForFunction(() => Boolean(window.package));
+    await page.evaluate(() => window.package.sendEmail());
+    await page.waitForFunction(() => window.calls.length === 1);
+    const key = await page.evaluate(() => window.calls[0].request['Idempotency-Key']);
+    await page.evaluate(() => window.calls[0].reject(new TypeError('network reset')));
+    await page.waitForFunction(() => !window.package.isPending);
+    await page.evaluate(() => window.package.sendEmail());
+    await page.waitForFunction(() => window.calls.length === 2);
+    assert.equal(await page.evaluate(() => window.calls[1].request['Idempotency-Key']),key);
+    await page.evaluate(() => window.calls[1].resolve({jobId:'accepted'}));
+    await page.waitForFunction(() => !window.package.isPending);
+    await page.evaluate(() => window.package.sendEmail());
+    await page.waitForFunction(() => window.calls.length === 3);
+    assert.notEqual(await page.evaluate(() => window.calls[2].request['Idempotency-Key']),key);
+    await page.evaluate(() => window.package.changeEmailBody('new draft'));
+    await page.waitForFunction(() => window.calls[2].signal.aborted);
+    assert.equal(await page.evaluate(() => window.cache.getMutationCache().getAll().length),0);
+  });
+  for (const action of ['save','refresh']) await scenario('users', async page => {
+    await page.waitForFunction(() => window.user.selectedUserId === 1);
+    await page.evaluate(action => action==='save'?window.user.saveUser():window.user.refreshUsers(),action);
+    await page.waitForFunction(() => window.calls.length === 1);
+    await page.evaluate(() => { window.render('closed'); window.cache.clear(); });
+    await page.waitForFunction(() => window.calls[0].signal.aborted);
+    await page.evaluate(action => window.calls[0].resolve(action==='save'?{user:window.userData.users[0]}:window.userData), action);
+    assert.equal(await page.evaluate(() => window.cache.getQueryData(window.userKey)), undefined);
+  });
+  for (const submitted of [false,true]) await scenario('users', async page => {
+    await page.waitForFunction(() => window.user.selectedUserId === 1);
+    await page.evaluate(() => window.user.deleteSelectedUser());
+    const confirm = page.getByRole('button',{name:'删除账号',exact:true});
+    await confirm.waitFor();
+    if (submitted) { await confirm.click(); await page.waitForFunction(() => window.calls.length === 1); }
+    await page.evaluate(() => { window.render('closed'); window.cache.clear(); });
+    await page.getByText('closed',{exact:true}).waitFor();
+    if (submitted) {
+      await page.waitForFunction(() => window.calls[0].signal.aborted);
+      await page.evaluate(() => window.calls[0].resolve({message:'late delete'}));
+    } else { await confirm.click(); assert.equal(await page.evaluate(() => window.calls.length),0); }
+    assert.equal(await page.evaluate(() => window.cache.getQueryData(window.userKey)),undefined);
+  });
+  await scenario('users', async page => {
+    await page.waitForFunction(() => window.user.selectedUserId === 1);
+    await page.evaluate(() => window.user.saveUser());
+    await page.waitForFunction(() => window.calls.length === 1);
+    await page.evaluate(() => window.render('users',false,1));
+    await page.waitForFunction(() => window.calls[0].signal.aborted);
+    await page.evaluate(() => window.calls[0].resolve({user:{...window.userData.users[0],username:'STALE-SESSION',versionNumber:2}}));
+    assert.equal(await page.evaluate(() => window.cache.getQueryData(window.userKey).users[0].username), 'admin1');
+  });
   await scenario('profit', async page => {
     await page.getByRole('button', { name: '展开利润分析' }).click();
     await page.getByRole('button', { name: '计算', exact: true }).click();

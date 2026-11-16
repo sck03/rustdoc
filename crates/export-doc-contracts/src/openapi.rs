@@ -199,6 +199,14 @@ mod tests {
             }
         }
         file_storage::apply(&mut baseline);
+        // A delivery attempt key distinguishes HTTP retries from intentional resends;
+        // the path parameter, body, authentication, errors and permissions stay frozen.
+        baseline["paths"]["/api/reports/invoices/{invoiceId}/document-email"]["post"]["parameters"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "name":"Idempotency-Key", "in":"header", "schema":{"type":"string"}
+            }));
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

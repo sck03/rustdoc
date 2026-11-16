@@ -36,7 +36,7 @@ pub(super) fn recover(paths: &RuntimePaths) -> Result<()> {
     Ok(())
 }
 
-fn read_json(path: &Path) -> Result<Value> {
+pub(super) fn read_json(path: &Path) -> Result<Value> {
     use std::io::Read;
     paths::ensure_safe_absolute(path).map_err(invalid)?;
     let mut bytes = Vec::new();
@@ -99,6 +99,9 @@ fn recover_root(root: &Path) -> Result<()> {
             super::package::SQLITE,
             super::package::POSTGRES,
             super::package::KEY,
+            super::package::OBJECTS,
+            "Files/.store-id",
+            "Configuration/file-storage.json",
         ]
         .into_iter()
         .map(str::to_owned)
@@ -132,13 +135,29 @@ fn validate_tree(root: &Path, directory: &Path, known: &HashSet<String>) -> Resu
             .collect::<Vec<_>>()
             .join("/");
         let kind = entry.file_type()?;
+        let object = name.strip_prefix("Files/objects/");
+        let object_file = object.is_some_and(|name| {
+            let Some((prefix, digest)) = name.split_once('/') else {
+                return false;
+            };
+            prefix.len() == 2
+                && digest.len() == 64
+                && digest.starts_with(prefix)
+                && digest
+                    .bytes()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        });
+        let object_directory = name == "Files/objects"
+            || object
+                .is_some_and(|name| name.len() == 2 && name.bytes().all(|b| b.is_ascii_hexdigit()));
         if kind.is_dir()
-            && known
-                .iter()
-                .any(|file| file.starts_with(&format!("{name}/")))
+            && (object_directory
+                || known
+                    .iter()
+                    .any(|file| file.starts_with(&format!("{name}/"))))
         {
             validate_tree(root, &path, known)?;
-        } else if !kind.is_file() || !known.contains(&name) {
+        } else if !kind.is_file() || !(known.contains(&name) || object_file) {
             return Err(unavailable("备份暂存包含未知内容，已保留现场。"));
         }
     }

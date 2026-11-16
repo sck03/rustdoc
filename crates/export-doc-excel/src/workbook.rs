@@ -11,7 +11,6 @@ use export_doc_domain::{
     invoice_columns::ITEM_COLUMNS,
 };
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
 
 struct Workbook {
     package: Package,
@@ -169,7 +168,16 @@ pub fn booking_from_invoice(
 
 /// General tabular exports write text as inline strings, never as formulas.
 pub fn table(columns: &[(&str, &str)], rows: &[Value], check: Check<'_>) -> Result<Vec<u8>> {
-    table_sheet(crate::tabular::sheet(columns, rows, check)?, check)
+    table_stream(
+        columns,
+        |emit| {
+            for row in rows {
+                emit(row)?;
+            }
+            Ok(())
+        },
+        check,
+    )
 }
 /// Feed one bounded database batch at a time without retaining all source DTOs.
 pub fn table_stream(
@@ -177,9 +185,18 @@ pub fn table_stream(
     source: impl FnOnce(&mut dyn FnMut(&Value) -> Result<()>) -> Result<()>,
     check: Check<'_>,
 ) -> Result<Vec<u8>> {
-    table_sheet(crate::tabular::sheet_stream(columns, source, check)?, check)
+    let mut output = std::io::Cursor::new(Vec::new());
+    write_table(columns, source, &mut output, check)?;
+    Ok(output.into_inner())
 }
-fn table_sheet(sheet: Vec<u8>, check: Check<'_>) -> Result<Vec<u8>> {
+/// Stream rows and ZIP bytes to a caller-owned, bounded destination.
+pub fn write_table(
+    columns: &[(&str, &str)],
+    source: impl FnOnce(&mut dyn FnMut(&Value) -> Result<()>) -> Result<()>,
+    output: impl std::io::Write + std::io::Seek,
+    check: Check<'_>,
+) -> Result<()> {
+    use std::io::Write;
     let files = [
         (
             "[Content_Types].xml",
@@ -197,17 +214,27 @@ fn table_sheet(sheet: Vec<u8>, check: Check<'_>) -> Result<Vec<u8>> {
             "xl/_rels/workbook.xml.rels",
             r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#,
         ),
-        (
-            "xl/worksheets/sheet1.xml",
-            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultColWidth="18" defaultRowHeight="20"/><sheetData/></worksheet>"#,
-        ),
     ];
-    let mut package = Package(
-        files
-            .into_iter()
-            .map(|(name, bytes)| (name.into(), bytes.as_bytes().to_vec()))
-            .collect::<BTreeMap<_, _>>(),
-    );
-    package.0.insert("xl/worksheets/sheet1.xml".into(), sheet);
-    package.finish(check)
+    let mut writer = zip::ZipWriter::new(output);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    for (name, bytes) in files {
+        check()?;
+        writer
+            .start_file(name, options)
+            .map_err(|e| e.to_string())?;
+        writer
+            .write_all(bytes.as_bytes())
+            .map_err(|e| e.to_string())?;
+    }
+    writer
+        .start_file("xl/worksheets/sheet1.xml", options)
+        .map_err(|e| e.to_string())?;
+    crate::tabular::write_sheet(columns, source, &mut writer, check)?;
+    check()?;
+    writer
+        .finish()
+        .map_err(|e| e.to_string())?
+        .flush()
+        .map_err(|e| e.to_string())
 }

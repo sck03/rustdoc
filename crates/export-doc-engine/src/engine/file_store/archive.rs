@@ -32,6 +32,24 @@ pub(in crate::engine) fn verify_local_inventory(
 }
 
 pub(in crate::engine) fn export(store: &super::super::store::Store, path: &Path) -> Result<()> {
+    export_with(store, path, |cursor| {
+        Ok(store.connection()?.file_objects(cursor, 200, false)?)
+    })
+}
+pub(in crate::engine) fn export_snapshot(
+    store: &super::super::store::Store,
+    path: &Path,
+    db: &export_doc_storage::Connection,
+) -> Result<()> {
+    export_with(store, path, |cursor| {
+        Ok(db.file_objects(cursor, 200, false)?)
+    })
+}
+fn export_with(
+    store: &super::super::store::Store,
+    path: &Path,
+    mut page: impl FnMut(&str) -> Result<Vec<FileObject>>,
+) -> Result<()> {
     let mut output_file = fs::OpenOptions::new()
         .create_new(true)
         .write(true)
@@ -48,7 +66,7 @@ pub(in crate::engine) fn export(store: &super::super::store::Store, path: &Path)
     output.write_all(&policy)?;
     let mut cursor = String::new();
     loop {
-        let objects = store.connection()?.file_objects(&cursor, 200, false)?;
+        let objects = page(&cursor)?;
         if objects.is_empty() {
             break;
         }
@@ -75,6 +93,21 @@ pub(in crate::engine) fn restore_archive(
     archive: &Path,
     staging: &Path,
     space: &std::sync::Arc<crate::temporary_space::Budget>,
+) -> Result<()> {
+    read_archive(archive, staging, space, true)
+}
+pub(in crate::engine) fn verify_archive(
+    archive: &Path,
+    staging: &Path,
+    space: &std::sync::Arc<crate::temporary_space::Budget>,
+) -> Result<()> {
+    read_archive(archive, staging, space, false)
+}
+fn read_archive(
+    archive: &Path,
+    staging: &Path,
+    space: &std::sync::Arc<crate::temporary_space::Budget>,
+    extract: bool,
 ) -> Result<()> {
     let mut input = fs::File::open(archive)?;
     let mut magic = vec![0; MAGIC.len()];
@@ -121,28 +154,53 @@ pub(in crate::engine) fn restore_archive(
             .join(&object.digest);
         paths::ensure_safe_absolute(&path).map_err(invalid)?;
         crate::secrets::private_directory(path.parent().unwrap()).map_err(unavailable)?;
-        paths::atomic_write_with(&path, |output| {
-            let mut output = space
-                .at(path.parent().unwrap().to_path_buf())
-                .writer(output)
+        if extract {
+            paths::atomic_write_with(&path, |output| {
+                let mut output = space
+                    .at(path.parent().unwrap().to_path_buf())
+                    .writer(output)
+                    .map_err(|e| e.to_string())?;
+                let actual = super::super::backup_io::copy_and_hash(
+                    &mut Read::by_ref(&mut input).take(object.size),
+                    &mut output,
+                    object.size,
+                )
                 .map_err(|e| e.to_string())?;
-            let actual = super::super::backup_io::copy_and_hash(
+                if actual != (object.size, object.digest.clone()) {
+                    return Err("文件对象归档不完整或摘要不符。".into());
+                }
+                Ok(())
+            })
+            .map_err(unavailable)?;
+        } else {
+            verify(&mut fs::File::open(&path)?, &object)?;
+            if super::super::backup_io::copy_and_hash(
                 &mut Read::by_ref(&mut input).take(object.size),
-                &mut output,
+                &mut std::io::sink(),
                 object.size,
-            )
-            .map_err(|e| e.to_string())?;
-            if actual != (object.size, object.digest.clone()) {
-                return Err("文件对象归档不完整或摘要不符。".into());
+            )? != (object.size, object.digest.clone())
+            {
+                return Err(invalid("文件对象归档不完整或摘要不符。"));
             }
-            Ok(())
-        })
-        .map_err(invalid)?;
+        }
         previous = object.digest;
     }
     let mut extra = [0];
     if input.read(&mut extra)? != 0 {
         return Err(invalid("文件对象归档存在额外数据。"));
+    }
+    if !extract {
+        let config_path = staging.join("Configuration/file-storage.json");
+        paths::ensure_safe_absolute(&config_path).map_err(invalid)?;
+        paths::ensure_safe_absolute(&root.join(".store-id")).map_err(invalid)?;
+        let config: Configuration = serde_json::from_slice(&fs::read(config_path)?)?;
+        if serde_json::to_value(&config.policy)? != serde_json::to_value(&policy)?
+            || fs::read_to_string(root.join(".store-id"))? != config.identity
+            || !matches!(config.backend, Backend::Local { ref directory } if directory == "Files")
+        {
+            return Err(invalid("恢复文件存储配置或身份不匹配。"));
+        }
+        return Ok(());
     }
     let identity = paths::nonce().map_err(unavailable)?;
     paths::atomic_write(&root.join(".store-id"), identity.as_bytes()).map_err(unavailable)?;

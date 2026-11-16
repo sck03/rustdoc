@@ -6,10 +6,10 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 const require = createRequire(path.join(repoRoot, "apps/export-doc-web/package.json"));
 const esbuild = require("esbuild");
 const { outputFiles } = await esbuild.build({
-  entryPoints: [path.join(repoRoot, "apps/export-doc-web/src/ui/downloadJobResult.ts")],
+  stdin: { resolveDir: repoRoot, contents: 'export * from "./apps/export-doc-web/src/ui/downloadJobResult.ts"; export {ApiError} from "./apps/export-doc-web/src/api/index.ts";' },
   bundle: true, write: false, format: "esm", platform: "node", logLevel: "silent",
 });
-const { waitForJobCompletion, downloadCompletedJobResult } = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString("base64")}`);
+const { waitForJobCompletion, downloadCompletedJobResult, ApiError } = await import(`data:text/javascript;base64,${Buffer.from(outputFiles[0].text).toString("base64")}`);
 const originalWindow = globalThis.window;
 const originalDocument = globalThis.document;
 const document = new EventTarget();
@@ -42,6 +42,18 @@ try {
   hiddenCancellation.abort();
   await assert.rejects(hiddenWait, { name: "AbortError" });
   document.hidden = false;
+
+  for (const failure of [new TypeError('network reset'), new ApiError(503, 'Unavailable', '')]) {
+    let attempts = 0;
+    const transient = { getJob: async () => { if (++attempts === 1) throw failure; return succeeded; } };
+    assert.equal(await waitForJobCompletion(transient, running, { pollIntervalMs: 500 }), succeeded);
+    assert.equal(attempts, 2);
+  }
+  for (const [failure, expected] of [[new ApiError(403, 'Forbidden', ''), 1], [new TypeError('offline'), 3]]) {
+    let attempts = 0;
+    await assert.rejects(waitForJobCompletion({ getJob: async () => { attempts++; throw failure; } }, running, { pollIntervalMs: 500 }), error => error === failure);
+    assert.equal(attempts, expected);
+  }
 
   let requestTimeout;
   const boundedClient = {
