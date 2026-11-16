@@ -78,6 +78,7 @@ try {
     await page.waitForFunction(() => window.pending.length === 1);
     await page.evaluate(() => { window.pauseContacts=true;window.pending[0].resolve({id:99,supplierCompanyId:1,name:'新增联系人回归',versionNumber:1}); });
     await page.waitForFunction(() => window.pending.length === 2);
+    await page.waitForFunction(() => !document.querySelector('button[type="submit"]')?.disabled);
     assert.equal(await page.getByLabel('姓名', { exact: true }).inputValue(), '新增联系人回归');
     assert(await page.getByRole('button', { name: '保存联系人', exact: true }).isEnabled(), 'Refresh must not extend the save lock');
     await page.getByRole('tab', { name: '基本资料', exact: true }).click();

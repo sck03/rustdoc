@@ -210,7 +210,7 @@ fn mutate(
         TRANSFER_CRM_FOLLOW_UP => "assign",
         _ => "delete",
     };
-    let permission_action = auth::operation_action(operation, PERMISSION, action)?;
+    let permission_action = auth::operation_action(operation, PERMISSION)?;
     store.transaction_as(actor, |tx, actor| {
         let mut row = checked(tx, actor, record_id, permission_action)?;
         let version = if operation == DELETE_CRM_FOLLOW_UP {

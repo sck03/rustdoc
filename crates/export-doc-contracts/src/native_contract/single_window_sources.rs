@@ -81,33 +81,12 @@ pub(super) fn schemas() -> Vec<(&'static str, Schema)> {
 fn policy(action: &'static str) -> Policy {
     super::policies::rule(
         (true, true, true),
-        Some(super::policies::legacy(
-            Some("document.single-window"),
-            None,
-            None,
-            None,
-            0,
-            false,
-            false,
-        )),
-        &[],
         super::policies::access("All", &[("document.single-window", &[action], false)]),
-        false,
     )
 }
 
 fn template_policy() -> Policy {
     let mut policy = policy("operate");
-    policy.requirements = vec![
-        Requirement {
-            resource_key: "document.jobs",
-            action: "view",
-        },
-        Requirement {
-            resource_key: "document.jobs",
-            action: "operate",
-        },
-    ];
     policy.access = super::policies::access(
         "All",
         &[

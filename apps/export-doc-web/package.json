@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:regressions": "node ../../scripts/test_frontend_regressions.mjs",
     "dev": "vite --host 127.0.0.1",
     "predev": "node ../../scripts/provision-report-fonts.mjs --web",
     "prebuild": "node ../../scripts/provision-report-fonts.mjs --web",

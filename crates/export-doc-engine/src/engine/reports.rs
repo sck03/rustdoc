@@ -412,11 +412,13 @@ pub fn handle(
         | PREVIEW_INVOICE_REPORT_DRAFT_HTML
         | PREVIEW_PAYMENT_VOUCHER_HTML
         | PREVIEW_PAYMENT_VOUCHER_DRAFT_HTML => {
+            let _rendering = resources::acquire()?;
             let (data, template, metadata) =
                 prepare_preview(service, actor, operation, parameters, body)?;
             page_preview::response(service, actor, data, template, body, metadata)
         }
         PREVIEW_REPORT_TEMPLATE_CONTENT => {
+            let _rendering = resources::acquire()?;
             auth::authorize(
                 actor,
                 if kind == "PaymentVoucher" {

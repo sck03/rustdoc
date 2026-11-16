@@ -35,7 +35,7 @@ export function SupplierContactsWorkspace({ client, selectedSupplier, canCreateC
       </> : <form className="form-grid" onSubmit={save}>
         <div className="section-heading-row"><h4>{selectedContact ? "编辑联系人资料" : "新增联系人资料"}</h4><button className="secondary-button" type="button" onClick={() => void select(undefined)}>返回联系人目录</button></div>
         <div className="form-field-wide context-strip"><strong>{selectedSupplier.name}</strong></div>
-        <fieldset className="permission-fieldset form-field-wide" disabled={command.isPending || (selectedContact ? !canEditContact : !canCreateContact)}>
+        <fieldset className="permission-fieldset form-field-wide" disabled={command.isEditingLocked || (selectedContact ? !canEditContact : !canCreateContact)}>
         <label>姓名<input name="contactName" required {...contactDraft.field("name")} /></label><label>职位<input name="title" {...contactDraft.field("title")} /></label><label>邮箱<input name="email" type="email" {...contactDraft.field("email")} /></label>
         <label>电话<input name="phone" {...contactDraft.field("phone")} /></label><label>即时通讯<input name="instantMessaging" {...contactDraft.field("instantMessaging")} /></label>{selectedContact ? <label>联系人角色<input value={selectedContact.isPrimary ? "主要联系人" : "普通联系人"} readOnly /></label> : null}
         </fieldset>

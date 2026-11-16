@@ -184,7 +184,7 @@ pub fn handle(
             _ => "deactivate",
         }
     };
-    let permission_action = auth::operation_action(operation, resource.permission, action)?;
+    let permission_action = auth::operation_action(operation, resource.permission)?;
     if operation == resource.list {
         return store.read_for(actor, operation, query, |tx, actor| {
             let parent = store::get(tx, parent_kind, parent_id)?;

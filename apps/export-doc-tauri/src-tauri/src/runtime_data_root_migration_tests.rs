@@ -200,24 +200,6 @@ fn source_and_target_business_instance_locks_prevent_all_migration_writes() {
 }
 
 #[test]
-fn legacy_source_instance_lock_is_also_respected() {
-    let workspace = Workspace::new();
-    let path = workspace.paths.data_root.join("native-instance.lock");
-    let lock = File::create(&path).unwrap();
-    lock.lock_exclusive().unwrap();
-    assert!(workspace.apply().is_err());
-    assert!(
-        workspace
-            .paths
-            .data_root
-            .join("Database/exportdoc-native.db")
-            .exists()
-    );
-    drop(lock);
-    workspace.apply().unwrap();
-}
-
-#[test]
 fn interrupted_copy_reuses_verified_files_and_releases_only_its_temporary_file() {
     let workspace = Workspace::new();
     workspace.prepare_journal(false, false);

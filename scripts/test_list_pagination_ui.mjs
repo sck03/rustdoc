@@ -22,6 +22,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   import ${source('styles/index.css')};
   import { PermissionAccessProvider } from ${source('app/PermissionAccessContext.tsx')};
   import { ConfirmationProvider } from ${source('ui/ConfirmationProvider.tsx')};
+  import { UnsavedChangesProvider } from ${source('ui/unsavedChangesGuard.tsx')};
   import { InvoiceListPage } from ${source('features/invoices/InvoiceListPage.tsx')};
   import { PaymentListPage } from ${source('features/payments/PaymentListPage.tsx')};
   import { JobCenterPage } from ${source('features/jobs/JobCenterPage.tsx')};
@@ -77,7 +78,8 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
     listAuditLogs: list, listSingleWindowOperationCenter: list,
     listBusinessAttachments: async (...args) => ({ page: await list(...args) }),
     listBusinessAttachmentCategories: async () => ({ items: [] }),
-    getWorklist: async (...args) => ({ page: await list(...args), sources: [] }),
+    getWorklist: async (input, options) => ({ page: await list(input, options), sources: [],
+      nextCursor: (input.pageNumber ?? 1) < window.__totalPages ? String((input.pageNumber ?? 1) + 1) : null }),
     listAnnouncements: list, listNotifications: list, getNotificationUnreadCount: async () => ({ unreadCount: 0 }),
     queryReportTemplateV3ImageResources: list, listUserReportTemplates: list, listReportTemplates: async () => [],
     listCustomersPage: mode === 'master' ? list : async () => ({ items: [] }),
@@ -120,10 +122,10 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   permissions.push({resourceKey:'document.hs-knowledge',action:'manage',dataScope:'all'});
   createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[mode.startsWith('hs-') ? '/' + mode.slice(3) : '/']}><QueryClientProvider client={queries}>
     <PermissionAccessProvider grants={[]} permissions={permissions} subject={{ id: 1 }} canManageSettings={false}>
-      <ConfirmationProvider><main><h1>列表分页验收</h1><Component client={client} businessDate='2026-10-06'
+      <ConfirmationProvider><UnsavedChangesProvider><main><h1>列表分页验收</h1><Component client={client} businessDate='2026-10-06'
         user={{ id: 1, companyScope: 'TEST', capabilities: { permissions }, businessTimeZone: 'Asia/Shanghai' }} editable={false} resources={[]} onChoose={() => {}}
         businessTimeZone="Asia/Shanghai" company="TEST" unitId="test-unit" accounts={[]}
-        config={getMasterDataConfig('customers')} canOperate={false} canManage={false} canViewMasterData canViewHsCodes={false}/></main></ConfirmationProvider>
+        config={getMasterDataConfig('customers')} canOperate={false} canManage={false} canViewMasterData canViewHsCodes={false}/></main></UnsavedChangesProvider></ConfirmationProvider>
     </PermissionAccessProvider></QueryClientProvider></MemoryRouter>);
 ` }, outfile: path.join(output, 'app.js'), bundle: true, platform: 'browser', format: 'esm', jsx: 'automatic', logLevel: 'silent' });
 const server = http.createServer((request, response) => {
@@ -166,6 +168,26 @@ try {
       await page.waitForFunction(() => !document.querySelector('.page-jump-control button')?.disabled);
     };
     try {
+      if (mode === 'worklist') {
+        const waitCursor = async number => {
+          await page.waitForFunction(number => document.querySelector('.pagination-bar')?.textContent.includes('第 ' + number + ' 页'), number);
+          await page.waitForFunction(() => !document.querySelector('.pagination-bar button:last-child')?.disabled);
+        };
+        await waitCursor(1);
+        assert.deepEqual(await page.evaluate(() => window.__requests.map(r => r.pageNumber)), [1], 'First page and summary share one request');
+        await pager.getByRole('button', { name: '下一页', exact: true }).click();
+        await waitCursor(2);
+        assert.deepEqual(await page.evaluate(() => window.__requests.map(r => r.pageNumber)), [1, 2]);
+        await pager.getByRole('button', { name: '上一页', exact: true }).click();
+        await waitCursor(1);
+        assert.equal(await page.evaluate(() => window.__requests.length), 2, 'Fresh first page is reused');
+        await page.getByRole('button', { name: '刷新', exact: true }).click();
+        await page.waitForFunction(() => window.__requests.length === 3 && window.__requests[2].completed);
+        assert.equal(await page.evaluate(() => window.__requests[2].pageNumber), 1);
+        assert.deepEqual(errors, []);
+        results.push({ mode, passed: true });
+        continue;
+      }
       await waitPage(1);
       if (mode !== 'resources') {
         for (const [width, density, height] of [[1280, 'comfortable', 40], [1280, 'compact', 34], [390, 'comfortable', 44]]) {

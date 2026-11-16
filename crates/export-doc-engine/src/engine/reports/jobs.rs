@@ -135,6 +135,8 @@ pub(super) fn start(
             let mut single_file = None;
             let mut output_index = 0;
             for id in &ids {
+                // Admit before retaining image snapshots; waiting holds no store connection.
+                let _rendering = resources::acquire_for_job()?;
                 let actor = auth::refresh_actor(&store, &task_actor)?;
                 auth::authorize_operation(&actor, operation, &[])?;
                 for prepared in prepare_batch(
@@ -148,7 +150,6 @@ pub(super) fn start(
                 )? {
                     crate::operation::check()?;
                     let pdf = {
-                        let _rendering = resources::acquire_for_job()?;
                         let document = prepared.render(&fonts, cancelled)?;
                         render::pdf_document(&document, &fonts, cancelled)?
                     };

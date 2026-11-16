@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiSupplierContactDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { largeDocumentQueryOptions } from "../../api/queryRetention.ts";
@@ -8,7 +8,8 @@ import { useScopedConfirmation } from "../../ui/useScopedConfirmation.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
-import { requestErrorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { readApiError } from "../../ui/formUtils.ts";
 
 export function useSupplierContacts(client: ExportDocManagerApiClient, supplierId: number,
   access: { create: boolean; edit: boolean; setPrimary: boolean; delete: boolean }) {
@@ -31,8 +32,10 @@ export function useSupplierContacts(client: ExportDocManagerApiClient, supplierI
   const requestConfirmation = useConfirmation();
   const { confirmDiscardChanges: discard } = useUnsavedChangesGuard({ isDirty: draft.isDirty, message: "当前联系人资料有未保存的修改。" });
   const confirmDiscard = useScopedConfirmation(confirmationScope, discard);
+  const activeAction = useRef<"save" | "primary" | "delete" | null>(null);
   const command = useScopedMutation<boolean, "save" | "primary" | "delete">(scope, client, {
     mutationFn: async (action, signal, { checkCurrent, continueInScope }) => {
+      activeAction.current = action;
       const current = draft.record;
       if (action === "save" ? (current ? !access.edit : !access.create) : !current || !(action === "primary" ? access.setPrimary : access.delete)) return false;
       if (action !== "save") {
@@ -67,13 +70,14 @@ export function useSupplierContacts(client: ExportDocManagerApiClient, supplierI
       return true;
     },
     refreshKeys: changed => changed ? [["supplier-contacts", supplierId]] : [],
+    onRefreshError: error => setFeedback(warningFeedback(`联系人已保存，但目录刷新失败：${readApiError(error)}`)),
     onError: error => setFeedback(requestErrorFeedback(error)),
   });
   async function select(next: ApiSupplierContactDto | null | undefined) {
     if (command.isPending || !await confirmDiscard("切换联系人视图")) return;
     draft.reset(); setSelection(next); setFeedback(null);
   }
-  return { query, draft, selection, feedback, command, pageNumber, pageSize, setPageNumber,
+  return { query, draft, selection, feedback, command: { ...command, isEditingLocked: command.isPending && activeAction.current !== "save" }, pageNumber, pageSize, setPageNumber,
     setPageSize: (size: number) => { setPageSize(size); setPageNumber(1); }, select,
     save: (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); command.mutate("save"); },
     loadServer: async () => { if (await confirmDiscard("载入服务器版本")) draft.loadServerVersion(); },

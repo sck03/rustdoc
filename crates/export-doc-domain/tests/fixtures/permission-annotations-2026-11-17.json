@@ -1,0 +1,225 @@
+{
+  "CreateSingleWindowSource": {
+    "permissions": {
+      "readModule": "document.single-window",
+      "writeModule": null,
+      "readAccessLevel": null,
+      "writeAccessLevel": null,
+      "selector": 0,
+      "disabled": false,
+      "overridesParent": false
+    },
+    "requirements": [],
+    "permissionBypass": false
+  },
+  "GetEmailTemplateVersion": {
+    "permissions": {
+      "readModule": "sales.email-templates",
+      "writeModule": null,
+      "readAccessLevel": null,
+      "writeAccessLevel": null,
+      "selector": 0,
+      "disabled": false,
+      "overridesParent": false
+    },
+    "requirements": [
+      {
+        "resourceKey": "sales.email-templates",
+        "action": "view"
+      }
+    ],
+    "permissionBypass": false
+  },
+  "GetEmailToolStatus": {
+    "permissions": {
+      "readModule": "common.email",
+      "writeModule": null,
+      "readAccessLevel": null,
+      "writeAccessLevel": null,
+      "selector": 0,
+      "disabled": false,
+      "overridesParent": false
+    },
+    "requirements": [],
+    "permissionBypass": false
+  },
+  "GetFileStorage": {
+    "permissions": null,
+    "requirements": [
+      {
+        "resourceKey": "system.settings",
+        "action": "manage"
+      }
+    ],
+    "permissionBypass": false
+  },
+  "GetFileStoragePolicy": {
+    "permissions": null,
+    "requirements": [],
+    "permissionBypass": true
+  },
+  "ListOaApplications": {
+    "permissions": null,
+    "requirements": [
+      {
+        "resourceKey": "office.general",
+        "action": "view"
+      }
+    ],
+    "permissionBypass": false
+  },
+  "ListOaFormReferences": {
+    "permissions": null,
+    "requirements": [
+      {
+        "resourceKey": "office.general",
+        "action": "view"
+      }
+    ],
+    "permissionBypass": false
+  },
+  "ListPersonnelAttachments": {
+    "permissions": null,
+    "requirements": [
+      {
+        "resourceKey": "office.people",
+        "action": "view-details"
+      }
+    ],
+    "permissionBypass": false
+  },
+  "ListSingleWindowSources": {
+    "permissions": {
+      "readModule": "document.single-window",
+      "writeModule": null,
+      "readAccessLevel": null,
+      "writeAccessLevel": null,
+      "selector": 0,
+      "disabled": false,
+      "overridesParent": false
+    },
+    "requirements": [],
+    "permissionBypass": false
+  },
+  "PreviewSingleWindowExcelImport": {
+    "permissions": {
+      "readModule": "document.single-window",
+      "writeModule": null,
+      "readAccessLevel": null,
+      "writeAccessLevel": null,
+      "selector": 0,
+      "disabled": false,
+      "overridesParent": false
+    },
+    "requirements": [],
+    "permissionBypass": false
+  },
+  "ReconcileFileStorage": {
+    "permissions": null,
+    "requirements": [
+      {
+        "resourceKey": "system.settings",
+        "action": "manage"
+      }
+    ],
+    "permissionBypass": false
+  },
+  "StartFileStorageMigration": {
+    "permissions": null,
+    "requirements": [
+      {
+        "resourceKey": "system.settings",
+        "action": "manage"
+      }
+    ],
+    "permissionBypass": false
+  },
+  "StartRecoveryArchiveSaveToPathJob": {
+    "permissions": null,
+    "requirements": [
+      {
+        "resourceKey": "system.backup",
+        "action": "manage"
+      },
+      {
+        "resourceKey": "system.disaster-recovery",
+        "action": "manage"
+      }
+    ],
+    "permissionBypass": false
+  },
+  "StartSingleWindowExcelTemplateDownloadJob": {
+    "permissions": {
+      "readModule": "document.single-window",
+      "writeModule": null,
+      "readAccessLevel": null,
+      "writeAccessLevel": null,
+      "selector": 0,
+      "disabled": false,
+      "overridesParent": false
+    },
+    "requirements": [
+      {
+        "resourceKey": "document.jobs",
+        "action": "view"
+      },
+      {
+        "resourceKey": "document.jobs",
+        "action": "operate"
+      }
+    ],
+    "permissionBypass": false
+  },
+  "StartSingleWindowExcelTemplateSaveToPathJob": {
+    "permissions": {
+      "readModule": "document.single-window",
+      "writeModule": null,
+      "readAccessLevel": null,
+      "writeAccessLevel": null,
+      "selector": 0,
+      "disabled": false,
+      "overridesParent": false
+    },
+    "requirements": [
+      {
+        "resourceKey": "document.jobs",
+        "action": "view"
+      },
+      {
+        "resourceKey": "document.jobs",
+        "action": "operate"
+      }
+    ],
+    "permissionBypass": false
+  },
+  "UpdateFileStorageCredentials": {
+    "permissions": null,
+    "requirements": [
+      {
+        "resourceKey": "system.settings",
+        "action": "manage"
+      }
+    ],
+    "permissionBypass": false
+  },
+  "UpdateFileStoragePolicy": {
+    "permissions": null,
+    "requirements": [
+      {
+        "resourceKey": "system.settings",
+        "action": "manage"
+      }
+    ],
+    "permissionBypass": false
+  },
+  "VerifyFileStorage": {
+    "permissions": null,
+    "requirements": [
+      {
+        "resourceKey": "system.settings",
+        "action": "manage"
+      }
+    ],
+    "permissionBypass": false
+  }
+}

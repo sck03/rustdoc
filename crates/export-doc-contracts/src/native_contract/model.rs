@@ -141,23 +141,6 @@ pub fn role(
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct LegacyPermissions {
-    pub read_module: Option<&'static str>,
-    pub write_module: Option<&'static str>,
-    pub read_access_level: Option<&'static str>,
-    pub write_access_level: Option<&'static str>,
-    pub selector: i64,
-    pub disabled: bool,
-    pub overrides_parent: bool,
-}
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Requirement {
-    pub resource_key: &'static str,
-    pub action: &'static str,
-}
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct AccessResource {
     pub resource_key: &'static str,
     pub actions: Vec<&'static str>,
@@ -180,9 +163,6 @@ pub struct Policy {
     pub requires_authentication: bool,
     pub requires_desktop_access: bool,
     pub requires_license: bool,
-    pub permissions: Option<LegacyPermissions>,
-    pub requirements: Vec<Requirement>,
-    pub permission_bypass: bool,
     pub access: Access,
 }
 #[derive(Clone, Serialize)]

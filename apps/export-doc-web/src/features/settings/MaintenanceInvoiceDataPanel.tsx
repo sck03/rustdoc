@@ -1,12 +1,7 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { FileWarning, RefreshCw } from "lucide-react";
-import type { ApiInvoiceDataMaintenancePreviewResponse } from "../../api/index.ts";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
-import { queryKeys } from "../../api/queryKeys.ts";
-import { readApiError } from "../../ui/formUtils.ts";
 import { formatRuntimeDate } from "./settingsFormatters.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useInvoiceDataMaintenance } from "./useInvoiceDataMaintenance.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 
 export function DataOwnershipUnavailablePanel() {
@@ -31,96 +26,9 @@ export function InvoiceDataMaintenancePanel({
   client: ExportDocManagerApiClient;
   canManageSettings: boolean;
 }) {
-  const requestConfirmation = useConfirmation();
-  const queryClient = useQueryClient();
-  const [invoiceId, setInvoiceId] = useState("");
-  const [invoiceNoConfirmation, setInvoiceNoConfirmation] = useState("");
-  const [reason, setReason] = useState("");
-  const [preview, setPreview] = useState<ApiInvoiceDataMaintenancePreviewResponse | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  const lookupMutation = useMutation({
-    mutationFn: () => client.getInvoiceDataMaintenancePreview({ id: Number(invoiceId) }),
-    onSuccess: (response) => {
-      setPreview(response);
-      setInvoiceNoConfirmation("");
-      setReason("");
-      setMessage(null);
-      setSuccessMessage(null);
-    },
-    onError: (error) => {
-      setPreview(null);
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const purgeMutation = useMutation({
-    mutationFn: () => client.purgeCancelledInvoice({
-      id: preview?.id ?? 0,
-      body: {
-        invoiceNoConfirmation: invoiceNoConfirmation.trim(),
-        reason: reason.trim(),
-      },
-    }),
-    onSuccess: async (response) => {
-      queryClient.removeQueries({ queryKey: queryKeys.invoice(response.invoiceId) });
-      queryClient.removeQueries({ queryKey: queryKeys.invoiceStatusHistory(response.invoiceId) });
-      queryClient.removeQueries({ queryKey: queryKeys.singleWindowCustomsCooDocument(response.invoiceId) });
-      queryClient.removeQueries({ queryKey: queryKeys.singleWindowCustomsCooExportReview(response.invoiceId) });
-      queryClient.removeQueries({ queryKey: queryKeys.singleWindowAgentConsignmentDocument(response.invoiceId) });
-      queryClient.removeQueries({ queryKey: queryKeys.singleWindowAgentConsignmentExportReview(response.invoiceId) });
-      setPreview(null);
-      setInvoiceId("");
-      setInvoiceNoConfirmation("");
-      setReason("");
-      setMessage(null);
-      setSuccessMessage(response.message || "已完成发票数据清理，审计记录已保留。");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.dashboard() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.singleWindowOperationCenterRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.auditLogsRoot() }),
-      ]);
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const numericInvoiceId = Number(invoiceId);
-  const canLookup = canManageSettings
-    && Number.isInteger(numericInvoiceId)
-    && numericInvoiceId > 0
-    && !lookupMutation.isPending
-    && !purgeMutation.isPending;
-  const canPurge = canManageSettings
-    && Boolean(preview?.canPurge)
-    && invoiceNoConfirmation.trim() === preview?.invoiceNo
-    && Boolean(reason.trim())
-    && reason.trim().length <= 500
-    && !purgeMutation.isPending;
-
-  async function handlePurge() {
-    if (!preview || !canPurge) return;
-    if (!await requestConfirmation({
-      title: "永久清理已作废发票",
-      description: `将物理删除发票“${preview.invoiceNo}”及其明细和关联工作区记录。`,
-      details: [
-        "该操作仅用于确有依据的错误数据或测试数据清理，不能撤销。",
-        "清理原因、操作人、原状态和发票摘要会继续保留在审计日志中。",
-      ],
-      confirmLabel: "确认永久清理",
-      tone: "danger",
-    })) return;
-
-    setMessage(null);
-    setSuccessMessage(null);
-    purgeMutation.mutate();
-  }
+  const { invoiceId, invoiceNoConfirmation, setInvoiceNoConfirmation, reason, setReason, preview, message,
+    successMessage, lookupMutation, purgeMutation, canLookup, canPurge, handlePurge, changeInvoiceId } =
+    useInvoiceDataMaintenance(client, canManageSettings);
 
   return (
     <section className="form-section invoice-data-maintenance-section" aria-label="发票数据清理">
@@ -145,14 +53,7 @@ export function InvoiceDataMaintenancePanel({
             value={invoiceId}
             disabled={!canManageSettings || purgeMutation.isPending}
             placeholder="从发票详情地址或列表读取"
-            onChange={(event) => {
-              setInvoiceId(event.target.value);
-              setPreview(null);
-              setInvoiceNoConfirmation("");
-              setReason("");
-              setMessage(null);
-              setSuccessMessage(null);
-            }}
+            onChange={(event) => changeInvoiceId(event.target.value)}
           />
         </label>
         <button

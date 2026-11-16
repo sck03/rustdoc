@@ -178,7 +178,7 @@ export function SupplierDirectoryPage({ businessDate, client }: { businessDate: 
     </section> : null}
     {view === "profile" && (newSupplier || selectedSupplier) ? <form className="form-grid" onSubmit={saveSupplier} {...(newSupplier ? { "aria-label": "新建供应商" } : getTaskViewPanelProps(supplierTabsId, "profile"))}>
         <div className="section-heading-row"><h3>{newSupplier ? "新建供应商" : canEditSupplier ? "供应商资料" : "查看供应商"}</h3></div>
-        <fieldset className="permission-fieldset form-field-wide" disabled={supplierCommand.isPending || (newSupplier ? !canCreateSupplier : !canEditSupplier)}>
+        <fieldset className="permission-fieldset form-field-wide" disabled={supplierCommand.isEditingLocked || (newSupplier ? !canCreateSupplier : !canEditSupplier)}>
         <label>名称<input name="name" required {...supplierDraft.field("name")} /></label><label>国家/地区<input name="countryRegion" {...supplierDraft.field("countryRegion")} /></label>
         <label>分类<input name="category" {...supplierDraft.field("category")} /></label><label>网站<input name="website" {...supplierDraft.field("website")} /></label>
         {!newSupplier ? <label>当前状态<input value={selectedSupplier?.status ?? ""} readOnly /></label> : null}

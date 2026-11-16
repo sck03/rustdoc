@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { frontendRegressionSuites } from './lib/frontend-regression-suites.mjs';
 import { validationPlan } from './github/native-validation-plan.mjs';
 assert.deepEqual(validationPlan(['docs/当前架构事实.md']),{rust:false,web:false,desktop:false,desktopCheck:false,ocr:false,full:false});
 assert.deepEqual(validationPlan(['apps/export-doc-web/src/features/office/OfficeRequestsPanel.tsx']),{rust:false,web:true,desktop:false,desktopCheck:false,ocr:false,full:false});
@@ -21,4 +23,13 @@ assert.equal(validationPlan(['scripts/github/native-validation-plan.mjs']).rust,
 assert(Object.values(validationPlan([], 'full')).every(Boolean));
 assert(validationPlan([], 'quick', true).rust);
 assert.throws(()=>validationPlan([], 'unknown'));
+const workflow = readFileSync(new URL('../.github/workflows/rust-native-validation.yml', import.meta.url), 'utf8');
+const matrix = /group: \[([^\]]+)\]/u.exec(workflow)?.[1].split(',').map(value => value.trim());
+assert.deepEqual(matrix, Object.keys(frontendRegressionSuites), 'Every registered regression group must run in CI');
+const registered = Object.values(frontendRegressionSuites).flat();
+assert.equal(new Set(registered).size, registered.length, 'Suites must not run in multiple CI groups');
+for (const required of ['settings-models', 'audit-log-maintenance-model', 'report-template-draft-ui', 'business-features-ui', 'concurrency-feedback', 'browser-session-contracts'])
+  assert(registered.includes(required), required + ' must remain in the ordinary gate');
+assert.match(workflow, /fail-fast: false/u);
+assert.match(workflow, /artifacts\/frontend-regressions/u);
 console.log('Native validation scope routing passed.');

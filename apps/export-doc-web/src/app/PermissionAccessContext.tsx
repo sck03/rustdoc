@@ -71,8 +71,8 @@ export function usePermissionCapabilities() {
 export function useModulePermission(moduleKey: string, record?: PermissionRecord | null) {
   const { grants, permissions, subject, canManageSettings } = useContext(PermissionAccessContext);
   const accessLevel = grants.get(normalizeModuleKey(moduleKey)) ?? "none";
-  // Reports combine several resources in legacy endpoint metadata. Standard
-  // modules authorize each action independently, even when manage ranks higher.
+  // Report tools combine template/resource grants through the server's module
+  // projection. Ordinary resources authorize each action independently.
   const allows = (action: PermissionAccessLevel) => moduleKey === "document.reports"
     ? permissionAccessRank(accessLevel) >= permissionAccessRank(action)
     : Boolean(permissions.get(permissionKey(moduleKey, action))) && (record === undefined ||

@@ -73,6 +73,9 @@ pub(super) fn append_groups(
                 }
                 let own = row["ownerUserId"] == actor.id;
                 let status = text(&row, "status");
+                let review = (status == "Pending")
+                    .then(|| approval::ReviewSnapshot::read(tx, actor, &row))
+                    .transpose()?;
                 let complete = if status != "Approved" {
                     false
                 } else if kind == "oa-general" {
@@ -84,7 +87,13 @@ pub(super) fn append_groups(
                     "Draft" | "Returned" if own && auth::visible(actor, resource, "edit", &row) => {
                         "待修改／提交"
                     }
-                    "Pending" if approval::authority(tx, actor, &row)?.is_some() => "待我审批",
+                    "Pending"
+                        if review
+                            .as_ref()
+                            .is_some_and(|review| review.authority(None).is_some()) =>
+                    {
+                        "待我审批"
+                    }
                     "Pending" if own => "等待审批，可催办或撤回",
                     "Approved" if complete => "待办理／验收／归档",
                     "Approved" if own => "已批准，等待办理／验收／归档",
@@ -100,9 +109,9 @@ pub(super) fn append_groups(
                     Value::Null
                 };
                 let instant = if status == "Pending" {
-                    let plan = approval::plan(&row)?;
-                    let deadlines = plan
+                    let deadlines = review
                         .as_ref()
+                        .and_then(|review| review.plan.as_ref())
                         .map(|p| {
                             p.current_indices()
                                 .into_iter()

@@ -1,11 +1,7 @@
-import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, ShieldCheck } from "lucide-react";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
-import { queryKeys } from "../../api/queryKeys.ts";
 import { SelectField } from "../../ui/FormFields.tsx";
-import { readApiError } from "../../ui/formUtils.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import { useOwnershipMaintenance } from "./useOwnershipMaintenance.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
 
@@ -16,96 +12,10 @@ export function SharedDatabaseOwnershipPanel({
   client: ExportDocManagerApiClient;
   canManageUsers: boolean;
 }) {
-  const requestConfirmation = useConfirmation();
-  const queryClient = useQueryClient();
-  const [message, setMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [fromUserId, setFromUserId] = useState("");
-  const [toUserId, setToUserId] = useState("");
-  const [onlyUnassigned, setOnlyUnassigned] = useState(true);
-  const [includeInvoices, setIncludeInvoices] = useState(true);
-  const [includePayments, setIncludePayments] = useState(true);
-  const [includeOtherBusinessData, setIncludeOtherBusinessData] = useState(true);
-
-  const ownershipQuery = useQuery({
-    queryKey: queryKeys.sharedDatabaseOwnership(),
-    queryFn: ({ signal }) => client.getSharedDatabaseOwnershipSummary({ signal }),
-    enabled: canManageUsers,
-  });
-
-  useEffect(() => {
-    const owners = ownershipQuery.data?.owners ?? [];
-    const activeOwners = owners.filter((owner) => owner.isActive);
-    if ((!toUserId || !activeOwners.some((owner) => String(owner.userId) === toUserId)) && activeOwners.length > 0) {
-      setToUserId(String(activeOwners[0].userId));
-    }
-  }, [ownershipQuery.data, toUserId]);
-
-  useEffect(() => {
-    if (ownershipQuery.isError) {
-      setMessage(readApiError(ownershipQuery.error));
-      setSuccessMessage(null);
-    }
-  }, [ownershipQuery.error, ownershipQuery.isError]);
-
-  const transferMutation = useMutation({
-    mutationFn: () =>
-      client.transferSharedDatabaseOwnership({
-        body: {
-          fromUserId: onlyUnassigned || !fromUserId ? null : Number(fromUserId),
-          toUserId: Number(toUserId),
-          includeInvoices,
-          includePayments,
-          includeOtherBusinessData,
-          onlyUnassigned,
-          departmentId: "",
-          companyScope: "",
-          confirmationText: "TRANSFER OWNERSHIP",
-        },
-      }),
-    onSuccess: async (response) => {
-      setMessage(null);
-      setSuccessMessage(response.message || "归属改派完成。");
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.sharedDatabaseOwnership() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.invoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.queryInvoicesRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.paymentsRoot() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.containerPackingProjects() }),
-        queryClient.invalidateQueries({ queryKey: ["reports", "user-templates"] }),
-      ]);
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const owners = ownershipQuery.data?.owners ?? [];
-  const isBusy = ownershipQuery.isFetching || transferMutation.isPending;
-  const canTransfer =
-    canManageUsers &&
-    Number(toUserId) > 0 &&
-    (includeInvoices || includePayments || includeOtherBusinessData) &&
-    (ownershipQuery.data?.owners ?? []).some((owner) => owner.isActive && String(owner.userId) === toUserId) &&
-    (onlyUnassigned || !fromUserId || fromUserId !== toUserId) &&
-    !isBusy;
-
-  async function handleTransferOwnership() {
-    const sourceLabel = onlyUnassigned
-      ? "当前未归属的数据"
-      : owners.find((owner) => String(owner.userId) === fromUserId)?.username || "所选用户的数据";
-    const targetLabel = owners.find((owner) => String(owner.userId) === toUserId)?.username || "目标用户";
-    const scopes = [includeInvoices ? "发票" : "", includePayments ? "付款报销" : "", includeOtherBusinessData ? "其他业务资料" : ""]
-      .filter(Boolean)
-      .join("、");
-    if (!await requestConfirmation({ title: "改派业务数据归属", description: `即将把${sourceLabel}中的${scopes}改派给“${targetLabel}”。`, details: ["此操作会修改业务数据归属，并写入审计记录。"], confirmLabel: "确认改派", tone: "danger" })) {
-      return;
-    }
-
-    transferMutation.mutate();
-  }
+  const { ownershipQuery, message, setMessage, successMessage, setSuccessMessage, fromUserId, setFromUserId, toUserId, setToUserId,
+    onlyUnassigned, setOnlyUnassigned, includeInvoices, setIncludeInvoices, includePayments, setIncludePayments,
+    includeOtherBusinessData, setIncludeOtherBusinessData, owners, isBusy, canTransfer, handleTransferOwnership } =
+    useOwnershipMaintenance(client, canManageUsers);
 
   return (
     <section className="form-section shared-ownership-section" aria-label="数据归属改派">

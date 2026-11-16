@@ -770,21 +770,17 @@ pub fn authorize_operation(
 pub fn operation_action(
     operation: crate::generated_api::Operation,
     resource: &str,
-    scope_action: &'static str,
 ) -> Result<&'static str> {
     let policy = &contracts::contract()["operations"][operation.id]["policy"];
-    let requirements = policy["requirements"]
+    let resources = policy["access"]["resources"]
         .as_array()
         .ok_or_else(|| unavailable("业务动作缺少生成的权限元数据。"))?;
-    // Current endpoints also inherit module policies. authorize_operation checks
-    // that policy; the use case action determines the record's data scope.
-    if requirements.is_empty() && policy["permissions"].is_object() {
-        return Ok(scope_action);
-    }
-    requirements
+    resources
         .iter()
         .find(|item| item["resourceKey"] == resource)
-        .and_then(|requirement| requirement["action"].as_str())
+        .and_then(|resource| resource["actions"].as_array())
+        .filter(|actions| actions.len() == 1)
+        .and_then(|actions| actions[0].as_str())
         .ok_or_else(|| unavailable("业务动作缺少生成的权限元数据。"))
 }
 

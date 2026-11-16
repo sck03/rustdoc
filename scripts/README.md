@@ -79,7 +79,9 @@ OA 管理员和用户手册：`node scripts/generate-oa-manuals.mjs` 从 `docs/m
 
 `-SkipBuild` 只整理已经构建好的相同 profile／target 二进制与资源；Tauri 前端内嵌在 EXE 中，前端变更必须重新 locked 构建宿主，重新整理目录不会更新内嵌界面。Document 正式包默认包含 OCR；`-WithoutOcr` 仅生成明确不提供文字识别的轻量验收包，不能用它代替完整单证版验收。网页/Docker Full 继续包含 OCR。
 
-便携/Web 组包写入 `exportdoc-package-files.json`，登记受控程序路径和 SHA-256。同目录重打包只移除已退出新清单且归属/摘要仍匹配的程序资源，清除旧 OCR 与 Web hash 文件；`App_Data`、DataRoot 用户模板、备份及私有文件不进入此清单。已修改的程序资源或模板、损坏清单、链接、嵌套 Git 和 Windows 路径别名会在复制前报错，先另存冲突内容或选择新包目录。旧无清单包只识别明确的只读运行资源树；首次遇到不同内容的模板不猜测覆盖。
+便携/Web 组包写入 `exportdoc-package-files.json`，登记受控程序路径和 SHA-256。同目录重打包只移除已退出新清单且归属/摘要仍匹配的程序资源，清除旧 OCR 与 Web hash 文件；`App_Data`、DataRoot 用户模板、备份及私有文件不进入此清单。已修改的程序资源或模板、损坏清单、链接、嵌套 Git 和 Windows 路径别名会在复制前报错，先另存冲突内容或选择新包目录。无清单的现存运行资源或未登记的目标文件不自动接管，必须选择新包目录；不再兼容旧包归属推断。
+
+`npm --prefix apps/export-doc-web run test:regressions` 顺序执行全部 Chromium 回归；追加 `-- editing`、`-- maintenance`、`-- business` 或 `-- session` 只执行对应组。分组共用 `lib/frontend-regression-suites.mjs`，每个脚本保留日志与退出状态，失败仍继续本组其它脚本，取消或超时清理进程树。必须从 npm 入口运行，以保留字体构建测试所需的 npm 环境。GitHub 按这四组独立运行并上传失败证据；Firefox/WebKit 继续使用手动工作流。
 
 直接 Cargo 命令、本地打包、实库/界面回归与 GitHub 工作流默认共用仓库 `target/`；不再分别写入 `.codex-runtime/cargo-target-native` 和 `artifacts/cargo-target-native`。`CARGO_TARGET_DIR` 可显式覆盖，相对路径按仓库根解析；公共入口同时把下载缓存和临时目录放入 `.codex-runtime`。手工运行 Cargo 时也应设置仓库内的 `CARGO_HOME`，以复用脚本的下载缓存。`-SkipBuild` 会先检查主程序及所需 OCR 程序，缺失时在创建/改动输出包之前报错；所有文件复制前统一验证来源和目标边界。
 

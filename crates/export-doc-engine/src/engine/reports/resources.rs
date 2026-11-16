@@ -1,5 +1,5 @@
 //! One heavyweight conversion per process bounds simultaneous SVG trees/PDF encoders.
-//! The guard spans layout and encoding; waiting never owns a database connection.
+//! The guard spans image preparation, layout and encoding; waiting owns no connection.
 use crate::engine::error::{Result, error, unavailable};
 use std::{
     sync::{Condvar, Mutex},

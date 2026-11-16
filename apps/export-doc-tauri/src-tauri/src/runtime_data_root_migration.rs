@@ -140,7 +140,6 @@ pub(crate) fn apply_pending_data_root_migration(
     // These are the exact locks used by ordinary SQLite opens. Their paths stay
     // in place through copying, publication, and source cleanup on every OS.
     let _source_lock = lock_root(&source_root, false)?;
-    let _legacy_lock = lock_legacy_source(&source_root)?;
     let _target_lock = lock_root(&target_root, true)?;
     let redirected = source_redirect_matches(&source_root, &migration)?;
     let journal_path = target_root.join(DATA_ROOT_MIGRATION_PENDING_FILE);
@@ -277,18 +276,6 @@ fn lock_root(root: &Path, create: bool) -> Result<File, Box<dyn Error>> {
         )
     })?;
     Ok(file)
-}
-
-fn lock_legacy_source(root: &Path) -> Result<Option<File>, Box<dyn Error>> {
-    let path = root.join("native-instance.lock");
-    reject_link_like_path(&path)?;
-    if !path.try_exists()? {
-        return Ok(None);
-    }
-    let file = OpenOptions::new().read(true).write(true).open(path)?;
-    file.try_lock_exclusive()
-        .map_err(|cause| format!("旧数据目录实例锁被占用：{cause}"))?;
-    Ok(Some(file))
 }
 
 fn source_redirect_matches(

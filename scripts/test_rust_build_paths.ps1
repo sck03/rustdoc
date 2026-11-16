@@ -79,6 +79,11 @@ try {
     $rejected = $false
     try { Copy-ExportDocNativePackageFiles -Copies $map -OutputRoot $output } catch { $rejected = $true }
     if (-not $rejected -or (Test-Path -LiteralPath (Join-Path $fixture 'escape.txt'))) { throw 'Package output escaped its root' }
+    $rejected = $false
+    try { Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'ExportDocManager.exe' }) -OutputRoot $output } catch { $rejected = $true }
+    if (-not $rejected) { throw 'Unmanifested executable was adopted' }
+    Assert-Equal ([IO.File]::ReadAllText($existing)) 'old'
+    Remove-Item -LiteralPath $existing
     Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'ExportDocManager.exe' }) -OutputRoot $output
     Assert-Equal ([IO.File]::ReadAllText($existing)) 'new'
     # Rebuilding a package retires only files owned by the package manifest.
@@ -134,7 +139,7 @@ try {
     if (-not $rejected -or (Test-Path -LiteralPath (Join-Path $output 'Web/assets/replacement.js'))) { throw 'Modified owned template was silently retired' }
     Assert-Equal ([IO.File]::ReadAllText($builtin)) 'new user edit'
     [IO.File]::WriteAllText($builtin, 'new')
-    # An existing marked package gets an ownership list without sweeping custom files.
+    # A package without ownership metadata is rejected without changing any files.
     Remove-Item -LiteralPath $fileManifest
     [IO.File]::WriteAllText((Join-Path $output 'exportdoc-native-package.json'), '{"schemaVersion":1,"purpose":"rust-native-application"}')
     $legacyOcr = Join-Path $output 'sidecar/ocr/onnxruntime.dll'
@@ -177,8 +182,10 @@ try {
     $rejected = $false
     try { Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Templates/custom.dtpl' }) -OutputRoot $output } catch { $rejected = $true }
     if (-not $rejected) { throw 'Unowned modified template was overwritten on first package adoption' }
-    Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Web/assets/current.js' }) -OutputRoot $output
-    if (Test-Path -LiteralPath $legacyOcr) { throw 'Unmanifested marked OCR resource survived lightweight rebuild' }
+    $rejected = $false
+    try { Copy-ExportDocNativePackageFiles -Copies ([ordered]@{ $good = 'Web/assets/current.js' }) -OutputRoot $output } catch { $rejected = $true }
+    if (-not $rejected -or (Test-Path -LiteralPath (Join-Path $output 'Web/assets/current.js'))) { throw 'Unmanifested package was adopted' }
+    Assert-Equal ([IO.File]::ReadAllText($legacyOcr)) 'old OCR'
     foreach ($file in @($data, $customTemplate)) { Assert-Equal ([IO.File]::ReadAllText($file)) 'keep' }
     Write-Host 'Rust build paths and package preflight passed.'
 } finally {

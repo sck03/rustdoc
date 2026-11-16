@@ -1,11 +1,12 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { largeDocumentQueryOptions } from "../../api/queryRetention.ts";
 import { useVersionedRecordDraft } from "../../ui/useVersionedRecordDraft.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
-import { requestErrorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { readApiError } from "../../ui/formUtils.ts";
 
 type ProfileAction = "save" | "admit" | "deactivate" | "restore" | "delete";
 const statusMessages = {
@@ -29,8 +30,10 @@ export function useSupplierProfile({ client, supplierId, newSupplier, view, acce
     enabled: supplierId > 0 && !newSupplier && ["profile", "contacts", "products", "assessments"].includes(view),
   });
   const draft = useVersionedRecordDraft(`supplier:${supplierId}`, newSupplier ? undefined : query.data, ["name", "countryRegion", "category", "website", "mainProducts", "notes"]);
+  const activeAction = useRef<ProfileAction | null>(null);
   const command = useScopedMutation<boolean, ProfileAction>(`supplier:${supplierId}:${view}`, client, {
     mutationFn: async (action, signal, { checkCurrent, continueInScope }) => {
+      activeAction.current = action;
       const current = draft.record;
       if (action === "save" ? (newSupplier ? !access.create : !access.edit || !current)
         : !current || !(action === "delete" ? access.delete : action === "admit" ? access.admit : access.deactivate)) return false;
@@ -69,8 +72,9 @@ export function useSupplierProfile({ client, supplierId, newSupplier, view, acce
       return true;
     },
     refreshKeys: changed => changed ? [["suppliers"]] : [],
+    onRefreshError: error => setFeedback(warningFeedback(`供应商操作已完成，但目录刷新失败：${readApiError(error)}`)),
     onError: error => setFeedback(requestErrorFeedback(error)),
   });
-  return { query, draft, command, feedback, setFeedback,
+  return { query, draft, command: { ...command, isEditingLocked: command.isPending && activeAction.current !== "save" }, feedback, setFeedback,
     save: (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); command.mutate("save"); } };
 }

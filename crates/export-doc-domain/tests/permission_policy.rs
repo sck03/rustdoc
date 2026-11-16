@@ -1,10 +1,35 @@
 //! Independent evaluation of annotations and reviewed changes protects access semantics.
 use export_doc_domain::{
-    contracts,
     generated_api::*,
     permissions::{self, Grant, ProductEdition},
 };
 use serde_json::Value;
+use std::sync::OnceLock;
+
+// Frozen pre-refactor annotations are independent of the live access rules.
+fn prior_policy(id: &str) -> &'static Value {
+    static POLICIES: OnceLock<Value> = OnceLock::new();
+    &POLICIES.get_or_init(|| {
+        let baseline: Value = serde_json::from_str(include_str!(
+            "../../export-doc-contracts/tests/fixtures/native-contract-baseline.json"
+        ))
+        .unwrap();
+        let mut policies = serde_json::Map::new();
+        for path in baseline["paths"].as_object().unwrap().values() {
+            for operation in path.as_object().unwrap().values() {
+                if let Some(id) = operation["operationId"].as_str() {
+                    policies.insert(id.into(), operation["x-exportdoc-policy"].clone());
+                }
+            }
+        }
+        let additions: Value = serde_json::from_str(include_str!(
+            "fixtures/permission-annotations-2026-11-17.json"
+        ))
+        .unwrap();
+        policies.extend(additions.as_object().unwrap().clone());
+        Value::Object(policies)
+    })[id]
+}
 
 fn rank(value: &str) -> u8 {
     match value {
@@ -44,7 +69,7 @@ fn prior_decision(
     op: Operation,
     query: &[(&str, String)],
 ) -> bool {
-    let policy = &contracts::contract()["operations"][op.id]["policy"];
+    let policy = prior_policy(op.id);
     if !policy.is_object() {
         return false;
     }
@@ -163,7 +188,7 @@ fn compiled_access_preserves_annotations_across_editions_actions_roles_and_selec
         ));
     }
     for op in ALL_OPERATIONS {
-        let policy: &Value = &contracts::contract()["operations"][op.id]["policy"];
+        let policy = prior_policy(op.id);
         let selectors = if op.method == "GET" && policy["permissions"]["selector"] == 1 {
             vec![
                 vec![],

@@ -32,15 +32,13 @@ function Copy-ExportDocNativePackageFiles {
             if (-not $previousFiles.TryAdd([IO.Path]::GetRelativePath($OutputRoot, $destination), $file.sha256)) { throw 'Duplicate native package manifest file.' }
         }
     }
-    # Callers validate the package identity before this copy. These immutable
-    # runtime trees belong to the packager, including files predating its manifest.
-    # Custom templates and runtime data are never swept as directories.
+    # Existing resources require a current ownership manifest; never adopt old packages.
     foreach ($relativeRoot in @('Web', 'sidecar/ocr', 'OcrModels/PaddleOCR/V6', 'Resources/Pdf', 'Tools/PostgreSQL', 'WebView2Runtime')) {
         $ownedRoot = Resolve-ExportDocNativePackageFile -RelativePath $relativeRoot -OutputRoot $OutputRoot
         if (Test-Path -LiteralPath $ownedRoot -PathType Container) {
             foreach ($file in Get-ExportDocNativePackageOwnedFiles -Directory $ownedRoot -OutputRoot $OutputRoot) {
                 $relative = [IO.Path]::GetRelativePath($OutputRoot, $file)
-                if (-not $previousFiles.ContainsKey($relative)) { $previousFiles.Add($relative, (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash) }
+                if (-not $previousFiles.ContainsKey($relative)) { throw "Unowned package resource; choose a new output directory: $relative" }
             }
         }
     }
@@ -52,12 +50,10 @@ function Copy-ExportDocNativePackageFiles {
         }
     }
     foreach ($file in $currentFiles.GetEnumerator()) {
-        # A first rebuild cannot distinguish an old built-in template from a
-        # manually edited template. Adopt identical files; preserve conflicts.
-        if ($file.Key -match '^Templates[\\/]' -and -not $previousFiles.ContainsKey($file.Key)) {
+        if (-not $previousFiles.ContainsKey($file.Key)) {
             $destination = Resolve-ExportDocNativePackageFile -RelativePath $file.Key -OutputRoot $OutputRoot
-            if ((Test-Path -LiteralPath $destination -PathType Leaf) -and (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash -ne $file.Value) {
-                throw "Unowned template differs from the package; preserve or move it before rebuilding: $($file.Key)"
+            if (Test-Path -LiteralPath $destination -PathType Leaf) {
+                throw "Unowned package file; choose a new output directory: $($file.Key)"
             }
         }
     }

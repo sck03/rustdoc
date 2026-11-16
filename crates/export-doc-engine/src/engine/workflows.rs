@@ -127,7 +127,7 @@ pub fn action(
         _ => return Err(invalid("业务动作未注册。")),
     };
     let resource = catalog::resource(kind).ok_or_else(|| invalid("业务资源未注册。"))?;
-    let permission_action = auth::operation_action(operation, resource.permission, action)?;
+    let permission_action = auth::operation_action(operation, resource.permission)?;
     auth::authorize(actor, resource.permission, permission_action)?;
     store.transaction_as(actor, |transaction, actor|{
         let mut value=store::get(transaction,kind,id)?;

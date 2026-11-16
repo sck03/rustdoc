@@ -139,18 +139,11 @@ pub(super) fn endpoints() -> Vec<Endpoint> {
             ),
             super::policies::rule(
                 (true, true, false),
-                None,
-                if id == "GetFileStoragePolicy" {
-                    &[]
-                } else {
-                    &[("system.settings", "manage")]
-                },
                 if id == "GetFileStoragePolicy" {
                     Access::Bypass { bypass: true }
                 } else {
                     super::policies::access("All", &[("system.settings", &["manage"], true)])
                 },
-                id == "GetFileStoragePolicy",
             ),
             None,
             body.map(r),

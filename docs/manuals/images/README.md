@@ -1,6 +1,6 @@
 # 手册界面图片
 
-来源：2026-11-12 当前源码运行 `scripts/test_oa_custom_ui.mjs` 的匿名培训场景，已完成创建、表单、仿真发布、申请、审批、办理及 PDF 下载回归。
+来源：2026-11-17 当前源码运行 `scripts/test_oa_custom_ui.mjs` 的匿名培训场景，已完成创建、表单、仿真发布、申请、审批、办理及 PDF 下载回归；运行 API 与当前生成契约一致，1440/1024/390 宽度及无障碍检查通过。
 
 - `form-designer.png`：`custom-designer-1440.png` 的内容局部，保留流程页签、适用部门及前三个字段设置。
 - `request-details.png`：`custom-completed-1440.png` 的申请详情内容，保留完成状态、审批单操作、材料及签署/办理记录。

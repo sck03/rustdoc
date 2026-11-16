@@ -25,6 +25,8 @@ import {UnsavedChangesProvider} from ${src('ui/unsavedChangesGuard.tsx')};
 import {queryKeys} from ${src('api/queryKeys.ts')};
 import {useUserManagement} from ${src('features/settings/useUserManagement.ts')};
 import {useInvoiceDocumentPackageWorkspace} from ${src('features/invoices/useInvoiceDocumentPackageWorkspace.ts')};
+import {InvoiceDataMaintenancePanel} from ${src('features/settings/MaintenanceInvoiceDataPanel.tsx')};
+import {SharedDatabaseOwnershipPanel} from ${src('features/settings/MaintenanceOwnershipPanel.tsx')};
 window.deliveryKey=queryKeys.emailDeliveries();
 window.calls=[]; window.jobs=[]; window.historyCalls=[];
 window.cache=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
@@ -35,6 +37,10 @@ window.cache.setQueryDefaults(window.userKey,{staleTime:Infinity});
 window.cache.setQueryData(window.userKey,window.userData);
 const accountClient={listUsers:i=>deferred('users',{},i),updateUserAccount:(r,i)=>deferred('save-user',r,i),createUserAccount:(r,i)=>deferred('create-user',r,i),deleteUserAccount:(r,i)=>deferred('delete-user',r,i)};
 const nextClient={...accountClient};
+const maintenanceClient={getInvoiceDataMaintenancePreview:(r,i)=>deferred('lookup',r,i),purgeCancelledInvoice:(r,i)=>deferred('purge',r,i),
+getSharedDatabaseOwnershipSummary:async()=>({owners:[{userId:1,username:'管理员',isActive:true},{userId:2,username:'接手人',isActive:true}]}),
+transferSharedDatabaseOwnership:(r,i)=>deferred('transfer',r,i)};
+const otherMaintenanceClient={...maintenanceClient};
 const documentClient={...accountClient,startInvoiceDocumentEmailJob:(r,i)=>deferred('document-email',r,i)};
 const emptyTemplates=[];
 function Accounts({session}){window.navigate=useNavigate();window.user=useUserManagement(session?nextClient:accountClient,true);return <div>{window.user.message}<input aria-label="Account" value={window.user.draft.username} onChange={e=>window.user.patchDraft('username',e.target.value)}/></div>;}
@@ -45,7 +51,9 @@ listInvoiceStatusHistory:async request=>{window.historyCalls.push(request);retur
 const controller={activeJob:false,status:{archives:[{id:'one',createdAt:'2026-11-15T00:00:00Z',sizeBytes:100}]},trackJob:id=>window.jobs.push(id)};
 function Harness({mode,session}){const [invoice,setInvoice]=useState(()=>createEmptyInvoice('2026-11-15'));
 window.edit=()=>setInvoice(value=>({...value,remarks:(value.remarks||'')+'changed'}));
-return mode==='users'?<Accounts session={session}/>:mode==='document-email'?<DocumentEmail/>:mode==='profit'?<InvoiceProfitAnalysisPanel client={client} invoice={invoice} invoiceId={7} disabled={false}/>:
+return mode==='purge'?<InvoiceDataMaintenancePanel client={session?otherMaintenanceClient:maintenanceClient} canManageSettings={true}/>:
+mode==='ownership'?<SharedDatabaseOwnershipPanel client={session?otherMaintenanceClient:maintenanceClient} canManageUsers={true}/>:
+mode==='users'?<Accounts session={session}/>:mode==='document-email'?<DocumentEmail/>:mode==='profit'?<InvoiceProfitAnalysisPanel client={client} invoice={invoice} invoiceId={7} disabled={false}/>:
 mode==='restore'?<BackupArchiveRestorePanel client={client} controller={controller} disabled={false} postgres={true} selectedId="one"/>:
 mode==='history'?<InvoiceStatusHistory client={client} invoiceId={7}/>:
 mode==='email'?<EmailPage client={client} businessTimeZone="Asia/Shanghai"/>:<div>closed</div>;}
@@ -61,10 +69,49 @@ async function scenario(mode, check) {
     await page.setContent('<!doctype html><html lang="zh-CN"><title>操作边界回归</title><div id="root"></div></html>');
     await page.addScriptTag({ path: bundle }); await page.evaluate(mode => window.render(mode), mode);
     await check(page); assert.deepEqual(errors, []); passed++;
-  } catch(error) { throw new Error(mode+': '+error.message+'; page errors: '+errors.join('; '),{cause:error});
+  } catch(error) { await page.screenshot({path:path.join(output,mode+'-failure.png'),fullPage:true}); throw new Error(mode+': '+error.message+'; page errors: '+errors.join('; '),{cause:error});
   } finally { await page.close(); }
 }
 try {
+  await scenario('purge', async page => {
+    await page.getByLabel('发票 ID',{exact:true}).fill('1');
+    await page.getByRole('button',{name:'查询发票',exact:true}).click();
+    await page.waitForFunction(()=>window.calls.length===1);
+    await page.getByLabel('发票 ID',{exact:true}).fill('2');
+    await page.waitForFunction(()=>window.calls[0].signal.aborted);
+    await page.evaluate(()=>window.calls[0].resolve({id:1,invoiceNo:'STALE-INVOICE',canPurge:true}));
+    assert.doesNotMatch(await page.locator('body').innerText(),/STALE-INVOICE/);
+    await page.getByRole('button',{name:'查询发票',exact:true}).click();
+    await page.waitForFunction(()=>window.calls.length===2);
+    await page.evaluate(()=>window.calls[1].resolve({id:2,invoiceNo:'CURRENT-INVOICE',canPurge:true}));
+    await page.getByText('CURRENT-INVOICE',{exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>window.cache.getMutationCache().getAll().length),0);
+  });
+  for (const mode of ['purge','ownership']) for (const change of ['unmount','session']) for (const submitted of [false,true]) {
+    await scenario(mode, async page => {
+      if (mode==='purge') {
+        await page.getByLabel('发票 ID',{exact:true}).fill('1');
+        await page.getByRole('button',{name:'查询发票',exact:true}).click();
+        await page.waitForFunction(()=>window.calls.length===1);
+        await page.evaluate(()=>window.calls.shift().resolve({id:1,invoiceNo:'INV-ONE',canPurge:true}));
+        await page.getByLabel('再次输入完整发票号',{exact:false}).fill('INV-ONE');
+        await page.getByLabel('清理原因',{exact:false}).fill('isolated test');
+      }
+      await page.getByRole('button',{name:mode==='purge'?'永久清理已作废发票':'执行改派',exact:true}).click();
+      const confirm=page.getByRole('button',{name:mode==='purge'?'确认永久清理':'确认改派',exact:true});
+      await confirm.waitFor();
+      if (submitted) { await confirm.click(); await page.waitForFunction(()=>window.calls.length===1); }
+      await page.evaluate(({mode,change})=>window.render(change==='unmount'?'closed':mode,false,1),{mode,change});
+      if (change==='unmount') await page.getByText('closed',{exact:true}).waitFor();
+      else await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      if (submitted) {
+        await page.waitForFunction(()=>window.calls[0].signal.aborted);
+        await page.evaluate(()=>window.calls[0].resolve({invoiceId:1,message:'LATE-MAINTENANCE'}));
+        assert.doesNotMatch(await page.locator('body').innerText(),/LATE-MAINTENANCE/);
+      } else { await confirm.click(); assert.equal(await page.evaluate(()=>window.calls.length),0); }
+      assert.equal(await page.evaluate(()=>window.cache.getMutationCache().getAll().length),0);
+    });
+  }
   await scenario('users', async page => {
     await page.waitForFunction(() => window.user.selectedUserId === 1);
     await page.evaluate(() => window.navigate('/?userId=2'));

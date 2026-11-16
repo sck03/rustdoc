@@ -179,6 +179,18 @@ mod tests {
         evolution::reviewed_versioning(&mut baseline);
         evolution::reviewed_independent_declarations(&mut baseline);
         custom_oa::apply(&mut baseline);
+        file_storage::apply(&mut baseline);
+        // Reviewed retirement: access is the sole authorization definition.
+        // Keep every access rule, authentication flag, schema and error in the comparison.
+        for path in baseline["paths"].as_object_mut().unwrap().values_mut() {
+            for operation in path.as_object_mut().unwrap().values_mut() {
+                if let Some(policy) = operation["x-exportdoc-policy"].as_object_mut() {
+                    for key in ["permissions", "requirements", "permissionBypass"] {
+                        policy.remove(key);
+                    }
+                }
+            }
+        }
         // Apply resource metadata after the reviewed endpoint/body changes, so
         // newly added binary and multipart inputs receive the same admission rule.
         for path in baseline["paths"].as_object_mut().unwrap().values_mut() {
@@ -198,7 +210,6 @@ mod tests {
                 }
             }
         }
-        file_storage::apply(&mut baseline);
         // A delivery attempt key distinguishes HTTP retries from intentional resends;
         // the path parameter, body, authentication, errors and permissions stay frozen.
         baseline["paths"]["/api/reports/invoices/{invoiceId}/document-email"]["post"]["parameters"]

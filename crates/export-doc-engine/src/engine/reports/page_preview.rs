@@ -68,7 +68,6 @@ pub(super) fn response(
     body: &Value,
     mut metadata: Value,
 ) -> Result<Value> {
-    let _rendering = resources::acquire()?;
     let format = body["previewFormat"].as_str().unwrap_or("Svg");
     if format == "Svg" {
         metadata["html"] = json!(

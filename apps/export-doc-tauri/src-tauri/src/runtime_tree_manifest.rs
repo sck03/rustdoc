@@ -18,7 +18,6 @@ use crate::runtime_data_root_storage::reject_link_like_path;
 pub(crate) const COPY_TEMP_FILE: &str = ".exportdoc-data-root-migration-copy.tmp";
 pub(crate) const COMPLETION_FILE: &str = ".exportdoc-data-root-migration-complete";
 pub(crate) const INSTANCE_LOCK: &str = "Locks/native-instance.lock";
-const LEGACY_INSTANCE_LOCK: &str = "native-instance.lock";
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,7 +36,6 @@ pub(crate) struct TreeManifest {
 pub(crate) fn managed_marker(relative: &str) -> bool {
     [
         INSTANCE_LOCK,
-        LEGACY_INSTANCE_LOCK,
         DATA_ROOT_MIGRATION_PENDING_FILE,
         DATA_ROOT_MIGRATION_REDIRECT_FILE,
         COPY_TEMP_FILE,
