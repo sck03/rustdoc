@@ -78,7 +78,9 @@ mod access_scope;
 mod command_receipts;
 mod foundation;
 mod identity_runtime;
+mod permission_usage;
 mod permission_versions;
+pub use permission_usage::PermissionSchemeUsage;
 mod schema;
 mod workflow;
 mod workflow_decisions;
@@ -404,6 +406,7 @@ delegate! {
     access_restrictions(kind:&str,id:i64,resolved:bool)->Vec<Value>;
     save_access_restriction(kind:&str,id:i64,body:&Value)->Value;
     permission_scheme_versions(scheme:i64,offset:i64,limit:i64)->Value;
+    permission_scheme_usage(ids:&[i64])->std::collections::BTreeMap<i64,PermissionSchemeUsage>;
     permission_scheme_version(scheme:i64,version:i64)->Option<Value>;
     publish_permission_scheme(scheme:i64,body:&Value,actor:i64,time:&str)->i64;
     foundation_candidates(unit:i64,keyword:&str,date:&str,offset:i64,limit:i64)->Value;

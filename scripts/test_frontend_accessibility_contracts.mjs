@@ -67,7 +67,7 @@ inspectTypeScriptSources(files, (file, source) => {
 
   if (new Set([
     "features/invoices/hooks/useInvoiceEditorWorkspace.ts",
-    "features/payments/PaymentEditorPage.tsx",
+    "features/payments/usePaymentEditorWorkspace.ts",
     "features/master-data/MasterDataEditorPage.tsx",
     "features/single-window/AgentConsignmentPage.tsx",
     "features/single-window/CustomsCooPage.tsx",

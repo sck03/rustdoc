@@ -13,15 +13,15 @@ pub(in crate::engine) fn directory(
             crate::engine::request_values::find(query, "companyCode").unwrap_or(&actor.company);
         demand(&actor, code, "organization.roles")?;
         let unit = company(tx, code)?;
-        let items = store::matching(
+        let items = permission_templates::project_many_with_usage(
             tx,
-            "permission-templates",
-            &[("ownerUnitId", unit["id"].to_string())],
-            &[],
-        )?
-        .into_iter()
-        .map(|v| permission_templates::project_with_usage(tx, v))
-        .collect::<Result<Vec<_>>>()?;
+            store::matching(
+                tx,
+                "permission-templates",
+                &[("ownerUnitId", unit["id"].to_string())],
+                &[],
+            )?,
+        )?;
         Ok(json!({"items":items,"unitId":unit["id"]}))
     })
 }

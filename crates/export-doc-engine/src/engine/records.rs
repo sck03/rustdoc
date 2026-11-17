@@ -169,10 +169,10 @@ pub fn list(
         result["companies"] = json!(store.catalog("companies")?);
         result["departments"] = json!(super::organization::departments(store)?);
         let templates = store.read(|tx| {
-            store::matching(tx, "permission-templates", &[], &[])?
-                .into_iter()
-                .map(|value| super::permission_templates::project_with_usage(tx, value))
-                .collect::<Result<Vec<_>>>()
+            super::permission_templates::project_many_with_usage(
+                tx,
+                store::matching(tx, "permission-templates", &[], &[])?,
+            )
         })?;
         result["permissionTemplates"] = json!(
             templates
@@ -194,15 +194,14 @@ pub fn list(
         }
     }
     if resource.key == "permission-templates" {
-        result["templates"] = Value::Array(store.read(|tx| {
-            Ok(result["templates"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .cloned()
-                .map(|value| super::permission_templates::project_with_usage(tx, value))
-                .collect::<Result<Vec<_>>>()?)
-        })?);
+        let templates = result["templates"]
+            .take()
+            .as_array_mut()
+            .map(std::mem::take)
+            .unwrap_or_default();
+        result["templates"] = Value::Array(
+            store.read(|tx| super::permission_templates::project_many_with_usage(tx, templates))?,
+        );
         result["resources"] = contracts::contract()["permissions"]["resources"].clone();
         for resource in result["resources"].as_array_mut().into_iter().flatten() {
             for action in resource["actions"].as_array_mut().into_iter().flatten() {

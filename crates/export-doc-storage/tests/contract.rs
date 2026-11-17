@@ -27,6 +27,8 @@ mod office_query;
 mod organization_fixture;
 #[path = "support/organization_query.rs"]
 mod organization_query;
+#[path = "support/permission_usage.rs"]
+mod permission_usage;
 #[path = "support/personnel_query.rs"]
 mod personnel_query;
 #[cfg(feature = "postgres")]
@@ -154,6 +156,7 @@ fn single_window_versions(connection: &Connection) {
 }
 
 fn roundtrip(connection: &Connection) {
+    permission_usage::exercise(connection);
     file_accounting::exercise(connection);
     single_window_versions(connection);
     worklist_query::exercise(connection);

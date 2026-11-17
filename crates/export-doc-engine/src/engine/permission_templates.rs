@@ -1,5 +1,5 @@
 //! Permission template invariants and projections shared by both frontends.
-use super::store::{self, Connection};
+use super::store::Connection;
 use super::{
     error::{Result, conflict, invalid},
     records::{required, text},
@@ -9,34 +9,35 @@ use serde_json::{Value, json};
 pub(super) mod publications;
 
 pub(super) fn project_with_usage(tx: &Connection, value: Value) -> Result<Value> {
-    let mut value = project(value)?;
-    let id = value["id"]
-        .as_i64()
-        .ok_or_else(|| invalid("方案编号缺失。"))?
-        .to_string();
-    let count = |kind| -> Result<usize> {
-        Ok(store::matching(
-            tx,
-            kind,
-            &[("permissionTemplateId", id.clone())],
-            &[("permissionGrants", "permissionGrants")],
-        )?
+    project_many_with_usage(tx, vec![value])?
+        .pop()
+        .ok_or_else(|| invalid("方案编号缺失。"))
+}
+
+pub(super) fn project_many_with_usage(tx: &Connection, values: Vec<Value>) -> Result<Vec<Value>> {
+    let ids = values
         .iter()
-        .filter(|r| r["permissionGrants"].is_null())
-        .count())
-    };
-    value["accountReferenceCount"] = json!(count("users")?);
-    value["unitRoleReferenceCount"] = json!(count(super::units::KIND)?);
-    value["publishedVersion"] = tx.permission_scheme_versions(
-        id.parse().map_err(|_| invalid("方案编号无效。"))?,
-        0,
-        1,
-    )?["items"]
-        .as_array()
-        .and_then(|items| items.first())
-        .map(|row| row["version"].clone())
-        .unwrap_or(Value::Null);
-    Ok(value)
+        .map(|value| {
+            value["id"]
+                .as_i64()
+                .ok_or_else(|| invalid("方案编号缺失。"))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let usage = tx.permission_scheme_usage(&ids)?;
+    values
+        .into_iter()
+        .zip(ids)
+        .map(|(value, id)| {
+            let mut value = project(value)?;
+            let summary = usage
+                .get(&id)
+                .ok_or_else(|| super::error::unavailable("权限方案统计缺失。"))?;
+            value["accountReferenceCount"] = json!(summary.account_reference_count);
+            value["unitRoleReferenceCount"] = json!(summary.unit_role_reference_count);
+            value["publishedVersion"] = json!(summary.published_version);
+            Ok(value)
+        })
+        .collect()
 }
 
 pub(super) fn validate_owner(value: &Value, company: &Value) -> Result<()> {

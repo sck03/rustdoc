@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-17：`npm --prefix apps/export-doc-web run test:payment-query-lifecycle-ui` 使用真实 React 组件验证付款确认跨记录/客户端/权限/卸载、加载失败草稿隔离、重复提交、保存后刷新不占写锁，以及查询导出的筛选与生命周期边界；纳入统一 `editing` 回归组。权限引用统计在 Storage 共用合同中验证缺失/空授权、停用账号、不同发布版本、批量参数边界与解绑，SQLite 和 `test-native-postgres.ps1 -Scope Storage` 执行同一合同。
+
 2026-11-16：`test:audit-log-maintenance-model` 同时运行模型检查与 `test_audit_producer_lifecycle_ui.mjs`，覆盖当前审计实体选项、重复下载不缓存 Blob、卸载/客户端变化取消、生产企业保存期间切换及迟到确认。Storage 共用维护合同覆盖脱敏日志的现存发票号关联、改号/删除、编号投影与游标；`test-native-postgres.ps1 -Scope Storage` 在 PostgreSQL 18 执行同一合同。HTTP 单元回归占满阻塞线程池后丢弃真实路由请求，检查认证和备份授权仍持有并发名额。
 
 供应商按需查询、快照回收、下载/保存取消和联系人刷新回归由 `test_supplier_lifecycle_ui.mjs` 执行，纳入 `test:business-features-ui`。独立性能测量入口为 `measure_native_workloads.mjs` 和 `measure_report_designer.mjs`，需 Windows、Python 3、现有前端依赖与受管 Chromium；不加入普通提交门禁。原生测量先以相同仓库 `CARGO_HOME`/`CARGO_TARGET_DIR` 执行 `cargo build --locked --release --target x86_64-pc-windows-gnu -p export-doc-server --no-default-features --example office_review`，再运行 `node scripts/measure_native_workloads.mjs <含OCR资源的AppRoot>`；脚本创建独立 DataRoot，仅向本次隔离库写入匿名负载。`node scripts/measure_report_designer.mjs` 使用生产 React 构建与模拟 API。两者在其它构建/重型验收退出后分别运行，输出 `artifacts/*-measurement/<时间戳>/result.json`；RSS 是约 50 ms 间隔的进程树采样下界，浏览器另记 JS 堆、交互分位数和卸载回收。样本与实际边界见[本批记录](../docs/archive/2026-11/2026-11-16审计与编辑生命周期修复.md)。

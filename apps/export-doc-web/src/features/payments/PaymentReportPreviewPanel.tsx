@@ -28,8 +28,10 @@ export function PaymentReportPreviewPanel({ client, paymentId, paymentDraft, has
   const templates = usePaymentReportTemplates(client, hasSource && catalogPermission.allowed);
   const canPreview = previewPermission.allowed && templates.ready;
   const preview = usePaymentReportPreview(client, { paymentId, paymentDraft, templatePath: templates.selectedPath }, templates.revision, canPreview);
+  const saved = paymentId > 0 && !hasUnsavedDraftChanges;
   const output = usePaymentReportOutput(client, {
     paymentId, templatePath: templates.selectedPath, defaultExportDirectory: templates.defaultExportDirectory,
+    canPrint: printPermission.allowed, canExport: saved && pdfPermission.allowed && templates.ready,
     defaultFileName: buildReportPdfDefaultFileName({
       templatePath: templates.selectedPath,
       displayName: templates.views.find(item => item.templatePath === templates.selectedPath)?.displayName,
@@ -38,7 +40,6 @@ export function PaymentReportPreviewPanel({ client, paymentId, paymentDraft, has
     }),
   });
   const busy = templates.busy || preview.busy || output.busy;
-  const saved = paymentId > 0 && !hasUnsavedDraftChanges;
   function openTemplates() {
     const params = new URLSearchParams({ reportType: "PaymentVoucher" });
     if (paymentId > 0) params.set("paymentId", String(paymentId));

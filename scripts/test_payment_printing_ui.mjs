@@ -42,7 +42,8 @@ await withOfficeUi('payment-printing-ui', async ({ repo, output, url, invoke, op
   await page.getByRole('link', { name: '付款报销打印', exact: true }).waitFor();
   const navigation = await page.locator('#workspace-primary-navigation').textContent();
   assert(navigation.includes('付款报销') && navigation.includes('报表模板管理'));
-  assert(!navigation.includes('单证与申报') && !navigation.includes('发票管理'));
+  assert.equal(await page.locator('#workspace-primary-navigation a[href="#/invoices"]').count(), 0,
+    'Payment users cannot navigate to the invoice directory');
   await page.goto(`${url}/#/reports/templates/manage`);
   await page.locator('.template-select-field select').waitFor();
   assert.equal(await page.locator('option[value="ExportDocument"]').count(), 0);

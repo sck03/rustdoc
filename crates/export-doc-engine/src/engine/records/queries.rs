@@ -117,28 +117,32 @@ pub(super) fn rows(
                 ));
             }
         }
+        let query = GenericQuery {
+            kind: resource.key,
+            scope: auth::data_scope(actor, read_permission(resource), "view"),
+            filters: &filters,
+            keyword: &keyword,
+            search_root: (resource.key == "people").then_some("employee"),
+            fields: &fields,
+            offset,
+            limit: if paginated { size as i64 } else { 200 },
+        };
+        if paginated {
+            let (total, rows) = tx.query_generic(&query)?;
+            return Ok((rows, total as usize));
+        }
         let mut items = Vec::new();
+        let mut cursor = None;
         loop {
             crate::operation::check()?;
-            let (total, rows) = tx.query_generic(&GenericQuery {
-                kind: resource.key,
-                scope: auth::data_scope(actor, read_permission(resource), "view"),
-                filters: &filters,
-                keyword: &keyword,
-                search_root: (resource.key == "people").then_some("employee"),
-                fields: &fields,
-                offset: if paginated {
-                    offset
-                } else {
-                    items.len() as i64
-                },
-                limit: if paginated { size as i64 } else { 200 },
-            })?;
-            let empty = rows.is_empty();
+            let (next, rows) = tx.scan_generic(&query, cursor)?;
+            let complete = rows.len() < query.limit as usize;
             items.extend(rows);
-            if paginated || empty || items.len() as i64 >= total {
-                return Ok((items, total as usize));
+            if complete {
+                let total = items.len();
+                return Ok((items, total));
             }
+            cursor = next;
         }
     };
     let (rows, total) = store.read_for(actor, operation, query, load)?;

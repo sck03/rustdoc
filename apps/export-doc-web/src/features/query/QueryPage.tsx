@@ -2,15 +2,15 @@ import { Field, FilterBar } from "../../ui/primitives/Field.tsx";
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { FocusEvent, FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import "../../styles/audit-query.css";
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Download, FolderOpen, RefreshCw, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ApiCustomerDto, ApiExporterDto, ApiQueryInvoiceRowDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { useModulePermission } from "../../app/PermissionAccessContext.tsx";
 import { useWorkspaceDeviceMode } from "../../app/workspaceDevice.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
-import { isDesktopBridgeAvailable, selectSaveExcelPath } from "../../desktop/desktopBridge.ts";
-import { DesktopIconButton, readDesktopError, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
+import { isDesktopBridgeAvailable } from "../../desktop/desktopBridge.ts";
+import { DesktopIconButton, renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { readStoredJson, writeStoredJson } from "../../ui/browserStorage.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { isComposingKey } from "../../ui/keyboardEvent.ts";
@@ -19,11 +19,10 @@ import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { RemoteSelectField } from "../../ui/RemoteSelectField.tsx";
 import { InlineNotice } from "../../ui/PageState.tsx";
-import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { formatAmount, formatPlainNumber, readApiError } from "../../ui/formUtils.ts";
 import { ViewJobButton } from "../jobs/ViewJobButton.tsx";
 import { readDefaultExportDirectory } from "../settings/settingsPaths.ts";
-import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { useQueryExport } from "./useQueryExport.ts";
 import {
   createDefaultQueryFilters,
   normalizeQueryFilters,
@@ -44,15 +43,11 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
   const keywordInputRef = useRef<HTMLInputElement | null>(null);
   const isDesktop = isDesktopBridgeAvailable();
   const workspaceDeviceMode = useWorkspaceDeviceMode();
-  const runAbortableOperation = useAbortableOperation();
   const [initialViewState] = useState(() => loadQueryViewState(businessDate));
   const [filters, setFilters] = useState<QueryFilters>(() => initialViewState.filters);
   const [committedFilters, setCommittedFilters] = useState<QueryFilters>(() => initialViewState.filters);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(() => initialViewState.pageSize);
-  const [exportPath, setExportPath] = useState("");
-  const [actionMessage, setActionMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
-  const [lastCreatedJobId, setLastCreatedJobId] = useState<string | null>(null);
   const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false);
 
   const selectedCustomerId = Number(filters.customerId);
@@ -89,6 +84,9 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
   });
 
   useServerPageNumber(invoiceQuery, pageNumber, setPageNumber);
+  const { exportPath, setExportPath, actionMessage, setActionMessage, lastCreatedJobId,
+    canExport, isActionBusy, reset: resetExport, handleSelectExportPath, handleExport,
+  } = useQueryExport(client, committedFilters, queryPermission.canOperate, readDefaultExportDirectory(settingsQuery.data?.settings));
 
   useEffect(() => {
     saveQueryViewState(committedFilters, pageSize);
@@ -115,46 +113,10 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
     return () => window.removeEventListener("keydown", handlePageKeyDown);
   }, [invoiceQuery]);
 
-  const exportMutation = useMutation({
-    mutationFn: async () => runAbortableOperation(async (signal) => {
-      if (isDesktop) {
-        const job = await client.saveQueriedInvoicesToPath({
-          body: {
-            ...toApiQueryFilters(committedFilters),
-            destinationPath: exportPath.trim(),
-          },
-        }, { signal });
-        setLastCreatedJobId(job.jobId);
-        return { mode: "desktop" as const, job };
-      }
-
-      const job = await client.downloadQueriedInvoices({
-        body: toApiQueryFilters(committedFilters),
-      }, { signal });
-      setLastCreatedJobId(job.jobId);
-      await downloadJobResultWhenReady(client, job, buildQueryExportFileName(), { signal });
-      return { mode: "browser" as const, job };
-    }),
-    onSuccess: (result) => {
-      if (result.mode === "browser") {
-        setActionMessage({ kind: "success", text: "查询结果 Excel 已生成并交给浏览器下载。" });
-        return;
-      }
-
-      setActionMessage({
-        kind: "success",
-        text: "查询结果 Excel 已加入“文件任务”，完成后将保存到所选路径。",
-      });
-    },
-    onError: (error) => setActionMessage({ kind: "error", text: readApiError(error) }),
-  });
-
   const page = invoiceQuery.data ?? null;
   const rows = page?.items ?? [];
   const isBusy = invoiceQuery.isFetching;
-  const isActionBusy = exportMutation.isPending;
   const message = invoiceQuery.isError ? readApiError(invoiceQuery.error) : null;
-  const canExport = queryPermission.canOperate && (!isDesktop || Boolean(exportPath.trim())) && !isActionBusy;
   const advancedFilterCount = [
     filters.customerId !== "0",
     filters.exporterId !== "0",
@@ -163,7 +125,6 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
   ].filter(Boolean).length;
   const showAdvancedFilters = workspaceDeviceMode === "desktop" || isAdvancedFilterOpen;
 
-  const defaultExportDirectory = readDefaultExportDirectory(settingsQuery.data?.settings);
 
   function updateFilter(key: keyof QueryFilters, value: string) {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -171,8 +132,7 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
 
   function runSearch() {
     setCommittedFilters(normalizeQueryFilters(filters));
-    setActionMessage(null);
-    setLastCreatedJobId(null);
+    resetExport();
     setPageNumber(1);
   }
 
@@ -208,29 +168,6 @@ export function QueryPage({ businessDate, client }: { businessDate: string; clie
     setPageSize(normalizeQueryPageSize(value));
     setActionMessage(null);
     setPageNumber(1);
-  }
-
-  async function handleSelectExportPath() {
-    try {
-      const selected = await selectSaveExcelPath(buildQueryExportFileName(), defaultExportDirectory);
-      if (selected) {
-        setExportPath(selected);
-        setActionMessage(null);
-        setLastCreatedJobId(null);
-      }
-    } catch (error) {
-      setActionMessage({ kind: "error", text: readDesktopError(error) });
-    }
-  }
-
-  function handleExport() {
-    if (!canExport) {
-      return;
-    }
-
-    setActionMessage(null);
-    setLastCreatedJobId(null);
-    exportMutation.mutate();
   }
 
   return (
@@ -503,10 +440,4 @@ function saveQueryViewState(filters: QueryFilters, pageSize: number) {
     filters: normalizeQueryFilters(filters),
     pageSize: normalizeQueryPageSize(pageSize),
   });
-}
-
-function buildQueryExportFileName() {
-  const now = new Date();
-  const pad = (number: number) => String(number).padStart(2, "0");
-  return `QueryResults_${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.xlsx`;
 }

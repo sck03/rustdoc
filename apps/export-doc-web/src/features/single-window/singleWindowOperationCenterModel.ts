@@ -1,6 +1,4 @@
-import type { QueryClient } from "@tanstack/react-query";
 import type { ApiSingleWindowClientProfileDto,SingleWindowOperationCenterDetail } from "../../api/index.ts";
-import { queryKeys } from "../../api/queryKeys.ts";
 import { readStoredJsonObject,writeStoredJson } from "../../ui/browserStorage.ts";
 import { normalizeListPageSize } from "../../ui/listViewState.ts";
 
@@ -143,15 +141,6 @@ export function resolveBusinessClientDirectories(
 export function buildReceiptPackageFileName(detail: Pick<SingleWindowOperationCenterDetail, "batchId" | "batchReference" | "invoiceNo">) {
   const fileName = toSafeFileName(detail.batchReference || detail.invoiceNo || `batch-${detail.batchId}`);
   return `${fileName || "receipt-package"}.swpkg`;
-}
-
-export async function invalidateSingleWindowBatchQueries(
-  queryClient: QueryClient,
-) {
-  const queryKey = queryKeys.singleWindowOperationCenterRoot();
-  await queryClient.cancelQueries({ queryKey });
-  await queryClient.invalidateQueries({ queryKey, refetchType: "none" });
-  await queryClient.refetchQueries({ queryKey, type: "active" });
 }
 
 function toSafeFileName(value: string) {

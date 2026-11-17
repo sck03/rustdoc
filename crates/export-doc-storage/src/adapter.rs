@@ -51,6 +51,7 @@ pub(crate) trait Adapter: Send {
         access_restrictions(kind: &str, id: i64, resolved: bool) -> Vec<Value> => access_scope::list;
         save_access_restriction(kind: &str, id: i64, body: &Value) -> Value => access_scope::save;
         permission_scheme_versions(scheme: i64, offset: i64, limit: i64) -> Value => permission_versions::versions;
+        permission_scheme_usage(ids: &[i64]) -> std::collections::BTreeMap<i64,PermissionSchemeUsage> => permission_usage::summaries;
         permission_scheme_version(scheme: i64, version: i64) -> Option<Value> => permission_versions::publication;
         publish_permission_scheme(scheme: i64, body: &Value, actor: i64, time: &str) -> i64 => permission_versions::publish;
         foundation_candidates(unit: i64, keyword: &str, date: &str, offset: i64, limit: i64) -> Value => foundation::candidates;
