@@ -1,6 +1,7 @@
 import type {
   ReportDesignerReportType,
-  ReportDesignerSchema,
+  ReportBlock,
+  ReportSectionType,
 } from "./reportDesignerSchema.ts";
 import {
   createIssue,
@@ -27,88 +28,89 @@ export function getControlledReportImageFieldPaths(reportType: ReportDesignerRep
   return reportType === "ExportDocument" ? CONTROLLED_REPORT_IMAGE_FIELD_PATHS : [];
 }
 
-export function validateReportTypeFieldDomains(schema: ReportDesignerSchema, issues: ReportDesignerSchemaIssue[]) {
-  schema.sections.forEach((section, sectionIndex) => {
-    section.blocks.forEach((block, blockIndex) => {
-      const blockPath = `$.sections[${sectionIndex}].blocks[${blockIndex}]`;
-      if (section.type !== "Body" && (block.type === "DetailTable" || block.type === "PageBreak")) {
-        issues.push(createIssue("error", blockPath, block.type === "DetailTable"
-          ? "明细表只能放在主体版区。"
-          : "分页符只能放在主体版区，不能放入重复页眉或页脚。"));
-      }
+export function validateReportBlockFieldDomains(
+  block: ReportBlock,
+  reportType: ReportDesignerReportType,
+  sectionType: ReportSectionType,
+  blockPath: string,
+  issues: ReportDesignerSchemaIssue[],
+) {
+  if (sectionType !== "Body" && (block.type === "DetailTable" || block.type === "PageBreak")) {
+    issues.push(createIssue("error", blockPath, block.type === "DetailTable"
+      ? "明细表只能放在主体版区。"
+      : "分页符只能放在主体版区，不能放入重复页眉或页脚。"));
+  }
 
-      switch (block.type) {
-        case "Field":
-          validateReportTypeFieldPath(schema.reportType, block.fieldPath, `${blockPath}.fieldPath`, issues);
-          break;
-        case "Row":
-          block.columns.forEach((column, columnIndex) => {
-            if (column.contentKind === "Field") {
-              validateFixedReportFieldPath(schema.reportType, column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
-            }
-          });
-          break;
-        case "Grid":
-          block.rows.forEach((row, rowIndex) => {
-            row.cells.forEach((cell, cellIndex) => {
-              if (cell.contentKind === "Field" || cell.contentKind === "CheckboxGroup") {
-                validateFixedReportFieldPath(schema.reportType, cell.fieldPath, `${blockPath}.rows[${rowIndex}].cells[${cellIndex}].fieldPath`, issues);
-              }
-            });
-          });
-          break;
-        case "Conditional":
-          block.conditions.forEach((rule, index) => validateFixedReportFieldPath(schema.reportType, rule.fieldPath, `${blockPath}.conditions[${index}].fieldPath`, issues));
-          if (block.content.kind === "Field") {
-            validateFixedReportFieldPath(schema.reportType, block.content.fieldPath, `${blockPath}.content.fieldPath`, issues);
+  switch (block.type) {
+    case "Field":
+      validateReportTypeFieldPath(reportType, block.fieldPath, `${blockPath}.fieldPath`, issues);
+      break;
+    case "Row":
+      block.columns.forEach((column, columnIndex) => {
+        if (column.contentKind === "Field") {
+          validateFixedReportFieldPath(reportType, column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
+        }
+      });
+      break;
+    case "Grid":
+      block.rows.forEach((row, rowIndex) => {
+        row.cells.forEach((cell, cellIndex) => {
+          if (cell.contentKind === "Field" || cell.contentKind === "CheckboxGroup") {
+            validateFixedReportFieldPath(reportType, cell.fieldPath, `${blockPath}.rows[${rowIndex}].cells[${cellIndex}].fieldPath`, issues);
           }
-          break;
-        case "Image":
-          if (block.sourceKind === "Field") {
-            validateControlledReportImageFieldPath(schema.reportType, block.fieldPath, `${blockPath}.fieldPath`, issues);
-          }
-          break;
-        case "DetailTable":
-          if (schema.reportType === "PaymentVoucher") {
-            issues.push(createIssue("error", blockPath, "付款/报销模板不能使用出口单据明细表；请用多列行组合付款或费用表格。"));
-          }
-          if (block.grouping) {
-            validateReportTypeFieldPath(schema.reportType, block.grouping.fieldPath, `${blockPath}.grouping.fieldPath`, issues);
-            block.grouping.footer?.cells.forEach((cell, cellIndex) => {
-              if (cell.contentKind === "Sum") {
-                validateReportTypeFieldPath(schema.reportType, cell.fieldPath, `${blockPath}.grouping.footer.cells[${cellIndex}].fieldPath`, issues);
-                validateDetailTableItemFieldPath(cell.fieldPath, `${blockPath}.grouping.footer.cells[${cellIndex}].fieldPath`, issues);
-              }
-            });
-          }
-          block.columns.forEach((column, columnIndex) => {
-            validateReportTypeFieldPath(schema.reportType, column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
-            validateDetailTableItemFieldPath(column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
-            column.content?.forEach((part, partIndex) => {
-              if (part.condition) {
-                validateReportTypeFieldPath(schema.reportType, part.condition.fieldPath, `${blockPath}.columns[${columnIndex}].content[${partIndex}].condition.fieldPath`, issues);
-                if (isControlledReportImageFieldPath(part.condition.fieldPath)) issues.push(createIssue("error", blockPath, "条件字段请使用普通文字或数字字段。"));
-              }
-              if (part.kind === "Field") {
-                validateReportTypeFieldPath(schema.reportType, part.fieldPath, `${blockPath}.columns[${columnIndex}].content[${partIndex}].fieldPath`, issues);
-              }
-            });
-          });
-          (["summaryRow", "introRow"] as const).forEach(key => block[key]?.cells.forEach((cell, cellIndex) => {
-            if (cell.contentKind === "Field") {
-              validateFixedReportFieldPath(schema.reportType, cell.fieldPath, `${blockPath}.${key}.cells[${cellIndex}].fieldPath`, issues);
-            }
-          }));
-          if (block.sideBand?.contentKind === "Field") {
-            validateFixedReportFieldPath(schema.reportType, block.sideBand.fieldPath, `${blockPath}.sideBand.fieldPath`, issues);
-          }
-          break;
-        case "Text":
-        case "PageBreak":
-          break;
+        });
+      });
+      break;
+    case "Conditional":
+      block.conditions.forEach((rule, index) => validateFixedReportFieldPath(reportType, rule.fieldPath, `${blockPath}.conditions[${index}].fieldPath`, issues));
+      if (block.content.kind === "Field") {
+        validateFixedReportFieldPath(reportType, block.content.fieldPath, `${blockPath}.content.fieldPath`, issues);
       }
-    });
-  });
+      break;
+    case "Image":
+      if (block.sourceKind === "Field") {
+        validateControlledReportImageFieldPath(reportType, block.fieldPath, `${blockPath}.fieldPath`, issues);
+      }
+      break;
+    case "DetailTable":
+      if (reportType === "PaymentVoucher") {
+        issues.push(createIssue("error", blockPath, "付款/报销模板不能使用出口单据明细表；请用多列行组合付款或费用表格。"));
+      }
+      if (block.grouping) {
+        validateReportTypeFieldPath(reportType, block.grouping.fieldPath, `${blockPath}.grouping.fieldPath`, issues);
+        block.grouping.footer?.cells.forEach((cell, cellIndex) => {
+          if (cell.contentKind === "Sum") {
+            validateReportTypeFieldPath(reportType, cell.fieldPath, `${blockPath}.grouping.footer.cells[${cellIndex}].fieldPath`, issues);
+            validateDetailTableItemFieldPath(cell.fieldPath, `${blockPath}.grouping.footer.cells[${cellIndex}].fieldPath`, issues);
+          }
+        });
+      }
+      block.columns.forEach((column, columnIndex) => {
+        validateReportTypeFieldPath(reportType, column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
+        validateDetailTableItemFieldPath(column.fieldPath, `${blockPath}.columns[${columnIndex}].fieldPath`, issues);
+        column.content?.forEach((part, partIndex) => {
+          if (part.condition) {
+            validateReportTypeFieldPath(reportType, part.condition.fieldPath, `${blockPath}.columns[${columnIndex}].content[${partIndex}].condition.fieldPath`, issues);
+            if (isControlledReportImageFieldPath(part.condition.fieldPath)) issues.push(createIssue("error", blockPath, "条件字段请使用普通文字或数字字段。"));
+          }
+          if (part.kind === "Field") {
+            validateReportTypeFieldPath(reportType, part.fieldPath, `${blockPath}.columns[${columnIndex}].content[${partIndex}].fieldPath`, issues);
+          }
+        });
+      });
+      (["summaryRow", "introRow"] as const).forEach(key => block[key]?.cells.forEach((cell, cellIndex) => {
+        if (cell.contentKind === "Field") {
+          validateFixedReportFieldPath(reportType, cell.fieldPath, `${blockPath}.${key}.cells[${cellIndex}].fieldPath`, issues);
+        }
+      }));
+      if (block.sideBand?.contentKind === "Field") {
+        validateFixedReportFieldPath(reportType, block.sideBand.fieldPath, `${blockPath}.sideBand.fieldPath`, issues);
+      }
+      break;
+    case "Text":
+    case "PageBreak":
+      break;
+  }
 }
 
 /** Validate an image field against the server-materialized image contract. */

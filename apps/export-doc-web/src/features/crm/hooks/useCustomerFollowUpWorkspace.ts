@@ -1,19 +1,19 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouteQuery } from "../../../ui/useRouteQuery.ts";
 import { readRouteId } from "../../../ui/routeQueryState.ts";
 import { useDirectoryLocation } from "../../../ui/useDirectoryLocation.ts";
-import type { ApiCrmContactDto, ApiCrmCustomerDto, ApiCrmFollowUpDto, ExportDocManagerApiClient } from "../../../api/index.ts";
+import type { ApiCrmCustomerDto, ApiCrmFollowUpDto, ExportDocManagerApiClient } from "../../../api/index.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
 import { readApiError } from "../../../ui/formUtils.ts";
-import { errorFeedback, requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../../ui/OperationFeedback.tsx";
+import { errorFeedback, requestErrorFeedback, type OperationFeedbackState } from "../../../ui/OperationFeedback.tsx";
 import { usePermission } from "../../../app/PermissionAccessContext.tsx";
 import { permissionActions, permissionResources } from "../../../app/permissionCatalog.ts";
-import { useConfirmation } from "../../../ui/ConfirmationProvider.tsx";
 import { usePagedDirectoryQuery } from "../../../ui/usePagedDirectoryQuery.ts";
 import { useConfirmUnsavedChanges, useUnsavedChangesGuard } from "../../../ui/unsavedChangesGuard.tsx";
 import { isAbortError, useAbortableOperation } from "../../../ui/useAbortableOperation.ts";
-import { businessDateTimeLocalInputToIso } from "../../../ui/businessTime.ts";
+import { useFollowUpCommands } from "./useFollowUpCommands.ts";
+import { useCrmContactsPage } from "./useCrmContactsPage.ts";
 export type CustomerFollowUpPageProps = {
   businessTimeZone: string;
   client: ExportDocManagerApiClient;
@@ -50,21 +50,17 @@ export function useCustomerFollowUpWorkspace({ businessTimeZone, client }: Custo
   const canRestoreFollowUp = usePermission(permissionResources.crmFollowUps, permissionActions.restore).allowed;
   const canAssignFollowUp = usePermission(permissionResources.crmFollowUps, permissionActions.assign).allowed;
   const canDeleteFollowUp = usePermission(permissionResources.crmFollowUps, permissionActions.delete).allowed;
-  const requestConfirmation = useConfirmation();
   const queryClient = useQueryClient();
-  const runAbortableOperation = useAbortableOperation();
   const { params: searchParams, update: updateRoute } = useRouteQuery();
   const focusedFollowUpId = readRouteId(searchParams.get("followUpId")) ?? undefined;
   const [customers, setCustomers] = useState<ApiCrmCustomerDto[]>([]);
-  const [contacts, setContacts] = useState<ApiCrmContactDto[]>([]);
   const customerId = readRouteId(searchParams.get("customerId")) ?? 0;
-  const setCustomerId = (id: number) => updateRoute({ customerId: id || null });
+  const setCustomerId = (id: number) => updateRoute({ customerId: id || null, contactsPage: null });
   const [customerKeyword, setCustomerKeyword] = useState("");
   const includeCompleted = searchParams.get("completed") === "true";
   const setIncludeCompleted = (value: boolean) => updateRoute({ completed: value, followupPage: null });
   const { pageNumber: followUpPageNumber, setPageNumber: setFollowUpPageNumber, pageSize: followUpPageSize, setPageSize: setFollowUpPageSize } = useDirectoryLocation("followup");
   const [followUpRevision, setFollowUpRevision] = useState(0);
-  const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
   const editFollowUpId = readRouteId(searchParams.get("editFollowUpId"));
   const [editingRecord, setEditingRecord] = useState<ApiCrmFollowUpDto | null>(null);
@@ -72,15 +68,29 @@ export function useCustomerFollowUpWorkspace({ businessTimeZone, client }: Custo
   const setEditingFollowUp = (item: ApiCrmFollowUpDto | null) => { setEditingRecord(item); updateRoute({ editFollowUpId: item?.id }); };
   const transferMode = searchParams.get("followUpAction") === "transfer";
   const setTransferMode = (value: boolean) => updateRoute({ followUpAction: value ? "transfer" : null });
-  const [followUpContactId, setFollowUpContactId] = useState<number | "">("");
-  const [followUpDraftDirty, setFollowUpDraftDirty] = useState(false);
   const view = readCustomerView(searchParams.get("view") ?? (focusedFollowUpId || !canViewCustomers ? "followups" : null));
+  const readScope = useMemo(() => ({}), [client, view, customerId, canViewCustomers]);
+  const runAbortableOperation = useAbortableOperation(readScope, { cancelPrevious: true });
+  const contactsPage = useCrmContactsPage(client, customerId, canViewContacts && (view === "contacts" || view === "followup-editor"));
+  const { contacts, reloadContacts } = contactsPage;
+  const commands = useFollowUpCommands({
+    client, view, customerId, recordId: editFollowUpId, record: editingFollowUp, transfer: transferMode, timeZone: businessTimeZone,
+    permissions: { create: canCreateFollowUp, edit: canEditFollowUp, complete: canCompleteFollowUp, restore: canRestoreFollowUp, assign: canAssignFollowUp, delete: canDeleteFollowUp },
+    accept: setEditingFollowUp, feedback: setFeedback, refresh,
+    complete: () => {
+      commands.draft.reset();
+      setEditingRecord(null);
+      updateRoute({ view: searchParams.get("returnView") === "customer-followups" ? "customer-followups" : "followups", editFollowUpId: null, followUpAction: null, returnView: null }, false);
+    },
+  });
+  const { draft: followUpDraft } = commands;
+  const followUpContactId = optionalNumber(followUpDraft.values.crmContactId) ?? "";
+  const setFollowUpContactId = (id: number | "") => followUpDraft.change("crmContactId", String(id));
   const confirmDiscardChanges = useConfirmUnsavedChanges();
   useUnsavedChangesGuard({
-    isDirty: followUpDraftDirty,
+    isDirty: view === "followup-editor" && (followUpDraft.isDirty || transferMode && Boolean(editingFollowUp && customerId !== editingFollowUp.crmCustomerId)),
     message: "当前客户跟进有未保存的修改。",
   });
-  useEffect(() => setFollowUpDraftDirty(false), [view, editFollowUpId]);
 
   function applyView(nextView: CustomerTaskView) {
     const returnView = searchParams.get("returnView");
@@ -91,7 +101,7 @@ export function useCustomerFollowUpWorkspace({ businessTimeZone, client }: Custo
   async function changeView(nextView: CustomerTaskView) {
     if (nextView === view) return true;
     if (!await confirmDiscardChanges("切换客户工作区")) return false;
-    setFollowUpDraftDirty(false);
+    followUpDraft.reset();
     applyView(nextView);
     return true;
   }
@@ -127,7 +137,6 @@ export function useCustomerFollowUpWorkspace({ businessTimeZone, client }: Custo
       if (!item) throw new Error("跟进记录不存在或无权访问。");
       setEditingRecord(item);
       updateRoute({ customerId: item.crmCustomerId });
-      setFollowUpContactId(item.crmContactId ?? "");
     }).catch((error) => { if (!controller.signal.aborted) setFeedback(requestErrorFeedback(error)); });
     return () => controller.abort();
   }, [client, view, editFollowUpId, editingRecord?.id, canViewFollowUps, updateRoute]);
@@ -155,22 +164,6 @@ export function useCustomerFollowUpWorkspace({ businessTimeZone, client }: Custo
     }).catch((error) => { if (!controller.signal.aborted) setFeedback(requestErrorFeedback(error)); });
     return () => controller.abort();
   }, [client, customerId, canViewCustomers, selectedCustomer]);
-
-  useEffect(() => {
-    if (!customerId || !canViewContacts) {
-      setContacts([]);
-      return;
-    }
-    const controller = new AbortController();
-    setContacts([]);
-    void client.queryCrmContacts(
-      { customerId, pageNumber: 1, pageSize: 100 },
-      { signal: controller.signal },
-    ).then((page) => { if (!controller.signal.aborted) setContacts(page.items); }).catch((error: unknown) => {
-      if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error)));
-    });
-    return () => controller.abort();
-  }, [client, customerId, canViewContacts]);
 
   async function refresh() {
     setFollowUpRevision((value) => value + 1);
@@ -215,142 +208,6 @@ export function useCustomerFollowUpWorkspace({ businessTimeZone, client }: Custo
     }
   }
 
-  async function reloadContacts(preferred?: ApiCrmContactDto, signal?: AbortSignal) {
-    signal?.throwIfAborted();
-    if (!customerId) {
-      setContacts([]);
-      return;
-    }
-    if (preferred) setContacts(current => [preferred, ...current.filter(item => item.id !== preferred.id)]);
-    const load = async (requestSignal: AbortSignal) => {
-      const page = await client.queryCrmContacts({ customerId, pageNumber: 1, pageSize: 100 }, { signal: requestSignal });
-      requestSignal.throwIfAborted();
-      setContacts(preferred && !page.items.some(item => item.id === preferred.id) ? [preferred, ...page.items] : page.items.map(item => item.id === preferred?.id ? preferred : item));
-    };
-    await (signal ? load(signal) : runAbortableOperation(load));
-  }
-
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (editingFollowUp ? !canEditFollowUp : !canCreateFollowUp) return;
-    const formElement = event.currentTarget;
-    if (!customerId) {
-      setFeedback(warningFeedback("请先在客户目录中建立并选择销售客户。"));
-      return;
-    }
-
-    const form = new FormData(formElement);
-    setSaving(true);
-    setFeedback(null);
-    try {
-      const body = {
-          id: 0,
-          crmCustomerId: customerId,
-          crmContactId: optionalNumber(form.get("crmContactId")),
-          type: String(form.get("type") ?? "其他"),
-          summary: String(form.get("summary") ?? ""),
-          nextAction: String(form.get("nextAction") ?? ""),
-          nextFollowUpAt: businessDateTimeLocalInputToIso(form.get("nextFollowUpAt"), businessTimeZone),
-          expectedVersion: editingFollowUp?.versionNumber ?? 0,
-        };
-      await runAbortableOperation(async (signal) => {
-        if (editingFollowUp) {
-          await client.updateCrmFollowUp(
-            { id: editingFollowUp.id, body: { ...body, id: editingFollowUp.id, followedUpAt: editingFollowUp.followedUpAt } },
-            { signal },
-          );
-        } else {
-          await client.createCrmFollowUp({ body }, { signal });
-        }
-      });
-      formElement.reset();
-      setFollowUpContactId("");
-      setFollowUpDraftDirty(false);
-      setEditingFollowUp(null);
-      setTransferMode(false);
-      setFeedback(successFeedback(editingFollowUp ? "客户跟进已更新。" : "客户跟进已保存。"));
-      await refresh();
-      applyView("followups");
-    } catch (error) {
-      if (isAbortError(error)) return;
-      setFeedback(requestErrorFeedback(error));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function toggleCompleted(item: ApiCrmFollowUpDto) {
-    if (item.isCompleted ? !canRestoreFollowUp : !canCompleteFollowUp) return;
-    try {
-      await runAbortableOperation((signal) => item.isCompleted
-        ? client.restoreCrmFollowUp(
-          { id: item.id, body: { expectedVersion: item.versionNumber } },
-          { signal },
-        )
-        : client.completeCrmFollowUp(
-          { id: item.id, body: { expectedVersion: item.versionNumber } },
-          { signal },
-        ));
-      await refresh();
-      setFeedback(successFeedback(item.isCompleted ? "跟进记录已恢复为待跟进。" : "跟进记录已标记完成。"));
-    } catch (error) {
-      if (isAbortError(error)) return;
-      setFeedback(requestErrorFeedback(error));
-    }
-  }
-
-  async function transferFollowUp(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!editingFollowUp || !canAssignFollowUp || !selectedCustomer) return;
-    if (editingFollowUp.crmCustomerId === selectedCustomer.id) {
-      setFeedback(warningFeedback("请选择不同的目标客户。"));
-      return;
-    }
-    if (!await requestConfirmation({
-      title: "转移跟进记录",
-      description: `确定把“${editingFollowUp.customerName}”的跟进转移到“${selectedCustomer.name}”吗？此操作会写入安全审计。`,
-      confirmLabel: "确认转移",
-      tone: "warning",
-    })) return;
-
-    setSaving(true);
-    setFeedback(null);
-    try {
-      await runAbortableOperation((signal) => client.transferCrmFollowUp({
-        id: editingFollowUp.id,
-        body: {
-          crmCustomerId: selectedCustomer.id,
-          crmContactId: followUpContactId === "" ? null : followUpContactId,
-          expectedVersion: editingFollowUp.versionNumber,
-        },
-      }, { signal }));
-      setFollowUpDraftDirty(false);
-      setEditingFollowUp(null);
-      setTransferMode(false);
-      setFollowUpContactId("");
-      setFeedback(successFeedback("跟进记录已转移。"));
-      await refresh();
-      applyView("followups");
-    } catch (error) {
-      if (!isAbortError(error)) setFeedback(requestErrorFeedback(error));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function deleteFollowUp(item: ApiCrmFollowUpDto) {
-    if (!canDeleteFollowUp || !await requestConfirmation({ title: "删除跟进记录", description: `确定删除“${item.customerName}”的这条跟进记录吗？`, confirmLabel: "确认删除", tone: "danger" })) return;
-    try {
-      await runAbortableOperation((signal) => client.deleteCrmFollowUp(
-        { id: item.id, expectedVersion: item.versionNumber },
-        { signal },
-      ));
-      await refresh();
-      setFeedback(successFeedback("跟进记录已删除。"));
-    } catch (error) {
-      if (!isAbortError(error)) setFeedback(requestErrorFeedback(error));
-    }
-  }
   return {
     canViewCustomers, canViewFollowUps, canViewContacts, canCreateCustomer, canEditCustomer,
     canDeactivateCustomer, canDeleteCustomer, canImportCustomer, canExportCustomer, canCreateContact,
@@ -358,11 +215,11 @@ export function useCustomerFollowUpWorkspace({ businessTimeZone, client }: Custo
     canCompleteFollowUp, canRestoreFollowUp, canAssignFollowUp, canDeleteFollowUp, updateRoute,
     focusedFollowUpId, customers, setCustomers, contacts, customerId,
     setCustomerId, customerKeyword, setCustomerKeyword, includeCompleted, setIncludeCompleted,
-    followUpPageNumber, setFollowUpPageNumber, followUpPageSize, setFollowUpPageSize, saving,
+    followUpPageNumber, setFollowUpPageNumber, followUpPageSize, setFollowUpPageSize,
     feedback, setFeedback, editFollowUpId, editingFollowUp, setEditingFollowUp,
-    transferMode, setTransferMode, followUpContactId, setFollowUpContactId, setFollowUpDraftDirty,
+    transferMode, setTransferMode, followUpContactId, setFollowUpContactId, followUpDraft, contactsPage,
     view, changeView, returnToList, selectedCustomer, followUpQuery,
     followUpPage, rows, loading, reloadCustomers, searchCustomerOptions,
-    reloadContacts, handleCreate, toggleCompleted, transferFollowUp, deleteFollowUp,
+    reloadContacts, ...commands,
   };
 }

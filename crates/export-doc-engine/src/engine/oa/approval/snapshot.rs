@@ -3,7 +3,7 @@ use super::{ApprovalPlan, plan, resource};
 use crate::engine::{
     auth,
     error::Result,
-    oa::settings,
+    oa::read_context::ReadContext,
     records::text,
     store::{Actor, Connection},
     units,
@@ -17,6 +17,10 @@ pub(in crate::engine) struct ReviewSnapshot {
 }
 impl ReviewSnapshot {
     pub fn read(tx: &Connection, actor: &Actor, row: &Value) -> Result<Self> {
+        Self::read_with(&mut ReadContext::new(tx, actor), row)
+    }
+    pub(in crate::engine) fn read_with(context: &mut ReadContext<'_>, row: &Value) -> Result<Self> {
+        let (tx, actor) = (context.tx, context.actor);
         let mut snapshot = Self {
             plan: plan(row)?,
             assignments: vec![],
@@ -46,10 +50,8 @@ impl ReviewSnapshot {
         {
             return Ok(snapshot);
         }
-        let signer = match crate::engine::oa::qualification::person_id(tx, actor) {
-            Ok(id) => id,
-            Err(cause) if cause.status == Some(403) => return Ok(snapshot),
-            Err(cause) => return Err(cause),
+        let Some(signer) = context.signer()? else {
+            return Ok(snapshot);
         };
         if row["employeeId"] == signer {
             return Ok(snapshot);
@@ -82,9 +84,9 @@ impl ReviewSnapshot {
             step.approver_user_id != actor.id || step.approver_context != actor.context
         });
         let delegations = if needs_delegations {
-            settings::principals(tx, actor)?
+            context.delegations()?
         } else {
-            vec![]
+            &[]
         };
         let mut principals: HashMap<(i64, String, String), Option<i64>> = HashMap::new();
         for index in eligible {
@@ -113,7 +115,7 @@ impl ReviewSnapshot {
                     .push((step.task_key.clone(), actor.id, String::new()));
                 continue;
             }
-            for (principal, delegation) in &delegations {
+            for (principal, delegation) in delegations {
                 if *principal != step.approver_user_id {
                     continue;
                 }

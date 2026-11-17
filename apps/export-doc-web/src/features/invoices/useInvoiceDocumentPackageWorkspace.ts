@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   ApiReportTemplateDto,
   ApiSettingsResponse,
@@ -7,10 +6,8 @@ import type {
 } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { selectDirectory, selectSaveZipPath } from "../../desktop/desktopBridge.ts";
-import { readDesktopError } from "../../ui/DesktopPathActions.tsx";
 import { downloadJobResultWhenReady } from "../../ui/downloadJobResult.ts";
 import { readApiError } from "../../ui/formUtils.ts";
-import { useAbortableOperation } from "../../ui/useAbortableOperation.ts";
 import { useTransientPreview } from "../../ui/useTransientPreview.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
@@ -37,6 +34,8 @@ type Options = {
   sourceRevision?: unknown;
   catalogRevision?: number;
   previewAllowed: boolean;
+  exportAllowed: boolean;
+  emailAllowed: boolean;
   invoiceNo?: string;
   customerName?: string;
   defaultToAddress?: string;
@@ -62,8 +61,6 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
     feedback,
     onPreviewGenerated,
   } = options;
-  const queryClient = useQueryClient();
-  const runAbortableOperation = useAbortableOperation();
   const [destinationPath, setDestinationPath] = useState("");
   const [createZip, setCreateZip] = useState(true);
   const [createZipTouched, setCreateZipTouched] = useState(false);
@@ -149,8 +146,19 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
       onPreviewGenerated();
       feedback.clear();
     });
-  const packageMutation = useMutation({
-    mutationFn: async () => runAbortableOperation(async (signal) => {
+  const exportScope = useMemo(() => ({}), [previewScope, options.exportAllowed, createZip, includeMergedPdf, desktopAvailable]);
+  const packageMutation = useScopedMutation(`invoice-package:${invoiceId}`, exportScope, {
+    mutationFn: async (mode: "pick" | "generate", signal, { checkCurrent }) => {
+      if (!options.exportAllowed || !selectedItems.length || selectedItems.length > 20) return null;
+      feedback.clear();
+      if (mode === "pick") {
+        const selected = createZip
+          ? await selectSaveZipPath(defaultFileName, defaultExportDirectory)
+          : await selectDirectory(defaultExportDirectory);
+        checkCurrent();
+        if (selected) setDestinationPath(selected);
+        return null;
+      }
       const job = desktopAvailable
         ? await client.startInvoiceDocumentPackageSaveToPathJob({
             invoiceId,
@@ -160,29 +168,33 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
             invoiceId,
             body: { items: selectedItems, includeMergedPdf, createZip: true, destinationPath: "" },
           }, { signal });
+      checkCurrent();
       if (!desktopAvailable) {
         const downloadName = defaultFileName.toLowerCase().endsWith(".zip") ? defaultFileName : `${defaultFileName}.zip`;
         await downloadJobResultWhenReady(client, job, downloadName, { signal });
       }
       return job;
-    }),
-    onSuccess: async (job) => {
+    },
+    onSuccess: (job) => {
+      if (!job) return;
       feedback.showJob(
         desktopAvailable
           ? `已创建${createZip ? "单据包 ZIP" : "单据文件夹导出"}任务：${job.jobId}`
           : "单据包 ZIP 已交给浏览器下载。",
         job.jobId,
       );
-      await queryClient.invalidateQueries({ queryKey: queryKeys.jobsRoot() });
     },
+    refreshKeys: job => job ? [queryKeys.jobsRoot()] : [],
     onError: (error) => feedback.showError(readApiError(error)),
   });
   const emailScope = useMemo(() => ({}), [client, invoiceId, options.sourceRevision, selectionKey,
-    emailIncludeMergedPdf, emailToAddress, emailSubject, emailBody]);
+    options.emailAllowed, options.catalogRevision, templates, emailIncludeMergedPdf, emailToAddress, emailSubject, emailBody]);
   const deliveryAttempt = useRef({ scope: emailScope, id: createRequestKey() });
   if (deliveryAttempt.current.scope !== emailScope) deliveryAttempt.current = { scope: emailScope, id: createRequestKey() };
   const emailMutation = useScopedMutation(`invoice-email:${invoiceId}`, emailScope, {
-    mutationFn: (_: void, signal) => client.startInvoiceDocumentEmailJob({
+    mutationFn: async (_: void, signal) => {
+      if (!options.emailAllowed || !selectedItems.length || selectedItems.length > 20) return null;
+      return client.startInvoiceDocumentEmailJob({
       invoiceId,
       "Idempotency-Key": deliveryAttempt.current.id,
       body: {
@@ -192,32 +204,20 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
         subject: emailSubject.trim(),
         body: emailBody,
       },
-    }, { signal }),
+    }, { signal });
+    },
     onSuccess: (job) => {
+      if (!job) return;
       deliveryAttempt.current.id = createRequestKey();
       feedback.showJob(`已创建单据邮件任务：${job.jobId}`, job.jobId);
     },
-    refreshKeys: () => [queryKeys.jobsRoot()],
+    refreshKeys: job => job ? [queryKeys.jobsRoot()] : [],
     onError: (error) => feedback.showError(readApiError(error)),
   });
   function clearGeneratedOutput() {
     packagePreview.clear();
     feedback.clear();
   }
-  async function pickDestination() {
-    try {
-      const selected = createZip
-        ? await selectSaveZipPath(defaultFileName, defaultExportDirectory)
-        : await selectDirectory(defaultExportDirectory);
-      if (selected) {
-        setDestinationPath(selected);
-        feedback.clear();
-      }
-    } catch (error) {
-      feedback.showError(readDesktopError(error));
-    }
-  }
-
   return {
     preview: packagePreview.preview,
     destinationPath,
@@ -248,8 +248,8 @@ export function useInvoiceDocumentPackageWorkspace(options: Options) {
       clearGeneratedOutput();
     },
     previewPackage: () => { if (options.previewAllowed) void packagePreview.generate(); },
-    generatePackage: () => packageMutation.mutate(),
-    pickDestination,
+    generatePackage: () => packageMutation.mutate("generate"),
+    pickDestination: () => packageMutation.mutateAsync("pick"),
     changeDestination(value: string) {
       setDestinationPath(value);
       clearGeneratedOutput();

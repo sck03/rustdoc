@@ -144,6 +144,16 @@ pub(in crate::engine) fn can_handle(
     row: &Value,
     resource: &str,
 ) -> Result<bool> {
+    can_handle_using(actor, row, resource, || {
+        Ok(assigned(&keys(tx, actor, resource)?, row))
+    })
+}
+pub(in crate::engine) fn can_handle_using(
+    actor: &Actor,
+    row: &Value,
+    resource: &str,
+    assigned: impl FnOnce() -> Result<bool>,
+) -> Result<bool> {
     if row["companyScope"] != actor.company {
         return Ok(false);
     }
@@ -156,7 +166,7 @@ pub(in crate::engine) fn can_handle(
     if text(row, "handlingKey").is_empty() {
         return Ok(auth::visible(actor, resource, action, row));
     }
-    Ok(assigned(&keys(tx, actor, resource)?, row))
+    assigned()
 }
 pub(in crate::engine) fn resource_access(
     tx: &Connection,

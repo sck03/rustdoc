@@ -12,7 +12,7 @@ pub(super) fn append_groups(
     groups: &mut Vec<Group>,
 ) -> Result<()> {
     let workflow_date = crate::engine::units::today(tx)?;
-    let mut authority = None;
+    let mut context = oa::read_context::ReadContext::new(tx, actor);
     for (kind, name) in [
         ("oa-personnel", "人员变动审批"),
         ("oa-leave", "请假审批与销假"),
@@ -31,12 +31,9 @@ pub(super) fn append_groups(
             groups.push(group);
             continue;
         }
-        if authority.is_none() {
-            authority = Some(oa::queue_authority::QueueAuthority::new(tx, actor)?);
-        }
-        let principals = authority.as_ref().unwrap().approvers(resource);
+        let principals = context.authority()?.approvers(resource);
         let keys = if kind == "oa-general" {
-            handling::keys(tx, actor, "office.general")?
+            context.handling_keys("office.general")?.to_vec()
         } else {
             vec![]
         };
@@ -68,20 +65,20 @@ pub(super) fn append_groups(
             )?;
             let count = rows.len() as i64;
             for row in rows {
-                let mut access = oa::Visibility::new(tx, actor, resource, &row);
+                let mut access = oa::Visibility::new(&mut context, resource, &row);
                 if !access.viewable()? {
                     continue;
                 }
                 let own = row["ownerUserId"] == actor.id;
                 let status = text(&row, "status");
-                let review = (status == "Pending").then(|| access.review()).transpose()?;
                 let complete = if status != "Approved" {
                     false
                 } else if kind == "oa-general" {
-                    handling::can_handle(tx, actor, &row, "office.general")?
+                    access.can_handle()?
                 } else {
                     auth::visible(actor, resource, "complete", &row)
                 };
+                let review = (status == "Pending").then(|| access.review()).transpose()?;
                 let label = match status.as_str() {
                     "Draft" | "Returned" if own && auth::visible(actor, resource, "edit", &row) => {
                         "待修改／提交"

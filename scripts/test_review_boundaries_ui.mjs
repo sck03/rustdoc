@@ -42,9 +42,9 @@ getSharedDatabaseOwnershipSummary:async()=>({owners:[{userId:1,username:'管理�
 transferSharedDatabaseOwnership:(r,i)=>deferred('transfer',r,i)};
 const otherMaintenanceClient={...maintenanceClient};
 const documentClient={...accountClient,startInvoiceDocumentEmailJob:(r,i)=>deferred('document-email',r,i)};
-const emptyTemplates=[];
+const emailTemplates=[{templatePath:'builtin:invoice_template.dtpl',displayName:'发票',withSealDefault:true}];
 function Accounts({session}){window.navigate=useNavigate();window.user=useUserManagement(session?nextClient:accountClient,true);return <div>{window.user.message}<input aria-label="Account" value={window.user.draft.username} onChange={e=>window.user.patchDraft('username',e.target.value)}/></div>;}
-function DocumentEmail(){window.package=useInvoiceDocumentPackageWorkspace({client:documentClient,invoiceId:7,previewAllowed:true,templates:emptyTemplates,desktopAvailable:false,defaultExportDirectory:'',feedback:{clear(){},showError(){},showJob(){},showStatus(){}},onPreviewGenerated(){}});return <div>document email</div>;}
+function DocumentEmail(){window.package=useInvoiceDocumentPackageWorkspace({client:documentClient,invoiceId:7,previewAllowed:true,exportAllowed:true,emailAllowed:true,templates:emailTemplates,desktopAvailable:false,defaultExportDirectory:'',feedback:{clear(){},showError(){},showJob(){},showStatus(){}},onPreviewGenerated(){}});return <div>document email</div>;}
 const client={analyzeInvoiceProfit:(r,i)=>deferred('profit',r,i),stageRecoveryArchiveRestore:(r,i)=>deferred('restore',r,i),sendEmail:(r,i)=>deferred('send',r,i),
 getEmailToolStatus:async()=>({isConfigured:true,fromAddress:'review@example.invalid',fromDisplayName:'测试发件人',smtpHost:'example.invalid',smtpPort:465,enableSsl:true}),
 listInvoiceStatusHistory:async request=>{window.historyCalls.push(request);return {items:[{id:request.beforeId?1:2,invoiceId:7,fromStatus:'Draft',toStatus:'Verified',note:request.beforeId?'早期原因':'最近原因',changedByUsername:'历史操作人',changedAt:'2026-11-15T00:00:00Z'}],nextCursor:request.beforeId?null:2};}};

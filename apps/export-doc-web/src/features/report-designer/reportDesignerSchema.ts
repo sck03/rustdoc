@@ -2,40 +2,7 @@ import type { ReportConditionalRule, ReportConditionMatch } from "./reportDesign
 export type { ReportConditionalRule } from "./reportDesignerConditions.ts";
 
 export type ReportDesignerReportType = "ExportDocument" | "PaymentVoucher" | "OaApproval";
-
-export type ReportDesignerSchema = {
-  version: 2;
-  reportType: ReportDesignerReportType;
-  page: ReportPageSettings;
-  sections: ReportSection[];
-};
-
-export type ReportPageSettings = {
-  size: "A4" | "A5" | "Letter" | "Custom";
-  orientation: "Portrait" | "Landscape";
-  widthMm?: number;
-  heightMm?: number;
-  marginTopMm: number;
-  marginRightMm: number;
-  marginBottomMm: number;
-  marginLeftMm: number;
-  fontFamily: string;
-  fontSizePt: number;
-};
-
-export type ReportSection = {
-  id: string;
-  type: "Header" | "Body" | "Footer";
-  print: ReportSectionPrintSettings;
-  blocks: ReportBlock[];
-};
-
-export type ReportSectionPrintSettings = {
-  repeatOnEveryPage: boolean;
-  keepTogether: boolean;
-  pinToPageBottom?: boolean;
-  minHeightMm?: number;
-};
+export type ReportSectionType = "Header" | "Body" | "Footer";
 
 export type ReportBlockOutputSettings = {
   enabled: boolean;

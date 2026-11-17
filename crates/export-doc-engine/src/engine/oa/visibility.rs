@@ -2,23 +2,24 @@
 use super::{FINANCE_STATUSES, approval, auth, fulfillment, handling, text};
 use crate::engine::{
     error::Result,
-    personnel_accounts,
     store::{Actor, Connection},
 };
 use serde_json::Value;
 
-pub(in crate::engine) struct Visibility<'a> {
-    tx: &'a Connection<'a>,
-    actor: &'a Actor,
+pub(in crate::engine) struct Visibility<'a, 'db> {
+    context: &'a mut super::read_context::ReadContext<'db>,
     resource: &'a str,
     row: &'a Value,
     review: Option<approval::ReviewSnapshot>,
 }
-impl<'a> Visibility<'a> {
-    pub fn new(tx: &'a Connection, actor: &'a Actor, resource: &'a str, row: &'a Value) -> Self {
+impl<'a, 'db> Visibility<'a, 'db> {
+    pub fn new(
+        context: &'a mut super::read_context::ReadContext<'db>,
+        resource: &'a str,
+        row: &'a Value,
+    ) -> Self {
         Self {
-            tx,
-            actor,
+            context,
             resource,
             row,
             review: None,
@@ -26,35 +27,36 @@ impl<'a> Visibility<'a> {
     }
     pub fn review(&mut self) -> Result<&approval::ReviewSnapshot> {
         if self.review.is_none() {
-            self.review = Some(approval::ReviewSnapshot::read(
-                self.tx, self.actor, self.row,
-            )?);
+            self.review = Some(approval::ReviewSnapshot::read_with(self.context, self.row)?);
         }
         Ok(self.review.as_ref().expect("initialized approval snapshot"))
     }
+    pub fn can_handle(&mut self) -> Result<bool> {
+        self.context.can_handle(self.resource, self.row)
+    }
     fn permitted(&self) -> bool {
-        self.row["companyScope"] == self.actor.company
-            && auth::authorize(self.actor, self.resource, "view").is_ok()
-            && auth::restriction_allows(self.actor, self.resource, "view", self.row, true)
+        self.row["companyScope"] == self.context.actor.company
+            && auth::authorize(self.context.actor, self.resource, "view").is_ok()
+            && auth::restriction_allows(self.context.actor, self.resource, "view", self.row, true)
     }
     pub fn viewable(&mut self) -> Result<bool> {
         if matches!(self.resource, "office.rooms" | "office.supplies") {
             return handling::resource_access(
-                self.tx,
-                self.actor,
+                self.context.tx,
+                self.context.actor,
                 self.resource,
                 "view",
                 self.row,
                 false,
             );
         }
-        if self.actor.oa_assigned_only {
+        if self.context.actor.oa_assigned_only {
             return Ok(self.permitted() && self.assigned()?);
         }
         self.scope_viewable()
     }
     fn scope_viewable(&mut self) -> Result<bool> {
-        let (tx, actor, resource, row) = (self.tx, self.actor, self.resource, self.row);
+        let (actor, resource, row) = (self.context.actor, self.resource, self.row);
         Ok(self.permitted()
             && (auth::visible(actor, resource, "view", row)
                 || (resource == "office.expenses"
@@ -62,37 +64,46 @@ impl<'a> Visibility<'a> {
                     && auth::visible(actor, resource, "complete", row))
                 || (resource == "office.general"
                     && handling::GENERAL_STATES.contains(&text(row, "status").as_str())
-                    && handling::can_handle(tx, actor, row, resource)?)
+                    && self.context.can_handle(resource, row)?)
                 || self.assigned()?))
     }
     fn assigned(&mut self) -> Result<bool> {
-        let (tx, actor, resource, row) = (self.tx, self.actor, self.resource, self.row);
+        let (tx, actor, resource, row) =
+            (self.context.tx, self.context.actor, self.resource, self.row);
         if row["ownerUserId"] == actor.id || !self.review()?.task_keys().is_empty() {
             return Ok(true);
         }
-        let principals = approval::object_approvers(tx, actor, resource, row)?;
-        let people = personnel_accounts::links(
-            tx,
-            &principals.iter().map(|p| p.user_id).collect::<Vec<_>>(),
-        )?;
-        let actor_person =
-            personnel_accounts::person_for_account(tx, actor.id)?.and_then(|p| p["id"].as_i64());
-        if self.review()?.plan.as_ref().is_some_and(|plan| {
-            plan.notify_user_ids.contains(&actor.id)
-                || plan.steps.iter().any(|step| {
-                    (step.acted_by_user_id == Some(actor.id)
-                        && step.acted_by_context == actor.context
-                        && step.acted_by_person_id == actor_person)
-                        || principals.iter().any(|principal| {
-                            principal.user_id == step.approver_user_id
-                                && principal.context == step.approver_context
-                                && people
-                                    .get(&principal.user_id)
-                                    .and_then(|p| p["id"].as_i64())
-                                    == step.approver_person_id
-                        })
-                })
-        }) {
+        let principals = self.context.authority()?.approvers_for(resource, row);
+        let users = std::iter::once(actor.id)
+            .chain(principals.iter().map(|p| p.user_id))
+            .collect::<Vec<_>>();
+        let people = self.context.people(&users)?;
+        let actor_person = people
+            .get(&actor.id)
+            .and_then(Option::as_ref)
+            .and_then(|p| p["id"].as_i64());
+        if self
+            .review
+            .as_ref()
+            .and_then(|review| review.plan.as_ref())
+            .is_some_and(|plan| {
+                plan.notify_user_ids.contains(&actor.id)
+                    || plan.steps.iter().any(|step| {
+                        (step.acted_by_user_id == Some(actor.id)
+                            && step.acted_by_context == actor.context
+                            && step.acted_by_person_id == actor_person)
+                            || principals.iter().any(|principal| {
+                                principal.user_id == step.approver_user_id
+                                    && principal.context == step.approver_context
+                                    && people
+                                        .get(&principal.user_id)
+                                        .and_then(Option::as_ref)
+                                        .and_then(|p| p["id"].as_i64())
+                                        == step.approver_person_id
+                            })
+                    })
+            })
+        {
             return Ok(true);
         }
         if fulfillment::assigned(tx, actor, row)? {
@@ -106,7 +117,7 @@ impl<'a> Visibility<'a> {
                     row["status"].as_str(),
                     Some("Approved" | "InUse" | "Completed" | "Issued" | "Returned")
                 ))
-            && handling::can_handle(tx, actor, row, resource)?)
+            && self.context.can_handle(resource, row)?)
     }
 }
 pub(in crate::engine) fn viewable(
@@ -115,7 +126,12 @@ pub(in crate::engine) fn viewable(
     resource: &str,
     row: &Value,
 ) -> Result<bool> {
-    Visibility::new(tx, actor, resource, row).viewable()
+    Visibility::new(
+        &mut super::read_context::ReadContext::new(tx, actor),
+        resource,
+        row,
+    )
+    .viewable()
 }
 pub(in crate::engine) fn assigned_to(
     tx: &Connection,
@@ -123,5 +139,10 @@ pub(in crate::engine) fn assigned_to(
     resource: &str,
     row: &Value,
 ) -> Result<bool> {
-    Visibility::new(tx, actor, resource, row).assigned()
+    Visibility::new(
+        &mut super::read_context::ReadContext::new(tx, actor),
+        resource,
+        row,
+    )
+    .assigned()
 }

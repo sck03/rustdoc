@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-17",
-  "reviewNotes": "2026-11-17 against c3639787: snapshot-bound PDF, scoped type/permission commands, searchable summary pages, row-bound approval reuse, bounded indexed purge, extracted persistence preparation. Shared SQLite/PostgreSQL regressions, opt-in query/lock/memory baseline comparison and real Tauri packing/PDF verification. Advance only this batch physical deltas; preserve existing drift, file caps and growth allowances. Evidence: docs/archive/2026-11/2026-11-17装柜一致性与关联查询优化.md.",
+  "reviewNotes": "2026-11-17 against 8b4139d8: CRM draft merging and paged contacts, scoped invoice exports, bounded attachment copying with pre-publication authorization, platform root containment, transaction-local OA identity reuse, direct V3 block domain validation. Removed synthetic V2 wrapper types and duplicate mutation flows. Advance only measured batch deltas, including behavioral regressions; keep per-file caps and growth allowances. Evidence: docs/archive/2026-11/2026-11-17客户跟进与输出稳定性修复.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -10,9 +10,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 88528,
+      "baselineAggregateLines": 88334,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 88728,
+      "maximumAggregateLines": 88534,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 112921,
+      "baselineAggregateLines": 113195,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 112996,
+      "maximumAggregateLines": 113270,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 33529,
+      "baselineAggregateLines": 33548,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 33649,
+      "maximumAggregateLines": 33668,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 29882,
+      "baselineAggregateLines": 30006,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 30032,
+      "maximumAggregateLines": 30156,
       "reportFiles": false
     },
     {

@@ -110,16 +110,35 @@ fn exercise(postgres: bool) {
         service
             .store
             .read(|tx| {
+                let mut context = oa::read_context::ReadContext::new(tx, &reviewer);
+                let mut first_cost = None;
                 for _ in 0..100 {
+                    let before_row = service.store.metrics()["operations"]["completed"]
+                        .as_u64()
+                        .unwrap();
                     let keys = if mode == "baseline" {
                         assert!(oa::viewable(tx, &reviewer, "office.general", &row)?);
                         oa::approval::ReviewSnapshot::read(tx, &reviewer, &row)?.task_keys()
                     } else {
-                        let mut access = oa::Visibility::new(tx, &reviewer, "office.general", &row);
+                        let mut access = oa::Visibility::new(&mut context, "office.general", &row);
                         assert!(access.viewable()?);
                         access.review()?.task_keys()
                     };
                     assert_eq!(keys.len(), 1);
+                    let cost = service.store.metrics()["operations"]["completed"]
+                        .as_u64()
+                        .unwrap()
+                        - before_row;
+                    if mode == "current" {
+                        if let Some(first) = first_cost {
+                            assert!(
+                                cost < first,
+                                "shared identities must remove repeated reads: {cost} >= {first}"
+                            );
+                        } else {
+                            first_cost = Some(cost);
+                        }
+                    }
                 }
                 Ok(())
             })

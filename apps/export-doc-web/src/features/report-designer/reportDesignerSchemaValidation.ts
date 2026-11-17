@@ -1,19 +1,16 @@
-import { portableReportSansFontFamily } from "../../app/typographyPolicy.ts";
 import type {
   ReportBlock,
   ReportConditionalContent,
   ReportDesignerReportType,
-  ReportDesignerSchema,
   ReportGridBlock,
   ReportGridCell,
   ReportGridColumn,
   ReportGridRow,
   ReportImageBlock,
   ReportRowColumn,
-  ReportSection,
-  ReportSectionPrintSettings,
+  ReportSectionType,
 } from "./reportDesignerSchema.ts";
-import { validateReportTypeFieldDomains } from "./reportDesignerSchemaDomains.ts";
+import { validateReportBlockFieldDomains } from "./reportDesignerSchemaDomains.ts";
 import { normalizeDetailTableBlock } from "./reportDesignerSchemaDetailTable.ts";
 import { normalizeBlockOutputSettings } from "./reportDesignerSchemaBlockSettings.ts";
 import { normalizeConditions } from "./reportDesignerConditions.ts";
@@ -50,7 +47,7 @@ export type { ReportDesignerSchemaIssue } from "./reportDesignerSchemaValues.ts"
 
 export type EmbeddedReportDesignerBlockValidationOptions = {
   reportType: ReportDesignerReportType;
-  sectionType: ReportSection["type"];
+  sectionType: ReportSectionType;
   path: string;
   blockIds?: Set<string>;
 };
@@ -75,55 +72,8 @@ export function normalizeEmbeddedReportDesignerBlock(
     return { block: null, issues };
   }
 
-  const domainIssues: ReportDesignerSchemaIssue[] = [];
-  const syntheticSchema: ReportDesignerSchema = {
-    version: 2,
-    reportType: options.reportType,
-    page: {
-      size: "A4",
-      orientation: "Portrait",
-      marginTopMm: 0,
-      marginRightMm: 0,
-      marginBottomMm: 0,
-      marginLeftMm: 0,
-      fontFamily: portableReportSansFontFamily,
-      fontSizePt: 10,
-    },
-    sections: [{
-      id: "embedded-section",
-      type: options.sectionType,
-      print: createSectionPrintDefaults(options.sectionType),
-      blocks: [block],
-    }],
-  };
-  validateReportTypeFieldDomains(syntheticSchema, domainIssues);
-  const syntheticPrefix = "$.sections[0].blocks[0]";
-  issues.push(...domainIssues.map((issue) => ({
-    ...issue,
-    path: issue.path === syntheticPrefix
-      ? options.path
-      : issue.path.startsWith(`${syntheticPrefix}.`)
-        ? `${options.path}${issue.path.slice(syntheticPrefix.length)}`
-        : issue.path,
-  })));
-
+  validateReportBlockFieldDomains(block, options.reportType, options.sectionType, options.path, issues);
   return { block, issues };
-}
-
-function createSectionPrintDefaults(sectionType: ReportSection["type"]): ReportSectionPrintSettings {
-  if (sectionType === "Body") {
-    return {
-      repeatOnEveryPage: false,
-      keepTogether: false,
-      pinToPageBottom: false,
-    };
-  }
-
-  return {
-    repeatOnEveryPage: true,
-    keepTogether: true,
-    pinToPageBottom: sectionType === "Footer",
-  };
 }
 
 function normalizeBlock(

@@ -37,13 +37,17 @@ export function useVersionedRecordDraft<T extends { id: number; versionNumber: n
     const baseline = valuesFrom(record);
     const values = mergeSavedDraftFields(latest.values, submitted, baseline, fields);
     update({ resourceKey: nextResourceKey, adoptedFrom: nextResourceKey === resourceKey ? undefined : resourceKey, record, persisted: record, baseline, values });
+    return fields.some(key => values[key] !== baseline[key]);
   }
   function field(key: K) {
     return { value: current.values[key], onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const latest = currentRef.current;
-      update({ ...latest, values: { ...latest.values, [key]: event.currentTarget.value } });
+      change(key, event.currentTarget.value);
     } };
   }
-  return { record: current.record, values: current.values, isDirty, field, acceptSaved,
+  function change(key: K, value: string) {
+    const latest = currentRef.current;
+    update({ ...latest, values: { ...latest.values, [key]: value } });
+  }
+  return { record: current.record, values: current.values, isDirty, field, change, acceptSaved,
     reset: () => update({ ...currentRef.current, values: currentRef.current.baseline }), ...sync };
 }

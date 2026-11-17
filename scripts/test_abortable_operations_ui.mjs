@@ -80,7 +80,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   function Package({ scope }) {
     const [revision, setRevision] = useState(0);
     const templates = useMemo(() => Array.from({length:revision+1}, (_, index) => ({templatePath:'template-'+index,displayName:'模板'+index,withSealDefault:true})), [revision]);
-    const workspace = useInvoiceDocumentPackageWorkspace({client, invoiceId:7,sourceRevision:scope,previewAllowed:true, templates,desktopAvailable:false,defaultExportDirectory:'',feedback:{clear(){},showError(message){window.results.push(message)},showJob(){},showStatus(){}},onPreviewGenerated(){}});
+    const workspace = useInvoiceDocumentPackageWorkspace({client, invoiceId:7,sourceRevision:scope,previewAllowed:true,exportAllowed:true,emailAllowed:true, templates,desktopAvailable:false,defaultExportDirectory:'',feedback:{clear(){},showError(message){window.results.push(message)},showJob(){},showStatus(){}},onPreviewGenerated(){}});
     window.packageState = workspace.templateState;
     return <><button onClick={() => workspace.changeTemplateSelected('template-0',false)}>取消第一份</button>
       <button onClick={() => workspace.changeTemplateSeal('template-0',false)}>取消第一枚章</button>

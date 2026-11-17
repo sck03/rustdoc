@@ -30,6 +30,7 @@ pub(in crate::engine) mod personnel_changes;
 mod publication_schedule;
 mod queries;
 pub(in crate::engine) mod queue_authority;
+pub(in crate::engine) mod read_context;
 mod request_identity;
 mod request_projects;
 mod reservation_schedule;

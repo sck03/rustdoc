@@ -11,7 +11,7 @@ import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { FormGuidance, InlineNotice, PageState, PermissionNotice } from "../../ui/PageState.tsx";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
-import { formatBusinessDateTime, isPastInstant, toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
+import { formatBusinessDateTime, isPastInstant } from "../../ui/businessTime.ts";
 import { useCustomerFollowUpWorkspace, CustomerFollowUpPageProps, optionalNumber } from "./hooks/useCustomerFollowUpWorkspace.ts";
 
 const crmTabsId = "crm-customer-workspace";
@@ -26,7 +26,7 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
     setCustomerId, customerKeyword, setCustomerKeyword, includeCompleted, setIncludeCompleted,
     followUpPageNumber, setFollowUpPageNumber, followUpPageSize, setFollowUpPageSize, saving,
     feedback, setFeedback, editFollowUpId, editingFollowUp, setEditingFollowUp,
-    transferMode, setTransferMode, followUpContactId, setFollowUpContactId, setFollowUpDraftDirty,
+    transferMode, setTransferMode, followUpContactId, setFollowUpContactId, followUpDraft, contactsPage,
     view, changeView, returnToList, selectedCustomer, followUpQuery,
     followUpPage, rows, loading, reloadCustomers, searchCustomerOptions,
     reloadContacts, handleCreate, toggleCompleted, transferFollowUp, deleteFollowUp,
@@ -47,6 +47,7 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
       </div>}
 
       <OperationFeedback feedback={feedback} />
+      {contactsPage.query.isError && <OperationFeedback feedback={errorFeedback(readApiError(contactsPage.query.error))} />}
       {focusedFollowUpId && <InlineNotice tone="info">正在查看指定跟进事项。<button type="button" className="command-button secondary" onClick={() => updateRoute({ view: "followups", followUpId: null, followupPage: null })}>返回全部跟进</button></InlineNotice>}
       {!canCreateCustomer && !canEditCustomer && !canCreateContact && !canEditContact && !canCreateFollowUp && !canEditFollowUp
         ? <PermissionNotice>当前岗位只有查看权限；客户、联系人和跟进的具体动作由管理员逐项授权。</PermissionNotice>
@@ -65,6 +66,7 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
         client={client}
         customers={customers}
         contacts={contacts}
+        contactPagination={contactsPage.pagination}
         customerId={customerId}
         onSelectCustomer={setCustomerId}
         onReloadCustomers={reloadCustomers}
@@ -92,13 +94,11 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
       {view === "import" && canImportCustomer ? <div aria-label="导入客户"><CrmCustomerImportPanel client={client} canImport={canImportCustomer} onImported={signal => reloadCustomers(undefined, signal)} /></div> : null}
 
       {view === "followup-editor" && editFollowUpId && !editingFollowUp && <PageState tone={feedback ? "error" : "loading"} title={feedback ? "无法打开跟进记录" : "正在读取跟进记录"} />}
-      {view === "followup-editor" && (!editFollowUpId || editingFollowUp) ? <form className="form-grid" key={`${transferMode ? "transfer" : "edit"}-${editingFollowUp?.id ?? "new"}-${editingFollowUp?.versionNumber ?? 0}`} onSubmit={transferMode ? transferFollowUp : handleCreate} aria-label="跟进记录编辑">
+      {view === "followup-editor" && (!editFollowUpId || editingFollowUp) ? <form className="form-grid" onSubmit={transferMode ? transferFollowUp : handleCreate} aria-label="跟进记录编辑">
         <div className="section-heading-row"><h3>{transferMode ? "转移跟进" : editingFollowUp ? canEditFollowUp ? "编辑跟进" : "查看跟进" : "新增跟进"}</h3>
         </div>
         {!customers.length ? <FormGuidance className="form-field-wide" title="先建立一位销售客户" description="跟进记录必须归属客户。客户资料与原单证客户相互独立。" action={canCreateCustomer ? <button className="primary-button" type="button" onClick={() => changeView("profile")}>建立客户资料</button> : undefined} /> : null}
-        <fieldset className="permission-fieldset form-field-wide" disabled={transferMode ? !canAssignFollowUp : editingFollowUp ? !canEditFollowUp : !canCreateFollowUp} onChangeCapture={(event) => {
-          if (!(event.target instanceof Element) || !event.target.closest("[data-draft-ignore]")) setFollowUpDraftDirty(true);
-        }}>
+        <fieldset className="permission-fieldset form-field-wide" disabled={transferMode ? !canAssignFollowUp || saving : editingFollowUp ? !canEditFollowUp : !canCreateFollowUp}>
         <label>
           客户
           <div className="toolbar compact-search-toolbar" data-draft-ignore>
@@ -118,15 +118,17 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
           <select
             name="crmContactId"
             value={followUpContactId}
-            onChange={(event) => setFollowUpContactId(optionalNumber(event.target.value) ?? "")}
+            onChange={(event) => { const id = optionalNumber(event.target.value) ?? ""; contactsPage.selectContact(Number(id)); setFollowUpContactId(id); }}
           >
             <option value="">不指定</option>
+            {followUpContactId && !contacts.some(item => item.id === followUpContactId) && <option value={followUpContactId}>{editingFollowUp?.crmContactId === followUpContactId ? editingFollowUp.contactName || "已选联系人" : "已选联系人"}</option>}
             {contacts.map((item) => <option key={item.id} value={item.id}>{item.name}{item.title ? ` · ${item.title}` : ""}</option>)}
           </select>
         </label>
+        {canViewContacts && customerId > 0 && <div className="form-field-wide"><Pagination {...contactsPage.pagination} onPageChange={contactsPage.location.setPageNumber} /></div>}
         {!transferMode ? <><label>
           跟进方式
-          <select name="type" defaultValue={editingFollowUp?.type ?? "邮件"}>
+          <select name="type" value={followUpDraft.values.type || "邮件"} onChange={event => followUpDraft.change("type", event.target.value)}>
             <option>邮件</option>
             <option>电话</option>
             <option>即时通讯</option>
@@ -136,15 +138,15 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
         </label>
         <label className="form-field-wide">
           跟进摘要
-          <input name="summary" required maxLength={500} defaultValue={editingFollowUp?.summary} placeholder="例如：客户确认样品，等待价格调整" />
+          <input name="summary" required maxLength={500} {...followUpDraft.field("summary")} placeholder="例如：客户确认样品，等待价格调整" />
         </label>
         <label className="form-field-wide">
           下次动作
-          <input name="nextAction" maxLength={300} defaultValue={editingFollowUp?.nextAction} placeholder="例如：周五发送新版报价" />
+          <input name="nextAction" maxLength={300} {...followUpDraft.field("nextAction")} placeholder="例如：周五发送新版报价" />
         </label>
         <label>
           下次跟进时间
-          <input name="nextFollowUpAt" type="datetime-local" defaultValue={toBusinessDateTimeLocalInput(editingFollowUp?.nextFollowUpAt, businessTimeZone)} />
+          <input name="nextFollowUpAt" type="datetime-local" {...followUpDraft.field("nextFollowUpAt")} />
         </label></> : <FormGuidance className="form-field-wide" title="受审计的客户转移" description="转移只变更跟进归属和可选联系人，不会改写原跟进内容、完成状态或历史时间。" />}
         <div className="form-actions">
           {(transferMode ? canAssignFollowUp : editingFollowUp ? canEditFollowUp : canCreateFollowUp) ? <button className="primary-button" type="submit" disabled={saving || !selectedCustomer}>
@@ -158,10 +160,8 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
       <div className="section-header">
         <div><h3>跟进记录</h3><p className="section-description">集中查看沟通结果、下一步动作和待办提醒。</p></div>
         {canCreateFollowUp ? <button className="primary-button" type="button" onClick={() => {
-          setFollowUpDraftDirty(false);
           setEditingFollowUp(null);
           setTransferMode(false);
-          setFollowUpContactId("");
           void changeView("followup-editor");
         }}>记录新跟进</button> : null}
       </div>
@@ -192,19 +192,15 @@ export function CustomerFollowUpPage({ businessTimeZone, client }: CustomerFollo
                 <td>
                   <div className="table-row-actions">
                     <button className="secondary-button" type="button" onClick={() => {
-                      setFollowUpDraftDirty(false);
                       setTransferMode(false);
                       setCustomerId(item.crmCustomerId);
                       setEditingFollowUp(item);
-                      setFollowUpContactId(item.crmContactId ?? "");
                       void changeView("followup-editor");
                     }}>{canEditFollowUp ? "编辑" : "查看"}</button>
                     {canAssignFollowUp ? <button className="secondary-button" type="button" onClick={() => {
-                      setFollowUpDraftDirty(false);
                       setTransferMode(true);
                       setCustomerId(item.crmCustomerId);
                       setEditingFollowUp(item);
-                      setFollowUpContactId(item.crmContactId ?? "");
                       void changeView("followup-editor");
                     }}>转移</button> : null}
                     {(item.isCompleted ? canRestoreFollowUp : canCompleteFollowUp) ? <button className="secondary-button" type="button" onClick={() => void toggleCompleted(item)}>

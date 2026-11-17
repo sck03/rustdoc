@@ -7,6 +7,7 @@ use unicode_normalization::UnicodeNormalization;
 pub(crate) mod file_stamp;
 mod temporary;
 pub use temporary::anonymous_file;
+mod containment;
 
 pub const SQLITE_DATABASE_RELATIVE_PATH: &str = "Database/exportdoc-native.db";
 
@@ -36,10 +37,8 @@ impl RuntimePaths {
         }
         ensure_safe_absolute(&path)?;
         if !path.is_dir()
-            || path.starts_with(&self.data_root)
-            || self.data_root.starts_with(&path)
-            || path.starts_with(&self.app_root)
-            || self.app_root.starts_with(&path)
+            || containment::overlaps(&path, &self.data_root)?
+            || containment::overlaps(&path, &self.app_root)?
         {
             return Err("独立文件存储必须是程序和数据目录之外的现有目录。".into());
         }
@@ -232,6 +231,15 @@ pub fn atomic_write_with(
     path: &Path,
     write: impl FnOnce(&mut fs::File) -> Result<(), String>,
 ) -> Result<(), String> {
+    atomic_write_checked(path, write, || Ok(()))
+}
+
+/// Revalidate authorization/cancellation after flushing and immediately before publication.
+pub(crate) fn atomic_write_checked(
+    path: &Path,
+    write: impl FnOnce(&mut fs::File) -> Result<(), String>,
+    before_publish: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
     ensure_safe_absolute(path)?;
     let parent = path.parent().ok_or("目标文件没有父目录。")?;
     if !parent.is_dir() {
@@ -248,6 +256,7 @@ pub fn atomic_write_with(
         output.sync_all().map_err(|error| error.to_string())?;
         drop(output);
         ensure_safe_absolute(path)?;
+        before_publish()?;
         fs::rename(&temporary, path).map_err(|error| format!("写入目标失败，原文件已保留：{error}"))
     })();
     if result.is_err() {
@@ -288,6 +297,27 @@ mod tests {
         assert_eq!(fs::read(&target).unwrap(), b"complete output");
         fs::remove_file(target).unwrap();
         fs::remove_dir(root).unwrap();
+    }
+    #[test]
+    fn cancelled_publication_preserves_existing_file() {
+        let root = crate::engine::test_support::ScratchDirectory::new();
+        let target = root.0.join("Cache/selected.bin");
+        fs::write(&target, b"original").unwrap();
+        let scope = crate::operation::OperationScope::new(std::time::Duration::from_secs(30));
+        let result = scope.run(|| {
+            atomic_write_checked(
+                &target,
+                |output| {
+                    output.write_all(b"complete new output").unwrap();
+                    scope.cancel();
+                    Ok(())
+                },
+                || crate::operation::check().map_err(|error| error.message),
+            )
+        });
+        assert!(result.is_err());
+        assert_eq!(fs::read(&target).unwrap(), b"original");
+        assert_eq!(fs::read_dir(target.parent().unwrap()).unwrap().count(), 1);
     }
     #[test]
     fn export_names_are_portable_and_normalized() {

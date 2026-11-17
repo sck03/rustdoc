@@ -138,6 +138,36 @@ fn oversized_stored_attachment_is_rejected_and_extension_case_is_preserved() {
 }
 
 #[test]
+fn cancelled_attachment_save_keeps_original_destination() {
+    let f = fixture();
+    let destination = f.root.0.join("copy.bin");
+    fs::write(&destination, b"previous file").unwrap();
+    let scope = crate::operation::OperationScope::new(std::time::Duration::from_secs(30));
+    scope.cancel();
+    let error = scope
+        .run(|| {
+            handle(
+                &f.store,
+                &f.actor,
+                SAVE_BUSINESS_ATTACHMENT_TO_PATH,
+                &[("id", f.id.to_string()), ("revision", "1".into())],
+                &[],
+                json!({"destinationPath": destination}),
+            )
+        })
+        .unwrap_err();
+    assert_eq!(error.status, Some(504));
+    assert_eq!(fs::read(&destination).unwrap(), b"previous file");
+    assert!(!fs::read_dir(&f.root.0).unwrap().any(|entry| {
+        entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".native-write-")
+    }));
+}
+
+#[test]
 fn a_new_attachment_has_an_empty_event_history_and_can_be_archived() {
     let f = fixture();
     let initial = f.invoke_json(GET_BUSINESS_ATTACHMENT, Value::Null).unwrap();

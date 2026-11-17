@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ComponentProps, type FormEvent } from "react";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import type { ApiCrmContactDto, ApiCrmCustomerDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { requestErrorFeedback, successFeedback, warningFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
@@ -15,6 +16,7 @@ type Props = {
   client: ExportDocManagerApiClient;
   customers: ApiCrmCustomerDto[];
   contacts: ApiCrmContactDto[];
+  contactPagination?: ComponentProps<typeof Pagination>;
   customerId: number;
   onSelectCustomer: (id: number) => void;
   onReloadCustomers: (preferred?: ApiCrmCustomerDto, signal?: AbortSignal) => Promise<void>;
@@ -247,6 +249,8 @@ export function CrmPartyManagementPanel(props: Props) {
           <option value={0}>新联系人</option>
           {contacts.map((item) => <option key={item.id} value={item.id}>{item.name}{item.isPrimary ? " · 主要" : ""}</option>)}
         </select></label>
+        {props.contactPagination && <div className="form-field-wide"><Pagination {...props.contactPagination} isBusy={props.contactPagination.isBusy || contactSave.isSaving}
+          onPageChange={page => { void (async () => { if (await confirmAndResetDrafts("切换联系人页")) props.contactPagination?.onPageChange(page); })(); }} /></div>}
         <fieldset className="permission-fieldset form-field-wide" disabled={(selectedContact ? !canEditContact : !canCreateContact) || !activeCustomerId}>
         <label>姓名<input name="contactName" required maxLength={100} {...contactDraft.field("name")} /></label>
         <label>职位<input name="title" maxLength={100} {...contactDraft.field("title")} /></label>

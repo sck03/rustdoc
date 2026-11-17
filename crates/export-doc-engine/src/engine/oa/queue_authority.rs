@@ -8,13 +8,20 @@ pub(in crate::engine) struct QueueAuthority {
 }
 impl QueueAuthority {
     pub(in crate::engine) fn new(tx: &Connection, actor: &Actor) -> Result<Self> {
+        Self::from_delegations(tx, actor, &settings::principals(tx, actor)?)
+    }
+    pub(super) fn from_delegations(
+        tx: &Connection,
+        actor: &Actor,
+        delegations: &[(i64, String)],
+    ) -> Result<Self> {
         let mut principals = vec![];
         let mut loaded = std::collections::HashSet::new();
-        for (id, _) in settings::principals(tx, actor)? {
-            if !loaded.insert(id) {
+        for (id, _) in delegations {
+            if !loaded.insert(*id) {
                 continue;
             }
-            match super::super::units::business_actors(tx, id, actor.edition, &actor.company) {
+            match super::super::units::business_actors(tx, *id, actor.edition, &actor.company) {
                 Ok(actors) => principals.extend(actors),
                 Err(e) if matches!(e.status, Some(400 | 401 | 403 | 404)) => {}
                 Err(e) => return Err(e),

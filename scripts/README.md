@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-17 客户跟进与输出：`npm --prefix apps/export-doc-web run test:crm-export-lifecycle-ui` 验证跟进保存续编、创建后版本衔接、联系人跨页选择，以及 PDF/托单/单据包在来源、客户端、权限或组件生命周期变化后的对话框/请求取消；纳入统一 `business` 组。模板契约测试继续覆盖 V3 Flow 组件的字段域及错误路径。QueryPerformance 的 `current` 模式复用一次读取内的身份查询，并断言后续事项不重复读取不变身份；逐记录权限条件保留。
+
 2026-11-17 装柜/权限方案：`test_packing_credit_workspace_ui.mjs` 增加柜型迟到响应、命令互斥、分页/搜索、输入失效和 PDF 取消；`test_permission_template_lifecycle_ui.mjs` 纳入 `test:settings-models`，验证真实 React 的客户端/权限/卸载取消、删除缓存及迟到确认。装柜分页摘要进入两库共用工具合同，关联来源的游标投影进入 Storage 共用合同；`test-native-postgres.ps1 -Scope Workflows` 在真实 PostgreSQL 18 执行。schema 18 指纹因新增索引变化，验收使用新隔离数据根。
 
 查询性能手动验收：分别设置 `$env:EXPORTDOC_QUERY_BENCH_MODE='baseline'` 与 `'current'`，各执行一次 `test-native-postgres.ps1 -PostgresBin <PostgreSQL18/bin> -Scope QueryPerformance`。每次创建新隔离集群，SQLite 与 PostgreSQL 各用独立测试进程，输出 `QUERY_PERFORMANCE` JSON。比较每类 3,000 条/8 KiB 载荷中清理 205 条关联记录，以及 100 次审批可见性/任务读取；记录存储适配器调用数、写协调器/连接池等待、用例响应时间、Windows 进程工作集峰值。历史算法仅在忽略的手动测试中对照；计数不是逐条 SQL 数，内存包含测试初始化，耗时不等于 HTTP 延迟或生产容量。

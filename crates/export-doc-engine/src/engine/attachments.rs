@@ -199,13 +199,13 @@ pub fn handle(
             .find(|(key, _)| *key == "revision")
             .and_then(|(_, value)| value.parse::<i64>().ok())
             .ok_or_else(|| invalid("缺少有效资料版本号。"))?;
-        let (metadata, bytes) = read(store, actor, operation, id, revision)?;
         if operation == DOWNLOAD_BUSINESS_ATTACHMENT {
-            return Ok(bytes);
+            return Ok(read(store, actor, operation, id, revision)?.1);
         }
+        let info = download_info(store, actor, operation, id, revision)?;
         let path = std::path::PathBuf::from(text(&body, "destinationPath"));
         paths::ensure_safe_absolute(&path).map_err(invalid)?;
-        let original = std::path::Path::new(metadata["fileName"].as_str().unwrap_or(""));
+        let original = std::path::Path::new(&info.file_name);
         let same_extension = match (
             path.extension().and_then(|value| value.to_str()),
             original.extension().and_then(|value| value.to_str()),
@@ -217,7 +217,44 @@ pub fn handle(
         if !same_extension {
             return Err(invalid("请保留原文件扩展名。"));
         }
-        paths::atomic_write(&path, &bytes).map_err(unavailable)?;
+        let mut input = store.files.open_object(&info.object)?;
+        let mut copied = Ok(());
+        let mut checked = Ok(());
+        let published = paths::atomic_write_checked(
+            &path,
+            |output| {
+                copied = (|| -> Result<()> {
+                    let actual =
+                        super::backup_io::copy_and_hash(&mut input, output, info.object.size)?;
+                    if actual != (info.object.size, info.object.digest.clone()) {
+                        return Err(unavailable("资料内容已变化，保存已取消。"));
+                    }
+                    Ok(())
+                })();
+                copied
+                    .as_ref()
+                    .map_err(|error| error.message.clone())
+                    .copied()
+            },
+            || {
+                checked = (|| -> Result<()> {
+                    if download_info(store, actor, operation, id, revision)? != info {
+                        return Err(conflict("资料版本已变化，保存已取消。"));
+                    }
+                    crate::operation::check()
+                })();
+                checked
+                    .as_ref()
+                    .map_err(|error| error.message.clone())
+                    .copied()
+            },
+        );
+        copied?;
+        checked?;
+        if let Err(cause) = published {
+            crate::operation::check()?;
+            return Err(unavailable(cause));
+        }
         json!({"success":true,"message":"文件已保存"})
     } else {
         let id = super::records::id(parameters)?;
