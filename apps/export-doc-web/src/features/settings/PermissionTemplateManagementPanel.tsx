@@ -1,238 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, Plus, RefreshCw, Save, Trash2 } from "lucide-react";
-import type {
-  ApiEffectivePermissionGrantDto,
-  ApiPermissionResourceDefinitionDto,
-  ApiPermissionTemplateDto,
-  ApiPermissionTemplateSaveRequest,
-  ExportDocManagerApiClient,
-} from "../../api/index.ts";
-import { identityQueryRoots, queryKeys } from "../../api/queryKeys.ts";
-import { readApiError } from "../../ui/formUtils.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
+import type { ApiEffectivePermissionGrantDto, ApiPermissionResourceDefinitionDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { InlineNotice, PermissionNotice } from "../../ui/PageState.tsx";
 import { PermissionModuleGrid } from "./PermissionModuleGrid.tsx";
-import { combinePermissionSchemes, createSchemeFromEmployee, getEditableSchemeGrants, grantKey, schemeStartingPoints, schemeActionDataScopes, scopeLabels, toPermissionGrants, type SchemeStartingPoint } from "./permissionSchemeModel.ts";
-import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
-import { createRequestKey } from "../../ui/createRequestKey.ts";
+import { grantKey, schemeStartingPoints, schemeActionDataScopes, scopeLabels, type SchemeStartingPoint } from "./permissionSchemeModel.ts";
 import { OfficeDialog } from "../office/OfficeUi.tsx";
 import { PermissionPublicationActions } from "./PermissionPublicationActions.tsx";
+import { usePermissionTemplateWorkspace } from "./usePermissionTemplateWorkspace.ts";
 
-type TemplateDraft = {
-  id: number;
-  versionNumber: number;
-  code: string;
-  name: string;
-  description: string;
-  isSystem: boolean;
-  isActive: boolean;
-  grants: Record<string, string>;
-  disabledModules: string[];
-  oaAssignedOnly: boolean;
-};
-
-export function PermissionTemplateManagementPanel({
-  client,
-  canManageUsers,
-}: {
-  client: ExportDocManagerApiClient;
-  canManageUsers: boolean;
+export function PermissionTemplateManagementPanel({ client, canManageUsers }: {
+  client: ExportDocManagerApiClient; canManageUsers: boolean;
 }) {
-  const requestConfirmation = useConfirmation();
-  const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<TemplateDraft>(() => createEmptyDraft());
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [persistedDraftSnapshot, setPersistedDraftSnapshot] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [startingPoint, setStartingPoint] = useState<SchemeStartingPoint>("blank");
-  const [sourceIds, setSourceIds] = useState<number[]>([]);
-  const [creating, setCreating] = useState(false);
-  const [publicationBusy,setPublicationBusy]=useState(false);
-
-  const catalogQuery = useQuery({
-    queryKey: queryKeys.permissionTemplates(),
-    queryFn: ({ signal }) => client.listPermissionTemplates({ signal }),
-    enabled: canManageUsers,
-  });
-  const templates = catalogQuery.data?.templates ?? [];
-  const resources = catalogQuery.data?.resources ?? [];
-  const assignableResources = useMemo(() => resources.filter((resource) => !resource.isTechnical), [resources]);
-  const technicalResources = useMemo(() => resources.filter((resource) => resource.isTechnical), [resources]);
-  const resourceByKey = useMemo(() => new Map(resources.map((resource) => [resource.key, resource])), [resources]);
-  const selectedTemplate = templates.find((template) => template.id === selectedId);
-
-  useEffect(() => {
-    if (selectedId == null && templates.length > 0) applyTemplate(templates[0]);
-  }, [selectedId, templates]);
-
-  useEffect(() => {
-    if (!catalogQuery.isError) return;
-    setMessage(readApiError(catalogQuery.error));
-    setSuccessMessage(null);
-  }, [catalogQuery.error, catalogQuery.isError]);
-
-  const saveMutation = useMutation({
-    mutationFn: (body: ApiPermissionTemplateSaveRequest) => draft.id > 0
-      ? client.updatePermissionTemplate({ id: draft.id, body })
-      : client.createPermissionTemplate({ body }),
-    onSuccess: async (saved) => {
-      const savedDraft = createDraftFromTemplate(saved, resourceByKey);
-      setSelectedId(saved.id);
-      setDraft(savedDraft);
-      setPersistedDraftSnapshot(buildTemplateDraftSnapshot(savedDraft));
-      setMessage(null);
-      setSuccessMessage("权限方案草稿已保存。发布并明确应用后，才改变已绑定身份的权限。");
-      await Promise.all([...identityQueryRoots, ["office"], ["worklist"]].map(queryKey => queryClient.invalidateQueries({ queryKey })));
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (target: { id: number; expectedVersion: number }) => client.deletePermissionTemplate(target),
-    onSuccess: async () => {
-      setSelectedId(null);
-      setDraft(createEmptyDraft());
-      setPersistedDraftSnapshot(null);
-      setMessage(null);
-      setSuccessMessage("权限方案已删除。");
-      await Promise.all([...identityQueryRoots, ["office"], ["worklist"]].map(queryKey => queryClient.invalidateQueries({ queryKey })));
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-      setSuccessMessage(null);
-    },
-  });
-
-  const currentDraftSnapshot = useMemo(() => buildTemplateDraftSnapshot(draft), [draft]);
-  const hasUnsavedTemplateChanges = Boolean(
-    canManageUsers && selectedId != null &&
-    (persistedDraftSnapshot == null || currentDraftSnapshot !== persistedDraftSnapshot),
-  );
-  const { confirmDiscardChanges } = useUnsavedChangesGuard({
-    isDirty: hasUnsavedTemplateChanges,
-    message: "当前权限方案有未保存的修改。",
-  });
-
+  const { draft, setDraft, selectedId, selectedTemplate, creating, setCreating, startingPoint, setStartingPoint, sourceIds, setSourceIds, templates, resourceByKey, assignableResources, technicalResources, catalogQuery, isAdminTemplate, isBusy, enabledActionCount, message, successMessage, hasUnsavedTemplateChanges, saveMutation, selectTemplate, beginNew, copySelected, saveTemplate, refreshTemplates, deleteSelected, setPublicationBusy, onPublished } = usePermissionTemplateWorkspace(client, canManageUsers);
   if (!canManageUsers) return null;
-  const isAdminTemplate = draft.isSystem && draft.code.toLowerCase() === "admin";
-  const isBusy = publicationBusy || catalogQuery.isFetching || saveMutation.isPending || deleteMutation.isPending;
-  const enabledActionCount = toPermissionGrants(draft.grants).filter(grant =>
-    !draft.disabledModules.includes(resourceByKey.get(grant.resourceKey)?.moduleKey ?? "")).length;
-
-  function applyTemplate(template: ApiPermissionTemplateDto) {
-    const nextDraft = createDraftFromTemplate(template, resourceByKey);
-    setSelectedId(template.id);
-    setDraft(nextDraft);
-    setPersistedDraftSnapshot(buildTemplateDraftSnapshot(nextDraft));
-  }
-
-  async function selectTemplate(template: ApiPermissionTemplateDto) {
-    if(isBusy)return;
-    if (template.id === selectedId || !await confirmDiscardChanges(`切换到权限方案“${template.name}”`)) return;
-    applyTemplate(template);
-    setMessage(null);
-    setSuccessMessage(null);
-  }
-
-  async function beginNew() {
-    if (!await confirmDiscardChanges("新建权限方案")) return;
-    const emptyDraft = createEmptyDraft();
-    if (startingPoint === "combined") {
-      const sources = templates.filter(template => sourceIds.includes(template.id) && template.isActive && template.code !== "Admin");
-      if (!sources.length || sources.length !== sourceIds.length) {
-        setMessage("请选择至少一个已启用的职责方案；系统管理员身份不能组合授予。");
-        return;
-      }
-      Object.assign(emptyDraft, combinePermissionSchemes(sources, resourceByKey), {
-        name: sources.map(source => source.name).join(" + ").slice(0, 120),
-        description: "组合选定方案的当前配置；同一操作取较大范围，任一来源关闭的模块继续关闭。保存后独立维护。",
-      });
-    } else if (startingPoint !== "blank") {
-      const source = templates.find(template => template.isSystem && template.code === "OfficeEmployee");
-      if (!source?.isActive) {
-        setMessage("请先确认普通员工方案存在且已启用，再从该方案创建。");
-        return;
-      }
-      Object.assign(emptyDraft, createSchemeFromEmployee(source, resourceByKey, startingPoint), {
-        name: schemeStartingPoints[startingPoint],
-        description: "以普通员工方案为起点；按实际职责核对模块、查看与审批范围，审批步骤另行配置。",
-      });
-    }
-    setSelectedId(0);
-    setDraft(emptyDraft);
-    setCreating(false);
-    setPersistedDraftSnapshot(null);
-    setMessage(null);
-    setSuccessMessage(null);
-  }
-
-  function copySelected() {
-    setSelectedId(0);
-    setDraft((current) => ({
-      ...current,
-      id: 0,
-      versionNumber: 0,
-      code: createCustomTemplateCode(),
-      name: `${current.name || "权限方案"} 副本`,
-      isSystem: false,
-      isActive: true,
-    }));
-    setPersistedDraftSnapshot(null);
-    setMessage(null);
-    setSuccessMessage(null);
-  }
-
-  function saveTemplate() {
-    if (!draft.code.trim() || !draft.name.trim()) {
-      setMessage("方案代码和名称不能为空。");
-      setSuccessMessage(null);
-      return;
-    }
-    saveMutation.mutate({
-      id: draft.id,
-      code: draft.code.trim(),
-      name: draft.name.trim(),
-      description: draft.description.trim(),
-      isActive: draft.isActive,
-      grants: toPermissionGrants(draft.grants),
-      disabledModules: draft.disabledModules,
-      oaAssignedOnly: draft.oaAssignedOnly,
-      expectedVersion: draft.id > 0 ? draft.versionNumber : 0,
-    });
-  }
-
-  async function refreshTemplates() {
-    if (!await confirmDiscardChanges("刷新权限方案")) return;
-    const result = await catalogQuery.refetch();
-    if (!selectedId || selectedId <= 0) return;
-    const refreshed = result.data?.templates.find((template) => template.id === selectedId);
-    if (refreshed && !result.isError) {
-      applyTemplate(refreshed);
-      setMessage(null);
-      setSuccessMessage(null);
-    }
-  }
-
-  async function deleteSelected() {
-    if (draft.id <= 0 || draft.isSystem || !await confirmDiscardChanges("删除当前权限方案")) return;
-    const persistedTemplate = templates.find((template) => template.id === draft.id);
-    if (!persistedTemplate) return;
-    if (!await requestConfirmation({
-      title: "删除权限方案",
-      description: `确定删除权限方案“${persistedTemplate.name}”吗？`,
-      details: ["主账号或单位身份仍引用的方案不能删除。"],
-      confirmLabel: "确认删除",
-      tone: "danger",
-    })) return;
-    applyTemplate(persistedTemplate);
-    deleteMutation.mutate({ id: persistedTemplate.id, expectedVersion: persistedTemplate.versionNumber });
-  }
-
   return (
     <section className="form-section permission-template-section" aria-label="权限方案">
       <div className="section-header">
@@ -295,7 +74,7 @@ export function PermissionTemplateManagementPanel({
             disabledModules={draft.disabledModules}
             onModulesChange={disabledModules => setDraft(current => ({ ...current, disabledModules }))}
           />
-          {selectedTemplate&&!isAdminTemplate&&<PermissionPublicationActions key={selectedTemplate.id} client={client} scheme={selectedTemplate} disabled={hasUnsavedTemplateChanges||saveMutation.isPending} accountTargets onBusy={setPublicationBusy} onPublished={versionNumber=>{const next={...draft,versionNumber};setDraft(next);setPersistedDraftSnapshot(buildTemplateDraftSnapshot(next));}} />}
+          {selectedTemplate&&!isAdminTemplate&&<PermissionPublicationActions key={selectedTemplate.id} client={client} scheme={selectedTemplate} disabled={hasUnsavedTemplateChanges||saveMutation.isPending} accountTargets onBusy={setPublicationBusy} onPublished={onPublished} />}
           <details className="permission-effective-details">
             <summary>权限设置说明</summary>
             <p>总经理等跨部门负责人可从“公司审批负责人”新建方案，部门主管可从“部门审批负责人”开始，再按职责增减。方案复制普通员工的操作和关闭模块，只增加人事、行政的查看与审批；查看范围内的草稿与历史也可见。审批步骤、财务接收、档案维护及系统管理分别配置。部门范围包含主职、兼职及本人负责的部门与启用子部门；可另启用仅本人和分派申请可见。</p>
@@ -372,30 +151,3 @@ function EffectivePermissionSummary({
 }
 
 export default PermissionTemplateManagementPanel;
-
-function createDraftFromTemplate(template: ApiPermissionTemplateDto, resources: ReadonlyMap<string, ApiPermissionResourceDefinitionDto>): TemplateDraft {
-  return {
-    id: template.id,
-    versionNumber: template.versionNumber ?? 1,
-    code: template.code,
-    name: template.name,
-    description: template.description ?? "",
-    isSystem: template.isSystem,
-    isActive: template.isActive,
-    grants: getEditableSchemeGrants(template.grants, resources),
-    disabledModules: template.disabledModules ?? [],
-    oaAssignedOnly: template.oaAssignedOnly ?? false,
-  };
-}
-
-function createEmptyDraft(): TemplateDraft {
-  return { id: 0, versionNumber: 0, code: createCustomTemplateCode(), name: "新权限方案", description: "", isSystem: false, isActive: true, grants: {}, disabledModules: [], oaAssignedOnly: false };
-}
-
-function buildTemplateDraftSnapshot(draft: TemplateDraft) {
-  return JSON.stringify({ ...draft, grants: Object.fromEntries(Object.entries(draft.grants).sort(([left], [right]) => left.localeCompare(right))) });
-}
-
-function createCustomTemplateCode() {
-  return `custom-${createRequestKey()}`;
-}

@@ -401,11 +401,7 @@ const agentDefaultFallbacks: Partial<Record<keyof ApiAgentConsignmentDocumentDto
 };
 
 export function cloneEditorDocument<TDocument>(document: TDocument): TDocument {
-  if (typeof structuredClone === "function") {
-    return structuredClone(document);
-  }
-
-  return JSON.parse(JSON.stringify(document)) as TDocument;
+  return structuredClone(document);
 }
 
 export function areEditorDocumentsEqual<TDocument>(left: TDocument, right: TDocument) {

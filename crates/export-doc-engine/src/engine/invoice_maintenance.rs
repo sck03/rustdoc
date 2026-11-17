@@ -9,6 +9,10 @@ use crate::{contracts, generated_api::*};
 use export_doc_storage::AuditWrite;
 use serde_json::{Value, json};
 
+#[cfg(test)]
+#[path = "../../tests/support/query_performance.rs"]
+mod query_performance;
+
 pub const OPERATIONS: &[Operation] = &[
     GET_INVOICE_DATA_MAINTENANCE_PREVIEW,
     PURGE_CANCELLED_INVOICE,
@@ -162,16 +166,35 @@ fn purge(store: &Store, actor: &Actor, invoice_id: i64, body: &Value) -> Result<
 
 fn delete_workspace(transaction: &Connection, invoice_id: i64) -> Result<()> {
     for kind in ["sw-coo", "sw-acd", "sw-batches"] {
-        for record in store::all(transaction, kind)?
-            .into_iter()
-            .filter(|record| record["sourceId"].as_i64() == Some(invoice_id))
-        {
-            if !transaction.delete(
-                kind,
-                record["id"].as_i64().unwrap_or(0),
-                record["versionNumber"].as_i64().unwrap_or(0),
-            )? {
-                return Err(conflict("关联单一窗口工作区记录已变化，请重新查询后再试。"));
+        let mut cursor = None;
+        loop {
+            crate::operation::check()?;
+            let (next, rows) = transaction.scan_generic(
+                &export_doc_storage::GenericQuery {
+                    kind,
+                    scope: export_doc_storage::DataScope {
+                        all: true,
+                        ..Default::default()
+                    },
+                    filters: &[("sourceId", invoice_id.to_string())],
+                    fields: &[("id", "id"), ("versionNumber", "versionNumber")],
+                    limit: 200,
+                    ..Default::default()
+                },
+                cursor,
+            )?;
+            if rows.is_empty() {
+                break;
+            }
+            cursor = next;
+            for record in rows {
+                if !transaction.delete(
+                    kind,
+                    record["id"].as_i64().unwrap_or(0),
+                    record["versionNumber"].as_i64().unwrap_or(0),
+                )? {
+                    return Err(conflict("关联单一窗口工作区记录已变化，请重新查询后再试。"));
+                }
             }
         }
     }
@@ -333,6 +356,34 @@ mod tests {
     #[test]
     fn purge_removes_invoice_and_records_audit() {
         let fixture = Fixture::new();
+        fixture
+            .store
+            .transaction(|tx| {
+                for kind in ["sw-coo", "sw-acd", "sw-batches"] {
+                    for index in 0..205 {
+                        store::save(
+                            tx,
+                            kind,
+                            0,
+                            json!({"sourceId":fixture.invoice_id,"payload":index}),
+                            None,
+                            &fixture.actor,
+                            "create",
+                        )?;
+                    }
+                    store::save(
+                        tx,
+                        kind,
+                        0,
+                        json!({"sourceId":fixture.invoice_id + 1}),
+                        None,
+                        &fixture.actor,
+                        "create",
+                    )?;
+                }
+                Ok(())
+            })
+            .unwrap();
         let result = purge(
             &fixture.store,
             &fixture.actor,
@@ -343,6 +394,15 @@ mod tests {
         assert_eq!(result["success"], true);
         assert_eq!(result["previousStatus"], "Cancelled");
         assert!(fixture.store.get("invoices", fixture.invoice_id).is_err());
+        for kind in ["sw-coo", "sw-acd", "sw-batches"] {
+            let remaining = fixture.store.connection().unwrap().all(kind).unwrap();
+            assert_eq!(
+                remaining.len(),
+                1,
+                "all pages of linked rows are removed without touching another invoice"
+            );
+            assert_eq!(remaining[0]["sourceId"], fixture.invoice_id + 1);
+        }
         let logs = fixture
             .store
             .connection()

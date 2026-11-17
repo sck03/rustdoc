@@ -91,22 +91,31 @@ pub fn handle(
     } else {
         let execute = |tx: &Connection, actor: &Actor| match operation {
             LIST_CONTAINER_PACKING_PROJECTS => {
-                let limit = query
-                    .iter()
-                    .find(|(key, _)| *key == "limit")
-                    .and_then(|(_, value)| value.parse::<usize>().ok())
-                    .unwrap_or(30)
-                    .clamp(1, 200);
-                let (_, rows) = tx.query_ordered_records(
+                let (page, size, offset) = store::page_parameters(query);
+                let keyword =
+                    store::normalize(super::request_values::find(query, "keyword").unwrap_or(""));
+                let (total, rows) = tx.query_ordered_records(
                     &export_doc_storage::GenericQuery {
                         kind: PROJECTS,
                         scope: auth::data_scope(actor, PERMISSION, "view"),
-                        limit: limit as i64,
+                        keyword: &keyword,
+                        fields: &[
+                            ("id", "id"),
+                            ("versionNumber", "versionNumber"),
+                            ("name", "name"),
+                            ("containerType", "containerType"),
+                            ("createdAt", "createdAt"),
+                            ("updatedAt", "updatedAt"),
+                        ],
+                        offset,
+                        limit: size as i64,
                         ..Default::default()
                     },
                     export_doc_storage::RecordOrder::UpdatedDescending,
                 )?;
-                Ok(json!({"projects":rows,"storagePolicy":POLICY}))
+                Ok(
+                    json!({"projects":rows,"totalCount":total,"pageNumber":page,"pageSize":size,"storagePolicy":POLICY}),
+                )
             }
             GET_CONTAINER_PACKING_PROJECT => Ok(
                 json!({"project":project(tx, actor, id(parameters)?, "view")?,"storagePolicy":POLICY}),

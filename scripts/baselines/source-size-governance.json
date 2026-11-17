@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-17",
-  "reviewNotes": "2026-11-17 payment/query lifecycle and catalog reads against e5017949: isolate payment drafts and scoped commands/confirmations, scope query/PDF output, batch relational permission usage, reuse keyset catalogs, remove unused single-window helper. Advance reviewed physical deltas only; per-file limits, growth allowances and inherited drift unchanged. Shared SQLite/PostgreSQL usage contract and 21 real React lifecycle regressions added; payment UI navigation assertions follow current authorized routes. Evidence: docs/archive/2026-11/2026-11-17付款查询与权限目录修复.md.",
+  "reviewNotes": "2026-11-17 against c3639787: snapshot-bound PDF, scoped type/permission commands, searchable summary pages, row-bound approval reuse, bounded indexed purge, extracted persistence preparation. Shared SQLite/PostgreSQL regressions, opt-in query/lock/memory baseline comparison and real Tauri packing/PDF verification. Advance only this batch physical deltas; preserve existing drift, file caps and growth allowances. Evidence: docs/archive/2026-11/2026-11-17装柜一致性与关联查询优化.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -10,9 +10,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 88445,
+      "baselineAggregateLines": 88528,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 88645,
+      "maximumAggregateLines": 88728,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 112754,
+      "baselineAggregateLines": 112921,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 112829,
+      "maximumAggregateLines": 112996,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 33209,
+      "baselineAggregateLines": 33529,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 33329,
+      "maximumAggregateLines": 33649,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 29703,
+      "baselineAggregateLines": 29882,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 29853,
+      "maximumAggregateLines": 30032,
       "reportFiles": false
     },
     {
@@ -82,9 +82,9 @@
       "filePattern": "^(?:.+\\.(?:mjs|ps1|cmd|yml|yaml|sh)|Dockerfile)$",
       "relativePathPattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)|deploy/rust-native/[^/]+|\\.github/workflows/rust-native-validation\\.yml)$",
       "maximumLines": 350,
-      "baselineAggregateLines": 2466,
+      "baselineAggregateLines": 2475,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 2541,
+      "maximumAggregateLines": 2550,
       "reportFiles": false
     },
     {

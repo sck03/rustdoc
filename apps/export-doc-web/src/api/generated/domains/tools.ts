@@ -76,7 +76,9 @@ export default function createApi(transport: ApiTransport) {
     const path = "/api/tools/container-packing/projects";
     return transport.request<ApiContainerPackingProjectListResponse>("GET", path, {
       query: {
-        "limit": request.limit,
+        "keyword": request.keyword,
+        "pageNumber": request.pageNumber,
+        "pageSize": request.pageSize,
       },
       init,
     });

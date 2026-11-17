@@ -77,7 +77,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("versionNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("name",s()),
         ("containerType",s()),("createdAt",s().format("date-time")),("updatedAt",s().format("date-time"))
     ]).required(vec!["container","rules","cargoItems","id","versionNumber","name","containerType","createdAt","updatedAt"])),
-    ("ApiContainerPackingProjectListResponse",o(vec![("projects",a(r("ApiContainerPackingProjectSummaryDto"))),("storagePolicy",s())]).required(vec!["projects","storagePolicy"])),
+    ("ApiContainerPackingProjectListResponse",o(vec![("projects",a(r("ApiContainerPackingProjectSummaryDto"))),("storagePolicy",s()),("totalCount",i().minimum(num("0"))),("pageNumber",i().minimum(num("1"))),("pageSize",i().minimum(num("1")))]).required(vec!["projects","storagePolicy","totalCount","pageNumber","pageSize"])),
     ("ApiContainerPackingProjectResponse",o(vec![("project",r("ApiContainerPackingProjectDto")),("storagePolicy",s())]).required(vec!["project","storagePolicy"])),
     ("ApiContainerPackingProjectSaveRequest",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("name",s()),

@@ -443,8 +443,11 @@ export interface ApiContainerPackingProjectDto {
 }
 
 export interface ApiContainerPackingProjectListResponse {
+  pageNumber: number;
+  pageSize: number;
   projects: ApiContainerPackingProjectSummaryDto[];
   storagePolicy: string;
+  totalCount: number;
 }
 
 export interface ApiContainerPackingProjectResponse {
@@ -9372,7 +9375,9 @@ export interface ListBusinessAttachmentsRequest {
 }
 
 export interface ListContainerPackingProjectsRequest {
-  limit?: number;
+  keyword?: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListCustomOptionsRequest {

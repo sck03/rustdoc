@@ -19,10 +19,14 @@ import { ContainerPackingProjectPanel } from "./ContainerPackingProjectPanel.tsx
 import { ContainerPackingResults } from "./ContainerPackingResults.tsx";
 import { ContainerPackingToolbar } from "./ContainerPackingToolbar.tsx";
 import { useContainerPackingPdfExport } from "./useContainerPackingPdfExport.ts";
+import type { ContainerPackingSnapshot } from "./containerPackingSnapshot.ts";
+import type { useContainerPackingProjects } from "./useContainerPackingProjects.ts";
 
 type Props = {
   client: ExportDocManagerApiClient;
   analysis: ApiContainerPackingAnalysisDto | null;
+  exportSnapshot: ContainerPackingSnapshot | null;
+  directory: ReturnType<typeof useContainerPackingProjects>["directory"];
   autoRefreshEnabled: boolean;
   autoRefreshState: string;
   canAnalyze: boolean;
@@ -78,12 +82,13 @@ type Props = {
 };
 
 export function ContainerPackingWorkspace(props: Props) {
-  const pdfExport = useContainerPackingPdfExport(props.client, props.projectName, props.container, props.analysis);
+  const pdfExport = useContainerPackingPdfExport(props.client, props.projectName, props.exportSnapshot);
 
   return (
     <form className="job-tool-panel" aria-label="装箱分析" onSubmit={props.onSubmit}>
       <ContainerPackingToolbar
         analysis={props.analysis}
+        canExport={Boolean(props.exportSnapshot?.response.analysis)}
         autoRefreshEnabled={props.autoRefreshEnabled}
         canAnalyze={props.canAnalyze}
         canOperate={props.canOperate}
@@ -127,6 +132,7 @@ export function ContainerPackingWorkspace(props: Props) {
       </div>
 
       <ContainerPackingProjectPanel
+        directory={props.directory}
         canLoadProject={props.canLoadProject}
         canManage={props.canManage}
         canOperate={props.canOperate}

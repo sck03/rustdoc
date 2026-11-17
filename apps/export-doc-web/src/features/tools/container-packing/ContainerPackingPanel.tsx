@@ -5,10 +5,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import type {
   ApiContainerPackingAnalyzeRequest,
-  ApiContainerPackingAnalyzeResponse,
 } from "../../../api/index.ts";
 import { ExportDocManagerApiClient } from "../../../api/index.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
@@ -29,12 +28,13 @@ import {
   findContainerType,
   formatFormNumber,
   isValidContainerPackingCargoRow,
-  readNonNegativeNumberInput,
   readPositiveIntegerInput,
   readPositiveNumberInput,
 } from "./containerPackingModel.ts";
 import { ContainerPackingWorkspace } from "./ContainerPackingWorkspace.tsx";
 import { useContainerPackingProjects } from "./useContainerPackingProjects.ts";
+import { useContainerPackingTypes } from "./useContainerPackingTypes.ts";
+import type { ContainerPackingSnapshot } from "./containerPackingSnapshot.ts";
 
 export function ContainerPackingPanel({
   client,
@@ -47,13 +47,7 @@ export function ContainerPackingPanel({
 }) {
   const requestConfirmation = useScopedConfirmation(client, useConfirmation());
   const queryClient = useQueryClient();
-  const [response, setResponse] =
-    useState<ApiContainerPackingAnalyzeResponse | null>(null);
-  const [analysisDimensions, setAnalysisDimensions] = useState<{
-    length: number;
-    width: number;
-    height: number;
-  } | null>(null);
+  const [snapshot, setSnapshot] = useState<ContainerPackingSnapshot | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [renderMode, setRenderMode] =
     useState<ContainerPackingRenderModeValue>("FullGrid");
@@ -63,28 +57,17 @@ export function ContainerPackingPanel({
   >("disabled");
   const [autoRefreshText, setAutoRefreshText] = useState("自动分析已关闭，修改后请点击“立即刷新”。");
   const autoRefreshTimerRef = useRef<number | null>(null);
-  useEffect(() => { setResponse(null); setAnalysisDimensions(null); }, [client]);
+  useEffect(() => { setSnapshot(null); }, [client]);
 
   const {
     currentProjectId, projectName, selectedProjectId, container, rules, cargoRows,
     setProjectName, setSelectedProjectId, setContainer, setRules, setCargoRows,
-    projectsQuery, saveProjectMutation, loadProjectMutation, deleteProjectMutation, isSaving,
-  } = useContainerPackingProjects(client, () => { setResponse(null); setAnalysisDimensions(null); }, setMessage);
-  const containerTypesQuery = useQuery({
-    queryKey: queryKeys.containerPackingContainerTypes(),
-    queryFn: ({ signal }) => client.listContainerPackingContainerTypes({ signal }),
-  });
+    projectsQuery, directory, saveProjectMutation, loadProjectMutation, deleteProjectMutation, isSaving,
+  } = useContainerPackingProjects(client, () => setSnapshot(null), setMessage);
+  const typeWorkspace = useContainerPackingTypes(client, currentProjectId, container, setContainer, canManage && canOperate, setMessage);
+  const { query: containerTypesQuery, types: containerTypes, selected: selectedContainerType } = typeWorkspace;
 
   const savedProjects = projectsQuery.data?.projects ?? [];
-  const containerTypes = containerTypesQuery.data?.containerTypes ?? [];
-  const selectedContainerType = findContainerType(
-    containerTypes,
-    container.containerType,
-  );
-  const containerTypeVersions = useRef(new Map<number, number>());
-  if (selectedContainerType && !containerTypeVersions.current.has(selectedContainerType.id)) {
-    containerTypeVersions.current.set(selectedContainerType.id, selectedContainerType.versionNumber);
-  }
   const validCargoRows = cargoRows.filter(isValidContainerPackingCargoRow);
   const analysisRequest = useMemo(
     () => buildContainerPackingAnalyzeRequest(container, cargoRows, rules),
@@ -92,8 +75,12 @@ export function ContainerPackingPanel({
   );
   const latestAnalysisRequestRef = useRef(analysisRequest);
   latestAnalysisRequestRef.current = analysisRequest;
-  const analysis = response?.analysis ?? null;
-  const visualizationDimensions = analysis ? analysisDimensions : null;
+  const analysis = snapshot?.response.analysis ?? null;
+  const dimensions = snapshot?.request.container;
+  const visualizationDimensions = useMemo(() => analysis && dimensions ? {
+    length: dimensions.length ?? 0, width: dimensions.width ?? 0, height: dimensions.height ?? 0,
+  } : null, [analysis, dimensions]);
+  const exportSnapshot = snapshot?.request === analysisRequest && canOperate ? snapshot : null;
   const canAnalyze =
     canOperate &&
     readPositiveNumberInput(container.length) > 0 &&
@@ -114,28 +101,19 @@ export function ContainerPackingPanel({
   );
   const packingStatusText = buildContainerPackingStatusText(
     analysis,
-    rules,
+    snapshot?.rules ?? rules,
     validCargoRows.length,
-    autoRefreshText,
+    analysis && !exportSnapshot ? "输入已修改，请重新分析后导出。" : autoRefreshText,
   );
 
-  const analysisScope = useMemo(() => ({}), [client, analysisRequest]);
+  const analysisScope = useMemo(() => ({}), [client, analysisRequest, canOperate]);
   const analyze = useTransientPreview(analysisScope,
     async (signal, variables: { request: ApiContainerPackingAnalyzeRequest; mode: ContainerPackingAnalyzeMode }) => ({
       nextResponse: await client.analyzeContainerPacking({ body: variables.request }, { signal }), variables,
     }),
     error => { setAutoRefreshState("error"); setAutoRefreshText("分析失败。"); setMessage(readApiError(error)); },
     ({ nextResponse, variables }) => {
-      setResponse(nextResponse);
-      const analyzedContainer = variables.request.container;
-      if (!analyzedContainer) {
-        throw new Error("装柜分析请求缺少柜型尺寸。");
-      }
-      setAnalysisDimensions({
-        length: analyzedContainer.length ?? 0,
-        width: analyzedContainer.width ?? 0,
-        height: analyzedContainer.height ?? 0,
-      });
+      setSnapshot({ request: variables.request, response: nextResponse, containerType: container.containerType, rules });
       setAutoRefreshState("complete");
       setAutoRefreshText(
         variables.mode === "auto" ? "自动分析完成。" : "手动刷新完成。",
@@ -189,51 +167,6 @@ export function ContainerPackingPanel({
     validCargoRows.length, client,
   ]);
 
-  const saveContainerTypeMutation = useMutation({
-    mutationFn: () =>
-      client.saveContainerPackingContainerType({
-        body: {
-          id: selectedContainerType?.id ?? 0,
-          expectedVersion: selectedContainerType ? containerTypeVersions.current.get(selectedContainerType.id) : undefined,
-          name: container.containerType.trim(),
-          length: readPositiveIntegerInput(container.length, 0),
-          width: readPositiveIntegerInput(container.width, 0),
-          height: readPositiveIntegerInput(container.height, 0),
-          maxVolume: readNonNegativeNumberInput(container.volume),
-          maxWeight: readNonNegativeNumberInput(container.maxWeight),
-        },
-      }),
-    onSuccess: (nextResponse) => {
-      containerTypeVersions.current.set(nextResponse.id, nextResponse.containerType.versionNumber);
-      setContainer((current) => ({
-        ...current,
-        containerType: nextResponse.containerType.name,
-      }));
-      setMessage(nextResponse.message || "柜型已保存。");
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.containerPackingContainerTypes(),
-      });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-    },
-  });
-
-  const deleteContainerTypeMutation = useMutation({
-    mutationFn: (containerTypeId: number) =>
-      client.deleteContainerPackingContainerType({ id: containerTypeId, expectedVersion: containerTypeVersions.current.get(containerTypeId) ?? 0 }),
-    onSuccess: () => {
-      setContainer((current) => ({ ...current, containerType: "" }));
-      setMessage("柜型已删除。");
-      void queryClient.invalidateQueries({
-        queryKey: queryKeys.containerPackingContainerTypes(),
-      });
-    },
-    onError: (error) => {
-      setMessage(readApiError(error));
-    },
-  });
-
   function markAnalysisInputsChanged() {
     setMessage(null);
   }
@@ -253,7 +186,6 @@ export function ContainerPackingPanel({
 
   function applyContainerType(typeName: string) {
     const definition = findContainerType(containerTypes, typeName);
-    if (definition) containerTypeVersions.current.set(definition.id, definition.versionNumber);
     setContainer((current) =>
       definition
         ? {
@@ -311,8 +243,7 @@ export function ContainerPackingPanel({
     }
 
     setCargoRows([]);
-    setResponse(null);
-    setAnalysisDimensions(null);
+    setSnapshot(null);
     setMessage("货物列表已清空。");
   }
 
@@ -380,25 +311,25 @@ export function ContainerPackingPanel({
   }
 
   function handleSaveContainerType() {
-    if (!canSaveContainerType || saveContainerTypeMutation.isPending) {
+    if (!canSaveContainerType || typeWorkspace.command.isPending) {
       return;
     }
 
     setMessage(null);
-    saveContainerTypeMutation.mutate();
+    typeWorkspace.command.mutate("save");
   }
 
   function handleDeleteContainerType() {
     if (
       !selectedContainerType ||
       selectedContainerType.isSystemDefault ||
-      deleteContainerTypeMutation.isPending
+      typeWorkspace.command.isPending
     ) {
       return;
     }
 
     setMessage(null);
-    deleteContainerTypeMutation.mutate(selectedContainerType.id);
+    typeWorkspace.command.mutate("delete");
   }
 
   const queryMessage = projectsQuery.isError
@@ -413,8 +344,7 @@ export function ContainerPackingPanel({
     saveProjectMutation.isError ||
     loadProjectMutation.isError ||
     deleteProjectMutation.isError ||
-    saveContainerTypeMutation.isError ||
-    deleteContainerTypeMutation.isError;
+    typeWorkspace.failed;
 
   return (
     <ContainerPackingWorkspace
@@ -423,9 +353,9 @@ export function ContainerPackingPanel({
       canManage={canManage} canOperate={canOperate}
       canSaveContainerType={canSaveContainerType} canSaveProject={canSaveProject} cargoRows={cargoRows}
       container={container} containerTypes={containerTypes} currentProjectId={currentProjectId}
-      hasVisibleError={hasVisibleError} isAnalyzing={analyze.isPending} isDeletingContainerType={deleteContainerTypeMutation.isPending}
+      hasVisibleError={hasVisibleError} isAnalyzing={analyze.isPending} isDeletingContainerType={typeWorkspace.command.isPending}
       isDeletingProject={deleteProjectMutation.isPending} isLoadingProject={loadProjectMutation.isPending}
-      isRefreshingProjects={projectsQuery.isFetching} isSavingContainerType={saveContainerTypeMutation.isPending}
+      isRefreshingProjects={projectsQuery.isFetching} isSavingContainerType={typeWorkspace.command.isPending}
       isSavingProject={isSaving} onAddCargo={addCargoRow} onAnalyze={runContainerPackingAnalysis}
       onApplyContainerType={applyContainerType} onAutoRefreshChange={setAutoRefreshEnabled} onClearCargo={clearCargoRows}
       onContainerFieldChange={updateContainerField} onDeleteContainerType={handleDeleteContainerType} onDeleteProject={handleDeleteProject}
@@ -436,6 +366,8 @@ export function ContainerPackingPanel({
       renderMode={renderMode} rules={rules} savedProjects={savedProjects} selectedProjectId={selectedProjectId}
       validCargoCount={validCargoRows.length} visibleMessage={visibleMessage}
       visualizationDimensions={visualizationDimensions}
+      exportSnapshot={exportSnapshot}
+      directory={directory}
     />
   );
 }

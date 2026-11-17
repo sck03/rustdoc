@@ -218,6 +218,22 @@ mod tests {
             .push(serde_json::json!({
                 "name":"Idempotency-Key", "in":"header", "schema":{"type":"string"}
             }));
+        // Reviewed replacement of the truncated packing directory with searchable pages.
+        baseline["paths"]["/api/tools/container-packing/projects"]["get"]["parameters"] = serde_json::json!([
+            {"name":"keyword","in":"query","schema":{"type":"string"}},
+            {"name":"pageNumber","in":"query","schema":{"type":["integer","string"],"format":"int32","pattern":"^-?(?:0|[1-9]\\d*)$"}},
+            {"name":"pageSize","in":"query","schema":{"type":["integer","string"],"format":"int32","pattern":"^-?(?:0|[1-9]\\d*)$"}}
+        ]);
+        let packing_page =
+            &mut baseline["components"]["schemas"]["ApiContainerPackingProjectListResponse"];
+        for (name, minimum) in [("totalCount", 0), ("pageNumber", 1), ("pageSize", 1)] {
+            packing_page["properties"][name] =
+                serde_json::json!({"type":"integer","minimum":minimum});
+            packing_page["required"]
+                .as_array_mut()
+                .unwrap()
+                .push(serde_json::json!(name));
+        }
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

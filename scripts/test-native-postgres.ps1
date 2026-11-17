@@ -2,7 +2,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$PostgresBin,
     [ValidateRange(60, 7200)][int]$TimeoutSeconds = 3600,
-    [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance')][string]$Scope = 'All',
+    [ValidateSet('All', 'Storage', 'Engine', 'Workflows', 'Capacity', 'Maintenance', 'QueryPerformance')][string]$Scope = 'All',
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
     [ValidateRange(200, 100000)][int]$HistoryRows = 10000,
     [ValidateRange(50, 1000)][int]$Rounds = 200
@@ -43,7 +43,7 @@ $databaseTargets = @()
 [string[]]$cargoProfile = @()
 if ($Configuration -eq 'Release') { $cargoProfile = @('--release') }
 if ($Scope -in @('All', 'Storage', 'Workflows')) { $databaseTargets += ,@('POSTGRES', 'native_storage') }
-if ($Scope -in @('All', 'Engine', 'Workflows')) {
+if ($Scope -in @('All', 'Engine', 'Workflows', 'QueryPerformance')) {
     $databaseTargets += ,@('ENGINE', 'native_engine')
 }
 if ($Scope -in @('All', 'Engine')) {
@@ -110,6 +110,13 @@ ALTER DEFAULT PRIVILEGES FOR ROLE native_owner IN SCHEMA public GRANT USAGE, SEL
         $buildArguments = @('build', '--locked', '-p', 'export-doc-server') + $cargoProfile
         Invoke-ExportDocExternal -FilePath 'cargo' -Arguments $buildArguments -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Build the measured Rust HTTP service'
         Invoke-ExportDocExternal -FilePath 'node' -Arguments @('scripts/test_native_capacity.mjs') -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName 'Twenty-session query, approval and PDF capacity comparison'
+    }
+    if ($Scope -eq 'QueryPerformance') {
+        if ($env:EXPORTDOC_QUERY_BENCH_MODE -notin @('baseline', 'current')) { throw 'Set EXPORTDOC_QUERY_BENCH_MODE to baseline or current explicitly.' }
+        foreach ($provider in @('sqlite', 'postgres')) {
+            $testName = if ($provider -eq 'postgres') { 'team_query_costs' } else { 'sqlite_query_costs' }
+            Invoke-ExportDocExternal -FilePath 'cargo' -Arguments (@('test', '--locked', '-p', 'export-doc-engine', '--features', 'postgres,excel', '--lib') + $cargoProfile + @('--', "engine::invoice_maintenance::query_performance::$testName", '--exact', '--ignored', '--nocapture', '--test-threads=1')) -WorkingDirectory $repositoryRoot -Environment $environment -TimeoutSeconds $TimeoutSeconds -DisplayName "Isolated $provider query/lock/memory measurement"
+        }
     }
     if ($Scope -eq 'Maintenance') {
         $environment['EXPORTDOC_MAINTENANCE_ISOLATED'] = '1'

@@ -68,14 +68,13 @@ pub(super) fn append_groups(
             )?;
             let count = rows.len() as i64;
             for row in rows {
-                if !oa::viewable(tx, actor, resource, &row)? {
+                let mut access = oa::Visibility::new(tx, actor, resource, &row);
+                if !access.viewable()? {
                     continue;
                 }
                 let own = row["ownerUserId"] == actor.id;
                 let status = text(&row, "status");
-                let review = (status == "Pending")
-                    .then(|| approval::ReviewSnapshot::read(tx, actor, &row))
-                    .transpose()?;
+                let review = (status == "Pending").then(|| access.review()).transpose()?;
                 let complete = if status != "Approved" {
                     false
                 } else if kind == "oa-general" {

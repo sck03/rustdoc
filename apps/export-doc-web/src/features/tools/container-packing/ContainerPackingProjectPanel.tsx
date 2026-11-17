@@ -1,7 +1,10 @@
 import { FolderOpen, RefreshCw, Save, Trash2 } from "lucide-react";
 import type { ApiContainerPackingProjectSummaryDto } from "../../../api/index.ts";
+import { Pagination } from "../../../ui/primitives/Pagination.tsx";
+import type { useContainerPackingProjects } from "./useContainerPackingProjects.ts";
 
 type Props = {
+  directory: ReturnType<typeof useContainerPackingProjects>["directory"];
   canLoadProject: boolean;
   canManage: boolean;
   canOperate: boolean;
@@ -23,6 +26,7 @@ type Props = {
 };
 
 export function ContainerPackingProjectPanel({
+  directory,
   canLoadProject,
   canManage,
   canOperate,
@@ -43,6 +47,7 @@ export function ContainerPackingProjectPanel({
   onSelectedProjectChange,
 }: Props) {
   return (
+    <>
     <div className="container-packing-project-panel" aria-label="装柜方案管理">
       <label className="container-packing-project-name">
         <span>方案名称</span>
@@ -51,6 +56,10 @@ export function ContainerPackingProjectPanel({
           disabled={!canOperate}
           onChange={(event) => onProjectNameChange(event.target.value)}
         />
+      </label>
+      <label className="container-packing-project-select">
+        <span>搜索方案</span>
+        <input value={directory.keyword} maxLength={100} onChange={event => directory.onKeywordChange(event.target.value)} />
       </label>
       <label className="container-packing-project-select">
         <span>已存方案</span>
@@ -102,5 +111,8 @@ export function ContainerPackingProjectPanel({
         </button>
       </div>
     </div>
+    <Pagination pageNumber={directory.pageNumber} pageSize={directory.pageSize} totalCount={directory.totalCount}
+      isBusy={isRefreshingProjects} onPageChange={directory.onPageChange} />
+    </>
   );
 }

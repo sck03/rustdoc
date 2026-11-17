@@ -1,56 +1,51 @@
-import { useRef, useState } from "react";
-import type { ApiContainerPackingAnalysisDto, ExportDocManagerApiClient } from "../../../api/index.ts";
+import { useMemo, useRef, useState } from "react";
+import type { ExportDocManagerApiClient } from "../../../api/index.ts";
 import { isDesktopBridgeAvailable, selectSavePdfPath } from "../../../desktop/desktopBridge.ts";
 import { downloadBlob } from "../../../ui/downloadBlob.ts";
-import type { ContainerPackingFormState } from "./containerPackingModel.ts";
+import { useScopedMutation } from "../../../ui/useScopedMutation.ts";
+import type { ContainerPackingSnapshot } from "./containerPackingSnapshot.ts";
 
 export function useContainerPackingPdfExport(
   client: ExportDocManagerApiClient,
   projectName: string,
-  container: ContainerPackingFormState,
-  analysis: ApiContainerPackingAnalysisDto | null,
+  snapshot: ContainerPackingSnapshot | null,
 ) {
   const resultsRootRef = useRef<HTMLDivElement | null>(null);
-  const [state, setState] = useState<"idle" | "exporting">("idle");
-  const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
-  async function exportPdf() {
-    if (!analysis || state === "exporting") return;
-    setState("exporting");
-    setMessage(null);
-    try {
+  const owner = useMemo(() => ({ client, projectName, snapshot }), [client, projectName, snapshot]);
+  const [feedback, setFeedback] = useState<{ owner: unknown; kind: "success" | "error"; text: string } | null>(null);
+  const command = useScopedMutation("packing-pdf", owner, {
+    mutationFn: async (_input: void, signal, { checkCurrent }) => {
+      if (!snapshot?.response.analysis || !snapshot.request.container) return;
+      setFeedback(null);
       const fileName = buildContainerPackingPdfFileName(projectName);
       const body = {
         projectName,
-        containerType: container.containerType,
+        containerType: snapshot.containerType,
         destinationPath: "",
-        container: {
-          length: Number(container.length),
-          width: Number(container.width),
-          height: Number(container.height),
-          volume: Number(container.volume),
-          maxWeight: Number(container.maxWeight),
-        },
-        analysis,
+        container: snapshot.request.container,
+        analysis: snapshot.response.analysis,
       };
       if (isDesktopBridgeAvailable()) {
         const destinationPath = await selectSavePdfPath(fileName);
+        checkCurrent();
         if (!destinationPath) return;
-        const result = await client.saveContainerPackingPdfToPath({ body: { ...body, destinationPath } });
-        setMessage({ kind: "success", text: `PDF 已保存到 ${result.filePath}（${formatPdfSize(result.sizeBytes)}）。` });
-        return;
+        const result = await client.saveContainerPackingPdfToPath({ body: { ...body, destinationPath } }, { signal });
+        return `PDF 已保存到 ${result.filePath}（${formatPdfSize(result.sizeBytes)}）。`;
       }
 
-      const blob = await client.downloadContainerPackingPdf({ body });
+      const blob = await client.downloadContainerPackingPdf({ body }, { signal });
+      checkCurrent();
       downloadBlob(blob, fileName);
-      setMessage({ kind: "success", text: `PDF 已下载（${formatPdfSize(blob.size)}）。` });
-    } catch (error) {
+      return `PDF 已下载（${formatPdfSize(blob.size)}）。`;
+    },
+    onSuccess: text => { if (text) setFeedback({ owner, kind: "success", text }); },
+    onError: error => {
       const errorText = error instanceof Error ? error.message : typeof error === "string" ? error : "未知错误";
-      setMessage({ kind: "error", text: `PDF 生成失败：${errorText}` });
-    } finally {
-      setState("idle");
-    }
-  }
-  return { resultsRootRef, state, message, exportPdf };
+      setFeedback({ owner, kind: "error", text: `PDF 生成失败：${errorText}` });
+    },
+  });
+  return { resultsRootRef, state: command.isPending ? "exporting" as const : "idle" as const,
+    message: feedback?.owner === owner ? feedback : null, exportPdf: () => command.mutate() };
 }
 
 function buildContainerPackingPdfFileName(projectName: string, generatedAt = new Date()) {

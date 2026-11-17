@@ -1,5 +1,9 @@
 # 脚本使用说明
 
+2026-11-17 装柜/权限方案：`test_packing_credit_workspace_ui.mjs` 增加柜型迟到响应、命令互斥、分页/搜索、输入失效和 PDF 取消；`test_permission_template_lifecycle_ui.mjs` 纳入 `test:settings-models`，验证真实 React 的客户端/权限/卸载取消、删除缓存及迟到确认。装柜分页摘要进入两库共用工具合同，关联来源的游标投影进入 Storage 共用合同；`test-native-postgres.ps1 -Scope Workflows` 在真实 PostgreSQL 18 执行。schema 18 指纹因新增索引变化，验收使用新隔离数据根。
+
+查询性能手动验收：分别设置 `$env:EXPORTDOC_QUERY_BENCH_MODE='baseline'` 与 `'current'`，各执行一次 `test-native-postgres.ps1 -PostgresBin <PostgreSQL18/bin> -Scope QueryPerformance`。每次创建新隔离集群，SQLite 与 PostgreSQL 各用独立测试进程，输出 `QUERY_PERFORMANCE` JSON。比较每类 3,000 条/8 KiB 载荷中清理 205 条关联记录，以及 100 次审批可见性/任务读取；记录存储适配器调用数、写协调器/连接池等待、用例响应时间、Windows 进程工作集峰值。历史算法仅在忽略的手动测试中对照；计数不是逐条 SQL 数，内存包含测试初始化，耗时不等于 HTTP 延迟或生产容量。
+
 2026-11-17：`npm --prefix apps/export-doc-web run test:payment-query-lifecycle-ui` 使用真实 React 组件验证付款确认跨记录/客户端/权限/卸载、加载失败草稿隔离、重复提交、保存后刷新不占写锁，以及查询导出的筛选与生命周期边界；纳入统一 `editing` 回归组。权限引用统计在 Storage 共用合同中验证缺失/空授权、停用账号、不同发布版本、批量参数边界与解绑，SQLite 和 `test-native-postgres.ps1 -Scope Storage` 执行同一合同。
 
 2026-11-16：`test:audit-log-maintenance-model` 同时运行模型检查与 `test_audit_producer_lifecycle_ui.mjs`，覆盖当前审计实体选项、重复下载不缓存 Blob、卸载/客户端变化取消、生产企业保存期间切换及迟到确认。Storage 共用维护合同覆盖脱敏日志的现存发票号关联、改号/删除、编号投影与游标；`test-native-postgres.ps1 -Scope Storage` 在 PostgreSQL 18 执行同一合同。HTTP 单元回归占满阻塞线程池后丢弃真实路由请求，检查认证和备份授权仍持有并发名额。

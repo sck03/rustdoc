@@ -4,6 +4,8 @@
 
 ## 基线与唯一来源
 
+2026-11-17：两库 `records_source_page` 部分索引按记录种类、`sourceId` 文本表达式及倒序编号组织，只索引存在来源编号的记录。发票维护读取关联记录编号/版本，按游标分批删除并保留同一事务；无来源的其它记录不增加该索引条目。索引进入完整 schema 18 基线，模型指纹更新，不对旧实验库追加 DDL。
+
 `crates/export-doc-storage/src/schema.rs` 固定 `SCHEMA_VERSION = 18`，只接受这一版本。完整 DDL 由下列七组文件组合，不能把其中一个脚本应用到已有库：
 
 自定义 OA 使用 `oa-definition-draft` 分别保存每个流程草稿，`oa-setting-section` 保存日历、代理、办理分工和审批单模板，`oa-approval-settings` 只保存发布目录。`revisions` 提供各编辑单元的 CAS 版本；删除未发布草稿保留版本墓碑，防止旧编辑器覆盖重建内容。发布内容继续进入不可变 `oa-definition-version`。`oa-general` 保存事项键、定义版本、冻结表单、原始值和服务端解析的显示值；显示值沿用原始字段的材料权限。两库均有按单位/事项/编号的分页索引。旧 schema 17 及以下数据库明确拒绝，不修改版本标记。

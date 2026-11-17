@@ -12,6 +12,7 @@ use export_doc_storage::{
 use serde_json::{Value, json};
 use std::{fs::File, time::Duration};
 use unicode_normalization::UnicodeNormalization;
+mod record_policy;
 mod sqlite_layout;
 
 pub struct Store {
@@ -475,77 +476,20 @@ pub fn save_in_scope(
     } else {
         1
     };
-    body["ownerUserId"] = json!(actor.id);
-    let primary_transfer = kind == "people" && action == "primary-transfer";
-    if kind != "users" && !primary_transfer {
-        body["companyScope"] = json!(actor.company);
-    }
-    if !matches!(kind, "people" | "users" | "bookings" | "supply-requests") {
-        body["departmentId"] = json!(actor.department);
-    } else if kind != "users" && body["departmentId"].as_str().is_none_or(str::is_empty) {
-        body["departmentId"] = json!(actor.department);
-    }
-    if id == 0 {
-        body["createdAt"] = json!(now);
-        if let Some(scope) = scope {
-            for key in ["ownerUserId", "companyScope", "departmentId"] {
-                if let Some(value) = scope.get(key) {
-                    body[key] = value.clone();
-                }
-            }
-        }
-    } else {
-        let previous = previous.as_ref().expect("existing record");
-        for key in ["ownerUserId", "companyScope", "departmentId", "createdAt"] {
-            if (key == "departmentId" && matches!(kind, "people" | "users"))
-                || (key == "companyScope" && (kind == "users" || primary_transfer))
-            {
-                continue;
-            }
-            if previous.get(key).is_some() {
-                body[key] = previous[key].clone();
-            }
-        }
-    }
-    if kind == "departments" {
-        body["companyScope"] = body["companyCode"].clone();
-    }
-    if kind == "companies" {
-        body["companyScope"] = body["code"].clone();
-    }
-    body["updatedAt"] = json!(now);
-    body["versionNumber"] = json!(version);
-    body["rowVersion"] = json!(format!("native:{version}"));
-    if let Some(object) = body.as_object_mut() {
-        object.remove("expectedVersion");
-        object.remove("resetPassword");
-    }
-    // The original invoice key is company + invoice number + data type. A
-    // length-delimited JSON tuple keeps both data versions and tenant keys distinct.
-    let identity = if kind == "departments" {
-        Some(department_identity(
-            &super::records::text(&body, "companyCode"),
-            &super::records::text(&body, "code"),
-        )?)
-    } else if kind == "people" {
-        Some(personnel_identity(
-            body["companyScope"].as_str().unwrap_or(""),
-            body["employeeNumber"].as_str().unwrap_or(""),
-        )?)
-    } else if kind == "invoices" {
-        Some(invoice_identity(
-            &body["companyScope"],
-            &body["invoiceNo"],
-            &body["type"],
-        )?)
-    } else {
-        identity
-            .filter(|key| !key.is_empty())
-            .map(|key| normalize(&key))
-    };
-    if id > 0 {
-        identify_record(&mut body, kind, id);
-    }
+    let identity = record_policy::prepare(
+        kind,
+        &mut body,
+        identity,
+        actor,
+        action,
+        record_policy::Revision {
+            id,
+            version,
+            timestamp: &now,
+            previous: previous.as_ref(),
+            inherited_scope: scope,
+        },
+    )?;
     let private_profile = if kind == "people" {
         Some(super::personnel_privacy::split(
             &mut body,
@@ -568,7 +512,7 @@ pub fn save_in_scope(
         id
     };
     if id == 0 {
-        identify_record(&mut body, kind, record_id);
+        record_policy::identify_record(&mut body, kind, record_id);
         connection.set_body(record_id, &body)?;
     }
     if kind == "oa-submission" && id == 0 {
@@ -595,18 +539,6 @@ pub fn save_in_scope(
         connection.put_command_receipt(&receipt, &body)?;
     }
     Ok(body)
-}
-
-fn identify_record(body: &mut Value, kind: &str, id: i64) {
-    body["id"] = json!(id);
-    if kind == "invoices" {
-        for item in body["items"].as_array_mut().into_iter().flatten() {
-            item["invoiceId"] = json!(id);
-        }
-    }
-    if kind == "people" {
-        body["employee"]["id"] = json!(id);
-    }
 }
 
 pub fn paged(mut items: Vec<Value>, query: &[(&str, String)]) -> Value {

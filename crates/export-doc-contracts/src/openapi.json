@@ -2006,6 +2006,14 @@
       "ApiContainerPackingProjectListResponse": {
         "type": "object",
         "properties": {
+          "pageNumber": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1
+          },
           "projects": {
             "type": "array",
             "items": {
@@ -2014,11 +2022,18 @@
           },
           "storagePolicy": {
             "type": "string"
+          },
+          "totalCount": {
+            "type": "integer",
+            "minimum": 0
           }
         },
         "required": [
           "projects",
-          "storagePolicy"
+          "storagePolicy",
+          "totalCount",
+          "pageNumber",
+          "pageSize"
         ]
       },
       "ApiContainerPackingProjectResponse": {
@@ -124069,7 +124084,26 @@
         ],
         "parameters": [
           {
-            "name": "limit",
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pageNumber",
+            "in": "query",
+            "schema": {
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$"
+            }
+          },
+          {
+            "name": "pageSize",
             "in": "query",
             "schema": {
               "type": [

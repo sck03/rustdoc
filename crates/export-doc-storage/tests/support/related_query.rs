@@ -13,6 +13,48 @@ fn insert(c: &Connection, kind: &str, mut body: Value, owner: i64) -> i64 {
 }
 pub fn exercise(c: &Connection) {
     c.begin().unwrap();
+    // Maintenance scans project only deletion identities, across a page boundary.
+    for kind in ["sw-coo", "sw-acd", "sw-batches"] {
+        let mut expected = vec![];
+        for source in [7001, 7002] {
+            for index in 0..203 {
+                let id = insert(
+                    c,
+                    kind,
+                    json!({"sourceId":source,"largePayload":"x".repeat(1000),"sequence":index}),
+                    1,
+                );
+                if source == 7001 {
+                    expected.push(id);
+                }
+            }
+        }
+        let query = export_doc_storage::GenericQuery {
+            kind,
+            scope: export_doc_storage::DataScope {
+                all: true,
+                ..Default::default()
+            },
+            filters: &[("sourceId", "7001".into())],
+            fields: &[("id", "id"), ("versionNumber", "versionNumber")],
+            limit: 200,
+            ..Default::default()
+        };
+        let (cursor, first) = c.scan_generic(&query, None).unwrap();
+        let (_, second) = c.scan_generic(&query, cursor).unwrap();
+        assert_eq!(first.len(), 200);
+        assert_eq!(second.len(), 3);
+        let rows: Vec<_> = first.into_iter().chain(second).collect();
+        assert!(
+            rows.iter()
+                .map(|row| row["id"].as_i64().unwrap())
+                .eq(expected.into_iter().rev())
+        );
+        assert!(
+            rows.iter()
+                .all(|row| row.as_object().unwrap().len() == 2 && row["versionNumber"] == 1)
+        );
+    }
     let mut expected = vec![];
     for index in 0..203 {
         let id = insert(

@@ -1,4 +1,4 @@
-import { useRef, useState, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type SetStateAction } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ExportDocManagerApiClient } from "../../../api/index.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
@@ -31,6 +31,7 @@ export function useContainerPackingProjects(
   latest.current = state;
   const [failed, setFailed] = useState(false);
   const [selectedProjectId, setSelected] = useState("");
+  const [directory, setDirectory] = useState({ keyword: "", pageNumber: 1, pageSize: 30 });
   const selected = useRef(selectedProjectId);
   selected.current = selectedProjectId;
   const confirmAction = useConfirmation();
@@ -43,9 +44,14 @@ export function useContainerPackingProjects(
     message: "装柜方案有未保存的修改。",
   });
   const projectsQuery = useQuery({
-    queryKey: queryKeys.containerPackingProjects(),
-    queryFn: ({ signal }) => client.listContainerPackingProjects({ limit: 100 }, { signal }),
+    queryKey: [...queryKeys.containerPackingProjects(), directory],
+    queryFn: ({ signal }) => client.listContainerPackingProjects(directory, { signal }),
   });
+  useEffect(() => {
+    if (!projectsQuery.data) return;
+    const lastPage = Math.max(1, Math.ceil(projectsQuery.data.totalCount / directory.pageSize));
+    if (directory.pageNumber > lastPage) setDirectory(current => ({ ...current, pageNumber: lastPage }));
+  }, [projectsQuery.data, directory.pageNumber, directory.pageSize]);
   const update = (next: typeof state) => {
     latest.current = next;
     setState(next);
@@ -173,6 +179,12 @@ export function useContainerPackingProjects(
     currentProjectVersion: state.version,
     selectedProjectId,
     projectsQuery,
+    directory: {
+      ...directory,
+      totalCount: projectsQuery.data?.totalCount ?? 0,
+      onKeywordChange: (keyword: string) => { loads.cancel(); select(""); setDirectory(current => ({ ...current, keyword, pageNumber: 1 })); },
+      onPageChange: (pageNumber: number) => { loads.cancel(); select(""); setDirectory(current => ({ ...current, pageNumber })); },
+    },
     isSaving: command.isPending,
     saveProjectMutation: {
       mutate: () => command.mutate({ kind: "save" }),

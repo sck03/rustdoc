@@ -20,16 +20,19 @@ import {InvoiceLetterOfCreditPanel} from ${source("features/invoices/InvoiceLett
 import {createEmptyInvoice} from ${source("features/invoices/invoiceModel.ts")};
 import {ConfirmationProvider} from ${source("ui/ConfirmationProvider.tsx")};
 import {UnsavedChangesProvider,useHasUnsavedChanges} from ${source("ui/unsavedChangesGuard.tsx")};
-window.requests=[];
+window.requests=[];window.directoryRequests=[];
 const queries=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:30000},mutations:{retry:false}}});window.queries=queries;
 const deferred=(kind,request,init)=>new Promise((resolve,reject)=>window.requests.push({kind,request,signal:init.signal,resolve,reject}));
 const project=id=>({id,versionNumber:1,name:id===2?"乙方案":"甲方案",containerType:"20GP",container:{length:589,width:235,height:239,volume:33.2,maxWeight:28000},rules:{allowRotation:true},cargoItems:[{name:id===2?"乙货物":"甲货物",length:60,width:40,height:40,weight:10,quantity:id===2?77:50}]});
-const client={listContainerPackingProjects:async(_request,init)=>window.delayDirectory?deferred("directory",{},init):({projects:[project(1),project(2)]}),listContainerPackingContainerTypes:async()=>({containerTypes:[]}),
+const type=id=>({id,versionNumber:1,name:id===1?"甲柜型":"乙柜型",length:id===1?600:800,width:235,height:239,maxVolume:33.2,maxWeight:28000,isSystemDefault:false});
+const client={listContainerPackingProjects:async(request,init)=>{window.directoryRequests.push(request);return window.delayDirectory?deferred("directory",{},init):({projects:window.largeDirectory?(request.keyword?[project(101)]:request.pageNumber===4?[project(101)]:[project(1),project(2)]):[project(1),project(2)],totalCount:window.largeDirectory?(request.keyword?1:101):2,pageNumber:request.pageNumber,pageSize:request.pageSize});},listContainerPackingContainerTypes:async()=>({containerTypes:[type(1),type(2)]}),
+saveContainerPackingContainerType:(r,i)=>deferred("saveType",r,i),deleteContainerPackingContainerType:(r,i)=>deferred("deleteType",r,i),downloadContainerPackingPdf:(r,i)=>deferred("pdf",r,i),
 getContainerPackingProject:(r,i)=>deferred("load",r,i),saveContainerPackingProject:(r,i)=>deferred("save",r,i),deleteContainerPackingProject:(r,i)=>deferred("delete",r,i),
 analyzeContainerPacking:(r,i)=>deferred("analyze",r,i),
 uploadLetterOfCreditDocument:(r,i)=>deferred("import",r,i),reviewLetterOfCreditCompliance:(r,i)=>deferred("review",r,i)};
 window.finish=index=>{const pending=window.requests[index];
 if(pending.kind==="load")pending.resolve({project:project(pending.request.id)});
+else if(pending.kind==="saveType")pending.resolve({id:pending.request.body.id||3,containerType:{...type(pending.request.body.id||3),...pending.request.body,versionNumber:2}});
 else if(pending.kind==="analyze")pending.resolve({analysis:null,diagnostic:"x".repeat(200000)});
 else if(pending.kind==="save")pending.resolve({id:pending.request.body.id||1,project:{...pending.request.body,id:pending.request.body.id||1,versionNumber:(pending.request.body.expectedVersion||0)+1}});
 else if(pending.kind==="import")pending.resolve({sourcePath:"甲信用证.txt",extractedText:"甲信用证正文",sourceDescription:"甲信用证"});
@@ -65,6 +68,50 @@ async function importCredit(page) {
   await page.waitForFunction(() => window.requests.length === 1);
 }
 try {
+  for (const kind of ["saveType", "deleteType"]) for (const outcome of ["resolve", "reject"]) await scenario("packing", async page => {
+    await page.getByLabel("柜型", { exact: true }).fill("甲柜型");
+    await page.getByRole("button", { name: kind === "saveType" ? "保存柜型" : "删除柜型", exact: true }).click();
+    await page.waitForFunction(() => window.requests.length === 1);
+    assert.equal(await page.getByRole("button", { name: kind === "saveType" ? "删除柜型" : "保存柜型", exact: true }).isDisabled(), true);
+    await page.getByLabel("柜型", { exact: true }).fill("乙柜型");
+    await page.waitForFunction(() => window.requests[0].signal.aborted);
+    await page.evaluate(outcome => outcome === "resolve" ? window.finish(0) : window.requests[0].reject(new Error("旧柜型失败")), outcome);
+    assert.equal(await page.getByLabel("柜型", { exact: true }).inputValue(), "乙柜型");
+    assert.equal(await page.getByLabel("柜长 cm", { exact: true }).inputValue(), "800");
+    assert.equal(await page.getByText("旧柜型失败").count(), 0);
+    assert.equal(await page.evaluate(() => window.queries.getMutationCache().getAll().length), 0);
+  });
+  await scenario("packing", async page => {
+    await page.evaluate(() => { window.largeDirectory = true; });
+    await page.getByRole("button", { name: "刷新方案", exact: true }).click();
+    await page.getByRole("button", { name: "末页", exact: true }).click();
+    await page.waitForFunction(() => window.directoryRequests.at(-1).pageNumber === 4);
+    await page.getByLabel(/^已存方案/).selectOption("101");
+    await page.getByLabel("搜索方案", { exact: true }).fill("甲方案");
+    await page.waitForFunction(() => window.directoryRequests.at(-1).keyword === "甲方案");
+    assert.equal(await page.evaluate(() => window.directoryRequests.at(-1).pageNumber), 1);
+    assert.equal(await page.getByLabel(/^已存方案/).inputValue(), "");
+  });
+  await scenario("packing", async page => {
+    const analyze = async () => {
+      await page.getByRole("button", { name: "分析", exact: true }).click();
+      await page.waitForFunction(() => window.requests.at(-1)?.kind === "analyze");
+      await page.evaluate(() => window.requests.at(-1).resolve({analysis:{packedItems:[],totalPackages:1,packedPackages:1,unpackedPackages:0,estimatedContainerCount:1,volumeUtilizationPercent:1,weightUtilizationPercent:1,packedVolume:1,totalVolume:1,packedWeight:1,totalWeight:1}}));
+      await page.getByText("装箱分析完成。", { exact: true }).waitFor();
+    };
+    await analyze();
+    assert.equal(await page.getByRole("button", { name: "导出 PDF", exact: true }).isEnabled(), true);
+    await page.getByLabel("柜长 cm", { exact: true }).fill("900");
+    assert.equal(await page.getByRole("button", { name: "导出 PDF", exact: true }).isDisabled(), true);
+    await analyze();
+    await page.getByRole("button", { name: "导出 PDF", exact: true }).click();
+    await page.waitForFunction(() => window.requests.at(-1)?.kind === "pdf");
+    assert.equal(await page.evaluate(() => window.requests.at(-1).request.body.container.length), 900);
+    await page.getByLabel("柜长 cm", { exact: true }).fill("901");
+    await page.waitForFunction(() => window.requests.at(-1).signal.aborted);
+    await page.evaluate(() => window.requests.at(-1).resolve(new Blob(["pdf"])));
+    assert.equal(await page.getByText(/PDF 已下载/).count(), 0);
+  });
   await scenario("packing", async page => {
     await load(page, 1);
     await page.evaluate(() => { window.delayDirectory = true; });

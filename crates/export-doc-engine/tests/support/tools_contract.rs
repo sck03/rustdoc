@@ -49,6 +49,58 @@ pub fn exercise(
     let read = by_id(GET_CONTAINER_PACKING_PROJECT, id).unwrap();
     assert_eq!(read["project"]["name"], "装柜方案已复核");
     assert_eq!(read["project"]["cargoItems"], plan["cargoItems"]);
+    let mut directory_ids = Vec::new();
+    for index in 0..101 {
+        let mut entry = plan.clone();
+        entry["id"] = json!(0);
+        entry["expectedVersion"] = json!(0);
+        entry["name"] = json!(format!("目录分页回归-{index:03}"));
+        directory_ids.push(run(SAVE_CONTAINER_PACKING_PROJECT, Some(entry)).unwrap()["id"].clone());
+    }
+    let directory = call(
+        LIST_CONTAINER_PACKING_PROJECTS,
+        &[],
+        &[
+            ("keyword", "目录分页回归".into()),
+            ("pageNumber", "4".into()),
+            ("pageSize", "30".into()),
+        ],
+        None,
+    )
+    .unwrap();
+    export_doc_contracts::validation::response(LIST_CONTAINER_PACKING_PROJECTS.id, &directory)
+        .unwrap();
+    assert_eq!(directory["totalCount"], 101);
+    assert_eq!(directory["projects"].as_array().unwrap().len(), 11);
+    assert!(
+        directory["projects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p["id"] == directory_ids[0])
+    );
+    for project in directory["projects"].as_array().unwrap() {
+        assert!(project.get("cargoItems").is_none());
+        assert!(project.get("container").is_none());
+    }
+    let search = call(
+        LIST_CONTAINER_PACKING_PROJECTS,
+        &[],
+        &[("keyword", "目录分页回归-000".into())],
+        None,
+    )
+    .unwrap();
+    assert_eq!(search["totalCount"], 1);
+    assert_eq!(search["projects"][0]["id"], directory_ids[0]);
+    for id in directory_ids {
+        call(
+            DELETE_CONTAINER_PACKING_PROJECT,
+            &[("id", id.to_string())],
+            &[("expectedVersion", "1".into())],
+            None,
+        )
+        .unwrap();
+    }
     plan["container"]["maxWeight"] = json!(35);
     let limited = run(ANALYZE_CONTAINER_PACKING, Some(plan.clone())).unwrap();
     assert_eq!(limited["analysis"]["packedPackages"], 3);

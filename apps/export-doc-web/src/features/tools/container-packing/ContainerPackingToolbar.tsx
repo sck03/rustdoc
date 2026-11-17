@@ -7,6 +7,7 @@ import {
 
 type Props = {
   analysis: ApiContainerPackingAnalysisDto | null;
+  canExport: boolean;
   autoRefreshEnabled: boolean;
   canAnalyze: boolean;
   canOperate: boolean;
@@ -27,6 +28,7 @@ type Props = {
 
 export function ContainerPackingToolbar({
   analysis,
+  canExport,
   autoRefreshEnabled,
   canAnalyze,
   canOperate,
@@ -115,13 +117,13 @@ export function ContainerPackingToolbar({
         <button
           className="command-button secondary"
           type="button"
-          disabled={!analysis || pdfExportState === "exporting"}
+          disabled={!canExport || pdfExportState === "exporting"}
           onClick={onExportPdf}
         >
           <FileDown size={16} aria-hidden="true" />
           <span>{pdfExportState === "exporting" ? "正在生成" : "导出 PDF"}</span>
         </button>
-        <button className="solid action-button" type="submit" disabled={!canAnalyze || isAnalyzing}>
+        <button className="command-button" type="submit" disabled={!canAnalyze || isAnalyzing}>
           <PackageCheck size={16} aria-hidden="true" />
           <span>分析</span>
         </button>
