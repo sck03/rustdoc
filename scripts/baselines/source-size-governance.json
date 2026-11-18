@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-18",
-  "reviewNotes": "2026-11-18 against 3a2cc0a1: isolate record lifetimes and normalize declared numeric/string IDs; share decimal profit and readiness rules in Domain; structured concurrency errors and early body authorization; bounded custom-option reads; remove display metadata and test-only production API. Regressions cover both stores and atomic test-directory ownership. Advance only measured batch deltas; retain every file cap and growth allowance. Evidence: docs/archive/2026-11/2026-11-18记录边界与资源优化.md.",
+  "reviewNotes": "2026-11-18 against b412e946: split the sales workspace and preserve quotation fields/continued edits; atomic invoice feedback; shared history authorization and indexed cursors; bounded JSON transfer and on-demand metrics; retire seven duplicate APIs; align diagnostics metadata and share current UI fixtures. Advance only measured batch deltas, including source-local tests; retain existing file caps and growth allowances. Add a stricter sales-workspace cap. Final measurements and validation: docs/archive/2026-11/2026-11-18业务一致性与响应资源治理.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -10,9 +10,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 88352,
+      "baselineAggregateLines": 88443,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 88552,
+      "maximumAggregateLines": 88643,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 113255,
+      "baselineAggregateLines": 113574,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 113330,
+      "maximumAggregateLines": 113649,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 33821,
+      "baselineAggregateLines": 34164,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 33941,
+      "maximumAggregateLines": 34284,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 30068,
+      "baselineAggregateLines": 30238,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 30218,
+      "maximumAggregateLines": 30388,
       "reportFiles": false
     },
     {
@@ -106,6 +106,13 @@
       "baselineAggregateLines": 518,
       "maximumAggregateGrowthLines": 40,
       "maximumAggregateLines": 558
+    },
+    {
+      "name": "sales opportunity workspace",
+      "directory": "apps/export-doc-web/src/features/opportunities",
+      "filePattern": "^.+\\.(?:ts|tsx)$",
+      "maximumLines": 180,
+      "maximumAggregateLines": 425
     },
     {
       "name": "worklist workspace",

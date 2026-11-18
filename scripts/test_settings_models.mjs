@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { runtimeDiagnosticsHealth } from "./lib/runtime-diagnostics-fixture.mjs";
 
 const require = createRequire(import.meta.url);
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -111,51 +112,32 @@ assert(reportTemplateSelection.readDefaultReportTemplatePath({
   reportTemplateDefaults: { paymentVoucherTemplatePath: "user:Internal/payment.html" },
 }, "PaymentVoucher") === "user:Internal/payment.html", "payment default template setting");
 
-const runtimeGroups = runtimeDiagnostics.buildRuntimePathGroups({
-  appRoot: "E:/App",
-  checkedAt: "2026-07-13T00:00:00Z",
-  dataRoot: "E:/App/App_Data",
-  databaseRoot: "E:/App/App_Data/Database",
-  informationalVersion: "1.0.0+test",
-  productVersion: "1.0.0",
-  runtimePaths: [
-    { key: "template-root", label: "报表模板", path: "E:/App/Templates", storageClass: "program-resource", accessMode: "managed", requirement: "feature", exists: true, description: "模板" },
-    { key: "log-root", label: "日志目录", path: "E:/App/App_Data/Logs", storageClass: "runtime-data", accessMode: "read-write", requirement: "core", exists: true, description: "日志" },
-    { key: "tool-root", label: "工具运行包", path: "E:/App/Tools", storageClass: "program-resource", accessMode: "read-only", requirement: "optional", exists: false, description: "工具" },
-  ],
-  runtimeDependencies: [
-    { key: "report-renderer", label: "报表 PDF 浏览器", requirement: "feature", status: "ready", ready: true, resolvedPath: "E:/App/Browsers/chrome.exe", message: "ready" },
-    { key: "ocr-runtime", label: "智能 OCR", requirement: "optional", status: "missing", ready: false, resolvedPath: "E:/App/OcrModels/PaddleOCR/V6", message: "missing" },
-  ],
-  status: "ok",
-});
+const health = runtimeDiagnosticsHealth();
+const runtimeGroups = runtimeDiagnostics.buildRuntimePathGroups(health);
 assert(runtimeGroups.length === 2, "runtime path grouping");
-assert(runtimeGroups[0].items[0].availability === "available", "runtime available status");
-assert(runtimeGroups[0].items[1].availability === "missing", "runtime missing status");
-assert(runtimeDiagnostics.runtimePathAccessModeLabel("managed") === "功能维护", "managed access label");
+assert(runtimeGroups[0].items.length === 1 && runtimeGroups[1].items.length === 3, "all four current runtime roots remain visible");
+assert(runtimeDiagnostics.runtimePathAccessModeLabel("read") === "只读", "current read access label");
 const runtimeSummary = runtimeDiagnostics.summarizeRuntimePathGroups(runtimeGroups);
-assert(runtimeSummary.total === 3, "runtime path summary");
-assert(runtimeSummary.coreTotal === 1 && runtimeSummary.coreMissing === 0, "optional dependency does not fail core readiness");
-assert(runtimeSummary.featureMissing === 0, "feature dependency summary");
-assert(runtimeDiagnostics.runtimePathRequirementLabel("feature") === "按功能需要", "runtime requirement label");
-const runtimeDependencies = runtimeDependencyDiagnostics.buildRuntimeDependencyItems({
-  appRoot: "E:/App",
-  checkedAt: "2026-07-13T00:00:00Z",
-  dataRoot: "E:/App/App_Data",
-  databaseRoot: "E:/App/App_Data/Database",
-  informationalVersion: "1.0.0+test",
-  productVersion: "1.0.0",
-  runtimeDependencies: [
-    { key: "report-renderer", label: "报表 PDF 浏览器", requirement: "feature", status: "ready", ready: true, resolvedPath: "E:/App/Browsers/chrome.exe", message: "ready" },
-    { key: "ocr-runtime", label: "智能 OCR", requirement: "optional", status: "disabled", ready: false, resolvedPath: "E:/App/OcrModels/PaddleOCR/V6", message: "disabled" },
-  ],
-  runtimePaths: [],
-  status: "ok",
-});
+assert(runtimeSummary.coreTotal === 4 && runtimeSummary.coreAvailable === 4 && runtimeSummary.invalidMetadata === 0, "current required root summary");
+assert(runtimeDiagnostics.runtimePathRequirementLabel(runtimeGroups[0].items[0].requirement) === "核心必需", "required roots never labelled optional");
+const runtimeDependencies = runtimeDependencyDiagnostics.buildRuntimeDependencyItems(health);
 const runtimeDependencySummary = runtimeDependencyDiagnostics.summarizeRuntimeDependencies(runtimeDependencies);
-assert(runtimeDependencySummary.total === 2 && runtimeDependencySummary.ready === 1, "runtime dependency summary");
-assert(runtimeDependencySummary.featureUnavailable === 0 && runtimeDependencySummary.optionalUnavailable === 1, "optional runtime dependency summary");
+assert(runtimeDependencies[0].requirement === "required", "SQLite is required");
+assert(runtimeDependencySummary.total === 3 && runtimeDependencySummary.ready === 2, "runtime dependency summary");
+assert(runtimeDependencySummary.requiredUnavailable === 0 && runtimeDependencySummary.optionalUnavailable === 1, "disabled OCR does not fail core readiness");
 assert(runtimeDependencyDiagnostics.runtimeDependencyStatusLabel("incomplete") === "文件不完整", "runtime dependency status label");
+health.runtimePaths[1].exists = false;
+health.runtimeDependencies[0].ready = false; health.runtimeDependencies[0].status = "missing";
+assert(runtimeDiagnostics.summarizeRuntimePathGroups(runtimeDiagnostics.buildRuntimePathGroups(health)).coreMissing === 1, "missing required directory is reported");
+assert(runtimeDependencyDiagnostics.summarizeRuntimeDependencies(runtimeDependencyDiagnostics.buildRuntimeDependencyItems(health)).requiredUnavailable === 1, "missing SQLite is reported");
+health.runtimePaths[0].storageClass = "unrecognized"; health.runtimePaths[0].requirement = "unrecognized"; health.runtimePaths[0].accessMode = "unrecognized";
+const malformedGroups = runtimeDiagnostics.buildRuntimePathGroups(health);
+assert(malformedGroups.flatMap(group => group.items).length === 4 && malformedGroups.at(-1).key === "unknown", "unknown directory metadata stays visible");
+assert(runtimeDiagnostics.summarizeRuntimePathGroups(malformedGroups).invalidMetadata === 1, "unknown directory metadata is reported");
+health.runtimeDependencies[0].requirement = "unrecognized"; health.runtimeDependencies[0].status = "unrecognized";
+assert(runtimeDependencyDiagnostics.summarizeRuntimeDependencies(runtimeDependencyDiagnostics.buildRuntimeDependencyItems(health)).invalidMetadata === 1, "unknown dependency metadata is reported");
+health.runtimeDependencies[0].requirement = "required"; health.runtimeDependencies[0].status = "ready";
+assert(runtimeDependencyDiagnostics.summarizeRuntimeDependencies(runtimeDependencyDiagnostics.buildRuntimeDependencyItems(health)).invalidMetadata === 1, "contradictory readiness is reported");
 const draft = globalThis.__draft;
 for (const section of ["documents", "documentDefaults", "documentFields"]) {
   assert(navigation.readSettingsCategoryFromSearch("?section=" + section) === "documents", "document settings category");

@@ -85,7 +85,7 @@ pub(super) fn details(
             name
         });
     }
-    value["allowedNextStages"] = json!(sales::next_stages(value["stage"].as_str().unwrap_or("")));
+    value["allowedNextStages"] = next_stages(&value);
     Ok(contracts::project(
         contracts::schema("ApiSalesOpportunityDto"),
         value,
@@ -93,8 +93,27 @@ pub(super) fn details(
 }
 
 pub(super) fn projected(mut value: Value) -> Value {
-    value["allowedNextStages"] = json!(sales::next_stages(value["stage"].as_str().unwrap_or("")));
+    value["allowedNextStages"] = next_stages(&value);
     contracts::project(contracts::schema("ApiSalesOpportunityDto"), value)
+}
+
+fn next_stages(value: &Value) -> Value {
+    if value["isArchived"] == true {
+        json!([])
+    } else {
+        json!(sales::next_stages(value["stage"].as_str().unwrap_or("")))
+    }
+}
+
+/// History and detail share record, parent-customer and product access rules.
+fn read(tx: &Connection, actor: &Actor, record_id: i64) -> Result<Value> {
+    auth::authorize(actor, "common.product-reference", "view")?;
+    details(
+        tx,
+        actor,
+        checked(tx, actor, record_id, "view", true)?,
+        "view",
+    )
 }
 
 fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value> {
@@ -104,6 +123,11 @@ fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value>
         return Err(invalid("商机阶段无效。"));
     }
     let keyword = store::normalize(read("keyword"));
+    let include_archived = match read("includeArchived") {
+        "" | "false" => false,
+        "true" => true,
+        _ => return Err(invalid("归档筛选参数无效。")),
+    };
     let customer_id = if read("crmCustomerId").is_empty() {
         None
     } else {
@@ -131,6 +155,7 @@ fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value>
                 stage,
                 keyword: &keyword,
                 upcoming_closings: false,
+                include_archived,
             },
             &crm_queries::fields("ApiSalesOpportunityDto"),
             offset,
@@ -173,26 +198,56 @@ fn append(
     Ok(())
 }
 
-fn history(store: &Store, actor: &Actor, record_id: i64) -> Result<Value> {
-    store.read_for(actor, LIST_SALES_OPPORTUNITY_HISTORY, &[], |tx, actor| {
-        checked(tx, actor, record_id, "view", true)?;
-        let mut rows: Vec<_> = store::matching(
-            tx,
-            "opportunity-events",
-            &[("opportunityId", record_id.to_string())],
-            &[("id", "id"), ("snapshot", "snapshot")],
-        )?
-        .into_iter()
-        .map(|row| {
-            let mut snapshot = row["snapshot"].clone();
-            snapshot["id"] = row["id"].clone();
-            snapshot
-        })
-        .collect();
-        rows.sort_by_key(|row| {
-            std::cmp::Reverse((row["versionNumber"].as_i64(), row["id"].as_i64()))
-        });
-        Ok(json!(rows))
+fn history(
+    store: &Store,
+    actor: &Actor,
+    record_id: i64,
+    query: &[(&str, String)],
+) -> Result<Value> {
+    let positive = |key| -> Result<Option<i64>> {
+        super::request_values::find(query, key)
+            .map(|value| {
+                value
+                    .parse::<i64>()
+                    .ok()
+                    .filter(|id| *id > 0)
+                    .ok_or_else(|| invalid("历史分页参数无效。"))
+            })
+            .transpose()
+    };
+    let before = positive("beforeId")?;
+    let limit = positive("limit")?.unwrap_or(30);
+    if limit > 200 {
+        return Err(invalid("历史每页最多 200 条。"));
+    }
+    store.read_for(actor, LIST_SALES_OPPORTUNITY_HISTORY, query, |tx, actor| {
+        read(tx, actor, record_id)?;
+        let (_, mut rows) = tx.scan_generic(
+            &export_doc_storage::GenericQuery {
+                kind: "opportunity-events",
+                scope: export_doc_storage::DataScope {
+                    all: true,
+                    ..Default::default()
+                },
+                filters: &[("opportunityId", record_id.to_string())],
+                fields: &[("id", "id"), ("snapshot", "snapshot")],
+                limit: limit + 1,
+                ..Default::default()
+            },
+            before,
+        )?;
+        let more = rows.len() > limit as usize;
+        rows.truncate(limit as usize);
+        let next = more.then(|| rows.last().unwrap()["id"].clone());
+        let items: Vec<_> = rows
+            .into_iter()
+            .map(|mut row| {
+                let mut snapshot = row["snapshot"].take();
+                snapshot["id"] = row["id"].take();
+                snapshot
+            })
+            .collect();
+        Ok(json!({"items":items,"nextCursor":next}))
     })
 }
 
@@ -201,6 +256,9 @@ fn save(store: &Store, actor: &Actor, record_id: i64, body: &Value) -> Result<Va
         .map_err(|cause| invalid(format!("商机资料无效：{cause}")))?;
     if record_id == 0 && request.id > 0 {
         return Err(invalid("新增商机不能包含已有 ID。"));
+    }
+    if request.id < 0 || (request.id != 0 && request.id != record_id) {
+        return Err(invalid("商机编号与请求地址不一致。"));
     }
     request.id = record_id;
     sales::normalize(&mut request).map_err(invalid)?;
@@ -340,15 +398,9 @@ pub fn handle(
     match operation {
         QUERY_SALES_OPPORTUNITIES => list(store, actor, query),
         GET_SALES_OPPORTUNITY => store.read_for(actor, operation, query, |tx, actor| {
-            auth::authorize(actor, "common.product-reference", "view")?;
-            details(
-                tx,
-                actor,
-                checked(tx, actor, id(parameters)?, "view", false)?,
-                "view",
-            )
+            read(tx, actor, id(parameters)?)
         }),
-        LIST_SALES_OPPORTUNITY_HISTORY => history(store, actor, id(parameters)?),
+        LIST_SALES_OPPORTUNITY_HISTORY => history(store, actor, id(parameters)?, query),
         CREATE_SALES_OPPORTUNITY => save(store, actor, 0, body),
         UPDATE_SALES_OPPORTUNITY => save(store, actor, id(parameters)?, body),
         _ => action(store, actor, operation, id(parameters)?, body),

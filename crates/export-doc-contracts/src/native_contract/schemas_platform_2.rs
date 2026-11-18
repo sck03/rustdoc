@@ -127,12 +127,13 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("retentionFailure",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String]))),
         ("active",i().minimum(num("0")).format("int64")),("workerHandles",i().minimum(num("0")).format("int64")),("stopping",b()),
         ("failed",b()),("persistedCounts",ty(Primitive::Object).additional(Additional::Schema(Box::new(i().minimum(num("0")).format("int64"))))),("retainedOutputBytes",i().minimum(num("0")).format("int64")),
-        ("retainedInputBytes",i().minimum(num("0")).format("int64")),("downloadMemory",o(vec![("capacityBytes",i().minimum(num("0")).format("int64")),("reservedBytes",i().minimum(num("0")).format("int64")),("rejections",i().minimum(num("0")).format("int64"))]).required(vec!["capacityBytes","reservedBytes","rejections"]).additional(Additional::Allowed(false)))
+        ("retainedInputBytes",i().minimum(num("0")).format("int64")),("downloadMemory",super::schema_shapes::memory_budget())
     ]).required(vec!["retentionFailure","active","workerHandles","stopping","failed","persistedCounts","retainedOutputBytes","retainedInputBytes","downloadMemory"]).additional(Additional::Allowed(false))),
     ("ApiRuntimeHttpMetrics",object_groups(vec![
+        (&["responseMemory"], super::schema_shapes::memory_budget()),
         (&["requests","queueWait","downloads"], r("ApiRuntimeLatencyMetrics")),
         (&["queueCapacity","queuedRequests","admissionRejected","bulkRejected","requestCapacity","availableRequestSlots","bulkCapacity","availableBulkSlots","uptimeSeconds","logsDropped","logWriteErrors","downloadCapacity","downloadTimeouts","downloadDisconnects","downloadReadErrors"], i().minimum(num("0")).format("int64")),
-    ]).required(vec!["requests","queueWait","queueCapacity","queuedRequests","admissionRejected","bulkRejected","requestCapacity","availableRequestSlots","bulkCapacity","availableBulkSlots","uptimeSeconds","logsDropped","logWriteErrors","downloads","downloadCapacity","downloadTimeouts","downloadDisconnects","downloadReadErrors"]).additional(Additional::Allowed(false))),
+    ]).required(vec!["responseMemory","requests","queueWait","queueCapacity","queuedRequests","admissionRejected","bulkRejected","requestCapacity","availableRequestSlots","bulkCapacity","availableBulkSlots","uptimeSeconds","logsDropped","logWriteErrors","downloads","downloadCapacity","downloadTimeouts","downloadDisconnects","downloadReadErrors"]).additional(Additional::Allowed(false))),
     ("ApiRuntimeMetricsResponse",o(vec![
         ("checkedAt",s().format("date-time")),("storage",r("ApiRuntimeDatabaseMetrics")),("jobs",r("ApiRuntimeJobMetrics")),
         ("workflowSchedule",super::scheduler_metrics::workflow()),("http",Schema::default().any_of(vec![r("ApiRuntimeHttpMetrics"),ty(Primitive::Null)]))

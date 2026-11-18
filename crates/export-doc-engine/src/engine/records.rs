@@ -9,6 +9,7 @@ use crate::{contracts, generated_api::Operation};
 use export_doc_storage::AuditWrite;
 use serde_json::{Value, json};
 use unicode_normalization::UnicodeNormalization;
+mod invoice_feedback;
 mod invoice_save;
 mod queries;
 mod references;
@@ -483,6 +484,9 @@ pub(super) fn save_in_transaction(
     } else {
         Some(text(&value, resource.identity))
     };
+    if resource.key == "invoices" {
+        invoice_feedback::apply(transaction, actor, &mut value, business_date)?;
+    }
     let mut saved = store::save_in_scope(
         transaction,
         resource.key,

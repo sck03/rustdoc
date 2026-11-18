@@ -210,6 +210,8 @@ pub(super) fn document() -> Value {
         );
     }
     let mut document = metadata::root();
+    document["x-exportdoc-json-response-limit-bytes"] =
+        serde_json::json!(crate::request_limits::MAX_JSON_RESPONSE_BYTES);
     document["components"]["schemas"] = serde_json::to_value(schemas).expect("native schemas");
     document["paths"] = serde_json::to_value(paths).expect("native operations");
     document

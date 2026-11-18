@@ -19,6 +19,9 @@ pub struct ApiClient {
 }
 
 impl ApiClient {
+    pub fn run_contract(&self, contract: impl FnOnce(&NativeService, &str)) {
+        contract(&self.native, &self.access_token);
+    }
     pub fn publish_scheme(&self, scheme: Value) -> Value {
         workflow::publish_scheme(&self.native, &self.access_token, scheme)
     }

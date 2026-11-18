@@ -62,6 +62,7 @@ pub async fn handle(state: ServerState, operation: Operation, request: Request) 
                             state.bulk_uploads.available_permits(),
                             state.requests.queued(),
                         );
+                        value["http"]["responseMemory"] = state.response_memory.snapshot();
                         reply.bytes = value.to_string().into_bytes();
                         response::success(operation, reply, &state, &request_id, range.as_deref())
                             .await
@@ -111,7 +112,7 @@ async fn execute(
         }
     }
     let permit = Arc::new(state.requests.acquire(&state.telemetry).await?);
-    let download_permit = if response::is_download(operation) {
+    let transfer_permit = if response::is_download(operation) {
         Some(
             state
                 .downloads
@@ -392,7 +393,7 @@ async fn execute(
                         file: None,
                         cookie: Some(cookie),
                         stream: None,
-                        download_permit: None,
+                        transfer_permit: None,
                         memory_reservation: None,
                     });
                 }
@@ -496,27 +497,27 @@ async fn execute(
                             )
                             .map(response::Reply::download);
                     }
-                    let preview_memory = if [
-                        PREVIEW_REPORT_TEMPLATE_CONTENT,
-                        PREVIEW_INVOICE_REPORT_HTML,
-                        PREVIEW_INVOICE_REPORT_DRAFT_HTML,
-                        PREVIEW_PAYMENT_VOUCHER_HTML,
-                        PREVIEW_PAYMENT_VOUCHER_DRAFT_HTML,
-                        PREVIEW_INVOICE_DOCUMENT_PACKAGE_HTML,
-                    ]
-                    .contains(&operation)
-                    {
-                        // Reserve before rendering/JSON encoding and keep the actual bytes until
-                        // the response is sent or disconnected. Slow readers cannot accumulate HTML.
-                        Some(
-                            state
-                                .preview_memory
-                                .reserve_working(64 * 1024 * 1024)
-                                .map_err(|_| error(429, "报表预览资源正在使用，请稍后重试。"))?,
-                        )
-                    } else {
-                        None
-                    };
+                    let preview_permit =
+                        if [
+                            PREVIEW_REPORT_TEMPLATE_CONTENT,
+                            PREVIEW_INVOICE_REPORT_HTML,
+                            PREVIEW_INVOICE_REPORT_DRAFT_HTML,
+                            PREVIEW_PAYMENT_VOUCHER_HTML,
+                            PREVIEW_PAYMENT_VOUCHER_DRAFT_HTML,
+                            PREVIEW_INVOICE_DOCUMENT_PACKAGE_HTML,
+                        ]
+                        .contains(&operation)
+                        {
+                            // Preserve preview admission without charging every small preview as 64 MiB.
+                            // Encoded bytes use the shared JSON budget; this permit bounds slow previews.
+                            Some(
+                                state.previews.clone().try_acquire_owned().map_err(|_| {
+                                    error(429, "报表预览资源正在使用，请稍后重试。")
+                                })?,
+                            )
+                        } else {
+                            None
+                        };
                     let result = state.service.dispatch_with_bootstrap(
                         operation,
                         &parameters,
@@ -525,12 +526,9 @@ async fn execute(
                         &token,
                         &bootstrap,
                     )?;
-                    if preview_memory.is_some() {
-                        if result.len() > 64 * 1024 * 1024 {
-                            return Err(error(400, "报表预览响应超过容量上限。"));
-                        }
+                    if preview_permit.is_some() {
                         let mut reply = response::Reply::bytes(result);
-                        reply.memory_reservation = preview_memory;
+                        reply.transfer_permit = preview_permit;
                         return Ok(reply);
                     }
                     if [
@@ -561,7 +559,7 @@ async fn execute(
                             file: None,
                             cookie: Some(cookie),
                             stream: None,
-                            download_permit: None,
+                            transfer_permit: None,
                             memory_reservation: None,
                         });
                     }
@@ -572,7 +570,7 @@ async fn execute(
                 }
             })
             .map(|mut reply| {
-                reply.download_permit = download_permit;
+                reply.transfer_permit = reply.transfer_permit.or(transfer_permit);
                 reply
             })
     });

@@ -146,12 +146,20 @@ inspectTypeScriptSources(files, (file, source) => {
     }
   }
 
-  if (["features/suppliers/SupplierDirectoryPage.tsx", "features/opportunities/SalesOpportunityPage.tsx", "features/crm/CrmCustomerDirectoryPanel.tsx"].includes(sourceRelativePath)) {
+  if (["features/suppliers/SupplierDirectoryPage.tsx", "features/crm/CrmCustomerDirectoryPanel.tsx"].includes(sourceRelativePath)) {
     for (const listContract of ["usePagedDirectoryQuery", "(signal)", "Pagination"]) {
       if (!sourceText.includes(listContract)) {
         failures.push(`${sourceRelativePath}: 业务目录分页必须统一使用可取消查询和公共分页组件：${listContract}`);
       }
     }
+  }
+
+  const salesContracts = {
+    "features/opportunities/SalesOpportunityPage.tsx": ["useSalesOpportunityWorkspace", "Pagination", "TaskViewTabs"],
+    "features/opportunities/useSalesOpportunityWorkspace.ts": ["usePagedDirectoryQuery", "(signal)", "useScopedMutation", "useVersionedRecordDraft", "gcTime: 0"],
+  };
+  for (const contract of salesContracts[sourceRelativePath] ?? []) {
+    if (!sourceText.includes(contract)) failures.push(`${sourceRelativePath}: 商机展示与工作区必须保持分页、取消及草稿边界：${contract}`);
   }
 
   if (sourceRelativePath === "ui/usePagedDirectoryQuery.ts") {

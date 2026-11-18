@@ -1,37 +1,25 @@
 import type { ApiHealthResponse, ApiRuntimePathInfo } from "../../api/index.ts";
 
 export type RuntimePathAvailability = "available" | "missing";
-export type RuntimePathRequirement = "core" | "feature" | "optional";
+export type RuntimePathRequirement = "required" | "optional" | "unknown";
 
 export type RuntimePathItem = ApiRuntimePathInfo & {
   availability: RuntimePathAvailability;
   requirement: RuntimePathRequirement;
   storageClass: RuntimePathGroup["key"];
+  invalidMetadata: boolean;
 };
 
 export type RuntimePathGroup = {
-  key: "program-resource" | "runtime-data" | "database-file";
+  key: "application" | "data" | "unknown";
   label: string;
-  description: string;
   items: RuntimePathItem[];
 };
 
 const groupCatalog: Array<Omit<RuntimePathGroup, "items">> = [
-  {
-    key: "program-resource",
-    label: "程序文件",
-    description: "随软件安装并由系统维护，普通业务操作不会改动这些文件。",
-  },
-  {
-    key: "runtime-data",
-    label: "运行数据",
-    description: "数据库、日志、缓存、备份和业务文件统一保存在业务数据目录，并可整体迁移。只有一个磁盘时也可选择该磁盘上的专用目录。",
-  },
-  {
-    key: "database-file",
-    label: "当前数据库",
-    description: "单机版使用业务数据目录内的数据库文件；团队版数据由企业服务器统一管理。",
-  },
+  { key: "application", label: "程序文件" },
+  { key: "data", label: "运行数据" },
+  { key: "unknown", label: "未识别目录类型" },
 ];
 
 export function buildRuntimePathGroups(health: ApiHealthResponse | null): RuntimePathGroup[] {
@@ -51,45 +39,49 @@ export function buildRuntimePathGroups(health: ApiHealthResponse | null): Runtim
 
 export function summarizeRuntimePathGroups(groups: RuntimePathGroup[]) {
   const items = groups.flatMap((group) => group.items);
-  const coreItems = items.filter((item) => item.requirement === "core");
+  const coreItems = items.filter((item) => item.requirement === "required");
   return {
     total: items.length,
     coreTotal: coreItems.length,
     coreAvailable: coreItems.filter((item) => item.availability === "available").length,
     coreMissing: coreItems.filter((item) => item.availability === "missing").length,
-    featureMissing: items.filter((item) => item.requirement === "feature" && item.availability === "missing").length,
+    invalidMetadata: items.filter(item => item.invalidMetadata).length,
   };
 }
 
 export function runtimePathAccessModeLabel(accessMode: string) {
   switch (accessMode) {
-    case "read-only":
-      return "随程序只读";
-    case "managed":
-      return "功能维护";
+    case "read":
+      return "只读";
     case "read-write":
       return "运行时可写";
     default:
-      return accessMode?.trim() || "未说明";
+      return "访问方式未识别";
   }
 }
 
 export function runtimePathRequirementLabel(requirement: RuntimePathRequirement) {
   switch (requirement) {
-    case "core":
+    case "required":
       return "核心必需";
-    case "feature":
-      return "按功能需要";
-    default:
+    case "optional":
       return "可选组件";
+    default:
+      return "必需性未识别";
   }
 }
 
 function normalizeRuntimePath(item: ApiRuntimePathInfo): RuntimePathItem {
   return {
     ...item,
-    storageClass: item.storageClass as RuntimePathGroup["key"],
-    requirement: item.requirement as RuntimePathRequirement,
+    storageClass: item.storageClass === "application" || item.storageClass === "data" ? item.storageClass : "unknown",
+    requirement: normalizeRuntimeRequirement(item.requirement),
     availability: item.exists ? "available" : "missing",
+    invalidMetadata: !["application", "data"].includes(item.storageClass)
+      || !["read", "read-write"].includes(item.accessMode) || normalizeRuntimeRequirement(item.requirement) === "unknown",
   };
+}
+
+export function normalizeRuntimeRequirement(requirement: string): RuntimePathRequirement {
+  return requirement === "required" || requirement === "optional" ? requirement : "unknown";
 }

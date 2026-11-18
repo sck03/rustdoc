@@ -1,268 +1,59 @@
+import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
+import { Button } from "../../ui/Button.tsx";
+import { PageState, PermissionNotice } from "../../ui/PageState.tsx";
+import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
 import { FilterBar } from "../../ui/primitives/Field.tsx";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
-import { useRouteQuery } from "../../ui/useRouteQuery.ts";
-import { readRouteId } from "../../ui/routeQueryState.ts";
-import { useDirectoryLocation } from "../../ui/useDirectoryLocation.ts";
-import { useQueryClient } from "@tanstack/react-query";
-import type { ApiCrmCustomerDto, ApiProductDto, ApiSalesOpportunityDto, ApiSalesOpportunityHistoryDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
+import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
+import { OperationFeedback } from "../../ui/OperationFeedback.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { TaskViewTabs, getTaskViewPanelProps } from "../../ui/TaskViewTabs.tsx";
-import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
-import { OperationFeedback, errorFeedback, requestErrorFeedback, successFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
-import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
-import { usePermission } from "../../app/PermissionAccessContext.tsx";
-import { permissionActions, permissionResources } from "../../app/permissionCatalog.ts";
-import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
-import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
-import { FormGuidance, PageState, PermissionNotice } from "../../ui/PageState.tsx";
-import { Pagination } from "../../ui/primitives/Pagination.tsx";
-import { PageHeader } from "../../ui/primitives/PageHeader.tsx";
-import { usePagedDirectoryQuery } from "../../ui/usePagedDirectoryQuery.ts";
-import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
-import { queryKeys } from "../../api/queryKeys.ts";
-import { formatBusinessDateTime } from "../../ui/businessTime.ts";
-import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
-
-const stages = ["线索", "需求确认", "已报价", "谈判中", "已成交", "已失单"];
-const opportunityTabsId = "sales-opportunity-workspace";
+import { opportunityStages } from "./salesOpportunityModel.ts";
+import { SalesOpportunityEditor } from "./SalesOpportunityEditor.tsx";
+import { SalesOpportunityHistory } from "./SalesOpportunityHistory.tsx";
+import { useSalesOpportunityWorkspace } from "./useSalesOpportunityWorkspace.ts";
 
 export function SalesOpportunityPage({ businessTimeZone, client }: { businessTimeZone: string; client: ExportDocManagerApiClient }) {
-  const canCreateOpportunity = usePermission(permissionResources.salesOpportunities, permissionActions.create).allowed;
-  const canEditOpportunity = usePermission(permissionResources.salesOpportunities, permissionActions.edit).allowed;
-  const canTransitionOpportunity = usePermission(permissionResources.salesOpportunities, permissionActions.transition).allowed;
-  const canArchiveOpportunity = usePermission(permissionResources.salesOpportunities, permissionActions.archive).allowed;
-  const canCreateQuote = usePermission(permissionResources.salesQuotes, permissionActions.create).allowed;
-  const canEditQuote = usePermission(permissionResources.salesQuotes, permissionActions.edit).allowed;
-  const canCreateCustomer = usePermission(permissionResources.crmCustomers, permissionActions.create).allowed;
-  const requestConfirmation = useConfirmation();
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const { params: searchParams, update: updateRoute } = useRouteQuery();
-  const selectedId = readRouteId(searchParams.get("opportunityId"));
-  const [selectedRecord, setSelectedRecord] = useState<ApiSalesOpportunityDto | null>(null);
-  const selected = selectedRecord?.id === selectedId ? selectedRecord : null;
-  const setSelected = (item: ApiSalesOpportunityDto | null) => { setSelectedRecord(item); updateRoute({ opportunityId: item?.id }); };
-  const { keywordInput, setKeywordInput, keyword, setKeyword, status: stage, setStatus: setStage, pageNumber, setPageNumber, pageSize, setPageSize } = useDirectoryLocation();
-  const [customers, setCustomers] = useState<ApiCrmCustomerDto[]>([]);
-  const [products, setProducts] = useState<ApiProductDto[]>([]);
-  const [customerKeyword, setCustomerKeyword] = useState("");
-  const [productKeyword, setProductKeyword] = useState("");
-  const [customerOptionTotal, setCustomerOptionTotal] = useState(0);
-  const [productOptionTotal, setProductOptionTotal] = useState(0);
-  const [transitionNote, setTransitionNote] = useState("");
-  const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
-  const [revision, setRevision] = useState(0);
-  const [history, setHistory] = useState<ApiSalesOpportunityHistoryDto[]>([]);
-  const view = readOpportunityView(searchParams.get("view"));
-  const [draftDirty, setDraftDirty] = useState(false);
-  const runCustomerSearch = useAbortableOperation(client, { cancelPrevious: true });
-  const runProductSearch = useAbortableOperation(client, { cancelPrevious: true });
-  const { confirmDiscardChanges } = useUnsavedChangesGuard({
-    isDirty: draftDirty,
-    message: "当前商机有未保存的修改。",
-  });
-  useEffect(() => setDraftDirty(false), [selectedId, view]);
-  const customerOptions = useMemo(() => selected && !customers.some((item) => item.id === selected.crmCustomerId)
-    ? [{ id: selected.crmCustomerId, name: selected.customerName } as ApiCrmCustomerDto, ...customers] : customers, [customers, selected]);
-  const productOptions = useMemo(() => selected?.productId && !products.some((item) => item.id === selected.productId)
-    ? [{ id: selected.productId, productCode: selected.productCode ?? "", nameCN: selected.productName ?? "", nameEN: "" } as ApiProductDto, ...products] : products, [products, selected]);
-
-  function applyView(nextView: "directory" | "editor" | "history") {
-    updateRoute({ view: nextView }, false);
-  }
-
-  async function changeView(nextView: "directory" | "editor" | "history") {
-    if (nextView === view) return true;
-    if (!await confirmDiscardChanges("切换商机工作区")) return false;
-    setDraftDirty(false);
-    applyView(nextView);
-    return true;
-  }
-
-  useEffect(() => {
-    if (!selectedId || selected) return;
-    const controller = new AbortController();
-    void client.getSalesOpportunity({ id: selectedId }, { signal: controller.signal }).then((item) => {
-      if (!controller.signal.aborted) setSelectedRecord(item);
-    }).catch((error) => { if (!controller.signal.aborted) setFeedback(requestErrorFeedback(error)); });
-    return () => controller.abort();
-  }, [client, selectedId, selected]);
-
-  const pageQuery = usePagedDirectoryQuery(
-    ["sales-opportunities", keyword, stage, pageNumber, pageSize, revision],
-    (signal) => client.querySalesOpportunities({ keyword, stage, pageNumber, pageSize }, { signal }),
-  );
-  const page = pageQuery.data ?? null;
-
-  async function searchCustomers(searchKeyword = customerKeyword) {
-    try {
-      const result = await runCustomerSearch(signal => client.queryCrmCustomers({ keyword: searchKeyword.trim(), status: "", pageNumber: 1, pageSize: 100 }, { signal }));
-      setCustomers(result.items);
-      setCustomerOptionTotal(result.totalCount);
-    } catch (error) { if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error))); }
-  }
-
-  async function searchProducts(searchKeyword = productKeyword) {
-    try {
-      const result = await runProductSearch(signal => client.listProducts({ keyword: searchKeyword.trim(), pageNumber: 1, pageSize: 100 }, { signal }));
-      setProducts(result.items);
-      setProductOptionTotal(result.totalCount);
-    } catch (error) { if (!isAbortError(error)) setFeedback(errorFeedback(readApiError(error))); }
-  }
-
-  useEffect(() => {
-    void searchCustomers("");
-    void searchProducts("");
-  }, [client]);
-  useEffect(() => {
-    if (!selected) { setHistory([]); return; }
-    const controller = new AbortController();
-    void client.listSalesOpportunityHistory({ id: selected.id }, { signal: controller.signal })
-      .then((items) => { if (!controller.signal.aborted) setHistory(items); })
-      .catch((error) => { if (!controller.signal.aborted) setFeedback(errorFeedback(readApiError(error))); });
-    return () => controller.abort();
-  }, [client, selected]);
-
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (selected ? !canEditOpportunity : !canCreateOpportunity) return;
-    const form = new FormData(event.currentTarget); const id = selected?.id ?? 0;
-    const expectedCloseDate = String(form.get("expectedCloseDate") ?? "");
-    const body = {
-      id, crmCustomerId: Number(form.get("crmCustomerId") ?? 0), productId: Number(form.get("productId") ?? 0) || undefined,
-      title: String(form.get("title") ?? "").trim(),
-      quotationNo: (selected && !canEditQuote ? selected.quotationNo : String(form.get("quotationNo") ?? "")).trim(),
-      estimatedAmount: selected && !canEditQuote ? selected.estimatedAmount : Number(form.get("estimatedAmount") ?? 0),
-      currency: (selected && !canEditQuote ? selected.currency : String(form.get("currency") ?? "USD")).trim().toUpperCase(),
-      probabilityPercent: selected && !canEditQuote ? selected.probabilityPercent : Number(form.get("probabilityPercent") ?? 0),
-      expectedCloseDate: expectedCloseDate || undefined,
-      nextAction: String(form.get("nextAction") ?? "").trim(), notes: String(form.get("notes") ?? "").trim(),
-      changeNote: String(form.get("changeNote") ?? "").trim(),
-      expectedVersion: id > 0 ? selected?.versionNumber ?? 0 : 0,
-    };
-    try {
-      const saved = id ? await client.updateSalesOpportunity({ id, body }) : await client.createSalesOpportunity({ body });
-      setSelected(saved);
-      setDraftDirty(false);
-      setRevision((value) => value + 1);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() });
-      setFeedback(successFeedback(id ? "商机已更新并按规则追加历史版本。" : "商机已建立并生成版本 1。"));
-    } catch (error) { setFeedback(requestErrorFeedback(error)); }
-  }
-
-  async function transitionTo(nextStage: string) {
-    if (!selected || !canTransitionOpportunity || !selected.allowedNextStages.includes(nextStage)) return;
-    if (draftDirty && !await confirmDiscardChanges("流转商机阶段")) return;
-    if (!await requestConfirmation({
-      title: "流转商机阶段",
-      description: `确定将“${selected.title}”从“${selected.stage}”流转到“${nextStage}”吗？`,
-      details: transitionNote.trim() ? [`流转说明：${transitionNote.trim()}`] : undefined,
-      confirmLabel: `流转到${nextStage}`,
-      tone: nextStage === "已失单" ? "warning" : undefined,
-    })) return;
-    try {
-      const saved = await client.transitionSalesOpportunity({
-        id: selected.id,
-        body: {
-          nextStage,
-          changeNote: transitionNote.trim(),
-          expectedVersion: selected.versionNumber,
-        },
-      });
-      setSelected(saved);
-      setDraftDirty(false);
-      setTransitionNote("");
-      setRevision((value) => value + 1);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() });
-      setFeedback(successFeedback(`商机已流转到“${saved.stage}”。`));
-    } catch (error) {
-      setFeedback(requestErrorFeedback(error));
-    }
-  }
-
-  async function remove() {
-    if (!canArchiveOpportunity || !selected || !await requestConfirmation({ title: "归档商机", description: `确定归档商机“${selected.title}”吗？`, details: ["商机将从当前销售管道隐藏，但版本历史会保留；客户和产品资料不受影响。"], confirmLabel: "确认归档", tone: "danger" }) || !await confirmDiscardChanges("归档商机")) return;
-    try { await client.archiveSalesOpportunity({ id: selected.id, body: { expectedVersion: selected.versionNumber } }); setDraftDirty(false); setSelected(null); applyView("directory"); setRevision((value) => value + 1); await queryClient.invalidateQueries({ queryKey: queryKeys.crmDashboard() }); setFeedback(successFeedback("商机已归档，历史版本仍可查询。")); }
-    catch (error) { setFeedback(requestErrorFeedback(error)); }
-  }
-
-  async function openCustomerProfile() {
-    if (!await confirmDiscardChanges("打开客户资料")) return;
-    setDraftDirty(false);
-    navigate("/crm/follow-ups?view=profile");
-  }
-
-  return <ListWorkspace >
-    <OperationFeedback feedback={feedback} />
-    {!canCreateOpportunity && !canEditOpportunity && !canTransitionOpportunity
-      ? <PermissionNotice>当前岗位只有商机查看权限；新建、编辑、阶段流转和归档分别授权。</PermissionNotice>
-      : null}
-    {view !== "directory" && <PageHeader title={selected?.title ?? (selectedId ? "商机详情" : "新建商机")} description={selected?.customerName}
-      actions={<button className="secondary-button" type="button" onClick={() => void changeView("directory")}>返回商机目录</button>} />}
-    {view !== "directory" && selected && <TaskViewTabs idPrefix={opportunityTabsId} value={view} label="商机详情" onChange={changeView} items={[
-      { id: "editor", label: "商机资料" }, { id: "history", label: "报价与阶段历史" },
-    ]} />}
-    {view !== "directory" && selectedId && !selected && <PageState tone={feedback ? "error" : "loading"} title="正在定位商机资料" />}
-    {view === "directory" ? <section className="form-section" aria-label="商机目录">
-      <PageHeader title="商机目录" count={page?.totalCount} unit="项" description="按客户、阶段和报价编号查找商机，打开后维护资料及报价历史。"
-        actions={canCreateOpportunity ? <button className="primary-button" type="button" onClick={() => { setSelected(null); changeView("editor"); }}>新建商机</button> : null}>
-      <FilterBar className="list-workspace-filters" label="筛选商机目录" onSubmit={(event) => { event.preventDefault(); setKeyword(keywordInput.trim()); setPageNumber(1); }}>
-        <input aria-label="搜索商机目录" value={keywordInput} onChange={(event) => setKeywordInput(event.target.value)} placeholder="搜索商机、客户、产品或报价编号" />
-        <select aria-label="商机阶段" value={stage} onChange={(event) => { setStage(event.target.value); setPageNumber(1); }}><option value="">全部阶段</option>{stages.map((item) => <option key={item}>{item}</option>)}</select>
-        <button className="secondary-button" type="submit">搜索</button>
-      </FilterBar>
+  const model = useSalesOpportunityWorkspace(client);
+  const { directory, page, record, permissions } = model;
+  return <ListWorkspace>
+    <OperationFeedback feedback={model.feedback} />
+    {!permissions.create && !permissions.edit && !permissions.transition && <PermissionNotice>当前权限允许查看商机。</PermissionNotice>}
+    {model.view === "directory" ? <section className="form-section" aria-label="商机目录">
+      <PageHeader title="商机目录" count={page.data?.totalCount} unit="项" actions={permissions.create && <Button variant="primary" disabled={model.busy} onClick={() => model.navigate(null, "editor")}>新建商机</Button>}>
+        <FilterBar className="list-workspace-filters" label="筛选商机目录" onSubmit={event => { event.preventDefault(); directory.setKeyword(directory.keywordInput.trim()); directory.setPageNumber(1); }}>
+          <input aria-label="搜索商机目录" value={directory.keywordInput} onChange={event => directory.setKeywordInput(event.target.value)} placeholder="商机、客户、产品或报价编号" />
+          <select aria-label="商机阶段" value={directory.status} onChange={event => { directory.setStatus(event.target.value); directory.setPageNumber(1); }}><option value="">全部阶段</option>{opportunityStages.map(stage => <option key={stage}>{stage}</option>)}</select>
+          <label className="inline-check"><input type="checkbox" checked={model.includeArchived} onChange={event => model.changeArchived(event.target.checked)} />含归档</label>
+          <Button type="submit">搜索</Button>
+        </FilterBar>
       </PageHeader>
-      {pageQuery.isError ? <OperationFeedback feedback={errorFeedback(readApiError(pageQuery.error))} /> : null}
-      <ResponsiveTableFrame label="销售商机列表" mobileLayout="scroll" busy={pageQuery.isFetching}><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th data-table-priority="secondary">产品</th><th>金额</th><th data-table-priority="secondary">概率</th><th>阶段</th><th /></tr></thead><tbody>
-        {(page?.items ?? []).map((item) => <tr key={item.id}><td><TablePrimaryText value={item.title} secondary={item.quotationNo || "未填报价编号"} /></td><td><TablePrimaryText value={item.customerName} /></td><td data-table-priority="secondary"><TablePrimaryText value={item.productCode || item.productName} /></td><td>{item.currency} {item.estimatedAmount.toFixed(2)}</td><td data-table-priority="secondary">{item.probabilityPercent}%</td><td><BusinessStatusBadge value={item.stage} /></td><td><button className="secondary-button" type="button" onClick={() => { setSelected(item); changeView("editor"); }}>{canEditOpportunity ? "编辑" : "查看"}</button></td></tr>)}
-        {!pageQuery.isFetching && !pageQuery.isError && !page?.items.length ? <tr><td className="empty-cell" colSpan={7}><div className="empty-cell-content"><strong>暂无商机记录</strong><span>{canCreateOpportunity ? "从一位销售客户开始，记录阶段、预计金额和下一步动作。" : "当前没有可查看的商机记录。"}</span>{canCreateOpportunity ? <button className="secondary-button" type="button" onClick={() => { setSelected(null); changeView("editor"); }}>建立第一条商机</button> : null}</div></td></tr> : null}
-      </tbody></table></ResponsiveTableFrame>
-      <Pagination pageNumber={pageNumber} totalPages={page?.totalPages ?? 1} totalCount={page?.totalCount ?? 0} pageSize={pageSize} pageSizeOptions={[20,30,50,100]} isBusy={pageQuery.isFetching} onPageChange={setPageNumber} onPageSizeChange={(value) => { setPageSize(value); setPageNumber(1); }} />
-    </section> : null}
-    {view === "editor" && (selected || !selectedId) ? <form className="form-grid" key={`${selected?.id ?? "new"}-${selected?.versionNumber ?? 0}`} onSubmit={save} {...(selected ? getTaskViewPanelProps(opportunityTabsId, "editor") : { "aria-label": "新建商机" })}>
-      <div className="section-header"><h3>{selected ? canEditOpportunity ? "编辑商机" : "查看商机" : "新建商机"}</h3><span>轻量销售跟踪</span></div>
-      {!customers.length ? <FormGuidance className="form-field-wide" title="先建立一位销售客户" description="商机必须归属 CRM 客户，不会写入原单证客户资料。" action={canCreateCustomer ? <button className="primary-button" type="button" onClick={() => void openCustomerProfile()}>建立客户资料</button> : undefined} /> : null}
-      <fieldset className="permission-fieldset form-field-wide" disabled={selected ? !canEditOpportunity || selected.stage === "已成交" || selected.stage === "已失单" : !canCreateOpportunity} onChangeCapture={(event) => {
-        if (!(event.target instanceof Element) || !event.target.closest("[data-draft-ignore]")) setDraftDirty(true);
-      }}>
-      <fieldset className="form-section-block">
-        <legend>基本信息</legend>
-        <label className="form-field-wide">CRM 客户<div className="toolbar" data-draft-ignore><input value={customerKeyword} onChange={(event) => setCustomerKeyword(event.target.value)} placeholder="搜索客户" /><button className="secondary-button" type="button" onClick={() => void searchCustomers()}>查找</button></div>{customerOptionTotal > customers.length ? <small>匹配 {customerOptionTotal} 家，当前显示前 {customers.length} 家；请继续输入名称缩小范围。</small> : null}<select name="crmCustomerId" required defaultValue={selected?.crmCustomerId ?? ""}><option value="">请选择客户</option>{customerOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
-        <label className="form-field-wide">商机名称<input name="title" required maxLength={200} defaultValue={selected?.title} placeholder="例如：2026 秋季服装订单" /></label>
-        <label>当前阶段<input value={selected?.stage ?? "线索"} readOnly /></label>
-      </fieldset>
-      <fieldset className="form-section-block" disabled={selected ? !canEditQuote : !canCreateQuote}>
-        <legend>报价与预计</legend>
-        <label>报价跟踪编号<input name="quotationNo" maxLength={100} defaultValue={selected?.quotationNo} placeholder="可暂不填写" /></label>
-        <label>预计金额<input name="estimatedAmount" type="number" min="0" step="0.0001" defaultValue={selected?.estimatedAmount ?? 0} /></label>
-        <label>币种<input name="currency" maxLength={3} defaultValue={selected?.currency ?? "USD"} /></label>
-        <label>成交概率（%）<input name="probabilityPercent" type="number" min="0" max="100" defaultValue={selected?.probabilityPercent ?? 0} /></label>
-        <label>预计成交日<input name="expectedCloseDate" type="date" defaultValue={selected?.expectedCloseDate ?? ""} /></label>
-        <label className="form-field-wide">关联产品（可选）<div className="toolbar" data-draft-ignore><input value={productKeyword} onChange={(event) => setProductKeyword(event.target.value)} placeholder="搜索产品货号或名称" /><button className="secondary-button" type="button" onClick={() => void searchProducts()}>查找</button></div>{productOptionTotal > products.length ? <small>匹配 {productOptionTotal} 项，当前显示前 {products.length} 项；请继续输入货号或名称缩小范围。</small> : null}<select name="productId" defaultValue={selected?.productId ?? 0}><option value={0}>不关联产品</option>{productOptions.map((item) => <option key={item.id} value={item.id}>{item.productCode || "无货号"} · {item.nameCN || item.nameEN || "未命名"}</option>)}</select></label>
-      </fieldset>
-      <fieldset className="form-section-block">
-        <legend>下一步</legend>
-        <label className="form-field-wide">下一步动作<input name="nextAction" maxLength={500} defaultValue={selected?.nextAction} placeholder="例如：周五发送新版报价并确认交期" /></label>
-      </fieldset>
-      <details className="optional-form-details form-field-wide">
-        <summary>补充记录（可选）</summary>
-        <div className="optional-form-grid"><label className="form-field-wide">长期备注<textarea name="notes" maxLength={2000} defaultValue={selected?.notes} /></label><label className="form-field-wide">本次变更说明<textarea name="changeNote" maxLength={1000} placeholder="阶段、报价或沟通背景；保存后只追加到历史，不覆盖长期备注" /></label></div>
-      </details>
-      </fieldset>
-      {selected && canTransitionOpportunity ? <section className="form-section-block form-field-wide"><h4>阶段流转</h4><label className="form-field-wide">流转说明（可选）<input maxLength={1000} value={transitionNote} onChange={(event) => setTransitionNote(event.target.value)} placeholder="记录本次推进、退回或重新打开的原因" /></label><div className="form-actions">{selected.allowedNextStages.map((nextStage) => <button className="secondary-button" type="button" key={nextStage} onClick={() => void transitionTo(nextStage)}>流转到{nextStage}</button>)}</div></section> : null}
-      <div className="form-actions">{(selected ? canEditOpportunity && selected.stage !== "已成交" && selected.stage !== "已失单" : canCreateOpportunity) ? <button className="primary-button" type="submit">保存商机</button> : null}{selected ? <button className="secondary-button" type="button" onClick={() => changeView("history")}>查看版本历史</button> : null}{selected && canArchiveOpportunity ? <button className="secondary-button danger-button" type="button" onClick={() => void remove()}>归档商机</button> : null}</div>
-    </form> : null}
-    {selected && view === "history" ? <section className="form-section" {...getTaskViewPanelProps(opportunityTabsId, "history")}><div className="section-header"><h3>阶段与报价版本历史</h3><span>{history.length} 个版本</span></div>
-      <ResponsiveTableFrame label="商机版本历史" mobileLayout="scroll"><table className="data-table"><thead><tr><th>版本</th><th>类型</th><th>阶段</th><th>报价编号</th><th>金额</th><th>概率</th><th>变更说明</th><th>操作信息</th></tr></thead><tbody>
-        {history.map((item) => <tr key={item.id}><td>V{item.versionNumber}</td><td>{item.changeType}</td><td><BusinessStatusBadge value={item.stage} /></td><td>{item.quotationNo || "-"}</td><td>{item.currency} {item.estimatedAmount.toFixed(2)}</td><td>{item.probabilityPercent}%</td><td>{item.changeNote || "-"}</td><td>{item.changedBy || "-"}<br /><small>{formatBusinessDateTime(item.createdAt, businessTimeZone)}</small></td></tr>)}
-        {!history.length ? <tr><td className="empty-cell" colSpan={8}>暂无版本历史。</td></tr> : null}
-      </tbody></table></ResponsiveTableFrame>
-    </section> : null}
+      {page.isError ? <PageState tone="error" title="商机加载失败" description={readApiError(page.error)} /> : <>
+        <ResponsiveTableFrame label="销售商机列表" mobileLayout="scroll" busy={page.isFetching}><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th>产品</th><th>金额</th><th>概率</th><th>阶段</th><th>操作</th></tr></thead><tbody>
+          {page.data?.items.map(item => <tr key={item.id}>
+            <td><TablePrimaryText value={item.title} secondary={item.quotationNo} /></td><td>{item.customerName}</td><td>{item.productCode || item.productName || "—"}</td>
+            <td>{item.currency} {item.estimatedAmount.toFixed(2)}</td><td>{item.probabilityPercent}%</td><td>{item.isArchived ? "已归档" : <BusinessStatusBadge value={item.stage} />}</td>
+            <td><Button disabled={model.busy} onClick={() => model.navigate(item.id, item.isArchived ? "history" : "editor")}>{item.isArchived ? "查看历史" : permissions.edit ? "编辑" : "查看"}</Button></td>
+          </tr>)}
+        </tbody></table></ResponsiveTableFrame>
+        {!page.isFetching && !page.data?.items.length && <PageState title="暂无商机记录" />}
+      </>}
+      <Pagination pageNumber={directory.pageNumber} totalPages={page.data?.totalPages ?? 1} totalCount={page.data?.totalCount ?? 0} pageSize={directory.pageSize} pageSizeOptions={[20, 30, 50, 100]} isBusy={page.isFetching}
+        onPageChange={directory.setPageNumber} onPageSizeChange={value => { directory.setPageSize(value); directory.setPageNumber(1); }} />
+    </section> : <>
+      <PageHeader title={record?.title || (model.id ? "商机详情" : "新建商机")} description={record?.customerName}
+        actions={<Button disabled={model.busy} onClick={() => model.navigate(model.id, "directory")}>返回商机目录</Button>} />
+      {record && <TaskViewTabs idPrefix="sales-opportunity-workspace" value={model.view} label="商机详情" onChange={view => { if (!model.busy) model.navigate(model.id, view); }}
+        items={[{ id: "editor", label: "商机资料" }, { id: "history", label: "报价与阶段历史" }]} />}
+      <div {...(record ? getTaskViewPanelProps("sales-opportunity-workspace", model.view) : {})}>
+      {model.id && (model.detail.isPending || model.detail.isError || !record) ? <PageState tone={model.detail.isError ? "error" : "loading"} title={model.detail.isError ? "商机加载失败" : "正在读取商机"}
+        description={model.detail.isError ? readApiError(model.detail.error) : undefined} action={model.detail.isError ? <Button onClick={model.reload}>重新加载</Button> : undefined} />
+        : model.view === "history" && model.id ? <SalesOpportunityHistory key={model.id} id={model.id} client={client} timeZone={businessTimeZone} />
+          : <SalesOpportunityEditor key={model.id ?? "new"} model={model} />}
+      </div>
+    </>}
   </ListWorkspace>;
-}
-
-function readOpportunityView(value: string | null): "directory" | "editor" | "history" {
-  return value === "editor" || value === "history" ? value : "directory";
 }

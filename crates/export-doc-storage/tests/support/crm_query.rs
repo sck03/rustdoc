@@ -169,6 +169,7 @@ pub fn exercise(c: &Connection) {
         customer_id: None,
         stage: "",
         keyword: "E\u{301}cole",
+        include_archived: false,
         upcoming_closings: false,
     };
     let (count, rows) = c.query_crm(&q).unwrap();
@@ -182,11 +183,24 @@ pub fn exercise(c: &Connection) {
         "1234567890.123456789"
     );
     assert!(!rows[0].to_string().contains("unused"));
+    if let CrmList::Opportunities {
+        ref mut include_archived,
+        ..
+    } = q.list
+    {
+        *include_archived = true;
+    }
+    let (with_archive, _) = c.query_crm(&q).unwrap();
+    assert_eq!(
+        with_archive, 3,
+        "archive inclusion still excludes the hidden parent customer"
+    );
     for keyword in ["cafe\u{301}", "PX-01"] {
         q.list = CrmList::Opportunities {
             customer_id: Some(customer),
             stage: "线索",
             keyword,
+            include_archived: false,
             upcoming_closings: false,
         };
         assert_eq!(c.query_crm(&q).unwrap().0, 1);
@@ -195,6 +209,7 @@ pub fn exercise(c: &Connection) {
         customer_id: None,
         stage: "",
         keyword: "",
+        include_archived: false,
         upcoming_closings: true,
     };
     assert_eq!(c.query_crm(&q).unwrap().0, 1);
@@ -230,6 +245,7 @@ pub fn exercise(c: &Connection) {
                 customer_id: Some(benchmark_customer),
                 stage: "",
                 keyword: "SCALE",
+                include_archived: false,
                 upcoming_closings: false,
             },
         ),

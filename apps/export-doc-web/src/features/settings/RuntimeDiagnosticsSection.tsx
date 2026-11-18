@@ -1,5 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
-import { Database, FolderCheck, HardDrive, PackageOpen, RefreshCw } from "lucide-react";
+import { useState } from "react";
+import { RuntimeMetricsSection } from "./RuntimeMetricsSection.tsx";
+import { FolderCheck, HardDrive, PackageOpen, RefreshCw } from "lucide-react";
 import type { ApiHealthResponse, ExportDocManagerApiClient } from "../../api/index.ts";
 import { renderOpenPathAction } from "../../ui/DesktopPathActions.tsx";
 import { formatManagedPath, formatRuntimeDate } from "./settingsFormatters.ts";
@@ -38,6 +40,7 @@ export function RuntimeDiagnosticsSection({
   onRefresh: () => void;
   onPathError: (message: string) => void;
 }) {
+  const [metricsOpen, setMetricsOpen] = useState(false);
   const templateStorageMutation = useMutation({
     mutationFn: () => client.checkReportTemplateStorage(),
   });
@@ -47,17 +50,17 @@ export function RuntimeDiagnosticsSection({
   const dependencySummary = summarizeRuntimeDependencies(dependencies);
   const directoryCheckValue = summary.total === 0
     ? "-"
-    : summary.coreMissing > 0
+    : summary.invalidMetadata > 0 ? "目录信息异常" : summary.coreMissing > 0
       ? `${summary.coreMissing} 项核心路径需处理`
       : `${summary.coreAvailable}/${summary.coreTotal} 核心路径正常`;
-  const directoryCheckTone = summary.coreMissing > 0 ? "warning" : "positive";
+  const metadataIssues = summary.invalidMetadata + dependencySummary.invalidMetadata;
+  const directoryCheckTone = summary.coreMissing > 0 || summary.invalidMetadata > 0 ? "warning" : summary.total > 0 ? "positive" : "neutral";
 
   return (
     <section className="form-section runtime-diagnostics-section" aria-label="运行诊断">
       <div className="section-header">
         <div>
           <h2>运行诊断</h2>
-          <p className="section-description">集中查看程序资源和业务可写目录，便于确认数据库、日志与缓存是否跟随运行目录。</p>
         </div>
         <div className="toolbar-actions">
           <button
@@ -74,7 +77,7 @@ export function RuntimeDiagnosticsSection({
           </button>
         </div>
       </div>
-      {health?.storagePolicy ? <InlineNotice tone="info">业务数据统一保存在所选数据目录，可在下方查看位置和可用性。</InlineNotice> : null}
+      {metadataIssues > 0 ? <InlineNotice tone="error">{metadataIssues} 项诊断信息异常，请刷新并检查服务返回的目录或依赖状态。</InlineNotice> : null}
       {errorMessage ? <InlineNotice tone="error" title="运行诊断加载失败">{errorMessage}</InlineNotice> : null}
       {templateStorageMutation.isError ? <InlineNotice tone="error" title="模板存储检查失败">{readApiError(templateStorageMutation.error)}</InlineNotice> : null}
       {templateStorageMutation.data ? (
@@ -93,29 +96,26 @@ export function RuntimeDiagnosticsSection({
       ) : null}
 
       <div className="runtime-overview-grid" aria-label="运行状态摘要">
-        <RuntimeOverviewItem label="服务状态" value={health?.status === "ok" ? "正常" : health?.status || "-"} tone={health?.status === "ok" ? "positive" : "neutral"} />
+        <RuntimeOverviewItem label="服务状态" value={health?.status === "Healthy" ? "正常" : health?.status || "-"} tone={health?.status === "Healthy" ? "positive" : "neutral"} />
         <RuntimeOverviewItem label="数据库类型" value={health?.databaseProvider || "-"} tone="neutral" />
         <RuntimeOverviewItem label="核心目录" value={directoryCheckValue} tone={directoryCheckTone} />
         <RuntimeOverviewItem
           label="功能依赖"
-          value={dependencySummary.featureUnavailable > 0 ? "报表输出需处理" : "核心功能依赖正常"}
-          tone={dependencySummary.featureUnavailable > 0 ? "warning" : dependencies.length > 0 ? "positive" : "neutral"}
+          value={dependencySummary.invalidMetadata > 0 ? "依赖信息异常" : dependencySummary.requiredUnavailable > 0
+            ? `${dependencySummary.requiredUnavailable} 项必需依赖需处理` : dependencySummary.optionalUnavailable > 0
+              ? `${dependencySummary.optionalUnavailable} 项可选依赖未就绪` : dependencies.length > 0 ? "依赖正常" : "-"}
+          tone={dependencySummary.requiredUnavailable > 0 || dependencySummary.invalidMetadata > 0 ? "warning" : dependencies.length > 0 ? "positive" : "neutral"}
         />
         <RuntimeOverviewItem label="检查时间" value={formatRuntimeDate(health?.checkedAt)} tone="neutral" />
       </div>
 
-      {summary.coreMissing === 0 && summary.featureMissing > 0 ? (
-        <InlineNotice tone="info" className="runtime-feature-dependency-note">
-          有 {summary.featureMissing} 项按功能需要的资源未安装，只影响对应功能，不影响数据库和基本运行。
-        </InlineNotice>
-      ) : null}
+      {canManageSettings && <details className="optional-form-details" onToggle={event => setMetricsOpen(event.currentTarget.open)}><summary>资源使用</summary>{metricsOpen && <RuntimeMetricsSection client={client} />}</details>}
 
       {dependencies.length > 0 ? (
         <div className="runtime-dependency-section" aria-label="功能依赖检查">
           <div className="runtime-dependency-heading">
             <div>
               <h3>功能依赖</h3>
-              <p>只读取运行目录中的可执行文件和模型，不启动外部程序，也不会自动下载。</p>
             </div>
             <span>{dependencySummary.ready}/{dependencySummary.total} 已就绪</span>
           </div>
@@ -192,7 +192,7 @@ function RuntimePathGroupCard({
   group: RuntimePathGroup;
   onPathError: (message: string) => void;
 }) {
-  const Icon = group.key === "program-resource" ? PackageOpen : group.key === "database-file" ? Database : HardDrive;
+  const Icon = group.key === "application" ? PackageOpen : HardDrive;
 
   return (
     <section className="runtime-path-group" aria-label={group.label}>
@@ -203,7 +203,6 @@ function RuntimePathGroupCard({
           </span>
           <div>
             <h3>{group.label}</h3>
-            <p>{group.description}</p>
           </div>
         </div>
         <span className="runtime-path-group-count">{group.items.length} 项</span>
@@ -255,11 +254,9 @@ function RuntimePathStatus({
 }) {
   const label = availability === "available"
     ? "已找到"
-    : requirement === "core"
+    : requirement === "required"
       ? "需要处理"
-      : requirement === "feature"
-        ? "功能未安装"
-        : "未安装（可选）";
+      : requirement === "optional" ? "未安装（可选）" : "状态需确认";
   return (
     <span className={`runtime-path-status runtime-path-status-${availability} runtime-path-status-${availability}-${requirement}`}>
       {label}

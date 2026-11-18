@@ -16,15 +16,13 @@ use std::{
 };
 mod preview;
 
-pub const UPLOADS: &[Operation] = &[PREVIEW_HS_CODES_IMPORT_UPLOAD, UPLOAD_HS_CODES_IMPORT_FILE];
+pub const UPLOADS: &[Operation] = &[PREVIEW_HS_CODES_IMPORT_UPLOAD];
 pub const OPERATIONS: &[Operation] = &[
     PREVIEW_HS_CODES_IMPORT_UPLOAD,
-    UPLOAD_HS_CODES_IMPORT_FILE,
     PREVIEW_HS_CODES_IMPORT_FROM_PATH,
-    IMPORT_HS_CODES_FROM_PATH,
     COMMIT_HS_CODES_IMPORT,
 ];
-pub const LOCAL: &[Operation] = &[PREVIEW_HS_CODES_IMPORT_FROM_PATH, IMPORT_HS_CODES_FROM_PATH];
+pub const LOCAL: &[Operation] = &[PREVIEW_HS_CODES_IMPORT_FROM_PATH];
 pub fn upload(
     service: &NativeService,
     actor: &Actor,
@@ -96,12 +94,6 @@ pub fn upload(
             "addCount":counts("Add"),"updateCount":counts("Update"),"unchangedCount":counts("Unchanged"),"suspectedObsoleteCount":counts("SuspectedObsolete"),"conflictCount":counts("Conflict"),"invalidCount":counts("Invalid"),
             "warnings":if mode=="CompleteSnapshot"{vec!["完整年度库会标记缺失编码为疑似作废，请核对全部预检结果。"]}else{vec![]},"storagePolicy":"预检尚未写入税则；30 分钟内确认有效，只能提交一次。"});
     response["items"] = Value::Array(items);
-    if operation == UPLOAD_HS_CODES_IMPORT_FILE {
-        let committed = commit(service, actor, operation, &response)?;
-        return Ok(
-            json!({"success":true,"fileName":name,"totalCount":committed["addedCount"].as_i64().unwrap_or(0)+committed["updatedCount"].as_i64().unwrap_or(0),"message":committed["message"],"storagePolicy":"税则保存在当前业务数据库。"}),
-        );
-    }
     Ok(response)
 }
 pub fn handle(
@@ -125,11 +117,7 @@ pub fn handle(
     upload(
         service,
         actor,
-        if operation == IMPORT_HS_CODES_FROM_PATH {
-            UPLOAD_HS_CODES_IMPORT_FILE
-        } else {
-            PREVIEW_HS_CODES_IMPORT_UPLOAD
-        },
+        PREVIEW_HS_CODES_IMPORT_UPLOAD,
         body,
         name,
         &bytes,

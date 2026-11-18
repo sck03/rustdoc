@@ -2,6 +2,27 @@
 use super::model::*;
 use std::collections::BTreeMap;
 
+fn history_parameters() -> Vec<Parameter> {
+    let mut parameters = super::route_parameters::record_id32();
+    parameters.extend([
+        p(
+            "beforeId",
+            "query",
+            None,
+            i().minimum(num("1")).format("int64"),
+        ),
+        p(
+            "limit",
+            "query",
+            None,
+            i().minimum(num("1"))
+                .maximum(num("200"))
+                .default_value(serde_json::json!(30)),
+        ),
+    ]);
+    parameters
+}
+
 #[rustfmt::skip]
 pub(super) fn entries() -> Vec<Endpoint> { vec![
     route("get","/api/crm/customers/{id}","GetCrmCustomer",super::responses::json(r("ApiCrmCustomerDto"),&[],&["404"]),super::policies::rule((true,true,true),super::policies::access("All",&[("sales.customers",&["view"],false)])),Some(super::route_parameters::record_id32()),None),
@@ -31,9 +52,9 @@ pub(super) fn entries() -> Vec<Endpoint> { vec![
     route("post","/api/crm/follow-ups/{id}/transfer","TransferCrmFollowUp",super::responses::json(r("ApiCrmFollowUpDto"),&[],&["400","401","403","404","409"]),super::policies::rule((true,true,true),super::policies::access("All",&[("sales.follow-ups",&["assign"],false)])),Some(super::route_parameters::record_id32()),Some(r("ApiCrmFollowUpTransferRequest"))),
     route("get","/api/crm/opportunities/{id}","GetSalesOpportunity",super::responses::json(r("ApiSalesOpportunityDto"),&[],&["404"]),super::policies::rule((true,true,true),super::policies::access("All",&[("sales.opportunities",&["view"],false)])),Some(super::route_parameters::record_id32()),None),
     route("put","/api/crm/opportunities/{id}","UpdateSalesOpportunity",super::responses::json(r("ApiSalesOpportunityDto"),&["400","409"],&["404"]),super::policies::rule((true,true,true),super::policies::access("All",&[("sales.opportunities",&["edit"],false)])),Some(super::route_parameters::record_id32()),Some(r("ApiSalesOpportunitySaveRequest"))),
-    route("get","/api/crm/opportunities","QuerySalesOpportunities",super::responses::json(r("ApiPagedResponseOfApiSalesOpportunityDto"),&[],&[]),super::policies::rule((true,true,true),super::policies::access("All",&[("sales.opportunities",&["view"],false)])),Some(vec![p("keyword","query",None,s()),p("stage","query",None,s()),p("pageNumber","query",None,Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),p("pageSize","query",None,Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))]),None),
+    route("get","/api/crm/opportunities","QuerySalesOpportunities",super::responses::json(r("ApiPagedResponseOfApiSalesOpportunityDto"),&[],&[]),super::policies::rule((true,true,true),super::policies::access("All",&[("sales.opportunities",&["view"],false)])),Some(vec![p("includeArchived","query",None,b()),p("keyword","query",None,s()),p("stage","query",None,s()),p("pageNumber","query",None,Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),p("pageSize","query",None,Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))]),None),
     route("post","/api/crm/opportunities","CreateSalesOpportunity",super::responses::reply("201","application/json",Some(r("ApiSalesOpportunityDto")),&["400","409"],&["404"]),super::policies::rule((true,true,true),super::policies::access("All",&[("sales.opportunities",&["create"],false)])),None,Some(r("ApiSalesOpportunitySaveRequest"))),
-    route("get","/api/crm/opportunities/{id}/history","ListSalesOpportunityHistory",super::responses::json(a(r("ApiSalesOpportunityHistoryDto")),&[],&["404"]),super::policies::rule((true,true,true),super::policies::access("All",&[("sales.opportunities",&["view"],false)])),Some(super::route_parameters::record_id32()),None),
+    route("get","/api/crm/opportunities/{id}/history","ListSalesOpportunityHistory",super::responses::json(r("ApiSalesOpportunityHistoryPage"),&[],&["404"]),super::policies::rule((true,true,true),super::policies::access("All",&[("sales.opportunities",&["view"],false)])),Some(history_parameters()),None),
     route("post","/api/crm/opportunities/{id}/transition","TransitionSalesOpportunity",super::responses::json(r("ApiSalesOpportunityDto"),&["400","409"],&["404"]),super::policies::rule((true,true,true),super::policies::access("All",&[("sales.opportunities",&["transition"],false)])),Some(super::route_parameters::record_id32()),Some(r("ApiSalesOpportunityTransitionRequest"))),
     route("post","/api/crm/opportunities/{id}/archive","ArchiveSalesOpportunity",super::responses::json(r("ApiCommandResponse"),&["409"],&["404"]),super::policies::rule((true,true,true),super::policies::access("All",&[("sales.opportunities",&["archive"],false)])),Some(super::route_parameters::record_id32()),Some(r("ApiSalesOpportunityLifecycleRequest"))),
 ] }

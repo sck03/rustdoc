@@ -23,6 +23,7 @@ import { verifyDesktopBackupSave } from './lib/native-backup-save-checks.mjs';
 import { verifyDesktopHsExamples } from './lib/native-hs-examples.mjs';
 import { verifySharedControlLayout } from './lib/shared-control-layout.mjs';
 import { verifyDesktopPacking } from './lib/native-packing-consistency.mjs';
+import { verifyDesktopSalesConsistency } from './lib/native-sales-consistency.mjs';
 
 assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
 const repo = path.resolve(import.meta.dirname, '..');
@@ -37,6 +38,8 @@ const catalog = { ...productEditionCatalog.editions, ...productEditionCatalog.lo
 const selected = process.argv[3] ? [process.argv[3]] : Object.keys(productEditionCatalog.editions);
 assert(selected.every(edition => catalog[edition]), 'Unknown desktop test edition');
 const withoutOcr = process.argv.includes('--without-ocr');
+const salesOnly = process.argv.includes('--sales-only');
+if (salesOnly) assert.deepEqual(selected, ['Full'], 'The isolated sales and diagnostics gate uses Full.');
 
 for (const edition of selected) {
   const name = `ExportDocManager.Tauri.${edition}`;
@@ -143,8 +146,10 @@ for (const edition of selected) {
     assert(await run(`document.querySelector('.about-detail-grid')?.textContent.includes(${JSON.stringify(health.body.informationalVersion)})`));
     await captureScreenshot(cdp, path.join(output, `${edition}-about.png`));
     if(edition==='Full') await verifySharedControlLayout({run,station:true,capture:name=>captureScreenshot(cdp,path.join(output,`${edition}-${name}.png`))});
-    if (marker.ocr && !process.argv.includes('--blank-grid-only') && !process.argv.includes('--entry-rows-only')) await verifyDesktopOcr({ run, cdp, repo, output, context, token: login.body.accessToken, operations });
-    if (process.argv.includes('--entry-rows-only')) {
+    if (marker.ocr && !salesOnly && !process.argv.includes('--blank-grid-only') && !process.argv.includes('--entry-rows-only')) await verifyDesktopOcr({ run, cdp, repo, output, context, token: login.body.accessToken, operations });
+    if (salesOnly) {
+      await verifyDesktopSalesConsistency({ run, request, token: login.body.accessToken, cdp, output });
+    } else if (process.argv.includes('--entry-rows-only')) {
       const { invoiceId } = await verifyDesktopEntryRows({ run, request, token: login.body.accessToken, cdp, output });
       if (edition === 'Full') {
         await verifyDesktopSingleWindow({ run, cdp, output, token: login.body.accessToken, invoiceId });

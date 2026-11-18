@@ -1,8 +1,17 @@
+#[path = "support/business_consistency_contract.rs"]
+mod consistency;
 #[path = "support/native_fixture.rs"]
 mod native_fixture;
 use export_doc_engine::{contracts, generated_api::*};
 use native_fixture::ApiClient;
 use serde_json::{Value, json};
+
+#[test]
+fn current_history_scopes_and_invoice_feedback_are_atomic() {
+    native_fixture::Fixture::new()
+        .client()
+        .run_contract(consistency::exercise);
+}
 
 fn call(client: &ApiClient, operation: Operation, id: i64, body: Value) -> Value {
     let value = client
@@ -110,11 +119,10 @@ fn quotes_transitions_nullable_fields_and_archive_keep_versioned_business_histor
     assert_eq!(
         client
             .json::<Value>(GET_SALES_OPPORTUNITY, &[("id", id.to_string())], &[], None)
-            .unwrap_err()
-            .status,
-        Some(404)
+            .unwrap()["isArchived"],
+        true
     );
-    let history: Vec<ApiSalesOpportunityHistoryDto> = client
+    let history: ApiSalesOpportunityHistoryPage = client
         .json(
             LIST_SALES_OPPORTUNITY_HISTORY,
             &[("id", id.to_string())],
@@ -122,6 +130,7 @@ fn quotes_transitions_nullable_fields_and_archive_keep_versioned_business_histor
             None,
         )
         .unwrap();
+    let history = history.items;
     assert_eq!(history.len(), 8);
     assert_eq!(history[0].change_type, "归档");
     assert_eq!(history[0].version_number, 8);

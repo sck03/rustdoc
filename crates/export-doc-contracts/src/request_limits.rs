@@ -1,5 +1,6 @@
 //! Execution budgets shared by the HTTP host and generated browser clients.
 pub const TRANSFER_SECONDS: u64 = 24 * 60 * 60;
+pub const MAX_JSON_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
 
 /// The generated contract includes capability and binary-response overrides.
 pub fn execution_seconds(operation: &str) -> u64 {
@@ -32,6 +33,10 @@ mod tests {
     #[test]
     fn long_running_operations_publish_their_execution_budgets() {
         let document = crate::openapi::document();
+        assert_eq!(
+            document["x-exportdoc-json-response-limit-bytes"],
+            super::MAX_JSON_RESPONSE_BYTES
+        );
         for operation in document["paths"]
             .as_object()
             .unwrap()

@@ -82,17 +82,17 @@ fn backup_retention_restore_confirmation_and_session_revocation_use_the_original
     fixture.client = Some(client.login("admin".into(), String::new()).unwrap().0);
     let customers: Value = fixture
         .client()
-        .json(LIST_CUSTOMERS, &[], &[], None)
+        .json(LIST_CUSTOMERS_PAGE, &[], &[], None)
         .unwrap();
     assert!(
-        customers
+        customers["items"]
             .as_array()
             .unwrap()
             .iter()
             .any(|row| row["customerNameEN"] == "BEFORE-BACKUP")
     );
     assert!(
-        !customers
+        !customers["items"]
             .as_array()
             .unwrap()
             .iter()

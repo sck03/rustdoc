@@ -1,6 +1,15 @@
 //! Shared response envelopes. Each family retains its own null, integer and paging rules.
 use super::model::*;
 
+pub(super) fn memory_budget() -> Schema {
+    o(["capacityBytes", "reservedBytes", "rejections"]
+        .into_iter()
+        .map(|name| (name, i().minimum(num("0")).format("int64")))
+        .collect())
+    .required(vec!["capacityBytes", "reservedBytes", "rejections"])
+    .additional(Additional::Allowed(false))
+}
+
 #[rustfmt::skip]
 pub(super) fn item_collection(item: &str) -> Schema {
     o(vec![("items",a(r(item)))]).required(vec!["items"])

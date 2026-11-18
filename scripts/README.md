@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-18 业务一致性：`npm --prefix apps/export-doc-web run test:sales-opportunity-lifecycle-ui` 验证商机受限报价字段、续编、重复提交、迟到响应/确认、归档分页和资源指标按需回收，纳入 `business` 回归组。`sales_service` 与 PostgreSQL `team_service` 共用 `business_consistency_contract`，验证显式关联客户限制、归档读取、游标历史及发票/HS 反馈事务回滚。Storage 查询计划回归核对两库的商机历史索引。`cargo test --locked -p export-doc-server --lib slow_json_sockets_are_bounded_and_disconnect_releases_the_budget -- --nocapture` 使用真实 TCP 慢读连接验证 128 MiB JSON 响应预算、429 和断线释放；此计数为受管缓冲容量，不是进程 RSS。完整结果见[本批记录](../docs/archive/2026-11/2026-11-18业务一致性与响应资源治理.md)。
+
 2026-11-18 记录与计算边界：`test:document-editor-ui` 增加发票及六类主数据在切换后加载失败、旧确认失效和新记录操作的真实 React 回归；`test:concurrency-feedback` 使用正式 `ConcurrencyConflict` 错误码并覆盖文案变化、普通冲突及无效响应。`tests/ContractFixtures/invoice-profit.json` 由 Rust 与 React 共用，验证金额舍入顺序、人民币默认汇率和缺汇率行为。HTTP 上传测试检查无效会话与无权限账号均不读取正文；两库业务合同验证错编号更新拒绝及空明细不能核对。当前错误 schema 已声明可选 `code`，本批没有增加第二套契约。
 
 2026-11-17 客户跟进与输出：`npm --prefix apps/export-doc-web run test:crm-export-lifecycle-ui` 验证跟进保存续编、创建后版本衔接、联系人跨页选择，以及 PDF/托单/单据包在来源、客户端、权限或组件生命周期变化后的对话框/请求取消；纳入统一 `business` 组。模板契约测试继续覆盖 V3 Flow 组件的字段域及错误路径。QueryPerformance 的 `current` 模式复用一次读取内的身份查询，并断言后续事项不重复读取不变身份；逐记录权限条件保留。

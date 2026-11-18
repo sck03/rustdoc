@@ -33,12 +33,10 @@
 }
 
 .runtime-dependency-heading h3,
-.runtime-dependency-heading p,
 .runtime-dependency-card p {
   margin: 0;
 }
 
-.runtime-dependency-heading p,
 .runtime-dependency-card p {
   color: var(--edm-text-secondary);
   font-size: var(--edm-font-size-sm);
@@ -192,8 +190,7 @@
   border-radius: var(--edm-radius-md);
 }
 
-.runtime-path-group-title h3,
-.runtime-path-group-title p {
+.runtime-path-group-title h3 {
   margin: 0;
 }
 
@@ -201,13 +198,6 @@
   color: var(--edm-neutral-750);
   font-size: var(--edm-font-size-md);
   line-height: var(--edm-line-height-md);
-}
-
-.runtime-path-group-title p {
-  margin-top: 4px;
-  color: var(--edm-text-secondary);
-  font-size: var(--edm-font-size-xs);
-  line-height: var(--edm-line-height-xs);
 }
 
 .runtime-path-group-count {
@@ -291,14 +281,9 @@
   white-space: nowrap;
 }
 
-.runtime-path-requirement-core {
+.runtime-path-requirement-required {
   color: var(--edm-primary-850);
   background: var(--edm-primary-75);
-}
-
-.runtime-path-requirement-feature {
-  color: var(--edm-cyan-800);
-  background: var(--edm-neutral-200);
 }
 
 .runtime-path-requirement-optional {
@@ -319,11 +304,6 @@
 .runtime-path-status-missing {
   color: var(--edm-warning-600);
   background: var(--edm-warning-100);
-}
-
-.runtime-path-status-missing-feature {
-  color: var(--edm-cyan-800);
-  background: var(--edm-neutral-200);
 }
 
 .runtime-path-status-missing-optional {

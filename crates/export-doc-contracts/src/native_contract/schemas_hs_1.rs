@@ -30,7 +30,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("unchangedCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("suspectedObsoleteCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("skippedCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("message",s())
     ]).required(vec!["success","addedCount","updatedCount","unchangedCount","suspectedObsoleteCount","skippedCount","message"])),
-    ("ApiHsCodeImportPathRequest",o(vec![("filePath",s())]).required(vec!["filePath"])),
     ("ApiHsCodeImportPreviewItemDto",o(vec![
         ("changeType",s()),("rowNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("item",r("ApiHsCodeDto")),
         ("changedFields",a(s())),("replacementCandidates",a(s())),("message",s())
@@ -47,10 +46,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("unchangedCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("suspectedObsoleteCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("conflictCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("invalidCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("warnings",a(s())),("storagePolicy",s())
     ]).required(vec!["token","fileName","mode","sourceName","worksheetName","headerRowNumber","confidence","columns","items","addCount","updateCount","unchangedCount","suspectedObsoleteCount","conflictCount","invalidCount","warnings","storagePolicy"])),
-    ("ApiHsCodeImportResponse",o(vec![
-        ("success",b()),("fileName",s()),("totalCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("message",s()),("storagePolicy",s())
-    ]).required(vec!["success","fileName","totalCount","message","storagePolicy"])),
     ("ApiHsCodeKnowledgeExamplePage",o(vec![
         ("items",a(r("HsCodeDeclarationExample"))),("totalCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("pageNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("pageSize",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))

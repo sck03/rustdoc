@@ -42,7 +42,6 @@ pub const OPERATIONS: &[Operation] = &[
     DELETE_HS_CODE_KNOWLEDGE_EXAMPLE,
     DELETE_HS_CODE_KNOWLEDGE_EXAMPLES_BATCH,
     RECORD_HS_CODE_KNOWLEDGE_FEEDBACK,
-    RECORD_INVOICE_HS_CODE_KNOWLEDGE_FEEDBACK,
     DISCOVER_HS_CODE_HISTORY_CANDIDATES,
     LIST_HS_CODE_REMOTE_CANDIDATES,
     REVIEW_HS_CODE_REMOTE_CANDIDATE,
@@ -199,7 +198,7 @@ pub fn handle(
                 json!({"success":true,"message":format!("已删除 {count} 条案例。"),"deletedCount":count}),
             )
         }
-        RECORD_HS_CODE_KNOWLEDGE_FEEDBACK | RECORD_INVOICE_HS_CODE_KNOWLEDGE_FEEDBACK => {
+        RECORD_HS_CODE_KNOWLEDGE_FEEDBACK => {
             hs_learning::feedback(tx, actor, body, year)?;
             Ok(json!({"success":true,"message":"反馈已记录。"}))
         }

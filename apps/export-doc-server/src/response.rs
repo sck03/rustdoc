@@ -9,13 +9,15 @@ use export_doc_engine::api::ApiError;
 use export_doc_engine::engine::tasks::FileOutput;
 use serde_json::json;
 mod range;
+#[cfg(test)]
+mod resource_tests;
 
 pub struct Reply {
     pub bytes: Vec<u8>,
     pub file: Option<(String, String)>,
     pub cookie: Option<String>,
     pub stream: Option<(std::fs::File, u64)>,
-    pub download_permit: Option<tokio::sync::OwnedSemaphorePermit>,
+    pub transfer_permit: Option<tokio::sync::OwnedSemaphorePermit>,
     pub memory_reservation: Option<export_doc_engine::engine::backup_io::Reservation>,
 }
 impl Reply {
@@ -25,7 +27,7 @@ impl Reply {
             file: None,
             cookie: None,
             stream: None,
-            download_permit: None,
+            transfer_permit: None,
             memory_reservation: None,
         }
     }
@@ -35,7 +37,7 @@ impl Reply {
             file: Some((file.file_name, file.media_type)),
             cookie: None,
             stream: None,
-            download_permit: None,
+            transfer_permit: None,
             memory_reservation: None,
         }
     }
@@ -59,7 +61,7 @@ impl Reply {
                 file: Some((file_name, media_type)),
                 cookie: None,
                 stream: Some((file, size)),
-                download_permit: None,
+                transfer_permit: None,
                 memory_reservation: None,
             },
         }
@@ -140,6 +142,25 @@ pub async fn success(
     request_id: &str,
     range_header: Option<&str>,
 ) -> Response<Body> {
+    // Ordinary JSON must retain its byte reservation until sent, cancelled or disconnected.
+    // Execution admission limits producers; this separate budget limits slow receivers.
+    if reply.file.is_none() && reply.stream.is_none() {
+        if reply.bytes.len() > export_doc_contracts::request_limits::MAX_JSON_RESPONSE_BYTES {
+            return error(crate::request::error(
+                400,
+                "响应内容超过容量上限，请缩小查询范围。",
+            ));
+        }
+        if reply.memory_reservation.is_none() {
+            match state
+                .response_memory
+                .reserve_working(reply.bytes.capacity().max(1))
+            {
+                Ok(reservation) => reply.memory_reservation = Some(reservation),
+                Err(cause) => return error(cause),
+            }
+        }
+    }
     let responses = &contracts::contract()["operations"][operation.id]["responses"];
     let success = responses
         .as_object()
@@ -182,13 +203,17 @@ pub async fn success(
                 offset + length - 1
             ));
         }
-        let permit = match reply
-            .download_permit
-            .take()
-            .or_else(|| state.downloads.clone().try_acquire_owned().ok())
-        {
-            Some(permit) => permit,
-            None => return error(crate::request::error(429, "下载正在处理，请稍后重试。")),
+        let permit = if is_file {
+            match reply
+                .transfer_permit
+                .take()
+                .or_else(|| state.downloads.clone().try_acquire_owned().ok())
+            {
+                Some(permit) => Some(permit),
+                None => return error(crate::request::error(429, "下载正在处理，请稍后重试。")),
+            }
+        } else {
+            reply.transfer_permit.take()
         };
         let (source, size): (Box<dyn tokio::io::AsyncRead + Unpin + Send>, u64) =
             if let Some((file, _)) = reply.stream {
@@ -214,6 +239,11 @@ pub async fn success(
             state.telemetry.clone(),
             request_id.to_owned(),
             state.shutdown.clone(),
+            std::time::Duration::from_secs(if is_file {
+                export_doc_contracts::request_limits::TRANSFER_SECONDS
+            } else {
+                export_doc_contracts::request_limits::execution_seconds(operation.id)
+            }),
         ));
         response
             .headers_mut()

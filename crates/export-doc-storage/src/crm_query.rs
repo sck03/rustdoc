@@ -13,6 +13,7 @@ pub enum CrmList<'a> {
         customer_id: Option<i64>,
         stage: &'a str,
         keyword: &'a str,
+        include_archived: bool,
         /// Open opportunities with a close date, ordered for the overview.
         upcoming_closings: bool,
     },
@@ -148,15 +149,18 @@ pub(crate) fn build(q: &CrmQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
             stage,
             keyword,
             upcoming_closings,
+            include_archived,
         } => {
-            clauses.push(
-                if pg {
-                    "COALESCE((r.body->>'isArchived')::boolean,false)=false"
-                } else {
-                    "COALESCE(json_extract(r.body,'$.isArchived'),0)<>1"
-                }
-                .into(),
-            );
+            if !include_archived {
+                clauses.push(
+                    if pg {
+                        "COALESCE((r.body->>'isArchived')::boolean,false)=false"
+                    } else {
+                        "COALESCE(json_extract(r.body,'$.isArchived'),0)<>1"
+                    }
+                    .into(),
+                );
+            }
             if !stage.is_empty() {
                 clauses.push(format!(
                     "{}={}",

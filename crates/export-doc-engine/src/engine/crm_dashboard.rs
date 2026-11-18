@@ -35,7 +35,7 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
             }
             Ok(())
         })?;
-        let opportunities = CrmList::Opportunities { customer_id: None, stage: "", keyword: "", upcoming_closings: false };
+        let opportunities = CrmList::Opportunities { customer_id: None, stage: "", keyword: "", include_archived: false, upcoming_closings: false };
         let mut stages: BTreeMap<String, usize> = BTreeMap::new();
         let mut currencies: BTreeMap<String, (usize, Decimal, Decimal)> = BTreeMap::new();
         crm_queries::scan(tx, actor, opportunities, &[
@@ -55,7 +55,7 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
             entry.2 = entry.2.checked_add(weighted).ok_or_else(|| unavailable("加权金额汇总超出范围。"))?;
             Ok(())
         })?;
-        let (_, closings) = crm_queries::page(tx, actor, CrmList::Opportunities { customer_id: None, stage: "", keyword: "", upcoming_closings: true },
+        let (_, closings) = crm_queries::page(tx, actor, CrmList::Opportunities { customer_id: None, stage: "", keyword: "", include_archived: false, upcoming_closings: true },
             &crm_queries::fields("ApiSalesOpportunityDto"), 0, 8)?;
         if closings.iter().any(|row| row["productId"].as_i64().is_some_and(|id| id > 0)) {
             auth::authorize(actor, "common.product-reference", "view")?;

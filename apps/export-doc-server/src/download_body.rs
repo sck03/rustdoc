@@ -78,10 +78,11 @@ impl AsyncRead for Reader {
 pub(crate) fn body(
     source: Box<dyn AsyncRead + Unpin + Send>,
     size: u64,
-    permit: OwnedSemaphorePermit,
+    permit: Option<OwnedSemaphorePermit>,
     telemetry: Arc<crate::telemetry::Telemetry>,
     request_id: String,
     shutdown: crate::Shutdown,
+    total: Duration,
 ) -> Body {
     transfer(
         source,
@@ -90,7 +91,7 @@ pub(crate) fn body(
         Transfer {
             telemetry,
             idle: Duration::from_secs(60),
-            total: Duration::from_secs(export_doc_contracts::request_limits::TRANSFER_SECONDS),
+            total,
             request_id,
             shutdown,
         },
@@ -106,7 +107,7 @@ struct Transfer {
 fn transfer(
     mut source: Box<dyn AsyncRead + Unpin + Send>,
     size: u64,
-    permit: OwnedSemaphorePermit,
+    permit: Option<OwnedSemaphorePermit>,
     context: Transfer,
 ) -> Body {
     let Transfer {
@@ -116,7 +117,8 @@ fn transfer(
         request_id,
         shutdown,
     } = context;
-    let (inner, mut writer) = tokio::io::duplex(64 * 1024);
+    let buffer_bytes = (size.min(64 * 1024) as usize).max(1);
+    let (inner, mut writer) = tokio::io::duplex(buffer_bytes);
     let (finished, completion) = oneshot::channel();
     let reader = Reader {
         inner,
@@ -129,7 +131,7 @@ fn transfer(
         let observation = telemetry.download_start();
         let copy = async {
             let mut remaining = size;
-            let mut buffer = vec![0; 64 * 1024];
+            let mut buffer = vec![0; buffer_bytes];
             while remaining > 0 {
                 let length = buffer.len().min(remaining as usize);
                 let read = tokio::time::timeout(idle, source.read(&mut buffer[..length]))
@@ -187,7 +189,7 @@ mod tests {
         super::transfer(
             source,
             size,
-            permit,
+            Some(permit),
             Transfer {
                 telemetry,
                 idle,
@@ -213,7 +215,7 @@ mod tests {
                 Some(budget.reserve(128 * 1024).unwrap()),
             ),
             128 * 1024,
-            slots.clone().try_acquire_owned().unwrap(),
+            Some(slots.clone().try_acquire_owned().unwrap()),
             Transfer {
                 telemetry,
                 idle: Duration::from_secs(60),

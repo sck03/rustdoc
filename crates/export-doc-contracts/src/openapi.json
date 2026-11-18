@@ -6899,17 +6899,6 @@
           "message"
         ]
       },
-      "ApiHsCodeImportPathRequest": {
-        "type": "object",
-        "properties": {
-          "filePath": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "filePath"
-        ]
-      },
       "ApiHsCodeImportPreviewItemDto": {
         "type": "object",
         "properties": {
@@ -7110,38 +7099,6 @@
           "conflictCount",
           "invalidCount",
           "warnings",
-          "storagePolicy"
-        ]
-      },
-      "ApiHsCodeImportResponse": {
-        "type": "object",
-        "properties": {
-          "fileName": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "storagePolicy": {
-            "type": "string"
-          },
-          "success": {
-            "type": "boolean"
-          },
-          "totalCount": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
-          }
-        },
-        "required": [
-          "success",
-          "fileName",
-          "totalCount",
-          "message",
           "storagePolicy"
         ]
       },
@@ -14213,6 +14170,32 @@
           "requests": {
             "$ref": "#/components/schemas/ApiRuntimeLatencyMetrics"
           },
+          "responseMemory": {
+            "type": "object",
+            "properties": {
+              "capacityBytes": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "rejections": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "reservedBytes": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "capacityBytes",
+              "reservedBytes",
+              "rejections"
+            ],
+            "additionalProperties": false
+          },
           "uptimeSeconds": {
             "type": "integer",
             "format": "int64",
@@ -14220,6 +14203,7 @@
           }
         },
         "required": [
+          "responseMemory",
           "requests",
           "queueWait",
           "queueCapacity",
@@ -14651,6 +14635,9 @@
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
+          "isArchived": {
+            "type": "boolean"
+          },
           "nextAction": {
             "type": "string"
           },
@@ -14706,6 +14693,7 @@
           "productName",
           "title",
           "stage",
+          "isArchived",
           "quotationNo",
           "estimatedAmount",
           "currency",
@@ -14802,6 +14790,29 @@
           "changeNote",
           "changedBy",
           "createdAt"
+        ]
+      },
+      "ApiSalesOpportunityHistoryPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApiSalesOpportunityHistoryDto"
+            },
+            "maxItems": 200
+          },
+          "nextCursor": {
+            "type": [
+              "null",
+              "integer"
+            ],
+            "format": "int64"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
         ]
       },
       "ApiSalesOpportunityLifecycleRequest": {
@@ -41429,6 +41440,7 @@
       "ai.modelName": "AI 模型名称"
     }
   },
+  "x-exportdoc-json-response-limit-bytes": 67108864,
   "paths": {
     "/api/audit-logs": {
       "get": {
@@ -45304,6 +45316,13 @@
         ],
         "parameters": [
           {
+            "name": "includeArchived",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "keyword",
             "in": "query",
             "schema": {
@@ -45662,10 +45681,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ApiSalesOpportunityHistoryDto"
-                  }
+                  "$ref": "#/components/schemas/ApiSalesOpportunityHistoryPage"
                 }
               }
             }
@@ -45707,6 +45723,25 @@
               "pattern": "^-?(?:0|[1-9]\\d*)$"
             },
             "required": true
+          },
+          {
+            "name": "beforeId",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 30,
+              "minimum": 1,
+              "maximum": 200
+            }
           }
         ]
       }
@@ -48900,67 +48935,6 @@
         ]
       }
     },
-    "/api/invoices/hs-knowledge/feedback": {
-      "post": {
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "RecordInvoiceHsCodeKnowledgeFeedback",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiCommandResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.invoices",
-                "actions": [
-                  "operate"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HsCodeKnowledgeFeedbackInput"
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/invoices/hs-knowledge/search": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
@@ -51037,61 +51011,6 @@
       }
     },
     "/api/master-data/customers": {
-      "get": {
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "ListCustomers",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ApiCustomerDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.reference-data",
-                "actions": [
-                  "view"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "keyword",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ]
-      },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,
@@ -51492,61 +51411,6 @@
       }
     },
     "/api/master-data/exporters": {
-      "get": {
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "ListExporters",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ApiExporterDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.reference-data",
-                "actions": [
-                  "view"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "keyword",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ]
-      },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,
@@ -52779,76 +52643,6 @@
         }
       }
     },
-    "/api/master-data/hs-codes/import-path": {
-      "post": {
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "ImportHsCodesFromPath",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiHsCodeImportResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "Conflict"
-          },
-          "503": {
-            "description": "Service Unavailable"
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.hs-knowledge",
-                "actions": [
-                  "manage"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiHsCodeImportPathRequest"
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/master-data/hs-codes/import-preview-path": {
       "post": {
         "x-exportdoc-timeout-seconds": 30,
@@ -53000,82 +52794,6 @@
               ],
               "format": "int32",
               "pattern": "^-?(?:0|[1-9]\\d*)$"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/octet-stream": {
-              "schema": {
-                "$ref": "#/components/schemas/IFormFile"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/master-data/hs-codes/import-upload": {
-      "post": {
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": true,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "UploadHsCodesImportFile",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiHsCodeImportResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "409": {
-            "description": "Conflict"
-          },
-          "503": {
-            "description": "Service Unavailable"
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.hs-knowledge",
-                "actions": [
-                  "manage"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "fileName",
-            "in": "query",
-            "schema": {
-              "type": "string"
             }
           }
         ],
@@ -54466,61 +54184,6 @@
       }
     },
     "/api/master-data/payees": {
-      "get": {
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "ListPayees",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ApiPayeeDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.reference-data",
-                "actions": [
-                  "view"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "keyword",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ]
-      },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,
@@ -54921,61 +54584,6 @@
       }
     },
     "/api/master-data/ports": {
-      "get": {
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "ListPorts",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ApiPortDto"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.master-data",
-                "actions": [
-                  "view"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "keyword",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ]
-      },
       "post": {
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,

@@ -46,6 +46,11 @@ pub fn exercise(c: &Connection) {
             body["templateId"] = json!(n % 100);
             body["content"] = json!({"versionNumber":n/100+1});
             insert(c, "template-versions", body);
+            insert(
+                c,
+                "opportunity-events",
+                json!({"versionNumber":1,"ownerUserId":1,"companyScope":"PLAN","departmentId":"D","opportunityId":n%200+1,"snapshot":{"versionNumber":n+1},"unused":"history-body".repeat(500)}),
+            );
         }
     }
     let write_ms = start.elapsed().as_secs_f64() * 1000.0;
@@ -66,6 +71,32 @@ pub fn exercise(c: &Connection) {
         ..Default::default()
     };
     let mut plans = vec![];
+    let history = GenericQuery {
+        kind: "opportunity-events",
+        scope: DataScope {
+            all: true,
+            ..Default::default()
+        },
+        filters: &[("opportunityId", "42".into())],
+        fields: &[("id", "id"), ("snapshot", "snapshot")],
+        limit: 31,
+        ..Default::default()
+    };
+    let (_, history_rows) = c.scan_generic(&history, None).unwrap();
+    assert_eq!(history_rows.len(), 5);
+    assert!(
+        !serde_json::to_string(&history_rows)
+            .unwrap()
+            .contains("history-body")
+    );
+    let history_plan = c.explain_query(&QueryPlan::Generic(&history)).unwrap();
+    assert!(
+        history_plan["plan"]
+            .to_string()
+            .contains("records_opportunity_history_page"),
+        "history must seek its parent index: {history_plan}"
+    );
+    plans.push(history_plan);
     for keyword in [
         "",
         "贸",
@@ -159,6 +190,6 @@ pub fn exercise(c: &Connection) {
     save(
         c,
         "lists",
-        &json!({"schema":export_doc_storage::SCHEMA_VERSION,"invoiceRows":rows,"additionalRows":3000,"inputBytes":input_bytes,"transactionalWriteMs":write_ms,"plans":plans}),
+        &json!({"schema":export_doc_storage::SCHEMA_VERSION,"invoiceRows":rows,"additionalRows":4000,"inputBytes":input_bytes,"transactionalWriteMs":write_ms,"plans":plans}),
     );
 }

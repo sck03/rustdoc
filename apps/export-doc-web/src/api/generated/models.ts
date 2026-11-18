@@ -1508,10 +1508,6 @@ export interface ApiHsCodeImportCommitResponse {
   updatedCount: number;
 }
 
-export interface ApiHsCodeImportPathRequest {
-  filePath: string;
-}
-
 export interface ApiHsCodeImportPreviewItemDto {
   changeType: string;
   changedFields: string[];
@@ -1547,14 +1543,6 @@ export interface ApiHsCodeImportPreviewResponse {
   updateCount: number;
   warnings: string[];
   worksheetName: string;
-}
-
-export interface ApiHsCodeImportResponse {
-  fileName: string;
-  message: string;
-  storagePolicy: string;
-  success: boolean;
-  totalCount: number;
 }
 
 export interface ApiHsCodeKnowledgeExamplePage {
@@ -3093,6 +3081,7 @@ export interface ApiRuntimeHttpMetrics {
   queuedRequests: number;
   requestCapacity: number;
   requests: ApiRuntimeLatencyMetrics;
+  responseMemory: { capacityBytes: number; rejections: number; reservedBytes: number };
   uptimeSeconds: number;
 }
 
@@ -3158,6 +3147,7 @@ export interface ApiSalesOpportunityDto {
   estimatedAmount: number;
   expectedCloseDate?: string | null;
   id: number;
+  isArchived: boolean;
   nextAction: string;
   notes: string;
   probabilityPercent: number;
@@ -3184,6 +3174,11 @@ export interface ApiSalesOpportunityHistoryDto {
   salesOpportunityId: number;
   stage: string;
   versionNumber: number;
+}
+
+export interface ApiSalesOpportunityHistoryPage {
+  items: ApiSalesOpportunityHistoryDto[];
+  nextCursor: number | null;
 }
 
 export interface ApiSalesOpportunityLifecycleRequest {
@@ -9279,10 +9274,6 @@ export interface ImportHsCodeKnowledgeRequest {
   body: Blob;
 }
 
-export interface ImportHsCodesFromPathRequest {
-  body: ApiHsCodeImportPathRequest;
-}
-
 export interface ImportInvoiceTransferPackageRequest {
   body: ApiInvoiceTransferImportRequest;
 }
@@ -9382,10 +9373,6 @@ export interface ListContainerPackingProjectsRequest {
 
 export interface ListCustomOptionsRequest {
   optionType: string;
-}
-
-export interface ListCustomersRequest {
-  keyword?: string;
 }
 
 export interface ListCustomersPageRequest {
@@ -9516,10 +9503,6 @@ export interface ListExpenseRequestRequest {
 export interface ListExpenseRequestWorkflowCandidatesRequest {
   id: number;
   beforeId?: number;
-}
-
-export interface ListExportersRequest {
-  keyword?: string;
 }
 
 export interface ListExportersPageRequest {
@@ -9739,10 +9722,6 @@ export interface ListOvertimeRequestWorkflowCandidatesRequest {
   beforeId?: number;
 }
 
-export interface ListPayeesRequest {
-  keyword?: string;
-}
-
 export interface ListPayeesPageRequest {
   pageNumber: number;
   pageSize: number;
@@ -9794,10 +9773,6 @@ export interface ListPersonnelReportingOptionsRequest {
   keyword?: string;
   pageNumber?: number;
   pageSize?: number;
-}
-
-export interface ListPortsRequest {
-  keyword?: string;
 }
 
 export interface ListPortsPageRequest {
@@ -9866,6 +9841,8 @@ export interface ListResponsibilitiesRequest {
 
 export interface ListSalesOpportunityHistoryRequest {
   id: number;
+  beforeId?: number;
+  limit?: number;
 }
 
 export interface ListSingleWindowOperationCenterRequest {
@@ -10194,6 +10171,7 @@ export interface QueryReportTemplateV3ImageResourcesRequest {
 }
 
 export interface QuerySalesOpportunitiesRequest {
+  includeArchived?: boolean;
   keyword?: string;
   stage?: string;
   pageNumber?: number;
@@ -10268,10 +10246,6 @@ export interface RecognizeOcrImageRequest {
 }
 
 export interface RecordHsCodeKnowledgeFeedbackRequest {
-  body: HsCodeKnowledgeFeedbackInput;
-}
-
-export interface RecordInvoiceHsCodeKnowledgeFeedbackRequest {
   body: HsCodeKnowledgeFeedbackInput;
 }
 
@@ -11196,11 +11170,6 @@ export interface UploadBusinessAttachmentRequest {
 export interface UploadExporterSealRequest {
   id: number;
   sealType: string;
-  fileName?: string;
-  body: Blob;
-}
-
-export interface UploadHsCodesImportFileRequest {
   fileName?: string;
   body: Blob;
 }

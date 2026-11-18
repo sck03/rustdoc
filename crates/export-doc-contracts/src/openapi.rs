@@ -11,6 +11,9 @@ pub fn document() -> Value {
 }
 
 #[cfg(test)]
+#[path = "contract_business_consistency.rs"]
+mod business_consistency;
+#[cfg(test)]
 #[path = "contract_custom_oa.rs"]
 mod custom_oa;
 #[cfg(test)]
@@ -180,6 +183,7 @@ mod tests {
         evolution::reviewed_independent_declarations(&mut baseline);
         custom_oa::apply(&mut baseline);
         file_storage::apply(&mut baseline);
+        business_consistency::apply(&mut baseline);
         // Reviewed retirement: access is the sole authorization definition.
         // Keep every access rule, authentication flag, schema and error in the comparison.
         for path in baseline["paths"].as_object_mut().unwrap().values_mut() {

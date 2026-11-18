@@ -158,6 +158,7 @@ impl Replay {
             input: None,
         }
     }
+    #[cfg(any(feature = "mail", test))]
     pub fn with_sensitive_fields(mut self, keys: &[&str]) -> Result<Self> {
         let mut fields = serde_json::Map::new();
         if let Some(body) = self.body.as_object_mut() {

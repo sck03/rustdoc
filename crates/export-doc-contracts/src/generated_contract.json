@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "161e704404e0512c42af7281cad722b8a049d7599725215e6826d5aef1033151",
+  "digest": "c56f40b7c47eb578948ca0b06d35fee39b6560bf5ec80d3631cfe9978b969894",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -45351,72 +45351,6 @@
       "timeoutSeconds": 30,
       "requiresProcessingSlot": true
     },
-    "ImportHsCodesFromPath": {
-      "policy": {
-        "requiresAuthentication": true,
-        "requiresDesktopAccess": true,
-        "requiresLicense": true,
-        "access": {
-          "match": "All",
-          "resources": [
-            {
-              "resourceKey": "document.hs-knowledge",
-              "actions": [
-                "manage"
-              ],
-              "administratorOnly": false
-            }
-          ]
-        }
-      },
-      "office": null,
-      "parameters": [],
-      "requestBody": {
-        "required": true,
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/ApiHsCodeImportPathRequest"
-            }
-          }
-        }
-      },
-      "responses": {
-        "200": {
-          "description": "OK",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiHsCodeImportResponse"
-              }
-            }
-          }
-        },
-        "400": {
-          "description": "Bad Request"
-        },
-        "401": {
-          "description": "Unauthorized"
-        },
-        "404": {
-          "description": "Not Found"
-        },
-        "409": {
-          "description": "Conflict"
-        },
-        "503": {
-          "description": "Service Unavailable"
-        }
-      },
-      "request": {
-        "$ref": "#/components/schemas/ApiHsCodeImportPathRequest"
-      },
-      "response": {
-        "$ref": "#/components/schemas/ApiHsCodeImportResponse"
-      },
-      "timeoutSeconds": 30,
-      "requiresProcessingSlot": false
-    },
     "ImportInvoiceTransferPackage": {
       "policy": {
         "requiresAuthentication": true,
@@ -47272,60 +47206,6 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiContainerPackingProjectListResponse"
-      },
-      "timeoutSeconds": 30,
-      "requiresProcessingSlot": false
-    },
-    "ListCustomers": {
-      "policy": {
-        "requiresAuthentication": true,
-        "requiresDesktopAccess": true,
-        "requiresLicense": true,
-        "access": {
-          "match": "All",
-          "resources": [
-            {
-              "resourceKey": "document.reference-data",
-              "actions": [
-                "view"
-              ],
-              "administratorOnly": false
-            }
-          ]
-        }
-      },
-      "office": null,
-      "parameters": [
-        {
-          "name": "keyword",
-          "in": "query",
-          "schema": {
-            "type": "string"
-          }
-        }
-      ],
-      "requestBody": null,
-      "responses": {
-        "200": {
-          "description": "OK",
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/ApiCustomerDto"
-                }
-              }
-            }
-          }
-        }
-      },
-      "request": null,
-      "response": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/ApiCustomerDto"
-        }
       },
       "timeoutSeconds": 30,
       "requiresProcessingSlot": false
@@ -49944,60 +49824,6 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaWorkflowCandidates"
-      },
-      "timeoutSeconds": 30,
-      "requiresProcessingSlot": false
-    },
-    "ListExporters": {
-      "policy": {
-        "requiresAuthentication": true,
-        "requiresDesktopAccess": true,
-        "requiresLicense": true,
-        "access": {
-          "match": "All",
-          "resources": [
-            {
-              "resourceKey": "document.reference-data",
-              "actions": [
-                "view"
-              ],
-              "administratorOnly": false
-            }
-          ]
-        }
-      },
-      "office": null,
-      "parameters": [
-        {
-          "name": "keyword",
-          "in": "query",
-          "schema": {
-            "type": "string"
-          }
-        }
-      ],
-      "requestBody": null,
-      "responses": {
-        "200": {
-          "description": "OK",
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/ApiExporterDto"
-                }
-              }
-            }
-          }
-        }
-      },
-      "request": null,
-      "response": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/ApiExporterDto"
-        }
       },
       "timeoutSeconds": 30,
       "requiresProcessingSlot": false
@@ -54599,60 +54425,6 @@
       "timeoutSeconds": 30,
       "requiresProcessingSlot": false
     },
-    "ListPayees": {
-      "policy": {
-        "requiresAuthentication": true,
-        "requiresDesktopAccess": true,
-        "requiresLicense": true,
-        "access": {
-          "match": "All",
-          "resources": [
-            {
-              "resourceKey": "document.reference-data",
-              "actions": [
-                "view"
-              ],
-              "administratorOnly": false
-            }
-          ]
-        }
-      },
-      "office": null,
-      "parameters": [
-        {
-          "name": "keyword",
-          "in": "query",
-          "schema": {
-            "type": "string"
-          }
-        }
-      ],
-      "requestBody": null,
-      "responses": {
-        "200": {
-          "description": "OK",
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/ApiPayeeDto"
-                }
-              }
-            }
-          }
-        }
-      },
-      "request": null,
-      "response": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/ApiPayeeDto"
-        }
-      },
-      "timeoutSeconds": 30,
-      "requiresProcessingSlot": false
-    },
     "ListPayeesPage": {
       "policy": {
         "requiresAuthentication": true,
@@ -55739,60 +55511,6 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/PagedResultOfOrganizationManagerRecord"
-      },
-      "timeoutSeconds": 30,
-      "requiresProcessingSlot": false
-    },
-    "ListPorts": {
-      "policy": {
-        "requiresAuthentication": true,
-        "requiresDesktopAccess": true,
-        "requiresLicense": true,
-        "access": {
-          "match": "All",
-          "resources": [
-            {
-              "resourceKey": "document.master-data",
-              "actions": [
-                "view"
-              ],
-              "administratorOnly": false
-            }
-          ]
-        }
-      },
-      "office": null,
-      "parameters": [
-        {
-          "name": "keyword",
-          "in": "query",
-          "schema": {
-            "type": "string"
-          }
-        }
-      ],
-      "requestBody": null,
-      "responses": {
-        "200": {
-          "description": "OK",
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/ApiPortDto"
-                }
-              }
-            }
-          }
-        }
-      },
-      "request": null,
-      "response": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/ApiPortDto"
-        }
       },
       "timeoutSeconds": 30,
       "requiresProcessingSlot": false
@@ -57071,6 +56789,25 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
           "required": true
+        },
+        {
+          "name": "beforeId",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "default": 30,
+            "minimum": 1,
+            "maximum": 200
+          }
         }
       ],
       "requestBody": null,
@@ -57080,10 +56817,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/components/schemas/ApiSalesOpportunityHistoryDto"
-                }
+                "$ref": "#/components/schemas/ApiSalesOpportunityHistoryPage"
               }
             }
           }
@@ -57094,10 +56828,7 @@
       },
       "request": null,
       "response": {
-        "type": "array",
-        "items": {
-          "$ref": "#/components/schemas/ApiSalesOpportunityHistoryDto"
-        }
+        "$ref": "#/components/schemas/ApiSalesOpportunityHistoryPage"
       },
       "timeoutSeconds": 30,
       "requiresProcessingSlot": false
@@ -63839,6 +63570,13 @@
       "office": null,
       "parameters": [
         {
+          "name": "includeArchived",
+          "in": "query",
+          "schema": {
+            "type": "boolean"
+          }
+        },
+        {
           "name": "keyword",
           "in": "query",
           "schema": {
@@ -65735,63 +65473,6 @@
           "resources": [
             {
               "resourceKey": "document.hs-knowledge",
-              "actions": [
-                "operate"
-              ],
-              "administratorOnly": false
-            }
-          ]
-        }
-      },
-      "office": null,
-      "parameters": [],
-      "requestBody": {
-        "required": true,
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/HsCodeKnowledgeFeedbackInput"
-            }
-          }
-        }
-      },
-      "responses": {
-        "200": {
-          "description": "OK",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiCommandResponse"
-              }
-            }
-          }
-        },
-        "400": {
-          "description": "Bad Request"
-        },
-        "401": {
-          "description": "Unauthorized"
-        }
-      },
-      "request": {
-        "$ref": "#/components/schemas/HsCodeKnowledgeFeedbackInput"
-      },
-      "response": {
-        "$ref": "#/components/schemas/ApiCommandResponse"
-      },
-      "timeoutSeconds": 30,
-      "requiresProcessingSlot": false
-    },
-    "RecordInvoiceHsCodeKnowledgeFeedback": {
-      "policy": {
-        "requiresAuthentication": true,
-        "requiresDesktopAccess": true,
-        "requiresLicense": true,
-        "access": {
-          "match": "All",
-          "resources": [
-            {
-              "resourceKey": "document.invoices",
               "actions": [
                 "operate"
               ],
@@ -85876,75 +85557,6 @@
       "timeoutSeconds": 30,
       "requiresProcessingSlot": true
     },
-    "UploadHsCodesImportFile": {
-      "policy": {
-        "requiresAuthentication": true,
-        "requiresDesktopAccess": true,
-        "requiresLicense": true,
-        "access": {
-          "match": "All",
-          "resources": [
-            {
-              "resourceKey": "document.hs-knowledge",
-              "actions": [
-                "manage"
-              ],
-              "administratorOnly": false
-            }
-          ]
-        }
-      },
-      "office": null,
-      "parameters": [
-        {
-          "name": "fileName",
-          "in": "query",
-          "schema": {
-            "type": "string"
-          }
-        }
-      ],
-      "requestBody": {
-        "required": true,
-        "content": {
-          "application/octet-stream": {
-            "schema": {
-              "$ref": "#/components/schemas/IFormFile"
-            }
-          }
-        }
-      },
-      "responses": {
-        "200": {
-          "description": "OK",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiHsCodeImportResponse"
-              }
-            }
-          }
-        },
-        "400": {
-          "description": "Bad Request"
-        },
-        "401": {
-          "description": "Unauthorized"
-        },
-        "409": {
-          "description": "Conflict"
-        },
-        "503": {
-          "description": "Service Unavailable"
-        }
-      },
-      "request": null,
-      "response": {
-        "$ref": "#/components/schemas/ApiHsCodeImportResponse"
-      },
-      "timeoutSeconds": 30,
-      "requiresProcessingSlot": true
-    },
     "UploadLetterOfCreditDocument": {
       "policy": {
         "requiresAuthentication": true,
@@ -96087,17 +95699,6 @@
         "message"
       ]
     },
-    "ApiHsCodeImportPathRequest": {
-      "type": "object",
-      "properties": {
-        "filePath": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "filePath"
-      ]
-    },
     "ApiHsCodeImportPreviewItemDto": {
       "type": "object",
       "properties": {
@@ -96298,38 +95899,6 @@
         "conflictCount",
         "invalidCount",
         "warnings",
-        "storagePolicy"
-      ]
-    },
-    "ApiHsCodeImportResponse": {
-      "type": "object",
-      "properties": {
-        "fileName": {
-          "type": "string"
-        },
-        "message": {
-          "type": "string"
-        },
-        "storagePolicy": {
-          "type": "string"
-        },
-        "success": {
-          "type": "boolean"
-        },
-        "totalCount": {
-          "type": [
-            "integer",
-            "string"
-          ],
-          "format": "int32",
-          "pattern": "^-?(?:0|[1-9]\\d*)$"
-        }
-      },
-      "required": [
-        "success",
-        "fileName",
-        "totalCount",
-        "message",
         "storagePolicy"
       ]
     },
@@ -103387,6 +102956,32 @@
         "requests": {
           "$ref": "#/components/schemas/ApiRuntimeLatencyMetrics"
         },
+        "responseMemory": {
+          "type": "object",
+          "properties": {
+            "capacityBytes": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            },
+            "rejections": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            },
+            "reservedBytes": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "capacityBytes",
+            "reservedBytes",
+            "rejections"
+          ],
+          "additionalProperties": false
+        },
         "uptimeSeconds": {
           "type": "integer",
           "format": "int64",
@@ -103394,6 +102989,7 @@
         }
       },
       "required": [
+        "responseMemory",
         "requests",
         "queueWait",
         "queueCapacity",
@@ -103825,6 +103421,9 @@
           "format": "int32",
           "pattern": "^-?(?:0|[1-9]\\d*)$"
         },
+        "isArchived": {
+          "type": "boolean"
+        },
         "nextAction": {
           "type": "string"
         },
@@ -103880,6 +103479,7 @@
         "productName",
         "title",
         "stage",
+        "isArchived",
         "quotationNo",
         "estimatedAmount",
         "currency",
@@ -103976,6 +103576,29 @@
         "changeNote",
         "changedBy",
         "createdAt"
+      ]
+    },
+    "ApiSalesOpportunityHistoryPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ApiSalesOpportunityHistoryDto"
+          },
+          "maxItems": 200
+        },
+        "nextCursor": {
+          "type": [
+            "null",
+            "integer"
+          ],
+          "format": "int64"
+        }
+      },
+      "required": [
+        "items",
+        "nextCursor"
       ]
     },
     "ApiSalesOpportunityLifecycleRequest": {

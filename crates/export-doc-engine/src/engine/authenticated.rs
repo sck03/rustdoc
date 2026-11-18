@@ -163,23 +163,14 @@ impl NativeService {
             LIST_CUSTOM_OPTIONS | SAVE_CUSTOM_OPTION => {
                 custom_options::handle(&self.store, actor, operation, parameters, &body_value)
             }
-            LIST_CUSTOMERS | LIST_EXPORTERS | LIST_PAYEES | LIST_UNITS | LIST_PORTS => {
-                let kind = match operation {
-                    LIST_CUSTOMERS => "customers",
-                    LIST_EXPORTERS => "exporters",
-                    LIST_PAYEES => "payees",
-                    LIST_UNITS => "units",
-                    _ => "ports",
-                };
-                records::list(
-                    &self.store,
-                    actor,
-                    catalog::resource(kind).unwrap(),
-                    operation,
-                    query,
-                    parameters,
-                )
-            }
+            LIST_UNITS => records::list(
+                &self.store,
+                actor,
+                catalog::resource("units").unwrap(),
+                operation,
+                query,
+                parameters,
+            ),
             _ => {
                 let resource = records::find(operation)
                     .ok_or_else(|| unsupported("此项原生操作尚未接入。"))?;

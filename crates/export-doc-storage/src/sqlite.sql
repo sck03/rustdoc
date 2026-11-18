@@ -25,6 +25,7 @@ CREATE TABLE personnel_private_profiles (
 );
 CREATE INDEX records_kind_id ON records(kind, id DESC);
 CREATE INDEX records_source_page ON records(kind, CAST(json_extract(body,'$.sourceId') AS TEXT), id DESC) WHERE CAST(json_extract(body,'$.sourceId') AS TEXT) IS NOT NULL;
+CREATE INDEX records_opportunity_history_page ON records(kind, CAST(json_extract(body,'$.opportunityId') AS TEXT), id DESC) WHERE CAST(json_extract(body,'$.opportunityId') AS TEXT) IS NOT NULL;
 CREATE INDEX attachment_invoice ON records(json_extract(body,'$.invoiceId')) WHERE kind='attachments';
 CREATE INDEX records_scope ON records(kind, company, department, owner_id);
 CREATE INDEX records_company_page ON records(kind, company, id DESC);

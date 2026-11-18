@@ -34,8 +34,9 @@ fn canceled_upload_authentication_retains_admission_until_blocking_work_exits() 
                 requests: Arc::new(Admission::new(1, 0, Duration::from_secs(1))),
                 bulk_uploads: Arc::new(Semaphore::new(2)),
                 downloads: Arc::new(Semaphore::new(8)),
+                previews: Arc::new(Semaphore::new(2)),
                 processing: Arc::new(Semaphore::new(2)),
-                body_resources: Arc::default(), preview_memory: Arc::default(),
+                body_resources: Arc::default(), response_memory: Arc::default(),
                 upload_space: service.paths.disk_space.clone(), tickets: Arc::default(),
                 desktop_token: None, shutdown: Shutdown::default(),
             };

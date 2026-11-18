@@ -9,6 +9,8 @@ mod advanced_workflow_contract;
 mod appointment_contract;
 #[path = "support/approval_contract.rs"]
 mod approval_contract;
+#[path = "support/business_consistency_contract.rs"]
+mod business_consistency_contract;
 #[path = "support/business_contract.rs"]
 mod business_contract;
 #[path = "support/communication_contract.rs"]
@@ -124,6 +126,9 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
             .is_none()
     );
     let token = admin["accessToken"].as_str().unwrap();
+    phase("business_consistency_contract::exercise", || {
+        business_consistency_contract::exercise(&service, token)
+    });
     phase("custom_oa_contract::exercise", || {
         custom_oa_contract::exercise(&service, token)
     });

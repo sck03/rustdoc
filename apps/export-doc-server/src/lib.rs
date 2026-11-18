@@ -17,6 +17,7 @@ const MAX_REQUESTS: usize = 16;
 const MAX_QUEUED_REQUESTS: usize = 16;
 const MAX_BULK_UPLOADS: usize = 2;
 const MAX_DOWNLOADS: usize = 8;
+const MAX_PREVIEWS: usize = 2;
 const MAX_PROCESSING: usize = 2;
 
 use axum::{
@@ -37,9 +38,10 @@ pub struct ServerState {
     requests: Arc<admission::Admission>,
     bulk_uploads: Arc<Semaphore>,
     downloads: Arc<Semaphore>,
+    previews: Arc<Semaphore>,
     processing: Arc<Semaphore>,
     body_resources: Arc<request::body::Resources>,
-    preview_memory: Arc<export_doc_engine::engine::backup_io::Budget>,
+    response_memory: Arc<export_doc_engine::engine::backup_io::Budget>,
     upload_space: Arc<temporary_space::Budget>,
     tickets: Arc<downloads::Tickets>,
     desktop_token: Option<Arc<str>>,
@@ -75,9 +77,10 @@ fn compose_router(
         )),
         bulk_uploads: Arc::new(Semaphore::new(MAX_BULK_UPLOADS)),
         downloads: Arc::new(Semaphore::new(MAX_DOWNLOADS)),
+        previews: Arc::new(Semaphore::new(MAX_PREVIEWS)),
         processing: Arc::new(Semaphore::new(MAX_PROCESSING)),
         body_resources: Arc::default(),
-        preview_memory: Arc::default(),
+        response_memory: Arc::default(),
         tickets: Arc::default(),
         desktop_token,
         shutdown: shutdown.clone(),

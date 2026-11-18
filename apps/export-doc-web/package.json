@@ -29,6 +29,7 @@
     "test:payment-printing-ui": "node ../../scripts/test_payment_printing_ui.mjs",
     "test:payment-query-lifecycle-ui": "node ../../scripts/test_payment_query_lifecycle_ui.mjs",
     "test:crm-export-lifecycle-ui": "node ../../scripts/test_crm_export_lifecycle_ui.mjs",
+    "test:sales-opportunity-lifecycle-ui": "node ../../scripts/test_sales_opportunity_lifecycle_ui.mjs",
     "test:invoice-report-ui": "node ../../scripts/test_invoice_report_ui.mjs",
     "test:batch-file-ui": "node ../../scripts/test_batch_file_workflows_ui.mjs",
     "test:print-preview-document": "node ../../scripts/test_print_report_preview_document.mjs",
