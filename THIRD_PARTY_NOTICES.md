@@ -147,7 +147,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | ego-tree | 0.11.1 | ISC | rust-workspace |
 | cargo | either | 1.19.0 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | email_address | 0.2.9 | MIT | rust-workspace |
-| cargo | email-encoding | 0.4.2 | MIT OR Apache-2.0 | rust-workspace |
+| cargo | email-encoding | 0.4.3 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | embed_plist | 1.2.2 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | embed-resource | 3.0.12 | MIT | rust-workspace |
 | cargo | encoding_rs | 0.8.42 | (Apache-2.0 OR MIT) AND BSD-3-Clause | excel-analyzer, rust-workspace |
@@ -280,7 +280,7 @@ This file is the unified redistribution notice for package-manager dependencies 
 | cargo | krilla | 0.8.2 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | krilla-svg | 0.8.1 | MIT OR Apache-2.0 | rust-workspace |
 | cargo | kurbo | 0.13.1 | Apache-2.0 OR MIT | rust-workspace |
-| cargo | lettre | 0.11.23 | MIT | rust-workspace |
+| cargo | lettre | 0.11.24 | MIT | rust-workspace |
 | cargo | libappindicator | 0.9.0 | Apache-2.0 OR MIT | rust-workspace |
 | cargo | libappindicator-sys | 0.9.0 | Apache-2.0 OR MIT | rust-workspace |
 | cargo | libc | 0.2.191 | MIT OR Apache-2.0 | excel-analyzer, rust-workspace |

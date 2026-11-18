@@ -291,7 +291,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | ego-tree | 0.11.1 | ISC | rust-workspace |
 | either | 1.19.0 | MIT OR Apache-2.0 | rust-workspace |
 | email_address | 0.2.9 | MIT | rust-workspace |
-| email-encoding | 0.4.2 | MIT OR Apache-2.0 | rust-workspace |
+| email-encoding | 0.4.3 | MIT OR Apache-2.0 | rust-workspace |
 | embed_plist | 1.2.2 | MIT OR Apache-2.0 | rust-workspace |
 | embed-resource | 3.0.12 | MIT | rust-workspace |
 | encoding_rs | 0.8.42 | (Apache-2.0 OR MIT) AND BSD-3-Clause | excel-analyzer, rust-workspace |
@@ -424,7 +424,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | krilla | 0.8.2 | MIT OR Apache-2.0 | rust-workspace |
 | krilla-svg | 0.8.1 | MIT OR Apache-2.0 | rust-workspace |
 | kurbo | 0.13.1 | Apache-2.0 OR MIT | rust-workspace |
-| lettre | 0.11.23 | MIT | rust-workspace |
+| lettre | 0.11.24 | MIT | rust-workspace |
 | libappindicator | 0.9.0 | Apache-2.0 OR MIT | rust-workspace |
 | libappindicator-sys | 0.9.0 | Apache-2.0 OR MIT | rust-workspace |
 | libc | 0.2.191 | MIT OR Apache-2.0 | excel-analyzer, rust-workspace |
