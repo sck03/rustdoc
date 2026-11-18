@@ -272,7 +272,7 @@ pub fn handle(
                 if actor.admin || entry["uploaders"].as_array().is_some_and(Vec::is_empty) {
                     tx.delete_blob(record_id, KIND)?;
                     if !tx.delete(KIND, record_id, entry["versionNumber"].as_i64().unwrap())? {
-                        return Err(conflict("图片已变化，请刷新。"));
+                        return Err(crate::engine::error::concurrency("图片已变化，请刷新。"));
                     }
                 } else {
                     store::save(

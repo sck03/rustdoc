@@ -77,7 +77,11 @@ pub fn error(error: ApiError) -> Response<Body> {
     } else {
         error.message
     };
-    let mut response = (status, Json(json!({"message":message}))).into_response();
+    let mut body = json!({"message":message});
+    if let Some(code) = error.code {
+        body["code"] = json!(code.as_str());
+    }
+    let mut response = (status, Json(body)).into_response();
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, "no-store".parse().unwrap());
@@ -87,6 +91,33 @@ pub fn error(error: ApiError) -> Response<Body> {
             .insert(header::RETRY_AFTER, "5".parse().unwrap());
     }
     response
+}
+
+#[cfg(test)]
+mod error_tests {
+    #[tokio::test]
+    async fn concurrency_code_is_public_and_internal_diagnostics_remain_private() {
+        use export_doc_engine::api::{ApiError, ErrorCode};
+        let response = super::error(ApiError {
+            status: Some(409),
+            message: "记录版本已变化。".into(),
+            code: Some(ErrorCode::ConcurrencyConflict),
+            diagnostic: Some("private-test-category"),
+        });
+        assert_eq!(response.status().as_u16(), 409);
+        let bytes = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(value["code"], "ConcurrencyConflict");
+        assert_eq!(value["message"], "记录版本已变化。");
+        assert!(value.get("diagnostic").is_none());
+        export_doc_contracts::validation::structure(
+            export_doc_contracts::contracts::schema("ApiErrorResponse"),
+            &value,
+        )
+        .unwrap();
+    }
 }
 
 pub fn is_download(operation: Operation) -> bool {

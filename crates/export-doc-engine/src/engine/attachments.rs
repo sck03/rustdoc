@@ -91,7 +91,9 @@ pub fn read(
     let file = download_info(store, actor, operation, id, revision)?;
     let output = store.files.load(&file, FILE_LIMIT)?;
     if download_info(store, actor, operation, id, revision)? != file {
-        return Err(conflict("资料版本已变化，请重新读取。"));
+        return Err(crate::engine::error::concurrency(
+            "资料版本已变化，请重新读取。",
+        ));
     }
     Ok((
         json!({"fileName":output.file_name,"contentType":output.media_type}),
@@ -239,7 +241,9 @@ pub fn handle(
             || {
                 checked = (|| -> Result<()> {
                     if download_info(store, actor, operation, id, revision)? != info {
-                        return Err(conflict("资料版本已变化，保存已取消。"));
+                        return Err(crate::engine::error::concurrency(
+                            "资料版本已变化，保存已取消。",
+                        ));
                     }
                     crate::operation::check()
                 })();
@@ -277,7 +281,9 @@ pub fn handle(
                     if operation == DELETE_BUSINESS_ATTACHMENT {
                         transaction.delete_blobs(id)?;
                         if !transaction.delete("attachments", id, store::expected(&record))? {
-                            return Err(conflict("资料版本已变化，删除已取消。"));
+                            return Err(crate::engine::error::concurrency(
+                                "资料版本已变化，删除已取消。",
+                            ));
                         }
                         transaction.append_audit(&AuditWrite {
                             kind: "attachments",

@@ -1,4 +1,8 @@
 //! Public regressions for participation limits and stable appointments, shared by both stores.
+#[path = "file_download.rs"]
+mod file_download;
+use file_download::DownloadFile;
+
 #[path = "approval_fixture.rs"]
 mod fixture;
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};

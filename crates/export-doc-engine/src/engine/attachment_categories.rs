@@ -117,7 +117,7 @@ pub fn handle(
                 record_id,
                 value["versionNumber"].as_i64().unwrap_or(0),
             )? {
-                return Err(conflict("分类版本已变化。"));
+                return Err(crate::engine::error::concurrency("分类版本已变化。"));
             }
             tx.append_audit_details(
                 &AuditWrite {

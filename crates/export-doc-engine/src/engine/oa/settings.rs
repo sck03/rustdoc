@@ -133,7 +133,9 @@ pub(super) fn handle(
         if entry["definitionKey"] != body["definitionKey"]
             || !tx.workflow_activation_state(id, store::expected(body), "Cancelled", "")?
         {
-            return Err(conflict("发布调度已变化，请刷新后重试。"));
+            return Err(crate::engine::error::concurrency(
+                "发布调度已变化，请刷新后重试。",
+            ));
         }
         let receipt = previous
             .as_object_mut()
@@ -186,7 +188,9 @@ pub(super) fn handle(
     }
     if previous["versionNumber"] == 0 {
         if store::expected(body) != 0 {
-            return Err(conflict("审批设置版本已变化，请重新读取。"));
+            return Err(crate::engine::error::concurrency(
+                "审批设置版本已变化，请重新读取。",
+            ));
         }
     } else {
         store::check_version(&previous, store::expected(body))?;

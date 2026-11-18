@@ -1,0 +1,9 @@
+[
+  {"name":"refund rounded before profit","currency":"USD","exchangeRate":"7.1239","items":[{"quantity":"1","unitPrice":"1","purchaseTotal":"0.01","taxRebateRate":"13"}],"expectedProfit":"7.11","expectedRefund":"0"},
+  {"name":"refund summed before rounding","currency":"CNY","items":[{"quantity":"1","unitPrice":"1","purchaseTotal":"0.03","taxRebateRate":"13"},{"quantity":"1","unitPrice":"1","purchaseTotal":"0.03","taxRebateRate":"13"}],"expectedProfit":"1.95","expectedRefund":"0.01"},
+  {"name":"RMB uses domestic rate","currency":"RMB","items":[{"quantity":"1","unitPrice":"100","purchaseTotal":"60","taxRebateRate":"0"}],"expectedProfit":"40","expectedRefund":"0"},
+  {"name":"currency whitespace and casing","currency":" cny ","exchangeRate":"0","items":[{"quantity":"1","unitPrice":"100","purchaseTotal":"60","taxRebateRate":"0"}],"expectedProfit":"40","expectedRefund":"0"},
+  {"name":"explicit rate takes precedence","currency":"CNY","exchangeRate":"2","items":[{"quantity":"1","unitPrice":"100","purchaseTotal":"60","taxRebateRate":"0"}],"expectedProfit":"140","expectedRefund":"0"},
+  {"name":"foreign currency needs rate","currency":"EUR","items":[{"quantity":"1","unitPrice":"100","purchaseTotal":"60","taxRebateRate":"0"}],"expectedProfit":"0","expectedRefund":"0"},
+  {"name":"loss midpoint rounds away from zero","currency":"USD","exchangeRate":"1.005","items":[{"quantity":"1","unitPrice":"1","purchaseTotal":"2","taxRebateRate":"0"}],"expectedProfit":"-1.00","expectedRefund":"0"}
+]

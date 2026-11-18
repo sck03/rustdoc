@@ -17,6 +17,7 @@ pub(super) fn error(status: u16, message: &str) -> ApiError {
     ApiError {
         status: Some(status),
         message: message.into(),
+        code: None,
         diagnostic: (status >= 500).then_some("http-processing"),
     }
 }
@@ -226,6 +227,7 @@ async fn execute(
     {
         let service = state.service.clone();
         let authentication_token = token.clone();
+        let authentication_query = query.clone();
         let authentication_scope = scope.clone();
         let authentication_registration = registration.clone();
         let authentication_permit = permit.clone();
@@ -233,9 +235,14 @@ async fn execute(
             let _registration = authentication_registration;
             let _permit = authentication_permit;
             authentication_scope.run_result(|| {
-                service
-                    .session_actor_for_operation(&authentication_token, operation)
-                    .map(|_| ())
+                service.authorize_request_body(
+                    &authentication_token,
+                    operation,
+                    &authentication_query
+                        .iter()
+                        .map(|(key, value)| (key.as_str(), value.clone()))
+                        .collect::<Vec<_>>(),
+                )
             })
         })
         .await

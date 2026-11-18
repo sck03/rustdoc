@@ -46,7 +46,7 @@ export function MasterDataEditorRoute({
 }) {
   const masterDataPermission = useModulePermission("document.master-data");
   const hsKnowledgePermission = useModulePermission("document.hs-knowledge");
-  const { entityKey } = useParams();
+  const { entityKey, recordKey } = useParams();
   const config = getMasterDataConfig(entityKey);
 
   if (!config) {
@@ -66,6 +66,7 @@ export function MasterDataEditorRoute({
 
   return (
     <MasterDataEditorPage
+      key={`${config.key}:${mode}:${recordKey ?? ""}`}
       client={client}
       config={config}
       mode={mode}

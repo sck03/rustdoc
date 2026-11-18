@@ -1,4 +1,8 @@
 //! The same immutable-version and stored-PDF contract runs on both databases.
+#[path = "file_download.rs"]
+mod file_download;
+use file_download::DownloadFile;
+
 use super::oa_contract::{call, operation};
 use export_doc_engine::{engine::NativeService, paths::nonce};
 use serde_json::{Value, json};

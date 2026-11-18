@@ -225,7 +225,7 @@ fn mutate(
         store::check_version(&row, version)?;
         if operation == DELETE_CRM_FOLLOW_UP {
             if !tx.delete(KIND, record_id, version)? {
-                return Err(conflict("跟进版本已变化。"));
+                return Err(crate::engine::error::concurrency("跟进版本已变化。"));
             }
             tx.append_audit_details(
                 &AuditWrite {

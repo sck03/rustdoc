@@ -176,22 +176,23 @@ impl NativeService {
             self.session_actor(token)
         }
     }
+    /// Reject unauthorized requests before their potentially large body is received.
+    /// Use cases still revalidate current permissions and record scope at publication.
+    pub fn authorize_request_body(
+        &self,
+        token: &str,
+        operation: Operation,
+        query: &[(&str, String)],
+    ) -> Result<()> {
+        let actor = self.session_actor_for_operation(token, operation)?;
+        self.authorize_operation(&actor, operation, query)
+    }
     pub fn authorize_administrator(&self, token: &str) -> Result<()> {
         auth::authorize(
             &self.sessions.actor(&self.store, token)?,
             "system.settings",
             "manage",
         )
-    }
-    /// Direct file downloads that are not backed by a persisted job result.
-    pub fn download_file(
-        &self,
-        operation: Operation,
-        parameters: &[(&str, String)],
-        token: &str,
-    ) -> Result<tasks::FileOutput> {
-        self.prepare_file_download(operation, parameters, token)?
-            .into_memory()
     }
     pub fn dispatch_with_bootstrap(
         &self,

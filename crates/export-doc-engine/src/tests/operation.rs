@@ -44,6 +44,7 @@ fn result_boundary_preserves_cancellation_after_an_adapter_erases_the_error() {
         Err(ApiError {
             status: Some(400),
             message: "stringified cancellation".into(),
+            code: None,
             diagnostic: None,
         })
     });
@@ -65,6 +66,7 @@ fn expired_work_does_not_start_and_genuine_validation_errors_keep_their_category
             Err(ApiError {
                 status: Some(400),
                 message: "invalid format".into(),
+                code: None,
                 diagnostic: None,
             })
         });

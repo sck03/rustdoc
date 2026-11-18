@@ -1,9 +1,23 @@
 use std::fmt;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ErrorCode {
+    ConcurrencyConflict,
+}
+
+impl ErrorCode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ConcurrencyConflict => "ConcurrencyConflict",
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ApiError {
     pub status: Option<u16>,
     pub message: String,
+    pub code: Option<ErrorCode>,
     /// Reviewed, value-free category for internal logs; never copy raw causes.
     pub diagnostic: Option<&'static str>,
 }
@@ -13,6 +27,7 @@ impl ApiError {
         Self {
             status: None,
             message: message.into(),
+            code: None,
             diagnostic: Some("local"),
         }
     }

@@ -34,13 +34,13 @@ client.getReportTemplateContent=input=>window.__failReload?Promise.reject(new Er
 client.saveUserReportTemplateDraft=async input=>{
  window.__calls.push({name:'saveUser',input});
  if(window.__pauseSave)await new Promise(resolve=>window.__finishSave=resolve);
- if(window.__failSave||input.body.expectedVersion!==userTemplates[0].versionNumber)throw new ApiError(409,'Conflict',JSON.stringify({message:'模板版本冲突，草稿已保留'}));
+ if(window.__failSave||input.body.expectedVersion!==userTemplates[0].versionNumber)throw new ApiError(409,'Conflict',JSON.stringify({code:'ConcurrencyConflict',message:'模板版本冲突，草稿已保留'}));
  userTemplates[0]={...userTemplates[0],name:input.body.name,contentHtml:input.body.contentHtml,versionNumber:userTemplates[0].versionNumber+1};
  return Promise.resolve(structuredClone(userTemplates[0]));
 };
 client.saveReportTemplateContent=input=>{
  window.__calls.push({name:'saveFile',input});
- if(input.body.expectedRevision!==file.revision)throw new ApiError(409,'Conflict',JSON.stringify({message:'文件版本冲突，草稿已保留'}));
+ if(input.body.expectedRevision!==file.revision)throw new ApiError(409,'Conflict',JSON.stringify({code:'ConcurrencyConflict',message:'文件版本冲突，草稿已保留'}));
  file={...file,content:input.body.content,revision:file.revision+'-next'};
  return Promise.resolve(structuredClone(file));
 };

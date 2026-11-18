@@ -1,4 +1,8 @@
 //! Business contracts shared by real SQLite and PostgreSQL execution.
+#[path = "file_download.rs"]
+mod file_download;
+use file_download::DownloadFile;
+
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 #[path = "approval_fixture.rs"]

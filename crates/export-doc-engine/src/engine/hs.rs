@@ -351,7 +351,9 @@ pub fn delete(tx: &Connection, actor: &Actor, kind: &str, ids: &BTreeSet<i64>) -
         };
         let version = row["versionNumber"].as_i64().unwrap_or(0);
         if !tx.delete(kind, *id, version)? {
-            return Err(conflict("记录已修改，请重新读取。"));
+            return Err(crate::engine::error::concurrency(
+                "记录已修改，请重新读取。",
+            ));
         }
         tx.append_audit_details(
             &AuditWrite {

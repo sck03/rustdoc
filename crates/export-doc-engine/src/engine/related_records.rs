@@ -293,7 +293,7 @@ pub fn handle(
                 id,
                 previous["versionNumber"].as_i64().unwrap_or(0),
             )? {
-                return Err(conflict("记录版本已变化。"));
+                return Err(crate::engine::error::concurrency("记录版本已变化。"));
             }
             tx.append_audit_details(
                 &AuditWrite {

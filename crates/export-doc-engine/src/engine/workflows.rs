@@ -27,37 +27,11 @@ pub const ACTIONS: &[Operation] = &[
 ];
 
 pub fn review(body: &Value) -> Result<Value> {
-    let mut issues = vec![];
-    for (field, label) in [
-        ("invoiceNo", "发票号"),
-        ("invoiceDate", "发票日期"),
-        ("exporterNameEN", "出口商"),
-        ("customerNameEN", "客户"),
-        ("currency", "币种"),
-        ("destinationCountry", "目的国"),
-        ("portOfLoading", "装货港"),
-        ("portOfDestination", "目的港"),
-    ] {
-        if text(body, field).is_empty() {
-            issues.push(json!({"code":"required","field":field,"fieldPath":field,"message":format!("请填写{label}"),"severity":"Error","rowNumber":null}));
-        }
-    }
-    if let Some(items) = body["items"].as_array() {
-        for (index, item) in items.iter().enumerate() {
-            for (field, label) in [
-                ("styleNo", "款号"),
-                ("styleName", "英文品名"),
-                ("hsCode", "HS 编码"),
-            ] {
-                if text(item, field).is_empty() {
-                    issues.push(json!({"code":"required","field":field,"fieldPath":format!("items[{index}].{field}"),"message":format!("第 {} 行缺少{label}",index+1),"severity":"Error","rowNumber":index+1}));
-                }
-            }
-        }
-    } else {
-        issues.push(json!({"code":"items","message":"请录入商品明细","severity":"Error"}));
-    }
-    Ok(json!({"ready":issues.is_empty(),"issues":issues}))
+    let invoice = serde_json::from_value(body.clone())
+        .map_err(|cause| invalid(format!("发票字段无效：{cause}")))?;
+    Ok(serde_json::to_value(
+        export_doc_domain::invoice_review::review(&invoice),
+    )?)
 }
 
 pub fn profit(body: &Value) -> Result<Value> {
@@ -66,33 +40,11 @@ pub fn profit(body: &Value) -> Result<Value> {
     let dto: ApiInvoiceDetailDto = serde_json::from_value(body["invoice"].clone())
         .map_err(|cause| invalid(cause.to_string()))?;
     let invoice = InvoiceDraft::from_dto(dto).build().map_err(invalid)?;
-    let rate = invoice
-        .exchange_rate
-        .filter(|rate| *rate > Decimal::ZERO)
-        .or_else(|| {
-            (invoice.currency.eq_ignore_ascii_case("CNY")
-                || invoice.currency.eq_ignore_ascii_case("RMB"))
-            .then_some(Decimal::ONE)
-        });
-    let sales_rmb = invoice
-        .total_amount
-        .checked_mul(rate.unwrap_or_default())
-        .ok_or_else(|| invalid("利润计算超出范围。"))?;
-    let profit = if rate.is_some() {
-        sales_rmb
-            .checked_sub(invoice.total_purchase_amount)
-            .and_then(|value| value.checked_add(invoice.total_tax_refund_amount))
-            .ok_or_else(|| invalid("利润计算超出范围。"))?
-    } else {
-        Decimal::ZERO
-    };
-    let margin = if sales_rmb > Decimal::ZERO {
-        profit
-            .checked_div(sales_rmb)
-            .ok_or_else(|| invalid("利润率计算超出范围。"))?
-    } else {
-        Decimal::ZERO
-    };
+    let result = export_doc_domain::invoice_profit::calculate(&invoice).map_err(invalid)?;
+    let rate = result.exchange_rate;
+    let sales_rmb = result.sales_rmb;
+    let profit = result.gross_profit;
+    let margin = result.margin;
     let percent = margin
         .checked_mul(Decimal::from(100))
         .ok_or_else(|| invalid("利润率显示超出范围。"))?;

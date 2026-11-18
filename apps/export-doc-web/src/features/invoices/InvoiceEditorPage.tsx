@@ -1,6 +1,7 @@
 import { EditorWorkspace } from "../../ui/layout/Workspaces.tsx";
 import { DocumentFieldLabelsProvider } from "../../ui/DocumentFieldLabelsContext.tsx";
 import { ArrowLeft, Edit3, Trash2 } from "lucide-react";
+import { useParams } from "react-router-dom";
 import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { handleEnterAsTabFormKeyDown } from "../../ui/formKeyboard.ts";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -15,17 +16,24 @@ import { readInvoiceItemSpareColumnCount } from "./invoiceEditorHelpers.ts";
 import { InvoiceReviewPanel } from "./InvoiceReviewPanel.tsx";
 import { useInvoiceEditorWorkspace } from "./hooks/useInvoiceEditorWorkspace.ts";
 
-export function InvoiceEditorPage({
-  businessDate,
-  client,
-  mode,
-  attachmentsEnabled = false,
-}: {
+type InvoiceEditorProps = {
   businessDate: string;
   client: ExportDocManagerApiClient;
   mode: "new" | "edit";
   attachmentsEnabled?: boolean;
-}) {
+};
+
+export function InvoiceEditorPage(props: InvoiceEditorProps) {
+  const { invoiceId } = useParams();
+  return <InvoiceEditor key={`${props.mode}:${invoiceId ?? ""}`} {...props} />;
+}
+
+function InvoiceEditor({
+  businessDate,
+  client,
+  mode,
+  attachmentsEnabled = false,
+}: InvoiceEditorProps) {
   const {
     masterDataPermission, reportDesignPermission, navigate, formRef,
     activeSection, workspaceDeviceMode, workspaceDeviceCapabilities, invoice, invoicePermission,

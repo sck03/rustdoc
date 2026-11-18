@@ -1,20 +1,28 @@
-import { ApiError } from "../api/index.ts";
+import { ApiError, type ApiErrorResponse } from "../api/index.ts";
+
+function readErrorResponse(error: ApiError): (Partial<ApiErrorResponse> & { error?: string }) | null {
+  try {
+    const value: unknown = JSON.parse(error.responseText);
+    return value !== null && typeof value === "object" && !Array.isArray(value) ? value : {};
+  } catch {
+    return null;
+  }
+}
 
 export function readApiError(error: unknown): string {
   if (error instanceof ApiError) {
-    try {
-      const parsed = JSON.parse(error.responseText) as { message?: string; error?: string };
-      return parsed.message || parsed.error || error.message;
-    } catch {
-      return error.responseText || error.message;
-    }
+    const parsed = readErrorResponse(error);
+    if (!parsed) return error.responseText || error.message;
+    return (typeof parsed.message === "string" && parsed.message)
+      || (typeof parsed.error === "string" && parsed.error)
+      || error.message;
   }
 
   return error instanceof Error ? error.message : "请求失败";
 }
 
 export function isConcurrencyConflict(error: unknown): boolean {
-  return error instanceof ApiError && error.status === 409 && /其他用户|其他会话|并发版本|加载最新|刷新后重试/.test(readApiError(error));
+  return error instanceof ApiError && error.status === 409 && readErrorResponse(error)?.code === "ConcurrencyConflict";
 }
 
 export function readRouteSuccessMessage(state: unknown) {

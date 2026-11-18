@@ -38,6 +38,40 @@ fn version(row: &Value) -> Value {
 /// Provider-independent regressions for the complete customer/supplier workflow.
 pub fn exercise(request: &Request<'_>) {
     invoice_status_history(request);
+    let option_type = [("optionType", "PaymentPayerName".into())];
+    let option = format!("payer-{}", nonce().unwrap());
+    for value in [option.clone(), option.to_uppercase()] {
+        save(
+            request,
+            SAVE_CUSTOM_OPTION,
+            &option_type,
+            json!({"value":value}),
+        );
+    }
+    let options = read(request, LIST_CUSTOM_OPTIONS, &option_type, &[], None);
+    assert_eq!(
+        options["customOptions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|value| **value == option)
+            .count(),
+        1
+    );
+    let currencies = read(
+        request,
+        LIST_CUSTOM_OPTIONS,
+        &[("optionType", "Currency".into())],
+        &[],
+        None,
+    );
+    assert!(
+        !currencies["customOptions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| *value == option)
+    );
     for (create, update, get, delete, fields) in [
         (
             CREATE_CUSTOMER,
@@ -84,7 +118,30 @@ pub fn exercise(request: &Request<'_>) {
     ] {
         let row = save(request, create, &[], fields);
         let path = [("id", row["id"].to_string())];
-        let saved = save(request, update, &path, row.clone());
+        let wrong_id = row["id"].as_i64().unwrap() + 1;
+        for supplied in [
+            json!(wrong_id),
+            json!(wrong_id.to_string()),
+            json!(-1),
+            json!("invalid"),
+        ] {
+            let mut wrong_record = row.clone();
+            wrong_record["id"] = supplied;
+            assert_eq!(
+                request(update, &path, &[], Some(wrong_record))
+                    .unwrap_err()
+                    .status,
+                Some(400)
+            );
+        }
+        let mut matching_identity = row.clone();
+        matching_identity["id"] = json!(row["id"].to_string());
+        let saved = save(request, update, &path, matching_identity);
+        let stale = request(update, &path, &[], Some(row.clone())).unwrap_err();
+        assert_eq!(
+            stale.code,
+            Some(export_doc_engine::api::ErrorCode::ConcurrencyConflict)
+        );
         assert!(matches!(
             request(delete, &path, &[], None).unwrap_err().status,
             Some(400 | 409)
@@ -399,6 +456,33 @@ pub fn exercise(request: &Request<'_>) {
 }
 
 fn invoice_status_history(request: &Request<'_>) {
+    let mut empty = export_doc_engine::invoice::InvoiceDraft::demo("2026-11-18", &nonce().unwrap());
+    empty.rows.clear();
+    let empty = save(
+        request,
+        CREATE_INVOICE,
+        &[],
+        serde_json::to_value(empty.build().unwrap()).unwrap(),
+    )["invoice"]
+        .clone();
+    assert_eq!(
+        read(request, REVIEW_INVOICE, &[], &[], Some(empty.clone()))["ready"],
+        false
+    );
+    let path = [("id", empty["id"].to_string())];
+    assert_eq!(request(TRANSITION_INVOICE_STATUS, &path, &[],
+        Some(json!({"targetStatus":"Verified","rowVersion":empty["rowVersion"],"note":"空明细不能核对"}))).unwrap_err().status, Some(400));
+    assert_eq!(
+        read(request, GET_INVOICE, &path, &[], None)["status"],
+        "Draft"
+    );
+    read(
+        request,
+        DELETE_INVOICE,
+        &path,
+        &[("rowVersion", empty["rowVersion"].as_str().unwrap().into())],
+        None,
+    );
     let draft = export_doc_engine::invoice::InvoiceDraft::demo("2026-11-15", &nonce().unwrap())
         .build()
         .unwrap();

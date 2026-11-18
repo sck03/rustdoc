@@ -199,6 +199,7 @@ mod tests {
         span.failure(&export_doc_engine::api::ApiError {
             status: Some(503),
             message: "password=SECRET; SELECT private-customer-data".into(),
+            code: None,
             diagnostic: Some("storage"),
         });
         span.finish(503);

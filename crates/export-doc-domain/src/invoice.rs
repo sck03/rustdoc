@@ -113,25 +113,7 @@ impl InvoiceDraft {
                 .map(|item| item.tax_refund_amount)
                 .sum(),
         );
-        let rate = invoice.exchange_rate.or_else(|| {
-            if invoice.currency.eq_ignore_ascii_case("CNY") {
-                Some(Decimal::ONE)
-            } else {
-                None
-            }
-        });
-        invoice.total_profit = if let Some(rate) = rate.filter(|rate| *rate > Decimal::ZERO) {
-            money(
-                invoice
-                    .total_amount
-                    .checked_mul(rate)
-                    .and_then(|amount| amount.checked_sub(invoice.total_purchase_amount))
-                    .and_then(|profit| profit.checked_add(invoice.total_tax_refund_amount))
-                    .ok_or("利润计算超出范围。")?,
-            )
-        } else {
-            Decimal::ZERO
-        };
+        invoice.total_profit = crate::invoice_profit::calculate(&invoice)?.gross_profit;
         Ok(invoice)
     }
     pub fn demo(business_date: &str, invoice_no: &str) -> Self {

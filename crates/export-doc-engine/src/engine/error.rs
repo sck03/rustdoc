@@ -5,6 +5,7 @@ pub fn error(status: u16, message: impl Into<String>) -> ApiError {
     ApiError {
         status: Some(status),
         message: message.into(),
+        code: None,
         diagnostic: (status >= 500).then_some("dependency"),
     }
 }
@@ -13,6 +14,11 @@ pub fn invalid(message: impl Into<String>) -> ApiError {
 }
 pub fn conflict(message: impl Into<String>) -> ApiError {
     error(409, message)
+}
+pub fn concurrency(message: impl Into<String>) -> ApiError {
+    let mut cause = conflict(message);
+    cause.code = Some(crate::api::ErrorCode::ConcurrencyConflict);
+    cause
 }
 pub fn unavailable(message: impl Into<String>) -> ApiError {
     error(503, message)

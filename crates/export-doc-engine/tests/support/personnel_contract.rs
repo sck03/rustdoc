@@ -1,3 +1,7 @@
+#[path = "file_download.rs"]
+mod file_download;
+use file_download::DownloadFile;
+
 use export_doc_engine::{api::ApiError, engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};
 #[path = "personnel_files_contract.rs"]

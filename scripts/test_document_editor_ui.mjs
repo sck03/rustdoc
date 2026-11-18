@@ -9,6 +9,7 @@ import { startChrome, createPageSession, evaluate, captureScreenshot } from "./l
 import { documentEditorUiFixture } from "./lib/document-editor-ui-fixture.mjs";
 import { runSettingsWorkspaceCases } from "./lib/settings-workspace-ui-cases.mjs";
 import { runInvoiceSaveCases } from "./lib/invoice-save-ui-cases.mjs";
+import { runRecordIdentityCases } from "./lib/record-identity-ui-cases.mjs";
 
 const repo = path.resolve(import.meta.dirname, ".."), web = path.join(repo, "apps/export-doc-web");
 const output = path.join(repo, "artifacts/document-editor-ui", String(Date.now()));
@@ -78,11 +79,12 @@ try {
     page = await createPageSession(cdp);
     await page.send("Emulation.setDeviceMetricsOverride", { width, height: 960, deviceScaleFactor: 1, mobile: false });
     await page.send("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/?mode=${mode}${extra}` });
-    await waitFor(page, mode === "settings" ? "document.querySelector('.settings-center-form, [aria-label=备份与恢复], [aria-label=系统维护]') && !document.querySelector('[aria-busy=true]')" : "(document.querySelector('form') || document.querySelector('[aria-label=发票单据包默认设置]')) && window.__calls.some(call=>call.name==='getSettings')");
+    await waitFor(page, mode === "settings" ? "document.querySelector('.settings-center-form, [aria-label=备份与恢复], [aria-label=系统维护]') && !document.querySelector('[aria-busy=true]')" : mode === "master" ? "document.querySelector('form.entity-form')" : "(document.querySelector('form') || document.querySelector('[aria-label=发票单据包默认设置]')) && window.__calls.some(call=>call.name==='getSettings')");
     await delay(200);
   };
   if (!process.argv.includes("--settings-only")) {
   await runInvoiceSaveCases({open,currentPage:()=>page,read,field,clickText,waitFor,results});
+  await runRecordIdentityCases({open,currentPage:()=>page,read,clickText,waitFor,results});
   for (const width of [1440, 1024, 390, 320]) {
     await open("new", width);
     assert.equal(await read(page, "document.querySelectorAll('[role=tabpanel]:not([hidden])').length"), 1);

@@ -294,7 +294,7 @@ fn remove(
     let record_id = row["id"].as_i64().unwrap_or(0);
     let version = row["versionNumber"].as_i64().unwrap_or(0);
     if !tx.delete(kind, record_id, version)? {
-        return Err(conflict("记录版本已变化。"));
+        return Err(crate::engine::error::concurrency("记录版本已变化。"));
     }
     tx.append_audit_details(
         &AuditWrite {

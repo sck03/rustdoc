@@ -1,4 +1,4 @@
-use super::error::{Result, conflict, error, unavailable};
+use super::error::{Result, concurrency, conflict, error, unavailable};
 use super::operation_lock::{OperationLock, WriteGuard};
 use crate::{contracts, paths::RuntimePaths};
 use chrono::Utc;
@@ -414,7 +414,7 @@ pub fn timestamp() -> String {
 }
 pub fn check_version(previous: &Value, expected: i64) -> Result<()> {
     if expected <= 0 || previous["versionNumber"].as_i64() != Some(expected) {
-        return Err(conflict(
+        return Err(concurrency(
             "记录已被修改或缺少版本号。请重新读取后核对，当前草稿已保留。",
         ));
     }
@@ -507,7 +507,7 @@ pub fn save_in_scope(
         connection.insert(&record)?
     } else {
         if !connection.update(id, version - 1, &record)? {
-            return Err(conflict("记录版本已变化，保存已取消。"));
+            return Err(concurrency("记录版本已变化，保存已取消。"));
         }
         id
     };

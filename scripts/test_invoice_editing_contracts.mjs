@@ -26,6 +26,14 @@ for (const test of cases) {
   assert.equal(result.unitPrice, Number(test.expectedUnitPrice));
   assert.equal(items.normalizeInvoiceItemForSave(input).totalPrice, result.totalPrice);
 }
+const profitCases = JSON.parse(fs.readFileSync(path.join(root, "tests/ContractFixtures/invoice-profit.json"), "utf8"));
+for (const test of profitCases) {
+  const rows = test.items.map(row => items.recalculateInvoiceItem({ ...items.createEmptyInvoiceItem(),
+    ...Object.fromEntries(Object.entries(row).map(([key, value]) => [key, Number(value)])) }, ["unitPrice"]));
+  const totals = items.calculateInvoiceTotals(rows, test.exchangeRate == null ? null : Number(test.exchangeRate), test.currency);
+  assert.equal(totals.totalProfit, Number(test.expectedProfit), test.name);
+  assert.equal(totals.totalTaxRefundAmount, Number(test.expectedRefund), test.name);
+}
 assert.equal(items.roundMoney(-1.005), -1.01);
 assert.equal(decimal.sumDecimalNumbers([0.1, 0.2]), 0.3);
 assert.equal(decimal.ExactDecimal.from("12345678901234567890.12345678").round(2).toString(), "12345678901234567890.12");

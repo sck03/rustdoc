@@ -9,12 +9,51 @@ pub fn create(namespace: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+    create_stamped(namespace, stamp)
+}
+
+fn create_stamped(namespace: &str, stamp: u128) -> PathBuf {
+    let parent = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../.codex-runtime")
-        .join(namespace)
-        .join(format!("{}-{stamp}", std::process::id()));
-    fs::create_dir_all(&root).unwrap();
-    root
+        .join(namespace);
+    fs::create_dir_all(&parent).unwrap();
+    // A clock value is not a unique identity. Never reuse another test's files.
+    for sequence in 0_u64.. {
+        let root = parent.join(format!("{}-{stamp}-{sequence}", std::process::id()));
+        match fs::create_dir(&root) {
+            Ok(()) => return root,
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => panic!("cannot create test workspace {}: {error}", root.display()),
+        }
+    }
+    unreachable!("test workspace sequence exhausted")
+}
+
+#[test]
+fn equal_clock_values_cannot_share_or_overwrite_a_test_directory() {
+    let roots = std::thread::scope(|scope| {
+        let workers: Vec<_> = (0..8)
+            .map(|_| scope.spawn(|| create_stamped("storage-workspace-tests", 0)))
+            .collect();
+        workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    assert_eq!(
+        roots.iter().collect::<std::collections::HashSet<_>>().len(),
+        roots.len()
+    );
+    for (index, root) in roots.iter().enumerate() {
+        fs::write(root.join("owner.txt"), index.to_string()).unwrap();
+    }
+    for (index, root) in roots.iter().enumerate() {
+        assert_eq!(
+            fs::read_to_string(root.join("owner.txt")).unwrap(),
+            index.to_string()
+        );
+        remove(root).unwrap();
+    }
 }
 
 /// Call after database handles have left scope. Windows scanners can briefly

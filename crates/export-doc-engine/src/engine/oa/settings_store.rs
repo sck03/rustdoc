@@ -123,7 +123,7 @@ pub(super) fn save(
         .as_i64()
         .ok_or_else(|| invalid("设置版本缺失。"))?;
     if previous.as_ref().map(|v| store::expected(v)).unwrap_or(0) != expected {
-        return Err(conflict("当前设置版本已改变。"));
+        return Err(crate::engine::error::concurrency("当前设置版本已改变。"));
     }
     let id = previous
         .as_ref()

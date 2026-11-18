@@ -1,6 +1,6 @@
 use super::{
     auth,
-    error::{Result, conflict, invalid, unavailable},
+    error::{Result, invalid, unavailable},
     store::{Actor, Store},
 };
 use crate::{
@@ -239,7 +239,7 @@ pub fn save(
         }
         let previous=tx.settings("settings")?;
         let version=previous.as_ref().and_then(|value|value["revision"].as_i64()).unwrap_or(0);
-        if settings["revision"].as_i64()!=Some(version){return Err(conflict("系统设置已被修改，请重新加载后核对。当前草稿已保留。"));}
+        if settings["revision"].as_i64()!=Some(version){return Err(crate::engine::error::concurrency("系统设置已被修改，请重新加载后核对。当前草稿已保留。"));}
         let mut protected=tx.settings("protected-credentials")?.unwrap_or_else(||json!({}));
         if !protected.is_object(){return Err(unavailable("加密凭证存储损坏。"));}
         if body["updateSecrets"]==true {

@@ -108,7 +108,7 @@ pub fn save(
         .and_then(|r| r["draftRevision"].as_i64())
         .unwrap_or(0);
     if body["expectedDraftRevision"].as_i64() != Some(revision) {
-        return Err(super::super::error::conflict(
+        return Err(crate::engine::error::concurrency(
             "单证草稿已被修改，请重新读取后合并；当前修改已保留。",
         ));
     }

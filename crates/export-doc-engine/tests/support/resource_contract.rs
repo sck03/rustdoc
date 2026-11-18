@@ -1,4 +1,8 @@
 //! Resource files, assigned inboxes and archived PDFs share the two-store contract.
+#[path = "file_download.rs"]
+mod file_download;
+use file_download::DownloadFile;
+
 use super::{NativeService, Value, call, json, operation, workflow};
 use export_doc_engine::{generated_api::*, paths::nonce};
 use std::time::{Duration, Instant};

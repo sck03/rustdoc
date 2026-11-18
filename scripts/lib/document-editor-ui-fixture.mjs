@@ -13,6 +13,8 @@ import { ConfirmationProvider } from ${source("ui/ConfirmationProvider.tsx")};
 import { UnsavedChangesProvider, useConfirmUnsavedChanges } from ${source("ui/unsavedChangesGuard.tsx")};
 import { InvoiceEditorPage } from ${source("features/invoices/InvoiceEditorPage.tsx")};
 import { PaymentEditorPage } from ${source("features/payments/PaymentEditorPage.tsx")};
+import { MasterDataEditorRoute } from ${source("features/master-data/MasterDataPages.tsx")};
+import { getMasterDataConfig } from ${source("features/master-data/masterDataConfigs.ts")};
 import { SettingsPage } from ${source("features/settings/SettingsPage.tsx")};
 import { BackupRecoveryPage } from ${source("features/settings/BackupRecoveryPage.tsx")};
 import { SystemMaintenancePage } from ${source("features/settings/SystemMaintenancePage.tsx")};
@@ -39,18 +41,22 @@ let invoice={...createEmptyInvoice(date),id:7,invoiceNo:'INV-2026-091',customerN
   items:[{...createEmptyInvoiceItem(7),styleNo:'STYLE-091',styleName:'COTTON SHIRT',quantity:5,unitPrice:10,totalPrice:50,spare10:params.has('populated')?'保留原始备注':''}],totalAmount:50};
 if(params.has('rows')) { invoice.items=Array.from({length:Number(params.get('rows'))},(_,index)=>({...invoice.items[0],id:index+1,styleNo:'STYLE-'+(index+1)}));invoice.totalAmount=invoice.items.length*50; }
 let payment={...createEmptyPayment(date),id:9,invoiceNo:'PAY-2026-091',paymentMethod:'电汇',receiptDate:date,rowVersion:1};
+const invoices=new Map([[7,invoice]]), masters=new Map();
+const invoiceFor=id=>{if(!invoices.has(id))invoices.set(id,{...invoice,id,invoiceNo:'INV-'+id,rowVersion:1,items:invoice.items.map(item=>({...item,invoiceId:id}))});return invoices.get(id);};
+const masterFor=(kind,id)=>{const key=kind+':'+id,config=getMasterDataConfig(kind);if(!masters.has(key))masters.set(key,{...config.emptyRecord(),id,[config.primaryField]:'MASTER-'+kind+'-'+id,rowVersion:'native:1'});return masters.get(key);};
 const custom={PaymentMethod:['支票','电汇','预付'],PaymentPayerName:[],Currency:['USD','CNY'],SupervisionMode:['一般贸易'],PaymentTerms:['T/T']};
 const record=(name,input,result)=>{window.__calls.push({name,input});return Promise.resolve(structuredClone(result))};
 const page=items=>({items,pageNumber:1,pageSize:50,totalCount:items.length,totalPages:1,hasNextPage:false,hasPreviousPage:false});
 window.__invoiceSaves=[];
 const saveInvoice=(name,input,init)=>{
-  invoice={...input.body,id:7,rowVersion:(invoice.rowVersion||0)+1};
-  const response=record(name,input,{id:7,invoice,isUpdate:name==='updateInvoice'});
+  const id=name==='createInvoice'?7:input.id;
+  invoice={...input.body,id,rowVersion:(invoiceFor(id).rowVersion||0)+1};invoices.set(id,invoice);
+  const response=record(name,input,{id,invoice,isUpdate:name==='updateInvoice'});
   if(!window.__delayInvoiceSave)return response;
   return new Promise((resolve,reject)=>window.__invoiceSaves.push({signal:init?.signal,resolve:()=>resolve(response),reject}));
 };
 window.__finishInvoiceSave=(index=0)=>window.__invoiceSaves[index].resolve();
-const conflict=()=>new ApiError(409,'Conflict',JSON.stringify({message:'数据已被其他用户更新，请重新加载最新设置后再保存。'}));
+const conflict=()=>new ApiError(409,'Conflict',JSON.stringify({code:'ConcurrencyConflict',message:'数据已被其他用户更新，请重新加载最新设置后再保存。'}));
 let backupPlan={revision:0,plan:{enabled:false,frequency:'Daily',time:'02:00',weekday:1,retentionCount:14,retentionDays:0,replicaMode:'None',verifyReplica:true,s3:{endpoint:'',region:'us-east-1',bucket:'',prefix:'ExportDocManager',accessKeyId:'',addressing:'virtualHost'}},encryptionPasswordSet:false,webDavPasswordSet:false,s3SecretAccessKeySet:false,s3SessionTokenSet:false,s3Available:true,timeZone:'Asia/Shanghai',nextRunAt:null,runningJobId:null,lastRunAt:null,lastResult:'NotRun',lastError:'',archives:[]};
 const backupStatus=()=>({...backupPlan,settingsRevision:settings.revision,webDav:{enabled:settings.webDav.enabled,url:settings.webDav.url,userName:settings.webDav.userName||''}});
 const savePayment=(name,input)=>{
@@ -74,7 +80,8 @@ const client={
   getServerMigrationStatus:()=>record('getServerMigrationStatus',{}, {supported:true,toolsReady:true,pendingRestore:false}),
   cleanupSystemLogs:()=>record('cleanupSystemLogs',{}, {message:'日志清理已完成。'}),
   testEmailConnection:()=>record('testEmailConnection',{}, {message:'邮件连接正常。'}),
-  getInvoice:input=>record('getInvoice',input,invoice),listInvoiceStatusHistory:()=>Promise.resolve([]),
+  getInvoice:input=>window.__failInvoiceReadId===input.id?Promise.reject(new Error('发票读取失败')):record('getInvoice',input,invoiceFor(input.id)),listInvoiceStatusHistory:()=>Promise.resolve([]),
+  deleteInvoice:input=>record('deleteInvoice',input,{success:true,message:'已删除'}),
   createInvoice:(input,init)=>saveInvoice('createInvoice',input,init),updateInvoice:(input,init)=>saveInvoice('updateInvoice',input,init),
   getPayment:input=>{if(window.__failPaymentReload){window.__failPaymentReload=false;return Promise.reject(new Error('付款读取失败'));}return record('getPayment',input,payment);},
   createPayment:input=>savePayment('createPayment',input),updatePayment:input=>savePayment('updatePayment',input),
@@ -98,6 +105,11 @@ const client={
   startPaymentVoucherPdfSaveToPathJob:input=>record('startPaymentVoucherPdfSaveToPathJob',input,{jobId:'fixture-pdf'}),
   reviewInvoice:input=>record('reviewInvoice',input,{ready:true,issues:[]}),
 };
+for(const [kind,type] of [['customers','Customer'],['exporters','Exporter'],['payees','Payee'],['products','Product'],['ports','Port'],['units','Unit']]){
+  client['get'+type]=input=>window.__failMasterRead===kind+':'+input.id?Promise.reject(new Error('主数据读取失败')):record('get'+type,input,masterFor(kind,input.id));
+  client['update'+type]=input=>{const saved={...input.body,id:input.id,rowVersion:'native:2'};masters.set(kind+':'+input.id,saved);return record('update'+type,input,saved);};
+  client['delete'+type]=input=>record('delete'+type,input,{success:true,message:'已删除'});
+}
 const queries=new QueryClient({defaultOptions:{queries:{retry:false,refetchOnWindowFocus:false},mutations:{retry:false}}});
 window.__reloadOptions=()=>queries.invalidateQueries({queryKey:['custom-options']});
 window.__updateDefaultSpares=async count=>{settings.system.itemEntrySpareColumnCount=count;await queries.invalidateQueries({queryKey:['settings']});};
@@ -114,7 +126,7 @@ function ExportDefaultsFixture(){
 const grants=['document.invoices','document.payments','document.master-data','document.reports','document.excel'].map(moduleKey=>({moduleKey,accessLevel:readonly?'view':'manage'}));
 const permissions=Object.values(permissionResources).flatMap(resourceKey=>Object.values(permissionActions).map(action=>({resourceKey,action,dataScope:'all'})));
 permissions.push(...grants.flatMap(({moduleKey})=>(readonly?['view']:['view','operate','manage']).map(action=>({resourceKey:moduleKey,action,dataScope:'all'}))));
-const entry=mode==='payment'?'/payments/9':mode==='payment-new'?'/payments/new':mode==='settings'?(params.get('path')||'/settings')+'?'+new URLSearchParams({section:params.get('section')||'documentDefaults',group:params.get('group')||'invoice'}):mode==='export-defaults'?'/export-defaults':mode==='edit'?'/invoices/7':'/invoices/new';
+const entry=mode==='master'?'/master-data/'+(params.get('entity')||'payees')+'/1':mode==='payment'?'/payments/9':mode==='payment-new'?'/payments/new':mode==='settings'?(params.get('path')||'/settings')+'?'+new URLSearchParams({section:params.get('section')||'documentDefaults',group:params.get('group')||'invoice'}):mode==='export-defaults'?'/export-defaults':mode==='edit'?'/invoices/7':'/invoices/new';
 const settingsProps={client,canManageSettings:!readonly,canManageUsers:!readonly&&!params.has('desktop'),canUseDocumentWorkspace:params.get('edition')!=='Sales',isDesktopRuntime:params.has('desktop'),productName:'单据工作台'};
 createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[entry]}><QueryClientProvider client={queries}>
   <PermissionAccessProvider grants={grants} permissions={permissions} subject={{id:1,companyScope:'DEMO',departmentId:'OFFICE'}} canManageSettings={!readonly}><ConfirmationProvider><UnsavedChangesProvider>
@@ -123,6 +135,7 @@ createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries=
       <Route path='/invoices/:invoiceId' element={<InvoiceEditorPage client={client} businessDate={date} mode='edit'/>}/>
       <Route path='/payments/:paymentId' element={<PaymentEditorPage client={client} businessDate={date} mode='edit'/>}/>
       <Route path='/payments/new' element={<PaymentEditorPage client={client} businessDate={date} mode='new'/>}/>
+      <Route path='/master-data/:entityKey/:recordKey' element={<MasterDataEditorRoute client={client} mode='edit'/>}/>
       <Route path='/settings' element={<SettingsPage {...settingsProps}/>}/>
       <Route path='/system/backup' element={<BackupRecoveryPage {...settingsProps}/>}/>
       <Route path='/system/maintenance' element={<SystemMaintenancePage {...settingsProps}/>}/>

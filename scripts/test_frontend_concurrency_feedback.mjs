@@ -1,31 +1,35 @@
+import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
 
-const require = createRequire(import.meta.url);
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const workspace = path.join(repoRoot, ".codex-runtime", "frontend-concurrency-feedback-tests");
-const entry = path.join(workspace, "entry.ts");
-const bundle = path.join(workspace, "bundle.mjs");
-fs.rmSync(workspace, { recursive: true, force: true });
-fs.mkdirSync(workspace, { recursive: true });
-const formUtilsPath = path.join(repoRoot, "apps", "export-doc-web", "src", "ui", "formUtils.ts").replaceAll("\\", "/");
-const apiPath = path.join(repoRoot, "apps", "export-doc-web", "src", "api", "index.ts").replaceAll("\\", "/");
-fs.writeFileSync(entry, `import { isConcurrencyConflict, readApiError } from ${JSON.stringify(formUtilsPath)}; import { ApiError } from ${JSON.stringify(apiPath)}; globalThis.__model = { isConcurrencyConflict, readApiError, ApiError };`, "utf8");
-const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
-await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
-await import(pathToFileURL(bundle).href);
-
-const { isConcurrencyConflict, readApiError, ApiError } = globalThis.__model;
-const assert = (condition, message) => { if (!condition) throw new Error(message); };
-const staleInvoice = new ApiError(409, "Conflict", JSON.stringify({ message: "该发票数据已被其他用户修改，请刷新后重试。" }));
-const staleSession = new ApiError(409, "Conflict", JSON.stringify({ message: "装柜方案已被其他会话修改，请重新加载后再保存。" }));
-const businessConflict = new ApiError(409, "Conflict", JSON.stringify({ message: "同一发票号记录已存在。" }));
-const validation = new ApiError(400, "Bad Request", JSON.stringify({ message: "发票号不能为空。" }));
-assert(isConcurrencyConflict(staleInvoice), "409 other-user update should be concurrency conflict");
-assert(isConcurrencyConflict(staleSession), "409 other-session update should be concurrency conflict");
-assert(!isConcurrencyConflict(businessConflict), "ordinary 409 business conflict should not show stale-data reload action");
-assert(!isConcurrencyConflict(validation), "validation error should not be concurrency conflict");
-assert(readApiError(staleInvoice).includes("其他用户"), "API message should remain user-facing Chinese text");
-process.stdout.write("frontend concurrency feedback tests passed\n");
+const web = path.resolve(import.meta.dirname, "../apps/export-doc-web");
+const require = createRequire(path.join(web, "package.json"));
+const result = await require("esbuild").build({
+  stdin: { resolveDir: web, loader: "ts", contents: `
+    export { isConcurrencyConflict, readApiError } from "./src/ui/formUtils.ts";
+    export { ApiError } from "./src/api/index.ts";` },
+  bundle: true, format: "esm", platform: "node", write: false, logLevel: "silent",
+});
+const { isConcurrencyConflict, readApiError, ApiError } = await import(
+  `data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString("base64")}`,
+);
+for (const message of [
+  "记录已被修改或缺少版本号。请重新读取后核对，当前草稿已保留。",
+  "系统设置已被修改，请重新加载后核对。当前草稿已保留。",
+  "A translated message without version-related keywords",
+]) {
+  const error = new ApiError(409, "Conflict", JSON.stringify({ code: "ConcurrencyConflict", message }));
+  assert.equal(isConcurrencyConflict(error), true);
+  assert.equal(readApiError(error), message);
+}
+for (const [status, body] of [
+  [409, { message: "同一发票号记录已存在。" }],
+  [409, { message: "其他用户正在办理，请刷新后重试。" }],
+  [409, { code: "BusinessConflict", message: "加载最新资料" }],
+  [400, { code: "ConcurrencyConflict", message: "请求无效" }],
+]) assert.equal(isConcurrencyConflict(new ApiError(status, "Error", JSON.stringify(body))), false);
+for (const text of ["invalid JSON", "null", "[]", "42"]) {
+  assert.equal(isConcurrencyConflict(new ApiError(409, "Conflict", text)), false);
+}
+assert.equal(readApiError(new ApiError(503, "Unavailable", "plain response")), "plain response");
+console.log("frontend structured concurrency feedback tests passed");

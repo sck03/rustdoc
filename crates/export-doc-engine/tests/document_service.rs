@@ -1,3 +1,7 @@
+#[path = "support/file_download.rs"]
+mod file_download;
+use file_download::DownloadFile;
+
 #[path = "support/document_samples.rs"]
 mod document_samples;
 #[path = "support/native_fixture.rs"]

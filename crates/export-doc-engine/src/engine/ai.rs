@@ -57,6 +57,7 @@ impl Reviewer {
         export_doc_ai::endpoint(&request.endpoint).map_err(|e| ApiError {
             status: Some(e.status),
             message: e.message,
+            code: None,
             diagnostic: Some("ai-transport"),
         })?;
         let mut command = Command::new(std::env::current_exe()?);
@@ -79,6 +80,7 @@ impl Reviewer {
         let report = report.map_err(|e| ApiError {
             status: Some(e.status),
             message: e.message,
+            code: None,
             diagnostic: Some("ai-transport"),
         })?;
         Ok(

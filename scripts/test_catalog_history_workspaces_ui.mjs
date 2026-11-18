@@ -29,7 +29,7 @@ const queries=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:30
 const deferred=(kind,request,init)=>new Promise((resolve,reject)=>window.requests.push({kind,request,signal:init.signal,resolve,reject}));
 const retention=keep=>({totalCount:window.totalHistory,totalBytes:window.totalHistory*1024,eligibleCount:Math.max(0,window.totalHistory-keep),eligibleBytes:Math.max(0,window.totalHistory-keep)*1024,retainLatest:keep,maxCleanupCount:5000,canClean:true,policy:"保留当前模板，历史由预检确认清理。"});
 const client={listHsCodes:async r=>structuredClone({items:window.catalog,pageNumber:1,pageSize:r.pageSize,totalCount:2,totalPages:1,hasNextPage:false,hasPreviousPage:false}),
-deleteHsCodesBatch:async r=>{window.calls.push({kind:"delete",request:r});if(r.body.expectedVersions.some(v=>window.catalog.find(row=>row.id===v.id)?.rowVersion!==v.rowVersion))throw new ApiError(409,"Conflict",JSON.stringify({message:"编码已变化，请重新读取。"}));return {success:true,message:"已删除"};},
+deleteHsCodesBatch:async r=>{window.calls.push({kind:"delete",request:r});if(r.body.expectedVersions.some(v=>window.catalog.find(row=>row.id===v.id)?.rowVersion!==v.rowVersion))throw new ApiError(409,"Conflict",JSON.stringify({code:'ConcurrencyConflict',message:"编码已变化，请重新读取。"}));return {success:true,message:"已删除"};},
 confirmHsCodesObsolete:(r,i)=>deferred("obsolete",r,i),previewHsCodesObsolete:i=>deferred("obsolete-preview",{},i),getUserReportTemplateHistoryRetention:async r=>retention(r.retainLatest||20),
 previewUserReportTemplateHistoryCleanup:(r,i)=>deferred("history-preview",r,i),commitUserReportTemplateHistoryCleanup:(r,i)=>deferred("history-commit",r,i)};
 window.finish=index=>{const p=window.requests[index];if(p.kind==="obsolete")p.resolve({success:true,message:"已确认作废"});

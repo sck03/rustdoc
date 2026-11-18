@@ -80,9 +80,10 @@ export function calculateInvoiceTotals(items: ApiInvoiceItemDto[], exchangeRate?
     for (const key of keys) totals[key] = totals[key].add(row[key]);
   }
   const amount = totals.amount.round(2);
-  const rate = numberValue(exchangeRate) > 0 ? numberValue(exchangeRate) : normalizeText(currency).toUpperCase() === "CNY" ? 1 : 0;
+  const purchase = totals.purchase.round(2), refund = totals.refund.round(2);
+  const rate = numberValue(exchangeRate) > 0 ? numberValue(exchangeRate) : ["CNY", "RMB"].includes(normalizeText(currency).toUpperCase()) ? 1 : 0;
   return { totalAmount: amount.toNumber(), totalCartons: totals.cartons.round(2).toNumber(), totalGrossWeight: totals.grossWeight.round(2).toNumber(),
-    totalNetWeight: totals.netWeight.round(2).toNumber(), totalPurchaseAmount: totals.purchase.round(2).toNumber(), totalQuantity: totals.quantity.round(2).toNumber(),
-    totalTaxRefundAmount: totals.refund.round(2).toNumber(), totalVolume: totals.volume.round(3).toNumber(),
-    totalProfit: rate > 0 ? amount.multiply(rate).subtract(totals.purchase).add(totals.refund).round(2).toNumber() : 0 };
+    totalNetWeight: totals.netWeight.round(2).toNumber(), totalPurchaseAmount: purchase.toNumber(), totalQuantity: totals.quantity.round(2).toNumber(),
+    totalTaxRefundAmount: refund.toNumber(), totalVolume: totals.volume.round(3).toNumber(),
+    totalProfit: rate > 0 ? amount.multiply(rate).subtract(purchase).add(refund).round(2).toNumber() : 0 };
 }

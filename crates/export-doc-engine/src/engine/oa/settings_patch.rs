@@ -27,7 +27,9 @@ pub(super) fn merge(previous: &Value, body: &Value) -> Result<Value> {
         section.clone()
     };
     if body["expectedRevision"].as_i64() != Some(revision(previous, &revision_key)) {
-        return Err(conflict("当前分区或流程已被修改，请重新载入后核对。"));
+        return Err(crate::engine::error::concurrency(
+            "当前分区或流程已被修改，请重新载入后核对。",
+        ));
     }
     let mut merged = previous.clone();
     if section == "rules" {

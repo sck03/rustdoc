@@ -48,6 +48,7 @@ fn failure(message: impl Into<String>) -> ApiError {
     ApiError {
         status: Some(503),
         message: message.into(),
+        code: None,
         diagnostic: Some("controlled-process"),
     }
 }
@@ -153,6 +154,7 @@ pub fn run(
                 break Err(ApiError {
                     status: Some(504),
                     message: "受控工具超过运行时限，已终止进程树。".into(),
+                    code: None,
                     diagnostic: Some("controlled-process-timeout"),
                 });
             }

@@ -1,4 +1,8 @@
 //! Material access must hold across every public representation, on either database.
+#[path = "file_download.rs"]
+mod file_download;
+use file_download::DownloadFile;
+
 #[path = "approval_fixture.rs"]
 mod workflow;
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};

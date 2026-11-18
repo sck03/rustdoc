@@ -193,6 +193,7 @@ fn denied() -> Response {
     crate::response::error(export_doc_engine::api::ApiError {
         status: Some(403),
         message: "不允许的桌面请求来源。".into(),
+        code: None,
         diagnostic: None,
     })
 }

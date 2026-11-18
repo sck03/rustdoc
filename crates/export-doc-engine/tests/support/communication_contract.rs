@@ -1,3 +1,7 @@
+#[path = "file_download.rs"]
+mod file_download;
+use file_download::DownloadFile;
+
 #[path = "approval_fixture.rs"]
 mod workflow;
 use export_doc_engine::{

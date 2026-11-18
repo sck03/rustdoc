@@ -3,7 +3,7 @@
 //! 不移动附件、不生成导出目录。改派在单事务内完成并写审计。
 use super::{
     NativeService, OWNERSHIP_STORAGE_POLICY, auth,
-    error::{Result, conflict, error, invalid},
+    error::{Result, error, invalid},
     store::{Actor, Store},
 };
 use crate::contracts;
@@ -348,7 +348,9 @@ fn apply_ownership(
         },
     )?;
     if !written {
-        return Err(conflict("记录版本已变化，归属改派已取消，请重试。"));
+        return Err(crate::engine::error::concurrency(
+            "记录版本已变化，归属改派已取消，请重试。",
+        ));
     }
     connection.set_body(id, &record)?;
     Ok(())

@@ -96,12 +96,12 @@ pub(in crate::engine) fn save(
             let old: SavedPlan = tx.settings(PLAN)?.map(serde_json::from_value).transpose()
                 .map_err(|_| unavailable("日常灾备设置损坏。"))?.unwrap_or_default();
             if body["expectedRevision"].as_i64() != Some(old.revision) {
-                return Err(error(409, "日常灾备计划已被修改，请重新加载后核对。"));
+                return Err(crate::engine::error::concurrency("日常灾备计划已被修改，请重新加载后核对。"));
             }
             let mut settings = settings::current_in(tx)?;
             let revision = settings["revision"].as_i64().unwrap_or(0);
             if body["expectedSettingsRevision"].as_i64() != Some(revision) {
-                return Err(error(409, "系统连接配置已被修改，请重新加载后核对。"));
+                return Err(crate::engine::error::concurrency("系统连接配置已被修改，请重新加载后核对。"));
             }
             let password = if password.is_empty() { old.password } else { service.protector.protect(PASSWORD, password).map_err(unavailable)? };
             if plan.enabled && password.is_empty() { return Err(invalid("启用前请设置并单独保管灾备包密码。")); }

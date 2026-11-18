@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-18 记录与计算边界：`test:document-editor-ui` 增加发票及六类主数据在切换后加载失败、旧确认失效和新记录操作的真实 React 回归；`test:concurrency-feedback` 使用正式 `ConcurrencyConflict` 错误码并覆盖文案变化、普通冲突及无效响应。`tests/ContractFixtures/invoice-profit.json` 由 Rust 与 React 共用，验证金额舍入顺序、人民币默认汇率和缺汇率行为。HTTP 上传测试检查无效会话与无权限账号均不读取正文；两库业务合同验证错编号更新拒绝及空明细不能核对。当前错误 schema 已声明可选 `code`，本批没有增加第二套契约。
+
 2026-11-17 客户跟进与输出：`npm --prefix apps/export-doc-web run test:crm-export-lifecycle-ui` 验证跟进保存续编、创建后版本衔接、联系人跨页选择，以及 PDF/托单/单据包在来源、客户端、权限或组件生命周期变化后的对话框/请求取消；纳入统一 `business` 组。模板契约测试继续覆盖 V3 Flow 组件的字段域及错误路径。QueryPerformance 的 `current` 模式复用一次读取内的身份查询，并断言后续事项不重复读取不变身份；逐记录权限条件保留。
 
 2026-11-17 装柜/权限方案：`test_packing_credit_workspace_ui.mjs` 增加柜型迟到响应、命令互斥、分页/搜索、输入失效和 PDF 取消；`test_permission_template_lifecycle_ui.mjs` 纳入 `test:settings-models`，验证真实 React 的客户端/权限/卸载取消、删除缓存及迟到确认。装柜分页摘要进入两库共用工具合同，关联来源的游标投影进入 Storage 共用合同；`test-native-postgres.ps1 -Scope Workflows` 在真实 PostgreSQL 18 执行。schema 18 指纹因新增索引变化，验收使用新隔离数据根。
@@ -215,7 +217,7 @@ HTTP 保持 16 个执行名额，另有 16 个公平等待名额，最多等待 
 
 `test-native-postgres.ps1` 的 All／Engine 另外创建独立发布测试库，验证报表来源快照、最终账号／权限复核，以及文件发布后的 SQL 失败补偿和重启恢复。普通 React 回归 `npm --prefix apps/export-doc-web run test:invoice-editing` 包含 200→1000→200 行的滚动／粘贴／撤销和 5000×38 大选区复制、填充、清空。
 
-有契约正文的认证请求先核验真实会话再读取；备份上传单次读取或写入空闲超过 60 秒结束本次上传。HTTP 与桌面宿主共用取消和关闭登记，HTTP 排空最多等待 35 秒；数据库、调度器和任务清理仍返回真实结果。
+有契约正文的认证请求先核验真实会话及端点操作权限再读取；正式提交继续检查当前授权与记录范围。备份上传单次读取或写入空闲超过 60 秒结束本次上传。HTTP 与桌面宿主共用取消和关闭登记，HTTP 排空最多等待 35 秒；数据库、调度器和任务清理仍返回真实结果。
 
 任务记录与生成文件分别保留。普通数据库文件结果默认全局 512 MiB、每用户 128 MiB；先保留较新的结果，超限回收旧 BLOB，保留成功状态和历史并提示重新生成。既有 30 天／全局 2000 条／每用户 200 条的任务历史策略继续执行。受管完整备份、服务器迁移包及业务附件不由此策略删除。
 

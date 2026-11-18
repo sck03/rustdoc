@@ -240,7 +240,9 @@ pub(super) fn validate_revision(path: &Path, display: &str, expected: &str) -> R
         Err(error) => return Err(error),
     };
     if revision != expected {
-        return Err(conflict("模板已被其他用户修改或删除，请重新加载后重试。"));
+        return Err(crate::engine::error::concurrency(
+            "模板已被其他用户修改或删除，请重新加载后重试。",
+        ));
     }
     Ok(())
 }

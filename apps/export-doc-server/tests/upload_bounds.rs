@@ -2,8 +2,8 @@ use axum::{body::Body, http::Request};
 use export_doc_engine::{
     engine::NativeService,
     generated_api::{
-        LOGIN, PREVIEW_CRM_CUSTOMER_IMPORT, UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB,
-        UPLOAD_BUSINESS_ATTACHMENT,
+        CREATE_USER_ACCOUNT, LOGIN, PREVIEW_CRM_CUSTOMER_IMPORT,
+        UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB, UPLOAD_BUSINESS_ATTACHMENT,
     },
     paths::{RuntimePaths, nonce},
 };
@@ -91,6 +91,34 @@ async fn invalid_sessions_do_not_read_uploads_and_shutdown_cancels_an_open_body(
             .unwrap(),
     )
     .unwrap();
+    let admin = login["accessToken"].as_str().unwrap();
+    service.dispatch(CREATE_USER_ACCOUNT, &[], &[], Some(export_doc_engine::contracts::overlay(
+        export_doc_engine::contracts::object(CREATE_USER_ACCOUNT.id, true),
+        &serde_json::json!({"username":"upload-denied","fullName":"无上传权限","role":"OfficeEmployee",
+            "departmentId":"GENERAL","companyScope":"DEFAULT","isActive":true,
+            "permissionGrants":[],"resetPassword":"Upload-Contract-2026"})
+    )), admin).unwrap();
+    let denied_login: serde_json::Value = serde_json::from_slice(&service.dispatch(LOGIN, &[], &[],
+        Some(serde_json::json!({"username":"upload-denied","password":"Upload-Contract-2026"})), "").unwrap()).unwrap();
+    let polled = Arc::new(AtomicBool::new(false));
+    let dropped = Arc::new(AtomicBool::new(false));
+    let response = tokio::time::timeout(
+        Duration::from_secs(2),
+        app.clone().oneshot(make(
+            denied_login["accessToken"].as_str().unwrap(),
+            polled.clone(),
+            dropped.clone(),
+        )),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(response.status().as_u16(), 403);
+    assert!(
+        !polled.load(Ordering::Acquire),
+        "permission denial must precede reading the body"
+    );
+    assert!(dropped.load(Ordering::Acquire));
     let polled = Arc::new(AtomicBool::new(false));
     let dropped = Arc::new(AtomicBool::new(false));
     let request = make(

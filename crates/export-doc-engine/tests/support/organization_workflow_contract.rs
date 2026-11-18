@@ -1,4 +1,8 @@
 //! One service contract runs unchanged against SQLite and a real PostgreSQL database.
+#[path = "file_download.rs"]
+mod file_download;
+use file_download::DownloadFile;
+
 use super::oa_contract::{call, operation, workflow};
 use export_doc_engine::{engine::NativeService, generated_api::*, paths::nonce};
 use serde_json::{Value, json};

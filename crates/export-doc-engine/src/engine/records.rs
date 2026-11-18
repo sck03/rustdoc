@@ -271,11 +271,28 @@ pub fn handle(
     if !request.is_object() {
         return Err(invalid("请求内容须为业务对象。"));
     }
+    let body_id = request
+        .get("id")
+        .filter(|value| !value.is_null())
+        .map(|value| {
+            value
+                .as_i64()
+                .or_else(|| value.as_str()?.parse().ok())
+                .filter(|id| *id >= 0)
+                .ok_or_else(|| invalid("记录编号无效。"))
+        })
+        .transpose()?;
     let record_id = if operation == resource.update && operation != resource.create {
         id(parameters)?
     } else {
-        request["id"].as_i64().unwrap_or(0)
+        body_id.unwrap_or(0)
     };
+    if body_id.is_some_and(|id| id != 0 && id != record_id) {
+        return Err(invalid("记录编号与请求地址不一致，请重新打开记录。"));
+    }
+    if let Some(id) = body_id {
+        request["id"] = json!(id);
+    }
     let action = if record_id > 0 { "edit" } else { "create" };
     auth::authorize(actor, resource.permission, action)?;
     if record_id > 0 {
@@ -632,17 +649,8 @@ fn validate(
             }
         }
         "container-projects" => required(value, "name", "方案名称", 160)?,
-        _ => {
-            let name_fields: Vec<_> = resource
-                .columns
-                .iter()
-                .take(2)
-                .map(|(key, _)| *key)
-                .collect();
-            if !name_fields.iter().any(|key| !text(value, key).is_empty()) {
-                return Err(invalid("请填写名称或编号。"));
-            }
-        }
+        _ => export_doc_domain::record_validation::validate_name(resource.key, value)
+            .map_err(invalid)?,
     }
     Ok(())
 }
@@ -744,7 +752,9 @@ pub fn delete(
                         .as_i64()
                         .ok_or_else(|| invalid("人员历史版本无效。"))?,
                 )? {
-                    return Err(conflict("人员历史已变化，请刷新后重试。"));
+                    return Err(crate::engine::error::concurrency(
+                        "人员历史已变化，请刷新后重试。",
+                    ));
                 }
             }
         }
@@ -753,7 +763,9 @@ pub fn delete(
             record_id,
             previous["versionNumber"].as_i64().unwrap_or(0),
         )? {
-            return Err(conflict("记录版本已变化，删除已取消。"));
+            return Err(crate::engine::error::concurrency(
+                "记录版本已变化，删除已取消。",
+            ));
         }
         Ok(json!({"success":true,"message":"已删除"}))
     })
