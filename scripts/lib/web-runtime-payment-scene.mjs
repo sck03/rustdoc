@@ -36,7 +36,7 @@ export function createPaymentSmokeScene({ authorizedJsonHeaders, evaluate, waitF
     const reference = `SMOKE-PAY-${Date.now()}`;
     const { payment } = await json('CreatePayment', { body: { voucherNo: reference, invoiceNo: reference,
       paymentDate: businessDate, payeeName: '付款打印验收', payerName: '报销验收人',
-      department: '测试部门', cnyAmount: 123.45, otherExpense: 123.45, notes: '临时验收记录，完成后清理。' } });
+      department: '测试部门', cnyAmount: "123.45", otherExpense: "123.45", notes: '临时验收记录，完成后清理。' } });
     assert(payment?.id, 'Created payment must have an identity');
     const url = new URL(options.webUrl);
     url.hash = `/payments/${payment.id}?section=report`;

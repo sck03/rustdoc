@@ -7,7 +7,7 @@ import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { buildReceiptPackageFileName } from "./singleWindowOperationCenterModel.ts";
 
 type Outcome = { kind: "dispatch"; response: SingleWindowClientDispatchResult } |
-  { kind: "receipts"; response: SingleWindowReceiptCollectionResult; targetPath: string };
+  { kind: "receipts"; response: SingleWindowReceiptCollectionResult; targetPath: string; part: number };
 
 /** One lock and cancellation boundary for the selected batch's local handoff commands. */
 export function useSingleWindowBatchActions(client: ExportDocManagerApiClient, row: SingleWindowOperationCenterRow, enabled: boolean) {
@@ -17,19 +17,26 @@ export function useSingleWindowBatchActions(client: ExportDocManagerApiClient, r
   const scope = `${row.batchId}:${enabled}`;
   useEffect(() => { setOutcome(null); setMessage(null); }, [scope, client]);
   const command = useScopedMutation(scope, client, {
-    mutationFn: async (kind: "dispatch" | "receipts", signal): Promise<Outcome> => {
+    mutationFn: async (kind: "dispatch" | "receipts" | number, signal): Promise<Outcome> => {
       if (!enabled) throw new Error("当前工作区不允许持卡机操作。");
       if (kind === "dispatch") return { kind, response: await client.dispatchSingleWindowBatchToClient({ body: { batchId: row.batchId } }, { signal }) };
-      const response = await client.collectSingleWindowClientReceipts({ body: { batchId: row.batchId } }, { signal });
+      const previous = outcome?.kind === "receipts" ? outcome.response : null;
+      const response = typeof kind === "number" && previous ? previous : await client.collectSingleWindowClientReceipts({ body: { batchId: row.batchId } }, { signal });
       signal.throwIfAborted();
-      if (!response.receiptFiles.length) throw new Error("当前档案的回执目录中尚未找到与当前批次精确匹配的回执文件。");
-      const targetPath = await selectSavePackagePath(buildReceiptPackageFileName(row)) ?? "";
+      if (!response.receiptBatches.length) throw new Error("当前档案的回执目录中尚未找到与当前批次精确匹配的回执文件。");
+      const part = typeof kind === "number" ? kind : 0;
+      const files = response.receiptBatches[part];
+      if (!files) throw new Error("请选择有效的回执分包。");
+      if (typeof kind !== "number") setOutcome({kind:"receipts",response,targetPath:"",part});
+      const base = buildReceiptPackageFileName(row);
+      const name = response.receiptBatches.length === 1 ? base : base.replace(/\.swpkg$/, `-${part + 1}.swpkg`);
+      const targetPath = await selectSavePackagePath(name) ?? "";
       signal.throwIfAborted();
       if (targetPath) await client.saveSingleWindowReceiptPackageToPath({ body: {
         businessType: row.businessType, batchReference: row.batchReference, invoiceNo: row.invoiceNo,
-        receiptFiles: response.receiptFiles, packagePath: targetPath,
+        receiptFiles: files, packagePath: targetPath,
       } }, { signal });
-      return { kind, response, targetPath };
+      return { kind: "receipts", response, targetPath, part };
     },
     onSuccess: result => {
       setOutcome(result);
@@ -39,13 +46,14 @@ export function useSingleWindowBatchActions(client: ExportDocManagerApiClient, r
         : result.targetPath ? "回执包已导出，请交回办公室系统导入归档。" : "已找到回执文件，但未选择回执包保存位置。");
     },
     refreshKeys: () => [queryKeys.singleWindowOperationCenterRoot()],
-    onError: error => { setOutcome(null); setMessage(readApiError(error)); setMessageKind("error"); },
+    onError: error => { setMessage(readApiError(error)); setMessageKind("error"); },
   });
   return {
     message, messageKind, setMessage, isBusy: command.isPending,
     dispatch: () => command.mutate("dispatch"), collect: () => command.mutate("receipts"),
     dispatchResult: outcome?.kind === "dispatch" ? outcome.response : null,
     receiptResult: outcome?.kind === "receipts" ? outcome.response : null,
+    exportPart: (part: number) => command.mutate(part),
     savedReceiptPackagePath: outcome?.kind === "receipts" ? outcome.targetPath : "",
   };
 }

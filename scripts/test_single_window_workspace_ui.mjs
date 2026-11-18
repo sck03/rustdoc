@@ -1,15 +1,10 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { createRequire } from "node:module";
+import { createReactUiFixture } from "./lib/react-ui-fixture.mjs";
 import { createServer } from "node:http";
-import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
 
-const root = path.resolve(import.meta.dirname, ".."), web = path.join(root, "apps/export-doc-web");
-const require = createRequire(path.join(web, "package.json"));
-const output = path.join(root, "artifacts/single-window-workspace-ui", String(Date.now()));
-fs.mkdirSync(path.join(output, "Temp"), { recursive: true });
-Object.assign(process.env, { TEMP: path.join(output, "Temp"), TMP: path.join(output, "Temp") });
+const { root, web, output, require, bundle, source, launch } = createReactUiFixture("single-window-workspace-ui");
 const schemas = JSON.parse(fs.readFileSync(path.join(root, "crates/export-doc-contracts/src/openapi.json"), "utf8")).components.schemas;
 function example(schema) {
   if (schema.$ref) return example(schemas[schema.$ref.split("/").at(-1)]);
@@ -21,7 +16,6 @@ function example(schema) {
   if (type === "boolean") return false;
   return "";
 }
-const source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\", "/"));
 const result = await require("esbuild").build({ write: false, bundle: true, format: "iife", platform: "browser", jsx: "automatic", loader: { ".css": "empty" }, logLevel: "silent",
   plugins: [{ name: "omit-independent-panels", setup(build) {
     build.onLoad({ filter: /SingleWindowExportReviewPanel\.tsx$/ }, args => ({ contents: `export function ${path.basename(args.path, ".tsx")}(){return null}`, loader: "tsx" }));
@@ -98,7 +92,7 @@ createRoot(document.getElementById('root')).render(<QueryClientProvider client={
 ` } });
 const server = createServer((_request, response) => { response.setHeader("Content-Type", "text/html; charset=utf-8"); response.end('<!doctype html><html lang="zh-CN"><div id="root"></div></html>'); });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
-const context = await require("playwright").chromium.launchPersistentContext(path.join(output, "Chrome"), { executablePath: locateChromeForTesting(root), headless: true });
+const context = await launch();
 let passed = 0;
 async function scenario(mode, check, desktop=false) {
   const page = await context.newPage(), errors = [];
@@ -207,13 +201,32 @@ try {
     await page.evaluate(()=>{window.receiptMode=true;window.setBatch(2);});
     await page.getByRole('button',{name:'收集并导出回执'}).click();
     await page.waitForFunction(()=>window.pending.length===1);
-    await page.evaluate(()=>window.pending[0].resolve({receiptFiles:['E:/receipt.xml']}));
+    await page.evaluate(()=>window.pending[0].resolve({receiptBatches:[['E:/receipt.xml']]}));
     await page.waitForFunction(()=>window.pending.length===2);
     await page.evaluate(()=>window.setBatch(3));
     await page.waitForFunction(()=>window.pending[0].signal.aborted);
     await page.evaluate(()=>window.pending[1].resolve('E:/late.swpkg'));
     await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,30)));
     assert.equal(await page.evaluate(()=>window.pending.length),2,'late native save dialog cannot export the previous batch');
+  },true);
+  await scenario('batch',async page=>{
+    await page.evaluate(()=>{window.receiptMode=true;window.setBatch(2);});
+    await page.getByRole('button',{name:'收集并导出回执'}).click();
+    await page.waitForFunction(()=>window.pending.length===1);
+    await page.evaluate(()=>window.pending[0].resolve({receiptBatches:[Array.from({length:200},(_,i)=>'E:/receipt-'+i+'.xml'),['E:/receipt-200.xml']]}));
+    await page.waitForFunction(()=>window.pending.length===2);
+    await page.evaluate(()=>window.pending[1].resolve('E:/receipts-1.swpkg'));
+    await page.waitForFunction(()=>window.pending.length===3);
+    assert.equal(await page.evaluate(()=>window.pending[2].request.body.receiptFiles.length),200);
+    await page.evaluate(()=>window.pending[2].resolve({}));
+    await page.getByRole('button',{name:'导出第 2 包（1 份）'}).click();
+    await page.waitForFunction(()=>window.pending.length===4);
+    await page.evaluate(()=>window.pending[3].resolve('E:/receipts-2.swpkg'));
+    await page.waitForFunction(()=>window.pending.length===5);
+    const exported=await page.evaluate(()=>[...window.pending[2].request.body.receiptFiles,...window.pending[4].request.body.receiptFiles]);
+    assert.deepEqual(exported,Array.from({length:201},(_,i)=>'E:/receipt-'+i+'.xml'));
+    assert.equal(await page.evaluate(()=>window.pending.filter(p=>p.kind==='collect').length),1);
+    await page.evaluate(()=>window.pending[4].resolve({}));
   },true);
   const detected = { customsCooDirectories: {outBox:'F:/发送',sentBox:'E:/归档',inBox:'D:/回执',failBox:'F:/失败'}, agentConsignmentDirectories:{outBox:'F:/ACD发送',sentBox:'E:/ACD归档',inBox:'D:/ACD回执',failBox:'F:/ACD失败'} };
   await scenario('directories', async page => {

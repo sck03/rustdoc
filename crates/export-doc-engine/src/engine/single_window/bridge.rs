@@ -1,6 +1,6 @@
 use super::*;
 use crate::paths::{ensure_safe_absolute, nonce};
-use std::{collections::BTreeSet, fs, io::Write, path::Path};
+use std::{collections::BTreeMap, fs, io::Write, path::Path};
 
 pub const OPERATIONS: &[Operation] = &[
     DISPATCH_SINGLE_WINDOW_BATCH_TO_CLIENT,
@@ -238,7 +238,7 @@ fn collect(service: &NativeService, actor: &Actor, id: i64) -> Result<Value> {
             Ok((row, roots, business))
         },
     )?;
-    let mut selected = BTreeSet::new();
+    let mut selected = BTreeMap::new();
     let mut inspected = 0;
     let mut folders = roots.clone();
     while let Some(folder) = folders.pop() {
@@ -283,14 +283,46 @@ fn collect(service: &NativeService, actor: &Actor, id: i64) -> Result<Value> {
                 || !reference.is_empty()
                     && rules::text(&parsed, "referenceNo").eq_ignore_ascii_case(reference)
             {
-                selected.insert(path);
-                if selected.len() > 200 {
-                    return Err(invalid("匹配回执超过 200 份，请分批选择导出。"));
-                }
+                selected.insert(path, bytes.len());
             }
         }
     }
     Ok(
-        json!({"batchId":id,"batchReference":row["batchReference"],"receiptDirectories":roots,"receiptFiles":selected}),
+        json!({"batchId":id,"batchReference":row["batchReference"],"receiptDirectories":roots,"receiptBatches":receipt_batches(selected)}),
     )
+}
+
+fn receipt_batches<T>(files: impl IntoIterator<Item = (T, usize)>) -> Vec<Vec<T>> {
+    let mut batches = Vec::new();
+    let mut batch = Vec::new();
+    let mut bytes = 0;
+    for (file, size) in files {
+        if batch.len() == receipts::MAX_PACKAGE_FILES || bytes + size > receipts::MAX_PACKAGE_BYTES
+        {
+            batches.push(std::mem::take(&mut batch));
+            bytes = 0;
+        }
+        batch.push(file);
+        bytes += size;
+    }
+    if !batch.is_empty() {
+        batches.push(batch);
+    }
+    batches
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn receipt_batches_preserve_every_file_and_both_limits() {
+        for (count, size, expected) in [
+            (201, 1, vec![200, 1]),
+            (11, 10 * 1024 * 1024, vec![5, 5, 1]),
+            (0, 0, vec![]),
+        ] {
+            let batches = receipt_batches((0..count).map(|id| (id, size)));
+            assert_eq!(batches.iter().map(Vec::len).collect::<Vec<_>>(), expected);
+            assert!(batches.into_iter().flatten().eq(0..count));
+        }
+    }
 }

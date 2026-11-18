@@ -107,6 +107,21 @@ impl ApiClient {
             .map_err(|error| ApiError::local(format!("后端响应不符合已生成的接口契约：{error}")))
     }
 
+    pub fn assert_rejected(
+        &self,
+        op: Operation,
+        path: &[(&str, String)],
+        body: Option<Value>,
+        status: u16,
+    ) {
+        assert_eq!(
+            self.json::<Value>(op, path, &[], body).unwrap_err().status,
+            Some(status),
+            "{}",
+            op.id
+        );
+    }
+
     pub fn bytes(
         &self,
         operation: Operation,

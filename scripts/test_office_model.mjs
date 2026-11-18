@@ -22,8 +22,47 @@ await require("esbuild").build({ stdin: { contents: `
   export { getDefaultWorkspaceRoute } from ${source("app/productEdition.ts")};
   export { isRouteAccessAllowed } from ${source("app/routeAccess.ts")};
   export { createRequestKey } from ${source("ui/createRequestKey.ts")};
+  export { ApiError } from ${source("api/index.ts")};
+  export { acknowledgedCommands } from ${source("features/office/officeCommands.ts")};
+  export { oaApi } from ${source("features/oa/oaApi.ts")};
+  export { officeRequestApi } from ${source("features/office/officeRequestApi.ts")};
 `, loader: "ts", resolveDir: web }, bundle: true, platform: "node", format: "esm", outfile: bundle, logLevel: "silent" });
 const { office, oa, personnel, organization, communication, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey, formReferenceLabels } = await import(pathToFileURL(bundle).href);
+const { ApiError, acknowledgedCommands, oaApi, officeRequestApi } = await import(pathToFileURL(bundle).href);
+// Exercise the real adapters: a lost response must query the same actor's receipt without resending.
+for (const kind of ["personnel", "leave", "overtime", "expense", "travel", "purchase", "general", "rooms", "supplies"]) {
+  const calls = [], saved = { id: 7, versionNumber: 3 }, body = { commandKey: createRequestKey(), expectedVersion: 2 };
+  const client = new Proxy({}, { get: (_target, name) => async (request, init) => {
+    calls.push({ name, request, init });
+    if (name.endsWith("CommandResult")) return { commandKey: body.commandKey, committedVersion: 3 };
+    if (name.startsWith("get")) return saved;
+    throw new TypeError("lost response");
+  } });
+  const api = ["rooms", "supplies"].includes(kind) ? officeRequestApi(client, kind) : oaApi(client, kind);
+  const init = { signal: new AbortController().signal };
+  assert.deepEqual(await (api.submit ? api.submit(7, body, init) : api.action("approve", 7, body, init)), saved);
+  assert.equal(calls.length, 3);
+  assert.equal(calls[1].request.commandKey, calls[0].request.body.commandKey);
+  assert.equal(calls[1].request.id, 7);
+  assert(calls.every(call => call.init === init));
+}
+for (const stage of ["send", "receipt", "refresh"]) {
+  const controller = new AbortController(), aborted = new DOMException("cancelled", "AbortError");
+  const client = { getLeaveRequestCommandResult: async () => { if (stage === "receipt") { controller.abort(aborted); throw aborted; } },
+    getLeaveRequest: async () => { controller.abort(aborted); throw aborted; } };
+  await assert.rejects(acknowledgedCommands(client, "LeaveRequest")(7, { commandKey: "key" }, { signal: controller.signal }, async () => {
+    if (stage === "send") controller.abort(aborted);
+    throw new TypeError("lost response");
+  }), error => error === aborted);
+}
+for (const status of [400, 401, 403, 409, 429]) {
+  const cause = new ApiError(status, "rejected", ""), client = {};
+  await assert.rejects(acknowledgedCommands(client, "LeaveRequest")(7, { commandKey: "key" }, undefined, async () => { throw cause; }), error => error === cause);
+}
+for (const committed of [false, true]) {
+  const client = { getLeaveRequestCommandResult: async () => { if (!committed) throw new ApiError(404, "missing", ""); }, getLeaveRequest: async () => { throw new TypeError("offline"); } };
+  await assert.rejects(acknowledgedCommands(client, "LeaveRequest")(7, { commandKey: "key" }, undefined, async () => { throw new DOMException("timed out", "TimeoutError"); }), committed ? /操作已提交/ : /操作结果待确认/);
+}
 const labels = formReferenceLabels({ fields: [{ key: "people", kind: "Table", columns: [{ key: "person", kind: "Person" }, { key: "department", kind: "Department" }] }] },
   { people: [{ person: "1", department: "1" }, { person: "2", department: "2" }] },
   { people: [{ person: "甲", department: "甲部门" }, { person: "乙", department: "乙部门" }] });

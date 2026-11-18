@@ -26,7 +26,9 @@ async fn headers(socket: &mut TcpStream) -> String {
 
 async fn check_command_admission(state: &ServerState) {
     use axum::{Router, http::Request, routing::post};
-    use export_doc_engine::generated_api::{CREATE_CRM_CUSTOMER, LOGIN, QUERY_CRM_CUSTOMERS};
+    use export_doc_engine::generated_api::{
+        CREATE_CRM_CUSTOMER, CREATE_MEETING_ROOM, DELETE_MEETING_ROOM, LOGIN, QUERY_CRM_CUSTOMERS,
+    };
     use tower::ServiceExt;
     let token: serde_json::Value = serde_json::from_slice(
         &state
@@ -87,6 +89,47 @@ async fn check_command_admission(state: &ServerState) {
         .unwrap();
     assert_eq!(status, 201, "{}", String::from_utf8_lossy(&bytes));
     assert_eq!(count(), 1);
+    let room: serde_json::Value = serde_json::from_slice(&state.service.dispatch(CREATE_MEETING_ROOM, &[], &[],
+        Some(serde_json::json!({"name":"empty-response-budget","capacity":4,"maximumBookingHours":8,"advanceBookingDays":90,"isActive":true})), token).unwrap()).unwrap();
+    let delete_state = state.clone();
+    let app = Router::new().route(
+        DELETE_MEETING_ROOM.path,
+        axum::routing::delete(move |request| {
+            crate::request::handle(delete_state.clone(), DELETE_MEETING_ROOM, request)
+        }),
+    );
+    let busy = state
+        .response_memory
+        .reserve_working(128 * 1024 * 1024)
+        .unwrap();
+    let response = app
+        .oneshot(
+            Request::delete(
+                DELETE_MEETING_ROOM
+                    .path
+                    .replace("{id}", &room["id"].to_string()),
+            )
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {token}"))
+            .body(Body::from(
+                serde_json::json!({"expectedVersion":room["versionNumber"]}).to_string(),
+            ))
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), 204);
+    assert!(
+        axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        state.response_memory.snapshot()["reservedBytes"],
+        128 * 1024 * 1024
+    );
+    drop(busy);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

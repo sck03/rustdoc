@@ -26,6 +26,7 @@ pub fn exercise(c: &Connection) {
     let query = HsQuery {
         kind: "hs-codes",
         current_year: Some(2026),
+        keyword: "",
         prefix: "6109",
         since: "",
         ranked_examples: false,
@@ -34,6 +35,24 @@ pub fn exercise(c: &Connection) {
         limit: 10,
     };
     let rows = c.query_hs(&query).unwrap();
+    assert_eq!(
+        c.page_hs(&HsQuery {
+            keyword: "棉针织",
+            ..query
+        })
+        .unwrap()
+        .0,
+        125
+    );
+    assert_eq!(
+        c.page_hs(&HsQuery {
+            keyword: "6棉",
+            ..query
+        })
+        .unwrap()
+        .0,
+        0
+    );
     assert_eq!(rows.len(), 10);
     assert_eq!(rows[0]["code"], "6109000006");
     assert!(
@@ -59,6 +78,7 @@ pub fn exercise(c: &Connection) {
         .query_hs(&HsQuery {
             kind: "hs-examples",
             current_year: None,
+            keyword: "",
             prefix: "6109",
             since: "",
             ranked_examples: true,
@@ -82,6 +102,7 @@ pub fn exercise(c: &Connection) {
         let mut q = HsQuery {
             kind,
             current_year: None,
+            keyword: "",
             prefix: "",
             since: "",
             ranked_examples: ranked,
@@ -118,6 +139,7 @@ pub fn exercise(c: &Connection) {
     let incremental = HsQuery {
         kind: "hs-replacements",
         since: "2026-11-10T00:00:00.000000001Z",
+        keyword: "",
         prefix: "",
         current_year: None,
         ranked_examples: false,

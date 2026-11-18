@@ -38,44 +38,7 @@ pub fn read_table_data(
             first_row: 1,
             rows: csv(&decode(bytes)?, maximum_rows, check)?,
         }),
-        "xlsx" | "xlsm" => {
-            let mut workbook = crate::reader::open(bytes, check)?;
-            let sheet = workbook
-                .sheet_names()
-                .first()
-                .cloned()
-                .ok_or("Excel 没有可读取的工作表。")?;
-            let range = workbook
-                .worksheet_range(&sheet)
-                .map_err(|cause| cause.to_string())?;
-            let (height, width) = range.get_size();
-            if height > maximum_rows + 1 || width > 128 {
-                return Err(format!("导入超过 {maximum_rows} 行或 128 列上限。"));
-            }
-            let rows = range
-                .rows()
-                .map(|row| {
-                    check()?;
-                    row.iter()
-                        .map(|cell| {
-                            if matches!(cell, Data::Error(_)) {
-                                return Err("导入文件含错误单元格，请先修正工作簿。".into());
-                            }
-                            let value = cell.to_string();
-                            if value.chars().count() > 1_000_000 {
-                                return Err("导入单元格内容超过上限。".into());
-                            }
-                            Ok(value.trim().to_owned())
-                        })
-                        .collect()
-                })
-                .collect::<Result<_>>()?;
-            Ok(TableData {
-                sheet_name: sheet,
-                first_row: range.start().map_or(1, |(row, _)| row as usize + 1),
-                rows,
-            })
-        }
+        "xlsx" | "xlsm" => read_sheet_data(bytes, "", maximum_rows, check),
         _ => Err("只支持 .csv、.xlsx 或 .xlsm 文件。".into()),
     }
 }
@@ -101,7 +64,6 @@ pub fn sheet_names(bytes: &[u8], name: &str, check: Check<'_>) -> Result<Vec<Str
 }
 pub fn read_sheet_data(
     bytes: &[u8],
-    _name: &str,
     sheet_name: &str,
     maximum_rows: usize,
     check: Check<'_>,
@@ -111,7 +73,7 @@ pub fn read_sheet_data(
         return Err("导入文件为空或超过 25 MiB。".into());
     }
     let mut workbook = crate::reader::open(bytes, check)?;
-    let names = workbook.sheet_names().to_vec();
+    let names = workbook.sheet_names();
     if names.is_empty() {
         return Err("Excel 没有可读取的工作表。".into());
     }
@@ -128,7 +90,7 @@ pub fn read_sheet_data(
         .worksheet_range(&sheet)
         .map_err(|cause| cause.to_string())?;
     let (height, width) = range.get_size();
-    if height > maximum_rows + 1 || width > 128 {
+    if height > maximum_rows.saturating_add(1) || width > 128 {
         return Err(format!("导入超过 {maximum_rows} 行或 128 列上限。"));
     }
     let rows = range
@@ -260,7 +222,7 @@ fn csv(input: &str, maximum_rows: usize, check: Check<'_>) -> Result<Vec<Vec<Str
         closed = false;
         started = false;
         field_length = 0;
-        if rows.len() > maximum_rows + 1 {
+        if rows.len() > maximum_rows.saturating_add(1) {
             return Err(format!("导入超过 {maximum_rows} 行上限，请拆分文件。"));
         }
     }

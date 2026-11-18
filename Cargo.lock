@@ -1749,6 +1749,7 @@ name = "export-doc-storage"
 version = "0.1.2"
 dependencies = [
  "chrono",
+ "export-doc-domain",
  "native-tls",
  "postgres",
  "postgres-native-tls",

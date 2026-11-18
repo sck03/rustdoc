@@ -135,6 +135,14 @@ pub fn is_download(operation: Operation) -> bool {
         })
 }
 
+/// Only endpoints whose sole successful response is 204 have a fixed empty body.
+pub(super) fn empty_success(operation: Operation) -> bool {
+    let responses = &contracts::contract()["operations"][operation.id]["responses"];
+    responses.as_object().is_some_and(|r| {
+        r.contains_key("204") && !r.keys().any(|k| k.starts_with('2') && k != "204")
+    })
+}
+
 pub async fn success(
     operation: Operation,
     mut reply: Reply,
@@ -144,7 +152,8 @@ pub async fn success(
 ) -> Response<Body> {
     // Ordinary JSON must retain its byte reservation until sent, cancelled or disconnected.
     // Execution admission limits producers; this separate budget limits slow receivers.
-    if reply.file.is_none() && reply.stream.is_none() {
+    let empty = empty_success(operation);
+    if !empty && reply.file.is_none() && reply.stream.is_none() {
         if reply.bytes.len() > export_doc_contracts::request_limits::MAX_JSON_RESPONSE_BYTES {
             return error(crate::request::error(
                 400,
@@ -172,10 +181,9 @@ pub async fn success(
         .unwrap_or("application/json");
     let mut selected_range = None;
     let is_file = reply.file.is_some();
-    let mut response = if reply.stream.is_some()
-        || reply.file.is_some()
-        || reply.memory_reservation.is_some()
-    {
+    let mut response = if empty {
+        Response::new(Body::empty())
+    } else if reply.stream.is_some() || reply.file.is_some() || reply.memory_reservation.is_some() {
         use tokio::io::{AsyncReadExt, AsyncSeekExt};
         let full_size = reply
             .stream

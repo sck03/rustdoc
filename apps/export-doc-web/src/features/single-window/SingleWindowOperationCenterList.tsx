@@ -114,7 +114,7 @@ export function OperationCenterListActionsPanel({
   isDesktopStation: boolean;
   onOpenDetail: () => void;
 }) {
-  const { message, messageKind, setMessage, dispatchResult, receiptResult, savedReceiptPackagePath, isBusy, dispatch, collect } =
+  const { message, messageKind, setMessage, dispatchResult, receiptResult, savedReceiptPackagePath, isBusy, dispatch, collect, exportPart } =
     useSingleWindowBatchActions(client, row, canOperate && isDesktopStation);
 
   const profileQuery = useQuery({
@@ -173,7 +173,8 @@ export function OperationCenterListActionsPanel({
         {isDesktopStation ? <DetailItem label="待导入目录" value={outBoxPath} actions={renderOpenPathAction(outBoxPath, "打开待导入目录", setMessage)} /> : null}
         {isDesktopStation ? <DetailItem label="回执目录" value={inBoxPath} actions={renderOpenPathAction(inBoxPath, "打开回执目录", setMessage)} /> : null}
         {dispatchResult ? <DetailItem label="已写入文件" value={dispatchResult.payloadFileCount} /> : null}
-        {receiptResult ? <DetailItem label="已收集回执" value={receiptResult.receiptFiles.length} /> : null}
+        {receiptResult ? <DetailItem label="已收集回执" value={receiptResult.receiptBatches.reduce((sum, files) => sum + files.length, 0)} /> : null}
+        {receiptResult && receiptResult.receiptBatches.length > 1 && <div className="toolbar" aria-label="回执分包">{receiptResult.receiptBatches.map((files, part) => <button key={part} type="button" className="command-button secondary" disabled={isBusy || !canCollect || !canOperate} onClick={() => exportPart(part)}>导出第 {part + 1} 包（{files.length} 份）</button>)}</div>}
         {savedReceiptPackagePath ? <DetailItem label="回执包" value={savedReceiptPackagePath} wide actions={renderOpenPathAction(savedReceiptPackagePath, "打开回执包位置", setMessage)} /> : null}
       </div>
     </section>

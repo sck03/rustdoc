@@ -1,14 +1,15 @@
 import type { ApiRequestInit, ExportDocManagerApiClient, OaWorkflowCommandSave } from "../../api/index.ts";
-import { officeCommand,type OfficeActionInput } from "./officeCommands.ts";
+import { acknowledgedCommands, officeCommand,type OfficeActionInput } from "./officeCommands.ts";
 import type { OfficeKind, OfficeRequestRow } from "./officeModel.ts";
 
 export function officeRequestApi(client: ExportDocManagerApiClient, kind: OfficeKind) {
   const name = kind === "rooms" ? "MeetingBooking" : "OfficeSupplyRequest";
+  const execute = acknowledgedCommands(client, name);
   return {
     get: (id: number, init?: ApiRequestInit): Promise<OfficeRequestRow> => client[`get${name}`]({id},init),
-    submit: (id: number, body: OfficeActionInput, init?: ApiRequestInit): Promise<OfficeRequestRow> => client[`submit${name}`]({id,body:officeCommand(client,`${kind}:${id}:submit`,body)},init),
-    workflow:(id:number,body:OaWorkflowCommandSave,init?:ApiRequestInit)=>client[`execute${name}Workflow`]({id,body},init),
-    fulfillment:(id:number,input:OfficeActionInput,init?:ApiRequestInit)=>client[`execute${name}Fulfillment`]({id,body:officeCommand(client,`${kind}:${id}:fulfillment`,input)},init),
+    submit: (id: number, body: OfficeActionInput, init?: ApiRequestInit): Promise<OfficeRequestRow> => execute(id,officeCommand(client,`${kind}:${id}:submit`,body),init,(request,options)=>client[`submit${name}`](request,options)),
+    workflow:(id:number,body:OaWorkflowCommandSave,init?:ApiRequestInit)=>execute(id,body,init,(request,options)=>client[`execute${name}Workflow`](request,options)),
+    fulfillment:(id:number,input:OfficeActionInput,init?:ApiRequestInit)=>execute(id,officeCommand(client,`${kind}:${id}:fulfillment`,input),init,(request,options)=>client[`execute${name}Fulfillment`](request,options)),
     workflowCandidates:(id:number,beforeId?:number,init?:ApiRequestInit)=>client[`list${name}WorkflowCandidates`]({id,beforeId},init),
     upload: (id: number, body: FormData, init?: ApiRequestInit): Promise<OfficeRequestRow> => client[`uploadAttachmentTo${name}`]({id,body},init),
     download: (id: number, attachmentId: number, init?: ApiRequestInit) => client[`downloadAttachmentOf${name}`]({id,attachmentId},init),

@@ -1,11 +1,10 @@
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { walkSourceFiles } from "./lib/source-files.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const baselinePath = path.join(repositoryRoot, "scripts", "baselines", "source-size-governance.json");
-if (!existsSync(baselinePath)) throw new Error(`Source-size baseline was not found: ${baselinePath}`);
 
 const baseline = JSON.parse(readFileSync(baselinePath, "utf8"));
 const ignoredDirectoryNames = new Set([
@@ -79,9 +78,5 @@ if (failures.length > 0) {
 process.stdout.write(`Source-size governance passed: ${JSON.stringify(report)}\n`);
 
 function countSourceLines(source) {
-  if (source.length === 0) return 0;
-  const newlineCount = source.match(/\r?\n/gu)?.length ?? 0;
-  // A final newline terminates the last physical line; otherwise the last
-  // unterminated line still counts as a source line.
-  return newlineCount + (source.endsWith("\n") ? 0 : 1);
+  return source.split("\n").length - Number(!source || source.endsWith("\n"));
 }

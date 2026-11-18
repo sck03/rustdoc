@@ -77,6 +77,6 @@ export async function verifyOfficialClientTransport({client,profile,detected,sou
     const sent=await waitFor(()=>findOfficialClientSentFiles(detected.agentConsignmentDirectories.sentBox,handoff.manifest.payloadFiles),
       90000,'Official client did not archive the anonymous payload to SentBox');
     const receipts=await client.collectSingleWindowClientReceipts({body:{batchId:handoff.trackingBatchId}});
-    fs.writeFileSync(path.join(output,'official-client-transport.json'),JSON.stringify({batchReference:handoff.manifest.batchReference,sentFiles:sent,receiptFileCount:receipts.receiptFiles.length,businessAcceptanceConfirmed:false},null,2));
+    fs.writeFileSync(path.join(output,'official-client-transport.json'),JSON.stringify({batchReference:handoff.manifest.batchReference,sentFiles:sent,receiptFileCount:receipts.receiptBatches.reduce((count, batch) => count + batch.length, 0),businessAcceptanceConfirmed:false},null,2));
   } finally { await client.saveSingleWindowClientProfile({body:{...body,expectedVersion:updated.profiles.find(item=>item.profileKey===profile.profileKey).versionNumber}}); }
 }

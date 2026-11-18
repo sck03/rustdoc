@@ -243,7 +243,7 @@ mod tests {
     fn generated_contract_retains_decimal_date_and_nested_personnel_fields() {
         assert_eq!(
             kind(&schema("ApiPaymentDto")["properties"]["usdAmount"]),
-            "number"
+            "string"
         );
         assert_eq!(
             schema("ApiPaymentDto")["properties"]["paymentDate"]["format"],

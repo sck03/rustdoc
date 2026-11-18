@@ -1,3 +1,4 @@
+import { ExactDecimal } from "./decimalSum.ts";
 import { ApiError, type ApiErrorResponse } from "../api/index.ts";
 
 function readErrorResponse(error: ApiError): (Partial<ApiErrorResponse> & { error?: string }) | null {
@@ -78,7 +79,12 @@ export function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString("zh-CN");
 }
 
-export function formatAmount(value?: number, currency = "") {
+export function formatAmount(value?: number | string, currency = "") {
+  if (typeof value === "string") {
+    if (!/^\d+(?:\.\d+)?$/.test(value) || value.length > 60) return "-";
+    const [whole, fraction] = ExactDecimal.from(value).toFixed(2).split(".");
+    return `${currency} ${BigInt(whole).toLocaleString("zh-CN")}.${fraction}`.trim();
+  }
   if (!Number.isFinite(value)) {
     return "-";
   }

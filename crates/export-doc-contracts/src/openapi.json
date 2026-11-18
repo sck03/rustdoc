@@ -11635,20 +11635,16 @@
             "type": "string"
           },
           "businessEntertainmentExpense": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "default": "0"
           },
           "cnyAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "default": "0"
           },
           "companyScope": {
             "type": "string"
@@ -11660,12 +11656,10 @@
             "type": "string"
           },
           "freightMiscExpense": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "default": "0"
           },
           "goodsName": {
             "type": "string"
@@ -11679,12 +11673,10 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
           "inspectionExpense": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "default": "0"
           },
           "invoiceNo": {
             "type": "string"
@@ -11693,20 +11685,16 @@
             "type": "string"
           },
           "officeExpense": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "default": "0"
           },
           "otherExpense": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "default": "0"
           },
           "ownerUserId": {
             "type": [
@@ -11758,12 +11746,10 @@
             "format": "date"
           },
           "repairExpense": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "default": "0"
           },
           "rowVersion": {
             "type": "string"
@@ -11812,31 +11798,25 @@
             "type": "string"
           },
           "telephoneExpense": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "default": "0"
           },
           "tradeMethod": {
             "type": "string"
           },
           "travelExpense": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "default": "0"
           },
           "usdAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "default": "0"
           },
           "voucherNo": {
             "type": "string"
@@ -31627,13 +31607,16 @@
           "batchReference": {
             "type": "string"
           },
-          "receiptDirectories": {
+          "receiptBatches": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
             }
           },
-          "receiptFiles": {
+          "receiptDirectories": {
             "type": "array",
             "items": {
               "type": "string"
@@ -31644,7 +31627,7 @@
           "batchId",
           "batchReference",
           "receiptDirectories",
-          "receiptFiles"
+          "receiptBatches"
         ]
       },
       "SingleWindowReceiptKind": {
@@ -116812,78 +116795,6 @@
         ]
       }
     },
-    "/api/single-window/acd/{sourceId}/export-review": {
-      "post": {
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "BuildAgentConsignmentExportReview",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SingleWindowExportReview"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "Conflict"
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.single-window",
-                "actions": [
-                  "operate"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "sourceId",
-            "in": "path",
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": 1
-            },
-            "required": true
-          }
-        ]
-      }
-    },
     "/api/single-window/acd/{sourceId}/locked-fields": {
       "get": {
         "x-exportdoc-timeout-seconds": 30,
@@ -118264,78 +118175,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApiCustomsCooDocumentDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "Conflict"
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.single-window",
-                "actions": [
-                  "operate"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "sourceId",
-            "in": "path",
-            "schema": {
-              "type": "integer",
-              "format": "int64",
-              "minimum": 1
-            },
-            "required": true
-          }
-        ]
-      }
-    },
-    "/api/single-window/coo/{sourceId}/export-review": {
-      "post": {
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "BuildCustomsCooExportReview",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SingleWindowExportReview"
                 }
               }
             }

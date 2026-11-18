@@ -2496,19 +2496,19 @@ export interface ApiPaymentDraftReportHtmlPreviewRequest {
 export interface ApiPaymentDto {
   accountNo: string;
   bankName: string;
-  businessEntertainmentExpense: number;
-  cnyAmount: number;
+  businessEntertainmentExpense: string;
+  cnyAmount: string;
   companyScope: string;
   department: string;
   departmentId: string;
-  freightMiscExpense: number;
+  freightMiscExpense: string;
   goodsName: string;
   id: number;
-  inspectionExpense: number;
+  inspectionExpense: string;
   invoiceNo: string;
   notes: string;
-  officeExpense: number;
-  otherExpense: number;
+  officeExpense: string;
+  otherExpense: string;
   ownerUserId?: number | null;
   payeeId: number;
   payeeName: string;
@@ -2519,7 +2519,7 @@ export interface ApiPaymentDto {
   quantity: string;
   quantityUnit: string;
   receiptDate?: string | null;
-  repairExpense: number;
+  repairExpense: string;
   rowVersion: string;
   shipmentCountry: string;
   shipmentDate?: string | null;
@@ -2534,10 +2534,10 @@ export interface ApiPaymentDto {
   spare8: string;
   spare9: string;
   taxRebateRate: string;
-  telephoneExpense: number;
+  telephoneExpense: string;
   tradeMethod: string;
-  travelExpense: number;
-  usdAmount: number;
+  travelExpense: string;
+  usdAmount: string;
   voucherNo: string;
 }
 
@@ -6754,8 +6754,8 @@ export type SingleWindowReceiptBusinessStatus = "Unknown" | "Received" | "Accept
 export interface SingleWindowReceiptCollectionResult {
   batchId: number;
   batchReference: string;
+  receiptBatches: string[][];
   receiptDirectories: string[];
-  receiptFiles: string[];
 }
 
 export type SingleWindowReceiptKind = "Unknown" | "CustomsCooBusinessReceipt" | "CustomsCooTechnicalReceipt" | "CustomsCooAttachmentReceipt" | "AgentConsignmentImportResponse" | "AgentConsignmentAcd002";
@@ -7288,6 +7288,19 @@ export const ApiPayeeDtoDefaults = {
   rowVersion: "",
 } as const satisfies Partial<ApiPayeeDto>;
 
+export const ApiPaymentDtoDefaults = {
+  businessEntertainmentExpense: "0",
+  cnyAmount: "0",
+  freightMiscExpense: "0",
+  inspectionExpense: "0",
+  officeExpense: "0",
+  otherExpense: "0",
+  repairExpense: "0",
+  telephoneExpense: "0",
+  travelExpense: "0",
+  usdAmount: "0",
+} as const satisfies Partial<ApiPaymentDto>;
+
 export const ApiPaymentReportHtmlPreviewRequestDefaults = {
   pageIndex: 0,
   previewFormat: "Svg",
@@ -7816,15 +7829,7 @@ export interface BuildAgentConsignmentDefaultsRequest {
   sourceId: number;
 }
 
-export interface BuildAgentConsignmentExportReviewRequest {
-  sourceId: number;
-}
-
 export interface BuildCustomsCooDefaultsRequest {
-  sourceId: number;
-}
-
-export interface BuildCustomsCooExportReviewRequest {
   sourceId: number;
 }
 

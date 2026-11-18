@@ -501,26 +501,20 @@ impl Adapter for Postgres {
     }
     fn insert(&self, r: &RecordWrite<'_>) -> Result<i64> {
         crate::record_projection::atomic(self, r.kind, || {
-            let stored = crate::identity_runtime::document(
-                r.kind,
-                &crate::workflow_runtime::document(r.kind, r.body),
-            );
-            let b = &stored;
+            let stored = crate::record_projection::document(r.kind, r.body);
+            let b = stored.as_ref();
             let body = serde_json::to_string(b)?;
-            let id=self.client.query_one("INSERT INTO records(kind,identity,version,owner_id,company,department,body) VALUES($1,$2,$3,$4,$5,$6,$7::text::jsonb) RETURNING id",&[&r.kind,&r.identity,&b["versionNumber"].as_i64(),&b["ownerUserId"].as_i64(),&b["companyScope"].as_str().unwrap_or(""),&b["departmentId"].as_str().unwrap_or(""),&body])?.try_get(0)?;
+            let id=self.client.query_one("INSERT INTO records(kind,identity,version,owner_id,company,department,body,hs_search) VALUES($1,$2,$3,$4,$5,$6,$7::text::jsonb,$8) RETURNING id",&[&r.kind,&r.identity,&b["versionNumber"].as_i64(),&b["ownerUserId"].as_i64(),&b["companyScope"].as_str().unwrap_or(""),&b["departmentId"].as_str().unwrap_or(""),&body,&crate::hs_query::search_document(r.kind,b)])?.try_get(0)?;
             crate::record_projection::persist(self, id, r.kind, r.body)?;
             Ok(id)
         })
     }
     fn update(&self, id: i64, expected: i64, r: &RecordWrite<'_>) -> Result<bool> {
         crate::record_projection::atomic(self, r.kind, || {
-            let stored = crate::identity_runtime::document(
-                r.kind,
-                &crate::workflow_runtime::document(r.kind, r.body),
-            );
-            let b = &stored;
+            let stored = crate::record_projection::document(r.kind, r.body);
+            let b = stored.as_ref();
             let body = serde_json::to_string(b)?;
-            let changed=self.client.execute("UPDATE records SET identity=$1,version=$2,body=$3::text::jsonb,owner_id=$4,company=$5,department=$6 WHERE kind=$7 AND id=$8 AND version=$9",&[&r.identity,&b["versionNumber"].as_i64(),&body,&b["ownerUserId"].as_i64(),&b["companyScope"].as_str().unwrap_or(""),&b["departmentId"].as_str().unwrap_or(""),&r.kind,&id,&expected])?==1;
+            let changed=self.client.execute("UPDATE records SET identity=$1,version=$2,body=$3::text::jsonb,owner_id=$4,company=$5,department=$6,hs_search=$10 WHERE kind=$7 AND id=$8 AND version=$9",&[&r.identity,&b["versionNumber"].as_i64(),&body,&b["ownerUserId"].as_i64(),&b["companyScope"].as_str().unwrap_or(""),&b["departmentId"].as_str().unwrap_or(""),&r.kind,&id,&expected,&crate::hs_query::search_document(r.kind,b)])?==1;
             if changed {
                 crate::record_projection::persist(self, id, r.kind, r.body)?;
             }
@@ -533,14 +527,15 @@ impl Adapter for Postgres {
             .query_one("SELECT kind FROM record_rows WHERE id=$1", &[&id])?
             .try_get(0)?;
         crate::record_projection::atomic(self, &kind, || {
-            let stored = crate::identity_runtime::document(
-                &kind,
-                &crate::workflow_runtime::document(&kind, body),
-            );
-            let body = &stored;
+            let stored = crate::record_projection::document(&kind, body);
+            let body = stored.as_ref();
             if self.client.execute(
-                "UPDATE records SET body=$1::text::jsonb WHERE id=$2",
-                &[&serde_json::to_string(body)?, &id],
+                "UPDATE records SET body=$1::text::jsonb,hs_search=$3 WHERE id=$2",
+                &[
+                    &serde_json::to_string(body)?,
+                    &id,
+                    &crate::hs_query::search_document(&kind, body),
+                ],
             )? != 1
             {
                 return Err(Error::unavailable("写入记录编号失败。"));

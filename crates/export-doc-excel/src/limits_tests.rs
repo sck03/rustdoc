@@ -42,7 +42,7 @@ fn sparse_coordinates_are_rejected_before_dense_allocation_in_all_import_paths()
     for result in [
         preview(&bytes, "sparse.xlsx", None, "2026-10-25", &check).map(|_| ()),
         read_table_data(&bytes, "sparse.xlsx", 2000, &check).map(|_| ()),
-        read_sheet_data(&bytes, "sparse.xlsx", "", 2000, &check).map(|_| ()),
+        read_sheet_data(&bytes, "", 2000, &check).map(|_| ()),
     ] {
         assert!(result.unwrap_err().contains("allocation limit exceeded"));
     }

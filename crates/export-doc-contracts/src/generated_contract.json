@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "b9bb88933ff59bec53e1fc2bbd4bc6efb568403279f6eac7e4d3728f80d41ee5",
+  "digest": "df58328d9a228540d944a43d1dfe8b36a34b3fb9ed794ec829a17b28e7392de1",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -10134,72 +10134,6 @@
       "timeoutSeconds": 30,
       "requiresProcessingSlot": false
     },
-    "BuildAgentConsignmentExportReview": {
-      "policy": {
-        "requiresAuthentication": true,
-        "requiresDesktopAccess": true,
-        "requiresLicense": true,
-        "access": {
-          "match": "All",
-          "resources": [
-            {
-              "resourceKey": "document.single-window",
-              "actions": [
-                "operate"
-              ],
-              "administratorOnly": false
-            }
-          ]
-        }
-      },
-      "office": null,
-      "parameters": [
-        {
-          "name": "sourceId",
-          "in": "path",
-          "schema": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 1
-          },
-          "required": true
-        }
-      ],
-      "requestBody": null,
-      "responses": {
-        "200": {
-          "description": "OK",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SingleWindowExportReview"
-              }
-            }
-          }
-        },
-        "400": {
-          "description": "Bad Request"
-        },
-        "401": {
-          "description": "Unauthorized"
-        },
-        "403": {
-          "description": "Forbidden"
-        },
-        "404": {
-          "description": "Not Found"
-        },
-        "409": {
-          "description": "Conflict"
-        }
-      },
-      "request": null,
-      "response": {
-        "$ref": "#/components/schemas/SingleWindowExportReview"
-      },
-      "timeoutSeconds": 30,
-      "requiresProcessingSlot": false
-    },
     "BuildCustomsCooDefaults": {
       "policy": {
         "requiresAuthentication": true,
@@ -10262,72 +10196,6 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/ApiCustomsCooDocumentDto"
-      },
-      "timeoutSeconds": 30,
-      "requiresProcessingSlot": false
-    },
-    "BuildCustomsCooExportReview": {
-      "policy": {
-        "requiresAuthentication": true,
-        "requiresDesktopAccess": true,
-        "requiresLicense": true,
-        "access": {
-          "match": "All",
-          "resources": [
-            {
-              "resourceKey": "document.single-window",
-              "actions": [
-                "operate"
-              ],
-              "administratorOnly": false
-            }
-          ]
-        }
-      },
-      "office": null,
-      "parameters": [
-        {
-          "name": "sourceId",
-          "in": "path",
-          "schema": {
-            "type": "integer",
-            "format": "int64",
-            "minimum": 1
-          },
-          "required": true
-        }
-      ],
-      "requestBody": null,
-      "responses": {
-        "200": {
-          "description": "OK",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SingleWindowExportReview"
-              }
-            }
-          }
-        },
-        "400": {
-          "description": "Bad Request"
-        },
-        "401": {
-          "description": "Unauthorized"
-        },
-        "403": {
-          "description": "Forbidden"
-        },
-        "404": {
-          "description": "Not Found"
-        },
-        "409": {
-          "description": "Conflict"
-        }
-      },
-      "request": null,
-      "response": {
-        "$ref": "#/components/schemas/SingleWindowExportReview"
       },
       "timeoutSeconds": 30,
       "requiresProcessingSlot": false
@@ -100431,20 +100299,16 @@
           "type": "string"
         },
         "businessEntertainmentExpense": {
-          "type": [
-            "number",
-            "string"
-          ],
-          "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "type": "string",
+          "format": "decimal",
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "default": "0"
         },
         "cnyAmount": {
-          "type": [
-            "number",
-            "string"
-          ],
-          "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "type": "string",
+          "format": "decimal",
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "default": "0"
         },
         "companyScope": {
           "type": "string"
@@ -100456,12 +100320,10 @@
           "type": "string"
         },
         "freightMiscExpense": {
-          "type": [
-            "number",
-            "string"
-          ],
-          "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "type": "string",
+          "format": "decimal",
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "default": "0"
         },
         "goodsName": {
           "type": "string"
@@ -100475,12 +100337,10 @@
           "pattern": "^-?(?:0|[1-9]\\d*)$"
         },
         "inspectionExpense": {
-          "type": [
-            "number",
-            "string"
-          ],
-          "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "type": "string",
+          "format": "decimal",
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "default": "0"
         },
         "invoiceNo": {
           "type": "string"
@@ -100489,20 +100349,16 @@
           "type": "string"
         },
         "officeExpense": {
-          "type": [
-            "number",
-            "string"
-          ],
-          "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "type": "string",
+          "format": "decimal",
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "default": "0"
         },
         "otherExpense": {
-          "type": [
-            "number",
-            "string"
-          ],
-          "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "type": "string",
+          "format": "decimal",
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "default": "0"
         },
         "ownerUserId": {
           "type": [
@@ -100554,12 +100410,10 @@
           "format": "date"
         },
         "repairExpense": {
-          "type": [
-            "number",
-            "string"
-          ],
-          "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "type": "string",
+          "format": "decimal",
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "default": "0"
         },
         "rowVersion": {
           "type": "string"
@@ -100608,31 +100462,25 @@
           "type": "string"
         },
         "telephoneExpense": {
-          "type": [
-            "number",
-            "string"
-          ],
-          "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "type": "string",
+          "format": "decimal",
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "default": "0"
         },
         "tradeMethod": {
           "type": "string"
         },
         "travelExpense": {
-          "type": [
-            "number",
-            "string"
-          ],
-          "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "type": "string",
+          "format": "decimal",
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "default": "0"
         },
         "usdAmount": {
-          "type": [
-            "number",
-            "string"
-          ],
-          "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "type": "string",
+          "format": "decimal",
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "default": "0"
         },
         "voucherNo": {
           "type": "string"
@@ -120170,13 +120018,16 @@
         "batchReference": {
           "type": "string"
         },
-        "receiptDirectories": {
+        "receiptBatches": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
-        "receiptFiles": {
+        "receiptDirectories": {
           "type": "array",
           "items": {
             "type": "string"
@@ -120187,7 +120038,7 @@
         "batchId",
         "batchReference",
         "receiptDirectories",
-        "receiptFiles"
+        "receiptBatches"
       ]
     },
     "SingleWindowReceiptKind": {

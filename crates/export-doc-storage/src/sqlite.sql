@@ -11,6 +11,7 @@ CREATE TABLE records (
     company TEXT NOT NULL,
     department TEXT NOT NULL,
     body TEXT NOT NULL CHECK(json_valid(body)),
+    hs_search TEXT,
     search_document TEXT GENERATED ALWAYS AS (
         CASE WHEN length(CAST(body AS BLOB))<=65536
         THEN template_normalize(record_json(body)) ELSE NULL END

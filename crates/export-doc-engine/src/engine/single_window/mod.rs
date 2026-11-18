@@ -50,8 +50,6 @@ pub const OPERATIONS: &[Operation] = &[
     UPDATE_CUSTOMS_COO_PRODUCER_PROFILE,
     DELETE_CUSTOMS_COO_PRODUCER_PROFILE,
     GET_SINGLE_WINDOW_EXPORT_REVIEW,
-    BUILD_CUSTOMS_COO_EXPORT_REVIEW,
-    BUILD_AGENT_CONSIGNMENT_EXPORT_REVIEW,
     REPAIR_SINGLE_WINDOW_EXPORT_REVIEW_GROUPS,
     LIST_SINGLE_WINDOW_OPERATION_CENTER,
     GET_SINGLE_WINDOW_OPERATION_CENTER_DETAIL,
@@ -198,7 +196,6 @@ pub fn handle(
             BUILD_CUSTOMS_COO_DEFAULTS,
             GET_CUSTOMS_COO_LOCKED_FIELDS,
             UNLOCK_CUSTOMS_COO_FIELDS,
-            BUILD_CUSTOMS_COO_EXPORT_REVIEW,
         ]
         .contains(&operation)
         {
@@ -209,7 +206,6 @@ pub fn handle(
             BUILD_AGENT_CONSIGNMENT_DEFAULTS,
             GET_AGENT_CONSIGNMENT_LOCKED_FIELDS,
             UNLOCK_AGENT_CONSIGNMENT_FIELDS,
-            BUILD_AGENT_CONSIGNMENT_EXPORT_REVIEW,
         ]
         .contains(&operation)
         {
@@ -302,9 +298,7 @@ pub fn handle(
                     json!({"success":true,"repairedGroupCount":changed,"review":review::build(business,&loaded.current,&loaded.defaults),"message":"所选分组已按当前来源资料修复。"}),
                 )
             }
-            GET_SINGLE_WINDOW_EXPORT_REVIEW
-            | BUILD_CUSTOMS_COO_EXPORT_REVIEW
-            | BUILD_AGENT_CONSIGNMENT_EXPORT_REVIEW => {
+            GET_SINGLE_WINDOW_EXPORT_REVIEW => {
                 Ok(review::build(business, &loaded.current, &loaded.defaults))
             }
             _ => Err(invalid("单一窗口操作不属于当前工作区。")),

@@ -94,12 +94,6 @@ function roundedQuotient(numerator: bigint, denominator: bigint): bigint {
   return sign * (positive / divisor + (positive % divisor * 2n >= divisor ? 1n : 0n));
 }
 
-/** Sum the decimal representations exactly before returning the API's numeric DTO value. */
-export function sumDecimalNumbers(values: readonly number[]): number {
-  if (values.some(value => !Number.isFinite(value))) return NaN;
-  return Number(sumDecimalStrings(values.map(String)));
-}
-
 /** Preserve decimal input strings, including optional invoice settlement lines. */
 export function sumDecimalStrings(values: readonly string[]): string {
   return values.reduce((sum, value) => sum.add(value), ExactDecimal.from(0)).toString();

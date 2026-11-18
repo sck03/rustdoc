@@ -35,7 +35,7 @@ for (const test of profitCases) {
   assert.equal(totals.totalTaxRefundAmount, Number(test.expectedRefund), test.name);
 }
 assert.equal(items.roundMoney(-1.005), -1.01);
-assert.equal(decimal.sumDecimalNumbers([0.1, 0.2]), 0.3);
+assert.equal(decimal.sumDecimalStrings(["0.1", "0.2"]), "0.3");
 assert.equal(decimal.ExactDecimal.from("12345678901234567890.12345678").round(2).toString(), "12345678901234567890.12");
 const cartons = items.recalculateInvoiceItem({ ...items.createEmptyInvoiceItem(), quantity: 0.14, pcsPerCtn: 0.01 }, ["quantity"]);
 assert.equal(cartons.cartons, 14);

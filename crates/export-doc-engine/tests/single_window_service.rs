@@ -336,7 +336,20 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
     let source = invoice(&f, "NATIVE-SW-HANDOFF");
     let id = source["id"].as_i64().unwrap();
     let saved = acd(&f, id);
-    let review = call(&f, BUILD_AGENT_CONSIGNMENT_EXPORT_REVIEW, id, None);
+    let review: Value = f
+        .client()
+        .json(
+            GET_SINGLE_WINDOW_EXPORT_REVIEW,
+            &[
+                ("businessType", "AgentConsignment".into()),
+                ("sourceId", id.to_string()),
+            ],
+            &[],
+            None,
+        )
+        .unwrap();
+    export_doc_contracts::validation::response(GET_SINGLE_WINDOW_EXPORT_REVIEW.id, &review)
+        .unwrap();
     assert_eq!(review["totalErrorCount"], 0, "{review}");
     let package_path = f.root.join("submit.swpkg");
     let exported = call(
@@ -401,7 +414,7 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
         0,
         Some(json!({"batchId":batch})),
     );
-    assert_eq!(collected["receiptFiles"].as_array().unwrap().len(), 1);
+    assert_eq!(collected["receiptBatches"][0].as_array().unwrap().len(), 1);
     let receipt_zip = f.root.join("receipt.swpkg");
     call(
         &f,
@@ -673,7 +686,7 @@ fn first_coo_receipt_matches_certificate_without_batch_filename() {
         Some(json!({"batchId":batch})),
     );
     assert_eq!(
-        collected["receiptFiles"].as_array().unwrap().len(),
+        collected["receiptBatches"][0].as_array().unwrap().len(),
         1,
         "{collected}"
     );

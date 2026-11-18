@@ -169,6 +169,7 @@ pub fn exercise(c: &Connection) {
         let q = HsQuery {
             kind: "hs-codes",
             current_year: year,
+            keyword: "",
             prefix: "000000004",
             since: "",
             ranked_examples: false,

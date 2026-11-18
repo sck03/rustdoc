@@ -1,15 +1,8 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-import { locateChromeForTesting } from './lib/chromium-executable.mjs';
+import { createReactUiFixture } from "./lib/react-ui-fixture.mjs";
 
-const repo=path.resolve(import.meta.dirname,'..'),web=path.join(repo,'apps/export-doc-web');
-const output=path.join(repo,'artifacts/report-template-commands-ui',String(Date.now()));
-fs.mkdirSync(path.join(output,'Temp'),{recursive:true});
-Object.assign(process.env,{TEMP:path.join(output,'Temp'),TMP:path.join(output,'Temp')});
-const require=createRequire(path.join(web,'package.json'));
-const src=name=>JSON.stringify(path.join(web,'src',name).replaceAll('\\','/'));
+const { root: repo, web, output, require, bundle, source: src, launch } = createReactUiFixture("report-template-commands-ui");
 await require('esbuild').build({stdin:{resolveDir:web,loader:'tsx',contents:`
 import React from 'react';import {createRoot} from 'react-dom/client';
 import {QueryClient,QueryClientProvider,useQuery} from '@tanstack/react-query';
@@ -51,7 +44,7 @@ const root=createRoot(document.getElementById('root'));
 window.render=(scope='a.dtpl',owner=0)=>root.render(<React.StrictMode><QueryClientProvider client={window.cache}><ConfirmationProvider><App scope={scope} owner={owner}/></ConfirmationProvider></QueryClientProvider></React.StrictMode>);
 window.unmount=()=>root.unmount();window.render();
 `},outfile:path.join(output,'app.js'),bundle:true,platform:'browser',format:'iife',jsx:'automatic',logLevel:'silent'});
-const context=await require('playwright').chromium.launchPersistentContext(path.join(output,'Chrome'),{executablePath:locateChromeForTesting(repo),headless:true});
+const context=await launch();
 let passed=0;
 async function scenario(check){
  const page=await context.newPage();page.setDefaultTimeout(8000);const errors=[];

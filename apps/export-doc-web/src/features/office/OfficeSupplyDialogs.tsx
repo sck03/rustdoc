@@ -61,7 +61,7 @@ export function OfficeSupplyApplication({ client, supply, user, onClose }: {
     void operation.run(async signal=>{
       const saved = await attachments.save(JSON.stringify(body),signal,(current,signal)=>current ? client.updateDraftOfOfficeSupplyRequest({id:current.id,body:{expectedVersion:current.versionNumber,quantity:body.quantity,purpose:body.purpose,returnDueDate:body.returnDueDate,projectId}},{signal}):client.createOfficeSupplyRequest({body},{signal}),
         (current,entry,signal)=>{const body=attachmentUploadForm(entry.file,current.versionNumber);body.set("purpose","Supporting");return client.uploadAttachmentToOfficeSupplyRequest({id:current.id,body},{signal});});
-      return client.submitOfficeSupplyRequest({id:saved.id,body:officeCommand(client,`supplies:${saved.id}:submit`,{commandKey:undefined,expectedVersion:saved.versionNumber,note:""})},{signal});
+      return officeRequestApi(client,"supplies").submit(saved.id,{ expectedVersion:saved.versionNumber, note:"" },{signal});
     },onClose);
   }
   return <OfficeDialog title={`申请${supply.isReturnable ? "借用" : "领用"} · ${supply.name}`} onClose={onClose} {...operation} protectChanges>
@@ -102,4 +102,4 @@ export function OfficeStockDialog({ client, supply, stocktake, onClose }: {
     </fieldset><OfficeSubmit busy={operation.busy} label={stocktake ? "确认盘点" : "确认入库"} /></form>
   </OfficeDialog>;
 }
-import { officeCommand } from "./officeCommands.ts";
+import { officeRequestApi } from "./officeRequestApi.ts";

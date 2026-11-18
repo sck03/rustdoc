@@ -412,28 +412,18 @@ fn settings_keep_reference_defaults_and_reject_stale_or_invalid_updates() {
     let saved = fixture.request(UPDATE_SETTINGS, None, Some(body.clone()));
     export_doc_contracts::validation::response(UPDATE_SETTINGS.id, &saved).unwrap();
     assert_eq!(saved["settings"]["revision"], 1);
-    assert_eq!(
-        fixture
-            .client()
-            .json::<Value>(UPDATE_SETTINGS, &[], &[], Some(body.clone()))
-            .unwrap_err()
-            .status,
-        Some(409)
-    );
+    fixture
+        .client()
+        .assert_rejected(UPDATE_SETTINGS, &[], Some(body.clone()), 409);
     body["settings"]["revision"] = json!(1);
     body["settings"]["system"]["itemEntrySpareColumnCount"] = json!(11);
     assert_eq!(
         fixture.request(VALIDATE_SETTINGS, None, Some(body.clone()))["isValid"],
         false
     );
-    assert_eq!(
-        fixture
-            .client()
-            .json::<Value>(UPDATE_SETTINGS, &[], &[], Some(body))
-            .unwrap_err()
-            .status,
-        Some(400)
-    );
+    fixture
+        .client()
+        .assert_rejected(UPDATE_SETTINGS, &[], Some(body), 400);
     assert_eq!(
         fixture.request(GET_SETTINGS, None, None)["settings"]["system"]["itemEntrySpareColumnCount"],
         5
@@ -591,9 +581,9 @@ fn crm_supplier_and_payment_records_roundtrip_and_keep_optional_fields() {
         Some(json!({"expectedVersion":supplier["versionNumber"]})),
     );
     assert_eq!(admitted["status"], "合作中");
-    let payment=fixture.create(CREATE_PAYMENT,json!({"invoiceNo":"NATIVE-PAY","cnyAmount":1234.56,"payeeName":"供应商","paymentDate":"2026-09-16","spare10":"保留备用十"}));
+    let payment=fixture.create(CREATE_PAYMENT,json!({"invoiceNo":"NATIVE-PAY","cnyAmount":"99999999999999.99","payeeName":"供应商","paymentDate":"2026-09-16","spare10":"保留备用十"}));
     assert_eq!(payment["payment"]["spare10"], "保留备用十");
-    assert_eq!(payment["payment"]["cnyAmount"], json!(1234.56));
+    assert_eq!(payment["payment"]["cnyAmount"], json!("99999999999999.99"));
 }
 #[test]
 fn meeting_bookings_reject_overlaps_but_allow_adjacent_times() {
@@ -784,20 +774,8 @@ fn an_assigned_empty_template_does_not_fall_back_to_role_defaults() {
         .login("reader".into(), "Native-Test-2026".into())
         .unwrap()
         .0;
-    assert_eq!(
-        client
-            .json::<Value>(LIST_INVOICES, &[], &[], None)
-            .unwrap_err()
-            .status,
-        Some(403)
-    );
-    assert_eq!(
-        client
-            .json::<Value>(LIST_USERS, &[], &[], None)
-            .unwrap_err()
-            .status,
-        Some(403)
-    );
+    client.assert_rejected(LIST_INVOICES, &[], None, 403);
+    client.assert_rejected(LIST_USERS, &[], None, 403);
     assert_eq!(
         fixture
             .client()

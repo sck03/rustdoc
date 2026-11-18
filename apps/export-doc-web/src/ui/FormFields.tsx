@@ -42,6 +42,7 @@ export function TextField({
   description,
   placeholder,
   autoComplete,
+  inputMode,
   onChange,
 }: {
   label: string;
@@ -52,6 +53,7 @@ export function TextField({
   description?: string;
   placeholder?: string;
   autoComplete?: string;
+  inputMode?: "decimal";
   onChange: (value: string) => void;
 }) {
   return (
@@ -62,6 +64,7 @@ export function TextField({
         required={required}
         disabled={disabled}
         placeholder={placeholder}
+        inputMode={inputMode}
         autoComplete={autoComplete}
         aria-describedby={descriptionId}
         onChange={(event) => onChange(event.target.value)}

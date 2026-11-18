@@ -90,7 +90,7 @@ pub(super) fn exercise(service: &NativeService, admin: &str, owner: &Value, othe
         0,
         Some(json!({
             "voucherNo":format!("PAY-{}",nonce().unwrap()),"payeeName":"本人报销打印验收",
-        "paymentDate":"2026-10-02","cnyAmount":123.45
+        "paymentDate":"2026-10-02","cnyAmount":"123.45"
         })),
     )
     .unwrap()["payment"]

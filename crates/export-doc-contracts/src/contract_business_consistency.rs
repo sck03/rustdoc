@@ -14,6 +14,8 @@ pub(super) fn apply(baseline: &mut Value) {
         paths[path]["get"]["x-exportdoc-policy"]["access"]["resources"].as_array_mut().unwrap().push(json!({"resourceKey":"common.product-reference","actions":["view"],"administratorOnly":false}));
     }
     for (path, method) in [
+        ("/api/single-window/coo/{sourceId}/export-review", "post"),
+        ("/api/single-window/acd/{sourceId}/export-review", "post"),
         ("/api/master-data/customers", "get"),
         ("/api/master-data/exporters", "get"),
         ("/api/master-data/payees", "get"),
@@ -50,6 +52,36 @@ pub(super) fn apply(baseline: &mut Value) {
         json!({"name":"limit","in":"query","schema":{"type":"integer","minimum":1,"maximum":200,"default":30}}),
     ]);
     let schemas = baseline["components"]["schemas"].as_object_mut().unwrap();
+    for key in [
+        "usdAmount",
+        "cnyAmount",
+        "travelExpense",
+        "businessEntertainmentExpense",
+        "telephoneExpense",
+        "officeExpense",
+        "repairExpense",
+        "freightMiscExpense",
+        "inspectionExpense",
+        "otherExpense",
+    ] {
+        let field = &mut schemas["ApiPaymentDto"]["properties"][key];
+        field["type"] = json!("string");
+        field["format"] = json!("decimal");
+        field["default"] = json!("0");
+    }
+    let collected = &mut schemas["SingleWindowReceiptCollectionResult"];
+    collected["properties"]
+        .as_object_mut()
+        .unwrap()
+        .remove("receiptFiles")
+        .unwrap();
+    collected["properties"]["receiptBatches"] =
+        json!({"type":"array","items":{"type":"array","items":{"type":"string"}}});
+    for key in collected["required"].as_array_mut().unwrap() {
+        if *key == "receiptFiles" {
+            *key = json!("receiptBatches");
+        }
+    }
     for name in [
         "ApiSalesOpportunityCurrencySummaryDto",
         "ApiSalesOpportunityDto",

@@ -20,192 +20,76 @@ struct Page {
     key: &'static str,
     fields: &'static [Field],
 }
+const fn field(
+    key: &'static str,
+    label: &'static str,
+    required: bool,
+    headers: &'static [&'static str],
+) -> Field {
+    Field {
+        key,
+        label,
+        required,
+        headers,
+    }
+}
+const CODE: Field = field("code", "代码", true, &["编码"]);
+const ENGLISH_NAME: Field = field("englishName", "英文名", true, &["英文名称"]);
+const ALIASES: Field = field("aliases", "别名", false, &["AliasesText", "别称"]);
 const PAGES: &[Page] = &[
     Page {
         key: "countries",
         fields: &[
-            Field {
-                key: "code",
-                label: "代码",
-                required: true,
-                headers: &["code", "代码", "Code", "编码"],
-            },
-            Field {
-                key: "englishName",
-                label: "英文名",
-                required: true,
-                headers: &[
-                    "englishName",
-                    "英文名",
-                    "EnglishName",
-                    "English Name",
-                    "英文名称",
-                ],
-            },
-            Field {
-                key: "chineseName",
-                label: "中文名",
-                required: true,
-                headers: &[
-                    "chineseName",
-                    "中文名",
-                    "ChineseName",
-                    "Chinese Name",
-                    "中文名称",
-                ],
-            },
-            Field {
-                key: "aliases",
-                label: "别名",
-                required: false,
-                headers: &["aliases", "别名", "Aliases", "AliasesText", "别称"],
-            },
+            CODE,
+            ENGLISH_NAME,
+            field("chineseName", "中文名", true, &["中文名称"]),
+            ALIASES,
         ],
     },
     Page {
         key: "acdCountries",
         fields: &[
-            Field {
-                key: "code",
-                label: "代码",
-                required: true,
-                headers: &["code", "代码", "Code", "编码"],
-            },
-            Field {
-                key: "chineseName",
-                label: "中文简称",
-                required: true,
-                headers: &[
-                    "chineseName",
-                    "中文简称",
-                    "ChineseName",
-                    "Chinese Name",
-                    "中文名",
-                    "中文名称",
-                ],
-            },
-            Field {
-                key: "englishName",
-                label: "英文名",
-                required: true,
-                headers: &[
-                    "englishName",
-                    "英文名",
-                    "EnglishName",
-                    "English Name",
-                    "英文名称",
-                ],
-            },
-            Field {
-                key: "aliases",
-                label: "别名",
-                required: false,
-                headers: &["aliases", "别名", "Aliases", "AliasesText", "别称"],
-            },
+            CODE,
+            field("chineseName", "中文简称", true, &["中文名", "中文名称"]),
+            ENGLISH_NAME,
+            ALIASES,
         ],
     },
     Page {
         key: "currencies",
         fields: &[
-            Field {
-                key: "code",
-                label: "标准数字代码",
-                required: true,
-                headers: &["code", "标准数字代码", "Code", "数字代码", "币制代码"],
-            },
-            Field {
-                key: "acdCode",
-                label: "ACD海关币制码",
-                required: false,
-                headers: &[
-                    "acdCode",
-                    "ACD海关币制码",
-                    "AcdCode",
-                    "海关币制码",
-                    "ACD币制码",
-                ],
-            },
-            Field {
-                key: "alphaCode",
-                label: "字母代码",
-                required: true,
-                headers: &[
-                    "alphaCode",
-                    "字母代码",
-                    "AlphaCode",
-                    "ISO代码",
-                    "币制字母代码",
-                ],
-            },
-            Field {
-                key: "aliases",
-                label: "别名",
-                required: false,
-                headers: &["aliases", "别名", "Aliases", "AliasesText", "别称"],
-            },
+            field("code", "标准数字代码", true, &["数字代码", "币制代码"]),
+            field(
+                "acdCode",
+                "ACD海关币制码",
+                false,
+                &["海关币制码", "ACD币制码"],
+            ),
+            field("alphaCode", "字母代码", true, &["ISO代码", "币制字母代码"]),
+            ALIASES,
         ],
     },
     Page {
         key: "acdTradeModes",
         fields: &[
-            Field {
-                key: "code",
-                label: "代码",
-                required: true,
-                headers: &["code", "代码", "Code", "编码"],
-            },
-            Field {
-                key: "name",
-                label: "简称",
-                required: true,
-                headers: &["name", "简称", "Name", "名称"],
-            },
-            Field {
-                key: "description",
-                label: "说明",
-                required: false,
-                headers: &["description", "说明", "Description", "描述", "备注"],
-            },
-            Field {
-                key: "aliases",
-                label: "别名",
-                required: false,
-                headers: &["aliases", "别名", "Aliases", "AliasesText", "别称"],
-            },
+            CODE,
+            field("name", "简称", true, &["名称"]),
+            field("description", "说明", false, &["描述", "备注"]),
+            ALIASES,
         ],
     },
     Page {
         key: "transportModes",
         fields: &[
-            Field {
-                key: "value",
-                label: "标准值",
-                required: true,
-                headers: &["value", "标准值", "Value", "运输方式", "运输方式标准值"],
-            },
-            Field {
-                key: "aliases",
-                label: "别名",
-                required: false,
-                headers: &["aliases", "别名", "Aliases", "AliasesText", "别称"],
-            },
+            field("value", "标准值", true, &["运输方式", "运输方式标准值"]),
+            ALIASES,
         ],
     },
     Page {
         key: "ports",
         fields: &[
-            Field {
-                key: "value",
-                label: "标准值",
-                required: true,
-                headers: &["value", "标准值", "Value", "港口", "港口标准值"],
-            },
-            Field {
-                key: "aliases",
-                label: "别名",
-                required: false,
-                headers: &["aliases", "别名", "Aliases", "AliasesText", "别称"],
-            },
+            field("value", "标准值", true, &["港口", "港口标准值"]),
+            ALIASES,
         ],
     },
 ];
@@ -266,26 +150,21 @@ fn detect_column_map(
     header: &[String],
     page: &'static Page,
 ) -> std::collections::BTreeMap<String, usize> {
-    let mut map = std::collections::BTreeMap::new();
-    for (index, field) in page.fields.iter().enumerate() {
-        let candidates: Vec<String> = field
-            .headers
-            .iter()
-            .map(|header| normalize_header(header))
-            .filter(|header| !header.is_empty())
-            .collect();
-        for (position, value) in header.iter().enumerate() {
-            let normalized = normalize_header(value);
-            if normalized.is_empty() {
-                continue;
-            }
-            if candidates.contains(&normalized) && !map.contains_key(field.key) {
-                map.insert(field.key.to_string(), position + 1);
-            }
-        }
-        let _ = index;
-    }
-    map
+    let header: Vec<_> = header.iter().map(|value| normalize_header(value)).collect();
+    page.fields
+        .iter()
+        .filter_map(|field| {
+            let aliases: Vec<_> = [field.key, field.label]
+                .into_iter()
+                .chain(field.headers.iter().copied())
+                .map(|name| normalize_header(name))
+                .collect();
+            header
+                .iter()
+                .position(|value| !value.is_empty() && aliases.contains(value))
+                .map(|index| (field.key.to_owned(), index + 1))
+        })
+        .collect()
 }
 fn import_rows(
     page: &'static Page,
@@ -400,9 +279,9 @@ pub fn preview(
     }
     let page = page(&text(metadata, "catalogKey"))?;
     let sheet = text(metadata, "sheetName");
-    let data_start = number(metadata, "dataStartRowNumber").max(1);
+    let data_start = number(metadata, "dataStartRowNumber");
     let data_start = if data_start > 0 { data_start } else { 2 };
-    let header_row = number(metadata, "headerRowNumber").max(1);
+    let header_row = number(metadata, "headerRowNumber");
     let header_row = if header_row > 0 {
         header_row
     } else {
@@ -412,48 +291,32 @@ pub fn preview(
         return Err(invalid("数据起始行必须大于表头行。"));
     }
     let names = sheet_names(bytes, name, &check).map_err(invalid)?;
-    if names.is_empty() {
-        return Err(invalid("Excel 文件没有可用工作表。"));
-    }
-    let table = read_sheet_data(bytes, name, &sheet, MAX_ROWS, &check).map_err(invalid)?;
+    let table = read_sheet_data(bytes, &sheet, MAX_ROWS, &check).map_err(invalid)?;
     let first_row = table.first_row.max(1) as i64;
-    let header_index = header_row.saturating_sub(first_row);
-    let header = table
-        .rows
-        .get(header_index.max(0) as usize)
-        .map(|row| row.clone())
-        .unwrap_or_default();
-    let mut requested = std::collections::BTreeMap::new();
-    for (index, field) in page.fields.iter().enumerate() {
-        let key = format!("{}Column", field.key);
-        requested.insert(
-            field.key.to_string(),
-            metadata[key]
-                .as_i64()
-                .filter(|value| *value > 0)
-                .map(|value| value as usize)
-                .unwrap_or(0),
-        );
-        let _ = index;
-    }
-    let detected = detect_column_map(&header, page);
-    let mut column_map = std::collections::BTreeMap::new();
-    for (index, field) in page.fields.iter().enumerate() {
-        let column = requested
-            .get(field.key)
-            .copied()
-            .filter(|column| *column > 0)
-            .or_else(|| detected.get(field.key).copied())
-            .unwrap_or(index + 1);
-        column_map.insert(field.key.to_string(), column);
-    }
-    let data_rows: Vec<Vec<String>> = table
-        .rows
+    let header = usize::try_from(header_row - first_row)
+        .ok()
+        .and_then(|index| table.rows.get(index));
+    let detected = detect_column_map(header.map(Vec::as_slice).unwrap_or_default(), page);
+    let column_map = page
+        .fields
         .iter()
-        .skip(data_start.saturating_sub(first_row).max(0) as usize)
-        .cloned()
+        .enumerate()
+        .map(|(index, field)| {
+            let column = metadata[format!("{}Column", field.key)]
+                .as_u64()
+                .and_then(|n| usize::try_from(n).ok())
+                .filter(|n| *n > 0)
+                .or_else(|| detected.get(field.key).copied())
+                .unwrap_or(index + 1);
+            (field.key.to_owned(), column)
+        })
         .collect();
-    let (catalog, row_count) = import_rows(page, &data_rows, &column_map);
+    let start = data_start.saturating_sub(first_row).max(0) as usize;
+    let (catalog, row_count) = import_rows(
+        page,
+        table.rows.get(start..).unwrap_or_default(),
+        &column_map,
+    );
     let mappings: Vec<Value> = page
         .fields
         .iter()

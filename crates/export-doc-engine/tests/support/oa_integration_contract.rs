@@ -333,7 +333,7 @@ pub fn exercise(service: &NativeService, root: &str) {
 
 fn ownership(service: &NativeService, root: &str, target: &Value) {
     let source = get(service, root, GET_CURRENT_USER, 0)["id"].clone();
-    call(service, root, CREATE_PAYMENT, 0, Some(contracts::overlay(contracts::object(CREATE_PAYMENT.id,true), &json!({"voucherNo":format!("REG-{}",nonce().unwrap()),"payeeName":"归属回归","paymentDate":"2026-10-02","cnyAmount":12.35})))).unwrap();
+    call(service, root, CREATE_PAYMENT, 0, Some(contracts::overlay(contracts::object(CREATE_PAYMENT.id,true), &json!({"voucherNo":format!("REG-{}",nonce().unwrap()),"payeeName":"归属回归","paymentDate":"2026-10-02","cnyAmount":"12.35"})))).unwrap();
     call(
         service,
         root,

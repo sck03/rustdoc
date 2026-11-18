@@ -327,7 +327,9 @@ async fn execute(
         reservation,
     } = parsed;
     // Once a command commits, response admission must not turn success into a retryable 429.
-    let command_memory = if !matches!(operation.method, "GET" | "HEAD") && transfer_permit.is_none()
+    let command_memory = if !matches!(operation.method, "GET" | "HEAD")
+        && transfer_permit.is_none()
+        && !response::empty_success(operation)
     {
         Some(
             state

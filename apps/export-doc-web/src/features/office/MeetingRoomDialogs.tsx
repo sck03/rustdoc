@@ -63,7 +63,7 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
       const body = { requestKey, meetingRoomId: room.id, title: String(form.get("title") ?? ""), attendeeCount: Number(form.get("attendeeCount")), startsAt, endsAt, employeeId: employee?.id ?? null, appointmentId:appointment.id,departmentId:appointment.departmentId,projectId,submitImmediately:false };
       const saved = await attachments.save(JSON.stringify(body),signal,(current,signal)=>current ? client.updateDraftOfMeetingBooking({id:current.id,body:{expectedVersion:current.versionNumber,title:body.title,attendeeCount:body.attendeeCount,startsAt,endsAt,projectId}},{signal}):client.createMeetingBooking({body},{signal}),
         (current,entry,signal)=>{const body=attachmentUploadForm(entry.file,current.versionNumber);body.set("purpose","Supporting");return client.uploadAttachmentToMeetingBooking({id:current.id,body},{signal});});
-      return client.submitMeetingBooking({id:saved.id,body:officeCommand(client,`rooms:${saved.id}:submit`,{commandKey:undefined,expectedVersion:saved.versionNumber,note:""})},{signal});
+      return officeRequestApi(client,"rooms").submit(saved.id,{ expectedVersion:saved.versionNumber, note:"" },{signal});
     }, onClose);
   }
   return <OfficeDialog title={`${room.name} · 日程与预约`} onClose={onClose} {...operation} protectChanges>
@@ -99,4 +99,4 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
       disabled={!range || availability.isPending || availability.isError || !canIdentifyOfficeApplicant(user) || canSelectEmployee && !employee} />}</form>
   </OfficeDialog>;
 }
-import { officeCommand } from "./officeCommands.ts";
+import { officeRequestApi } from "./officeRequestApi.ts";

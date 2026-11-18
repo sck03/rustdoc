@@ -1,17 +1,10 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { createRequire } from "node:module";
-import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
+import { createReactUiFixture } from "./lib/react-ui-fixture.mjs";
 import { runtimeDiagnosticsHealth } from "./lib/runtime-diagnostics-fixture.mjs";
 
-const root = path.resolve(import.meta.dirname, ".."), web = path.join(root, "apps/export-doc-web");
-const require = createRequire(path.join(web, "package.json"));
-const output = path.join(root, "artifacts/sales-opportunity-lifecycle-ui", String(Date.now()));
-fs.mkdirSync(path.join(output, "Temp"), { recursive: true });
-Object.assign(process.env, { TEMP: path.join(output, "Temp"), TMP: path.join(output, "Temp") });
-const source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\", "/"));
-const bundle = path.join(output, "app.js");
+const { root, web, output, require, bundle, source, launch } = createReactUiFixture("sales-opportunity-lifecycle-ui");
 await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, contents: `
 import React,{useState} from "react";import {createRoot} from "react-dom/client";
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
@@ -23,7 +16,7 @@ import {ConfirmationProvider} from ${source("ui/ConfirmationProvider.tsx")};
 import {UnsavedChangesProvider,useHasUnsavedChanges} from ${source("ui/unsavedChangesGuard.tsx")};
 import ${source("styles/index.css")};import ${source("styles/workspaces.css")};import ${source("styles/responsive.css")};
 import ${source("styles/runtime-diagnostics.css")};
-window.requests=[];window.reads=[];window.historyReads=[];window.metricReads=0;window.failRecord=0;
+window.requests=[];window.reads=[];window.historyReads=[];window.optionReads=[];window.metricReads=0;window.failRecord=0;
 const health=${JSON.stringify(runtimeDiagnosticsHealth())};
 const cache=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:30000},mutations:{retry:false}}});window.cache=cache;
 const record=id=>({id,crmCustomerId:1,customerName:"示例客户",productId:7,productCode:"P-7",productName:"棉制T恤",
@@ -38,7 +31,7 @@ const base={querySalesOpportunities:async r=>paged(Object.values(window.records)
  jobs:{active:0,retainedInputBytes:1024,retainedOutputBytes:2048,downloadMemory:{reservedBytes:0,capacityBytes:134217728}},
  http:{requestCapacity:16,availableRequestSlots:14,queuedRequests:3,queueCapacity:16,responseMemory:{reservedBytes:33554432,capacityBytes:134217728,rejections:1},downloadTimeouts:2}};},
  getSalesOpportunity:async({id})=>{window.reads.push(id);if(window.failRecord===id)throw new Error("record load failed");return {...window.records[id]};},
- queryCrmCustomers:async()=>paged([{id:1,name:"示例客户"}]),listProducts:async()=>paged([{id:7,productCode:"P-7",nameCN:"棉制T恤",nameEN:"Cotton"}]),
+ queryCrmCustomers:async()=>{window.optionReads.push('customers');return paged([{id:1,name:"示例客户"}]);},listProducts:async()=>{window.optionReads.push('products');return paged([{id:7,productCode:"P-7",nameCN:"棉制T恤",nameEN:"Cotton"}]);},
  createSalesOpportunity:(r,i)=>deferred("create",r,i),updateSalesOpportunity:(r,i)=>deferred("save",r,i),
  archiveSalesOpportunity:(r,i)=>deferred("archive",r,i),transitionSalesOpportunity:(r,i)=>deferred("transition",r,i),
  listSalesOpportunityHistory:async r=>{window.historyReads.push(r);return {items:(r.beforeId?[1]:[3,2]).map(versionNumber=>({id:versionNumber,versionNumber,salesOpportunityId:r.id,
@@ -47,7 +40,7 @@ const base={querySalesOpportunities:async r=>paged(Object.values(window.records)
 window.finish=(fail=false)=>{const pending=window.requests.at(-1);if(fail){pending.reject(new Error("late write failed"));return;}
  const id=pending.request.id||3,previous=window.records[id],saved={...previous,...pending.request.body,id,versionNumber:pending.request.id?previous.versionNumber+1:1};
  window.records[id]=saved;pending.resolve(saved);};
-function Harness(){const [client,setClient]=useState(()=>({...base})),[allowed,setAllowed]=useState(true),[shown,setShown]=useState(true);
+function Harness(){const [client,setClient]=useState(()=>({...base})),[allowed,setAllowed]=useState(window.config.readOnly!==true),[shown,setShown]=useState(true);
  const navigate=useNavigate(),location=useLocation();window.route=location.search;window.navigate=navigate;window.dirty=useHasUnsavedChanges();
  window.switchClient=()=>setClient({...base});window.revoke=()=>setAllowed(false);window.hide=()=>setShown(false);
  const permissions=[...(allowed?["view","create","edit","transition","archive"]:["view"]).map(action=>({resourceKey:"sales.opportunities",action,dataScope:"all"})),
@@ -58,7 +51,7 @@ function Harness(){const [client,setClient]=useState(()=>({...base})),[allowed,s
 createRoot(document.getElementById("root")).render(<MemoryRouter initialEntries={[window.config.entry||"/crm/opportunities?opportunityId=1&view=editor"]}>
  <QueryClientProvider client={cache}><ConfirmationProvider><UnsavedChangesProvider><Harness/></UnsavedChangesProvider></ConfirmationProvider></QueryClientProvider></MemoryRouter>);
 ` }, outfile: bundle, bundle: true, platform: "browser", format: "iife", jsx: "automatic", logLevel: "silent" });
-const context = await require("playwright").chromium.launchPersistentContext(path.join(output, "Chrome"), { executablePath: locateChromeForTesting(root), headless: true });
+const context = await launch();
 const results = [];
 async function scenario(name, config, check) {
   if (process.argv[2] && !name.includes(process.argv[2])) return;
@@ -87,6 +80,13 @@ try {
     await title(page).fill("修改基础资料"); await submit(page); await page.waitForFunction(() => window.requests.length === 1);
     assert.deepEqual(await page.evaluate(() => { const b=window.requests[0].request.body;return [b.productId,b.expectedCloseDate,b.estimatedAmount,b.quotationNo]; }), [7,"2026-12-15","10000000000000.0001","Q-1"]);
     assert.equal(await page.locator('[name="estimatedAmount"]').isDisabled(), true);
+    assert.deepEqual(await page.evaluate(() => window.optionReads), ['customers']);
+  });
+  await scenario("read-only detail uses saved names without candidate queries", { readOnly: true }, async page => {
+    await title(page).waitFor(); await flush(page);
+    assert.equal(await title(page).isDisabled(), true);
+    assert.equal(await page.locator('[name="crmCustomerId"] option:checked').textContent(), '示例客户');
+    assert.deepEqual(await page.evaluate(() => window.optionReads), []);
   });
   for (const isNew of [false, true]) await scenario("save merges continued typing: " + isNew, { entry: isNew ? "/crm/opportunities?view=editor" : undefined }, async page => {
     if (isNew) await page.locator('[name="crmCustomerId"]').selectOption("1");

@@ -227,7 +227,7 @@ try {
   await waitFor(page, "window.__calls.some(call=>call.name==='createPayment')");
   const acrossTabs = await read(page, "window.__calls.find(call=>call.name==='createPayment').input.body");
   assert.equal(acrossTabs.voucherNo, "PAY-TABS"); assert.equal(acrossTabs.spare1, "跨部门运输");
-  assert.equal(acrossTabs.goodsName, "合计货物"); assert.equal(acrossTabs.cnyAmount, 250);
+  assert.equal(acrossTabs.goodsName, "合计货物"); assert.equal(acrossTabs.cnyAmount, "250");
   results.push("new-payment-cross-tab-keyboard-save-and-custom-labels");
   await open("payment", 1024, "&payment-output=1");
   await click(page, "#payment-tab-report");

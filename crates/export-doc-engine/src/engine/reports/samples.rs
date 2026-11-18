@@ -9,7 +9,7 @@ pub(super) fn data(kind: &str, profile: &str, date: &str, with_seal: bool) -> Re
         }
         let mut value = contracts::overlay(
             contracts::initial(contracts::schema("ApiPaymentDto")),
-            &json!({"payerName":"示例公司","payeeName":"示例收款单位","department":"业务部","project":"费用支付","cnyAmount":12345.67,"usdAmount":100,"invoiceNo":"PREVIEW-001","paymentDate":date,"shipmentDate":date,"paymentMethod":"电汇","accountNo":"6222 0200 0000 0000"}),
+            &json!({"payerName":"示例公司","payeeName":"示例收款单位","department":"业务部","project":"费用支付","cnyAmount":"12345.67","usdAmount":"100","invoiceNo":"PREVIEW-001","paymentDate":date,"shipmentDate":date,"paymentMethod":"电汇","accountNo":"6222 0200 0000 0000"}),
         );
         add_spares(&mut value);
         return ReportData::payment(&serde_json::from_value(value)?, json!({})).map_err(Into::into);

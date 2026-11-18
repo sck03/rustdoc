@@ -1,17 +1,9 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import path from "node:path";
-import { createRequire } from "node:module";
-import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
+import { createReactUiFixture } from "./lib/react-ui-fixture.mjs";
 import { runInvoiceItemsGridCases } from "./lib/invoice-items-grid-ui-cases.mjs";
 
-const root = path.resolve(import.meta.dirname, ".."), web = path.join(root, "apps/export-doc-web");
-const require = createRequire(path.join(web, "package.json"));
-const output = path.join(root, "artifacts/invoice-save-workspace-ui", String(Date.now()));
-fs.mkdirSync(path.join(output, "Temp"), { recursive: true });
-Object.assign(process.env, { TEMP:path.join(output, "Temp"), TMP:path.join(output, "Temp") });
-const bundle = path.join(output, "app.js");
-const source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\", "/"));
+const { root, web, output, require, bundle, source, launch } = createReactUiFixture("invoice-save-workspace-ui");
 await require("esbuild").build({ stdin:{ resolveDir:web, loader:"tsx", contents:`
 import React,{useState} from "react"; import {createRoot} from "react-dom/client";
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
@@ -69,7 +61,7 @@ return <div><form onKeyDownCapture={handleEnterAsTabFormKeyDown} onSubmit={event
 window.finish=(index=0)=>{const item=window.requests[index];item.resolve({id:7,isUpdate:!window.newInvoice,invoice:{...item.request.body,id:7,rowVersion:"native:2"}})};
 createRoot(document.getElementById("root")).render(<MemoryRouter><QueryClientProvider client={queryClient}><ConfirmationProvider><Harness/></ConfirmationProvider></QueryClientProvider></MemoryRouter>);
 ` }, outfile:bundle,bundle:true,platform:"browser",format:"iife",jsx:"automatic",logLevel:"silent" });
-const context=await require("playwright").chromium.launchPersistentContext(path.join(output,"Chrome"),{executablePath:locateChromeForTesting(root),headless:true});
+const context=await launch();
 let passed=0;
 async function scenario(check,{isNew=false,gridMode=false,initialRows=1}={}){
   const page=await context.newPage();page.setDefaultTimeout(gridMode?20000:7000);const errors=[];page.on("pageerror",error=>errors.push(error.message));

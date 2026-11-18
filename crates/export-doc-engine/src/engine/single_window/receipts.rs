@@ -258,6 +258,9 @@ fn write_back(
     Ok(())
 }
 
+pub(super) const MAX_PACKAGE_FILES: usize = 200;
+pub(super) const MAX_PACKAGE_BYTES: usize = 50 * 1024 * 1024;
+
 pub fn export(
     service: &NativeService,
     actor: &Actor,
@@ -267,7 +270,7 @@ pub fn export(
     profiles::local(service)?;
     let selected: Vec<String> = serde_json::from_value(body["receiptFiles"].clone())
         .map_err(|_| invalid("请选择 XML 回执文件。"))?;
-    if selected.is_empty() || selected.len() > 200 {
+    if selected.is_empty() || selected.len() > MAX_PACKAGE_FILES {
         return Err(invalid("每次请选择 1–200 个回执文件。"));
     }
     let (row, profile) = service.store.read_for(actor, operation, &[], |tx, actor| {
@@ -304,7 +307,7 @@ pub fn export(
             .ok_or_else(|| invalid("回执文件名无效。"))?;
         let bytes = super::super::media::read_local(path, 10 * 1024 * 1024)?;
         total += bytes.len();
-        if total > 50 * 1024 * 1024 {
+        if total > MAX_PACKAGE_BYTES {
             return Err(invalid("回执总容量最多 50 MiB。"));
         }
         if !hashes.insert(digest(&bytes)) {

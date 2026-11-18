@@ -16,14 +16,14 @@ export function SalesOpportunityEditor({ model }: { model: SalesOpportunityWorks
   const queryScope = useMemo(createRequestKey, [client]);
   const [chosenCustomer, setChosenCustomer] = useState<{ id: number; name: string } | null>(record ? { id: record.crmCustomerId, name: record.customerName } : null);
   const [chosenProduct, setChosenProduct] = useState<{ id: number; name: string } | null>(record?.productId ? { id: record.productId, name: record.productCode || record.productName } : null);
-  const customers = useQuery({ queryKey: ["sales-opportunity-options", queryScope, "customers", customerKeyword], gcTime: 0,
+  const editable = !opportunityClosed(record) && (record ? permissions.edit : permissions.create);
+  const quoteEditable = record ? permissions.editQuote : permissions.createQuote;
+  const customers = useQuery({ queryKey: ["sales-opportunity-options", queryScope, "customers", customerKeyword], enabled: editable, gcTime: 0,
     queryFn: ({ signal }) => client.queryCrmCustomers({ keyword: customerKeyword, pageNumber: 1, pageSize: 100 }, { signal }) });
-  const products = useQuery({ queryKey: ["sales-opportunity-options", queryScope, "products", productKeyword], gcTime: 0,
+  const products = useQuery({ queryKey: ["sales-opportunity-options", queryScope, "products", productKeyword], enabled: editable && quoteEditable, gcTime: 0,
     queryFn: ({ signal }) => client.listProducts({ keyword: productKeyword, pageNumber: 1, pageSize: 100 }, { signal }) });
   const customerItems = withChosen((customers.data?.items ?? []).map(item => ({ id: item.id, name: item.name })), chosenCustomer);
   const productItems = withChosen((products.data?.items ?? []).map(item => ({ id: item.id, name: `${item.productCode || "无货号"} · ${item.nameCN || item.nameEN}` })), chosenProduct);
-  const editable = !opportunityClosed(record) && (record ? permissions.edit : permissions.create);
-  const quoteEditable = record ? permissions.editQuote : permissions.createQuote;
   return <form className="form-grid" aria-label={record ? "编辑商机" : "新建商机"} onSubmit={event => { event.preventDefault(); model.save(); }}>
     {(customers.isError || products.isError) && <InlineNotice tone="error">{readApiError(customers.error ?? products.error)}</InlineNotice>}
     {customers.isSuccess && !customerItems.length && !customerKeyword && <InlineNotice tone="info"

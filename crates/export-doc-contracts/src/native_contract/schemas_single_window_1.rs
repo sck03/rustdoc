@@ -178,8 +178,8 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("SingleWindowReceiptBusinessStatus",Schema::default().enumeration(Enumeration::Values(vec![serde_json::json!("Unknown"),serde_json::json!("Received"),serde_json::json!("Accepted"),serde_json::json!("Rejected"),serde_json::json!("PendingReview"),serde_json::json!("Approved"),serde_json::json!("Failed")]))),
     ("SingleWindowReceiptCollectionResult",o(vec![
         ("batchId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("batchReference",s()),("receiptDirectories",a(s())),
-        ("receiptFiles",a(s()))
-    ]).required(vec!["batchId","batchReference","receiptDirectories","receiptFiles"])),
+        ("receiptBatches",a(a(s())))
+    ]).required(vec!["batchId","batchReference","receiptDirectories","receiptBatches"])),
     ("SingleWindowReceiptKind",Schema::default().enumeration(Enumeration::Values(vec![serde_json::json!("Unknown"),serde_json::json!("CustomsCooBusinessReceipt"),serde_json::json!("CustomsCooTechnicalReceipt"),serde_json::json!("CustomsCooAttachmentReceipt"),serde_json::json!("AgentConsignmentImportResponse"),serde_json::json!("AgentConsignmentAcd002")]))),
     ("SingleWindowReceiptParseResult",o(vec![
         ("businessType",r("SingleWindowBusinessType")),("receiptKind",r("SingleWindowReceiptKind")),("referenceNo",s()),

@@ -7,12 +7,31 @@ use crate::{
 pub struct HsQuery<'a> {
     pub kind: &'a str,
     pub current_year: Option<i32>,
+    pub keyword: &'a str,
     pub prefix: &'a str,
     pub since: &'a str,
     pub ranked_examples: bool,
     pub fields: &'a [(&'a str, &'a str)],
     pub offset: i64,
     pub limit: i64,
+}
+
+pub(crate) fn search_document(kind: &str, body: &serde_json::Value) -> Option<String> {
+    let fields = match kind {
+        "hs-codes" => ["code", "name", "elements", "description"],
+        "hs-examples" => [
+            "rawReportedHsCode",
+            "resolvedCurrentHsCode",
+            "productName",
+            "specification",
+        ],
+        _ => return None,
+    };
+    Some(
+        fields
+            .map(|key| export_doc_domain::hs::text(body[key].as_str().unwrap_or_default()))
+            .join("\n"),
+    )
 }
 
 /// Preserve catalog ordering while seeking past the last row, without OFFSET rescans.
@@ -129,6 +148,13 @@ pub(crate) fn build(query: &HsQuery<'_>, pg: bool) -> Result<(QuerySql, String)>
     }
     let mut values = vec![];
     let mut clauses = vec![format!("r.kind={}", bind(&mut values, query.kind, pg))];
+    if !query.keyword.is_empty() {
+        clauses.push(sql::substring(
+            "r.hs_search",
+            &bind(&mut values, query.keyword, pg),
+            pg,
+        ));
+    }
     if !query.since.is_empty() {
         let updated = field(
             if query.kind == "hs-codes" {

@@ -31,7 +31,7 @@ publish = false
 [workspace.dependencies]
 serde = { version = "=1.0.229", features = ["derive"] }
 serde_json = { version = "=1.0.154", features = ["arbitrary_precision", "preserve_order"] }
-rust_decimal = { version = "=1.43.0", default-features = false, features = ["std", "serde-float", "serde-arbitrary-precision"] }
+rust_decimal = { version = "=1.43.0", default-features = false, features = ["std", "serde-float", "serde-arbitrary-precision", "serde-with-str"] }
 unicode-normalization = "=0.1.26"
 hyper = "=1.12.0"
 hyper-util = "=0.1.21"

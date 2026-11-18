@@ -1,10 +1,9 @@
 import { ApiPaymentDto } from "../../api/index.ts";
 import { documentSpareKeys, mapDocumentSpareFields } from "../../ui/documentSpareFields.ts";
-import { sumDecimalNumbers } from "../../ui/decimalSum.ts";
+import { sumDecimalStrings } from "../../ui/decimalSum.ts";
 import {
   dateInputToApiDate,
   normalizeText,
-  numberValue,
   toDateInputValue,
 } from "../../ui/formUtils.ts";
 
@@ -20,8 +19,19 @@ export const paymentExpenseFields = [
 ] as const;
 export const paymentAmountFields = [{ field: "usdAmount", label: "USD 金额" }, { field: "cnyAmount", label: "CNY 金额" }, ...paymentExpenseFields] as const;
 
+const paymentTextFields = ["accountNo", "bankName", "companyScope", "department", "departmentId", "goodsName", "invoiceNo", "voucherNo", "tradeMethod", "taxRebateRate", "quantityUnit", "notes", "payeeName", "payerName", "paymentMethod", "project", "quantity", "shipmentCountry"] as const;
+function fieldValues<K extends string>(keys: readonly K[], get: (key: K) => string) {
+  return Object.fromEntries(keys.map(key => [key,get(key)])) as Record<K,string>;
+}
+
+function validPaymentAmount(value: string) {
+  return value.length <= 60 && /^(?:0|[1-9]\d*)(?:\.\d{1,28})?$/.test(value)
+    && BigInt(value.replace(".", "")) <= 79228162514264337593543950335n;
+}
+
 export function calculatePaymentExpenseTotal(payment: ApiPaymentDto) {
-  return sumDecimalNumbers(paymentExpenseFields.map(({ field }) => payment[field] ?? 0));
+  const amounts = paymentExpenseFields.map(({ field }) => payment[field]?.trim() || "0");
+  return amounts.every(validPaymentAmount) ? sumDecimalStrings(amounts) : "";
 }
 
 export function createEmptyPayment(businessDate: string): ApiPaymentDto {
@@ -30,40 +40,14 @@ export function createEmptyPayment(businessDate: string): ApiPaymentDto {
 
   return {
     id: 0,
+    ...fieldValues(paymentTextFields, () => ""),
+    ...fieldValues(paymentAmountFields.map(({field})=>field), () => "0"),
     ownerUserId: null,
-    departmentId: "",
-    companyScope: "",
-    invoiceNo: "",
-    voucherNo: "",
-    tradeMethod: "",
-    taxRebateRate: "",
-    quantityUnit: "",
     ...mapDocumentSpareFields({}),
     shipmentDate: today,
     payeeId: 0,
-    department: "",
-    project: "",
-    payeeName: "",
-    payerName: "",
-    bankName: "",
-    accountNo: "",
-    paymentMethod: "",
-    notes: "",
-    goodsName: "",
-    quantity: "",
-    shipmentCountry: "",
     paymentDate: today,
     receiptDate: today,
-    usdAmount: 0,
-    cnyAmount: 0,
-    travelExpense: 0,
-    businessEntertainmentExpense: 0,
-    telephoneExpense: 0,
-    officeExpense: 0,
-    repairExpense: 0,
-    freightMiscExpense: 0,
-    inspectionExpense: 0,
-    otherExpense: 0,
     rowVersion: "",
   };
 }
@@ -71,39 +55,13 @@ export function createEmptyPayment(businessDate: string): ApiPaymentDto {
 export function normalizePaymentForSave(payment: ApiPaymentDto, id: number): ApiPaymentDto {
   return {
     ...payment,
+    ...fieldValues(paymentTextFields, key => normalizeText(payment[key])),
+    ...Object.fromEntries(paymentAmountFields.map(({field}) => [field, payment[field].trim() || "0"])),
     id,
-    accountNo: normalizeText(payment.accountNo),
-    bankName: normalizeText(payment.bankName),
-    businessEntertainmentExpense: numberValue(payment.businessEntertainmentExpense),
-    cnyAmount: numberValue(payment.cnyAmount),
-    companyScope: normalizeText(payment.companyScope),
-    department: normalizeText(payment.department),
-    departmentId: normalizeText(payment.departmentId),
-    freightMiscExpense: numberValue(payment.freightMiscExpense),
-    goodsName: normalizeText(payment.goodsName),
-    inspectionExpense: numberValue(payment.inspectionExpense),
-    invoiceNo: normalizeText(payment.invoiceNo),
-    voucherNo: normalizeText(payment.voucherNo),
-    tradeMethod: normalizeText(payment.tradeMethod),
-    taxRebateRate: normalizeText(payment.taxRebateRate),
-    quantityUnit: normalizeText(payment.quantityUnit),
     ...mapDocumentSpareFields(payment, normalizeText),
-    notes: normalizeText(payment.notes),
-    officeExpense: numberValue(payment.officeExpense),
-    otherExpense: numberValue(payment.otherExpense),
-    payeeName: normalizeText(payment.payeeName),
-    payerName: normalizeText(payment.payerName),
     paymentDate: normalizeOptionalDate(payment.paymentDate),
-    paymentMethod: normalizeText(payment.paymentMethod),
-    project: normalizeText(payment.project),
-    quantity: normalizeText(payment.quantity),
     receiptDate: normalizeOptionalDate(payment.receiptDate),
-    repairExpense: numberValue(payment.repairExpense),
-    shipmentCountry: normalizeText(payment.shipmentCountry),
     shipmentDate: normalizeOptionalDate(payment.shipmentDate),
-    telephoneExpense: numberValue(payment.telephoneExpense),
-    travelExpense: numberValue(payment.travelExpense),
-    usdAmount: numberValue(payment.usdAmount),
   };
 }
 
@@ -137,9 +95,6 @@ export function validatePaymentDraft(payment: ApiPaymentDto) {
   const overlong = textLimits.find(([value, maximumLength]) => (value?.trim().length ?? 0) > maximumLength);
   if (overlong) return `${overlong[2]}不能超过 ${overlong[1]} 个字符。`;
 
-  const invalid = paymentAmountFields.find(({ field }) => !Number.isFinite(payment[field] ?? 0));
-  if (invalid) return `${invalid.label}必须是有效金额。`;
-  const negative = paymentAmountFields.find(({ field }) => Number(payment[field] ?? 0) < 0);
-  if (negative) return `${negative.label}不能小于 0。`;
-  return null;
+  const invalid = paymentAmountFields.find(({ field }) => !validPaymentAmount(payment[field].trim() || "0"));
+  return invalid ? `${invalid.label}必须是范围内的非负十进制金额。` : null;
 }

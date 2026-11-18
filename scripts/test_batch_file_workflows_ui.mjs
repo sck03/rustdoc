@@ -127,7 +127,7 @@ await withOfficeUi('batch-file-workflows-ui', async ({ repo, output, url, invoke
     await saveJob(await invoke('StartInvoiceReportPdfZipDownloadJob', { ...batch, invoiceIds: [longInvoice.id],
       templatePaths: rebuilt.filter(template => template.reportType === 'ExportDocument').map(template => template.path) }, {}, token), 'rebuilt-long-export-reports.zip');
   }
-  const payment = await invoke('CreatePayment', { voucherNo: 'REBUILD-PAY-001', payeeName: '示例收款单位', payerName: '示例支付单位', paymentDate: session.user.businessDate, paymentMethod: '电汇', cnyAmount: 128.5, otherExpense: 128.5 }, {}, token);
+  const payment = await invoke('CreatePayment', { voucherNo: 'REBUILD-PAY-001', payeeName: '示例收款单位', payerName: '示例支付单位', paymentDate: session.user.businessDate, paymentMethod: '电汇', cnyAmount: "128.5", otherExpense: "128.5" }, {}, token);
   for (const template of rebuilt.filter(template => template.reportType === 'PaymentVoucher')) {
     await saveJob(await invoke('StartPaymentVoucherPdfDownloadJob', { templatePath: template.path }, { paymentId: payment.payment.id }, token), path.basename(template.name, '.dtpl') + '.pdf');
   }

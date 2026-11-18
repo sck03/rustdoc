@@ -68,7 +68,7 @@ await withOfficeUi('payment-printing-ui', async ({ repo, output, url, invoke, op
   assert.equal((await request('GetUserReportTemplate', peer.accessToken, { id: copy.id })).status, 403);
   assert.equal((await request('PublishUserReportTemplate', owner.accessToken, { id: copy.id }, '', { expectedVersion: saved.versionNumber })).status, 403);
   const payment = (await invoke('CreatePayment', { ...model.createEmptyPayment(owner.user.businessDate),
-    voucherNo: 'STAFF-PAY-001', payeeName: '员工报销验收', cnyAmount: 123.45, otherExpense: 123.45, notes: '本人付款报销打印' }, {}, owner.accessToken)).payment;
+    voucherNo: 'STAFF-PAY-001', payeeName: '员工报销验收', cnyAmount: "123.45", otherExpense: "123.45", notes: '本人付款报销打印' }, {}, owner.accessToken)).payment;
   assert.equal((await request('GetPayment', peer.accessToken, { id: payment.id })).status, 403);
   assert.equal((await request('GetPayment', finance.accessToken, { id: payment.id })).status, 200);
   assert.equal((await request('UpdatePayment', finance.accessToken, { id: payment.id }, '', payment)).status, 403);

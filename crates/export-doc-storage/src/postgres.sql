@@ -19,6 +19,7 @@ CREATE TABLE records (
     company TEXT NOT NULL,
     department TEXT NOT NULL,
     body JSONB NOT NULL,
+    hs_search TEXT,
     search_document TEXT GENERATED ALWAYS AS (
         CASE WHEN octet_length(body::text)<=65536
         THEN lower(normalize(exportdoc_record_text(body),NFC) COLLATE pg_unicode_fast) ELSE NULL END

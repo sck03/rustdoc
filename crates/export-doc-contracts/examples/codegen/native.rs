@@ -31,6 +31,9 @@ fn field_name(value: &str) -> String {
         name
     }
 }
+fn string_decimal(schema: &Value) -> bool {
+    schema["type"] == "string" && schema["format"] == "decimal"
+}
 fn nullable(schema: &Value) -> bool {
     array(&schema["type"]).iter().any(|t| t == "null")
         || schema["nullable"] == true
@@ -59,7 +62,7 @@ pub fn rust_type(schema: &Value, optional: bool) -> String {
         rust_type(alternatives[0], false)
     } else if has_type("integer") {
         "i64".into()
-    } else if has_type("number") {
+    } else if has_type("number") || string_decimal(schema) {
         "rust_decimal::Decimal".into()
     } else if has_type("string") {
         "String".into()
@@ -202,6 +205,14 @@ pub fn generate(document: &Value, operations: &[Operation<'_>]) -> Result<(Strin
         writeln!(output, "#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]\npub struct {name} {{").unwrap();
         for (key, value) in properties {
             let optional = !required(schema, key);
+            if string_decimal(value) {
+                let module = if optional { "str_option" } else { "str" };
+                writeln!(
+                    output,
+                    "    #[serde(with = \"rust_decimal::serde::{module}\")]"
+                )
+                .unwrap();
+            }
             writeln!(
                 output,
                 "    #[serde(rename = {}{})]\n    pub {}: {},",

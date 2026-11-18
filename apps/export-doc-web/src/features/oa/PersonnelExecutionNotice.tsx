@@ -3,7 +3,7 @@ import type { ApiUserDto, ExportDocManagerApiClient, OaRequest } from "../../api
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "../office/OfficeUi.tsx";
-import { officeCommand } from "../office/officeCommands.ts";
+import { acknowledgedCommands, officeCommand } from "../office/officeCommands.ts";
 import { useOaOperation } from "./useOaOperation.ts";
 import { oaAccess } from "./oaModel.ts";
 
@@ -30,7 +30,7 @@ export function PersonnelExecutionNotice({ client, user, row }: { client: Export
     </div>
     {action && <OfficeDialog title={label} onClose={() => setAction(null)} {...operation} protectChanges hasChanges={Boolean(note)}>
       <p>{action === "cancel" ? "保留已经签署的审批历史，停止这次人员变动。" : "保留原批准内容，重新检查当前条件；不会覆盖期间已经修改的人员事实。"}</p>
-      <form onSubmit={event => { event.preventDefault(); const body = officeCommand(client, `${row.id}:personnel:${action}`, { commandKey: undefined, expectedVersion: row.versionNumber, note }); void operation.run(signal => action === "cancel" ? client.cancelApprovedPersonnelChange({ id: row.id, body }, { signal }) : client.executeApprovedPersonnelChange({ id: row.id, body }, { signal }), () => setAction(null)); }}>
+      <form onSubmit={event => { event.preventDefault(); const body = officeCommand(client, `${row.id}:personnel:${action}`, { commandKey: undefined, expectedVersion: row.versionNumber, note }); void operation.run(signal => acknowledgedCommands(client,"PersonnelChangeRequest")(row.id,body,{signal},(request,init) => action === "cancel" ? client.cancelApprovedPersonnelChange(request,init) : client.executeApprovedPersonnelChange(request,init)), () => setAction(null)); }}>
         <OfficeField label="处理说明"><textarea required maxLength={500} value={note} onChange={event => setNote(event.target.value)} /></OfficeField>
         <OfficeSubmit busy={operation.busy} label={label} />
       </form>

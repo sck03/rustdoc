@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { CreditCard, RefreshCw, Settings } from "lucide-react";
 import { ApiPayeeDto, ApiPaymentDto, ExportDocManagerApiClient } from "../../api/index.ts";
-import { DateField, EditableComboField, NumberField, SelectField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
+import { DateField, EditableComboField, SelectField, TextAreaField, TextField } from "../../ui/FormFields.tsx";
 import { formatAmount } from "../../ui/formUtils.ts";
 import { InlineNotice } from "../../ui/PageState.tsx";
 import { RemoteSelectField } from "../../ui/RemoteSelectField.tsx";
@@ -218,7 +218,7 @@ export function PaymentAmountsPanel({
         </div>
       </div>
       <div className="field-grid">
-        {paymentAmountFields.map(({ field, label }) => <NumberField key={field} label={label} value={payment[field]} onChange={(value) => onChange({ [field]: value })} />)}
+        {paymentAmountFields.map(({ field, label }) => <TextField inputMode="decimal" key={field} label={label} value={payment[field]} onChange={(value) => onChange({ [field]: value })} />)}
       </div>
     </section>
   );

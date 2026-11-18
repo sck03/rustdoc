@@ -1,3 +1,4 @@
+import { acknowledgedCommands, officeCommand } from "./officeCommands.ts";
 import { officePolling } from "../../api/queryPollingPolicy.ts";
 import { useLayoutEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
@@ -146,24 +147,9 @@ export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUs
 
 export function applyOfficeAction(client: ExportDocManagerApiClient, kind: OfficeKind, row: OfficeRequestRow,
   action: OfficeAction, note: string, quantity: number, signal: AbortSignal, taskKey?: string, verification: Pick<OaAction, "verificationValues" | "confirmedReviewPoints" | "nodeKey"> = {}): Promise<OfficeRequestRow> {
-  const init = { signal };
-  if (kind === "rooms") {
-    const request = { id: row.id, body: officeCommand(client,`${kind}:${row.id}:${action}`,{commandKey:undefined,expectedVersion: row.versionNumber, note, taskKey, ...verification}) };
-    switch (action) {
-      case "approve": return client.approveMeetingBooking(request, init);
-      case "reject": return client.rejectMeetingBooking(request, init);
-      case "cancel": return client.cancelMeetingBooking(request, init);
-      case "issue": return client.issueMeetingRoomKey(request, init);
-      case "return": return client.returnMeetingRoomKey(request, init);
-    }
-  }
-  const request = { id: row.id, body: officeCommand(client,`${kind}:${row.id}:${action}`,{commandKey:undefined,expectedVersion: row.versionNumber, note, quantity, taskKey, ...verification}) };
-  switch (action) {
-    case "approve": return client.approveOfficeSupplyRequest(request, init);
-    case "reject": return client.rejectOfficeSupplyRequest(request, init);
-    case "cancel": return client.cancelOfficeSupplyRequest(request, init);
-    case "issue": return client.issueOfficeSupply(request, init);
-    case "return": return client.returnOfficeSupply(request, init);
-  }
+  const rooms = kind === "rooms";
+  const name = rooms ? "MeetingBooking" : "OfficeSupplyRequest";
+  const method = {approve:`approve${name}`,reject:`reject${name}`,cancel:`cancel${name}`,issue:rooms?"issueMeetingRoomKey":"issueOfficeSupply",return:rooms?"returnMeetingRoomKey":"returnOfficeSupply"} as const;
+  const body = officeCommand(client,`${kind}:${row.id}:${action}`,{commandKey:undefined,expectedVersion:row.versionNumber,note,taskKey,...verification,...(rooms?{}:{quantity})});
+  return acknowledgedCommands(client,name)(row.id,body,{signal},(request,init)=>client[method[action]](request,init));
 }
-import { officeCommand } from "./officeCommands.ts";

@@ -2,15 +2,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
-import { createRequire } from 'node:module';
-import { locateChromeForTesting } from './lib/chromium-executable.mjs';
+import { createReactUiFixture } from "./lib/react-ui-fixture.mjs";
 import { navigationReorganizationUiFixture } from './lib/navigation-reorganization-ui-fixture.mjs';
 
-const repo = path.resolve(import.meta.dirname, '..'), web = path.join(repo, 'apps/export-doc-web');
-const require = createRequire(path.join(web, 'package.json'));
-const output = path.join(repo, 'artifacts/supplier-lifecycle-ui', String(Date.now()));
-fs.mkdirSync(output, { recursive: true });
-const source = name => JSON.stringify(path.join(web, 'src', name).replaceAll('\\', '/'));
+const { root: repo, web, output, require, bundle, source, launch } = createReactUiFixture("supplier-lifecycle-ui");
 const setup = `
 window.cache=queries;window.pending=[];window.downloads=0;
 URL.createObjectURL=()=>{window.downloads++;return 'blob:fixture'};URL.revokeObjectURL=()=>{};
@@ -29,8 +24,7 @@ const server = http.createServer((request, response) => {
   else response.writeHead(404).end();
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-const browser = await require('playwright').chromium.launchPersistentContext(path.join(output, 'Chrome'), {
-  executablePath: locateChromeForTesting(repo), headless: true, viewport: { width: 1440, height: 1000 } });
+const browser = await launch({ viewport: { width: 1440, height: 1000 } });
 let passed = 0;
 async function scenario(check) {
   const page = await browser.newPage(); page.setDefaultTimeout(10000);

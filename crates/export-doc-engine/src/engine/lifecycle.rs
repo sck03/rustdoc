@@ -59,37 +59,7 @@ impl NativeService {
         store.edition = edition;
         let store = Arc::new(store);
         auth::seed(&store)?;
-        packing::seed(&store)?;
-        #[cfg(feature = "mail")]
-        email::recover(&store)?;
-        let jobs = tasks::Jobs::with_retention(store.clone(), retention)?;
-        Self::activate(Self {
-            maintenance: RwLock::new(()),
-            protector: crate::secrets::Protector::new(&paths.data_root),
-            report_fonts: Arc::new(export_doc_report::Fonts::new(&paths.font_path)),
-            report_previews: Default::default(),
-            paths,
-            store,
-            sessions: auth::Sessions::default(),
-            jobs,
-            workflow_scheduler: Default::default(),
-            backup_scheduler: Default::default(),
-            backup_tickets: Default::default(),
-            bootstrap_token: String::new(),
-            clock: crate::clock::BusinessClock::default(),
-            license_gate: Default::default(),
-            license_cache: Default::default(),
-            #[cfg(feature = "ai")]
-            ai_reviewer: Default::default(),
-            packing_gate: Default::default(),
-            oa_document_gate: Default::default(),
-            #[cfg(feature = "ocr")]
-            ocr_gate: Default::default(),
-            #[cfg(feature = "exchange-rates")]
-            exchange: Default::default(),
-            #[cfg(feature = "exchange-rates")]
-            exchange_scheduler: Default::default(),
-        })
+        Self::start(paths, store, retention, String::new())
     }
     #[cfg(feature = "postgres")]
     pub fn open_postgres(
@@ -134,14 +104,23 @@ impl NativeService {
     ) -> Result<Arc<Self>> {
         super::team_backup::postgres::ensure_no_pending(&paths)?;
         let mut store = Store::open_postgres_with_pool(&paths, connection_string, pool)?;
-        store.clock = clock.clone();
+        store.clock = clock;
         let store = Arc::new(store);
-        packing::seed(&store)?;
-        #[cfg(feature = "mail")]
-        email::recover(&store)?;
         if store.all("users")?.is_empty() && bootstrap_token.len() < 32 {
             return Err(invalid("空库首次启动需要至少 32 字符的一次性部署令牌。"));
         }
+        Self::start(paths, store, retention, bootstrap_token)
+    }
+    fn start(
+        paths: RuntimePaths,
+        store: Arc<Store>,
+        retention: tasks::retention::Retention,
+        bootstrap_token: String,
+    ) -> Result<Arc<Self>> {
+        packing::seed(&store)?;
+        #[cfg(feature = "mail")]
+        email::recover(&store)?;
+        let clock = store.clock.clone();
         let jobs = tasks::Jobs::with_retention(store.clone(), retention)?;
         Self::activate(Self {
             maintenance: RwLock::new(()),

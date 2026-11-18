@@ -139,7 +139,7 @@ export async function verifyDesktopBlankGrid({ run, request, token, businessDate
   assert(previewText.includes('用款事项') && previewText.includes('支付单位'), 'native preview preserves the vertical title and payment field label');
   await run('window.scrollTo(0,0); true');
   await captureScreenshot(cdp, path.join(output, 'Full-blank-grid-preview.png'), { captureBeyondViewport: false });
-  const payment = await request('CreatePayment', token, { voucherNo: 'BLANK-GRID-001', invoiceNo: 'GRID-2026', payeeName: '空白设计收款方', payerName: '空白设计付款单位', paymentDate: businessDate, paymentMethod: '电汇', cnyAmount: 128.5 });
+  const payment = await request('CreatePayment', token, { voucherNo: 'BLANK-GRID-001', invoiceNo: 'GRID-2026', payeeName: '空白设计收款方', payerName: '空白设计付款单位', paymentDate: businessDate, paymentMethod: '电汇', cnyAmount: "128.5" });
   assert.equal(payment.status, 201);
   const pdf = path.join(output, 'desktop-blank-grid.pdf');
   const job = await request('StartPaymentVoucherPdfSaveToPathJob', token, { templatePath: `user-template:${created.body.id}`, destinationPath: pdf }, { paymentId: payment.body.payment.id });

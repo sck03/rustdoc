@@ -1,16 +1,8 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
 import path from "node:path";
-import { createRequire } from "node:module";
-import { locateChromeForTesting } from "./lib/chromium-executable.mjs";
+import { createReactUiFixture } from "./lib/react-ui-fixture.mjs";
 
-const root = path.resolve(import.meta.dirname, ".."), web = path.join(root, "apps/export-doc-web");
-const require = createRequire(path.join(web, "package.json"));
-const output = path.join(root, "artifacts/packing-credit-workspace-ui", String(Date.now()));
-fs.mkdirSync(path.join(output, "Temp"), { recursive: true });
-Object.assign(process.env, { TEMP: path.join(output, "Temp"), TMP: path.join(output, "Temp") });
-const source = name => JSON.stringify(path.join(web, "src", name).replaceAll("\\", "/"));
-const bundle = path.join(output, "app.js");
+const { root, web, output, require, bundle, source, launch } = createReactUiFixture("packing-credit-workspace-ui");
 await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, contents: `
 import React,{useState} from "react";import {createRoot} from "react-dom/client";
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
@@ -42,7 +34,7 @@ window.hide=()=>setShown(false);window.switchInvoice=id=>setInvoice({...createEm
 return shown?(window.mode==="packing"?<ContainerPackingPanel client={client} canOperate canManage/>:<InvoiceLetterOfCreditPanel client={client} invoice={invoice} onChange={changes=>setInvoice(current=>({...current,...changes}))} onClearPageMessages={()=>{}}/>):<div>unmounted</div>;}
 createRoot(document.getElementById("root")).render(<MemoryRouter><QueryClientProvider client={queries}><ConfirmationProvider><UnsavedChangesProvider><Harness/></UnsavedChangesProvider></ConfirmationProvider></QueryClientProvider></MemoryRouter>);
 ` }, outfile: bundle, bundle: true, platform: "browser", format: "iife", jsx: "automatic", logLevel: "silent" });
-const context = await require("playwright").chromium.launchPersistentContext(path.join(output, "Chrome"), { executablePath: locateChromeForTesting(root), headless: true });
+const context = await launch();
 let passed = 0;
 async function scenario(mode, check) {
   const page = await context.newPage(), errors = []; page.setDefaultTimeout(8000); page.on("pageerror", error => errors.push(error.message));

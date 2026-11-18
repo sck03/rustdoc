@@ -78,13 +78,19 @@ try {
   chrome = await startChrome({ browserExecutable: browser, userDataDir: path.join(output, "Chrome"), timeoutMs: 30000 });
   cdp = await CdpClient.connect(chrome.browserWebSocketUrl); page = await createPageSession(cdp);
   await page.send("Page.addScriptToEvaluateOnNewDocument", { source: `window.__oaErrors=[];addEventListener('error',e=>window.__oaErrors.push(e.message));addEventListener('unhandledrejection',e=>window.__oaErrors.push(String(e.reason)));
-    const originalFetch=window.fetch.bind(window);window.fetch=async(...args)=>{const counts=window.__saveCounts;if(!counts)return originalFetch(...args);const url=String(args[0] instanceof Request ? args[0].url : args[0]);const method=args[1]?.method;if(method==='POST' && /expense-requests$/.test(url))counts.create++;const upload=method==='POST' && /expense-requests\\/[^/]+\\/attachments$/.test(url);if(upload)counts.upload++;const response=await originalFetch(...args);if(upload && counts.upload===2)throw new TypeError('Simulated lost upload response');return response;};` });
+    const originalFetch=window.fetch.bind(window);window.fetch=async(...args)=>{
+      const counts=window.__saveCounts,url=String(args[0] instanceof Request ? args[0].url : args[0]),method=args[1]?.method,upload=method==='POST' && /expense-requests\\/[^/]+\\/attachments$/.test(url);
+      if(counts){if(method==='POST' && /expense-requests$/.test(url))counts.create++;if(upload)counts.upload++;}
+      if(method==='GET' && url.includes('/commands/'))window.__receiptReads=(window.__receiptReads||0)+1;
+      const response=await originalFetch(...args);if(upload && counts?.upload===2)throw new TypeError('Simulated lost upload response');
+      if(response.ok && method==='POST' && /\\/(submit|approve)$/.test(url) && !window.__lostCommand){window.__lostCommand=true;throw new TypeError('Simulated lost command response');}return response;};` });
   await navigate(url);
   await wait("document.querySelector('input[autocomplete=username]')", "Login not displayed");
   await run(`(() => {for(const [selector,value] of [['input[autocomplete=username]','oa-review'],['input[autocomplete=current-password]','Review-2026-Test']]){const input=document.querySelector(selector);Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,value);input.dispatchEvent(new Event('input',{bubbles:true}));}})()`);
   await click("登录");
   await wait("!document.querySelector('.login-submit-button')", "Login failed");
   await exerciseOfficeResources({ url, page, output, run, wait, click, fill, navigate, captureScreenshot, approveResource });
+  assert.deepEqual(await run("[window.__lostCommand,window.__receiptReads]"), [true,1], "A committed command with a lost HTTP response is confirmed by its receipt");
   await navigate(`${url}/#/office/approvals`);
   await wait("document.querySelector('[aria-label=\"申请与审批中心\"]')", "Approval hub missing");
   const groups = await run("[...document.querySelectorAll('.nav-group-button')].map(button=>button.textContent.trim())");

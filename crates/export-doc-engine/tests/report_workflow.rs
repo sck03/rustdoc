@@ -311,7 +311,7 @@ fn builtins_images_pdf_jobs_and_backup_restore_share_the_business_store() {
     )
     .unwrap();
     assert!(pdf.starts_with(b"%PDF-"));
-    let payment = fixture.create(CREATE_PAYMENT, json!({"voucherNo":"PAY-REPORT-001","payeeName":"测试收款单位","paymentDate":"2026-09-16","shipmentDate":"2026-09-16","cnyAmount":1234.56,"travelExpense":1234.56,"paymentMethod":"电汇","notes":"报销验证"}));
+    let payment = fixture.create(CREATE_PAYMENT, json!({"voucherNo":"PAY-REPORT-001","payeeName":"测试收款单位","paymentDate":"2026-09-16","shipmentDate":"2026-09-16","cnyAmount":"1234.56","travelExpense":"1234.56","paymentMethod":"电汇","notes":"报销验证"}));
     let payment = &payment["payment"];
     for template in [Builtin::PaymentVoucher, Builtin::ExpenseReimbursement] {
         let pdf = jobs::render_report_pdf(
@@ -629,14 +629,9 @@ fn payment_drafts_preview_without_persistence_and_save_with_a_real_identity() {
         persisted["payment"]["rowVersion"],
         saved["payment"]["rowVersion"]
     );
-    assert_eq!(
-        fixture
-            .client()
-            .json::<Value>(UPDATE_PAYMENT, &parameters, &[], Some(updated))
-            .unwrap_err()
-            .status,
-        Some(409)
-    );
+    fixture
+        .client()
+        .assert_rejected(UPDATE_PAYMENT, &parameters, Some(updated), 409);
     let current = fixture.request(GET_PAYMENT, &parameters, &[], None);
     assert_eq!(current["notes"], "更新后的付款备注");
     let precise: ApiPaymentDto = serde_json::from_value(current.clone()).unwrap();
@@ -649,28 +644,16 @@ fn payment_drafts_preview_without_persistence_and_save_with_a_real_identity() {
     ] {
         let mut invalid_body = current.clone();
         invalid_body[key] = invalid;
-        assert_eq!(
-            fixture
-                .client()
-                .json::<Value>(UPDATE_PAYMENT, &parameters, &[], Some(invalid_body))
-                .unwrap_err()
-                .status,
-            Some(400),
-            "{key}"
-        );
+        fixture
+            .client()
+            .assert_rejected(UPDATE_PAYMENT, &parameters, Some(invalid_body), 400);
     }
     let reader = fixture.user("invoice-only-reader");
-    assert_eq!(
-        reader
-            .json::<Value>(
-                PREVIEW_PAYMENT_VOUCHER_DRAFT_HTML,
-                &[],
-                &[],
-                Some(preview_body)
-            )
-            .unwrap_err()
-            .status,
-        Some(403)
+    reader.assert_rejected(
+        PREVIEW_PAYMENT_VOUCHER_DRAFT_HTML,
+        &[],
+        Some(preview_body),
+        403,
     );
 }
 

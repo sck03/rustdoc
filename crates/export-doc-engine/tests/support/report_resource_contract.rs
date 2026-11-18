@@ -1,5 +1,18 @@
 use super::*;
 
+fn download_image(
+    client: &ApiClient,
+    image: &Value,
+) -> Result<Vec<u8>, export_doc_engine::api::ApiError> {
+    client.bytes(
+        DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
+        &[("resourceId", image["id"].as_str().unwrap().into())],
+        &[],
+        None,
+        jobs::PDF_LIMIT,
+    )
+}
+
 fn resource(fixture: &Fixture) -> Value {
     fixture
         .client()
@@ -49,19 +62,7 @@ fn history_only_image_uses_current_template_visibility() {
         &[],
         Some(json!({"expectedVersion":published["versionNumber"],"shareScope":"Company"})),
     );
-    let resource_parameters = [("resourceId", image["id"].as_str().unwrap().into())];
-    assert_eq!(
-        reader
-            .bytes(
-                DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
-                &resource_parameters,
-                &[],
-                None,
-                jobs::PDF_LIMIT
-            )
-            .unwrap(),
-        Fixture::png()
-    );
+    assert_eq!(download_image(&reader, &image).unwrap(), Fixture::png());
     fixture.request(
         SHARE_USER_REPORT_TEMPLATE,
         &parameters,
@@ -69,16 +70,7 @@ fn history_only_image_uses_current_template_visibility() {
         Some(json!({"expectedVersion":shared["versionNumber"],"shareScope":"Private"})),
     );
     assert_eq!(
-        reader
-            .bytes(
-                DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
-                &resource_parameters,
-                &[],
-                None,
-                jobs::PDF_LIMIT
-            )
-            .unwrap_err()
-            .status,
+        download_image(&reader, &image).unwrap_err().status,
         Some(403)
     );
 }
@@ -96,36 +88,21 @@ fn file_template_resources_are_readable_and_cannot_be_recycled() {
     let saved = fixture.request(SAVE_REPORT_TEMPLATE_CONTENT, &[], &[], Some(json!({"reportType":"ExportDocument",
         "templatePath":file["templatePath"],"expectedRevision":file["revision"],"content":with_image(file["content"].as_str().unwrap(), &image)})));
     let parameters = [("resourceId", image["id"].as_str().unwrap().into())];
-    assert_eq!(
-        reader
-            .bytes(
-                DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
-                &parameters,
-                &[],
-                None,
-                jobs::PDF_LIMIT
-            )
-            .unwrap(),
-        Fixture::png()
-    );
+    assert_eq!(download_image(&reader, &image).unwrap(), Fixture::png());
     let entries: Value = reader
         .json(QUERY_REPORT_TEMPLATE_V3_IMAGE_RESOURCES, &[], &[], None)
         .unwrap();
     assert_eq!(entries["items"][0]["isReferenced"], true);
     assert_eq!(entries["items"][0]["canRecycle"], false);
-    assert_eq!(
-        fixture
-            .client()
-            .json::<Value>(
-                RECYCLE_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
-                &parameters,
-                &[],
-                None
-            )
-            .unwrap_err()
-            .status,
-        Some(409)
-    );
+    let assert_referenced = || {
+        fixture.client().assert_rejected(
+            RECYCLE_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
+            &parameters,
+            None,
+            409,
+        );
+    };
+    assert_referenced();
     let clone: Value = reader.json(CLONE_USER_REPORT_TEMPLATE, &[], &[], Some(json!({"reportType":"ExportDocument","name":"图片副本","sourceTemplatePath":saved["templatePath"]}))).unwrap();
     assert_eq!(clone["status"], "Draft");
     fixture.request(
@@ -144,19 +121,7 @@ fn file_template_resources_are_readable_and_cannot_be_recycled() {
         ],
         None,
     );
-    assert_eq!(
-        fixture
-            .client()
-            .json::<Value>(
-                RECYCLE_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
-                &parameters,
-                &[],
-                None
-            )
-            .unwrap_err()
-            .status,
-        Some(409)
-    );
+    assert_referenced();
 }
 
 #[test]
@@ -184,16 +149,7 @@ fn shared_template_does_not_bypass_its_source_domain_permission_for_images() {
         Some(json!({"expectedVersion":published["versionNumber"],"shareScope":"Company"})),
     );
     assert_eq!(
-        reader
-            .bytes(
-                DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
-                &[("resourceId", image["id"].as_str().unwrap().into())],
-                &[],
-                None,
-                jobs::PDF_LIMIT
-            )
-            .unwrap_err()
-            .status,
+        download_image(&reader, &image).unwrap_err().status,
         Some(403)
     );
 }
@@ -208,16 +164,7 @@ fn resource_id_in_invoice_text_does_not_grant_image_access() {
     draft.header.spare1 = image["id"].as_str().unwrap().into();
     reader.save_invoice(&draft.build().unwrap()).unwrap();
     assert_eq!(
-        reader
-            .bytes(
-                DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
-                &[("resourceId", image["id"].as_str().unwrap().into())],
-                &[],
-                None,
-                jobs::PDF_LIMIT
-            )
-            .unwrap_err()
-            .status,
+        download_image(&reader, &image).unwrap_err().status,
         Some(403)
     );
 }

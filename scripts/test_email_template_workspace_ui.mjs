@@ -1,16 +1,8 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-import { locateChromeForTesting } from './lib/chromium-executable.mjs';
+import { createReactUiFixture } from "./lib/react-ui-fixture.mjs";
 
-const repo=path.resolve(import.meta.dirname,'..'), web=path.join(repo,'apps/export-doc-web');
-const output=path.join(repo,'artifacts/email-template-workspace-ui',String(Date.now()));
-fs.mkdirSync(path.join(output,'Temp'),{recursive:true});
-Object.assign(process.env,{TEMP:path.join(output,'Temp'),TMP:path.join(output,'Temp')});
-const require=createRequire(path.join(web,'package.json'));
-const src=name=>JSON.stringify(path.join(web,'src',name).replaceAll('\\','/'));
-const bundle=path.join(output,'app.js');
+const { root: repo, web, output, require, bundle, source: src, launch } = createReactUiFixture("email-template-workspace-ui");
 await require('esbuild').build({stdin:{resolveDir:web,loader:'tsx',contents:`
 import React from 'react'; import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
@@ -30,7 +22,7 @@ restoreEmailTemplateVersion:async request=>{window.restores.push(request);return
 const permissions=['view','edit','restore','archive'].map(action=>({resourceKey:'sales.email-templates',action,dataScope:'all'}));
 createRoot(document.getElementById('root')).render(<MemoryRouter><PermissionAccessProvider permissions={permissions}><ConfirmationProvider><UnsavedChangesProvider><EmailTemplatePage client={client}/></UnsavedChangesProvider></ConfirmationProvider></PermissionAccessProvider></MemoryRouter>);
 `},outfile:bundle,bundle:true,platform:'browser',format:'iife',jsx:'automatic',logLevel:'silent'});
-const context=await require('playwright').chromium.launchPersistentContext(path.join(output,'Chrome'),{executablePath:locateChromeForTesting(repo),headless:true});
+const context=await launch();
 let passed=0;
 async function scenario(check){
   const page=await context.newPage();page.setDefaultTimeout(6000);
