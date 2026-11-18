@@ -10,7 +10,7 @@ export async function verifyDesktopSalesConsistency({ run, request, token, cdp, 
   const customer = await request('CreateCrmCustomer', token, { id: 0, name: '商机桌面验收客户' });
   assert.equal(customer.status, 201, JSON.stringify(customer.body));
   const created = await request('CreateSalesOpportunity', token, { id: 0, crmCustomerId: customer.body.id, title: '桌面商机初稿',
-    quotationNo: 'DESKTOP-SALES', estimatedAmount: 125.75, currency: 'USD', probabilityPercent: 20, expectedCloseDate: '2026-12-15' });
+    quotationNo: 'DESKTOP-SALES', estimatedAmount: '10000000000000.0001', currency: 'USD', probabilityPercent: 20, expectedCloseDate: '2026-12-15' });
   assert.equal(created.status, 201, JSON.stringify(created.body));
   const id = created.body.id;
   await run(`location.hash=${JSON.stringify(`#/crm/opportunities?opportunityId=${id}&view=editor`)}; true`);
@@ -21,6 +21,7 @@ export async function verifyDesktopSalesConsistency({ run, request, token, cdp, 
   await wait("document.body.innerText.includes('商机已保存。')");
   const saved = await request('GetSalesOpportunity', token, undefined, { id });
   assert.equal(saved.status, 200); assert.equal(saved.body.title, '桌面中文商机修订');
+  assert.equal(saved.body.estimatedAmount, '10000000000000.0001');
   assert.equal(saved.body.versionNumber, 2); assert.equal(saved.body.expectedCloseDate, '2026-12-15');
   await run(`${button('报价与阶段历史')}.click();true`);
   await wait("document.querySelector('[aria-label=\"报价与阶段历史\"]')?.textContent.includes('V2')");

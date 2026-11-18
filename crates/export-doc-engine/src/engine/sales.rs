@@ -107,7 +107,6 @@ fn next_stages(value: &Value) -> Value {
 
 /// History and detail share record, parent-customer and product access rules.
 fn read(tx: &Connection, actor: &Actor, record_id: i64) -> Result<Value> {
-    auth::authorize(actor, "common.product-reference", "view")?;
     details(
         tx,
         actor,
@@ -146,7 +145,6 @@ fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value>
     let page = read("pageNumber").parse::<usize>().unwrap_or(1).max(1);
     let offset = i64::try_from(page.saturating_sub(1).saturating_mul(size)).unwrap_or(i64::MAX);
     store.read_for(actor, QUERY_SALES_OPPORTUNITIES, query, |tx, actor| {
-        auth::authorize(actor, "common.product-reference", "view")?;
         let (count, rows) = crm_queries::page(
             tx,
             actor,
@@ -154,7 +152,7 @@ fn list(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result<Value>
                 customer_id,
                 stage,
                 keyword: &keyword,
-                upcoming_closings: false,
+                closing_window: None,
                 include_archived,
             },
             &crm_queries::fields("ApiSalesOpportunityDto"),
@@ -278,6 +276,13 @@ fn save(store: &Store, actor: &Actor, record_id: i64, body: &Value) -> Result<Va
         };
         customer(tx, actor, request.crm_customer_id, PERMISSION, action)?;
         let mut value = contracts::overlay(previous.clone(), &serde_json::to_value(&request)?);
+        value["estimatedAmount"] = json!(
+            request
+                .estimated_amount
+                .unwrap_or_default()
+                .normalize()
+                .to_string()
+        );
         // Optional values cleared in the editor must also clear the saved record.
         value["productId"] = json!(request.product_id);
         value["expectedCloseDate"] = json!(request.expected_close_date);

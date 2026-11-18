@@ -354,7 +354,8 @@ fn existing_dangling_opportunity_product_links_fail_instead_of_returning_empty_p
             row["crmCustomerId"] = customer["id"].clone();
             row["productId"] = json!(i64::MAX);
             row["stage"] = json!("线索");
-            row["expectedCloseDate"] = json!("2026-12-15");
+            row["estimatedAmount"] = json!("0");
+            row["expectedCloseDate"] = json!(service.clock.now().unwrap().today);
             store::save(tx, "opportunities", 0, row, None, &admin, "create")?;
             Ok(())
         })

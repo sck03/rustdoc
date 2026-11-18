@@ -4,6 +4,7 @@ export const permissionResources = {
   crmContacts: "sales.contacts",
   crmFollowUps: "sales.follow-ups",
   salesOpportunities: "sales.opportunities",
+  productReference: "common.product-reference",
   salesQuotes: "sales.quotes",
   suppliers: "sales.suppliers",
   supplierContacts: "sales.supplier-contacts",

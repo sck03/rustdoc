@@ -15,7 +15,14 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 
 pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Value> {
-    let now = clock.now().map_err(unavailable)?.utc_now;
+    let time = clock.now().map_err(unavailable)?;
+    let now = time.utc_now;
+    let start = time.today.to_string();
+    let end = time
+        .today
+        .checked_add_days(chrono::Days::new(30))
+        .ok_or_else(|| unavailable("业务日期超出范围。"))?
+        .to_string();
     store.read_for(actor, GET_CRM_DASHBOARD, &[], |tx, actor| {
         let customer_count = tx.query_generic(&GenericQuery {
             kind: "crm-customers",
@@ -35,7 +42,7 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
             }
             Ok(())
         })?;
-        let opportunities = CrmList::Opportunities { customer_id: None, stage: "", keyword: "", include_archived: false, upcoming_closings: false };
+        let opportunities = CrmList::Opportunities { customer_id: None, stage: "", keyword: "", include_archived: false, closing_window: None };
         let mut stages: BTreeMap<String, usize> = BTreeMap::new();
         let mut currencies: BTreeMap<String, (usize, Decimal, Decimal)> = BTreeMap::new();
         crm_queries::scan(tx, actor, opportunities, &[
@@ -55,7 +62,7 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
             entry.2 = entry.2.checked_add(weighted).ok_or_else(|| unavailable("加权金额汇总超出范围。"))?;
             Ok(())
         })?;
-        let (_, closings) = crm_queries::page(tx, actor, CrmList::Opportunities { customer_id: None, stage: "", keyword: "", include_archived: false, upcoming_closings: true },
+        let (_, closings) = crm_queries::page(tx, actor, CrmList::Opportunities { customer_id: None, stage: "", keyword: "", include_archived: false, closing_window: Some((&start, &end)) },
             &crm_queries::fields("ApiSalesOpportunityDto"), 0, 8)?;
         if closings.iter().any(|row| row["productId"].as_i64().is_some_and(|id| id > 0)) {
             auth::authorize(actor, "common.product-reference", "view")?;
@@ -68,7 +75,7 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
         result["dueNextSevenDaysCount"] = json!(upcoming);
         result["upcomingFollowUps"] = json!(follow_ups.into_iter().map(|row| contracts::project(contracts::schema("ApiCrmFollowUpDto"), row)).collect::<Vec<_>>());
         result["opportunityStages"] = json!(rules::STAGES.iter().map(|stage| json!({"stage":stage,"count":stages.get(*stage).copied().unwrap_or(0)})).collect::<Vec<_>>());
-        result["opportunityCurrencies"] = json!(currencies.into_iter().map(|(currency,(count,amount,weighted))| json!({"currency":currency,"count":count,"estimatedAmount":amount,"weightedAmount":weighted})).collect::<Vec<_>>());
+        result["opportunityCurrencies"] = json!(currencies.into_iter().map(|(currency,(count,amount,weighted))| json!({"currency":currency,"count":count,"estimatedAmount":amount.to_string(),"weightedAmount":weighted.to_string()})).collect::<Vec<_>>());
         result["upcomingOpportunityClosings"] = json!(closings.into_iter().map(sales::projected).collect::<Vec<_>>());
         Ok(result)
     })

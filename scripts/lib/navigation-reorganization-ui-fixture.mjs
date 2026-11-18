@@ -17,7 +17,7 @@ import {ConfirmationProvider} from ${source("ui/ConfirmationProvider.tsx")};
 import {UnsavedChangesProvider} from ${source("ui/unsavedChangesGuard.tsx")};
 const role=new URLSearchParams(location.search).get('role')||'admin';
 const rows=Array.from({length:135},(_,i)=>({id:i+1,name:'示例单位 '+String(i+1).padStart(3,'0'),countryRegion:'CN',website:'',status:'合作中',category:'纺织',mainProducts:'服装',notes:'',source:'展会',versionNumber:1}));
-const opportunities=rows.map(row=>({...row,title:'商机 '+row.id,crmCustomerId:row.id,customerName:row.name,productId:null,productCode:'',productName:'',stage:'线索',quotationNo:'QT-'+row.id,estimatedAmount:100,currency:'USD',probabilityPercent:20,nextAction:'确认需求',allowedNextStages:['需求确认']}));
+const opportunities=rows.map(row=>({...row,title:'商机 '+row.id,crmCustomerId:row.id,customerName:row.name,productId:null,productCode:'',productName:'',stage:'线索',quotationNo:'QT-'+row.id,estimatedAmount:'100',currency:'USD',probabilityPercent:20,nextAction:'确认需求',allowedNextStages:['需求确认']}));
 const invoices=rows.map(row=>({id:row.id,invoiceNo:'INV-'+row.id,customerName:row.name,invoiceDate:'2026-09-12',currency:'USD',totalAmount:100,type:'出口',status:'Draft',exporterName:'示例出口公司',destinationCountry:'US',portOfLoading:'宁波',portOfDestination:'纽约',contractNo:''}));
 const deliveries=Array.from({length:65},(_,i)=>({deliveryId:'delivery-'+i,jobId:'',kind:'EmailTool',recipient:'buyer'+i+'@example.test',subject:'业务邮件 '+i,attachmentCount:0,status:i%2?'Uncertain':'Sent',errorMessage:'',createdAt:'2026-09-12T01:00:00Z',updatedAt:'2026-09-12T01:00:00Z'}));
 const templates=[{templatePath:'invoice_template.html',displayName:'标准发票',reportType:'ExportDocument',withSealDefault:true},{templatePath:'packing.html',displayName:'装箱单',reportType:'ExportDocument',withSealDefault:false}];
@@ -43,7 +43,7 @@ const client={
  querySupplierContacts:input=>call('supplierContacts',input,page([{...supplierContact,supplierCompanyId:input.supplierId}],input)),
  setPrimarySupplierContact:input=>{window.__calls.push({name:'primarySupplierContact',input});if(window.__failContactAction)return Promise.reject(new Error('contact action failed'));supplierContact={...supplierContact,isPrimary:true,versionNumber:supplierContact.versionNumber+1};return Promise.resolve({...supplierContact,supplierCompanyId:input.supplierId});},
  querySalesOpportunities:input=>call('opportunities',input,page(matches(opportunities,input),input)),getSalesOpportunity:input=>call('opportunity',input,exact(opportunities,input.id)),
- listSalesOpportunityHistory:input=>call('opportunityHistory',input,{items:[{id:1,versionNumber:1,changeType:'新建',stage:'线索',quotationNo:'QT-'+input.id,estimatedAmount:100,currency:'USD',probabilityPercent:20,changedBy:'示例人员',createdAt:'2026-09-12T01:00:00Z'}],nextCursor:null}),
+ listSalesOpportunityHistory:input=>call('opportunityHistory',input,{items:[{id:1,versionNumber:1,changeType:'新建',stage:'线索',quotationNo:'QT-'+input.id,estimatedAmount:'100',currency:'USD',probabilityPercent:20,changedBy:'示例人员',createdAt:'2026-09-12T01:00:00Z'}],nextCursor:null}),
  listProducts:input=>call('products',input,page([],input)),
  listInvoices:input=>call('invoices',input,page(matches(invoices,input),input)),
  getSettings:()=>call('settings',{}, {settings,secrets:{},storagePolicy:''}),

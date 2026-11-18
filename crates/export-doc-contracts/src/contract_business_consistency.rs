@@ -4,6 +4,15 @@ use serde_json::{Value, json};
 pub(super) fn apply(baseline: &mut Value) {
     baseline["x-exportdoc-json-response-limit-bytes"] = json!(67108864);
     let paths = baseline["paths"].as_object_mut().unwrap();
+    paths["/livez"]["head"]["operationId"] = json!("headLiveness");
+    paths["/readyz"]["head"]["operationId"] = json!("headReadiness");
+    for path in [
+        "/api/crm/opportunities",
+        "/api/crm/opportunities/{id}",
+        "/api/crm/opportunities/{id}/history",
+    ] {
+        paths[path]["get"]["x-exportdoc-policy"]["access"]["resources"].as_array_mut().unwrap().push(json!({"resourceKey":"common.product-reference","actions":["view"],"administratorOnly":false}));
+    }
     for (path, method) in [
         ("/api/master-data/customers", "get"),
         ("/api/master-data/exporters", "get"),
@@ -12,6 +21,10 @@ pub(super) fn apply(baseline: &mut Value) {
         ("/api/master-data/hs-codes/import-path", "post"),
         ("/api/master-data/hs-codes/import-upload", "post"),
         ("/api/invoices/hs-knowledge/feedback", "post"),
+        (
+            "/api/master-data/hs-knowledge/remote-candidates/review",
+            "post",
+        ),
     ] {
         let path_item = paths[path].as_object_mut().unwrap();
         assert!(
@@ -37,6 +50,21 @@ pub(super) fn apply(baseline: &mut Value) {
         json!({"name":"limit","in":"query","schema":{"type":"integer","minimum":1,"maximum":200,"default":30}}),
     ]);
     let schemas = baseline["components"]["schemas"].as_object_mut().unwrap();
+    for name in [
+        "ApiSalesOpportunityCurrencySummaryDto",
+        "ApiSalesOpportunityDto",
+        "ApiSalesOpportunityHistoryDto",
+        "ApiSalesOpportunitySaveRequest",
+    ] {
+        for field in ["estimatedAmount", "weightedAmount"] {
+            if let Some(amount) = schemas[name]["properties"].get_mut(field) {
+                amount["format"] = json!("decimal");
+                if name != "ApiSalesOpportunitySaveRequest" {
+                    amount["type"] = json!("string");
+                }
+            }
+        }
+    }
     for name in ["ApiHsCodeImportPathRequest", "ApiHsCodeImportResponse"] {
         assert!(schemas.remove(name).is_some());
     }

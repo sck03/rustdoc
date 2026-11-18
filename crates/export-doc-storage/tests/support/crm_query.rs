@@ -170,7 +170,7 @@ pub fn exercise(c: &Connection) {
         stage: "",
         keyword: "E\u{301}cole",
         include_archived: false,
-        upcoming_closings: false,
+        closing_window: None,
     };
     let (count, rows) = c.query_crm(&q).unwrap();
     assert_eq!(count, 2);
@@ -201,7 +201,7 @@ pub fn exercise(c: &Connection) {
             stage: "线索",
             keyword,
             include_archived: false,
-            upcoming_closings: false,
+            closing_window: None,
         };
         assert_eq!(c.query_crm(&q).unwrap().0, 1);
     }
@@ -210,9 +210,17 @@ pub fn exercise(c: &Connection) {
         stage: "",
         keyword: "",
         include_archived: false,
-        upcoming_closings: true,
+        closing_window: Some(("2026-10-28", "2026-11-27")),
     };
     assert_eq!(c.query_crm(&q).unwrap().0, 1);
+    for (date, count) in [("2026-10-27", 1), ("2026-11-27", 1), ("2026-11-26", 2)] {
+        insert(
+            c,
+            "opportunities",
+            json!({"crmCustomerId":customer,"stage":"线索","expectedCloseDate":date}),
+        );
+        assert_eq!(c.query_crm(&q).unwrap().0, count);
+    }
     let benchmark_customer = insert(c, "crm-customers", json!({"name":"SCALE customer"}));
     let large = "unused-crm-detail".repeat(256);
     for number in 0..1000 {
@@ -246,7 +254,7 @@ pub fn exercise(c: &Connection) {
                 stage: "",
                 keyword: "SCALE",
                 include_archived: false,
-                upcoming_closings: false,
+                closing_window: None,
             },
         ),
     ] {

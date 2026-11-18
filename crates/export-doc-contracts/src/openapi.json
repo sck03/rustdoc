@@ -14566,19 +14566,13 @@
             "type": "string"
           },
           "estimatedAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
+            "type": "string",
+            "format": "decimal",
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
           },
           "weightedAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
+            "type": "string",
+            "format": "decimal",
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
           }
         },
@@ -14613,11 +14607,8 @@
             "type": "string"
           },
           "estimatedAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
+            "type": "string",
+            "format": "decimal",
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
           },
           "expectedCloseDate": {
@@ -14724,11 +14715,8 @@
             "type": "string"
           },
           "estimatedAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
+            "type": "string",
+            "format": "decimal",
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
           },
           "expectedCloseDate": {
@@ -14855,7 +14843,7 @@
               "number",
               "string"
             ],
-            "format": "double",
+            "format": "decimal",
             "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
             "default": 0
           },
@@ -45304,6 +45292,13 @@
                   "view"
                 ],
                 "administratorOnly": false
+              },
+              {
+                "resourceKey": "common.product-reference",
+                "actions": [
+                  "view"
+                ],
+                "administratorOnly": false
               }
             ]
           }
@@ -45471,6 +45466,13 @@
             "resources": [
               {
                 "resourceKey": "sales.opportunities",
+                "actions": [
+                  "view"
+                ],
+                "administratorOnly": false
+              },
+              {
+                "resourceKey": "common.product-reference",
                 "actions": [
                   "view"
                 ],
@@ -45699,6 +45701,13 @@
             "resources": [
               {
                 "resourceKey": "sales.opportunities",
+                "actions": [
+                  "view"
+                ],
+                "administratorOnly": false
+              },
+              {
+                "resourceKey": "common.product-reference",
                 "actions": [
                   "view"
                 ],
@@ -53983,70 +53992,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/HsCodeRemoteCandidateResetInput"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/master-data/hs-knowledge/remote-candidates/review": {
-      "post": {
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "ReviewHsCodeRemoteCandidate",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiCommandResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.hs-knowledge",
-                "actions": [
-                  "manage"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HsCodeRemoteCandidateReviewInput"
               }
             }
           }
@@ -126392,7 +126337,7 @@
         "tags": [
           "ExportDocManager.Api"
         ],
-        "operationId": "getLiveness",
+        "operationId": "headLiveness",
         "responses": {
           "200": {
             "description": "OK"
@@ -126441,7 +126386,7 @@
         "tags": [
           "ExportDocManager.Api"
         ],
-        "operationId": "getReadiness",
+        "operationId": "headReadiness",
         "responses": {
           "200": {
             "description": "OK"

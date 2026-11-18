@@ -236,7 +236,7 @@ pub async fn success(
             source,
             size,
             permit,
-            state.telemetry.clone(),
+            is_file.then(|| state.telemetry.clone()),
             request_id.to_owned(),
             state.shutdown.clone(),
             std::time::Duration::from_secs(if is_file {

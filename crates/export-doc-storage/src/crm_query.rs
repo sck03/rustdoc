@@ -14,8 +14,8 @@ pub enum CrmList<'a> {
         stage: &'a str,
         keyword: &'a str,
         include_archived: bool,
-        /// Open opportunities with a close date, ordered for the overview.
-        upcoming_closings: bool,
+        /// Business dates, inclusive start and exclusive end.
+        closing_window: Option<(&'a str, &'a str)>,
     },
 }
 pub struct CrmQuery<'a> {
@@ -93,7 +93,7 @@ pub(crate) fn build(q: &CrmQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
         CrmList::Contacts => ("crm-contacts", "r.id DESC"),
         CrmList::FollowUps { .. } => ("crm-follow-ups", "r.id"),
         CrmList::Opportunities {
-            upcoming_closings: true,
+            closing_window: Some(_),
             ..
         } => (
             "opportunities",
@@ -148,7 +148,7 @@ pub(crate) fn build(q: &CrmQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
             customer_id,
             stage,
             keyword,
-            upcoming_closings,
+            closing_window,
             include_archived,
         } => {
             if !include_archived {
@@ -168,15 +168,15 @@ pub(crate) fn build(q: &CrmQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
                     sql::bind(&mut values, stage, pg)
                 ));
             }
-            if upcoming_closings {
+            if let Some((start, end)) = closing_window {
                 clauses.push(format!(
                     "{} NOT IN ('已成交','已失单')",
                     sql::field("stage", pg)
                 ));
-                clauses.push(format!(
-                    "COALESCE({},'')<>''",
-                    sql::field("expectedCloseDate", pg)
-                ));
+                let date = sql::field("expectedCloseDate", pg);
+                let start = sql::bind(&mut values, start, pg);
+                let end = sql::bind(&mut values, end, pg);
+                clauses.push(format!("{date}>={start} AND {date}<{end}"));
             }
             if !keyword.is_empty() {
                 let parameter = sql::bind(&mut values, keyword, pg);

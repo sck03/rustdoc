@@ -651,7 +651,6 @@ const operationDomains: Record<string, Domain> = {
   returnForCorrectionTravelRequest: "office",
   returnMeetingRoomKey: "office",
   returnOfficeSupply: "office",
-  reviewHsCodeRemoteCandidate: "masterData",
   reviewHsCodeRemoteCandidatesBatch: "masterData",
   reviewInvoice: "invoices",
   reviewLetterOfCreditCompliance: "tools",

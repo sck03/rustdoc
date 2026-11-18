@@ -17,7 +17,7 @@ export function opportunityRequest(values: OpportunityValues, record: ApiSalesOp
     crmCustomerId: Number(values.crmCustomerId), title: values.title.trim(),
     productId: quoteAllowed ? Number(values.productId) || null : record?.productId ?? null,
     quotationNo: quoteAllowed ? values.quotationNo.trim() : record?.quotationNo ?? "",
-    estimatedAmount: quoteAllowed ? Number(values.estimatedAmount || 0) : record?.estimatedAmount ?? 0,
+    estimatedAmount: quoteAllowed ? values.estimatedAmount.trim() || "0" : record?.estimatedAmount ?? "0",
     currency: quoteAllowed ? values.currency.trim().toUpperCase() || "USD" : record?.currency ?? "USD",
     probabilityPercent: quoteAllowed ? Number(values.probabilityPercent || 0) : record?.probabilityPercent ?? 0,
     expectedCloseDate: quoteAllowed ? values.expectedCloseDate || null : record?.expectedCloseDate ?? null,

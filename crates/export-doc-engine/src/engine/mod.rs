@@ -273,7 +273,7 @@ impl NativeService {
                 &records::text(&body_value, "username"),
                 body_value["password"].as_str().unwrap_or(""),
             )?,
-            GET_HEALTH | GET_LIVENESS | GET_READINESS => {
+            GET_HEALTH | GET_LIVENESS | GET_READINESS | HEAD_LIVENESS | HEAD_READINESS => {
                 self.health()?;
                 diagnostics::health(&self.paths, self.provider()?)?
             }

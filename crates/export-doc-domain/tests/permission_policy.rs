@@ -69,7 +69,11 @@ fn prior_decision(
     op: Operation,
     query: &[(&str, String)],
 ) -> bool {
-    let policy = prior_policy(op.id);
+    let policy = prior_policy(match op {
+        HEAD_LIVENESS => GET_LIVENESS.id,
+        HEAD_READINESS => GET_READINESS.id,
+        _ => op.id,
+    });
     if !policy.is_object() {
         return false;
     }
@@ -86,6 +90,12 @@ fn prior_decision(
     if op == GET_EMAIL_TOOL_STATUS {
         return allows("common.email-delivery", "send")
             || allows("common.email-delivery", "view-delivery");
+    }
+    if matches!(
+        op,
+        GET_SALES_OPPORTUNITY | QUERY_SALES_OPPORTUNITIES | LIST_SALES_OPPORTUNITY_HISTORY
+    ) {
+        return allows("sales.opportunities", "view") && allows("common.product-reference", "view");
     }
     if let Some(requirements) = policy["requirements"]
         .as_array()

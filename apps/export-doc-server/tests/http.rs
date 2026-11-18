@@ -33,6 +33,8 @@ fn http_uses_generated_routes_and_denies_unauthenticated_or_local_operations() {
         .unwrap();
     let (tokens,metrics_request_id)=runtime.block_on(async {
         for (method, path, status) in [
+            ("HEAD", "/livez", StatusCode::OK),
+            ("HEAD", "/readyz", StatusCode::OK),
             ("GET", "/api/invoices", StatusCode::UNAUTHORIZED),
             ("GET", "/api/diagnostics/metrics", StatusCode::UNAUTHORIZED),
             ("POST", "/api/disaster-recovery/archives/00000000000000000000000000000000/save-to-path-jobs", StatusCode::FORBIDDEN),

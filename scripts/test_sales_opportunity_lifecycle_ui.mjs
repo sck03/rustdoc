@@ -27,7 +27,7 @@ window.requests=[];window.reads=[];window.historyReads=[];window.metricReads=0;w
 const health=${JSON.stringify(runtimeDiagnosticsHealth())};
 const cache=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:30000},mutations:{retry:false}}});window.cache=cache;
 const record=id=>({id,crmCustomerId:1,customerName:"示例客户",productId:7,productCode:"P-7",productName:"棉制T恤",
- title:"商机-"+id,stage:"线索",quotationNo:"Q-"+id,estimatedAmount:125.75,currency:"USD",probabilityPercent:20,
+ title:"商机-"+id,stage:"线索",quotationNo:"Q-"+id,estimatedAmount:"10000000000000.0001",currency:"USD",probabilityPercent:20,
  expectedCloseDate:"2026-12-15",nextAction:"联系客户",notes:"",versionNumber:1,isArchived:id===1&&window.config.archived,
  allowedNextStages:["需求确认"]});
 window.records={1:record(1),2:record(2),3:record(3)};
@@ -42,7 +42,7 @@ const base={querySalesOpportunities:async r=>paged(Object.values(window.records)
  createSalesOpportunity:(r,i)=>deferred("create",r,i),updateSalesOpportunity:(r,i)=>deferred("save",r,i),
  archiveSalesOpportunity:(r,i)=>deferred("archive",r,i),transitionSalesOpportunity:(r,i)=>deferred("transition",r,i),
  listSalesOpportunityHistory:async r=>{window.historyReads.push(r);return {items:(r.beforeId?[1]:[3,2]).map(versionNumber=>({id:versionNumber,versionNumber,salesOpportunityId:r.id,
- changeType:"资料更新",stage:"线索",quotationNo:"Q-1",estimatedAmount:125.75,currency:"USD",probabilityPercent:20,changeNote:"第"+versionNumber+"次",changedBy:"测试人员",createdAt:"2026-11-18T01:00:00Z"})),nextCursor:r.beforeId?null:2};},
+ changeType:"资料更新",stage:"线索",quotationNo:"Q-1",estimatedAmount:"125.75",currency:"USD",probabilityPercent:20,changeNote:"第"+versionNumber+"次",changedBy:"测试人员",createdAt:"2026-11-18T01:00:00Z"})),nextCursor:r.beforeId?null:2};},
 };
 window.finish=(fail=false)=>{const pending=window.requests.at(-1);if(fail){pending.reject(new Error("late write failed"));return;}
  const id=pending.request.id||3,previous=window.records[id],saved={...previous,...pending.request.body,id,versionNumber:pending.request.id?previous.versionNumber+1:1};
@@ -85,7 +85,7 @@ const changeScope = (page, change) => page.evaluate(change => {
 try {
   await scenario("restricted quotation fields survive save", { quote: false }, async page => {
     await title(page).fill("修改基础资料"); await submit(page); await page.waitForFunction(() => window.requests.length === 1);
-    assert.deepEqual(await page.evaluate(() => { const b=window.requests[0].request.body;return [b.productId,b.expectedCloseDate,b.estimatedAmount,b.quotationNo]; }), [7,"2026-12-15",125.75,"Q-1"]);
+    assert.deepEqual(await page.evaluate(() => { const b=window.requests[0].request.body;return [b.productId,b.expectedCloseDate,b.estimatedAmount,b.quotationNo]; }), [7,"2026-12-15","10000000000000.0001","Q-1"]);
     assert.equal(await page.locator('[name="estimatedAmount"]').isDisabled(), true);
   });
   for (const isNew of [false, true]) await scenario("save merges continued typing: " + isNew, { entry: isNew ? "/crm/opportunities?view=editor" : undefined }, async page => {

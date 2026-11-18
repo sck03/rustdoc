@@ -24,6 +24,71 @@ async fn headers(socket: &mut TcpStream) -> String {
     .unwrap()
 }
 
+async fn check_command_admission(state: &ServerState) {
+    use axum::{Router, http::Request, routing::post};
+    use export_doc_engine::generated_api::{CREATE_CRM_CUSTOMER, LOGIN, QUERY_CRM_CUSTOMERS};
+    use tower::ServiceExt;
+    let token: serde_json::Value = serde_json::from_slice(
+        &state
+            .service
+            .dispatch(
+                LOGIN,
+                &[],
+                &[],
+                Some(serde_json::json!({"username":"admin","password":""})),
+                "",
+            )
+            .unwrap(),
+    )
+    .unwrap();
+    let token = token["accessToken"].as_str().unwrap();
+    let count = || {
+        let result = state
+            .service
+            .dispatch(
+                QUERY_CRM_CUSTOMERS,
+                &[],
+                &[("keyword", "budget-test".into())],
+                None,
+                token,
+            )
+            .unwrap();
+        serde_json::from_slice::<serde_json::Value>(&result).unwrap()["totalCount"]
+            .as_u64()
+            .unwrap()
+    };
+    let command_state = state.clone();
+    let app = Router::new().route(
+        CREATE_CRM_CUSTOMER.path,
+        post(move |request| {
+            crate::request::handle(command_state.clone(), CREATE_CRM_CUSTOMER, request)
+        }),
+    );
+    let request = || {
+        Request::post(CREATE_CRM_CUSTOMER.path)
+            .header("content-type", "application/json")
+            .header("authorization", format!("Bearer {token}"))
+            .body(Body::from(
+                serde_json::json!({"id":0,"name":"budget-test"}).to_string(),
+            ))
+            .unwrap()
+    };
+    let busy = state
+        .response_memory
+        .reserve_working(128 * 1024 * 1024)
+        .unwrap();
+    assert_eq!(app.clone().oneshot(request()).await.unwrap().status(), 429);
+    assert_eq!(count(), 0);
+    drop(busy);
+    let response = app.oneshot(request()).await.unwrap();
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .unwrap();
+    assert_eq!(status, 201, "{}", String::from_utf8_lossy(&bytes));
+    assert_eq!(count(), 1);
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn slow_json_sockets_are_bounded_and_disconnect_releases_the_budget() {
     let workspace = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -50,6 +115,7 @@ async fn slow_json_sockets_are_bounded_and_disconnect_releases_the_budget() {
         shutdown: Shutdown::default(),
     };
     let large_state = state.clone();
+    check_command_admission(&state).await;
     let app = axum::Router::new().route(
         "/large",
         axum::routing::get(move || {

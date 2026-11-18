@@ -101,6 +101,7 @@ fn compose_router(
         let operation = *operation;
         let method = match operation.method {
             "GET" => MethodFilter::GET,
+            "HEAD" => MethodFilter::HEAD,
             "POST" => MethodFilter::POST,
             "PUT" => MethodFilter::PUT,
             "PATCH" => MethodFilter::PATCH,

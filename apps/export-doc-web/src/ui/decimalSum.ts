@@ -54,6 +54,11 @@ export class ExactDecimal {
 
   toNumber(): number { return Number(this.toString()); }
 
+  toFixed(digits: number): string {
+    const [whole, fraction = ""] = this.round(digits).toString().split(".");
+    return digits ? `${whole}.${fraction.padEnd(digits, "0")}` : whole;
+  }
+
   toString(): string {
     const sign = this.coefficient < 0n ? "-" : "";
     const digits = (this.coefficient < 0n ? -this.coefficient : this.coefficient).toString().padStart(this.scale + 1, "0");

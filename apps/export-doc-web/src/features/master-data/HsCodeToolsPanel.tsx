@@ -36,6 +36,7 @@ export function HsCodeToolsPanel({
   businessYear,
   client,
   disabled,
+  readOnlySearch = false,
   keyword,
   onLocalDataChanged,
   onRemoteCandidatesChanged,
@@ -44,6 +45,7 @@ export function HsCodeToolsPanel({
   businessYear: number;
   client: ExportDocManagerApiClient;
   disabled: boolean;
+  readOnlySearch?: boolean;
   keyword: string;
   onLocalDataChanged: () => Promise<void>;
   onRemoteCandidatesChanged?: () => Promise<void>;
@@ -117,7 +119,7 @@ export function HsCodeToolsPanel({
     onError: (error) => showError(readApiError(error)),
   });
 
-  const commandScope = `hs-tools:${disabled}`;
+  const commandScope = `hs-tools:${disabled}:${readOnlySearch}`;
   const commitImportMutation = useScopedMutation(commandScope, client, {
     mutationFn: (token: string, signal) => client.commitHsCodesImport({ body: { token } }, { signal }),
     onSuccess: (response) => {
@@ -137,7 +139,7 @@ export function HsCodeToolsPanel({
 
   const remoteSearchMutation = useScopedMutation(commandScope, client, {
     mutationFn: (request: { keyword: string; requestId: number }, signal) =>
-      client.captureRemoteHsCodes({
+      readOnlySearch ? client.searchRemoteHsCodes({ keyword: request.keyword }, { signal }) : client.captureRemoteHsCodes({
         body: {
           keyword: request.keyword,
         },
@@ -152,6 +154,11 @@ export function HsCodeToolsPanel({
       setRemoteResults(items);
       setExpandedResultKey(null);
 
+      if (readOnlySearch) {
+        showSuccess(`查到 ${items.length} 条当前编码，未写入候选池。`);
+        return;
+      }
+
       if (pendingDetailCount > 0) {
         showSuccess(`联网查询完成：找到 ${response.standardCodeCount ?? items.length} 条当前编码，${response.declarationExampleCount ?? 0} 条申报实例已进入候选池；其中 ${pendingDetailCount} 条编码可按需补全详情。`);
         return;
@@ -165,7 +172,7 @@ export function HsCodeToolsPanel({
             : "联网查询完成，未找到当前编码或申报实例。",
       );
     },
-    refresh: onRemoteCandidatesChanged,
+    refresh: readOnlySearch ? undefined : onRemoteCandidatesChanged,
     onError: error => showError(readApiError(error)),
   });
 
@@ -401,7 +408,7 @@ export function HsCodeToolsPanel({
                   <div className="search-form hs-code-remote-search"><Search size={17} /><input aria-label="联网查询 HS 编码" value={remoteKeyword} onChange={(event) => setRemoteKeyword(event.target.value)} placeholder="HS 编码、品名或关键词" /></div>
                   <button className="command-button" type="submit" disabled={isBusy || !remoteKeyword.trim()}><Globe2 size={17} /><span>查询</span></button>
                 </form>
-                {remoteResults.length > 0 ? <HsCodeRemoteResults items={remoteResults} expandedResultKey={expandedResultKey} setExpandedResultKey={setExpandedResultKey} isBusy={isBusy} fetchDetail={(item) => fetchDetailMutation.mutate(item)} saveItem={(item) => saveRemoteMutation.mutate(item)} /> : null}
+                {remoteResults.length > 0 ? <HsCodeRemoteResults items={remoteResults} expandedResultKey={expandedResultKey} setExpandedResultKey={setExpandedResultKey} isBusy={isBusy || readOnlySearch} fetchDetail={(item) => fetchDetailMutation.mutate(item)} saveItem={(item) => saveRemoteMutation.mutate(item)} /> : null}
               </div>
             )}
         </HsCodeWorkspace>

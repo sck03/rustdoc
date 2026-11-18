@@ -107,6 +107,9 @@ pub fn schema_type(schema: &Value) -> String {
                 format!("{item}[]")
             }
         }
+        "number" if schema["format"] == "decimal" && types.contains(&"string") => {
+            "number | string".into()
+        }
         "integer" | "number" => "number".into(),
         "string" | "boolean" => kind.into(),
         _ if has_properties(schema) => format!(

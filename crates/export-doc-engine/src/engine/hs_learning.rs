@@ -245,20 +245,16 @@ pub fn remote_review(
             json!({"success":true,"message":format!("已重置 {count} 条候选。"),"count":count}),
         );
     }
-    let inputs = if operation == REVIEW_HS_CODE_REMOTE_CANDIDATE {
-        vec![body.clone()]
-    } else if operation == REVIEW_HS_CODE_REMOTE_CANDIDATES_BATCH {
-        body["items"]
-            .as_array()
-            .cloned()
-            .ok_or_else(|| invalid("缺少候选列表。"))?
-    } else {
+    if operation != REVIEW_HS_CODE_REMOTE_CANDIDATES_BATCH {
         return Err(invalid("知识库操作无效。"));
-    };
+    }
+    let inputs = body["items"]
+        .as_array()
+        .ok_or_else(|| invalid("缺少候选列表。"))?;
     if inputs.len() > 200 {
         return Err(invalid("一次最多审核 200 条候选。"));
     }
-    let codes = hs::codes_for_year(tx, year)?;
+    let mut verified = BTreeSet::new();
     let mut count = 0;
     for input in inputs {
         operation::check()?;
@@ -269,8 +265,8 @@ pub fn remote_review(
         }
         let accepted = input["confirmed"] == true;
         if accepted {
-            let current = rules::code(&text(&input, "currentCode")).map_err(invalid)?;
-            if !codes.get(&current).is_some_and(rules::Standard::trusted) {
+            let current = rules::code(&text(input, "currentCode")).map_err(invalid)?;
+            if verified.insert(current.clone()) && !hs::is_current(tx, &current, year)? {
                 return Err(invalid("请选择经过验证的当前有效编码。"));
             }
             let raw = text(&row, "rawReportedHsCode");

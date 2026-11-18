@@ -19,7 +19,7 @@ window.calls=[];window.downloads=[];window.cache=new QueryClient({defaultOptions
 document.addEventListener('click',event=>{if(event.target instanceof HTMLAnchorElement){event.preventDefault();window.downloads.push(event.target.download);}});
 const clients=[0,1].map(owner=>new Proxy({}, {get:(_,method)=>(request,options)=>new Promise((resolve,reject)=>window.calls.push({owner,method,request,signal:options?.signal,resolve,reject}))}));
 const root=createRoot(document.getElementById('root'));
-window.render=(owner=0,enabled=true)=>root.render(<React.StrictMode><QueryClientProvider client={window.cache}>{window.mode==='transfer'?<HsKnowledgeTransfer client={clients[owner]} canImport={enabled} canExport={enabled}/>:<HsCodeToolsPanel client={clients[owner]} disabled={!enabled} businessYear={2026} keyword="" mode="import" onLocalDataChanged={async()=>{}}/>}</QueryClientProvider></React.StrictMode>);
+window.render=(owner=0,enabled=true)=>root.render(<React.StrictMode><QueryClientProvider client={window.cache}>{window.mode==='transfer'?<HsKnowledgeTransfer client={clients[owner]} canImport={enabled} canExport={enabled}/>:<HsCodeToolsPanel client={clients[owner]} disabled={!enabled} businessYear={2026} keyword="" mode={window.mode==='import'?'import':'remote'} readOnlySearch={window.mode==='read-only'} onLocalDataChanged={async()=>{}}/>}</QueryClientProvider></React.StrictMode>);
 window.hide=()=>root.unmount();window.render();
 `}});
 const context=await require('playwright').chromium.launchPersistentContext(path.join(output,'Chrome'),{executablePath:locateChromeForTesting(repo),headless:true});
@@ -32,6 +32,16 @@ async function scenario(mode,check){
   finally{await page.close();}
 }
 try{
+  for(const [mode,method] of [['read-only','searchRemoteHsCodes'],['capture','captureRemoteHsCodes']]) await scenario(mode,async page=>{
+    await page.getByLabel('联网查询 HS 编码').fill('棉布');
+    await page.getByRole('button',{name:'查询',exact:true}).click();
+    await page.waitForFunction(()=>window.calls.length===1);
+    assert.equal(await page.evaluate(()=>window.calls[0].method),method);
+    await page.evaluate(()=>window.calls[0].resolve({items:[{code:'5208',name:'棉布'}]}));
+    const save=page.getByRole('button',{name:'保存为本地参考资料'});
+    await save.waitFor();assert.equal(await save.isDisabled(),mode==='read-only');
+    assert.equal(await page.evaluate(()=>window.calls.length),1);
+  });
   for(const departure of ['owner','revoke','unmount']) for(const outcome of ['success','failure']) await scenario('transfer',async page=>{
     await page.getByRole('button',{name:'导出 .edmhs',exact:true}).click();await page.waitForFunction(()=>window.calls.length===1);
     await page.evaluate(departure=>departure==='unmount'?window.hide():window.render(departure==='owner'?1:0,departure!=='revoke'),departure);

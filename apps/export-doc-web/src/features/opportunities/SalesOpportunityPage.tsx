@@ -12,6 +12,7 @@ import { OperationFeedback } from "../../ui/OperationFeedback.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { TaskViewTabs, getTaskViewPanelProps } from "../../ui/TaskViewTabs.tsx";
 import { opportunityStages } from "./salesOpportunityModel.ts";
+import { ExactDecimal } from "../../ui/decimalSum.ts";
 import { SalesOpportunityEditor } from "./SalesOpportunityEditor.tsx";
 import { SalesOpportunityHistory } from "./SalesOpportunityHistory.tsx";
 import { useSalesOpportunityWorkspace } from "./useSalesOpportunityWorkspace.ts";
@@ -35,7 +36,7 @@ export function SalesOpportunityPage({ businessTimeZone, client }: { businessTim
         <ResponsiveTableFrame label="销售商机列表" mobileLayout="scroll" busy={page.isFetching}><table className="data-table responsive-data-table"><thead><tr><th>商机</th><th>客户</th><th>产品</th><th>金额</th><th>概率</th><th>阶段</th><th>操作</th></tr></thead><tbody>
           {page.data?.items.map(item => <tr key={item.id}>
             <td><TablePrimaryText value={item.title} secondary={item.quotationNo} /></td><td>{item.customerName}</td><td>{item.productCode || item.productName || "—"}</td>
-            <td>{item.currency} {item.estimatedAmount.toFixed(2)}</td><td>{item.probabilityPercent}%</td><td>{item.isArchived ? "已归档" : <BusinessStatusBadge value={item.stage} />}</td>
+            <td>{item.currency} {ExactDecimal.from(item.estimatedAmount).toFixed(2)}</td><td>{item.probabilityPercent}%</td><td>{item.isArchived ? "已归档" : <BusinessStatusBadge value={item.stage} />}</td>
             <td><Button disabled={model.busy} onClick={() => model.navigate(item.id, item.isArchived ? "history" : "editor")}>{item.isArchived ? "查看历史" : permissions.edit ? "编辑" : "查看"}</Button></td>
           </tr>)}
         </tbody></table></ResponsiveTableFrame>

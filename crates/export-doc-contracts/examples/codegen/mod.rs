@@ -82,7 +82,7 @@ pub fn generate(document: &Value) -> Result<Generated> {
     let mut operations = Vec::new();
     let mut names = HashSet::new();
     for (path, item) in ordered(&document["paths"]) {
-        for method in ["get", "post", "put", "delete", "patch"] {
+        for method in ["get", "head", "post", "put", "delete", "patch"] {
             if let Some(value) = item.get(method) {
                 let id = value["operationId"]
                     .as_str()

@@ -23,7 +23,7 @@ export function RuntimeMetricsSection({ client }: { client: ExportDocManagerApiC
     ...(http ? [["HTTP 执行请求", `${http.requestCapacity - http.availableRequestSlots} / ${http.requestCapacity}`],
       ["HTTP 等待请求", `${http.queuedRequests} / ${http.queueCapacity}`],
       ["JSON 缓冲预算", `${formatBytes(http.responseMemory.reservedBytes)} / ${formatBytes(http.responseMemory.capacityBytes)}`],
-      ["JSON 缓冲拒绝", String(http.responseMemory.rejections)], ["响应传输超时", String(http.downloadTimeouts)]] : []),
+      ["JSON 缓冲拒绝", String(http.responseMemory.rejections)], ["文件下载超时", String(http.downloadTimeouts)]] : []),
   ];
   return <section aria-label="运行资源指标"><div className="toolbar-actions"><Button aria-label="刷新资源使用" disabled={query.isFetching} onClick={() => void query.refetch()}>刷新</Button></div>
     <p className="section-description">显示每个服务实例的请求名额与缓冲预算，程序总内存需单独监测。</p>

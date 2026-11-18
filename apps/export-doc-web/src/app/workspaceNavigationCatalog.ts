@@ -89,7 +89,7 @@ const navigationEntries = {
         ] },
   opportunities: { label: "商机与报价", description: "跟踪销售阶段、报价金额和下一步动作", keywords: "商机跟踪", to: "/crm/opportunities", icon: CircleDollarSign,
         isActive: (path) => path.startsWith("/crm/opportunities"), workspace: "sales", moduleKey: "sales.opportunities",
-        requiredPermissions: [{ resourceKey: permissionResources.salesOpportunities, action: permissionActions.view }] },
+        requiredPermissions: [permissionResources.salesOpportunities, permissionResources.productReference].map(resourceKey => ({ resourceKey, action: permissionActions.view })) },
   suppliers: { label: "供应商管理", description: "维护供应商、联系人、产品和评价", to: "/suppliers", icon: Factory,
         isActive: (path) => path.startsWith("/suppliers"), workspace: "sales", moduleKey: "sales.suppliers",
         requiredPermissions: [{ resourceKey: permissionResources.suppliers, action: permissionActions.view }] },

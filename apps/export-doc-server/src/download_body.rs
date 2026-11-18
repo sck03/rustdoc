@@ -79,7 +79,7 @@ pub(crate) fn body(
     source: Box<dyn AsyncRead + Unpin + Send>,
     size: u64,
     permit: Option<OwnedSemaphorePermit>,
-    telemetry: Arc<crate::telemetry::Telemetry>,
+    download_metrics: Option<Arc<crate::telemetry::Telemetry>>,
     request_id: String,
     shutdown: crate::Shutdown,
     total: Duration,
@@ -89,7 +89,7 @@ pub(crate) fn body(
         size,
         permit,
         Transfer {
-            telemetry,
+            download_metrics,
             idle: Duration::from_secs(60),
             total,
             request_id,
@@ -98,7 +98,7 @@ pub(crate) fn body(
     )
 }
 struct Transfer {
-    telemetry: Arc<crate::telemetry::Telemetry>,
+    download_metrics: Option<Arc<crate::telemetry::Telemetry>>,
     idle: Duration,
     total: Duration,
     request_id: String,
@@ -111,7 +111,7 @@ fn transfer(
     context: Transfer,
 ) -> Body {
     let Transfer {
-        telemetry,
+        download_metrics,
         idle,
         total,
         request_id,
@@ -128,7 +128,9 @@ fn transfer(
     tokio::spawn(async move {
         let _permit = permit;
         let started = std::time::Instant::now();
-        let observation = telemetry.download_start();
+        let observation = download_metrics
+            .as_ref()
+            .map(|metrics| metrics.download_start());
         let copy = async {
             let mut remaining = size;
             let mut buffer = vec![0; buffer_bytes];
@@ -161,15 +163,19 @@ fn transfer(
             result = tokio::time::timeout(total, copy) => result.unwrap_or(Err("transfer-timeout")),
             _ = shutdown.wait() => Err("server-shutdown"),
         };
-        if let Err(reason) = result {
-            telemetry.download_failure(reason);
+        if let Some(telemetry) = download_metrics.as_ref() {
+            if let Err(reason) = result {
+                telemetry.download_failure(reason);
+            }
+            telemetry.download_finished(&request_id, result.err(), started.elapsed());
         }
-        observation.finish(result.is_ok());
-        telemetry.download_finished(&request_id, result.err(), started.elapsed());
+        if let Some(observation) = observation {
+            observation.finish(result.is_ok());
+        }
     });
     Body::from_stream(tokio_util::io::ReaderStream::with_capacity(
         reader,
-        64 * 1024,
+        buffer_bytes,
     ))
 }
 
@@ -191,7 +197,7 @@ mod tests {
             size,
             Some(permit),
             Transfer {
-                telemetry,
+                download_metrics: Some(telemetry),
                 idle,
                 total,
                 request_id,
@@ -217,7 +223,7 @@ mod tests {
             128 * 1024,
             Some(slots.clone().try_acquire_owned().unwrap()),
             Transfer {
-                telemetry,
+                download_metrics: Some(telemetry),
                 idle: Duration::from_secs(60),
                 total: Duration::from_secs(3600),
                 request_id: "shutdown-test".into(),

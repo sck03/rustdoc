@@ -3135,8 +3135,8 @@ export interface ApiRuntimePathInfo {
 export interface ApiSalesOpportunityCurrencySummaryDto {
   count: number;
   currency: string;
-  estimatedAmount: number;
-  weightedAmount: number;
+  estimatedAmount: string;
+  weightedAmount: string;
 }
 
 export interface ApiSalesOpportunityDto {
@@ -3144,7 +3144,7 @@ export interface ApiSalesOpportunityDto {
   crmCustomerId: number;
   currency: string;
   customerName: string;
-  estimatedAmount: number;
+  estimatedAmount: string;
   expectedCloseDate?: string | null;
   id: number;
   isArchived: boolean;
@@ -3166,7 +3166,7 @@ export interface ApiSalesOpportunityHistoryDto {
   changedBy: string;
   createdAt: string;
   currency: string;
-  estimatedAmount: number;
+  estimatedAmount: string;
   expectedCloseDate?: string | null;
   id: number;
   probabilityPercent: number;
@@ -3189,7 +3189,7 @@ export interface ApiSalesOpportunitySaveRequest {
   changeNote?: string;
   crmCustomerId: number;
   currency?: string;
-  estimatedAmount?: number;
+  estimatedAmount?: number | string;
   expectedCloseDate?: string | null;
   expectedVersion?: number;
   id: number;
@@ -10470,10 +10470,6 @@ export interface ReturnMeetingRoomKeyRequest {
 export interface ReturnOfficeSupplyRequest {
   id: number;
   body: OfficeReturnRequest;
-}
-
-export interface ReviewHsCodeRemoteCandidateRequest {
-  body: HsCodeRemoteCandidateReviewInput;
 }
 
 export interface ReviewHsCodeRemoteCandidatesBatchRequest {

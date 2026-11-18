@@ -57,6 +57,7 @@ const salesPermissions = [
   permissionGrant("sales.customers", "view"),
   permissionGrant("sales.follow-ups", "view"),
   permissionGrant("sales.opportunities", "view"),
+  permissionGrant("common.product-reference", "view"),
   permissionGrant("sales.email-templates", "view", "department"),
   permissionGrant("sales.suppliers", "view", "company"),
 ];
@@ -180,6 +181,9 @@ assert(!salesGroups.flatMap((group) => group.items.flatMap((item) => item.childr
 assert(salesGroups.flatMap((group) => group.items.flatMap((item) => item.children ?? [item])).some((item) => item.to === "/suppliers"), "supplier workspace visible for salesperson");
 assert(salesGroups.flatMap((group) => group.items.flatMap((item) => item.children ?? [item])).some((item) => item.to === "/crm/email-templates"), "email templates visible for salesperson");
 assert(salesGroups.flatMap((group) => group.items.flatMap((item) => item.children ?? [item])).some((item) => item.to === "/crm/opportunities"), "sales opportunities visible for salesperson");
+const opportunityOnly = model.filterWorkspaceNavGroups({ productEdition: "Full", canUseSalesWorkspace: true,
+  ...moduleGrants(["sales.opportunities"]), permissions: [permissionGrant("sales.opportunities", "view")] });
+assert(!opportunityOnly.flatMap(group => group.items.flatMap(item => item.children ?? [item])).some(item => item.to === "/crm/opportunities"), "opportunities require product reference access");
 assert(!salesGroups.flatMap((group) => group.items.flatMap((item) => item.children ?? [item])).some((item) => item.to === "/invoices"), "documents hidden for salesperson");
 assert(!salesGroups.flatMap((group) => group.items.flatMap((item) => item.children ?? [item])).some((item) => item.to === "/master-data"), "document master data hidden for salesperson");
 assert(!salesGroups.flatMap((group) => group.items.flatMap((item) => item.children ?? [item])).some((item) => ["/reports/templates/manage", "/tools/excel", "/tools/ocr", "/tools/container-packing"].includes(item.to)), "document-only tools hidden for salesperson");

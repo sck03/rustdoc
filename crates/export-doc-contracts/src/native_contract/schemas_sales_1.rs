@@ -44,14 +44,14 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiPagedResponseOfApiSupplierProductLinkDto",super::schema_shapes::paged_response("ApiSupplierProductLinkDto")),
     ("ApiPagedResponseOfApiSupplierProductOptionDto",super::schema_shapes::paged_response("ApiSupplierProductOptionDto")),
     ("ApiSalesOpportunityCurrencySummaryDto",o(vec![
-        ("currency",s()),("count",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("estimatedAmount",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
-        ("weightedAmount",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"))
+        ("currency",s()),("count",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("estimatedAmount",s().format("decimal").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
+        ("weightedAmount",s().format("decimal").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"))
     ]).required(vec!["currency","count","estimatedAmount","weightedAmount"])),
     ("ApiSalesOpportunityDto",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("crmCustomerId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("customerName",s()),
         ("productId",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("productCode",s()),("productName",s()),
         ("title",s()),("stage",s()),("isArchived",b()),("quotationNo",s()),
-        ("estimatedAmount",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("currency",s()),("probabilityPercent",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
+        ("estimatedAmount",s().format("decimal").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("currency",s()),("probabilityPercent",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("expectedCloseDate",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),("nextAction",s()),("notes",s()),
         ("versionNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("allowedNextStages",a(s()))
     ]).required(vec!["id","crmCustomerId","customerName","productCode","productName","title","stage","isArchived","quotationNo","estimatedAmount","currency","probabilityPercent","nextAction","notes","versionNumber","allowedNextStages"])),
@@ -62,14 +62,14 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiSalesOpportunityHistoryDto",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("salesOpportunityId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("versionNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("changeType",s()),("stage",s()),("quotationNo",s()),
-        ("estimatedAmount",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("currency",s()),("probabilityPercent",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
+        ("estimatedAmount",s().format("decimal").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("currency",s()),("probabilityPercent",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("expectedCloseDate",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),("changeNote",s()),("changedBy",s()),
         ("createdAt",s().format("date-time"))
     ]).required(vec!["id","salesOpportunityId","versionNumber","changeType","stage","quotationNo","estimatedAmount","currency","probabilityPercent","changeNote","changedBy","createdAt"])),
     ("ApiSalesOpportunityLifecycleRequest",super::schema_shapes::lifecycle_request()),
     ("ApiSalesOpportunitySaveRequest",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("crmCustomerId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("productId",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("title",s().default_value(serde_json::json!(""))),("quotationNo",s().default_value(serde_json::json!(""))),("estimatedAmount",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).default_value(serde_json::json!(num("0"))).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
+        ("title",s().default_value(serde_json::json!(""))),("quotationNo",s().default_value(serde_json::json!(""))),("estimatedAmount",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).default_value(serde_json::json!(num("0"))).format("decimal").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
         ("currency",s().default_value(serde_json::json!("USD"))),("probabilityPercent",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("0"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("expectedCloseDate",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),
         ("nextAction",s().default_value(serde_json::json!(""))),("notes",s().default_value(serde_json::json!(""))),("changeNote",s().default_value(serde_json::json!(""))),
         ("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("0"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))

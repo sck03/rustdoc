@@ -125,6 +125,7 @@ export function AppWorkspaceRoutes({
           ? <EmailTemplatePage client={client} />
           : <Navigate to={defaultRoute} replace />} />
         <Route path="/crm/opportunities" element={hasPermission(permissions, permissionResources.salesOpportunities, permissionActions.view)
+          && hasPermission(permissions, permissionResources.productReference, permissionActions.view)
           ? <SalesOpportunityPage businessTimeZone={user.businessTimeZone} client={client} />
           : <Navigate to={defaultRoute} replace />} />
         <Route path="/crm/follow-ups" element={hasPermission(permissions, permissionResources.crmCustomers, permissionActions.view) ||

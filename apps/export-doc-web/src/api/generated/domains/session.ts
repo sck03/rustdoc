@@ -83,6 +83,16 @@ export default function createApi(transport: ApiTransport) {
     return transport.request<void>("GET", path, { init });
   },
 
+  headLiveness(init?: ApiRequestInit): Promise<void> {
+    const path = "/livez";
+    return transport.request<void>("HEAD", path, { init });
+  },
+
+  headReadiness(init?: ApiRequestInit): Promise<void> {
+    const path = "/readyz";
+    return transport.request<void>("HEAD", path, { init });
+  },
+
   };
 }
 export type Api = ReturnType<typeof createApi>;

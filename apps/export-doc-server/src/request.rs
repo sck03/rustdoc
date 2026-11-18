@@ -326,6 +326,17 @@ async fn execute(
         merge_uploads,
         reservation,
     } = parsed;
+    // Once a command commits, response admission must not turn success into a retryable 429.
+    let command_memory = if !matches!(operation.method, "GET" | "HEAD") && transfer_permit.is_none()
+    {
+        Some(
+            state
+                .response_memory
+                .reserve_working(export_doc_contracts::request_limits::MAX_JSON_RESPONSE_BYTES)?,
+        )
+    } else {
+        None
+    };
     let worker = tokio::task::spawn_blocking(move || {
         let _registration = registration;
         let _permit = permit;
@@ -570,6 +581,15 @@ async fn execute(
                 }
             })
             .map(|mut reply| {
+                if let Some(mut memory) = command_memory {
+                    if reply.bytes.capacity()
+                        > export_doc_contracts::request_limits::MAX_JSON_RESPONSE_BYTES
+                    {
+                        reply.bytes.shrink_to_fit();
+                    }
+                    memory.shrink_to(reply.bytes.capacity().max(1));
+                    reply.memory_reservation = Some(memory);
+                }
                 reply.transfer_permit = reply.transfer_permit.or(transfer_permit);
                 reply
             })

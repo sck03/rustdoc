@@ -12,6 +12,7 @@ import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { WorkspaceGuide } from "../../ui/WorkspaceGuide.tsx";
+import { ExactDecimal } from "../../ui/decimalSum.ts";
 import { TaskViewPanel, TaskViewTabs } from "../../ui/TaskViewTabs.tsx";
 import { Card, KpiTile } from "../../ui/primitives/Card.tsx";
 
@@ -129,7 +130,7 @@ export function SalesDashboardPage({ businessTimeZone, client }: { businessTimeZ
   );
 }
 
-function formatAmount(value?: number) { return (value ?? 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function formatAmount(value: string) { return ExactDecimal.from(value).toFixed(2); }
 function formatDate(value?: string | null) {
   if (!value) return "未设置";
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);

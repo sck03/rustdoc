@@ -34,9 +34,14 @@ pub fn exercise(service: &NativeService, admin: &str) {
     let mut record = call(
         CREATE_SALES_OPPORTUNITY,
         0,
-        json!({"crmCustomerId":customer["id"],"title":format!("范围商机-{tag}"),"currency":"USD","estimatedAmount":123.45}),
+        json!({"crmCustomerId":customer["id"],"title":format!("范围商机-{tag}"),"currency":"USD","estimatedAmount":"10000000000000.0001"}),
     );
     let id = record["id"].as_i64().unwrap();
+    assert_eq!(record["estimatedAmount"], "10000000000000.0001");
+    assert_eq!(
+        request(service, admin, GET_SALES_OPPORTUNITY, id, &[], None).unwrap()["estimatedAmount"],
+        record["estimatedAmount"]
+    );
     let scheme = workflow::publish_scheme(
         service,
         admin,

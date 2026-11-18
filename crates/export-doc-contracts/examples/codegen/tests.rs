@@ -25,7 +25,7 @@ fn complete_contract_preserves_types_requests_runtime_and_endpoint_metadata() {
     let operations = contract["operations"].as_object().unwrap();
     assert_eq!(operations.len(), generated.operation_count);
     for item in document["paths"].as_object().unwrap().values() {
-        for method in ["get", "post", "put", "delete", "patch"] {
+        for method in ["get", "head", "post", "put", "delete", "patch"] {
             if let Some(op) = item.get(method) {
                 let projected = &operations[text(&op["operationId"])];
                 for (source, target) in [

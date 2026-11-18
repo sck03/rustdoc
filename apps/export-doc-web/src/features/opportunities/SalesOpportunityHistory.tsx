@@ -1,3 +1,4 @@
+import { ExactDecimal } from "../../ui/decimalSum.ts";
 import { useMemo, useState } from "react";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { useQuery } from "@tanstack/react-query";
@@ -21,7 +22,7 @@ export function SalesOpportunityHistory({ client, id, timeZone }: { client: Expo
       <th>版本</th><th>类型</th><th>阶段</th><th>报价编号</th><th>金额</th><th>概率</th><th>变更说明</th><th>操作信息</th>
     </tr></thead><tbody>{history.data.items.map(item => <tr key={item.id}>
       <td>V{item.versionNumber}</td><td>{item.changeType}</td><td>{item.stage}</td><td>{item.quotationNo || "—"}</td>
-      <td>{item.currency} {item.estimatedAmount.toFixed(2)}</td><td>{item.probabilityPercent}%</td><td>{item.changeNote || "—"}</td>
+      <td>{item.currency} {ExactDecimal.from(item.estimatedAmount).toFixed(2)}</td><td>{item.probabilityPercent}%</td><td>{item.changeNote || "—"}</td>
       <td>{item.changedBy}<br /><small>{formatBusinessDateTime(item.createdAt, timeZone)}</small></td>
     </tr>)}</tbody></table></ResponsiveTableFrame>
     {!history.data.items.length && <PageState title="暂无版本历史" />}
