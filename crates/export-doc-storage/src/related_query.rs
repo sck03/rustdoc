@@ -105,10 +105,17 @@ pub(crate) fn analytics(
             ),
         ));
     }
-    let projection_totals = sql::projected(
-        totals.iter().map(|(key, value)| Ok((*key, value.clone()))),
-        pg,
-    )?;
+    // Aggregates must stay in this SELECT scope, outside row-projection subqueries.
+    let projection_totals = format!(
+        "{}({}){}",
+        sql::object(pg),
+        totals
+            .iter()
+            .map(|(key, value)| format!("'{key}',{value}"))
+            .collect::<Vec<_>>()
+            .join(","),
+        if pg { "::text" } else { "" }
+    );
     let mut result = connection.query_json(
         &crate::query_source::aggregate(&selection, &projection_totals),
         &selection.values,

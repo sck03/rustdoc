@@ -118,6 +118,17 @@ pub fn exercise(c: &Connection) {
         limit: 200,
         ..query
     };
+    let empty = c
+        .supplier_assessment_analytics(&RelatedQuery {
+            parent_id: 7003,
+            ..assessments
+        })
+        .unwrap();
+    assert_eq!(
+        empty,
+        json!({"totalCount":0,"qualityTotal":0,"deliveryTotal":0,"serviceTotal":0,"priceTotal":0,
+        "preferredCount":0,"qualifiedCount":0,"watchCount":0,"pausedCount":0,"recent":[]})
+    );
     assert_eq!(c.query_related(&assessments).unwrap().0, 2);
     let analytics = c.supplier_assessment_analytics(&assessments).unwrap();
     assert_eq!(analytics["totalCount"], 2);

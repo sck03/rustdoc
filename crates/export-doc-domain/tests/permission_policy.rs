@@ -8,6 +8,12 @@ use std::sync::OnceLock;
 
 // Frozen pre-refactor annotations are independent of the live access rules.
 fn prior_policy(id: &str) -> &'static Value {
+    // Aggregate reads retain the independently frozen assessment-list permissions.
+    let id = if id == GET_SUPPLIER_ASSESSMENT_ANALYTICS.id {
+        LIST_SUPPLIER_ASSESSMENTS.id
+    } else {
+        id
+    };
     static POLICIES: OnceLock<Value> = OnceLock::new();
     &POLICIES.get_or_init(|| {
         let baseline: Value = serde_json::from_str(include_str!(
