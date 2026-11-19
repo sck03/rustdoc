@@ -34,29 +34,41 @@ export async function verifyDesktopSupplierConsistency({ run, request, token, bu
     }, { supplierId });
     assert.equal(result.status, 201, JSON.stringify(result.body));
   }
-  await run("window.__supplierReads=[];const original=window.fetch;window.fetch=(input,...args)=>{const url=typeof input==='string'?input:input.url;if(url?.includes('assessment-analytics'))window.__supplierReads.push(url);return original(input,...args);};true");
-  await run(`location.hash=${JSON.stringify(`#/suppliers?supplierId=${supplierId}&view=assessments`)};true`);
-  await wait(button('记录新评价'));
-  assert.equal(await run('window.__supplierReads.length'), 0, 'analytics is loaded only on demand');
-  await run(`${button('记录新评价')}.click();true`);
-  await wait("document.querySelector('textarea[name=notes]')");
-  await run("document.querySelector('textarea[name=notes]').focus();true");
-  await cdp.send('Input.insertText', { text: '中文评价保存回读' });
-  await run(`${button('保存评价草稿')}.click();true`);
-  await wait("document.body.innerText.includes('供应商评价已保存。')");
-  await run(`${button('返回评价记录')}.click();true`);
-  await wait("document.querySelectorAll('.supplier-assessment-workspace tbody tr').length===20");
-  await run(`${button('下一页')}.click();true`);
-  await wait("document.querySelectorAll('.supplier-assessment-workspace tbody tr').length===2");
-  await run(`${button('趋势分析')}.click();true`);
-  await wait("document.querySelector('.supplier-dimension-list')");
-  const analytics = await request('GetSupplierAssessmentAnalytics', token, undefined, { supplierId });
-  assert.equal(analytics.status, 200, JSON.stringify(analytics.body));
-  assert.equal(analytics.body.totalCount, 22); assert.equal(analytics.body.qualityTotal, 65);
-  assert.equal(analytics.body.recent.length, 12);
-  assert.equal(await run("document.querySelector('.supplier-dimension-row strong').textContent"), '2.95');
-  assert.equal(await run('window.__supplierReads.length'), 1);
-  await captureScreenshot(cdp, path.join(output, 'Full-supplier-analytics.png'));
-  fs.writeFileSync(path.join(output, 'supplier-consistency-result.json'), JSON.stringify({ runtime: 'Tauri+React+Rust+SQLite', supplierId,
-    referencePrice: links.body.items[0].referencePrice, assessmentCount: analytics.body.totalCount, recentCount: 12, qualityTotal: 65 }, null, 2));
+  const reads = [];
+  const observe = event => {
+    const message = JSON.parse(event.data);
+    if (message.method === 'Network.requestWillBeSent' && message.params.request.method === 'GET'
+      && message.params.request.url.includes('/assessment-analytics')) reads.push(message.params.request.url);
+  };
+  await cdp.send('Network.enable');
+  cdp.socket.addEventListener('message', observe);
+  try {
+    await run(`location.hash=${JSON.stringify(`#/suppliers?supplierId=${supplierId}&view=assessments`)};true`);
+    await wait(button('记录新评价'));
+    assert.equal(reads.length, 0, 'analytics is loaded only on demand');
+    await run(`${button('记录新评价')}.click();true`);
+    await wait("document.querySelector('textarea[name=notes]')");
+    await run("document.querySelector('textarea[name=notes]').focus();true");
+    await cdp.send('Input.insertText', { text: '中文评价保存回读' });
+    await run(`${button('保存评价草稿')}.click();true`);
+    await wait("document.body.innerText.includes('供应商评价已保存。')");
+    await run(`${button('返回评价记录')}.click();true`);
+    await wait("document.querySelectorAll('.supplier-assessment-workspace tbody tr').length===20");
+    await run(`${button('下一页')}.click();true`);
+    await wait("document.querySelectorAll('.supplier-assessment-workspace tbody tr').length===2");
+    await run(`${button('趋势分析')}.click();true`);
+    await wait("document.querySelector('.supplier-dimension-list')");
+    const analytics = await request('GetSupplierAssessmentAnalytics', token, undefined, { supplierId });
+    assert.equal(analytics.status, 200, JSON.stringify(analytics.body));
+    assert.equal(analytics.body.totalCount, 22); assert.equal(analytics.body.qualityTotal, 65);
+    assert.equal(analytics.body.recent.length, 12);
+    assert.equal(await run("document.querySelector('.supplier-dimension-row strong').textContent"), '2.95');
+    assert.equal(reads.length, 1);
+    await captureScreenshot(cdp, path.join(output, 'Full-supplier-analytics.png'));
+    fs.writeFileSync(path.join(output, 'supplier-consistency-result.json'), JSON.stringify({ runtime: 'Tauri+React+Rust+SQLite', supplierId,
+      referencePrice: links.body.items[0].referencePrice, assessmentCount: analytics.body.totalCount, recentCount: 12, qualityTotal: 65,
+      analyticsReads: reads.length }, null, 2));
+  } finally {
+    cdp.socket.removeEventListener('message', observe);
+  }
 }

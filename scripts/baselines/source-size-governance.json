@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 34448,
+      "baselineAggregateLines": 34449,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 34568,
+      "maximumAggregateLines": 34569,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 30543,
+      "baselineAggregateLines": 30557,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 30693,
+      "maximumAggregateLines": 30707,
       "reportFiles": false
     },
     {
