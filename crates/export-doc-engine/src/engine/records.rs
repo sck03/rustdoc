@@ -272,17 +272,7 @@ pub fn handle(
     if !request.is_object() {
         return Err(invalid("请求内容须为业务对象。"));
     }
-    let body_id = request
-        .get("id")
-        .filter(|value| !value.is_null())
-        .map(|value| {
-            value
-                .as_i64()
-                .or_else(|| value.as_str()?.parse().ok())
-                .filter(|id| *id >= 0)
-                .ok_or_else(|| invalid("记录编号无效。"))
-        })
-        .transpose()?;
+    let body_id = super::request_values::record_id(request.get("id"))?;
     let record_id = if operation == resource.update && operation != resource.create {
         id(parameters)?
     } else {

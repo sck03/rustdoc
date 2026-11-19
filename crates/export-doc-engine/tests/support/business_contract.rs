@@ -367,6 +367,37 @@ pub fn exercise(request: &Request<'_>) {
     assert_eq!(link["productCode"], product["productCode"]);
     assert_eq!(link["status"], "供货中");
     assert_eq!(link["referencePrice"], "9007199254740993.01");
+    for (field, invalid) in [
+        ("id", json!(link["id"])),
+        (
+            "supplierCompanyId",
+            json!(supplier["id"].as_i64().unwrap() + 1),
+        ),
+        ("productId", json!(product["id"].to_string())),
+        ("expectedVersion", json!("0")),
+        ("referencePrice", json!("+1")),
+        ("referencePrice", json!("01")),
+        ("referencePrice", json!("1_0")),
+        ("unexpected", json!(true)),
+    ] {
+        let mut invalid_body = contracts::overlay(
+            contracts::object(CREATE_SUPPLIER_PRODUCT_LINK.id, true),
+            &body,
+        );
+        invalid_body[field] = invalid;
+        assert_eq!(
+            request(
+                CREATE_SUPPLIER_PRODUCT_LINK,
+                &supplier_path,
+                &[],
+                Some(invalid_body)
+            )
+            .unwrap_err()
+            .status,
+            Some(400),
+            "{field}"
+        );
+    }
     assert_eq!(
         request(
             CREATE_SUPPLIER_PRODUCT_LINK,
@@ -479,6 +510,19 @@ pub fn exercise(request: &Request<'_>) {
     );
     let mut update = confirmed.clone();
     update["expectedVersion"] = confirmed["versionNumber"].clone();
+    let mut invalid_version = update.clone();
+    invalid_version["expectedVersion"] = json!(confirmed["versionNumber"].to_string());
+    assert_eq!(
+        request(
+            UPDATE_SUPPLIER_ASSESSMENT,
+            &path,
+            &[],
+            Some(invalid_version)
+        )
+        .unwrap_err()
+        .status,
+        Some(400)
+    );
     assert_eq!(
         request(UPDATE_SUPPLIER_ASSESSMENT, &path, &[], Some(update))
             .unwrap_err()

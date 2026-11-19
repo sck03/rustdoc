@@ -28,6 +28,7 @@ export async function verifyDesktopSupplierConsistency({ run, request, token, bu
   await captureScreenshot(cdp, path.join(output, 'Full-supplier-price.png'));
   for (let index = 0; index < 21; index++) {
     const result = await request('CreateSupplierAssessment', token, {
+      id: 0, supplierCompanyId: supplierId,
       assessmentDate: businessDate, assessmentKind: '定期评价', qualityScore: index % 5 + 1,
       deliveryScore: 4, serviceScore: 4, priceScore: 4, conclusion: '合格', notes: `分页评价 ${index}`,
     }, { supplierId });

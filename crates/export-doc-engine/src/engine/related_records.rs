@@ -244,6 +244,19 @@ pub fn handle(
         } else {
             records::id(parameters)?
         };
+        if operation == resource.create || operation == resource.update {
+            if matches!(resource.key, "supplier-products" | "supplier-assessments") {
+                export_doc_contracts::validation::structure(contracts::request(operation.id), body)
+                    .map_err(invalid)?;
+            }
+            for (key, expected) in [("id", id), (field, parent_id)] {
+                if super::request_values::record_id(body.get(key))?
+                    .is_some_and(|value| value > 0 && value != expected)
+                {
+                    return Err(invalid("记录编号与请求地址不一致，请重新打开记录。"));
+                }
+            }
+        }
         let previous = if id > 0 {
             let row = store::get(tx, resource.key, id)?;
             if row[field] != parent_id {

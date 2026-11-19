@@ -5,10 +5,19 @@ pub const ASSESSMENT_KINDS: &[&str] = &["定期评价", "订单复盘", "样品�
 pub const CONCLUSIONS: &[&str] = &["优先合作", "合格", "观察", "暂停合作"];
 pub fn reference_price(value: &Value) -> Result<String, String> {
     let text = value.as_str().ok_or("参考价必须是精确十进制文本。")?;
-    let price = Decimal::from_str_exact(text).map_err(|_| "参考价格式或精度无效。")?;
-    if price < Decimal::ZERO {
-        return Err("参考价不能小于零。".into());
+    let (whole, fraction) = text
+        .split_once('.')
+        .map_or((text, None), |(whole, fraction)| (whole, Some(fraction)));
+    if text.len() > 60
+        || whole.is_empty()
+        || !whole.bytes().all(|b| b.is_ascii_digit())
+        || whole.len() > 1 && whole.starts_with('0')
+        || fraction
+            .is_some_and(|value| value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()))
+    {
+        return Err("参考价必须是非负普通十进制文本。".into());
     }
+    let price = Decimal::from_str_exact(text).map_err(|_| "参考价格式或精度无效。")?;
     Ok(price.normalize().to_string())
 }
 pub fn assessment(value: &mut Value, today: &str) -> Result<(), String> {
@@ -63,6 +72,14 @@ mod tests {
             json!(-1),
             json!(1.005),
             json!("-0.01"),
+            json!("+1"),
+            json!("01"),
+            json!("-0"),
+            json!("1_0"),
+            json!(".5"),
+            json!("1."),
+            json!("1e3"),
+            json!(" 1"),
             json!("0.00000000000000000000000000001"),
         ] {
             assert!(reference_price(&value).is_err(), "{value}");
