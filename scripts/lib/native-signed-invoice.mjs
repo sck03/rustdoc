@@ -12,6 +12,8 @@ export async function verifyDesktopSignedInvoice({ run, request, token, cdp, out
   assert.equal(created.status, 201, JSON.stringify(created.body));
   const invoiceId = created.body.id;
   await run(`location.hash='#/invoices/${invoiceId}?section=items';true`);
+  await waitFor(() => run("Boolean(document.querySelector('[aria-label=\"商品明细\"]'))"), 30000, 'Invoice items missing');
+  await run("[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='商品资料').click();true");
   const input = `document.querySelector('input[aria-label="第 1 行金额"]')`;
   await waitFor(() => run(`Boolean(${input})`), 30000, 'Invoice amount editor missing');
   await run(`${input}.scrollIntoView({block:'center'});${input}.focus();${input}.select();true`);
