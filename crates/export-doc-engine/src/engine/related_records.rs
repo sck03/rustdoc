@@ -244,6 +244,15 @@ pub fn handle(
         } else {
             records::id(parameters)?
         };
+        let previous = if id > 0 {
+            let row = store::get(tx, resource.key, id)?;
+            if row[field] != parent_id {
+                return Err(error(404, "记录不属于所选客户或供应商。"));
+            }
+            row
+        } else {
+            contracts::initial(contracts::schema(resource.schema))
+        };
         if operation == resource.create || operation == resource.update {
             if matches!(resource.key, "supplier-products" | "supplier-assessments") {
                 export_doc_contracts::validation::structure(contracts::request(operation.id), body)
@@ -257,21 +266,14 @@ pub fn handle(
                 }
             }
         }
-        let previous = if id > 0 {
-            let row = store::get(tx, resource.key, id)?;
-            if row[field] != parent_id {
-                return Err(error(404, "记录不属于所选客户或供应商。"));
-            }
+        if id > 0 {
             let expected = query
                 .iter()
                 .find(|(key, _)| *key == "expectedVersion")
                 .and_then(|(_, value)| value.parse().ok())
                 .unwrap_or_else(|| store::expected(body));
-            store::check_version(&row, expected)?;
-            row
-        } else {
-            contracts::initial(contracts::schema(resource.schema))
-        };
+            store::check_version(&previous, expected)?;
+        }
         if resource.delete == Some(operation) {
             if resource.key == "supplier-assessments" && previous["status"] == "Confirmed" {
                 return Err(conflict("已确认评价不能删除。"));
