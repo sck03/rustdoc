@@ -331,11 +331,9 @@ async fn execute(
         && transfer_permit.is_none()
         && !response::empty_success(operation)
     {
-        Some(
-            state
-                .response_memory
-                .reserve_working(export_doc_contracts::request_limits::MAX_JSON_RESPONSE_BYTES)?,
-        )
+        Some(state.response_memory.reserve_working(
+            export_doc_contracts::request_limits::json_response_bytes(operation.id),
+        )?)
     } else {
         None
     };
@@ -344,8 +342,8 @@ async fn execute(
         let _permit = permit;
         let _processing = processing;
         let _body_reservation = reservation;
-        scope
-            .run_result(|| {
+        let dispatch = || {
+            scope.run_result(|| {
                 let parameters: Vec<_> = parameters
                     .iter()
                     .map(|(k, v)| (k.as_str(), v.clone()))
@@ -401,8 +399,7 @@ async fn execute(
                             .tickets
                             .issue(id, &token, &cookie_binding, secure_cookie)?;
                     return Ok(response::Reply {
-                        bytes: serde_json::to_vec(&ticket)
-                            .map_err(|_| error(503, "下载票据编码失败。"))?,
+                        bytes: export_doc_engine::json_response::encode(operation, &ticket)?,
                         file: None,
                         cookie: Some(cookie),
                         stream: None,
@@ -412,20 +409,20 @@ async fn execute(
                 }
                 let _bulk_permit = bulk_permit;
                 if let Some((authorization, file)) = backup_upload {
-                    return serde_json::to_vec(&state.service.finish_backup_upload(
-                        authorization,
-                        file,
-                        &token,
-                    )?)
-                    .map(response::Reply::bytes)
-                    .map_err(|_| error(503, "上传结果编码失败。"));
+                    return export_doc_engine::json_response::encode(
+                        operation,
+                        &state
+                            .service
+                            .finish_backup_upload(authorization, file, &token)?,
+                    )
+                    .map(response::Reply::bytes);
                 }
                 if operation == UPLOAD_AND_START_PDF_MERGE_DOWNLOAD_JOB {
-                    return serde_json::to_vec(
+                    return export_doc_engine::json_response::encode(
+                        operation,
                         &state.service.upload_pdf_merge(merge_uploads, &token)?,
                     )
-                    .map(response::Reply::bytes)
-                    .map_err(|_| error(503, "文件任务响应编码失败。"));
+                    .map(response::Reply::bytes);
                 }
                 if let Some((name, file)) = document {
                     let value = state.service.upload_document_file(
@@ -436,9 +433,8 @@ async fn execute(
                         file,
                         &token,
                     )?;
-                    return serde_json::to_vec(&value)
-                        .map(response::Reply::bytes)
-                        .map_err(|_| error(503, "上传结果编码失败。"));
+                    return export_doc_engine::json_response::encode(operation, &value)
+                        .map(response::Reply::bytes);
                 }
                 if let Some((name, bytes)) = upload {
                     let value = state.service.upload(
@@ -449,9 +445,8 @@ async fn execute(
                         &bytes,
                         &token,
                     )?;
-                    serde_json::to_vec(&value)
+                    export_doc_engine::json_response::encode(operation, &value)
                         .map(response::Reply::bytes)
-                        .map_err(|_| error(503, "上传结果编码失败。"))
                 } else {
                     if export_doc_engine::engine::NativeService::is_generated_download(operation) {
                         return state
@@ -567,8 +562,7 @@ async fn execute(
                             secure_cookie,
                         )?;
                         return Ok(response::Reply {
-                            bytes: serde_json::to_vec(&ticket)
-                                .map_err(|_| error(503, "票据编码失败。"))?,
+                            bytes: export_doc_engine::json_response::encode(operation, &ticket)?,
                             file: None,
                             cookie: Some(cookie),
                             stream: None,
@@ -582,19 +576,29 @@ async fn execute(
                     Ok(response::Reply::bytes(result))
                 }
             })
-            .map(|mut reply| {
-                if let Some(mut memory) = command_memory {
-                    if reply.bytes.capacity()
-                        > export_doc_contracts::request_limits::MAX_JSON_RESPONSE_BYTES
-                    {
-                        reply.bytes.shrink_to_fit();
-                    }
-                    memory.shrink_to(reply.bytes.capacity().max(1));
-                    reply.memory_reservation = Some(memory);
+        };
+        let result = if response::empty_success(operation) || response::is_download(operation) {
+            dispatch().map(|reply| (reply, None))
+        } else {
+            export_doc_engine::json_response::with_budget(
+                state.response_memory.clone(),
+                command_memory,
+                dispatch,
+            )
+        };
+        result.map(|(mut reply, reservation)| {
+            if let Some(mut memory) = reservation {
+                if reply.bytes.capacity()
+                    > export_doc_contracts::request_limits::json_response_bytes(operation.id)
+                {
+                    reply.bytes.shrink_to_fit();
                 }
-                reply.transfer_permit = reply.transfer_permit.or(transfer_permit);
-                reply
-            })
+                memory.shrink_to(reply.bytes.capacity().max(1));
+                reply.memory_reservation = Some(memory);
+            }
+            reply.transfer_permit = reply.transfer_permit.or(transfer_permit);
+            reply
+        })
     });
     tokio::time::timeout(Duration::from_secs(request_seconds(operation) + 2), worker)
         .await

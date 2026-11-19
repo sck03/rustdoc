@@ -39,7 +39,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiExcelImportAnalysisReportDto",Schema::default().properties(BTreeMap::from([
         ("schemaVersion",s()),("analyzerId",s()),("selectedWorksheetName",s()),
         ("confidence",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("sheets",a(r("ApiExcelImportSheetAnalysisDto"))),("fields",a(r("ApiExcelImportFieldAnalysisDto"))),
-        ("itemTable",Schema::default().one_of(vec![ty(Primitive::Null),r("ApiExcelImportItemTableAnalysisDto")])),("issues",a(r("ApiExcelImportAnalysisIssueDto")))
+        ("itemTable",Schema::default().any_of(vec![ty(Primitive::Null),r("ApiExcelImportItemTableAnalysisDto")])),("issues",a(r("ApiExcelImportAnalysisIssueDto")))
     ])).kind(Types::Many(vec![Primitive::Null,Primitive::Object])).required(vec!["schemaVersion","analyzerId","selectedWorksheetName","confidence","sheets","fields","issues"])),
     ("ApiPagedResponseOfApiUserReportTemplateVersionDto",super::schema_shapes::paged_response("ApiUserReportTemplateVersionDto")),
     ("ApiPagedResponseOfReportTemplateImageResourceListItem",super::schema_shapes::paged_response("ReportTemplateImageResourceListItem")),

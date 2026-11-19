@@ -3,8 +3,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { captureScreenshot } from './web-runtime-browser-session.mjs';
 import { waitFor } from './web-runtime-smoke-common.mjs';
+import { verifyDesktopSupplierConsistency } from './native-supplier-consistency.mjs';
 
-export async function verifyDesktopSalesConsistency({ run, request, token, cdp, output }) {
+export async function verifyDesktopSalesConsistency({ run, request, token, businessDate, cdp, output }) {
   const wait = expression => waitFor(() => run(`Boolean(${expression})`), 20000, expression);
   const button = name => `[...document.querySelectorAll('button')].find(e=>e.getClientRects().length&&e.textContent.trim()===${JSON.stringify(name)})`;
   const customer = await request('CreateCrmCustomer', token, { id: 0, name: '商机桌面验收客户' });
@@ -51,4 +52,5 @@ export async function verifyDesktopSalesConsistency({ run, request, token, cdp, 
   fs.writeFileSync(path.join(output, 'sales-consistency-result.json'), JSON.stringify({ runtime: 'Tauri+React+Rust+SQLite', opportunityId: id,
     savedVersion: saved.body.versionNumber, historyVersions: history.body.items.length, runtimeDirectories: 4, databaseRequirement: 'required',
     jsonBudgetBytes: metrics.body.http.responseMemory.capacityBytes }, null, 2));
+  await verifyDesktopSupplierConsistency({ run, request, token, businessDate, cdp, output });
 }

@@ -148,7 +148,7 @@ for (const edition of selected) {
     if(edition==='Full') await verifySharedControlLayout({run,station:true,capture:name=>captureScreenshot(cdp,path.join(output,`${edition}-${name}.png`))});
     if (marker.ocr && !salesOnly && !process.argv.includes('--blank-grid-only') && !process.argv.includes('--entry-rows-only')) await verifyDesktopOcr({ run, cdp, repo, output, context, token: login.body.accessToken, operations });
     if (salesOnly) {
-      await verifyDesktopSalesConsistency({ run, request, token: login.body.accessToken, cdp, output });
+      await verifyDesktopSalesConsistency({ run, request, token: login.body.accessToken, businessDate: login.body.user.businessDate, cdp, output });
     } else if (process.argv.includes('--entry-rows-only')) {
       const { invoiceId } = await verifyDesktopEntryRows({ run, request, token: login.body.accessToken, cdp, output });
       if (edition === 'Full') {

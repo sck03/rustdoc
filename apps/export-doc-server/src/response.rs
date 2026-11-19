@@ -154,7 +154,9 @@ pub async fn success(
     // Execution admission limits producers; this separate budget limits slow receivers.
     let empty = empty_success(operation);
     if !empty && reply.file.is_none() && reply.stream.is_none() {
-        if reply.bytes.len() > export_doc_contracts::request_limits::MAX_JSON_RESPONSE_BYTES {
+        if reply.bytes.len()
+            > export_doc_contracts::request_limits::json_response_bytes(operation.id)
+        {
             return error(crate::request::error(
                 400,
                 "响应内容超过容量上限，请缩小查询范围。",

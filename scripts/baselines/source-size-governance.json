@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-11-18",
-  "reviewNotes": "2026-11-18 against b412e946: split the sales workspace and preserve quotation fields/continued edits; atomic invoice feedback; shared history authorization and indexed cursors; bounded JSON transfer and on-demand metrics; retire seven duplicate APIs; align diagnostics metadata and share current UI fixtures. Advance only measured batch deltas, including source-local tests; retain existing file caps and growth allowances. Add a stricter sales-workspace cap. Final measurements and validation: docs/archive/2026-11/2026-11-18业务一致性与响应资源治理.md.",
+  "updatedAt": "2026-11-19",
+  "reviewNotes": "2026-11-19 against 7f7cafd9: supplier model/hook/view separation; exact price, bounded assessment directory and permission-filtered SQL analytics; strict nullable unions; shared bounded JSON encoder and projected endpoint capacities; Docker embedded asset contract. Advance measured source baselines only, including source-local evolution/regression tests, retaining file caps and growth allowances. Add a 100-line supplier-related module cap. Evidence: docs/archive/2026-11/2026-11-19供应商与响应资源完整重构.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -10,9 +10,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 88443,
+      "baselineAggregateLines": 88532,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 88643,
+      "maximumAggregateLines": 88732,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 113574,
+      "baselineAggregateLines": 114162,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 113649,
+      "maximumAggregateLines": 114237,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 34164,
+      "baselineAggregateLines": 34344,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 34284,
+      "maximumAggregateLines": 34464,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 30238,
+      "baselineAggregateLines": 30496,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 30388,
+      "maximumAggregateLines": 30646,
       "reportFiles": false
     },
     {
@@ -82,9 +82,9 @@
       "filePattern": "^(?:.+\\.(?:mjs|ps1|cmd|yml|yaml|sh)|Dockerfile)$",
       "relativePathPattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)|deploy/rust-native/[^/]+|\\.github/workflows/rust-native-validation\\.yml)$",
       "maximumLines": 350,
-      "baselineAggregateLines": 2475,
+      "baselineAggregateLines": 2520,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 2550,
+      "maximumAggregateLines": 2595,
       "reportFiles": false
     },
     {
@@ -358,6 +358,13 @@
       "maximumAggregateLines": 773,
       "baselineAggregateLines": 723,
       "maximumAggregateGrowthLines": 50
+    },
+    {
+      "name": "supplier related workspaces",
+      "directory": "apps/export-doc-web/src/features/suppliers",
+      "filePattern": "^(?:Supplier(?:AssessmentsPanel|ProductLinksPanel|AssessmentAnalytics)|supplier(?:Assessment(?:AnalyticsModel|Model)|ProductLinkModel)|useSupplier(?:Assessments|ProductLinks|RelatedWorkspace))\\.(?:ts|tsx)$",
+      "maximumLines": 100,
+      "maximumAggregateLines": 650
     }
   ]
 }

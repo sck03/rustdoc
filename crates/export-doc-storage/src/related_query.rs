@@ -11,7 +11,7 @@ pub struct RelatedQuery<'a> {
     pub limit: i64,
 }
 
-pub(crate) fn build(q: &RelatedQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
+fn selection(q: &RelatedQuery<'_>, pg: bool) -> Result<QuerySql> {
     let relation = match q.kind {
         "crm-contacts" => "crmCustomerId",
         "supplier-contacts" | "supplier-products" | "supplier-assessments" => "supplierCompanyId",
@@ -40,6 +40,15 @@ pub(crate) fn build(q: &RelatedQuery<'_>, pg: bool) -> Result<(QuerySql, String)
         "CASE WHEN {primary} THEN 1 ELSE 0 END DESC, {} DESC NULLS LAST, r.id DESC",
         sql::field("assessmentDate", pg)
     );
+    Ok(QuerySql {
+        source: crate::query_source::Source::Records,
+        filter,
+        order,
+        values,
+    })
+}
+pub(crate) fn build(q: &RelatedQuery<'_>, pg: bool) -> Result<(QuerySql, String)> {
+    let selection = selection(q, pg)?;
     let projection = sql::projected(q.fields.iter().map(|(name, path)| {
         sql::valid_path(path)?;
         let product_path = match *path {
@@ -58,13 +67,52 @@ pub(crate) fn build(q: &RelatedQuery<'_>, pg: bool) -> Result<(QuerySql, String)
         } else { sql::json_field(path, pg) };
         Ok((*name, value))
     }), pg)?;
-    Ok((
-        QuerySql {
-            source: crate::query_source::Source::Records,
-            filter,
-            order,
-            values,
-        },
-        projection,
-    ))
+    Ok((selection, projection))
+}
+
+pub(crate) fn analytics(
+    connection: &(impl crate::adapter::Adapter + ?Sized),
+    q: &RelatedQuery<'_>,
+) -> Result<serde_json::Value> {
+    if q.kind != "supplier-assessments" {
+        return Err(Error::unavailable("评价分析目录无效。"));
+    }
+    let pg = connection.provider() == "PostgreSQL";
+    let (selection, projection) = build(q, pg)?;
+    let mut totals = vec![("totalCount", "COUNT(*)".to_owned())];
+    for (target, field) in [
+        ("qualityTotal", "qualityScore"),
+        ("deliveryTotal", "deliveryScore"),
+        ("serviceTotal", "serviceScore"),
+        ("priceTotal", "priceScore"),
+    ] {
+        totals.push((
+            target,
+            format!("COALESCE(SUM(CAST({} AS BIGINT)),0)", sql::field(field, pg)),
+        ));
+    }
+    for (target, conclusion) in [
+        ("preferredCount", "优先合作"),
+        ("qualifiedCount", "合格"),
+        ("watchCount", "观察"),
+        ("pausedCount", "暂停合作"),
+    ] {
+        totals.push((
+            target,
+            format!(
+                "COALESCE(SUM(CASE WHEN {}='{conclusion}' THEN 1 ELSE 0 END),0)",
+                sql::field("conclusion", pg)
+            ),
+        ));
+    }
+    let projection_totals = sql::projected(
+        totals.iter().map(|(key, value)| Ok((*key, value.clone()))),
+        pg,
+    )?;
+    let mut result = connection.query_json(
+        &crate::query_source::aggregate(&selection, &projection_totals),
+        &selection.values,
+    )?;
+    result["recent"] = serde_json::json!(connection.query_slice(&selection, &projection, 0, 12)?);
+    Ok(result)
 }

@@ -5,6 +5,24 @@ pub(super) fn general_request_page() -> Vec<Parameter> {
     parameters.push(p("definitionKey", "query", None, s().max_length(80)));
     parameters
 }
+pub(super) fn supplier_page() -> Vec<Parameter> {
+    let mut parameters = supplier_id();
+    parameters.extend([
+        p(
+            "pageNumber",
+            "query",
+            None,
+            i().minimum(num("1")).format("int32"),
+        ),
+        p(
+            "pageSize",
+            "query",
+            None,
+            i().minimum(num("1")).maximum(num("200")).format("int32"),
+        ),
+    ]);
+    parameters
+}
 
 pub(super) fn single_window_source_id() -> Vec<Parameter> {
     vec![p(

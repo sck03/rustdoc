@@ -5,6 +5,18 @@ function Assert-Contract([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 
+# Verify compile-time deployment assets in both the build context and Rust stage.
+$repositoryRoot = Split-Path $PSScriptRoot -Parent
+$deploymentSource = [IO.File]::ReadAllText((Join-Path $repositoryRoot 'apps/export-doc-server/src/deployment.rs'))
+$dockerfile = [IO.File]::ReadAllText((Join-Path $repositoryRoot 'deploy/rust-native/Dockerfile'))
+$context = [IO.File]::ReadAllLines((Join-Path $repositoryRoot '.dockerignore'))
+foreach ($match in [regex]::Matches($deploymentSource, 'include_str!\("../../../(deploy/[^"]+)"\)')) {
+    $asset = $match.Groups[1].Value
+    Assert-Contract (Test-Path -LiteralPath (Join-Path $repositoryRoot $asset) -PathType Leaf) "Missing embedded deployment asset: $asset"
+    Assert-Contract ($context -contains ("!" + $asset)) "Embedded deployment asset excluded from Docker context: $asset"
+    Assert-Contract ($dockerfile -match ('(?m)^COPY [^\r\n]*' + [regex]::Escape($asset) + '[^\r\n]* deploy/rust-native/\r?$')) "Embedded deployment asset not copied into Rust stage: $asset"
+}
+
 # Model a running API holding PostgreSQL's instance lock. Exercise the actual
 # orchestration with failures at every external boundary, without a Docker daemon.
 function Invoke-ExportDocExternal {

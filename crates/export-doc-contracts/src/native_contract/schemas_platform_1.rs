@@ -14,7 +14,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["success","changedCount","document","lockedFields","message"])),
     ("ApiAttachmentSaveRequest",o(vec![("destinationPath",s())]).required(vec!["destinationPath"])),
     ("ApiAttachmentUploadForm",o(vec![
-        ("file",Schema::default().one_of(vec![ty(Primitive::Null),r("IFormFile")])),("attachmentId",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
+        ("file",Schema::default().any_of(vec![ty(Primitive::Null),r("IFormFile")])),("attachmentId",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("uploadKey",s().format("uuid")),("title",s()),("categoryId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("poNumber",s()),("styleNo",s()),("note",s())
     ])),
@@ -188,7 +188,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiExcelImportPreviewRequest",o(vec![("filePath",s()),("schemeName",s().max_length(100))]).required(vec!["filePath"])),
     ("ApiExcelImportPreviewResponse",o(vec![
         ("sourcePath",s()),("success",b()),("invoice",Schema::default().one_of(vec![ty(Primitive::Null),r("ApiInvoiceDetailDto")])),
-        ("customer",Schema::default().one_of(vec![ty(Primitive::Null),r("ApiImportedCustomerDto")])),("exporter",Schema::default().one_of(vec![ty(Primitive::Null),r("ApiImportedExporterDto")])),("analysisReport",Schema::default().one_of(vec![ty(Primitive::Null),r("ApiExcelImportAnalysisReportDto")])),
+        ("customer",Schema::default().any_of(vec![ty(Primitive::Null),r("ApiImportedCustomerDto")])),("exporter",Schema::default().any_of(vec![ty(Primitive::Null),r("ApiImportedExporterDto")])),("analysisReport",Schema::default().any_of(vec![ty(Primitive::Null),r("ApiExcelImportAnalysisReportDto")])),
         ("errors",a(s())),("storagePolicy",s())
     ]).required(vec!["sourcePath","success","errors","storagePolicy"])),
     ("ApiExcelImportSheetAnalysisDto",o(vec![

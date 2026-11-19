@@ -1,13 +1,4 @@
-export type SupplierAssessmentAnalyticsInput = {
-  id: number;
-  assessmentDate: string;
-  qualityScore: number;
-  deliveryScore: number;
-  serviceScore: number;
-  priceScore: number;
-  averageScore: number;
-  conclusion: string;
-};
+import type { ApiSupplierAssessmentAnalyticsDto } from "../../api/index.ts";
 
 export type SupplierAssessmentDimension = {
   key: "quality" | "delivery" | "service" | "price";
@@ -41,30 +32,25 @@ export type SupplierAssessmentAnalytics = {
 const CONCLUSIONS = ["优先合作", "合格", "观察", "暂停合作"] as const;
 
 export function buildSupplierAssessmentAnalytics(
-  rows: readonly SupplierAssessmentAnalyticsInput[],
+  summary: ApiSupplierAssessmentAnalyticsDto,
 ): SupplierAssessmentAnalytics {
-  const ordered = [...rows].sort((left, right) => {
+  const ordered = [...summary.recent].sort((left, right) => {
     const dateDifference = right.assessmentDate.localeCompare(left.assessmentDate);
     return dateDifference || right.id - left.id;
   });
-  const totalCount = ordered.length;
+  const totalCount = summary.totalCount;
   const dimensions = totalCount ? [
-    dimension("quality", "质量", ordered.reduce((sum, row) => sum + row.qualityScore, 0) / totalCount),
-    dimension("delivery", "交期", ordered.reduce((sum, row) => sum + row.deliveryScore, 0) / totalCount),
-    dimension("service", "服务", ordered.reduce((sum, row) => sum + row.serviceScore, 0) / totalCount),
-    dimension("price", "价格", ordered.reduce((sum, row) => sum + row.priceScore, 0) / totalCount),
+    dimension("quality", "质量", summary.qualityTotal / totalCount),
+    dimension("delivery", "交期", summary.deliveryTotal / totalCount),
+    dimension("service", "服务", summary.serviceTotal / totalCount),
+    dimension("price", "价格", summary.priceTotal / totalCount),
   ] : [];
   const rankedDimensions = [...dimensions].sort((left, right) => right.average - left.average);
-  const conclusionCounts = new Map<string, number>();
-  for (const row of ordered) {
-    const conclusion = row.conclusion.trim() || "未设置";
-    conclusionCounts.set(conclusion, (conclusionCounts.get(conclusion) ?? 0) + 1);
-  }
-  const extraConclusions = [...conclusionCounts.keys()].filter((item) => !CONCLUSIONS.includes(item as typeof CONCLUSIONS[number]));
-  const conclusions = [...CONCLUSIONS, ...extraConclusions].map((conclusion) => {
-    const count = conclusionCounts.get(conclusion) ?? 0;
+  const counts = [summary.preferredCount, summary.qualifiedCount, summary.watchCount, summary.pausedCount];
+  const conclusions = CONCLUSIONS.map((conclusion, index) => {
+    const count = counts[index];
     return { conclusion, count, percentage: totalCount ? round(count / totalCount * 100) : 0 };
-  }).filter((item) => item.count > 0);
+  }).filter(item => item.count > 0);
 
   return {
     totalCount,

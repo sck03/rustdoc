@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-19 供应商与响应资源：`test:abortable-operations-ui` 覆盖精确供货价格、保存续编、新建后更新及客户端/权限/卸载取消；`test:supplier-assessment-analytics` 检查统计不依赖最近记录窗口。SQLite/PostgreSQL 共用业务合同核对分页和精确价格，Storage 合同核对普通用户/审批者统计可见性。`test_native_docker_lifecycle.ps1` 另核对 Rust 内嵌部署资源在 Docker context 和构建阶段均存在。当前结果和清理边界见[本批记录](../docs/archive/2026-11/2026-11-19供应商与响应资源完整重构.md)。
+
 2026-11-19 一致性验收：`test_office_model.mjs` 验证九类 OA/办公命令回执确认、取消和错误分类；`test_oa_workspace_ui.mjs` 在真实 React/Rust HTTP 中模拟已提交但响应丢失。`test_single_window_workspace_ui.mjs` 验证 201 份回执分两包导出无遗漏/重复，商机生命周期回归核对只读候选零请求。十二个界面回归共用 `lib/react-ui-fixture.mjs` 的仓库临时目录和浏览器启动。`clean-generated-artifacts.ps1 -RustTestOutputsOnly -ListOnly` 根据 Cargo 指纹盘点测试程序，完成全部编译/测试/doc-test 后才可执行同参数清理。范围及结果见[本批记录](../docs/archive/2026-11/2026-11-19前后端一致性修复与交付.md)。
 
 2026-11-18 业务一致性：`npm --prefix apps/export-doc-web run test:sales-opportunity-lifecycle-ui` 验证商机受限报价字段、续编、重复提交、迟到响应/确认、归档分页和资源指标按需回收，纳入 `business` 回归组。`sales_service` 与 PostgreSQL `team_service` 共用 `business_consistency_contract`，验证显式关联客户限制、归档读取、游标历史及发票/HS 反馈事务回滚。Storage 查询计划回归核对两库的商机历史索引。`cargo test --locked -p export-doc-server --lib slow_json_sockets_are_bounded_and_disconnect_releases_the_budget -- --nocapture` 使用真实 TCP 慢读连接验证 128 MiB JSON 响应预算、429 和断线释放；此计数为受管缓冲容量，不是进程 RSS。完整结果见[本批记录](../docs/archive/2026-11/2026-11-18业务一致性与响应资源治理.md)。

@@ -196,6 +196,9 @@ pub(crate) trait Adapter: Send {
         }
         Ok(result)
     }
+    fn supplier_assessment_analytics(&self, query: &RelatedQuery<'_>) -> Result<Value> {
+        related_query::analytics(self, query)
+    }
     fn execute_statement(&self, statement: &str, values: &[String]) -> Result<u64>;
 
     fn workflow_system_requests(&self, action: &str) -> Result<Vec<Value>> {

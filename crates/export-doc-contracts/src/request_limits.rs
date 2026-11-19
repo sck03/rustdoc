@@ -2,6 +2,23 @@
 pub const TRANSFER_SECONDS: u64 = 24 * 60 * 60;
 pub const MAX_JSON_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
 
+/// Capacity is response metadata, not a path or authentication heuristic.
+pub fn json_response_bytes(operation: &str) -> usize {
+    crate::contracts::contract()["operations"][operation]["maxJsonResponseBytes"]
+        .as_u64()
+        .filter(|bytes| *bytes > 0 && *bytes <= MAX_JSON_RESPONSE_BYTES as u64)
+        .expect("generated JSON response capacity") as usize
+}
+pub(crate) fn response_schema_bytes(schema: &str) -> usize {
+    match schema {
+        "ApiCommandResponse" | "ApiSupplierProductLinkDto" | "ApiSupplierAssessmentDto" => {
+            64 * 1024
+        }
+        "ApiSupplierAssessmentAnalyticsDto" => 1024 * 1024,
+        _ => MAX_JSON_RESPONSE_BYTES,
+    }
+}
+
 /// The generated contract includes capability and binary-response overrides.
 pub fn execution_seconds(operation: &str) -> u64 {
     crate::contracts::contract()["operations"][operation]["timeoutSeconds"]

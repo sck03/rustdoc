@@ -412,6 +412,7 @@ const operationDomains: Record<string, Domain> = {
   getSubmissionOfPurchaseRequest: "office",
   getSubmissionOfTravelRequest: "office",
   getSupplier: "suppliers",
+  getSupplierAssessmentAnalytics: "suppliers",
   getSupplierAssessmentOverview: "suppliers",
   getTravelRequest: "office",
   getTravelRequestCommandResult: "office",

@@ -23,6 +23,9 @@ mod evolution;
 #[path = "contract_file_storage.rs"]
 mod file_storage;
 #[cfg(test)]
+#[path = "contract_supplier_resources.rs"]
+mod supplier_resources;
+#[cfg(test)]
 mod tests {
     use super::*;
     fn difference(path: &str, actual: &Value, expected: &Value) -> Option<String> {
@@ -184,6 +187,7 @@ mod tests {
         custom_oa::apply(&mut baseline);
         file_storage::apply(&mut baseline);
         business_consistency::apply(&mut baseline);
+        supplier_resources::apply(&mut baseline);
         // Reviewed retirement: access is the sole authorization definition.
         // Keep every access rule, authentication flag, schema and error in the comparison.
         for path in baseline["paths"].as_object_mut().unwrap().values_mut() {

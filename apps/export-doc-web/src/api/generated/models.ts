@@ -2385,6 +2385,16 @@ export interface ApiPagedResponseOfApiSalesOpportunityDto {
   totalPages: number;
 }
 
+export interface ApiPagedResponseOfApiSupplierAssessmentDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiSupplierAssessmentDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
 export interface ApiPagedResponseOfApiSupplierContactDto {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
@@ -3610,6 +3620,19 @@ export interface ApiSingleWindowUnlockFieldsRequest {
   fieldKeys?: string[];
 }
 
+export interface ApiSupplierAssessmentAnalyticsDto {
+  deliveryTotal: number;
+  pausedCount: number;
+  preferredCount: number;
+  priceTotal: number;
+  qualifiedCount: number;
+  qualityTotal: number;
+  recent: ApiSupplierAssessmentDto[];
+  serviceTotal: number;
+  totalCount: number;
+  watchCount: number;
+}
+
 export interface ApiSupplierAssessmentDto {
   assessedBy: string;
   assessmentDate: string;
@@ -3759,7 +3782,7 @@ export interface ApiSupplierProductLinkDto {
   productId: number;
   productNameCN: string;
   productNameEN: string;
-  referencePrice: number;
+  referencePrice: string;
   status: string;
   supplierCompanyId: number;
   supplierProductCode: string;
@@ -3772,7 +3795,7 @@ export interface ApiSupplierProductLinkSaveRequest {
   id: number;
   leadTimeDays: number;
   productId: number;
-  referencePrice: number;
+  referencePrice: string;
   supplierCompanyId: number;
   supplierProductCode: string;
 }
@@ -9208,6 +9231,10 @@ export interface GetSupplierRequest {
   id: number;
 }
 
+export interface GetSupplierAssessmentAnalyticsRequest {
+  supplierId: number;
+}
+
 export interface GetTravelRequestRequest {
   id: number;
 }
@@ -9920,6 +9947,8 @@ export interface ListSubmissionsOfTravelRequestRequest {
 
 export interface ListSupplierAssessmentsRequest {
   supplierId: number;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface ListTravelRequestRequest {

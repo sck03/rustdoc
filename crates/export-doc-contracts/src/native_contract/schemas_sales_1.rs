@@ -40,6 +40,8 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiPagedResponseOfApiCrmFollowUpDto",super::schema_shapes::paged_response("ApiCrmFollowUpDto")),
     ("ApiPagedResponseOfApiSalesOpportunityDto",super::schema_shapes::paged_response("ApiSalesOpportunityDto")),
     ("ApiPagedResponseOfApiSupplierContactDto",super::schema_shapes::paged_response("ApiSupplierContactDto")),
+    ("ApiPagedResponseOfApiSupplierAssessmentDto",super::schema_shapes::paged_response("ApiSupplierAssessmentDto")),
+    ("ApiSupplierAssessmentAnalyticsDto",supplier_assessment_analytics()),
     ("ApiPagedResponseOfApiSupplierDto",super::schema_shapes::paged_response("ApiSupplierDto")),
     ("ApiPagedResponseOfApiSupplierProductLinkDto",super::schema_shapes::paged_response("ApiSupplierProductLinkDto")),
     ("ApiPagedResponseOfApiSupplierProductOptionDto",super::schema_shapes::paged_response("ApiSupplierProductOptionDto")),
@@ -77,12 +79,12 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiSalesOpportunityStageSummaryDto",o(vec![("stage",s()),("count",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))]).required(vec!["stage","count"])),
     ("ApiSalesOpportunityTransitionRequest",o(vec![("nextStage",s()),("changeNote",s()),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))]).required(vec!["nextStage","changeNote","expectedVersion"])),
     ("ApiSupplierAssessmentDto",o(vec![
-        ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("supplierCompanyId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("assessmentDate",s().format("date")),
-        ("assessmentKind",s()),("qualityScore",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("deliveryScore",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("serviceScore",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("priceScore",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("averageScore",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
-        ("conclusion",s()),("notes",s()),("assessedBy",s()),
-        ("status",s()),("confirmedBy",s()),("confirmedAt",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date-time")),
-        ("createdAt",s().format("date-time")),("updatedAt",s().format("date-time")),("versionNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))
+        ("id",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("supplierCompanyId",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("assessmentDate",s().format("date")),
+        ("assessmentKind",s().max_length(20)),("qualityScore",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("deliveryScore",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
+        ("serviceScore",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("priceScore",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("averageScore",Schema::default().kind(Types::One(Primitive::Number)).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
+        ("conclusion",s().max_length(20)),("notes",s().max_length(1000)),("assessedBy",s().max_length(100)),
+        ("status",s().max_length(20)),("confirmedBy",s().max_length(100)),("confirmedAt",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date-time")),
+        ("createdAt",s().format("date-time")),("updatedAt",s().format("date-time")),("versionNumber",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))
     ]).required(vec!["id","supplierCompanyId","assessmentDate","assessmentKind","qualityScore","deliveryScore","serviceScore","priceScore","averageScore","conclusion","notes","assessedBy","status","confirmedBy","createdAt","updatedAt","versionNumber"])),
     ("ApiSupplierAssessmentOverviewDto",o(vec![
         ("totalSuppliers",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("assessedSuppliers",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("unassessedSuppliers",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
@@ -98,10 +100,10 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("conclusion",s()),("notes",s())
     ]).required(vec!["supplierCompanyId","supplierName","supplierStatus","category","assessmentCount","latestAssessmentDate","latestAssessmentKind","qualityScore","deliveryScore","serviceScore","priceScore","averageScore","conclusion","notes"])),
     ("ApiSupplierAssessmentSaveRequest",o(vec![
-        ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("supplierCompanyId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("assessmentDate",s().format("date")),
-        ("assessmentKind",s()),("qualityScore",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("deliveryScore",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("serviceScore",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("priceScore",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("conclusion",s()),
-        ("notes",s()),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("0"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))
+        ("id",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("supplierCompanyId",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("assessmentDate",s().format("date")),
+        ("assessmentKind",s().max_length(20)),("qualityScore",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("deliveryScore",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
+        ("serviceScore",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("priceScore",Schema::default().kind(Types::One(Primitive::Integer)).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("conclusion",s().max_length(20)),
+        ("notes",s().max_length(1000)),("expectedVersion",Schema::default().kind(Types::One(Primitive::Integer)).default_value(serde_json::json!(num("0"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))
     ]).required(vec!["id","supplierCompanyId","assessmentDate","assessmentKind","qualityScore","deliveryScore","serviceScore","priceScore","conclusion","notes"])),
     ("ApiSupplierContactDto",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("supplierCompanyId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("name",s()),
@@ -130,17 +132,8 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         (&["isDuplicate"], b()),
     ]).required(vec!["rowNumber","name","countryRegion","category","website","status","mainProducts","notes","contactName","contactTitle","contactEmail","contactPhone","isDuplicate","error"])),
     ("ApiSupplierLifecycleRequest",super::schema_shapes::lifecycle_request()),
-    ("ApiSupplierProductLinkDto",o(vec![
-        ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("supplierCompanyId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("productId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("productCode",s()),("productNameCN",s()),("productNameEN",s()),
-        ("supplierProductCode",s()),("referencePrice",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("currency",s()),
-        ("leadTimeDays",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("status",s()),("versionNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))
-    ]).required(vec!["id","supplierCompanyId","productId","productCode","productNameCN","productNameEN","supplierProductCode","referencePrice","currency","leadTimeDays","status","versionNumber"])),
-    ("ApiSupplierProductLinkSaveRequest",o(vec![
-        ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("supplierCompanyId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("productId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("supplierProductCode",s()),("referencePrice",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("currency",s()),
-        ("leadTimeDays",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("0"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))
-    ]).required(vec!["id","supplierCompanyId","productId","supplierProductCode","referencePrice","currency","leadTimeDays"])),
+    ("ApiSupplierProductLinkDto",supplier_product_link(false)),
+    ("ApiSupplierProductLinkSaveRequest",supplier_product_link(true)),
     ("ApiSupplierProductOptionDto",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("productCode",s()),("nameCN",s()),
         ("nameEN",s())
@@ -151,3 +144,67 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("notes",s()),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("0"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))
     ]).required(vec!["id","name","countryRegion","category","website","mainProducts","notes"])),
 ] }
+
+fn supplier_product_link(save: bool) -> Schema {
+    let mut fields = vec![
+        ("id", i().format("int32")),
+        ("supplierCompanyId", i().format("int32")),
+        ("productId", i().format("int32")),
+        ("supplierProductCode", s().max_length(100)),
+        (
+            "referencePrice",
+            s().format("decimal")
+                .max_length(60)
+                .pattern("^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"),
+        ),
+        ("currency", s().max_length(3)),
+        (
+            "leadTimeDays",
+            i().minimum(num("0")).maximum(num("3650")).format("int32"),
+        ),
+    ];
+    if save {
+        fields.push((
+            "expectedVersion",
+            i().format("int32").default_value(serde_json::json!(0)),
+        ));
+    } else {
+        fields.extend([
+            ("productCode", s().max_length(200)),
+            ("productNameCN", s().max_length(1000)),
+            ("productNameEN", s().max_length(1000)),
+            ("status", s().max_length(20)),
+            ("versionNumber", i().format("int32")),
+        ]);
+    }
+    let required = fields
+        .iter()
+        .map(|(key, _)| *key)
+        .filter(|key| *key != "expectedVersion")
+        .collect();
+    o(fields)
+        .required(required)
+        .additional(Additional::Allowed(false))
+}
+
+fn supplier_assessment_analytics() -> Schema {
+    let mut fields: Vec<_> = [
+        "totalCount",
+        "qualityTotal",
+        "deliveryTotal",
+        "serviceTotal",
+        "priceTotal",
+        "preferredCount",
+        "qualifiedCount",
+        "watchCount",
+        "pausedCount",
+    ]
+    .into_iter()
+    .map(|key| (key, i().minimum(num("0")).format("int64")))
+    .collect();
+    fields.push(("recent", a(r("ApiSupplierAssessmentDto")).max_items(12)));
+    let required = fields.iter().map(|(key, _)| *key).collect();
+    o(fields)
+        .required(required)
+        .additional(Additional::Allowed(false))
+}

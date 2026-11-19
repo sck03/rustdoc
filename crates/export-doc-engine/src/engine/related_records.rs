@@ -10,7 +10,6 @@ use crate::engine::store::Connection;
 use crate::{clock::BusinessClock, contracts, generated_api::*};
 use export_doc_domain::{crm, sales, supplier};
 use export_doc_storage::AuditWrite;
-use rust_decimal::Decimal;
 use serde_json::{Value, json};
 
 pub const OPERATIONS: &[Operation] = &[
@@ -31,6 +30,7 @@ pub const OPERATIONS: &[Operation] = &[
     DEACTIVATE_SUPPLIER_PRODUCT_LINK,
     RESTORE_SUPPLIER_PRODUCT_LINK,
     LIST_SUPPLIER_ASSESSMENTS,
+    GET_SUPPLIER_ASSESSMENT_ANALYTICS,
     CREATE_SUPPLIER_ASSESSMENT,
     UPDATE_SUPPLIER_ASSESSMENT,
     DELETE_SUPPLIER_ASSESSMENT,
@@ -41,7 +41,9 @@ fn resource(operation: Operation) -> &'static Resource {
         catalog::resource(match operation {
             SET_PRIMARY_CRM_CONTACT => "crm-contacts",
             SET_PRIMARY_SUPPLIER_CONTACT => "supplier-contacts",
-            CONFIRM_SUPPLIER_ASSESSMENT => "supplier-assessments",
+            CONFIRM_SUPPLIER_ASSESSMENT | GET_SUPPLIER_ASSESSMENT_ANALYTICS => {
+                "supplier-assessments"
+            }
             _ => "supplier-products",
         })
         .unwrap()
@@ -101,11 +103,8 @@ fn validate(
         auth::authorize(actor, "common.product-reference", "view")?;
         let product_id = records::positive(value, "productId", "产品")?;
         store::get(tx, "products", product_id)?;
-        let price: Decimal = serde_json::from_value(value["referencePrice"].clone())
-            .map_err(|_| invalid("参考价格式无效。"))?;
-        if price < Decimal::ZERO {
-            return Err(invalid("参考价不能小于零。"));
-        }
+        value["referencePrice"] =
+            json!(supplier::reference_price(&value["referencePrice"]).map_err(invalid)?);
         if value["leadTimeDays"]
             .as_i64()
             .is_none_or(|days| !(0..=3650).contains(&days))
@@ -185,13 +184,12 @@ pub fn handle(
         }
     };
     let permission_action = auth::operation_action(operation, resource.permission)?;
-    if operation == resource.list {
+    if operation == resource.list || operation == GET_SUPPLIER_ASSESSMENT_ANALYTICS {
         return store.read_for(actor, operation, query, |tx, actor| {
             let parent = store::get(tx, parent_kind, parent_id)?;
             if !auth::visible(actor, resource.permission, permission_action, &parent) {
                 return Err(error(403, "所属客户或供应商不在当前账号的操作范围内。"));
             }
-            let array = operation == LIST_SUPPLIER_ASSESSMENTS;
             let (page, size, offset) = store::page_parameters(query);
             let mut fields: Vec<_> = contracts::schema(resource.schema)["properties"]
                 .as_object()
@@ -204,40 +202,36 @@ pub fn handle(
             }
             let include_other_drafts =
                 auth::visible(actor, resource.permission, "approve", &parent);
-            let mut items = vec![];
-            loop {
-                crate::operation::check()?;
-                let (total, mut rows) = tx.query_related(&export_doc_storage::RelatedQuery {
-                    kind: resource.key,
-                    parent_id,
-                    include_other_drafts,
-                    user_id: actor.id,
-                    fields: &fields,
-                    offset: if array { items.len() as i64 } else { offset },
-                    limit: if array { 200 } else { size as i64 },
-                })?;
-                let empty = rows.is_empty();
-                if resource.key == "supplier-products" {
-                    for row in &mut rows {
-                        if row["__linkedProductId"].as_i64().is_none() {
-                            return Err(error(404, "关联商品不存在。"));
-                        }
-                        row.as_object_mut()
-                            .expect("related record")
-                            .remove("__linkedProductId");
+            let related = export_doc_storage::RelatedQuery {
+                kind: resource.key,
+                parent_id,
+                include_other_drafts,
+                user_id: actor.id,
+                fields: &fields,
+                offset,
+                limit: size as i64,
+            };
+            if operation == GET_SUPPLIER_ASSESSMENT_ANALYTICS {
+                return tx
+                    .supplier_assessment_analytics(&related)
+                    .map_err(Into::into);
+            }
+            let (total, mut rows) = tx.query_related(&related)?;
+            if resource.key == "supplier-products" {
+                for row in &mut rows {
+                    if row["__linkedProductId"].as_i64().is_none() {
+                        return Err(error(404, "关联商品不存在。"));
                     }
-                }
-                items.extend(
-                    rows.into_iter()
-                        .map(|row| contracts::project(contracts::schema(resource.schema), row)),
-                );
-                if !array {
-                    return Ok(contracts::page(items, total as usize, page, size));
-                }
-                if empty || items.len() as i64 >= total {
-                    return Ok(json!(items));
+                    row.as_object_mut()
+                        .expect("related record")
+                        .remove("__linkedProductId");
                 }
             }
+            let items = rows
+                .into_iter()
+                .map(|row| contracts::project(contracts::schema(resource.schema), row))
+                .collect();
+            Ok(contracts::page(items, total as usize, page, size))
         });
     }
     store.transaction_as(actor, |tx, actor| {

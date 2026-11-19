@@ -1,27 +1,20 @@
-import type { ApiSupplierAssessmentDto } from "../../api/index.ts";
+import type { ApiSupplierAssessmentAnalyticsDto } from "../../api/index.ts";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
 import { buildSupplierAssessmentAnalytics } from "./supplierAssessmentAnalyticsModel.ts";
 
-export function SupplierAssessmentAnalytics({ rows, supplierName, onCreate }: {
-  rows: readonly ApiSupplierAssessmentDto[];
+export function SupplierAssessmentAnalytics({ summary, supplierName, onCreate }: {
+  summary: ApiSupplierAssessmentAnalyticsDto;
   supplierName: string;
   onCreate?: () => void;
 }) {
-  const analytics = buildSupplierAssessmentAnalytics(rows);
+  const analytics = buildSupplierAssessmentAnalytics(summary);
   if (!analytics.totalCount) {
     return <div className="empty-cell-content supplier-assessment-analysis-empty">
       <strong>暂无可分析的评价</strong>
-      <span>至少记录一次评价后，这里会自动汇总四项得分、结论分布和最近趋势。</span>
       {onCreate ? <button className="primary-button" type="button" onClick={onCreate}>记录第一次评价</button> : null}
     </div>;
   }
-
-  const latest = rows.reduce((current, row) => {
-    if (!current) return row;
-    const dateDifference = row.assessmentDate.localeCompare(current.assessmentDate);
-    return dateDifference > 0 || (dateDifference === 0 && row.id > current.id) ? row : current;
-  }, null as ApiSupplierAssessmentDto | null);
-
+  const latest = summary.recent[0];
   return <div className="supplier-assessment-analysis">
     <div className="supplier-assessment-summary-grid">
       <SummaryCard label="最近综合分" value={`${analytics.latestAverage?.toFixed(2) ?? "-"} / 5`}
@@ -35,7 +28,7 @@ export function SupplierAssessmentAnalytics({ rows, supplierName, onCreate }: {
 
     <div className="supplier-assessment-analysis-grid">
       <section className="supplier-analysis-card">
-        <div className="supplier-analysis-card-header"><div><h4>四项平均表现</h4><p>基于 {supplierName} 的全部评价记录</p></div></div>
+        <div className="supplier-analysis-card-header"><div><h4>四项平均表现</h4><p>{supplierName} 的全部可见评价</p></div></div>
         <div className="supplier-dimension-list">
           {analytics.dimensions.map((item) => <div className="supplier-dimension-row" key={item.key}>
             <span>{item.label}</span><div className="supplier-score-track" aria-label={`${item.label}平均 ${item.average.toFixed(2)} 分`}>

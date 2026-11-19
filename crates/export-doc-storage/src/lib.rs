@@ -480,6 +480,7 @@ delegate! {
     query_business(query:&BusinessQuery<'_>)->(i64, Vec<Value>);
     query_crm(query:&CrmQuery<'_>)->(i64, Vec<Value>);
     query_related(query:&RelatedQuery<'_>)->(i64, Vec<Value>);
+    supplier_assessment_analytics(query:&RelatedQuery<'_>)->Value;
     scan_crm(query:&CrmQuery<'_>,after_id:i64)->Vec<Value>;
     query_personnel(query:&PersonnelQuery<'_>)->(i64, Vec<Value>);
     query_office(query:&OfficeQuery<'_>)->(i64, Vec<Value>);

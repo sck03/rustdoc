@@ -108,7 +108,8 @@ pub fn exercise(c: &Connection) {
         insert(
             c,
             "supplier-assessments",
-            json!({"supplierCompanyId":7001,"status":status,"assessmentDate":"2026-10-25"}),
+            json!({"supplierCompanyId":7001,"status":status,"assessmentDate":"2026-10-25",
+                "qualityScore":4,"deliveryScore":3,"serviceScore":2,"priceScore":5,"conclusion":"合格"}),
             owner,
         );
     }
@@ -118,6 +119,19 @@ pub fn exercise(c: &Connection) {
         ..query
     };
     assert_eq!(c.query_related(&assessments).unwrap().0, 2);
+    let analytics = c.supplier_assessment_analytics(&assessments).unwrap();
+    assert_eq!(analytics["totalCount"], 2);
+    assert_eq!(analytics["qualityTotal"], 8);
+    assert_eq!(analytics["qualifiedCount"], 2);
+    assert_eq!(analytics["recent"].as_array().unwrap().len(), 2);
+    let all = c
+        .supplier_assessment_analytics(&RelatedQuery {
+            include_other_drafts: true,
+            ..assessments
+        })
+        .unwrap();
+    assert_eq!(all["totalCount"], 3);
+    assert_eq!(all["qualityTotal"], 12);
     assert_eq!(
         c.query_related(&RelatedQuery {
             include_other_drafts: true,
@@ -137,7 +151,7 @@ pub fn exercise(c: &Connection) {
     insert(
         c,
         "supplier-products",
-        json!({"supplierCompanyId":7001,"productId":product,"referencePrice":123.45678}),
+        json!({"supplierCompanyId":7001,"productId":product,"referencePrice":"9007199254740993.01"}),
         1,
     );
     let fields = [
@@ -159,7 +173,7 @@ pub fn exercise(c: &Connection) {
         .unwrap();
     assert_eq!(rows[0]["productCode"], "P-1");
     assert_eq!(rows[0]["productNameCN"], "商品");
-    assert_eq!(rows[0]["referencePrice"], json!(123.45678));
+    assert_eq!(rows[0]["referencePrice"], json!("9007199254740993.01"));
     assert_eq!(rows[0]["__linkedProductId"], product);
     c.rollback().unwrap();
 }

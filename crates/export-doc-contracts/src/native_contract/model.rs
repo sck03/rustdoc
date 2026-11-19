@@ -232,6 +232,8 @@ pub struct Foundation {
 }
 #[derive(Clone, Serialize)]
 pub struct Operation {
+    #[serde(rename = "x-exportdoc-json-response-limit-bytes")]
+    pub max_json_response_bytes: usize,
     #[serde(rename = "x-exportdoc-timeout-seconds")]
     pub timeout_seconds: u64,
     #[serde(rename = "x-exportdoc-processing-slot")]
@@ -277,6 +279,22 @@ pub fn ep(
         method,
         path,
         operation: Operation {
+            max_json_response_bytes: responses
+                .iter()
+                .filter(|(code, _)| code.starts_with('2'))
+                .filter_map(|(_, response)| response.content.as_ref()?.get("application/json"))
+                .map(|media| match &media.schema {
+                    Schema::Definition(schema) => crate::request_limits::response_schema_bytes(
+                        schema
+                            .reference
+                            .as_deref()
+                            .and_then(|r| r.rsplit('/').next())
+                            .unwrap_or(""),
+                    ),
+                    Schema::Unspecified => crate::request_limits::MAX_JSON_RESPONSE_BYTES,
+                })
+                .max()
+                .unwrap_or(crate::request_limits::MAX_JSON_RESPONSE_BYTES),
             timeout_seconds: if responses.values().any(|response| {
                 response
                     .content

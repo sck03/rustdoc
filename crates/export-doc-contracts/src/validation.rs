@@ -34,9 +34,7 @@ fn check(schema: &Value, value: &Value, path: &str, depth: usize) -> Result<(), 
                 .count();
             if (key == "allOf" && passed != options.len())
                 || (key == "anyOf" && passed == 0)
-                // The frozen .NET document sometimes repeats null through a
-                // nullable referenced DTO and an explicit null alternative.
-                || (key == "oneOf" && passed != 1 && !(value.is_null() && passed > 0))
+                || (key == "oneOf" && passed != 1)
             {
                 return Err(format!("{path}: {key} mismatch"));
             }
@@ -103,6 +101,13 @@ mod tests {
         let schema = &contracts::schema("PersonnelRecord")["properties"]["account"];
         assert!(structure(schema, &Value::Null).is_ok());
         assert!(structure(schema, &json!({"id":1})).is_err());
+        assert!(
+            structure(
+                &json!({"oneOf":[{"type":"null"},{"type":["null","object"]}]}),
+                &Value::Null
+            )
+            .is_err()
+        );
         assert!(
             structure(
                 &json!({"oneOf":[{"type":"integer"},{"type":"number"}]}),

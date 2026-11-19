@@ -19,7 +19,9 @@ await import(pathToFileURL(bundle).href);
 
 const { buildSupplierAssessmentAnalytics } = globalThis.__model;
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
-const empty = buildSupplierAssessmentAnalytics([]);
+const summary = {totalCount:0, qualityTotal:0, deliveryTotal:0, serviceTotal:0, priceTotal:0,
+  preferredCount:0, qualifiedCount:0, watchCount:0, pausedCount:0, recent:[]};
+const empty = buildSupplierAssessmentAnalytics(summary);
 assert(empty.totalCount === 0 && empty.latestAverage === null && empty.dimensions.length === 0, "empty analytics");
 
 const rows = [
@@ -27,11 +29,16 @@ const rows = [
   { id: 3, assessmentDate: "2026-03-10", qualityScore: 5, deliveryScore: 4, serviceScore: 5, priceScore: 4, averageScore: 4.5, conclusion: "优先合作" },
   { id: 2, assessmentDate: "2026-02-10", qualityScore: 5, deliveryScore: 3, serviceScore: 4, priceScore: 3, averageScore: 3.75, conclusion: "合格" },
 ];
-const analytics = buildSupplierAssessmentAnalytics(rows);
+const analytics = buildSupplierAssessmentAnalytics({...summary,totalCount:3,qualityTotal:14,deliveryTotal:9,serviceTotal:12,priceTotal:12,
+  preferredCount:1,qualifiedCount:1,watchCount:1,recent:rows});
 assert(analytics.totalCount === 3 && analytics.latestAverage === 4.5, "latest score and count");
 assert(analytics.changeFromPrevious === 0.75, "change from previous assessment");
 assert(analytics.strongestDimension.label === "质量" && analytics.strongestDimension.average === 4.67, "strongest dimension");
 assert(analytics.weakestDimension.label === "交期" && analytics.weakestDimension.average === 3, "weakest dimension");
 assert(analytics.conclusions.reduce((sum, item) => sum + item.count, 0) === 3, "conclusion distribution count");
 assert(analytics.trend.map((item) => item.id).join(",") === "1,2,3", "trend chronological order");
+const large = buildSupplierAssessmentAnalytics({...summary,totalCount:10000,qualityTotal:40000,deliveryTotal:20000,
+  serviceTotal:30000,priceTotal:50000,qualifiedCount:10000,recent:rows});
+assert(large.totalCount === 10000 && large.dimensions[0].average === 4 && large.trend.length === 3,
+  "all-record averages are independent of the bounded recent window");
 process.stdout.write("supplier-assessment-analytics-model tests passed\n");

@@ -32,6 +32,10 @@ fn complete_contract_preserves_types_requests_runtime_and_endpoint_metadata() {
                     ("x-exportdoc-policy", "policy"),
                     ("responses", "responses"),
                     ("requestBody", "requestBody"),
+                    (
+                        "x-exportdoc-json-response-limit-bytes",
+                        "maxJsonResponseBytes",
+                    ),
                 ] {
                     assert_eq!(op[source], projected[target]);
                 }

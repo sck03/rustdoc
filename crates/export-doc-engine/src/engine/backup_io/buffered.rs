@@ -49,6 +49,14 @@ impl Drop for Reservation {
     }
 }
 impl Reservation {
+    pub fn grow_to(&mut self, bytes: usize) -> Result<()> {
+        if bytes > self.bytes {
+            let mut additional = self.budget.reserve_working(bytes - self.bytes)?;
+            self.bytes += additional.bytes;
+            additional.bytes = 0;
+        }
+        Ok(())
+    }
     pub fn shrink_to(&mut self, bytes: usize) {
         if bytes < self.bytes {
             self.budget.used.fetch_sub(self.bytes - bytes, Relaxed);

@@ -3,6 +3,14 @@ use rust_decimal::Decimal;
 use serde_json::{Value, json};
 pub const ASSESSMENT_KINDS: &[&str] = &["定期评价", "订单复盘", "样品评估", "其它"];
 pub const CONCLUSIONS: &[&str] = &["优先合作", "合格", "观察", "暂停合作"];
+pub fn reference_price(value: &Value) -> Result<String, String> {
+    let text = value.as_str().ok_or("参考价必须是精确十进制文本。")?;
+    let price = Decimal::from_str_exact(text).map_err(|_| "参考价格式或精度无效。")?;
+    if price < Decimal::ZERO {
+        return Err("参考价不能小于零。".into());
+    }
+    Ok(price.normalize().to_string())
+}
 pub fn assessment(value: &mut Value, today: &str) -> Result<(), String> {
     let date = value["assessmentDate"].as_str().unwrap_or("");
     if !valid_date(date) || date > today {
@@ -39,4 +47,25 @@ pub fn assessment(value: &mut Value, today: &str) -> Result<(), String> {
         false
     )?);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn reference_price_preserves_precision_and_rejects_rounding() {
+        assert_eq!(
+            reference_price(&json!("9007199254740993.0100")).unwrap(),
+            "9007199254740993.01"
+        );
+        assert_eq!(reference_price(&json!("1.005")).unwrap(), "1.005");
+        for value in [
+            json!(-1),
+            json!(1.005),
+            json!("-0.01"),
+            json!("0.00000000000000000000000000001"),
+        ] {
+            assert!(reference_price(&value).is_err(), "{value}");
+        }
+    }
 }

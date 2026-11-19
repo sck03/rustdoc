@@ -289,55 +289,58 @@ impl NativeService {
                 self.authorize_operation(&actor, operation, query)?;
                 if operation == GET_RUNTIME_METRICS {
                     auth::authorize(&actor, "system.settings", "view")?;
-                    return serde_json::to_vec(&self.runtime_metrics()?).map_err(Into::into);
+                    return crate::json_response::encode(operation, &self.runtime_metrics()?);
                 }
                 if communication::metadata(operation).is_some() {
-                    return serde_json::to_vec(&communication::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &communication::handle(
+                            self,
+                            &actor,
+                            operation,
+                            parameters,
+                            query,
+                            &body_value,
+                        )?,
+                    );
                 }
                 if oa::metadata(operation).is_some() {
-                    return serde_json::to_vec(&oa::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &oa::handle(self, &actor, operation, parameters, query, &body_value)?,
+                    );
                 }
                 if operation == START_PDF_MERGE_SAVE_TO_PATH_JOB {
-                    return serde_json::to_vec(&pdf_merge::local(self, &actor, &body_value)?)
-                        .map_err(Into::into);
+                    return crate::json_response::encode(
+                        operation,
+                        &pdf_merge::local(self, &actor, &body_value)?,
+                    );
                 }
                 if licensing::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&licensing::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &licensing::handle(
+                            self,
+                            &actor,
+                            operation,
+                            parameters,
+                            query,
+                            &body_value,
+                        )?,
+                    );
                 }
                 if team_backup::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&team_backup::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &team_backup::handle(
+                            self,
+                            &actor,
+                            operation,
+                            parameters,
+                            query,
+                            &body_value,
+                        )?,
+                    );
                 }
                 #[cfg(feature = "invoice-transfer")]
                 if invoice_transfer::OPERATIONS.contains(&operation) {
@@ -351,13 +354,10 @@ impl NativeService {
                 }
                 #[cfg(feature = "excel")]
                 if invoice_query::EXPORTS.contains(&operation) {
-                    return serde_json::to_vec(&invoice_query::export(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &invoice_query::export(self, &actor, operation, &body_value)?,
+                    );
                 }
                 #[cfg(feature = "single-window")]
                 if single_window::OPERATIONS.contains(&operation) {
@@ -372,87 +372,81 @@ impl NativeService {
                 }
                 #[cfg(feature = "ai")]
                 if operation == REVIEW_LETTER_OF_CREDIT_COMPLIANCE {
-                    return serde_json::to_vec(&self.ai_reviewer.review(
-                        &self.store,
-                        &self.protector,
-                        &self.paths.cache_root,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                    return crate::json_response::encode(
+                        operation,
+                        &self.ai_reviewer.review(
+                            &self.store,
+                            &self.protector,
+                            &self.paths.cache_root,
+                            &body_value,
+                        )?,
+                    );
                 }
                 if operation == IMPORT_LETTER_OF_CREDIT_DOCUMENT {
-                    return serde_json::to_vec(&letter_of_credit::local(self, &body_value)?)
-                        .map_err(Into::into);
+                    return crate::json_response::encode(
+                        operation,
+                        &letter_of_credit::local(self, &body_value)?,
+                    );
                 }
                 #[cfg(feature = "ocr")]
                 if operation == RECOGNIZE_OCR_IMAGE {
-                    return serde_json::to_vec(&ocr::local(self, &body_value)?).map_err(Into::into);
+                    return crate::json_response::encode(
+                        operation,
+                        &ocr::local(self, &body_value)?,
+                    );
                 }
                 #[cfg(feature = "mail")]
                 if email::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&email::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &email::handle(self, &actor, operation, parameters, query, &body_value)?,
+                    );
                 }
                 #[cfg(feature = "mail")]
                 if email_templates::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&email_templates::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &email_templates::handle(
+                            self,
+                            &actor,
+                            operation,
+                            parameters,
+                            query,
+                            &body_value,
+                        )?,
+                    );
                 }
                 if document_packages::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&document_packages::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &document_packages::handle(
+                            self,
+                            &actor,
+                            operation,
+                            parameters,
+                            &body_value,
+                        )?,
+                    );
                 }
                 #[cfg(feature = "hs-remote")]
                 if hs_remote::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&hs_remote::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &hs_remote::handle(self, &actor, operation, query, &body_value)?,
+                    );
                 }
                 #[cfg(feature = "excel")]
                 if hs_files::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&hs_files::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &hs_files::handle(self, &actor, operation, &body_value)?,
+                    );
                 }
                 if hs::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&hs::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &hs::handle(self, &actor, operation, parameters, query, &body_value)?,
+                    );
                 }
                 if packing::OPERATIONS.contains(&operation) {
                     return packing::handle(
@@ -465,77 +459,87 @@ impl NativeService {
                     );
                 }
                 if attachment_categories::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&attachment_categories::handle(
-                        &self.store,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &attachment_categories::handle(
+                            &self.store,
+                            &actor,
+                            operation,
+                            parameters,
+                            query,
+                            &body_value,
+                        )?,
+                    );
                 }
                 if related_records::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&related_records::handle(
-                        &self.store,
-                        &actor,
-                        &self.clock,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &related_records::handle(
+                            &self.store,
+                            &actor,
+                            &self.clock,
+                            operation,
+                            parameters,
+                            query,
+                            &body_value,
+                        )?,
+                    );
                 }
                 #[cfg(feature = "excel")]
                 if party_files::OPERATIONS.contains(&operation) {
                     return party_files::handle(self, &actor, operation, query, &body_value);
                 }
                 if invoice_maintenance::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&invoice_maintenance::handle(
-                        &self.store,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &invoice_maintenance::handle(
+                            &self.store,
+                            &actor,
+                            operation,
+                            parameters,
+                            &body_value,
+                        )?,
+                    );
                 }
                 if operation == SEARCH_SUPPLIER_PRODUCT_OPTIONS {
-                    return serde_json::to_vec(&product_options::search(
-                        &self.store,
-                        &actor,
-                        query,
-                    )?)
-                    .map_err(Into::into);
+                    return crate::json_response::encode(
+                        operation,
+                        &product_options::search(&self.store, &actor, query)?,
+                    );
                 }
                 if crm::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&crm::handle(
-                        &self.store,
-                        &actor,
-                        &self.clock,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &crm::handle(
+                            &self.store,
+                            &actor,
+                            &self.clock,
+                            operation,
+                            parameters,
+                            query,
+                            &body_value,
+                        )?,
+                    );
                 }
                 if sales::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&sales::handle(
-                        &self.store,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &sales::handle(
+                            &self.store,
+                            &actor,
+                            operation,
+                            parameters,
+                            query,
+                            &body_value,
+                        )?,
+                    );
                 }
                 #[cfg(feature = "exchange-rates")]
                 if exchange::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&exchange::handle(self, &actor, operation, query)?)
-                        .map_err(Into::into);
+                    return crate::json_response::encode(
+                        operation,
+                        &exchange::handle(self, &actor, operation, query)?,
+                    );
                 }
                 let is_audit = audit::OPERATIONS.contains(&operation);
                 #[cfg(feature = "excel")]
@@ -544,72 +548,71 @@ impl NativeService {
                     return audit::handle(self, &actor, operation, query, &body_value);
                 }
                 if report_templates::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&report_templates::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &report_templates::handle(
+                            self,
+                            &actor,
+                            operation,
+                            parameters,
+                            query,
+                            &body_value,
+                        )?,
+                    );
                 }
                 if reports::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&reports::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &reports::handle(self, &actor, operation, parameters, query, &body_value)?,
+                    );
                 }
                 if operation == DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE {
                     return Ok(report_assets::download(self, &actor, parameters)?.content);
                 }
                 if report_assets::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&report_assets::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &report_assets::handle(
+                            self,
+                            &actor,
+                            operation,
+                            parameters,
+                            query,
+                            &body_value,
+                        )?,
+                    );
                 }
                 if report_template_files::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&report_template_files::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        query,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &report_template_files::handle(
+                            self,
+                            &actor,
+                            operation,
+                            parameters,
+                            query,
+                            &body_value,
+                        )?,
+                    );
                 }
                 #[cfg(feature = "excel")]
                 if excel::OPERATIONS.contains(&operation) {
-                    return serde_json::to_vec(&excel::handle(
-                        self,
-                        &actor,
+                    return crate::json_response::encode(
                         operation,
-                        parameters,
-                        &body_value,
-                    )?)
-                    .map_err(Into::into);
+                        &excel::handle(self, &actor, operation, parameters, &body_value)?,
+                    );
                 }
                 if operation == DOWNLOAD_PERSONNEL_ATTACHMENT {
                     return Ok(personnel_files::download(&self.store, &actor, parameters)?.content);
                 }
                 if operation == DELETE_PERSONNEL_ATTACHMENT {
-                    return serde_json::to_vec(&contracts::dto(
-                        contracts::response(operation.id),
-                        personnel_files::remove(&self.store, &actor, parameters, &body_value)?,
-                    ))
-                    .map_err(Into::into);
+                    return crate::json_response::encode(
+                        operation,
+                        &contracts::dto(
+                            contracts::response(operation.id),
+                            personnel_files::remove(&self.store, &actor, parameters, &body_value)?,
+                        ),
+                    );
                 }
                 if personnel::OPERATIONS.contains(&operation) {
                     return personnel::handle(
@@ -643,8 +646,10 @@ impl NativeService {
                     let job_id = crate::engine::request_values::find(parameters, "jobId")
                         .ok_or_else(|| invalid("缺少文件任务编号。"))?;
                     if operation == RETRY_JOB {
-                        return serde_json::to_vec(&tasks::retry::execute(self, &actor, job_id)?)
-                            .map_err(Into::into);
+                        return crate::json_response::encode(
+                            operation,
+                            &tasks::retry::execute(self, &actor, job_id)?,
+                        );
                     }
                     return self.jobs.operation(operation, &actor, job_id);
                 }
@@ -671,10 +676,9 @@ impl NativeService {
                 }
             }
         };
-        serde_json::to_vec(&contracts::project(
-            contracts::response(operation.id),
-            value,
-        ))
-        .map_err(Into::into)
+        crate::json_response::encode(
+            operation,
+            &contracts::project(contracts::response(operation.id), value),
+        )
     }
 }

@@ -357,7 +357,7 @@ pub fn exercise(request: &Request<'_>) {
         &[],
         json!({"productCode":format!("P-{suffix}"),"nameCN":"棉外套","nameEN":"Cotton Coat"}),
     );
-    let body = json!({"productId":product["id"],"supplierProductCode":"SUP-001","referencePrice":123.45,"currency":"CNY","leadTimeDays":30});
+    let body = json!({"productId":product["id"],"supplierProductCode":"SUP-001","referencePrice":"9007199254740993.0100","currency":"CNY","leadTimeDays":30});
     let mut link = save(
         request,
         CREATE_SUPPLIER_PRODUCT_LINK,
@@ -366,6 +366,7 @@ pub fn exercise(request: &Request<'_>) {
     );
     assert_eq!(link["productCode"], product["productCode"]);
     assert_eq!(link["status"], "供货中");
+    assert_eq!(link["referencePrice"], "9007199254740993.01");
     assert_eq!(
         request(
             CREATE_SUPPLIER_PRODUCT_LINK,
@@ -434,6 +435,48 @@ pub fn exercise(request: &Request<'_>) {
         .unwrap();
     assert_eq!(latest["conclusion"], "观察");
     assert_eq!(latest["assessmentCount"], 1);
+    for _ in 0..13 {
+        save(
+            request,
+            CREATE_SUPPLIER_ASSESSMENT,
+            &supplier_path,
+            json!({
+                "assessmentDate":today,"assessmentKind":"定期评价","qualityScore":4,
+                "deliveryScore":4,"serviceScore":4,"priceScore":4,"conclusion":"合格","notes":"分页历史记录"
+            }),
+        );
+    }
+    let page = read(
+        request,
+        LIST_SUPPLIER_ASSESSMENTS,
+        &supplier_path,
+        &[("pageNumber", "2".into()), ("pageSize", "7".into())],
+        None,
+    );
+    assert_eq!(page["totalCount"], 14);
+    assert_eq!(page["items"].as_array().unwrap().len(), 7);
+    let analytics = read(
+        request,
+        GET_SUPPLIER_ASSESSMENT_ANALYTICS,
+        &supplier_path,
+        &[],
+        None,
+    );
+    assert_eq!(analytics["totalCount"], 14);
+    assert_eq!(analytics["qualityTotal"], 57);
+    assert_eq!(analytics["qualifiedCount"], 13);
+    assert_eq!(analytics["watchCount"], 1);
+    assert_eq!(analytics["recent"].as_array().unwrap().len(), 12);
+    assert_eq!(
+        analytics["recent"][0]["id"],
+        read(
+            request,
+            LIST_SUPPLIER_ASSESSMENTS,
+            &supplier_path,
+            &[("pageSize", "1".into())],
+            None
+        )["items"][0]["id"]
+    );
     let mut update = confirmed.clone();
     update["expectedVersion"] = confirmed["versionNumber"].clone();
     assert_eq!(

@@ -31,7 +31,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["code","companyCode","name","isActive"])),
     ("ApiOrganizationDirectoryResponse",o(vec![("companies",a(r("ApiOrganizationCompanyDto"))),("departments",a(r("ApiOrganizationDepartmentDto")))]).required(vec!["companies","departments"])),
     ("ApiPagedResponseOfApiUnitDto",super::schema_shapes::paged_response("ApiUnitDto")),
-    ("ApiPersonnelImageForm",o(vec![("file",Schema::default().one_of(vec![ty(Primitive::Null),r("IFormFile")])),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))])),
+    ("ApiPersonnelImageForm",o(vec![("file",Schema::default().any_of(vec![ty(Primitive::Null),r("IFormFile")])),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))])),
     ("ApiUnitDto",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("nameEN",s()),("nameCN",s()),
         ("code",s()),("rowVersion",s().default_value(serde_json::json!("")))
@@ -103,7 +103,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("employee",r("PersonnelDirectoryRecord")),("profile",r("PersonnelProfile")),("employmentType",r("EmploymentType")),
         ("hireDate",s().format("date")),("lastEffectiveDate",s().format("date")),("probationEndsOn",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),
         ("contractEndsOn",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),("confirmedOn",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),("departedOn",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),
-        ("account",Schema::default().one_of(vec![ty(Primitive::Null),r("PersonnelAccountRecord")])),("versionNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("canEdit",b()),
+        ("account",Schema::default().any_of(vec![ty(Primitive::Null),r("PersonnelAccountRecord")])),("versionNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("canEdit",b()),
         ("canTransition",b()),("canLinkAccount",b()),("images",a(r("PersonnelImageRecord"))),
         ("canDelete",b().default_value(serde_json::json!(false))),("canCorrectRegistration",b().default_value(serde_json::json!(false))),("deleteRestriction",s().default_value(serde_json::json!(""))),
         ("organization",r("PersonnelOrganization")),("companyScope",s().read_only(true)),("approvalRequiredActions",a(s().enumeration(Enumeration::Values(vec![serde_json::json!("Hire"),serde_json::json!("Confirm"),serde_json::json!("Transfer"),serde_json::json!("Depart"),serde_json::json!("Rehire")]))).read_only(true)),
@@ -115,7 +115,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ])).kind(Types::Many(vec![Primitive::Null,Primitive::Object])).required(vec!["employeeNumber","departmentId","jobTitle","hireDate","onProbation"])),
     ("PersonnelUpdateRequest",o(vec![
         ("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("profile",r("PersonnelProfile")),("employmentType",r("EmploymentType")),
-        ("probationEndsOn",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),("contractEndsOn",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),("registration",Schema::default().one_of(vec![ty(Primitive::Null),r("PersonnelRegistrationCorrection")])),
+        ("probationEndsOn",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),("contractEndsOn",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).format("date")),("registration",Schema::default().any_of(vec![ty(Primitive::Null),r("PersonnelRegistrationCorrection")])),
         ("correctionNote",s().max_length(500))
     ]).required(vec!["expectedVersion","profile","employmentType","probationEndsOn","contractEndsOn"])),
     ("AnnouncementDepartment",super::schema_shapes::code_name()),
