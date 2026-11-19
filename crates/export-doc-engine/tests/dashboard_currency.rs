@@ -92,7 +92,7 @@ fn dashboard_keeps_original_currencies_separate_without_an_exchange_rate() {
     }
     let result = fixture.request(GET_DASHBOARD, None, None);
     export_doc_contracts::validation::response(GET_DASHBOARD.id, &result).unwrap();
-    assert_eq!(result["monthlyExportAmount"], 0);
+    assert_eq!(result["monthlyExportAmount"], "0");
     assert_eq!(result["exportAmountCurrency"], "");
     let amounts = result["exportAmountsByCurrency"].as_array().unwrap();
     assert_eq!(amounts.len(), 2);

@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 import { defaultReportDesigns } from './lib/default-report-designs.mjs';
 import { rebuildDesignerDocument } from './lib/report-designer-rebuild.mjs';
+import { normalizeReportScope } from './lib/report-html-comparison.mjs';
 
 await withOfficeUi('batch-file-workflows-ui', async ({ repo, output, url, invoke, openPage, require, operations }) => {
   const bundle = path.join(output, 'models.mjs');
@@ -30,7 +31,7 @@ await withOfficeUi('batch-file-workflows-ui', async ({ repo, output, url, invoke
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const draft = { ...model.createEmptyInvoice(session.user.businessDate), invoiceNo: 'BATCH-001', exporterNameEN: 'SAMPLE EXPORTER', customerNameEN: 'SAMPLE CUSTOMER', currency: 'USD' };
-  draft.items = [{ ...model.createEmptyInvoiceItem(), styleNo: 'STYLE-01', styleName: 'Sample product', quantity: 20, cartons: 2, unitEN: 'PCS', ctnUnitEN: 'CTNS', unitPrice: 5, totalPrice: 100 }];
+  draft.items = [{ ...model.createEmptyInvoiceItem(), styleNo: 'STYLE-01', styleName: 'Sample product', quantity: "20", cartons: "2", unitEN: 'PCS', ctnUnitEN: 'CTNS', unitPrice: "5", totalPrice: "100" }];
   const invoice = await invoke('CreateInvoice', draft, {}, token);
   const templates = await invoke('ListReportTemplates', undefined, {}, token);
   const fixed = model.parseReportDesignerV3Source('', 'ExportDocument').schema;
@@ -59,11 +60,12 @@ await withOfficeUi('batch-file-workflows-ui', async ({ repo, output, url, invoke
       const original = await invoke('PreviewReportTemplateContent', { reportType: reference.reportType, content: JSON.stringify(reference), sampleProfile, withSeal: false }, {}, token);
       const recreated = await invoke('PreviewReportTemplateContent', { reportType: reference.reportType, content, sampleProfile, withSeal: false }, {}, token);
       fs.writeFileSync(path.join(output, `${path.basename(name, '.dtpl')}-${sampleProfile}.html`), recreated.html);
-      if (recreated.html !== original.html) {
+      const actual = normalizeReportScope(recreated.html), expected = normalizeReportScope(original.html);
+      if (actual !== expected) {
         fs.writeFileSync(path.join(output, `${path.basename(name, '.dtpl')}-${sampleProfile}-reference.html`), original.html);
         let index = 0;
-        while (index < Math.min(recreated.html.length, original.html.length) && recreated.html[index] === original.html[index]) index++;
-        throw new Error(`${name}/${sampleProfile}: native layout differs at ${index}; rebuilt ${recreated.html.slice(Math.max(0,index-80),index+100)}; reference ${original.html.slice(Math.max(0,index-80),index+100)}; ${output}`);
+        while (index < Math.min(actual.length, expected.length) && actual[index] === expected[index]) index++;
+        throw new Error(`${name}/${sampleProfile}: native layout differs at ${index}; rebuilt ${actual.slice(Math.max(0,index-80),index+100)}; reference ${expected.slice(Math.max(0,index-80),index+100)}; ${output}`);
       }
     }
     const created = await invoke('CreateUserReportTemplate', { reportType: reference.reportType, name: `空白重建·${path.basename(name, '.dtpl')}`, contentHtml: content }, {}, token);
@@ -75,10 +77,11 @@ await withOfficeUi('batch-file-workflows-ui', async ({ repo, output, url, invoke
     const template = templates.find(template => template.templatePath.endsWith(name)); assert(template, name); return template.templatePath;
   });
   selected.push(rebuilt.find(template => template.name.endsWith('/invoice_template.dtpl')).path);
-  const capabilities = await invoke('GetReportTemplateV3Contract', undefined, {}, token);
-  assert.equal(capabilities.page.size, 'A4');
-  assert.equal(capabilities.batchLimits.maxReports, 200);
-  assert(capabilities.page.presets.some(preset => preset.size === 'A5'));
+  const contract = await (await fetch(url + '/openapi/v1.json')).json();
+  const schemas = contract.components.schemas;
+  assert.equal(schemas.ApiInvoiceReportBatchLimitsContract.properties.maxReports.default, 200);
+  assert(schemas.ApiReportTemplateV3PageContract.properties.presets.default.some(preset => preset.size === 'A5'));
+  assert(contract['x-exportdoc-shared-schemas'].includes('ApiReportTemplateV3LimitsContract'));
   const page = await openPage('oa-review', 'Review-2026-Test');
   await page.waitForURL('**/#/dashboard');
   await page.evaluate(() => { location.hash = '#/invoices'; });

@@ -33,6 +33,7 @@ CREATE TABLE personnel_private_profiles (
     body JSONB NOT NULL CHECK(jsonb_typeof(body)='object')
 );
 CREATE INDEX records_kind_id ON records(kind, id DESC);
+CREATE INDEX records_hs_feedback_query ON records(hs_search, id) WHERE kind='hs-feedback';
 CREATE INDEX records_source_page ON records(kind, (body->>'sourceId'), id DESC) WHERE body->>'sourceId' IS NOT NULL;
 CREATE INDEX records_opportunity_history_page ON records(kind, (body->>'opportunityId'), id DESC) WHERE body->>'opportunityId' IS NOT NULL;
 CREATE INDEX attachment_invoice ON records((body->'invoiceId')) WHERE kind='attachments';

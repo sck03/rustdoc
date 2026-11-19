@@ -25,6 +25,7 @@ pub fn exercise(c: &Connection) {
     let fields = [("code", "code"), ("effectiveYear", "effectiveYear")];
     let query = HsQuery {
         kind: "hs-codes",
+        feedback_query: None,
         current_year: Some(2026),
         keyword: "",
         prefix: "6109",
@@ -77,6 +78,7 @@ pub fn exercise(c: &Connection) {
     let examples = c
         .query_hs(&HsQuery {
             kind: "hs-examples",
+            feedback_query: None,
             current_year: None,
             keyword: "",
             prefix: "6109",
@@ -101,6 +103,7 @@ pub fn exercise(c: &Connection) {
     ] {
         let mut q = HsQuery {
             kind,
+            feedback_query: None,
             current_year: None,
             keyword: "",
             prefix: "",
@@ -128,6 +131,43 @@ pub fn exercise(c: &Connection) {
         assert_eq!(actual, expected, "keyset scan preserves {kind} ordering");
     }
 
+    let feedback_id = insert(
+        c,
+        "hs-feedback",
+        json!({"queryText":" Cotton Shirt ","candidateCode":"6109100000","acceptedCount":2,"rejectedCount":1}),
+        1,
+    );
+    insert(
+        c,
+        "hs-feedback",
+        json!({"queryText":"Unrelated","candidateCode":"6109100000","acceptedCount":100}),
+        1,
+    );
+    let normalized = export_doc_domain::hs::text("cotton shirt");
+    let feedback = HsQuery {
+        kind: "hs-feedback",
+        feedback_query: Some(&normalized),
+        current_year: None,
+        keyword: "",
+        prefix: "",
+        since: "",
+        ranked_examples: false,
+        fields: &[("candidateCode", "candidateCode")],
+        offset: 0,
+        limit: 10,
+    };
+    let (count, rows) = c.page_hs(&feedback).unwrap();
+    assert_eq!(count, 1);
+    assert_eq!(rows[0]["candidateCode"], "6109100000");
+    let mut body = c.get("hs-feedback", feedback_id).unwrap().unwrap();
+    body["queryText"] = json!("Revised query");
+    c.set_body(feedback_id, &body).unwrap();
+    assert_eq!(
+        c.page_hs(&feedback).unwrap().0,
+        0,
+        "feedback normalization follows the write transaction"
+    );
+
     let mut ids = vec![];
     for date in [
         Some("2026-11-10T08:00:00.000000001+08:00"),
@@ -141,6 +181,7 @@ pub fn exercise(c: &Connection) {
         since: "2026-11-10T00:00:00.000000001Z",
         keyword: "",
         prefix: "",
+        feedback_query: None,
         current_year: None,
         ranked_examples: false,
         fields: &[("id", "id")],

@@ -7,6 +7,7 @@ import type {
   HsCodeKnowledgeSearchResult,
 } from "../../api/index.ts";
 import { normalizeText, readApiError } from "../../ui/formUtils.ts";
+import { ExactDecimal, decimalText } from "../../ui/decimalSum.ts";
 import { Drawer } from "../../ui/primitives/Dialog.tsx";
 import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { buildInvoiceHsFeedbackContext, buildInvoiceHsQuery } from "./invoiceHsKnowledgeModel.ts";
@@ -78,7 +79,7 @@ export function InvoiceHsKnowledgePanel({
       };
       const patch: Partial<ApiInvoiceItemDto> = { hsCode: result.currentCode };
       if (!normalizeText(item?.unitCN) && normalizeText(standard.unit)) patch.unitCN = normalizeText(standard.unit);
-      if (!(item?.taxRebateRate ?? 0)) {
+      if (ExactDecimal.from(item?.taxRebateRate ?? "0").compare(0) === 0) {
         const rate = parsePercent(standard.rebateRate);
         if (rate != null) patch.taxRebateRate = rate;
       }
@@ -136,8 +137,12 @@ export function InvoiceHsKnowledgePanel({
 }
 
 function parsePercent(value?: string) {
-  const number = Number.parseFloat((value ?? "").replace("%", "").trim());
-  return Number.isFinite(number) ? number : null;
+  const text = (value ?? "").trim().replace(/%$/, "").trim();
+  if (!text) return null;
+  try {
+    const decimal = ExactDecimal.from(decimalText(text));
+    return decimal.compare(0) >= 0 && decimal.compare(100) <= 0 ? decimal.toString() : null;
+  } catch { return null; }
 }
 
 function isTrustedActiveHsCode(value: { status?: string; sourceName?: string; effectiveYear?: number | null; lastVerifiedAt?: string | null }) {

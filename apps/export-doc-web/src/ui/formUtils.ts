@@ -1,4 +1,4 @@
-import { ExactDecimal } from "./decimalSum.ts";
+import { formatDecimal } from "./decimalSum.ts";
 import { ApiError, type ApiErrorResponse } from "../api/index.ts";
 
 function readErrorResponse(error: ApiError): (Partial<ApiErrorResponse> & { error?: string }) | null {
@@ -81,9 +81,8 @@ export function formatDate(value?: string | null) {
 
 export function formatAmount(value?: number | string, currency = "") {
   if (typeof value === "string") {
-    if (!/^\d+(?:\.\d+)?$/.test(value) || value.length > 60) return "-";
-    const [whole, fraction] = ExactDecimal.from(value).toFixed(2).split(".");
-    return `${currency} ${BigInt(whole).toLocaleString("zh-CN")}.${fraction}`.trim();
+    if (!/^[+-]?\d+(?:\.\d+)?$/.test(value) || value.length > 60) return "-";
+    return `${currency} ${formatDecimal(value, 2)}`.trim();
   }
   if (!Number.isFinite(value)) {
     return "-";
@@ -95,7 +94,8 @@ export function formatAmount(value?: number | string, currency = "") {
   })}`.trim();
 }
 
-export function formatPlainNumber(value?: number) {
+export function formatPlainNumber(value?: number | string) {
+  if (typeof value === "string") return formatDecimal(value, 4, true);
   if (!Number.isFinite(value)) {
     return "-";
   }

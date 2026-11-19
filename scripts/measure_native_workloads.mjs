@@ -6,12 +6,14 @@ import { pathToFileURL } from 'node:url';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { spawnProcessTree, stopProcessTree } from './lib/child-process-tree.mjs';
-import { officeReviewOperations, officeReviewInvoke } from './lib/native-office-ui.mjs';
+import { officeReviewExecutable, officeReviewOperations, officeReviewInvoke } from './lib/native-office-ui.mjs';
+import { cargoExampleExecutable } from './lib/cargo-paths.mjs';
 import { measureProcessTree } from './lib/workload-memory.mjs';
 
 const repo = path.resolve(import.meta.dirname, '..');
 const app = path.resolve(process.argv[2] ?? 'artifacts/review-desktop/ExportDocManager.Tauri.Full');
-const binary = path.join(repo, 'target/x86_64-pc-windows-gnu/release/examples/office_review.exe');
+const binary = process.env.EXPORTDOC_OFFICE_REVIEW_BINARY ? officeReviewExecutable(repo)
+  : cargoExampleExecutable(repo, 'office_review', process.env, process.platform, 'release');
 const output = path.join(repo, 'artifacts/native-workload-measurement', String(Date.now()));
 const data = path.join(output, 'Data'); fs.mkdirSync(data, { recursive: true });
 const require = createRequire(path.join(repo, 'apps/export-doc-web/package.json'));
@@ -58,7 +60,7 @@ try {
     const measured = await measureProcessTree(server.pid, run);
     measurements.push({ name, ...measured });
     fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify({ platform: process.platform, configuration: 'Release',
-      target: 'x86_64-pc-windows-gnu', binary, app, auditRows, measurements }, null, 2));
+      target: process.env.CARGO_BUILD_TARGET || 'host', binary, app, auditRows, measurements }, null, 2));
     console.log(`${name}: ${measured.elapsedMs.toFixed(1)} ms; sampled RSS ${(measured.peakRss / 1048576).toFixed(1)} MiB`);
   }
   const db = path.join(data, 'Database/exportdoc-native.db');
@@ -101,7 +103,7 @@ con.executemany('INSERT INTO audit_logs(kind,record_id,version,action,actor_id,o
   const model = await import(pathToFileURL(modelFile).href), invoices = [];
   for (let index = 0; index < 10; index++) {
     const draft = { ...model.createEmptyInvoice(session.user.businessDate), invoiceNo: `MEASURE-${index}`, exporterNameEN: 'SAMPLE EXPORTER', customerNameEN: 'SAMPLE CUSTOMER', currency: 'USD',
-      items: Array.from({ length: 40 }, (_, row) => ({ ...model.createEmptyInvoiceItem(), styleNo: `STYLE-${row}`, styleName: 'Sample product / 匿名测量商品', quantity: 20, cartons: 2, unitEN: 'PCS', ctnUnitEN: 'CTNS', unitPrice: 5, totalPrice: 100 })) };
+      items: Array.from({ length: 40 }, (_, row) => ({ ...model.createEmptyInvoiceItem(), styleNo: `STYLE-${row}`, styleName: 'Sample product / 匿名测量商品', quantity: "20", cartons: "2", unitEN: 'PCS', ctnUnitEN: 'CTNS', unitPrice: "5", totalPrice: "100" })) };
     invoices.push((await api('CreateInvoice', draft)).id);
   }
   const templates = await api('ListReportTemplates', undefined, { reportType: 'ExportDocument' });
@@ -143,6 +145,33 @@ con.executemany('INSERT INTO audit_logs(kind,record_id,version,action,actor_id,o
       assert.equal(result.lines.length, 16); assert(result.fullText.includes('ITEM 16'));
     }
     return { images: 8, linesPerImage: 16, concurrency: 1, metrics: await idle() };
+  });
+  const hsRows = 5000, queryText = '实验专用硅胶连接管';
+  const initialExamples = (await api('ListHsCodeKnowledgeExamples', undefined, {pageSize:1})).totalCount;
+  const tariffCodes = (await api('ListHsCodes', undefined, {pageSize:1})).totalCount;
+  for (let start = 0; start < hsRows; start += 4) {
+    await Promise.all(Array.from({ length: Math.min(4, hsRows - start) }, async (_, offset) => {
+      const index = start + offset, code = '39' + String(index).padStart(8, '0');
+      await api('SaveHsCodeKnowledgeExample', { id: 0, rawReportedHsCode: code,
+        productName: index === 0 ? queryText : '普通包装薄膜样例' + index, specification: '匿名性能样例',
+        source: 'PerformanceFixture', sourceYear: Number(session.user.businessDate.slice(0, 4)), isManuallyVerified: false });
+      if (index < 1000) await api('RecordHsCodeKnowledgeFeedback', { queryText: '无关查询' + index,
+        productName: '匿名性能样例', specification: '', candidateCode: code, accepted: false });
+    }));
+    if ((start + 4) % 500 === 0) console.log('Prepared HS examples: ' + (start + 4) + '/' + hsRows);
+  }
+  await measure('hs-5000-examples-1000-feedback', async () => {
+    const times = [];
+    for (let round = 0; round < 12; round++) {
+      const started = performance.now();
+      const result = await api('SearchHsCodeKnowledge', undefined, { query: queryText, maxResults: 1 });
+      times.push(performance.now() - started);
+      assert.equal(result.localExampleCount, initialExamples + hsRows);
+      assert.equal(result.items[0].name, queryText, 'The oldest low-use example remains searchable');
+    }
+    times.sort((a,b) => a-b);
+    return { examples: initialExamples + hsRows, addedFeedbackRows: 1000, tariffCodes, rounds: times.length,
+      medianMs: times[6], p95Ms: times[11], metrics: await idle() };
   });
   console.log(`Workload evidence: ${output}`);
 } finally { await stopProcessTree(server); }

@@ -1,11 +1,12 @@
 import type { ApiInvoiceItemDto, ApiUnitDto } from "../../api/index.ts";
 import { ApiInvoiceEditingLimitsContractDefaults } from "../../api/index.ts";
 import { normalizeText, numberValue } from "../../ui/formUtils.ts";
+import { ExactDecimal, decimalText } from "../../ui/decimalSum.ts";
 import { documentSpareKeys, mapDocumentSpareFields } from "../../ui/documentSpareFields.ts";
 import type { EditableInvoiceItemField, InvoiceItemColumnDefinition } from "./invoiceItemTableModel.ts";
 import { invoiceItemEditableColumns } from "./invoiceItemTableModel.ts";
 import { parseTabularClipboard } from "../../ui/tabularClipboard.ts";
-import { invoiceItemPriceCalculationModes, invoiceItemUnitPriceMaximumScale, invoiceItemUnitPriceStandardScale, invoiceItemWeightScale, invoiceItemVolumeScale, roundTo, roundUnitPrice, roundWeight, roundVolume, normalizePriceCalculationMode, normalizeInvoiceItemPrices } from "./invoiceItemCalculation.ts";
+import { invoiceItemPriceCalculationModes, invoiceItemUnitPriceMaximumScale, invoiceItemUnitPriceStandardScale, invoiceItemWeightScale, invoiceItemVolumeScale, roundUnitPrice, roundWeight, roundVolume, normalizePriceCalculationMode, normalizeInvoiceItemPrices } from "./invoiceItemCalculation.ts";
 export { invoiceItemPriceCalculationModes, invoiceItemUnitPriceStandardScale, invoiceItemUnitPriceMaximumScale, invoiceItemWeightScale, invoiceItemVolumeScale, recalculateInvoiceItem, calculateInvoiceTotals, haveInvoiceTotalsInputsChanged, normalizePriceCalculationMode, hasChanged, roundMoney, roundTo, roundUnitPrice, roundWeight, roundVolume } from "./invoiceItemCalculation.ts";
 export type { InvoiceItemPriceCalculationMode } from "./invoiceItemCalculation.ts";
 export const maxInvoiceItemRows = ApiInvoiceEditingLimitsContractDefaults.maxItems;
@@ -221,7 +222,7 @@ function readItemClipboardValue(item: ApiInvoiceItemDto | undefined, column: Inv
 
   const value = item[column.field];
   if (column.kind === "number") {
-    return typeof value === "number" && Number.isFinite(value) ? String(value) : "";
+    return typeof value === "string" ? decimalText(value) : "";
   }
 
   return sanitizeClipboardCell(typeof value === "string" ? value : "");
@@ -245,36 +246,36 @@ export function readItemTextValue(item: ApiInvoiceItemDto, field: EditableInvoic
 
 export function readItemNumberValue(item: ApiInvoiceItemDto, field: EditableInvoiceItemField) {
   const value = item[field];
-  if (typeof value !== "number" || !Number.isFinite(value)) {
+  if (typeof value !== "string" || !value) {
     return undefined;
   }
 
-  if (value === 0 && (blankWhenZeroInvoiceItemNumberFields.has(field) || !isMeaningfulInvoiceItem(item))) {
+  if (ExactDecimal.from(value).compare(0) === 0 && (blankWhenZeroInvoiceItemNumberFields.has(field) || !isMeaningfulInvoiceItem(item))) {
     return undefined;
   }
 
   return value;
 }
 
-export function invoiceItemNumberInputValue(value?: number) {
-  return Number.isFinite(value) ? String(value) : "";
+export function invoiceItemNumberInputValue(value?: string) {
+  return value ?? "";
 }
 
-export function invoiceItemUnitPriceDisplayValue(value?: number) {
-  if (!Number.isFinite(value)) {
+export function invoiceItemUnitPriceDisplayValue(value?: string) {
+  if (value === undefined) {
     return "";
   }
 
-  const normalized = roundUnitPrice(Number(value));
-  if (roundTo(normalized, invoiceItemUnitPriceStandardScale) === normalized) {
+  const normalized = ExactDecimal.from(roundUnitPrice(value));
+  if (normalized.round(invoiceItemUnitPriceStandardScale).compare(normalized) === 0) {
     return normalized.toFixed(invoiceItemUnitPriceStandardScale);
   }
 
   return normalized.toFixed(invoiceItemUnitPriceMaximumScale).replace(/0+$/, "");
 }
 
-export function invoiceItemNumberDisplayValue(field: EditableInvoiceItemField, value?: number) {
-  if (!Number.isFinite(value)) {
+export function invoiceItemNumberDisplayValue(field: EditableInvoiceItemField, value?: string) {
+  if (value === undefined) {
     return "";
   }
 
@@ -293,12 +294,12 @@ export function invoiceItemNumberDisplayValue(field: EditableInvoiceItemField, v
   return invoiceItemNumberInputValue(value);
 }
 
-export function invoiceItemWeightDisplayValue(value?: number) {
-  return Number.isFinite(value) ? roundWeight(Number(value)).toFixed(invoiceItemWeightScale) : "";
+export function invoiceItemWeightDisplayValue(value?: string) {
+  return value === undefined ? "" : ExactDecimal.from(value).toFixed(invoiceItemWeightScale);
 }
 
-export function invoiceItemVolumeDisplayValue(value?: number) {
-  return Number.isFinite(value) ? roundVolume(Number(value)).toFixed(invoiceItemVolumeScale) : "";
+export function invoiceItemVolumeDisplayValue(value?: string) {
+  return value === undefined ? "" : ExactDecimal.from(value).toFixed(invoiceItemVolumeScale);
 }
 
 export function readInvoiceItemNumberInput(value: string) {
@@ -306,8 +307,7 @@ export function readInvoiceItemNumberInput(value: string) {
     return undefined;
   }
 
-  const next = Number(value);
-  return Number.isFinite(next) ? next : undefined;
+  return decimalText(value);
 }
 
 export function createEmptyInvoiceItem(invoiceId = 0): ApiInvoiceItemDto {
@@ -322,28 +322,28 @@ export function createEmptyInvoiceItem(invoiceId = 0): ApiInvoiceItemDto {
     brand: "",
     hsCode: "",
     origin: "",
-    quantity: 0,
+    quantity: "0",
     unitEN: "",
     unitCN: "",
-    pcsPerCtn: 0,
-    cartons: 0,
+    pcsPerCtn: "0",
+    cartons: "0",
     ctnUnitCN: "",
     ctnUnitEN: "",
-    length: 0,
-    width: 0,
-    height: 0,
-    volume: 0,
-    gwPerCtn: 0,
-    nwPerCtn: 0,
-    gwTotal: 0,
-    nwTotal: 0,
+    length: "0",
+    width: "0",
+    height: "0",
+    volume: "0",
+    gwPerCtn: "0",
+    nwPerCtn: "0",
+    gwTotal: "0",
+    nwTotal: "0",
     priceCalculationMode: invoiceItemPriceCalculationModes.unitPriceDriven,
-    unitPrice: 0,
-    totalPrice: 0,
-    purchasePrice: 0,
-    purchaseTotal: 0,
-    taxRebateRate: 0,
-    taxRefundAmount: 0,
+    unitPrice: "0",
+    totalPrice: "0",
+    purchasePrice: "0",
+    purchaseTotal: "0",
+    taxRebateRate: "0",
+    taxRefundAmount: "0",
     ...mapDocumentSpareFields({}),
     customFieldsJson: "",
   };
@@ -355,38 +355,38 @@ export function normalizeInvoiceItemForSave(item: ApiInvoiceItemDto): ApiInvoice
     ...createEmptyInvoiceItem(numberValue(item.invoiceId)),
     ...item,
     brand: normalizeText(item.brand),
-    cartons: numberValue(item.cartons),
+    cartons: decimalText(item.cartons),
     ctnUnitCN: normalizeText(item.ctnUnitCN),
     ctnUnitEN: normalizeText(item.ctnUnitEN),
     customFieldsJson: normalizeText(item.customFieldsJson),
     fabricComposition: normalizeText(item.fabricComposition),
-    gwPerCtn: roundWeight(numberValue(item.gwPerCtn)),
-    gwTotal: roundWeight(numberValue(item.gwTotal)),
-    height: numberValue(item.height),
+    gwPerCtn: roundWeight(decimalText(item.gwPerCtn)),
+    gwTotal: roundWeight(decimalText(item.gwTotal)),
+    height: decimalText(item.height),
     hsCode: normalizeText(item.hsCode),
     id: numberValue(item.id),
     invoiceId: numberValue(item.invoiceId),
-    length: numberValue(item.length),
-    nwPerCtn: roundWeight(numberValue(item.nwPerCtn)),
-    nwTotal: roundWeight(numberValue(item.nwTotal)),
+    length: decimalText(item.length),
+    nwPerCtn: roundWeight(decimalText(item.nwPerCtn)),
+    nwTotal: roundWeight(decimalText(item.nwTotal)),
     origin: normalizeText(item.origin),
-    pcsPerCtn: numberValue(item.pcsPerCtn),
+    pcsPerCtn: decimalText(item.pcsPerCtn),
     poNumber: normalizeText(item.poNumber),
-    purchasePrice: numberValue(item.purchasePrice),
-    purchaseTotal: numberValue(item.purchaseTotal),
-    quantity: numberValue(item.quantity),
+    purchasePrice: decimalText(item.purchasePrice),
+    purchaseTotal: decimalText(item.purchaseTotal),
+    quantity: decimalText(item.quantity),
     ...mapDocumentSpareFields(item, normalizeText),
     styleName: normalizeText(item.styleName),
     styleNameCN: normalizeText(item.styleNameCN),
     styleNo: normalizeText(item.styleNo),
-    taxRebateRate: numberValue(item.taxRebateRate),
-    totalPrice: numberValue(item.totalPrice),
+    taxRebateRate: decimalText(item.taxRebateRate),
+    totalPrice: decimalText(item.totalPrice),
     unitCN: normalizeText(item.unitCN),
     unitEN: normalizeText(item.unitEN),
-    unitPrice: numberValue(item.unitPrice),
+    unitPrice: decimalText(item.unitPrice),
     priceCalculationMode: normalizePriceCalculationMode(item.priceCalculationMode),
-    volume: roundVolume(numberValue(item.volume)),
-    width: numberValue(item.width),
+    volume: roundVolume(decimalText(item.volume)),
+    width: decimalText(item.width),
   };
 
   normalizeInvoiceItemPrices(normalized);
@@ -430,5 +430,5 @@ export function isMeaningfulInvoiceItem(item: ApiInvoiceItemDto) {
     item.width,
   ];
 
-  return item.id > 0 || textValues.some((value) => Boolean(value?.trim())) || numberValues.some((value) => numberValue(value) !== 0);
+  return item.id > 0 || textValues.some((value) => Boolean(value?.trim())) || numberValues.some((value) => ExactDecimal.from(decimalText(value)).compare(0) !== 0);
 }

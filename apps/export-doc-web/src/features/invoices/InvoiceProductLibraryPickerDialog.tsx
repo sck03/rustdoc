@@ -1,7 +1,7 @@
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { PackagePlus, RefreshCw, Search } from "lucide-react";
 import type { ApiProductDto } from "../../api/index.ts";
-import { formatPlainNumber, normalizeText, numberValue } from "../../ui/formUtils.ts";
+import { formatPlainNumber, normalizeText } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { Dialog } from "../../ui/primitives/Dialog.tsx";
@@ -157,7 +157,7 @@ export function ProductLibraryPickerDialog({
                       <td title={normalizeText(product.brand)}>{normalizeText(product.brand)}</td>
                       <td title={normalizeText(product.origin)}>{normalizeText(product.origin)}</td>
                       <td title={formatProductUnits(product)}>{formatProductUnits(product)}</td>
-                      <td>{formatPlainNumber(numberValue(product.defaultPrice))}</td>
+                      <td>{formatPlainNumber(product.defaultPrice)}</td>
                     </tr>
                   );
                 })

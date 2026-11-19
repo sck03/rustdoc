@@ -7,9 +7,19 @@ pub fn response(operation: &str, value: &Value) -> Result<(), String> {
     structure(contracts::response(operation), value)
 }
 pub fn structure(schema: &Value, value: &Value) -> Result<(), String> {
-    check(schema, value, "$", 0)
+    check(schema, value, "$", 0, true)
 }
-fn check(schema: &Value, value: &Value, path: &str, depth: usize) -> Result<(), String> {
+/// Sparse commands may omit fields; every supplied value still obeys its native schema.
+pub fn provided_fields(schema: &Value, value: &Value) -> Result<(), String> {
+    check(schema, value, "$", 0, false)
+}
+fn check(
+    schema: &Value,
+    value: &Value,
+    path: &str,
+    depth: usize,
+    require_properties: bool,
+) -> Result<(), String> {
     if depth > 64 {
         return Err(format!("{path}: contract nesting limit exceeded"));
     }
@@ -24,13 +34,13 @@ fn check(schema: &Value, value: &Value, path: &str, depth: usize) -> Result<(), 
         if schema.is_null() {
             return Err(format!("{path}: missing schema {name}"));
         }
-        return check(schema, value, path, depth + 1);
+        return check(schema, value, path, depth + 1, require_properties);
     }
     for key in ["allOf", "anyOf", "oneOf"] {
         if let Some(options) = schema[key].as_array() {
             let passed = options
                 .iter()
-                .filter(|option| check(option, value, path, depth + 1).is_ok())
+                .filter(|option| check(option, value, path, depth + 1, require_properties).is_ok())
                 .count();
             if (key == "allOf" && passed != options.len())
                 || (key == "anyOf" && passed == 0)
@@ -63,6 +73,17 @@ fn check(schema: &Value, value: &Value, path: &str, depth: usize) -> Result<(), 
     if !valid {
         return Err(format!("{path}: expected {}", schema["type"]));
     }
+    if schema["format"] == "decimal"
+        && let Some(text) = value.as_str()
+        && (crate::decimal_text::parse(text).is_none()
+            || schema["maxLength"]
+                .as_u64()
+                .is_some_and(|max| text.len() as u64 > max))
+    {
+        return Err(format!(
+            "{path}: 请输入可精确表示且长度有效的普通十进制数字。"
+        ));
+    }
     if let Some(object) = value.as_object() {
         for key in schema["required"]
             .as_array()
@@ -70,22 +91,40 @@ fn check(schema: &Value, value: &Value, path: &str, depth: usize) -> Result<(), 
             .flatten()
             .filter_map(Value::as_str)
         {
-            if !object.contains_key(key) {
+            if require_properties && !object.contains_key(key) {
                 return Err(format!("{path}.{key}: required property missing"));
             }
         }
         for (key, value) in object {
             if let Some(property) = schema["properties"].get(key) {
-                check(property, value, &format!("{path}.{key}"), depth + 1)?;
+                check(
+                    property,
+                    value,
+                    &format!("{path}.{key}"),
+                    depth + 1,
+                    require_properties,
+                )?;
             } else if let Some(additional) = schema.get("additionalProperties") {
-                check(additional, value, &format!("{path}.{key}"), depth + 1)?;
+                check(
+                    additional,
+                    value,
+                    &format!("{path}.{key}"),
+                    depth + 1,
+                    require_properties,
+                )?;
             }
         }
     }
     if let Some(items) = value.as_array() {
         if let Some(schema) = schema.get("items") {
             for (index, item) in items.iter().enumerate() {
-                check(schema, item, &format!("{path}[{index}]"), depth + 1)?;
+                check(
+                    schema,
+                    item,
+                    &format!("{path}[{index}]"),
+                    depth + 1,
+                    require_properties,
+                )?;
             }
         }
     }

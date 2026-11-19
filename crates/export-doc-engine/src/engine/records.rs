@@ -20,7 +20,7 @@ pub fn find(operation: Operation) -> Option<&'static Resource> {
         [
             Some(resource.list),
             Some(resource.create),
-            Some(resource.update),
+            resource.update,
             resource.get,
             resource.delete,
         ]
@@ -273,7 +273,7 @@ pub fn handle(
         return Err(invalid("请求内容须为业务对象。"));
     }
     let body_id = super::request_values::record_id(request.get("id"))?;
-    let record_id = if operation == resource.update && operation != resource.create {
+    let record_id = if Some(operation) == resource.update && operation != resource.create {
         id(parameters)?
     } else {
         body_id.unwrap_or(0)

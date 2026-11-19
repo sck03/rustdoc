@@ -53,7 +53,7 @@ export async function verifyDesktopEntryRows({ run, request, token, cdp, output 
     await wait(`${expression}.value===${JSON.stringify(text)}`);
   };
   const draft = { ...createEmptyInvoice('2026-10-19'), invoiceNo: 'ENTRY-DESKTOP-001', exporterNameEN: 'SAMPLE EXPORT COMPANY', customerNameEN: 'SAMPLE CUSTOMER', currency: 'USD' };
-  draft.items = [[331, 7944, 73849], [185, 3330, 40293]].map(([cartons, quantity, totalPrice]) => ({ ...createEmptyInvoiceItem(), styleName: 'INTERNAL PRODUCT', cartons, quantity, totalPrice, priceCalculationMode: 'LineAmountDriven', unitEN: 'PCS', ctnUnitEN: 'CTNS' }));
+  draft.items = [['331', '7944', '73849'], ['185', '3330', '40293']].map(([cartons, quantity, totalPrice]) => ({ ...createEmptyInvoiceItem(), styleName: 'INTERNAL PRODUCT', cartons, quantity, totalPrice, priceCalculationMode: 'LineAmountDriven', unitEN: 'PCS', ctnUnitEN: 'CTNS' }));
   const created = await request('CreateInvoice', token, draft);
   assert.equal(created.status, 201, JSON.stringify(created.body));
   const invoiceId = created.body.id;
@@ -81,8 +81,8 @@ export async function verifyDesktopEntryRows({ run, request, token, cdp, output 
   assert.deepEqual(saved.items.map(item => item.printRows.map(({ kind, text }) => ({ kind, text }))), [
     [{ kind: 'Text', text: 'MEN SWEATERS' }, { kind: 'Item', text: '' }, { kind: 'Blank', text: '' }], [{ kind: 'Item', text: '' }],
   ]);
-  assert.equal(saved.totalAmount, 114142);
-  assert.equal(saved.totalCartons, 516);
+  assert.equal(saved.totalAmount, '114142');
+  assert.equal(saved.totalCartons, '516');
   await cdp.send('Page.reload');
   await wait("document.querySelector('[aria-label=\"按录入行打印明细\"]')");
   assert.equal(await run("document.querySelectorAll('[aria-label=\"按录入行打印明细\"] tbody tr').length"), 4);
@@ -143,7 +143,7 @@ export async function verifyDesktopEntryRows({ run, request, token, cdp, output 
   await click('保存发票');
   await waitFor(async () => (await request('GetInvoice', token, undefined, { id: invoiceId })).body.items[0].printRows.length === 6, 30000, 'Batch notes did not roundtrip');
   const final = (await request('GetInvoice', token, undefined, { id: invoiceId })).body;
-  assert.equal(final.totalAmount, 114142);
+  assert.equal(final.totalAmount, '114142');
   assert.equal(final.items[0].printRows[2].kind, 'Blank');
   await run("[...document.querySelectorAll('summary')].find(e=>e.textContent==='批量插入说明与空白行').click(); true");
   await screenshot('Full-entry-batch-notes.png');

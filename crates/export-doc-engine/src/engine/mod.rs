@@ -223,6 +223,12 @@ impl NativeService {
         body: Option<Value>,
         token: &str,
     ) -> Result<Vec<u8>> {
+        if let Some(probe) = export_doc_contracts::request_limits::probe(operation.id) {
+            if probe == export_doc_contracts::request_limits::Probe::Readiness {
+                self.health()?;
+            }
+            return Ok(Vec::new());
+        }
         #[cfg(feature = "excel")]
         if operation == EXPORT_HS_CODE_KNOWLEDGE {
             crate::operation::check()?;
@@ -265,7 +271,26 @@ impl NativeService {
                 operation.id
             )));
         }
+        // Every JSON use-case result crosses the same bounded encoder.
+        macro_rules! respond_json {
+            ($result:expr) => {
+                return crate::json_response::encode(operation, &$result?);
+            };
+        }
+        if let Some(actor) = &authenticated_actor {
+            self.authorize_operation(actor, operation, query)?;
+        }
         let body_value = body.unwrap_or_else(|| json!({}));
+        if contracts::contract()["operations"][operation.id]["validatesDecimalInput"]
+            .as_bool()
+            .expect("generated decimal input metadata")
+        {
+            export_doc_contracts::validation::provided_fields(
+                contracts::request(operation.id),
+                &body_value,
+            )
+            .map_err(invalid)?;
+        }
         let value = match operation {
             LOGIN => self.sessions.login(
                 &self.store,
@@ -273,7 +298,7 @@ impl NativeService {
                 &records::text(&body_value, "username"),
                 body_value["password"].as_str().unwrap_or(""),
             )?,
-            GET_HEALTH | GET_LIVENESS | GET_READINESS | HEAD_LIVENESS | HEAD_READINESS => {
+            GET_HEALTH => {
                 self.health()?;
                 diagnostics::health(&self.paths, self.provider()?)?
             }
@@ -284,63 +309,58 @@ impl NativeService {
             _ => {
                 let actor = match authenticated_actor {
                     Some(actor) => actor,
-                    None => self.session_actor_for_operation(token, operation)?,
+                    None => {
+                        let actor = self.session_actor_for_operation(token, operation)?;
+                        self.authorize_operation(&actor, operation, query)?;
+                        actor
+                    }
                 };
-                self.authorize_operation(&actor, operation, query)?;
                 if operation == GET_RUNTIME_METRICS {
                     auth::authorize(&actor, "system.settings", "view")?;
-                    return crate::json_response::encode(operation, &self.runtime_metrics()?);
+                    respond_json!(self.runtime_metrics());
                 }
                 if communication::metadata(operation).is_some() {
-                    return crate::json_response::encode(
+                    respond_json!(communication::handle(
+                        self,
+                        &actor,
                         operation,
-                        &communication::handle(
-                            self,
-                            &actor,
-                            operation,
-                            parameters,
-                            query,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        query,
+                        &body_value,
+                    ));
                 }
                 if oa::metadata(operation).is_some() {
-                    return crate::json_response::encode(
+                    respond_json!(oa::handle(
+                        self,
+                        &actor,
                         operation,
-                        &oa::handle(self, &actor, operation, parameters, query, &body_value)?,
-                    );
+                        parameters,
+                        query,
+                        &body_value
+                    ));
                 }
                 if operation == START_PDF_MERGE_SAVE_TO_PATH_JOB {
-                    return crate::json_response::encode(
-                        operation,
-                        &pdf_merge::local(self, &actor, &body_value)?,
-                    );
+                    respond_json!(pdf_merge::local(self, &actor, &body_value));
                 }
                 if licensing::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(licensing::handle(
+                        self,
+                        &actor,
                         operation,
-                        &licensing::handle(
-                            self,
-                            &actor,
-                            operation,
-                            parameters,
-                            query,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        query,
+                        &body_value,
+                    ));
                 }
                 if team_backup::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(team_backup::handle(
+                        self,
+                        &actor,
                         operation,
-                        &team_backup::handle(
-                            self,
-                            &actor,
-                            operation,
-                            parameters,
-                            query,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        query,
+                        &body_value,
+                    ));
                 }
                 #[cfg(feature = "invoice-transfer")]
                 if invoice_transfer::OPERATIONS.contains(&operation) {
@@ -354,10 +374,7 @@ impl NativeService {
                 }
                 #[cfg(feature = "excel")]
                 if invoice_query::EXPORTS.contains(&operation) {
-                    return crate::json_response::encode(
-                        operation,
-                        &invoice_query::export(self, &actor, operation, &body_value)?,
-                    );
+                    respond_json!(invoice_query::export(self, &actor, operation, &body_value));
                 }
                 #[cfg(feature = "single-window")]
                 if single_window::OPERATIONS.contains(&operation) {
@@ -372,81 +389,74 @@ impl NativeService {
                 }
                 #[cfg(feature = "ai")]
                 if operation == REVIEW_LETTER_OF_CREDIT_COMPLIANCE {
-                    return crate::json_response::encode(
-                        operation,
-                        &self.ai_reviewer.review(
-                            &self.store,
-                            &self.protector,
-                            &self.paths.cache_root,
-                            &body_value,
-                        )?,
-                    );
+                    respond_json!(self.ai_reviewer.review(
+                        &self.store,
+                        &self.protector,
+                        &self.paths.cache_root,
+                        &body_value,
+                    ));
                 }
                 if operation == IMPORT_LETTER_OF_CREDIT_DOCUMENT {
-                    return crate::json_response::encode(
-                        operation,
-                        &letter_of_credit::local(self, &body_value)?,
-                    );
+                    respond_json!(letter_of_credit::local(self, &body_value));
                 }
                 #[cfg(feature = "ocr")]
                 if operation == RECOGNIZE_OCR_IMAGE {
-                    return crate::json_response::encode(
-                        operation,
-                        &ocr::local(self, &body_value)?,
-                    );
+                    respond_json!(ocr::local(self, &body_value));
                 }
                 #[cfg(feature = "mail")]
                 if email::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(email::handle(
+                        self,
+                        &actor,
                         operation,
-                        &email::handle(self, &actor, operation, parameters, query, &body_value)?,
-                    );
+                        parameters,
+                        query,
+                        &body_value
+                    ));
                 }
                 #[cfg(feature = "mail")]
                 if email_templates::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(email_templates::handle(
+                        self,
+                        &actor,
                         operation,
-                        &email_templates::handle(
-                            self,
-                            &actor,
-                            operation,
-                            parameters,
-                            query,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        query,
+                        &body_value,
+                    ));
                 }
                 if document_packages::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(document_packages::handle(
+                        self,
+                        &actor,
                         operation,
-                        &document_packages::handle(
-                            self,
-                            &actor,
-                            operation,
-                            parameters,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        &body_value,
+                    ));
                 }
                 #[cfg(feature = "hs-remote")]
                 if hs_remote::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(hs_remote::handle(
+                        self,
+                        &actor,
                         operation,
-                        &hs_remote::handle(self, &actor, operation, query, &body_value)?,
-                    );
+                        query,
+                        &body_value
+                    ));
                 }
                 #[cfg(feature = "excel")]
                 if hs_files::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
-                        operation,
-                        &hs_files::handle(self, &actor, operation, &body_value)?,
-                    );
+                    respond_json!(hs_files::handle(self, &actor, operation, &body_value));
                 }
                 if hs::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(hs::handle(
+                        self,
+                        &actor,
                         operation,
-                        &hs::handle(self, &actor, operation, parameters, query, &body_value)?,
-                    );
+                        parameters,
+                        query,
+                        &body_value
+                    ));
                 }
                 if packing::OPERATIONS.contains(&operation) {
                     return packing::handle(
@@ -459,87 +469,66 @@ impl NativeService {
                     );
                 }
                 if attachment_categories::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(attachment_categories::handle(
+                        &self.store,
+                        &actor,
                         operation,
-                        &attachment_categories::handle(
-                            &self.store,
-                            &actor,
-                            operation,
-                            parameters,
-                            query,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        query,
+                        &body_value,
+                    ));
                 }
                 if related_records::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(related_records::handle(
+                        &self.store,
+                        &actor,
+                        &self.clock,
                         operation,
-                        &related_records::handle(
-                            &self.store,
-                            &actor,
-                            &self.clock,
-                            operation,
-                            parameters,
-                            query,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        query,
+                        &body_value,
+                    ));
                 }
                 #[cfg(feature = "excel")]
                 if party_files::OPERATIONS.contains(&operation) {
                     return party_files::handle(self, &actor, operation, query, &body_value);
                 }
                 if invoice_maintenance::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(invoice_maintenance::handle(
+                        &self.store,
+                        &actor,
                         operation,
-                        &invoice_maintenance::handle(
-                            &self.store,
-                            &actor,
-                            operation,
-                            parameters,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        &body_value,
+                    ));
                 }
                 if operation == SEARCH_SUPPLIER_PRODUCT_OPTIONS {
-                    return crate::json_response::encode(
-                        operation,
-                        &product_options::search(&self.store, &actor, query)?,
-                    );
+                    respond_json!(product_options::search(&self.store, &actor, query));
                 }
                 if crm::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(crm::handle(
+                        &self.store,
+                        &actor,
+                        &self.clock,
                         operation,
-                        &crm::handle(
-                            &self.store,
-                            &actor,
-                            &self.clock,
-                            operation,
-                            parameters,
-                            query,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        query,
+                        &body_value,
+                    ));
                 }
                 if sales::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(sales::handle(
+                        &self.store,
+                        &actor,
                         operation,
-                        &sales::handle(
-                            &self.store,
-                            &actor,
-                            operation,
-                            parameters,
-                            query,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        query,
+                        &body_value,
+                    ));
                 }
                 #[cfg(feature = "exchange-rates")]
                 if exchange::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
-                        operation,
-                        &exchange::handle(self, &actor, operation, query)?,
-                    );
+                    respond_json!(exchange::handle(self, &actor, operation, query));
                 }
                 let is_audit = audit::OPERATIONS.contains(&operation);
                 #[cfg(feature = "excel")]
@@ -548,59 +537,57 @@ impl NativeService {
                     return audit::handle(self, &actor, operation, query, &body_value);
                 }
                 if report_templates::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(report_templates::handle(
+                        self,
+                        &actor,
                         operation,
-                        &report_templates::handle(
-                            self,
-                            &actor,
-                            operation,
-                            parameters,
-                            query,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        query,
+                        &body_value,
+                    ));
                 }
                 if reports::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(reports::handle(
+                        self,
+                        &actor,
                         operation,
-                        &reports::handle(self, &actor, operation, parameters, query, &body_value)?,
-                    );
+                        parameters,
+                        query,
+                        &body_value
+                    ));
                 }
                 if operation == DOWNLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE {
                     return Ok(report_assets::download(self, &actor, parameters)?.content);
                 }
                 if report_assets::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(report_assets::handle(
+                        self,
+                        &actor,
                         operation,
-                        &report_assets::handle(
-                            self,
-                            &actor,
-                            operation,
-                            parameters,
-                            query,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        query,
+                        &body_value,
+                    ));
                 }
                 if report_template_files::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(report_template_files::handle(
+                        self,
+                        &actor,
                         operation,
-                        &report_template_files::handle(
-                            self,
-                            &actor,
-                            operation,
-                            parameters,
-                            query,
-                            &body_value,
-                        )?,
-                    );
+                        parameters,
+                        query,
+                        &body_value,
+                    ));
                 }
                 #[cfg(feature = "excel")]
                 if excel::OPERATIONS.contains(&operation) {
-                    return crate::json_response::encode(
+                    respond_json!(excel::handle(
+                        self,
+                        &actor,
                         operation,
-                        &excel::handle(self, &actor, operation, parameters, &body_value)?,
-                    );
+                        parameters,
+                        &body_value
+                    ));
                 }
                 if operation == DOWNLOAD_PERSONNEL_ATTACHMENT {
                     return Ok(personnel_files::download(&self.store, &actor, parameters)?.content);
@@ -646,10 +633,7 @@ impl NativeService {
                     let job_id = crate::engine::request_values::find(parameters, "jobId")
                         .ok_or_else(|| invalid("缺少文件任务编号。"))?;
                     if operation == RETRY_JOB {
-                        return crate::json_response::encode(
-                            operation,
-                            &tasks::retry::execute(self, &actor, job_id)?,
-                        );
+                        respond_json!(tasks::retry::execute(self, &actor, job_id));
                     }
                     return self.jobs.operation(operation, &actor, job_id);
                 }

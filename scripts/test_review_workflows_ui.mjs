@@ -11,9 +11,17 @@ await withOfficeUi('review-workflows-ui',async({repo,output,require,url,invoke,o
   const model=path.join(output,'invoice-model.mjs');
   await require('esbuild').build({stdin:{resolveDir:path.join(repo,'apps/export-doc-web'),contents:"export { createEmptyInvoice } from './src/features/invoices/invoiceModel.ts'; export { createEmptyInvoiceItem } from './src/features/invoices/invoiceItemsEditorModel.ts';"},bundle:true,platform:'node',format:'esm',outfile:model,logLevel:'silent'});
   const {createEmptyInvoice,createEmptyInvoiceItem}=await import(pathToFileURL(model).href);
+  for(const [field,value] of [['quantity',0.1],['unitPrice','1e3'],['unitPrice','1_000'],
+    ['unitPrice','1.00000000000000000000000000001'],['unitPrice','79228162514264337593543950336'],['exchangeRate','']]) {
+    const body={...createEmptyInvoice(login.user.businessDate),invoiceNo:'WIRE-REJECT',
+      items:[{...createEmptyInvoiceItem(),styleName:'Precision input',quantity:'1',unitPrice:'1'}]};
+    (field==='exchangeRate'?body:body.items[0])[field]=value;
+    await assert.rejects(invoke('CreateInvoice',body,{},token), /CreateInvoice \(400\)/u);
+  }
+  assert.equal((await invoke('ListInvoices',undefined,{keyword:'WIRE-REJECT'},token)).totalCount,0,'Invalid decimals must not persist an invoice');
   for(const currency of ['USD','CNY']) {
     const invoice={...createEmptyInvoice(login.user.businessDate),invoiceNo:'CURRENCY-'+currency,currency,exchangeRate:null,
-      items:[{...createEmptyInvoiceItem(),styleName:'Sample product',quantity:10,unitPrice:10,totalPrice:100}]};
+      items:[{...createEmptyInvoiceItem(),styleName:'Sample product',quantity:"10",unitPrice:"10",totalPrice:"100"}]};
     await invoke('CreateInvoice',invoice,{},token);
   }
   const page=await openPage('oa-review','Review-2026-Test');
@@ -30,7 +38,7 @@ await withOfficeUi('review-workflows-ui',async({repo,output,require,url,invoke,o
   await page.setViewportSize({width:1440,height:1000});
   await verifyBusinessWorkspaceLayouts({ page, invoke, token, url, output, businessDate: login.user.businessDate, require });
   const statusDraft={...createEmptyInvoice(login.user.businessDate),invoiceNo:'STATUS-REVIEW',exporterNameEN:'Sample exporter',customerNameEN:'Sample customer',currency:'USD',destinationCountry:'NETHERLANDS',portOfLoading:'NINGBO',portOfDestination:'ROTTERDAM',
-    items:[{...createEmptyInvoiceItem(),styleNo:'SAMPLE',styleName:'Sample product',hsCode:'6109100010',quantity:10,unitPrice:10,totalPrice:100}]};
+    items:[{...createEmptyInvoiceItem(),styleNo:'SAMPLE',styleName:'Sample product',hsCode:'6109100010',quantity:"10",unitPrice:"10",totalPrice:"100"}]};
   const created=await invoke('CreateInvoice',statusDraft,{},token), id=created.id;
   let statusInvoice=created.invoice;
   for(const [operation,targetStatus,note] of [['TransitionInvoiceStatus','Verified','核对通过'],['UnverifyInvoice','Draft','修正商品资料']]) {

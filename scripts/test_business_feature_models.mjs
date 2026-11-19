@@ -52,7 +52,7 @@ assert.deepEqual(model.attachments.attachmentMetadata({ title: "图纸", categor
 assert(!request.body.has("invoiceId"));
 assert(!request.body.has("attachmentId"));
 const draft = model.createEmptyInvoice("2026-09-08");
-draft.items = [{ styleName: "BOLT", quantity: 1 }, {}, { styleNo: "NEW STYLE", quantity: 0 }];
+draft.items = [{ styleName: "BOLT", quantity: "1" }, {}, { styleNo: "NEW STYLE", quantity: "0" }];
 const review = model.review.prepareInvoiceReview(draft);
 assert.deepEqual(review.sourceRows, [1, 3]);
 assert.equal(model.review.invoiceReviewIssueLabel({ rowNumber: 2, field: "quantity", message: "数量必须大于 0。" }, review.sourceRows), "第 3 行：数量必须大于 0。");

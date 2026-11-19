@@ -178,15 +178,16 @@ impl ReportData {
     }
     pub fn display(&self, path: &str, item: Option<&Value>) -> String {
         let value = self.value(path, item);
-        let name = path.rsplit('.').next().unwrap_or(path);
-        if value.is_number()
-            && (name.ends_with("Amount") || name.ends_with("Expense") || name == "TotalPrice")
+        let name = path.rsplit('.').next().unwrap_or(path).to_ascii_lowercase();
+        let numeric = value.is_number() || value.is_string();
+        if numeric
+            && (name.ends_with("amount") || name.ends_with("expense") || name == "totalprice")
         {
             return decimal(value)
                 .map(|v| format_decimal(v, 2))
                 .unwrap_or_else(|_| plain(value));
         }
-        if value.is_number() && name == "UnitPrice" {
+        if numeric && name == "unitprice" {
             return decimal(value)
                 .map(|v| {
                     format_decimal(

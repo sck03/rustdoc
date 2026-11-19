@@ -1,19 +1,4 @@
-/// Ordinary signed decimal text; precision is never silently rounded.
-pub fn parse_decimal_text(text: &str) -> Option<rust_decimal::Decimal> {
-    let unsigned = text.strip_prefix(['-', '+']).unwrap_or(text);
-    let (whole, fraction) = unsigned
-        .split_once('.')
-        .map_or((unsigned, None), |(whole, fraction)| {
-            (whole, Some(fraction))
-        });
-    if whole.is_empty()
-        || !whole.bytes().all(|b| b.is_ascii_digit())
-        || fraction.is_some_and(|v| v.is_empty() || !v.bytes().all(|b| b.is_ascii_digit()))
-    {
-        return None;
-    }
-    rust_decimal::Decimal::from_str_exact(text).ok()
-}
+pub use export_doc_contracts::decimal_text::parse as parse_decimal_text;
 
 /// Decimal display rounds explicitly before applying a fixed-width format.
 pub fn format_decimal(value: rust_decimal::Decimal, precision: u32) -> String {

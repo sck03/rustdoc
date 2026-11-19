@@ -20,36 +20,36 @@ export * as decimal from ${source("ui/decimalSum.ts")};` }, outfile: bundle, bun
 const { items, table, invoice, save, grid, decimal } = await import(pathToFileURL(bundle).href);
 const cases = JSON.parse(fs.readFileSync(path.join(root, "tests/ContractFixtures/invoice-arithmetic.json"), "utf8"));
 for (const test of cases) {
-  const input = { ...items.createEmptyInvoiceItem(), quantity: Number(test.quantity), unitPrice: Number(test.unitPrice) };
+  const input = { ...items.createEmptyInvoiceItem(), quantity: test.quantity, unitPrice: test.unitPrice };
   const result = items.recalculateInvoiceItem(input, ["quantity", "unitPrice"]);
-  assert.equal(result.totalPrice, Number(test.expectedAmount), JSON.stringify(test));
-  assert.equal(result.unitPrice, Number(test.expectedUnitPrice));
+  assert.equal(result.totalPrice, decimal.decimalText(test.expectedAmount), JSON.stringify(test));
+  assert.equal(result.unitPrice, decimal.decimalText(test.expectedUnitPrice));
   assert.equal(items.normalizeInvoiceItemForSave(input).totalPrice, result.totalPrice);
 }
 const profitCases = JSON.parse(fs.readFileSync(path.join(root, "tests/ContractFixtures/invoice-profit.json"), "utf8"));
 for (const test of profitCases) {
   const rows = test.items.map(row => items.recalculateInvoiceItem({ ...items.createEmptyInvoiceItem(),
-    ...Object.fromEntries(Object.entries(row).map(([key, value]) => [key, Number(value)])) }, ["unitPrice"]));
-  const totals = items.calculateInvoiceTotals(rows, test.exchangeRate == null ? null : Number(test.exchangeRate), test.currency);
-  assert.equal(totals.totalProfit, Number(test.expectedProfit), test.name);
-  assert.equal(totals.totalTaxRefundAmount, Number(test.expectedRefund), test.name);
+    ...row }, ["unitPrice"]));
+  const totals = items.calculateInvoiceTotals(rows, test.exchangeRate ?? null, test.currency);
+  assert.equal(totals.totalProfit, decimal.decimalText(test.expectedProfit), test.name);
+  assert.equal(totals.totalTaxRefundAmount, decimal.decimalText(test.expectedRefund), test.name);
 }
-assert.equal(items.roundMoney(-1.005), -1.01);
+assert.equal(items.roundMoney("-1.005"), "-1.01");
 assert.equal(decimal.sumDecimalStrings(["0.1", "0.2"]), "0.3");
 assert.equal(decimal.ExactDecimal.from("12345678901234567890.12345678").round(2).toString(), "12345678901234567890.12");
-const cartons = items.recalculateInvoiceItem({ ...items.createEmptyInvoiceItem(), quantity: 0.14, pcsPerCtn: 0.01 }, ["quantity"]);
-assert.equal(cartons.cartons, 14);
-assert.equal(items.recalculateInvoiceItem({ ...items.createEmptyInvoiceItem(), quantity:1, purchasePrice:1.005 }, ["purchasePrice"]).purchaseTotal, 1.01);
-const totals = items.calculateInvoiceTotals([{ ...items.createEmptyInvoiceItem(), totalPrice:0.1 }, { ...items.createEmptyInvoiceItem(), totalPrice:0.2 }], 1, "CNY");
-assert.equal(totals.totalAmount, 0.3);
-const mutable = { ...items.createEmptyInvoiceItem(), quantity:1, unitPrice:1.005, totalPrice:1.01 };
-const firstCopy = items.normalizeInvoiceItemForSave(mutable); firstCopy.totalPrice = 999;
-assert.equal(items.normalizeInvoiceItemForSave(mutable).totalPrice, 1.01, "returned DTO mutation must not contaminate normalization cache");
-mutable.unitPrice = 2.675; mutable.totalPrice = 2.68;
-assert.equal(items.normalizeInvoiceItemForSave(mutable).totalPrice, 2.68, "input mutations invalidate normalized rows");
-assert.equal(items.calculateInvoiceTotals([mutable],1,"CNY").totalAmount,2.68);
-mutable.totalPrice=3.01;
-assert.equal(items.calculateInvoiceTotals([mutable],1,"CNY").totalAmount,3.01,"input mutations invalidate exact row totals");
+const cartons = items.recalculateInvoiceItem({ ...items.createEmptyInvoiceItem(), quantity: "0.14", pcsPerCtn: "0.01" }, ["quantity"]);
+assert.equal(cartons.cartons, "14");
+assert.equal(items.recalculateInvoiceItem({ ...items.createEmptyInvoiceItem(), quantity:"1", purchasePrice:"1.005" }, ["purchasePrice"]).purchaseTotal, "1.01");
+const totals = items.calculateInvoiceTotals([{ ...items.createEmptyInvoiceItem(), totalPrice:"0.1" }, { ...items.createEmptyInvoiceItem(), totalPrice:"0.2" }], "1", "CNY");
+assert.equal(totals.totalAmount, "0.3");
+const mutable = { ...items.createEmptyInvoiceItem(), quantity:"1", unitPrice:"1.005", totalPrice:"1.01" };
+const firstCopy = items.normalizeInvoiceItemForSave(mutable); firstCopy.totalPrice = "999";
+assert.equal(items.normalizeInvoiceItemForSave(mutable).totalPrice, "1.01", "returned DTO mutation must not contaminate normalization cache");
+mutable.unitPrice = "2.675"; mutable.totalPrice = "2.68";
+assert.equal(items.normalizeInvoiceItemForSave(mutable).totalPrice, "2.68", "input mutations invalidate normalized rows");
+assert.equal(items.calculateInvoiceTotals([mutable],"1","CNY").totalAmount,"2.68");
+mutable.totalPrice="3.01";
+assert.equal(items.calculateInvoiceTotals([mutable],"1","CNY").totalAmount,"3.01","input mutations invalidate exact row totals");
 const quoted = '"Line 1\nLine 2"\t"a\tand\t\"\"b\"\""\t\r\n';
 const expected = [["Line 1\nLine 2", 'a\tand\t"b"', ""]];
 assert.deepEqual(items.parseInvoiceItemClipboardRows(quoted), expected);
@@ -67,9 +67,9 @@ const shortened = items.calculateInvoiceItemVirtualRange(300, 200000, 600, true)
 assert.ok(shortened.startIndex < shortened.endIndex && shortened.endIndex <= 300);
 assert.ok(shortened.topSpacerHeight < 300 * 42);
 assert.equal(items.haveInvoiceTotalsInputsChanged(manyRows, manyRows.map((row, i) => i ? row : { ...row, styleName: "edited text" })), false);
-assert.equal(items.haveInvoiceTotalsInputsChanged(manyRows, manyRows.map((row, i) => i ? row : { ...row, totalPrice: 1 })), true);
+assert.equal(items.haveInvoiceTotalsInputsChanged(manyRows, manyRows.map((row, i) => i ? row : { ...row, totalPrice: "1" })), true);
 const project = invoice.createInvoiceDetailsProjector();
-const draft = { items: manyRows, exchangeRate: 7, currency: "USD" };
+const draft = { items: manyRows, exchangeRate: "7", currency: "USD" };
 const projected = project(draft);
 const edited = { ...draft, items: manyRows.map((row, i) => i === 4999 ? { ...row, styleName: "text edit" } : row) };
 const next = project(edited);
@@ -77,8 +77,8 @@ assert.equal(next.items[0], projected.items[0], "unchanged rows retain their pro
 assert.notEqual(next.items[4999], projected.items[4999]);
 assert.deepEqual(next, invoice.normalizeInvoiceDetailsForSave(edited));
 for (const changed of [
-  { ...edited, items: edited.items.map((row, i) => i === 4999 ? { ...row, quantity: 3, unitPrice: 1.005 } : row) },
-  { ...edited, exchangeRate: 0, currency: "CNY" },
+  { ...edited, items: edited.items.map((row, i) => i === 4999 ? { ...row, quantity: "3", unitPrice: "1.005" } : row) },
+  { ...edited, exchangeRate: "0", currency: "CNY" },
   { ...edited, items: [...edited.items, { ...items.createEmptyInvoiceItem(), printRows: [{ text: "print only" }] }] },
   draft,
 ]) assert.deepEqual(project(changed), invoice.normalizeInvoiceDetailsForSave(changed), "edits, print rows and undo preserve exact save semantics");

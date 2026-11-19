@@ -18,11 +18,10 @@ fn profit_display_rounds_midpoints_without_truncating() {
     )
     .unwrap();
     invoice["items"].as_array_mut().unwrap().truncate(1);
-    invoice["items"][0]["quantity"] = json!(1);
-    invoice["items"][0]["unitPrice"] = json!(1);
-    invoice["items"][0]["amount"] = json!(1);
-    invoice["items"][0]["purchaseAmount"] = json!(0);
-    invoice["exchangeRate"] = json!(1.12505);
+    invoice["items"][0]["quantity"] = json!("1");
+    invoice["items"][0]["unitPrice"] = json!("1");
+    invoice["items"][0]["purchaseTotal"] = json!("0");
+    invoice["exchangeRate"] = json!("1.12505");
     let result = fixture.request(
         ANALYZE_INVOICE_PROFIT,
         None,
@@ -366,7 +365,6 @@ fn implemented_parameterless_reads_match_the_generated_response_structure() {
         .filter(|operation| {
             ![
                 LIST_EXCHANGE_RATES,
-                LIST_AVAILABLE_EXCHANGE_RATE_CURRENCIES,
                 GET_HS_CODE_REMOTE_HEALTH,
                 SEARCH_REMOTE_HS_CODES,
                 LIST_POSTGRE_SQL_PHYSICAL_BACKUPS,

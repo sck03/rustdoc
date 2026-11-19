@@ -210,6 +210,10 @@ pub(super) fn document() -> Value {
         );
     }
     let mut document = metadata::root();
+    document["x-exportdoc-shared-schemas"] = serde_json::json!([
+        "ApiReportTemplateV3LimitsContract",
+        "ApiReportTemplateV3PageContract"
+    ]);
     document["x-exportdoc-json-response-limit-bytes"] =
         serde_json::json!(crate::request_limits::MAX_JSON_RESPONSE_BYTES);
     document["components"]["schemas"] = serde_json::to_value(schemas).expect("native schemas");

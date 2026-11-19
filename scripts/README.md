@@ -1,5 +1,9 @@
 # 脚本使用说明
 
+2026-11-19 精度与稳定性：`test:invoice-editing` 覆盖十进制字符串输入、保存回读、5000 行编辑及舍入临界值；`test:office-ui` 覆盖附件失败后的身份锁定与重试。Rust HS 查询回归检查第 2,001 条之后的低使用次数实例，Storage 共用合同检查反馈规范化索引随写入更新。HTTP 回归验证缓冲等待、取消、发送释放，以及业务队列和响应预算占满时的独立空正文探针。记录见[本批验收](../docs/archive/2026-11/2026-11-19精度检索与稳定性修复.md)。
+
+`test_hs_transfer_ui.mjs` 同时验证只读查询/详情不采集、不开放保存，以及有管理权限时的采集接口。`measure_native_workloads.mjs` 增加 5,000 条匿名 HS 实例、1,000 条无关反馈和 12 次查询，记录实际税则数量、延迟分位数及进程树内存采样。测量程序默认读取宿主 Release 输出；指定架构时，编译与测量保持相同的 `CARGO_BUILD_TARGET`，或通过 `EXPORTDOC_OFFICE_REVIEW_BINARY` 指向 `.codex-runtime` 中的隔离程序副本。
+
 2026-11-19 供应商与响应资源：`test:abortable-operations-ui` 覆盖精确供货价格、保存续编、新建后更新及客户端/权限/卸载取消；`test:supplier-assessment-analytics` 检查统计不依赖最近记录窗口。SQLite/PostgreSQL 共用业务合同核对分页和精确价格，Storage 合同核对普通用户/审批者统计可见性。`test_native_docker_lifecycle.ps1` 另核对 Rust 内嵌部署资源在 Docker context 和构建阶段均存在。当前结果和清理边界见[本批记录](../docs/archive/2026-11/2026-11-19供应商与响应资源完整重构.md)。
 
 2026-11-19 一致性验收：`test_office_model.mjs` 验证九类 OA/办公命令回执确认、取消和错误分类；`test_oa_workspace_ui.mjs` 在真实 React/Rust HTTP 中模拟已提交但响应丢失。`test_single_window_workspace_ui.mjs` 验证 201 份回执分两包导出无遗漏/重复，商机生命周期回归核对只读候选零请求。十二个界面回归共用 `lib/react-ui-fixture.mjs` 的仓库临时目录和浏览器启动。`clean-generated-artifacts.ps1 -RustTestOutputsOnly -ListOnly` 根据 Cargo 指纹盘点测试程序，完成全部编译/测试/doc-test 后才可执行同参数清理。范围及结果见[本批记录](../docs/archive/2026-11/2026-11-19前后端一致性修复与交付.md)。
@@ -18,7 +22,7 @@
 
 2026-11-16：`test:audit-log-maintenance-model` 同时运行模型检查与 `test_audit_producer_lifecycle_ui.mjs`，覆盖当前审计实体选项、重复下载不缓存 Blob、卸载/客户端变化取消、生产企业保存期间切换及迟到确认。Storage 共用维护合同覆盖脱敏日志的现存发票号关联、改号/删除、编号投影与游标；`test-native-postgres.ps1 -Scope Storage` 在 PostgreSQL 18 执行同一合同。HTTP 单元回归占满阻塞线程池后丢弃真实路由请求，检查认证和备份授权仍持有并发名额。
 
-供应商按需查询、快照回收、下载/保存取消和联系人刷新回归由 `test_supplier_lifecycle_ui.mjs` 执行，纳入 `test:business-features-ui`。独立性能测量入口为 `measure_native_workloads.mjs` 和 `measure_report_designer.mjs`，需 Windows、Python 3、现有前端依赖与受管 Chromium；不加入普通提交门禁。原生测量先以相同仓库 `CARGO_HOME`/`CARGO_TARGET_DIR` 执行 `cargo build --locked --release --target x86_64-pc-windows-gnu -p export-doc-server --no-default-features --example office_review`，再运行 `node scripts/measure_native_workloads.mjs <含OCR资源的AppRoot>`；脚本创建独立 DataRoot，仅向本次隔离库写入匿名负载。`node scripts/measure_report_designer.mjs` 使用生产 React 构建与模拟 API。两者在其它构建/重型验收退出后分别运行，输出 `artifacts/*-measurement/<时间戳>/result.json`；RSS 是约 50 ms 间隔的进程树采样下界，浏览器另记 JS 堆、交互分位数和卸载回收。样本与实际边界见[本批记录](../docs/archive/2026-11/2026-11-16审计与编辑生命周期修复.md)。
+供应商按需查询、快照回收、下载/保存取消和联系人刷新回归由 `test_supplier_lifecycle_ui.mjs` 执行，纳入 `test:business-features-ui`。独立性能测量入口为 `measure_native_workloads.mjs` 和 `measure_report_designer.mjs`，需 Windows、Python 3、现有前端依赖与受管 Chromium；不加入普通提交门禁。原生测量先以相同仓库 `CARGO_HOME`/`CARGO_TARGET_DIR` 执行 `cargo build --locked --release -p export-doc-server --no-default-features --example office_review`，再运行 `node scripts/measure_native_workloads.mjs <含OCR资源的AppRoot>`；脚本创建独立 DataRoot，仅向本次隔离库写入匿名负载。`node scripts/measure_report_designer.mjs` 使用生产 React 构建与模拟 API。两者在其它构建/重型验收退出后分别运行，输出 `artifacts/*-measurement/<时间戳>/result.json`；RSS 是约 50 ms 间隔的进程树采样下界，浏览器另记 JS 堆、交互分位数和卸载回收。样本与实际边界见[本批记录](../docs/archive/2026-11/2026-11-16审计与编辑生命周期修复.md)。
 
 2026-11-15：`test_review_boundaries_ui.mjs` 纳入 `test:settings-models`，验证真实 React 下的利润草稿失效/迟到结果、恢复密码无操作缓存、仅发送权限和历史游标分页。发票状态事件合同在 `business_contract` 中同时供 SQLite 与 PostgreSQL 团队测试使用；网络期限测试遍历全部最终生成元数据。当前 schema 18 模型指纹已随状态历史基线更新，旧实验库仍拒绝打开。
 

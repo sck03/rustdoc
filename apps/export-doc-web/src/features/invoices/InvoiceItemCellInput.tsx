@@ -9,7 +9,7 @@ import {
   readInvoiceItemNumberInput,
 } from "./invoiceItemsEditorModel.ts";
 import { normalizeText } from "../../ui/formUtils.ts";
-import { useNumberInputDraft } from "../../ui/useNumberInputDraft.ts";
+import { useDecimalInputDraft } from "../../ui/useNumberInputDraft.ts";
 import { isComposingKey } from "../../ui/keyboardEvent.ts";
 import { filterInvoiceItemHistoryOptionsByPrefix } from "./invoiceItemHistory.ts";
 
@@ -45,9 +45,9 @@ export const InvoiceItemCellInput = memo(function InvoiceItemCellInput({
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [activeOptionIndex, setActiveOptionIndex] = useState(0);
   const currentNumberValue = column.kind === "number" ? readItemNumberValue(item, column.field) : undefined;
-  const numberInput = useNumberInputDraft(column.kind === "number" ? Number(item[column.field] ?? 0) : undefined, !isFocused
+  const numberInput = useDecimalInputDraft(column.kind === "number" ? String(item[column.field] ?? "0") : undefined, !isFocused
       ? invoiceItemNumberDisplayValue(column.field, currentNumberValue)
-      : invoiceItemNumberInputValue(currentNumberValue), onChange, 0);
+      : invoiceItemNumberInputValue(currentNumberValue), onChange, "0");
   const currentInputText = column.kind === "number"
     ? numberInput.value
     : readItemTextValue(item, column.field);

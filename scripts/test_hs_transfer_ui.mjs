@@ -37,10 +37,22 @@ try{
     await page.getByRole('button',{name:'查询',exact:true}).click();
     await page.waitForFunction(()=>window.calls.length===1);
     assert.equal(await page.evaluate(()=>window.calls[0].method),method);
-    await page.evaluate(()=>window.calls[0].resolve({items:[{code:'5208',name:'棉布'}]}));
+    await page.evaluate(()=>window.calls[0].resolve({items:[{code:'5208',name:'棉布',detailUrl:'https://example.test/hs/5208'}]}));
     const save=page.getByRole('button',{name:'保存为本地参考资料'});
     await save.waitFor();assert.equal(await save.isDisabled(),mode==='read-only');
     assert.equal(await page.evaluate(()=>window.calls.length),1);
+    const detail=page.getByRole('button',{name:'补全详情',exact:true});
+    assert.equal(await detail.isDisabled(),false);await detail.click();
+    await page.waitForFunction(()=>window.calls.length===2);
+    assert.equal(await page.evaluate(()=>window.calls[1].method),mode==='read-only'?'fetchRemoteHsCodeDetail':'resolveRemoteHsCodeDetail');
+    assert.equal(await page.evaluate(()=>window.calls[1].request.body.code),'5208');
+    await page.evaluate(mode=>{const item={...window.calls[1].request.body,elements:'成分含量、织造方法'};
+      window.calls[1].resolve(mode==='read-only'?item:{items:[item],removedItems:[],updatedCount:1,removedCount:0,message:'远程详情已读取。'});},mode);
+    await page.getByText('远程详情已读取。',{exact:true}).waitFor();
+    await page.getByRole('button',{name:'查看详情',exact:true}).click();
+    await page.getByText('成分含量、织造方法',{exact:true}).waitFor();
+    assert.equal(await save.isDisabled(),mode==='read-only');
+    assert.equal(await page.evaluate(()=>window.calls.length),2,'Reading detail must not implicitly save or capture it');
   });
   for(const departure of ['owner','revoke','unmount']) for(const outcome of ['success','failure']) await scenario('transfer',async page=>{
     await page.getByRole('button',{name:'导出 .edmhs',exact:true}).click();await page.waitForFunction(()=>window.calls.length===1);

@@ -7,6 +7,7 @@ use crate::{
 pub struct HsQuery<'a> {
     pub kind: &'a str,
     pub current_year: Option<i32>,
+    pub feedback_query: Option<&'a str>,
     pub keyword: &'a str,
     pub prefix: &'a str,
     pub since: &'a str,
@@ -17,6 +18,11 @@ pub struct HsQuery<'a> {
 }
 
 pub(crate) fn search_document(kind: &str, body: &serde_json::Value) -> Option<String> {
+    if kind == "hs-feedback" {
+        return Some(export_doc_domain::hs::text(
+            body["queryText"].as_str().unwrap_or_default(),
+        ));
+    }
     let fields = match kind {
         "hs-codes" => ["code", "name", "elements", "description"],
         "hs-examples" => [
@@ -148,6 +154,12 @@ pub(crate) fn build(query: &HsQuery<'_>, pg: bool) -> Result<(QuerySql, String)>
     }
     let mut values = vec![];
     let mut clauses = vec![format!("r.kind={}", bind(&mut values, query.kind, pg))];
+    if let Some(text) = query.feedback_query {
+        if query.kind != "hs-feedback" {
+            return Err(Error::unavailable("反馈筛选只能用于 HS 反馈。"));
+        }
+        clauses.push(format!("r.hs_search={}", bind(&mut values, text, pg)));
+    }
     if !query.keyword.is_empty() {
         clauses.push(sql::substring(
             "r.hs_search",

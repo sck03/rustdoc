@@ -69,6 +69,13 @@ fn invoice_editor_and_rust_use_the_same_exact_arithmetic_fixtures() {
         invoice_calculation::recalculate(&mut item, &[8, 23]).unwrap();
         assert_eq!(item.unit_price, number("expectedUnitPrice"), "{case}");
         assert_eq!(item.total_price, number("expectedAmount"), "{case}");
+        let encoded = serde_json::to_value(&item).unwrap();
+        assert_eq!(encoded["quantity"], case["quantity"]);
+        assert!(encoded["unitPrice"].is_string());
+        assert_eq!(
+            serde_json::from_value::<ApiInvoiceItemDto>(encoded).unwrap(),
+            item
+        );
     }
     assert!(std::mem::size_of::<export_doc_domain::designer::Kind>() <= 512);
 }

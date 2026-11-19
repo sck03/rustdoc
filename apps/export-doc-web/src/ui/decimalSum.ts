@@ -1,4 +1,4 @@
-/** Exact arithmetic on decimal text; convert to number only at the numeric DTO boundary. */
+/** Exact arithmetic on decimal text. Number conversion is reserved for visual coordinates and ratios. */
 export class ExactDecimal {
   private static readonly zero = new ExactDecimal(0n, 0);
   private constructor(private readonly coefficient: bigint, private readonly scale: number) {}
@@ -48,9 +48,22 @@ export class ExactDecimal {
   }
 
   ceil(): number {
-    const divisor = power10(this.scale);
-    return Number(this.coefficient / divisor + (this.coefficient > 0n && this.coefficient % divisor !== 0n ? 1n : 0n));
+    return this.ceiling().toNumber();
   }
+
+  ceiling(): ExactDecimal {
+    const divisor = power10(this.scale);
+    return new ExactDecimal(this.coefficient / divisor + (this.coefficient > 0n && this.coefficient % divisor !== 0n ? 1n : 0n), 0);
+  }
+
+  compare(value: ExactDecimal | number | string): number {
+    const other = ExactDecimal.resolve(value);
+    const scale = Math.max(this.scale, other.scale);
+    const left = this.atScale(scale), right = other.atScale(scale);
+    return left < right ? -1 : left > right ? 1 : 0;
+  }
+
+  normalize(): ExactDecimal { return ExactDecimal.result(this.coefficient, this.scale); }
 
   toNumber(): number { return Number(this.toString()); }
 
@@ -97,4 +110,21 @@ function roundedQuotient(numerator: bigint, denominator: bigint): bigint {
 /** Preserve decimal input strings, including optional invoice settlement lines. */
 export function sumDecimalStrings(values: readonly string[]): string {
   return values.reduce((sum, value) => sum.add(value), ExactDecimal.from(0)).toString();
+}
+
+export function decimalText(value?: string | null): string {
+  const text = value?.trim() ?? "";
+  if (!text) return "0";
+  if (text.length > 60) throw new Error("数字或计算结果过长，请减小数值。");
+  if (!/^[+-]?\d+(?:\.\d+)?$/.test(text)) throw new Error("请输入普通十进制数字。");
+  return ExactDecimal.from(text).normalize().toString();
+}
+
+export function formatDecimal(value: string, digits: number, trimZeros = false): string {
+  const rounded = ExactDecimal.from(value).toFixed(digits);
+  const [whole, decimal = ""] = rounded.split(".");
+  const sign = whole.startsWith("-") ? "-" : "";
+  const integer = BigInt(sign ? whole.slice(1) : whole).toLocaleString("zh-CN");
+  const fraction = trimZeros ? decimal.replace(/0+$/, "") : decimal;
+  return `${sign}${integer}${fraction ? `.${fraction}` : ""}`;
 }

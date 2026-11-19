@@ -177,13 +177,19 @@ export function HsCodeToolsPanel({
   });
 
   const fetchDetailMutation = useScopedMutation(commandScope, client, {
-    mutationFn: (item: ApiHsCodeDto, signal) => client.resolveRemoteHsCodeDetail({ body: normalizeHsCodeDtoForRequest(item) }, { signal }),
+    mutationFn: async (item: ApiHsCodeDto, signal) => {
+      const body = normalizeHsCodeDtoForRequest(item);
+      if (!readOnlySearch) return client.resolveRemoteHsCodeDetail({ body }, { signal });
+      const detail = await client.fetchRemoteHsCodeDetail({ body }, { signal });
+      return { items: [detail], removedItems: [], updatedCount: 1, removedCount: 0,
+        message: "远程详情已读取。", storagePolicy: "只读取远程详情。" };
+    },
     onSuccess: (response, item) => {
       setRemoteResults((current) => applyHsCodeRemoteDetailResolution(current, item, response));
       setExpandedResultKey(null);
       showSuccess(response.message || `已补全 ${item.code} 的远程详情。`);
     },
-    refresh: onRemoteCandidatesChanged,
+    refresh: readOnlySearch ? undefined : onRemoteCandidatesChanged,
     onError: (error) => showError(readApiError(error)),
   });
 
@@ -345,7 +351,7 @@ export function HsCodeToolsPanel({
       <div className="section-header">
         <div>
           <h2>{mode === "import" ? "年度税则智能导入" : mode === "remote" ? "联网补充" : "HS 编码工具"}</h2>
-          <span>{mode === "import" ? "识别工作表和字段，预检差异后才写入本地库" : mode === "remote" ? "查询第三方申报实例并进入待审核候选池" : remoteResultStatus}</span>
+          <span>{mode === "import" ? "识别工作表和字段，预检差异后才写入本地库" : mode === "remote" ? "查询第三方税则与申报资料" : remoteResultStatus}</span>
         </div>
       </div>
 
@@ -408,7 +414,7 @@ export function HsCodeToolsPanel({
                   <div className="search-form hs-code-remote-search"><Search size={17} /><input aria-label="联网查询 HS 编码" value={remoteKeyword} onChange={(event) => setRemoteKeyword(event.target.value)} placeholder="HS 编码、品名或关键词" /></div>
                   <button className="command-button" type="submit" disabled={isBusy || !remoteKeyword.trim()}><Globe2 size={17} /><span>查询</span></button>
                 </form>
-                {remoteResults.length > 0 ? <HsCodeRemoteResults items={remoteResults} expandedResultKey={expandedResultKey} setExpandedResultKey={setExpandedResultKey} isBusy={isBusy || readOnlySearch} fetchDetail={(item) => fetchDetailMutation.mutate(item)} saveItem={(item) => saveRemoteMutation.mutate(item)} /> : null}
+                {remoteResults.length > 0 ? <HsCodeRemoteResults items={remoteResults} expandedResultKey={expandedResultKey} setExpandedResultKey={setExpandedResultKey} isBusy={isBusy} readOnly={readOnlySearch} fetchDetail={(item) => fetchDetailMutation.mutate(item)} saveItem={(item) => saveRemoteMutation.mutate(item)} /> : null}
               </div>
             )}
         </HsCodeWorkspace>
@@ -459,11 +465,12 @@ function parseImportYear(value: string) {
   return Number.isInteger(year) && year >= 2000 && year <= 2100 ? year : undefined;
 }
 
-function HsCodeRemoteResults({ items, expandedResultKey, setExpandedResultKey, isBusy, fetchDetail, saveItem }: {
+function HsCodeRemoteResults({ items, expandedResultKey, setExpandedResultKey, isBusy, readOnly, fetchDetail, saveItem }: {
   items: ApiHsCodeDto[];
   expandedResultKey: string | null;
   setExpandedResultKey: (value: string | null) => void;
   isBusy: boolean;
+  readOnly: boolean;
   fetchDetail: (item: ApiHsCodeDto) => void;
   saveItem: (item: ApiHsCodeDto) => void;
 }) {
@@ -471,7 +478,7 @@ function HsCodeRemoteResults({ items, expandedResultKey, setExpandedResultKey, i
     {items.map((item, index) => {
       const key = buildHsCodeResultKey(item, index);
       const expanded = expandedResultKey === key;
-      return <Fragment key={key}><tr><td className="strong-cell">{item.code || "-"}</td><td>{item.name || "-"}</td><td><span className="remote-evidence-kind">{remoteRecordKindLabel(item.remoteRecordKind)}</span><small className="remote-evidence-count">{remoteEvidenceCount(item)}</small></td><td>{item.unit || "-"}</td><td>{item.rebateRate || "-"}</td><td>{item.supervisionConditions || "-"}</td><td className="row-actions-cell"><button className="icon-button compact-icon-button" type="button" title="查看详情" aria-label="查看详情" onClick={() => setExpandedResultKey(expanded ? null : key)}><Eye size={15} /></button><button className="icon-button compact-icon-button" type="button" title="补全详情" aria-label="补全详情" disabled={isBusy || !item.detailUrl} onClick={() => fetchDetail(item)}><RefreshCw size={15} /></button><button className="icon-button compact-icon-button" type="button" title="保存为本地参考资料" aria-label="保存为本地参考资料" disabled={isBusy || !item.code} onClick={() => saveItem(item)}><Save size={15} /></button></td></tr>{expanded ? <tr className="hs-code-detail-row"><td colSpan={7}><HsCodeRemoteDetail item={item} /></td></tr> : null}</Fragment>;
+      return <Fragment key={key}><tr><td className="strong-cell">{item.code || "-"}</td><td>{item.name || "-"}</td><td><span className="remote-evidence-kind">{remoteRecordKindLabel(item.remoteRecordKind)}</span><small className="remote-evidence-count">{remoteEvidenceCount(item)}</small></td><td>{item.unit || "-"}</td><td>{item.rebateRate || "-"}</td><td>{item.supervisionConditions || "-"}</td><td className="row-actions-cell"><button className="icon-button compact-icon-button" type="button" title="查看详情" aria-label="查看详情" onClick={() => setExpandedResultKey(expanded ? null : key)}><Eye size={15} /></button><button className="icon-button compact-icon-button" type="button" title="补全详情" aria-label="补全详情" disabled={isBusy || !item.detailUrl} onClick={() => fetchDetail(item)}><RefreshCw size={15} /></button><button className="icon-button compact-icon-button" type="button" title="保存为本地参考资料" aria-label="保存为本地参考资料" disabled={isBusy || readOnly || !item.code} onClick={() => saveItem(item)}><Save size={15} /></button></td></tr>{expanded ? <tr className="hs-code-detail-row"><td colSpan={7}><HsCodeRemoteDetail item={item} /></td></tr> : null}</Fragment>;
     })}
   </tbody></table></ResponsiveTableFrame>;
 }

@@ -2,6 +2,22 @@
 pub const TRANSFER_SECONDS: u64 = 24 * 60 * 60;
 pub const MAX_JSON_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Probe {
+    Liveness,
+    Readiness,
+}
+
+pub fn probe(operation: &str) -> Option<Probe> {
+    match crate::contracts::contract()["operations"][operation]["probe"].as_str() {
+        Some("liveness") => Some(Probe::Liveness),
+        Some("readiness") => Some(Probe::Readiness),
+        None => None,
+        _ => panic!("invalid generated probe metadata"),
+    }
+}
+
 /// Capacity is response metadata, not a path or authentication heuristic.
 pub fn json_response_bytes(operation: &str) -> usize {
     crate::contracts::contract()["operations"][operation]["maxJsonResponseBytes"]
@@ -11,9 +27,12 @@ pub fn json_response_bytes(operation: &str) -> usize {
 }
 pub(crate) fn response_schema_bytes(schema: &str) -> usize {
     match schema {
-        "ApiCommandResponse" | "ApiSupplierProductLinkDto" | "ApiSupplierAssessmentDto" => {
-            64 * 1024
-        }
+        "ApiCommandResponse"
+        | "ApiSupplierProductLinkDto"
+        | "ApiSupplierAssessmentDto"
+        | "ApiDownloadTicket"
+        | "ApiLogoutResponse"
+        | "ApiCrmCustomerBatchStatusResult" => 64 * 1024,
         "ApiSupplierAssessmentAnalyticsDto" => 1024 * 1024,
         _ => MAX_JSON_RESPONSE_BYTES,
     }

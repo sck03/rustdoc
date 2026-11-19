@@ -171,7 +171,7 @@ pub fn handle(
         "view"
     } else if operation == resource.create {
         "create"
-    } else if operation == resource.update {
+    } else if Some(operation) == resource.update {
         "edit"
     } else if resource.delete == Some(operation) {
         "delete"
@@ -253,7 +253,7 @@ pub fn handle(
         } else {
             contracts::initial(contracts::schema(resource.schema))
         };
-        if operation == resource.create || operation == resource.update {
+        if operation == resource.create || Some(operation) == resource.update {
             if matches!(resource.key, "supplier-products" | "supplier-assessments") {
                 export_doc_contracts::validation::structure(contracts::request(operation.id), body)
                     .map_err(invalid)?;
@@ -320,7 +320,7 @@ pub fn handle(
         }
         let mut value = previous.clone();
         value[field] = json!(parent_id);
-        if operation == resource.create || operation == resource.update {
+        if operation == resource.create || Some(operation) == resource.update {
             for key in contracts::properties(contracts::request(operation.id))
                 .into_iter()
                 .flat_map(|properties| properties.keys())

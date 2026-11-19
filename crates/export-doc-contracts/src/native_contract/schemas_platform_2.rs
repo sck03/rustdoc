@@ -148,7 +148,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("id",s()),("fileName",s()),("createdAt",s().format("date-time")),
         ("sizeBytes",i().format("int64")),("replicaStatus",s()),("message",s())
     ]).required(vec!["id","fileName","createdAt","sizeBytes","replicaStatus","message"]).additional(Additional::Allowed(false))),
-    ("ApiDashboardCurrencyAmount",o(vec![("currency",s()),("monthlyAmount",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("previousMonthlyAmount",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"))]).required(vec!["currency","monthlyAmount","previousMonthlyAmount"])),
+    ("ApiDashboardCurrencyAmount",o(vec![("currency",s()),("monthlyAmount",decimal()),("previousMonthlyAmount",decimal())]).required(vec!["currency","monthlyAmount","previousMonthlyAmount"])),
     ("IdentityEffectivePeriod",o(vec![("startsOn",s().format("date")),("endsOn",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).default_value(serde_json::json!(null)).format("date"))]).required(vec!["startsOn"]).additional(Additional::Allowed(false))),
     ("IdentityAssignment",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).default_value(serde_json::json!(null)).pattern("^[1-9][0-9]{0,18}$")),("appointmentId",s().min_length(1).max_length(64)),("projectId",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).default_value(serde_json::json!(null)).pattern("^[1-9][0-9]{0,18}$")),

@@ -1,4 +1,5 @@
 pub mod contracts;
+pub mod decimal_text;
 pub mod generated_api;
 pub mod hs_maintenance;
 pub mod invoice_editing;

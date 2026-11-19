@@ -10,12 +10,19 @@ const CAPACITY: usize = 128 * 1024 * 1024;
 pub struct Budget {
     used: AtomicUsize,
     rejected: AtomicU64,
+    available: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 pub struct Reservation {
     budget: Arc<Budget>,
     bytes: usize,
 }
 impl Budget {
+    pub fn with_availability_callback(callback: impl Fn() + Send + Sync + 'static) -> Self {
+        Self {
+            available: Some(Arc::new(callback)),
+            ..Default::default()
+        }
+    }
     pub fn reserve(self: &Arc<Self>, bytes: usize) -> Result<Reservation> {
         if bytes == 0 || bytes > 64 * 1024 * 1024 {
             return Err(error(503, "任务结果大小无效。"));
@@ -23,21 +30,39 @@ impl Budget {
         self.reserve_working(bytes)
     }
     pub fn reserve_working(self: &Arc<Self>, bytes: usize) -> Result<Reservation> {
+        self.try_reserve_working(bytes)?
+            .ok_or_else(|| self.exhausted())
+    }
+    pub fn try_reserve_working(self: &Arc<Self>, bytes: usize) -> Result<Option<Reservation>> {
         if bytes == 0 || bytes > CAPACITY {
             return Err(error(503, "文件处理大小超出可用容量。"));
         }
-        self.used
+        if self
+            .used
             .try_update(Relaxed, Relaxed, |used| {
                 used.checked_add(bytes).filter(|total| *total <= CAPACITY)
             })
-            .map_err(|_| {
-                self.rejected.fetch_add(1, Relaxed);
-                error(429, "文件下载内存正在使用，请稍后重试。")
-            })?;
-        Ok(Reservation {
+            .is_err()
+        {
+            return Ok(None);
+        }
+        Ok(Some(Reservation {
             budget: self.clone(),
             bytes,
-        })
+        }))
+    }
+    pub fn exhausted(&self) -> crate::api::ApiError {
+        self.rejected.fetch_add(1, Relaxed);
+        error(429, "响应缓冲正在使用，请稍后重试。")
+    }
+    fn release(&self, bytes: usize) {
+        if bytes == 0 {
+            return;
+        }
+        self.used.fetch_sub(bytes, Relaxed);
+        if let Some(available) = &self.available {
+            available();
+        }
     }
     pub fn snapshot(&self) -> serde_json::Value {
         serde_json::json!({"capacityBytes":CAPACITY,"reservedBytes":self.used.load(Relaxed),"rejections":self.rejected.load(Relaxed)})
@@ -45,7 +70,7 @@ impl Budget {
 }
 impl Drop for Reservation {
     fn drop(&mut self) {
-        self.budget.used.fetch_sub(self.bytes, Relaxed);
+        self.budget.release(self.bytes);
     }
 }
 impl Reservation {
@@ -59,7 +84,7 @@ impl Reservation {
     }
     pub fn shrink_to(&mut self, bytes: usize) {
         if bytes < self.bytes {
-            self.budget.used.fetch_sub(self.bytes - bytes, Relaxed);
+            self.budget.release(self.bytes - bytes);
             self.bytes = bytes;
         }
     }

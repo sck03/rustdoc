@@ -950,11 +950,6 @@ export interface ApiCustomsCooProducerProfileListResponse {
   totalCount: number;
 }
 
-export interface ApiCustomsCooProducerProfileResponse {
-  profile: ApiCustomsCooProducerProfileDto;
-  storagePolicy: string;
-}
-
 export interface ApiCustomsCooProducerProfileSaveRequest {
   expectedVersion?: number;
   profile: ApiCustomsCooProducerProfileInputDto;
@@ -978,8 +973,8 @@ export interface ApiCustomsCooUnlockFieldsResponse {
 
 export interface ApiDashboardCurrencyAmount {
   currency: string;
-  monthlyAmount: number;
-  previousMonthlyAmount: number;
+  monthlyAmount: string;
+  previousMonthlyAmount: string;
 }
 
 export interface ApiDashboardRecentInvoiceDto {
@@ -990,7 +985,7 @@ export interface ApiDashboardRecentInvoiceDto {
   invoiceNo: string;
   status: string;
   statusText: string;
-  totalAmount: number;
+  totalAmount: string;
   type: string;
 }
 
@@ -999,15 +994,15 @@ export interface ApiDashboardResponse {
   draftCount: number;
   exportAmountCurrency?: string;
   exportAmountsByCurrency?: ApiDashboardCurrencyAmount[];
-  monthlyExportAmount: number;
+  monthlyExportAmount: string;
   monthlyInvoiceCount: number;
-  monthlyProfit: number;
-  monthlyTaxRefund: number;
+  monthlyProfit: string;
+  monthlyTaxRefund: string;
   pendingCount: number;
   periodLabel: string;
-  previousMonthlyExportAmount: number;
-  previousMonthlyProfit: number;
-  previousMonthlyTaxRefund: number;
+  previousMonthlyExportAmount: string;
+  previousMonthlyProfit: string;
+  previousMonthlyTaxRefund: string;
   recentInvoices: ApiDashboardRecentInvoiceDto[];
   shippedCount: number;
   singleWindowStatusSummary: string;
@@ -1305,15 +1300,6 @@ export interface ApiExcelImportSheetAnalysisDto {
 
 export interface ApiExcelOutputRequest {
   destinationPath?: string;
-}
-
-export interface ApiExchangeRateAvailableCurrenciesResponse {
-  currencies: string[];
-  fetchedAt: string;
-  isStale?: boolean;
-  lastError?: string;
-  sourceUrl: string;
-  storagePolicy: string;
 }
 
 export interface ApiExchangeRateDto {
@@ -1719,7 +1705,7 @@ export interface ApiInvoiceDetailDto {
   departmentId: string;
   destinationCountry: string;
   docSealPath?: string | null;
-  exchangeRate?: number | null;
+  exchangeRate?: string | null;
   exporterAddressCN: string;
   exporterAddressEN: string;
   exporterCreditCode: string;
@@ -1762,15 +1748,15 @@ export interface ApiInvoiceDetailDto {
   status: string;
   supervisionMode: string;
   swiftCode: string;
-  totalAmount: number;
-  totalCartons: number;
-  totalGrossWeight: number;
-  totalNetWeight: number;
-  totalProfit: number;
-  totalPurchaseAmount: number;
-  totalQuantity: number;
-  totalTaxRefundAmount: number;
-  totalVolume: number;
+  totalAmount: string;
+  totalCartons: string;
+  totalGrossWeight: string;
+  totalNetWeight: string;
+  totalProfit: string;
+  totalPurchaseAmount: string;
+  totalQuantity: string;
+  totalTaxRefundAmount: string;
+  totalVolume: string;
   tradeTerms: string;
   transportMode: string;
   type: string;
@@ -1830,28 +1816,28 @@ export interface ApiInvoiceEditingLimitsContract {
 
 export interface ApiInvoiceItemDto {
   brand: string;
-  cartons: number;
+  cartons: string;
   ctnUnitCN: string;
   ctnUnitEN: string;
   customFieldsJson: string;
   fabricComposition: string;
-  gwPerCtn: number;
-  gwTotal: number;
-  height: number;
+  gwPerCtn: string;
+  gwTotal: string;
+  height: string;
   hsCode: string;
   id: number;
   invoiceId: number;
-  length: number;
-  nwPerCtn: number;
-  nwTotal: number;
+  length: string;
+  nwPerCtn: string;
+  nwTotal: string;
   origin: string;
-  pcsPerCtn: number;
+  pcsPerCtn: string;
   poNumber: string;
   priceCalculationMode: string;
   printRows?: ApiInvoicePrintRow[];
-  purchasePrice: number;
-  purchaseTotal: number;
-  quantity: number;
+  purchasePrice: string;
+  purchaseTotal: string;
+  quantity: string;
   spare1: string;
   spare10: string;
   spare2: string;
@@ -1865,14 +1851,14 @@ export interface ApiInvoiceItemDto {
   styleName: string;
   styleNameCN: string;
   styleNo: string;
-  taxRebateRate: number;
-  taxRefundAmount: number;
-  totalPrice: number;
+  taxRebateRate: string;
+  taxRefundAmount: string;
+  totalPrice: string;
   unitCN: string;
   unitEN: string;
-  unitPrice: number;
-  volume: number;
-  width: number;
+  unitPrice: string;
+  volume: string;
+  width: string;
 }
 
 export interface ApiInvoiceListItemDto {
@@ -1887,7 +1873,7 @@ export interface ApiInvoiceListItemDto {
   portOfDestination: string;
   portOfLoading: string;
   status: string;
-  totalAmount: number;
+  totalAmount: string;
   type: string;
 }
 
@@ -1902,20 +1888,20 @@ export interface ApiInvoiceProfitAnalysisRequest {
 
 export interface ApiInvoiceProfitAnalysisResponse {
   currency: string;
-  exchangeRate?: number | null;
+  exchangeRate?: string | null;
   exchangeRateText: string;
-  grossProfit: number;
+  grossProfit: string;
   grossProfitText: string;
-  margin: number;
+  margin: string;
   marginText: string;
-  purchaseCost: number;
+  purchaseCost: string;
   purchaseCostText: string;
-  salesRmb: number;
+  salesRmb: string;
   salesRmbText: string;
-  salesTotal: number;
+  salesTotal: string;
   salesTotalText: string;
   storagePolicy: string;
-  taxRefund: number;
+  taxRefund: string;
   taxRefundText: string;
 }
 
@@ -2726,31 +2712,31 @@ export interface ApiPostgreSqlRestorePlanResponse {
 export interface ApiProductDto {
   brand: string;
   createdAt: string;
-  defaultPrice: number;
+  defaultPrice: string;
   description: string;
   elements: string;
-  gwPerCtn: number;
-  height: number;
+  gwPerCtn: string;
+  height: string;
   hsCode: string;
   id: number;
   inspectionCategory: string;
-  length: number;
+  length: string;
   material: string;
   nameCN: string;
   nameEN: string;
-  nwPerCtn: number;
+  nwPerCtn: string;
   origin: string;
   packageUnitCN: string;
   packageUnitEN: string;
-  pcsPerCtn: number;
+  pcsPerCtn: string;
   productCode: string;
   rowVersion: string;
   supervisionConditions: string;
-  taxRebateRate: number;
+  taxRebateRate: string;
   unitCN: string;
   unitEN: string;
   updatedAt: string;
-  width: number;
+  width: string;
 }
 
 export interface ApiQueryInvoiceExportRequest {
@@ -2790,9 +2776,9 @@ export interface ApiQueryInvoiceRowDto {
   invoiceDate: string;
   invoiceNo: string;
   shipmentDate: string;
-  totalAmount: number;
-  totalCartons: number;
-  totalQuantity: number;
+  totalAmount: string;
+  totalCartons: string;
+  totalQuantity: string;
   tradeTerms: string;
   transportMode: string;
   type: string;
@@ -2984,37 +2970,6 @@ export interface ApiReportTemplateStorageStatusResponse {
   writable: boolean;
 }
 
-export interface ApiReportTemplateV3ContractResponse {
-  astKind: string;
-  batchLimits?: ApiInvoiceReportBatchLimitsContract;
-  contractVersion: string;
-  coordinateUnit: string;
-  elementTypes: string[];
-  expressions: ApiReportTemplateV3ExpressionContract;
-  flowTypes: string[];
-  images: ApiReportTemplateV3ImageResourceContract;
-  layerRoles: string[];
-  limits: ApiReportTemplateV3LimitsContract;
-  page: ApiReportTemplateV3PageContract;
-  release: ApiReportTemplateV3ReleaseContract;
-  repeatBand: ApiReportTemplateV3RepeatBandContract;
-  reportTypes: string[];
-  schemaVersion: number;
-}
-
-export interface ApiReportTemplateV3ExpressionContract {
-  aggregateOperators: string[];
-  allowsDynamicEvaluation: boolean;
-  conditionOperators: string[];
-}
-
-export interface ApiReportTemplateV3ImageResourceContract {
-  allowsExternalUrl: boolean;
-  controlledFieldPaths: string[];
-  mediaTypes: string[];
-  policy: string;
-}
-
 export interface ApiReportTemplateV3LimitsContract {
   maxElementsPerLayer: number;
   maxImageDimension: number;
@@ -3035,19 +2990,6 @@ export interface ApiReportTemplateV3PageContract {
   pageAndLayerRoles: string[];
   presets?: { heightHundredthMm: number; size: string; widthHundredthMm: number }[];
   size: string;
-}
-
-export interface ApiReportTemplateV3ReleaseContract {
-  publishedAtType: string;
-  revisionType: string;
-  states: string[];
-}
-
-export interface ApiReportTemplateV3RepeatBandContract {
-  detailTableSemantics: string;
-  layerRoles: string[];
-  persistedAsSeparateList: boolean;
-  source: string;
 }
 
 export interface ApiRuntimeDatabaseMetrics {
@@ -7212,6 +7154,24 @@ export const ApiCrmFollowUpSaveRequestDefaults = {
   type: "",
 } as const satisfies Partial<ApiCrmFollowUpSaveRequest>;
 
+export const ApiDashboardCurrencyAmountDefaults = {
+  monthlyAmount: "0",
+  previousMonthlyAmount: "0",
+} as const satisfies Partial<ApiDashboardCurrencyAmount>;
+
+export const ApiDashboardRecentInvoiceDtoDefaults = {
+  totalAmount: "0",
+} as const satisfies Partial<ApiDashboardRecentInvoiceDto>;
+
+export const ApiDashboardResponseDefaults = {
+  monthlyExportAmount: "0",
+  monthlyProfit: "0",
+  monthlyTaxRefund: "0",
+  previousMonthlyExportAmount: "0",
+  previousMonthlyProfit: "0",
+  previousMonthlyTaxRefund: "0",
+} as const satisfies Partial<ApiDashboardResponse>;
+
 export const ApiEmailTemplateDraftRequestDefaults = {
   bodyHtml: "",
   category: "",
@@ -7219,11 +7179,6 @@ export const ApiEmailTemplateDraftRequestDefaults = {
   name: "",
   subject: "",
 } as const satisfies Partial<ApiEmailTemplateDraftRequest>;
-
-export const ApiExchangeRateAvailableCurrenciesResponseDefaults = {
-  isStale: false,
-  lastError: "",
-} as const satisfies Partial<ApiExchangeRateAvailableCurrenciesResponse>;
 
 export const ApiExchangeRateListResponseDefaults = {
   autoRefreshEnabled: false,
@@ -7266,6 +7221,16 @@ export const ApiHsCodeSearchResponseDefaults = {
 
 export const ApiInvoiceDetailDtoDefaults = {
   amountAdjustments: [],
+  exchangeRate: null,
+  totalAmount: "0",
+  totalCartons: "0",
+  totalGrossWeight: "0",
+  totalNetWeight: "0",
+  totalProfit: "0",
+  totalPurchaseAmount: "0",
+  totalQuantity: "0",
+  totalTaxRefundAmount: "0",
+  totalVolume: "0",
   useEntryPrintRows: false,
 } as const satisfies Partial<ApiInvoiceDetailDto>;
 
@@ -7274,8 +7239,39 @@ export const ApiInvoiceEditingLimitsContractDefaults = {
 } as const satisfies Partial<ApiInvoiceEditingLimitsContract>;
 
 export const ApiInvoiceItemDtoDefaults = {
+  cartons: "0",
+  gwPerCtn: "0",
+  gwTotal: "0",
+  height: "0",
+  length: "0",
+  nwPerCtn: "0",
+  nwTotal: "0",
+  pcsPerCtn: "0",
   printRows: [],
+  purchasePrice: "0",
+  purchaseTotal: "0",
+  quantity: "0",
+  taxRebateRate: "0",
+  taxRefundAmount: "0",
+  totalPrice: "0",
+  unitPrice: "0",
+  volume: "0",
+  width: "0",
 } as const satisfies Partial<ApiInvoiceItemDto>;
+
+export const ApiInvoiceListItemDtoDefaults = {
+  totalAmount: "0",
+} as const satisfies Partial<ApiInvoiceListItemDto>;
+
+export const ApiInvoiceProfitAnalysisResponseDefaults = {
+  exchangeRate: null,
+  grossProfit: "0",
+  margin: "0",
+  purchaseCost: "0",
+  salesRmb: "0",
+  salesTotal: "0",
+  taxRefund: "0",
+} as const satisfies Partial<ApiInvoiceProfitAnalysisResponse>;
 
 export const ApiInvoiceReportBatchLimitsContractDefaults = {
   maxArchiveBytes: 67108864,
@@ -7359,8 +7355,22 @@ export const ApiPortDtoDefaults = {
 } as const satisfies Partial<ApiPortDto>;
 
 export const ApiProductDtoDefaults = {
+  defaultPrice: "0",
+  gwPerCtn: "0",
+  height: "0",
+  length: "0",
+  nwPerCtn: "0",
+  pcsPerCtn: "0",
   rowVersion: "",
+  taxRebateRate: "0",
+  width: "0",
 } as const satisfies Partial<ApiProductDto>;
+
+export const ApiQueryInvoiceRowDtoDefaults = {
+  totalAmount: "0",
+  totalCartons: "0",
+  totalQuantity: "0",
+} as const satisfies Partial<ApiQueryInvoiceRowDto>;
 
 export const ApiReportHtmlPreviewRequestDefaults = {
   pageIndex: 0,
@@ -8939,10 +8949,6 @@ export interface GetCustomsCooDocumentRequest {
 
 export interface GetCustomsCooLockedFieldsRequest {
   sourceId: number;
-}
-
-export interface GetCustomsCooProducerProfileRequest {
-  id: number;
 }
 
 export interface GetEmailTemplateVersionRequest {
@@ -11001,11 +11007,6 @@ export interface UpdateLeaveRequestRequest {
   body: OaRequestSave;
 }
 
-export interface UpdateMeetingBookingRequest {
-  id: number;
-  body: MeetingBookingUpdateRequest;
-}
-
 export interface UpdateMeetingRoomRequest {
   id: number;
   body: MeetingRoomSaveRequest;
@@ -11014,11 +11015,6 @@ export interface UpdateMeetingRoomRequest {
 export interface UpdateOfficeSupplyRequest {
   id: number;
   body: OfficeSupplySaveRequest;
-}
-
-export interface UpdateOfficeSupplyRequestRequest {
-  id: number;
-  body: SupplyRequestUpdateRequest;
 }
 
 export interface UpdateOrganizationCompanyRequest {

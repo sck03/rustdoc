@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { OaDepartmentPicker } from "../oa/OaDepartmentPicker.tsx";
-import { WorkflowProjectPicker } from "../oa/WorkflowProjectPicker.tsx";
+import { OfficeRequestIdentity } from "./OfficeRequestIdentity.tsx";
 import type { ApiUserDto, ExportDocManagerApiClient, MeetingBookingRecord, MeetingRoomRecord, PersonnelDirectoryRecord } from "../../api/index.ts";
 import { businessDateTimeLocalInputToIso, formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
@@ -9,8 +8,7 @@ import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { officeAccess, officeBookingDefaults, readMeetingRoomForm, shiftOfficeBookingEnd } from "./officeModel.ts";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
 import { useMeetingAvailability, useOfficeResourceOperation } from "./useOfficeData.ts";
-import { OfficeEmployeePicker } from "./OfficeEmployeePicker.tsx";
-import { OfficeApplicantIdentity, canIdentifyOfficeApplicant } from "./OfficeApplicantIdentity.tsx";
+import { canIdentifyOfficeApplicant } from "./OfficeApplicantIdentity.tsx";
 import { HandlingServicePicker } from "../oa/HandlingServicePicker.tsx";
 import { AttachmentDraftFields } from "../../ui/AttachmentDraftFields.tsx";
 import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
@@ -86,10 +84,9 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
               <strong>{slot.status === "Pending" ? "待审批" : slot.status === "InUse" ? "使用中" : "已预约"}</strong></li>)}</ul>}
       </div>
       {access.allows("create") && room.isActive && <>
-        {canSelectEmployee && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={person=>{setEmployee(person);setAppointment({});setProjectId(null);}} disabled={operation.busy} />}
-        <OfficeApplicantIdentity user={user} />
-        <OaDepartmentPicker client={client} user={user} employeeId={employee?.id} value={appointment.id} onChange={value=>{setAppointment(value);setProjectId(null);}}/>
-        <WorkflowProjectPicker client={client} user={user} kind="room" employeeId={employee?.id} appointmentId={appointment.id} departmentId={appointment.departmentId} value={projectId} onChange={setProjectId}/>
+        <OfficeRequestIdentity client={client} user={user} kind="room" employee={employee} appointment={appointment}
+          projectId={projectId} locked={Boolean(attachments.saved)} onEmployee={person=>{setEmployee(person);setAppointment({});setProjectId(null);}}
+          onAppointment={value=>{setAppointment(value);setProjectId(null);}} onProject={setProjectId} />
         <OfficeField label="会议主题" wide><input name="title" required maxLength={200} placeholder="例如：项目周会" /></OfficeField>
         <OfficeField label="参会人数"><input name="attendeeCount" type="number" required min={1} max={room.capacity} defaultValue={1} /></OfficeField>
         <AttachmentDraftFields draft={attachments} busy={operation.busy} existingFiles={attachments.saved?.attachments}/>

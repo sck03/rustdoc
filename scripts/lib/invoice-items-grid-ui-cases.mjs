@@ -4,6 +4,44 @@ const cell = (row, field) => `input[data-invoice-item-row="${row}"][data-invoice
 
 export async function runInvoiceItemsGridCases(scenario) {
   await scenario(async page => {
+    const enter = async (field, text) => {
+      await page.locator(cell(0, field)).click();
+      await page.locator(cell(0, field)).press("ControlOrMeta+A");
+      await page.keyboard.insertText(text);
+    };
+    await enter("unitPrice", "100");
+    assert.equal(await page.evaluate(() => window.invoice.items[0].unitPrice), "100");
+    await enter("quantity", "9".repeat(60));
+    await page.waitForFunction(() => /数字|计算|小数/.test(document.querySelector("[data-message]")?.textContent ?? ""));
+    assert.equal(await page.evaluate(() => window.invoice.items[0].quantity), "1", "A rejected calculation must retain the previous draft");
+    await enter("quantity", "2");
+    assert.equal(await page.evaluate(() => window.invoice.items[0].quantity), "2");
+    await page.locator(cell(0, "quantity")).press("ControlOrMeta+z");
+    assert.equal(await page.evaluate(() => window.invoice.items[0].quantity), "1", "Rejected edits must not enter undo history");
+    await page.locator(cell(0, "quantity")).press("ControlOrMeta+y");
+    assert.equal(await page.evaluate(() => window.invoice.items[0].quantity), "2", "Redo must restore the last accepted edit");
+    await page.getByRole("button", { name:"save", exact:true }).click();
+    await page.waitForFunction(() => window.requests.length === 1);
+    assert.equal(await page.evaluate(() => window.requests[0].request.body.totalAmount), "200");
+    await page.evaluate(() => window.finish());
+  }, { gridMode:true });
+  await scenario(async page => {
+    for (const [field, value] of [["quantity", "123456.000049999999"], ["unitPrice", "100"]]) {
+      const input = page.locator(cell(0, field));
+      await input.click(); await input.press("ControlOrMeta+A"); await input.pressSequentially(value);
+    }
+    await page.getByRole("button", { name:"save", exact:true }).click();
+    await page.waitForFunction(() => window.requests.length === 1);
+    const item = await page.evaluate(() => window.requests[0].request.body.items[0]);
+    assert.equal(item.quantity, "123456.000049999999");
+    assert.equal(item.unitPrice, "100");
+    assert.equal(item.totalPrice, "12345600");
+    await page.evaluate(() => window.finish());
+    await page.waitForFunction(() => !window.saveBusy);
+    await page.locator(cell(0, "quantity")).focus();
+    assert.equal(await page.locator(cell(0, "quantity")).inputValue(), "123456.000049999999");
+  }, { gridMode:true });
+  await scenario(async page => {
     await page.locator(cell(0, "styleNo")).fill("ni-history");
     const input = page.locator(cell(1, "styleNo"));
     await input.fill("");
@@ -69,16 +107,16 @@ export async function runInvoiceItemsGridCases(scenario) {
         assert.equal(await input.inputValue(), "", `${field}: clear`);
         await input.pressSequentially(text);
         assert.equal(await input.inputValue(), text, `${field}: ${text}`);
-        assert.equal(await page.evaluate(field => window.invoice.items[0][field], field), Number(text));
+        assert.equal(await page.evaluate(field => window.invoice.items[0][field], field), text);
       }
     }
     await page.getByRole("button", {name:"save", exact:true}).click();
     await page.waitForFunction(() => window.requests.length === 1);
-    assert.equal(await page.evaluate(() => window.requests[0].request.body.items[0].unitPrice), 100.05);
+    assert.equal(await page.evaluate(() => window.requests[0].request.body.items[0].unitPrice), "100.05");
     await page.evaluate(() => window.finish());
     const input = page.locator(cell(0, "unitPrice"));
     await input.click(); await input.press("ControlOrMeta+A"); await input.pressSequentially("-1.125");
-    assert.equal(await page.evaluate(() => window.invoice.items[0].unitPrice), -1.125);
+    assert.equal(await page.evaluate(() => window.invoice.items[0].unitPrice), "-1.125");
     await input.press("ControlOrMeta+z");
     assert.equal(Number(await input.inputValue()), -1.12);
     await input.press("ControlOrMeta+y");

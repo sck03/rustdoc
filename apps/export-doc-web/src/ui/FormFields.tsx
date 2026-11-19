@@ -1,6 +1,6 @@
 import { type ReactNode, useId } from "react";
 import { dateInputToApiDate, numberInputValue, toDateInputValue } from "./formUtils.ts";
-import { useNumberInputDraft } from "./useNumberInputDraft.ts";
+import { useDecimalInputDraft, useNumberInputDraft } from "./useNumberInputDraft.ts";
 import { isComposingKey } from "./keyboardEvent.ts";
 import { Field } from "./primitives/Field.tsx";
 
@@ -217,28 +217,39 @@ export function DateField({
   );
 }
 
-export function NumberField({
-  label,
-  value,
-  required,
-  disabled,
-  className,
-  description,
-  step = "0.01",
-  formatValue,
-  onChange,
-}: {
+type NumericFieldProps<T> = {
   label: string;
-  value?: number;
+  value?: T;
   required?: boolean;
   disabled?: boolean;
   className?: string;
   description?: string;
   step?: string;
-  formatValue?: (value?: number) => string;
-  onChange: (value: number) => void;
-}) {
+  formatValue?: (value?: T) => string;
+  onChange: (value: T) => void;
+};
+
+export function NumberField(props: NumericFieldProps<number>) {
+  const { value, formatValue, onChange } = props;
   const input = useNumberInputDraft(value, formatValue ? formatValue(value) : numberInputValue(value), next => onChange(next ?? 0), 0);
+  return <NumericFieldView {...props} input={input} />;
+}
+
+export function DecimalField(props: NumericFieldProps<string>) {
+  const { value, formatValue, onChange } = props;
+  const input = useDecimalInputDraft(value, formatValue ? formatValue(value) : value ?? "0", next => onChange(next ?? "0"));
+  return <NumericFieldView {...props} input={input} />;
+}
+
+function NumericFieldView({
+  label,
+  required,
+  disabled,
+  className,
+  description,
+  step = "0.01",
+  input,
+}: Omit<FieldShellProps, "children"> & { step?: string; input: ReturnType<typeof useNumberInputDraft> }) {
   return (
     <FieldShell label={label} required={required} disabled={disabled} className={className} description={description}>
       {(descriptionId) => (

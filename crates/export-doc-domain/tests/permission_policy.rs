@@ -93,6 +93,9 @@ fn prior_decision(
                         .any(|g| g.resource_key == key && g.action == prior_action(key, action)))
     };
     // Reviewed status access supports sending without granting delivery history.
+    if op == FETCH_REMOTE_HS_CODE_DETAIL {
+        return allows("document.hs-knowledge", "view");
+    }
     if op == GET_EMAIL_TOOL_STATUS {
         return allows("common.email-delivery", "send")
             || allows("common.email-delivery", "view-delivery");

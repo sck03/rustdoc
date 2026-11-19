@@ -12,20 +12,20 @@ import { useTransientPreview } from "../../ui/useTransientPreview.ts";
 
 const emptyAnalysis: ApiInvoiceProfitAnalysisResponse = {
   currency: "",
-  exchangeRate: 0,
+  exchangeRate: "0",
   exchangeRateText: "未设置",
-  grossProfit: 0,
+  grossProfit: "0",
   grossProfitText: "¥ 0.00",
-  margin: 0,
+  margin: "0",
   marginText: "0.00%",
-  purchaseCost: 0,
+  purchaseCost: "0",
   purchaseCostText: "- ¥ 0.00",
-  salesRmb: 0,
+  salesRmb: "0",
   salesRmbText: "¥ 0.00",
-  salesTotal: 0,
+  salesTotal: "0",
   salesTotalText: "0.00",
   storagePolicy: "",
-  taxRefund: 0,
+  taxRefund: "0",
   taxRefundText: "+ ¥ 0.00",
 };
 

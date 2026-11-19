@@ -7,7 +7,6 @@ pub const OPERATIONS: &[Operation] = &[
     GET_CUSTOMS_COO_ISSUING_AUTHORITIES,
     GET_CUSTOMS_COO_EDITOR_OPTIONS,
     LIST_CUSTOMS_COO_PRODUCER_PROFILES,
-    GET_CUSTOMS_COO_PRODUCER_PROFILE,
     CREATE_CUSTOMS_COO_PRODUCER_PROFILE,
     UPDATE_CUSTOMS_COO_PRODUCER_PROFILE,
     DELETE_CUSTOMS_COO_PRODUCER_PROFILE,
@@ -105,13 +104,6 @@ pub fn handle(
                 export_doc_storage::RecordOrder::UpdatedDescending,
             )?;
             Ok(json!({"totalCount":total,"items":rows,"storagePolicy":POLICY}))
-        }
-        GET_CUSTOMS_COO_PRODUCER_PROFILE => {
-            let row = store::get(tx, PRODUCERS, records::id(parameters)?)?;
-            if !auth::visible(actor, PERMISSION, "view", &row) {
-                return Err(error(403, "无权查看该生产企业。"));
-            }
-            Ok(json!({"profile":row,"storagePolicy":POLICY}))
         }
         CREATE_CUSTOMS_COO_PRODUCER_PROFILE | UPDATE_CUSTOMS_COO_PRODUCER_PROFILE => {
             let id = if operation == UPDATE_CUSTOMS_COO_PRODUCER_PROFILE {

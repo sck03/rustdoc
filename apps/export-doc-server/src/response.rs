@@ -135,11 +135,17 @@ pub fn is_download(operation: Operation) -> bool {
         })
 }
 
-/// Only endpoints whose sole successful response is 204 have a fixed empty body.
+/// A response without any declared successful content has no representation to encode.
 pub(super) fn empty_success(operation: Operation) -> bool {
     let responses = &contracts::contract()["operations"][operation.id]["responses"];
     responses.as_object().is_some_and(|r| {
-        r.contains_key("204") && !r.keys().any(|k| k.starts_with('2') && k != "204")
+        let mut successful = r
+            .iter()
+            .filter(|(code, _)| code.starts_with('2'))
+            .peekable();
+        successful.peek().is_some()
+            && successful
+                .all(|(_, response)| response["content"].as_object().is_none_or(|c| c.is_empty()))
     })
 }
 
@@ -283,12 +289,14 @@ pub async fn success(
         .as_ref()
         .map(|(_, content_type)| content_type.as_str())
         .unwrap_or(content_type);
-    response.headers_mut().insert(
-        header::CONTENT_TYPE,
-        content_type
-            .parse()
-            .unwrap_or_else(|_| "application/octet-stream".parse().unwrap()),
-    );
+    if !empty {
+        response.headers_mut().insert(
+            header::CONTENT_TYPE,
+            content_type
+                .parse()
+                .unwrap_or_else(|_| "application/octet-stream".parse().unwrap()),
+        );
+    }
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, "no-store".parse().unwrap());

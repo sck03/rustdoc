@@ -23,7 +23,7 @@ import {PermissionAccessProvider} from ${source("app/PermissionAccessContext.tsx
 import {ConfirmationProvider} from ${source("ui/ConfirmationProvider.tsx")};
 import {UnsavedChangesProvider} from ${source("ui/unsavedChangesGuard.tsx")};
 window.serverInvoice={...createEmptyInvoice("2026-11-08"),id:7,invoiceNo:"SERVER-1",rowVersion:"native:1",
-  items:Array.from({length:window.rows??1},()=>({...createEmptyInvoiceItem(7),styleName:"item",quantity:1,unitPrice:2}))};
+  items:Array.from({length:window.rows??1},()=>({...createEmptyInvoiceItem(7),styleName:"item",quantity:"1",unitPrice:"2"}))};
 window.pending=[];window.jobCalls=0;
 const client={getInvoice:async({id},{signal})=>{
   if(window.failRefresh)throw new Error("refresh failure");
@@ -83,13 +83,13 @@ try {
     await page.evaluate(() => { window.originalRows = window.ws.currentInvoiceDraft.items; window.ws.patchInvoice({ contractNo: "HEADER" }); });
     await page.waitForFunction(() => window.ws.currentInvoiceDraft.contractNo === "HEADER");
     assert.equal(await page.evaluate(() => window.originalRows === window.ws.currentInvoiceDraft.items), true);
-    assert.equal(await page.evaluate(() => window.ws.currentInvoiceDraft.totalAmount), 10000);
+    assert.equal(await page.evaluate(() => window.ws.currentInvoiceDraft.totalAmount), "10000");
     await page.evaluate(() => window.ws.patchInvoice({ items: window.ws.invoice.items.map((row, index) => index === 4999 ? { ...row, styleName: "中文续编" } : row) }));
     await page.waitForFunction(() => window.ws.currentInvoiceDraft.items[4999].styleName === "中文续编");
     assert.equal(await page.evaluate(() => window.originalRows[0] === window.ws.currentInvoiceDraft.items[0]), true);
-    assert.equal(await page.evaluate(() => window.ws.currentInvoiceDraft.totalAmount), 10000);
-    await page.evaluate(() => window.ws.patchInvoice({ items: window.ws.invoice.items.map((row, index) => index ? row : { ...row, quantity: 3 }) }));
-    await page.waitForFunction(() => window.ws.currentInvoiceDraft.totalAmount === 10004);
+    assert.equal(await page.evaluate(() => window.ws.currentInvoiceDraft.totalAmount), "10000");
+    await page.evaluate(() => window.ws.patchInvoice({ items: window.ws.invoice.items.map((row, index) => index ? row : { ...row, quantity: "3" }) }));
+    await page.waitForFunction(() => window.ws.currentInvoiceDraft.totalAmount === "10004");
   }, 5000);
   await scenario("backup", async page => {
     const calls = await page.evaluate(() => window.jobCalls);

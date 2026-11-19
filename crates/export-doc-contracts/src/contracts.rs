@@ -165,6 +165,13 @@ pub fn dto(schema: &Value, value: Value) -> Value {
 
 fn project_value(schema: &Value, value: Value, declared_only: bool) -> Value {
     let schema = resolve(schema);
+    // Internal exact JSON numbers retain their digits when projected to the
+    // canonical decimal-text API. Input validation never uses this projection.
+    if schema["format"] == "decimal" && kind(schema) == "string" {
+        if let Value::Number(number) = value {
+            return Value::String(number.to_string());
+        }
+    }
     match value {
         Value::Object(values) => {
             let properties = schema["properties"].as_object();

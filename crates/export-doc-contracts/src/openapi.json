@@ -4344,21 +4344,6 @@
           "storagePolicy"
         ]
       },
-      "ApiCustomsCooProducerProfileResponse": {
-        "type": "object",
-        "properties": {
-          "profile": {
-            "$ref": "#/components/schemas/ApiCustomsCooProducerProfileDto"
-          },
-          "storagePolicy": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "profile",
-          "storagePolicy"
-        ]
-      },
       "ApiCustomsCooProducerProfileSaveRequest": {
         "type": "object",
         "properties": {
@@ -4449,20 +4434,18 @@
             "type": "string"
           },
           "monthlyAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "previousMonthlyAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           }
         },
         "required": [
@@ -4502,12 +4485,11 @@
             "type": "string"
           },
           "totalAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "type": {
             "type": "string"
@@ -4555,12 +4537,11 @@
             "description": "Original-currency totals for the union of both months. Compare only amounts from the same entry; no exchange-rate conversion."
           },
           "monthlyExportAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "monthlyInvoiceCount": {
             "type": [
@@ -4571,20 +4552,18 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
           "monthlyProfit": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "monthlyTaxRefund": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "pendingCount": {
             "type": [
@@ -4598,28 +4577,25 @@
             "type": "string"
           },
           "previousMonthlyExportAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "previousMonthlyProfit": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "previousMonthlyTaxRefund": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "recentInvoices": {
             "type": "array",
@@ -5978,41 +5954,6 @@
             "type": "string"
           }
         }
-      },
-      "ApiExchangeRateAvailableCurrenciesResponse": {
-        "type": "object",
-        "properties": {
-          "currencies": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "fetchedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "isStale": {
-            "type": "boolean",
-            "default": false
-          },
-          "lastError": {
-            "type": "string",
-            "default": ""
-          },
-          "sourceUrl": {
-            "type": "string"
-          },
-          "storagePolicy": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "currencies",
-          "sourceUrl",
-          "fetchedAt",
-          "storagePolicy"
-        ]
       },
       "ApiExchangeRateDto": {
         "type": "object",
@@ -7844,11 +7785,12 @@
           "exchangeRate": {
             "type": [
               "null",
-              "number",
               "string"
             ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": null,
+            "maxLength": 60
           },
           "exporterAddressCN": {
             "type": "string"
@@ -8001,76 +7943,67 @@
             "type": "string"
           },
           "totalAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "totalCartons": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "totalGrossWeight": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "totalNetWeight": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "totalProfit": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "totalPurchaseAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "totalQuantity": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "totalTaxRefundAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "totalVolume": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "tradeTerms": {
             "type": "string"
@@ -8326,13 +8259,11 @@
             "type": "string"
           },
           "cartons": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "minimum": 0
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "ctnUnitCN": {
             "type": "string"
@@ -8347,31 +8278,25 @@
             "type": "string"
           },
           "gwPerCtn": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "minimum": 0
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "gwTotal": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "minimum": 0
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "height": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "minimum": 0
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "hsCode": {
             "type": "string"
@@ -8393,43 +8318,35 @@
             "pattern": "^-?(?:0|[1-9]\\d*)$"
           },
           "length": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "minimum": 0
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "nwPerCtn": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "minimum": 0
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "nwTotal": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "minimum": 0
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "origin": {
             "type": "string"
           },
           "pcsPerCtn": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "minimum": 0
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "poNumber": {
             "type": "string"
@@ -8447,29 +8364,25 @@
             "maxItems": 64
           },
           "purchasePrice": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "purchaseTotal": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "quantity": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "minimum": 0
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "spare1": {
             "type": "string"
@@ -8511,30 +8424,25 @@
             "type": "string"
           },
           "taxRebateRate": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "minimum": 0,
-            "maximum": 100
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "taxRefundAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "totalPrice": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "unitCN": {
             "type": "string"
@@ -8543,30 +8451,25 @@
             "type": "string"
           },
           "unitPrice": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "volume": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "minimum": 0
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "width": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
-            "minimum": 0
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           }
         },
         "required": [
@@ -8658,12 +8561,11 @@
             "type": "string"
           },
           "totalAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "type": {
             "type": "string"
@@ -8728,66 +8630,62 @@
           "exchangeRate": {
             "type": [
               "null",
-              "number",
               "string"
             ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": null,
+            "maxLength": 60
           },
           "exchangeRateText": {
             "type": "string"
           },
           "grossProfit": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "grossProfitText": {
             "type": "string"
           },
           "margin": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "marginText": {
             "type": "string"
           },
           "purchaseCost": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "purchaseCostText": {
             "type": "string"
           },
           "salesRmb": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "salesRmbText": {
             "type": "string"
           },
           "salesTotal": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "salesTotalText": {
             "type": "string"
@@ -8796,12 +8694,11 @@
             "type": "string"
           },
           "taxRefund": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "taxRefundText": {
             "type": "string"
@@ -12682,12 +12579,11 @@
             "format": "date-time"
           },
           "defaultPrice": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "description": {
             "type": "string"
@@ -12696,20 +12592,18 @@
             "type": "string"
           },
           "gwPerCtn": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "height": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "hsCode": {
             "type": "string"
@@ -12726,12 +12620,11 @@
             "type": "string"
           },
           "length": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "material": {
             "type": "string"
@@ -12743,12 +12636,11 @@
             "type": "string"
           },
           "nwPerCtn": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "origin": {
             "type": "string"
@@ -12760,12 +12652,11 @@
             "type": "string"
           },
           "pcsPerCtn": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "productCode": {
             "type": "string"
@@ -12778,12 +12669,11 @@
             "type": "string"
           },
           "taxRebateRate": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "unitCN": {
             "type": "string"
@@ -12796,12 +12686,11 @@
             "format": "date-time"
           },
           "width": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           }
         },
         "required": [
@@ -12983,28 +12872,25 @@
             "type": "string"
           },
           "totalAmount": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "totalCartons": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "totalQuantity": {
-            "type": [
-              "number",
-              "string"
-            ],
-            "format": "double",
-            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+            "type": "string",
+            "format": "decimal",
+            "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
+            "default": "0",
+            "maxLength": 60
           },
           "tradeTerms": {
             "type": "string"
@@ -13679,143 +13565,6 @@
           "storagePolicy"
         ]
       },
-      "ApiReportTemplateV3ContractResponse": {
-        "type": "object",
-        "properties": {
-          "astKind": {
-            "type": "string"
-          },
-          "batchLimits": {
-            "$ref": "#/components/schemas/ApiInvoiceReportBatchLimitsContract"
-          },
-          "contractVersion": {
-            "type": "string"
-          },
-          "coordinateUnit": {
-            "type": "string"
-          },
-          "elementTypes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "expressions": {
-            "$ref": "#/components/schemas/ApiReportTemplateV3ExpressionContract"
-          },
-          "flowTypes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "images": {
-            "$ref": "#/components/schemas/ApiReportTemplateV3ImageResourceContract"
-          },
-          "layerRoles": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "limits": {
-            "$ref": "#/components/schemas/ApiReportTemplateV3LimitsContract"
-          },
-          "page": {
-            "$ref": "#/components/schemas/ApiReportTemplateV3PageContract"
-          },
-          "release": {
-            "$ref": "#/components/schemas/ApiReportTemplateV3ReleaseContract"
-          },
-          "repeatBand": {
-            "$ref": "#/components/schemas/ApiReportTemplateV3RepeatBandContract"
-          },
-          "reportTypes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "schemaVersion": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
-          }
-        },
-        "required": [
-          "contractVersion",
-          "schemaVersion",
-          "astKind",
-          "coordinateUnit",
-          "page",
-          "layerRoles",
-          "repeatBand",
-          "elementTypes",
-          "flowTypes",
-          "expressions",
-          "images",
-          "release",
-          "limits",
-          "reportTypes"
-        ]
-      },
-      "ApiReportTemplateV3ExpressionContract": {
-        "type": "object",
-        "properties": {
-          "aggregateOperators": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "allowsDynamicEvaluation": {
-            "type": "boolean"
-          },
-          "conditionOperators": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "conditionOperators",
-          "aggregateOperators",
-          "allowsDynamicEvaluation"
-        ]
-      },
-      "ApiReportTemplateV3ImageResourceContract": {
-        "type": "object",
-        "properties": {
-          "allowsExternalUrl": {
-            "type": "boolean"
-          },
-          "controlledFieldPaths": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "mediaTypes": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "policy": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "policy",
-          "mediaTypes",
-          "controlledFieldPaths",
-          "allowsExternalUrl"
-        ]
-      },
       "ApiReportTemplateV3LimitsContract": {
         "type": "object",
         "properties": {
@@ -13998,54 +13747,6 @@
           "orientations",
           "coordinateUnit",
           "pageAndLayerRoles"
-        ]
-      },
-      "ApiReportTemplateV3ReleaseContract": {
-        "type": "object",
-        "properties": {
-          "publishedAtType": {
-            "type": "string"
-          },
-          "revisionType": {
-            "type": "string"
-          },
-          "states": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "states",
-          "revisionType",
-          "publishedAtType"
-        ]
-      },
-      "ApiReportTemplateV3RepeatBandContract": {
-        "type": "object",
-        "properties": {
-          "detailTableSemantics": {
-            "type": "string"
-          },
-          "layerRoles": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "persistedAsSeparateList": {
-            "type": "boolean"
-          },
-          "source": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "source",
-          "layerRoles",
-          "detailTableSemantics",
-          "persistedAsSeparateList"
         ]
       },
       "ApiRuntimeDatabaseMetrics": {
@@ -41486,6 +41187,10 @@
       "ai.modelName": "AI 模型名称"
     }
   },
+  "x-exportdoc-shared-schemas": [
+    "ApiReportTemplateV3LimitsContract",
+    "ApiReportTemplateV3PageContract"
+  ],
   "x-exportdoc-json-response-limit-bytes": 67108864,
   "paths": {
     "/api/audit-logs": {
@@ -41983,7 +41688,7 @@
     },
     "/api/auth/logout": {
       "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-json-response-limit-bytes": 65536,
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,
         "tags": [
@@ -43442,7 +43147,7 @@
     },
     "/api/crm/customers/batch-status": {
       "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-json-response-limit-bytes": 65536,
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,
         "tags": [
@@ -46287,7 +45992,7 @@
     },
     "/api/disaster-recovery/archives/{id}/download-ticket": {
       "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-json-response-limit-bytes": 65536,
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,
         "tags": [
@@ -51067,7 +50772,7 @@
     },
     "/api/jobs/{jobId}/download-ticket": {
       "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-json-response-limit-bytes": 65536,
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,
         "tags": [
@@ -52759,7 +52464,7 @@
               {
                 "resourceKey": "document.hs-knowledge",
                 "actions": [
-                  "manage"
+                  "view"
                 ],
                 "administratorOnly": false
               }
@@ -61088,133 +60793,6 @@
           "action": "get",
           "resource": "office.rooms",
           "permission": "view"
-        }
-      },
-      "put": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "UpdateMeetingBooking",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MeetingBookingRecord"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "504": {
-            "description": "Gateway Timeout",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "office.rooms",
-                "actions": [
-                  "edit"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "minimum": 1
-            },
-            "required": true
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MeetingBookingUpdateRequest"
-              }
-            }
-          }
         }
       }
     },
@@ -98321,133 +97899,6 @@
           "resource": "office.supplies",
           "permission": "view"
         }
-      },
-      "put": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "UpdateOfficeSupplyRequest",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OfficeSupplyRequestRecord"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Conflict",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Service Unavailable",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "504": {
-            "description": "Gateway Timeout",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "office.supplies",
-                "actions": [
-                  "edit"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "minimum": 1
-            },
-            "required": true
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SupplyRequestUpdateRequest"
-              }
-            }
-          }
-        }
       }
     },
     "/api/office/supply-requests/{id}/approve": {
@@ -111780,7 +111231,7 @@
     },
     "/api/postgresql-maintenance/backups/download-ticket": {
       "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-json-response-limit-bytes": 65536,
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,
         "tags": [
@@ -114852,58 +114303,6 @@
                   "manage"
                 ],
                 "administratorOnly": true
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ]
-      }
-    },
-    "/api/reports/templates/v3/contract": {
-      "get": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "GetReportTemplateV3Contract",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiReportTemplateV3ContractResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "403": {
-            "description": "Forbidden"
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.report-templates",
-                "actions": [
-                  "view"
-                ],
-                "administratorOnly": false
               }
             ]
           }
@@ -118551,82 +117950,6 @@
               "type": "integer",
               "format": "int64",
               "minimum": 1
-            },
-            "required": true
-          }
-        ]
-      },
-      "get": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "GetCustomsCooProducerProfile",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiCustomsCooProducerProfileResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.single-window",
-                "actions": [
-                  "view"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "pattern": "^-?(?:0|[1-9]\\d*)$"
             },
             "required": true
           }
@@ -125665,58 +124988,6 @@
         ]
       }
     },
-    "/api/tools/exchange-rates/available-currencies": {
-      "get": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "ListAvailableExchangeRateCurrencies",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiExchangeRateAvailableCurrenciesResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "503": {
-            "description": "Service Unavailable"
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "common.exchange-rates",
-                "actions": [
-                  "view"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ]
-      }
-    },
     "/api/tools/letter-of-credit/import": {
       "post": {
         "x-exportdoc-json-response-limit-bytes": 67108864,
@@ -127069,8 +126340,9 @@
     },
     "/livez": {
       "get": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
-        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-probe": "liveness",
+        "x-exportdoc-json-response-limit-bytes": 65536,
+        "x-exportdoc-timeout-seconds": 1,
         "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
@@ -127092,8 +126364,9 @@
         }
       },
       "head": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
-        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-probe": "liveness",
+        "x-exportdoc-json-response-limit-bytes": 65536,
+        "x-exportdoc-timeout-seconds": 1,
         "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
@@ -127117,8 +126390,9 @@
     },
     "/readyz": {
       "get": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
-        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-probe": "readiness",
+        "x-exportdoc-json-response-limit-bytes": 65536,
+        "x-exportdoc-timeout-seconds": 1,
         "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
@@ -127129,7 +126403,14 @@
             "description": "OK"
           },
           "503": {
-            "description": "Service Unavailable"
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-exportdoc-policy": {
@@ -127143,8 +126424,9 @@
         }
       },
       "head": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
-        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-probe": "readiness",
+        "x-exportdoc-json-response-limit-bytes": 65536,
+        "x-exportdoc-timeout-seconds": 1,
         "x-exportdoc-processing-slot": false,
         "tags": [
           "ExportDocManager.Api"
@@ -127155,7 +126437,14 @@
             "description": "OK"
           },
           "503": {
-            "description": "Service Unavailable"
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
           }
         },
         "x-exportdoc-policy": {

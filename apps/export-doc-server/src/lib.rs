@@ -6,6 +6,7 @@ mod download_body;
 mod downloads;
 mod request;
 mod response;
+mod response_admission;
 mod service_shutdown;
 mod shutdown;
 pub use service_shutdown::close_service;
@@ -40,8 +41,10 @@ pub struct ServerState {
     downloads: Arc<Semaphore>,
     previews: Arc<Semaphore>,
     processing: Arc<Semaphore>,
+    probes: Arc<Semaphore>,
     body_resources: Arc<request::body::Resources>,
     response_memory: Arc<export_doc_engine::engine::backup_io::Budget>,
+    response_admission: Arc<response_admission::Admission>,
     upload_space: Arc<temporary_space::Budget>,
     tickets: Arc<downloads::Tickets>,
     desktop_token: Option<Arc<str>>,
@@ -66,6 +69,7 @@ fn compose_router(
 ) -> (Router, Shutdown) {
     let telemetry = Arc::new(telemetry::Telemetry::new(service.paths.log_root.clone()));
     let shutdown = Shutdown::default();
+    let response_admission = Arc::new(response_admission::Admission::new());
     let state = ServerState {
         upload_space: service.paths.disk_space.clone(),
         telemetry,
@@ -79,8 +83,10 @@ fn compose_router(
         downloads: Arc::new(Semaphore::new(MAX_DOWNLOADS)),
         previews: Arc::new(Semaphore::new(MAX_PREVIEWS)),
         processing: Arc::new(Semaphore::new(MAX_PROCESSING)),
+        probes: Arc::new(Semaphore::new(2)),
         body_resources: Arc::default(),
-        response_memory: Arc::default(),
+        response_memory: response_admission.budget.clone(),
+        response_admission,
         tickets: Arc::default(),
         desktop_token,
         shutdown: shutdown.clone(),

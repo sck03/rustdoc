@@ -2,6 +2,7 @@ use crate::{ServerState, response};
 pub(super) mod body;
 #[cfg(test)]
 mod lifecycle_tests;
+mod probe;
 mod upload_file;
 use axum::{
     body::Body,
@@ -47,10 +48,14 @@ pub async fn handle(state: ServerState, operation: Operation, request: Request) 
     } else {
         None
     };
-    let result = tokio::select! {
-        result = tokio::time::timeout(Duration::from_secs(request_seconds(operation) + 5), execute(state.clone(), operation, request)) =>
-            result.unwrap_or_else(|_| Err(error(504, "请求读取或处理超过时限。"))),
-        _ = state.shutdown.wait() => Err(error(503, "服务正在关闭，已取消请求。")),
+    let result = if let Some(kind) = export_doc_contracts::request_limits::probe(operation.id) {
+        probe::execute(&state, operation, kind).await
+    } else {
+        tokio::select! {
+            result = tokio::time::timeout(Duration::from_secs(request_seconds(operation) + 5), execute(state.clone(), operation, request)) =>
+                result.unwrap_or_else(|_| Err(error(504, "请求读取或处理超过时限。"))),
+            _ = state.shutdown.wait() => Err(error(503, "服务正在关闭，已取消请求。")),
+        }
     };
     let mut response = match result {
         Ok(mut reply) => {
@@ -331,9 +336,14 @@ async fn execute(
         && transfer_permit.is_none()
         && !response::empty_success(operation)
     {
-        Some(state.response_memory.reserve_working(
-            export_doc_contracts::request_limits::json_response_bytes(operation.id),
-        )?)
+        Some(
+            state
+                .response_admission
+                .reserve(export_doc_contracts::request_limits::json_response_bytes(
+                    operation.id,
+                ))
+                .await?,
+        )
     } else {
         None
     };

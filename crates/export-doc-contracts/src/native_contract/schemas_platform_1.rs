@@ -121,10 +121,10 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["optionType","predefinedOptions","customOptions","options","allowCustomValues","storagePolicy"])),
     ("ApiCustomOptionSaveRequest",o(vec![("value",s())])),
     ("ApiDashboardResponse",o(vec![
-        ("monthlyExportAmount",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("monthlyProfit",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("monthlyTaxRefund",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
+        ("monthlyExportAmount",decimal()),("monthlyProfit",decimal()),("monthlyTaxRefund",decimal()),
         ("pendingCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("shippedCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("totalActiveCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("periodLabel",s()),("previousMonthlyExportAmount",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("previousMonthlyProfit",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
-        ("previousMonthlyTaxRefund",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("monthlyInvoiceCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("draftCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
+        ("periodLabel",s()),("previousMonthlyExportAmount",decimal()),("previousMonthlyProfit",decimal()),
+        ("previousMonthlyTaxRefund",decimal()),("monthlyInvoiceCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("draftCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("verifiedCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("completedCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("singleWindowStatusSummary",s()),
         ("recentInvoices",a(r("ApiDashboardRecentInvoiceDto"))),("todoItems",a(r("ApiDashboardTodoItemDto"))),("storagePolicy",s()),
         ("exportAmountCurrency",s().description("Currency of the scalar export amounts. Empty for no invoices or mixed currencies; scalar amounts are then zero. Use exportAmountsByCurrency.")),("exportAmountsByCurrency",a(r("ApiDashboardCurrencyAmount")).description("Original-currency totals for the union of both months. Compare only amounts from the same entry; no exchange-rate conversion."))
@@ -196,10 +196,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("fieldCandidateCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("hasItemTable",b()),("confidence",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"))
     ]).required(vec!["name","usedRowCount","usedColumnCount","fieldCandidateCount","hasItemTable","confidence"])),
     ("ApiExcelOutputRequest",o(vec![("destinationPath",s())])),
-    ("ApiExchangeRateAvailableCurrenciesResponse",o(vec![
-        ("currencies",a(s())),("sourceUrl",s()),("fetchedAt",s().format("date-time")),
-        ("storagePolicy",s()),("isStale",b().default_value(serde_json::json!(false))),("lastError",s().default_value(serde_json::json!("")))
-    ]).required(vec!["currencies","sourceUrl","fetchedAt","storagePolicy"])),
     ("ApiExchangeRateDto",o(vec![
         ("currencyName",s()),("buyingRate",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("cashBuyingRate",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
         ("sellingRate",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("cashSellingRate",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("middleRate",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
@@ -287,7 +283,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiProductDto",object_groups(vec![
         (&["id"], Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         (&["productCode","nameEN","nameCN","description","hsCode","elements","supervisionConditions","inspectionCategory","material","brand","origin","unitEN","unitCN","packageUnitEN","packageUnitCN"], s()),
-        (&["taxRebateRate","length","width","height","gwPerCtn","nwPerCtn","pcsPerCtn","defaultPrice"], Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
+        (&["taxRebateRate","length","width","height","gwPerCtn","nwPerCtn","pcsPerCtn","defaultPrice"], decimal()),
         (&["createdAt","updatedAt"], s().format("date-time")),
         (&["rowVersion"], s().default_value(serde_json::json!(""))),
     ]).required(vec!["id","productCode","nameEN","nameCN","description","hsCode","elements","supervisionConditions","inspectionCategory","taxRebateRate","material","brand","origin","unitEN","unitCN","length","width","height","gwPerCtn","nwPerCtn","pcsPerCtn","packageUnitEN","packageUnitCN","defaultPrice","createdAt","updatedAt","rowVersion"])),

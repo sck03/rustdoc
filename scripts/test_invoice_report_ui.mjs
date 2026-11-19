@@ -58,7 +58,7 @@ try {
     const result=await response.json();assert(response.ok,JSON.stringify(result));return result;
   };
   const draft={...createEmptyInvoice("2026-09-28"),invoiceNo:"UI-SEAL-001",exporterNameEN:"SAMPLE EXPORT COMPANY",customerNameEN:"SAMPLE CUSTOMER",currency:"EUR"};
-  draft.items=[1,2,3].map(n=>({...createEmptyInvoiceItem(),styleNo:`STYLE-${n}`,styleName:`Sample product ${n}`,quantity:1000+n,cartons:100+n,unitEN:"PCS",ctnUnitEN:"CTNS",unitPrice:10+n,totalPrice:(1000+n)*(10+n),gwTotal:200+n,nwTotal:190+n,volume:1+n/100}));
+  draft.items=[1,2,3].map(n=>({...createEmptyInvoiceItem(),styleNo:`STYLE-${n}`,styleName:`Sample product ${n}`,quantity:String(1000+n),cartons:String(100+n),unitEN:"PCS",ctnUnitEN:"CTNS",unitPrice:String(10+n),totalPrice:String((1000+n)*(10+n)),gwTotal:String(200+n),nwTotal:String(190+n),volume:String(1+n/100)}));
   const saved=await api("/api/invoices",draft);
   const invoiceId=saved.id;
   chrome=await startChrome({browserExecutable:locateChromeForTesting(repo),userDataDir:path.join(output,"Chrome"),timeoutMs:30000});
@@ -124,7 +124,7 @@ try {
   await wait("/发票已(保存|创建)/.test(document.body.innerText)","Invoice save failed");
   const reloaded=await api(`/api/invoices/${invoiceId}`);
   assert.equal(reloaded.specialTerms, "BY APPOINTMENT\nKEEP DRY");
-  assert.equal(reloaded.totalGrossWeight,606); assert.equal(reloaded.totalNetWeight,576); assert.equal(reloaded.totalVolume,3.06);
+  assert.equal(reloaded.totalGrossWeight,"606"); assert.equal(reloaded.totalNetWeight,"576"); assert.equal(reloaded.totalVolume,"3.06");
   for(let i=0;i<draft.items.length;i++) for(const field of ['gwTotal','nwTotal','volume']) assert.equal(reloaded.items[i][field],draft.items[i][field]);
   assert.equal(reloaded.exporterId,0);
   assert.match(reloaded.docSealPath,/^Files\/Seals\/img-/);

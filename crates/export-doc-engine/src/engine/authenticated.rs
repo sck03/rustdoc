@@ -63,7 +63,6 @@ impl NativeService {
                 report_templates::demand_type(actor, kind)?;
                 serde_json::to_value(report_templates::fields(kind)?).map_err(Into::into)
             }
-            GET_REPORT_TEMPLATE_V3_CONTRACT => report_templates::contract(),
             LIST_JOBS => self.jobs.list(actor, query),
             CLEAR_FINISHED_JOBS => self.jobs.clear_finished(actor),
             LIST_DATABASE_BACKUPS => maintenance::list(&self.store, &self.paths, actor),

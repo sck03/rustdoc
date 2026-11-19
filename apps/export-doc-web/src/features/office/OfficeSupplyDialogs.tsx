@@ -1,13 +1,11 @@
 import { useState, type FormEvent } from "react";
-import { OaDepartmentPicker } from "../oa/OaDepartmentPicker.tsx";
-import { WorkflowProjectPicker } from "../oa/WorkflowProjectPicker.tsx";
+import { OfficeRequestIdentity } from "./OfficeRequestIdentity.tsx";
 import type { ApiUserDto, ExportDocManagerApiClient, OfficeSupplyRequestRecord, OfficeSupplyRecord, PersonnelDirectoryRecord } from "../../api/index.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
 import { readOfficeSupplyForm } from "./officeModel.ts";
 import { OfficeDialog, OfficeField, OfficeSubmit } from "./OfficeUi.tsx";
 import { useOfficeResourceOperation } from "./useOfficeData.ts";
-import { OfficeEmployeePicker } from "./OfficeEmployeePicker.tsx";
-import { OfficeApplicantIdentity, canIdentifyOfficeApplicant } from "./OfficeApplicantIdentity.tsx";
+import { canIdentifyOfficeApplicant } from "./OfficeApplicantIdentity.tsx";
 import { HandlingServicePicker } from "../oa/HandlingServicePicker.tsx";
 import { AttachmentDraftFields } from "../../ui/AttachmentDraftFields.tsx";
 import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
@@ -70,10 +68,9 @@ export function OfficeSupplyApplication({ client, supply, user, onClose }: {
     <p className="office-muted">全部节点审批通过后预留库存，由指定办理人发放；库存不足时须先补充再批准。</p>
     {operation.error && attachments.saved && <p role="status">草稿 #{attachments.saved.id} 已保存。剩余附件可重试，也可稍后从申请草稿继续办理。</p>}
     <form onSubmit={submit}><fieldset disabled={operation.busy} className="office-form-grid">
-      {canSelectEmployee && <OfficeEmployeePicker client={client} user={user} value={employee} onChange={person=>{setEmployee(person);setAppointment({});setProjectId(null);}} disabled={operation.busy} />}
-      <OfficeApplicantIdentity user={user} />
-      <OaDepartmentPicker client={client} user={user} employeeId={employee?.id} value={appointment.id} onChange={value=>{setAppointment(value);setProjectId(null);}}/>
-      <WorkflowProjectPicker client={client} user={user} kind="supply" employeeId={employee?.id} appointmentId={appointment.id} departmentId={appointment.departmentId} value={projectId} onChange={setProjectId}/>
+      <OfficeRequestIdentity client={client} user={user} kind="supply" employee={employee} appointment={appointment}
+        projectId={projectId} locked={Boolean(attachments.saved)} onEmployee={person=>{setEmployee(person);setAppointment({});setProjectId(null);}}
+        onAppointment={value=>{setAppointment(value);setProjectId(null);}} onProject={setProjectId} />
       <OfficeField label={`申请数量（${supply.unit}）`}><input name="quantity" type="number" required min={1} max={1000000} defaultValue={1} /></OfficeField>
       {supply.isReturnable && <OfficeField label="预计归还日期"><input name="returnDueDate" type="date" required min={user.businessDate} defaultValue={user.businessDate} /></OfficeField>}
       <OfficeField label="领用用途" wide><textarea name="purpose" rows={3} required maxLength={500} placeholder="请说明使用用途" /></OfficeField>

@@ -56,7 +56,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiDashboardRecentInvoiceDto",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("invoiceNo",s()),("status",s()),
         ("statusText",s()),("type",s()),("invoiceDate",s().format("date")),
-        ("totalAmount",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("customerNameEN",s()),("currency",s())
+        ("totalAmount",decimal()),("customerNameEN",s()),("currency",s())
     ]).required(vec!["id","invoiceNo","status","statusText","type","invoiceDate","totalAmount","customerNameEN"])),
     ("ApiExporterDto",object_groups(vec![
         (&["id"], Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
@@ -97,9 +97,9 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         (&["ownerUserId"], Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         (&["departmentId","companyScope","invoiceNo","contractNo","letterOfCreditNo","letterOfCreditSourcePath","letterOfCreditContent","issuingBank","customsBrokerName","customsBrokerCode","spare1","spare2","spare3","spare4","spare5","spare6","spare7","spare8","spare9","spare10","customFieldsJson","paymentTerms","portOfLoading","portOfDestination","destinationCountry","shippingMarks","shippingMarksType","shippingMarksImage","tradeTerms","transportMode","currency","specialTerms","type","supervisionMode","customerNameEN","customerAddressEN","notifyPartyName","notifyPartyAddress","exporterNameEN","exporterNameCN","exporterAddressEN","exporterAddressCN","exporterCreditCode","exporterCustomsCode","bankName","bankAccount","swiftCode","status","rowVersion"], s()),
         (&["invoiceDate","shipmentDate"], s().format("date")),
-        (&["totalCartons","totalQuantity","totalGrossWeight","totalNetWeight","totalVolume","totalAmount","totalPurchaseAmount","totalTaxRefundAmount","totalProfit"], Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
+        (&["totalCartons","totalQuantity","totalGrossWeight","totalNetWeight","totalVolume","totalAmount","totalPurchaseAmount","totalTaxRefundAmount","totalProfit"], decimal()),
         (&["notifyPartyMode"], r("NotifyPartyMode")),
-        (&["exchangeRate"], Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
+        (&["exchangeRate"], nullable_decimal()),
         (&["items"], a(r("ApiInvoiceItemDto"))),
         (&["pendingHsFeedback"], a(r("HsCodeKnowledgeFeedbackInput"))),
         (&["docSealPath","customsSealPath"], Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String])).description("受控发票印章；null 继承出口商档案，空字符串不盖章。")),
@@ -131,23 +131,23 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiInvoiceItemDto",object_groups(vec![
         (&["id","invoiceId"], Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         (&["poNumber","styleNo","styleName","fabricComposition","styleNameCN","brand","hsCode","origin","unitEN","unitCN","ctnUnitEN","ctnUnitCN","priceCalculationMode","spare1","spare2","spare3","spare4","spare5","spare6","spare7","spare8","spare9","spare10","customFieldsJson"], s()),
-        (&["quantity","pcsPerCtn","cartons","length","width","height","volume","gwPerCtn","nwPerCtn","gwTotal","nwTotal"], Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").minimum(num("0")).pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
-        (&["unitPrice","totalPrice","purchasePrice","purchaseTotal","taxRefundAmount"], Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^[+-]?[0-9]+(?:\\.[0-9]+)?$")),
-        (&["taxRebateRate"], Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").minimum(num("0")).maximum(num("100")).pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
+        (&["quantity","pcsPerCtn","cartons","length","width","height","volume","gwPerCtn","nwPerCtn","gwTotal","nwTotal"], decimal()),
+        (&["unitPrice","totalPrice","purchasePrice","purchaseTotal","taxRefundAmount"], decimal()),
+        (&["taxRebateRate"], decimal()),
         (&["printRows"], a(r("ApiInvoicePrintRow")).default_value(serde_json::json!([])).description("此货项的打印行，非空时必须且只能有一行 Item 承载本货项数量金额；Text 与 Blank 不参与合计。").max_items(64)),
     ]).required(vec!["id","invoiceId","poNumber","styleNo","styleName","fabricComposition","styleNameCN","brand","hsCode","origin","quantity","unitEN","unitCN","pcsPerCtn","cartons","ctnUnitEN","ctnUnitCN","length","width","height","volume","gwPerCtn","nwPerCtn","gwTotal","nwTotal","priceCalculationMode","unitPrice","totalPrice","purchasePrice","purchaseTotal","taxRebateRate","taxRefundAmount","spare1","spare2","spare3","spare4","spare5","spare6","spare7","spare8","spare9","spare10","customFieldsJson"])),
     ("ApiInvoiceListItemDto",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("invoiceNo",s()),("contractNo",s()),
         ("invoiceDate",s().format("date")),("customerName",s()),("exporterName",s()),
         ("destinationCountry",s()),("portOfLoading",s()),("portOfDestination",s()),
-        ("currency",s()),("totalAmount",Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),("type",s()),
+        ("currency",s()),("totalAmount",decimal()),("type",s()),
         ("status",s())
     ]).required(vec!["id","invoiceNo","contractNo","invoiceDate","customerName","exporterName","destinationCountry","portOfLoading","portOfDestination","currency","totalAmount","type","status"])),
     ("ApiInvoiceProfitAnalysisRequest",o(vec![("invoice",r("ApiInvoiceDetailDto"))]).required(vec!["invoice"])),
     ("ApiInvoiceProfitAnalysisResponse",object_groups(vec![
         (&["currency","salesTotalText","exchangeRateText","salesRmbText","purchaseCostText","taxRefundText","grossProfitText","marginText","storagePolicy"], s()),
-        (&["salesTotal","salesRmb","purchaseCost","taxRefund","grossProfit","margin"], Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
-        (&["exchangeRate"], Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
+        (&["salesTotal","salesRmb","purchaseCost","taxRefund","grossProfit","margin"], decimal()),
+        (&["exchangeRate"], nullable_decimal()),
     ]).required(vec!["currency","salesTotal","salesRmb","purchaseCost","taxRefund","grossProfit","margin","salesTotalText","exchangeRateText","salesRmbText","purchaseCostText","taxRefundText","grossProfitText","marginText","storagePolicy"])),
     ("ApiInvoicePurgeRequest",o(vec![("invoiceNoConfirmation",s()),("reason",s())])),
     ("ApiInvoicePurgeResponse",o(vec![
@@ -243,7 +243,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("ApiQueryInvoiceRowDto",object_groups(vec![
         (&["id"], Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         (&["invoiceNo","invoiceDate","contractNo","customerName","exporterName","destinationCountry","tradeTerms","shipmentDate","transportMode","currency","type"], s()),
-        (&["totalCartons","totalQuantity","totalAmount"], Schema::default().kind(Types::Many(vec![Primitive::Number,Primitive::String])).format("double").pattern("^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$")),
+        (&["totalCartons","totalQuantity","totalAmount"], decimal()),
     ]).required(vec!["id","invoiceNo","invoiceDate","contractNo","customerName","exporterName","destinationCountry","tradeTerms","shipmentDate","transportMode","totalCartons","totalQuantity","totalAmount","currency","type"])),
     ("DocumentFieldLabelSettings",o(vec![("invoice",ty(Primitive::Object).additional(Additional::Schema(Box::new(s())))),("item",ty(Primitive::Object).additional(Additional::Schema(Box::new(s())))),("payment",ty(Primitive::Object).additional(Additional::Schema(Box::new(s()))))]).required(vec!["invoice","item","payment"])),
     ("InvoiceCloneOptions",o(vec![

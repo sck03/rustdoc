@@ -30,6 +30,7 @@ pub(super) fn query<'a>(kind: &'a str, fields: &'a [(&'a str, &'a str)]) -> HsQu
         kind,
         fields,
         current_year: None,
+        feedback_query: None,
         keyword: "",
         prefix: "",
         since: "",
@@ -70,23 +71,17 @@ pub(super) fn feedback(
     normalized: &str,
 ) -> Result<std::collections::BTreeMap<String, i64>> {
     let mut boosts = std::collections::BTreeMap::<String, i64>::new();
-    let fields = [
-        "queryText",
-        "candidateCode",
-        "acceptedCount",
-        "rejectedCount",
-    ]
-    .map(|key| (key, key));
-    visit(tx, &mut query(hs::FEEDBACK, &fields), |row| {
-        if rules::text(&text(&row, "queryText")) == normalized {
-            let boost = row["acceptedCount"]
-                .as_i64()
-                .unwrap_or(0)
-                .saturating_mul(5)
-                .saturating_sub(row["rejectedCount"].as_i64().unwrap_or(0).saturating_mul(4));
-            let value = boosts.entry(text(&row, "candidateCode")).or_default();
-            *value = value.saturating_add(boost);
-        }
+    let fields = ["candidateCode", "acceptedCount", "rejectedCount"].map(|key| (key, key));
+    let mut selection = query(hs::FEEDBACK, &fields);
+    selection.feedback_query = Some(normalized);
+    visit(tx, &mut selection, |row| {
+        let boost = row["acceptedCount"]
+            .as_i64()
+            .unwrap_or(0)
+            .saturating_mul(5)
+            .saturating_sub(row["rejectedCount"].as_i64().unwrap_or(0).saturating_mul(4));
+        let value = boosts.entry(text(&row, "candidateCode")).or_default();
+        *value = value.saturating_add(boost);
         Ok(())
     })?;
     Ok(boosts)

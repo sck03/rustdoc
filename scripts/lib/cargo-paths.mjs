@@ -11,6 +11,6 @@ export function cargoArtifactDirectory(repositoryRoot, environment = process.env
     profile);
 }
 
-export function cargoExampleExecutable(repositoryRoot, name, environment = process.env, platform = process.platform) {
-  return path.join(cargoArtifactDirectory(repositoryRoot, environment), 'examples', name + (platform === 'win32' ? '.exe' : ''));
+export function cargoExampleExecutable(repositoryRoot, name, environment = process.env, platform = process.platform, profile = 'debug') {
+  return path.join(cargoArtifactDirectory(repositoryRoot, environment, profile), 'examples', name + (platform === 'win32' ? '.exe' : ''));
 }

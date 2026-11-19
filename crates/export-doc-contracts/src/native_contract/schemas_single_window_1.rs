@@ -34,7 +34,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         (&["ciqRegNo","prdcEtpsName","prdcEtpsConcEr","prdcEtpsTel","producer","producerTel","producerFax","producerEmail","producerSertFlag","lastInvoiceNo","lastContractNo","lastSourceStyleNo"], s()),
     ])),
     ("ApiCustomsCooProducerProfileListResponse",o(vec![("items",a(r("ApiCustomsCooProducerProfileDto"))),("totalCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("storagePolicy",s())]).required(vec!["items","totalCount","storagePolicy"])),
-    ("ApiCustomsCooProducerProfileResponse",o(vec![("profile",r("ApiCustomsCooProducerProfileDto")),("storagePolicy",s())]).required(vec!["profile","storagePolicy"])),
     ("ApiCustomsCooProducerProfileSaveRequest",o(vec![("profile",r("ApiCustomsCooProducerProfileInputDto")),("expectedVersion",i().minimum(num("1")).format("int64"))]).required(vec!["profile"])),
     ("ApiCustomsCooProducerProfileSaveResponse",o(vec![
         ("success",b()),("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("profile",r("ApiCustomsCooProducerProfileDto")),

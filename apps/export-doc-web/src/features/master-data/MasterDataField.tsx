@@ -1,4 +1,4 @@
-import { EditableComboField,NumberField,SelectField,TextAreaField,TextField } from "../../ui/FormFields.tsx";
+import { DecimalField,EditableComboField,NumberField,SelectField,TextAreaField,TextField } from "../../ui/FormFields.tsx";
 import type { CustomOptionMap } from "../custom-options/customOptionModel.ts";
 import { getCustomOptions } from "../custom-options/customOptionModel.ts";
 import {
@@ -66,6 +66,10 @@ export function MasterDataField({
     );
   }
 
+  if (field.type === "decimal") {
+    return <DecimalField className={field.className} disabled={disabled} label={field.label}
+      required={field.required} value={readString(record, field.name) || "0"} onChange={onChange} />;
+  }
   if (field.type === "number") {
     return (
       <NumberField

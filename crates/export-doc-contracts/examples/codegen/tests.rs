@@ -23,6 +23,20 @@ fn complete_contract_preserves_types_requests_runtime_and_endpoint_metadata() {
         assert_eq!(contract[key], previous[key], "contract projection: {key}");
     }
     let operations = contract["operations"].as_object().unwrap();
+    assert_eq!(
+        operations[export_doc_contracts::generated_api::CREATE_INVOICE.id]["validatesDecimalInput"],
+        true
+    );
+    assert_eq!(
+        operations[export_doc_contracts::generated_api::CREATE_PRODUCT.id]["validatesDecimalInput"],
+        true
+    );
+    assert_eq!(
+        operations[export_doc_contracts::generated_api::APPROVE_MEETING_BOOKING.id]["validatesDecimalInput"],
+        false
+    );
+    assert!(contract["schemas"]["ApiReportTemplateV3LimitsContract"].is_object());
+    assert!(!operations.contains_key("GetReportTemplateV3Contract"));
     assert_eq!(operations.len(), generated.operation_count);
     for item in document["paths"].as_object().unwrap().values() {
         for method in ["get", "head", "post", "put", "delete", "patch"] {
@@ -54,6 +68,7 @@ fn multipart_binary_headers_defaults_and_nullable_items_are_preserved() {
         "responses":{"200":{"content":{"application/pdf":{"schema":{"type":"string","format":"binary"}}}}}
     }}});
     doc["components"]["schemas"] = json!({"Example":{"type":"object","required":["name"],"properties":{"name":{"type":"string","default":"中文"},"enabled":{"type":"boolean"}}}});
+    doc["x-exportdoc-shared-schemas"] = json!(["Example"]);
     let generated = generate(&doc).unwrap();
     for expected in [
         "body: FormData;",
@@ -106,6 +121,9 @@ fn invalid_references_duplicate_names_and_missing_security_fail_closed() {
     let original = export_doc_contracts::openapi::document();
     let mut doc = original.clone();
     doc["components"]["schemas"]["Bad"] = json!({"$ref":"#/components/schemas/Missing"});
+    assert!(generate(&doc).is_err());
+    let mut doc = original.clone();
+    doc["x-exportdoc-shared-schemas"] = json!(["Missing"]);
     assert!(generate(&doc).is_err());
     let mut doc = original.clone();
     let operation =

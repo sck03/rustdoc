@@ -298,7 +298,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     )
     .unwrap();
     assert_eq!(approved["status"], "Approved");
-    assert_eq!(call(&service, staff_token, UPDATE_MEETING_BOOKING, booking_id, Some(json!({"expectedVersion":approved["versionNumber"],"meetingRoomId":room_id,"title":"修改后重新审批","attendeeCount":4,"startsAt":start.to_rfc3339(),"endsAt":end.to_rfc3339()}))).unwrap_err().status, Some(409));
+    assert_eq!(call(&service, staff_token, UPDATE_DRAFT_OF_MEETING_BOOKING, booking_id, Some(json!({"expectedVersion":approved["versionNumber"],"meetingRoomId":room_id,"title":"修改后重新审批","attendeeCount":4,"startsAt":start.to_rfc3339(),"endsAt":end.to_rfc3339()}))).unwrap_err().status, Some(409));
     let cancelled = call(
         &service,
         staff_token,

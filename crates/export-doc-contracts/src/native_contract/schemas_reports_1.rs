@@ -135,18 +135,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("templateRoot",s()),("exists",b()),("writable",b()),
         ("message",s()),("storagePolicy",s())
     ]).required(vec!["templateRoot","exists","writable","message","storagePolicy"])),
-    ("ApiReportTemplateV3ContractResponse",o(vec![
-        ("contractVersion",s()),("schemaVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("astKind",s()),
-        ("coordinateUnit",s()),("page",r("ApiReportTemplateV3PageContract")),("layerRoles",a(s())),
-        ("repeatBand",r("ApiReportTemplateV3RepeatBandContract")),("elementTypes",a(s())),("flowTypes",a(s())),
-        ("expressions",r("ApiReportTemplateV3ExpressionContract")),("images",r("ApiReportTemplateV3ImageResourceContract")),("release",r("ApiReportTemplateV3ReleaseContract")),
-        ("limits",r("ApiReportTemplateV3LimitsContract")),("reportTypes",a(s())),("batchLimits",r("ApiInvoiceReportBatchLimitsContract"))
-    ]).required(vec!["contractVersion","schemaVersion","astKind","coordinateUnit","page","layerRoles","repeatBand","elementTypes","flowTypes","expressions","images","release","limits","reportTypes"])),
-    ("ApiReportTemplateV3ExpressionContract",o(vec![("conditionOperators",a(s())),("aggregateOperators",a(s())),("allowsDynamicEvaluation",b())]).required(vec!["conditionOperators","aggregateOperators","allowsDynamicEvaluation"])),
-    ("ApiReportTemplateV3ImageResourceContract",o(vec![
-        ("policy",s()),("mediaTypes",a(s())),("controlledFieldPaths",a(s())),
-        ("allowsExternalUrl",b())
-    ]).required(vec!["policy","mediaTypes","controlledFieldPaths","allowsExternalUrl"])),
     ("ApiReportTemplateV3LimitsContract",o(vec![
         ("maxLayers",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("16"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("maxElementsPerLayer",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("1000"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("maxTotalElements",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("4000"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("maxResources",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("1000"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("maxResourceBytes",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("33554432"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("minElementSizeHundredthMm",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).default_value(serde_json::json!(num("400"))).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
@@ -157,11 +145,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("pageAndLayerRoles",a(s())),("presets",a(o(vec![("size",s()),("widthHundredthMm",i()),("heightHundredthMm",i())]).required(vec!["size","widthHundredthMm","heightHundredthMm"])).default_value(serde_json::json!([{"size":"A4","widthHundredthMm":num("21000"),"heightHundredthMm":num("29700")},{"size":"A3","widthHundredthMm":num("29700"),"heightHundredthMm":num("42000")},{"size":"A5","widthHundredthMm":num("14800"),"heightHundredthMm":num("21000")},{"size":"Letter","widthHundredthMm":num("21590"),"heightHundredthMm":num("27940")},{"size":"Legal","widthHundredthMm":num("21590"),"heightHundredthMm":num("35560")}])).description("标准纸张竖版尺寸；横版交换宽高。Custom 使用文档自身尺寸。")),("minDimensionHundredthMm",i().default_value(serde_json::json!(num("4000")))),
         ("maxDimensionHundredthMm",i().default_value(serde_json::json!(num("60000"))))
     ]).required(vec!["size","orientations","coordinateUnit","pageAndLayerRoles"])),
-    ("ApiReportTemplateV3ReleaseContract",o(vec![("states",a(s())),("revisionType",s()),("publishedAtType",s())]).required(vec!["states","revisionType","publishedAtType"])),
-    ("ApiReportTemplateV3RepeatBandContract",o(vec![
-        ("source",s()),("layerRoles",a(s())),("detailTableSemantics",s()),
-        ("persistedAsSeparateList",b())
-    ]).required(vec!["source","layerRoles","detailTableSemantics","persistedAsSeparateList"])),
     ("ApiUserReportTemplateCloneRequest",o(vec![("reportType",s().default_value(serde_json::json!(""))),("name",s().default_value(serde_json::json!(""))),("sourceTemplatePath",s().default_value(serde_json::json!("")))])),
     ("ApiUserReportTemplateCreateRequest",o(vec![("reportType",s().default_value(serde_json::json!(""))),("name",s().default_value(serde_json::json!(""))),("contentHtml",s().default_value(serde_json::json!("")))])),
     ("ApiUserReportTemplateDraftRequest",o(vec![

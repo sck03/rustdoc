@@ -46,7 +46,7 @@ window.finish=(index=0)=>{const pending=window.requests[index],id=pending.reques
 window.finishHs=(keyword)=>window.hsRequests.filter(p=>p.request.keyword===keyword).forEach(p=>p.resolve(page([{id:1,code:keyword,normalizedCode:keyword,status:"Active",requiresAnnualReview:false,description:"HS "+keyword,unit:"千克"}])));
 function Master({mode}){const {entityKey}=useParams();return <MasterDataEditorPage client={client} config={masterDataConfigs.find(c=>c.key===entityKey)} mode={mode} canOperate canManage/>}
 const user={id:1,companyScope:"company",departmentId:"D1",businessDate:"2026-10-25",businessTimeZone:"Asia/Shanghai",capabilities:{canManageUsers:true}};
-function Numeric(){const [quantity,setQuantity]=useState(0);return <><InvoiceItemCellInput item={{quantity}} index={1} column={{field:"quantity",kind:"number",ariaName:"数量"}} selected options={["100"]} onFocus={()=>{}} onMouseDown={()=>{}} onChange={setQuantity}/><button>next</button><output>{quantity}</output></>}
+function Numeric(){const [quantity,setQuantity]=useState("0");return <><InvoiceItemCellInput item={{quantity}} index={1} column={{field:"quantity",kind:"number",ariaName:"数量"}} selected options={["100"]} onFocus={()=>{}} onMouseDown={()=>{}} onChange={setQuantity}/><button>next</button><output>{quantity}</output></>}
 function Harness(){const navigate=useNavigate(),location=useLocation(),[shown,setShown]=useState(true);
   window.navigate=navigate;window.hide=()=>setShown(false);window.route=location.pathname;window.dirty=useHasUnsavedChanges();
   if(!shown)return <div>unmounted</div>;
@@ -88,7 +88,7 @@ try {
       await submit(page); await page.waitForFunction(() => window.requests.length === 2);
       assert.equal(await page.evaluate(() => window.requests[1].request.body.rowVersion), fresh ? "native:1" : "native:2");
       assert.equal(await page.evaluate(entity => window.requests[1].request.body[entity === "payees" ? "name" : "nameEN"], entity), "newer unsaved");
-      if (entity === "products") assert.equal(await page.evaluate(() => window.requests[1].request.body.defaultPrice), 9.5);
+      if (entity === "products") assert.equal(await page.evaluate(() => window.requests[1].request.body.defaultPrice), "9.5");
       await page.evaluate(() => window.finish(1)); await page.waitForFunction(() => !window.dirty);
       assert.equal(await page.evaluate(() => Array.isArray(window.queries.getQueryData(["master-data", "products", "list", { pageNumber: 1, pageSize: 200, keyword: "" }]))), false);
     });

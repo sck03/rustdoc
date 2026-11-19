@@ -60,6 +60,6 @@ export function OfficeEmployeePicker({ client, user, value, onChange, disabled }
         </li>)}
       </ul>
     </div>}
-    <small id={`${id}-hint`} className="office-muted">{value ? "已选人员；点击上方可搜索并更换。" : "支持姓名、工号搜索；↑ ↓ 选择，Enter 确认。"}</small>
+    <small id={`${id}-hint`} className="office-muted">{value ? disabled ? "已选人员" : "已选人员；点击上方可搜索并更换。" : "支持姓名、工号搜索；↑ ↓ 选择，Enter 确认。"}</small>
   </div>;
 }

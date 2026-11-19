@@ -20,7 +20,7 @@ export async function verifyDesktopConditionalReports({ run, request, token, cdp
   const seal = await request('SaveInvoiceSealImage', token, { imageDataUrl: 'data:image/png;base64,' + fs.readFileSync(path.join(repo, 'tests/ReportTemplateFixtures/sample-seal.png')).toString('base64') });
   assert.equal(seal.status, 200);
   const draft = { ...createEmptyInvoice('2026-10-10'), invoiceNo: 'CONDITION-DESKTOP-001', exporterNameEN: 'SAMPLE EXPORT COMPANY', customerNameEN: 'SAMPLE CUSTOMER', currency: 'USD', tradeTerms: 'FOB SHANGHAI', portOfLoading: 'SHANGHAI', docSealPath: seal.body.imagePath, customsSealPath: seal.body.imagePath };
-  draft.items = [1, 2, 3].map(n => ({ ...createEmptyInvoiceItem(), styleNo: `STYLE-${n}`, styleName: `Sample product ${n}`, quantity: 100 * n, cartons: 10 * n, unitEN: 'PCS', ctnUnitEN: 'CTNS', unitPrice: 120, totalPrice: 12000 * n }));
+  draft.items = [1, 2, 3].map(n => ({ ...createEmptyInvoiceItem(), styleNo: `STYLE-${n}`, styleName: `Sample product ${n}`, quantity: String(100 * n), cartons: String(10 * n), unitEN: 'PCS', ctnUnitEN: 'CTNS', unitPrice: "120", totalPrice: String(12000 * n) }));
   const created = await request('CreateInvoice', token, draft);
   assert.equal(created.status, 201);
   const invoiceId = created.body.id;
@@ -51,7 +51,7 @@ export async function verifyDesktopConditionalReports({ run, request, token, cdp
   await run("[...document.querySelectorAll('button')].find(e=>e.textContent.trim()==='保存发票').click(); true");
   await wait("document.body.innerText.includes('发票已保存')");
   const adjustedInvoice = (await request('GetInvoice', token, undefined, { id: invoiceId })).body;
-  assert.equal(adjustedInvoice.totalAmount, 72000);
+  assert.equal(adjustedInvoice.totalAmount, '72000');
   assert.deepEqual(adjustedInvoice.amountAdjustments.map(row => row.amount), ['-10963.50', '125.10', '0.20']);
   const cloned = await request('CloneUserReportTemplate', token, { reportType: 'ExportDocument', name: '桌面条件发票', sourceTemplatePath: fileTemplate('invoice_template.dtpl') });
   assert.equal(cloned.status, 201);

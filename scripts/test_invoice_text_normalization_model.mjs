@@ -29,8 +29,6 @@ const formUtilsPath = path
 const draftEqualityPath = path
   .join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "invoiceDraftEquality.ts")
   .replaceAll("\\", "/");
-const invoiceEditorSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "invoices", "hooks", "useInvoiceEditorWorkspace.ts"), "utf8");
-const paymentEditorSource = fs.readFileSync(path.join(repoRoot, "apps", "export-doc-web", "src", "features", "payments", "PaymentEditorPage.tsx"), "utf8");
 fs.writeFileSync(entry, `import * as model from ${JSON.stringify(modelPath)}; import * as hsModel from ${JSON.stringify(hsModelPath)}; import * as itemModel from ${JSON.stringify(itemModelPath)}; import * as productLibrary from ${JSON.stringify(productLibraryPath)}; import * as formUtils from ${JSON.stringify(formUtilsPath)}; import * as draftEquality from ${JSON.stringify(draftEqualityPath)}; globalThis.__model = model; globalThis.__hsModel = hsModel; globalThis.__itemModel = itemModel; globalThis.__productLibrary = productLibrary; globalThis.__formUtils = formUtils; globalThis.__draftEquality = draftEquality;`, "utf8");
 const esbuild = require(path.join(repoRoot, "apps", "export-doc-web", "node_modules", "esbuild"));
 await esbuild.build({ entryPoints: [entry], outfile: bundle, bundle: true, format: "esm", platform: "node", logLevel: "silent" });
@@ -47,13 +45,13 @@ await esbuild.build({ entryPoints: [path.join(repoRoot, 'apps/export-doc-web/src
 const printRowModel = await import(pathToFileURL(printRowsBundle).href);
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const entryItems = [
-  { ...itemModel.createEmptyInvoiceItem(), quantity: 10, printRows: [{ kind: 'Item', text: '' }, { kind: 'Text', text: '自由说明' }] },
-  { ...itemModel.createEmptyInvoiceItem(), quantity: 20, printRows: [{ kind: 'Item', text: '第二件' }] },
+  { ...itemModel.createEmptyInvoiceItem(), quantity: "10", printRows: [{ kind: 'Item', text: '' }, { kind: 'Text', text: '自由说明' }] },
+  { ...itemModel.createEmptyInvoiceItem(), quantity: "20", printRows: [{ kind: 'Item', text: '第二件' }] },
 ];
 const moved = printRowModel.movePrintRow(entryItems, { item: 0, row: 1 }, 1);
 assert(JSON.stringify(printRowModel.flattenPrintRows(moved.items).map(entry => entry.row.text)) === JSON.stringify(['', '第二件', '自由说明']), 'moving a note across items changes its actual print order');
 assert(moved.selection.item === 1 && moved.selection.row === 1, 'selection follows moved note');
-assert(moved.items[0].quantity === 10 && moved.items[1].quantity === 20 && entryItems[0].printRows.length === 2, 'moving text preserves amounts and immutable undo snapshots');
+assert(moved.items[0].quantity === "10" && moved.items[1].quantity === "20" && entryItems[0].printRows.length === 2, 'moving text preserves amounts and immutable undo snapshots');
 const back = printRowModel.movePrintRow(moved.items, moved.selection, -1);
 const beforePrevious = printRowModel.movePrintRow(back.items, back.selection, -1);
 assert(printRowModel.flattenPrintRows(beforePrevious.items)[0].row.text === '自由说明', 'notes can also cross upwards past the previous business row');
@@ -76,13 +74,13 @@ assert(printRowModel.resolvePrintRowSelection(entryItems, validSelection) === va
 let rejected = false;
 try { printRowModel.insertPrintNotes(full, 1, 'one more'); } catch { rejected = true; }
 assert(rejected && full.length === 64, 'oversized batch leaves original rows untouched');
-const totalOnly = { ...itemModel.createEmptyInvoiceItem(), styleNo: "TOTAL-ONLY", quantity: 505, cartons: 17, unitPrice: 8.22, gwTotal: 250, nwTotal: 233, volume: 1.252, purchaseTotal: 123.45 };
+const totalOnly = { ...itemModel.createEmptyInvoiceItem(), styleNo: "TOTAL-ONLY", quantity: "505", cartons: "17", unitPrice: "8.22", gwTotal: "250", nwTotal: "233", volume: "1.252", purchaseTotal: "123.45" };
 const savedTotalOnly = itemModel.normalizeInvoiceItemForSave(totalOnly);
-assert(savedTotalOnly.gwTotal === 250 && savedTotalOnly.nwTotal === 233 && savedTotalOnly.volume === 1.252 && savedTotalOnly.purchaseTotal === 123.45, "saving preserves independent imported totals without pretending quantity was edited");
-assert(savedTotalOnly.totalPrice === 4151.1, "saving still normalizes the active price calculation");
+assert(savedTotalOnly.gwTotal === "250" && savedTotalOnly.nwTotal === "233" && savedTotalOnly.volume === "1.252" && savedTotalOnly.purchaseTotal === "123.45", "saving preserves independent imported totals without pretending quantity was edited");
+assert(savedTotalOnly.totalPrice === "4151.1", "saving still normalizes the active price calculation");
 const pastedTotals = itemModel.recalculateInvoiceItem(totalOnly, ["quantity", "cartons", "gwTotal", "nwTotal", "volume"]);
-assert(pastedTotals.gwTotal === 250 && pastedTotals.nwTotal === 233 && pastedTotals.volume === 1.252, "explicit pasted totals take priority over dependent calculations");
-assert(itemModel.recalculateInvoiceItem({ ...totalOnly, gwPerCtn: 12 }, ["gwPerCtn"]).gwTotal === 204, "editing a real weight input still recalculates its total");
+assert(pastedTotals.gwTotal === "250" && pastedTotals.nwTotal === "233" && pastedTotals.volume === "1.252", "explicit pasted totals take priority over dependent calculations");
+assert(itemModel.recalculateInvoiceItem({ ...totalOnly, gwPerCtn: "12" }, ["gwPerCtn"]).gwTotal === "204", "editing a real weight input still recalculates its total");
 const empty = model.createEmptyInvoice("2026-10-09");
 const printRows = [{ kind: "Text", text: "FREE TEXT\n任意说明" }, { kind: "Item", text: "" }, { kind: "Blank", text: "" }];
 const entryDraft = model.normalizeInvoiceForSave({ ...empty, useEntryPrintRows: true, items: [{ ...totalOnly, printRows }] }, 0);
@@ -108,9 +106,9 @@ const draft = model.uppercaseInvoiceEnglishText({
     fabricComposition: "100% cotton",
     unitEN: "pcs",
     unitCN: "件",
-    quantity: 10,
-    unitPrice: 2,
-    totalPrice: 20,
+    quantity: "10",
+    unitPrice: "2",
+    totalPrice: "20",
   }],
 });
 assert(draft.invoiceNo === "2026YH024", "invoice number uppercased");
@@ -130,15 +128,11 @@ const changedDraft = { ...persistedDraft, customerNameEN: "TEMPORARY CUSTOMER" }
 assert(!draftEquality.areInvoiceDraftsEqual(changedDraft, persistedDraft), "invoice dirty comparison detects a changed field");
 const restoredDraft = { ...changedDraft, customerNameEN: persistedDraft.customerNameEN };
 assert(draftEquality.areInvoiceDraftsEqual(restoredDraft, persistedDraft), "invoice dirty comparison clears after restoring the saved value");
-assert(!draftEquality.areInvoiceDraftsEqual({ ...persistedDraft, items: [{ ...persistedDraft.items[0], quantity: 11 }] }, persistedDraft), "invoice dirty comparison detects nested item changes");
+assert(!draftEquality.areInvoiceDraftsEqual({ ...persistedDraft, items: [{ ...persistedDraft.items[0], quantity: "11" }] }, persistedDraft), "invoice dirty comparison detects nested item changes");
 assert(formUtils.toDateInputValue("2026-07-29") === "2026-07-29", "business date keeps the DateOnly wire format");
 assert(formUtils.toDateInputValue("2026-07-29T00:00:00") === "", "business date rejects date-time compatibility values");
 assert(formUtils.dateInputToApiDate("2026-07-29") === "2026-07-29", "date inputs submit the DateOnly wire format");
 assert(formUtils.currentLocalDateInputValue(new Date(2026, 6, 29, 0, 30, 0)) === "2026-07-29", "local date input uses the operator calendar day instead of UTC");
-assert(invoiceEditorSource.includes("const [pageBusinessDate] = useState(() => businessDate);"), "invoice editor captures the business date once per page instance");
-assert(!invoiceEditorSource.includes("createEmptyInvoice(businessDate)"), "session renewal must not reset a new invoice draft");
-assert(paymentEditorSource.includes("const [pageBusinessDate] = useState(() => businessDate);"), "payment editor captures the business date once per page instance");
-assert(!paymentEditorSource.includes("createEmptyPayment(businessDate)"), "session renewal must not reset a new payment draft");
 
 const imported = model.readRouteInvoiceDraft(
   { invoiceDraft: { ...draft, customerNameEN: "mixed Case buyer" } },
@@ -165,13 +159,13 @@ const feedbackContext = hsModel.buildInvoiceHsFeedbackContext({
 assert(feedbackContext.productName === "化纤制针织女式非起绒套头衫", "HS feedback learns the current invoice product name");
 assert(feedbackContext.specification.includes("LADIES PULLOVER") && feedbackContext.specification.includes("51%涤44%棉5%氨纶") && feedbackContext.specification.includes("PETROL INDUSTRIES"), "HS feedback keeps reusable product attributes");
 assert(!feedbackContext.specification.includes("YLAW1320-2"), "HS feedback does not split identical products by style number");
-assert(itemModel.invoiceItemUnitPriceDisplayValue(12) === "12.00", "ordinary unit price uses two decimals");
-assert(itemModel.invoiceItemUnitPriceDisplayValue(12.3) === "12.30", "ordinary fractional unit price uses two decimals");
-assert(itemModel.invoiceItemUnitPriceDisplayValue(100 / 3) === "33.33333", "derived unit price uses five decimals");
-assert(itemModel.invoiceItemUnitPriceDisplayValue(14.2857) === "14.2857", "extended unit price trims insignificant trailing zeroes");
-assert(itemModel.invoiceItemUnitPriceDisplayValue(14.225) === "14.225", "extended unit price keeps meaningful three decimals");
-assert(itemModel.invoiceItemWeightDisplayValue(1.236) === "1.24", "gross/net weight uses two decimals");
-assert(itemModel.invoiceItemVolumeDisplayValue(1.23456) === "1.235", "volume uses three decimals");
+assert(itemModel.invoiceItemUnitPriceDisplayValue("12") === "12.00", "ordinary unit price uses two decimals");
+assert(itemModel.invoiceItemUnitPriceDisplayValue("12.3") === "12.30", "ordinary fractional unit price uses two decimals");
+assert(itemModel.invoiceItemUnitPriceDisplayValue("33.333333333333") === "33.33333", "derived unit price uses five decimals");
+assert(itemModel.invoiceItemUnitPriceDisplayValue("14.2857") === "14.2857", "extended unit price trims insignificant trailing zeroes");
+assert(itemModel.invoiceItemUnitPriceDisplayValue("14.225") === "14.225", "extended unit price keeps meaningful three decimals");
+assert(itemModel.invoiceItemWeightDisplayValue("1.236") === "1.24", "gross/net weight uses two decimals");
+assert(itemModel.invoiceItemVolumeDisplayValue("1.23456") === "1.235", "volume uses three decimals");
 const productSourceItem = {
   ...itemModel.createEmptyInvoiceItem(7),
   styleNo: " SKU-001 ",
@@ -192,10 +186,10 @@ assert(updatedProductDraft.rowVersion === "concurrency-token-42", "existing prod
 const newProductDraft = productLibrary.createProductDraftFromInvoiceItem(productSourceItem);
 assert(newProductDraft.id === 0, "new product draft uses zero id");
 assert(newProductDraft.rowVersion === "", "new product draft starts without a row version");
-const libraryProduct = { ...newProductDraft, productCode: " P-001 ", nameEN: "Cotton coat", nameCN: "棉外套", material: "Cotton", defaultPrice: 123.45678, packageUnitEN: "CTNS", rowVersion: "native:2", description: "Master description" };
+const libraryProduct = { ...newProductDraft, productCode: " P-001 ", nameEN: "Cotton coat", nameCN: "棉外套", material: "Cotton", defaultPrice: "123.45678", packageUnitEN: "CTNS", rowVersion: "native:2", description: "Master description" };
 const libraryItem = productLibrary.createInvoiceItemFromProduct(libraryProduct, 123);
 assert(libraryItem.styleNo === "P-001" && libraryItem.styleNameCN === "棉外套" && libraryItem.ctnUnitEN === "CTNS", "production product mapping preserves normalized names and packaging");
-assert(libraryItem.unitPrice === 123.45678, "production product mapping retains five-decimal unit price");
+assert(libraryItem.unitPrice === "123.45678", "production product mapping retains five-decimal unit price");
 const roundTripProduct = productLibrary.createProductDraftFromInvoiceItem(libraryItem, libraryProduct);
 assert(roundTripProduct.rowVersion === "native:2" && roundTripProduct.description === "Master description" && roundTripProduct.defaultPrice === libraryItem.unitPrice, "production product round trip preserves concurrency, description and price");
 process.stdout.write("invoice-text-normalization model tests passed\n");

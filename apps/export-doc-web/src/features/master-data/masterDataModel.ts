@@ -1,5 +1,6 @@
 import type { ApiHsCodeDto,ApiHsCodeRemoteDetailResolutionResponse,ApiProductDto,ApiUnitDto } from "../../api/index.ts";
 import { normalizeText,numberValue } from "../../ui/formUtils.ts";
+import { ExactDecimal, decimalText } from "../../ui/decimalSum.ts";
 import type {
 MasterDataColumnDefinition,
 MasterDataEntityConfig,
@@ -223,7 +224,7 @@ export function applyHsCodeToProductRecord(record: MasterDataRecord, hsCode: Api
   next = fillProductTextFieldFromHsCode(next, "unitCN", "中文单位", hsCode.unit, appliedLabels);
 
   const rebateRate = parseHsCodeRebateRate(hsCode.rebateRate);
-  if (rebateRate != null && readRecordNumber(next, "taxRebateRate") === 0) {
+  if (rebateRate != null && ExactDecimal.from(decimalText(readString(next, "taxRebateRate"))).compare(0) === 0) {
     next = { ...next, taxRebateRate: rebateRate };
     appliedLabels.push("退税率");
   }
@@ -258,8 +259,10 @@ function parseHsCodeRebateRate(value?: string) {
     return null;
   }
 
-  const parsed = Number(match[0]);
-  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 100 ? parsed : null;
+  try {
+    const parsed = ExactDecimal.from(match[0]);
+    return parsed.compare(0) >= 0 && parsed.compare(100) <= 0 ? parsed.normalize().toString() : null;
+  } catch { return null; }
 }
 
 export function buildProductUnitAssistance(products: ApiProductDto[], units: ApiUnitDto[]): ProductUnitAssistance {
@@ -455,20 +458,6 @@ export function normalizeCustomerRecord(record: MasterDataRecord, id: number) {
   return next;
 }
 
-function normalizeMixedFields(
-  record: MasterDataRecord,
-  id: number,
-  textFields: string[],
-  numberFields: string[],
-) {
-  const next = normalizeTextFields(record, id, textFields);
-  for (const field of numberFields) {
-    next[field] = readRecordNumber(record, field);
-  }
-
-  return next;
-}
-
 export function encodeRouteId(value: string | number) {
   return encodeURIComponent(String(value));
 }
@@ -483,7 +472,8 @@ export function parseNumericRouteKey(recordKey: string) {
 }
 
 export function normalizeProductRecord(record: MasterDataRecord, id: number) {
-  const next = normalizeMixedFields(record, id, productTextFields, productNumberFields);
+  const next = normalizeTextFields(record, id, productTextFields);
+  for (const field of productDecimalFields) next[field] = decimalText(readString(record, field));
   const createdAt = readString(record, "createdAt");
   const updatedAt = readString(record, "updatedAt");
   if (createdAt) {
@@ -568,7 +558,7 @@ const productTextFields = [
   "packageUnitCN",
 ];
 
-const productNumberFields = [
+const productDecimalFields = [
   "taxRebateRate",
   "length",
   "width",

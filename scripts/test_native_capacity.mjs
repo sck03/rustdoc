@@ -103,7 +103,7 @@ async function phase(size,key) {
     const date=admin.user.businessDate;assert(/^\d{4}-\d{2}-\d{2}$/u.test(date));
     const invoice=(number)=>{
       const draft={...createEmptyInvoice(date),invoiceNo:number,exporterNameEN:'CAPACITY SAMPLE EXPORTER',customerNameEN:'Capacity sample customer',currency:'USD'};
-      draft.items=[{...createEmptyInvoiceItem(),styleNo:'CAP-ITEM',styleName:'Sample product',quantity:10,cartons:1,unitEN:'PCS',ctnUnitEN:'CTNS',unitPrice:1.25,totalPrice:12.5}];return draft;
+      draft.items=[{...createEmptyInvoiceItem(),styleNo:'CAP-ITEM',styleName:'Sample product',quantity:"10",cartons:"1",unitEN:'PCS',ctnUnitEN:'CTNS',unitPrice:"1.25",totalPrice:"12.5"}];return draft;
     };
     for(let n=0;n<historyRows;n++)await api('CreateInvoice',token,invoice(`CAP-SEED-${n}`));
     const users=[];

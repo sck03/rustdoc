@@ -32,7 +32,12 @@ fn field_name(value: &str) -> String {
     }
 }
 fn string_decimal(schema: &Value) -> bool {
-    schema["type"] == "string" && schema["format"] == "decimal"
+    schema["format"] == "decimal"
+        && (schema["type"] == "string"
+            || array(&schema["type"])
+                .iter()
+                .all(|kind| kind == "string" || kind == "null")
+                && array(&schema["type"]).iter().any(|kind| kind == "string"))
 }
 fn nullable(schema: &Value) -> bool {
     array(&schema["type"]).iter().any(|t| t == "null")
@@ -116,6 +121,26 @@ fn response(operation: &Value) -> Value {
         .map(|(_, v)| v["content"]["application/json"]["schema"].clone())
         .unwrap_or(Value::Null)
 }
+fn has_decimal_input(schema: &Value, schemas: &Value, seen: &mut BTreeSet<String>) -> bool {
+    if let Some(reference) = schema["$ref"].as_str() {
+        let name = reference.rsplit('/').next().unwrap();
+        return seen.insert(name.into()) && has_decimal_input(&schemas[name], schemas, seen);
+    }
+    schema["format"] == "decimal"
+        || schema["properties"].as_object().is_some_and(|fields| {
+            fields
+                .values()
+                .any(|field| has_decimal_input(field, schemas, seen))
+        })
+        || ["items", "additionalProperties"]
+            .iter()
+            .any(|key| schema[*key].is_object() && has_decimal_input(&schema[*key], schemas, seen))
+        || ["oneOf", "anyOf", "allOf"].iter().any(|key| {
+            array(&schema[*key])
+                .iter()
+                .any(|field| has_decimal_input(field, schemas, seen))
+        })
+}
 pub fn generate(document: &Value, operations: &[Operation<'_>]) -> Result<(String, String, usize)> {
     if array(&document["x-exportdoc-permissions"]["resources"]).is_empty() {
         return Err("Missing permission catalog".into());
@@ -131,6 +156,14 @@ pub fn generate(document: &Value, operations: &[Operation<'_>]) -> Result<(Strin
     let mut names = BTreeSet::new();
     for op in &sorted {
         collect(op.value, &document["components"]["schemas"], &mut names);
+    }
+    for name in array(&document["x-exportdoc-shared-schemas"]) {
+        let name = name.as_str().ok_or("Shared schema name must be text")?;
+        let schema = document["components"]["schemas"]
+            .get(name)
+            .ok_or("Unknown shared schema")?;
+        names.insert(name.into());
+        collect(schema, &document["components"]["schemas"], &mut names);
     }
     let schemas: serde_json::Map<_, _> = names
         .iter()
@@ -185,6 +218,14 @@ pub fn generate(document: &Value, operations: &[Operation<'_>]) -> Result<(Strin
         contract["maxJsonResponseBytes"] =
             op.value["x-exportdoc-json-response-limit-bytes"].clone();
         contract["requiresProcessingSlot"] = op.value["x-exportdoc-processing-slot"].clone();
+        contract["validatesDecimalInput"] = json!(has_decimal_input(
+            request,
+            &document["components"]["schemas"],
+            &mut BTreeSet::new()
+        ));
+        if let Some(probe) = op.value.get("x-exportdoc-probe") {
+            contract["probe"] = probe.clone();
+        }
         if let Some(metadata) = op.value.get("x-exportdoc-communication") {
             contract["communication"] = metadata.clone();
         }
@@ -208,12 +249,12 @@ pub fn generate(document: &Value, operations: &[Operation<'_>]) -> Result<(Strin
         for (key, value) in properties {
             let optional = !required(schema, key);
             if string_decimal(value) {
-                let module = if optional { "str_option" } else { "str" };
-                writeln!(
-                    output,
-                    "    #[serde(with = \"rust_decimal::serde::{module}\")]"
-                )
-                .unwrap();
+                let module = if optional || nullable(value) {
+                    "crate::decimal_text::optional"
+                } else {
+                    "crate::decimal_text"
+                };
+                writeln!(output, "    #[serde(with = \"{module}\")]").unwrap();
             }
             writeln!(
                 output,

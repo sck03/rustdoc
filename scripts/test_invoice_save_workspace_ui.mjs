@@ -31,7 +31,7 @@ window.switchSource=setId;window.hide=()=>setShown(false);
 return shown?<Editor key={id} id={id}/>:<div>unmounted</div>;
 }
 function Editor({id}){
-const [invoice,setInvoice]=useState(()=>({...createEmptyInvoice("2026-10-25"),id,invoiceNo:"before-save",rowVersion:"native:1",items:Array.from({length:window.initialRows??1},(_,index)=>({...createEmptyInvoiceItem(id),poNumber:"PO-"+index,styleNo:"ZZ-1",styleName:"item",quantity:1,unitPrice:1}))}));
+const [invoice,setInvoice]=useState(()=>({...createEmptyInvoice("2026-10-25"),id,invoiceNo:"before-save",rowVersion:"native:1",items:Array.from({length:window.initialRows??1},(_,index)=>({...createEmptyInvoiceItem(id),poNumber:"PO-"+index,styleNo:"ZZ-1",styleName:"item",quantity:"1",unitPrice:"1"}))}));
 const [message,setMessage]=useState(null),[success,setSuccessMessage]=useState(null),[baseline,setPersistedInvoiceDraft]=useState(null);
 const [number,setNumber]=useState(0);window.number=number;
 const [feedback,setPendingHsFeedback]=useState([]);const location=useLocation();window.locationState=location.state;window.currentRoute=location.pathname;

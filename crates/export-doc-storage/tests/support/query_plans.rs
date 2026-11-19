@@ -168,6 +168,7 @@ pub fn exercise(c: &Connection) {
     for year in [None, Some(2026)] {
         let q = HsQuery {
             kind: "hs-codes",
+            feedback_query: None,
             current_year: year,
             keyword: "",
             prefix: "000000004",

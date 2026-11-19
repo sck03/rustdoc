@@ -82,7 +82,7 @@ function buildInvoiceItemPreviousValueOptions(
 function readHistoryValue(item: ApiInvoiceItemDto, column: InvoiceItemColumnDefinition) {
   const value = item[column.field];
   if (column.kind === "number") {
-    return typeof value === "number" && Number.isFinite(value) && value !== 0 ? String(value) : "";
+    return typeof value === "string" && !/^[+-]?0+(?:\.0+)?$/.test(value) ? value : "";
   }
 
   return typeof value === "string" ? normalizeText(value) : "";

@@ -1,7 +1,7 @@
 import { ClipboardList, Copy, FileText, RotateCcw } from "lucide-react";
 import type { ApiInvoiceDetailDto } from "../../api/index.ts";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
-import { DateField, EditableComboField, NumberField, SelectField, TextField } from "../../ui/FormFields.tsx";
+import { DateField, DecimalField, EditableComboField, SelectField, TextField } from "../../ui/FormFields.tsx";
 import { DocumentSpareFieldsPanel } from "../../ui/DocumentSpareFieldsPanel.tsx";
 import { getCustomOptions, type CustomOptionMap } from "../custom-options/customOptionModel.ts";
 import {
@@ -133,7 +133,7 @@ export function InvoiceBasicInfoPanel({
           onChange={(value) => onChange({ currency: value })}
           onCommit={(value) => onCommitCustomOption?.("Currency", value)}
         />
-        <NumberField label="汇率" value={invoice.exchangeRate ?? 0} step="0.0001" disabled={!isEditable} onChange={(value) => onChange({ exchangeRate: value })} />
+        <DecimalField label="汇率" value={invoice.exchangeRate ?? "0"} step="0.0001" disabled={!isEditable} onChange={(value) => onChange({ exchangeRate: value })} />
         <EditableComboField
           label="监管方式"
           value={invoice.supervisionMode ?? ""}

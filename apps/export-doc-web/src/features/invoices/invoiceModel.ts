@@ -1,5 +1,6 @@
 import { ApiInvoiceDetailDto, ApiInvoiceItemDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
-import { dateInputToApiDate, readNumber, toDateInputValue } from "../../ui/formUtils.ts";
+import { dateInputToApiDate, toDateInputValue } from "../../ui/formUtils.ts";
+import { decimalText } from "../../ui/decimalSum.ts";
 import { mapDocumentSpareFields } from "../../ui/documentSpareFields.ts";
 import {
   calculateInvoiceTotals,
@@ -131,17 +132,17 @@ export function createEmptyInvoice(businessDate: string): ApiInvoiceDetailDto {
     supervisionMode: "一般贸易",
     status: "Draft",
     type: "报关数据",
-    totalAmount: 0,
+    totalAmount: "0",
     amountAdjustments: [],
-    totalCartons: 0,
-    totalQuantity: 0,
-    totalGrossWeight: 0,
-    totalNetWeight: 0,
-    totalVolume: 0,
-    totalPurchaseAmount: 0,
-    totalTaxRefundAmount: 0,
-    totalProfit: 0,
-    exchangeRate: 0,
+    totalCartons: "0",
+    totalQuantity: "0",
+    totalGrossWeight: "0",
+    totalNetWeight: "0",
+    totalVolume: "0",
+    totalPurchaseAmount: "0",
+    totalTaxRefundAmount: "0",
+    totalProfit: "0",
+    exchangeRate: "0",
     shippingMarksType: "Text",
     specialTerms: "",
     letterOfCreditNo: "",
@@ -286,7 +287,7 @@ export function normalizeInvoiceForSave(
     supervisionMode: invoice.supervisionMode?.trim() || "一般贸易",
     status: normalizeInvoiceStatus(invoice.status),
     type: normalizeInvoiceType(invoice.type),
-    exchangeRate: readNumber(String(invoice.exchangeRate)),
+    exchangeRate: decimalText(invoice.exchangeRate),
     ...normalizeInvoiceShippingMarks(invoice),
     specialTerms: invoice.specialTerms ?? "",
     amountAdjustments: (invoice.amountAdjustments ?? []).filter(row => row.description.trim() || row.amount.trim()).map(row => ({ description: row.description.trim(), amount: row.amount.trim() })),
@@ -309,7 +310,7 @@ export function normalizeInvoiceDetailsForSave(invoice: Pick<ApiInvoiceDetailDto
 export function createInvoiceDetailsProjector() {
   const rows = new WeakMap<ApiInvoiceItemDto, ApiInvoiceItemDto | null>();
   let previous: ReturnType<typeof normalizeInvoiceDetailsForSave> | undefined;
-  let previousRate: number | null | undefined, previousCurrency: string | undefined;
+  let previousRate: string | null | undefined, previousCurrency: string | undefined;
   return (invoice: Pick<ApiInvoiceDetailDto, "items" | "exchangeRate" | "currency">) => {
     const items: ApiInvoiceItemDto[] = [];
     for (const item of invoice.items ?? []) {

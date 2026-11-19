@@ -65,6 +65,17 @@ pub fn ty(kind: Primitive) -> Schema {
 pub fn s() -> Schema {
     ty(Primitive::String)
 }
+pub fn decimal() -> Schema {
+    s().format("decimal")
+        .pattern("^[+-]?[0-9]+(?:\\.[0-9]+)?$")
+        .max_length(60)
+        .default_value(Value::String("0".into()))
+}
+pub fn nullable_decimal() -> Schema {
+    decimal()
+        .kind(Types::Many(vec![Primitive::Null, Primitive::String]))
+        .default_value(Value::Null)
+}
 pub fn i() -> Schema {
     ty(Primitive::Integer)
 }
@@ -232,6 +243,8 @@ pub struct Foundation {
 }
 #[derive(Clone, Serialize)]
 pub struct Operation {
+    #[serde(rename = "x-exportdoc-probe", skip_serializing_if = "Option::is_none")]
+    pub probe: Option<crate::request_limits::Probe>,
     #[serde(rename = "x-exportdoc-json-response-limit-bytes")]
     pub max_json_response_bytes: usize,
     #[serde(rename = "x-exportdoc-timeout-seconds")]
@@ -279,6 +292,7 @@ pub fn ep(
         method,
         path,
         operation: Operation {
+            probe: None,
             max_json_response_bytes: responses
                 .iter()
                 .filter(|(code, _)| code.starts_with('2'))
@@ -326,6 +340,12 @@ pub fn ep(
     }
 }
 impl Endpoint {
+    pub fn probe(mut self, probe: crate::request_limits::Probe) -> Self {
+        self.operation.probe = Some(probe);
+        self.operation.timeout_seconds = 1;
+        self.operation.max_json_response_bytes = 64 * 1024;
+        self
+    }
     pub fn tags(mut self, values: Vec<&'static str>) -> Self {
         self.operation.tags = values;
         self

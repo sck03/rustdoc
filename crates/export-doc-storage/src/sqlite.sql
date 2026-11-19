@@ -25,6 +25,7 @@ CREATE TABLE personnel_private_profiles (
     body TEXT NOT NULL CHECK(json_valid(body) AND json_type(body)='object')
 );
 CREATE INDEX records_kind_id ON records(kind, id DESC);
+CREATE INDEX records_hs_feedback_query ON records(hs_search, id) WHERE kind='hs-feedback';
 CREATE INDEX records_source_page ON records(kind, CAST(json_extract(body,'$.sourceId') AS TEXT), id DESC) WHERE CAST(json_extract(body,'$.sourceId') AS TEXT) IS NOT NULL;
 CREATE INDEX records_opportunity_history_page ON records(kind, CAST(json_extract(body,'$.opportunityId') AS TEXT), id DESC) WHERE CAST(json_extract(body,'$.opportunityId') AS TEXT) IS NOT NULL;
 CREATE INDEX attachment_invoice ON records(json_extract(body,'$.invoiceId')) WHERE kind='attachments';

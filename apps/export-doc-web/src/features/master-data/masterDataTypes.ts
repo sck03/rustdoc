@@ -5,7 +5,7 @@ export const hsCodeClearAllConfirmationText = "CLEAR";
 
 export type MasterDataEntityKey = "customers" | "exporters" | "payees" | "products" | "ports" | "units" | "hs-codes";
 export type MasterDataRecord = Record<string, unknown> & { id: number };
-export type MasterDataFieldType = "text" | "number" | "textarea";
+export type MasterDataFieldType = "text" | "number" | "decimal" | "textarea";
 
 export type MasterDataListResult = {
   hasNextPage: boolean;

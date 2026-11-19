@@ -12,6 +12,7 @@ import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { WorkspaceGuide } from "../../ui/WorkspaceGuide.tsx";
 import { Card, KpiTile } from "../../ui/primitives/Card.tsx";
+import { ExactDecimal, formatDecimal } from "../../ui/decimalSum.ts";
 
 export function DashboardPage({ client }: { client: ExportDocManagerApiClient }) {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
   const recentInvoices = dashboard?.recentInvoices ?? [];
   const todoItems = dashboard?.todoItems ?? [];
   const metrics = [
-    ...(dashboard?.exportAmountsByCurrency?.length ? dashboard.exportAmountsByCurrency : [{currency:"",monthlyAmount:0,previousMonthlyAmount:0}]).map((amount) => ({
+    ...(dashboard?.exportAmountsByCurrency?.length ? dashboard.exportAmountsByCurrency : [{currency:"",monthlyAmount:"0",previousMonthlyAmount:"0"}]).map((amount) => ({
       label: amount.currency ? `本月出口额（${amount.currency}）` : "本月出口额",
       value: dashboard && amount.currency ? formatAmount(amount.monthlyAmount) : "—",
       detail: dashboard && amount.currency ? buildMonthTrend(amount.monthlyAmount, amount.previousMonthlyAmount) : null,
@@ -254,26 +255,28 @@ export function DashboardPage({ client }: { client: ExportDocManagerApiClient })
   );
 }
 
-function buildMonthTrend(current: number, previous: number) {
-  if (previous === 0) {
-    return current === 0
+function buildMonthTrend(current: string, previous: string) {
+  const value = ExactDecimal.from(current), prior = ExactDecimal.from(previous);
+  if (prior.compare(0) === 0) {
+    return value.compare(0) === 0
       ? { text: "与上月持平", direction: "flat" as const }
-      : { text: "较上月新增", direction: "up" as const };
+      : { text: "较上月新增", direction: value.compare(0) > 0 ? "up" as const : "down" as const };
   }
 
-  const percent = ((current - previous) / Math.abs(previous)) * 100;
-  if (Math.abs(percent) < 0.05) {
+  const percent = value.subtract(prior).divide(prior.compare(0) < 0 ? prior.multiply(-1) : prior).multiply(100);
+  const magnitude = percent.compare(0) < 0 ? percent.multiply(-1) : percent;
+  if (magnitude.compare("0.05") < 0) {
     return { text: "与上月持平", direction: "flat" as const };
   }
 
   return {
-    text: `较上月 ${Math.abs(percent).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}%`,
-    direction: percent > 0 ? "up" as const : "down" as const,
+    text: `较上月 ${formatDecimal(magnitude.toString(), 1, true)}%`,
+    direction: percent.compare(0) > 0 ? "up" as const : "down" as const,
   };
 }
 
-function formatAmount(value: number | undefined) {
-  return (value ?? 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatAmount(value: string | undefined) {
+  return formatDecimal(value ?? "0", 2);
 }
 
 function formatCount(value: number | undefined) {

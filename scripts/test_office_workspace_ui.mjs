@@ -24,6 +24,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   import { MemoryRouter, Routes, Route } from 'react-router-dom';
   import { ConfirmationProvider } from ${source("ui/ConfirmationProvider.tsx")};
   import { UnsavedChangesProvider } from ${source("ui/unsavedChangesGuard.tsx")};
+  import { FileUploadPolicyProvider } from ${source("ui/FileUploadPolicy.tsx")};
   import { MeetingRoomsPage } from ${source("features/office/MeetingRoomsPage.tsx")};
   import { OfficeSuppliesPage } from ${source("features/office/OfficeSuppliesPage.tsx")};
   import { OaApprovalHubPage } from ${source("features/oa/OaApprovalHubPage.tsx")};
@@ -69,6 +70,8 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   const template={id:7,code:'OfficeEmployee',name:'公司员工',description:'会议室与物品申请',isSystem:true,isActive:true,versionNumber:1,grants:permissions.filter(p=>p.resourceKey==='office.people'?p.action==='view':['view','create','cancel'].includes(p.action)).map(p=>({...p,dataScope:p.resourceKey==='office.people'?'company':'own'})),effectiveGrants:[]};
   resources.push({key:'office.people',name:'人员信息管理',group:'公司行政',workspace:'office',moduleKey:'office.people',sortOrder:350,isTechnical:false,supportsDataScope:true,actions:personnelActions.map((key,index)=>({key,name:({view:'公司通讯录','view-details':'人事档案与记录',create:'入职登记',edit:'编辑档案',transition:'转正、调岗与离职',assign:'关联账号'})[key],description:'人员管理动作',sortOrder:index,presetLevel:index===0?'view':index<4?'operate':'manage'}))});
   person.images=[];
+  person.companyScope='DEMO';
+  if(mode==='rooms'||mode==='supplies')person.organization={primaryAssignmentId:'primary',additionalAssignments:[{id:'secondary',companyCode:'DEMO',departmentId:'D2',jobTitle:'协作专员'}]};
   person.canDelete=admin;person.canCorrectRegistration=unlinked;person.deleteRestriction='';
   let personDeleted=false;
   window.__officeCalls=[]; window.__officeErrors=[];
@@ -76,7 +79,20 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   window.addEventListener('unhandledrejection',e=>window.__officeErrors.push(String(e.reason)));
   const record=(name,input,value)=>{window.__officeCalls.push({name,input}); return Promise.resolve(value)};
   let bookingDraft, supplyDraft;
+  window.__officeUploadFail=false;
+  const upload=(kind,input)=>{
+    window.__officeCalls.push({name:kind+'Upload',input:{id:input.id}});
+    if(window.__officeUploadFail){window.__officeUploadFail=false;return Promise.reject(new Error('模拟附件上传中断'));}
+    const draft=kind==='booking'?bookingDraft:supplyDraft;
+    draft.versionNumber++;
+    return Promise.resolve({...draft});
+  };
   const client={
+    getFileStoragePolicy:async()=>({fileBytes:1048576,requestFiles:20,requestBytes:20971520}),
+    updateDraftOfMeetingBooking:input=>{Object.assign(bookingDraft,input.body,{versionNumber:bookingDraft.versionNumber+1});return record('updateBookingDraft',input,{...bookingDraft});},
+    updateDraftOfOfficeSupplyRequest:input=>{Object.assign(supplyDraft,input.body,{versionNumber:supplyDraft.versionNumber+1});return record('updateSupplyDraft',input,{...supplyDraft});},
+    uploadAttachmentToMeetingBooking:input=>upload('booking',input),
+    uploadAttachmentToOfficeSupplyRequest:input=>upload('supply',input),
     deleteOrganizationCompany:input=>{companies.splice(companies.findIndex(item=>item.id===input.id),1);return record('deleteCompany',input,undefined)},
     deleteOrganizationDepartment:input=>{departments.splice(departments.findIndex(item=>item.id===input.id),1);return record('deleteDepartment',input,undefined)},
     getOrganizationDirectory:async()=>structuredClone({companies,departments}),
@@ -129,7 +145,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   };
   const queries=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
   const initialPath=mode==='organization'?'/system/organization':mode==='permissions'?'/permissions':mode==='directory'||mode==='people'&&!admin?'/office/directory':mode==='people'?'/office/people':mode==='supplies'?'/office/supplies':'/office/meeting-rooms';
-  createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[mode==='hub'?'/office/approvals':initialPath]}><QueryClientProvider client={queries}><ConfirmationProvider><UnsavedChangesProvider>
+  createRoot(document.getElementById('root')).render(<MemoryRouter initialEntries={[mode==='hub'?'/office/approvals':initialPath]}><QueryClientProvider client={queries}><FileUploadPolicyProvider client={client}><ConfirmationProvider><UnsavedChangesProvider>
     <main className='workspace-content'><h1>公司行政工作台</h1><Routes>
       <Route path='/permissions' element={<AccessControlPage client={client} canManageUsers={true}/>}/>
       <Route path='/office/people' element={<PersonnelPage client={client} user={user}/>}/>
@@ -140,7 +156,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
       <Route path='/office/approvals' element={<OaApprovalHubPage client={client} user={user}/>}/>
       <Route path='/office/meeting-rooms' element={<MeetingRoomsPage client={client} user={user}/>}/>
     </Routes></main>
-  </UnsavedChangesProvider></ConfirmationProvider></QueryClientProvider></MemoryRouter>);
+  </UnsavedChangesProvider></ConfirmationProvider></FileUploadPolicyProvider></QueryClientProvider></MemoryRouter>);
 ` }, outfile:path.join(output,"app.js"), bundle:true, format:"esm", platform:"browser", jsx:"automatic", logLevel:"silent" });
 const server=http.createServer((request,response)=>{
   const name=new URL(request.url,"http://localhost").pathname.slice(1);
@@ -201,6 +217,22 @@ try {
       await audit(page,`${mode}-dialog-${width}`);
       if(width===390)await captureScreenshot(page,path.join(output,`${mode}-dialog-${width}.png`));
     }
+  }
+  for (const mode of ['rooms','supplies']) {
+    await open(mode,1024);await clickText(page,mode==='rooms'?'查看日程与预约':'申请借用');await selectEmployee(page);
+    await input(page,mode==='rooms'?'input[name="title"]':'textarea[name="purpose"]','重试前的申请');
+    await waitFor(page,"document.querySelector('input[type=file]') && !document.querySelector('input[type=file]').disabled");
+    await read(page,"(()=>{window.__officeUploadFail=true;const input=document.querySelector('input[type=file]');const files=new DataTransfer();files.items.add(new File(['%PDF-1.7 retry'],'retry.pdf',{type:'application/pdf'}));input.files=files.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()");
+    await clickText(page,mode==='rooms'?'提交预约':'提交申请');
+    await waitFor(page,"document.body.innerText.includes('模拟附件上传中断') && document.body.innerText.includes('申请身份已锁定')");
+    assert(await read(page,"document.querySelector('input[role=combobox]').matches(':disabled')"));
+    assert(await read(page,"[...document.querySelectorAll('.permission-fieldset select')].every(node=>node.matches(':disabled'))"));
+    await input(page,mode==='rooms'?'input[name="title"]':'textarea[name="purpose"]','重试后的内容');
+    await clickText(page,mode==='rooms'?'提交预约':'提交申请');
+    await waitFor(page,"!document.querySelector('[data-dialog-purpose=content]')");
+    assert.equal(await read(page,"window.__officeCalls.filter(call=>call.name==='createBooking'||call.name==='createSupplyRequest').length"),1);
+    assert.equal(await read(page,"window.__officeCalls.find(call=>call.name==='createBooking'||call.name==='createSupplyRequest').input.body.employeeId"),1);
+    results.push(mode+'-retry-keeps-applicant');
   }
   await open("rooms",1024,"employee");assert.equal(await read(page,"document.body.innerText.includes('添加会议室')"),false);
   await clickText(page,"查看日程与预约");await input(page,'input[name="title"]',"跨部门项目沟通");

@@ -49,8 +49,7 @@ fn check() -> export_doc_exchange::Result<()> {
     })
 }
 
-pub const OPERATIONS: &[Operation] =
-    &[LIST_EXCHANGE_RATES, LIST_AVAILABLE_EXCHANGE_RATE_CURRENCIES];
+pub const OPERATIONS: &[Operation] = &[LIST_EXCHANGE_RATES];
 pub fn handle(
     service: &NativeService,
     actor: &Actor,
@@ -62,32 +61,17 @@ pub fn handle(
     let force = query
         .iter()
         .any(|(key, value)| *key == "forceRefresh" && value.eq_ignore_ascii_case("true"));
-    let all = operation == LIST_AVAILABLE_EXCHANGE_RATE_CURRENCIES;
     let time = service.clock.now().map_err(unavailable)?;
     let quotation = service
         .exchange
-        .get(&config, force, all, time.utc_now, &check)
+        .get(&config, force, false, time.utc_now, &check)
         .map_err(map_error)?;
     let policy = "报价为每 100 外币对应的人民币金额，仅供参考，不自动改写单据汇率。服务运行期间共享内存缓存；失败保留同一来源的上次成功报价，重启后重新获取。";
-    if all {
-        let mut currencies: Vec<_> = quotation
-            .rates
-            .iter()
-            .map(|rate| rate.currency_name.clone())
-            .collect();
-        currencies.sort();
-        currencies.dedup();
-        Ok(
-            json!({"currencies":currencies,"sourceUrl":config.source.url,"fetchedAt":quotation.fetched_at,"storagePolicy":policy,
-                "isStale":quotation.is_stale,"lastError":quotation.last_error}),
-        )
-    } else {
-        Ok(
-            json!({"statusText":if quotation.is_stale {"显示上次成功报价，请留意更新时间。".into()} else {format!("已读取 {} 种常用货币。",quotation.rates.len())},"rates":quotation.rates,
+    Ok(
+        json!({"statusText":if quotation.is_stale {"显示上次成功报价，请留意更新时间。".into()} else {format!("已读取 {} 种常用货币。",quotation.rates.len())},"rates":quotation.rates,
             "selectedCurrencies":config.selected,"sourceUrl":config.source.url,"sourceFormat":config.source.format.name(),"fetchedAt":quotation.fetched_at,
             "cacheDurationMinutes":config.minutes,"autoRefreshEnabled":config.automatic,"storagePolicy":policy,
             "availableCurrencies":quotation.available,"missingCurrencies":quotation.missing,
             "isStale":quotation.is_stale,"lastAttemptAt":quotation.last_attempt_at,"nextRefreshAt":quotation.next_refresh_at,"lastError":quotation.last_error}),
-        )
-    }
+    )
 }

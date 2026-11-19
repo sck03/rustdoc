@@ -28,6 +28,7 @@ fn canceled_upload_authentication_retains_admission_until_blocking_work_exits() 
         .unwrap();
     runtime.block_on(async {
         for operation in [PREVIEW_CRM_CUSTOMER_IMPORT, STAGE_SERVER_MIGRATION_RESTORE] {
+            let response_admission = Arc::new(crate::response_admission::Admission::new());
             let state = ServerState {
                 telemetry: Arc::new(Telemetry::new(service.paths.log_root.clone())),
                 service: service.clone(),
@@ -36,10 +37,21 @@ fn canceled_upload_authentication_retains_admission_until_blocking_work_exits() 
                 downloads: Arc::new(Semaphore::new(8)),
                 previews: Arc::new(Semaphore::new(2)),
                 processing: Arc::new(Semaphore::new(2)),
-                body_resources: Arc::default(), response_memory: Arc::default(),
+                probes: Arc::new(Semaphore::new(2)),
+                body_resources: Arc::default(), response_memory: response_admission.budget.clone(), response_admission,
                 upload_space: service.paths.disk_space.clone(), tickets: Arc::default(),
                 desktop_token: None, shutdown: Shutdown::default(),
             };
+            let occupied = state.requests.acquire(&state.telemetry).await.unwrap();
+            let memory = state.response_memory.reserve_working(128 * 1024 * 1024).unwrap();
+            for probe in [GET_LIVENESS, GET_READINESS, HEAD_LIVENESS, HEAD_READINESS] {
+                let response = handle(state.clone(), probe, Request::builder().method(probe.method)
+                    .uri(probe.path).body(Body::empty()).unwrap()).await;
+                assert_eq!(response.status(), axum::http::StatusCode::OK);
+                assert!(!response.headers().contains_key("content-type"));
+                assert!(axum::body::to_bytes(response.into_body(), 1024).await.unwrap().is_empty());
+            }
+            drop((occupied, memory));
             let gate = state.requests.clone();
             let (release, blocked) = std::sync::mpsc::channel();
             let (started, ready) = tokio::sync::oneshot::channel();

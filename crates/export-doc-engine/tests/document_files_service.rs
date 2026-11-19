@@ -71,7 +71,7 @@ fn invoice_package_preview_conflicts_and_atomic_rejection_preserve_business_data
     let saved = target.request(GET_INVOICE, Some(id), None);
     assert_eq!(
         saved["totalAmount"],
-        serde_json::to_value(invoice.total_amount).unwrap()
+        json!(invoice.total_amount.to_string())
     );
     let skipped = upload(
         IMPORT_UPLOADED_INVOICE_TRANSFER_PACKAGE,

@@ -79,10 +79,15 @@ async fn check_command_admission(state: &ServerState) {
         .response_memory
         .reserve_working(128 * 1024 * 1024)
         .unwrap();
-    assert_eq!(app.clone().oneshot(request()).await.unwrap().status(), 429);
+    let pending = app.oneshot(request());
+    tokio::pin!(pending);
+    tokio::select! {
+        _ = &mut pending => panic!("a command must wait for response capacity before executing"),
+        _ = tokio::time::sleep(Duration::from_millis(25)) => {}
+    }
     assert_eq!(count(), 0);
     drop(busy);
-    let response = app.oneshot(request()).await.unwrap();
+    let response = pending.await.unwrap();
     let status = response.status();
     let bytes = axum::body::to_bytes(response.into_body(), 1024 * 1024)
         .await
@@ -142,6 +147,7 @@ async fn slow_json_sockets_are_bounded_and_disconnect_releases_the_budget() {
         .join(".codex-runtime/http-json-budget-tests")
         .join(nonce().unwrap());
     let service = NativeService::open(RuntimePaths::server(&workspace, &root).unwrap()).unwrap();
+    let response_admission = Arc::new(crate::response_admission::Admission::new());
     let state = ServerState {
         telemetry: Arc::new(Telemetry::new(service.paths.log_root.clone())),
         service: service.clone(),
@@ -150,8 +156,10 @@ async fn slow_json_sockets_are_bounded_and_disconnect_releases_the_budget() {
         downloads: Arc::new(Semaphore::new(8)),
         previews: Arc::new(Semaphore::new(2)),
         processing: Arc::new(Semaphore::new(2)),
+        probes: Arc::new(Semaphore::new(2)),
         body_resources: Arc::default(),
-        response_memory: Arc::default(),
+        response_memory: response_admission.budget.clone(),
+        response_admission,
         upload_space: service.paths.disk_space.clone(),
         tickets: Arc::default(),
         desktop_token: None,

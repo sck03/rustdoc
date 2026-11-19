@@ -1,5 +1,5 @@
 import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, HsCodeKnowledgeFeedbackInput } from "../../api/index.ts";
-import { readNumber } from "../../ui/formUtils.ts";
+import { decimalText } from "../../ui/decimalSum.ts";
 import { calculateInvoiceTotals, createEmptyInvoiceItem } from "./invoiceItemsEditorModel.ts";
 import { normalizeInvoiceForSave, type RouteInvoiceImportAction } from "./invoiceModel.ts";
 import { normalizeInvoiceItemSpareColumnCount } from "./invoiceItemColumnVisibility.ts";
@@ -65,14 +65,7 @@ export function readInvoiceItemSpareColumnCount(settings?: object) {
 }
 
 export function areInvoiceItemValuesEqual(left: unknown, right: unknown) {
-  if (typeof left === "number" || typeof right === "number") {
-    const leftNumber = typeof left === "number" && Number.isFinite(left) ? left : Number(left);
-    const rightNumber = typeof right === "number" && Number.isFinite(right) ? right : Number(right);
-    return Number.isFinite(leftNumber) && Number.isFinite(rightNumber)
-      ? leftNumber === rightNumber
-      : String(left ?? "") === String(right ?? "");
-  }
-  return String(left ?? "") === String(right ?? "");
+  return left === right;
 }
 
 export function areInvoiceItemsEqual(left: ApiInvoiceItemDto[], right: ApiInvoiceItemDto[]) {
@@ -101,5 +94,5 @@ export function areInvoiceItemsEqual(left: ApiInvoiceItemDto[], right: ApiInvoic
 }
 
 export function readInvoiceItemTableNumber(value: string) {
-  return value.trim() ? readNumber(value) : undefined;
+  return value.trim() ? decimalText(value) : undefined;
 }

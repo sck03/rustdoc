@@ -15,6 +15,20 @@ pub struct Resolution {
     pub replacements: Vec<String>,
     pub usable: bool,
 }
+#[derive(Default)]
+struct Evidence {
+    sample: i64,
+    count: usize,
+    used: i64,
+}
+struct Candidate {
+    sample: Option<i64>,
+    standard: bool,
+    score: i64,
+    usable: bool,
+    count: usize,
+    used: i64,
+}
 pub fn resolve(
     raw: &str,
     current: &str,
@@ -100,20 +114,18 @@ pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Va
     let codes = codes_for_year(tx, year)?;
     let prefix = rules::code(raw).ok().filter(|c| c.len() >= 4);
     let fields = [
+        "id",
         "rawReportedHsCode",
         "resolvedCurrentHsCode",
         "productName",
         "specification",
         "isManuallyVerified",
         "useCount",
-        "updatedAt",
     ]
     .map(|key| (key, key));
     let mut example_query = super::hs_queries::query(hs::EXAMPLES, &fields);
     example_query.prefix = prefix.as_deref().unwrap_or("");
     example_query.ranked_examples = true;
-    example_query.limit = 2000;
-    let examples = tx.query_hs(&example_query)?;
     let feedback = super::hs_queries::feedback(tx, &normalized)?;
     let mut relations = BTreeMap::<String, Vec<Value>>::new();
     let relation_fields = ["oldCode", "newCode", "isManuallyVerified"].map(|key| (key, key));
@@ -128,94 +140,97 @@ pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Va
             Ok(())
         },
     )?;
-    let mut related_examples = BTreeMap::<String, Vec<&Value>>::new();
-    for row in &examples {
-        let raw = text(row, "rawReportedHsCode");
-        let current = text(row, "resolvedCurrentHsCode");
-        related_examples.entry(raw.clone()).or_default().push(row);
-        if current != raw {
-            related_examples.entry(current).or_default().push(row);
+    let mut related_examples = BTreeMap::<String, Evidence>::new();
+    let mut example_count = 0;
+    let mut results = BTreeMap::<String, Candidate>::new();
+    super::hs_queries::visit(tx, &mut example_query, |example| {
+        example_count += 1;
+        operation::check()?;
+        let name = text(&example, "productName");
+        let specification = text(&example, "specification");
+        let raw_code = text(&example, "rawReportedHsCode");
+        let current_code = text(&example, "resolvedCurrentHsCode");
+        let sample = super::records::positive(&example, "id", "实例")?;
+        let used = example["useCount"].as_i64().unwrap_or(0);
+        for code in [&raw_code, &current_code]
+            .into_iter()
+            .enumerate()
+            .filter(|(index, code)| {
+                codes.get(*code).is_some_and(Standard::trusted)
+                    && (*index == 0 || *code != &raw_code)
+            })
+            .map(|(_, code)| code)
+        {
+            let evidence = related_examples
+                .entry(code.clone())
+                .or_insert_with(|| Evidence {
+                    sample,
+                    ..Default::default()
+                });
+            evidence.count += 1;
+            evidence.used = evidence.used.saturating_add(used);
         }
-    }
-    let mut results: BTreeMap<String, Value> = BTreeMap::new();
-    if prefix.is_none() {
-        for example in &examples {
-            operation::check()?;
-            let name = text(example, "productName");
-            let specification = text(example, "specification");
-            let combined = rules::text(&format!("{name} {specification}"));
-            let assessment = rules::attributes(&normalized, &combined);
-            let score = rules::score(&normalized, &combined).max(
-                ((rules::score(&normalized, &rules::text(&name)) * 72
-                    + rules::score(&normalized, &rules::text(&specification)) * 28)
-                    as f64
-                    / 100.)
-                    .round_ties_even() as i64,
-            ) - assessment.penalty;
-            if score < 18 {
-                continue;
-            }
-            let raw_code = text(example, "rawReportedHsCode");
-            let resolved = resolve(
-                &raw_code,
-                &text(example, "resolvedCurrentHsCode"),
-                example["isManuallyVerified"] == true,
-                &codes,
-                relations
-                    .get(&raw_code)
-                    .map(Vec::as_slice)
-                    .unwrap_or_default(),
-            );
-            let candidate = if resolved.code.is_empty() {
-                raw_code.clone()
-            } else {
-                resolved.code.clone()
-            };
-            let boost = feedback.get(&candidate).copied().unwrap_or(0);
-            let used = example["useCount"].as_i64().unwrap_or(0);
-            let score = (score
-                + used.saturating_mul(2).min(15)
-                + if example["isManuallyVerified"] == true {
-                    15
-                } else {
-                    0
-                })
-            .saturating_add(boost)
-            .clamp(0, 100);
-            let key = if resolved.code.is_empty() {
-                format!("obsolete:{raw_code}")
-            } else {
-                resolved.code.clone()
-            };
-            let standard = codes.get(&resolved.code);
-            let mut row = result(
-                &raw_code,
-                &name,
-                &specification,
-                &resolved,
-                standard,
-                score,
-                assessment.reasons,
-                assessment.warnings,
-            );
-            row["exampleCount"] = json!(1);
-            row["confirmedCount"] = json!(used);
-            if let Some(previous) = results.get_mut(&key) {
-                let count = previous["exampleCount"].as_i64().unwrap_or(0) + 1;
-                let confirmed = previous["confirmedCount"]
-                    .as_i64()
-                    .unwrap_or(0)
-                    .saturating_add(used);
-                if score > previous["score"].as_i64().unwrap_or(0) {
-                    *previous = row;
-                }
-                previous["exampleCount"] = json!(count);
-                previous["confirmedCount"] = json!(confirmed);
-            } else {
-                results.insert(key, row);
-            }
+        if prefix.is_some() {
+            return Ok(());
         }
-    }
+        let combined = rules::text(&format!("{name} {specification}"));
+        let assessment = rules::attributes(&normalized, &combined);
+        let score = rules::score(&normalized, &combined).max(
+            ((rules::score(&normalized, &rules::text(&name)) * 72
+                + rules::score(&normalized, &rules::text(&specification)) * 28) as f64
+                / 100.)
+                .round_ties_even() as i64,
+        ) - assessment.penalty;
+        if score < 18 {
+            return Ok(());
+        }
+        let resolved = resolve(
+            &raw_code,
+            &current_code,
+            example["isManuallyVerified"] == true,
+            &codes,
+            relations
+                .get(&raw_code)
+                .map(Vec::as_slice)
+                .unwrap_or_default(),
+        );
+        let candidate = if resolved.code.is_empty() {
+            raw_code.clone()
+        } else {
+            resolved.code.clone()
+        };
+        let boost = feedback.get(&candidate).copied().unwrap_or(0);
+        let score = (score
+            + used.saturating_mul(2).min(15)
+            + if example["isManuallyVerified"] == true {
+                15
+            } else {
+                0
+            })
+        .saturating_add(boost)
+        .clamp(0, 100);
+        let key = if resolved.code.is_empty() {
+            format!("obsolete:{raw_code}")
+        } else {
+            resolved.code.clone()
+        };
+        let previous = results.entry(key).or_insert(Candidate {
+            sample: Some(sample),
+            standard: false,
+            score,
+            usable: resolved.usable,
+            count: 0,
+            used: 0,
+        });
+        previous.count += 1;
+        previous.used = previous.used.saturating_add(used);
+        if score > previous.score {
+            previous.sample = Some(sample);
+            previous.score = score;
+            previous.usable = resolved.usable;
+        }
+        Ok(())
+    })?;
     for (code, standard) in &codes {
         operation::check()?;
         if !standard.trusted() || results.contains_key(code) {
@@ -241,69 +256,151 @@ pub fn search(tx: &Connection, query: &[(&str, String)], year: i32) -> Result<Va
         if score < 22 {
             continue;
         }
-        let related = related_examples
-            .get(code)
-            .map(Vec::as_slice)
-            .unwrap_or_default();
-        let name = related
-            .first()
-            .map(|r| text(r, "productName"))
-            .unwrap_or_else(|| standard.name.clone());
-        let specification = related
-            .first()
-            .map(|r| text(r, "specification"))
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| {
-                if !standard.elements.is_empty() {
-                    standard.elements.clone()
-                } else {
-                    standard.description.clone()
-                }
-            });
-        let resolution = Resolution {
-            code: code.clone(),
-            status: "Active",
-            replacements: vec![],
-            usable: true,
-        };
-        let reasons = if let Some(prefix) = &prefix {
-            vec![format!("HS 编码前缀匹配：{prefix}")]
-        } else {
-            assessment.reasons
-        };
-        let mut row = result(
-            code,
-            &name,
-            &specification,
-            &resolution,
-            Some(standard),
-            score,
-            reasons,
-            assessment.warnings,
+        let related = related_examples.get(code);
+        results.insert(
+            code.clone(),
+            Candidate {
+                sample: related.map(|r| r.sample),
+                standard: true,
+                score,
+                usable: true,
+                count: related.map_or(0, |r| r.count),
+                used: related.map_or(0, |r| r.used),
+            },
         );
-        row["exampleCount"] = json!(related.len());
-        row["confirmedCount"] = json!(
-            related
-                .iter()
-                .filter_map(|r| r["useCount"].as_i64())
-                .fold(0, i64::saturating_add)
-        );
-        results.insert(code.clone(), row);
     }
-    let mut rows: Vec<_> = results.into_values().collect();
+    // Rank only compact identities/counters. Hydrate at most the final result limit.
+    let mut rows: Vec<_> = results.into_iter().collect();
     rows.sort_by(|a, b| {
-        (a["canUse"] != true)
-            .cmp(&(b["canUse"] != true))
-            .then_with(|| b["score"].as_i64().cmp(&a["score"].as_i64()))
-            .then_with(|| a["currentCode"].as_str().cmp(&b["currentCode"].as_str()))
+        (!a.1.usable)
+            .cmp(&(!b.1.usable))
+            .then_with(|| b.1.score.cmp(&a.1.score))
+            .then_with(|| {
+                fn code(key: &str) -> &str {
+                    if key.starts_with("obsolete:") {
+                        ""
+                    } else {
+                        key
+                    }
+                }
+                code(&a.0).cmp(code(&b.0))
+            })
     });
     rows.truncate(limit);
+    let ids: Vec<_> = rows
+        .iter()
+        .filter_map(|(_, candidate)| candidate.sample)
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let samples: BTreeMap<_, _> = tx
+        .records_by_ids(hs::EXAMPLES, &ids, &fields)?
+        .into_iter()
+        .map(|row| Ok((super::records::positive(&row, "id", "实例")?, row)))
+        .collect::<Result<_>>()?;
+    let rows = rows
+        .into_iter()
+        .map(|(code, candidate)| {
+            render_candidate(
+                &code,
+                candidate,
+                &samples,
+                &codes,
+                &relations,
+                &normalized,
+                prefix.as_deref(),
+            )
+        })
+        .collect::<Result<Vec<_>>>()?;
     let message = if rows.is_empty() {
         "没有匹配的本地知识，请补充商品属性或维护经过验证的税则。"
     } else {
         "候选按属性及本地证据排序，请结合申报要素确认。"
     };
-    Ok(json!({"query":raw,"items":rows,"localExampleCount":examples.len(),"message":message}))
+    Ok(json!({"query":raw,"items":rows,"localExampleCount":example_count,"message":message}))
+}
+fn render_candidate(
+    code: &str,
+    candidate: Candidate,
+    samples: &BTreeMap<i64, Value>,
+    codes: &BTreeMap<String, Standard>,
+    relations: &BTreeMap<String, Vec<Value>>,
+    normalized: &str,
+    prefix: Option<&str>,
+) -> Result<Value> {
+    let sample = candidate
+        .sample
+        .map(|id| {
+            samples
+                .get(&id)
+                .ok_or_else(|| super::error::unavailable("查询快照中的 HS 实例缺失。"))
+        })
+        .transpose()?;
+    let (raw, name, specification, resolved, combined) = if candidate.standard {
+        let standard = &codes[code];
+        let specification = sample
+            .map(|r| text(r, "specification"))
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| {
+                if standard.elements.is_empty() {
+                    standard.description.clone()
+                } else {
+                    standard.elements.clone()
+                }
+            });
+        (
+            code.to_string(),
+            sample
+                .map(|r| text(r, "productName"))
+                .unwrap_or_else(|| standard.name.clone()),
+            specification,
+            Resolution {
+                code: code.into(),
+                status: "Active",
+                replacements: vec![],
+                usable: true,
+            },
+            rules::text(&format!(
+                "{} {} {}",
+                standard.name, standard.elements, standard.description
+            )),
+        )
+    } else {
+        let sample = sample.ok_or_else(|| super::error::unavailable("HS 实例候选缺少来源。"))?;
+        let raw = text(sample, "rawReportedHsCode");
+        let name = text(sample, "productName");
+        let specification = text(sample, "specification");
+        let resolved = resolve(
+            &raw,
+            &text(sample, "resolvedCurrentHsCode"),
+            sample["isManuallyVerified"] == true,
+            codes,
+            relations.get(&raw).map(Vec::as_slice).unwrap_or_default(),
+        );
+        let combined = rules::text(&format!("{name} {specification}"));
+        (raw, name, specification, resolved, combined)
+    };
+    let assessment = rules::attributes(normalized, &combined);
+    let reasons = if candidate.standard {
+        prefix
+            .map(|p| vec![format!("HS 编码前缀匹配：{p}")])
+            .unwrap_or(assessment.reasons)
+    } else {
+        assessment.reasons
+    };
+    let mut row = result(
+        &raw,
+        &name,
+        &specification,
+        &resolved,
+        codes.get(&resolved.code),
+        candidate.score,
+        reasons,
+        assessment.warnings,
+    );
+    row["exampleCount"] = json!(candidate.count);
+    row["confirmedCount"] = json!(candidate.used);
+    Ok(row)
 }
 fn result(
     raw: &str,
@@ -316,4 +413,43 @@ fn result(
     warnings: Vec<String>,
 ) -> Value {
     json!({"currentCode":resolution.code,"rawCode":raw,"name":name,"specification":spec,"standardName":standard.map(|s|s.name.as_str()).unwrap_or(""),"resolutionStatus":resolution.status,"score":score,"exampleCount":0,"confirmedCount":0,"replacementCandidates":resolution.replacements,"matchReasons":reasons,"conflictWarnings":warnings,"standardSource":standard.map(|s|s.source_name.as_str()).unwrap_or(""),"effectiveYear":standard.and_then(|s|s.effective_year),"lastVerifiedAt":standard.and_then(|s|s.last_verified_at.as_deref()),"canUse":resolution.usable&&standard.is_some_and(Standard::trusted)})
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn low_usage_examples_beyond_the_old_prefix_participate_in_matching() {
+        let scratch = crate::engine::test_support::ScratchDirectory::new();
+        let service = scratch.service();
+        let actor = crate::engine::test_support::administrator();
+        service.store.transaction(|tx| {
+            crate::engine::store::save(tx, hs::CODES, 0, json!({"code":"3917320000","name":"其他塑料制品",
+                "status":"Active","sourceName":"测试年度税则","effectiveYear":2026,"lastVerifiedAt":"2026-11-19T00:00:00Z",
+                "elements":"","description":""}), Some("3917320000".into()), &actor, "create")?;
+            for index in 0..2101 {
+                crate::engine::store::save(tx, hs::EXAMPLES, 0, json!({"rawReportedHsCode":"3917320000",
+                    "resolvedCurrentHsCode":"3917320000","productName":if index == 2100 {"实验用硅胶导管"} else {"普通包装塑料薄膜"},
+                    "specification":"","isManuallyVerified":true,"useCount":if index == 2100 {0} else {1}}),
+                    Some(format!("example-{index}")), &actor, "create")?;
+            }
+            Ok(())
+        }).unwrap();
+        let response = service
+            .store
+            .read(|tx| {
+                search(
+                    tx,
+                    &[
+                        ("query", "实验用硅胶导管".into()),
+                        ("maxResults", "1".into()),
+                    ],
+                    2026,
+                )
+            })
+            .unwrap();
+        assert_eq!(response["localExampleCount"], 2101);
+        assert_eq!(response["items"].as_array().unwrap().len(), 1);
+        assert_eq!(response["items"][0]["name"], "实验用硅胶导管");
+    }
 }

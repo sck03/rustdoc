@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-19",
-  "reviewNotes": "2026-11-19 against 7f7cafd9: supplier model/hook/view separation; exact price, bounded assessment directory and permission-filtered SQL analytics; strict nullable unions; shared bounded JSON encoder and projected endpoint capacities; Docker embedded asset contract. Advance measured source baselines only, including source-local evolution/regression tests, retaining file caps and growth allowances. Add a 100-line supplier-related module cap. Evidence: docs/archive/2026-11/2026-11-19供应商与响应资源完整重构.md.",
+  "reviewNotes": "2026-11-19 against c0481632: decimal text contracts and independent evolution assertions; compact HS ranking with bounded result hydration and indexed feedback; shared JSON response exits; separate cancel-safe response admission and dependency probes, each with behavioral regression tests. Retire five redundant endpoints and the duplicate V3 JSON contract. Rust totals include source-local regression tests. Advance only the two measured Rust baselines; retain all module caps, aggregate growth allowances and the previous supplier module limits. Evidence: docs/archive/2026-11/2026-11-19精度检索与稳定性修复.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 114252,
+      "baselineAggregateLines": 114718,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 114327,
+      "maximumAggregateLines": 114793,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 34449,
+      "baselineAggregateLines": 34570,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 34569,
+      "maximumAggregateLines": 34690,
       "reportFiles": false
     },
     {

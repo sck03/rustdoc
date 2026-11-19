@@ -1,5 +1,5 @@
 import type { ApiInvoiceDetailDto } from "../../api/index.ts";
-import { EditableComboField, NumberField, TextField } from "../../ui/FormFields.tsx";
+import { EditableComboField, DecimalField, TextField } from "../../ui/FormFields.tsx";
 import { getCustomOptions, type CustomOptionMap } from "../custom-options/customOptionModel.ts";
 import {
   invoiceItemVolumeDisplayValue,
@@ -23,14 +23,14 @@ export function InvoiceShippingTermsPanel({
 }) {
   const totalsFields = (
     <>
-      <NumberField label="总箱数" value={invoice.totalCartons ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
-      <NumberField label="总数量" value={invoice.totalQuantity ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
-      <NumberField label="总毛重" value={invoice.totalGrossWeight ?? 0} disabled step="0.01" formatValue={invoiceItemWeightDisplayValue} description="由商品明细自动汇总" onChange={() => undefined} />
-      <NumberField label="总净重" value={invoice.totalNetWeight ?? 0} disabled step="0.01" formatValue={invoiceItemWeightDisplayValue} description="由商品明细自动汇总" onChange={() => undefined} />
-      <NumberField label="总体积" value={invoice.totalVolume ?? 0} disabled step="0.001" formatValue={invoiceItemVolumeDisplayValue} description="由商品明细自动汇总" onChange={() => undefined} />
-      <NumberField label="采购总额" value={invoice.totalPurchaseAmount ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
-      <NumberField label="退税总额" value={invoice.totalTaxRefundAmount ?? 0} disabled description="由商品明细自动汇总" onChange={() => undefined} />
-      <NumberField label="利润总额" value={invoice.totalProfit ?? 0} disabled description="按币种和汇率自动计算" onChange={() => undefined} />
+      <DecimalField label="总箱数" value={invoice.totalCartons ?? "0"} disabled description="由商品明细自动汇总" onChange={() => undefined} />
+      <DecimalField label="总数量" value={invoice.totalQuantity ?? "0"} disabled description="由商品明细自动汇总" onChange={() => undefined} />
+      <DecimalField label="总毛重" value={invoice.totalGrossWeight ?? "0"} disabled step="0.01" formatValue={invoiceItemWeightDisplayValue} description="由商品明细自动汇总" onChange={() => undefined} />
+      <DecimalField label="总净重" value={invoice.totalNetWeight ?? "0"} disabled step="0.01" formatValue={invoiceItemWeightDisplayValue} description="由商品明细自动汇总" onChange={() => undefined} />
+      <DecimalField label="总体积" value={invoice.totalVolume ?? "0"} disabled step="0.001" formatValue={invoiceItemVolumeDisplayValue} description="由商品明细自动汇总" onChange={() => undefined} />
+      <DecimalField label="采购总额" value={invoice.totalPurchaseAmount ?? "0"} disabled description="由商品明细自动汇总" onChange={() => undefined} />
+      <DecimalField label="退税总额" value={invoice.totalTaxRefundAmount ?? "0"} disabled description="由商品明细自动汇总" onChange={() => undefined} />
+      <DecimalField label="利润总额" value={invoice.totalProfit ?? "0"} disabled description="按币种和汇率自动计算" onChange={() => undefined} />
     </>
   );
 

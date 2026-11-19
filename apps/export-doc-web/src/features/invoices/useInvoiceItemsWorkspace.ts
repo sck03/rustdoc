@@ -166,10 +166,17 @@ export function useInvoiceItemsWorkspace({
     if (!isEditable || !invoice) return;
     const invoiceId = invoice.id;
     const currentItems = latestInvoiceItemsRef.current;
-    const nextItems = buildItems(currentItems, invoice.id);
-    if (nextItems.length > maxInvoiceItemRows) { setMessage(`商品明细最多 ${maxInvoiceItemRows} 行，未应用本次修改。`); return; }
-    if (areInvoiceItemsEqual(currentItems, nextItems)) return;
-    const updateTotals = haveInvoiceTotalsInputsChanged(currentItems, nextItems);
+    let nextItems: ApiInvoiceItemDto[];
+    let totals: Partial<ApiInvoiceDetailDto> | undefined;
+    try {
+      nextItems = buildItems(currentItems, invoiceId);
+      if (nextItems.length > maxInvoiceItemRows) { setMessage(`商品明细最多 ${maxInvoiceItemRows} 行，未应用本次修改。`); return; }
+      if (areInvoiceItemsEqual(currentItems, nextItems)) return;
+      if (haveInvoiceTotalsInputsChanged(currentItems, nextItems)) {
+        totals = calculateInvoiceTotals(nextItems, invoice.exchangeRate, invoice.currency);
+      }
+    } catch (error) { setMessage(readApiError(error)); return; }
+    // Validate and calculate before publishing either the draft or its undo snapshot.
     latestInvoiceItemsRef.current = nextItems;
 
     if (options.trackHistory !== false) {
@@ -187,10 +194,12 @@ export function useInvoiceItemsWorkspace({
       ? {
           ...current,
           items: nextItems,
-          ...(updateTotals ? calculateInvoiceTotals(nextItems, current.exchangeRate, current.currency) : {}),
+          ...(totals && (current.exchangeRate === invoice.exchangeRate && current.currency === invoice.currency
+            ? totals : calculateInvoiceTotals(nextItems, current.exchangeRate, current.currency))),
         }
       : current);
     setSuccessMessage(null);
+    setMessage(null);
   }
 
   function addItem() {

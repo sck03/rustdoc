@@ -97,12 +97,19 @@ pub fn exercise(
     );
     assert_eq!(copy["invoice"]["invoiceNo"], format!("{number}-NEW"));
     assert_ne!(copy["invoice"]["invoiceDate"], "2001-02-03");
-    assert_eq!(copy["invoice"]["totalAmount"], 0);
+    assert_eq!(copy["invoice"]["totalAmount"], "0");
     assert_eq!(
         copy["invoice"]["totalQuantity"],
         source["invoice"]["totalQuantity"]
     );
-    assert!(copy["invoice"]["items"].as_array().unwrap().iter().all(|item| item["unitPrice"] == 0 && item["priceCalculationMode"] == "UnitPriceDriven"));
+    assert!(
+        copy["invoice"]["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|item| item["unitPrice"] == "0"
+                && item["priceCalculationMode"] == "UnitPriceDriven")
+    );
     let empty = call(
         CLONE_INVOICE,
         id,
@@ -110,7 +117,7 @@ pub fn exercise(
     );
     assert_eq!(empty["invoice"]["customerNameEN"], "");
     assert_eq!(empty["invoice"]["items"], json!([]));
-    assert_eq!(empty["invoice"]["totalAmount"], 0);
+    assert_eq!(empty["invoice"]["totalAmount"], "0");
     let reloaded = request(GET_INVOICE, &path, &[], None).unwrap();
     assert_eq!(
         reloaded, source["invoice"],
