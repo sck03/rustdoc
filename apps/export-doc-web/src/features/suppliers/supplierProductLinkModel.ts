@@ -7,7 +7,7 @@ export function emptyProductLink(supplierCompanyId: number): ApiSupplierProductL
     productNameEN: "", supplierProductCode: "", referencePrice: "0", currency: "CNY", leadTimeDays: 0, status: "供货中" };
 }
 export function productLinkRequest(record: ApiSupplierProductLinkDto, values: ProductLinkValues): ApiSupplierProductLinkSaveRequest {
-  if (!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(values.referencePrice.trim())) throw new Error("参考价必须是非负十进制数。");
+  if (!/^[+-]?[0-9]+(?:\.[0-9]+)?$/.test(values.referencePrice.trim())) throw new Error("参考价必须是十进制数，可带正负号。");
   const productId = Number(values.productId), leadTimeDays = Number(values.leadTimeDays);
   if (!Number.isSafeInteger(productId) || productId <= 0) throw new Error("请选择产品。");
   if (!Number.isSafeInteger(leadTimeDays) || leadTimeDays < 0 || leadTimeDays > 3650) throw new Error("交期天数必须在 0 至 3650 之间。");

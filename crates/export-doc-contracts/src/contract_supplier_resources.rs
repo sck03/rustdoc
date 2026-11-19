@@ -2,6 +2,33 @@
 use serde_json::{Value, json};
 pub(super) fn apply(baseline: &mut Value) {
     let schemas = &mut baseline["components"]["schemas"];
+    let item = &mut schemas["ApiInvoiceItemDto"]["properties"];
+    for key in [
+        "unitPrice",
+        "totalPrice",
+        "purchasePrice",
+        "purchaseTotal",
+        "taxRefundAmount",
+    ] {
+        item[key]["pattern"] = json!("^[+-]?[0-9]+(?:\\.[0-9]+)?$");
+    }
+    for key in [
+        "quantity",
+        "pcsPerCtn",
+        "cartons",
+        "length",
+        "width",
+        "height",
+        "volume",
+        "gwPerCtn",
+        "nwPerCtn",
+        "gwTotal",
+        "nwTotal",
+        "taxRebateRate",
+    ] {
+        item[key]["minimum"] = json!(0);
+    }
+    item["taxRebateRate"]["maximum"] = json!(100);
     for (name, key) in [
         ("ApiAttachmentUploadForm", "file"),
         ("ApiPersonnelImageForm", "file"),
@@ -51,7 +78,7 @@ pub(super) fn apply(baseline: &mut Value) {
                 field["maxLength"] = json!(max);
             }
         }
-        schema["properties"]["referencePrice"] = json!({"type":"string","format":"decimal","maxLength":60,"pattern":"^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"});
+        schema["properties"]["referencePrice"] = json!({"type":"string","format":"decimal","maxLength":60,"pattern":"^[+-]?[0-9]+(?:\\.[0-9]+)?$"});
         schema["additionalProperties"] = json!(false);
         schema["required"] = if name.ends_with("Dto") {
             json!([

@@ -1,8 +1,5 @@
 //! Decimal arithmetic shared by desktop editing and application validation.
-use crate::{
-    generated_api::ApiInvoiceItemDto,
-    invoice::{money, number},
-};
+use crate::{generated_api::ApiInvoiceItemDto, invoice::money};
 use rust_decimal::{Decimal, RoundingStrategy};
 
 pub const UNIT_PRICE_SCALE: u32 = 5;
@@ -15,7 +12,24 @@ fn multiply(a: Decimal, b: Decimal) -> Result<Decimal, String> {
         .ok_or_else(|| "计算结果超出可表示范围。".into())
 }
 pub fn normalize_item(item: &mut ApiInvoiceItemDto) -> Result<(), String> {
-    if item.tax_rebate_rate > Decimal::from(100) {
+    for (label, value) in [
+        ("数量", item.quantity),
+        ("每箱数量", item.pcs_per_ctn),
+        ("箱数", item.cartons),
+        ("长", item.length),
+        ("宽", item.width),
+        ("高", item.height),
+        ("体积", item.volume),
+        ("每箱毛重", item.gw_per_ctn),
+        ("总毛重", item.gw_total),
+        ("每箱净重", item.nw_per_ctn),
+        ("总净重", item.nw_total),
+    ] {
+        if value < Decimal::ZERO {
+            return Err(format!("{label}不能为负数。"));
+        }
+    }
+    if item.tax_rebate_rate < Decimal::ZERO || item.tax_rebate_rate > Decimal::from(100) {
         return Err("退税率须在 0–100 之间。".into());
     }
     match item.price_calculation_mode.as_str() {
@@ -74,17 +88,5 @@ pub fn recalculate(item: &mut ApiInvoiceItemDto, changed: &[usize]) -> Result<()
         item.nw_total = money(multiply(money(item.nw_per_ctn), item.cartons)?);
     }
     normalize_item(item)?;
-    // Generated DTOs retain decimals as exact JSON numbers.
-    for value in [
-        item.total_price,
-        item.purchase_total,
-        item.gw_total,
-        item.nw_total,
-        item.volume,
-    ] {
-        if value < Decimal::ZERO {
-            return Err(format!("计算结果不能为负数：{}", number(value)));
-        }
-    }
     Ok(())
 }

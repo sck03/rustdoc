@@ -11,7 +11,7 @@ export function useNumberInputDraft(value: number | undefined, formatted: string
   if (draft && draft.value !== value) setDraft(null);
   function change(text: string) {
     if (composing.current) { setDraft({ text, value }); return; }
-    if (!/^-?(?:\d*(?:\.\d*)?)$/.test(text)) return;
+    if (!/^[+-]?(?:\d*(?:\.\d*)?)$/.test(text)) return;
     const parsed = text === "" ? emptyValue : Number(text);
     const next = parsed === undefined || Number.isFinite(parsed) ? parsed : value;
     setDraft({ text, value: next });

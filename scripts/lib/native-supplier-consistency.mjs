@@ -18,13 +18,13 @@ export async function verifyDesktopSupplierConsistency({ run, request, token, bu
   await wait(`document.querySelector('select[name=productId] option[value="${product.body.id}"]')`);
   await run(`(()=>{const select=document.querySelector('select[name=productId]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(select,${JSON.stringify(String(product.body.id))});select.dispatchEvent(new Event('change',{bubbles:true}));return true;})()`);
   await run("document.querySelector('input[name=referencePrice]').focus();document.querySelector('input[name=referencePrice]').select();true");
-  await cdp.send('Input.insertText', { text: '9007199254740993.0100' });
+  await cdp.send('Input.insertText', { text: '-9007199254740993.0100' });
   await run(`${button('保存供货关系')}.click();true`);
   await wait("document.body.innerText.includes('供货关系已保存。')");
   const links = await request('QuerySupplierProductLinks', token, undefined, { supplierId });
   assert.equal(links.status, 200, JSON.stringify(links.body));
-  assert.equal(links.body.items[0].referencePrice, '9007199254740993.01');
-  assert.equal(await run("document.querySelector('input[name=referencePrice]').value"), '9007199254740993.01');
+  assert.equal(links.body.items[0].referencePrice, '-9007199254740993.01');
+  assert.equal(await run("document.querySelector('input[name=referencePrice]').value"), '-9007199254740993.01');
   await captureScreenshot(cdp, path.join(output, 'Full-supplier-price.png'));
   for (let index = 0; index < 21; index++) {
     const result = await request('CreateSupplierAssessment', token, {

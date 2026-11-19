@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "b6d252e2e01af7e5d18cd6f9eb850fe630d1229812e104c140f298ac0db7d596",
+  "digest": "012f1a11ef1641581d3087ca75c66abafe174081d4260f986e507f49472f6e6c",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -97835,7 +97835,8 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "minimum": 0
         },
         "ctnUnitCN": {
           "type": "string"
@@ -97855,7 +97856,8 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "minimum": 0
         },
         "gwTotal": {
           "type": [
@@ -97863,7 +97865,8 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "minimum": 0
         },
         "height": {
           "type": [
@@ -97871,7 +97874,8 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "minimum": 0
         },
         "hsCode": {
           "type": "string"
@@ -97898,7 +97902,8 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "minimum": 0
         },
         "nwPerCtn": {
           "type": [
@@ -97906,7 +97911,8 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "minimum": 0
         },
         "nwTotal": {
           "type": [
@@ -97914,7 +97920,8 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "minimum": 0
         },
         "origin": {
           "type": "string"
@@ -97925,7 +97932,8 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "minimum": 0
         },
         "poNumber": {
           "type": "string"
@@ -97948,7 +97956,7 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$"
         },
         "purchaseTotal": {
           "type": [
@@ -97956,7 +97964,7 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$"
         },
         "quantity": {
           "type": [
@@ -97964,7 +97972,8 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "minimum": 0
         },
         "spare1": {
           "type": "string"
@@ -98011,7 +98020,9 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "minimum": 0,
+          "maximum": 100
         },
         "taxRefundAmount": {
           "type": [
@@ -98019,7 +98030,7 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$"
         },
         "totalPrice": {
           "type": [
@@ -98027,7 +98038,7 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$"
         },
         "unitCN": {
           "type": "string"
@@ -98041,7 +98052,7 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$"
         },
         "volume": {
           "type": [
@@ -98049,7 +98060,8 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "minimum": 0
         },
         "width": {
           "type": [
@@ -98057,7 +98069,8 @@
             "string"
           ],
           "format": "double",
-          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$"
+          "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "minimum": 0
         }
       },
       "required": [
@@ -106879,7 +106892,7 @@
         "referencePrice": {
           "type": "string",
           "format": "decimal",
-          "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
           "maxLength": 60
         },
         "status": {
@@ -106944,7 +106957,7 @@
         "referencePrice": {
           "type": "string",
           "format": "decimal",
-          "pattern": "^(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+          "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
           "maxLength": 60
         },
         "supplierCompanyId": {

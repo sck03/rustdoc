@@ -155,7 +155,7 @@ fn supplier_product_link(save: bool) -> Schema {
             "referencePrice",
             s().format("decimal")
                 .max_length(60)
-                .pattern("^(?:0|[1-9]\\d*)(?:\\.\\d+)?$"),
+                .pattern("^[+-]?[0-9]+(?:\\.[0-9]+)?$"),
         ),
         ("currency", s().max_length(3)),
         (

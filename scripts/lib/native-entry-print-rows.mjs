@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { captureScreenshot } from './web-runtime-browser-session.mjs';
 import { waitFor } from './web-runtime-smoke-common.mjs';
 import { verifyEntryTemplateDesigner } from './native-entry-template-designer.mjs';
+import { verifyDesktopSignedInvoice } from './native-signed-invoice.mjs';
 
 export async function verifyDesktopEntryRows({ run, request, token, cdp, output }) {
   const repo = path.resolve(import.meta.dirname, '../..');
@@ -147,5 +148,6 @@ export async function verifyDesktopEntryRows({ run, request, token, cdp, output 
   await run("[...document.querySelectorAll('summary')].find(e=>e.textContent==='批量插入说明与空白行').click(); true");
   await screenshot('Full-entry-batch-notes.png');
   await verifyEntryTemplateDesigner({ run, request, token, cdp, output, invoice: final, originalDraft: draft, templatePath: catalog.find(item => item.templatePath.endsWith('invoice_template.dtpl')).templatePath });
+  await verifyDesktopSignedInvoice({ run, request, token, cdp, output, draft, templatePath: catalog.find(item => item.templatePath.endsWith('invoice_template.dtpl')).templatePath });
   return { invoiceId };
 }

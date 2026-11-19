@@ -2,7 +2,6 @@ use crate::business_date::is_valid as valid_date;
 use crate::generated_api::ApiInvoiceDetailDto;
 pub use crate::invoice_columns::{COLUMN_COUNT, COLUMNS, ItemRow};
 use rust_decimal::{Decimal, RoundingStrategy};
-use std::str::FromStr;
 use unicode_normalization::UnicodeNormalization;
 pub const MAX_ROWS: usize = export_doc_contracts::invoice_editing::MAX_ITEMS;
 
@@ -199,10 +198,10 @@ pub fn parse_number(value: &str) -> Result<Decimal, String> {
     if value.is_empty() {
         return Ok(Decimal::ZERO);
     }
-    let parsed = Decimal::from_str(value)
-        .map_err(|_| "请输入数字，使用小数点，不含千位分隔符。".to_owned())?;
-    if parsed < Decimal::ZERO || parsed > Decimal::from(1_000_000_000u64) || parsed.scale() > 12 {
-        return Err("数字范围应为 0–10 亿，最多 12 位小数。".into());
+    let parsed = crate::number::parse_decimal_text(value)
+        .ok_or("请输入普通十进制数字，使用小数点，不含千位分隔符。")?;
+    if parsed.abs() > Decimal::from(1_000_000_000u64) || parsed.scale() > 12 {
+        return Err("数字绝对值不能超过 10 亿，最多 12 位小数。".into());
     }
     Ok(parsed)
 }
@@ -210,6 +209,7 @@ pub fn parse_number(value: &str) -> Result<Decimal, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
     #[test]
     fn refund_total_rounds_only_after_exact_line_accumulation() {
         let mut draft = InvoiceDraft::new("2026-11-06");

@@ -375,8 +375,8 @@ pub fn exercise(request: &Request<'_>) {
         ),
         ("productId", json!(product["id"].to_string())),
         ("expectedVersion", json!("0")),
-        ("referencePrice", json!("+1")),
-        ("referencePrice", json!("01")),
+        ("referencePrice", json!("--1")),
+        ("referencePrice", json!("1e3")),
         ("referencePrice", json!("1_0")),
         ("unexpected", json!(true)),
     ] {
@@ -414,6 +414,13 @@ pub fn exercise(request: &Request<'_>) {
     );
     let mut path = supplier_path.clone();
     path.push(("id", link["id"].to_string()));
+    for (price, expected) in [("-1000.00", "-1000"), ("+001.00", "1")] {
+        let mut update = body.clone();
+        update["referencePrice"] = json!(price);
+        update["expectedVersion"] = link["versionNumber"].clone();
+        link = save(request, UPDATE_SUPPLIER_PRODUCT_LINK, &path, update);
+        assert_eq!(link["referencePrice"], expected);
+    }
     link = save(
         request,
         DEACTIVATE_SUPPLIER_PRODUCT_LINK,
