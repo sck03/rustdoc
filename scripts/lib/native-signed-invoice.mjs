@@ -30,7 +30,7 @@ export async function verifyDesktopSignedInvoice({ run, request, token, cdp, out
   const report = { reportType: 'ExportDocument', templatePath };
   const preview = await request('PreviewInvoiceReportHtml', token, report, { invoiceId });
   assert.equal(preview.status, 200, JSON.stringify(preview.body));
-  assert.match(preview.body.html, /-1,?000(?:\.00)?/);
+  assert.match(preview.body.html, /-(?:[A-Z]{3}|[$¥€])?1,?000(?:\.00)?/);
   const destinationPath = path.join(output, 'signed-invoice.pdf');
   const job = await request('StartInvoiceReportPdfSaveToPathJob', token, { ...report, destinationPath }, { invoiceId });
   assert.equal(job.status, 202, JSON.stringify(job.body));

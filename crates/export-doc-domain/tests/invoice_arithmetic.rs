@@ -75,6 +75,7 @@ fn invoice_editor_and_rust_use_the_same_exact_arithmetic_fixtures() {
 
 #[test]
 fn signed_invoice_money_roundtrips_and_physical_values_remain_nonnegative() {
+    use export_doc_domain::invoice::InvoiceDraft;
     let mut draft = InvoiceDraft::demo("2026-11-19", "SIGNED-MONEY");
     draft.rows.truncate(1);
     for (column, value) in [(8, "2"), (24, "-1000"), (25, "-1.005"), (27, "13")] {
