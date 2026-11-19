@@ -6,6 +6,9 @@ use export_doc_engine::{
 use std::{sync::Arc, time::Duration};
 use tokio::sync::{Notify, Semaphore};
 
+// Upfront maxima must leave room for concurrent reads to encode their actual bytes.
+const READ_HEADROOM: usize = 8 * 1024 * 1024;
+
 pub(crate) struct Admission {
     pub budget: Arc<Budget>,
     available: Arc<Notify>,
@@ -37,7 +40,7 @@ impl Admission {
                 let ready = self.available.notified();
                 tokio::pin!(ready);
                 ready.as_mut().enable();
-                if let Some(reservation) = self.budget.try_reserve_working(bytes)? {
+                if let Some(reservation) = self.budget.try_reserve_working(bytes, READ_HEADROOM)? {
                     return Ok(reservation);
                 }
                 ready.await;
@@ -68,14 +71,33 @@ mod tests {
         let third = pending.await.unwrap().unwrap();
         let cancelled = tokio::spawn({
             let admission = admission.clone();
-            async move { admission.reserve(128 * 1024 * 1024).await }
+            async move { admission.reserve(64 * 1024 * 1024).await }
         });
         tokio::task::yield_now().await;
         cancelled.abort();
         assert!(matches!(cancelled.await, Err(error) if error.is_cancelled()));
         drop((second, third));
         assert_eq!(admission.budget.snapshot()["reservedBytes"], 0);
-        drop(admission.reserve(128 * 1024 * 1024).await.unwrap());
+        drop(admission.reserve(64 * 1024 * 1024).await.unwrap());
+    }
+    #[tokio::test]
+    async fn command_maxima_leave_space_for_reads_while_another_command_waits() {
+        let admission = Arc::new(Admission::new());
+        let first = admission.reserve(64 * 1024 * 1024).await.unwrap();
+        let waiting = tokio::spawn({
+            let admission = admission.clone();
+            async move { admission.reserve(64 * 1024 * 1024).await }
+        });
+        tokio::task::yield_now().await;
+        assert!(!waiting.is_finished());
+        let reads: Vec<_> = (0..32)
+            .map(|_| admission.budget.reserve_working(64 * 1024).unwrap())
+            .collect();
+        assert_eq!(admission.budget.snapshot()["rejections"], 0);
+        drop(first);
+        let second = waiting.await.unwrap().unwrap();
+        drop((second, reads));
+        assert_eq!(admission.budget.snapshot()["reservedBytes"], 0);
     }
     #[tokio::test]
     async fn exhausted_wait_has_a_deadline_and_counts_one_rejection() {

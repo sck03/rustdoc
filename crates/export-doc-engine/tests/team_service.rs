@@ -318,7 +318,7 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
     let saved = call(&service, token, CREATE_INVOICE, 0, Some(json!(invoice))).unwrap();
     assert_eq!(
         saved["invoice"]["items"][0]["quantity"],
-        json!(invoice.items[0].quantity)
+        json!(invoice.items[0].quantity.to_string())
     );
     assert_eq!(
         call(

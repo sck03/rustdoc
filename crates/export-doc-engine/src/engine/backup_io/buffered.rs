@@ -30,17 +30,22 @@ impl Budget {
         self.reserve_working(bytes)
     }
     pub fn reserve_working(self: &Arc<Self>, bytes: usize) -> Result<Reservation> {
-        self.try_reserve_working(bytes)?
+        self.try_reserve_working(bytes, 0)?
             .ok_or_else(|| self.exhausted())
     }
-    pub fn try_reserve_working(self: &Arc<Self>, bytes: usize) -> Result<Option<Reservation>> {
-        if bytes == 0 || bytes > CAPACITY {
+    pub fn try_reserve_working(
+        self: &Arc<Self>,
+        bytes: usize,
+        headroom: usize,
+    ) -> Result<Option<Reservation>> {
+        let ceiling = CAPACITY.saturating_sub(headroom);
+        if bytes == 0 || bytes > ceiling {
             return Err(error(503, "文件处理大小超出可用容量。"));
         }
         if self
             .used
             .try_update(Relaxed, Relaxed, |used| {
-                used.checked_add(bytes).filter(|total| *total <= CAPACITY)
+                used.checked_add(bytes).filter(|total| *total <= ceiling)
             })
             .is_err()
         {
