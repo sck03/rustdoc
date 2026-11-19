@@ -1,7 +1,7 @@
 use std::io::{self, Write};
 
-/// A serialization/output sink that refuses bytes before growing beyond its budget.
-pub(crate) struct BoundedBytes {
+/// A shared input/output buffer that refuses bytes before growing beyond its limit.
+pub struct BoundedBytes {
     pub bytes: Vec<u8>,
     pub limit: usize,
 }

@@ -3,7 +3,7 @@ pub use export_doc_contracts::{contracts, generated_api};
 extern crate self as export_doc_engine;
 pub use export_doc_domain::{designer, invoice, template};
 pub mod api;
-mod bounded_bytes;
+pub mod bounded_bytes;
 pub mod build_info;
 pub mod clock;
 pub mod controlled_process;

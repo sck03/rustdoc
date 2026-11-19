@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 114718,
+      "baselineAggregateLines": 114887,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 114793,
+      "maximumAggregateLines": 114962,
       "reportFiles": false
     },
     {

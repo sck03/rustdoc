@@ -7,11 +7,13 @@ use axum::{
 use export_doc_contracts::{contracts, generated_api::*};
 use export_doc_engine::{api::ApiError, engine::tasks::FileOutput};
 use serde_json::{Map, Value};
-use std::{collections::HashMap, future::poll_fn, pin::Pin, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+mod buffer;
+use buffer::bytes;
 
-// Per-host budgets: slow receivers consume bounded input capacity, never parser
-// slots. The reservation follows the parsed value into the service worker.
+// Per-host budgets charge input bytes as they arrive, never idle parser slots.
+// The actual buffer reservation follows the parsed value into the service worker.
 pub(crate) struct Resources {
     memory: Arc<Semaphore>,
     uploads: Arc<Semaphore>,
@@ -91,24 +93,6 @@ fn parameter(value: String, schema: &Value) -> Result<Value, ApiError> {
             .map_err(|_| error(400, "上传参数必须是布尔值。")),
         _ => Ok(Value::String(value)),
     }
-}
-
-async fn bytes(mut body: Body, limit: usize, idle: Duration) -> Result<Bytes, ApiError> {
-    let mut content = Vec::new();
-    while let Some(frame) =
-        tokio::time::timeout(idle, poll_fn(|cx| Pin::new(&mut body).poll_frame(cx)))
-            .await
-            .map_err(|_| error(504, "请求读取空闲超过时限。"))?
-    {
-        let frame = frame.map_err(|_| error(400, "请求内容读取失败。"))?;
-        if let Ok(chunk) = frame.into_data() {
-            if chunk.len() > limit.saturating_sub(content.len()) {
-                return Err(error(413, "请求超过该操作的容量上限。"));
-            }
-            content.extend_from_slice(&chunk);
-        }
-    }
-    Ok(Bytes::from(content))
 }
 
 pub(super) fn multipart_error(cause: axum::extract::multipart::MultipartError) -> ApiError {
@@ -310,18 +294,21 @@ pub(super) async fn parse_with_files(
             .as_u64()
             .and_then(|value| usize::try_from(value).ok())
             .unwrap_or(16 * MIB);
-        let reservation = resources
-            .memory
-            .clone()
-            .try_acquire_many_owned(limit.div_ceil(1024) as u32)
-            .map_err(|_| error(429, "请求接收容量已满，请稍后重试。"))?;
-        let bytes = bytes(request.into_body(), limit, Duration::from_secs(10)).await?;
+        let (bytes, reservation) = buffer::receive(
+            request.into_body(),
+            limit,
+            Duration::from_secs(10),
+            Some(resources.memory.clone()),
+        )
+        .await?;
         if !bytes.is_empty() {
-            let permit = resources
-                .parsers
-                .clone()
-                .try_acquire_owned()
-                .map_err(|_| error(429, "请求解析繁忙，请稍后重试。"))?;
+            let permit = tokio::time::timeout(
+                Duration::from_secs(5),
+                resources.parsers.clone().acquire_owned(),
+            )
+            .await
+            .map_err(|_| error(429, "请求解析繁忙，请稍后重试。"))?
+            .map_err(|_| error(503, "请求解析已停止。"))?;
             let (body, reservation) = tokio::task::spawn_blocking(move || {
                 let _permit = permit;
                 serde_json::from_slice(&bytes)
@@ -331,7 +318,7 @@ pub(super) async fn parse_with_files(
             .await
             .map_err(|_| error(503, "请求解析未完成。"))??;
             result.body = Some(body);
-            result.reservation = Some(reservation);
+            result.reservation = reservation;
         }
     }
     Ok(result)

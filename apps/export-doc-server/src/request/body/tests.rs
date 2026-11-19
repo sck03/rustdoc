@@ -1,13 +1,17 @@
 use super::*;
-struct PendingBody;
+use std::pin::Pin;
+struct PendingBody(Option<Bytes>);
 impl HttpBody for PendingBody {
     type Data = Bytes;
     type Error = std::convert::Infallible;
     fn poll_frame(
-        self: Pin<&mut Self>,
+        mut self: Pin<&mut Self>,
         _: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Option<Result<hyper::body::Frame<Bytes>, Self::Error>>> {
-        std::task::Poll::Pending
+        match self.0.take() {
+            Some(bytes) => std::task::Poll::Ready(Some(Ok(hyper::body::Frame::data(bytes)))),
+            None => std::task::Poll::Pending,
+        }
     }
 }
 
@@ -18,7 +22,7 @@ async fn slow_receivers_do_not_reserve_parsers_and_idle_reads_expire() {
     let slow = parse(
         &resources,
         LOGIN,
-        Request::new(Body::new(PendingBody)),
+        Request::new(Body::new(PendingBody(None))),
         &parameters,
         &[],
     );
@@ -28,7 +32,7 @@ async fn slow_receivers_do_not_reserve_parsers_and_idle_reads_expire() {
         _ = tokio::time::sleep(Duration::from_millis(10)) => {}
     }
     assert_eq!(resources.parsers.available_permits(), 4);
-    assert_eq!(resources.memory.available_permits(), 64 * 1024 - 4);
+    assert_eq!(resources.memory.available_permits(), 64 * 1024);
     assert!(
         parse(
             &resources,
@@ -41,17 +45,24 @@ async fn slow_receivers_do_not_reserve_parsers_and_idle_reads_expire() {
         .is_ok()
     );
     assert_eq!(
-        bytes(Body::new(PendingBody), 1024, Duration::from_millis(10))
-            .await
-            .unwrap_err()
-            .status,
+        bytes(
+            Body::new(PendingBody(None)),
+            1024,
+            Duration::from_millis(10)
+        )
+        .await
+        .unwrap_err()
+        .status,
         Some(504)
     );
 }
 
 #[tokio::test]
 async fn retained_json_is_bounded_but_bodyless_requests_and_other_hosts_remain_available() {
-    let resources = Resources::default();
+    let resources = Resources {
+        memory: Arc::new(Semaphore::new(8)),
+        ..Default::default()
+    };
     let parameters = HashMap::new();
     let mut retained = Vec::new();
     for _ in 0..4 {
@@ -59,7 +70,9 @@ async fn retained_json_is_bounded_but_bodyless_requests_and_other_hosts_remain_a
             parse(
                 &resources,
                 CREATE_INVOICE,
-                Request::new(Body::from("{}")),
+                Request::new(Body::from(
+                    serde_json::to_string(&"x".repeat(2046)).unwrap(),
+                )),
                 &parameters,
                 &[],
             )
@@ -86,7 +99,7 @@ async fn retained_json_is_bounded_but_bodyless_requests_and_other_hosts_remain_a
         parse(
             &resources,
             GET_HEALTH,
-            Request::new(Body::new(PendingBody)),
+            Request::new(Body::new(PendingBody(None))),
             &parameters,
             &[]
         )
@@ -105,7 +118,7 @@ async fn retained_json_is_bounded_but_bodyless_requests_and_other_hosts_remain_a
         .is_ok()
     );
     drop(retained);
-    assert_eq!(resources.memory.available_permits(), 64 * 1024);
+    assert_eq!(resources.memory.available_permits(), 8);
     assert!(
         parse(
             &resources,
@@ -117,6 +130,55 @@ async fn retained_json_is_bounded_but_bodyless_requests_and_other_hosts_remain_a
         .await
         .is_err()
     );
+    assert_eq!(resources.memory.available_permits(), 8);
+}
+
+#[tokio::test]
+async fn small_parallel_requests_are_charged_for_actual_buffers() {
+    let resources = Arc::new(Resources::default());
+    let mut tasks = tokio::task::JoinSet::new();
+    for _ in 0..20 {
+        let resources = resources.clone();
+        tasks.spawn(async move {
+            parse(
+                &resources,
+                CREATE_INVOICE,
+                Request::new(Body::from("{}")),
+                &HashMap::new(),
+                &[],
+            )
+            .await
+            .unwrap()
+        });
+    }
+    let mut retained = Vec::new();
+    while let Some(result) = tasks.join_next().await {
+        retained.push(result.unwrap());
+    }
+    assert_eq!(resources.memory.available_permits(), 64 * 1024 - 20);
+    assert_eq!(resources.parsers.available_permits(), 4);
+    drop(retained);
+    assert_eq!(resources.memory.available_permits(), 64 * 1024);
+}
+
+#[tokio::test]
+async fn cancelled_partial_receivers_return_their_actual_reservation() {
+    let resources = Resources::default();
+    let parameters = HashMap::new();
+    let mut pending = Box::pin(parse(
+        &resources,
+        LOGIN,
+        Request::new(Body::new(PendingBody(Some(Bytes::from_static(b"{"))))),
+        &parameters,
+        &[],
+    ));
+    tokio::select! {
+        _ = &mut pending => panic!("partial body completed"),
+        _ = tokio::time::sleep(Duration::from_millis(10)) => {}
+    }
+    assert_eq!(resources.memory.available_permits(), 64 * 1024 - 1);
+    assert_eq!(resources.parsers.available_permits(), 4);
+    drop(pending);
     assert_eq!(resources.memory.available_permits(), 64 * 1024);
 }
 
