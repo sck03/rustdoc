@@ -31,7 +31,7 @@ export function filterDetailItemFieldGroups(fieldGroups: ReportDesignerFieldGrou
 }
 
 export function normalizeNumber(value: string, fallback: number) {
-  const parsed = Number.parseFloat(value);
+  const parsed = value.trim() === "" ? Number.NaN : Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 

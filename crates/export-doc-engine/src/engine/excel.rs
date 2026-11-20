@@ -295,21 +295,16 @@ pub fn handle(
     };
     let mut exporter_name = text(&settings["system"], "defaultTemplateExporterNameCn");
     if invoice.is_none() && exporter_name.trim().is_empty() {
-        let mut names: Vec<_> = service
+        exporter_name = service
             .store
-            .all("exporters")?
-            .iter()
-            .filter(|exporter| auth::visible(actor, "document.reference-data", "view", exporter))
-            .map(|exporter| text(exporter, "exporterNameCN"))
-            .filter(|name| !name.trim().is_empty())
-            .collect();
-        names.sort_by_key(|name| name.to_lowercase());
-        names.dedup_by(|a, b| a.eq_ignore_ascii_case(b));
-        exporter_name = if names.len() == 1 {
-            names.remove(0)
-        } else {
-            "请填写出口商中文名称".into()
-        };
+            .read(|tx| {
+                Ok(tx.sole_exporter_name(&auth::data_scope(
+                    actor,
+                    "document.reference-data",
+                    "view",
+                ))?)
+            })?
+            .unwrap_or_else(|| "请填写出口商中文名称".into());
     }
     let booking = ![
         START_EXCEL_TEMPLATE_DOWNLOAD_JOB,

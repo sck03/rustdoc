@@ -84,6 +84,16 @@ for (const [name, reference] of defaultReportDesigns()) {
   fs.writeFileSync(path.join(directory, path.basename(name, '.dtpl') + '.json'), JSON.stringify(rebuilt));
 }
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
+for (const invalid of ["12garbage", "12", "", true, null, Infinity, -1]) {
+  const schema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
+  schema.page.fontSizePt = invalid;
+  assert(!api.hasValidReportDesignerV3Schema(JSON.stringify(schema)), `模板数字必须与 Rust JSON 类型一致: ${String(invalid)}`);
+}
+{
+  const schema = api.parseReportDesignerV3Source("", "ExportDocument").schema;
+  schema.detailRowHeightHundredthMm = 1200.5;
+  assert(!api.hasValidReportDesignerV3Schema(JSON.stringify(schema)), "整数布局字段不能被静默四舍五入");
+}
 let productState = api.createReportDesignerV3DocumentState(api.parseReportDesignerV3Source("", "ExportDocument").schema);
 for (const name of ["StyleName", "Cartons", "Quantity", "UnitEN", "UnitPrice", "TotalPrice"]) {
   const next = api.insertProductField(productState, { label: name, value: `item.${name}` });

@@ -45,19 +45,7 @@ pub fn seed(store: &Store) -> Result<()> {
 }
 
 fn has_users(connection: &store::Connection) -> Result<bool> {
-    Ok(connection
-        .query_generic(&export_doc_storage::GenericQuery {
-            kind: "users",
-            scope: export_doc_storage::DataScope {
-                all: true,
-                ..Default::default()
-            },
-            fields: &[("id", "id")],
-            limit: 1,
-            ..Default::default()
-        })?
-        .0
-        > 0)
+    Ok(connection.record_exists("users", &[])?)
 }
 
 fn seed_admin(store: &Store, password: &str) -> Result<()> {

@@ -20419,20 +20419,62 @@
         ],
         "additionalProperties": false
       },
-      "IdentityCandidatePage": {
+      "IdentityAssignmentOption": {
         "type": "object",
         "properties": {
-          "departmentCount": {
+          "code": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "isActive"
+        ],
+        "additionalProperties": false
+      },
+      "IdentityAssignmentOptionPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IdentityAssignmentOption"
+            }
+          },
+          "selected": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IdentityAssignmentOption"
+            }
+          },
+          "totalCount": {
             "type": "integer",
             "format": "int64",
             "minimum": 0
-          },
-          "departments": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/IdentityDepartmentOption"
-            }
-          },
+          }
+        },
+        "required": [
+          "items",
+          "selected",
+          "totalCount"
+        ],
+        "additionalProperties": false
+      },
+      "IdentityCandidatePage": {
+        "type": "object",
+        "properties": {
           "items": {
             "type": "array",
             "items": {
@@ -20459,32 +20501,7 @@
           "items",
           "totalCount",
           "pageNumber",
-          "pageSize",
-          "departments",
-          "departmentCount"
-        ],
-        "additionalProperties": false
-      },
-      "IdentityDepartmentOption": {
-        "type": "object",
-        "properties": {
-          "code": {
-            "type": "string",
-            "maxLength": 120
-          },
-          "id": {
-            "type": "string",
-            "pattern": "^[1-9][0-9]{0,18}$"
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 120
-          }
-        },
-        "required": [
-          "id",
-          "code",
-          "name"
+          "pageSize"
         ],
         "additionalProperties": false
       },
@@ -41584,7 +41601,7 @@
     },
     "/api/auth/login": {
       "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-json-response-limit-bytes": 8388608,
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,
         "tags": [
@@ -41764,7 +41781,7 @@
     },
     "/api/auth/renew": {
       "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-json-response-limit-bytes": 8388608,
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,
         "tags": [
@@ -41801,7 +41818,7 @@
     },
     "/api/auth/unit-context": {
       "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-json-response-limit-bytes": 8388608,
         "x-exportdoc-timeout-seconds": 30,
         "x-exportdoc-processing-slot": false,
         "tags": [
@@ -107438,6 +107455,171 @@
         }
       }
     },
+    "/api/organization/assignment-options": {
+      "get": {
+        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "GetIdentityAssignmentOptions",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentityAssignmentOptionPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Gateway Timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "organization.directory",
+                "actions": [
+                  "view"
+                ],
+                "administratorOnly": false
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "unitId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]{0,18}$"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "projects",
+                "departments"
+              ]
+            },
+            "required": true
+          },
+          {
+            "name": "keyword",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "selectedIds",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 4000
+            }
+          },
+          {
+            "name": "pageNumber",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ],
+        "x-exportdoc-foundation": {
+          "kind": "assignment-options",
+          "action": "list"
+        }
+      }
+    },
     "/api/organization/employments": {
       "get": {
         "x-exportdoc-json-response-limit-bytes": 67108864,
@@ -124808,7 +124990,7 @@
     },
     "/api/tools/letter-of-credit/import": {
       "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-json-response-limit-bytes": 4194304,
         "x-exportdoc-timeout-seconds": 600,
         "x-exportdoc-processing-slot": false,
         "tags": [
@@ -124844,28 +125026,12 @@
           "requiresDesktopAccess": true,
           "requiresLicense": true,
           "access": {
-            "match": "Any",
+            "match": "All",
             "resources": [
               {
-                "resourceKey": "document.report-templates",
+                "resourceKey": "document.invoices",
                 "actions": [
-                  "design",
-                  "clone",
-                  "publish",
-                  "share",
-                  "deactivate",
-                  "archive",
-                  "restore",
-                  "import",
-                  "export"
-                ],
-                "administratorOnly": false
-              },
-              {
-                "resourceKey": "document.report-resources",
-                "actions": [
-                  "upload",
-                  "recycle"
+                  "operate"
                 ],
                 "administratorOnly": false
               }
@@ -124892,7 +125058,7 @@
     },
     "/api/tools/letter-of-credit/import-upload": {
       "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-json-response-limit-bytes": 4194304,
         "x-exportdoc-timeout-seconds": 600,
         "x-exportdoc-processing-slot": true,
         "tags": [
@@ -124928,28 +125094,12 @@
           "requiresDesktopAccess": true,
           "requiresLicense": true,
           "access": {
-            "match": "Any",
+            "match": "All",
             "resources": [
               {
-                "resourceKey": "document.report-templates",
+                "resourceKey": "document.invoices",
                 "actions": [
-                  "design",
-                  "clone",
-                  "publish",
-                  "share",
-                  "deactivate",
-                  "archive",
-                  "restore",
-                  "import",
-                  "export"
-                ],
-                "administratorOnly": false
-              },
-              {
-                "resourceKey": "document.report-resources",
-                "actions": [
-                  "upload",
-                  "recycle"
+                  "operate"
                 ],
                 "administratorOnly": false
               }
@@ -125018,28 +125168,12 @@
           "requiresDesktopAccess": true,
           "requiresLicense": true,
           "access": {
-            "match": "Any",
+            "match": "All",
             "resources": [
               {
-                "resourceKey": "document.report-templates",
+                "resourceKey": "document.invoices",
                 "actions": [
-                  "design",
-                  "clone",
-                  "publish",
-                  "share",
-                  "deactivate",
-                  "archive",
-                  "restore",
-                  "import",
-                  "export"
-                ],
-                "administratorOnly": false
-              },
-              {
-                "resourceKey": "document.report-resources",
-                "actions": [
-                  "upload",
-                  "recycle"
+                  "operate"
                 ],
                 "administratorOnly": false
               }
@@ -125175,7 +125309,7 @@
     },
     "/api/tools/ocr/recognize-image": {
       "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-json-response-limit-bytes": 8388608,
         "x-exportdoc-timeout-seconds": 95,
         "x-exportdoc-processing-slot": true,
         "tags": [
@@ -125249,7 +125383,7 @@
     },
     "/api/tools/ocr/recognize-image-upload": {
       "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-json-response-limit-bytes": 8388608,
         "x-exportdoc-timeout-seconds": 95,
         "x-exportdoc-processing-slot": true,
         "tags": [

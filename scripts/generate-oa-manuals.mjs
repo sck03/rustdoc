@@ -61,14 +61,21 @@ figure{margin:5mm 0}img{display:block;width:100%;max-height:207mm;object-fit:con
 const browser = await require("playwright").chromium.launch({ executablePath: locateChromeForTesting(root), headless: true });
 const manifest = [];
 try {
-  for (const [name, label, screenshot] of [["OA管理员手册", "ADMIN", "form-designer.png"], ["OA用户手册", "USER", "request-details.png"]]) {
+  const manuals = [
+    ["OA管理员手册", "ADMIN", ["form-designer.png", "project-duties.png"]],
+    ["OA用户手册", "USER", ["request-details.png"]],
+    ["项目程序操作说明", "OPERATIONS", ["packing-workspace.png", "project-duties.png"]],
+  ];
+  for (const [name, label, screenshots] of manuals) {
     const source = fs.readFileSync(path.join(sourceRoot, `${name}.md`), "utf8");
     const date = source.match(/版本日期：(\d{4}-\d{2}-\d{2})/u)?.[1];
     if (!date) throw new Error(`${name}: source revision date is required`);
     const sections = source.split(/^---\s*$/mu).map((section, index) => `<section class="${index ? "chapter" : "cover"}">${markdown(section)}</section>`);
-    const screenshotPath = path.join(sourceRoot, "images", screenshot);
-    if (!fs.existsSync(screenshotPath)) throw new Error(`Current anonymous UI evidence is required: ${screenshotPath}`);
-    sections.push(`<section><h2>界面参考</h2><figure><img src="${pathToFileURL(screenshotPath).href}" alt="${name}匿名界面"><figcaption>本批匿名真实界面。显示的字段、操作和流程以当前身份权限及公司发布规则为准。</figcaption></figure></section>`);
+    for (const screenshot of screenshots) {
+      const screenshotPath = path.join(sourceRoot, "images", screenshot);
+      if (!fs.existsSync(screenshotPath)) throw new Error(`Anonymous UI evidence is required: ${screenshotPath}`);
+      sections.push(`<section><h2>界面参考</h2><figure><img src="${pathToFileURL(screenshotPath).href}" alt="${name}匿名界面"><figcaption>匿名验收界面示例，来源见图片目录说明。显示的字段、操作和流程以当前产品版、身份权限及公司发布规则为准。</figcaption></figure></section>`);
+    }
     const html = path.join(output, `${name}.html`);
     fs.writeFileSync(html, `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${name}</title><style>${style}</style></head><body>${sections.join("\n")}</body></html>`);
     const page = await browser.newPage();
@@ -77,7 +84,7 @@ try {
       await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].map(image => image.decode())); });
       const pdf = path.join(sourceRoot, `${name}.pdf`);
       await page.pdf({ path: pdf, preferCSSPageSize: true, printBackground: true, tagged: true, outline: true, displayHeaderFooter: true,
-        headerTemplate: '<div></div>', footerTemplate: `<div style="font-size:8px;width:100%;margin:0 18mm;color:#607080;display:flex;justify-content:space-between"><span>ExportDocManager / OA ${label} / ${date}</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>` });
+        headerTemplate: '<div></div>', footerTemplate: `<div style="font-size:8px;width:100%;margin:0 18mm;color:#607080;display:flex;justify-content:space-between"><span>ExportDocManager / ${label} / ${date}</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>` });
       manifest.push({ file: path.relative(root, pdf), bytes: fs.statSync(pdf).size, sourceSha256: createHash("sha256").update(source).digest("hex"), expectedPages: sections.length });
     } finally { await page.close(); }
   }

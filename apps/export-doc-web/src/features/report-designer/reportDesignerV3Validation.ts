@@ -665,5 +665,8 @@ function normalizeId(value: unknown, fallback: string, ids: Set<string>, path: s
 }
 
 function readInteger(value: unknown, fallback: number, min: number, max: number, path: string, issues: ReportDesignerSchemaIssue[]) {
+  if (typeof value === "number" && Number.isFinite(value) && !Number.isInteger(value)) {
+    issues.push({ severity: "error", path, message: "必须使用 JSON 整数。" });
+  }
   return Math.round(readNumber(value, fallback, min, max, path, issues));
 }

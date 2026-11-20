@@ -66,7 +66,7 @@ mod s3_transport;
 pub use media::{SEAL_LIMIT, read_seal_image};
 pub mod oa;
 #[cfg(feature = "ocr")]
-mod ocr;
+pub(crate) mod ocr;
 mod office;
 mod office_events;
 mod office_queries;

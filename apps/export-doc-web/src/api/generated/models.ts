@@ -4401,19 +4401,24 @@ export interface IdentityAssignment {
   role?: "" | "Member" | "Leader";
 }
 
+export interface IdentityAssignmentOption {
+  code: string;
+  id: string;
+  isActive: boolean;
+  name: string;
+}
+
+export interface IdentityAssignmentOptionPage {
+  items: IdentityAssignmentOption[];
+  selected: IdentityAssignmentOption[];
+  totalCount: number;
+}
+
 export interface IdentityCandidatePage {
-  departmentCount: number;
-  departments: IdentityDepartmentOption[];
   items: IdentityPersonOption[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
-}
-
-export interface IdentityDepartmentOption {
-  code: string;
-  id: string;
-  name: string;
 }
 
 export interface IdentityEffectivePeriod {
@@ -8969,6 +8974,15 @@ export interface GetGeneralRequestCommandResultRequest {
 
 export interface GetHsCodeRequest {
   code: string;
+}
+
+export interface GetIdentityAssignmentOptionsRequest {
+  unitId?: string;
+  kind: "projects" | "departments";
+  keyword?: string;
+  selectedIds?: string;
+  pageNumber?: number;
+  pageSize?: number;
 }
 
 export interface GetIdentityCandidatesRequest {

@@ -2,6 +2,42 @@
 use crate::{Adapter, QuerySql, Result, sql};
 use serde_json::Value;
 
+/// Only project names and stop at the second distinct authorized name. Keyset
+/// pages bound memory even when a large directory contains one repeated name.
+pub(crate) fn sole_exporter_name(
+    db: &(impl Adapter + ?Sized),
+    scope: &crate::DataScope<'_>,
+) -> Result<Option<String>> {
+    let query = crate::GenericQuery {
+        kind: "exporters",
+        scope: scope.clone(),
+        fields: &[("name", "exporterNameCN")],
+        limit: 256,
+        ..Default::default()
+    };
+    let mut before = None;
+    let mut name: Option<String> = None;
+    loop {
+        crate::operation::check()?;
+        let (next, rows) = db.scan_generic(&query, before)?;
+        if rows.is_empty() {
+            return Ok(name);
+        }
+        for row in rows {
+            let candidate = row["name"].as_str().unwrap_or("").trim();
+            if candidate.is_empty() {
+                continue;
+            }
+            match &name {
+                Some(name) if !name.eq_ignore_ascii_case(candidate) => return Ok(None),
+                None => name = Some(candidate.to_owned()),
+                _ => {}
+            }
+        }
+        before = next;
+    }
+}
+
 pub(crate) fn candidates(
     db: &(impl Adapter + ?Sized),
     kind: &str,

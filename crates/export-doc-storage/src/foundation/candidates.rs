@@ -37,18 +37,9 @@ pub(crate) fn list(
         offset.max(0)
     );
     let items = json_value(&aggregate(&select, s.pg), s.pg);
-    let departments = json_value(
-        &aggregate(
-            &format!(
-                "SELECT {obj}('id',CAST(d.id AS TEXT),'code',d.code,'name',l.name) AS body FROM organization_departments d JOIN organization_labels l ON l.id=d.id WHERE d.unit_id={unit} AND l.is_active=1 ORDER BY d.code,d.id LIMIT 500"
-            ),
-            s.pg,
-        ),
-        s.pg,
-    );
     let query = read_json(
         format!(
-            "SELECT {obj}('items',{items},'totalCount',(SELECT COUNT(*) FROM persons p LEFT JOIN employee_identities e ON e.person_id=p.id AND e.unit_id={unit} WHERE {filter}),'pageNumber',{},'pageSize',{},'departments',{departments},'departmentCount',(SELECT COUNT(*) FROM organization_departments d JOIN organization_labels l ON l.id=d.id WHERE d.unit_id={unit} AND l.is_active=1))",
+            "SELECT {obj}('items',{items},'totalCount',(SELECT COUNT(*) FROM persons p LEFT JOIN employee_identities e ON e.person_id=p.id AND e.unit_id={unit} WHERE {filter}),'pageNumber',{},'pageSize',{})",
             offset.max(0) / limit.clamp(1, 100) + 1,
             limit.clamp(1, 100)
         ),

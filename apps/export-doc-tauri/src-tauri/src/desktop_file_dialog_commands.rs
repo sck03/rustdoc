@@ -114,8 +114,8 @@ pub(crate) async fn select_letter_of_credit_file(
             (
                 "信用证文件",
                 &[
-                    "pdf", "txt", "md", "csv", "json", "xml", "png", "jpg", "jpeg", "bmp", "gif",
-                    "tif", "tiff", "webp",
+                    "pdf", "txt", "md", "csv", "json", "xml", "png", "jpg", "jpeg", "bmp", "tif",
+                    "tiff", "webp",
                 ],
             ),
             ("全部文件", &["*"]),

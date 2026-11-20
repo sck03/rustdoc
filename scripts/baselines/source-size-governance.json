@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-20",
-  "reviewNotes": "2026-11-20 against 12e58506: packing request parsing and batched cargo geometry replace duplicate/coercing implementations; shared tool-panel CSS removes route-order dependence. Storage owns paginated supplier overview and global totals; email recovery uses existing bounded projection. Retired two redundant endpoints. Rust aggregate includes inline boundary/email regressions and explicit frozen-contract review; automation adds real Tauri/React pagination, layout, precision and resource-release coverage. Advance only these measured aggregates; retain per-file caps and growth allowances. No dependency or schema changes. Evidence: docs/archive/2026-11/2026-11-20装柜与资源优化.md.",
+  "reviewNotes": "2026-11-20 against 1f1a2d22: task-scoped PDF/OCR framing replaces aggregate-text and per-page process entry points; shared process ownership, bounded organization options and classed response admission have separate modules. Added independent contract deltas, mixed-PDF/frame/permission/routing and real HTTP/UI regressions. Removed candidate department payload/DTO and report-permission coupling. Advance only the five measured aggregates; preserve per-file caps and existing growth allowances. No dependency or schema version changes. Evidence: docs/archive/2026-11/2026-11-20全项目复核收尾.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -24,9 +24,9 @@
       ],
       "filePattern": "^.+\\.rs$",
       "maximumLines": 1000,
-      "baselineAggregateLines": 10543,
+      "baselineAggregateLines": 10663,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 10618,
+      "maximumAggregateLines": 10738,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 115188,
+      "baselineAggregateLines": 115738,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 115263,
+      "maximumAggregateLines": 115813,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 34958,
+      "baselineAggregateLines": 35183,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 35078,
+      "maximumAggregateLines": 35303,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 31047,
+      "baselineAggregateLines": 31211,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 31197,
+      "maximumAggregateLines": 31361,
       "reportFiles": false
     },
     {
@@ -355,8 +355,8 @@
       "directory": "apps/export-doc-web/src/features/organization",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 200,
-      "maximumAggregateLines": 773,
-      "baselineAggregateLines": 723,
+      "maximumAggregateLines": 859,
+      "baselineAggregateLines": 809,
       "maximumAggregateGrowthLines": 50
     },
     {

@@ -32,7 +32,6 @@ export function useInvoiceEditorWorkspace({ businessDate, client, mode }: {
   attachmentsEnabled?: boolean;
 }) {
   const masterDataPermission = useModulePermission("document.master-data");
-  const reportDesignPermission = useModulePermission("document.reports");
   const confirm = useConfirmation();
   const { invoiceId } = useParams();
   const navigate = useNavigate();
@@ -539,7 +538,7 @@ export function useInvoiceEditorWorkspace({ businessDate, client, mode }: {
     setSearchParams(nextSearchParams, { replace: true });
   }
   return {
-    masterDataPermission, reportDesignPermission, navigate, formRef,
+    masterDataPermission, navigate, formRef,
     activeSection, workspaceDeviceMode, workspaceDeviceCapabilities, invoice, invoicePermission,
     singleWindowPermission, message, setMessage, successMessage, setSuccessMessage,
     concurrencyMessage, setIsLetterOfCreditBusy, persistedInvoiceStatus, cancelReason, setCancelReason,

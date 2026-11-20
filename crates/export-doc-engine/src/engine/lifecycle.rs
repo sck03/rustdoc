@@ -106,7 +106,7 @@ impl NativeService {
         let mut store = Store::open_postgres_with_pool(&paths, connection_string, pool)?;
         store.clock = clock;
         let store = Arc::new(store);
-        if store.all("users")?.is_empty() && bootstrap_token.len() < 32 {
+        if !store.connection()?.record_exists("users", &[])? && bootstrap_token.len() < 32 {
             return Err(invalid("空库首次启动需要至少 32 字符的一次性部署令牌。"));
         }
         Self::start(paths, store, retention, bootstrap_token)

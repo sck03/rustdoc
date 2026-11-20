@@ -10,7 +10,12 @@ use crate::{
     paths::{self, RuntimePaths},
 };
 use serde_json::{Value, json};
-use std::{path::PathBuf, process::Command, sync::TryLockError, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    sync::TryLockError,
+    time::Duration,
+};
 pub const OPERATIONS: &[Operation] = &[RECOGNIZE_OCR_IMAGE, UPLOAD_OCR_IMAGE, PREVIEW_OCR_IMAGE];
 const MAX_INPUT: usize = 25 * 1024 * 1024;
 pub struct Resources {
@@ -20,18 +25,17 @@ pub struct Resources {
 }
 impl Resources {
     pub fn new(paths: &RuntimePaths) -> Self {
-        let tools = paths.app_root.join("sidecar").join("ocr");
+        Self::from_root(&paths.app_root)
+    }
+    pub(crate) fn from_root(root: &Path) -> Self {
+        let tools = root.join("sidecar").join("ocr");
         Self {
             worker: tools.join(if cfg!(windows) {
                 "exportdoc-ocr.exe"
             } else {
                 "exportdoc-ocr"
             }),
-            models: paths
-                .app_root
-                .join("OcrModels")
-                .join("PaddleOCR")
-                .join("V6"),
+            models: root.join("OcrModels").join("PaddleOCR").join("V6"),
             library: tools.join(if cfg!(windows) {
                 "onnxruntime.dll"
             } else if cfg!(target_os = "macos") {
@@ -63,15 +67,15 @@ impl Resources {
         }
         Ok(())
     }
-    fn command(&self, paths: &RuntimePaths) -> Command {
+    pub(crate) fn command(&self, cache: &Path) -> Command {
         let mut command = Command::new(&self.worker);
         command
             .arg("--model-root")
             .arg(&self.models)
-            .current_dir(&paths.cache_root)
+            .current_dir(cache)
             .env("ORT_DYLIB_PATH", &self.library)
-            .env("TEMP", &paths.cache_root)
-            .env("TMP", &paths.cache_root)
+            .env("TEMP", cache)
+            .env("TMP", cache)
             .env_remove("EXPORTDOCMANAGER_MASTER_KEY");
         command
     }
@@ -139,7 +143,7 @@ pub fn recognize(service: &NativeService, bytes: &[u8], source: &str) -> Result<
         TryLockError::WouldBlock => error(429, "OCR 正在处理其他图片，请稍后重试。"),
         TryLockError::Poisoned(_) => unavailable("OCR 执行状态异常。"),
     })?;
-    let mut command = resources.command(&service.paths);
+    let mut command = resources.command(&service.paths.cache_root);
     command.arg("--recognize-stdin");
     let output = controlled_process::run(
         &mut command,
@@ -156,7 +160,7 @@ pub fn recognize(service: &NativeService, bytes: &[u8], source: &str) -> Result<
     decode_response(&output.stdout, source)
 }
 
-fn decode_response(bytes: &[u8], source: &str) -> Result<Value> {
+pub(crate) fn decode_response(bytes: &[u8], source: &str) -> Result<Value> {
     let result: Value =
         serde_json::from_slice(bytes).map_err(|_| unavailable("OCR 工具返回了无效结果。"))?;
     if result["id"] != "stdin" {

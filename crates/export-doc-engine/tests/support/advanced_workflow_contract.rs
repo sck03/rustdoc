@@ -128,20 +128,20 @@ pub fn exercise(service: &NativeService, admin: &str) {
         .find(|u| u["code"] == "DEFAULT")
         .unwrap()["id"]
         .to_string();
-    let duty = fixture::request(
-        service,
-        admin,
-        SAVE_RESPONSIBILITY,
-        Some(
-            json!({"unitId":unit,"code":format!("duty-{}",nonce().unwrap()),"name":"高级流程责任","workflowKinds":["general"],"assignments":[{"appointmentId":reviewer.appointment,"period":{"startsOn":"2026-01-01","endsOn":null}}],"isActive":true,"expectedVersion":0,"note":"有效职责"}),
-        ),
-    );
     let project = fixture::request(
         service,
         admin,
         SAVE_PROJECT,
         Some(
             json!({"unitId":unit,"code":format!("project-{}",nonce().unwrap()),"name":"有限审批项目","ownerAppointmentId":reviewer.appointment,"members":[{"appointmentId":applicant.appointment,"role":"Member","period":{"startsOn":"2026-01-01","endsOn":null}}],"isActive":true,"expectedVersion":0,"note":"有限成员"}),
+        ),
+    );
+    let duty = fixture::request(
+        service,
+        admin,
+        SAVE_RESPONSIBILITY,
+        Some(
+            json!({"unitId":unit,"code":format!("duty-{}",nonce().unwrap()),"name":"高级流程责任","workflowKinds":["general"],"assignments":[{"appointmentId":reviewer.appointment,"projectId":project["id"],"period":{"startsOn":"2026-01-01","endsOn":null}}],"isActive":true,"expectedVersion":0,"note":"有效职责"}),
         ),
     );
     let positions: Value = serde_json::from_slice(
@@ -246,7 +246,62 @@ pub fn exercise(service: &NativeService, admin: &str) {
         json!({"note":"提交"}),
     );
     assert_eq!(row["approvalPlan"]["steps"].as_array().unwrap().len(), 3);
+    let decision = fixture::decision_body(
+        service,
+        &reviewer.token,
+        APPROVE_GENERAL_REQUEST,
+        row["id"].as_i64().unwrap(),
+        Some(json!({"expectedVersion":row["versionNumber"],"note":"未分派账号不能签署"})),
+    );
+    assert_eq!(
+        fixture::call(
+            service,
+            &handler.token,
+            APPROVE_GENERAL_REQUEST,
+            row["id"].as_i64().unwrap(),
+            decision
+        )
+        .unwrap_err()
+        .status,
+        Some(403)
+    );
     for source in ["Position", "Responsibility", "ProjectLeader"] {
+        if source == "Responsibility" {
+            // A frozen task does not retain authority after its project duty expires.
+            let mut expired = duty.clone();
+            expired["expectedVersion"] = expired
+                .as_object_mut()
+                .unwrap()
+                .remove("versionNumber")
+                .unwrap();
+            expired["note"] = json!("撤销当前职责期间");
+            expired["assignments"][0]["period"]["endsOn"] = json!("2026-01-02");
+            let task = fixture::decision_body(
+                service,
+                &reviewer.token,
+                APPROVE_GENERAL_REQUEST,
+                row["id"].as_i64().unwrap(),
+                Some(json!({"expectedVersion":row["versionNumber"],"note":"过期来源不能签署"})),
+            );
+            let expired = fixture::request(service, admin, SAVE_RESPONSIBILITY, Some(expired));
+            assert_eq!(
+                fixture::call(
+                    service,
+                    &reviewer.token,
+                    APPROVE_GENERAL_REQUEST,
+                    row["id"].as_i64().unwrap(),
+                    task
+                )
+                .unwrap_err()
+                .status,
+                Some(403)
+            );
+            let mut restored = duty.clone();
+            restored.as_object_mut().unwrap().remove("versionNumber");
+            restored["expectedVersion"] = expired["versionNumber"].clone();
+            restored["note"] = json!("恢复职责供后续合同验证");
+            fixture::request(service, admin, SAVE_RESPONSIBILITY, Some(restored));
+        }
         row = command(
             service,
             &reviewer.token,

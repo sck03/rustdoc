@@ -1,3 +1,4 @@
+import { useDebouncedValue } from "../../ui/useDebouncedValue.ts";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
@@ -28,16 +29,17 @@ function FoundationEditor({ client, kind, unitId, item, onClose, onSaved }: { cl
   const [initial] = useState(() => foundationDraft(kind, unitId, item));
   const [draft, setDraft] = useState(initial);
   const [keyword, setKeyword] = useState("");
-  const options = useQuery({ queryKey: ["personnel-foundation", unitId, "candidates", keyword], queryFn: ({ signal }) => client.getIdentityCandidates({ unitId, keyword, pageSize: 100 }, { signal }) });
+  const search = useDebouncedValue(keyword, 250);
+  const options = useQuery({ enabled: draft.kind !== "positions", queryKey: ["personnel-foundation", unitId, "candidates", search], queryFn: ({ signal }) => client.getIdentityCandidates({ unitId, keyword: search, pageSize: 100 }, { signal }) });
   const operation = useOrganizationOperation();
   const patch = (update: Partial<FoundationDraft["body"]>) => setDraft(value => ({ ...value, body: { ...value.body, ...update } } as FoundationDraft));
   return <OfficeDialog title={`${item ? "编辑" : "新增"}${foundationLabels[kind]}`} onClose={onClose} {...operation} protectChanges hasChanges={JSON.stringify(draft) !== JSON.stringify(initial)}>
     <form onSubmit={event => { event.preventDefault(); void operation.run(signal => saveFoundation(client, draft, signal), onSaved); }} onInvalidCapture={event => { const details = (event.target as HTMLElement).closest("details"); if (details) details.open = true; }}>
       <fieldset disabled={operation.busy} className="office-form-grid">{"name" in draft.body && <><OfficeField label="名称"><input required maxLength={120} value={draft.body.name} onChange={event => patch({ name: event.target.value })} /></OfficeField><OfficeField label="代码"><input required maxLength={120} value={draft.body.code} onChange={event => patch({ code: event.target.value })} /></OfficeField></>}
-        <OfficeField label="查找人员或工号"><input type="search" maxLength={100} value={keyword} onChange={event => setKeyword(event.target.value)} /></OfficeField>
-        {options.isPending ? <PageState tone="loading" title="正在加载任职候选" /> : options.isError ? <PageState tone="error" title="任职候选加载失败" description={readApiError(options.error)} action={<button type="button" onClick={() => void options.refetch()}>重试</button>} /> : <>{draft.kind === "positions" && <PositionFields value={draft.body} options={options.data} patch={patch} />}{draft.kind === "responsibilities" && <ResponsibilityFields value={draft.body} options={options.data} patch={patch} />}{draft.kind === "projects" && <ProjectFields value={draft.body} options={options.data} patch={patch} />}{options.data.totalCount > options.data.items.length && <p role="status">请按姓名或工号检索所需人员。</p>}</>}
+        {draft.kind !== "positions" && <OfficeField label="查找人员或工号"><input type="search" maxLength={100} value={keyword} onChange={event => setKeyword(event.target.value)} /></OfficeField>}
+        {draft.kind === "positions" ? <PositionFields client={client} value={draft.body} patch={patch} /> : options.isPending ? <PageState tone="loading" title="正在加载任职候选" /> : options.isError ? <PageState tone="error" title="任职候选加载失败" description={readApiError(options.error)} action={<button type="button" onClick={() => void options.refetch()}>重试</button>} /> : <>{draft.kind === "responsibilities" && <ResponsibilityFields client={client} value={draft.body} options={options.data} patch={patch} />}{draft.kind === "projects" && <ProjectFields client={client} value={draft.body} options={options.data} patch={patch} />}{options.data.totalCount > options.data.items.length && <p role="status">请按姓名或工号检索所需人员。</p>}</>}
         {"isActive" in draft.body && <label className="checkbox-field"><input type="checkbox" checked={draft.body.isActive} onChange={event => patch({ isActive: event.target.checked })} />启用</label>}<OfficeField label="维护原因"><textarea required maxLength={500} value={draft.body.note} onChange={event => patch({ note: event.target.value })} /></OfficeField>
-      </fieldset><OfficeSubmit busy={operation.busy || !options.data} label={`保存${foundationLabels[kind]}`} />
+      </fieldset><OfficeSubmit busy={operation.busy || draft.kind !== "positions" && !options.data} label={`保存${foundationLabels[kind]}`} />
     </form>
   </OfficeDialog>;
 }

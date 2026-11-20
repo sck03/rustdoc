@@ -207,15 +207,15 @@ export function readNumber(
   path: string,
   issues: ReportDesignerSchemaIssue[],
 ) {
-  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value) : Number.NaN;
+  const parsed = typeof value === "number" ? value : Number.NaN;
   if (!Number.isFinite(parsed)) {
-    issues.push(createIssue("warning", path, "数字值无效，已使用默认值。"));
+    issues.push(createIssue("error", path, "必须使用有限 JSON 数字。"));
     return fallback;
   }
 
   const clamped = Math.min(max, Math.max(min, parsed));
   if (clamped !== parsed) {
-    issues.push(createIssue("warning", path, `数字值超出范围，已限制在 ${min}-${max}。`));
+    issues.push(createIssue("error", path, `数字必须在 ${min}-${max} 范围内。`));
   }
 
   return clamped;
@@ -229,7 +229,7 @@ export function readOptionalNumber(
   path: string,
   issues: ReportDesignerSchemaIssue[],
 ) {
-  if (value === undefined || value === null || value === "") {
+  if (value === undefined || value === null) {
     return undefined;
   }
 
@@ -243,13 +243,13 @@ export function readOptionalInteger(
   path: string,
   issues: ReportDesignerSchemaIssue[],
 ) {
-  if (value === undefined || value === null || value === "") {
+  if (value === undefined || value === null) {
     return undefined;
   }
 
-  const parsed = typeof value === "number" ? value : Number.parseFloat(String(value));
+  const parsed = typeof value === "number" ? value : Number.NaN;
   if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
-    issues.push(createIssue("warning", path, `整数必须为 ${min}-${max},已忽略。`));
+    issues.push(createIssue("error", path, `必须使用 ${min}-${max} 范围内的 JSON 整数。`));
     return undefined;
   }
 

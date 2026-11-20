@@ -59,6 +59,31 @@ pub(super) fn handle(
                 .as_i64()
                 .ok_or_else(|| unavailable("单位编号缺失。"))?;
             let scope = auth::data_scope(&actor, "office.people", "view-details");
+            if kind == "assignment-options" {
+                let find = |key| crate::engine::request_values::find(query, key).unwrap_or("");
+                let kind = find("kind");
+                if !matches!(kind, "projects" | "departments")
+                    || find("keyword").chars().count() > 100
+                {
+                    return Err(invalid("组织选项类别或检索词无效。"));
+                }
+                let selected = find("selectedIds")
+                    .split(',')
+                    .filter(|id| !id.is_empty())
+                    .map(|id| StableId::parse(id).map(|id| id.number()).map_err(invalid))
+                    .collect::<Result<Vec<_>>>()?;
+                if selected.len() > 200 {
+                    return Err(invalid("已选组织选项超过上限。"));
+                }
+                return Ok(tx.foundation_options(
+                    unit,
+                    kind,
+                    find("keyword"),
+                    &selected,
+                    (page - 1).saturating_mul(size),
+                    size,
+                )?);
+            }
             if kind == "candidates" {
                 let keyword = crate::engine::request_values::find(query, "keyword").unwrap_or("");
                 return Ok(tx.foundation_candidates(
@@ -101,6 +126,10 @@ pub(super) fn handle(
         } else {
             &body["assignments"]
         };
+        let previous = id
+            .map(|id| tx.foundation_get(&kind, unit, id))
+            .transpose()?
+            .flatten();
         for entry in children.as_array().into_iter().flatten() {
             let assigned = appointment(tx, unit, &code, &text(entry, "appointmentId"))?;
             if body["departmentId"].is_string() && assigned["departmentId"] != body["departmentId"]
@@ -115,7 +144,19 @@ pub(super) fn handle(
                         StableId::parse(project).map_err(invalid)?.number(),
                     )?
                     .ok_or_else(|| invalid("项目不属于当前单位。"))?;
-                if project["isActive"] != true {
+                let retained = previous.as_ref().is_some_and(|saved| {
+                    saved["assignments"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .any(|old| {
+                            entry["id"].is_string()
+                                && old["id"] == entry["id"]
+                                && old["appointmentId"] == entry["appointmentId"]
+                                && old["projectId"] == entry["projectId"]
+                        })
+                });
+                if project["isActive"] != true && !retained {
                     return Err(invalid("项目已停用。"));
                 }
             }

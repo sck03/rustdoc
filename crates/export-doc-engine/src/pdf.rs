@@ -1,8 +1,9 @@
+mod credit;
 mod merge;
+pub(crate) use credit::extract_text;
 mod native;
 use crate::{api::ApiError, engine::error::unavailable, paths::ensure_safe_absolute};
 pub use merge::{MAX_MERGE_INPUT, merge};
-use serde::{Deserialize, Serialize};
 use std::{
     io::{Read, Write},
     path::Path,
@@ -21,73 +22,22 @@ pub struct PdfPageImage {
 pub(super) const PREVIEW_LIMIT: u64 = 16 * 1024 * 1024;
 pub const PDF_LIMIT: u64 = 64 * 1024 * 1024;
 
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TextDocument {
-    pub page_count: u32,
+pub(super) struct TextPage {
     pub text: String,
-    pub raster_pixels: u64,
+    pub needs_ocr: bool,
 }
 
-fn decoder(
-    bytes: &[u8],
-    library: &Path,
-    mode: &str,
-    index: u32,
-    limit: usize,
-) -> Result<Vec<u8>, String> {
-    ensure_safe_absolute(library)?;
-    let mut command = Command::new(std::env::current_exe().map_err(|e| e.to_string())?);
-    command
-        .arg(mode)
-        .arg("--pdfium")
-        .arg(library)
-        .arg("--page")
-        .arg(index.to_string());
-    let output = crate::controlled_process::run(
-        &mut command,
-        bytes.to_vec(),
-        limit,
-        Duration::from_secs(60),
-    )
-    .map_err(|e| e.to_string())?;
-    if !output.status.success() {
-        return Err(format!("PDF 处理失败：{}", output.stderr.trim()));
-    }
-    Ok(output.stdout)
-}
-pub fn extract_text(bytes: &[u8], library: &Path) -> Result<TextDocument, String> {
-    serde_json::from_slice(&decoder(
-        bytes,
-        library,
-        "--pdf-text-worker",
-        0,
-        4 * 1024 * 1024,
-    )?)
-    .map_err(|_| "PDF 文字响应无效。".into())
-}
-pub fn ocr_page(bytes: &[u8], index: u32, library: &Path) -> Result<Vec<u8>, String> {
-    decoder(
-        bytes,
-        library,
-        "--pdf-ocr-page-worker",
-        index,
-        25 * 1024 * 1024,
-    )
-}
 /// Both desktop and HTTP executables provide the same isolated decoder entry.
 pub fn worker_args(args: &[String]) -> Option<Result<(), String>> {
     if args.iter().any(|a| a == "--pdf-merge-worker") {
         return Some(merge::worker(args));
     }
-    let mode = args.iter().find(|a| {
-        [
-            "--pdf-preview-worker",
-            "--pdf-text-worker",
-            "--pdf-ocr-page-worker",
-        ]
-        .contains(&a.as_str())
-    })?;
+    if args.iter().any(|a| a == "--pdf-credit-worker") {
+        return Some(credit::worker(args));
+    }
+    if !args.iter().any(|a| a == "--pdf-preview-worker") {
+        return None;
+    }
     Some((|| {
         let option = |key| {
             args.iter()
@@ -98,28 +48,7 @@ pub fn worker_args(args: &[String]) -> Option<Result<(), String>> {
         let index = option("--page")
             .and_then(|s| s.parse().ok())
             .ok_or("缺少 PDF 页码。")?;
-        if mode == "--pdf-preview-worker" {
-            return worker(library, index);
-        }
-        let mut bytes = Vec::new();
-        std::io::stdin()
-            .take(25 * 1024 * 1024 + 1)
-            .read_to_end(&mut bytes)
-            .map_err(|e| e.to_string())?;
-        if bytes.len() > 25 * 1024 * 1024 || !bytes.starts_with(b"%PDF-") {
-            return Err("无效或超限的 PDF 输入。".into());
-        }
-        let output = native::with_document(&bytes, library, |document| {
-            if mode == "--pdf-text-worker" {
-                serde_json::to_vec(&document.extract()?).map_err(|e| e.to_string())
-            } else {
-                Ok(document.render(index, true)?.png)
-            }
-        })?;
-        std::io::stdout()
-            .write_all(&output)
-            .and_then(|_| std::io::stdout().flush())
-            .map_err(|e| e.to_string())
+        worker(library, index)
     })())
 }
 

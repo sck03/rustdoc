@@ -375,8 +375,8 @@ function readGridSpan(
   path: string,
   issues: ReportDesignerSchemaIssue[],
 ) {
-  if (value === undefined || value === null || value === "") return fallback;
-  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number.parseFloat(value) : Number.NaN;
+  if (value === undefined) return fallback;
+  const parsed = typeof value === "number" ? value : Number.NaN;
   if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < min || parsed > max) {
     issues.push(createIssue("error", path, `合并跨度和行跨度必须是 ${min}-${max} 的整数。`));
     return Number.isFinite(parsed) ? Math.min(max, Math.max(min, Math.trunc(parsed))) : fallback;

@@ -5,7 +5,7 @@ use super::{
     media,
     records::text,
 };
-use crate::{generated_api::*, operation, pdf};
+use crate::{generated_api::*, pdf};
 use serde_json::{Value, json};
 use std::path::Path;
 
@@ -32,33 +32,20 @@ pub fn import(service: &NativeService, source: &str, bytes: &[u8]) -> Result<Val
         .to_ascii_lowercase();
     let (content, description) = match extension.as_str() {
         "txt" | "md" | "csv" | "json" | "xml" => (decode_text(bytes)?, "文本文件"),
-        "png" | "jpg" | "jpeg" | "bmp" | "gif" | "tif" | "tiff" | "webp" => {
+        "png" | "jpg" | "jpeg" | "bmp" | "tif" | "tiff" | "webp" => {
             (ocr(service, source, bytes)?, "图片 OCR")
         }
         "pdf" => {
-            let extracted =
-                pdf::extract_text(bytes, &service.paths.pdfium_path()).map_err(invalid)?;
-            let text = if useful_pdf_text(&extracted.text) {
-                extracted.text
-            } else {
-                let mut pages = Vec::new();
-                let mut characters = 0;
-                for index in 0..extracted.page_count {
-                    operation::check()?;
-                    let image = pdf::ocr_page(bytes, index, &service.paths.pdfium_path())
-                        .map_err(invalid)?;
-                    let text = ocr(service, source, &image)?;
-                    characters += text.chars().count();
-                    if characters > MAX_CHARACTERS {
-                        return Err(invalid("信用证提取文本超过 50 万字，请拆分文件。"));
-                    }
-                    if !text.trim().is_empty() {
-                        pages.push(text);
-                    }
+            #[cfg(feature = "ocr")]
+            let _lease = service.ocr_gate.try_lock().map_err(|cause| match cause {
+                std::sync::TryLockError::WouldBlock => {
+                    error(429, "OCR 正在处理其他文件，请稍后重试。")
                 }
-                pages.join("\n\n")
-            };
-            (text, "PDF")
+                std::sync::TryLockError::Poisoned(_) => {
+                    super::error::unavailable("OCR 执行状态异常。")
+                }
+            })?;
+            (pdf::extract_text(bytes, &service.paths)?, "PDF")
         }
         _ => return Err(invalid("请选择文本、PDF 或受支持的图片信用证文件。")),
     };
@@ -103,12 +90,6 @@ fn decode_text(bytes: &[u8]) -> Result<String> {
         )
         .map_err(|_| invalid("信用证文本须使用 UTF-8 或带 BOM 的 UTF-16 编码。"))
     }
-}
-fn useful_pdf_text(text: &str) -> bool {
-    text.chars()
-        .filter(|c| !c.is_whitespace() && !c.is_control())
-        .count()
-        >= 20
 }
 
 fn ocr(service: &NativeService, source: &str, bytes: &[u8]) -> Result<String> {

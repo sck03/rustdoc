@@ -28,6 +28,7 @@ pub(crate) trait Adapter: Send {
     semantic_operations! {
         scan_dashboard(scope: &DataScope<'_>, fields: &[(&str, &str)], before: Option<i64>) -> Vec<Value> => dashboard_query::scan;
         party_candidates(kind: &str, company: &str, keys: &[(&str, String)]) -> Vec<Value> => party_query::candidates;
+        sole_exporter_name(scope: &DataScope<'_>) -> Option<String> => party_query::sole_exporter_name;
         insert_file(file:&FileWrite<'_>)->() => file_catalog::insert;
         file_info(record:i64,kind:&str)->Option<FileInfo> => file_catalog::get;
         file_page(record:i64,prefix:&str,after:&str,limit:i64)->(i64,Vec<FileInfo>) => file_catalog::page;
@@ -57,6 +58,7 @@ pub(crate) trait Adapter: Send {
         permission_scheme_version(scheme: i64, version: i64) -> Option<Value> => permission_versions::publication;
         publish_permission_scheme(scheme: i64, body: &Value, actor: i64, time: &str) -> i64 => permission_versions::publish;
         foundation_candidates(unit: i64, keyword: &str, date: &str, offset: i64, limit: i64) -> Value => foundation::candidates;
+        foundation_options(unit: i64, kind: &str, keyword: &str, selected: &[i64], offset: i64, limit: i64) -> Value => foundation::options;
         foundation_list(kind: &str, unit: i64, scope: &DataScope<'_>, offset: i64, limit: i64) -> Value => foundation::list;
         foundation_appointment(unit: i64, key: &str) -> Option<Value> => foundation::appointment;
         foundation_get(kind: &str, unit: i64, id: i64) -> Option<Value> => foundation::get;

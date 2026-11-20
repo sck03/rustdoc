@@ -228,8 +228,13 @@ pub(super) fn rule(
         ) {
             continue;
         }
-        if stage.source == ApproverSource::ProjectLeader {
-            super::actor_binding::validate_project_source(tx, &scope, stage)?;
+        // Project-qualified duties require the real project and applicant. Validate
+        // their reference here; publication samples and submission resolve actors.
+        if matches!(
+            stage.source,
+            ApproverSource::ProjectLeader | ApproverSource::Responsibility
+        ) {
+            super::actor_binding::validate_context_source(tx, &scope, stage)?;
             continue;
         }
         if prospective

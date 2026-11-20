@@ -13,9 +13,8 @@ pub(crate) fn options(
     let unit = statement.number(unit);
     let appointment = statement.text(appointment);
     let day = statement.text(day);
-    let filter = format!(
-        "r.unit_id={unit} AND r.is_active=1 AND (r.owner_appointment_id={appointment} OR EXISTS(SELECT 1 FROM project_memberships member WHERE member.project_id=r.id AND member.appointment_id={appointment} AND member.starts_on<={day} AND (member.ends_on IS NULL OR {day}<member.ends_on)))"
-    );
+    let member = authority::project_member("r", &appointment, &day, false);
+    let filter = format!("r.unit_id={unit} AND r.is_active=1 AND {member}");
     let body = format!(
         "{}('id',CAST(r.id AS TEXT),'unitId',CAST(r.unit_id AS TEXT),'code',r.code,'name',r.name)",
         object(statement.pg)

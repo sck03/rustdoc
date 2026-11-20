@@ -1,5 +1,9 @@
 # 脚本使用说明
 
+`node scripts/test_credit_http.mjs <AppRoot>` 需要按当前源码构建的 `office_review` 和完整 OCR/PDFium 资源，在独立测试库验证仅发票权限的信用证上传、无权限拒绝、PDF/OCR 与登录并发、请求取消后的资源恢复。结果写入 `artifacts/credit-http`。
+
+2026-11-20 全项目复核收尾：`test_foundation_options_ui.mjs` 随 `test:identity-ui` 验证真实 React/HTTP 的职责项目分页、搜索、保存回显；设计器契约测试拒绝字符串数字和小数整数。`test_native_pdf.mjs <executable> <pdfium> <anonymous.pdf> [AppRoot]` 使用现行 `--pdf-credit-worker` 验证混合页面、同页文字/扫描图、合并和错误分类；需当前 OCR 包。`test_native_ocr.mjs <AppRoot>` 增加任务内多帧识别。已移除独立文字/逐页 OCR 旧进程入口，不维护旧测试调用。详细证据见[复核收尾记录](../docs/archive/2026-11/2026-11-20全项目复核收尾.md)。
+
 2026-11-20 装柜与资源优化：`test_packing_credit_workspace_ui.mjs` 验证方案生命周期、非法行不丢失、精度回读及 1024/1366/1920 宽度布局；夹具加载正式共用工具样式，独立夹具截图不代替完整桌面验收。`test_container_packing_render_blocks.mjs` 验证合批几何、数值边界和资源释放，输出的构建耗时不代表 FPS。`test_supplier_overview_ui.mjs` 纳入 `test:business-features-ui`，验证分页、全局统计与旧请求隔离。Full 桌面验收使用 `lib/native-packing-consistency.mjs` 和 `lib/native-supplier-overview.mjs` 核对真实 React/HTTP、布局、分页和 PDF；后者用隔离数据验证 31 家供应商的 30+1 分页。见[本批记录](../docs/archive/2026-11/2026-11-20装柜与资源优化.md)。
 
 2026-11-19 精度与稳定性：`test:invoice-editing` 覆盖十进制字符串输入、保存回读、5000 行编辑及舍入临界值；`test:office-ui` 覆盖附件失败后的身份锁定与重试。Rust HS 查询回归检查第 2,001 条之后的低使用次数实例，Storage 共用合同检查反馈规范化索引随写入更新。HTTP 回归验证缓冲等待、取消、发送释放，以及业务队列和响应预算占满时的独立空正文探针。记录见[本批验收](../docs/archive/2026-11/2026-11-19精度检索与稳定性修复.md)。
@@ -30,7 +34,7 @@
 
 核对日期：2026-11-13。当前使用全新 schema 18；旧实验库须另存后显式新建 DataRoot/数据库。日常文件已独立于数据库，完整迁机必须包含文件对象；下文带日期的旧验收条目不替代当前参数和能力。GitHub 入口与 quick/full 差异见[工作流手册](../docs/GitHub%20Actions工作流用途与运行手册.md)。
 
-OA 管理员和用户手册：`node scripts/generate-oa-manuals.mjs` 从 `docs/manuals` 的 Markdown 生成两份同名 PDF，使用现有 Playwright 和受管 Noto 字体；中间文件写入 `artifacts/oa-manuals`。首次准备前端依赖和报表字体，截图使用当前 `test_oa_custom_ui.mjs` 的匿名界面，分别保存为 `docs/manuals/images/form-designer.png`、`request-details.png`；更新后逐页检查中文、分页和完整性。阅读入口见[OA 手册](../docs/人员组织权限与OA操作手册.md)。
+操作与 OA 手册：`node scripts/generate-oa-manuals.mjs` 从 `docs/manuals` 的 Markdown 生成 OA 管理员、OA 用户和项目程序操作说明三份同名 PDF，复用 Playwright 和受管 Noto 字体；中间文件写入 `artifacts/oa-manuals`。先准备前端依赖与字体，匿名界面来源和日期见 `docs/manuals/images/README.md`，不能将保留截图冒充本批验收。更新后逐页检查中文、分页、表格、页码和完整性。阅读入口见[操作与 OA 手册](../docs/人员组织权限与OA操作手册.md)。
 
 普通依赖版本检查按月；完整依赖治理在每周一及相关改动/手动触发时执行，其余日期仅漏洞审计。GLib 的动态安全更新失败不受普通版本检查计划控制，详见[安全检查](../docs/依赖更新与安全检查.md)。
 

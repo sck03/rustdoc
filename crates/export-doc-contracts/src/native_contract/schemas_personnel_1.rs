@@ -236,7 +236,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("note",s().max_length(500)),("toContextId",s().max_length(150))
     ]).required(vec!["requestId","requestKind","expectedVersion","taskKey","fromUserId","toUserId","note"])),
     ("UnitTaskChange",o(vec![("requestId",i().format("int64")),("versionNumber",i().format("int64"))]).required(vec!["requestId","versionNumber"])),
-    ("IdentityDepartmentOption",o(vec![("id",s().pattern("^[1-9][0-9]{0,18}$")),("code",s().max_length(120)),("name",s().max_length(120))]).required(vec!["id","code","name"]).additional(Additional::Allowed(false))),
     ("IdentityAppointmentOption",o(vec![
         ("id",s()),("departmentId",s().pattern("^[1-9][0-9]{0,18}$")),("departmentCode",s().max_length(120)),
         ("jobTitle",s().max_length(120)),("positionId",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).default_value(serde_json::json!(null)).pattern("^[1-9][0-9]{0,18}$")),("isPrimary",b())

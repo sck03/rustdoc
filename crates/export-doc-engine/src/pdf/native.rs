@@ -3,6 +3,10 @@
 //! `pdfium-render` owns the C ABI and object lifetime. This module keeps the
 //! project-specific path validation, capacity limits and error wording so the
 //! HTTP/Tauri callers and worker protocol remain unchanged.
+use crate::{
+    api::ApiError,
+    engine::error::{invalid, unavailable},
+};
 use pdfium_render::prelude::*;
 use std::{io::Cursor, path::Path};
 
@@ -36,10 +40,18 @@ pub(super) fn with_document<T>(
     path: &Path,
     work: impl FnOnce(Document<'_>) -> Result<T, String>,
 ) -> Result<T, String> {
-    let pdfium = BoundPdfium::open(path)?.into_pdfium();
+    with_document_result(bytes, path, |document| work(document).map_err(invalid))
+        .map_err(|e| e.to_string())
+}
+pub(super) fn with_document_result<T>(
+    bytes: &[u8],
+    path: &Path,
+    work: impl FnOnce(Document<'_>) -> Result<T, ApiError>,
+) -> Result<T, ApiError> {
+    let pdfium = BoundPdfium::open(path).map_err(unavailable)?.into_pdfium();
     let inner = pdfium
         .load_pdf_from_byte_slice(bytes, None)
-        .map_err(|_| "PDF 已损坏、受密码保护或格式不受支持。".to_string())?;
+        .map_err(|_| invalid("PDF 已损坏、受密码保护或格式不受支持。"))?;
     work(Document { inner })
 }
 
@@ -118,16 +130,13 @@ impl Document<'_> {
         Ok((width, height))
     }
 
-    pub fn extract(&self) -> Result<super::TextDocument, String> {
+    pub fn extract(&self) -> Result<Vec<super::TextPage>, String> {
         let count = self.count()?;
         if count > 50 {
             return Err("信用证 PDF 最多 50 页。".into());
         }
-        let mut result = super::TextDocument {
-            page_count: count,
-            text: String::new(),
-            raster_pixels: 0,
-        };
+        let mut result = Vec::with_capacity(count as usize);
+        let mut raster_pixels = 0u64;
         let pages = self.inner.pages();
         let mut text_length = 0;
         for index in 0..count {
@@ -136,8 +145,8 @@ impl Document<'_> {
                 .map_err(|_| "PDF 页面无法读取。".to_string())?;
             let (points_x, points_y) = Self::dimensions(&page)?;
             let (width, height) = Self::ocr_dimensions(points_x as f64, points_y as f64)?;
-            result.raster_pixels += u64::from(width) * u64::from(height);
-            if result.raster_pixels > 200_000_000 {
+            raster_pixels += u64::from(width) * u64::from(height);
+            if raster_pixels > 200_000_000 {
                 return Err("信用证 PDF 总渲染像素超过 2 亿。".into());
             }
             let text_page = page
@@ -147,15 +156,25 @@ impl Document<'_> {
                 return Err("PDF 文本超过允许长度。".into());
             }
             let content = text_page.all();
-            if !content.trim().is_empty() {
-                if !result.text.is_empty() {
-                    result.text.push_str("\n\n");
-                    text_length += 2;
-                }
-                let content = content.trim();
-                text_length += content.chars().count();
-                result.text.push_str(content);
+            let content = content.trim().to_owned();
+            text_length += content.chars().count();
+            // Images and form objects may contain scanned text even when the page
+            // also has native headings. Never infer their content from text length.
+            let objects = page.objects();
+            let mut needs_ocr = content.is_empty() && !objects.is_empty();
+            for index in 0..objects.len() {
+                let object = objects
+                    .get(index)
+                    .map_err(|_| "PDF 页面对象无法读取。".to_string())?;
+                needs_ocr |= matches!(
+                    object.object_type(),
+                    PdfPageObjectType::Image | PdfPageObjectType::XObjectForm
+                );
             }
+            result.push(super::TextPage {
+                text: content,
+                needs_ocr,
+            });
             if text_length > 500_000 {
                 return Err("信用证文本超过 50 万字。".into());
             }

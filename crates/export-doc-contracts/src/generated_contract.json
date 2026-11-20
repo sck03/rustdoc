@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "fe5c19239be7ce569d9bdc20ce2fdace1be5f786278745df3ae6fe6b5ea1f97b",
+  "digest": "db8d8b8c82aeb49133568d2d78fa749a8976f53be2ffffc68e70956ed03405ce",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -37207,6 +37207,166 @@
       "requiresProcessingSlot": false,
       "validatesDecimalInput": false
     },
+    "GetIdentityAssignmentOptions": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "organization.directory",
+              "actions": [
+                "view"
+              ],
+              "administratorOnly": false
+            }
+          ]
+        }
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "unitId",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$"
+          }
+        },
+        {
+          "name": "kind",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "projects",
+              "departments"
+            ]
+          },
+          "required": true
+        },
+        {
+          "name": "keyword",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "maxLength": 100
+          }
+        },
+        {
+          "name": "selectedIds",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "maxLength": 4000
+          }
+        },
+        {
+          "name": "pageNumber",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentityAssignmentOptionPage"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/IdentityAssignmentOptionPage"
+      },
+      "timeoutSeconds": 30,
+      "maxJsonResponseBytes": 67108864,
+      "requiresProcessingSlot": false,
+      "validatesDecimalInput": false,
+      "foundation": {
+        "kind": "assignment-options",
+        "action": "list"
+      }
+    },
     "GetIdentityCandidates": {
       "policy": {
         "requiresAuthentication": true,
@@ -45983,28 +46143,12 @@
         "requiresDesktopAccess": true,
         "requiresLicense": true,
         "access": {
-          "match": "Any",
+          "match": "All",
           "resources": [
             {
-              "resourceKey": "document.report-templates",
+              "resourceKey": "document.invoices",
               "actions": [
-                "design",
-                "clone",
-                "publish",
-                "share",
-                "deactivate",
-                "archive",
-                "restore",
-                "import",
-                "export"
-              ],
-              "administratorOnly": false
-            },
-            {
-              "resourceKey": "document.report-resources",
-              "actions": [
-                "upload",
-                "recycle"
+                "operate"
               ],
               "administratorOnly": false
             }
@@ -46054,7 +46198,7 @@
         "$ref": "#/components/schemas/ApiLetterOfCreditImportResponse"
       },
       "timeoutSeconds": 600,
-      "maxJsonResponseBytes": 67108864,
+      "maxJsonResponseBytes": 4194304,
       "requiresProcessingSlot": false,
       "validatesDecimalInput": false
     },
@@ -60113,7 +60257,7 @@
         "$ref": "#/components/schemas/ApiLoginResponse"
       },
       "timeoutSeconds": 30,
-      "maxJsonResponseBytes": 67108864,
+      "maxJsonResponseBytes": 8388608,
       "requiresProcessingSlot": false,
       "validatesDecimalInput": false
     },
@@ -66257,7 +66401,7 @@
         "$ref": "#/components/schemas/ApiOcrRecognizeImageResponse"
       },
       "timeoutSeconds": 95,
-      "maxJsonResponseBytes": 67108864,
+      "maxJsonResponseBytes": 8388608,
       "requiresProcessingSlot": true,
       "validatesDecimalInput": false
     },
@@ -68993,7 +69137,7 @@
         "$ref": "#/components/schemas/ApiLoginResponse"
       },
       "timeoutSeconds": 30,
-      "maxJsonResponseBytes": 67108864,
+      "maxJsonResponseBytes": 8388608,
       "requiresProcessingSlot": false,
       "validatesDecimalInput": false
     },
@@ -71925,28 +72069,12 @@
         "requiresDesktopAccess": true,
         "requiresLicense": true,
         "access": {
-          "match": "Any",
+          "match": "All",
           "resources": [
             {
-              "resourceKey": "document.report-templates",
+              "resourceKey": "document.invoices",
               "actions": [
-                "design",
-                "clone",
-                "publish",
-                "share",
-                "deactivate",
-                "archive",
-                "restore",
-                "import",
-                "export"
-              ],
-              "administratorOnly": false
-            },
-            {
-              "resourceKey": "document.report-resources",
-              "actions": [
-                "upload",
-                "recycle"
+                "operate"
               ],
               "administratorOnly": false
             }
@@ -79030,7 +79158,7 @@
         "$ref": "#/components/schemas/ApiLoginResponse"
       },
       "timeoutSeconds": 30,
-      "maxJsonResponseBytes": 67108864,
+      "maxJsonResponseBytes": 8388608,
       "requiresProcessingSlot": false,
       "validatesDecimalInput": false
     },
@@ -86514,28 +86642,12 @@
         "requiresDesktopAccess": true,
         "requiresLicense": true,
         "access": {
-          "match": "Any",
+          "match": "All",
           "resources": [
             {
-              "resourceKey": "document.report-templates",
+              "resourceKey": "document.invoices",
               "actions": [
-                "design",
-                "clone",
-                "publish",
-                "share",
-                "deactivate",
-                "archive",
-                "restore",
-                "import",
-                "export"
-              ],
-              "administratorOnly": false
-            },
-            {
-              "resourceKey": "document.report-resources",
-              "actions": [
-                "upload",
-                "recycle"
+                "operate"
               ],
               "administratorOnly": false
             }
@@ -86591,7 +86703,7 @@
         "$ref": "#/components/schemas/ApiLetterOfCreditImportResponse"
       },
       "timeoutSeconds": 600,
-      "maxJsonResponseBytes": 67108864,
+      "maxJsonResponseBytes": 4194304,
       "requiresProcessingSlot": true,
       "validatesDecimalInput": false
     },
@@ -86670,7 +86782,7 @@
         "$ref": "#/components/schemas/ApiOcrRecognizeImageResponse"
       },
       "timeoutSeconds": 95,
-      "maxJsonResponseBytes": 67108864,
+      "maxJsonResponseBytes": 8388608,
       "requiresProcessingSlot": true,
       "validatesDecimalInput": false
     },
@@ -110080,20 +110192,62 @@
       ],
       "additionalProperties": false
     },
-    "IdentityCandidatePage": {
+    "IdentityAssignmentOption": {
       "type": "object",
       "properties": {
-        "departmentCount": {
+        "code": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,18}$"
+        },
+        "isActive": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "code",
+        "name",
+        "isActive"
+      ],
+      "additionalProperties": false
+    },
+    "IdentityAssignmentOptionPage": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/IdentityAssignmentOption"
+          }
+        },
+        "selected": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/IdentityAssignmentOption"
+          }
+        },
+        "totalCount": {
           "type": "integer",
           "format": "int64",
           "minimum": 0
-        },
-        "departments": {
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/IdentityDepartmentOption"
-          }
-        },
+        }
+      },
+      "required": [
+        "items",
+        "selected",
+        "totalCount"
+      ],
+      "additionalProperties": false
+    },
+    "IdentityCandidatePage": {
+      "type": "object",
+      "properties": {
         "items": {
           "type": "array",
           "items": {
@@ -110120,32 +110274,7 @@
         "items",
         "totalCount",
         "pageNumber",
-        "pageSize",
-        "departments",
-        "departmentCount"
-      ],
-      "additionalProperties": false
-    },
-    "IdentityDepartmentOption": {
-      "type": "object",
-      "properties": {
-        "code": {
-          "type": "string",
-          "maxLength": 120
-        },
-        "id": {
-          "type": "string",
-          "pattern": "^[1-9][0-9]{0,18}$"
-        },
-        "name": {
-          "type": "string",
-          "maxLength": 120
-        }
-      },
-      "required": [
-        "id",
-        "code",
-        "name"
+        "pageSize"
       ],
       "additionalProperties": false
     },

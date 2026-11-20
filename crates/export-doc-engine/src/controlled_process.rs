@@ -1,6 +1,10 @@
 //! A bounded native process tree with cancellable pipes. No shell interpolation.
+#[cfg(feature = "ocr")]
+mod frames;
 #[cfg(windows)]
 mod windows_job;
+#[cfg(feature = "ocr")]
+pub(crate) use frames::FramedProcess;
 
 use crate::{api::ApiError, operation};
 use std::{
@@ -18,10 +22,48 @@ pub struct Output {
 struct Process {
     child: Child,
     stopped: bool,
+    #[cfg(unix)]
+    own_group: bool,
     #[cfg(windows)]
     job: Option<windows_job::ProcessJob>,
 }
 impl Process {
+    fn spawn(command: &mut Command, own_group: bool) -> Result<Self, ApiError> {
+        operation::check()?;
+        command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000);
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            if own_group {
+                command.process_group(0);
+            }
+        }
+        let child = command
+            .spawn()
+            .map_err(|e| failure(format!("无法启动受控工具：{e}")))?;
+        let _ = own_group;
+        let mut process = Self {
+            child,
+            stopped: false,
+            #[cfg(unix)]
+            own_group,
+            #[cfg(windows)]
+            job: None,
+        };
+        #[cfg(windows)]
+        {
+            process.job = Some(windows_job::ProcessJob::attach(&process.child).map_err(failure)?);
+        }
+        Ok(process)
+    }
     fn stop(&mut self) {
         if self.stopped {
             return;
@@ -33,7 +75,9 @@ impl Process {
         }
         #[cfg(unix)]
         unsafe {
-            libc::kill(-(self.child.id() as i32), libc::SIGKILL);
+            if self.own_group {
+                libc::kill(-(self.child.id() as i32), libc::SIGKILL);
+            }
         }
         let _ = self.child.kill();
         let _ = self.child.wait();
@@ -76,34 +120,7 @@ pub fn run(
     output_limit: usize,
     timeout: Duration,
 ) -> Result<Output, ApiError> {
-    operation::check()?;
-    command
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        command.creation_flags(0x08000000);
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::CommandExt;
-        command.process_group(0);
-    }
-    let child = command
-        .spawn()
-        .map_err(|e| failure(format!("无法启动受控工具：{e}")))?;
-    let mut process = Process {
-        child,
-        stopped: false,
-        #[cfg(windows)]
-        job: None,
-    };
-    #[cfg(windows)]
-    {
-        process.job = Some(windows_job::ProcessJob::attach(&process.child).map_err(failure)?);
-    }
+    let mut process = Process::spawn(command, true)?;
     let mut stdin = process
         .child
         .stdin

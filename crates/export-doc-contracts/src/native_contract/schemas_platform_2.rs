@@ -160,8 +160,15 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["personId","name","employeeNumber","appointments"]).additional(Additional::Allowed(false))),
     ("IdentityCandidatePage",o(vec![
         ("items",a(r("IdentityPersonOption"))),("totalCount",i().minimum(num("0")).format("int64")),("pageNumber",i().minimum(num("0")).format("int64")),
-        ("pageSize",i().minimum(num("0")).format("int64")),("departments",a(r("IdentityDepartmentOption"))),("departmentCount",i().minimum(num("0")).format("int64"))
-    ]).required(vec!["items","totalCount","pageNumber","pageSize","departments","departmentCount"]).additional(Additional::Allowed(false))),
+        ("pageSize",i().minimum(num("0")).format("int64"))
+    ]).required(vec!["items","totalCount","pageNumber","pageSize"]).additional(Additional::Allowed(false))),
+    ("IdentityAssignmentOption",o(vec![
+        ("id",s().pattern("^[1-9][0-9]{0,18}$")),("code",s()),("name",s()),("isActive",b())
+    ]).required(vec!["id","code","name","isActive"]).additional(Additional::Allowed(false))),
+    ("IdentityAssignmentOptionPage",o(vec![
+        ("items",a(r("IdentityAssignmentOption"))), ("selected",a(r("IdentityAssignmentOption"))),
+        ("totalCount",i().minimum(num("0")).format("int64"))
+    ]).required(vec!["items","selected","totalCount"]).additional(Additional::Allowed(false))),
     ("IdentityEmployment",o(vec![
         ("id",s().pattern("^[1-9][0-9]{0,18}$")),("unitId",s().pattern("^[1-9][0-9]{0,18}$")),("personId",s().pattern("^[1-9][0-9]{0,18}$")),
         ("employeeNumber",s().max_length(120)),("stage",s().enumeration(Enumeration::Values(vec![serde_json::json!("Probation"),serde_json::json!("Regular"),serde_json::json!("Departed")]))),("period",r("IdentityEffectivePeriod")),

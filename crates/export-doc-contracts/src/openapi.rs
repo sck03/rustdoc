@@ -3,6 +3,9 @@
 mod native;
 pub use native::{DETAIL_FIELDS as OA_SHEET_DETAIL_FIELDS, SHEET_FIELDS as OA_SHEET_FIELDS};
 use serde_json::Value;
+#[cfg(test)]
+#[path = "contract_audit_fixes.rs"]
+mod audit_fixes;
 use std::sync::OnceLock;
 
 pub fn document() -> Value {
@@ -250,6 +253,7 @@ mod tests {
                 .unwrap()
                 .push(serde_json::json!(name));
         }
+        audit_fixes::apply(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

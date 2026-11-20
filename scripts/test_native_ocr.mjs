@@ -41,5 +41,26 @@ for (const bytes of [Buffer.alloc(0), Buffer.from('not an image'), Buffer.alloc(
   assert.equal(response.success, false);
   assert.equal(response.errorKind, 'invalid_input');
 }
-fs.writeFileSync(path.join(temporary, `result-${process.platform}-${process.arch}.json`), JSON.stringify({ platform: process.platform, architecture: process.arch, appRoot: app, rows }, null, 2));
+const frames = ['invoice', 'blank'].map(name => {
+  const image = fs.readFileSync(path.join(repo, `tests/OcrFixtures/${name}.png`));
+  const header = Buffer.alloc(4); header.writeUInt32LE(image.length);
+  return Buffer.concat([header, image]);
+});
+const start = performance.now();
+const batch = spawnSync(worker, ['--model-root', models, '--recognize-frames'], {
+  input: Buffer.concat(frames), cwd: temporary, env: environment, windowsHide: true, timeout: 180_000, maxBuffer: 8 * 1024 * 1024,
+});
+assert.ifError(batch.error); assert.equal(batch.status, 0, batch.stderr?.toString());
+let offset = 0;
+const results = [];
+while (offset < batch.stdout.length) {
+  const length = batch.stdout.readUInt32LE(offset); offset += 4;
+  results.push(JSON.parse(batch.stdout.subarray(offset, offset + length))); offset += length;
+}
+assert.equal(results.length, 2);
+assert.equal(results[0].fullText.replace(/\s/gu, ''), invoice.replace(/\s/gu, ''));
+assert.equal(results[1].fullText, '');
+assert(results.every(result => result.success));
+const batchMs = Math.round(performance.now() - start);
+fs.writeFileSync(path.join(temporary, `result-${process.platform}-${process.arch}.json`), JSON.stringify({ platform: process.platform, architecture: process.arch, appRoot: app, rows, batchMs, batchImages: results.length }, null, 2));
 console.log(`Native OCR: ${rows.length} real model samples, health and invalid-input boundaries passed (${process.platform}/${process.arch}).`);

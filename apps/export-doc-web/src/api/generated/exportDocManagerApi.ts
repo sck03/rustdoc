@@ -347,6 +347,7 @@ const operationDomains: Record<string, Domain> = {
   getGeneralRequestCommandResult: "office",
   getHsCode: "masterData",
   getHsCodeRemoteHealth: "masterData",
+  getIdentityAssignmentOptions: "organization",
   getIdentityCandidates: "organization",
   getInvoice: "invoices",
   getInvoiceDataMaintenancePreview: "system",

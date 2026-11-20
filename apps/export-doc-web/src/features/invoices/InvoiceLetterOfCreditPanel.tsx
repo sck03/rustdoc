@@ -20,7 +20,7 @@ type LetterOfCreditImportSource =
   | { kind: "browser"; file: File };
 
 const maximumLetterOfCreditBytes = 25 * 1024 * 1024;
-const letterOfCreditAccept = ".pdf,.txt,.md,.csv,.json,.xml,.png,.jpg,.jpeg,.bmp,.gif,.tif,.tiff,.webp";
+const letterOfCreditAccept = ".pdf,.txt,.md,.csv,.json,.xml,.png,.jpg,.jpeg,.bmp,.tif,.tiff,.webp";
 
 export function InvoiceLetterOfCreditPanel({
   client,

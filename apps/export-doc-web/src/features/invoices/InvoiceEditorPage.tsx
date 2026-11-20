@@ -35,7 +35,7 @@ function InvoiceEditor({
   attachmentsEnabled = false,
 }: InvoiceEditorProps) {
   const {
-    masterDataPermission, reportDesignPermission, navigate, formRef,
+    masterDataPermission, navigate, formRef,
     activeSection, workspaceDeviceMode, workspaceDeviceCapabilities, invoice, invoicePermission,
     singleWindowPermission, message, setMessage, successMessage, setSuccessMessage,
     concurrencyMessage, setIsLetterOfCreditBusy, persistedInvoiceStatus, cancelReason, setCancelReason,
@@ -202,8 +202,8 @@ function InvoiceEditor({
             partyMessage={partyMessage}
             sealBusy={exporterSealMutation.isPending}
             profitAnalysisDisabled={!invoicePermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
-            letterOfCreditDisabled={!isInvoiceEditable || !workspaceDeviceCapabilities.canUseAdvancedTools || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
-            letterOfCreditReviewDisabled={!invoicePermission.canOperate || !reportDesignPermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
+            letterOfCreditDisabled={!isInvoiceEditable || !workspaceDeviceCapabilities.canUseAdvancedTools || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
+            letterOfCreditReviewDisabled={!invoicePermission.canOperate || invoiceQuery.isFetching || saveInvoiceMutation.isPending}
             onNavigate={navigateInvoiceSection}
             onUppercase={uppercaseInvoiceText}
             onChange={patchInvoice}

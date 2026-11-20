@@ -11,6 +11,8 @@ fn prior_policy(id: &str) -> &'static Value {
     // Aggregate reads retain the independently frozen assessment-list permissions.
     let id = if id == GET_SUPPLIER_ASSESSMENT_ANALYTICS.id {
         LIST_SUPPLIER_ASSESSMENTS.id
+    } else if id == GET_IDENTITY_ASSIGNMENT_OPTIONS.id {
+        GET_IDENTITY_CANDIDATES.id
     } else {
         id
     };
@@ -93,6 +95,14 @@ fn prior_decision(
                         .any(|g| g.resource_key == key && g.action == prior_action(key, action)))
     };
     // Reviewed status access supports sending without granting delivery history.
+    if matches!(
+        op,
+        IMPORT_LETTER_OF_CREDIT_DOCUMENT
+            | UPLOAD_LETTER_OF_CREDIT_DOCUMENT
+            | REVIEW_LETTER_OF_CREDIT_COMPLIANCE
+    ) {
+        return allows("document.invoices", "operate");
+    }
     if op == FETCH_REMOTE_HS_CODE_DETAIL {
         return allows("document.hs-knowledge", "view");
     }

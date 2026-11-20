@@ -6,6 +6,8 @@ import { identityQueryRoots, queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 
+import { AssignmentOptionPicker } from "../organization/AssignmentOptionPicker.tsx";
+
 const modes: Record<AccessRestrictionSave["mode"], string> = {
   Deny: "禁止此动作", Unrestricted: "撤销附加限制，保留原授权", Units: "指定单位集合",
   Departments: "指定部门集合", Projects: "明确项目关系", Participation: "本人及明确参与事项",
@@ -58,12 +60,10 @@ function ScopeRestrictionEditor({ client, principalKind, principalId, company, r
   const [error, setError] = useState("");
   const cache = useQueryClient();
   const unit = directory.companies.find(item => item.code === company);
-  const projects = useQuery({ queryKey: ["personnel-foundation", unit?.id, "scope-projects"], enabled: mode === "Projects" && Boolean(unit),
-    queryFn: ({ signal }) => client.listProjects({ unitId: String(unit?.id), pageSize: 100 }, { signal }) });
   const choices = mode === "Units" ? directory.companies.map(item => ({ id: String(item.id), name: item.name }))
     : mode === "Departments" ? directory.departments.filter(item => principalKind === "Account" || item.companyCode === company)
       .map(item => ({ id: String(item.id), name: `${item.companyCode} · ${item.name}` }))
-    : projects.data?.items.map(item => ({ id: item.id, name: item.name })) ?? [];
+    : [];
   const key = ["access-restrictions", principalKind, principalId] as const;
   const operation = useScopedMutation(`${principalKind}:${principalId}:${resourceKey}:${action}`, client, {
     mutationFn: (_: void, signal) => client.saveAccessRestriction({ body: { principalKind, principalId: String(principalId), resourceKey, action,
@@ -81,10 +81,10 @@ function ScopeRestrictionEditor({ client, principalKind, principalId, company, r
       <OfficeField label="附加范围或限制"><select value={mode} onChange={event => { setMode(event.target.value as AccessRestrictionSave["mode"]); setMembers([]); }}>
         {Object.entries(modes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
       </select></OfficeField>
-      {hasMembers && <fieldset><legend>明确范围成员</legend>{choices.map(choice => <label className="checkbox-field" key={choice.id}>
+      {mode === "Projects" && unit && <AssignmentOptionPicker client={client} unitId={String(unit.id)} kind="projects" label="明确项目关系" values={members} multiple onChange={setMembers} />}
+      {hasMembers && mode !== "Projects" && <fieldset><legend>明确范围成员</legend>{choices.map(choice => <label className="checkbox-field" key={choice.id}>
         <input type="checkbox" checked={members.includes(choice.id)} onChange={event => setMembers(value => event.target.checked ? [...value, choice.id] : value.filter(id => id !== choice.id))} />{choice.name}
       </label>)}</fieldset>}
-      {projects.isError && mode === "Projects" && <p role="alert">{readApiError(projects.error)}</p>}
       <OfficeField label="限制或调整原因"><input required maxLength={500} value={reason} onChange={event => setReason(event.target.value)} /></OfficeField>
       <button type="button" className="command-button secondary" disabled={!reason.trim() || hasMembers && members.length === 0}
         onClick={() => { setError(""); operation.mutate(); }}>保存明确限制</button>

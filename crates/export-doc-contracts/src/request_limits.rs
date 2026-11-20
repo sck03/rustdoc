@@ -34,6 +34,10 @@ pub(crate) fn response_schema_bytes(schema: &str) -> usize {
         | "ApiLogoutResponse"
         | "ApiCrmCustomerBatchStatusResult" => 64 * 1024,
         "ApiSupplierAssessmentAnalyticsDto" => 1024 * 1024,
+        // Text extraction is capped at 500k characters, including JSON escaping.
+        "ApiLetterOfCreditImportResponse" => 4 * 1024 * 1024,
+        // OCR's bounded worker response is at most 4 MiB; leave projection headroom.
+        "ApiOcrRecognizeImageResponse" | "ApiLoginResponse" => 8 * 1024 * 1024,
         _ => MAX_JSON_RESPONSE_BYTES,
     }
 }

@@ -57,7 +57,7 @@ fn source_unit(
         }
     }
 }
-pub(super) fn validate_project_source(
+pub(super) fn validate_context_source(
     tx: &Connection,
     actor: &Actor,
     stage: &ApprovalStage,
@@ -65,12 +65,17 @@ pub(super) fn validate_project_source(
     let id = stage
         .source_id
         .as_ref()
-        .ok_or_else(|| invalid("项目来源缺少稳定编号。"))?
+        .ok_or_else(|| invalid("职责来源缺少稳定编号。"))?
         .number();
-    let unit = source_unit(tx, actor, stage, "projects", id)?;
-    tx.foundation_get("projects", records::positive(&unit, "id", "项目单位")?, id)?
+    let kind = if stage.source == ApproverSource::Responsibility {
+        "responsibilities"
+    } else {
+        "projects"
+    };
+    let unit = source_unit(tx, actor, stage, kind, id)?;
+    tx.foundation_get(kind, records::positive(&unit, "id", "来源单位")?, id)?
         .filter(|p| p["isActive"] == true)
-        .ok_or_else(|| invalid("项目来源已停用或不属于路由单位。"))?;
+        .ok_or_else(|| invalid("职责来源已停用或不属于路由单位。"))?;
     Ok(())
 }
 pub(super) fn resolve(

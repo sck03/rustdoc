@@ -389,6 +389,7 @@ impl Connection {
 delegate! {
     scan_dashboard(scope:&DataScope<'_>,fields:&[(&str,&str)],before:Option<i64>)->Vec<Value>;
     party_candidates(kind:&str,company:&str,keys:&[(&str,String)])->Vec<Value>;
+    sole_exporter_name(scope:&DataScope<'_>)->Option<String>;
     insert_file(file:&FileWrite<'_>)->();
     file_info(record:i64,kind:&str)->Option<FileInfo>;
     file_page(record:i64,prefix:&str,after:&str,limit:i64)->(i64,Vec<FileInfo>);
@@ -416,6 +417,7 @@ delegate! {
     permission_scheme_version(scheme:i64,version:i64)->Option<Value>;
     publish_permission_scheme(scheme:i64,body:&Value,actor:i64,time:&str)->i64;
     foundation_candidates(unit:i64,keyword:&str,date:&str,offset:i64,limit:i64)->Value;
+    foundation_options(unit:i64,kind:&str,keyword:&str,selected:&[i64],offset:i64,limit:i64)->Value;
     foundation_list(kind:&str,unit:i64,scope:&DataScope<'_>,offset:i64,limit:i64)->Value;
     foundation_appointment(unit:i64,key:&str)->Option<Value>;
     foundation_get(kind:&str,unit:i64,id:i64)->Option<Value>;
