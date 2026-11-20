@@ -117,7 +117,7 @@ export function useInvoiceListSingleWindowOperations({ client, queryClient, defa
     await run("export", async ({ signal, checkCurrent }) => {
       const targetPath = await requestSingleWindowPackageOpenPath();
       checkCurrent(); if (!targetPath) return;
-      const response = await client.importSingleWindowReceiptPackage({ body: { packagePath: targetPath, keepWorkingDirectory: false } }, { signal });
+      const response = await client.importSingleWindowReceiptPackage({ body: { packagePath: targetPath } }, { signal });
       checkCurrent(); setPackagePath(response.packagePath || null); setMessageType("success");
       setMessage(`${response.message || "单一窗口回执包已导入。"} ${response.persistedReceiptCount > 0 ? `新增回执 ${response.persistedReceiptCount} 条。` : "没有新增回执。"}`);
       await Promise.all([queryKeys.invoicesRoot(), queryKeys.queryInvoicesRoot(), queryKeys.dashboard(), queryKeys.singleWindowOperationCenterRoot()].map(queryKey => queryClient.invalidateQueries({ queryKey })));

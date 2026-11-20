@@ -227,7 +227,7 @@ pub(super) fn resolve(
                     text(row, "routingDepartment")
                 };
                 let department = tx
-                    .find_identity("departments", &store::department_identity(&unit, &code)?)?
+                    .find_identity("departments", &store::company_identity(&unit, &code)?)?
                     .ok_or_else(|| conflict("路由部门已失效。"))?;
                 Some(
                     export_doc_domain::identity::StableId::parse(

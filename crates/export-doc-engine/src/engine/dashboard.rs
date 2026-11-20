@@ -22,7 +22,14 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
     let end = start
         .checked_add_months(Months::new(1))
         .ok_or_else(|| unavailable("业务月份超出范围。"))?;
-    let mut preferred = BTreeMap::<(String, String), Value>::new();
+    let mut totals = [[Decimal::ZERO; 2]; 2];
+    let mut monthly_count = 0usize;
+    let mut currencies = BTreeMap::<String, [Decimal; 2]>::new();
+    let mut statuses = BTreeMap::<String, usize>::new();
+    // Only recent display rows and bounded per-status todos survive a batch.
+    let mut records = Vec::<Value>::new();
+    let mut todo_records = BTreeMap::<String, Vec<Value>>::new();
+    let mut total_active = 0usize;
     let schema = contracts::schema("ApiDashboardRecentInvoiceDto");
     let mut fields: Vec<_> = schema["properties"]
         .as_object()
@@ -53,103 +60,73 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
         }
     }
     store.read(|tx| {
-        let mut offset = 0;
+        let actor = auth::refresh_actor_in(tx, actor)?;
+        auth::authorize(&actor, "document.invoices", "view")?;
+        let mut before = None;
+        let scope = auth::data_scope(&actor, "document.invoices", "view");
         loop {
             crate::operation::check()?;
-            let (total, batch) = tx.query_business(&export_doc_storage::BusinessQuery {
-                list: export_doc_storage::BusinessList::Dashboard,
-                scope: auth::data_scope(actor, "document.invoices", "view"),
-                fields: &fields,
-                offset,
-                limit: 200,
-            })?;
+            let batch = tx.scan_dashboard(&scope, &fields, before)?;
             if batch.is_empty() {
                 break;
             }
-            offset += batch.len() as i64;
             for record in batch {
                 crate::operation::check()?;
-                let key = (text(&record, "companyScope"), text(&record, "invoiceNo"));
-                let rank = |record: &Value| {
-                    let kind = text(record, "type");
-                    (
-                        if kind.contains("实际") {
-                            2
-                        } else if kind.contains("报关") {
-                            1
-                        } else {
-                            0
-                        },
-                        record["id"].as_i64().unwrap_or(0),
-                    )
-                };
-                if preferred
-                    .get(&key)
-                    .is_none_or(|current| rank(&record) > rank(current))
-                {
-                    preferred.insert(key, record);
+                before = Some(
+                    record["id"]
+                        .as_i64()
+                        .ok_or_else(|| unavailable("发票编号损坏。"))?,
+                );
+                total_active += 1;
+                let status = text(&record, "status");
+                *statuses.entry(status.clone()).or_default() += 1;
+                if records.len() < 10 {
+                    records.push(record.clone());
                 }
-            }
-            if offset >= total {
-                break;
+                let limit = match status.as_str() {
+                    "Draft" => 3,
+                    "Verified" | "Shipped" => 5,
+                    _ => 0,
+                };
+                let todos = todo_records.entry(status).or_default();
+                if todos.len() < limit {
+                    todos.push(record.clone());
+                }
+                let date = NaiveDate::parse_from_str(&text(&record, "invoiceDate"), "%Y-%m-%d")
+                    .map_err(|_| unavailable("发票业务日期损坏。"))?;
+                if date < previous || date >= end {
+                    continue;
+                }
+                let period = usize::from(date >= start);
+                monthly_count += period;
+                let currency = text(&record, "currency").trim().to_ascii_uppercase();
+                if currency.is_empty() {
+                    return Err(unavailable("发票币种缺失。"));
+                }
+                let amount: Decimal = serde_json::from_value(record["totalAmount"].clone())
+                    .map_err(|_| unavailable("发票出口金额无效。"))?;
+                let amounts = currencies.entry(currency).or_default();
+                amounts[period] = amounts[period]
+                    .checked_add(amount)
+                    .ok_or_else(|| unavailable("币种金额汇总超出范围。"))?;
+                for (column, key) in ["totalProfit", "totalTaxRefundAmount"].iter().enumerate() {
+                    let value: Decimal = serde_json::from_value(record[*key].clone())
+                        .map_err(|_| unavailable(format!("发票统计字段 {key} 无效。")))?;
+                    totals[period][column] = totals[period][column]
+                        .checked_add(value)
+                        .ok_or_else(|| unavailable("发票汇总超出金额范围。"))?;
+                }
             }
         }
         Ok(())
     })?;
-    let mut records: Vec<_> = preferred.into_values().collect();
-    records.sort_by_key(|record| std::cmp::Reverse(record["id"].as_i64()));
-    let mut totals = [[Decimal::ZERO; 3]; 2];
-    let mut counts = [0usize; 2];
-    let mut currencies = BTreeMap::<String, [Decimal; 2]>::new();
-    for record in &records {
-        let date = NaiveDate::parse_from_str(&text(record, "invoiceDate"), "%Y-%m-%d")
-            .map_err(|_| unavailable("发票业务日期损坏。"))?;
-        if date < previous || date >= end {
-            continue;
-        }
-        let period = usize::from(date >= start);
-        counts[period] += 1;
-        for (column, key) in ["totalAmount", "totalProfit", "totalTaxRefundAmount"]
-            .iter()
-            .enumerate()
-        {
-            let value: Decimal = serde_json::from_value(record[*key].clone())
-                .map_err(|_| unavailable(format!("发票统计字段 {key} 无效。")))?;
-            if *key == "totalAmount" {
-                let currency = text(record, "currency").trim().to_ascii_uppercase();
-                if currency.is_empty() {
-                    return Err(unavailable("发票币种缺失。"));
-                }
-                let amounts = currencies.entry(currency).or_default();
-                amounts[period] = amounts[period]
-                    .checked_add(value)
-                    .ok_or_else(|| unavailable("币种金额汇总超出范围。"))?;
-                continue;
-            }
-            totals[period][column] = totals[period][column]
-                .checked_add(value)
-                .ok_or_else(|| unavailable("发票汇总超出金额范围。"))?;
-        }
-    }
-    // Frozen scalar fields are meaningful only when both months use one currency.
-    if currencies.len() == 1 {
-        let amounts = currencies.values().next().unwrap();
-        for period in 0..2 {
-            totals[period][0] = amounts[period];
-        }
-    }
     let mut result = contracts::object(GET_DASHBOARD.id, false);
     for (period, prefix) in [(0, "previousMonthly"), (1, "monthly")] {
-        for (column, suffix) in ["ExportAmount", "Profit", "TaxRefund"].iter().enumerate() {
+        for (column, suffix) in ["Profit", "TaxRefund"].iter().enumerate() {
             result[format!("{prefix}{suffix}")] = json!(totals[period][column]);
         }
     }
-    result["monthlyInvoiceCount"] = json!(counts[1]);
-    result["exportAmountCurrency"] = json!(if currencies.len() == 1 {
-        currencies.keys().next().cloned().unwrap()
-    } else {
-        String::new()
-    });
+    result["monthlyInvoiceCount"] = json!(monthly_count);
     result["exportAmountsByCurrency"] = json!(currencies.into_iter().map(|(currency,amounts)|json!({"currency":currency,"monthlyAmount":amounts[1],"previousMonthlyAmount":amounts[0]})).collect::<Vec<_>>());
     result["periodLabel"] = json!(format!("{}年{}月", today.year(), today.month()));
     for (field, status) in [
@@ -158,17 +135,12 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
         ("shippedCount", "Shipped"),
         ("completedCount", "Completed"),
     ] {
-        result[field] = json!(
-            records
-                .iter()
-                .filter(|record| record["status"] == status)
-                .count()
-        );
+        result[field] = json!(statuses.get(status).copied().unwrap_or(0));
     }
     result["pendingCount"] = json!(
         result["draftCount"].as_u64().unwrap_or(0) + result["verifiedCount"].as_u64().unwrap_or(0)
     );
-    result["totalActiveCount"] = json!(records.len());
+    result["totalActiveCount"] = json!(total_active);
     result["recentInvoices"] = json!(
         records
             .iter()
@@ -202,7 +174,7 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
             3,
         ),
     ] {
-        todos.extend(records.iter().filter(|record|record["status"]==status).take(count).map(|record|json!({"title":title,"description":format!("发票 {} {description}",text(record,"invoiceNo")),"actionType":"ViewInvoice","referenceId":record["id"].to_string()})));
+        todos.extend(todo_records.get(status).into_iter().flatten().take(count).map(|record|json!({"title":title,"description":format!("发票 {} {description}",text(record,"invoiceNo")),"actionType":"ViewInvoice","referenceId":record["id"].to_string()})));
     }
     result["todoItems"] = json!(todos);
     result["storagePolicy"] = json!(

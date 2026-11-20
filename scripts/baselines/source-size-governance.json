@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-11-19",
-  "reviewNotes": "2026-11-19 against c0481632: decimal text contracts and independent evolution assertions; compact HS ranking with bounded result hydration and indexed feedback; shared JSON response exits; separate cancel-safe response admission and dependency probes, each with behavioral regression tests. Retire five redundant endpoints and the duplicate V3 JSON contract. Rust totals include source-local regression tests. Advance only the two measured Rust baselines; retain all module caps, aggregate growth allowances and the previous supplier module limits. Evidence: docs/archive/2026-11/2026-11-19精度检索与稳定性修复.md.",
+  "updatedAt": "2026-11-20",
+  "reviewNotes": "2026-11-20 against 95662c3c: bounded Storage dashboard and company-scoped party queries; shared company identity helper; isolated contract retirement assertions; resource submission snapshot UI reuses ApprovalDocument and shared controls. Typed master-data projections reuse normalization field lists instead of duplicating mappings. Added SQLite/PostgreSQL cross-company read/write, ambiguity/order and keyset-boundary regressions plus real React lifecycle/history tests. Advance only measured affected aggregate baselines; preserve per-file caps and existing growth allowances. Evidence: docs/archive/2026-11/2026-11-20项目审查修复与清理.md. Scope parity follow-up projects resolved restrictions through the native contract and one shared UI predicate; the keyed restriction editor reuses scoped mutation and hydrates saved members. Invoice list actions use declared ownership fields.",
   "rules": [
     {
       "name": "repository web production default",
@@ -10,9 +10,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 88532,
+      "baselineAggregateLines": 88821,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 88732,
+      "maximumAggregateLines": 89021,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 114887,
+      "baselineAggregateLines": 114932,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 114962,
+      "maximumAggregateLines": 115007,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 34570,
+      "baselineAggregateLines": 34958,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 34690,
+      "maximumAggregateLines": 35078,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 30557,
+      "baselineAggregateLines": 30724,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 30707,
+      "maximumAggregateLines": 30874,
       "reportFiles": false
     },
     {
@@ -128,8 +128,8 @@
       "directory": "apps/export-doc-web/src/features/office",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 220,
-      "maximumAggregateLines": 1100,
-      "baselineAggregateLines": 1063,
+      "maximumAggregateLines": 1167,
+      "baselineAggregateLines": 1130,
       "maximumAggregateGrowthLines": 30,
       "excludePattern": "/(?:Personnel.*|personnelModel|usePersonnelData|usePersonnelImage|usePersonnelPositions)\\.(?:ts|tsx)$"
     },

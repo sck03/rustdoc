@@ -2,7 +2,7 @@ use super::*;
 use crate::engine::{file_store::FileStore, test_support::ScratchDirectory};
 
 #[test]
-fn cached_local_reads_have_independent_cursors_and_detect_same_size_tampering() {
+fn local_reads_have_independent_cursors_and_detect_same_size_tampering() {
     let root = ScratchDirectory::new();
     let store = FileStore::open(&root.paths(), false).unwrap();
     let prepared = store.prepare(b"original").unwrap();
@@ -34,6 +34,6 @@ fn cached_local_reads_have_independent_cursors_and_detect_same_size_tampering() 
     fs::remove_file(&path).unwrap();
     assert!(
         store.open_object(&prepared.object).is_err(),
-        "metadata cache cannot resurrect missing files"
+        "missing files must fail closed"
     );
 }

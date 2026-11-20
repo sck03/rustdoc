@@ -137,5 +137,93 @@ pub fn exercise(c: &Connection) {
         serde_json::to_vec(&page).unwrap().len(),
         started.elapsed().as_micros()
     );
+    // Preferred versions are chosen within visibility, before bounded keyset paging.
+    let mut selected = vec![];
+    for index in 0..205 {
+        let mut row = base.clone();
+        row["invoiceNo"] = json!(format!("DASH-{index}"));
+        row["type"] = json!("实际数据");
+        let id = insert(c, "invoices", row.clone());
+        selected.push(id);
+        row["type"] = json!("报关数据");
+        insert(c, "invoices", row.clone());
+        row["type"] = json!("实际数据");
+        row["companyScope"] = json!("OTHER");
+        insert(c, "invoices", row);
+    }
+    let mut before = None;
+    let mut actual = vec![];
+    loop {
+        let rows = c
+            .scan_dashboard(
+                &scope(),
+                &[("id", "id"), ("invoiceNo", "invoiceNo")],
+                before,
+            )
+            .unwrap();
+        if rows.is_empty() {
+            break;
+        }
+        assert!(rows.len() <= 200);
+        before = rows.last().unwrap()["id"].as_i64();
+        actual.extend(
+            rows.into_iter()
+                .filter(|r| r["invoiceNo"].as_str().unwrap().starts_with("DASH-"))
+                .map(|r| r["id"].as_i64().unwrap()),
+        );
+    }
+    selected.reverse();
+    assert_eq!(actual, selected);
+    let visible = insert(
+        c,
+        "invoices",
+        json!({"companyScope":"QUERY","ownerUserId":901,"invoiceNo":"VISIBLE-VERSION","type":"报关数据","status":"Draft","versionNumber":1}),
+    );
+    insert(
+        c,
+        "invoices",
+        json!({"companyScope":"QUERY","ownerUserId":902,"invoiceNo":"VISIBLE-VERSION","type":"实际数据","status":"Draft","versionNumber":1}),
+    );
+    insert(
+        c,
+        "invoices",
+        json!({"companyScope":"QUERY","ownerUserId":901,"invoiceNo":"VISIBLE-VERSION","type":"实际数据","status":"Cancelled","versionNumber":1}),
+    );
+    let rows = c
+        .scan_dashboard(
+            &DataScope {
+                company: "QUERY",
+                user_id: 901,
+                own: true,
+                ..Default::default()
+            },
+            &[("id", "id")],
+            None,
+        )
+        .unwrap();
+    assert_eq!(
+        rows[0]["id"], visible,
+        "invisible or cancelled versions cannot displace an authorized invoice"
+    );
+    for (name, tax, company) in [
+        ("École", "A", "QUERY"),
+        ("Other", "B", "QUERY"),
+        ("École", "B", "OTHER"),
+    ] {
+        insert(
+            c,
+            "customers",
+            json!({"customerNameEN":name,"taxId":tax,"companyScope":company,"versionNumber":1}),
+        );
+    }
+    let candidates = c
+        .party_candidates(
+            "customers",
+            "QUERY",
+            &[("customerNameEN", "ÉCOLE".into()), ("taxId", "B".into())],
+        )
+        .unwrap();
+    assert_eq!(candidates.len(), 2);
+    assert!(candidates.iter().all(|r| r["companyScope"] == "QUERY"));
     c.rollback().unwrap();
 }

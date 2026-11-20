@@ -86,7 +86,7 @@ pub(super) fn validate_definition(
     form: &FormDefinition,
 ) -> Result<()> {
     for department in &form.department_ids {
-        let identity = store::department_identity(company, department)?;
+        let identity = store::company_identity(company, department)?;
         if !tx
             .find_identity("departments", &identity)?
             .is_some_and(|d| d["isActive"] == true)

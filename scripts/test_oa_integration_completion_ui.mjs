@@ -156,6 +156,24 @@ await withOfficeUi('oa-completion-ui', async ({output,url,invoke,openPage,requir
   const decision=successor.getByRole('dialog',{name:'批准',exact:true});await decision.getByRole('button',{name:'批准',exact:true}).click();await decision.waitFor({state:'hidden'});
   await successor.locator('summary').filter({hasText:'申请附件、审批单与任务移交'}).click();
   const supplyDownload=successor.waitForEvent('download');await successor.getByRole('button',{name:'下载审批单 PDF',exact:true}).click();await (await supplyDownload).saveAs(path.join(output,'supply-approval.pdf'));
+  for (const [page, file] of [[reviewer,'meeting-source.xml'],[successor,'supply-source.xml']]) {
+    const history=page.getByRole('region',{name:'资源申请提交版本',exact:true});
+    assert.equal(await history.count(),0,'resource history remains unmounted until expanded');
+    await page.getByText('提交版本',{exact:true}).click();
+    await history.getByRole('button',{name:/提交版本 1 ·/u}).click();
+    await history.getByRole('article',{name:'提交时的申请资料'}).waitFor();
+    await history.getByText(file,{exact:false}).first().waitFor();
+    const originalDownload=page.waitForEvent('download');
+    await history.getByRole('button',{name:'下载该版本原文件',exact:true}).click();
+    const destination=path.join(output,'history-'+file);
+    await (await originalDownload).saveAs(destination);
+    assert.deepEqual(fs.readFileSync(destination),original);
+    const pdf=page.waitForEvent('download');
+    await history.getByRole('button',{name:'下载审批单 PDF',exact:true}).click();
+    const pdfPath=path.join(output,'history-'+file+'.pdf');
+    await (await pdf).saveAs(pdfPath);
+    assert.equal(fs.readFileSync(pdfPath).subarray(0,5).toString(),'%PDF-');
+  }
   await successor.setViewportSize({width:390,height:844});
   await successor.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
   const geometry=await successor.evaluate(()=>{

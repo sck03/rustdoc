@@ -218,7 +218,9 @@ pub(crate) fn build(q: &GenericQuery<'_>, pg: bool) -> Result<(QuerySql, String)
     for (name, value) in q.filters {
         sql::valid_path(name)?;
         let expression = field(name, pg);
-        let expression = if pg {
+        let expression = if q.kind == "products" && *name == "productCode" {
+            sql::normalized(&expression, pg)
+        } else if pg {
             expression
         } else if matches!(value.as_str(), "true" | "false") {
             format!(

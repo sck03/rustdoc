@@ -384,3 +384,13 @@ pwsh -NoProfile -File scripts/clean-generated-artifacts.ps1 -IncludeCodexRuntime
 
 `npm --prefix apps/export-doc-web run test:concurrency-feedback` 包含 `test_single_window_workspace_ui.mjs`，覆盖两类单据保存续编、重复提交、切换/卸载/撤权/客户端变化、保存成功后锁定字段读取失败，以及参考目录 Excel 迟到响应与缓存释放。`test_native_desktop_editions.mjs <packagesRoot> Full --without-ocr --entry-rows-only` 在实际 Tauri/WebView2 中追加版本冲突、保存响应暂停期间续编、中文输入和保存回读，沿用原有表格/设计器/PDF 验证；必须先用当前前端重建桌面宿主。
 2026-11-16 会话/恢复收口：`test:settings-models` 的真实 React 回归覆盖账号保存、密码缓存、URL 选择、新建、卸载及客户端更换，另验证单据邮件重试键和草稿取消；`test:background-job-polling` 覆盖网络/503 重试与 403 停止。Rust 回归覆盖生成下载预算、流式 Excel、恢复取消/权限/提交日志、快照对象清单和磁盘不足回滚；同批 PostgreSQL 使用 `test-native-postgres.ps1 -Scope All`。完整记录见[本批验收](../docs/archive/2026-11/2026-11-16会话下载与恢复完整修复.md)。
+
+### 审查修复专项回归（2026-11-20）
+
+`npm --prefix apps/export-doc-web run test:review-lifecycle-ui` 验证公告迟到详情、HS 查询/客户端/权限切换与卸载取消，以及资源提交历史的按需加载、分页和身份/记录隔离；它也纳入 `test:settings-models`。
+
+`cargo test --locked -p export-doc-engine --test account_scopes` 覆盖公司内自然键与跨公司单证权限，`--test document_files_service` 覆盖单据包名称/强标识冲突，`cargo test --locked -p export-doc-storage --test contract` 覆盖有界工作台扫描。共享契约同时由 `test-native-postgres.ps1 -Scope All` 在隔离 PostgreSQL 18 执行。所有手工 Cargo 命令使用仓库 CARGO_HOME 并串行执行；旧 schema 18 实验数据库不自动升级或删除。
+
+### 指定单位集合的前后端一致性验收
+
+`node scripts/test_company_scope_ui.mjs` 使用 `office_review` 隔离 HTTP 夹具与真实 React 页面：在账号权限界面保存并回显查看/操作的单位集合，验证发票和付款的“查看 A/B、仅编辑 A”按钮及实际写入，再收窄查看范围，检查列表、直接详情地址、越权保存与会话撤销。运行前按上述夹具流程构建当前契约与前端；不会修改真实业务库。

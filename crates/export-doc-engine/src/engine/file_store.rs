@@ -89,7 +89,6 @@ pub struct FileStore {
     uploads: journal::Uploads,
     space: std::sync::Arc<crate::temporary_space::Budget>,
     downloads: cache::Cache,
-    verified: verification::Verified,
     #[cfg(feature = "s3-storage")]
     agent: ureq::Agent,
 }
@@ -151,7 +150,6 @@ impl FileStore {
             uploads: Default::default(),
             space: paths.disk_space.clone(),
             downloads: cache::Cache::open(&paths.cache_root.join("FileDownloads"))?,
-            verified: Default::default(),
             #[cfg(feature = "s3-storage")]
             agent: export_doc_network::storage_pooled_agent(
                 std::time::Duration::from_secs(super::backup_io::TIMEOUT_SECONDS),
@@ -372,8 +370,7 @@ impl FileStore {
         match &config.backend {
             Backend::Local { .. } => {
                 self.local_identity(&config)?;
-                self.verified
-                    .open(&self.object_path(&config, object)?, object)
+                verification::open(&self.object_path(&config, object)?, object)
             }
             Backend::S3 { .. } => self.downloads.download(self, &config, object),
         }

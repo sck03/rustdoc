@@ -227,12 +227,12 @@ fn dashboard_prefers_actual_data_and_keeps_previous_month_totals() {
     let dashboard = fixture.request(GET_DASHBOARD, None, None);
     export_doc_contracts::validation::response(GET_DASHBOARD.id, &dashboard).unwrap();
     assert_eq!(
-        dashboard["monthlyExportAmount"],
+        dashboard["exportAmountsByCurrency"][0]["monthlyAmount"],
         saved["invoice"]["totalAmount"]
     );
     assert_eq!(dashboard["monthlyProfit"], saved["invoice"]["totalProfit"]);
     assert_eq!(
-        dashboard["previousMonthlyExportAmount"],
+        dashboard["exportAmountsByCurrency"][0]["previousMonthlyAmount"],
         earlier["invoice"]["totalAmount"]
     );
     assert_eq!(dashboard["monthlyInvoiceCount"], 1);

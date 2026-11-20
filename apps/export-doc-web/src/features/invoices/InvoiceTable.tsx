@@ -1,3 +1,4 @@
+import { useRecordPermission } from "../../app/PermissionAccessContext.tsx";
 import type { KeyboardEvent } from "react";
 import { Copy, Download, FileCheck2, FileSpreadsheet } from "lucide-react";
 import type { ApiInvoiceListItemDto } from "../../api/index.ts";
@@ -14,15 +15,16 @@ export function InvoiceTable({ data, isBusy, hasError = false, canOperate, canEx
   onCopy: (invoice: ApiInvoiceListItemDto) => void; onExportPackage: (invoice: ApiInvoiceListItemDto) => void;
   onExportBookingSheet: (invoice: ApiInvoiceListItemDto) => void; onSingleWindow: (invoice: ApiInvoiceListItemDto) => void;
 }) {
+  const allows = useRecordPermission();
   const openFromKeyboard = (event: KeyboardEvent<HTMLTableRowElement>, id: number) => {
     if (!isDirectTableRowKeyboardEvent(event)) return;
     if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(id); }
   };
   const actions = [
-    { title: "导出单据包", icon: Download, run: onExportPackage, visible: canExportPackage },
-    { title: "导出货代订舱托单", icon: FileSpreadsheet, run: onExportBookingSheet, visible: canExportBookingSheet },
-    { title: "单一窗口办理", icon: FileCheck2, run: onSingleWindow, visible: canUseSingleWindow },
-    { title: "复制发票", icon: Copy, run: onCopy, visible: canOperate },
+    { title: "导出单据包", icon: Download, run: onExportPackage, visible: canExportPackage, resource: "document.invoice-output", action: "export-zip" },
+    { title: "导出货代订舱托单", icon: FileSpreadsheet, run: onExportBookingSheet, visible: canExportBookingSheet, resource: "document.excel", action: "operate" },
+    { title: "单一窗口办理", icon: FileCheck2, run: onSingleWindow, visible: canUseSingleWindow, resource: "document.single-window", action: "operate" },
+    { title: "复制发票", icon: Copy, run: onCopy, visible: canOperate, resource: "document.invoices", action: "operate" },
   ].filter((action) => action.visible);
   return <ResponsiveTableFrame label="发票列表" busy={isBusy} mobileLayout="scroll"><table><thead><tr>{selection && <th><input type="checkbox" aria-label="选择本页发票" disabled={isBusy} checked={data.length > 0 && data.every((item) => selection.items.some((selected) => selected.id === item.id))}
     onChange={(event) => selection.onChange(event.target.checked ? [...selection.items, ...data.filter((item) => !selection.items.some((selected) => selected.id === item.id))].slice(0, 200) : selection.items.filter((item) => !data.some((row) => row.id === item.id)))} /></th>}{["发票号","日期","客户","出口商","目的国","装港","目的港","金额","类型","状态","操作"].map((label) => <th key={label} className={label === "金额" ? "amount-cell" : undefined}>{label}</th>)}</tr></thead><tbody>
@@ -31,7 +33,7 @@ export function InvoiceTable({ data, isBusy, hasError = false, canOperate, canEx
         checked={selection.items.some((item) => item.id === invoice.id)} disabled={isBusy || selection.items.length >= 200 && !selection.items.some((item) => item.id === invoice.id)}
         onChange={(event) => selection.onChange(event.target.checked ? [...selection.items, invoice] : selection.items.filter((item) => item.id !== invoice.id))} /></td>}
       <td className="strong-cell">{invoice.invoiceNo || "-"}</td><td>{formatDate(invoice.invoiceDate)}</td><td>{invoice.customerName || "-"}</td><td>{invoice.exporterName || "-"}</td><td>{invoice.destinationCountry || "-"}</td><td>{invoice.portOfLoading || "-"}</td><td>{invoice.portOfDestination || "-"}</td><td className="amount-cell">{formatAmount(invoice.totalAmount, invoice.currency)}</td><td><span className="status-pill">{invoice.type || "-"}</span></td><td><span className="status-pill">{getInvoiceStatusLabel(invoice.status)}</span></td>
-      <td className="row-actions-cell">{actions.map(({ title, icon: Icon, run }) => <button key={title} className="icon-button compact-icon-button" type="button" title={title} aria-label={`${title} ${invoice.invoiceNo || invoice.id}`} disabled={isBusy} onClick={(event) => { event.stopPropagation(); run(invoice); }}><Icon size={15} aria-hidden="true" /></button>)}</td>
+      <td className="row-actions-cell">{actions.map(({ title, icon: Icon, run, resource, action }) => <button key={title} className="icon-button compact-icon-button" type="button" title={title} aria-label={`${title} ${invoice.invoiceNo || invoice.id}`} disabled={isBusy || !allows(resource, action, invoice)} onClick={(event) => { event.stopPropagation(); run(invoice); }}><Icon size={15} aria-hidden="true" /></button>)}</td>
     </tr>)}
   </tbody></table></ResponsiveTableFrame>;
 }

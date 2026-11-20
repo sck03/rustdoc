@@ -141,8 +141,9 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("invoiceDate",s().format("date")),("customerName",s()),("exporterName",s()),
         ("destinationCountry",s()),("portOfLoading",s()),("portOfDestination",s()),
         ("currency",s()),("totalAmount",decimal()),("type",s()),
-        ("status",s())
-    ]).required(vec!["id","invoiceNo","contractNo","invoiceDate","customerName","exporterName","destinationCountry","portOfLoading","portOfDestination","currency","totalAmount","type","status"])),
+        ("status",s()),("companyScope",s()),("departmentId",s()),
+        ("ownerUserId",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))
+    ]).required(vec!["id","invoiceNo","contractNo","invoiceDate","customerName","exporterName","destinationCountry","portOfLoading","portOfDestination","currency","totalAmount","type","status","companyScope","departmentId"])),
     ("ApiInvoiceProfitAnalysisRequest",o(vec![("invoice",r("ApiInvoiceDetailDto"))]).required(vec!["invoice"])),
     ("ApiInvoiceProfitAnalysisResponse",object_groups(vec![
         (&["currency","salesTotalText","exchangeRateText","salesRmbText","purchaseCostText","taxRefundText","grossProfitText","marginText","storagePolicy"], s()),

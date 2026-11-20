@@ -14,6 +14,7 @@ export function officeRequestApi(client: ExportDocManagerApiClient, kind: Office
     upload: (id: number, body: FormData, init?: ApiRequestInit): Promise<OfficeRequestRow> => client[`uploadAttachmentTo${name}`]({id,body},init),
     download: (id: number, attachmentId: number, init?: ApiRequestInit) => client[`downloadAttachmentOf${name}`]({id,attachmentId},init),
     remove: (id: number, attachmentId: number, body: OfficeActionInput, init?: ApiRequestInit): Promise<OfficeRequestRow> => client[`deleteAttachmentOf${name}`]({id,attachmentId,body:officeCommand(client,`${kind}:${id}:remove:${attachmentId}`,body)},init),
+    submissions: (id: number, pageNumber: number, init?: ApiRequestInit) => client[`listSubmissionsOf${name}`]({id,pageNumber,pageSize:20},init),
     submission: (id: number, submissionId: number, init?: ApiRequestInit) => client[`getSubmissionOf${name}`]({id,submissionId},init),
     decisions:(id:number,pageNumber:number,init?:ApiRequestInit)=>client[`listDecisionsOf${name}`]({id,pageNumber,pageSize:20},init),
     generateApproval: (id: number, submissionId: number, init?: ApiRequestInit) => client[`generateApprovalOf${name}`]({id,submissionId},init),

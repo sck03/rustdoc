@@ -1,7 +1,6 @@
 //! Process-local verified objects. Independent handles serve overlapping Range
 //! requests; eviction unlinks only files created by this cache instance.
 use super::*;
-use crate::paths::file_stamp;
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::{Arc, Mutex},
@@ -11,7 +10,6 @@ const MAX_ENTRIES: usize = 1024;
 struct Entry {
     path: PathBuf,
     size: u64,
-    stamp: Option<file_stamp::Stamp>,
 }
 impl Drop for Entry {
     fn drop(&mut self) {
@@ -91,12 +89,17 @@ impl Cache {
             return Ok(None);
         };
         paths::ensure_safe_absolute(&entry.path).map_err(unavailable)?;
-        let file = match fs::File::open(&entry.path) {
+        let mut file = match fs::File::open(&entry.path) {
             Ok(file) => Some(file),
             Err(cause) if cause.kind() == std::io::ErrorKind::NotFound => None,
             Err(cause) => return Err(cause.into()),
         };
-        let stamp = file.as_ref().map(file_stamp::read).transpose()?;
+        // Hash outside the cache lock. Reusing downloaded bytes must never
+        // reuse a metadata-only integrity verdict.
+        let checked = file
+            .as_mut()
+            .map(|file| super::verification::check(file, object))
+            .transpose();
         let mut state = self
             .state
             .lock()
@@ -105,10 +108,11 @@ impl Cache {
             .entries
             .get(&object.digest)
             .is_some_and(|(_, value)| Arc::ptr_eq(value, &entry));
-        if stamp.as_ref().is_none_or(|stamp| stamp.size != object.size) || stamp != entry.stamp {
+        if file.is_none() || checked.is_err() {
             let old = current.then(|| state.remove(&object.digest));
             drop(state);
             drop(old);
+            checked?;
             return Ok(None);
         }
         if current {
@@ -145,13 +149,11 @@ impl Cache {
             .read(true)
             .write(true)
             .open(&path)?;
-        let mut entry = Entry {
+        let entry = Entry {
             path,
             size: object.size,
-            stamp: None,
         };
         store.download_into(config, object, &mut file)?;
-        entry.stamp = Some(file_stamp::read(&file)?);
         file.seek(SeekFrom::Start(0))?;
         let mut state = self
             .state
@@ -220,11 +222,47 @@ impl FileStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cached_bytes_are_rechecked_when_size_and_modified_time_match() {
+        let root = crate::engine::test_support::ScratchDirectory::new();
+        let path = root.0.join("cached-object");
+        fs::write(&path, b"original").unwrap();
+        let modified = fs::metadata(&path).unwrap().modified().unwrap();
+        let object = FileObject {
+            digest: crate::engine::media::digest(b"original"),
+            size: 8,
+        };
+        let cache = Cache::default();
+        cache.state.lock().unwrap().insert(
+            object.digest.clone(),
+            Arc::new(Entry {
+                path: path.clone(),
+                size: 8,
+            }),
+        );
+        let mut first = cache.get(&object).unwrap().unwrap();
+        first.seek(SeekFrom::Start(4)).unwrap();
+        let mut second = cache.get(&object).unwrap().unwrap();
+        let mut bytes = Vec::new();
+        second.read_to_end(&mut bytes).unwrap();
+        assert_eq!(bytes, b"original");
+        drop((first, second));
+        fs::write(&path, b"tampered").unwrap();
+        fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(modified)
+            .unwrap();
+        assert!(cache.get(&object).is_err());
+        assert!(cache.get(&object).unwrap().is_none());
+        assert!(!path.exists(), "failed cache entries must be removed");
+    }
+
     fn entry(size: u64) -> Arc<Entry> {
         Arc::new(Entry {
             path: PathBuf::new(),
             size,
-            stamp: None,
         })
     }
     #[test]

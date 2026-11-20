@@ -18,9 +18,9 @@ export function useSingleWindowPackageImport(client: ExportDocManagerApiClient, 
     mutationFn: async (kind: "choose" | "submit" | "receipt", signal): Promise<Result> => {
       if (!enabled) throw new Error("当前工作区不允许导入交接包。");
       if (kind === "choose") return { path: await selectSingleWindowPackageFile() };
-      if (kind === "submit") return { response: await client.importSingleWindowSubmitPackage({ body: { packagePath: packagePath.trim(), keepWorkingDirectory: false } }, { signal }) };
+      if (kind === "submit") return { response: await client.importSingleWindowSubmitPackage({ body: { packagePath: packagePath.trim() } }, { signal }) };
       if (!file) throw new Error("请选择回执包文件。");
-      return { response: await client.uploadSingleWindowReceiptPackage({ fileName: file.name, keepWorkingDirectory: false, body: file }, { signal }) };
+      return { response: await client.uploadSingleWindowReceiptPackage({ fileName: file.name, body: file }, { signal }) };
     },
     onSuccess: response => {
       setError(false);

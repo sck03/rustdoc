@@ -9,7 +9,7 @@ export function AuthenticatedWorkspace({ shell, routes }: {
 }) {
   const user = routes.user;
   return <PermissionAccessProvider subject={user} grants={user.capabilities.moduleAccess}
-    permissions={user.capabilities.permissions} canManageSettings={user.capabilities.canManageSettings}>
+    permissions={user.capabilities.permissions} scopeRestrictions={user.capabilities.scopeRestrictions} canManageSettings={user.capabilities.canManageSettings}>
     <WorkspaceShell {...shell}><AppWorkspaceRoutes {...routes} /></WorkspaceShell>
   </PermissionAccessProvider>;
 }

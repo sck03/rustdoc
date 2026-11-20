@@ -299,3 +299,7 @@ CREATE TABLE unit_access_grants (
     data_scope TEXT NOT NULL CHECK(data_scope IN ('own','department','company')),
     PRIMARY KEY(role_id,resource_key,action)
 );
+
+-- Company-owned catalog natural keys are encoded as [company, key]; fresh schema only.
+CREATE INDEX records_invoice_versions ON records(company, (body->>'invoiceNo'), id DESC) WHERE kind='invoices';
+CREATE INDEX records_product_code ON records((lower(btrim(normalize(body->>'productCode', NFC), U&'\0009\000A\000B\000C\000D\0020\0085\00A0\1680\2000\2001\2002\2003\2004\2005\2006\2007\2008\2009\200A\2028\2029\202F\205F\3000') COLLATE pg_unicode_fast)), company, id DESC) WHERE kind='products';

@@ -3,7 +3,7 @@ import { hasPermission } from "../../app/PermissionAccessContext.tsx";
 import { officeBookingDefaults } from "../office/officeModel.ts";
 import { readPersonnelProfile } from "../office/personnelModel.ts";
 import { createRequestKey } from "../../ui/createRequestKey.ts";
-import { hasDepartment } from "../../app/permissionScope.ts";
+import { hasDepartment, isRecordWithinRestrictions } from "../../app/permissionScope.ts";
 
 export type OaKind = OaRequest["kind"];
 export const personnelChangeLabels: Record<OaPersonnelChange["action"], string> = { Hire: "入职", Confirm: "转正", Transfer: "调岗", Depart: "离职", Rehire: "返聘" };
@@ -22,7 +22,9 @@ export const oaHandlingLabels: Record<OaKind, string> = { leave: "待销假", ov
 const oaActionLabels = { submit: "提交审批", withdraw: "撤回修改", approve: "批准", reject: "最终驳回", return: "退回修改", cancel: "取消申请", void: "作废批准", complete: "完成登记", remind: "催办" } as const;
 export type OaActionName = keyof typeof oaActionLabels;
 export function oaAccess(user: ApiUserDto, kind: OaKind, action: string, row?: OaRequest): boolean {
+  if (row && row.companyScope !== user.companyScope) return false;
   const resource = oaModules[kind].resource;
+  if (row && !isRecordWithinRestrictions(user.capabilities.scopeRestrictions, resource, action, user, { ...row, companyScope: row.companyScope ?? "", departmentId: row.departmentId ?? "" }, true)) return false;
   if (!hasPermission(user.capabilities.permissions, resource, action)) return false;
   if (row && kind === "general" && action === "complete" && row.canHandle !== undefined) return row.canHandle;
   return !row || user.capabilities.permissions.some((grant) => grant.resourceKey === resource && grant.action === action &&
@@ -30,6 +32,7 @@ export function oaAccess(user: ApiUserDto, kind: OaKind, action: string, row?: O
     || action === "view" && ((kind === "expense" && ["Approved", "HandedOff"].includes(row.status) && oaAccess(user, kind, "complete", row)) || kind === "general" && ["Approved", "Completed"].includes(row.status) && row.canHandle === true);
 }
 export function oaActions(row: OaRequest, user: ApiUserDto): OaActionName[] {
+  if (row.companyScope !== user.companyScope) return [];
   const allows = (action: string) => oaAccess(user, row.kind, action, row);
   const reviewer = row.ownerUserId !== user.id;
   const applicant = allows("edit") && row.ownerUserId === user.id;

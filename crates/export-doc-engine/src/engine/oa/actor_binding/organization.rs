@@ -20,7 +20,7 @@ pub(super) fn appointments(
             let department = tx
                 .find_identity(
                     "departments",
-                    &store::department_identity(&actor.company, &department)?,
+                    &store::company_identity(&actor.company, &department)?,
                 )?
                 .filter(|d| d["isActive"] == true)
                 .ok_or_else(|| conflict("申请部门已失效。"))?;

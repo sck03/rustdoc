@@ -63,3 +63,14 @@ pub(super) fn restrict(actor: &mut super::store::Actor) {
         })
     });
 }
+
+/// Publish the same resolved members used by storage and object authorization.
+pub(super) fn capabilities(actor: &super::store::Actor) -> serde_json::Value {
+    serde_json::json!(actor.scope_rules.iter().map(|rule| serde_json::json!({
+        "resourceKey": rule.resource_key, "action": rule.action, "mode": rule.mode,
+        "unitCodes": rule.unit_codes, "projectIds": rule.project_ids,
+        "departments": rule.departments.iter().map(|(company, department)| serde_json::json!({
+            "companyScope": company, "departmentId": department
+        })).collect::<Vec<_>>()
+    })).collect::<Vec<_>>())
+}

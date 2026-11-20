@@ -74,7 +74,7 @@ const grants = scope => ["office.rooms", "office.supplies"].flatMap(resourceKey 
 const modules = enabledModules => ({ enabledModules, moduleAccess: enabledModules.map(moduleKey => ({ moduleKey, accessLevel: "view" })) });
 const user = { id: 1, companyScope: "C1", departmentId: "D1", businessDate: "2026-09-07",
   capabilities: { ...modules(["office.rooms", "office.supplies", "system.about"]), permissions: grants("own"), productEdition: "Full" } };
-const row = { id: 7, meetingRoomId: 2, ownerUserId: 2, departmentId: "D2", status: "Pending", requiresKey: true,
+const row = { id: 7, companyScope: "C1", meetingRoomId: 2, ownerUserId: 2, departmentId: "D2", status: "Pending", requiresKey: true,
   startsAt: "2026-09-07T08:00:00Z", endsAt: "2026-09-07T09:00:00Z" };
 assert.deepEqual(office.officeRequestActions(row, user, "rooms"), [], "viewing a record does not allow operations beyond own scope");
 const manager = { ...user, capabilities: { ...user.capabilities, permissions: grants("company") } };
@@ -85,6 +85,12 @@ const oaUser = { ...user, capabilities: { permissions: ["view","edit","approve"]
 assert.deepEqual(oa.oaActions({ ...row, kind:"leave" }, oaUser), [], "broad read access must not expose out-of-scope approval actions");
 const oaManager = { ...oaUser, capabilities: { permissions: oaUser.capabilities.permissions.map(grant => ({ ...grant, dataScope:"company" })) } };
 assert(!oa.oaActions({ ...row, kind:"leave", ownerUserId:user.id }, oaManager).includes("approve"), "team self-approval remains unavailable");
+for (const scope of ["own", "department", "company", "all"]) {
+  const cross = { ...row, companyScope: "OTHER", ownerUserId: user.id, departmentId: user.departmentId, canReview: true };
+  assert.deepEqual(office.officeRequestActions(cross, { ...manager, capabilities: { permissions: grants(scope) } }, "rooms"), []);
+  assert(!oa.oaAccess({ ...oaManager, capabilities: { permissions: [{ resourceKey: "office.leave", action: "view", dataScope: scope }] } }, "leave", "view", { ...cross, kind: "leave" }));
+}
+assert(office.officeAccess({ ...user, capabilities: { permissions: [...grants("own"), ...grants("company")] } }, "rooms").allows("cancel", row), "permission alternatives remain a union");
 assert.equal(oa.oaActionLabel("complete","expense"), "财务接收", "expense completion records handoff without implying payment");
 assert.equal(office.officeStatus({ ...row, status: "InUse" }, user.businessDate, Date.parse(row.endsAt)), "超时未归还");
 assert.equal(office.officeStatus({ ...row, status: "InUse", requiresKey:false }, user.businessDate, Date.parse(row.endsAt)), "超时未结束");
@@ -163,7 +169,7 @@ assert(!isRouteAccessAllowed({pathname:"/system/organization",user:personnelUser
 assert(navigation.searchWorkspaceNavGroups("部门",navigation.filterWorkspaceNavGroups(fullDesktopUser.capabilities)).some(group=>group.items.some(item=>item.to==="/system/organization")));
 assert(!isRouteAccessAllowed({pathname:"/invoices",user:fullDesktopUser,canManageSystem:true,isDesktopRuntime:true}));
 assert.equal(office.officeRequestActions({...row,status:"Approved"},fullDesktopUser,"rooms").find(item=>item.action==='cancel').label,"取消申请");
-const supplyRow = {id:8,officeSupplyId:2,ownerUserId:2,status:"Approved",handlingKey:"daily",canHandle:false,isReturnable:false};
+const supplyRow = {companyScope:"C1",id:8,officeSupplyId:2,ownerUserId:2,status:"Approved",handlingKey:"daily",canHandle:false,isReturnable:false};
 assert(!office.officeRequestActions(supplyRow,manager,"supplies").some(entry=>entry.action==="issue"),"company permission cannot bypass an explicit custodian");
 assert(office.officeRequestActions({...supplyRow,canHandle:true},user,"supplies").some(entry=>entry.action==="issue"),"a designated custodian can issue outside ordinary own scope");
 assert(!office.officeRequestActions({...supplyRow,status:"Issued",canHandle:true},manager,"supplies").some(entry=>entry.action==="return"),"consumable issue is terminal and offers no return action");

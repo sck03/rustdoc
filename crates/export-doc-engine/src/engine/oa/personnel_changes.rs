@@ -52,7 +52,7 @@ pub(super) fn prepare(
         if tx
             .find_identity(
                 "people",
-                &store::personnel_identity(&actor.company, &text(&registration, "employeeNumber"))?,
+                &store::company_identity(&actor.company, &text(&registration, "employeeNumber"))?,
             )?
             .is_some()
         {

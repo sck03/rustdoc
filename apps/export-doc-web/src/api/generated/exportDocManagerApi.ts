@@ -285,7 +285,6 @@ const operationDomains: Record<string, Domain> = {
   downloadReportTemplateFile: "reports",
   downloadReportTemplatePackage: "reports",
   downloadReportTemplateV3ImageResource: "reports",
-  downloadSingleWindowReceiptPackage: "singleWindow",
   downloadSupportPackage: "supportPackage",
   editBusinessAttachmentMetadata: "businessAttachments",
   executeApprovedPersonnelChange: "office",

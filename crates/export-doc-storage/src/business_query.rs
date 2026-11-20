@@ -24,7 +24,6 @@ pub enum BusinessList<'a> {
         filter: &'a Value,
         tokens: &'a [String],
     },
-    Dashboard,
     InvoiceIds(&'a [i64]),
 }
 pub struct BusinessQuery<'a> {
@@ -277,11 +276,6 @@ pub(crate) fn build(q: &BusinessQuery<'_>, pg: bool) -> Result<(QuerySql, String
             } else {
                 "json_extract(r.body,'$.invoiceDate') DESC, r.id DESC"
             };
-        }
-        BusinessList::Dashboard => {
-            clauses.extend(["r.kind='invoices'".into(), scope]);
-            clauses.push(format!("{}<>'Cancelled'", field("status", pg)));
-            order = "r.id DESC";
         }
         BusinessList::InvoiceIds(ids) => {
             clauses.extend(["r.kind='invoices'".into(), scope]);

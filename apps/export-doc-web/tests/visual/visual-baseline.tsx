@@ -80,6 +80,7 @@ function BaselineApp() {
     id: 1, isActive: true, companyScope: "", departmentId: "",
     businessDate: "2026-07-22", businessDateValidUntilUtc: "2026-07-22T16:00:00Z", businessTimeZone: "Asia/Shanghai",
     capabilities: {
+      scopeRestrictions: [],
       canManageSettings: true,
       canManageUsers: true,
       availableFeatures: baselineFeatures,

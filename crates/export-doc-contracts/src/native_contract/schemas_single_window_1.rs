@@ -66,12 +66,12 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("trackingBatchId",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("storagePolicy",s()),("message",s())
     ]).required(vec!["success","packagePath","manifest","storagePolicy","message"])),
     ("ApiSingleWindowImportedPackageResponse",o(vec![
-        ("success",b()),("packagePath",s()),("workingDirectory",s()),
-        ("workingDirectoryKept",b()),("manifest",r("SingleWindowPackageManifest")),("parsedReceipts",a(r("SingleWindowReceiptParseResult"))),
+        ("success",b()),("packagePath",s()),
+        ("manifest",r("SingleWindowPackageManifest")),("parsedReceipts",a(r("SingleWindowReceiptParseResult"))),
         ("trackingBatchId",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("trackingStatus",s()),("persistedReceiptCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("storagePolicy",s()),("message",s())
-    ]).required(vec!["success","packagePath","workingDirectory","workingDirectoryKept","manifest","parsedReceipts","trackingStatus","persistedReceiptCount","storagePolicy","message"])),
-    ("ApiSingleWindowImportPackageRequest",o(vec![("packagePath",s()),("workingDirectory",s().default_value(serde_json::json!(""))),("keepWorkingDirectory",b().default_value(serde_json::json!(false)))]).required(vec!["packagePath"])),
+    ]).required(vec!["success","packagePath","manifest","parsedReceipts","trackingStatus","persistedReceiptCount","storagePolicy","message"])),
+    ("ApiSingleWindowImportPackageRequest",o(vec![("packagePath",s())]).required(vec!["packagePath"])),
     ("ApiSingleWindowIssuingAuthorityCatalogResponse",o(vec![("options",a(r("ApiSingleWindowIssuingAuthorityOptionDto"))),("storagePolicy",s())]).required(vec!["options","storagePolicy"])),
     ("ApiSingleWindowIssuingAuthorityOptionDto",o(vec![("code",s()),("label",s()),("applicationAddress",s())]).required(vec!["code","label","applicationAddress"])),
     ("ApiSingleWindowLockedFieldDto",o(vec![

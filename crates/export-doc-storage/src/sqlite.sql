@@ -273,3 +273,7 @@ CREATE TABLE unit_access_grants (
     data_scope TEXT NOT NULL CHECK(data_scope IN ('own','department','company')),
     PRIMARY KEY(role_id,resource_key,action)
 );
+
+-- Company-owned catalog natural keys are encoded as [company, key]; fresh schema only.
+CREATE INDEX records_invoice_versions ON records(company, json_extract(body,'$.invoiceNo'), id DESC) WHERE kind='invoices';
+CREATE INDEX records_product_code ON records(template_normalize(json_extract(body,'$.productCode')), company, id DESC) WHERE kind='products';

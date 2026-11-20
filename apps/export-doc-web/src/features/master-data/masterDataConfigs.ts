@@ -1,12 +1,4 @@
-import type {
-ApiCustomerDto,
-ApiExporterDto,
-ApiHsCodeDto,
-ApiPayeeDto,
-ApiPortDto,
-ApiProductDto,
-ApiUnitDto,
-} from "../../api/index.ts";
+import { customerRequest, exporterRequest, payeeRequest, productRequest, portRequest, unitRequest, hsCodeRequest } from "./masterDataRequests.ts";
 import { formatAmount,formatDate,numberValue } from "../../ui/formUtils.ts";
 import {
 encodeRouteId,
@@ -24,7 +16,7 @@ portTextFields,
 readString,
 unitTextFields
 } from "./masterDataModel.ts";
-import type { MasterDataEntityConfig,MasterDataRecord } from "./masterDataTypes.ts";
+import type { MasterDataEntityConfig } from "./masterDataTypes.ts";
 
 
 export const masterDataConfigs: MasterDataEntityConfig[] = [
@@ -95,10 +87,10 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
         pageSize: request.pageSize,
       }, { signal })),
     get: async (client, recordKey, signal) =>
-      (await client.getCustomer({ id: parseNumericRouteKey(recordKey) }, { signal })) as unknown as MasterDataRecord,
-    create: async (client, record, signal) => (await client.createCustomer({ body: record as unknown as ApiCustomerDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.getCustomer({ id: parseNumericRouteKey(recordKey) }, { signal }) }),
+    create: async (client, record, signal) => ({ ...await client.createCustomer({ body: customerRequest(record) }, { signal }) }),
     update: async (client, recordKey, record, signal) =>
-      (await client.updateCustomer({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiCustomerDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.updateCustomer({ id: parseNumericRouteKey(recordKey), body: customerRequest(record) }, { signal }) }),
     delete: (client, record, _recordKey, signal) => client.deleteCustomer({ id: numberValue(record.id), rowVersion: String(record.rowVersion ?? "") }, { signal }),
   },
   {
@@ -175,10 +167,10 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
         pageSize: request.pageSize,
       }, { signal })),
     get: async (client, recordKey, signal) =>
-      (await client.getExporter({ id: parseNumericRouteKey(recordKey) }, { signal })) as unknown as MasterDataRecord,
-    create: async (client, record, signal) => (await client.createExporter({ body: record as unknown as ApiExporterDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.getExporter({ id: parseNumericRouteKey(recordKey) }, { signal }) }),
+    create: async (client, record, signal) => ({ ...await client.createExporter({ body: exporterRequest(record) }, { signal }) }),
     update: async (client, recordKey, record, signal) =>
-      (await client.updateExporter({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiExporterDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.updateExporter({ id: parseNumericRouteKey(recordKey), body: exporterRequest(record) }, { signal }) }),
     delete: (client, record, _recordKey, signal) => client.deleteExporter({ id: numberValue(record.id), rowVersion: String(record.rowVersion ?? "") }, { signal }),
   },
   {
@@ -238,10 +230,10 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
         pageSize: request.pageSize,
       }, { signal })),
     get: async (client, recordKey, signal) =>
-      (await client.getPayee({ id: parseNumericRouteKey(recordKey) }, { signal })) as unknown as MasterDataRecord,
-    create: async (client, record, signal) => (await client.createPayee({ body: record as unknown as ApiPayeeDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.getPayee({ id: parseNumericRouteKey(recordKey) }, { signal }) }),
+    create: async (client, record, signal) => ({ ...await client.createPayee({ body: payeeRequest(record) }, { signal }) }),
     update: async (client, recordKey, record, signal) =>
-      (await client.updatePayee({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiPayeeDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.updatePayee({ id: parseNumericRouteKey(recordKey), body: payeeRequest(record) }, { signal }) }),
     delete: (client, record, _recordKey, signal) => client.deletePayee({ id: numberValue(record.id), rowVersion: String(record.rowVersion ?? "") }, { signal }),
   },
   {
@@ -338,7 +330,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
           pageSize: request.pageSize,
         }, { signal });
         return {
-          items: result.items as unknown as MasterDataRecord[],
+          items: result.items.map(item => ({ ...item })),
           pageNumber: result.pageNumber,
           pageSize: result.pageSize,
           totalCount: result.totalCount,
@@ -348,10 +340,10 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
         };
       },
     get: async (client, recordKey, signal) =>
-      (await client.getProduct({ id: parseNumericRouteKey(recordKey) }, { signal })) as unknown as MasterDataRecord,
-    create: async (client, record, signal) => (await client.createProduct({ body: record as unknown as ApiProductDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.getProduct({ id: parseNumericRouteKey(recordKey) }, { signal }) }),
+    create: async (client, record, signal) => ({ ...await client.createProduct({ body: productRequest(record) }, { signal }) }),
     update: async (client, recordKey, record, signal) =>
-      (await client.updateProduct({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiProductDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.updateProduct({ id: parseNumericRouteKey(recordKey), body: productRequest(record) }, { signal }) }),
     delete: (client, record, _recordKey, signal) => client.deleteProduct({ id: numberValue(record.id), rowVersion: String(record.rowVersion ?? "") }, { signal }),
   },
   {
@@ -389,10 +381,10 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
         pageSize: request.pageSize,
       }, { signal })),
     get: async (client, recordKey, signal) =>
-      (await client.getPort({ id: parseNumericRouteKey(recordKey) }, { signal })) as unknown as MasterDataRecord,
-    create: async (client, record, signal) => (await client.createPort({ body: record as unknown as ApiPortDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.getPort({ id: parseNumericRouteKey(recordKey) }, { signal }) }),
+    create: async (client, record, signal) => ({ ...await client.createPort({ body: portRequest(record) }, { signal }) }),
     update: async (client, recordKey, record, signal) =>
-      (await client.updatePort({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiPortDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.updatePort({ id: parseNumericRouteKey(recordKey), body: portRequest(record) }, { signal }) }),
     delete: (client, record, _recordKey, signal) => client.deletePort({ id: numberValue(record.id), rowVersion: String(record.rowVersion ?? "") }, { signal }),
   },
   {
@@ -428,10 +420,10 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
         pageSize: request.pageSize,
       }, { signal })),
     get: async (client, recordKey, signal) =>
-      (await client.getUnit({ id: parseNumericRouteKey(recordKey) }, { signal })) as unknown as MasterDataRecord,
-    create: async (client, record, signal) => (await client.createUnit({ body: record as unknown as ApiUnitDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.getUnit({ id: parseNumericRouteKey(recordKey) }, { signal }) }),
+    create: async (client, record, signal) => ({ ...await client.createUnit({ body: unitRequest(record) }, { signal }) }),
     update: async (client, recordKey, record, signal) =>
-      (await client.updateUnit({ id: parseNumericRouteKey(recordKey), body: record as unknown as ApiUnitDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.updateUnit({ id: parseNumericRouteKey(recordKey), body: unitRequest(record) }, { signal }) }),
     delete: (client, record, _recordKey, signal) => client.deleteUnit({ id: numberValue(record.id), rowVersion: String(record.rowVersion ?? "") }, { signal }),
   },
   {
@@ -534,7 +526,7 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       return {
         hasNextPage: result.hasNextPage,
         hasPreviousPage: result.hasPreviousPage,
-        items: result.items as unknown as MasterDataRecord[],
+        items: result.items.map(item => ({ ...item })),
         pageNumber: result.pageNumber,
         pageSize: result.pageSize,
         totalCount: result.totalCount,
@@ -542,16 +534,16 @@ export const masterDataConfigs: MasterDataEntityConfig[] = [
       };
     },
     get: async (client, recordKey, signal) =>
-      (await client.getHsCode({ code: decodeURIComponent(recordKey) }, { signal })) as unknown as MasterDataRecord,
-    create: async (client, record, signal) => (await client.createHsCode({ body: record as unknown as ApiHsCodeDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.getHsCode({ code: decodeURIComponent(recordKey) }, { signal }) }),
+    create: async (client, record, signal) => ({ ...await client.createHsCode({ body: hsCodeRequest(record) }, { signal }) }),
     update: async (client, recordKey, record, signal) =>
-      (await client.updateHsCode({ code: decodeURIComponent(recordKey), body: record as unknown as ApiHsCodeDto }, { signal })) as unknown as MasterDataRecord,
+      ({ ...await client.updateHsCode({ code: decodeURIComponent(recordKey), body: hsCodeRequest(record) }, { signal }) }),
     delete: (client, record, _recordKey, signal) => client.deleteHsCode({ id: numberValue(record.id), expectedRowVersion: readString(record, "rowVersion") }, { signal }),
   },
 ];
 
 function toMasterDataPage(result: {
-  items: unknown[];
+  items: { id: number }[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
@@ -561,7 +553,7 @@ function toMasterDataPage(result: {
 }) {
   return {
     ...result,
-    items: result.items as MasterDataRecord[],
+    items: result.items.map(item => ({ ...item })),
   };
 }
 

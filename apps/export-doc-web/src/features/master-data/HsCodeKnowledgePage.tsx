@@ -1,5 +1,6 @@
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { ListWorkspace } from "../../ui/layout/Workspaces.tsx";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import "../../styles/features/hs-knowledge.css";
 import { ShieldCheck, Sparkles } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
@@ -61,11 +62,13 @@ function KnowledgeSearch({ client, canOperate }: { client: ExportDocManagerApiCl
   const [query, setQuery] = useState("");
   const [feedback, setFeedback] = useState<KnowledgeFeedback | null>(null);
   const search = useQuery({ queryKey: ["hs-knowledge", "search", query], queryFn: ({ signal }) => client.searchHsCodeKnowledge({ query }, { signal }), enabled: !!query });
-  const feedbackMutation = useMutation({
-    mutationFn: (value: { code: string; accepted: boolean; name: string; specification: string }) => client.recordHsCodeKnowledgeFeedback({ body: { queryText: query, productName: value.name, specification: value.specification, candidateCode: value.code, accepted: value.accepted } }),
-    onSuccess: (_, value) => { setFeedback({ tone: "success", message: value.accepted ? "已记录：当前商品与该候选编码匹配，用于优化后续推荐。" : "已记录：当前商品与该候选编码不匹配，用于优化后续推荐。" }); void search.refetch(); },
+  const feedbackMutation = useScopedMutation(JSON.stringify([query, canOperate]), client, {
+    mutationFn: (value: { code: string; accepted: boolean; name: string; specification: string }, signal) => client.recordHsCodeKnowledgeFeedback({ body: { queryText: query, productName: value.name, specification: value.specification, candidateCode: value.code, accepted: value.accepted } }, { signal }),
+    onSuccess: (_, value) => { setFeedback({ tone: "success", message: value.accepted ? "已记录：当前商品与该候选编码匹配，用于优化后续推荐。" : "已记录：当前商品与该候选编码不匹配，用于优化后续推荐。" }); },
+    refreshKeys: () => [["hs-knowledge", "search", query]],
     onError: error => setFeedback({ tone: "error", message: readApiError(error) }),
   });
+  useEffect(() => setFeedback(null), [client, canOperate, query]);
   function submit(event: FormEvent) { event.preventDefault(); if (draft.trim()) { setFeedback(null); setQuery(draft.trim()); } }
   return <div className="knowledge-task-card knowledge-search-card">
     <div className="knowledge-intro"><Sparkles size={24}/><div><h2>像普通商品名称一样查询</h2><p>输入品名、材质、用途或规格，系统会优先展示已审核实例和当前年度税则。</p></div></div>
@@ -94,17 +97,18 @@ function KnowledgeSearch({ client, canOperate }: { client: ExportDocManagerApiCl
 }
 
 function HistoryLearning({ businessYear, client, canOperate }: { businessYear: number; client: ExportDocManagerApiClient; canOperate:boolean }) {
-  const queryClient = useQueryClient();
   const [keyword, setKeyword] = useState("");
   const debouncedKeyword = useDebouncedValue(keyword);
   const [pageNumber, setPageNumber] = useState(1); const [pageSize, setPageSize] = useState(30);
   const [feedback, setFeedback] = useState<KnowledgeFeedback | null>(null);
   const candidates = useQuery({ queryKey: ["hs-history-candidates", debouncedKeyword, pageNumber, pageSize], queryFn: ({ signal }) => client.discoverHsCodeHistoryCandidates({ keyword: debouncedKeyword, pageNumber, pageSize }, { signal }), placeholderData: keepPreviousData });
   useServerPageNumber(candidates, pageNumber, setPageNumber);
+  useEffect(() => setFeedback(null), [client, canOperate, debouncedKeyword, pageNumber, pageSize, businessYear]);
   useEffect(() => setPageNumber(1), [debouncedKeyword, pageSize]);
-  const confirm = useMutation({
-    mutationFn: (item: NonNullable<typeof candidates.data>["items"][number]) => client.saveHsCodeKnowledgeExample({ body: { id: 0, rawReportedHsCode: item.rawCode, resolvedCurrentHsCode: item.currentCode, productName: item.productName, specification: item.specification, source: `HistoryConfirmed:${item.source}`, sourceYear: businessYear, resolutionStatus: "ManuallyVerified", isManuallyVerified: true } }),
-    onSuccess: async () => { setFeedback({tone:"success",message:"历史经验已确认并加入申报实例库。"}); await queryClient.invalidateQueries({ queryKey: ["hs-history-candidates"] }); await queryClient.invalidateQueries({ queryKey: ["hs-knowledge", "examples"] }); },
+  const confirm = useScopedMutation(JSON.stringify([debouncedKeyword, pageNumber, pageSize, businessYear, canOperate]), client, {
+    mutationFn: (item: NonNullable<typeof candidates.data>["items"][number], signal) => client.saveHsCodeKnowledgeExample({ body: { id: 0, rawReportedHsCode: item.rawCode, resolvedCurrentHsCode: item.currentCode, productName: item.productName, specification: item.specification, source: `HistoryConfirmed:${item.source}`, sourceYear: businessYear, resolutionStatus: "ManuallyVerified", isManuallyVerified: true } }, { signal }),
+    onSuccess: () => setFeedback({tone:"success",message:"历史经验已确认并加入申报实例库。"}),
+    refreshKeys: () => [["hs-history-candidates"], ["hs-knowledge", "examples"]],
     onError: error => setFeedback({tone:"error",message:readApiError(error)}),
   });
   return <div className="knowledge-task-card">

@@ -11,7 +11,6 @@ fn description(operation: Operation) -> Option<(&'static str, &'static str)> {
         DOWNLOAD_CUSTOMS_COO_SUBMIT_PACKAGE | DOWNLOAD_AGENT_CONSIGNMENT_SUBMIT_PACKAGE => {
             ("单一窗口提交包.zip", "application/zip")
         }
-        DOWNLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE => ("单一窗口回执包.zip", "application/zip"),
         DOWNLOAD_AUDIT_LOGS | EXPORT_CRM_CUSTOMERS | EXPORT_SUPPLIERS => (
             match operation {
                 EXPORT_CRM_CUSTOMERS => "CRM客户.xlsx",

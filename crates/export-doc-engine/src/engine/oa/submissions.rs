@@ -58,7 +58,7 @@ fn capture(tx: &Connection, actor: &Actor, row: &mut Value, number: i64) -> Resu
     let department = tx
         .find_identity(
             "departments",
-            &store::department_identity(&actor.company, &text(row, "departmentId"))?,
+            &store::company_identity(&actor.company, &text(row, "departmentId"))?,
         )?
         .ok_or_else(|| super::super::error::unavailable("申请部门资料缺失。"))?;
     let settings = settings::load(tx, &actor.company)?;

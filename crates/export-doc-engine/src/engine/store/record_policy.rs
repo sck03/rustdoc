@@ -1,5 +1,5 @@
 //! Record preparation owns business identity and scope rules; Store owns atomic persistence.
-use super::{Actor, Result, department_identity, invoice_identity, normalize, personnel_identity};
+use super::{Actor, Result, company_identity, invoice_identity, normalize};
 use serde_json::{Value, json};
 
 pub(super) struct Revision<'a> {
@@ -72,12 +72,12 @@ pub(super) fn prepare(
     // The original invoice key is company + invoice number + data type. A
     // length-delimited JSON tuple keeps both data versions and tenant keys distinct.
     let identity = if kind == "departments" {
-        Some(department_identity(
+        Some(company_identity(
             &crate::engine::records::text(body, "companyCode"),
             &crate::engine::records::text(body, "code"),
         )?)
     } else if kind == "people" {
-        Some(personnel_identity(
+        Some(company_identity(
             body["companyScope"].as_str().unwrap_or(""),
             body["employeeNumber"].as_str().unwrap_or(""),
         )?)
@@ -87,6 +87,14 @@ pub(super) fn prepare(
             &body["invoiceNo"],
             &body["type"],
         )?)
+    } else if matches!(
+        kind,
+        "customers" | "exporters" | "products" | "units" | "ports" | "rooms" | "supplies"
+    ) {
+        identity
+            .filter(|key| !key.is_empty())
+            .map(|key| company_identity(body["companyScope"].as_str().unwrap_or(""), &key))
+            .transpose()?
     } else {
         identity
             .filter(|key| !key.is_empty())

@@ -122,7 +122,7 @@ pub fn validate_assignment(connection: &Connection, company: &str, department: &
         && !connection
             .find_identity(
                 "departments",
-                &store::department_identity(company, department)?,
+                &store::company_identity(company, department)?,
             )?
             .is_some_and(|item| {
                 item["code"] == department
@@ -353,7 +353,7 @@ impl DepartmentNames {
             Entry::Occupied(entry) => Ok(entry.get().clone()),
             Entry::Vacant(entry) => {
                 let name = tx
-                    .find_identity("departments", &store::department_identity(company, code)?)?
+                    .find_identity("departments", &store::company_identity(company, code)?)?
                     .filter(|department| department["companyCode"] == company)
                     .map(|department| text(&department, "name"))
                     .unwrap_or_else(|| code.to_owned());

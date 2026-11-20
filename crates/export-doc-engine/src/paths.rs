@@ -4,7 +4,6 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 use unicode_normalization::UnicodeNormalization;
-pub(crate) mod file_stamp;
 mod temporary;
 pub use temporary::anonymous_file;
 mod containment;

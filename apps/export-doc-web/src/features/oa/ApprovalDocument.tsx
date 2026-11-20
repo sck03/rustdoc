@@ -1,6 +1,6 @@
 import { queryPollingInterval } from "../../api/queryPollingPolicy.ts";
 import { Button } from "../../ui/Button.tsx";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ApiRequestInit, ApiUserDto, OaSubmission } from "../../api/index.ts";
 import { useBlobUrl } from "../../ui/useBlobUrl.ts";
@@ -11,13 +11,13 @@ import { OfficeDialog } from "../office/OfficeUi.tsx";
 import { useOfficeOperation } from "../office/useOfficeData.ts";
 
 type Document = Pick<OaSubmission, "documentStatus" | "documentError" | "submissionNumber" | "materialAccess">;
-export type ApprovalDocumentApi = {
-  submission: (id: number, submissionId: number, init?: ApiRequestInit) => Promise<Document>;
-  generateApproval: (id: number, submissionId: number, init?: ApiRequestInit) => Promise<Document>;
+export type ApprovalDocumentApi<T extends Document = Document> = {
+  submission: (id: number, submissionId: number, init?: ApiRequestInit) => Promise<T>;
+  generateApproval: (id: number, submissionId: number, init?: ApiRequestInit) => Promise<T>;
   approvalPdf: (id: number, submissionId: number, init?: ApiRequestInit) => Promise<Blob>;
   materials: (id: number, submissionId: number, init?: ApiRequestInit) => Promise<Blob>;
 };
-export function ApprovalDocument({api,user,row,scope,submissionId = row.submissionId}: {api: ApprovalDocumentApi;user:ApiUserDto;row:{id:number;status:string;versionNumber:number;submissionId?:number};scope:string;submissionId?:number}) {
+export function ApprovalDocument<T extends Document>({api,user,row,scope,submissionId = row.submissionId,renderContent}: {api: ApprovalDocumentApi<T>;user:ApiUserDto;row:{id:number;status:string;versionNumber:number;submissionId?:number};scope:string;submissionId?:number;renderContent?:(document:T)=>ReactNode}) {
   const operation = useOfficeOperation([["office","approval-document",scope,user.id,user.contextId,row.id]],false);
   const [preview,setPreview] = useState<Blob|null>(null);
   const url = useBlobUrl(preview);
@@ -31,6 +31,7 @@ export function ApprovalDocument({api,user,row,scope,submissionId = row.submissi
   return <section className="oa-detail-content" aria-label="审批单"><h3>审批单{document ? ` · 提交版本 ${document.submissionNumber}` : ""}</h3>
     {query.isPending && <p role="status">正在加载审批单…</p>}
     {query.isError && <InlineNotice tone="error">{readApiError(query.error)} <Button type="button" disabled={query.isFetching} onClick={()=>void query.refetch()}>重试</Button></InlineNotice>}
+    {document && renderContent?.(document)}
     {partial&&<p>本节点仅展示获准材料。下载的审批单会标明材料范围，完整原件由具备完整权限的人员核验。</p>}
     {document?.documentStatus === "Running" && <p role="status">正在生成审批单 PDF…</p>}
     {document?.documentStatus === "Failed" && <InlineNotice tone="warning">{document.documentError} 已完成的审批结果保留。</InlineNotice>}

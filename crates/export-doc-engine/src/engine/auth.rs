@@ -508,6 +508,7 @@ pub(super) fn user_dto_for(
         })
     };
     user["capabilities"] = json!({"canManageSettings":actor.admin,"canManageUsers":actor.admin && actor.edition.allows("system.users"),"canViewAllBusinessData":actor.admin,"canUseDocumentWorkspace":workspace("document"),"canUseSalesWorkspace":workspace("sales"),"productEdition":actor.edition.name(),"enabledModules":enabled,"moduleAccess":access,"permissions":actor.grants,"availableFeatures":["worklist","business-attachments"]});
+    user["capabilities"]["scopeRestrictions"] = super::scope_policies::capabilities(actor);
     user["capabilities"]["oaAssignedOnly"] = json!(actor.oa_assigned_only);
     user["capabilities"]["unitManagement"] = json!(super::units::management(actor));
     Ok(user)

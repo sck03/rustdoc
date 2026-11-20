@@ -123,16 +123,11 @@ pub struct Actor {
 pub fn invoice_identity(company: &Value, number: &Value, data_type: &Value) -> Result<String> {
     Ok(serde_json::to_string(&[company, number, data_type])?)
 }
-pub fn department_identity(company: &str, code: &str) -> Result<String> {
+/// Company-owned natural keys use an unambiguous normalized tuple.
+pub fn company_identity(company: &str, key: &str) -> Result<String> {
     Ok(serde_json::to_string(&[
         normalize(company),
-        normalize(code),
-    ])?)
-}
-pub fn personnel_identity(company: &str, number: &str) -> Result<String> {
-    Ok(serde_json::to_string(&[
-        normalize(company),
-        normalize(number),
+        normalize(key),
     ])?)
 }
 

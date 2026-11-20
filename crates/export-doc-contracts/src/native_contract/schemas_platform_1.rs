@@ -121,14 +121,14 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["optionType","predefinedOptions","customOptions","options","allowCustomValues","storagePolicy"])),
     ("ApiCustomOptionSaveRequest",o(vec![("value",s())])),
     ("ApiDashboardResponse",o(vec![
-        ("monthlyExportAmount",decimal()),("monthlyProfit",decimal()),("monthlyTaxRefund",decimal()),
+        ("monthlyProfit",decimal()),("monthlyTaxRefund",decimal()),
         ("pendingCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("shippedCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("totalActiveCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("periodLabel",s()),("previousMonthlyExportAmount",decimal()),("previousMonthlyProfit",decimal()),
+        ("periodLabel",s()),("previousMonthlyProfit",decimal()),
         ("previousMonthlyTaxRefund",decimal()),("monthlyInvoiceCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("draftCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("verifiedCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("completedCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("singleWindowStatusSummary",s()),
         ("recentInvoices",a(r("ApiDashboardRecentInvoiceDto"))),("todoItems",a(r("ApiDashboardTodoItemDto"))),("storagePolicy",s()),
-        ("exportAmountCurrency",s().description("Currency of the scalar export amounts. Empty for no invoices or mixed currencies; scalar amounts are then zero. Use exportAmountsByCurrency.")),("exportAmountsByCurrency",a(r("ApiDashboardCurrencyAmount")).description("Original-currency totals for the union of both months. Compare only amounts from the same entry; no exchange-rate conversion."))
-    ]).required(vec!["monthlyExportAmount","monthlyProfit","monthlyTaxRefund","pendingCount","shippedCount","totalActiveCount","periodLabel","previousMonthlyExportAmount","previousMonthlyProfit","previousMonthlyTaxRefund","monthlyInvoiceCount","draftCount","verifiedCount","completedCount","singleWindowStatusSummary","recentInvoices","todoItems","storagePolicy"])),
+        ("exportAmountsByCurrency",a(r("ApiDashboardCurrencyAmount")).description("Original-currency totals for the union of both months. Compare only amounts from the same entry; no exchange-rate conversion."))
+    ]).required(vec!["monthlyProfit","monthlyTaxRefund","pendingCount","shippedCount","totalActiveCount","periodLabel","previousMonthlyProfit","previousMonthlyTaxRefund","monthlyInvoiceCount","draftCount","verifiedCount","completedCount","singleWindowStatusSummary","recentInvoices","todoItems","storagePolicy"])),
     ("ApiDashboardTodoItemDto",o(vec![
         ("title",s()),("description",s()),("actionType",s()),
         ("referenceId",s())
@@ -373,12 +373,18 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("disabledModules",a(s()).default_value(serde_json::json!([])).description("Disabled modules are removed from both effective permissions and navigation.").max_items(100)),("employee",Schema::default().any_of(vec![r("AccountPersonnelRecord"),ty(Primitive::Null)]).default_value(serde_json::json!(null)).description("Current personnel link; maintained through personnel workflows, never account save input.").read_only(true)),("oaAssignedOnly",b().default_value(serde_json::json!(false)).description("Restrict office requests to the user's own requests and explicitly assigned approval/handling work, within the ordinary data scopes.")),
         ("permissionSchemeVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::Null])).default_value(serde_json::json!(null)).minimum(num("1")).format("int64"))
     ]).required(vec!["id","username","fullName","role","versionNumber","permissionTemplateCode","permissionTemplateName","departmentId","companyScope","isActive"])),
+    ("ApiPermissionDepartmentScopeDto",o(vec![("companyScope",s()),("departmentId",s())]).required(vec!["companyScope","departmentId"])),
+    ("ApiPermissionScopeRestrictionDto",o(vec![
+        ("resourceKey",s()),("action",s()),
+        ("mode",s().enumeration(Enumeration::Values(vec![serde_json::json!("Deny"),serde_json::json!("Unrestricted"),serde_json::json!("Units"),serde_json::json!("Departments"),serde_json::json!("Projects"),serde_json::json!("Participation")]))),
+        ("unitCodes",a(s())),("departments",a(r("ApiPermissionDepartmentScopeDto"))),("projectIds",a(s()))
+    ]).required(vec!["resourceKey","action","mode","unitCodes","departments","projectIds"])),
     ("ApiUserCapabilitiesDto",o(vec![
         ("canManageSettings",b()),("canManageUsers",b()),("canViewAllBusinessData",b()),
         ("canUseDocumentWorkspace",b()),("canUseSalesWorkspace",b()),("productEdition",s()),
-        ("enabledModules",a(s())),("moduleAccess",a(r("ApiModuleAccessDto"))),("permissions",a(r("ApiPermissionGrantDto"))),
+        ("enabledModules",a(s())),("moduleAccess",a(r("ApiModuleAccessDto"))),("permissions",a(r("ApiPermissionGrantDto"))),("scopeRestrictions",a(r("ApiPermissionScopeRestrictionDto"))),
         ("oaAssignedOnly",b().default_value(serde_json::json!(false)).description("Restrict office requests to the user's own requests and explicitly assigned approval/handling work, within the ordinary data scopes.")),("availableFeatures",a(s())),("unitManagement",r("UnitManagement"))
-    ]).required(vec!["canManageSettings","canManageUsers","canViewAllBusinessData","canUseDocumentWorkspace","canUseSalesWorkspace","productEdition","enabledModules","moduleAccess","permissions","availableFeatures"])),
+    ]).required(vec!["canManageSettings","canManageUsers","canViewAllBusinessData","canUseDocumentWorkspace","canUseSalesWorkspace","productEdition","enabledModules","moduleAccess","permissions","scopeRestrictions","availableFeatures"])),
     ("ApiUserDto",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("username",s()),("fullName",s()),
         ("role",s()),("departmentId",s()),("companyScope",s()),

@@ -81,13 +81,34 @@ fn find_party(tx: &Connection, actor: &Actor, kind: &str, value: &Value) -> Resu
     } else {
         &["exporterNameEN", "exporterNameCN", "creditCode"]
     };
-    Ok(store::all(tx, kind)?.into_iter().find(|v| {
-        v["companyScope"] == actor.company
-            && keys.iter().any(|key| {
-                !text(value, key).is_empty()
-                    && store::normalize(&text(value, key)) == store::normalize(&text(v, key))
-            })
-    }))
+    let keys: Vec<_> = keys
+        .iter()
+        .map(|key| (*key, store::normalize(&text(value, key))))
+        .collect();
+    let mut candidates = tx.party_candidates(kind, &actor.company, &keys)?;
+    if candidates.len() > 1 {
+        return Err(conflict(
+            "单据包的名称与税号/信用代码匹配多个往来单位，请核对档案后重新导入。",
+        ));
+    }
+    if let Some(candidate) = candidates.pop() {
+        // A unique name match must not silently override a conflicting strong identifier.
+        let identifier = if kind == "customers" {
+            "taxId"
+        } else {
+            "creditCode"
+        };
+        let incoming = store::normalize(&text(value, identifier));
+        let existing = store::normalize(&text(&candidate, identifier));
+        if !incoming.is_empty() && !existing.is_empty() && incoming != existing {
+            return Err(conflict(
+                "单据包与现有往来单位的税号/信用代码不一致，请核对档案后重新导入。",
+            ));
+        }
+        Ok(Some(candidate))
+    } else {
+        Ok(None)
+    }
 }
 fn preview(tx: &Connection, actor: &Actor, package: &Package) -> Result<Value> {
     let existing = find_invoice(tx, actor, &package.invoice)?;

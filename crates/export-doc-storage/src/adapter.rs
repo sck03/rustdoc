@@ -26,6 +26,8 @@ macro_rules! unsupported_operations {
 /// All business operations use this semantic storage boundary, never provider SQL.
 pub(crate) trait Adapter: Send {
     semantic_operations! {
+        scan_dashboard(scope: &DataScope<'_>, fields: &[(&str, &str)], before: Option<i64>) -> Vec<Value> => dashboard_query::scan;
+        party_candidates(kind: &str, company: &str, keys: &[(&str, String)]) -> Vec<Value> => party_query::candidates;
         insert_file(file:&FileWrite<'_>)->() => file_catalog::insert;
         file_info(record:i64,kind:&str)->Option<FileInfo> => file_catalog::get;
         file_page(record:i64,prefix:&str,after:&str,limit:i64)->(i64,Vec<FileInfo>) => file_catalog::page;

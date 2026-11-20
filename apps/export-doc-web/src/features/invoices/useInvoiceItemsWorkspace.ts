@@ -89,11 +89,12 @@ export function useInvoiceItemsWorkspace({
       const productCode = normalizeText(item.styleNo);
       if (!productCode) throw new Error("商品编码(款号)不能为空。");
 
-      const candidates = (await client.listProducts(
-        { productCode, pageNumber: 1, pageSize: 1 },
+      const candidates = await client.listProducts(
+        { productCode, pageNumber: 1, pageSize: 2 },
         { signal },
-      )).items;
-      const existing = candidates[0] ?? null;
+      );
+      if (candidates.totalCount > 1) throw new Error("获准范围内有多个同编码商品，请到商品库选择对应档案后更新。");
+      const existing = candidates.items[0] ?? null;
       if (existing && !await requestConfirmation({
         title: "更新商品库",
         description: `商品库中已存在编码为 ${productCode} 的商品，是否用当前发票明细更新？`,

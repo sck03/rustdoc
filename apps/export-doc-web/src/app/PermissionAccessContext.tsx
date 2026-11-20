@@ -1,6 +1,6 @@
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import type { ApiModuleAccessDto, ApiPermissionGrantDto } from "../api/index.ts";
-import { isRecordInPermissionScope, type PermissionRecord, type PermissionSubject } from "./permissionScope.ts";
+import type { ApiModuleAccessDto, ApiPermissionGrantDto, ApiPermissionScopeRestrictionDto } from "../api/index.ts";
+import { isRecordInPermissionScope, isRecordWithinRestrictions, type PermissionRecord, type PermissionSubject } from "./permissionScope.ts";
 
 export type PermissionAccessLevel = "none" | "view" | "operate" | "manage";
 
@@ -9,6 +9,7 @@ type PermissionAccessValue = {
   permissions: ReadonlyMap<string, string>;
   canManageSettings: boolean;
   subject?: PermissionSubject;
+  scopeRestrictions?: readonly ApiPermissionScopeRestrictionDto[];
 };
 
 const PermissionAccessContext = createContext<PermissionAccessValue>({
@@ -22,12 +23,14 @@ export function PermissionAccessProvider({
   permissions,
   canManageSettings = false,
   subject,
+  scopeRestrictions,
   children,
 }: {
   grants?: ApiModuleAccessDto[];
   permissions?: ApiPermissionGrantDto[];
   canManageSettings?: boolean;
   subject?: PermissionSubject;
+  scopeRestrictions?: readonly ApiPermissionScopeRestrictionDto[];
   children: ReactNode;
 }) {
   const value = useMemo<PermissionAccessValue>(() => ({
@@ -43,15 +46,26 @@ export function PermissionAccessProvider({
     ),
     canManageSettings,
     subject,
-  }), [canManageSettings, grants, permissions, subject]);
+    scopeRestrictions,
+  }), [canManageSettings, grants, permissions, scopeRestrictions, subject]);
 
   return <PermissionAccessContext.Provider value={value}>{children}</PermissionAccessContext.Provider>;
 }
 
+function allowsRecord(value: PermissionAccessValue, resourceKey: string, action: string, record?: PermissionRecord | null) {
+  const scope = value.permissions.get(permissionKey(resourceKey, action)) ?? "";
+  return Boolean(scope) && (record === undefined || (isRecordInPermissionScope(scope, value.subject, record, value.canManageSettings) &&
+    isRecordWithinRestrictions(value.scopeRestrictions, resourceKey, action, value.subject, record)));
+}
+
+export function useRecordPermission() {
+  const value = useContext(PermissionAccessContext);
+  return (resourceKey: string, action: string, record: PermissionRecord | null) => allowsRecord(value, resourceKey, action, record);
+}
+
 export function usePermission(resourceKey: string, action: string, record?: PermissionRecord | null) {
-  const { permissions, subject, canManageSettings } = useContext(PermissionAccessContext);
-  const dataScope = permissions.get(permissionKey(resourceKey, action)) ?? "";
-  return { allowed: dataScope.length > 0 && (record === undefined || isRecordInPermissionScope(dataScope, subject, record, canManageSettings)), dataScope };
+  const value = useContext(PermissionAccessContext);
+  return { allowed: allowsRecord(value, resourceKey, action, record), dataScope: value.permissions.get(permissionKey(resourceKey, action)) ?? "" };
 }
 
 export function hasPermission(
@@ -69,14 +83,13 @@ export function usePermissionCapabilities() {
 }
 
 export function useModulePermission(moduleKey: string, record?: PermissionRecord | null) {
-  const { grants, permissions, subject, canManageSettings } = useContext(PermissionAccessContext);
-  const accessLevel = grants.get(normalizeModuleKey(moduleKey)) ?? "none";
+  const value = useContext(PermissionAccessContext);
+  const accessLevel = value.grants.get(normalizeModuleKey(moduleKey)) ?? "none";
   // Report tools combine template/resource grants through the server's module
   // projection. Ordinary resources authorize each action independently.
   const allows = (action: PermissionAccessLevel) => moduleKey === "document.reports"
     ? permissionAccessRank(accessLevel) >= permissionAccessRank(action)
-    : Boolean(permissions.get(permissionKey(moduleKey, action))) && (record === undefined ||
-      isRecordInPermissionScope(permissions.get(permissionKey(moduleKey, action)) ?? "", subject, record, canManageSettings));
+    : allowsRecord(value, moduleKey, action, record);
   return {
     accessLevel,
     canView: allows("view"),

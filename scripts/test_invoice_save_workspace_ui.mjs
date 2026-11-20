@@ -22,7 +22,7 @@ queryClient.setQueryData(["dashboard"],{old:true});queryClient.setQueryData(["qu
 window.queryClient=queryClient;
 const client={updateInvoice:(request,init)=>new Promise((resolve,reject)=>window.requests.push({request,signal:init.signal,resolve,reject})),
 createInvoice:(request,init)=>new Promise((resolve,reject)=>window.requests.push({request,signal:init.signal,resolve,reject})),
-listProducts:async request=>{window.productQuery=request;return {items:request.productCode?[{id:51,productCode:request.productCode,rowVersion:"native:1"}]:[],pageNumber:1,totalCount:1}},
+listProducts:async request=>{window.productQuery=request;return {items:request.productCode?(window.ambiguousProducts?[{id:51,companyScope:"A"},{id:52,companyScope:"B"}]:[{id:51,productCode:request.productCode,rowVersion:"native:1"}]):[],pageNumber:1,totalCount:window.ambiguousProducts?2:1}},
 updateProduct:async request=>{window.productWrites.push({kind:"update",request});return request.body;},
 createProduct:async request=>{window.productWrites.push({kind:"create",request});return request.body;}};
 function Harness(){
@@ -135,6 +135,13 @@ try{
     assert.equal(await page.evaluate(()=>window.productWrites[0].request.id),51);
     await page.getByRole("button",{name:"paste",exact:true}).click();
     assert.match(await page.locator("[data-message]").textContent(),/5000/);assert.equal(await page.evaluate(()=>window.invoice.items.length),1);
+  });
+  await scenario(async page=>{
+    await page.evaluate(()=>window.ambiguousProducts=true);
+    await page.getByRole("button",{name:"product",exact:true}).click();
+    await page.waitForFunction(()=>document.querySelector("[data-product]").textContent.includes("多个同编码商品"));
+    assert.equal(await page.evaluate(()=>window.productWrites.length),0,"ambiguous cross-company codes must never update the first record");
+    assert.equal(await page.getByRole("button",{name:"更新商品",exact:true}).count(),0);
   });
   await runInvoiceItemsGridCases(scenario);
   console.log(`Invoice save workspace UI: ${passed} passed; ${output}`);

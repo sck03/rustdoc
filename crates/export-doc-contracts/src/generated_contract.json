@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "b6c33598bbbd2889591fc71da25b8b832a79299019dd913f7efc0b537106232e",
+  "digest": "676bfa5f1ff25fd5791c09a43c0a64d607101b224bafa5f11cbb181a74674111",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -30283,70 +30283,6 @@
         }
       },
       "request": null,
-      "response": null,
-      "timeoutSeconds": 86400,
-      "maxJsonResponseBytes": 67108864,
-      "requiresProcessingSlot": false,
-      "validatesDecimalInput": false
-    },
-    "DownloadSingleWindowReceiptPackage": {
-      "policy": {
-        "requiresAuthentication": true,
-        "requiresDesktopAccess": true,
-        "requiresLicense": true,
-        "access": {
-          "match": "All",
-          "resources": [
-            {
-              "resourceKey": "document.single-window",
-              "actions": [
-                "operate"
-              ],
-              "administratorOnly": false
-            }
-          ]
-        }
-      },
-      "office": null,
-      "parameters": [],
-      "requestBody": {
-        "required": true,
-        "content": {
-          "application/json": {
-            "schema": {
-              "$ref": "#/components/schemas/ApiSingleWindowReceiptPackageExportRequest"
-            }
-          }
-        }
-      },
-      "responses": {
-        "200": {
-          "description": "OK",
-          "content": {
-            "application/octet-stream": {
-              "schema": {
-                "type": "string",
-                "format": "byte"
-              }
-            }
-          }
-        },
-        "400": {
-          "description": "Bad Request"
-        },
-        "401": {
-          "description": "Unauthorized"
-        },
-        "403": {
-          "description": "Forbidden"
-        },
-        "409": {
-          "description": "Conflict"
-        }
-      },
-      "request": {
-        "$ref": "#/components/schemas/ApiSingleWindowReceiptPackageExportRequest"
-      },
       "response": null,
       "timeoutSeconds": 86400,
       "maxJsonResponseBytes": 67108864,
@@ -87350,20 +87286,6 @@
           "schema": {
             "type": "string"
           }
-        },
-        {
-          "name": "workingDirectory",
-          "in": "query",
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "name": "keepWorkingDirectory",
-          "in": "query",
-          "schema": {
-            "type": "boolean"
-          }
         }
       ],
       "requestBody": {
@@ -87434,20 +87356,6 @@
           "in": "query",
           "schema": {
             "type": "string"
-          }
-        },
-        {
-          "name": "workingDirectory",
-          "in": "query",
-          "schema": {
-            "type": "string"
-          }
-        },
-        {
-          "name": "keepWorkingDirectory",
-          "in": "query",
-          "schema": {
-            "type": "boolean"
           }
         }
       ],
@@ -94400,23 +94308,12 @@
           "format": "int32",
           "pattern": "^-?(?:0|[1-9]\\d*)$"
         },
-        "exportAmountCurrency": {
-          "type": "string",
-          "description": "Currency of the scalar export amounts. Empty for no invoices or mixed currencies; scalar amounts are then zero. Use exportAmountsByCurrency."
-        },
         "exportAmountsByCurrency": {
           "type": "array",
           "items": {
             "$ref": "#/components/schemas/ApiDashboardCurrencyAmount"
           },
           "description": "Original-currency totals for the union of both months. Compare only amounts from the same entry; no exchange-rate conversion."
-        },
-        "monthlyExportAmount": {
-          "type": "string",
-          "format": "decimal",
-          "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
-          "default": "0",
-          "maxLength": 60
         },
         "monthlyInvoiceCount": {
           "type": [
@@ -94450,13 +94347,6 @@
         },
         "periodLabel": {
           "type": "string"
-        },
-        "previousMonthlyExportAmount": {
-          "type": "string",
-          "format": "decimal",
-          "pattern": "^[+-]?[0-9]+(?:\\.[0-9]+)?$",
-          "default": "0",
-          "maxLength": 60
         },
         "previousMonthlyProfit": {
           "type": "string",
@@ -94516,14 +94406,12 @@
         }
       },
       "required": [
-        "monthlyExportAmount",
         "monthlyProfit",
         "monthlyTaxRefund",
         "pendingCount",
         "shippedCount",
         "totalActiveCount",
         "periodLabel",
-        "previousMonthlyExportAmount",
         "previousMonthlyProfit",
         "previousMonthlyTaxRefund",
         "monthlyInvoiceCount",
@@ -98382,6 +98270,9 @@
     "ApiInvoiceListItemDto": {
       "type": "object",
       "properties": {
+        "companyScope": {
+          "type": "string"
+        },
         "contractNo": {
           "type": "string"
         },
@@ -98389,6 +98280,9 @@
           "type": "string"
         },
         "customerName": {
+          "type": "string"
+        },
+        "departmentId": {
           "type": "string"
         },
         "destinationCountry": {
@@ -98411,6 +98305,15 @@
         },
         "invoiceNo": {
           "type": "string"
+        },
+        "ownerUserId": {
+          "type": [
+            "null",
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
         },
         "portOfDestination": {
           "type": "string"
@@ -98445,7 +98348,9 @@
         "currency",
         "totalAmount",
         "type",
-        "status"
+        "status",
+        "companyScope",
+        "departmentId"
       ]
     },
     "ApiInvoicePrintRow": {
@@ -101848,6 +101753,21 @@
         "presetLevel"
       ]
     },
+    "ApiPermissionDepartmentScopeDto": {
+      "type": "object",
+      "properties": {
+        "companyScope": {
+          "type": "string"
+        },
+        "departmentId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "companyScope",
+        "departmentId"
+      ]
+    },
     "ApiPermissionGrantDto": {
       "type": "object",
       "properties": {
@@ -101928,6 +101848,54 @@
         "isTechnical",
         "supportsDataScope",
         "actions"
+      ]
+    },
+    "ApiPermissionScopeRestrictionDto": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "departments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ApiPermissionDepartmentScopeDto"
+          }
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "Deny",
+            "Unrestricted",
+            "Units",
+            "Departments",
+            "Projects",
+            "Participation"
+          ]
+        },
+        "projectIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resourceKey": {
+          "type": "string"
+        },
+        "unitCodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "resourceKey",
+        "action",
+        "mode",
+        "unitCodes",
+        "departments",
+        "projectIds"
       ]
     },
     "ApiPermissionTemplateCatalogResponse": {
@@ -105584,16 +105552,8 @@
     "ApiSingleWindowImportPackageRequest": {
       "type": "object",
       "properties": {
-        "keepWorkingDirectory": {
-          "type": "boolean",
-          "default": false
-        },
         "packagePath": {
           "type": "string"
-        },
-        "workingDirectory": {
-          "type": "string",
-          "default": ""
         }
       },
       "required": [
@@ -105643,19 +105603,11 @@
         },
         "trackingStatus": {
           "type": "string"
-        },
-        "workingDirectory": {
-          "type": "string"
-        },
-        "workingDirectoryKept": {
-          "type": "boolean"
         }
       },
       "required": [
         "success",
         "packagePath",
-        "workingDirectory",
-        "workingDirectoryKept",
         "manifest",
         "parsedReceipts",
         "trackingStatus",
@@ -107548,6 +107500,12 @@
         "productEdition": {
           "type": "string"
         },
+        "scopeRestrictions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ApiPermissionScopeRestrictionDto"
+          }
+        },
         "unitManagement": {
           "$ref": "#/components/schemas/UnitManagement"
         }
@@ -107562,6 +107520,7 @@
         "enabledModules",
         "moduleAccess",
         "permissions",
+        "scopeRestrictions",
         "availableFeatures"
       ]
     },

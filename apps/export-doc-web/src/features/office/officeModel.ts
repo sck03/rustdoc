@@ -1,6 +1,6 @@
 import type { ApiUserDto, MeetingBookingRecord, MeetingBookingUpdateRequest, MeetingRoomSaveRequest, OfficeSupplyRequestRecord, OfficeSupplySaveRequest, SupplyRequestUpdateRequest } from "../../api/index.ts";
 import { businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from "../../ui/businessTime.ts";
-import { hasDepartment } from "../../app/permissionScope.ts";
+import { hasDepartment, isRecordWithinRestrictions } from "../../app/permissionScope.ts";
 
 export type OfficeKind = "rooms" | "supplies";
 export type OfficeRequestRow = MeetingBookingRecord | OfficeSupplyRequestRecord;
@@ -29,17 +29,20 @@ export const officeHistoryLabels: Record<string, string> = {
 
 export function officeAccess(user: ApiUserDto, kind: OfficeKind) {
   const grants = (user.capabilities.permissions ?? []).filter((grant) => grant.resourceKey === `office.${kind}`);
-  const scope = (action: string) => grants.find((grant) => grant.action === action)?.dataScope ?? "";
   return {
-    canSeeOthers: ["department", "company", "all"].includes(scope("view")),
+    canSeeOthers: grants.some(grant => grant.action === "view" && ["department", "company", "all"].includes(grant.dataScope)),
     allows: (action: string, row?: OfficeRequestRow) => {
-      const value = scope(action);
-      if (!["own", "department", "company", "all"].includes(value)) return false;
-      if (!row) return true;
-      if (row.handlingKey && ["issue", "return"].includes(action)) return row.canHandle === true;
-      if (value === "own") return row.ownerUserId === user.id;
-      if (value === "department") return Boolean(user.departmentId) && hasDepartment(user, row.departmentId);
-      return true;
+      if (row && (row.companyScope !== user.companyScope || !isRecordWithinRestrictions(
+        user.capabilities.scopeRestrictions, `office.${kind}`, action, user, row, true,
+      ))) return false;
+      return grants.some(grant => {
+        if (grant.action !== action || !["own", "department", "company", "all"].includes(grant.dataScope)) return false;
+        if (!row) return true;
+        if (row.handlingKey && ["issue", "return"].includes(action)) return row.canHandle === true;
+        if (grant.dataScope === "own") return row.ownerUserId === user.id;
+        if (grant.dataScope === "department") return hasDepartment(user, row.departmentId);
+        return true;
+      });
     },
   };
 }
@@ -59,6 +62,7 @@ export function readSupplyRequestUpdate(form: FormData, version: number): Supply
 }
 
 export function officeRequestActions(row: OfficeRequestRow, user: ApiUserDto, kind: OfficeKind) {
+  if (row.companyScope !== user.companyScope) return [];
   const access = officeAccess(user, kind);
   const actions: { action: OfficeAction; label: string }[] = [];
   if (row.status === "Pending" && row.canReview === true) {

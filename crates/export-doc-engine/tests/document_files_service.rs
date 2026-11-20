@@ -226,3 +226,77 @@ fn query_filters_shipment_date_and_exports_the_same_sorted_records() {
     assert!(!sheet.contains("Q-300"));
     assert!(sheet.contains("船期/航期"));
 }
+
+#[test]
+fn ambiguous_party_matches_reject_preview_and_import_independent_of_record_order() {
+    let source = native_fixture::Fixture::new();
+    let party = source.create(
+        CREATE_CUSTOMER,
+        json!({"customerNameEN":"ALPHA","displayName":"甲","taxId":"TAX-B"}),
+    );
+    let mut draft = InvoiceDraft::demo("2026-11-20", "AMBIGUOUS-PARTY")
+        .build()
+        .unwrap();
+    draft.customer_id = party["id"].as_i64().unwrap();
+    draft.customer_name_en = "ALPHA".into();
+    let invoice = source.client().save_invoice(&draft).unwrap();
+    let bytes = source
+        .client()
+        .bytes(
+            DOWNLOAD_INVOICE_TRANSFER_PACKAGE,
+            &[("id", invoice.id.to_string())],
+            &[],
+            None,
+            25 * 1024 * 1024,
+        )
+        .unwrap();
+    for reverse in [false, true] {
+        let target = native_fixture::Fixture::new();
+        let mut parties = vec![
+            json!({"customerNameEN":"ALPHA","displayName":"甲","taxId":"TAX-A"}),
+            json!({"customerNameEN":"BETA","displayName":"乙","taxId":"TAX-B"}),
+        ];
+        if reverse {
+            parties.reverse();
+        }
+        for party in parties {
+            target.create(CREATE_CUSTOMER, party);
+        }
+        for op in [
+            PREVIEW_UPLOADED_INVOICE_TRANSFER_PACKAGE,
+            IMPORT_UPLOADED_INVOICE_TRANSFER_PACKAGE,
+        ] {
+            let rejected = target
+                .client()
+                .upload(
+                    op,
+                    &[],
+                    json!({"conflictAction":"Skip"}),
+                    "test.edpkg",
+                    &bytes,
+                )
+                .unwrap_err();
+            assert_eq!(rejected.status, Some(409));
+        }
+        assert_eq!(target.request(LIST_INVOICES, None, None)["totalCount"], 0);
+    }
+    let target = native_fixture::Fixture::new();
+    target.create(
+        CREATE_CUSTOMER,
+        json!({"customerNameEN":"ALPHA","displayName":"甲","taxId":"TAX-A"}),
+    );
+    assert_eq!(
+        target
+            .client()
+            .upload(
+                IMPORT_UPLOADED_INVOICE_TRANSFER_PACKAGE,
+                &[],
+                json!({}),
+                "test.edpkg",
+                &bytes
+            )
+            .unwrap_err()
+            .status,
+        Some(409)
+    );
+}

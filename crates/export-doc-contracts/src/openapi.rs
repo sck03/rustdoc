@@ -26,6 +26,9 @@ mod file_storage;
 #[path = "contract_precision_stability.rs"]
 mod precision_stability;
 #[cfg(test)]
+#[path = "contract_review_cleanup.rs"]
+mod review_cleanup;
+#[cfg(test)]
 #[path = "contract_supplier_resources.rs"]
 mod supplier_resources;
 #[cfg(test)]
@@ -192,6 +195,7 @@ mod tests {
         business_consistency::apply(&mut baseline);
         supplier_resources::apply(&mut baseline);
         precision_stability::apply(&mut baseline);
+        review_cleanup::apply(&mut baseline);
         // Reviewed retirement: access is the sole authorization definition.
         // Keep every access rule, authentication flag, schema and error in the comparison.
         for path in baseline["paths"].as_object_mut().unwrap().values_mut() {

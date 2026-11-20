@@ -52,7 +52,7 @@ pub(super) fn display_values(
                 );
             }
             FieldKind::Department => {
-                departments.insert(store::department_identity(&actor.company, value)?);
+                departments.insert(store::company_identity(&actor.company, value)?);
             }
             _ => unreachable!(),
         }
@@ -81,7 +81,7 @@ pub(super) fn display_values(
             return Err(invalid("请选择本单位的启用部门。"));
         }
         department_names.insert(
-            store::department_identity(&actor.company, &text(&department, "code"))?,
+            store::company_identity(&actor.company, &text(&department, "code"))?,
             text(&department, "name"),
         );
     }
@@ -98,7 +98,7 @@ pub(super) fn display_values(
             FieldKind::Department => format!(
                 "{}（{value}）",
                 department_names
-                    .get(&store::department_identity(&actor.company, value)?)
+                    .get(&store::company_identity(&actor.company, value)?)
                     .ok_or_else(|| invalid("请选择本单位的启用部门。"))?
             ),
             _ => unreachable!(),

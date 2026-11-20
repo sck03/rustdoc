@@ -59,7 +59,6 @@ pub const OPERATIONS: &[Operation] = &[
     DOWNLOAD_AGENT_CONSIGNMENT_SUBMIT_PACKAGE,
     SAVE_CUSTOMS_COO_SUBMIT_PACKAGE_TO_PATH,
     SAVE_AGENT_CONSIGNMENT_SUBMIT_PACKAGE_TO_PATH,
-    DOWNLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
     SAVE_SINGLE_WINDOW_RECEIPT_PACKAGE_TO_PATH,
     IMPORT_SINGLE_WINDOW_SUBMIT_PACKAGE,
     IMPORT_SINGLE_WINDOW_RECEIPT_PACKAGE,
@@ -107,7 +106,7 @@ pub fn upload(
     if catalog_excel::UPLOADS.contains(&operation) {
         return catalog_excel::preview(service, actor, operation, metadata, name, bytes);
     }
-    imports::import(service, actor, operation, metadata, name, bytes)
+    imports::import(service, actor, operation, name, bytes)
 }
 pub const BATCHES: &str = "sw-batches";
 pub fn parameter<'a>(values: &'a [(&str, String)], key: &str) -> &'a str {

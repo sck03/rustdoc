@@ -5,7 +5,6 @@ pub fn import(
     service: &NativeService,
     actor: &Actor,
     operation: Operation,
-    metadata: &Value,
     name: &str,
     bytes: &[u8],
 ) -> Result<Value> {
@@ -27,13 +26,6 @@ pub fn import(
         &tracking::check,
     )
     .map_err(invalid)?;
-    if metadata["keepWorkingDirectory"] == true
-        || !rules::text(metadata, "workingDirectory").is_empty()
-    {
-        return Err(invalid(
-            "原生交接直接使用数据库归档，请关闭保留解包工作目录。",
-        ));
-    }
     let prepared = if submit {
         None
     } else {
@@ -124,7 +116,7 @@ pub fn import(
                 Ok((row, Vec::new(), 0))
             })?;
     Ok(
-        json!({"success":true,"packagePath":"","workingDirectory":"","workingDirectoryKept":false,"manifest":package.manifest,
+        json!({"success":true,"packagePath":"","manifest":package.manifest,
         "parsedReceipts":parsed,"trackingBatchId":row["id"],"trackingStatus":row["status"],"persistedReceiptCount":count,"storagePolicy":packages::POLICY,"message":if submit{"提交包已验证并归档，可送入当前官方客户端。"}else{"回执已验证并归档。"}}),
     )
 }

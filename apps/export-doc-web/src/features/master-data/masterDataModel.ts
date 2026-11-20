@@ -417,13 +417,10 @@ function readDisplayString(value: unknown) {
   return "-";
 }
 
-export function normalizeTextFields(record: MasterDataRecord, id: number, fields: string[]) {
-  const next: MasterDataRecord = { ...record, id };
-  for (const field of fields) {
-    next[field] = normalizeText(readString(record, field));
-  }
-
-  return next;
+export function normalizeTextFields<const K extends string>(record: MasterDataRecord, id: number, fields: readonly K[]) {
+  // The assertion is confined to this key-preserving Object.fromEntries projection.
+  const text = Object.fromEntries(fields.map(field => [field, normalizeText(readString(record, field))])) as Record<K, string>;
+  return { ...record, id, ...text } as MasterDataRecord & Record<K, string>;
 }
 
 export function isSeparateNotifyParty(record: MasterDataRecord) {
@@ -447,15 +444,10 @@ export function applyCustomerFieldChange(
 export function normalizeCustomerRecord(record: MasterDataRecord, id: number) {
   const next = normalizeTextFields(record, id, customerTextFields);
   const requestedMode = readString(record, "notifyPartyMode");
-  next.notifyPartyMode = requestedMode === "SameAsConsignee" || requestedMode === "Separate"
-    ? requestedMode
-    : "None";
-  if (next.notifyPartyMode !== "Separate") {
-    next.notifyPartyName = "";
-    next.notifyPartyAddress = "";
-  }
-
-  return next;
+  const notifyPartyMode: "None" | "SameAsConsignee" | "Separate" = requestedMode === "SameAsConsignee" || requestedMode === "Separate" ? requestedMode : "None";
+  return { ...next, notifyPartyMode,
+    notifyPartyName: notifyPartyMode === "Separate" ? next.notifyPartyName : "",
+    notifyPartyAddress: notifyPartyMode === "Separate" ? next.notifyPartyAddress : "" };
 }
 
 export function encodeRouteId(value: string | number) {
@@ -472,19 +464,8 @@ export function parseNumericRouteKey(recordKey: string) {
 }
 
 export function normalizeProductRecord(record: MasterDataRecord, id: number) {
-  const next = normalizeTextFields(record, id, productTextFields);
-  for (const field of productDecimalFields) next[field] = decimalText(readString(record, field));
-  const createdAt = readString(record, "createdAt");
-  const updatedAt = readString(record, "updatedAt");
-  if (createdAt) {
-    next.createdAt = createdAt;
-  }
-
-  if (updatedAt) {
-    next.updatedAt = updatedAt;
-  }
-
-  return next;
+  const decimals = Object.fromEntries(productDecimalFields.map(field => [field, decimalText(readString(record, field))])) as Record<typeof productDecimalFields[number], string>;
+  return { ...normalizeTextFields(record, id, productTextFields), ...decimals };
 }
 
 export function normalizeHsCodeRecord(record: MasterDataRecord, id: number) {
@@ -509,7 +490,7 @@ const customerTextFields = [
   "taxId",
   "notes",
   "rowVersion",
-];
+] as const;
 
 export const exporterTextFields = [
   "exporterNameEN",
@@ -527,7 +508,7 @@ export const exporterTextFields = [
   "docSealPath",
   "customsSealPath",
   "rowVersion",
-];
+] as const;
 
 export const payeeTextFields = [
   "category",
@@ -538,7 +519,7 @@ export const payeeTextFields = [
   "contactPerson",
   "phone",
   "notes",
-];
+] as const;
 
 const productTextFields = [
   "productCode",
@@ -556,7 +537,7 @@ const productTextFields = [
   "unitCN",
   "packageUnitEN",
   "packageUnitCN",
-];
+] as const;
 
 const productDecimalFields = [
   "taxRebateRate",
@@ -567,10 +548,10 @@ const productDecimalFields = [
   "nwPerCtn",
   "pcsPerCtn",
   "defaultPrice",
-];
+] as const;
 
-export const portTextFields = ["nameEN", "nameCN", "country", "code"];
-export const unitTextFields = ["nameEN", "nameCN", "code"];
+export const portTextFields = ["nameEN", "nameCN", "country", "code"] as const;
+export const unitTextFields = ["nameEN", "nameCN", "code"] as const;
 const hsCodeTextFields = [
   "code",
   "normalizedCode",
@@ -591,4 +572,4 @@ const hsCodeTextFields = [
   "consumptionTaxRate",
   "valueAddedTaxRate",
   "notes",
-];
+] as const;

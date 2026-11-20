@@ -10,6 +10,8 @@ pub use postgres::tools::{
 };
 mod audit_query;
 mod business_query;
+mod dashboard_query;
+mod party_query;
 pub use audit_query::AuditQuery;
 mod crm_query;
 pub use crm_query::{CrmList, CrmQuery};
@@ -383,6 +385,8 @@ impl Connection {
     }
 }
 delegate! {
+    scan_dashboard(scope:&DataScope<'_>,fields:&[(&str,&str)],before:Option<i64>)->Vec<Value>;
+    party_candidates(kind:&str,company:&str,keys:&[(&str,String)])->Vec<Value>;
     insert_file(file:&FileWrite<'_>)->();
     file_info(record:i64,kind:&str)->Option<FileInfo>;
     file_page(record:i64,prefix:&str,after:&str,limit:i64)->(i64,Vec<FileInfo>);

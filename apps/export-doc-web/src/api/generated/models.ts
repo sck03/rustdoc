@@ -992,15 +992,12 @@ export interface ApiDashboardRecentInvoiceDto {
 export interface ApiDashboardResponse {
   completedCount: number;
   draftCount: number;
-  exportAmountCurrency?: string;
   exportAmountsByCurrency?: ApiDashboardCurrencyAmount[];
-  monthlyExportAmount: string;
   monthlyInvoiceCount: number;
   monthlyProfit: string;
   monthlyTaxRefund: string;
   pendingCount: number;
   periodLabel: string;
-  previousMonthlyExportAmount: string;
   previousMonthlyProfit: string;
   previousMonthlyTaxRefund: string;
   recentInvoices: ApiDashboardRecentInvoiceDto[];
@@ -1862,14 +1859,17 @@ export interface ApiInvoiceItemDto {
 }
 
 export interface ApiInvoiceListItemDto {
+  companyScope: string;
   contractNo: string;
   currency: string;
   customerName: string;
+  departmentId: string;
   destinationCountry: string;
   exporterName: string;
   id: number;
   invoiceDate: string;
   invoiceNo: string;
+  ownerUserId?: number | null;
   portOfDestination: string;
   portOfLoading: string;
   status: string;
@@ -2581,6 +2581,11 @@ export interface ApiPermissionActionDefinitionDto {
   unitAssignable?: boolean;
 }
 
+export interface ApiPermissionDepartmentScopeDto {
+  companyScope: string;
+  departmentId: string;
+}
+
 export interface ApiPermissionGrantDto {
   action: string;
   dataScope: string;
@@ -2600,6 +2605,15 @@ export interface ApiPermissionResourceDefinitionDto {
   unitAssignable?: boolean;
   workflowResource?: boolean;
   workspace: string;
+}
+
+export interface ApiPermissionScopeRestrictionDto {
+  action: string;
+  departments: ApiPermissionDepartmentScopeDto[];
+  mode: "Deny" | "Unrestricted" | "Units" | "Departments" | "Projects" | "Participation";
+  projectIds: string[];
+  resourceKey: string;
+  unitCodes: string[];
 }
 
 export interface ApiPermissionTemplateCatalogResponse {
@@ -3429,9 +3443,7 @@ export interface ApiSingleWindowHandoffPackageResponse {
 }
 
 export interface ApiSingleWindowImportPackageRequest {
-  keepWorkingDirectory?: boolean;
   packagePath: string;
-  workingDirectory?: string;
 }
 
 export interface ApiSingleWindowImportedPackageResponse {
@@ -3444,8 +3456,6 @@ export interface ApiSingleWindowImportedPackageResponse {
   success: boolean;
   trackingBatchId?: number | null;
   trackingStatus: string;
-  workingDirectory: string;
-  workingDirectoryKept: boolean;
 }
 
 export interface ApiSingleWindowIssuingAuthorityCatalogResponse {
@@ -3860,6 +3870,7 @@ export interface ApiUserCapabilitiesDto {
   oaAssignedOnly?: boolean;
   permissions: ApiPermissionGrantDto[];
   productEdition: string;
+  scopeRestrictions: ApiPermissionScopeRestrictionDto[];
   unitManagement?: UnitManagement;
 }
 
@@ -7164,10 +7175,8 @@ export const ApiDashboardRecentInvoiceDtoDefaults = {
 } as const satisfies Partial<ApiDashboardRecentInvoiceDto>;
 
 export const ApiDashboardResponseDefaults = {
-  monthlyExportAmount: "0",
   monthlyProfit: "0",
   monthlyTaxRefund: "0",
-  previousMonthlyExportAmount: "0",
   previousMonthlyProfit: "0",
   previousMonthlyTaxRefund: "0",
 } as const satisfies Partial<ApiDashboardResponse>;
@@ -7415,11 +7424,6 @@ export const ApiSalesOpportunitySaveRequestDefaults = {
   quotationNo: "",
   title: "",
 } as const satisfies Partial<ApiSalesOpportunitySaveRequest>;
-
-export const ApiSingleWindowImportPackageRequestDefaults = {
-  keepWorkingDirectory: false,
-  workingDirectory: "",
-} as const satisfies Partial<ApiSingleWindowImportPackageRequest>;
 
 export const ApiSingleWindowSubmitPackageRequestDefaults = {
   packagePath: "",
@@ -8728,10 +8732,6 @@ export interface DownloadReportTemplateFileRequest {
 export interface DownloadReportTemplateV3ImageResourceRequest {
   resourceId: string;
   Range?: string;
-}
-
-export interface DownloadSingleWindowReceiptPackageRequest {
-  body: ApiSingleWindowReceiptPackageExportRequest;
 }
 
 export interface DownloadSupportPackageRequest {
@@ -11244,15 +11244,11 @@ export interface UploadReportTemplateV3ImageResourceRequest {
 
 export interface UploadSingleWindowReceiptPackageRequest {
   fileName?: string;
-  workingDirectory?: string;
-  keepWorkingDirectory?: boolean;
   body: Blob;
 }
 
 export interface UploadSingleWindowSubmitPackageRequest {
   fileName?: string;
-  workingDirectory?: string;
-  keepWorkingDirectory?: boolean;
   body: Blob;
 }
 
