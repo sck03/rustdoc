@@ -44,7 +44,6 @@ fn catalog_upload(operation: Operation) -> bool {
     [
         IMPORT_HS_CODE_KNOWLEDGE,
         UPLOAD_SINGLE_WINDOW_RECEIPT_PACKAGE,
-        UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
     ]
     .contains(&operation)
 }

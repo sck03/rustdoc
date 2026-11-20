@@ -337,11 +337,13 @@ impl Connection {
         Ok(())
     }
     pub fn commit(&self) -> Result<()> {
-        if let Err(cause) = self.health() {
+        if let Err(cause) = self.health().and_then(|_| operation::check()) {
             let _ = self.rollback();
             return Err(cause);
         }
-        let result = self.adapter.commit();
+        // Cancellation ends at dispatch: finish the commit under the adapter
+        // timeout so caller cancellation cannot turn a known result uncertain.
+        let result = operation::without_control(|| self.adapter.commit());
         if result
             .as_ref()
             .is_err_and(|cause| matches!(cause.kind, ErrorKind::Conflict | ErrorKind::Busy))
@@ -426,7 +428,7 @@ delegate! {
     unit_account_page(company:&str,date:&str,all:bool,before:Option<i64>,limit:i64)->Vec<Value>;
     workflow_notification_account_page(company:&str,date:&str,before:Option<i64>,limit:i64)->Vec<Value>;
     resource_has_open_requests(kind:&str,parent:i64,states:&[&str])->bool;
-    supplier_overview(scope:&DataScope<'_>)->Value;
+    supplier_overview(scope:&DataScope<'_>, filter:&str, offset:i64, limit:i64)->Value;
     query_workflow_summary(query:&WorkflowSummaryQuery<'_>)->(i64,Vec<Value>);
     query_workflow_tasks(query:&WorkflowTaskQuery<'_>)->(i64,Vec<Value>);
     freeze_request_revision(id:i64,snapshot:&Value)->();

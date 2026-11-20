@@ -302,10 +302,6 @@ impl NativeService {
                 self.health()?;
                 diagnostics::health(&self.paths, self.provider()?)?
             }
-            RUN_SHUTDOWN_MAINTENANCE => {
-                self.close()?;
-                json!({"success":true,"message":"关闭维护完成"})
-            }
             _ => {
                 let actor = match authenticated_actor {
                     Some(actor) => actor,

@@ -1,2 +1,3 @@
 /* Container-packing CSS is loaded only when the tool route is opened. */
+@import "../primitives/tool-panels.css" layer(route);
 @import "../container-packing.css" layer(route);

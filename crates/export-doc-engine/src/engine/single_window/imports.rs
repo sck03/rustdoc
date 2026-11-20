@@ -11,11 +11,7 @@ pub fn import(
     if !crate::paths::valid_file_name(name) {
         return Err(invalid("交接包文件名无效。"));
     }
-    let submit = [
-        UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
-        IMPORT_SINGLE_WINDOW_SUBMIT_PACKAGE,
-    ]
-    .contains(&operation);
+    let submit = operation == IMPORT_SINGLE_WINDOW_SUBMIT_PACKAGE;
     let package = Package::decode(
         bytes,
         if submit {

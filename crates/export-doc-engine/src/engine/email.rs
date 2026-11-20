@@ -551,6 +551,49 @@ fn apply_template(
 mod authorization_tests {
     use super::*;
     #[test]
+    fn recovery_batches_attempts_without_changing_sent_history_and_is_idempotent() {
+        let directory = crate::engine::test_support::ScratchDirectory::new();
+        let service = directory.service();
+        let user = service.store.all("users").unwrap().remove(0);
+        let actor = auth::current_actor(&service.store, user["id"].as_i64().unwrap()).unwrap();
+        service
+            .store
+            .transaction(|tx| {
+                for index in 0..207 {
+                    store::save(
+                        tx,
+                        KIND,
+                        0,
+                        json!({"deliveryId":format!("recovery-{index}"),
+                    "status":if index < 205 {"Attempting"} else {"Sent"}, "subject":"保留摘要"}),
+                        Some(format!("{}:recovery-{index}", actor.id)),
+                        &actor,
+                        "send",
+                    )?;
+                }
+                Ok(())
+            })
+            .unwrap();
+        recover(&service.store).unwrap();
+        let first = service.store.all(KIND).unwrap();
+        assert_eq!(
+            first
+                .iter()
+                .filter(|row| row["status"] == "Uncertain")
+                .count(),
+            205
+        );
+        assert_eq!(
+            first.iter().filter(|row| row["status"] == "Sent").count(),
+            2
+        );
+        assert!(first.iter().all(|row| row["subject"] == "保留摘要"));
+        recover(&service.store).unwrap();
+        assert_eq!(service.store.all(KIND).unwrap(), first);
+        service.close().unwrap();
+    }
+
+    #[test]
     fn revoked_actor_cannot_start_a_smtp_attempt() {
         let directory = crate::engine::test_support::ScratchDirectory::new();
         let service = directory.service();
@@ -591,13 +634,24 @@ mod authorization_tests {
     }
 }
 pub fn recover(store: &Store) -> Result<()> {
-    store.transaction(|tx| {
-        for mut row in store::all(tx, KIND)?
-            .into_iter()
-            .filter(|r| r["status"] == "Attempting")
-        {
-            row["status"] = json!("Uncertain");
-            row["errorMessage"] = json!("程序在投递完成前退出，结果未知，未自动重发。");
+    loop {
+        operation::check()?;
+        let count = store.transaction(|tx| {
+            let (_, rows) = tx.query_record_fields(
+                &export_doc_storage::GenericQuery {
+                    kind: KIND,
+                    scope: export_doc_storage::DataScope {
+                        all: true,
+                        ..Default::default()
+                    },
+                    filters: &[("status", "Attempting".into())],
+                    limit: 100,
+                    ..Default::default()
+                },
+                &[],
+                false,
+            )?;
+            let count = rows.len();
             let actor = Actor {
                 scope_rules: vec![],
                 context: String::new(),
@@ -611,19 +665,27 @@ pub fn recover(store: &Store) -> Result<()> {
                 departments: vec![],
                 oa_assigned_only: false,
             };
-            let identity = format!("{}:{}", row["ownerUserId"], text(&row, "deliveryId"));
-            store::save(
-                tx,
-                KIND,
-                row["id"].as_i64().unwrap_or(0),
-                row,
-                Some(identity),
-                &actor,
-                "uncertain",
-            )?;
+            for mut row in rows {
+                operation::check()?;
+                row["status"] = json!("Uncertain");
+                row["errorMessage"] = json!("程序在投递完成前退出，结果未知，未自动重发。");
+                let identity = format!("{}:{}", row["ownerUserId"], text(&row, "deliveryId"));
+                store::save(
+                    tx,
+                    KIND,
+                    row["id"].as_i64().unwrap_or(0),
+                    row,
+                    Some(identity),
+                    &actor,
+                    "uncertain",
+                )?;
+            }
+            Ok(count)
+        })?;
+        if count < 100 {
+            return Ok(());
         }
-        Ok(())
-    })
+    }
 }
 fn suggestion(body: &Value) -> Result<Value> {
     let address = recipient::mailbox(&text(body, "emailAddress")).map_err(invalid)?;

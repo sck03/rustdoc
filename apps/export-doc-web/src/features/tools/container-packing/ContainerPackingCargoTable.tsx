@@ -39,7 +39,7 @@ export function ContainerPackingCargoTable({ cargoRows, onRemoveCargo, onUpdateC
             <tr>
               <td colSpan={14} className="empty-cell small-empty">货物列表已清空</td>
             </tr>
-          ) : cargoRows.map((row) => (
+          ) : cargoRows.map((row, index) => (
             <tr key={row.id}>
               <td>
                 <input
@@ -50,15 +50,16 @@ export function ContainerPackingCargoTable({ cargoRows, onRemoveCargo, onUpdateC
                   onChange={(event) => onUpdateCargo(row.id, { colorHex: event.target.value })}
                 />
               </td>
-              <CargoTextCell value={row.name} onChange={(value) => onUpdateCargo(row.id, { name: value })} />
-              <CargoNumberCell value={row.length} onChange={(value) => onUpdateCargo(row.id, { length: value })} />
-              <CargoNumberCell value={row.width} onChange={(value) => onUpdateCargo(row.id, { width: value })} />
-              <CargoNumberCell value={row.height} onChange={(value) => onUpdateCargo(row.id, { height: value })} />
-              <CargoNumberCell value={row.weight} onChange={(value) => onUpdateCargo(row.id, { weight: value })} />
-              <CargoNumberCell inputMode="numeric" value={row.quantity} onChange={(value) => onUpdateCargo(row.id, { quantity: value })} />
+              <CargoTextCell label={`第 ${index + 1} 行名称`} value={row.name} onChange={(value) => onUpdateCargo(row.id, { name: value })} />
+              <CargoNumberCell label={`第 ${index + 1} 行长度`} value={row.length} onChange={(value) => onUpdateCargo(row.id, { length: value })} />
+              <CargoNumberCell label={`第 ${index + 1} 行宽度`} value={row.width} onChange={(value) => onUpdateCargo(row.id, { width: value })} />
+              <CargoNumberCell label={`第 ${index + 1} 行高度`} value={row.height} onChange={(value) => onUpdateCargo(row.id, { height: value })} />
+              <CargoNumberCell label={`第 ${index + 1} 行重量`} value={row.weight} onChange={(value) => onUpdateCargo(row.id, { weight: value })} />
+              <CargoNumberCell inputMode="numeric" label={`第 ${index + 1} 行数量`} value={row.quantity} onChange={(value) => onUpdateCargo(row.id, { quantity: value })} />
               <td>
                 <select
                   className="item-cell-input"
+                  aria-label={`第 ${index + 1} 行区域`}
                   value={row.preferredZone}
                   onChange={(event) => onUpdateCargo(row.id, { preferredZone: event.target.value as ContainerPackingZoneValue })}
                 >
@@ -77,13 +78,14 @@ export function ContainerPackingCargoTable({ cargoRows, onRemoveCargo, onUpdateC
               </td>
               <CargoNumberCell
                 inputMode="numeric"
+                label={`第 ${index + 1} 行每托数量`}
                 value={row.unitsPerPallet}
                 disabled={!row.usePallet}
                 onChange={(value) => onUpdateCargo(row.id, { unitsPerPallet: value })}
               />
-              <CargoNumberCell value={row.maxTopLoadWeight} onChange={(value) => onUpdateCargo(row.id, { maxTopLoadWeight: value })} />
-              <CargoNumberCell inputMode="numeric" value={row.loadSequence} onChange={(value) => onUpdateCargo(row.id, { loadSequence: value })} />
-              <CargoTextCell value={row.priorityGroup} onChange={(value) => onUpdateCargo(row.id, { priorityGroup: value })} />
+              <CargoNumberCell label={`第 ${index + 1} 行顶部承重`} value={row.maxTopLoadWeight} onChange={(value) => onUpdateCargo(row.id, { maxTopLoadWeight: value })} />
+              <CargoNumberCell inputMode="numeric" label={`第 ${index + 1} 行顺序`} value={row.loadSequence} onChange={(value) => onUpdateCargo(row.id, { loadSequence: value })} />
+              <CargoTextCell label={`第 ${index + 1} 行优先组`} value={row.priorityGroup} onChange={(value) => onUpdateCargo(row.id, { priorityGroup: value })} />
               <td>
                 <button
                   className="icon-button compact-icon-button"
@@ -103,20 +105,22 @@ export function ContainerPackingCargoTable({ cargoRows, onRemoveCargo, onUpdateC
   );
 }
 
-function CargoTextCell({ value, onChange }: { value: string; onChange(value: string): void }) {
+function CargoTextCell({ label, value, onChange }: { label: string; value: string; onChange(value: string): void }) {
   return (
     <td>
-      <input className="item-cell-input" value={value} onChange={(event) => onChange(event.target.value)} />
+      <input className="item-cell-input" aria-label={label} value={value} onChange={(event) => onChange(event.target.value)} />
     </td>
   );
 }
 
 function CargoNumberCell({
+  label,
   disabled = false,
   inputMode = "decimal",
   value,
   onChange,
 }: {
+  label: string;
   disabled?: boolean;
   inputMode?: "decimal" | "numeric";
   value: string;
@@ -126,6 +130,7 @@ function CargoNumberCell({
     <td>
       <input
         className="item-cell-input item-number-input"
+        aria-label={label}
         inputMode={inputMode}
         value={value}
         disabled={disabled}

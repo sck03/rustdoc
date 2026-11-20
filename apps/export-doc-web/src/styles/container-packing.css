@@ -132,6 +132,10 @@
   padding-top: 12px;
 }
 
+.container-packing-project-actions {
+  grid-column: 1 / -1;
+}
+
 .container-packing-field-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));

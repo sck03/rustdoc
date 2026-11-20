@@ -93,4 +93,56 @@ pub(super) fn apply(baseline: &mut Value) {
             .remove("/api/single-window/receipts/download-package")
             .is_some()
     );
+
+    for path in [
+        "/api/system/shutdown-maintenance",
+        "/api/single-window/packages/upload",
+    ] {
+        assert!(
+            baseline["paths"]
+                .as_object_mut()
+                .unwrap()
+                .remove(path)
+                .is_some()
+        );
+    }
+    assert!(
+        baseline["components"]["schemas"]
+            .as_object_mut()
+            .unwrap()
+            .remove("ApiShutdownMaintenanceResponse")
+            .is_some()
+    );
+    baseline["paths"]["/api/suppliers/assessment-overview"]["get"]["parameters"] = serde_json::json!([
+        {"name":"filter","in":"query","schema":{"type":"string","enum":["all","attention","preferred"]}},
+        {"name":"pageNumber","in":"query","schema":{"type":"integer","format":"int32","minimum":1}},
+        {"name":"pageSize","in":"query","schema":{"type":"integer","format":"int32","minimum":1,"maximum":200}}
+    ]);
+    baseline["paths"]["/api/suppliers/assessment-overview"]["get"]["responses"]["400"] =
+        serde_json::json!({"description":"Bad Request"});
+    let schema = &mut baseline["components"]["schemas"]["ApiSupplierAssessmentOverviewDto"];
+    for name in ["totalCount", "pageNumber", "pageSize"] {
+        schema["properties"][name] = serde_json::json!({"type":"integer"});
+    }
+    let required = schema["required"].as_array_mut().unwrap();
+    required.splice(
+        0..0,
+        [
+            serde_json::json!("totalCount"),
+            serde_json::json!("pageNumber"),
+            serde_json::json!("pageSize"),
+        ],
+    );
+    let item = &mut baseline["components"]["schemas"]["ApiSupplierAssessmentOverviewItemDto"];
+    assert!(
+        item["properties"]
+            .as_object_mut()
+            .unwrap()
+            .remove("notes")
+            .is_some()
+    );
+    item["required"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|name| name != "notes");
 }

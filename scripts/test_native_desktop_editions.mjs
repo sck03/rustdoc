@@ -23,6 +23,7 @@ import { verifyDesktopBackupSave } from './lib/native-backup-save-checks.mjs';
 import { verifyDesktopHsExamples } from './lib/native-hs-examples.mjs';
 import { verifySharedControlLayout } from './lib/shared-control-layout.mjs';
 import { verifyDesktopPacking } from './lib/native-packing-consistency.mjs';
+import { verifyDesktopSupplierOverview } from './lib/native-supplier-overview.mjs';
 import { verifyDesktopSalesConsistency } from './lib/native-sales-consistency.mjs';
 
 assert.equal(process.platform, 'win32', 'This gate exercises Windows WebView2 packages.');
@@ -32,7 +33,7 @@ const output = path.resolve(process.env.EXPORTDOCMANAGER_DESKTOP_VALIDATION_OUTP
 fs.mkdirSync(output, { recursive: true });
 const openapi = JSON.parse(fs.readFileSync(path.join(repo, 'crates/export-doc-contracts/src/openapi.json'), 'utf8'));
 const operations = new Map(Object.entries(openapi.paths).flatMap(([url, methods]) =>
-  Object.entries(methods).filter(([, value]) => value.operationId).map(([method, value]) => [value.operationId, { url, method, request: value.requestBody?.content?.['application/json']?.schema }])));
+  Object.entries(methods).filter(([, value]) => value.operationId).map(([method, value]) => [value.operationId, { url, method, parameters: value.parameters ?? [], request: value.requestBody?.content?.['application/json']?.schema }])));
 const results = [];
 const catalog = { ...productEditionCatalog.editions, ...productEditionCatalog.localTestEditions };
 const selected = process.argv[3] ? [process.argv[3]] : Object.keys(productEditionCatalog.editions);
@@ -95,7 +96,8 @@ for (const edition of selected) {
       const schema = operation.request?.$ref ? openapi.components.schemas[operation.request.$ref.split('/').at(-1)] : operation.request;
       if (body && schema?.required?.includes('commandKey') && !body.commandKey) body = { ...body, commandKey: randomUUID() };
       const route = operation.url.replace(/\{([^}]+)\}/gu, (_, key) => encodeURIComponent(parameters[key]));
-      const response = await fetch(context.apiBaseUrl + route, {
+      const query = new URLSearchParams(operation.parameters.filter(p => p.in === 'query' && parameters[p.name] !== undefined).map(p => [p.name, String(parameters[p.name])]));
+      const response = await fetch(context.apiBaseUrl + route + (query.size ? '?' + query : ''), {
         method: operation.method, signal: AbortSignal.timeout(15000),
         headers: { 'Content-Type': 'application/json', 'X-ExportDocManager-Desktop-Token': context.desktopAccessToken,
           ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -159,6 +161,7 @@ for (const edition of selected) {
       await verifyDesktopBlankGrid({ run, request, token: login.body.accessToken, businessDate: login.body.user.businessDate, cdp, output });
     } else if (edition === 'Full') {
       await verifyDesktopPacking({ run, request, token: login.body.accessToken, cdp, output });
+      await verifyDesktopSupplierOverview({ run, request, token: login.body.accessToken, businessDate: login.body.user.businessDate, cdp, output });
       await verifyDesktopHsExamples({ run, request, token: login.body.accessToken, cdp, output });
       await verifyDesktopBackupSave({run,request,token:login.body.accessToken,cdp,output,dataRoot:path.join(output,edition)});
       assert(text.includes('行政与人事') && text.includes('申请与审批') && text.includes('通知与公告'));

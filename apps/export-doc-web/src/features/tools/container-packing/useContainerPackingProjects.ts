@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { ExportDocManagerApiClient } from "../../../api/index.ts";
+import type { ApiContainerTypeDto, ExportDocManagerApiClient } from "../../../api/index.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
 import { readApiError } from "../../../ui/formUtils.ts";
 import { useConfirmation } from "../../../ui/ConfirmationProvider.tsx";
@@ -8,11 +8,12 @@ import { useUnsavedChangesGuard } from "../../../ui/unsavedChangesGuard.tsx";
 import { useScopedMutation } from "../../../ui/useScopedMutation.ts";
 import { useAbortableOperationController } from "../../../ui/useAbortableOperation.ts";
 import { mergeSavedDraftFields } from "../../../ui/recordDraftMerge.ts";
-import { buildContainerPackingProjectSaveRequest } from "./containerPackingModel.ts";
+import { buildContainerPackingProjectSaveRequest } from "./containerPackingRequest.ts";
 import {
   createPackingProjectDraft,
   packingDraftFromProject,
   packingDraftFields,
+  packingContainerFromType,
   type ContainerPackingProjectDraft,
 } from "./containerPackingProjectDraft.ts";
 
@@ -29,6 +30,14 @@ export function useContainerPackingProjects(
   });
   const latest = useRef(state);
   latest.current = state;
+  const initializeContainer = useCallback((type: ApiContainerTypeDto) => {
+    const current = latest.current;
+    if (current.id || current.baseline.container.length || current.draft.container !== current.baseline.container) return;
+    const container = packingContainerFromType(type);
+    const next = { ...current, draft: { ...current.draft, container }, baseline: { ...current.baseline, container } };
+    latest.current = next;
+    setState(next);
+  }, []);
   const [failed, setFailed] = useState(false);
   const [selectedProjectId, setSelected] = useState("");
   const [directory, setDirectory] = useState({ keyword: "", pageNumber: 1, pageSize: 30 });
@@ -175,6 +184,7 @@ export function useContainerPackingProjects(
   });
   return {
     ...state.draft,
+    initializeContainer,
     currentProjectId: state.id,
     currentProjectVersion: state.version,
     selectedProjectId,

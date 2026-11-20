@@ -23,6 +23,18 @@ export async function verifyDesktopPacking({ run, request, token, cdp, output })
   }
   await run("location.hash='#/tools/container-packing'; true");
   await wait(`${button('末页')} && !${button('末页')}.disabled`);
+  for (const width of [1024,1366,1920]) {
+    await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+    await run('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    const positions=await run("[...document.querySelectorAll('.container-packing-project-actions button')].map(button=>button.getBoundingClientRect().top)");
+    assert.equal(positions.length,4);
+    assert.equal(await run("getComputedStyle(document.querySelector('.job-tool-panel')).display"),'grid');
+    assert.equal(await run("getComputedStyle(document.querySelector('.tool-panel-heading')).display"),'flex');
+    if(width>1180) assert.equal(await run("new Set([...document.querySelector('.container-packing-grid').children].map(e=>e.getBoundingClientRect().top)).size"),1);
+    assert.equal(new Set(positions).size,1,'packing buttons share a row at '+width);
+    await captureScreenshot(cdp,path.join(output,'Full-packing-layout-'+width+'.png'));
+  }
+  await cdp.send('Emulation.clearDeviceMetricsOverride');
   await run(`${button('末页')}.click(); true`);
   await wait("[...document.querySelectorAll('option')].some(e=>e.textContent.includes('桌面装柜分页-000'))");
   await edit('搜索方案', '桌面装柜分页-000');

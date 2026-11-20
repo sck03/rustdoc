@@ -1,10 +1,9 @@
 import type {
   ApiContainerPackingAnalysisDto,
-  ApiContainerPackingAnalyzeRequest,
-  ApiContainerPackingProjectSaveRequest,
   ApiContainerTypeDto,
 } from "../../../api/index.ts";
-import { formatPlainNumber, readNumber } from "../../../ui/formUtils.ts";
+import { ExactDecimal } from "../../../ui/decimalSum.ts";
+import { formatPlainNumber } from "../../../ui/formUtils.ts";
 
 export type ContainerPackingZoneValue = "Auto" | "Head" | "Middle" | "Door";
 
@@ -191,170 +190,6 @@ export function buildContainerPackingStatusText(
   )}/重量${formatPlainNumber(analysis.containersNeededByWeight)})${centerText} | ${refreshSegment}`;
 }
 
-export function buildContainerPackingAnalyzeRequest(
-  container: ContainerPackingFormState,
-
-  cargoRows: ContainerPackingCargoRow[],
-
-  rules: ContainerPackingRulesFormState,
-): ApiContainerPackingAnalyzeRequest {
-  return {
-    container: {
-      length: readPositiveIntegerInput(container.length, 0),
-
-      width: readPositiveIntegerInput(container.width, 0),
-
-      height: readPositiveIntegerInput(container.height, 0),
-
-      volume: readNonNegativeNumberInput(container.volume),
-
-      maxWeight: readNonNegativeNumberInput(container.maxWeight),
-    },
-
-    cargoItems: cargoRows
-      .filter(isValidContainerPackingCargoRow)
-      .map((row, index) => ({
-        name: row.name.trim() || `货物 ${index + 1}`,
-
-        length: readPositiveNumberInput(row.length),
-
-        width: readPositiveNumberInput(row.width),
-
-        height: readPositiveNumberInput(row.height),
-
-        weight: readNonNegativeNumberInput(row.weight),
-
-        quantity: readPositiveIntegerInput(row.quantity, 1),
-
-        colorArgb: colorHexToSignedArgb(row.colorHex),
-
-        usePallet: row.usePallet,
-
-        unitsPerPallet: readPositiveIntegerInput(row.unitsPerPallet, 1),
-
-        maxTopLoadWeight: readNonNegativeNumberInput(row.maxTopLoadWeight),
-
-        preferredZone: row.preferredZone,
-
-        loadSequence: readPositiveIntegerInput(row.loadSequence, index + 1),
-
-        priorityGroup: row.priorityGroup.trim(),
-      })),
-
-    rules: {
-      allowRotation: rules.allowRotation,
-
-      usePalletConstraints: rules.usePalletConstraints,
-
-      defaultPalletLength: readPositiveIntegerInput(
-        rules.defaultPalletLength,
-        120,
-      ),
-
-      defaultPalletWidth: readPositiveIntegerInput(
-        rules.defaultPalletWidth,
-        100,
-      ),
-
-      defaultPalletHeight: readPositiveIntegerInput(
-        rules.defaultPalletHeight,
-        15,
-      ),
-
-      defaultPalletWeight: readNonNegativeNumberInput(
-        rules.defaultPalletWeight,
-      ),
-
-      enforceCenterOfGravity: rules.enforceCenterOfGravity,
-
-      centerOfGravityTolerancePercent: readNonNegativeNumberInput(
-        rules.centerOfGravityTolerancePercent,
-      ),
-
-      minimumSupportAreaPercent: readNonNegativeNumberInput(
-        rules.minimumSupportAreaPercent,
-      ),
-
-      requireSameFootprintStacking: rules.requireSameFootprintStacking,
-    },
-  };
-}
-
-export function buildContainerPackingProjectSaveRequest(
-  projectId: number,
-
-  expectedVersion: number,
-
-  projectName: string,
-
-  container: ContainerPackingFormState,
-
-  cargoRows: ContainerPackingCargoRow[],
-
-  rules: ContainerPackingRulesFormState,
-): ApiContainerPackingProjectSaveRequest {
-  const analysisRequest = buildContainerPackingAnalyzeRequest(
-    container,
-    cargoRows,
-    rules,
-  );
-
-  return {
-    id: Math.max(projectId, 0),
-
-    expectedVersion: Math.max(expectedVersion, 0),
-
-    name: projectName.trim(),
-
-    containerType: container.containerType.trim(),
-
-    container: analysisRequest.container,
-
-    rules: analysisRequest.rules,
-
-    cargoItems: analysisRequest.cargoItems,
-  };
-}
-
-export function isValidContainerPackingCargoRow(row: ContainerPackingCargoRow) {
-  return (
-    readPositiveNumberInput(row.length) > 0 &&
-    readPositiveNumberInput(row.width) > 0 &&
-    readPositiveNumberInput(row.height) > 0 &&
-    readPositiveIntegerInput(row.quantity, 0) > 0
-  );
-}
-
-export function readPositiveNumberInput(value: string, fallback = 0) {
-  const parsed = readNumber(value);
-
-  return parsed > 0 ? parsed : fallback;
-}
-
-export function readNonNegativeNumberInput(value: string, fallback = 0) {
-  const parsed = readNumber(value);
-
-  return parsed >= 0 ? parsed : fallback;
-}
-
-export function readPositiveIntegerInput(value: string, fallback = 1) {
-  const parsed = Math.trunc(readNumber(value));
-
-  return parsed > 0 ? parsed : fallback;
-}
-
-function colorHexToSignedArgb(hex: string) {
-  const normalized = hex.trim().replace(/^#/, "");
-
-  if (!/^[0-9a-f]{6}$/i.test(normalized)) {
-    return colorHexToSignedArgb(containerPackingColorPalette[0]);
-  }
-
-  const unsigned = Number.parseInt(`ff${normalized}`, 16);
-
-  return unsigned > 0x7fffffff ? unsigned - 0x100000000 : unsigned;
-}
-
 export function signedArgbToColorHex(value: number) {
   const unsigned = value >>> 0;
 
@@ -411,9 +246,7 @@ export function formatFormNumber(value?: number) {
     return "";
   }
 
-  return Number.isInteger(value)
-    ? String(value)
-    : String(Number(value.toFixed(3)));
+  return ExactDecimal.from(value).normalize().toString();
 }
 
 

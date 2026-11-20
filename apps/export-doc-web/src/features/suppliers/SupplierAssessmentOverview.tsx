@@ -1,10 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ApiSupplierAssessmentOverviewDto, ExportDocManagerApiClient } from "../../api/index.ts";
+import { useMemo, useState } from "react";
+import type { ExportDocManagerApiClient } from "../../api/index.ts";
 import { BusinessStatusBadge } from "../../ui/BusinessStatusBadge.tsx";
-import { OperationFeedback, errorFeedback, type OperationFeedbackState } from "../../ui/OperationFeedback.tsx";
+import { OperationFeedback, errorFeedback } from "../../ui/OperationFeedback.tsx";
 import { TablePrimaryText } from "../../ui/TablePrimaryText.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { ResponsiveTableFrame } from "../../ui/ResponsiveTable.tsx";
+
+import { useQuery } from "@tanstack/react-query";
+import { largeDocumentQueryOptions } from "../../api/queryRetention.ts";
+import { createRequestKey } from "../../ui/createRequestKey.ts";
+import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
 
 type OverviewFilter = "all" | "attention" | "preferred";
 
@@ -12,21 +18,18 @@ export function SupplierAssessmentOverview({ client, onOpenSupplier }: {
   client: ExportDocManagerApiClient;
   onOpenSupplier: (supplierId: number, supplierName: string) => void | Promise<void>;
 }) {
-  const [overview, setOverview] = useState<ApiSupplierAssessmentOverviewDto | null>(null);
-  const [filter, setFilter] = useState<OverviewFilter>("all");
-  const [feedback, setFeedback] = useState<OperationFeedbackState | null>(null);
-
-  useEffect(() => {
-    setFeedback(null);
-    void client.getSupplierAssessmentOverview().then(setOverview)
-      .catch((error) => setFeedback(errorFeedback(readApiError(error))));
-  }, [client]);
-
-  const rows = useMemo(() => (overview?.items ?? []).filter((item) => {
-    if (filter === "attention") return item.conclusion === "观察" || item.conclusion === "暂停合作";
-    if (filter === "preferred") return item.conclusion === "优先合作";
-    return true;
-  }), [filter, overview]);
+  const [filter, setFilterValue] = useState<OverviewFilter>("all");
+  const [pageNumber, setPageNumber] = useState(1);
+  const pageSize = 30;
+  const scope = useMemo(createRequestKey, [client]);
+  const query = useQuery({ ...largeDocumentQueryOptions,
+    queryKey: ["supplier-assessment-overview", scope, filter, pageNumber, pageSize],
+    queryFn: ({ signal }) => client.getSupplierAssessmentOverview({ filter, pageNumber, pageSize }, { signal }) });
+  useServerPageNumber(query, pageNumber, setPageNumber, pageSize);
+  const overview = query.data;
+  const feedback = query.error ? errorFeedback(readApiError(query.error)) : null;
+  const rows = overview?.items ?? [];
+  const setFilter = (value: OverviewFilter) => { setFilterValue(value); setPageNumber(1); };
 
   if (!overview) return <section className="form-section supplier-procurement-overview">
     <div className="section-header"><div><h3>采购概览</h3><p className="section-description">汇总每家供应商最新一次已确认人工评价，不生成自动排名。</p></div></div>
@@ -76,6 +79,8 @@ export function SupplierAssessmentOverview({ client, onOpenSupplier }: {
       </tr>)}
       {!rows.length ? <tr><td className="empty-cell" colSpan={6}><div className="empty-cell-content"><strong>当前筛选没有供应商</strong><span>切换筛选查看其它最新评价结论。</span></div></td></tr> : null}
     </tbody></table></ResponsiveTableFrame>
+    <Pagination pageNumber={pageNumber} pageSize={pageSize} totalCount={overview.totalCount}
+      isBusy={query.isFetching} onPageChange={setPageNumber} />
     {overview.unassessedSuppliers ? <p className="section-description">另有 {overview.unassessedSuppliers} 家供应商尚无评价，未参与均分和结论统计。</p> : null}
   </section>;
 }

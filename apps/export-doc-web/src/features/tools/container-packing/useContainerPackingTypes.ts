@@ -1,10 +1,11 @@
 import { useMemo, useState, type SetStateAction } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiContainerTypeListResponse, ExportDocManagerApiClient } from "../../../api/index.ts";
+import { buildContainerPackingDimensions } from "./containerPackingRequest.ts";
 import { queryKeys } from "../../../api/queryKeys.ts";
 import { readApiError } from "../../../ui/formUtils.ts";
 import { useScopedMutation } from "../../../ui/useScopedMutation.ts";
-import { findContainerType, readNonNegativeNumberInput, readPositiveIntegerInput, type ContainerPackingFormState } from "./containerPackingModel.ts";
+import { findContainerType, type ContainerPackingFormState } from "./containerPackingModel.ts";
 
 /** One command boundary for the selected type; a late response cannot edit another draft. */
 export function useContainerPackingTypes(
@@ -42,14 +43,12 @@ export function useContainerPackingTypes(
         setContainer(current => ({ ...current, containerType: "" }));
         setMessage("柜型已删除。");
       } else {
+        const dimensions = buildContainerPackingDimensions(container);
         const response = await client.saveContainerPackingContainerType({ body: {
           id: selected?.id ?? 0, expectedVersion,
           name: container.containerType.trim(),
-          length: readPositiveIntegerInput(container.length, 0),
-          width: readPositiveIntegerInput(container.width, 0),
-          height: readPositiveIntegerInput(container.height, 0),
-          maxVolume: readNonNegativeNumberInput(container.volume),
-          maxWeight: readNonNegativeNumberInput(container.maxWeight),
+          length: dimensions.length, width: dimensions.width, height: dimensions.height,
+          maxVolume: dimensions.volume, maxWeight: dimensions.maxWeight,
         } }, { signal });
         checkCurrent();
         const nextScope = `${projectId}:${response.containerType.name}`;

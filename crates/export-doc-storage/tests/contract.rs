@@ -50,6 +50,8 @@ mod template_history_query;
 mod template_query;
 #[path = "support/workspace.rs"]
 mod test_workspace;
+#[path = "support/transaction_cancellation.rs"]
+mod transaction_cancellation;
 #[path = "support/workflow_fixture.rs"]
 mod workflow_fixture;
 #[path = "support/worklist_query.rs"]
@@ -297,6 +299,7 @@ fn roundtrip(connection: &Connection) {
     assert!(connection.delete("contract", id, 1).unwrap());
     connection.commit().unwrap();
     assert!(connection.credential(id).unwrap().is_none());
+    transaction_cancellation::before_commit(connection);
     workflow_fixture::exercise(connection);
 }
 
@@ -386,5 +389,6 @@ fn postgres_matches_the_sqlite_contract_and_holds_the_instance_lock() {
         assert_eq!(connection.provider(), "PostgreSQL");
     }
     Connection::postgres(&app).unwrap().health().unwrap();
+    transaction_cancellation::during_postgres_commit(&app, &maintenance);
     pool_recovery::exercise(&app, &maintenance);
 }

@@ -3342,19 +3342,6 @@ export interface ApiShippingMarkImageSaveResponse {
   storagePolicy: string;
 }
 
-export interface ApiShutdownMaintenanceResponse {
-  backupRoot: string;
-  cloudSyncErrorMessage: string;
-  cloudSyncFailed: boolean;
-  deletedAuditLogs: number;
-  deletedTextLogs: number;
-  logRoot: string;
-  message: string;
-  storagePolicy: string;
-  success: boolean;
-  uploadedBackupFileName: string;
-}
-
 export interface ApiSingleWindowClientDirectories {
   failBox: string;
   inBox: string;
@@ -3613,9 +3600,12 @@ export interface ApiSupplierAssessmentOverviewDto {
   averageQualityScore: number;
   averageServiceScore: number;
   items: ApiSupplierAssessmentOverviewItemDto[];
+  pageNumber: number;
+  pageSize: number;
   pausedCount: number;
   preferredCount: number;
   qualifiedCount: number;
+  totalCount: number;
   totalSuppliers: number;
   unassessedSuppliers: number;
   watchCount: number;
@@ -3629,7 +3619,6 @@ export interface ApiSupplierAssessmentOverviewItemDto {
   deliveryScore: number;
   latestAssessmentDate: string;
   latestAssessmentKind: string;
-  notes: string;
   priceScore: number;
   qualityScore: number;
   serviceScore: number;
@@ -9241,6 +9230,12 @@ export interface GetSupplierAssessmentAnalyticsRequest {
   supplierId: number;
 }
 
+export interface GetSupplierAssessmentOverviewRequest {
+  filter?: "all" | "attention" | "preferred";
+  pageNumber?: number;
+  pageSize?: number;
+}
+
 export interface GetTravelRequestRequest {
   id: number;
 }
@@ -11243,11 +11238,6 @@ export interface UploadReportTemplateV3ImageResourceRequest {
 }
 
 export interface UploadSingleWindowReceiptPackageRequest {
-  fileName?: string;
-  body: Blob;
-}
-
-export interface UploadSingleWindowSubmitPackageRequest {
   fileName?: string;
   body: Blob;
 }

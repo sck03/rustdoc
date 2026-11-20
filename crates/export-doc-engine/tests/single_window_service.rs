@@ -361,18 +361,13 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
         ),
     );
     let batch = exported["trackingBatchId"].as_i64().unwrap();
-    let bytes = std::fs::read(&package_path).unwrap();
-    let imported = f
-        .client()
-        .upload(
-            UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
-            &[],
-            json!({}),
-            "submit.swpkg",
-            &bytes,
-        )
-        .unwrap();
-    export_doc_contracts::validation::response(UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE.id, &imported)
+    let imported = call(
+        &f,
+        IMPORT_SINGLE_WINDOW_SUBMIT_PACKAGE,
+        0,
+        Some(json!({"packagePath":package_path})),
+    );
+    export_doc_contracts::validation::response(IMPORT_SINGLE_WINDOW_SUBMIT_PACKAGE.id, &imported)
         .unwrap();
     assert_eq!(imported["trackingBatchId"], batch);
     call(
@@ -459,12 +454,11 @@ fn submit_dispatch_receipt_roundtrip_is_authenticated_and_idempotent() {
     assert!(
         attacker
             .client()
-            .upload(
-                UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
+            .json::<Value>(
+                IMPORT_SINGLE_WINDOW_SUBMIT_PACKAGE,
                 &[],
-                json!({}),
-                "submit.swpkg",
-                &bytes
+                &[],
+                Some(json!({"packagePath":package_path}))
             )
             .is_err()
     );
@@ -659,15 +653,12 @@ fn first_coo_receipt_matches_certificate_without_batch_filename() {
         ),
     );
     let batch = exported["trackingBatchId"].as_i64().unwrap();
-    f.client()
-        .upload(
-            UPLOAD_SINGLE_WINDOW_SUBMIT_PACKAGE,
-            &[],
-            json!({}),
-            "coo.swpkg",
-            &std::fs::read(f.root.join("coo.swpkg")).unwrap(),
-        )
-        .unwrap();
+    call(
+        &f,
+        IMPORT_SINGLE_WINDOW_SUBMIT_PACKAGE,
+        0,
+        Some(json!({"packagePath":f.root.join("coo.swpkg")})),
+    );
     call(
         &f,
         DISPATCH_SINGLE_WINDOW_BATCH_TO_CLIENT,

@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-20 装柜与资源优化：`test_packing_credit_workspace_ui.mjs` 验证方案生命周期、非法行不丢失、精度回读及 1024/1366/1920 宽度布局；夹具加载正式共用工具样式，独立夹具截图不代替完整桌面验收。`test_container_packing_render_blocks.mjs` 验证合批几何、数值边界和资源释放，输出的构建耗时不代表 FPS。`test_supplier_overview_ui.mjs` 纳入 `test:business-features-ui`，验证分页、全局统计与旧请求隔离。Full 桌面验收使用 `lib/native-packing-consistency.mjs` 和 `lib/native-supplier-overview.mjs` 核对真实 React/HTTP、布局、分页和 PDF；后者用隔离数据验证 31 家供应商的 30+1 分页。见[本批记录](../docs/archive/2026-11/2026-11-20装柜与资源优化.md)。
+
 2026-11-19 精度与稳定性：`test:invoice-editing` 覆盖十进制字符串输入、保存回读、5000 行编辑及舍入临界值；`test:office-ui` 覆盖附件失败后的身份锁定与重试。Rust HS 查询回归检查第 2,001 条之后的低使用次数实例，Storage 共用合同检查反馈规范化索引随写入更新。HTTP 回归验证缓冲等待、取消、发送释放，以及业务队列和响应预算占满时的独立空正文探针。记录见[本批验收](../docs/archive/2026-11/2026-11-19精度检索与稳定性修复.md)。
 
 `test_hs_transfer_ui.mjs` 同时验证只读查询/详情不采集、不开放保存，以及有管理权限时的采集接口。`measure_native_workloads.mjs` 增加 5,000 条匿名 HS 实例、1,000 条无关反馈和 12 次查询，记录实际税则数量、延迟分位数及进程树内存采样。测量程序默认读取宿主 Release 输出；指定架构时，编译与测量保持相同的 `CARGO_BUILD_TARGET`，或通过 `EXPORTDOC_OFFICE_REVIEW_BINARY` 指向 `.codex-runtime` 中的隔离程序副本。

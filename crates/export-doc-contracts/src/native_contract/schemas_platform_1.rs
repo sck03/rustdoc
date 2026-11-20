@@ -348,12 +348,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("imagePath",s()),("fileName",s()),("contentType",s()),
         ("sizeBytes",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int64").pattern("^-?(?:0|[1-9]\\d*)$")),("storagePolicy",s())
     ]).required(vec!["imagePath","fileName","contentType","sizeBytes","storagePolicy"])),
-    ("ApiShutdownMaintenanceResponse",o(vec![
-        ("success",b()),("message",s()),("deletedAuditLogs",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("deletedTextLogs",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("uploadedBackupFileName",s()),("cloudSyncErrorMessage",s()),
-        ("cloudSyncFailed",b()),("backupRoot",s()),("logRoot",s()),
-        ("storagePolicy",s())
-    ]).required(vec!["success","message","deletedAuditLogs","deletedTextLogs","uploadedBackupFileName","cloudSyncErrorMessage","cloudSyncFailed","backupRoot","logRoot","storagePolicy"])),
     ("ApiSupportPackageRequest",o(vec![("includeLatestDatabaseBackup",b()),("includeSampleFiles",b()),("confirmationText",s())]).required(vec!["includeLatestDatabaseBackup","includeSampleFiles","confirmationText"])),
     ("ApiSupportPackageResponse",o(vec![
         ("success",b()),("message",s()),("fileName",s()),

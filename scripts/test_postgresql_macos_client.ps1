@@ -47,6 +47,6 @@ try {
     if (Test-Path -LiteralPath $script:alias) { Remove-Item -LiteralPath $script:alias -Force }
     if ($fixture.StartsWith($repository + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -and
         -not @(Get-ChildItem -LiteralPath $fixture -Force -Recurse | Where-Object { $_.Name -eq '.git' -or $_.Attributes -band [IO.FileAttributes]::ReparsePoint }).Count) {
-        Remove-Item -LiteralPath $fixture -Recurse -Force
+        Remove-ExportDocDirectoryWithRetry -Path $fixture
     }
 }

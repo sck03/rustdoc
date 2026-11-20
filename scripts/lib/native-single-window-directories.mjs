@@ -71,7 +71,7 @@ export async function verifyOfficialClientTransport({client,profile,detected,sou
     const packagePath=path.join(output,'official-client-anonymous-acd.swpkg');
     const draft=await client.getAgentConsignmentDocument({sourceId});
     const handoff=await client.saveAgentConsignmentSubmitPackageToPath({sourceId,body:{packagePath,stationAssignmentCode:profile.stationAssignmentCode,expectedDraftRevision:draft.draftRevision}});
-    await client.uploadSingleWindowSubmitPackage({fileName:path.basename(packagePath),body:new Blob([fs.readFileSync(packagePath)])});
+    await client.importSingleWindowSubmitPackage({body:{packagePath}});
     const dispatched=await client.dispatchSingleWindowBatchToClient({body:{batchId:handoff.trackingBatchId}});
     assert.equal(path.resolve(dispatched.targetDirectory),path.resolve(detected.agentConsignmentDirectories.outBox));
     const sent=await waitFor(()=>findOfficialClientSentFiles(detected.agentConsignmentDirectories.sentBox,handoff.manifest.payloadFiles),

@@ -205,7 +205,7 @@ async fn desktop_http_preserves_original_login_and_rejects_untrusted_callers() {
         .unwrap();
     assert_eq!(
         app.oneshot(local).await.unwrap().status(),
-        StatusCode::FORBIDDEN
+        StatusCode::NOT_FOUND
     );
 }
 

@@ -100,7 +100,7 @@ impl NativeService {
             }
             GET_DASHBOARD => dashboard::query(&self.store, actor, &self.clock),
             GET_CRM_DASHBOARD => crm_dashboard::query(&self.store, actor, &self.clock),
-            GET_SUPPLIER_ASSESSMENT_OVERVIEW => supplier_overview::query(&self.store, actor),
+            GET_SUPPLIER_ASSESSMENT_OVERVIEW => supplier_overview::query(&self.store, actor, query),
             GET_WORKLIST => worklist::query(&self.store, actor, &self.clock, query),
             LIST_QUERIED_INVOICES => invoice_query::list(&self.store, actor, query),
             REVIEW_INVOICE => {

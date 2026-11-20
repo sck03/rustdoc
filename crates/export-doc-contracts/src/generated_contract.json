@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "676bfa5f1ff25fd5791c09a43c0a64d607101b224bafa5f11cbb181a74674111",
+  "digest": "fe5c19239be7ce569d9bdc20ce2fdace1be5f786278745df3ae6fe6b5ea1f97b",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -44349,7 +44349,39 @@
         }
       },
       "office": null,
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "filter",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "all",
+              "attention",
+              "preferred"
+            ]
+          }
+        },
+        {
+          "name": "pageNumber",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 200
+          }
+        }
+      ],
       "requestBody": null,
       "responses": {
         "200": {
@@ -44361,6 +44393,9 @@
               }
             }
           }
+        },
+        "400": {
+          "description": "Bad Request"
         },
         "401": {
           "description": "Unauthorized"
@@ -72032,49 +72067,6 @@
       "requiresProcessingSlot": false,
       "validatesDecimalInput": false
     },
-    "RunShutdownMaintenance": {
-      "policy": {
-        "requiresAuthentication": false,
-        "requiresDesktopAccess": true,
-        "requiresLicense": false,
-        "access": {
-          "bypass": true
-        }
-      },
-      "office": null,
-      "parameters": [],
-      "requestBody": null,
-      "responses": {
-        "200": {
-          "description": "OK",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiShutdownMaintenanceResponse"
-              }
-            }
-          }
-        },
-        "403": {
-          "description": "Forbidden",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiErrorResponse"
-              }
-            }
-          }
-        }
-      },
-      "request": null,
-      "response": {
-        "$ref": "#/components/schemas/ApiShutdownMaintenanceResponse"
-      },
-      "timeoutSeconds": 30,
-      "maxJsonResponseBytes": 67108864,
-      "requiresProcessingSlot": false,
-      "validatesDecimalInput": false
-    },
     "SaveAccessRestriction": {
       "policy": {
         "requiresAuthentication": true,
@@ -87261,77 +87253,6 @@
       "validatesDecimalInput": false
     },
     "UploadSingleWindowReceiptPackage": {
-      "policy": {
-        "requiresAuthentication": true,
-        "requiresDesktopAccess": true,
-        "requiresLicense": true,
-        "access": {
-          "match": "All",
-          "resources": [
-            {
-              "resourceKey": "document.single-window",
-              "actions": [
-                "operate"
-              ],
-              "administratorOnly": false
-            }
-          ]
-        }
-      },
-      "office": null,
-      "parameters": [
-        {
-          "name": "fileName",
-          "in": "query",
-          "schema": {
-            "type": "string"
-          }
-        }
-      ],
-      "requestBody": {
-        "required": true,
-        "content": {
-          "application/octet-stream": {
-            "schema": {
-              "$ref": "#/components/schemas/IFormFile"
-            }
-          }
-        }
-      },
-      "responses": {
-        "200": {
-          "description": "OK",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApiSingleWindowImportedPackageResponse"
-              }
-            }
-          }
-        },
-        "400": {
-          "description": "Bad Request"
-        },
-        "401": {
-          "description": "Unauthorized"
-        },
-        "404": {
-          "description": "Not Found"
-        },
-        "409": {
-          "description": "Conflict"
-        }
-      },
-      "request": null,
-      "response": {
-        "$ref": "#/components/schemas/ApiSingleWindowImportedPackageResponse"
-      },
-      "timeoutSeconds": 30,
-      "maxJsonResponseBytes": 67108864,
-      "requiresProcessingSlot": true,
-      "validatesDecimalInput": false
-    },
-    "UploadSingleWindowSubmitPackage": {
       "policy": {
         "requiresAuthentication": true,
         "requiresDesktopAccess": true,
@@ -105162,63 +105083,6 @@
         "storagePolicy"
       ]
     },
-    "ApiShutdownMaintenanceResponse": {
-      "type": "object",
-      "properties": {
-        "backupRoot": {
-          "type": "string"
-        },
-        "cloudSyncErrorMessage": {
-          "type": "string"
-        },
-        "cloudSyncFailed": {
-          "type": "boolean"
-        },
-        "deletedAuditLogs": {
-          "type": [
-            "integer",
-            "string"
-          ],
-          "format": "int32",
-          "pattern": "^-?(?:0|[1-9]\\d*)$"
-        },
-        "deletedTextLogs": {
-          "type": [
-            "integer",
-            "string"
-          ],
-          "format": "int32",
-          "pattern": "^-?(?:0|[1-9]\\d*)$"
-        },
-        "logRoot": {
-          "type": "string"
-        },
-        "message": {
-          "type": "string"
-        },
-        "storagePolicy": {
-          "type": "string"
-        },
-        "success": {
-          "type": "boolean"
-        },
-        "uploadedBackupFileName": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "success",
-        "message",
-        "deletedAuditLogs",
-        "deletedTextLogs",
-        "uploadedBackupFileName",
-        "cloudSyncErrorMessage",
-        "cloudSyncFailed",
-        "backupRoot",
-        "logRoot",
-        "storagePolicy"
-      ]
-    },
     "ApiSingleWindowClientDirectories": {
       "type": "object",
       "properties": {
@@ -106274,6 +106138,12 @@
             "$ref": "#/components/schemas/ApiSupplierAssessmentOverviewItemDto"
           }
         },
+        "pageNumber": {
+          "type": "integer"
+        },
+        "pageSize": {
+          "type": "integer"
+        },
         "pausedCount": {
           "type": [
             "integer",
@@ -106297,6 +106167,9 @@
           ],
           "format": "int32",
           "pattern": "^-?(?:0|[1-9]\\d*)$"
+        },
+        "totalCount": {
+          "type": "integer"
         },
         "totalSuppliers": {
           "type": [
@@ -106324,6 +106197,9 @@
         }
       },
       "required": [
+        "totalCount",
+        "pageNumber",
+        "pageSize",
         "totalSuppliers",
         "assessedSuppliers",
         "unassessedSuppliers",
@@ -106378,9 +106254,6 @@
         "latestAssessmentKind": {
           "type": "string"
         },
-        "notes": {
-          "type": "string"
-        },
         "priceScore": {
           "type": [
             "integer",
@@ -106433,8 +106306,7 @@
         "serviceScore",
         "priceScore",
         "averageScore",
-        "conclusion",
-        "notes"
+        "conclusion"
       ]
     },
     "ApiSupplierAssessmentSaveRequest": {

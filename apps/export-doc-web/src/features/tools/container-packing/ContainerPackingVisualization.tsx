@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { memo, useId, useState } from "react";
 import type { ApiContainerPackingAnalysisDto } from "../../../api/index.ts";
 import { formatPlainNumber } from "../../../ui/formUtils.ts";
 import type { ContainerPackingRenderModeValue } from "./containerPackingModel.ts";
@@ -12,7 +12,7 @@ import {
 import { buildContainerPackingLegend, buildContainerPackingProjection, buildPackedCargoTitle, projectPackedCargoItem, renderContainerPackingCenterOfGravity, renderContainerPackingGuides, renderContainerPackingItemGrid } from "./ContainerPackingProjectionModel.tsx";
 
 
-export function ContainerPackingVisualization({
+export const ContainerPackingVisualization = memo(function ContainerPackingVisualization({
   analysis,
 
   dimensions,
@@ -89,7 +89,7 @@ export function ContainerPackingVisualization({
       ) : null}
     </section>
   );
-}
+});
 
 type ContainerPackingViewKind = "top" | "side" | "door";
 

@@ -84,11 +84,11 @@ try {
   await page.screenshot({ path: path.join(output, 'packing-top-fit.png') });
   assert(Object.values(projected).every(value => Math.abs(value) < 1), `rotation around the container center keeps the complete model in view: ${JSON.stringify(projected)}`);
   await page.getByRole('button', { name: '切换框线' }).click();
-  await page.waitForFunction(() => window.sceneMetrics.created === 2 && document.querySelector('canvas').dataset.renderMode === 'FullGrid');
+  await page.waitForFunction(() => window.sceneMetrics.created === 1 && document.querySelector('canvas').dataset.renderMode === 'FullGrid');
   assert.deepEqual(await page.evaluate(() => window.sceneMetrics.angles), top, 'changing render mode retains the displayed view');
   await page.getByRole('button', { name: '父级刷新', exact: false }).click();
   await frames();
-  assert.equal(await page.evaluate(() => window.sceneMetrics.created), 2, 'equal dimensions do not recreate a WebGL context');
+  assert.equal(await page.evaluate(() => window.sceneMetrics.created), 1, 'equal dimensions do not recreate a WebGL context');
   const canvas = page.locator('canvas');
   const rect = await canvas.boundingBox();
   await page.getByRole('button', { name: '柜门', exact: true }).click();
@@ -142,7 +142,7 @@ try {
   assert.equal(await page.locator('canvas').count(), 0, 'a lost context is released');
   await page.getByRole('button', { name:'重试三维视图' }).click();
   await page.waitForSelector('canvas[data-scene-ready=true]');
-  assert.equal(await page.evaluate(() => window.sceneMetrics.created), 3, 'retry creates a fresh renderer');
+  assert.equal(await page.evaluate(() => window.sceneMetrics.created), 2, 'retry creates a fresh renderer');
   await page.getByRole('button', { name:'放大三维图', exact:true }).click();
   await frames();
   assert.equal(await page.evaluate(() => window.sceneMetrics.zoom), 1.2);

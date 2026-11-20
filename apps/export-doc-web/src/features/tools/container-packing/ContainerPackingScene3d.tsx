@@ -1,3 +1,4 @@
+import { setCargoGrid } from "./containerPackingCargoGeometry.ts";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Pause, Play, RotateCcw, Square, ZoomIn, ZoomOut } from "lucide-react";
 import { DirectionalLight, Fog, Group, HemisphereLight, OrthographicCamera, Scene, WebGLRenderer } from "three";
@@ -13,6 +14,7 @@ type ContainerPackingSceneControlApi = {
   resetView: () => void;
   setViewPreset: (preset: ContainerPackingViewPreset) => void;
   setAutoRotate: (enabled: boolean) => void;
+  setRenderMode: (mode: ContainerPackingRenderModeValue) => void;
   zoomBy: (factor: number) => void;
 };
 
@@ -45,6 +47,8 @@ export function ContainerPackingScene3d({
   const sceneData = useMemo(() => buildContainerPackingSceneData(analysis, dimensions), [analysis, dimensions.length, dimensions.width, dimensions.height]);
   const viewRef = useRef({ ...containerPackingViewAngles[initialViewPreset] });
   const zoomRef = useRef(1);
+  const renderModeRef = useRef(renderMode);
+  renderModeRef.current = renderMode;
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -78,7 +82,7 @@ export function ContainerPackingScene3d({
     const camera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
     camera.zoom = zoomRef.current;
 
-    const content = buildContainerPackingRoot(sceneData, analysis, renderMode === "FullGrid");
+    const content = buildContainerPackingRoot(sceneData, analysis, renderModeRef.current === "FullGrid");
     content.position.y = -sceneData.container.height / 2;
     const root = new Group();
     root.position.y = sceneData.container.height / 2;
@@ -113,7 +117,7 @@ export function ContainerPackingScene3d({
       renderer.render(scene, camera);
       renderer.domElement.dataset.autoRotate = String(autoRotateRef.current);
       renderer.domElement.dataset.viewPreset = viewPresetRef.current;
-      renderer.domElement.dataset.renderMode = renderMode;
+      renderer.domElement.dataset.renderMode = renderModeRef.current;
       renderer.domElement.dataset.sceneReady = "true";
     };
 
@@ -178,6 +182,7 @@ export function ContainerPackingScene3d({
     };
 
     controlApiRef.current = {
+      setRenderMode: mode => { setCargoGrid(content, sceneData.boxes, mode === "FullGrid"); scheduleAnimation(); },
       resetView: () => {
         camera.zoom = zoomRef.current = 1;
         camera.updateProjectionMatrix();
@@ -310,7 +315,9 @@ export function ContainerPackingScene3d({
       renderer.forceContextLoss();
       mount.innerHTML = "";
     };
-  }, [analysis, renderMode, sceneData, failure]);
+  }, [analysis, sceneData, failure]);
+
+  useEffect(() => { controlApiRef.current?.setRenderMode(renderMode); }, [renderMode]);
 
   function switchViewPreset(nextPreset: ContainerPackingViewPreset) {
     setAutoRotate(false);

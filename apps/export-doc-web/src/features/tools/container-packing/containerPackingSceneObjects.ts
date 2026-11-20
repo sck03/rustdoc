@@ -1,3 +1,4 @@
+import { buildCargoGeometry, setCargoGrid } from "./containerPackingCargoGeometry.ts";
 import {
   BoxGeometry, BufferGeometry, Color, DoubleSide, EdgesGeometry, GridHelper, Group,
   Line, LineBasicMaterial, LineSegments, type Material, Mesh, MeshStandardMaterial,
@@ -6,7 +7,7 @@ import {
 import type { ApiContainerPackingAnalysisDto, ApiPackedCargoItemDto } from "../../../api/index.ts";
 import type { ContainerPackingVisualizationDimensions } from "./containerPackingVisualizationModel.ts";
 
-type ContainerPackingSceneBox = {
+export type ContainerPackingSceneBox = {
   name: string;
   color: number;
   length: number;
@@ -22,8 +23,8 @@ export function buildContainerPackingRoot(data: ReturnType<typeof buildContainer
   const root = new Group();
   root.add(buildContainerFloor(data.container), buildContainerShell(data.container),
     buildContainerDoorFrame(data.container), buildContainerAxisMarkers(data.container));
-  const materials = new Map<number, MeshStandardMaterial[]>();
-  data.boxes.forEach(box => root.add(buildPackedCargoMesh(box, fullGrid, materials)));
+  root.add(buildCargoGeometry(data.boxes));
+  setCargoGrid(root, data.boxes, fullGrid);
   const marker = buildCenterOfGravityMarker(data, analysis);
   if (marker) root.add(marker);
   return root;
@@ -168,91 +169,6 @@ function buildMarkerPlane(color: number, width: number, depth: number) {
   return new Mesh(geometry, material);
 }
 
-function buildPackedCargoMesh(box: ContainerPackingSceneBox, showFullGrid: boolean, materials: Map<number, MeshStandardMaterial[]>) {
-  const group = new Group();
-  const geometry = new BoxGeometry(box.length, box.height, box.width);
-  const material = materials.get(box.color) ?? buildPackedCargoMaterials(box.color);
-  materials.set(box.color, material);
-  const mesh = new Mesh(geometry, material);
-  mesh.position.set(box.x, box.y, box.z);
-  mesh.name = box.name;
-  mesh.renderOrder = 1;
-  group.add(mesh);
-
-  const edges = new LineSegments(
-    new EdgesGeometry(geometry),
-    new LineBasicMaterial({ color: 0x111827 }),
-  );
-  edges.position.copy(mesh.position);
-  edges.renderOrder = 3;
-  group.add(edges);
-  if (showFullGrid) {
-    const grid = buildPackedCargoLayerLines(box);
-    grid.position.copy(mesh.position);
-    grid.renderOrder = 2;
-    group.add(grid);
-  }
-
-  return group;
-}
-
-function buildPackedCargoLayerLines(box: ContainerPackingSceneBox) {
-  const group = new Group();
-  const layerCount = clampInteger(box.loadCount, 1, 18);
-  if (layerCount <= 1) {
-    return group;
-  }
-
-  const material = new LineBasicMaterial({
-    color: 0x0f172a,
-    transparent: true,
-    opacity: 0.62,
-  });
-  const minX = -box.length / 2;
-  const maxX = box.length / 2;
-  const minZ = -box.width / 2;
-  const maxZ = box.width / 2;
-  const minY = -box.height / 2;
-  const surfaceOffset = Math.max(Math.min(box.length, box.width, box.height) * 0.0015, 0.006);
-
-  const points: Vector3[] = [];
-  for (let index = 1; index < layerCount; index += 1) {
-    const y = minY + (box.height * index) / layerCount;
-    points.push(
-      new Vector3(minX, y, maxZ + surfaceOffset),
-      new Vector3(maxX, y, maxZ + surfaceOffset),
-      new Vector3(maxX + surfaceOffset, y, minZ),
-      new Vector3(maxX + surfaceOffset, y, maxZ),
-      new Vector3(minX, y, minZ - surfaceOffset),
-      new Vector3(maxX, y, minZ - surfaceOffset),
-      new Vector3(minX - surfaceOffset, y, minZ),
-      new Vector3(minX - surfaceOffset, y, maxZ),
-    );
-  }
-  const layerLines = new LineSegments(new BufferGeometry().setFromPoints(points), material);
-  layerLines.renderOrder = 2;
-  group.add(layerLines);
-  return group;
-}
-
-function buildPackedCargoMaterials(color: number) {
-  const side = shadeColorNumber(color, -0.08);
-  const farSide = shadeColorNumber(color, -0.18);
-  const top = shadeColorNumber(color, 0.14);
-  const bottom = shadeColorNumber(color, -0.24);
-  const front = shadeColorNumber(color, -0.02);
-
-  const materials = [side, farSide, top, bottom, front].map(
-    (entry) =>
-      new MeshStandardMaterial({
-        color: entry,
-        roughness: 0.72,
-        metalness: 0.01,
-      }),
-  );
-  return [...materials, materials[0]];
-}
-
 function buildCenterOfGravityMarker(
   sceneData: ReturnType<typeof buildContainerPackingSceneData>,
   analysis: ApiContainerPackingAnalysisDto,
@@ -284,30 +200,10 @@ function signedArgbToNumber(value: number) {
   return value >>> 0 & 0x00ffffff;
 }
 
-function shadeColorNumber(color: number, amount: number) {
-  const normalized = color & 0x00ffffff;
-  const target = amount >= 0 ? 255 : 0;
-  const ratio = Math.min(Math.abs(amount), 1);
-  const red = normalized >> 16 & 0xff;
-  const green = normalized >> 8 & 0xff;
-  const blue = normalized & 0xff;
-  const shade = (channel: number) => Math.round(channel + (target - channel) * ratio);
-
-  return shade(red) << 16 | shade(green) << 8 | shade(blue);
-}
-
 function clampNumber(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) {
     return min;
   }
 
   return Math.min(Math.max(value, min), Math.max(min, max));
-}
-
-function clampInteger(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
-
-  return Math.min(Math.max(Math.trunc(value), min), Math.max(min, max));
 }

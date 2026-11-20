@@ -19,7 +19,7 @@ pub fn exercise(c: &Connection) {
         user_id: 71,
         ..Default::default()
     };
-    let empty = c.supplier_overview(&scope).unwrap();
+    let empty = c.supplier_overview(&scope, "all", 0, 30).unwrap();
     assert_eq!(empty["totalSuppliers"], 0);
     assert_eq!(empty["items"], json!([]));
     let mut suppliers = vec![];
@@ -31,7 +31,7 @@ pub fn exercise(c: &Connection) {
     ] {
         suppliers.push(insert(c, "suppliers", json!({"name":name,"status":"Active","category":"制造","unusedLargeBody":"not projected"}), owner, company));
     }
-    let unassessed = c.supplier_overview(&scope).unwrap();
+    let unassessed = c.supplier_overview(&scope, "all", 0, 30).unwrap();
     assert_eq!(unassessed["totalSuppliers"], 3);
     assert_eq!(unassessed["items"], json!([]));
     for (supplier, date, quality, state, conclusion, notes) in [
@@ -61,7 +61,7 @@ pub fn exercise(c: &Connection) {
             },
         );
     }
-    let data = c.supplier_overview(&scope).unwrap();
+    let data = c.supplier_overview(&scope, "all", 0, 30).unwrap();
     assert_eq!(data["totalSuppliers"], 3);
     let items = data["items"].as_array().unwrap();
     assert_eq!(items.len(), 2);
@@ -70,15 +70,37 @@ pub fn exercise(c: &Connection) {
     assert_eq!(items[1]["qualityScore"], 5);
     assert_eq!(items[1]["assessmentCount"], 3);
     assert_eq!(items[1]["latestAssessmentDate"], "2026-10-29");
-    assert_eq!(items[1]["notes"], Value::Null);
+    assert!(items[1].get("notes").is_none());
     assert!(items.iter().all(|row| row.get("unusedLargeBody").is_none()));
+    let second = c.supplier_overview(&scope, "all", 1, 1).unwrap();
+    assert_eq!(second["items"].as_array().unwrap().len(), 1);
+    assert_eq!(second["items"][0]["supplierCompanyId"], suppliers[0]);
+    assert_eq!(second["assessedSuppliers"], 2);
+    assert_eq!(second["qualityScore"], 7);
+    assert_eq!(second["totalCount"], 2);
+    let attention = c.supplier_overview(&scope, "attention", 0, 1).unwrap();
+    assert_eq!(attention["totalCount"], 1);
+    assert_eq!(attention["assessedSuppliers"], 2);
+    assert_eq!(attention["preferredCount"], 1);
+    assert_eq!(attention["pausedCount"], 1);
+    assert_eq!(attention["items"][0]["supplierCompanyId"], suppliers[1]);
+    let preferred = c.supplier_overview(&scope, "preferred", 1, 1).unwrap();
+    assert_eq!(preferred["totalCount"], 1);
+    assert_eq!(preferred["items"], json!([]));
+    assert!(c.supplier_overview(&scope, "bad", 0, 1).is_err());
+    assert!(c.supplier_overview(&scope, "all", 0, 201).is_err());
     let own = c
-        .supplier_overview(&DataScope {
-            own: true,
-            company: "SUPPLIER-Q",
-            user_id: 71,
-            ..Default::default()
-        })
+        .supplier_overview(
+            &DataScope {
+                own: true,
+                company: "SUPPLIER-Q",
+                user_id: 71,
+                ..Default::default()
+            },
+            "all",
+            0,
+            30,
+        )
         .unwrap();
     assert_eq!(own["totalSuppliers"], 2);
     assert_eq!(own["items"].as_array().unwrap().len(), 1);
@@ -103,7 +125,7 @@ pub fn exercise(c: &Connection) {
         "SUPPLIER-Q",
     );
     assert_eq!(
-        c.supplier_overview(&scope).unwrap_err().kind,
+        c.supplier_overview(&scope, "all", 0, 30).unwrap_err().kind,
         ErrorKind::Unavailable
     );
     c.rollback().unwrap();

@@ -41,7 +41,7 @@ fn http_uses_generated_routes_and_denies_unauthenticated_or_local_operations() {
             (
                 "POST",
                 "/api/system/shutdown-maintenance",
-                StatusCode::FORBIDDEN,
+                StatusCode::NOT_FOUND,
             ),
             ("GET", "/route-that-does-not-exist", StatusCode::NOT_FOUND),
         ] {

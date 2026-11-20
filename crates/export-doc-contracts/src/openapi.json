@@ -15414,63 +15414,6 @@
           "storagePolicy"
         ]
       },
-      "ApiShutdownMaintenanceResponse": {
-        "type": "object",
-        "properties": {
-          "backupRoot": {
-            "type": "string"
-          },
-          "cloudSyncErrorMessage": {
-            "type": "string"
-          },
-          "cloudSyncFailed": {
-            "type": "boolean"
-          },
-          "deletedAuditLogs": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
-          },
-          "deletedTextLogs": {
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32",
-            "pattern": "^-?(?:0|[1-9]\\d*)$"
-          },
-          "logRoot": {
-            "type": "string"
-          },
-          "message": {
-            "type": "string"
-          },
-          "storagePolicy": {
-            "type": "string"
-          },
-          "success": {
-            "type": "boolean"
-          },
-          "uploadedBackupFileName": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "success",
-          "message",
-          "deletedAuditLogs",
-          "deletedTextLogs",
-          "uploadedBackupFileName",
-          "cloudSyncErrorMessage",
-          "cloudSyncFailed",
-          "backupRoot",
-          "logRoot",
-          "storagePolicy"
-        ]
-      },
       "ApiSingleWindowClientDirectories": {
         "type": "object",
         "properties": {
@@ -16526,6 +16469,12 @@
               "$ref": "#/components/schemas/ApiSupplierAssessmentOverviewItemDto"
             }
           },
+          "pageNumber": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
           "pausedCount": {
             "type": [
               "integer",
@@ -16549,6 +16498,9 @@
             ],
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$"
+          },
+          "totalCount": {
+            "type": "integer"
           },
           "totalSuppliers": {
             "type": [
@@ -16576,6 +16528,9 @@
           }
         },
         "required": [
+          "totalCount",
+          "pageNumber",
+          "pageSize",
           "totalSuppliers",
           "assessedSuppliers",
           "unassessedSuppliers",
@@ -16630,9 +16585,6 @@
           "latestAssessmentKind": {
             "type": "string"
           },
-          "notes": {
-            "type": "string"
-          },
           "priceScore": {
             "type": [
               "integer",
@@ -16685,8 +16637,7 @@
           "serviceScore",
           "priceScore",
           "averageScore",
-          "conclusion",
-          "notes"
+          "conclusion"
         ]
       },
       "ApiSupplierAssessmentSaveRequest": {
@@ -119060,83 +119011,6 @@
         }
       }
     },
-    "/api/single-window/packages/upload": {
-      "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": true,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "UploadSingleWindowSubmitPackage",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiSingleWindowImportedPackageResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "409": {
-            "description": "Conflict"
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": true,
-          "requiresDesktopAccess": true,
-          "requiresLicense": true,
-          "access": {
-            "match": "All",
-            "resources": [
-              {
-                "resourceKey": "document.single-window",
-                "actions": [
-                  "operate"
-                ],
-                "administratorOnly": false
-              }
-            ]
-          }
-        },
-        "security": [
-          {
-            "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ],
-        "parameters": [
-          {
-            "name": "fileName",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/octet-stream": {
-              "schema": {
-                "$ref": "#/components/schemas/IFormFile"
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/single-window/receipts/import": {
       "post": {
         "x-exportdoc-json-response-limit-bytes": 67108864,
@@ -120309,6 +120183,9 @@
               }
             }
           },
+          "400": {
+            "description": "Bad Request"
+          },
           "401": {
             "description": "Unauthorized"
           },
@@ -120337,6 +120214,39 @@
           {
             "BearerAuth": [],
             "DesktopAccess": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "filter",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "attention",
+                "preferred"
+              ]
+            }
+          },
+          {
+            "name": "pageNumber",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1,
+              "maximum": 200
+            }
           }
         ]
       }
@@ -123149,52 +123059,6 @@
         "security": [
           {
             "BearerAuth": [],
-            "DesktopAccess": []
-          }
-        ]
-      }
-    },
-    "/api/system/shutdown-maintenance": {
-      "post": {
-        "x-exportdoc-json-response-limit-bytes": 67108864,
-        "x-exportdoc-timeout-seconds": 30,
-        "x-exportdoc-processing-slot": false,
-        "tags": [
-          "ExportDocManager.Api"
-        ],
-        "operationId": "RunShutdownMaintenance",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiShutdownMaintenanceResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorResponse"
-                }
-              }
-            }
-          }
-        },
-        "x-exportdoc-policy": {
-          "requiresAuthentication": false,
-          "requiresDesktopAccess": true,
-          "requiresLicense": false,
-          "access": {
-            "bypass": true
-          }
-        },
-        "security": [
-          {
             "DesktopAccess": []
           }
         ]

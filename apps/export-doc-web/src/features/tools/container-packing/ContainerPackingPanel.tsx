@@ -21,16 +21,13 @@ import {
   type ContainerPackingFormState,
   type ContainerPackingRenderModeValue,
   type ContainerPackingRulesFormState,
-  buildContainerPackingAnalyzeRequest,
   buildContainerPackingStatusText,
   containerPackingAutoRefreshDebounceMs,
   createContainerPackingCargoRow,
   findContainerType,
-  formatFormNumber,
-  isValidContainerPackingCargoRow,
-  readPositiveIntegerInput,
-  readPositiveNumberInput,
 } from "./containerPackingModel.ts";
+import { buildContainerPackingAnalyzeRequest, buildContainerPackingDimensions, isValidContainerPackingCargoRow, validatePackingInput } from "./containerPackingRequest.ts";
+import { packingContainerFromType } from "./containerPackingProjectDraft.ts";
 import { ContainerPackingWorkspace } from "./ContainerPackingWorkspace.tsx";
 import { useContainerPackingProjects } from "./useContainerPackingProjects.ts";
 import { useContainerPackingTypes } from "./useContainerPackingTypes.ts";
@@ -62,17 +59,24 @@ export function ContainerPackingPanel({
   const {
     currentProjectId, projectName, selectedProjectId, container, rules, cargoRows,
     setProjectName, setSelectedProjectId, setContainer, setRules, setCargoRows,
-    projectsQuery, directory, saveProjectMutation, loadProjectMutation, deleteProjectMutation, isSaving,
+    projectsQuery, directory, initializeContainer, saveProjectMutation, loadProjectMutation, deleteProjectMutation, isSaving,
   } = useContainerPackingProjects(client, () => setSnapshot(null), setMessage);
   const typeWorkspace = useContainerPackingTypes(client, currentProjectId, container, setContainer, canManage && canOperate, setMessage);
   const { query: containerTypesQuery, types: containerTypes, selected: selectedContainerType } = typeWorkspace;
 
+  useEffect(() => {
+    const initial = containerTypes.find(type => type.isSystemDefault) ?? containerTypes[0];
+    if (initial) initializeContainer(initial);
+  }, [containerTypes, initializeContainer]);
+
   const savedProjects = projectsQuery.data?.projects ?? [];
-  const validCargoRows = cargoRows.filter(isValidContainerPackingCargoRow);
-  const analysisRequest = useMemo(
-    () => buildContainerPackingAnalyzeRequest(container, cargoRows, rules),
+  const validCargoCount = useMemo(() => cargoRows.filter(isValidContainerPackingCargoRow).length, [cargoRows]);
+  const validation = useMemo(
+    () => validatePackingInput(() => buildContainerPackingAnalyzeRequest(container, cargoRows, rules)),
     [container, cargoRows, rules],
   );
+  const analysisRequest = validation.value;
+  const containerValidation = useMemo(() => validatePackingInput(() => buildContainerPackingDimensions(container)), [container]);
   const latestAnalysisRequestRef = useRef(analysisRequest);
   latestAnalysisRequestRef.current = analysisRequest;
   const analysis = snapshot?.response.analysis ?? null;
@@ -81,20 +85,13 @@ export function ContainerPackingPanel({
     length: dimensions.length ?? 0, width: dimensions.width ?? 0, height: dimensions.height ?? 0,
   } : null, [analysis, dimensions]);
   const exportSnapshot = snapshot?.request === analysisRequest && canOperate ? snapshot : null;
-  const canAnalyze =
-    canOperate &&
-    readPositiveNumberInput(container.length) > 0 &&
-    readPositiveNumberInput(container.width) > 0 &&
-    readPositiveNumberInput(container.height) > 0 &&
-    validCargoRows.length > 0;
+  const canAnalyze = canOperate && analysisRequest !== null;
   const canSaveProject = canOperate && canAnalyze && projectName.trim().length > 0;
   const canLoadProject = Number.parseInt(selectedProjectId, 10) > 0;
   const canSaveContainerType =
     canManage &&
     container.containerType.trim().length > 0 &&
-    readPositiveIntegerInput(container.length, 0) > 0 &&
-    readPositiveIntegerInput(container.width, 0) > 0 &&
-    readPositiveIntegerInput(container.height, 0) > 0 &&
+    containerValidation.value !== null &&
     selectedContainerType?.isSystemDefault !== true;
   const canDeleteContainerType = Boolean(
     canManage && selectedContainerType && !selectedContainerType.isSystemDefault,
@@ -102,7 +99,7 @@ export function ContainerPackingPanel({
   const packingStatusText = buildContainerPackingStatusText(
     analysis,
     snapshot?.rules ?? rules,
-    validCargoRows.length,
+    validCargoCount,
     analysis && !exportSnapshot ? "输入已修改，请重新分析后导出。" : autoRefreshText,
   );
 
@@ -135,10 +132,10 @@ export function ContainerPackingPanel({
       return undefined;
     }
 
-    if (!canAnalyze) {
+    if (!canAnalyze || !analysisRequest) {
       setAutoRefreshState("idle");
       setAutoRefreshText(
-        validCargoRows.length > 0 ? "等待有效柜型。" : "等待有效货物。",
+        validation.error ?? "等待有效输入。",
       );
       return undefined;
     }
@@ -164,7 +161,7 @@ export function ContainerPackingPanel({
     analysisRequest,
     autoRefreshEnabled,
     canAnalyze,
-    validCargoRows.length, client,
+    validation.error, client,
   ]);
 
   function markAnalysisInputsChanged() {
@@ -188,15 +185,7 @@ export function ContainerPackingPanel({
     const definition = findContainerType(containerTypes, typeName);
     setContainer((current) =>
       definition
-        ? {
-            ...current,
-            containerType: definition.name,
-            length: String(definition.length),
-            width: String(definition.width),
-            height: String(definition.height),
-            volume: formatFormNumber(definition.maxVolume),
-            maxWeight: formatFormNumber(definition.maxWeight),
-          }
+        ? packingContainerFromType(definition)
         : { ...current, containerType: typeName },
     );
     markAnalysisInputsChanged();
@@ -337,9 +326,9 @@ export function ContainerPackingPanel({
     : containerTypesQuery.isError
       ? readApiError(containerTypesQuery.error)
       : null;
-  const visibleMessage = message ?? queryMessage;
+  const visibleMessage = validation.error ?? message ?? queryMessage;
   const hasVisibleError =
-    Boolean(queryMessage) ||
+    Boolean(validation.error || (!message && queryMessage)) ||
     autoRefreshState === "error" ||
     saveProjectMutation.isError ||
     loadProjectMutation.isError ||
@@ -364,7 +353,7 @@ export function ContainerPackingPanel({
       onSaveContainerType={handleSaveContainerType} onSaveProject={handleSaveProject} onSelectedProjectChange={setSelectedProjectId}
       onSubmit={handleSubmit} onUpdateCargo={updateCargoRow} packingStatusText={packingStatusText} projectName={projectName}
       renderMode={renderMode} rules={rules} savedProjects={savedProjects} selectedProjectId={selectedProjectId}
-      validCargoCount={validCargoRows.length} visibleMessage={visibleMessage}
+      validCargoCount={validCargoCount} visibleMessage={visibleMessage}
       visualizationDimensions={visualizationDimensions}
       exportSnapshot={exportSnapshot}
       directory={directory}

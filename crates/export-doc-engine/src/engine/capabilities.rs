@@ -27,8 +27,7 @@ impl NativeService {
             || operation == SAVE_CONTAINER_PACKING_PDF_TO_PATH
             || matches!(
                 operation,
-                RUN_SHUTDOWN_MAINTENANCE
-                    | START_PDF_MERGE_SAVE_TO_PATH_JOB
+                START_PDF_MERGE_SAVE_TO_PATH_JOB
                     | SAVE_QUERIED_INVOICES_TO_PATH
                     | SAVE_BUSINESS_ATTACHMENT_TO_PATH
                     | IMPORT_LETTER_OF_CREDIT_DOCUMENT

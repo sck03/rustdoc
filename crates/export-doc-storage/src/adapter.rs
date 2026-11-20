@@ -186,9 +186,26 @@ pub(crate) trait Adapter: Send {
             .is_empty())
     }
 
-    fn supplier_overview(&self, scope: &DataScope<'_>) -> Result<Value> {
-        let (statement, values) =
-            supplier_overview_query::build(scope, self.provider() == "PostgreSQL");
+    fn supplier_overview(
+        &self,
+        scope: &DataScope<'_>,
+        filter: &str,
+        offset: i64,
+        limit: i64,
+    ) -> Result<Value> {
+        if !matches!(filter, "all" | "attention" | "preferred")
+            || offset < 0
+            || !(1..=200).contains(&limit)
+        {
+            return Err(Error::unavailable("供应商总览分页或筛选无效。"));
+        }
+        let (statement, values) = supplier_overview_query::build(
+            scope,
+            filter,
+            offset,
+            limit,
+            self.provider() == "PostgreSQL",
+        );
         let result = self.query_json(&statement, &values)?;
         if result["invalidCount"]
             .as_i64()

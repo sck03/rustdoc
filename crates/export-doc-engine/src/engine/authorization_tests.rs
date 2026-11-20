@@ -58,21 +58,21 @@ fn supplier_overview_refreshes_scope_and_revocation_inside_the_read_snapshot() {
     let mut account = accounts::save(&service.store, &admin, 0, json!({"username":"supplier-reader","fullName":"评价阅览员","role":"OfficeEmployee","companyScope":"DEFAULT","departmentId":"GENERAL","isActive":true,"resetPassword":"Supplier-Snapshot-2026","permissionGrants":[{"resourceKey":"sales.supplier-assessments","action":"view","dataScope":"company"}]})).unwrap()["user"].clone();
     let stale = auth::current_actor(&service.store, account["id"].as_i64().unwrap()).unwrap();
     assert_eq!(
-        supplier_overview::query(&service.store, &stale).unwrap()["totalSuppliers"],
+        supplier_overview::query(&service.store, &stale, &[]).unwrap()["totalSuppliers"],
         1
     );
     account["expectedVersion"] = account["versionNumber"].clone();
     account["permissionGrants"][0]["dataScope"] = json!("own");
     account = accounts::save(&service.store, &admin, stale.id, account).unwrap()["user"].clone();
     assert_eq!(
-        supplier_overview::query(&service.store, &stale).unwrap()["totalSuppliers"],
+        supplier_overview::query(&service.store, &stale, &[]).unwrap()["totalSuppliers"],
         0
     );
     account["expectedVersion"] = account["versionNumber"].clone();
     account["permissionGrants"] = json!([]);
     accounts::save(&service.store, &admin, stale.id, account).unwrap();
     assert_eq!(
-        supplier_overview::query(&service.store, &stale)
+        supplier_overview::query(&service.store, &stale, &[])
             .unwrap_err()
             .status,
         Some(403)

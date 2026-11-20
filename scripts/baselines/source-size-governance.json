@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-20",
-  "reviewNotes": "2026-11-20 against 95662c3c: bounded Storage dashboard and company-scoped party queries; shared company identity helper; isolated contract retirement assertions; resource submission snapshot UI reuses ApprovalDocument and shared controls. Typed master-data projections reuse normalization field lists instead of duplicating mappings. Added SQLite/PostgreSQL cross-company read/write, ambiguity/order and keyset-boundary regressions plus real React lifecycle/history tests. Advance only measured affected aggregate baselines; preserve per-file caps and existing growth allowances. Evidence: docs/archive/2026-11/2026-11-20项目审查修复与清理.md. Scope parity follow-up projects resolved restrictions through the native contract and one shared UI predicate; the keyed restriction editor reuses scoped mutation and hydrates saved members. Invoice list actions use declared ownership fields.",
+  "reviewNotes": "2026-11-20 against 12e58506: packing request parsing and batched cargo geometry replace duplicate/coercing implementations; shared tool-panel CSS removes route-order dependence. Storage owns paginated supplier overview and global totals; email recovery uses existing bounded projection. Retired two redundant endpoints. Rust aggregate includes inline boundary/email regressions and explicit frozen-contract review; automation adds real Tauri/React pagination, layout, precision and resource-release coverage. Advance only these measured aggregates; retain per-file caps and growth allowances. No dependency or schema changes. Evidence: docs/archive/2026-11/2026-11-20装柜与资源优化.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 114932,
+      "baselineAggregateLines": 115188,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 115007,
+      "maximumAggregateLines": 115263,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 30724,
+      "baselineAggregateLines": 31047,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 30874,
+      "maximumAggregateLines": 31197,
       "reportFiles": false
     },
     {

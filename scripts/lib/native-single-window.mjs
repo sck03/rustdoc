@@ -233,7 +233,7 @@ export async function verifyDesktopSingleWindow({ run, cdp, output, token, invoi
   const packagePath = path.join(output, 'desktop-manual.swpkg');
   const handoff = await client.saveAgentConsignmentSubmitPackageToPath({ sourceId, body: { packagePath, stationAssignmentCode: profile.stationAssignmentCode, expectedDraftRevision: savedAcd.document.draftRevision } });
   assert(fs.statSync(packagePath).size > 0);
-  await client.uploadSingleWindowSubmitPackage({ body: new Blob([fs.readFileSync(packagePath)]), fileName: 'desktop-manual.swpkg' });
+  await client.importSingleWindowSubmitPackage({ body: { packagePath } });
   const dispatch = await client.dispatchSingleWindowBatchToClient({ body: { batchId: handoff.trackingBatchId } });
   assert.equal(fs.readdirSync(dispatch.targetDirectory).filter(name => name.endsWith('.xml')).length, 1);
   if (process.env.EXPORTDOCMANAGER_SW_CLIENT_TRANSPORT === '1') {

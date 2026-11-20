@@ -147,6 +147,10 @@ impl Request {
             if i32::try_from(color).is_err() {
                 return Err("货物颜色值无效。".into());
             }
+            let sequence = row.load_sequence.unwrap_or(1);
+            if !(1..=i32::MAX as i64).contains(&sequence) {
+                return Err(format!("第 {} 行装载顺序须为正整数。", index + 1));
+            }
             let pallet = rules.pallet && row.use_pallet.unwrap_or(false);
             let base = Item {
                 name: if name.is_empty() {
@@ -172,7 +176,7 @@ impl Request {
                 color,
                 pallet,
                 zone,
-                sequence: row.load_sequence.unwrap_or(1).max(1),
+                sequence,
                 group,
             };
             packages += quantity;
@@ -238,6 +242,26 @@ fn needed(total: D, capacity: D, label: &str) -> Result<i64, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn load_sequence_rejects_invalid_values_without_silent_normalization() {
+        let mut dto: ApiContainerPackingAnalyzeRequest =
+            serde_json::from_value(serde_json::json!({
+                "container":{"length":100,"width":100,"height":100,"volume":1,"maxWeight":100},
+                "cargoItems":[{"length":10,"width":10,"height":10,"weight":1,"quantity":1}]
+            }))
+            .unwrap();
+        assert_eq!(Request::new(&dto).unwrap().items[0].sequence, 1);
+        for value in [-1, 0, i32::MAX as i64 + 1] {
+            dto.cargo_items.as_mut().unwrap()[0].load_sequence = Some(value);
+            assert!(Request::new(&dto).is_err());
+        }
+        dto.cargo_items.as_mut().unwrap()[0].load_sequence = Some(i32::MAX as i64);
+        assert_eq!(
+            Request::new(&dto).unwrap().items[0].sequence,
+            i32::MAX as i64
+        );
+    }
 
     #[test]
     fn zero_capacity_cannot_estimate_positive_cargo_as_zero_containers() {

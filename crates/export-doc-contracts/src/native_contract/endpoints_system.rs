@@ -1,10 +1,8 @@
 //! Typed route catalogue; common authentication, parameters and JSON media are composed once.
 use super::model::*;
-use std::collections::BTreeMap;
 
 #[rustfmt::skip]
 pub(super) fn entries() -> Vec<Endpoint> { vec![
-    ep("post","/api/system/shutdown-maintenance","RunShutdownMaintenance",super::responses::json(r("ApiShutdownMaintenanceResponse"),&["403"],&[]),super::policies::rule((false,true,false),Access::Bypass{bypass:true})).security(vec![BTreeMap::from([("DesktopAccess",vec![])])]),
     route("post","/api/system/logs/cleanup","CleanupSystemLogs",super::responses::json(r("ApiSystemLogCleanupResponse"),&["403","409"],&["401"]),super::policies::rule((true,true,true),Access::Bypass{bypass:true}),None,None),
     route("get","/api/system/license","GetLicenseStatus",super::responses::json(r("ApiLicenseStatusResponse"),&[],&[]),super::policies::rule((true,true,false),Access::Bypass{bypass:true}),None,None),
     route("post","/api/system/license/register","RegisterLicense",super::responses::json(r("ApiLicenseRegisterResponse"),&["400","403"],&[]),super::policies::rule((true,true,false),Access::Bypass{bypass:true}),None,Some(r("ApiLicenseRegisterRequest"))),

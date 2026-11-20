@@ -25,7 +25,7 @@
     "test:container-packing-scene-ui": "node ../../scripts/test_container_packing_scene_ui.mjs",
     "test:communication-ui": "node ../../scripts/test_communication_ui.mjs",
     "test:business-feature-models": "node ../../scripts/test_business_feature_models.mjs",
-    "test:business-features-ui": "node ../../scripts/test_business_features_ui.mjs && node ../../scripts/test_supplier_lifecycle_ui.mjs",
+    "test:business-features-ui": "node ../../scripts/test_business_features_ui.mjs && node ../../scripts/test_supplier_lifecycle_ui.mjs && node ../../scripts/test_supplier_overview_ui.mjs",
     "test:payment-printing-ui": "node ../../scripts/test_payment_printing_ui.mjs",
     "test:payment-query-lifecycle-ui": "node ../../scripts/test_payment_query_lifecycle_ui.mjs",
     "test:crm-export-lifecycle-ui": "node ../../scripts/test_crm_export_lifecycle_ui.mjs",

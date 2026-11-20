@@ -4,9 +4,11 @@ import { createReactUiFixture } from "./lib/react-ui-fixture.mjs";
 
 const { root, web, output, require, bundle, source, launch } = createReactUiFixture("packing-credit-workspace-ui");
 await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, contents: `
+import ${source("styles/index.css")}; import ${source("styles/routes/container-packing.css")}; import ${source("styles/workspaces.css")}; import ${source("styles/responsive.css")};
 import React,{useState} from "react";import {createRoot} from "react-dom/client";
 import {QueryClient,QueryClientProvider} from "@tanstack/react-query";
 import {MemoryRouter} from "react-router-dom";
+import {RecordWorkspace} from ${source("ui/layout/Workspaces.tsx")};
 import {ContainerPackingPanel} from ${source("features/tools/container-packing/ContainerPackingPanel.tsx")};
 import {InvoiceLetterOfCreditPanel} from ${source("features/invoices/InvoiceLetterOfCreditPanel.tsx")};
 import {createEmptyInvoice} from ${source("features/invoices/invoiceModel.ts")};
@@ -17,7 +19,7 @@ const queries=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:30
 const deferred=(kind,request,init)=>new Promise((resolve,reject)=>window.requests.push({kind,request,signal:init.signal,resolve,reject}));
 const project=id=>({id,versionNumber:1,name:id===2?"乙方案":"甲方案",containerType:"20GP",container:{length:589,width:235,height:239,volume:33.2,maxWeight:28000},rules:{allowRotation:true},cargoItems:[{name:id===2?"乙货物":"甲货物",length:60,width:40,height:40,weight:10,quantity:id===2?77:50}]});
 const type=id=>({id,versionNumber:1,name:id===1?"甲柜型":"乙柜型",length:id===1?600:800,width:235,height:239,maxVolume:33.2,maxWeight:28000,isSystemDefault:false});
-const client={listContainerPackingProjects:async(request,init)=>{window.directoryRequests.push(request);return window.delayDirectory?deferred("directory",{},init):({projects:window.largeDirectory?(request.keyword?[project(101)]:request.pageNumber===4?[project(101)]:[project(1),project(2)]):[project(1),project(2)],totalCount:window.largeDirectory?(request.keyword?1:101):2,pageNumber:request.pageNumber,pageSize:request.pageSize});},listContainerPackingContainerTypes:async()=>({containerTypes:[type(1),type(2)]}),
+const client={listContainerPackingProjects:async(request,init)=>{window.directoryRequests.push(request);return window.delayDirectory?deferred("directory",{},init):({projects:window.largeDirectory?(request.keyword?[project(101)]:request.pageNumber===4?[project(101)]:[project(1),project(2)]):[project(1),project(2)],totalCount:window.largeDirectory?(request.keyword?1:101):2,pageNumber:request.pageNumber,pageSize:request.pageSize});},listContainerPackingContainerTypes:async()=>{if(window.pauseTypes)await new Promise(resolve=>window.finishTypes=resolve);return ({containerTypes:[{...type(0),name:"20GP",length:589,maxVolume:28,maxWeight:21000,isSystemDefault:true},type(1),type(2)]});},
 saveContainerPackingContainerType:(r,i)=>deferred("saveType",r,i),deleteContainerPackingContainerType:(r,i)=>deferred("deleteType",r,i),downloadContainerPackingPdf:(r,i)=>deferred("pdf",r,i),
 getContainerPackingProject:(r,i)=>deferred("load",r,i),saveContainerPackingProject:(r,i)=>deferred("save",r,i),deleteContainerPackingProject:(r,i)=>deferred("delete",r,i),
 analyzeContainerPacking:(r,i)=>deferred("analyze",r,i),
@@ -31,16 +33,16 @@ else if(pending.kind==="import")pending.resolve({sourcePath:"甲信用证.txt",e
 else pending.resolve({contextSummary:"甲审核",reportText:"甲审核结果"});};
 function Harness(){const [shown,setShown]=useState(true),[invoice,setInvoice]=useState(()=>({...createEmptyInvoice("2026-10-26"),id:1,letterOfCreditContent:"当前正文"}));
 window.hide=()=>setShown(false);window.switchInvoice=id=>setInvoice({...createEmptyInvoice("2026-10-26"),id,letterOfCreditContent:"乙正文"});window.dirty=useHasUnsavedChanges();window.invoice=invoice;
-return shown?(window.mode==="packing"?<ContainerPackingPanel client={client} canOperate canManage/>:<InvoiceLetterOfCreditPanel client={client} invoice={invoice} onChange={changes=>setInvoice(current=>({...current,...changes}))} onClearPageMessages={()=>{}}/>):<div>unmounted</div>;}
+return shown?(window.mode==="packing"?<RecordWorkspace className="container-packing-surface"><ContainerPackingPanel client={client} canOperate canManage/></RecordWorkspace>:<InvoiceLetterOfCreditPanel client={client} invoice={invoice} onChange={changes=>setInvoice(current=>({...current,...changes}))} onClearPageMessages={()=>{}}/>):<div>unmounted</div>;}
 createRoot(document.getElementById("root")).render(<MemoryRouter><QueryClientProvider client={queries}><ConfirmationProvider><UnsavedChangesProvider><Harness/></UnsavedChangesProvider></ConfirmationProvider></QueryClientProvider></MemoryRouter>);
 ` }, outfile: bundle, bundle: true, platform: "browser", format: "iife", jsx: "automatic", logLevel: "silent" });
 const context = await launch();
 let passed = 0;
-async function scenario(mode, check) {
+async function scenario(mode, check, setup = {}) {
   const page = await context.newPage(), errors = []; page.setDefaultTimeout(8000); page.on("pageerror", error => errors.push(error.message));
   try {
     await page.setContent('<!doctype html><html lang="zh-CN"><title>Packing and credit regression</title><div id="root"></div></html>');
-    await page.evaluate(mode => window.mode = mode, mode); await page.addScriptTag({ path: bundle });
+    await page.evaluate(({mode,setup}) => {window.mode = mode;Object.assign(window,setup);}, {mode,setup}); await page.addScriptTag({ path: bundle }); await page.addStyleTag({path:path.join(output,"app.css")});
     await check(page); assert.deepEqual(errors, []); passed++;
   } catch (error) { await page.screenshot({ path: path.join(output, `failure-${passed}.png`), fullPage: true }); throw error; }
   finally { await page.close(); }
@@ -60,6 +62,52 @@ async function importCredit(page) {
   await page.waitForFunction(() => window.requests.length === 1);
 }
 try {
+  await scenario("packing", async page=>{
+    await page.waitForFunction(()=>Boolean(window.finishTypes));
+    await page.getByLabel("柜长 cm",{exact:true}).fill("777");
+    await page.evaluate(()=>window.finishTypes());
+    await page.waitForFunction(()=>document.querySelectorAll('#container-packing-type-options option').length===3);
+    assert.equal(await page.getByLabel("柜长 cm",{exact:true}).inputValue(),"777");
+    assert.equal(await page.evaluate(()=>window.dirty),true);
+  }, {pauseTypes:true});
+  for(const width of [1024,1366,1920]) await scenario("packing",async page=>{
+    await page.setViewportSize({width,height:900});
+    await page.getByRole("button",{name:"保存方案",exact:true}).waitFor();
+    const positions=await page.locator('.container-packing-project-actions button').evaluateAll(buttons=>buttons.map(button=>button.getBoundingClientRect().top));
+    assert.equal(new Set(positions).size,1,'project actions share a row at '+width);
+    assert.equal(await page.locator('.job-tool-panel').evaluate(e=>getComputedStyle(e).display),'grid');
+    assert.equal(await page.locator('.tool-panel-heading').evaluate(e=>getComputedStyle(e).display),'flex');
+    if(width>1180) assert.equal(await page.locator('.container-packing-grid').evaluate(e=>new Set([...e.children].map(child=>child.getBoundingClientRect().top)).size),1,'container and rules retain two columns');
+    await page.screenshot({path:path.join(output,'packing-layout-'+width+'.png'),fullPage:true});
+  });
+  await scenario("packing", async page => {
+    await page.waitForFunction(() => document.querySelector('[aria-label="装箱分析"]') && !window.dirty);
+    assert.equal(await page.getByLabel("体积 CBM", {exact:true}).inputValue(), "28");
+    assert.equal(await page.getByLabel("限重 kg", {exact:true}).inputValue(), "21000");
+    await page.getByRole("button", {name:"添加货物",exact:true}).click();
+    await page.getByLabel("第 2 行高度", {exact:true}).fill("");
+    assert.equal(await page.getByRole("button",{name:"保存方案",exact:true}).isDisabled(), true);
+    assert.equal(await page.getByRole("button",{name:"分析",exact:true}).isDisabled(), true);
+    await page.getByText(/第 2 行高度须为/).waitFor();
+    assert.equal(await page.locator('.container-packing-cargo-table tbody tr').count(),2);
+    assert.equal(await page.evaluate(()=>window.requests.length),0);
+    await page.getByLabel("第 2 行高度", {exact:true}).fill("12.3456");
+    await page.getByLabel("第 2 行重量", {exact:true}).fill("0.0004");
+    for (const [field,value] of [["数量","1.9"],["重量","-10"],["顺序","0"]]) {
+      const input=page.getByLabel('第 2 行'+field,{exact:true}),previous=await input.inputValue();
+      await input.fill(value);
+      assert.equal(await page.getByRole("button",{name:"保存方案",exact:true}).isDisabled(),true);
+      await input.fill(previous);
+    }
+    await page.getByRole("button",{name:"保存方案",exact:true}).click();
+    await page.waitForFunction(()=>window.requests.length===1);
+    assert.equal(await page.evaluate(()=>window.requests[0].request.body.cargoItems.length),2);
+    await page.evaluate(()=>window.finish(0));
+    await page.getByText("装柜方案已保存。",{exact:true}).waitFor();
+    assert.equal(await page.getByLabel("第 2 行高度", {exact:true}).inputValue(),"12.3456");
+    assert.equal(await page.getByLabel("第 2 行重量", {exact:true}).inputValue(),"0.0004");
+    assert.equal(await page.evaluate(()=>window.dirty),false);
+  });
   for (const kind of ["saveType", "deleteType"]) for (const outcome of ["resolve", "reject"]) await scenario("packing", async page => {
     await page.getByLabel("柜型", { exact: true }).fill("甲柜型");
     await page.getByRole("button", { name: kind === "saveType" ? "保存柜型" : "删除柜型", exact: true }).click();

@@ -118,3 +118,30 @@ pub(super) fn supplier_id() -> Vec<Parameter> { vec![p("supplierId","path",Some(
 pub(super) fn supplier_link_id() -> Vec<Parameter> { vec![p("supplierId","path",Some(true),i().format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),p("id","path",Some(true),i().format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))] }
 #[rustfmt::skip]
 pub(super) fn versioned_supplier_link_id() -> Vec<Parameter> { vec![p("supplierId","path",Some(true),i().format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),p("id","path",Some(true),i().format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),p("expectedVersion","query",None,Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))] }
+
+pub(super) fn supplier_overview() -> Vec<Parameter> {
+    vec![
+        p(
+            "filter",
+            "query",
+            None,
+            s().enumeration(Enumeration::Values(vec![
+                "all".into(),
+                "attention".into(),
+                "preferred".into(),
+            ])),
+        ),
+        p(
+            "pageNumber",
+            "query",
+            None,
+            i().minimum(num("1")).format("int32"),
+        ),
+        p(
+            "pageSize",
+            "query",
+            None,
+            i().minimum(num("1")).maximum(num("200")).format("int32"),
+        ),
+    ]
+}
