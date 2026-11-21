@@ -23214,14 +23214,6 @@
       "OaAttachment": {
         "type": "object",
         "properties": {
-          "classification": {
-            "type": "string",
-            "default": "Internal",
-            "enum": [
-              "Internal",
-              "Restricted"
-            ]
-          },
           "digest": {
             "type": "string"
           },
@@ -24788,10 +24780,6 @@
       "OaMaterialPolicy": {
         "type": "object",
         "properties": {
-          "allowRestrictedAttachments": {
-            "type": "boolean",
-            "default": false
-          },
           "hiddenFields": {
             "type": "array",
             "items": {
@@ -61086,14 +61074,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "classification": {
-                    "type": "string",
-                    "default": "Internal",
-                    "enum": [
-                      "Internal",
-                      "Restricted"
-                    ]
-                  },
                   "expectedVersion": {
                     "type": "integer",
                     "format": "int64"
@@ -61112,7 +61092,8 @@
                 "required": [
                   "file",
                   "expectedVersion"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           },
@@ -65268,14 +65249,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "classification": {
-                    "type": "string",
-                    "default": "Internal",
-                    "enum": [
-                      "Internal",
-                      "Restricted"
-                    ]
-                  },
                   "expectedVersion": {
                     "type": "integer",
                     "format": "int64"
@@ -65296,7 +65269,8 @@
                 "required": [
                   "file",
                   "expectedVersion"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           },
@@ -70176,14 +70150,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "classification": {
-                    "type": "string",
-                    "default": "Internal",
-                    "enum": [
-                      "Internal",
-                      "Restricted"
-                    ]
-                  },
                   "expectedVersion": {
                     "type": "integer",
                     "format": "int64"
@@ -70204,7 +70170,8 @@
                 "required": [
                   "file",
                   "expectedVersion"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           },
@@ -74790,14 +74757,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "classification": {
-                    "type": "string",
-                    "default": "Internal",
-                    "enum": [
-                      "Internal",
-                      "Restricted"
-                    ]
-                  },
                   "expectedVersion": {
                     "type": "integer",
                     "format": "int64"
@@ -74818,7 +74777,8 @@
                 "required": [
                   "file",
                   "expectedVersion"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           },
@@ -79969,14 +79929,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "classification": {
-                    "type": "string",
-                    "default": "Internal",
-                    "enum": [
-                      "Internal",
-                      "Restricted"
-                    ]
-                  },
                   "expectedVersion": {
                     "type": "integer",
                     "format": "int64"
@@ -79997,7 +79949,8 @@
                 "required": [
                   "file",
                   "expectedVersion"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           },
@@ -87396,14 +87349,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "classification": {
-                    "type": "string",
-                    "default": "Internal",
-                    "enum": [
-                      "Internal",
-                      "Restricted"
-                    ]
-                  },
                   "expectedVersion": {
                     "type": "integer",
                     "format": "int64"
@@ -87424,7 +87369,8 @@
                 "required": [
                   "file",
                   "expectedVersion"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           },
@@ -92010,14 +91956,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "classification": {
-                    "type": "string",
-                    "default": "Internal",
-                    "enum": [
-                      "Internal",
-                      "Restricted"
-                    ]
-                  },
                   "expectedVersion": {
                     "type": "integer",
                     "format": "int64"
@@ -92038,7 +91976,8 @@
                 "required": [
                   "file",
                   "expectedVersion"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           },
@@ -98191,14 +98130,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "classification": {
-                    "type": "string",
-                    "default": "Internal",
-                    "enum": [
-                      "Internal",
-                      "Restricted"
-                    ]
-                  },
                   "expectedVersion": {
                     "type": "integer",
                     "format": "int64"
@@ -98217,7 +98148,8 @@
                 "required": [
                   "file",
                   "expectedVersion"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           },
@@ -102373,14 +102305,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "classification": {
-                    "type": "string",
-                    "default": "Internal",
-                    "enum": [
-                      "Internal",
-                      "Restricted"
-                    ]
-                  },
                   "expectedVersion": {
                     "type": "integer",
                     "format": "int64"
@@ -102401,7 +102325,8 @@
                 "required": [
                   "file",
                   "expectedVersion"
-                ]
+                ],
+                "additionalProperties": false
               }
             }
           },

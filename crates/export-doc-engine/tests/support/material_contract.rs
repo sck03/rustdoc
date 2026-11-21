@@ -45,8 +45,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
     let applicant = person("申请材料所有者");
     let mut settings = workflow::request(service, admin, GET_OA_APPROVAL_SETTINGS, None);
     let mut node = workflow::node("material-review", &[], "Named", json!([user["id"]]));
-    node["materialPolicy"] =
-        json!({"hiddenFields":["title","reason"],"allowRestrictedAttachments":false});
+    node["materialPolicy"] = json!({"hiddenFields":["title","reason"]});
     settings["rules"]
         .as_array_mut()
         .unwrap()
@@ -71,10 +70,32 @@ pub fn exercise(service: &NativeService, admin: &str) {
     );
     let id = request["id"].as_i64().unwrap();
     let parameters = [("id", id.to_string())];
-    request = service.upload(super::oa_contract::operation("general","upload"), &parameters,
-        json!({"expectedVersion":request["versionNumber"],"purpose":"Supporting","classification":"Restricted"}),
-        &format!("{secret}.xml"), b"<?xml version=\"1.0\"?><Private>restricted</Private>", admin).unwrap();
+    request = service
+        .upload(
+            super::oa_contract::operation("general", "upload"),
+            &parameters,
+            json!({"expectedVersion":request["versionNumber"],"purpose":"Supporting"}),
+            "supporting.xml",
+            b"<?xml version=\"1.0\"?><Supporting>anonymous</Supporting>",
+            admin,
+        )
+        .unwrap();
     let attachment = request["attachments"][0]["id"].clone();
+    let upload = |purpose| {
+        service.upload(
+            super::oa_contract::operation("general", "upload"),
+            &parameters,
+            json!({"expectedVersion":request["versionNumber"],"purpose":purpose}),
+            "supporting.xml",
+            b"<?xml version=\"1.0\"?><Supporting>anonymous</Supporting>",
+            admin,
+        )
+    };
+    assert_eq!(
+        upload("Supporting").unwrap()["versionNumber"],
+        request["versionNumber"]
+    );
+    assert_eq!(upload("Voucher").unwrap_err().status, Some(409));
     let act = |token: &str, operation: Operation, row: &Value, note: &str| {
         workflow::call(
             service,
@@ -113,7 +134,8 @@ pub fn exercise(service: &NativeService, admin: &str) {
     check(&detail);
     assert!(detail.get("title").is_none() && detail.get("reason").is_none());
     assert_eq!(detail["materialAccess"]["isPartial"], true);
-    assert_eq!(detail["attachments"], json!([]));
+    assert_eq!(detail["attachments"][0]["id"], attachment);
+    assert!(detail["attachments"][0].get("classification").is_none());
     check(&read(
         super::oa_contract::operation("general", "list"),
         &[],
@@ -136,10 +158,10 @@ pub fn exercise(service: &NativeService, admin: &str) {
                 &attachment_path,
                 token
             )
-            .err()
             .unwrap()
-            .status,
-        Some(403)
+            .content,
+        b"<?xml version=\"1.0\"?><Supporting>anonymous</Supporting>",
+        "ordinary attachments require no personnel-detail grant"
     );
     request = act(token, APPROVE_GENERAL_REQUEST, &request, &secret);
     check(&request);

@@ -219,6 +219,16 @@ pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
     if decisions.is_empty() {
         return Err(crate::error::invalid("审批单缺少实际节点签署记录。"));
     }
+    let attachments = if snapshot["materialAccess"]["omittedFields"]
+        .as_array()
+        .is_some_and(|fields| fields.iter().any(|field| field == "attachments"))
+    {
+        "附件未在当前材料权限内展示。".into()
+    } else if attachments.is_empty() {
+        "无附件".into()
+    } else {
+        attachments
+    };
     Ok(ReportData {
         report_type: "OaApproval",
         root: json!({"Oa":{
@@ -232,7 +242,7 @@ pub fn data(snapshot: &Value, generated_at: &str) -> Result<ReportData> {
             "Reference":format!("申请 #{} · 提交版本 {} · 已批准",snapshot["requestId"],snapshot["submissionNumber"]),
             "Applicant":format!("{} · 工号 {} · {}\n提交时间：{}",text(request,"employeeName"),text(request,"employeeNumber"),text(snapshot,"departmentName"),text(snapshot,"submittedAt")),
             "Title":text(request,"title"),"Summary":summary.join("\n"),"Reason":text(request,"reason"),
-            "Attachments":if attachments.is_empty(){"无附件".into()}else{attachments},"Approvals":decisions.join("\n\n"),"GeneratedAt":format!("生成时间：{}",time(generated_at))
+            "Attachments":attachments,"Approvals":decisions.join("\n\n"),"GeneratedAt":format!("生成时间：{}",time(generated_at))
         }}),
         images: Default::default(),
     })

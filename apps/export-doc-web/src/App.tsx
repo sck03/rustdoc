@@ -35,7 +35,7 @@ import { isCurrentSession, openSessionChannel, shouldAcceptSessionUpdate, type S
 import { useBusinessDateSessionRefresh } from "./app/useBusinessDateSessionRefresh.ts";
 import { useUnitContextSwitch } from "./app/useUnitContextSwitch.ts";
 import { prefetchLandingDashboard } from "./app/loginPrefetch.ts";
-import { createSessionApiClient } from "./app/sessionApiClient.ts";
+import { createSessionApiClient, sessionAuthorizationKey } from "./app/sessionApiClient.ts";
 import { useSessionLogout } from "./app/useSessionLogout.ts";
 import { isDashboardRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
 import {
@@ -86,15 +86,23 @@ function App() {
   const allowAuthenticationFailure = useCallback(() => !sessionActionRef.current && !unitTransitionRef.current, []);
   const apiBaseUrlRef = useRef(apiBaseUrl);
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  const authorizationGenerationRef = useRef(0);
   const setSession = useCallback((nextSession: SessionState | null) => {
+    const scopeChanged = sessionAuthorizationKey(sessionRef.current) !== sessionAuthorizationKey(nextSession);
     validatedUserTokenRef.current = nextSession?.accessToken;
     sessionRef.current = nextSession;
+    if (scopeChanged) {
+      authorizationGenerationRef.current += 1;
+      void queryClient.cancelQueries();
+      queryClient.clear();
+    }
     setSessionState(nextSession);
     if (nextSession) writeStoredSession(nextSession);
     else clearStoredSession();
-  }, []);
+  }, [queryClient]);
   const resetSessionAttention = useCallback((state: "expired" | null = null) => {
     if (state === "expired" && sessionAttentionRef.current === state) return;
+    if (state === "expired") authorizationGenerationRef.current += 1;
     sessionAttentionRef.current = state;
     setSessionAttentionState(state);
     setSessionActionError(null);
@@ -225,10 +233,6 @@ function App() {
         sessionActionRef.current = null;
         setSession(event.session);
         resetSessionAttention();
-        if (!previousSession || previousSession.user.contextId !== event.session.user.contextId || JSON.stringify(previousSession.user.capabilities) !== JSON.stringify(event.session.user.capabilities)) {
-          void queryClient.cancelQueries();
-          queryClient.clear();
-        }
         if (!previousSession) navigate(getDefaultWorkspaceRoute(event.session.user.capabilities), { replace: true });
         return;
       }
@@ -257,22 +261,16 @@ function App() {
     };
   }, [endSession, navigate, queryClient, resetSessionAttention, setSession]);
 
-  const sessionIdentity = session ? `${session.user.id}:${session.user.contextId ?? ""}` : null;
+  const authorizationGeneration = authorizationGenerationRef.current;
   const client = useMemo(
     () =>
       createSessionApiClient({
         baseUrl: sessionApiBaseUrl ?? apiBaseUrl,
-        accessToken: () => {
-          const current = sessionRef.current;
-          const identity = current ? `${current.user.id}:${current.user.contextId ?? ""}` : null;
-          if (identity !== sessionIdentity || sessionAttentionRef.current === "expired") {
-            throw new DOMException("会话已暂停或身份已切换。", "AbortError");
-          }
-          return current?.accessToken;
-        },
+        accessToken: () => sessionRef.current?.accessToken,
         desktopAccessToken: () => desktopAccessToken,
-      }, requestToken => !sessionActionRef.current && !unitTransitionRef.current && sessionRef.current?.accessToken === requestToken && sessionRef.current?.apiBaseUrl === (sessionApiBaseUrl ?? apiBaseUrl)),
-    [apiBaseUrl, desktopAccessToken, sessionIdentity, sessionApiBaseUrl],
+      }, requestToken => !sessionActionRef.current && !unitTransitionRef.current && sessionRef.current?.accessToken === requestToken && sessionRef.current?.apiBaseUrl === (sessionApiBaseUrl ?? apiBaseUrl),
+      () => authorizationGenerationRef.current === authorizationGeneration && sessionAttentionRef.current !== "expired"),
+    [apiBaseUrl, desktopAccessToken, sessionApiBaseUrl, authorizationGeneration],
   );
   const unitContext = useUnitContextSwitch(client, session, (next, previous) => {
     setSession(next);
@@ -387,7 +385,6 @@ function App() {
   useBusinessDateSessionRefresh({
     client,
     desktopContextLoading,
-    queryClient,
     session,
     sessionRef,
     setSession,

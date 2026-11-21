@@ -4956,7 +4956,6 @@ export interface OaAssignmentOrigin {
 }
 
 export interface OaAttachment {
-  classification?: "Internal" | "Restricted";
   digest?: string;
   fileName: string;
   id: number;
@@ -5321,7 +5320,6 @@ export interface OaMaterialPersonnelProfile {
 }
 
 export interface OaMaterialPolicy {
-  allowRestrictedAttachments?: boolean;
   hiddenFields?: string[];
   requireReviewPoints?: boolean;
   verificationFields?: OaVerificationField[];
@@ -7589,10 +7587,6 @@ export const OaApprovalStepDefaults = {
   verificationValues: {},
 } as const satisfies Partial<OaApprovalStep>;
 
-export const OaAttachmentDefaults = {
-  classification: "Internal",
-} as const satisfies Partial<OaAttachment>;
-
 export const OaCommandActionDefaults = {
   confirmedReviewPoints: [],
   decision: "Approve",
@@ -7646,7 +7640,6 @@ export const OaMaterialPersonnelProfileDefaults = {
 } as const satisfies Partial<OaMaterialPersonnelProfile>;
 
 export const OaMaterialPolicyDefaults = {
-  allowRestrictedAttachments: false,
   hiddenFields: [],
   requireReviewPoints: false,
   verificationFields: [],

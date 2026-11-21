@@ -46,6 +46,7 @@ function Details({client,user,kind,row}: {client: ExportDocManagerApiClient;user
     <p className="office-muted">附件随草稿保存，提交后冻结原件。修改已提交资料须取消后重新申请。</p>
     {"reservationState" in current && current.reservationState === "Insufficient" && <InlineNotice tone="warning" title="批准已保留，库存待协调">当前尚未预留库存。补充库存后，办理人可重新尝试发放，系统会再次核对数量。</InlineNotice>}
     {editable && <AttachmentUploadPanel record={current} operation={operation} upload={(record,body,signal)=>{body.set("purpose","Supporting");return api.upload(record.id,body,{signal});}} />}
+    {current.materialAccess?.omittedFields.includes("attachments") && <p className="office-muted">附件未在当前材料权限内展示。</p>}
     <ul>{(current.attachments ?? []).map(file=><li className="office-card-actions" key={file.id}><span>{file.fileName} · {Math.ceil(file.sizeBytes/1024)} KiB</span><button type="button" className="command-button secondary" disabled={operation.busy} onClick={()=>void operation.run(signal=>api.download(current.id,file.id,{signal}),blob=>downloadBlob(blob,file.fileName),false)}>下载附件</button>{editable && <button type="button" className="text-button" onClick={()=>{setRemoving(file.id);setNote("");}}>移除附件</button>}</li>)}</ul>
     <ApprovalDocument api={api} user={user} row={current} scope={kind} />
     <ResourceSubmissionHistory client={client} user={user} kind={kind} row={current}/>

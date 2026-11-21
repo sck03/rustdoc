@@ -8,6 +8,8 @@ pub use export_doc_domain::organization::search_key;
 use export_doc_storage::{OrganizationReference, PersonnelQuery};
 use serde_json::{Value, json};
 use std::collections::{HashMap, hash_map::Entry};
+mod projection;
+pub(super) use projection::project;
 
 pub(super) fn leaders(
     value: &Value,
@@ -145,13 +147,6 @@ pub fn directory(store: &Store, actor: &Actor) -> Result<Value> {
         let actor = super::auth::refresh_actor_in(tx, actor)?;
         super::auth::authorize(&actor, "organization.directory", "manage")?;
         let mut companies = super::units::companies(tx, &actor)?;
-        for company in &mut companies {
-            company["executiveName"] = match company["executiveEmployeeId"].as_i64() {
-                Some(id) => json!(text(&store::get(tx, "people", id)?, "profile.fullName")),
-                None => json!(""),
-            };
-            company["additionalLeaderNames"] = leader_names(tx, company)?;
-        }
         let mut departments = if actor.admin {
             store::all(tx, "departments")?
         } else {
@@ -162,44 +157,9 @@ pub fn directory(store: &Store, actor: &Actor) -> Result<Value> {
                 &[],
             )?
         };
-        for department in &mut departments {
-            *department = project(tx, std::mem::take(department))?;
-        }
+        projection::enrich(tx, &mut companies, &mut departments)?;
         Ok(json!({"companies":companies,"departments":departments}))
     })
-}
-pub(super) fn project(tx: &Connection, row: Value) -> Result<Value> {
-    let mut department = crate::contracts::overlay(
-        crate::contracts::initial(crate::contracts::schema("ApiOrganizationDepartmentDto")),
-        &row,
-    );
-    department["managerName"] = json!("");
-    department["managerEmployeeNumber"] = json!("");
-    if let Some(id) = row["managerEmployeeId"].as_i64() {
-        let person = tx
-            .get("people", id)?
-            .ok_or_else(|| super::error::unavailable("部门负责人引用无效。"))?;
-        department["managerName"] = person["profile"]["fullName"].clone();
-        department["managerEmployeeNumber"] = person["employeeNumber"].clone();
-    }
-    department["additionalLeaderNames"] = leader_names(tx, &row)?;
-    Ok(department)
-}
-
-pub(super) fn leader_names(tx: &Connection, row: &Value) -> Result<Value> {
-    let mut names = serde_json::Map::new();
-    for leader in leaders(row)? {
-        let person = store::get(tx, "people", leader.employee_id)?;
-        names.insert(
-            leader.employee_id.to_string(),
-            json!(format!(
-                "{} · {}",
-                text(&person, "profile.fullName"),
-                text(&person, "employeeNumber")
-            )),
-        );
-    }
-    Ok(Value::Object(names))
 }
 
 pub(super) fn leadership_referenced(tx: &Connection, company: &str, employee: i64) -> Result<bool> {
@@ -283,11 +243,7 @@ pub(super) fn validate_personnel_duties(tx: &Connection, proposed: &Value) -> Re
     Ok(())
 }
 pub(super) fn enrich_departments(store: &Store, rows: &mut [Value]) -> Result<()> {
-    let tx = store.connection()?;
-    for row in rows {
-        *row = project(&tx, std::mem::take(row))?;
-    }
-    Ok(())
+    store.read(|tx| projection::enrich(tx, &mut [], rows))
 }
 
 pub fn managers(store: &Store, query: &[(&str, String)]) -> Result<Value> {
@@ -309,6 +265,7 @@ pub fn managers(store: &Store, query: &[(&str, String)]) -> Result<Value> {
             company,
             department: "",
             status: "",
+            attention_through: None,
             keyword: &keyword,
             search_fields: &["employeeNumber", "profile.fullName"],
             scopes: &[],
@@ -382,6 +339,7 @@ fn has_active_members(tx: &Connection, company: &str, department: &str) -> Resul
         company,
         department,
         status: "",
+        attention_through: None,
         keyword: "",
         search_fields: &[],
         scopes: &[],

@@ -43,7 +43,7 @@ function SessionHarness(){const user={id:1,capabilities:{},businessDateValidUnti
 const [session,store]=useState(window.mode==="session-restored"?{accessToken:"restored",user}:null),sessionRef=useRef(session),validatedUserTokenRef=useRef();
 const setSession=value=>{sessionRef.current=value;validatedUserTokenRef.current=value.accessToken;store(value)};
 window.login=()=>setSession({accessToken:"fresh",user});window.renew=()=>setSession({accessToken:"renewed",user});
-useBusinessDateSessionRefresh({client,desktopContextLoading:false,queryClient:queries,session,sessionRef,setSession,validatedUserTokenRef});return <div>session harness</div>}
+useBusinessDateSessionRefresh({client,desktopContextLoading:false,session,sessionRef,setSession,validatedUserTokenRef});return <div>session harness</div>}
 const approvalApi={submission:async()=>{window.documentCalls++;if(window.documentCalls===2)throw new Error("document unavailable");return {documentStatus:window.documentCalls<4?"Running":"Ready",submissionNumber:1}}};
 function OfficeHarness(){const operation=useOfficeOperation();useQuery({queryKey:["office","refresh-test"],queryFn:async()=>{if(window.refreshFailure)throw new Error("directory unavailable");return []}});
 return <><button onClick={()=>operation.run(async()=>{window.refreshFailure=true;window.writes=(window.writes||0)+1;return 1},()=>{window.applied=true})}>保存操作</button><div>{operation.error}</div></>}

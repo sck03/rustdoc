@@ -78,17 +78,13 @@ fn policies(
     tx: &Connection,
     actor: &Actor,
     row: &Value,
-    restricted: bool,
     plan: Option<&export_doc_domain::approval::ApprovalPlan>,
 ) -> Result<Vec<MaterialPolicy>> {
     let mut current = vec![];
     let mut history = vec![];
     let mut participant = false;
     if row["ownerUserId"] == actor.id && text(row, "_requesterContext") == actor.context {
-        return Ok(vec![MaterialPolicy {
-            allow_restricted_attachments: restricted,
-            ..Default::default()
-        }]);
+        return Ok(vec![MaterialPolicy::default()]);
     }
     if let Some(plan) = plan {
         let resource = approval::resource(&text(row, "kind"))
@@ -171,10 +167,7 @@ fn policies(
         // Past participation cannot widen a currently active node's policy.
         return Ok(history);
     }
-    Ok(vec![MaterialPolicy {
-        allow_restricted_attachments: restricted,
-        ..Default::default()
-    }])
+    Ok(vec![MaterialPolicy::default()])
 }
 fn filter(
     value: &mut Value,
@@ -259,7 +252,7 @@ pub(in crate::engine) fn project_with_plan(
     plan: Option<&export_doc_domain::approval::ApprovalPlan>,
 ) -> Result<Value> {
     let restricted = private_access(tx, actor, row)?;
-    let policies = policies(tx, actor, row, restricted, plan)?;
+    let policies = policies(tx, actor, row, plan)?;
     let mut omitted = vec![];
     if let Some(fields) = value.as_object_mut() {
         for key in fields.keys().cloned().collect::<Vec<_>>() {
@@ -279,16 +272,12 @@ pub(in crate::engine) fn project_with_plan(
             }
         }
     }
-    if let Some(attachments) = value["attachments"].as_array_mut() {
-        attachments.retain(|file| {
-            let accepted = allowed("attachments", &policies)
-                && (file["classification"] != "Restricted"
-                    || restricted && policies.iter().any(|p| p.allow_restricted_attachments));
-            if !accepted {
-                omitted.push("attachments.restricted".into());
-            }
-            accepted
-        });
+    if let Some(attachments) = value["attachments"].as_array_mut()
+        && !attachments.is_empty()
+        && !allowed("attachments", &policies)
+    {
+        attachments.clear();
+        omitted.push("attachments".into());
     }
     // Verification fields are stored in signed facts but have their own classification.
     if let Some(plan) = value.get_mut("approvalPlan").and_then(Value::as_object_mut) {
@@ -484,19 +473,14 @@ pub(super) fn snapshot(
 pub(super) fn full(tx: &Connection, actor: &Actor, row: &Value, snapshot: &Value) -> Result<bool> {
     Ok(self::snapshot(tx, actor, row, snapshot.clone())?["materialAccess"]["isPartial"] != true)
 }
-pub(in crate::engine) fn attachment(
+pub(in crate::engine) fn authorize_attachments(
     tx: &Connection,
     actor: &Actor,
     row: &Value,
-    file: &Value,
 ) -> Result<()> {
-    let restricted = private_access(tx, actor, row)?;
     let plan = approval::plan(row)?;
-    let policy = policies(tx, actor, row, restricted, plan.as_ref())?;
-    if !allowed("attachments", &policy)
-        || file["classification"] == "Restricted"
-            && (!restricted || !policy.iter().any(|p| p.allow_restricted_attachments))
-    {
+    let policy = policies(tx, actor, row, plan.as_ref())?;
+    if !allowed("attachments", &policy) {
         return Err(error(403, "当前身份或节点没有此原件的材料权限。"));
     }
     Ok(())

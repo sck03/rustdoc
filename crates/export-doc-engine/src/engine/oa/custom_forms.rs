@@ -20,6 +20,7 @@ pub(super) fn references(
             company: &actor.company,
             department: "",
             status: "",
+            attention_through: None,
             keyword,
             search_fields: &["employeeNumber", "profile.fullName"],
             scopes: &[],

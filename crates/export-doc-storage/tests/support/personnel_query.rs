@@ -48,6 +48,7 @@ pub fn exercise(connection: &Connection) {
         company: "A",
         department: "",
         status: "",
+        attention_through: None,
         keyword: "éCOLE",
         search_fields: &["profile.fullName", "employeeNumber"],
         scopes: &scopes,
@@ -122,6 +123,35 @@ pub fn exercise(connection: &Connection) {
     query.status = "";
     query.department = "D";
     assert_eq!(connection.query_personnel(&query).unwrap().0, 1);
+    connection
+        .set_personnel_private_profile(ids[0], &json!({"identityValidUntil":"2026-11-28"}))
+        .unwrap();
+    connection
+        .set_personnel_private_profile(ids[1], &json!({"identityValidUntil":"2026-11-29"}))
+        .unwrap();
+    connection
+        .set_personnel_private_profile(
+            ids[2],
+            &json!({"identityValidUntil":"2026-01-01","identityLongTerm":true}),
+        )
+        .unwrap();
+    query.department = "";
+    query.attention_through = Some("2026-11-28");
+    connection
+        .set_personnel_private_profile(
+            ids[3],
+            &json!({"identityValidUntil":"invalid-hidden-company-date"}),
+        )
+        .unwrap();
+    let (total, rows) = connection.query_personnel(&query).unwrap();
+    assert_eq!(total, 1);
+    assert_eq!(rows[0]["id"], ids[0]);
+    query.offset = 99;
+    let (total, rows) = connection.query_personnel(&query).unwrap();
+    assert_eq!(total, 1);
+    assert!(rows.is_empty());
+    query.offset = 0;
+    query.attention_through = None;
     let appointment_scope = [DataScope {
         company: "A",
         department: "D",
@@ -249,5 +279,14 @@ pub fn exercise(connection: &Connection) {
     assert!(rows.is_empty());
     summary.companies = &[];
     assert_eq!(connection.query_workflow_summary(&summary).unwrap().0, 0);
+    query.scopes = &[];
+    query.attention_through = Some("2026-11-28");
+    connection
+        .set_personnel_private_profile(ids[1], &json!({"identityValidUntil":"2026-02-30"}))
+        .unwrap();
+    assert!(
+        connection.query_personnel(&query).is_err(),
+        "a malformed date outside the requested page must fail"
+    );
     connection.rollback().unwrap();
 }

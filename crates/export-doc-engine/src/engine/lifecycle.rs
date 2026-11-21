@@ -4,6 +4,7 @@ use super::*;
 impl NativeService {
     pub fn request_shutdown(&self) -> Result<()> {
         let mut failure = None;
+        remember(&mut failure, self.report_previews.stop());
         remember(&mut failure, self.workflow_scheduler.request_stop());
         #[cfg(feature = "exchange-rates")]
         remember(&mut failure, self.exchange_scheduler.request_stop());

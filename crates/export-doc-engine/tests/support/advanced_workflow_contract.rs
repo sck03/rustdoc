@@ -471,16 +471,23 @@ pub fn exercise(service: &NativeService, admin: &str) {
         ("id", row["id"].to_string()),
         ("submissionId", row["submissionId"].to_string()),
     ];
-    service
-        .dispatch(
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    // The automatic system node may still own the document admission guard.
+    loop {
+        match service.dispatch(
             GENERATE_APPROVAL_OF_GENERAL_REQUEST,
             &parameters,
             &[],
             None,
             &applicant.token,
-        )
-        .unwrap();
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+        ) {
+            Ok(_) => break,
+            Err(cause) if cause.status == Some(429) && std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(50))
+            }
+            Err(cause) => panic!("approval document admission failed: {cause:?}"),
+        }
+    }
     loop {
         let current = fixture::call(
             service,

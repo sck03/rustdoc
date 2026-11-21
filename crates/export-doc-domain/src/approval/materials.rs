@@ -13,8 +13,6 @@ pub struct MaterialPolicy {
     pub verification_fields: Vec<VerificationField>,
     #[serde(default)]
     pub require_review_points: bool,
-    #[serde(default)]
-    pub allow_restricted_attachments: bool,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

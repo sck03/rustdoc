@@ -8,7 +8,7 @@ use super::{
 };
 use crate::engine::store::Connection;
 use crate::{clock::BusinessClock, contracts};
-use chrono::{Duration, NaiveDate};
+use chrono::Duration;
 use export_doc_storage::{DataScope, GenericQuery, PersonnelQuery};
 use serde_json::{Value, json};
 
@@ -91,9 +91,8 @@ pub fn options(store: &Store, actor: &Actor, query: &[(&str, String)]) -> Result
     }
     let companies = if actor.admin { store::all(tx, "companies")? } else { store::matching(tx,"companies",&[("code",company.clone())],&[])? };
     let companies: Vec<_> = companies.into_iter().filter(|c| c["unitKind"] != "Group" && c["isActive"] == true).map(|c| contracts::dto(contracts::schema("ApiOrganizationCompanyDto"), c)).collect();
-    let departments: Vec<_> = store::all(tx, "departments")?
+    let departments: Vec<_> = store::matching(tx, "departments", &[("companyCode", company.clone())], &[])?
         .into_iter()
-        .filter(|department| department["companyCode"] == company)
         .map(|department| {
             contracts::project(contracts::schema("PersonnelDepartmentRecord"), department)
         })
@@ -115,13 +114,6 @@ const DIRECTORY_FIELDS: &[(&str, &str)] = &[
     ("ownerUserId", "ownerUserId"),
     ("status", "status"),
 ];
-const ATTENTION_FIELDS: &[(&str, &str)] = &[
-    ("privateProfileAvailable", "privateProfileAvailable"),
-    ("probationEndsOn", "probationEndsOn"),
-    ("contractEndsOn", "contractEndsOn"),
-    ("identityLongTerm", "profile.identityLongTerm"),
-    ("identityValidUntil", "profile.identityValidUntil"),
-];
 
 pub fn directory(
     store: &Store,
@@ -140,7 +132,8 @@ pub fn directory(
         "true" => true,
         _ => return Err(invalid("到期筛选须为 true 或 false。")),
     };
-    let date = clock.now().map_err(unavailable)?.today.to_string();
+    let today = clock.now().map_err(unavailable)?.today;
+    let date = today.to_string();
     let mut public_scope = auth::data_scope(actor, "office.people", "view");
     public_scope.personnel_date = Some(&date);
     let mut scopes = vec![public_scope];
@@ -154,27 +147,22 @@ pub fn directory(
     }
     let through = if attention {
         Some(
-            clock
-                .now()
-                .map_err(unavailable)?
-                .today
+            today
                 .checked_add_signed(Duration::days(30))
-                .ok_or_else(|| unavailable("业务日期超出范围。"))?,
+                .ok_or_else(|| unavailable("业务日期超出范围。"))?
+                .to_string(),
         )
     } else {
         None
     };
     let (page, size, start) = store::page_parameters(query);
-    let mut fields = DIRECTORY_FIELDS.to_vec();
-    if attention {
-        fields.extend_from_slice(ATTENTION_FIELDS);
-    }
     store.read(|tx| {
-        let mut listing = PersonnelQuery {
+        let listing = PersonnelQuery {
             as_of: &date,
             company: &actor.company,
             department: argument("departmentId"),
             status,
+            attention_through: through.as_deref(),
             keyword: &keyword,
             search_fields: &[
                 "employee.fullName",
@@ -185,92 +173,41 @@ pub fn directory(
                 "employee.workLocation",
             ],
             scopes: &scopes,
-            fields: &fields,
-            offset: if attention { 0 } else { start },
-            limit: if attention { 200 } else { size as i64 },
+            fields: DIRECTORY_FIELDS,
+            offset: start,
+            limit: size as i64,
         };
         let mut items = Vec::new();
-        let mut count = 0;
         let mut departments = super::organization::DepartmentNames::default();
-        loop {
+        let (total, rows) = tx.query_personnel(&listing)?;
+        for record in rows {
             crate::operation::check()?;
-            let (total, rows) = tx.query_personnel(&listing)?;
-            listing.offset += rows.len() as i64;
-            let empty = rows.is_empty();
-            for record in rows {
-                // Validate dates even outside the requested page; malformed private
-                // metadata must not become a successful, misleading attention count.
-                if let Some(through) = through {
-                    if record["privateProfileAvailable"] != true {
-                        return Err(unavailable("人员私密档案缺失，无法核对到期事项。"));
-                    }
-                    if !needs_attention(&record, through)? {
-                        continue;
-                    }
-                }
-                if !attention || (count >= start && items.len() < size) {
-                    let mut entry = directory_entry(tx, actor, &record, &mut departments)?;
-                    if record["status"] != "Departed" {
-                        let selected = super::personnel_organization::departments_in(
-                            tx,
-                            &record,
-                            &actor.company,
-                        )?;
-                        let department = if argument("departmentId").is_empty() {
-                            selected
-                                .first()
-                                .map(String::as_str)
-                                .ok_or_else(|| unavailable("人员目录任职投影失效。"))?
-                        } else {
-                            argument("departmentId")
-                        };
-                        let assignment = super::personnel_organization::appointment_in(
-                            tx,
-                            &record,
-                            &actor.company,
-                            department,
-                        )?;
-                        entry["departmentId"] = json!(department);
-                        entry["departmentName"] =
-                            json!(departments.get(tx, &actor.company, department)?);
-                        entry["jobTitle"] = json!(assignment.job_title);
-                    }
-                    items.push(entry);
-                }
-                count += 1;
+            let mut entry = directory_entry(tx, actor, &record, &mut departments)?;
+            if record["status"] != "Departed" {
+                let selected =
+                    super::personnel_organization::departments_in(tx, &record, &actor.company)?;
+                let department = if argument("departmentId").is_empty() {
+                    selected
+                        .first()
+                        .map(String::as_str)
+                        .ok_or_else(|| unavailable("人员目录任职投影失效。"))?
+                } else {
+                    argument("departmentId")
+                };
+                let assignment = super::personnel_organization::appointment_in(
+                    tx,
+                    &record,
+                    &actor.company,
+                    department,
+                )?;
+                entry["departmentId"] = json!(department);
+                entry["departmentName"] = json!(departments.get(tx, &actor.company, department)?);
+                entry["jobTitle"] = json!(assignment.job_title);
             }
-            if !attention {
-                count = total;
-                break;
-            }
-            if empty || listing.offset >= total {
-                break;
-            }
+            items.push(entry);
         }
-        Ok(contracts::page(items, count as usize, page, size))
+        Ok(contracts::page(items, total as usize, page, size))
     })
-}
-
-fn needs_attention(record: &Value, through: NaiveDate) -> Result<bool> {
-    if record["status"] == "Departed" {
-        return Ok(false);
-    }
-    for (enabled, field) in [
-        (record["status"] == "Probation", "probationEndsOn"),
-        (true, "contractEndsOn"),
-        (record["identityLongTerm"] != true, "identityValidUntil"),
-    ] {
-        let value = text(record, field);
-        if !enabled || value.is_empty() {
-            continue;
-        }
-        let date = NaiveDate::parse_from_str(&value, "%Y-%m-%d")
-            .map_err(|_| unavailable("人员到期日期无效。"))?;
-        if date <= through {
-            return Ok(true);
-        }
-    }
-    Ok(false)
 }
 
 pub fn history(store: &Store, actor: &Actor, id: i64, query: &[(&str, String)]) -> Result<Value> {

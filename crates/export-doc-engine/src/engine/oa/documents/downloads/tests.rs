@@ -77,7 +77,7 @@ fn bundles_keep_valid_long_names_and_refuse_to_consume_disk_headroom() {
 }
 
 #[test]
-fn busy_document_generation_recovers_and_download_rechecks_private_material() {
+fn busy_document_generation_recovers_and_download_rechecks_request_access() {
     let directory = crate::engine::test_support::ScratchDirectory::new();
     let service = directory.service();
     service.workflow_scheduler.stop().unwrap();
@@ -103,12 +103,10 @@ fn busy_document_generation_recovers_and_download_rechecks_private_material() {
         crate::generated_api::GET_OA_APPROVAL_SETTINGS,
         None,
     );
-    let mut node = fixture::node("review", &[], "Named", json!([reviewer_id]));
-    node["materialPolicy"] = json!({"allowRestrictedAttachments":true});
+    let node = fixture::node("review", &[], "Named", json!([reviewer_id]));
     let mut handling = fixture::node("handle", &["review"], "Named", json!([reviewer_id]));
     handling["kind"] = json!("Handling");
     handling["phase"] = json!("Fulfillment");
-    handling["materialPolicy"] = json!({"allowRestrictedAttachments":true});
     let mut document = fixture::node("document", &["review"], "Named", json!([]));
     document["kind"] = json!("System");
     document["phase"] = json!("Fulfillment");
@@ -132,7 +130,7 @@ fn busy_document_generation_recovers_and_download_rechecks_private_material() {
         admin,
         crate::generated_api::CREATE_GENERAL_REQUEST,
         Some(
-            json!({"requestKey":crate::paths::nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":"完整下载并发边界","reason":"下载准备之后撤销私密材料权限","category":"Other"}),
+            json!({"requestKey":crate::paths::nonce().unwrap(),"employeeId":applicant["employee"]["id"],"title":"完整下载并发边界","reason":"下载准备之后撤销申请查看权限","category":"Other"}),
         ),
     );
     let id = draft["id"].as_i64().unwrap();
@@ -141,7 +139,16 @@ fn busy_document_generation_recovers_and_download_rechecks_private_material() {
         .copied()
         .find(|op| metadata(*op).is_some_and(|m| m["kind"] == "general" && m["action"] == "upload"))
         .unwrap();
-    let draft=service.upload(upload,&[("id",id.to_string())],json!({"expectedVersion":draft["versionNumber"],"purpose":"Supporting","classification":"Restricted"}),"private.xml",b"<?xml version=\"1.0\"?><Private>anonymous</Private>",admin).unwrap();
+    let draft = service
+        .upload(
+            upload,
+            &[("id", id.to_string())],
+            json!({"expectedVersion":draft["versionNumber"],"purpose":"Supporting"}),
+            "supporting.xml",
+            b"<?xml version=\"1.0\"?><Supporting>anonymous</Supporting>",
+            admin,
+        )
+        .unwrap();
     let pending = fixture::call(
         &service,
         admin,
@@ -284,9 +291,7 @@ fn busy_document_generation_recovers_and_download_rechecks_private_material() {
             user["permissionGrants"]
                 .as_array_mut()
                 .unwrap()
-                .retain(|g| {
-                    !(g["resourceKey"] == "office.people" && g["action"] == "view-details")
-                });
+                .retain(|g| !(g["resourceKey"] == "office.general" && g["action"] == "view"));
             let username = text(&user, "username");
             store::save(
                 tx,
@@ -306,7 +311,7 @@ fn busy_document_generation_recovers_and_download_rechecks_private_material() {
     assert_eq!(
         result.err().unwrap().status,
         Some(403),
-        "the second snapshot must not return a complete private file"
+        "the second snapshot must recheck request access before returning the archive"
     );
     service.close().unwrap();
 }

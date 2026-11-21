@@ -72,16 +72,17 @@ pub(in crate::engine) fn upload(
     if meta["action"] != "upload" {
         return Err(invalid("该操作不能上传附件。"));
     }
+    export_doc_contracts::validation::provided_fields(
+        &crate::contracts::contract()["operations"][operation.id]["requestBody"]["content"]
+            ["multipart/form-data"]["schema"],
+        body,
+    )
+    .map_err(invalid)?;
     let purpose = match text(body, "purpose").as_str() {
         "" | "Voucher" => "Voucher",
         "ReimbursementForm" => "ReimbursementForm",
         "Supporting" => "Supporting",
         _ => return Err(invalid("附件用途无效。")),
-    };
-    let classification = match text(body, "classification").as_str() {
-        "" | "Internal" => "Internal",
-        "Restricted" => "Restricted",
-        _ => return Err(invalid("附件材料级别无效。")),
     };
     service.store.read(|tx| {
         current(tx, actor, meta, records::id(parameters)?).and_then(|(_, row)| mutable(meta, &row))
@@ -92,11 +93,14 @@ pub(in crate::engine) fn upload(
     service.store.transaction(|tx| {
         let (actor,row)=current(tx,actor,meta,records::id(parameters)?)?;
         mutable(meta,&row)?;
-        if !announcement(meta){oa::materials::attachment(tx,&actor,&row,&json!({"classification":classification}))?;}
+        if !announcement(meta){oa::materials::authorize_attachments(tx,&actor,&row)?;}
         let kind=attachment_kind(meta);
         let (count,existing)=communication::children(tx,&row,kind, 0, crate::engine::file_store::policy::MAX_REQUEST_FILES)?;
         if let Some(existing) = existing.iter().find(|item| item["digest"]==digest) {
-            if existing["fileName"] == name { return project(tx,&actor,meta,row); }
+            if existing["fileName"] == name {
+                if existing["purpose"] != purpose { return Err(conflict("该附件已用于其他用途，请先移除后重新上传。")); }
+                return project(tx,&actor,meta,row);
+            }
             return Err(conflict("该凭证已上传，请勿重复添加。"));
         }
         store::check_version(&row,store::expected(body))?;
@@ -107,14 +111,13 @@ pub(in crate::engine) fn upload(
         let identity = format!("{}:{digest}",row["id"]);
         if !announcement(meta) && let Some(mut retained) = tx.find_identity(kind,&identity)? {
             if retained["requestId"] != 0 || retained["sourceRequestId"] != row["id"] || retained["fileName"] != name { return Err(conflict("同一原始文件已有历史引用，请保留原文件名。")); }
-            oa::materials::attachment(tx,&actor,&row,&retained)?;
             retained["requestId"] = row["id"].clone();
             retained["purpose"] = json!(purpose);
             let id = records::positive(&retained,"id","附件")?;
             store::save_in_scope(tx,kind,id,retained,Some(identity),&actor,"reattach",Some(&row))?;
             return save(tx,&actor,meta,row,"upload",&name);
         }
-        let record=store::save_in_scope(tx,kind,0,json!({"requestId":row["id"],"sourceRequestId":row["id"],"fileName":name,"mediaType":media_type,"sizeBytes":size,"digest":digest,"purpose":purpose,"classification":classification}),Some(identity),&actor,"upload",Some(&row))?;
+        let record=store::save_in_scope(tx,kind,0,json!({"requestId":row["id"],"sourceRequestId":row["id"],"fileName":name,"mediaType":media_type,"sizeBytes":size,"digest":digest,"purpose":purpose}),Some(identity),&actor,"upload",Some(&row))?;
         tx.publish_file(&prepared,kind,records::positive(&record,"id","附件")?,&name,media_type)?;
         save(tx,&actor,meta,row,"upload",&name)
     })
@@ -196,7 +199,7 @@ pub(in crate::engine) fn download_info(
         let (current_actor, row) = current(tx, actor, meta, records::id(parameters)?)?;
         let attachment = attachment(tx, meta, &row, parameters)?;
         if !announcement(meta) {
-            oa::materials::attachment(tx, &current_actor, &row, &attachment)?;
+            oa::materials::authorize_attachments(tx, &current_actor, &row)?;
         }
         let blob = tx
             .file_info(

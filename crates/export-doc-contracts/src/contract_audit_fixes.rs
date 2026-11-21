@@ -1,6 +1,7 @@
-//! Reviewed replacement of truncated selector payloads, not a runtime compatibility path.
+//! Reviewed contract changes, not a runtime compatibility path.
 use serde_json::{Value, json};
 pub(super) fn apply(baseline: &mut Value) {
+    remove_attachment_classification(baseline);
     let schemas = &mut baseline["components"]["schemas"];
     schemas
         .as_object_mut()
@@ -74,5 +75,42 @@ pub(super) fn apply(baseline: &mut Value) {
             };
             op["x-exportdoc-json-response-limit-bytes"] = json!(bytes);
         }
+    }
+}
+
+fn remove_attachment_classification(baseline: &mut Value) {
+    for (schema, field) in [
+        ("OaAttachment", "classification"),
+        ("OaMaterialPolicy", "allowRestrictedAttachments"),
+    ] {
+        assert!(
+            baseline["components"]["schemas"][schema]["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove(field)
+                .is_some()
+        );
+    }
+    for path in [
+        "/api/office/personnel-requests/{id}/attachments",
+        "/api/office/leave-requests/{id}/attachments",
+        "/api/office/travel-requests/{id}/attachments",
+        "/api/office/overtime-requests/{id}/attachments",
+        "/api/office/expense-requests/{id}/attachments",
+        "/api/office/purchase-requests/{id}/attachments",
+        "/api/office/general-requests/{id}/attachments",
+        "/api/office/bookings/{id}/attachments",
+        "/api/office/supply-requests/{id}/attachments",
+    ] {
+        let schema = &mut baseline["paths"][path]["post"]["requestBody"]["content"]["multipart/form-data"]
+            ["schema"];
+        assert!(
+            schema["properties"]
+                .as_object_mut()
+                .unwrap()
+                .remove("classification")
+                .is_some()
+        );
+        schema["additionalProperties"] = json!(false);
     }
 }

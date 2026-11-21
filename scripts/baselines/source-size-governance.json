@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-21",
-  "reviewNotes": "2026-11-21 against 1658f273: scoped office/product commands reuse the shared mutation boundary; report source paging has a separate hook. Storage shares authorized selection for count-only CRM queries and typed reminder aggregates, replacing fake maximum-offset pages and application-side reminder scans. New UI regressions cover draft/version conflicts, cancellation, paging and lazy queries. Advance only the two measured aggregates (Rust production +119, automation +161); preserve every per-file cap and existing growth allowance. No dependency, API or schema version changes. Evidence: docs/archive/2026-11/2026-11-21工作区同步与查询精简.md.",
+  "reviewNotes": "2026-11-21 OA audit fixes against 30809811: remove unused attachment privacy and application-side attention scanning; batch organization projections in a dedicated module; add a bounded preview expiry worker with shutdown coverage; validate authorization scope at the shared generated transport. Reviewed measured totals: Rust production 116031 and Rust tests/examples 35370. Advance only these aggregate baselines; retain every per-file cap, growth allowance and all other baselines. New regression coverage checks attachment purpose conflicts, scoped success/body completion, date filtering and idle cache release. No dependency or database schema version change. Evidence: docs/archive/2026-11/2026-11-21OA附件简化与审查修订.md; preceding baseline evidence remains in docs/archive/2026-11/2026-11-21工作区同步与查询精简.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 115857,
+      "baselineAggregateLines": 116031,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 115932,
+      "maximumAggregateLines": 116106,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 35183,
+      "baselineAggregateLines": 35370,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 35303,
+      "maximumAggregateLines": 35490,
       "reportFiles": false
     },
     {

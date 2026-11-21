@@ -2,62 +2,11 @@
 use super::super::media;
 use super::*;
 use sha2::{Digest, Sha256};
-use std::{
-    collections::VecDeque,
-    sync::{Arc, Mutex},
-    time::{Duration, Instant},
-};
-
-struct Entry {
-    key: String,
-    pdf: Arc<Pdf>,
-    inserted: Instant,
-}
+mod cache;
+pub(in crate::engine) use cache::Cache;
 struct Pdf {
     bytes: Vec<u8>,
     page_count: u32,
-}
-#[derive(Default)]
-pub(in crate::engine) struct Cache {
-    entries: Mutex<VecDeque<Entry>>,
-}
-
-impl Cache {
-    fn pdf(&self, key: &str, render: impl FnOnce() -> Result<Pdf>) -> Result<Arc<Pdf>> {
-        {
-            let mut entries = self
-                .entries
-                .lock()
-                .map_err(|_| unavailable("PDF 预览缓存异常。"))?;
-            entries.retain(|entry| entry.inserted.elapsed() < Duration::from_secs(300));
-            if let Some(entry) = entries.iter().find(|entry| entry.key == key) {
-                return Ok(entry.pdf.clone());
-            }
-        }
-        let pdf = Arc::new(render()?);
-        let mut entries = self
-            .entries
-            .lock()
-            .map_err(|_| unavailable("PDF 预览缓存异常。"))?;
-        while entries.len() >= 4
-            || entries
-                .iter()
-                .map(|entry| entry.pdf.bytes.len())
-                .sum::<usize>()
-                + pdf.bytes.len()
-                > 64 * 1024 * 1024
-        {
-            if entries.pop_front().is_none() {
-                break;
-            }
-        }
-        entries.push_back(Entry {
-            key: key.into(),
-            pdf: pdf.clone(),
-            inserted: Instant::now(),
-        });
-        Ok(pdf)
-    }
 }
 
 pub(super) fn response(
@@ -179,30 +128,4 @@ fn validate_current_access(
         }
         Ok(())
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn preview_cache_reuses_a_revision_and_evicts_old_entries() {
-        let cache = Cache::default();
-        let make = || {
-            Ok(Pdf {
-                bytes: vec![0; 1024],
-                page_count: 2,
-            })
-        };
-        let first = cache.pdf("one", make).unwrap();
-        let same = cache
-            .pdf("one", || panic!("same revision must reuse encoded PDF"))
-            .unwrap();
-        assert!(Arc::ptr_eq(&first, &same));
-        for key in ["two", "three", "four", "five"] {
-            cache.pdf(key, make).unwrap();
-        }
-        let entries = cache.entries.lock().unwrap();
-        assert_eq!(entries.len(), 4);
-        assert!(entries.iter().all(|entry| entry.key != "one"));
-    }
 }

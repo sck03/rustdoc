@@ -129,6 +129,19 @@ fn approval_sheet_is_one_page_and_preserves_long_content_in_order() {
             .unwrap();
         }
     }
+    snapshot["request"]["attachments"] = json!([]);
+    assert_eq!(
+        approval::data(&snapshot, "2026-10-28T11:01:00+08:00")
+            .unwrap()
+            .root["Oa"]["Attachments"],
+        "无附件"
+    );
+    snapshot["materialAccess"] = json!({"isPartial":true,"omittedFields":["attachments"]});
+    let limited = approval::data(&snapshot, "2026-10-28T11:01:00+08:00").unwrap();
+    assert_eq!(
+        limited.root["Oa"]["Attachments"],
+        "附件未在当前材料权限内展示。"
+    );
 }
 
 #[test]

@@ -6,6 +6,7 @@ pub struct PersonnelQuery<'a> {
     pub company: &'a str,
     pub department: &'a str,
     pub status: &'a str,
+    pub attention_through: Option<&'a str>,
     pub keyword: &'a str,
     pub search_fields: &'a [&'a str],
     /// Each scope is required; alternatives within a scope remain a union.
@@ -54,6 +55,49 @@ pub(crate) fn build(q: &PersonnelQuery<'_>, pg: bool) -> Result<(QuerySql, Strin
         let keyword = sql::bind(&mut values, q.keyword, pg);
         clauses.push(sql::contains(&text, &keyword, pg));
     }
+    if let Some(through) = q.attention_through {
+        let through = sql::bind(&mut values, through, pg);
+        let profile = "SELECT p.body FROM personnel_private_profiles p WHERE p.person_id=r.id";
+        let private = |key| sql::field_from("p.body", key, pg);
+        let long_term = format!(
+            "(SELECT {} FROM personnel_private_profiles p WHERE p.person_id=r.id)",
+            sql::json_field_from("p.body", "identityLongTerm", pg)
+        );
+        let identity_date = format!(
+            "(SELECT {} FROM personnel_private_profiles p WHERE p.person_id=r.id)",
+            private("identityValidUntil")
+        );
+        let mut due = Vec::new();
+        for (enabled, date) in [
+            (
+                format!("{status}='Probation'"),
+                sql::field("probationEndsOn", pg),
+            ),
+            ("TRUE".into(), sql::field("contractEndsOn", pg)),
+            (
+                format!("COALESCE({long_term},'false')<>'true'"),
+                identity_date,
+            ),
+        ] {
+            due.push(format!("CASE WHEN {enabled} AND COALESCE({date},'')<>'' THEN CASE WHEN {}<={} THEN 1 ELSE 0 END ELSE 0 END", strict_date(&date, pg), if pg {format!("({through})::date")} else {through.clone()}));
+        }
+        // Arithmetic evaluates each applicable date, including malformed dates outside the page.
+        // A missing private profile must fail closed rather than disappear from the count.
+        let attention = format!(
+            "CASE WHEN NOT EXISTS({profile}) THEN {} IS NULL WHEN {status}='Departed' THEN FALSE ELSE ({})>0 END",
+            strict_date(
+                "('missing personnel private profile: ' || CAST(r.id AS TEXT))",
+                pg
+            ),
+            due.join(" + ")
+        );
+        // SQL optimizers may reorder AND predicates. Validate private dates only after
+        // the complete authorized selection, including keyword and department filters.
+        clauses.push(format!(
+            "CASE WHEN {} THEN {attention} ELSE FALSE END",
+            clauses.join(" AND ")
+        ));
+    }
     Ok((
         QuerySql {
             source: crate::query_source::Source::Projected,
@@ -66,22 +110,16 @@ pub(crate) fn build(q: &PersonnelQuery<'_>, pg: bool) -> Result<(QuerySql, Strin
             .into(),
             values,
         },
-        if q.fields.is_empty() {
-            sql::projection(q.fields, pg)?
-        } else {
-            sql::projected(q.fields.iter().map(|(name,source)| {
-                sql::valid_path(source)?;
-                let expression = match *source {
-                    "profile.identityLongTerm" | "profile.identityValidUntil" => {
-                        let key = source.strip_prefix("profile.").unwrap();
-                        if pg { format!("(SELECT p.body->'{key}' FROM personnel_private_profiles p WHERE p.person_id=r.id)") }
-                        else { format!("(SELECT json(p.body->'$.{key}') FROM personnel_private_profiles p WHERE p.person_id=r.id)") }
-                    },
-                    "privateProfileAvailable" => if pg { "to_jsonb(EXISTS(SELECT 1 FROM personnel_private_profiles p WHERE p.person_id=r.id))".into() } else { "json(CASE WHEN EXISTS(SELECT 1 FROM personnel_private_profiles p WHERE p.person_id=r.id) THEN 'true' ELSE 'false' END)".into() },
-                    _ => sql::json_field(source,pg),
-                };
-                Ok((*name,expression))
-            }),pg)?
-        },
+        sql::projection(q.fields, pg)?,
     ))
+}
+
+fn strict_date(value: &str, pg: bool) -> String {
+    if pg {
+        format!(
+            "(CASE WHEN {value} ~ '^[0-9]{{4}}-[0-9]{{2}}-[0-9]{{2}}$' THEN {value} ELSE 'invalid personnel date: '||COALESCE({value},'') END)::date"
+        )
+    } else {
+        format!("record_date({value})")
+    }
 }

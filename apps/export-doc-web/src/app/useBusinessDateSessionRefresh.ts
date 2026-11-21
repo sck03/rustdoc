@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from "react";
-import type { QueryClient } from "@tanstack/react-query";
 import type { ExportDocManagerApiClient } from "../api/index.ts";
 import { notifyAuthenticationFailure } from "../api/authenticationFailureEvents.ts";
 import { calculateBusinessDateRefreshDelay } from "../api/businessDateRefreshModel.ts";
@@ -8,7 +7,6 @@ import type { WebSessionState } from "./webSessionStorage.ts";
 type BusinessDateSessionRefreshOptions = {
   client: ExportDocManagerApiClient;
   desktopContextLoading: boolean;
-  queryClient: QueryClient;
   session: WebSessionState | null;
   sessionRef: { current: WebSessionState | null };
   setSession: (session: WebSessionState) => void;
@@ -19,7 +17,6 @@ type BusinessDateSessionRefreshOptions = {
 export function useBusinessDateSessionRefresh({
   client,
   desktopContextLoading,
-  queryClient,
   session,
   sessionRef,
   setSession,
@@ -44,9 +41,6 @@ export function useBusinessDateSessionRefresh({
           return;
         }
 
-        if (JSON.stringify(currentSession.user.capabilities) !== JSON.stringify(user.capabilities)) {
-          queryClient.clear();
-        }
         if (JSON.stringify(currentSession.user) !== JSON.stringify(user)) {
           setSession({ ...currentSession, user });
         }
@@ -61,7 +55,7 @@ export function useBusinessDateSessionRefresh({
       });
     activeRefreshRef.current = { accessToken, promise: refresh };
     return refresh;
-  }, [accessToken, client, desktopContextLoading, queryClient, sessionRef, setSession]);
+  }, [accessToken, client, desktopContextLoading, sessionRef, setSession]);
 
   useEffect(() => {
     // Login/renewal responses contain a fresh user. Restored sessions still

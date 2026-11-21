@@ -86,8 +86,7 @@ fn participation_limits(service: &NativeService, admin: &str) {
         ));
         applicants.push(fixture::request(service, admin, CREATE_PERSONNEL, Some(json!({"requestKey":nonce().unwrap(),"employeeNumber":nonce().unwrap(),"departmentId":code,"jobTitle":"范围验收人员","employmentType":"FullTime","hireDate":"2026-01-01","profile":{"fullName":code}}))));
     }
-    let mut node = fixture::node("scope-review", &[], "Named", json!([reviewer_id]));
-    node["materialPolicy"] = json!({"allowRestrictedAttachments":true});
+    let node = fixture::node("scope-review", &[], "Named", json!([reviewer_id]));
     publish(service, admin, node);
     let mut rows = vec![];
     for applicant in &applicants {
@@ -101,7 +100,16 @@ fn participation_limits(service: &NativeService, admin: &str) {
         );
         if applicant["employee"]["id"] == applicants[1]["employee"]["id"] {
             let id = draft["id"].as_i64().unwrap();
-            draft=service.upload(super::oa_contract::operation("general","upload"),&[("id",id.to_string())],json!({"expectedVersion":draft["versionNumber"],"purpose":"Supporting","classification":"Restricted"}),"scope.xml",b"<?xml version=\"1.0\"?><Scope>anonymous</Scope>",admin).unwrap();
+            draft = service
+                .upload(
+                    super::oa_contract::operation("general", "upload"),
+                    &[("id", id.to_string())],
+                    json!({"expectedVersion":draft["versionNumber"],"purpose":"Supporting"}),
+                    "scope.xml",
+                    b"<?xml version=\"1.0\"?><Scope>anonymous</Scope>",
+                    admin,
+                )
+                .unwrap();
         }
         rows.push(submit(service, admin, &draft));
     }

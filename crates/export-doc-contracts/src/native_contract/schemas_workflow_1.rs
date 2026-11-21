@@ -39,7 +39,6 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("OaAttachment",o(vec![
         ("id",i().format("int64")),("fileName",s()),("mediaType",s()),
         ("sizeBytes",i().format("int64")),("purpose",s().enumeration(Enumeration::Values(vec![serde_json::json!("ReimbursementForm"),serde_json::json!("Voucher"),serde_json::json!("Supporting")]))),("digest",s()),
-        ("classification",s().default_value(serde_json::json!("Internal")).enumeration(Enumeration::Values(vec![serde_json::json!("Internal"),serde_json::json!("Restricted")])))
     ]).required(vec!["id","fileName","mediaType","sizeBytes"])),
     ("OaEvent",object_groups(vec![
         (&["id","requestVersion","submissionId","approvalGeneration","definitionVersion"], i().format("int64")),
@@ -348,7 +347,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["key","label","kind","required"])),
     ("OaMaterialPolicy",o(vec![
         ("visibleFields",a(s().min_length(1).max_length(160)).default_value(serde_json::json!([])).max_items(100).unique_items(true)),("hiddenFields",a(s().min_length(1).max_length(160)).default_value(serde_json::json!([])).max_items(100).unique_items(true)),("verificationFields",a(r("OaVerificationField")).default_value(serde_json::json!([])).max_items(20)),
-        ("requireReviewPoints",b().default_value(serde_json::json!(false))),("allowRestrictedAttachments",b().default_value(serde_json::json!(false)))
+        ("requireReviewPoints",b().default_value(serde_json::json!(false)))
     ]).required(vec![])),
     ("OaMaterialAccess",o(vec![("isPartial",b()),("omittedFields",a(s())),("canDownloadArchive",b())]).required(vec!["isPartial","omittedFields","canDownloadArchive"])),
     ("OaPersonnelProfileProjection",o(vec![

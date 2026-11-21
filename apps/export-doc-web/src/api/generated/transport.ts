@@ -8,6 +8,8 @@ const desktopAccessTokenHeaderName = "X-ExportDocManager-Desktop-Token";
 
 export interface ApiClientOptions {
   baseUrl: string;
+  /** Reject work started under an obsolete application authorization scope. */
+  checkCurrent?: () => void;
   onAuthenticationFailure?: (error: ApiError, requestToken?: string) => void;
   accessToken?: AccessTokenProvider;
   desktopAccessToken?: AccessTokenProvider;
@@ -32,9 +34,11 @@ export class ApiTransport {
   private readonly desktopAccessToken?: AccessTokenProvider;
   private readonly defaultTimeoutMs: number;
   private readonly fetchImpl: typeof globalThis.fetch;
+  private readonly checkCurrent?: () => void;
   private readonly onAuthenticationFailure?: (error: ApiError, requestToken?: string) => void;
 
   constructor(options: ApiClientOptions) {
+    this.checkCurrent = options.checkCurrent;
     this.onAuthenticationFailure = options.onAuthenticationFailure;
     this.baseUrl = `${options.baseUrl.replace(/\/+$/, "")}/`;
     this.accessToken = options.accessToken;
@@ -90,6 +94,7 @@ export class ApiTransport {
     const { headers: initHeaders, body: _ignoredBody, signal: callerSignal, timeoutMs, ...restInit } = options.init ?? {};
     const timeout = createRequestTimeout(callerSignal, timeoutMs ?? this.defaultTimeoutMs);
     try {
+      this.checkCurrent?.();
       const headers = new Headers(initHeaders);
       const isFormDataBody = typeof FormData !== "undefined" && options.body instanceof FormData;
       const isBlobBody = typeof Blob !== "undefined" && options.body instanceof Blob;
@@ -124,6 +129,7 @@ export class ApiTransport {
       }
 
       throwIfAborted(requestSignal);
+      this.checkCurrent?.();
       const response = await this.fetchImpl(url, requestInit);
       const contentType = response.headers.get("content-type") ?? "";
       const contentDisposition = response.headers.get("content-disposition") ?? "";
@@ -150,6 +156,8 @@ export class ApiTransport {
       return (contentType.includes("application/json") ? JSON.parse(responseText) : responseText) as T;
     } finally {
       timeout.dispose();
+      throwIfAborted(timeout.signal);
+      this.checkCurrent?.();
     }
   }
 }

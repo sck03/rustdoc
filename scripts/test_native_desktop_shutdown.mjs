@@ -35,25 +35,39 @@ const run = async (session, expression) => (await evaluate(session.cdp, expressi
 
 async function processes(session) {
   // Pass paths as environment data, never interpolate them into PowerShell code.
+  // Parent PIDs can be reused. Keep creation times and observed identities when the host exits.
   const command = `
-    $all = @(Get-CimInstance Win32_Process)
-    $ids = [Collections.Generic.HashSet[uint32]]::new()
-    [void]$ids.Add([uint32]$env:EDM_TEST_PID)
+    $started = [DateTimeOffset]::Parse($env:EDM_TEST_STARTED).UtcDateTime
+    $all = @(Get-CimInstance Win32_Process | Where-Object { $_.CreationDate.ToUniversalTime() -ge $started })
+    $known = [Collections.Generic.Dictionary[uint32,DateTime]]::new()
+    foreach ($entry in (ConvertFrom-Json $env:EDM_TEST_PROCESS_IDENTITIES)) {
+      $known[[uint32]$entry.ProcessId] = ([DateTime]$entry.CreationDate).ToUniversalTime()
+    }
+    $ids = [Collections.Generic.Dictionary[uint32,DateTime]]::new()
+    foreach ($entry in $all) {
+      if (($known.ContainsKey([uint32]$entry.ProcessId) -and $entry.CreationDate.ToUniversalTime() -eq $known[[uint32]$entry.ProcessId]) -or
+          ($env:EDM_TEST_HOST_ALIVE -eq '1' -and $entry.ProcessId -eq [uint32]$env:EDM_TEST_PID) -or
+          ($entry.Name -eq 'msedgewebview2.exe' -and $entry.CommandLine -and
+           $entry.CommandLine.Contains($env:EDM_TEST_PROFILE, [StringComparison]::OrdinalIgnoreCase))) {
+        $ids[[uint32]$entry.ProcessId] = $entry.CreationDate
+      }
+    }
     do {
       $added = $false
       foreach ($entry in $all) {
-        if ($ids.Contains($entry.ParentProcessId)) { $added = $ids.Add($entry.ProcessId) -or $added }
+        if (-not $ids.ContainsKey([uint32]$entry.ProcessId) -and $ids.ContainsKey([uint32]$entry.ParentProcessId) -and $entry.CreationDate -ge $ids[[uint32]$entry.ParentProcessId]) {
+          $ids[[uint32]$entry.ProcessId] = $entry.CreationDate
+          $added = $true
+        }
       }
     } while ($added)
     $all | Where-Object {
-      $ids.Contains($_.ProcessId) -or
-      ($_.Name -eq 'msedgewebview2.exe' -and $_.CommandLine -and
-       $_.CommandLine.Contains($env:EDM_TEST_PROFILE, [StringComparison]::OrdinalIgnoreCase))
+      $ids.ContainsKey([uint32]$_.ProcessId)
     } | Select-Object ProcessId,ParentProcessId,Name,CreationDate,WorkingSetSize | ConvertTo-Json -Compress
   `;
   const { stdout } = await execute("pwsh", ["-NoProfile", "-NonInteractive", "-Command", command], {
     windowsHide: true, timeout: 15000,
-    env: { ...process.env, EDM_TEST_PID: String(session.child.pid), EDM_TEST_PROFILE: path.join(session.dataRoot, "WebView") },
+    env: { ...process.env, EDM_TEST_PID: String(session.child.pid), EDM_TEST_PROFILE: path.join(session.dataRoot, "WebView"), EDM_TEST_STARTED: session.startedAt, EDM_TEST_HOST_ALIVE: session.exit ? "0" : "1", EDM_TEST_PROCESS_IDENTITIES: JSON.stringify(session.before ?? []) },
   });
   const entries = stdout.trim() ? JSON.parse(stdout) : [];
   return Array.isArray(entries) ? entries : [entries];
@@ -61,7 +75,7 @@ async function processes(session) {
 
 async function start(name, dataRoot = path.join(output, name)) {
   const port = await getFreePort();
-  const session = { name, dataRoot, child: null, cdp: null, exit: null };
+  const session = { name, dataRoot, child: null, cdp: null, exit: null, startedAt: new Date().toISOString() };
   session.child = spawnProcessTree(executable, ["--app-root", appRoot, "--data-root", dataRoot], {
     cwd: appRoot, windowsHide: true, stdio: "ignore",
     env: {

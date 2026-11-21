@@ -63,6 +63,7 @@ pub fn exercise(tx: &Connection) {
             company: "ORG-A",
             department: "SECONDARY",
             status: "",
+            attention_through: None,
             keyword: "",
             search_fields: &[],
             scopes: &[],
