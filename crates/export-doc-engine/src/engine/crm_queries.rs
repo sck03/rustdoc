@@ -6,7 +6,7 @@ use super::{
 };
 use crate::contracts;
 use crate::engine::store::Connection;
-use export_doc_storage::{CrmList, CrmQuery};
+use export_doc_storage::{CrmFollowUpCounts, CrmList, CrmQuery};
 use serde_json::Value;
 
 pub(super) fn fields(schema: &str) -> Vec<(&'static str, &'static str)> {
@@ -75,6 +75,34 @@ pub(super) fn page(
         }
     }
     Ok((total as usize, rows))
+}
+
+pub(super) fn count(tx: &Connection, actor: &Actor, list: CrmList<'_>) -> Result<i64> {
+    Ok(tx.count_crm(&request(actor, list, &[("id", "id")], 0, 1))?)
+}
+
+pub(super) fn reminders(
+    tx: &Connection,
+    actor: &Actor,
+    now: &str,
+    until: &str,
+) -> Result<(CrmFollowUpCounts, Vec<Value>)> {
+    let fields = fields("ApiCrmFollowUpDto");
+    let query = request(
+        actor,
+        CrmList::FollowUps {
+            include_completed: false,
+            customer_id: None,
+            record_id: None,
+        },
+        &fields,
+        0,
+        8,
+    );
+    Ok((
+        tx.crm_follow_up_counts(&query, now, until)?,
+        tx.list_crm(&query)?,
+    ))
 }
 pub(super) fn scan(
     tx: &Connection,

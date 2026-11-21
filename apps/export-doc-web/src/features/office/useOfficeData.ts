@@ -1,11 +1,11 @@
 import { acknowledgedCommands, officeCommand } from "./officeCommands.ts";
 import { officePolling } from "../../api/queryPollingPolicy.ts";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import type { ApiUserDto, ExportDocManagerApiClient, ListOfficeSuppliesRequest, OaAction, OfficeRequestEventRecord, OfficeStockMovementRecord } from "../../api/index.ts";
 import { officeResourceQueryRoots } from "../../api/queryKeys.ts";
-import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { officeAccess, officeDayRange, officeRequestFocus, type OfficeAction, type OfficeKind, type OfficePage, type OfficeRequestRow } from "./officeModel.ts";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
@@ -77,40 +77,36 @@ export function useOfficeHistory(client: ExportDocManagerApiClient, user: ApiUse
   return { paging, query };
 }
 
-export function useOfficeOperation(relatedKeys: readonly QueryKey[] = [], includeOffice = true) {
+export function useOfficeOperation(relatedKeys: readonly QueryKey[] = [], includeOffice = true, scope = "office", owner?: unknown) {
   const queries = useQueryClient();
-  const abortable = useAbortableOperation();
-  const inFlight = useRef(false);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const mounted = useRef(true);
-  const revision = useRef(0);
-  useLayoutEffect(() => { mounted.current = true; return () => { mounted.current = false; revision.current++; }; }, []);
-  const refresh = () => Promise.all([...(includeOffice ? [["office"]] : []), ["worklist"], ...relatedKeys].map(queryKey => queries.invalidateQueries({ queryKey }, { throwOnError: true })));
-  async function run<T>(operation: (signal: AbortSignal) => Promise<T>, done: (result: T) => void, refreshAfter = true) {
-    if (inFlight.current) return;
-    inFlight.current = true;
-    const current = ++revision.current;
-    setBusy(true);
-    setError("");
-    try {
-      const result = await abortable(operation);
-      // Apply the result before refreshes can unmount a deleted or filtered record.
-      done(result);
-      if (refreshAfter) void refresh().catch(failure => {
-        if (mounted.current && revision.current === current) setError(`操作已成功，列表刷新失败：${readApiError(failure)}`);
-      });
-    } catch (failure) {
-      if (!isAbortError(failure)) {
-        setError(readApiError(failure));
-        if (refreshAfter) void refresh().catch(() => {});
+  const keys = [...(includeOffice ? [["office"]] : []), ["worklist"], ...relatedKeys];
+  const command = useScopedMutation<() => void, { execute: (signal: AbortSignal) => Promise<() => void>; refreshAfter: boolean }>(scope, owner ?? queries, {
+    mutationFn: async (input, signal, { checkCurrent }) => {
+      setError("");
+      try { return await input.execute(signal); }
+      catch (failure) {
+        checkCurrent();
+        if (input.refreshAfter) void Promise.all(keys.map(queryKey => queries.invalidateQueries({ queryKey }))).catch(() => {});
+        throw failure;
       }
-    } finally { inFlight.current = false; setBusy(false); }
+    },
+    onSuccess: done => done(),
+    refreshKeys: (_, input) => input.refreshAfter ? keys : [],
+    onRefreshError: failure => setError(`操作已成功，列表刷新失败：${readApiError(failure)}`),
+    onError: failure => setError(readApiError(failure)),
+  });
+  async function run<T>(operation: (signal: AbortSignal) => Promise<T>, done: (result: T) => void, refreshAfter = true) {
+    await command.mutateAsync({ refreshAfter, execute: async signal => {
+      const result = await operation(signal);
+      return () => done(result);
+    } });
   }
-  return { run, busy, error };
+  return { run, busy: command.isPending, error };
 }
 
-export const useOfficeResourceOperation = (kind: OfficeKind) => useOfficeOperation(officeResourceQueryRoots(kind), false);
+export const useOfficeResourceOperation = (kind: OfficeKind, client: ExportDocManagerApiClient, recordId = 0) =>
+  useOfficeOperation(officeResourceQueryRoots(kind), false, `${kind}:${recordId}`, client);
 
 export function useOfficeRequests(client: ExportDocManagerApiClient, user: ApiUserDto, kind: OfficeKind) {
   const access = officeAccess(user, kind);

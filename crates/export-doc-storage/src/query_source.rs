@@ -70,3 +70,12 @@ pub(crate) fn aggregate(sql: &QuerySql, projection: &str) -> String {
         sql.filter
     )
 }
+
+pub(crate) fn count(
+    db: &(impl crate::adapter::Adapter + ?Sized),
+    sql: &QuerySql,
+) -> crate::Result<i64> {
+    db.query_json(&aggregate(sql, "CAST(COUNT(*) AS TEXT)"), &sql.values)?
+        .as_i64()
+        .ok_or_else(|| crate::Error::unavailable("记录计数无效。"))
+}

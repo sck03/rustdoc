@@ -1,4 +1,6 @@
-use export_doc_storage::{Connection, CrmList, CrmQuery, DataScope, RecordWrite};
+use export_doc_storage::{
+    Connection, CrmFollowUpCounts, CrmList, CrmQuery, DataScope, GenericQuery, RecordWrite,
+};
 use serde_json::{Value, json};
 
 fn insert(c: &Connection, kind: &str, mut body: Value) -> i64 {
@@ -86,6 +88,31 @@ pub fn exercise(c: &Connection) {
         limit: 1,
     };
     let (count, rows) = c.query_crm(&q).unwrap();
+    assert_eq!(c.count_crm(&q).unwrap(), count);
+    assert_eq!(c.list_crm(&q).unwrap(), rows);
+    assert_eq!(
+        c.count_generic(&GenericQuery {
+            kind: "crm-customers",
+            scope: own(),
+            filters: &[],
+            keyword: "",
+            search_root: None,
+            fields: &[("id", "id")],
+            offset: 0,
+            limit: 1,
+        })
+        .unwrap(),
+        1
+    );
+    assert_eq!(
+        c.crm_follow_up_counts(&q, "2026-10-25T00:00:00Z", "2026-11-01T00:00:00Z")
+            .unwrap(),
+        CrmFollowUpCounts {
+            pending: 3,
+            overdue: 1,
+            due_soon: 1
+        }
+    );
     assert_eq!(count, 3);
     assert_eq!(rows[0]["summary"], "earlier");
     assert_eq!(rows[0]["customerName"], "École 客户");
@@ -126,6 +153,19 @@ pub fn exercise(c: &Connection) {
     assert_eq!(c.query_crm(&q).unwrap().1[0]["summary"], "nano-later");
     q.offset = 0;
     q.limit = 2;
+    assert_eq!(
+        c.crm_follow_up_counts(
+            &q,
+            "2026-10-25T00:30:00.000000100Z",
+            "2026-10-25T00:30:00.000000200Z"
+        )
+        .unwrap(),
+        CrmFollowUpCounts {
+            pending: 5,
+            overdue: 2,
+            due_soon: 2
+        }
+    );
     let scan = c.scan_crm(&q, 0).unwrap();
     assert_eq!(scan.len(), 2);
     let cursor = scan.last().unwrap()["id"].as_i64().unwrap();
@@ -138,12 +178,14 @@ pub fn exercise(c: &Connection) {
     q.limit = 1;
     q.list = CrmList::Contacts;
     q.scope = DataScope::default();
+    assert_eq!(c.count_crm(&q).unwrap(), 0);
     assert_eq!(
         c.query_crm(&q).unwrap().0,
         0,
         "contact permissions remain independent"
     );
     q.scope = company();
+    assert_eq!(c.count_crm(&q).unwrap(), 1);
     assert_eq!(c.query_crm(&q).unwrap().0, 1);
     let fields = [
         ("id", "id"),

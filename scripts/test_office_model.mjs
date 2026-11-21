@@ -29,6 +29,12 @@ await require("esbuild").build({ stdin: { contents: `
 `, loader: "ts", resolveDir: web }, bundle: true, platform: "node", format: "esm", outfile: bundle, logLevel: "silent" });
 const { office, oa, personnel, organization, communication, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey, formReferenceLabels } = await import(pathToFileURL(bundle).href);
 const { ApiError, acknowledgedCommands, oaApi, officeRequestApi } = await import(pathToFileURL(bundle).href);
+for (const kind of ["rooms", "supplies"]) {
+  const statuses = office.officeRequestStatuses(kind);
+  assert(statuses.includes("Suspended") && statuses.includes("Terminated"));
+  assert(statuses.every(status => office.officeStatusLabels[status]));
+  assert.equal(new Set(statuses).size, statuses.length);
+}
 // Exercise the real adapters: a lost response must query the same actor's receipt without resending.
 for (const kind of ["personnel", "leave", "overtime", "expense", "travel", "purchase", "general", "rooms", "supplies"]) {
   const calls = [], saved = { id: 7, versionNumber: 3 }, body = { commandKey: createRequestKey(), expectedVersion: 2 };

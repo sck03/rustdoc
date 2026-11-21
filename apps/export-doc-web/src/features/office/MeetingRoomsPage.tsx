@@ -31,7 +31,7 @@ function MeetingRoomsDirectory({ client, user }: { client: ExportDocManagerApiCl
   const [editing, setEditing] = useState<MeetingRoomRecord | "new" | null>(null);
   const [booking, setBooking] = useState<MeetingRoomRecord | null>(null);
   const [deleting, setDeleting] = useState<MeetingRoomRecord | null>(null);
-  const deletion = useOfficeResourceOperation("rooms");
+  const deletion = useOfficeResourceOperation("rooms", client);
   return <>
     <PageHeader title="会议室" count={query.data?.totalCount} unit="间" actions={<>
       <Button aria-label="刷新会议室" icon={<RefreshCw size={18} aria-hidden="true" />} disabled={query.isFetching} onClick={model.refresh}>刷新</Button>

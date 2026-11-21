@@ -3,7 +3,8 @@ import { useState } from "react";
 import { ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { largeDocumentQueryOptions } from "../../api/queryRetention.ts";
-import { previewSourcePageSize, type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
+import { type ReportTypeOption } from "./reportTemplateDesignerModel.ts";
+import { useReportTemplatePreviewSources } from "./useReportTemplatePreviewSources.ts";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export function useReportTemplateWorkspaceQueries({
@@ -11,6 +12,7 @@ export function useReportTemplateWorkspaceQueries({
   reportType,
   enabled,
   includeDesignerData,
+  includePreviewData,
   includeArchived,
   canPreviewInvoiceSource,
   canPreviewPaymentSource,
@@ -21,6 +23,7 @@ export function useReportTemplateWorkspaceQueries({
   reportType: ReportTypeOption;
   enabled: boolean;
   includeDesignerData: boolean;
+  includePreviewData: boolean;
   includeArchived: boolean;
   canPreviewInvoiceSource: boolean;
   canPreviewPaymentSource: boolean;
@@ -59,24 +62,9 @@ export function useReportTemplateWorkspaceQueries({
     staleTime: 0,
   });
 
-  const previewInvoicesQuery = useQuery({
-    queryKey: queryKeys.reportTemplatePreviewInvoices(previewSourcePageSize),
-    queryFn: ({ signal }) =>
-      client.listInvoices({
-        pageNumber: 1,
-        pageSize: previewSourcePageSize,
-        sortColumn: "InvoiceDate",
-        ascending: false,
-      }, { signal }),
-    enabled: enabled && includeDesignerData && canPreviewInvoiceSource && reportType === "ExportDocument",
-    staleTime: 60 * 1000,
-  });
-
-  const previewPaymentsQuery = useQuery({
-    queryKey: queryKeys.reportTemplatePreviewPayments(previewSourcePageSize),
-    queryFn: ({ signal }) => client.listPayments({ pageNumber: 1, pageSize: previewSourcePageSize }, { signal }),
-    enabled: enabled && includeDesignerData && canPreviewPaymentSource && reportType === "PaymentVoucher",
-    staleTime: 60 * 1000,
+  const previewSources = useReportTemplatePreviewSources({
+    client, reportType, canPreviewInvoiceSource, canPreviewPaymentSource,
+    enabled: enabled && includeDesignerData && includePreviewData,
   });
 
   const settingsQuery = useQuery({
@@ -106,8 +94,7 @@ export function useReportTemplateWorkspaceQueries({
       onPageChange: (pageNumber: number) => setDirectory({ ...directory, pageNumber }),
     },
     fieldCatalogQuery,
-    previewInvoicesQuery,
-    previewPaymentsQuery,
+    ...previewSources,
     settingsQuery,
     templateContentQuery,
   };

@@ -1,5 +1,7 @@
 import { Button } from "../../ui/Button.tsx";
-import { SelectField } from "../../ui/FormFields.tsx";
+import { SelectField, TextField } from "../../ui/FormFields.tsx";
+import { Pagination } from "../../ui/primitives/Pagination.tsx";
+import type { ReportPreviewSourceDirectory } from "./useReportTemplatePreviewSources.ts";
 import { FilterBar } from "../../ui/primitives/Field.tsx";
 import { SegmentedNav } from "../../ui/primitives/Tabs.tsx";
 import { type ReportDesignerPreviewSampleProfile } from "../report-designer/reportDesignerPreviewSamples.ts";
@@ -11,6 +13,7 @@ export function ReportTemplatePreviewWorkspace({
   sampleProfiles,
   selectedSourceValue,
   sourceOptions,
+  sourceDirectory,
   renderedHtml,
   isBusy,
   onModeChange,
@@ -23,6 +26,7 @@ export function ReportTemplatePreviewWorkspace({
   sampleProfiles: Array<{ value: string; label: string }>;
   selectedSourceValue: string;
   sourceOptions: Array<{ value: string; label: string }>;
+  sourceDirectory: ReportPreviewSourceDirectory;
   renderedHtml: string;
   isBusy: boolean;
   onModeChange: (mode: TemplatePreviewMode) => void;
@@ -46,16 +50,18 @@ export function ReportTemplatePreviewWorkspace({
             onChange={onSampleProfileChange}
           />
         ) : (
+          <><TextField label="检索预览单据" value={sourceDirectory.search} disabled={isBusy || !sourceDirectory.allowed} onChange={sourceDirectory.onSearchChange} />
           <SelectField
             label="预览单据"
             value={selectedSourceValue}
-            disabled={isBusy || sourceOptions.length === 0}
+            disabled={isBusy || sourceDirectory.loading || !sourceDirectory.allowed || sourceOptions.length === 0}
             includeEmptyOption={sourceOptions.length === 0}
             options={sourceOptions}
             onChange={onSourceChange}
-          />
+          /></>
         )}
       </FilterBar>
+      {mode === "savedSource" && sourceDirectory.allowed && <Pagination pageNumber={sourceDirectory.pageNumber} pageSize={sourceDirectory.pageSize} totalCount={sourceDirectory.totalCount} isBusy={isBusy || sourceDirectory.loading} onPageChange={sourceDirectory.onPageChange} />}
       <div className="report-template-preview report-template-preview-full">
         {pdf.format === "PdfPage" && pdf.pageCount > 0 ? <div className="report-template-preview-pagination" role="group" aria-label="PDF 预览翻页">
           <Button disabled={isBusy || pdf.pageIndex <= 0} onClick={() => pdf.onPageChange(pdf.pageIndex - 1)}>上一页</Button>

@@ -35,7 +35,7 @@ function OfficeSupplyDirectory({ client, user }: { client: ExportDocManagerApiCl
   const [dialog, setDialog] = useState<SupplyDialog | null>(null);
   const close = () => setDialog(null);
   const saved = (supply: OfficeSupplyRecord) => { model.acceptSaved(supply); close(); };
-  const deletion = useOfficeResourceOperation("supplies");
+  const deletion = useOfficeResourceOperation("supplies", client);
   return <>
     <PageHeader title="办公物品" count={query.data?.totalCount} actions={<>
       <Button aria-label="刷新办公物品" icon={<RefreshCw size={18} aria-hidden="true" />} disabled={query.isFetching} onClick={model.refresh}>刷新</Button>

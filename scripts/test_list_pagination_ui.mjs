@@ -101,7 +101,7 @@ await require('esbuild').build({ stdin: { loader: 'tsx', resolveDir: web, conten
   function Knowledge() { return <Routes><Route path="/:section" element={<HsCodeKnowledgePage client={client} businessDate="2026-10-06" />} /></Routes>; }
   function Templates() {
     const { userTemplateDirectory: d, userTemplatesQuery: q } = useReportTemplateWorkspaceQueries({ client, reportType: 'ExportDocument', enabled: true,
-      includeDesignerData: false, includeArchived: false, canPreviewInvoiceSource: false, canPreviewPaymentSource: false, selectedUserTemplateId: 0, selectedTemplatePath: '' });
+      includeDesignerData: false, includePreviewData: false, includeArchived: false, canPreviewInvoiceSource: false, canPreviewPaymentSource: false, selectedUserTemplateId: 0, selectedTemplatePath: '' });
     return <>{q.isError && <p>{q.error.message}</p>}<ReportTemplateSelectionPanel directory={d} reportType="ExportDocument" reportTypeOptions={[]}
       templates={[]} userTemplates={[]} selectedTemplatePath="" selectedUserTemplateId={0} defaultTemplatePath="" isBusy={d.loading} canSetDefault={false}
       onReportTypeChange={() => {}} onTemplateChange={() => {}} onUserTemplateChange={() => {}} onSetDefault={() => {}} /></>;

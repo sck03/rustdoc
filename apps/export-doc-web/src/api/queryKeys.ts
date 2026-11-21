@@ -75,8 +75,6 @@ export const queryKeys = {
     ["reports", "templates", reportType, "content", templatePath] as const,
   reportTemplateFields: (reportType: string) => ["reports", "templates", reportType, "fields"] as const,
   reportTemplatePreviewSourcesRoot: () => ["reports", "templates", "preview-sources"] as const,
-  reportTemplatePreviewInvoices: (pageSize: number) => ["reports", "templates", "preview-sources", "invoices", { pageSize }] as const,
-  reportTemplatePreviewPayments: (pageSize: number) => ["reports", "templates", "preview-sources", "payments", { pageSize }] as const,
   settings: () => ["settings"] as const,
   users: () => ["users"] as const,
   organizationDirectory: () => ["organization-directory"] as const,

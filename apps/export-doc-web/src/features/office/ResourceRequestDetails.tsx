@@ -1,5 +1,5 @@
 import { ResourceSubmissionHistory } from "./ResourceSubmissionHistory.tsx";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { readApiError } from "../../ui/formUtils.ts";
@@ -21,22 +21,28 @@ import { officeRequestApi } from "./officeRequestApi.ts";
 
 export function ResourceRequestDetails(props: {client: ExportDocManagerApiClient;user:ApiUserDto;kind:OfficeKind;row:OfficeRequestRow}) {
   const [opened,setOpened] = useState(false);
-  return <details onToggle={event=>setOpened(event.currentTarget.open)}><summary>申请附件、审批单与任务移交</summary>{opened && <Details {...props} />}</details>;
+  return <details onToggle={event=>setOpened(event.currentTarget.open)}><summary>申请附件、审批单与任务移交</summary>{opened && <Details key={`${props.kind}:${props.user.id}:${props.user.contextId}:${props.row.id}`} {...props} />}</details>;
 }
 function Details({client,user,kind,row}: {client: ExportDocManagerApiClient;user:ApiUserDto;kind:OfficeKind;row:OfficeRequestRow}) {
   const api = officeRequestApi(client,kind);
-  const operation = useOfficeResourceOperation(kind);
-  const [editing,setEditing] = useState(false);
+  const operation = useOfficeResourceOperation(kind, client, row.id);
+  const [editing,setEditing] = useState<OfficeRequestRow | null>(null);
   const [reassigning,setReassigning] = useState(false);
   const [removing,setRemoving] = useState<number|null>(null);
   const [note,setNote] = useState("");
-  const query = useQuery({queryKey:["office","resource-request",kind,user.id,user.contextId,row.id],queryFn:({signal})=>api.get(row.id,{signal})});
+  const query = useQuery({queryKey:["office","resource-request",kind,user.id,user.contextId,row.id],queryFn:({signal})=>api.get(row.id,{signal}),gcTime:0});
+  const { refetch } = query;
+  const detailVersion = query.data?.versionNumber;
+  useEffect(() => {
+    if (detailVersion !== undefined && detailVersion < row.versionNumber) void refetch();
+  }, [detailVersion, row.versionNumber, refetch]);
   if (query.isPending) return <p>正在读取申请资料…</p>;
-  if (query.isError) return <InlineNotice tone="error">{readApiError(query.error)} <button type="button" onClick={()=>void query.refetch()}>重试</button></InlineNotice>;
+  if (!query.data) return <InlineNotice tone="error">{readApiError(query.error)} <button type="button" onClick={()=>void refetch()}>重试</button></InlineNotice>;
   const current = query.data;
   const editable = current.status === "Draft" && current.ownerUserId === user.id && officeAccess(user,kind).allows("create",current);
   return <section aria-label="资源申请资料">
-    {editable && <div className="office-card-actions"><button type="button" className="command-button secondary" onClick={()=>setEditing(true)}>继续编辑草稿</button><button type="button" className="command-button" disabled={operation.busy} onClick={()=>void operation.run(signal=>api.submit(current.id,{expectedVersion:current.versionNumber,note:""},{signal}),()=>{})}>提交申请</button></div>}
+    {query.isError && <InlineNotice tone="error">资料刷新失败：{readApiError(query.error)} <button type="button" onClick={()=>void refetch()}>重试</button></InlineNotice>}
+    {editable && <div className="office-card-actions"><button type="button" className="command-button secondary" disabled={query.isFetching} onClick={()=>setEditing(current)}>继续编辑草稿</button><button type="button" className="command-button" disabled={operation.busy || query.isFetching} onClick={()=>void operation.run(signal=>api.submit(current.id,{expectedVersion:current.versionNumber,note:""},{signal}),()=>{})}>提交申请</button></div>}
     <p className="office-muted">附件随草稿保存，提交后冻结原件。修改已提交资料须取消后重新申请。</p>
     {"reservationState" in current && current.reservationState === "Insufficient" && <InlineNotice tone="warning" title="批准已保留，库存待协调">当前尚未预留库存。补充库存后，办理人可重新尝试发放，系统会再次核对数量。</InlineNotice>}
     {editable && <AttachmentUploadPanel record={current} operation={operation} upload={(record,body,signal)=>{body.set("purpose","Supporting");return api.upload(record.id,body,{signal});}} />}
@@ -47,13 +53,13 @@ function Details({client,user,kind,row}: {client: ExportDocManagerApiClient;user
     <WorkflowFulfillmentPanel client={client} user={user} row={current}/>
     {(user.capabilities.canManageUsers || user.capabilities.unitManagement?.workflows) && current.status === "Pending" && <button type="button" className="command-button secondary" onClick={()=>setReassigning(true)}>移交未完成审批</button>}
     {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
-    {editing && <ResourceDraftEditor client={client} user={user} kind={kind} row={current} onClose={()=>setEditing(false)} />}
+    {editing && <ResourceDraftEditor client={client} user={user} kind={kind} row={editing} onClose={()=>setEditing(null)} />}
     {reassigning && <ApprovalReassignDialog client={client} row={current} onClose={()=>setReassigning(false)} />}
     {removing !== null && <OfficeDialog title="移除申请附件" onClose={()=>setRemoving(null)} {...operation} protectChanges hasChanges={note !== ""}><form onSubmit={event=>{event.preventDefault();void operation.run(signal=>api.remove(current.id,removing,{expectedVersion:current.versionNumber,note},{signal}),()=>setRemoving(null));}}><OfficeField label="移除原因"><textarea required maxLength={500} value={note} onChange={event=>setNote(event.target.value)} /></OfficeField><OfficeSubmit busy={operation.busy} label="确认移除附件" /></form></OfficeDialog>}
   </section>;
 }
 function ResourceDraftEditor({client,user,kind,row,onClose}: {client:ExportDocManagerApiClient;user:ApiUserDto;kind:OfficeKind;row:OfficeRequestRow;onClose:()=>void}) {
-  const operation = useOfficeResourceOperation(kind);
+  const operation = useOfficeResourceOperation(kind, client, row.id);
   const attachments = useAttachmentDraft<OfficeRequestRow>(row);
   const api = officeRequestApi(client,kind);
   const [dirty,setDirty] = useState(false);

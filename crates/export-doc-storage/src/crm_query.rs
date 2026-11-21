@@ -27,6 +27,58 @@ pub struct CrmQuery<'a> {
     pub limit: i64,
 }
 
+#[derive(Debug, serde::Deserialize, PartialEq, Eq)]
+pub struct CrmFollowUpCounts {
+    pub pending: i64,
+    pub overdue: i64,
+    pub due_soon: i64,
+}
+
+/// Count in the same authorized snapshot as the reminder page; compare full instants.
+pub(crate) fn follow_up_counts(
+    db: &(impl crate::adapter::Adapter + ?Sized),
+    query: &CrmQuery<'_>,
+    now: &str,
+    until: &str,
+) -> Result<CrmFollowUpCounts> {
+    if !matches!(
+        query.list,
+        CrmList::FollowUps {
+            include_completed: false,
+            ..
+        }
+    ) {
+        return Err(crate::Error::unavailable("跟进统计只接受未完成跟进查询。"));
+    }
+    let pg = db.provider() == "PostgreSQL";
+    let (mut selection, _) = build(query, pg)?;
+    let next = format!("NULLIF({},'')", sql::field("nextFollowUpAt", pg));
+    let (seconds, nanos) = sql::instant_order(&next, pg);
+    let now = sql::bind(&mut selection.values, now, pg);
+    let until = sql::bind(&mut selection.values, until, pg);
+    let (start_seconds, start_nanos) = sql::instant_order(&now, pg);
+    let (end_seconds, end_nanos) = sql::instant_order(&until, pg);
+    let instant = format!("({seconds},{nanos})");
+    let start = format!("({start_seconds},{start_nanos})");
+    let end = format!("({end_seconds},{end_nanos})");
+    let sum = |condition: String| {
+        format!(
+            "COALESCE(SUM(CASE WHEN {next} IS NULL THEN 0 WHEN {condition} THEN 1 ELSE 0 END),0)"
+        )
+    };
+    let overdue = sum(format!("{instant}<{start}"));
+    let due = sum(format!("{instant}>={start} AND {instant}<={end}"));
+    let projection = format!(
+        "{}('pending',COUNT(*),'overdue',{overdue},'due_soon',{due}){}",
+        sql::object(pg),
+        if pg { "::text" } else { "" }
+    );
+    Ok(serde_json::from_value(db.query_json(
+        &crate::query_source::aggregate(&selection, &projection),
+        &selection.values,
+    )?)?)
+}
+
 fn related(kind: &str, relation: &str, path: &str, json: bool, pg: bool) -> String {
     let value = if json {
         sql::json_field_from("related.body", path, pg)

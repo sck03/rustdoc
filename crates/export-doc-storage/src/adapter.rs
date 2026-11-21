@@ -26,6 +26,7 @@ macro_rules! unsupported_operations {
 /// All business operations use this semantic storage boundary, never provider SQL.
 pub(crate) trait Adapter: Send {
     semantic_operations! {
+        crm_follow_up_counts(query: &CrmQuery<'_>, now: &str, until: &str) -> CrmFollowUpCounts => crm_query::follow_up_counts;
         scan_dashboard(scope: &DataScope<'_>, fields: &[(&str, &str)], before: Option<i64>) -> Vec<Value> => dashboard_query::scan;
         party_candidates(kind: &str, company: &str, keys: &[(&str, String)]) -> Vec<Value> => party_query::candidates;
         sole_exporter_name(scope: &DataScope<'_>) -> Option<String> => party_query::sole_exporter_name;
@@ -94,8 +95,17 @@ pub(crate) trait Adapter: Send {
         query_generic(&GenericQuery<'_>) -> (i64, Vec<Value>) => generic_query::build, query_page;
         query_business(&BusinessQuery<'_>) -> (i64, Vec<Value>) => business_query::build, query_page;
         query_crm(&CrmQuery<'_>) -> (i64, Vec<Value>) => crm_query::build, query_page;
+        list_crm(&CrmQuery<'_>) -> Vec<Value> => crm_query::build, query_slice;
         query_related(&RelatedQuery<'_>) -> (i64, Vec<Value>) => related_query::build, query_page;
         query_personnel(&PersonnelQuery<'_>) -> (i64, Vec<Value>) => personnel_query::build, query_page;
+    }
+    fn count_generic(&self, query: &GenericQuery<'_>) -> Result<i64> {
+        let (sql, _) = generic_query::build(query, self.provider() == "PostgreSQL")?;
+        query_source::count(self, &sql)
+    }
+    fn count_crm(&self, query: &CrmQuery<'_>) -> Result<i64> {
+        let (sql, _) = crm_query::build(query, self.provider() == "PostgreSQL")?;
+        query_source::count(self, &sql)
     }
     unsupported_operations! {
         query_json(_statement: &str, _values: &[String]) -> Value => "存储适配器不支持专用聚合查询。";

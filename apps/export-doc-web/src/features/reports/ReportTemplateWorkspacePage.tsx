@@ -128,6 +128,7 @@ export function ReportTemplateWorkspacePage({
     fieldCatalogQuery,
     previewInvoicesQuery,
     previewPaymentsQuery,
+    previewSourceDirectory,
     settingsQuery,
     templateContentQuery,
   } = useReportTemplateWorkspaceQueries({
@@ -135,6 +136,7 @@ export function ReportTemplateWorkspacePage({
     reportType,
     enabled: canUseCurrentReportType,
     includeDesignerData: view === "designer",
+    includePreviewData: workspaceMode !== "design" && templatePreviewMode === "savedSource",
     includeArchived: templateAccess.restore,
     canPreviewInvoiceSource: invoicePreviewPermission.allowed,
     canPreviewPaymentSource: paymentPreviewPermission.allowed,
@@ -671,6 +673,7 @@ export function ReportTemplateWorkspacePage({
             sampleProfiles={previewSampleProfiles.map((profile) => ({ value: profile.value, label: profile.label }))}
             selectedSourceValue={selectedPreviewSourceValue}
             sourceOptions={previewDocumentOptions}
+            sourceDirectory={previewSourceDirectory}
             renderedHtml={renderedPreviewHtml}
             isBusy={isBusy}
             onModeChange={handleTemplatePreviewModeChange}

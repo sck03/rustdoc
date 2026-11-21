@@ -12,7 +12,7 @@ import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
 import { attachmentUploadForm } from "../../ui/documentAttachments.ts";
 
 export function OfficeSupplyEditor({ client, user, supply, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; supply?: OfficeSupplyRecord; onClose: () => void; onSaved: (saved: OfficeSupplyRecord) => void }) {
-  const operation = useOfficeResourceOperation("supplies");
+  const operation = useOfficeResourceOperation("supplies", client);
   const [handlingKey, setHandlingKey] = useState(supply?.handlingKey ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -44,7 +44,7 @@ export function OfficeSupplyApplication({ client, supply, user, onClose }: {
   const [appointment,setAppointment]=useState<{id?:string;departmentId?:string}>({});
   const [projectId,setProjectId]=useState<string|null>(null);
   const canSelectEmployee = user.capabilities.canManageUsers;
-  const operation = useOfficeResourceOperation("supplies");
+  const operation = useOfficeResourceOperation("supplies", client);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canIdentifyOfficeApplicant(user)) return;
@@ -83,7 +83,7 @@ export function OfficeStockDialog({ client, supply, stocktake, onClose }: {
   client: ExportDocManagerApiClient; supply: OfficeSupplyRecord; stocktake: boolean; onClose: () => void;
 }) {
   const [operationId] = useState(createRequestKey);
-  const operation = useOfficeResourceOperation("supplies");
+  const operation = useOfficeResourceOperation("supplies", client);
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);

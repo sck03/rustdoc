@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-11-20",
-  "reviewNotes": "2026-11-20 against 1f1a2d22: task-scoped PDF/OCR framing replaces aggregate-text and per-page process entry points; shared process ownership, bounded organization options and classed response admission have separate modules. Added independent contract deltas, mixed-PDF/frame/permission/routing and real HTTP/UI regressions. Removed candidate department payload/DTO and report-permission coupling. Advance only the five measured aggregates; preserve per-file caps and existing growth allowances. No dependency or schema version changes. Evidence: docs/archive/2026-11/2026-11-20全项目复核收尾.md.",
+  "updatedAt": "2026-11-21",
+  "reviewNotes": "2026-11-21 against 1658f273: scoped office/product commands reuse the shared mutation boundary; report source paging has a separate hook. Storage shares authorized selection for count-only CRM queries and typed reminder aggregates, replacing fake maximum-offset pages and application-side reminder scans. New UI regressions cover draft/version conflicts, cancellation, paging and lazy queries. Advance only the two measured aggregates (Rust production +119, automation +161); preserve every per-file cap and existing growth allowance. No dependency, API or schema version changes. Evidence: docs/archive/2026-11/2026-11-21工作区同步与查询精简.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 115738,
+      "baselineAggregateLines": 115857,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 115813,
+      "maximumAggregateLines": 115932,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 31211,
+      "baselineAggregateLines": 31372,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 31361,
+      "maximumAggregateLines": 31522,
       "reportFiles": false
     },
     {

@@ -15,7 +15,7 @@ import { useAttachmentDraft } from "../../ui/useAttachmentDraft.ts";
 import { attachmentUploadForm } from "../../ui/documentAttachments.ts";
 
 export function MeetingRoomEditor({ client, user, room, onClose, onSaved }: { client: ExportDocManagerApiClient; user: ApiUserDto; room?: MeetingRoomRecord; onClose: () => void; onSaved: (saved: MeetingRoomRecord) => void }) {
-  const operation = useOfficeResourceOperation("rooms");
+  const operation = useOfficeResourceOperation("rooms", client);
   const [handlingKey, setHandlingKey] = useState(room?.handlingKey ?? "");
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -47,7 +47,7 @@ export function MeetingBookingDialog({ client, room, user, onClose }: {
   const [appointment,setAppointment]=useState<{id?:string;departmentId?:string}>({});
   const [projectId,setProjectId]=useState<string|null>(null);
   const canSelectEmployee = user.capabilities.canManageUsers;
-  const operation = useOfficeResourceOperation("rooms");
+  const operation = useOfficeResourceOperation("rooms", client);
   const { range, query: availability } = useMeetingAvailability(client, user, room.id, times.start.slice(0, 10));
   const access = officeAccess(user, "rooms");
   function submit(event: FormEvent<HTMLFormElement>) {

@@ -34,10 +34,12 @@ function Editor({id}){
 const [invoice,setInvoice]=useState(()=>({...createEmptyInvoice("2026-10-25"),id,invoiceNo:"before-save",rowVersion:"native:1",items:Array.from({length:window.initialRows??1},(_,index)=>({...createEmptyInvoiceItem(id),poNumber:"PO-"+index,styleNo:"ZZ-1",styleName:"item",quantity:"1",unitPrice:"1"}))}));
 const [message,setMessage]=useState(null),[success,setSuccessMessage]=useState(null),[baseline,setPersistedInvoiceDraft]=useState(null);
 const [number,setNumber]=useState(0);window.number=number;
+const [activeClient,setActiveClient]=useState(client),[productAllowed,setProductAllowed]=useState(true);
+window.switchProductClient=()=>setActiveClient({...client});window.revokeProductPermission=()=>setProductAllowed(false);
 const [feedback,setPendingHsFeedback]=useState([]);const location=useLocation();window.locationState=location.state;window.currentRoute=location.pathname;
 const mutations=useInvoicePersistenceOperations({client,invoice,invoiceId:id,isNew:id===0,pendingHsFeedback:feedback,resetItemEditHistory:()=>window.resets++,
 setConcurrencyMessage:setMessage,setInvoice,setMessage,setPendingHsFeedback,setPersistedInvoiceDraft,setPersistedInvoiceStatus:()=>{},setSuccessMessage});
-const items=useInvoiceItemsWorkspace({client,invoice,setInvoice,setSuccessMessage,isEditable:true,canSaveToProductLibrary:true,setMessage});
+const items=useInvoiceItemsWorkspace({client:activeClient,invoice,setInvoice,setSuccessMessage,isEditable:true,canSaveToProductLibrary:productAllowed,setMessage});
 window.actions={save:()=>mutations.saveInvoiceMutation.mutate({...invoice}),product:()=>items.saveItemToProductLibrary(0),
 paste:()=>{try{items.pasteItemTable(0,"styleNo",Array(5001).fill(["item"]));}catch(error){setMessage(error.message);}}};
 window.baseline=baseline;window.invoice=invoice;window.saveBusy=mutations.saveInvoiceMutation.isPending;
@@ -142,6 +144,21 @@ try{
     await page.waitForFunction(()=>document.querySelector("[data-product]").textContent.includes("多个同编码商品"));
     assert.equal(await page.evaluate(()=>window.productWrites.length),0,"ambiguous cross-company codes must never update the first record");
     assert.equal(await page.getByRole("button",{name:"更新商品",exact:true}).count(),0);
+  });
+  for(const change of ["switchProductClient","revokeProductPermission"]) await scenario(async page=>{
+    await page.getByRole("button",{name:"product",exact:true}).click();
+    await page.getByRole("button",{name:"更新商品",exact:true}).waitFor();
+    await page.evaluate(change=>window[change](),change);
+    await page.getByRole("button",{name:"更新商品",exact:true}).click();
+    assert.equal(await page.evaluate(()=>window.productWrites.length),0,"late confirmation cannot write under a changed client or permission");
+    assert.equal(await page.locator("[data-product]").textContent(),"");
+    assert.equal(await page.evaluate(()=>window.queryClient.getMutationCache().getAll().length),0,"product commands retain no invoice item snapshots");
+  });
+  await scenario(async page=>{
+    await page.evaluate(()=>{window.actions.product();window.actions.product()});
+    await page.getByRole("button",{name:"更新商品",exact:true}).click();
+    await page.waitForFunction(()=>window.productWrites.length===1);
+    assert.equal(await page.evaluate(()=>window.queryClient.getMutationCache().getAll().length),0);
   });
   await runInvoiceItemsGridCases(scenario);
   console.log(`Invoice save workspace UI: ${passed} passed; ${output}`);

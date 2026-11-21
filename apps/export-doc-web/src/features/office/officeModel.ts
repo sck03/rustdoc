@@ -3,6 +3,9 @@ import { businessDateTimeLocalInputToIso, toBusinessDateTimeLocalInput } from ".
 import { hasDepartment, isRecordWithinRestrictions } from "../../app/permissionScope.ts";
 
 export type OfficeKind = "rooms" | "supplies";
+export function officeRequestStatuses(kind: OfficeKind) {
+  return ["Draft", "Pending", "Suspended", "Approved", ...(kind === "rooms" ? ["InUse", "Completed"] : ["Issued", "Returned"]), "Rejected", "Cancelled", "Terminated"];
+}
 export type OfficeRequestRow = MeetingBookingRecord | OfficeSupplyRequestRecord;
 export type OfficeAction = "approve" | "reject" | "cancel" | "issue" | "return";
 export function officeRequestFocus(search: URLSearchParams) {

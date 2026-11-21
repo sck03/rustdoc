@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import type { ApiInvoiceDetailDto, ApiInvoiceItemDto, ApiProductDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { queryKeys } from "../../api/queryKeys.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
-import { isAbortError, useAbortableOperation } from "../../ui/useAbortableOperation.ts";
+import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { normalizeText, readApiError } from "../../ui/formUtils.ts";
 import {
   type InvoiceItemCellSelection,
@@ -49,8 +49,6 @@ export function useInvoiceItemsWorkspace({
   setMessage,
 }: Options) {
   const requestConfirmation = useConfirmation();
-  const runAbortable = useAbortableOperation(invoice?.id);
-  const queryClient = useQueryClient();
   const [editHistory, setEditHistoryState] = useState<InvoiceItemEditHistory>(emptyInvoiceItemEditHistory);
   const [productLibraryKeyword, setProductLibraryKeyword] = useState("");
   const [productLibraryMessage, setProductLibraryMessage] = useState<string | null>(null);
@@ -84,8 +82,9 @@ export function useInvoiceItemsWorkspace({
     placeholderData: keepPreviousData,
     staleTime: 5 * 60 * 1000,
   });
-  const saveProductMutation = useMutation({
-    mutationFn: ({ item }: { item: ApiInvoiceItemDto }) => runAbortable(async (signal) => {
+  const saveProductMutation = useScopedMutation(
+    `${invoice?.id ?? 0}:${isEditable}:${canSaveToProductLibrary}`, client, {
+    mutationFn: async ({ item }: { item: ApiInvoiceItemDto }, signal, { checkCurrent }) => {
       const productCode = normalizeText(item.styleNo);
       if (!productCode) throw new Error("商品编码(款号)不能为空。");
 
@@ -95,6 +94,7 @@ export function useInvoiceItemsWorkspace({
       );
       if (candidates.totalCount > 1) throw new Error("获准范围内有多个同编码商品，请到商品库选择对应档案后更新。");
       const existing = candidates.items[0] ?? null;
+      checkCurrent();
       if (existing && !await requestConfirmation({
         title: "更新商品库",
         description: `商品库中已存在编码为 ${productCode} 的商品，是否用当前发票明细更新？`,
@@ -105,23 +105,23 @@ export function useInvoiceItemsWorkspace({
       }
 
       const body = createProductDraftFromInvoiceItem(item, existing);
-      signal.throwIfAborted();
+      checkCurrent();
       if (existing) {
         await client.updateProduct({ id: existing.id, body }, { signal });
         return { cancelled: false, isUpdate: true, productCode };
       }
       await client.createProduct({ body }, { signal });
       return { cancelled: false, isUpdate: false, productCode };
-    }),
-    onSuccess: async (result) => {
+    },
+    onSuccess: (result) => {
       if (result.cancelled) {
         setProductLibraryMessage("已取消商品库更新。");
         return;
       }
       setProductLibraryMessage(result.isUpdate ? `商品库已更新：${result.productCode}` : `商品已保存到商品库：${result.productCode}`);
-      await queryClient.invalidateQueries({ queryKey: queryKeys.masterDataRoot("products") });
     },
-    onError: (error) => { if (!isAbortError(error)) setProductLibraryMessage(readApiError(error)); },
+    refreshKeys: result => result.cancelled ? [] : [queryKeys.masterDataRoot("products")],
+    onError: error => setProductLibraryMessage(readApiError(error)),
   });
 
   function resetEditHistory() {

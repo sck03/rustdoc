@@ -7,7 +7,7 @@ use super::{
     store::{Actor, Store},
 };
 use crate::{clock::BusinessClock, contracts, generated_api::GET_CRM_DASHBOARD};
-use chrono::{DateTime, Duration};
+use chrono::Duration;
 use export_doc_domain::sales as rules;
 use export_doc_storage::{CrmList, GenericQuery};
 use rust_decimal::Decimal;
@@ -24,24 +24,14 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
         .ok_or_else(|| unavailable("业务日期超出范围。"))?
         .to_string();
     store.read_for(actor, GET_CRM_DASHBOARD, &[], |tx, actor| {
-        let customer_count = tx.query_generic(&GenericQuery {
+        let customer_count = tx.count_generic(&GenericQuery {
             kind: "crm-customers",
             scope: auth::data_scope(actor, "sales.customers", "view"),
             filters: &[], keyword: "", search_root: None, fields: &[("id", "id")],
-            offset: i64::MAX, limit: 1,
-        })?.0;
-        let contacts = crm_queries::page(tx, actor, CrmList::Contacts, &[("id", "id")], i64::MAX, 1)?.0;
-        let pending = CrmList::FollowUps { include_completed: false, customer_id: None, record_id: None };
-        let (follow_up_count, follow_ups) = crm_queries::page(tx, actor, pending, &crm_queries::fields("ApiCrmFollowUpDto"), 0, 8)?;
-        let (mut overdue, mut upcoming) = (0, 0);
-        crm_queries::scan(tx, actor, pending, &[("nextFollowUpAt", "nextFollowUpAt")], |row| {
-            if let Some(date) = row["nextFollowUpAt"].as_str().filter(|value| !value.is_empty()) {
-                let date = DateTime::parse_from_rfc3339(date).map_err(|cause| unavailable(format!("跟进到期时间无效：{cause}")))?;
-                overdue += usize::from(date < now);
-                upcoming += usize::from(date >= now && date <= now + Duration::days(7));
-            }
-            Ok(())
+            offset: 0, limit: 1,
         })?;
+        let contacts = crm_queries::count(tx, actor, CrmList::Contacts)?;
+        let (reminders, follow_ups) = crm_queries::reminders(tx, actor, &now.to_rfc3339(), &(now + Duration::days(7)).to_rfc3339())?;
         let opportunities = CrmList::Opportunities { customer_id: None, stage: "", keyword: "", include_archived: false, closing_window: None };
         let mut stages: BTreeMap<String, usize> = BTreeMap::new();
         let mut currencies: BTreeMap<String, (usize, Decimal, Decimal)> = BTreeMap::new();
@@ -70,9 +60,9 @@ pub fn query(store: &Store, actor: &Actor, clock: &BusinessClock) -> Result<Valu
         let mut result = contracts::object(GET_CRM_DASHBOARD.id, false);
         result["customerCount"] = json!(customer_count);
         result["contactCount"] = json!(contacts);
-        result["pendingFollowUpCount"] = json!(follow_up_count);
-        result["overdueFollowUpCount"] = json!(overdue);
-        result["dueNextSevenDaysCount"] = json!(upcoming);
+        result["pendingFollowUpCount"] = json!(reminders.pending);
+        result["overdueFollowUpCount"] = json!(reminders.overdue);
+        result["dueNextSevenDaysCount"] = json!(reminders.due_soon);
         result["upcomingFollowUps"] = json!(follow_ups.into_iter().map(|row| contracts::project(contracts::schema("ApiCrmFollowUpDto"), row)).collect::<Vec<_>>());
         result["opportunityStages"] = json!(rules::STAGES.iter().map(|stage| json!({"stage":stage,"count":stages.get(*stage).copied().unwrap_or(0)})).collect::<Vec<_>>());
         result["opportunityCurrencies"] = json!(currencies.into_iter().map(|(currency,(count,amount,weighted))| json!({"currency":currency,"count":count,"estimatedAmount":amount.to_string(),"weightedAmount":weighted.to_string()})).collect::<Vec<_>>());

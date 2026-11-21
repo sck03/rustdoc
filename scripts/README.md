@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-21 工作区同步：`npm --prefix apps/export-doc-web run test:workspace-refresh-ui` 验证两类资源详情版本推进、中文草稿保留及旧版本冲突，模板来源跨页检索/选择/取消，折叠任务零请求及办公命令换客户端取消；登记到统一 `business` 组。发票保存回归另验证商品库确认期间撤权或换客户端不得写入。CRM 授权计数、提醒空值及偏移/纳秒边界由 Storage 双库共用合同验证，真实 PostgreSQL 使用 `test-native-postgres.ps1 -Scope Workflows`。范围与实际结果见[本批记录](../docs/archive/2026-11/2026-11-21工作区同步与查询精简.md)。
+
 `node scripts/test_credit_http.mjs <AppRoot>` 需要按当前源码构建的 `office_review` 和完整 OCR/PDFium 资源，在独立测试库验证仅发票权限的信用证上传、无权限拒绝、PDF/OCR 与登录并发、请求取消后的资源恢复。结果写入 `artifacts/credit-http`。
 
 2026-11-20 全项目复核收尾：`test_foundation_options_ui.mjs` 随 `test:identity-ui` 验证真实 React/HTTP 的职责项目分页、搜索、保存回显；设计器契约测试拒绝字符串数字和小数整数。`test_native_pdf.mjs <executable> <pdfium> <anonymous.pdf> [AppRoot]` 使用现行 `--pdf-credit-worker` 验证混合页面、同页文字/扫描图、合并和错误分类；需当前 OCR 包。`test_native_ocr.mjs <AppRoot>` 增加任务内多帧识别。已移除独立文字/逐页 OCR 旧进程入口，不维护旧测试调用。详细证据见[复核收尾记录](../docs/archive/2026-11/2026-11-20全项目复核收尾.md)。

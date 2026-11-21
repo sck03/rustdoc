@@ -14,7 +14,7 @@ mod dashboard_query;
 mod party_query;
 pub use audit_query::AuditQuery;
 mod crm_query;
-pub use crm_query::{CrmList, CrmQuery};
+pub use crm_query::{CrmFollowUpCounts, CrmList, CrmQuery};
 mod attachment_history;
 mod invoice_status_history;
 pub use invoice_status_history::InvoiceStatusEvent;
@@ -478,6 +478,7 @@ delegate! {
     expired_job_outputs(policy:&JobOutputRetention)->Vec<Value>;
     expired_job_inputs(policy:&JobOutputRetention)->Vec<Value>;
     query_generic(query:&GenericQuery<'_>)->(i64, Vec<Value>);
+    count_generic(query:&GenericQuery<'_>)->i64;
     explain_query(query:&QueryPlan<'_>)->Value;
     scan_generic(query:&GenericQuery<'_>,before_id:Option<i64>)->(Option<i64>, Vec<Value>);
     scan_worklist(query:&ScopedQuery<'_>,actor:i64,customer_scope:&DataScope<'_>,scan:&WorklistScan<'_>,cursor:Option<i64>)->(Option<i64>,Vec<Value>);
@@ -487,6 +488,9 @@ delegate! {
     query_ordered_record_fields(query:&GenericQuery<'_>,search_fields:&[&str],order:RecordOrder)->(i64,Vec<Value>);
     query_business(query:&BusinessQuery<'_>)->(i64, Vec<Value>);
     query_crm(query:&CrmQuery<'_>)->(i64, Vec<Value>);
+    count_crm(query:&CrmQuery<'_>)->i64;
+    list_crm(query:&CrmQuery<'_>)->Vec<Value>;
+    crm_follow_up_counts(query:&CrmQuery<'_>,now:&str,until:&str)->CrmFollowUpCounts;
     query_related(query:&RelatedQuery<'_>)->(i64, Vec<Value>);
     supplier_assessment_analytics(query:&RelatedQuery<'_>)->Value;
     scan_crm(query:&CrmQuery<'_>,after_id:i64)->Vec<Value>;

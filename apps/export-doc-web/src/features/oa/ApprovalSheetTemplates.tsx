@@ -1,11 +1,13 @@
 import { Button } from "../../ui/Button.tsx";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { ExportDocManagerApiClient, OaApprovalSettings, OaSheetTemplate } from "../../api/index.ts";
 import { OfficeDialog, OfficeField } from "../office/OfficeUi.tsx";
 import { useOfficeOperation } from "../office/useOfficeData.ts";
 import { useReportTemplateDocument } from "../reports/useReportTemplateDocument.ts";
-import { ReportDesignerV3Workspace } from "../report-designer/ReportDesignerV3Workspace.tsx";
+import { PageState } from "../../ui/PageState.tsx";
 import "../../styles/routes/reports.css";
+
+const ReportDesignerV3Workspace = lazy(() => import("../report-designer/ReportDesignerV3Workspace.tsx").then(module => ({ default: module.ReportDesignerV3Workspace })));
 
 export function ApprovalSheetTemplates({ client, settings, disabled, onChange }: {
   client: ExportDocManagerApiClient; settings: OaApprovalSettings; disabled: boolean; onChange: (templates: OaSheetTemplate[]) => void;
@@ -58,7 +60,7 @@ function SheetEditor({ client, template, catalog, onClose, onApply }: {
     <div className="office-card-actions"><Button type="button" disabled={operation.busy || !model.document.name.trim()} onClick={() => validate(false)}>预览审批单样例</Button>
       <Button type="button" disabled={operation.busy || !model.document.name.trim()} onClick={() => validate(true)}>应用到设置草稿</Button></div>
     <p className="office-muted">应用后还须保存审批设置。请将申请摘要、说明、附件及审批记录放入正文的自动增高表格，保证长内容完整输出。</p>
-    {model.document.path && <ReportDesignerV3Workspace reportType="OaApproval" displayName={model.document.name} content={model.document.content} fieldCatalog={catalog} editable={!operation.busy} onDesignerDraftChange={model.setDraft} />}
+    {model.document.path && <Suspense fallback={<PageState tone="loading" title="正在加载设计器" />}><ReportDesignerV3Workspace reportType="OaApproval" displayName={model.document.name} content={model.document.content} fieldCatalog={catalog} editable={!operation.busy} onDesignerDraftChange={model.setDraft} /></Suspense>}
     {html && <OfficeDialog title="审批单样例预览" onClose={() => setHtml("")}><iframe title="审批单样例" sandbox="" srcDoc={html} style={{width:"100%",height:"75vh",border:0}} /></OfficeDialog>}
   </OfficeDialog>;
 }

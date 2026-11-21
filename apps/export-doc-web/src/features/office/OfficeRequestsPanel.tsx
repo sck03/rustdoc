@@ -3,7 +3,7 @@ import { useState, type FormEvent } from "react";
 import { RefreshCw } from "lucide-react";
 import type { ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
 import { formatBusinessDateTime } from "../../ui/businessTime.ts";
-import { isMeetingBooking, officeActionLabels, officeRequestActions, officeStatus, officeStatusLabels,
+import { isMeetingBooking, officeActionLabels, officeRequestActions, officeRequestStatuses, officeStatus, officeStatusLabels,
   type OfficeAction, type OfficeKind, type OfficeRequestRow } from "./officeModel.ts";
 import { applyOfficeAction, useOfficeResourceOperation, useOfficeRequests } from "./useOfficeData.ts";
 import { OfficeDialog, OfficeField, OfficePager, OfficeQueryState, OfficeSubmit } from "./OfficeUi.tsx";
@@ -17,7 +17,7 @@ export function OfficeRequestsPanel({ client, user, kind }: { client: ExportDocM
   const model = useOfficeRequests(client, user, kind);
   const [selected, setSelected] = useState<{ row: OfficeRequestRow; action: OfficeAction; label: string } | null>(null);
   const [history, setHistory] = useState<OfficeRequestRow | null>(null);
-  const statuses = kind === "rooms" ? ["Draft", "Pending", "Approved", "InUse", "Completed", "Rejected", "Cancelled"] : ["Draft", "Pending", "Approved", "Issued", "Returned", "Rejected", "Cancelled"];
+  const statuses = officeRequestStatuses(kind);
   return <>
     {model.focused && <div className="office-toolbar"><p>正在查看{model.focus.requestId ? `申请 #${model.focus.requestId}` : "所选人员的申请记录"}</p>
       <button type="button" className="command-button secondary" onClick={model.clearFocus}>显示全部记录</button></div>}
@@ -62,7 +62,7 @@ export function OfficeRequestsPanel({ client, user, kind }: { client: ExportDocM
 function OfficeActionDialog({ client, kind, row, action, label, onClose }: {
   client: ExportDocManagerApiClient; kind: OfficeKind; row: OfficeRequestRow; action: OfficeAction; label: string; onClose: () => void;
 }) {
-  const operation = useOfficeResourceOperation(kind);
+  const operation = useOfficeResourceOperation(kind, client, row.id);
   const [taskKey, setTaskKey] = useState(action==="approve"||action==="reject"?row.reviewTaskKeys?.[0]??"":"");
   const handlingNode=row.approvalPlan?.nodes.find(node=>node.kind==="Handling"&&node.handlingAction===(action==="issue"?"Issue":"Return")&&!node.skipped);
   const [verificationValues, setVerificationValues] = useState<Record<string, string | boolean>>({});

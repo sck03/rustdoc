@@ -12,12 +12,13 @@ import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import { useServerPageNumber } from "../../ui/useServerPageNumber.ts";
 
 export function UnitWorkflowTasksPanel({ client, user, accounts }: { client: ExportDocManagerApiClient; user: ApiUserDto; accounts: ApprovalAccount[] }) {
+  const [opened, setOpened] = useState(false);
   const [page, setPage] = useState(1);
   const [assignee, setAssignee] = useState(0);
   const [editing, setEditing] = useState<UnitWorkflowTask | null>(null);
-  const query = useQuery({ queryKey: ["unit-workflow-tasks", user.contextId, page, assignee], queryFn: ({ signal }) => client.getUnitWorkflowTasks({ pageNumber: page, pageSize: 20, assigneeId: assignee || undefined }, { signal }) });
+  const query = useQuery({ queryKey: ["unit-workflow-tasks", user.contextId, page, assignee], queryFn: ({ signal }) => client.getUnitWorkflowTasks({ pageNumber: page, pageSize: 20, assigneeId: assignee || undefined }, { signal }), enabled: opened });
   useServerPageNumber(query, page, setPage);
-  return <details><summary>在途任务与职责交接</summary><p>包含待激活的后续任务。交接只改变未签署任务，保留原流程版本、申请资料与历史签署。</p>
+  return <details onToggle={event => setOpened(event.currentTarget.open)}><summary>在途任务与职责交接</summary><p>包含待激活的后续任务。交接只改变未签署任务，保留原流程版本、申请资料与历史签署。</p>
     <OfficeField label="按责任人查看"><select value={assignee} onChange={e => { setAssignee(Number(e.target.value)); setPage(1); }}><option value={0}>全部责任人</option>{accounts.map(a => <option key={a.id} value={a.id}>{a.fullName}</option>)}</select></OfficeField>
     {query.isError ? <PageState tone="error" title="在途任务读取失败" description={readApiError(query.error)} action={<Button type="button" onClick={() => void query.refetch()}>重试</Button>} /> : query.isPending ? <PageState tone="loading" title="正在读取在途任务" /> : <>
       {!query.data.items.length && <p>当前没有等待交接的在途任务。</p>}
