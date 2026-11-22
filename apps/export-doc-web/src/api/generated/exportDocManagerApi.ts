@@ -142,6 +142,7 @@ const operationDomains: Record<string, Domain> = {
   confirmSupplierAssessment: "suppliers",
   createAnnouncement: "communication",
   createBusinessAttachmentCategory: "businessAttachmentCategories",
+  createBusinessAttachmentDownloadTicket: "businessAttachments",
   createCrmContact: "crm",
   createCrmCustomer: "crm",
   createCrmFollowUp: "crm",

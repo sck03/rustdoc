@@ -15,6 +15,25 @@ fn call(client: &ApiClient, op: Operation, code: &str, body: Value) -> Result<Va
 }
 
 #[test]
+fn clear_catalog_visits_all_batches_and_preserves_knowledge_history() {
+    let fixture = native_fixture::Fixture::new();
+    for index in 0..405 {
+        fixture.create(CREATE_HS_CODE, json!({"code":format!("96{index:08}"),"name":"清空分页回归","status":"ReferenceOnly","notes":"catalog payload".repeat(60)}));
+    }
+    let example = fixture.create(
+        SAVE_HS_CODE_KNOWLEDGE_EXAMPLE,
+        json!({"rawReportedHsCode":"9600000000","productName":"保留历史实例","source":"历史单据"}),
+    );
+    let cleared = fixture.create(CLEAR_ALL_HS_CODES, json!({"confirmation":"CLEAR"}));
+    assert_eq!(cleared["deletedCount"], 405);
+    assert_eq!(fixture.request(LIST_HS_CODES, None, None)["totalCount"], 0);
+    assert_eq!(
+        fixture.request(LIST_HS_CODE_KNOWLEDGE_EXAMPLES, None, None)["items"][0]["id"],
+        example["id"]
+    );
+}
+
+#[test]
 fn cleanup_rechecks_versions_is_atomic_and_retains_history() {
     let fixture = native_fixture::Fixture::new();
     let client = fixture.client();

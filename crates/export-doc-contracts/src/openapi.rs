@@ -6,6 +6,9 @@ use serde_json::Value;
 #[cfg(test)]
 #[path = "contract_audit_fixes.rs"]
 mod audit_fixes;
+#[cfg(test)]
+#[path = "contract_browser_downloads.rs"]
+mod browser_downloads;
 use std::sync::OnceLock;
 
 pub fn document() -> Value {
@@ -258,6 +261,7 @@ mod tests {
         }
         audit_fixes::apply(&mut baseline);
         contract_import_preview::apply(&mut baseline);
+        browser_downloads::apply(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

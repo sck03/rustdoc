@@ -1,7 +1,12 @@
 //! Browser download tickets are short lived and bound to both the authenticated
 //! session and an HttpOnly cookie. A copied URL alone cannot download a file.
 use axum::http::HeaderMap;
-use export_doc_engine::{api::ApiError, paths::nonce};
+use export_doc_contracts::generated_api::{
+    DOWNLOAD_BUSINESS_ATTACHMENT, DOWNLOAD_BUSINESS_ATTACHMENT_WITH_TICKET,
+    DOWNLOAD_JOB_RESULT_WITH_TICKET, DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
+    DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET, Operation,
+};
+use export_doc_engine::{api::ApiError, engine::NativeService, paths::nonce};
 use serde_json::{Value, json};
 use std::{
     collections::HashMap,
@@ -12,9 +17,50 @@ use subtle::ConstantTimeEq;
 
 const COOKIE: &str = "ExportDocManager.DownloadSession";
 const LIFETIME: Duration = Duration::from_secs(300);
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Target {
+    Job(String),
+    PostgreSqlBackup(String),
+    RecoveryArchive(String),
+    BusinessAttachment { id: String, revision: String },
+}
+impl Target {
+    fn operation(&self) -> Operation {
+        match self {
+            Self::Job(_) => DOWNLOAD_JOB_RESULT_WITH_TICKET,
+            Self::PostgreSqlBackup(_) => DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
+            Self::RecoveryArchive(_) => DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET,
+            Self::BusinessAttachment { .. } => DOWNLOAD_BUSINESS_ATTACHMENT_WITH_TICKET,
+        }
+    }
+    pub fn prepare(
+        &self,
+        service: &NativeService,
+        session: &str,
+    ) -> Result<export_doc_engine::engine::backup_io::Download, ApiError> {
+        match self {
+            Self::Job(id) => service.prepare_job_download(id, session),
+            Self::PostgreSqlBackup(token) | Self::RecoveryArchive(token) => service
+                .prepare_backup_download(self.operation(), &[("token", token.clone())], session),
+            Self::BusinessAttachment { id, revision } => service.prepare_file_download(
+                DOWNLOAD_BUSINESS_ATTACHMENT,
+                &[("id", id.clone()), ("revision", revision.clone())],
+                session,
+            ),
+        }
+    }
+}
+pub fn is_ticket_download(operation: Operation) -> bool {
+    matches!(
+        operation,
+        DOWNLOAD_JOB_RESULT_WITH_TICKET
+            | DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET
+            | DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET
+            | DOWNLOAD_BUSINESS_ATTACHMENT_WITH_TICKET
+    )
+}
 struct Ticket {
-    operation: &'static str,
-    job_id: String,
+    target: Target,
     session: String,
     binding: String,
     expires: Instant,
@@ -45,23 +91,7 @@ pub fn binding(headers: &HeaderMap) -> String {
 impl Tickets {
     pub fn issue(
         &self,
-        job_id: &str,
-        session: &str,
-        binding: &str,
-        secure: bool,
-    ) -> Result<(Value, String), ApiError> {
-        self.issue_for(
-            export_doc_contracts::generated_api::DOWNLOAD_JOB_RESULT_WITH_TICKET,
-            job_id,
-            session,
-            binding,
-            secure,
-        )
-    }
-    pub fn issue_for(
-        &self,
-        operation: export_doc_contracts::generated_api::Operation,
-        job_id: &str,
+        target: Target,
         session: &str,
         binding: &str,
         secure: bool,
@@ -89,18 +119,17 @@ impl Tickets {
         } else {
             binding.into()
         };
+        let url = target.operation().path.replace("{token}", &token);
         entries.insert(
             token.clone(),
             Ticket {
-                operation: operation.id,
-                job_id: job_id.into(),
+                target,
                 session: session.into(),
                 binding: binding.clone(),
                 expires: now + LIFETIME,
             },
         );
         let expiry = (chrono::Utc::now() + chrono::Duration::seconds(300)).to_rfc3339();
-        let url = operation.path.replace("{token}", &token);
         Ok((
             json!({"token":token,"downloadUrl":url,"expiresAtUtc":expiry}),
             format!(
@@ -109,19 +138,12 @@ impl Tickets {
             ),
         ))
     }
-    pub fn resolve(&self, token: &str, binding: &str) -> Result<(String, String), ApiError> {
-        self.resolve_for(
-            export_doc_contracts::generated_api::DOWNLOAD_JOB_RESULT_WITH_TICKET,
-            token,
-            binding,
-        )
-    }
-    pub fn resolve_for(
+    pub fn resolve(
         &self,
-        operation: export_doc_contracts::generated_api::Operation,
+        operation: Operation,
         token: &str,
         binding: &str,
-    ) -> Result<(String, String), ApiError> {
+    ) -> Result<(Target, String), ApiError> {
         let mut entries = self
             .0
             .lock()
@@ -137,7 +159,7 @@ impl Tickets {
         let ticket = entries
             .get(token)
             .filter(|ticket| {
-                ticket.operation == operation.id
+                ticket.target.operation() == operation
                     && !binding.is_empty()
                     && ticket
                         .binding
@@ -147,7 +169,7 @@ impl Tickets {
                         == 1
             })
             .ok_or_else(|| error(404, "下载票据已过期或不属于当前会话。"))?;
-        Ok((ticket.job_id.clone(), ticket.session.clone()))
+        Ok((ticket.target.clone(), ticket.session.clone()))
     }
     pub fn revoke(&self, session: &str) -> Result<(), ApiError> {
         self.0
@@ -164,51 +186,78 @@ mod tests {
     #[test]
     fn tickets_require_the_bound_browser_and_are_revoked_on_logout() {
         let tickets = Tickets::default();
-        let (value, cookie) = tickets.issue("job-1", "session-1", "", true).unwrap();
+        let (value, cookie) = tickets
+            .issue(Target::Job("job-1".into()), "session-1", "", true)
+            .unwrap();
         assert!(cookie.contains("HttpOnly; SameSite=Strict"));
         assert!(cookie.ends_with("; Secure"));
         let mut headers = HeaderMap::new();
         headers.insert("cookie", cookie.parse().unwrap());
         let binding = binding(&headers);
         let token = value["token"].as_str().unwrap();
-        assert!(tickets.resolve(token, "").is_err());
-        assert!(tickets.resolve(token, &"0".repeat(64)).is_err());
+        assert!(
+            tickets
+                .resolve(DOWNLOAD_JOB_RESULT_WITH_TICKET, token, "")
+                .is_err()
+        );
+        assert!(
+            tickets
+                .resolve(DOWNLOAD_JOB_RESULT_WITH_TICKET, token, &"0".repeat(64))
+                .is_err()
+        );
         assert_eq!(
-            tickets.resolve(token, &binding).unwrap(),
-            ("job-1".into(), "session-1".into())
+            tickets
+                .resolve(DOWNLOAD_JOB_RESULT_WITH_TICKET, token, &binding)
+                .unwrap(),
+            (Target::Job("job-1".into()), "session-1".into())
         );
         tickets.revoke("session-1").unwrap();
-        assert!(tickets.resolve(token, &binding).is_err());
+        assert!(
+            tickets
+                .resolve(DOWNLOAD_JOB_RESULT_WITH_TICKET, token, &binding)
+                .is_err()
+        );
     }
 
     #[test]
     fn tickets_preserve_retry_and_operation_boundaries_and_reject_expiry() {
-        use export_doc_contracts::generated_api::DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET;
         let tickets = Tickets::default();
         let binding = "a".repeat(64);
-        let (value, _) = tickets.issue("job", "session", &binding, false).unwrap();
-        let token = value["token"].as_str().unwrap();
-        assert!(
-            tickets
-                .resolve_for(DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET, token, &binding)
-                .is_err()
-        );
-        for _ in 0..2 {
-            assert_eq!(
-                tickets.resolve(token, &binding).unwrap(),
-                ("job".into(), "session".into())
+        for target in [
+            Target::Job("job".into()),
+            Target::PostgreSqlBackup("backup-token".into()),
+            Target::RecoveryArchive("archive-token".into()),
+            Target::BusinessAttachment {
+                id: "17".into(),
+                revision: "3".into(),
+            },
+        ] {
+            let operation = target.operation();
+            let other = if operation == DOWNLOAD_JOB_RESULT_WITH_TICKET {
+                DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET
+            } else {
+                DOWNLOAD_JOB_RESULT_WITH_TICKET
+            };
+            let (value, _) = tickets
+                .issue(target.clone(), "session", &binding, false)
+                .unwrap();
+            let token = value["token"].as_str().unwrap();
+            assert!(tickets.resolve(other, token, &binding).is_err());
+            for _ in 0..2 {
+                assert_eq!(
+                    tickets.resolve(operation, token, &binding).unwrap(),
+                    (target.clone(), "session".into())
+                );
+            }
+            tickets.0.lock().unwrap().get_mut(token).unwrap().expires = Instant::now();
+            assert!(tickets.resolve(operation, token, &binding).is_err());
+            assert!(!tickets.0.lock().unwrap().contains_key(token));
+            let (value, _) = tickets.issue(target, "session", &binding, false).unwrap();
+            assert!(
+                tickets
+                    .resolve(operation, value["token"].as_str().unwrap(), &binding)
+                    .is_ok()
             );
         }
-        tickets.0.lock().unwrap().get_mut(token).unwrap().expires = Instant::now();
-        assert!(tickets.resolve(token, &binding).is_err());
-        assert!(!tickets.0.lock().unwrap().contains_key(token));
-        let (value, _) = tickets
-            .issue("new-job", "session", &binding, false)
-            .unwrap();
-        assert!(
-            tickets
-                .resolve(value["token"].as_str().unwrap(), &binding)
-                .is_ok()
-        );
     }
 }

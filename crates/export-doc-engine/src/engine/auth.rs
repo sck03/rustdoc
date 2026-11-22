@@ -212,7 +212,10 @@ impl Sessions {
     }
     fn validated_session(&self, store: &Store, token: &str) -> Result<Session> {
         let session = self.identity(token)?;
-        let user = store.get("users", session.user_id)?;
+        let Some(user) = store.connection()?.get("users", session.user_id)? else {
+            self.logout(token)?;
+            return Err(error(401, "账号已删除，请重新登录。"));
+        };
         if user["isActive"] != true {
             self.logout(token)?;
             return Err(error(401, "账号已停用。"));

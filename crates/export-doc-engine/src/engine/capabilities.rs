@@ -64,7 +64,13 @@ impl NativeService {
         }
         if invoice_maintenance::OPERATIONS.contains(&operation)
             || product_options::OPERATIONS.contains(&operation)
-            || [CREATE_JOB_DOWNLOAD_TICKET, DOWNLOAD_JOB_RESULT_WITH_TICKET].contains(&operation)
+            || [
+                CREATE_JOB_DOWNLOAD_TICKET,
+                DOWNLOAD_JOB_RESULT_WITH_TICKET,
+                CREATE_BUSINESS_ATTACHMENT_DOWNLOAD_TICKET,
+                DOWNLOAD_BUSINESS_ATTACHMENT_WITH_TICKET,
+            ]
+            .contains(&operation)
         {
             return true;
         }

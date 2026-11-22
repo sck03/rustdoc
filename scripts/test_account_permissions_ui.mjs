@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 import { publishPermissionScheme } from './lib/approval-fixtures.mjs';
@@ -76,4 +77,14 @@ await withOfficeUi('account-permissions-ui', async ({ output, url, invoke, openP
   await admin.setViewportSize({ width: 390, height: 844 });
   await admin.screenshot({ path: path.join(output, 'account-mobile.png'), fullPage: true });
   assert(await admin.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Mobile page does not overflow');
+  const temporary = await invoke('createUserAccount', { username: 'deleted-session-ui', fullName: '删除会话验收',
+    role: 'Admin', isActive: true, companyScope: 'DEFAULT', departmentId: 'GENERAL', resetPassword: 'Deleted-Session-2026' }, {}, token);
+  const deletedSession = await openPage('deleted-session-ui', 'Deleted-Session-2026');
+  await invoke('deleteUserAccount', undefined, { id: temporary.user.id, expectedVersion: temporary.user.versionNumber }, token);
+  // A background 401 may already have expired the workspace; otherwise exercise logout.
+  await deletedSession.evaluate(() => document.querySelector('.workspace-logout-button')?.click());
+  await deletedSession.locator('input[autocomplete=username]').waitFor({ state: 'visible' });
+  assert.equal(await deletedSession.locator('.workspace-shell').count(), 0, 'deleted identities cannot remain in the authenticated workspace');
+  await deletedSession.screenshot({ path: path.join(output, 'deleted-session-login.png') });
+  fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ accountPermissions: true, deletedSessionReturnsToLogin: true }, null, 2));
 });

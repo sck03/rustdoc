@@ -1,5 +1,6 @@
 //! Typed route catalogue; common authentication, parameters and JSON media are composed once.
 use super::model::*;
+use std::collections::BTreeMap;
 
 #[rustfmt::skip]
 pub(super) fn entries() -> Vec<Endpoint> { vec![
@@ -10,4 +11,6 @@ pub(super) fn entries() -> Vec<Endpoint> { vec![
     route("put","/api/business-attachments/{id}/metadata","EditBusinessAttachmentMetadata",super::responses::json(r("BusinessAttachmentRecord"),&[],&[]),super::policies::action("document.invoices","operate"),Some(super::route_parameters::positive_record_id32()),Some(r("BusinessAttachmentMetadataUpdate"))),
     route("get","/api/business-attachments/{id}/revisions/{revision}/content","DownloadBusinessAttachment",super::responses::reply("200","application/octet-stream",Some(Schema::default().kind(Types::One(Primitive::String)).format("byte")),&[],&[]),super::policies::action("document.invoices","view"),Some(vec![p("id","path",Some(true),i().minimum(num("1")).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),p("revision","path",Some(true),i().minimum(num("1")).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))]),None),
     route("post","/api/business-attachments/{id}/revisions/{revision}/save-to-path","SaveBusinessAttachmentToPath",super::responses::json(r("ApiCommandResponse"),&[],&[]),super::policies::action("document.invoices","view"),Some(vec![p("id","path",Some(true),i().minimum(num("1")).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),p("revision","path",Some(true),i().minimum(num("1")).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))]),Some(r("ApiAttachmentSaveRequest"))),
+    route("post","/api/business-attachments/{id}/revisions/{revision}/download-ticket","CreateBusinessAttachmentDownloadTicket",super::responses::json(r("ApiDownloadTicket"),&[],&[]),super::policies::action("document.invoices","view"),Some(vec![p("id","path",Some(true),i().minimum(num("1")).format("int32")),p("revision","path",Some(true),i().minimum(num("1")).format("int32"))]),None),
+    ep("get","/downloads/business-attachments/{token}","DownloadBusinessAttachmentWithTicket",super::responses::reply("200","application/octet-stream",Some(s().format("byte")),&[],&[]),super::policies::rule((false,true,false),super::policies::access("All",&[("document.invoices",&["view"],false)]))).security(vec![BTreeMap::from([("DesktopAccess",vec![])])]).parameters(super::route_parameters::download_token()),
 ] }

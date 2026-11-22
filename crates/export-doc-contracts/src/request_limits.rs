@@ -56,6 +56,7 @@ pub fn seconds(operation: &str) -> u64 {
         | "UploadAndRestorePostgreSqlPhysicalBackup"
         | "DownloadJobResult"
         | "DownloadJobResultWithTicket"
+        | "DownloadBusinessAttachmentWithTicket"
         | "DownloadPostgreSqlPhysicalBackupWithTicket"
         | "DownloadRecoveryArchiveWithTicket"
         | "RestorePostgreSqlPhysicalBackup" => TRANSFER_SECONDS,

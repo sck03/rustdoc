@@ -39,7 +39,7 @@ pub(super) fn handle(store: &store::Store, actor: &Actor, body: &Value) -> Resul
             return tx.command_receipt(actor.id,&actor.context,&text(body,"commandKey"))?.map(|r|r["result"].clone()).ok_or_else(||unavailable("停用操作回执缺失。"));
         }
         store::check_version(&user,store::expected(body))?;
-        if user["role"]=="Admin"&&user["isActive"]==true&&store::all(tx,"users")?.iter().filter(|u|u["role"]=="Admin"&&u["isActive"]==true).count()<=1{return Err(conflict("停用此维护管理员前须建立另一位启用的维护管理员。"));}
+        if super::super::accounts::is_last_active_administrator(tx,&user)?{return Err(conflict("停用此维护管理员前须建立另一位启用的维护管理员。"));}
         let clearance=super::super::office_queries::account_clearance(tx,&user)?;
         let receipt=user[command_receipts::FIELD].clone();user.as_object_mut().map(|v|v.remove(command_receipts::FIELD));
         clear_grants(&mut user);user["expectedVersion"]=user["versionNumber"].clone();

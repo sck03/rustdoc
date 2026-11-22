@@ -8035,6 +8035,11 @@ export interface CreateBusinessAttachmentCategoryRequest {
   body: BusinessAttachmentCategoryCreate;
 }
 
+export interface CreateBusinessAttachmentDownloadTicketRequest {
+  id: number;
+  revision: number;
+}
+
 export interface CreateCrmContactRequest {
   customerId: number;
   body: ApiCrmContactSaveRequest;
@@ -8626,6 +8631,11 @@ export interface DownloadAuditLogsRequest {
 export interface DownloadBusinessAttachmentRequest {
   id: number;
   revision: number;
+  Range?: string;
+}
+
+export interface DownloadBusinessAttachmentWithTicketRequest {
+  token: string;
   Range?: string;
 }
 

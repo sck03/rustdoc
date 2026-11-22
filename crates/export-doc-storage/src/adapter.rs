@@ -269,6 +269,28 @@ pub(crate) trait Adapter: Send {
         let (sql, projection) = generic_query::build(&query, self.provider() == "PostgreSQL")?;
         Ok(!self.query_slice(&sql, &projection, 0, 1)?.is_empty())
     }
+    fn has_other_active_administrator(&self, account_id: i64) -> Result<bool> {
+        let query = GenericQuery {
+            kind: "users",
+            scope: DataScope {
+                all: true,
+                ..Default::default()
+            },
+            filters: &[("role", "Admin".into()), ("isActive", "true".into())],
+            fields: &[("id", "id")],
+            ..Default::default()
+        };
+        let (sql, projection) = generic_query::build(&query, self.provider() == "PostgreSQL")?;
+        for row in self.query_slice(&sql, &projection, 0, 2)? {
+            let id = row["id"]
+                .as_i64()
+                .ok_or_else(|| Error::unavailable("管理员账号编号损坏。"))?;
+            if id != account_id {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
     fn organization_referenced(
         &self,
         reference: OrganizationReference,

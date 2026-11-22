@@ -43076,6 +43076,74 @@
         ]
       }
     },
+    "/api/business-attachments/{id}/revisions/{revision}/download-ticket": {
+      "post": {
+        "x-exportdoc-json-response-limit-bytes": 65536,
+        "x-exportdoc-timeout-seconds": 30,
+        "x-exportdoc-processing-slot": false,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "CreateBusinessAttachmentDownloadTicket",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiDownloadTicket"
+                }
+              }
+            }
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": true,
+          "requiresDesktopAccess": true,
+          "requiresLicense": true,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "document.invoices",
+                "actions": [
+                  "view"
+                ],
+                "administratorOnly": false
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": [],
+            "DesktopAccess": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1
+            },
+            "required": true
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 1
+            },
+            "required": true
+          }
+        ]
+      }
+    },
     "/api/business-attachments/{id}/revisions/{revision}/save-to-path": {
       "post": {
         "x-exportdoc-json-response-limit-bytes": 65536,
@@ -126247,6 +126315,90 @@
               ],
               "format": "int32",
               "pattern": "^-?(?:0|[1-9]\\d*)$"
+            }
+          }
+        ]
+      }
+    },
+    "/downloads/business-attachments/{token}": {
+      "get": {
+        "x-exportdoc-json-response-limit-bytes": 67108864,
+        "x-exportdoc-timeout-seconds": 86400,
+        "x-exportdoc-processing-slot": false,
+        "tags": [
+          "ExportDocManager.Api"
+        ],
+        "operationId": "DownloadBusinessAttachmentWithTicket",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "Partial Content",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range Not Satisfiable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-exportdoc-policy": {
+          "requiresAuthentication": false,
+          "requiresDesktopAccess": true,
+          "requiresLicense": false,
+          "access": {
+            "match": "All",
+            "resources": [
+              {
+                "resourceKey": "document.invoices",
+                "actions": [
+                  "view"
+                ],
+                "administratorOnly": false
+              }
+            ]
+          }
+        },
+        "security": [
+          {
+            "DesktopAccess": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          },
+          {
+            "name": "Range",
+            "in": "header",
+            "schema": {
+              "type": "string"
             }
           }
         ]

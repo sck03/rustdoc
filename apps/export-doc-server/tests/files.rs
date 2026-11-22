@@ -8,6 +8,7 @@ use export_doc_engine::{
     paths::{RuntimePaths, nonce},
 };
 use export_doc_server::router;
+use hyper::body::Body as HttpBody;
 use serde_json::{Value, json};
 use std::{
     path::PathBuf,
@@ -329,6 +330,221 @@ async fn browser_downloads_require_bound_tickets_and_path_operations_stay_local(
         .await
         .unwrap();
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    drop(app);
+    service.close().unwrap();
+    drop(service);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[tokio::test]
+async fn attachment_tickets_stream_ranges_and_recheck_deleted_sessions() {
+    use export_doc_engine::{generated_api::*, invoice::InvoiceDraft};
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    let root = workspace
+        .join(".codex-runtime/http-file-tests")
+        .join(nonce().unwrap());
+    std::fs::create_dir_all(&root).unwrap();
+    let service =
+        NativeService::open(RuntimePaths::server(&workspace, &root.join("Data")).unwrap()).unwrap();
+    let app = router(service.clone(), None);
+    let (_, _, admin) = json_response(
+        &app,
+        "POST",
+        "/api/auth/login",
+        "",
+        json!({"username":"admin","password":""}),
+    )
+    .await;
+    let admin_token = admin["accessToken"].as_str().unwrap();
+    let (_, _, invoice) = json_response(
+        &app,
+        "POST",
+        "/api/invoices",
+        admin_token,
+        json!(
+            InvoiceDraft::demo("2026-11-22", "TICKET-FILE")
+                .build()
+                .unwrap()
+        ),
+    )
+    .await;
+    let (_, _, category) = json_response(
+        &app,
+        "POST",
+        "/api/business-attachment-categories",
+        admin_token,
+        json!({"companyScope":"DEFAULT","name":"下载回归"}),
+    )
+    .await;
+    let content: Vec<u8> = (0..2 * 1024 * 1024 + 17)
+        .map(|index| b' ' + (index % 95) as u8)
+        .collect();
+    let attachment = service
+        .upload(
+            UPLOAD_BUSINESS_ATTACHMENT,
+            &[("invoiceId", invoice["id"].to_string())],
+            json!({"title":"分块下载","categoryId":category["id"],"uploadKey":nonce().unwrap()}),
+            "original.txt",
+            &content,
+            admin_token,
+        )
+        .unwrap();
+    let issue_path = CREATE_BUSINESS_ATTACHMENT_DOWNLOAD_TICKET
+        .path
+        .replace("{id}", &attachment["id"].to_string())
+        .replace("{revision}", "1");
+    assert_eq!(
+        json_response(&app, "POST", &issue_path, "", json!({}))
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    let account_body = json!({"username":"file-reader","fullName":"原件读取验证","role":"User","companyScope":"DEFAULT",
+        "departmentId":"GENERAL","isActive":true,"resetPassword":"File-Reader-2026","permissionGrants":[
+        {"resourceKey":"document.invoices","action":"view","dataScope":"all"}]});
+    let (status, _, account) =
+        json_response(&app, "POST", "/api/users", admin_token, account_body).await;
+    assert_eq!(status, StatusCode::OK, "{account}");
+    let (_, _, login) = json_response(
+        &app,
+        "POST",
+        "/api/auth/login",
+        "",
+        json!({"username":"file-reader","password":"File-Reader-2026"}),
+    )
+    .await;
+    let token = login["accessToken"].as_str().unwrap();
+    let (status, headers, ticket) =
+        json_response(&app, "POST", &issue_path, token, json!({})).await;
+    assert_eq!(status, StatusCode::OK, "{ticket}");
+    let cookie = headers["set-cookie"]
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap();
+    let url = ticket["downloadUrl"].as_str().unwrap();
+    for binding in [
+        "",
+        "ExportDocManager.DownloadSession=0000000000000000000000000000000000000000000000000000000000000000",
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(url)
+                    .header("cookie", binding)
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(url)
+                .header("cookie", cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(
+        response.headers()["content-length"],
+        content.len().to_string()
+    );
+    let mut body = response.into_body();
+    let mut offset = 0;
+    let mut frames = 0;
+    while let Some(frame) =
+        std::future::poll_fn(|context| std::pin::Pin::new(&mut body).poll_frame(context)).await
+    {
+        if let Ok(bytes) = frame.unwrap().into_data() {
+            assert!(
+                bytes.len() <= 64 * 1024,
+                "file delivery must remain chunked"
+            );
+            assert_eq!(bytes.as_ref(), &content[offset..offset + bytes.len()]);
+            offset += bytes.len();
+            frames += 1;
+        }
+    }
+    assert_eq!(offset, content.len());
+    assert!(frames > 1);
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(url)
+                .header("cookie", cookie)
+                .header("range", "bytes=1000-1999")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::PARTIAL_CONTENT);
+    assert_eq!(
+        to_bytes(response.into_body(), 2000).await.unwrap().as_ref(),
+        &content[1000..2000]
+    );
+    let wrong_route = DOWNLOAD_JOB_RESULT_WITH_TICKET
+        .path
+        .replace("{token}", ticket["token"].as_str().unwrap());
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(wrong_route)
+                .header("cookie", cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    let delete = format!(
+        "/api/users/{}?expectedVersion={}",
+        account["user"]["id"], account["user"]["versionNumber"]
+    );
+    assert_eq!(
+        json_response(&app, "DELETE", &delete, admin_token, json!({}))
+            .await
+            .0,
+        StatusCode::OK
+    );
+    let response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri(url)
+                .header("cookie", cookie)
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        StatusCode::UNAUTHORIZED,
+        "a valid cookie cannot revive a deleted account"
+    );
+    assert_eq!(
+        json_response(&app, "POST", "/api/auth/logout", token, json!({}))
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    drop(body);
     drop(app);
     service.close().unwrap();
     drop(service);

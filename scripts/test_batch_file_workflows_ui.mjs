@@ -157,6 +157,21 @@ await withOfficeUi('batch-file-workflows-ui', async ({ repo, output, url, invoke
     const original = files.find(file => path.parse(file).name === record.title); assert(original);
     assert.deepEqual(Buffer.from(await response.arrayBuffer()), fs.readFileSync(original));
   }
+  await page.getByRole('button', { name: '查看版本', exact: true }).first().click();
+  const ticketResponse = page.waitForResponse(response => response.request().method() === 'POST'
+    && response.url().includes('/business-attachments/') && response.url().endsWith('/download-ticket'));
+  const [originalDownload] = await Promise.all([page.waitForEvent('download'),
+    page.getByRole('button', { name: '下载原文件', exact: true }).first().click()]);
+  assert.equal((await ticketResponse).status(), 200, 'real React obtains an authenticated browser ticket');
+  const downloadedPath = path.join(output, 'downloaded-original.txt');
+  await originalDownload.saveAs(downloadedPath);
+  const originalPath = files.find(file => path.basename(file) === originalDownload.suggestedFilename());
+  assert(originalPath);
+  assert.deepEqual(fs.readFileSync(downloadedPath), fs.readFileSync(originalPath), 'browser streaming preserves the archived original bytes');
+  const directUrl = originalDownload.url();
+  assert(directUrl.includes('/downloads/business-attachments/'));
+  assert.equal((await fetch(directUrl)).status, 404, 'a copied download link requires its browser cookie');
+  await page.getByRole('button', { name: '返回资料列表', exact: true }).click();
   await page.screenshot({ path: path.join(output, 'business-attachments-saved.png'), fullPage: true });
-  fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ invoiceId: invoice.id, templatePaths: selected, pdfCount: 5, rebuiltTemplates: rebuilt, attachmentCount: 2, privateTemplateDenied: true }, null, 2));
+  fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ invoiceId: invoice.id, templatePaths: selected, pdfCount: 5, rebuiltTemplates: rebuilt, attachmentCount: 2, attachmentTicketDownload: true, privateTemplateDenied: true }, null, 2));
 });

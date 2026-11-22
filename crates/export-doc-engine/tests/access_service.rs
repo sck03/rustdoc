@@ -1,7 +1,16 @@
+#[path = "support/account_lifecycle_contract.rs"]
+mod account_lifecycle_contract;
 #[path = "support/native_fixture.rs"]
 mod native_fixture;
 use export_doc_engine::{contracts, generated_api::*};
 use serde_json::{Value, json};
+
+#[test]
+fn account_deletion_requires_handover_and_revokes_missing_identities() {
+    native_fixture::Fixture::new()
+        .client()
+        .run_contract(account_lifecycle_contract::exercise);
+}
 
 #[test]
 fn permission_catalog_preserves_builtin_rules_and_explains_effective_scopes() {

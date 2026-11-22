@@ -99,7 +99,7 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
     const id = details.data.attachment.id;
     await run(signal => readBusinessAttachment(client, id, version, showPreview, signal), result => {
       if (result?.preview) setPreview(result.preview);
-      if (result?.saved) setMessage("归档原文件已保存。");
+      if (result?.saved) setMessage(result.browserDownload ? "归档原文件已交给浏览器下载。" : "归档原文件已保存。");
     });
   }
   const commitSearch = () => { setSearch(keyword.trim()); setPageNumber(1); };

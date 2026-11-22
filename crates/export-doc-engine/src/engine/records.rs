@@ -684,8 +684,8 @@ pub fn delete(
             return Err(error(403, "没有删除此记录的权限。"));
         }
         store::check_version(&previous, store::expected(&body))?;
-        if resource.key == "users" && record_id == actor.id {
-            return Err(conflict("不能删除当前登录账号。"));
+        if resource.key == "users" {
+            super::accounts::validate_deletion(transaction, actor, &previous)?;
         }
         if resource.key == "permission-templates" && previous["isSystem"] == true {
             return Err(conflict("系统内置权限方案不可删除。"));

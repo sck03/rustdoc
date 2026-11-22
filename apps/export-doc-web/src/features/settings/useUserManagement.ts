@@ -112,7 +112,7 @@ export function useUserManagement(client: ExportDocManagerApiClient, canManageUs
         const target = users.find(user => user.id === draft.id);
         if (!target) throw new Error("请选择服务器列表中的用户。");
         if (!await requestConfirmation({ title: "删除账号", description: `确定删除账号“${target.username}”吗？`,
-          details: ["删除后该账号将立即无法登录。", "已有业务数据的账号不能删除，请改为停用。"], confirmLabel: "删除账号", tone: "danger" })) return false;
+          details: ["删除后该账号将立即无法登录。", "须先交接业务资料和未结事项；已有历史引用的账号应保留并停用。"], confirmLabel: "删除账号", tone: "danger" })) return false;
         checkCurrent();
         const response = await client.deleteUserAccount({ id: target.id, expectedVersion: target.versionNumber }, { signal }); checkCurrent();
         await queryClient.cancelQueries({ queryKey: queryKeys.users() }); checkCurrent();

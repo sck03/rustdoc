@@ -1,4 +1,4 @@
-use crate::{ServerState, response};
+use crate::{ServerState, downloads, response};
 pub(super) mod body;
 #[cfg(test)]
 mod lifecycle_tests;
@@ -359,39 +359,25 @@ async fn execute(
                     .map(|(k, v)| (k.as_str(), v.clone()))
                     .collect();
                 let query: Vec<_> = query.iter().map(|(k, v)| (k.as_str(), v.clone())).collect();
-                if operation == DOWNLOAD_JOB_RESULT_WITH_TICKET {
+                if downloads::is_ticket_download(operation) {
                     let ticket = parameters
                         .iter()
                         .find(|(name, _)| *name == "token")
                         .map(|(_, value)| value.as_str())
                         .unwrap_or("");
-                    let (id, session) = state.tickets.resolve(ticket, &cookie_binding)?;
-                    return state
-                        .service
-                        .prepare_job_download(&id, &session)
+                    let (target, session) =
+                        state.tickets.resolve(operation, ticket, &cookie_binding)?;
+                    return target
+                        .prepare(&state.service, &session)
                         .map(response::Reply::download);
                 }
                 if [
-                    DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET,
-                    DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET,
+                    DOWNLOAD_JOB_RESULT,
+                    CREATE_JOB_DOWNLOAD_TICKET,
+                    CREATE_BUSINESS_ATTACHMENT_DOWNLOAD_TICKET,
                 ]
                 .contains(&operation)
                 {
-                    let ticket = parameters
-                        .iter()
-                        .find(|(name, _)| *name == "token")
-                        .map(|(_, value)| value.as_str())
-                        .unwrap_or("");
-                    let (token, session) =
-                        state
-                            .tickets
-                            .resolve_for(operation, ticket, &cookie_binding)?;
-                    return state
-                        .service
-                        .prepare_backup_download(operation, &[("token", token)], &session)
-                        .map(response::Reply::download);
-                }
-                if [DOWNLOAD_JOB_RESULT, CREATE_JOB_DOWNLOAD_TICKET].contains(&operation) {
                     let id = parameters
                         .iter()
                         .find(|(name, _)| *name == "jobId")
@@ -403,11 +389,31 @@ async fn execute(
                             .prepare_job_download(id, &token)
                             .map(response::Reply::download);
                     }
-                    state.service.authorize_job_download(id, &token)?;
+                    let target = if operation == CREATE_JOB_DOWNLOAD_TICKET {
+                        state.service.authorize_job_download(id, &token)?;
+                        downloads::Target::Job(id.into())
+                    } else {
+                        state.service.authorize_file_download(
+                            DOWNLOAD_BUSINESS_ATTACHMENT,
+                            &parameters,
+                            &token,
+                        )?;
+                        let value = |key| {
+                            parameters
+                                .iter()
+                                .find(|(name, _)| *name == key)
+                                .map(|(_, value)| value.clone())
+                                .unwrap_or_default()
+                        };
+                        downloads::Target::BusinessAttachment {
+                            id: value("id"),
+                            revision: value("revision"),
+                        }
+                    };
                     let (ticket, cookie) =
                         state
                             .tickets
-                            .issue(id, &token, &cookie_binding, secure_cookie)?;
+                            .issue(target, &token, &cookie_binding, secure_cookie)?;
                     return Ok(response::Reply {
                         bytes: export_doc_engine::json_response::encode(operation, &ticket)?,
                         file: None,
@@ -560,13 +566,12 @@ async fn execute(
                         let id = original["token"]
                             .as_str()
                             .ok_or_else(|| error(503, "备份下载票据缺失。"))?;
-                        let (ticket, cookie) = state.tickets.issue_for(
+                        let (ticket, cookie) = state.tickets.issue(
                             if operation == CREATE_RECOVERY_ARCHIVE_DOWNLOAD_TICKET {
-                                DOWNLOAD_RECOVERY_ARCHIVE_WITH_TICKET
+                                downloads::Target::RecoveryArchive(id.into())
                             } else {
-                                DOWNLOAD_POSTGRE_SQL_PHYSICAL_BACKUP_WITH_TICKET
+                                downloads::Target::PostgreSqlBackup(id.into())
                             },
-                            id,
                             &token,
                             &cookie_binding,
                             secure_cookie,

@@ -10,6 +10,35 @@ use export_doc_domain::permissions;
 use serde_json::{Value, json};
 use unicode_normalization::UnicodeNormalization;
 
+pub(super) fn is_last_active_administrator(
+    tx: &store::Connection,
+    account: &Value,
+) -> Result<bool> {
+    Ok(account["role"] == "Admin"
+        && account["isActive"] == true
+        && !tx.has_other_active_administrator(super::records::positive(account, "id", "账号")?)?)
+}
+
+pub(super) fn ensure_handover_complete(tx: &store::Connection, account: &Value) -> Result<()> {
+    if super::office_queries::account_clearance(tx, account)?["isClear"] != true {
+        return Err(conflict(
+            "仍有未结申请、审批、办理职责或业务资料，请先完成交接。",
+        ));
+    }
+    Ok(())
+}
+
+pub(super) fn validate_deletion(
+    tx: &store::Connection,
+    actor: &Actor,
+    account: &Value,
+) -> Result<()> {
+    if account["id"] == actor.id {
+        return Err(conflict("不能删除当前登录账号。"));
+    }
+    ensure_handover_complete(tx, account)
+}
+
 pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Value> {
     auth::authorize(actor, "system.users", "manage")?;
     for key in ["username", "fullName", "companyScope", "departmentId"] {
@@ -74,25 +103,16 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
         }
         if let Some(previous) = &previous {
             store::check_version(previous, store::expected(&body))?;
-            if previous["role"] == "Admin"
-                && previous["isActive"] == true
-                && (body["role"] != "Admin" || body["isActive"] != true)
-                && store::all(tx, "users")?
-                    .iter()
-                    .filter(|user| user["role"] == "Admin" && user["isActive"] == true)
-                    .count()
-                    <= 1
+            if (body["role"] != "Admin" || body["isActive"] != true)
+                && is_last_active_administrator(tx, previous)?
             {
                 return Err(invalid("必须保留至少一个启用的管理员。"));
             }
-            if (previous["companyScope"] != body["companyScope"]
+            if previous["companyScope"] != body["companyScope"]
                 || previous["departmentId"] != body["departmentId"]
-                || previous["isActive"] == true && body["isActive"] != true)
-                && super::office_queries::account_clearance(tx, previous)?["isClear"] != true
+                || previous["isActive"] == true && body["isActive"] != true
             {
-                return Err(conflict(
-                    "仍有未结申请、审批、办理职责或业务资料，请先完成交接。",
-                ));
+                ensure_handover_complete(tx, previous)?;
             }
         }
         super::organization::validate_assignment(

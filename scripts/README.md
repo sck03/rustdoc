@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-22 账号与下载回归：`access_service` 和 PostgreSQL `team_service` 共用账号交接、管理员保留、删除及旧会话合同；HTTP `files` 验证资料票据的 Cookie/操作绑定、分块、Range 及账号删除后拒绝下载。`test_business_features_ui.mjs` 检查原件不经 Blob 和迟到票据取消，`test_batch_file_workflows_ui.mjs` 在真实 React/HTTP 中下载并逐字节核对原件。HS 清空回归覆盖超过两批编号的完整清理与知识实例保留。执行结果与定向清理见[本批记录](../docs/archive/2026-11/2026-11-22账号生命周期与下载优化.md)。
+
 2026-11-22 导入与资源回归：`test_catalog_history_workspaces_ui.mjs` 验证 HS 预检由服务端分页/筛选及字段前后值展示；`test_business_features_ui.mjs` 验证资料分类筛选和窄屏布局。Engine 的双库共享业务合同覆盖增量缺列保留、明确空列清空、分页和消费后拒绝访问，Storage 双库合同覆盖预检行分页、容量及事务。S3 缓存取消/超时与图片回收动作分别由 Engine 回归覆盖。本批新增 `import_preview_rows` 后须使用新测试数据库；验证与清理见[记录](../docs/archive/2026-11/2026-11-22导入预检与资源一致性修复.md)。
 
 2026-11-22 审查回归：`test_hs_transfer_ui.mjs` 覆盖联网参考首次保存、已有记录确认更新、本地字段保留、版本冲突和身份/权限切换；`test:business-date-refresh` 同时执行模型与真实 React 时钟回归，登记在统一 `session` 组。资源终态保护及 HS 写入边界进入 Engine 双库共享合同，会议室重叠、时区、纳秒、状态和损坏时间进入 Storage 双库共享合同。实际验证与清理见[本批记录](../docs/archive/2026-11/2026-11-22项目审查修复与清理.md)。

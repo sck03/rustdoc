@@ -35,6 +35,18 @@ fn prior_policy(id: &str) -> &'static Value {
         ))
         .unwrap();
         policies.extend(additions.as_object().unwrap().clone());
+        // Issuing and consuming browser tickets preserve the original invoice-view right.
+        for operation in [
+            CREATE_BUSINESS_ATTACHMENT_DOWNLOAD_TICKET,
+            DOWNLOAD_BUSINESS_ATTACHMENT_WITH_TICKET,
+        ] {
+            policies.insert(
+                operation.id.into(),
+                serde_json::json!({
+                    "requirements":[{"resourceKey":"document.invoices","action":"view"}]
+                }),
+            );
+        }
         // Reading a private import preview keeps the importer's management right.
         policies.insert(
             LIST_HS_CODE_IMPORT_PREVIEW_ITEMS.id.into(),

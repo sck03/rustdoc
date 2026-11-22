@@ -1,4 +1,6 @@
 #![cfg(feature = "postgres")]
+#[path = "support/account_lifecycle_contract.rs"]
+mod account_lifecycle_contract;
 #[path = "support/account_permissions.rs"]
 mod account_permissions;
 #[path = "support/account_scope.rs"]
@@ -126,6 +128,9 @@ fn team_bootstrap_permissions_personnel_and_approval_share_the_rust_services() {
             .is_none()
     );
     let token = admin["accessToken"].as_str().unwrap();
+    phase("account_lifecycle_contract::exercise", || {
+        account_lifecycle_contract::exercise(&service, token)
+    });
     phase("business_consistency_contract::exercise", || {
         business_consistency_contract::exercise(&service, token)
     });

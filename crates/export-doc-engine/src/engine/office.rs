@@ -376,14 +376,7 @@ pub(super) fn supply_totals(supply: &mut Value) {
     supply["lowStock"] = json!(available < supply["minimumStock"].as_i64().unwrap_or(0));
 }
 fn validate_department(connection: &Connection, company: &str, code: &str) -> Result<()> {
-    if store::all(connection, "departments")?
-        .iter()
-        .any(|department| {
-            department["code"] == code
-                && department["isActive"] == true
-                && department["companyCode"] == company
-        })
-    {
+    if super::organization::department_is_active(connection, company, code)? {
         Ok(())
     } else {
         Err(invalid("请选择本公司启用的部门。"))

@@ -49,6 +49,8 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   const create=URL.createObjectURL.bind(URL), revoke=URL.revokeObjectURL.bind(URL);
   URL.createObjectURL=blob=>{const url=create(blob);window.__createdUrls.push(url);return url;};
   URL.revokeObjectURL=url=>{window.__revokedUrls.push(url);revoke(url);};
+  const clickLink=HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click=function(){if(this.pathname.startsWith('/downloads/business-attachments/')){window.__calls.push({name:'browserDownload',url:this.href});return;}return clickLink.call(this);};
   const user={id:7,username:'user',fullName:'示例用户',companyScope:'C1',businessTimeZone:'Asia/Shanghai',businessDate:'2026-09-08',capabilities:{}};
   let categories=[{id:1,name:'确认资料',versionNumber:1,attachmentCount:1},{id:2,name:'产品图纸',versionNumber:1,attachmentCount:0}];
   let attachment={id:11,invoiceId:1,invoiceNo:'INV-2026-091',invoiceType:'实际数据',customerName:'SAMPLE CUSTOMER',title:'客户确认图纸',categoryId:1,categoryName:'确认资料',poNumber:'PO-2026',styleNo:'NEW-STYLE',latestRevision:2,currentRevision:1,isArchived:false,versionNumber:2,updatedAt:'2026-09-08T04:00:00Z',canEdit:!readonly,canDelete:!readonly};
@@ -60,6 +62,8 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
   const page=(items,request={})=>({items,totalCount:items.length,pageNumber:request.pageNumber||1,pageSize:request.pageSize||20,totalPages:items.length?1:0,hasPreviousPage:false,hasNextPage:false});
   const record=(name,input,result)=>{window.__calls.push({name,input});return Promise.resolve(result);};
   const client={
+    resolveUrl:path=>new URL(path,location.origin).href,
+    createBusinessAttachmentDownloadTicket:async(input,options)=>{window.__calls.push({name:'downloadTicket',input});if(window.__delayTicket)await new Promise(resolve=>{window.__resolveTicket=resolve;window.__ticketSignal=options.signal;});return {token:'browser-ticket',downloadUrl:'/downloads/business-attachments/browser-ticket',expiresAtUtc:'2099-01-01T00:00:00Z'};},
     listBusinessAttachmentCategories:input=>record('listCategories',input,{companyScope:'C1',canManage:!readonly,items:categories.map(item=>({...item,attachmentCount:!deleted&&attachment.categoryId===item.id?1:0}))}),
     createBusinessAttachmentCategory:input=>{const item={id:Math.max(...categories.map(item=>item.id))+1,name:input.body.name,versionNumber:1,attachmentCount:0};categories.push(item);return record('createCategory',input,{...item});},
     updateBusinessAttachmentCategory:input=>{const item=categories.find(item=>item.id===input.id);Object.assign(item,{name:input.body.name,versionNumber:item.versionNumber+1});if(attachment.categoryId===item.id)attachment.categoryName=item.name;return record('updateCategory',input,{...item});},
@@ -179,6 +183,11 @@ try {
   await click(page, "查看并处理", "a"); await waitFor(page, "window.__destination");
   assert.equal(await read(page, "window.__destination"), "/crm/follow-ups?followUpId=79"); results.push("worklist-filter-and-source-link");
   await open("attachments"); await click(page, "查看版本"); await waitFor(page, "document.querySelector('.attachment-detail')");
+  await click(page, '下载原文件'); await waitFor(page, "window.__calls.some(c=>c.name==='browserDownload')");
+  assert.deepEqual(await read(page, "window.__calls.find(c=>c.name==='downloadTicket').input"), {id:11,revision:2});
+  assert.equal(await read(page, "window.__calls.some(c=>c.name==='download')"), false, 'original downloads must not allocate a preview Blob');
+  assert.equal(await read(page, 'window.__createdUrls.length'), 0);
+  results.push('attachment-original-uses-browser-ticket');
   await click(page, "设为有效版本"); await waitFor(page, "document.body.innerText.includes('请先填写本次确认')");
   await input(page, ".attachment-detail input", "客户确认采用第二版"); await click(page, "设为有效版本");
   await waitFor(page, "document.querySelector('[role=dialog]')"); await click(page, "确认", "[role=dialog] button");
@@ -211,6 +220,16 @@ try {
   }
   await verifyAttachmentManagementUi({page,open,read,waitFor,click,input,audit,results});
   await verifyGlobalAttachmentUploadUi({page,open,read,waitFor,click,input,audit,results});
+  await open('attachments'); await click(page, '查看版本'); await waitFor(page, "document.querySelector('.attachment-detail')");
+  await read(page, 'window.__delayTicket=true'); await click(page, '下载原文件');
+  await waitFor(page, 'window.__resolveTicket');
+  await read(page, "window.__navigate('/invoices/1/attachments')");
+  await waitFor(page, "!document.querySelector('.attachment-detail')");
+  await read(page, 'window.__resolveTicket()');
+  await waitFor(page, "[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='查看版本'&&!b.disabled)");
+  assert.equal(await read(page, 'window.__ticketSignal.aborted'), true);
+  assert.equal(await read(page, "window.__calls.some(c=>c.name==='browserDownload')"), false, 'a late ticket cannot initiate a download after navigation');
+  results.push('late-attachment-ticket-cancelled');
   for (const outcome of ['success', 'failure']) {
     await open('attachments'); await click(page, '查看版本'); await waitFor(page, "document.querySelector('.attachment-detail')");
     await read(page, 'window.__delayPreview=true'); await click(page, '预览');

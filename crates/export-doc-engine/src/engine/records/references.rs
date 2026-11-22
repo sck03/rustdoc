@@ -30,18 +30,12 @@ pub fn check_references(connection: &Connection, kind: &str, record: &Value) -> 
             text(record, "companyCode")
         };
         let department = text(record, "code");
+        let mut filters = vec![("companyScope", company)];
+        if kind == "departments" {
+            filters.push(("departmentId", department));
+        }
         for request_kind in super::super::oa::KINDS {
-            if connection
-                .query_records(&export_doc_storage::RecordQuery {
-                    kind: request_kind,
-                    company: &company,
-                    department: (kind == "departments").then_some(department.as_str()),
-                    limit: 1,
-                    ..Default::default()
-                })?
-                .0
-                > 0
-            {
+            if connection.record_exists(request_kind, &filters)? {
                 return Err(conflict("组织已有行政审批记录，不能删除。"));
             }
         }
@@ -70,23 +64,8 @@ pub fn check_references(connection: &Connection, kind: &str, record: &Value) -> 
         ("invoices", "attachments", "invoiceId"),
         ("attachment-categories", "attachments", "categoryId"),
     ];
-    for (parent, child, property) in REFS.iter().filter(|(parent, _, _)| *parent == kind) {
-        let _ = parent;
-        if connection
-            .query_generic(&export_doc_storage::GenericQuery {
-                kind: child,
-                scope: export_doc_storage::DataScope {
-                    all: true,
-                    ..Default::default()
-                },
-                filters: &[(*property, record["id"].to_string())],
-                fields: &[("id", "id")],
-                limit: 1,
-                ..Default::default()
-            })?
-            .0
-            > 0
-        {
+    for (_, child, property) in REFS.iter().filter(|(parent, _, _)| *parent == kind) {
+        if connection.record_exists(child, &[(*property, record["id"].to_string())])? {
             return Err(conflict("该记录已被业务引用，不能删除。"));
         }
     }

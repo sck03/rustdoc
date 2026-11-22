@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "1ee7301f90026a8259e4940d4cf6eb51094727345935e11d3303b34373d86b70",
+  "digest": "1641f6204509c4abf38ce113cdd878782100a025a7e71ad0787f1bbf60920286",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -14327,6 +14327,69 @@
       "requiresProcessingSlot": false,
       "validatesDecimalInput": false
     },
+    "CreateBusinessAttachmentDownloadTicket": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "document.invoices",
+              "actions": [
+                "view"
+              ],
+              "administratorOnly": false
+            }
+          ]
+        }
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "required": true
+        },
+        {
+          "name": "revision",
+          "in": "path",
+          "schema": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          },
+          "required": true
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiDownloadTicket"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/ApiDownloadTicket"
+      },
+      "timeoutSeconds": 30,
+      "maxJsonResponseBytes": 65536,
+      "requiresProcessingSlot": false,
+      "validatesDecimalInput": false
+    },
     "CreateCrmContact": {
       "policy": {
         "requiresAuthentication": true,
@@ -27697,6 +27760,84 @@
             "format": "int32",
             "pattern": "^-?(?:0|[1-9]\\d*)$",
             "minimum": 1
+          },
+          "required": true
+        },
+        {
+          "name": "Range",
+          "in": "header",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "byte"
+              }
+            }
+          }
+        },
+        "206": {
+          "description": "Partial Content",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "byte"
+              }
+            }
+          }
+        },
+        "416": {
+          "description": "Range Not Satisfiable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": null,
+      "timeoutSeconds": 86400,
+      "maxJsonResponseBytes": 67108864,
+      "requiresProcessingSlot": false,
+      "validatesDecimalInput": false
+    },
+    "DownloadBusinessAttachmentWithTicket": {
+      "policy": {
+        "requiresAuthentication": false,
+        "requiresDesktopAccess": true,
+        "requiresLicense": false,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "document.invoices",
+              "actions": [
+                "view"
+              ],
+              "administratorOnly": false
+            }
+          ]
+        }
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "token",
+          "in": "path",
+          "schema": {
+            "type": "string"
           },
           "required": true
         },

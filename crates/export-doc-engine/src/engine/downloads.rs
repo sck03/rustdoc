@@ -28,6 +28,37 @@ impl NativeService {
         self.authorize_operation(&actor, operation, &[])?;
         work(&actor)
     }
+    fn capture_file_download(
+        &self,
+        operation: Operation,
+        parameters: &[(&str, String)],
+        token: &str,
+    ) -> Result<export_doc_storage::FileInfo> {
+        use crate::generated_api::{DOWNLOAD_BUSINESS_ATTACHMENT, DOWNLOAD_PERSONNEL_ATTACHMENT};
+        self.with_download_access(operation, token, |actor| match operation {
+            DOWNLOAD_BUSINESS_ATTACHMENT => {
+                let id = super::records::id(parameters)?;
+                let revision = super::request_values::find(parameters, "revision")
+                    .and_then(|v| v.parse::<i64>().ok())
+                    .filter(|revision| *revision > 0)
+                    .ok_or_else(|| super::error::invalid("缺少有效资料版本号。"))?;
+                super::attachments::download_info(&self.store, actor, operation, id, revision)
+            }
+            DOWNLOAD_PERSONNEL_ATTACHMENT => {
+                super::personnel_files::download_info(&self.store, actor, parameters)
+            }
+            _ => super::record_documents::download_info(self, actor, operation, parameters),
+        })
+    }
+    pub fn authorize_file_download(
+        &self,
+        operation: Operation,
+        parameters: &[(&str, String)],
+        token: &str,
+    ) -> Result<()> {
+        self.capture_file_download(operation, parameters, token)
+            .map(|_| ())
+    }
     pub fn prepare_file_download(
         &self,
         operation: Operation,
@@ -40,27 +71,7 @@ impl NativeService {
                 && super::oa::metadata(operation).is_some_and(|m| m["action"] == "download")
             || super::communication::is_download(operation)
         {
-            let capture = || {
-                self.with_download_access(operation, token, |actor| match operation {
-                    DOWNLOAD_BUSINESS_ATTACHMENT => {
-                        let id = super::records::id(parameters)?;
-                        let revision = super::request_values::find(parameters, "revision")
-                            .and_then(|v| v.parse().ok())
-                            .ok_or_else(|| super::error::invalid("缺少有效资料版本号。"))?;
-                        super::attachments::download_info(
-                            &self.store,
-                            actor,
-                            operation,
-                            id,
-                            revision,
-                        )
-                    }
-                    DOWNLOAD_PERSONNEL_ATTACHMENT => {
-                        super::personnel_files::download_info(&self.store, actor, parameters)
-                    }
-                    _ => super::record_documents::download_info(self, actor, operation, parameters),
-                })
-            };
+            let capture = || self.capture_file_download(operation, parameters, token);
             let info = capture()?;
             let download = self.store.files.download(&info)?;
             if capture()? != info {

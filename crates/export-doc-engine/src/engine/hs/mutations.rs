@@ -2,6 +2,42 @@
 use super::*;
 use crate::engine::{error::unavailable, records::required};
 
+pub(super) fn clear_codes(tx: &Connection, actor: &Actor, body: &Value) -> Result<Value> {
+    if text(body, "confirmation") != "CLEAR" {
+        return Err(invalid("请输入 CLEAR 确认清空税则主档。"));
+    }
+    let query = export_doc_storage::GenericQuery {
+        kind: CODES,
+        scope: export_doc_storage::DataScope {
+            all: true,
+            ..Default::default()
+        },
+        fields: &[("id", "id")],
+        limit: 200,
+        ..Default::default()
+    };
+    let mut cursor = None;
+    let mut count = 0;
+    loop {
+        operation::check()?;
+        let (next, rows) = tx.scan_generic(&query, cursor)?;
+        if rows.is_empty() {
+            break;
+        }
+        let ids = rows
+            .iter()
+            .map(|row| {
+                row["id"]
+                    .as_i64()
+                    .ok_or_else(|| unavailable("HS 编码编号损坏。"))
+            })
+            .collect::<Result<BTreeSet<_>>>()?;
+        count += delete(tx, actor, CODES, &ids)?;
+        cursor = next;
+    }
+    Ok(json!({"success":true,"message":format!("已删除 {count} 个编码。"),"deletedCount":count}))
+}
+
 pub(super) fn preview_obsolete(tx: &Connection) -> Result<Value> {
     use export_doc_storage::{DataScope, GenericQuery};
     let (total, items) = tx.query_generic(&GenericQuery {

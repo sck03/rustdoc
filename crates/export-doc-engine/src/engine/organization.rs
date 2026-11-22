@@ -120,21 +120,25 @@ pub fn validate_assignment(connection: &Connection, company: &str, department: &
     {
         return Err(invalid("选择的公司不存在或已停用。"));
     }
-    if !department.is_empty()
-        && !connection
-            .find_identity(
-                "departments",
-                &store::company_identity(company, department)?,
-            )?
-            .is_some_and(|item| {
-                item["code"] == department
-                    && item["companyCode"] == company
-                    && item["isActive"] == true
-            })
-    {
+    if !department.is_empty() && !department_is_active(connection, company, department)? {
         return Err(invalid("选择的部门不存在、已停用或不属于所选公司。"));
     }
     Ok(())
+}
+
+pub(super) fn department_is_active(
+    connection: &Connection,
+    company: &str,
+    department: &str,
+) -> Result<bool> {
+    Ok(connection
+        .find_identity(
+            "departments",
+            &store::company_identity(company, department)?,
+        )?
+        .is_some_and(|item| {
+            item["code"] == department && item["companyCode"] == company && item["isActive"] == true
+        }))
 }
 
 pub fn departments(store: &Store) -> Result<Vec<Value>> {

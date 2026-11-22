@@ -174,19 +174,7 @@ pub fn handle(
         DELETE_HS_CODE | DELETE_HS_CODES_BATCH => {
             mutations::delete_codes(tx, actor, operation, parameters, query, body)
         }
-        CLEAR_ALL_HS_CODES => {
-            if text(body, "confirmation") != "CLEAR" {
-                return Err(invalid("请输入 CLEAR 确认清空税则主档。"));
-            }
-            let ids = store::all(tx, CODES)?
-                .iter()
-                .filter_map(|r| r["id"].as_i64())
-                .collect();
-            let count = delete(tx, actor, CODES, &ids)?;
-            Ok(
-                json!({"success":true,"message":format!("已删除 {count} 个编码。"),"deletedCount":count}),
-            )
-        }
+        CLEAR_ALL_HS_CODES => mutations::clear_codes(tx, actor, body),
         SEARCH_HS_CODE_KNOWLEDGE | SEARCH_INVOICE_HS_CODE_KNOWLEDGE => {
             hs_search::search(tx, query, year)
         }
