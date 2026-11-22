@@ -22,7 +22,6 @@ import {
 applyHsCodeRemoteDetailResolution,
 buildHsCodeResultKey,
 normalizeHsCodeDtoForRequest,
-normalizeHsCodeDtoForSave,
 replaceHsCodeResult,
 shouldFetchRemoteHsCodeDetail
 } from "./masterDataModel.ts";
@@ -30,6 +29,7 @@ import { hsCodeClearAllConfirmationText } from "./masterDataTypes.ts";
 import { HsCodeCleanupPanel } from "./HsCodeCleanupPanel.tsx";
 import { HsCodeImportPreview } from "./HsCodeImportPreview.tsx";
 import { HsCodeObsoleteReviewPanel } from "./HsCodeObsoleteReviewPanel.tsx";
+import { useHsReferenceSave } from "./useHsReferenceSave.ts";
 
 
 export function HsCodeToolsPanel({
@@ -193,11 +193,11 @@ export function HsCodeToolsPanel({
     onError: (error) => showError(readApiError(error)),
   });
 
-  const saveRemoteMutation = useScopedMutation(commandScope, client, {
-    mutationFn: (item: ApiHsCodeDto, signal) => client.createHsCode({ body: normalizeHsCodeDtoForSave(item) }, { signal }),
-    onSuccess: (response, item) => {
-      setRemoteResults((current) => replaceHsCodeResult(current, item, response));
-      showSuccess(`HS编码 ${response.code || item.code} 已保存为本地参考资料，导入年度税则后才会标记为当前有效。`);
+  const saveRemoteMutation = useHsReferenceSave({
+    client, scope: commandScope,
+    onSaved: ({ record, updated }, item) => {
+      setRemoteResults((current) => replaceHsCodeResult(current, item, record));
+      showSuccess(`HS编码 ${record.code || item.code} ${updated ? "已更新本地参考资料。" : "已保存为本地参考资料，导入年度税则后才会标记为当前有效。"}`);
     },
     refresh: onLocalDataChanged,
     onError: (error) => showError(readApiError(error)),

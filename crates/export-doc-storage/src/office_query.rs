@@ -1,6 +1,45 @@
 //! Resource requests share authorization, filtering and one-snapshot pagination.
 use crate::{DataScope, QuerySql, Result, sql};
 
+/// Conflict checks read at most one identity, without counting or loading history.
+/// Actual handover overruns remain a separate rule from the reserved time interval.
+pub(crate) fn booking_overlaps(
+    db: &(impl crate::adapter::Adapter + ?Sized),
+    company: &str,
+    room: i64,
+    from: &str,
+    to: &str,
+    states: &[&str],
+) -> Result<bool> {
+    let pg = db.provider() == "PostgreSQL";
+    let mut query = crate::record_query::sql(
+        &crate::RecordQuery {
+            kind: "bookings",
+            company,
+            resource_id: Some(room),
+            statuses: states,
+            ..Default::default()
+        },
+        pg,
+    );
+    let first = sql::bind(&mut query.values, from, pg);
+    let last = sql::bind(&mut query.values, to, pg);
+    let instant = |value: &str| {
+        let (seconds, nanos) = sql::instant_order(value, pg);
+        format!("({seconds},{nanos})")
+    };
+    query.filter += &format!(
+        " AND {}<{} AND {}>{}",
+        instant(&sql::field("startsAt", pg)),
+        instant(&last),
+        instant(&sql::field("endsAt", pg)),
+        instant(&first),
+    );
+    Ok(!db
+        .query_slice(&query, &sql::projection(&[("id", "id")], pg)?, 0, 1)?
+        .is_empty())
+}
+
 pub struct OfficeQuery<'a> {
     pub viewer: i64,
     pub context: &'a str,

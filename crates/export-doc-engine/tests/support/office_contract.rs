@@ -377,6 +377,37 @@ pub fn exercise(admin: &Request<'_>, applicant: &Request<'_>, reviewer: &Request
         json!({"expectedVersion":issued["versionNumber"],"quantity":2,"note":"余下设备归还"}),
     );
     assert_eq!(issued["status"], "Returned");
+    for (operation, body) in [
+        (
+            UPDATE_DRAFT_OF_OFFICE_SUPPLY_REQUEST,
+            json!({"expectedVersion":issued["versionNumber"],"quantity":4,"purpose":"禁止重开已归还申请","returnDueDate":today.to_string()}),
+        ),
+        (
+            SUBMIT_OFFICE_SUPPLY_REQUEST,
+            json!({"expectedVersion":issued["versionNumber"],"commandKey":nonce().unwrap(),"note":"禁止重复提交已归还申请"}),
+        ),
+    ] {
+        assert_eq!(
+            applicant(operation, issued["id"].as_i64(), &[], Some(body))
+                .unwrap_err()
+                .status,
+            Some(409)
+        );
+    }
+    let unchanged = applicant(GET_OFFICE_SUPPLY_REQUEST, issued["id"].as_i64(), &[], None).unwrap();
+    for field in [
+        "status",
+        "quantity",
+        "returnedQuantity",
+        "submissionId",
+        "submissionNumber",
+        "versionNumber",
+    ] {
+        assert_eq!(
+            unchanged[field], issued[field],
+            "returned resource field {field} must remain immutable"
+        );
+    }
     let history = page(
         admin,
         GET_OFFICE_SUPPLY_REQUEST_HISTORY,

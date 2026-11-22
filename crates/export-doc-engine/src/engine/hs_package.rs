@@ -141,7 +141,7 @@ pub fn import(service: &NativeService, actor: &Actor, name: &str, bytes: &[u8]) 
                 row["expectedVersion"]=old["versionNumber"].clone();
             }
             *counters.entry(if old.is_some(){"updatedHsCodes"}else{"addedHsCodes"}).or_default()+=1;
-            hs::save_code(tx,actor,&row,true)?;
+            hs::save_code(tx,actor,&row,hs::SaveMode::Import)?;
             Ok(())
         })?;
         unique.clear();

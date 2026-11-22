@@ -68,6 +68,70 @@ pub fn exercise(
         Some(400)
     );
     let b = get(codes[1]);
+    let mut duplicate = b.clone();
+    duplicate["id"] = json!(0);
+    duplicate["rowVersion"] = json!("native:1");
+    duplicate["name"] = json!("过期联网结果");
+    duplicate["notes"] = json!("");
+    assert_eq!(
+        call(CREATE_HS_CODE, &[], &[], Some(duplicate))
+            .unwrap_err()
+            .status,
+        Some(409)
+    );
+    assert_eq!(
+        get(codes[1]),
+        b,
+        "duplicate creation must preserve the latest local reference"
+    );
+    let wrong_id = b["id"].as_i64().unwrap() + 100;
+    for id in [
+        json!(wrong_id),
+        json!(wrong_id.to_string()),
+        json!(-1),
+        json!("-1"),
+        json!("invalid"),
+        json!(true),
+        Value::Null,
+    ] {
+        let mut wrong = b.clone();
+        wrong["id"] = id;
+        assert_eq!(
+            call(
+                UPDATE_HS_CODE,
+                &[("code", codes[1].into())],
+                &[],
+                Some(wrong)
+            )
+            .unwrap_err()
+            .status,
+            Some(400)
+        );
+    }
+    let mut stale = b.clone();
+    stale["rowVersion"] = json!("native:1");
+    assert_eq!(
+        call(
+            UPDATE_HS_CODE,
+            &[("code", codes[1].into())],
+            &[],
+            Some(stale)
+        )
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
+    assert_eq!(get(codes[1]), b);
+    let mut valid = b.clone();
+    valid["id"] = json!(b["id"].as_i64().unwrap().to_string());
+    let b = call(
+        UPDATE_HS_CODE,
+        &[("code", codes[1].into())],
+        &[],
+        Some(valid),
+    )
+    .unwrap();
+    assert_eq!(b["notes"], "他人年度核对后的资料");
     assert_eq!(
         call(
             CONFIRM_HS_CODES_OBSOLETE,

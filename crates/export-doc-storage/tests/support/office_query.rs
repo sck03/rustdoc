@@ -1,6 +1,7 @@
 use export_doc_storage::{Connection, DataScope, OfficeQuery, RecordWrite};
 use serde_json::json;
 pub fn exercise(c: &Connection) {
+    booking_conflicts(c);
     c.begin().unwrap();
     let mut ids = vec![];
     for (owner, company, department, status, key) in [
@@ -81,5 +82,75 @@ pub fn exercise(c: &Connection) {
     q.to = None;
     q.offset = i64::MAX;
     assert!(c.query_office(&q).unwrap().1.is_empty());
+    c.rollback().unwrap();
+}
+
+fn booking_conflicts(c: &Connection) {
+    c.begin().unwrap();
+    let states = ["Pending", "Suspended", "Approved", "InUse"];
+    let start = "2026-11-22T10:00:00.000000001+08:00";
+    let end = "2026-11-22T11:00:00.000000001+08:00";
+    for (room, status) in states
+        .iter()
+        .chain(["Completed", "Draft", "Cancelled"].iter())
+        .enumerate()
+    {
+        let body = json!({"companyScope":"BOOKING-CONFLICT","ownerUserId":71,
+            "departmentId":"A","versionNumber":1,"meetingRoomId":room as i64 + 1,
+            "status":status,"startsAt":start,"endsAt":end});
+        c.insert(&RecordWrite::unkeyed("bookings", &body)).unwrap();
+        assert_eq!(
+            c.booking_overlaps("BOOKING-CONFLICT", room as i64 + 1, start, end, &states)
+                .unwrap(),
+            room < states.len()
+        );
+    }
+    for (from, to, expected) in [
+        (
+            "2026-11-22T01:00:00Z",
+            "2026-11-22T02:00:00.000000001Z",
+            false,
+        ),
+        (
+            "2026-11-22T01:00:00Z",
+            "2026-11-22T02:00:00.000000002Z",
+            true,
+        ),
+        (
+            "2026-11-22T03:00:00.000000001Z",
+            "2026-11-22T04:00:00Z",
+            false,
+        ),
+        ("2026-11-22T03:00:00Z", "2026-11-22T04:00:00Z", true),
+    ] {
+        assert_eq!(
+            c.booking_overlaps("BOOKING-CONFLICT", 1, from, to, &states)
+                .unwrap(),
+            expected
+        );
+    }
+    assert!(!c.booking_overlaps("OTHER", 1, start, end, &states).unwrap());
+    assert!(
+        !c.booking_overlaps("BOOKING-CONFLICT", 99, start, end, &states)
+            .unwrap()
+    );
+    assert!(
+        !c.booking_overlaps(
+            "BOOKING-CONFLICT",
+            4,
+            "2026-11-22T04:00:00Z",
+            "2026-11-22T05:00:00Z",
+            &states
+        )
+        .unwrap(),
+        "an overdue handover does not extend the reserved interval"
+    );
+    c.insert(&RecordWrite::unkeyed("bookings", &json!({"companyScope":"BOOKING-CONFLICT","ownerUserId":71,
+        "departmentId":"A","versionNumber":1,"meetingRoomId":99,"status":"Pending","startsAt":"damaged","endsAt":end}))).unwrap();
+    assert!(
+        c.booking_overlaps("BOOKING-CONFLICT", 99, start, end, &states)
+            .is_err(),
+        "corrupt instants must not become a free room or a business conflict"
+    );
     c.rollback().unwrap();
 }

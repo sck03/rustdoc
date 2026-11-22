@@ -11,6 +11,17 @@ pub const SUPPLY_IN_FLIGHT_STATES: &[&str] = &["Pending", "Suspended", "Approved
 pub const OA_UNFINISHED_STATES: &[&str] =
     &["Draft", "Pending", "Suspended", "Approved", "Returned"];
 
+/// Resource returns are completed handovers; only ordinary OA returns reopen editing.
+pub fn request_is_editable(kind: &str, status: &str) -> bool {
+    match kind {
+        "room" | "supply" => status == "Draft",
+        "personnel" | "leave" | "overtime" | "expense" | "travel" | "purchase" | "general" => {
+            matches!(status, "Draft" | "Returned")
+        }
+        _ => false,
+    }
+}
+
 fn string<'a>(value: &'a Value, key: &str) -> &'a str {
     value[key].as_str().unwrap_or("")
 }

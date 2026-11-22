@@ -238,21 +238,14 @@ pub fn validate(
                     "请选择当前时间之后、会议室允许提前预约天数以内的时段。",
                 ));
             }
-            for booking in store::matching(
-                connection,
-                "bookings",
-                &[("meetingRoomId", value["meetingRoomId"].to_string())],
-                &[],
+            if connection.booking_overlaps(
+                &actor.company,
+                positive(value, "meetingRoomId", "会议室")?,
+                &start.to_rfc3339(),
+                &end.to_rfc3339(),
+                export_doc_domain::oa::ROOM_OCCUPYING_STATES,
             )? {
-                if booking["id"] != id
-                    && booking["meetingRoomId"] == value["meetingRoomId"]
-                    && export_doc_domain::oa::ROOM_OCCUPYING_STATES
-                        .contains(&text(&booking, "status").as_str())
-                    && start < instant(&booking, "endsAt")?
-                    && end > instant(&booking, "startsAt")?
-                {
-                    return Err(conflict("该会议室在所选时间已被预约。"));
-                }
+                return Err(conflict("该会议室在所选时间已被预约。"));
             }
             let employee = person(connection, actor, value)?;
             value["employeeId"] = employee["id"].clone();

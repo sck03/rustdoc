@@ -1,28 +1,24 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
-import { locateChromeForTesting } from './lib/chromium-executable.mjs';
+import { createReactUiFixture } from './lib/react-ui-fixture.mjs';
 
-const repo=path.resolve(import.meta.dirname,'..'),web=path.join(repo,'apps/export-doc-web');
-const output=path.join(repo,'artifacts/hs-transfer-ui',String(Date.now()));
-fs.mkdirSync(path.join(output,'Temp'),{recursive:true});
-Object.assign(process.env,{TEMP:path.join(output,'Temp'),TMP:path.join(output,'Temp')});
-const require=createRequire(path.join(web,'package.json'));
-const source=name=>JSON.stringify(path.join(web,'src',name).replaceAll('\\','/'));
+const {web,output,require,source,launch}=createReactUiFixture('hs-transfer-ui');
 const result=await require('esbuild').build({write:false,bundle:true,format:'iife',platform:'browser',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent',stdin:{resolveDir:web,loader:'tsx',contents:`
 import React from 'react';import {createRoot} from 'react-dom/client';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {HsKnowledgeTransfer} from ${source('features/master-data/HsKnowledgeTransfer.tsx')};
 import {HsCodeToolsPanel} from ${source('features/master-data/HsCodeToolsPanel.tsx')};
+import {ConfirmationProvider} from ${source('ui/ConfirmationProvider.tsx')};
+import {ApiError} from ${source('api/index.ts')};
 window.calls=[];window.downloads=[];window.cache=new QueryClient({defaultOptions:{queries:{retry:false},mutations:{retry:false}}});
 document.addEventListener('click',event=>{if(event.target instanceof HTMLAnchorElement){event.preventDefault();window.downloads.push(event.target.download);}});
 const clients=[0,1].map(owner=>new Proxy({}, {get:(_,method)=>(request,options)=>new Promise((resolve,reject)=>window.calls.push({owner,method,request,signal:options?.signal,resolve,reject}))}));
 const root=createRoot(document.getElementById('root'));
-window.render=(owner=0,enabled=true)=>root.render(<React.StrictMode><QueryClientProvider client={window.cache}>{window.mode==='transfer'?<HsKnowledgeTransfer client={clients[owner]} canImport={enabled} canExport={enabled}/>:<HsCodeToolsPanel client={clients[owner]} disabled={!enabled} businessYear={2026} keyword="" mode={window.mode==='import'?'import':'remote'} readOnlySearch={window.mode==='read-only'} onLocalDataChanged={async()=>{}}/>}</QueryClientProvider></React.StrictMode>);
+window.ApiError=ApiError;
+window.render=(owner=0,enabled=true)=>root.render(<React.StrictMode><QueryClientProvider client={window.cache}><ConfirmationProvider>{window.mode==='transfer'?<HsKnowledgeTransfer client={clients[owner]} canImport={enabled} canExport={enabled}/>:<HsCodeToolsPanel client={clients[owner]} disabled={!enabled} businessYear={2026} keyword="" mode={window.mode==='import'?'import':'remote'} readOnlySearch={window.mode==='read-only'} onLocalDataChanged={async()=>{}}/>}</ConfirmationProvider></QueryClientProvider></React.StrictMode>);
 window.hide=()=>root.unmount();window.render();
 `}});
-const context=await require('playwright').chromium.launchPersistentContext(path.join(output,'Chrome'),{executablePath:locateChromeForTesting(repo),headless:true});
+const context=await launch();
 let passed=0;
 async function scenario(mode,check){
   const page=await context.newPage();page.setDefaultTimeout(10000);const errors=[];
@@ -31,7 +27,62 @@ async function scenario(mode,check){
   catch(error){await page.screenshot({path:path.join(output,'failure-'+passed+'.png')});throw error;}
   finally{await page.close();}
 }
+async function startReferenceSave(page) {
+  await page.getByLabel('联网查询 HS 编码').fill('棉布');
+  await page.getByRole('button',{name:'查询',exact:true}).click();
+  await page.waitForFunction(()=>window.calls.length===1);
+  await page.evaluate(()=>window.calls[0].resolve({items:[{id:0,code:'5208',name:'远程棉布名称',elements:'',notes:'远程备注',rowVersion:'native:1',remoteRecordKind:'StandardCode'}]}));
+  await page.getByRole('button',{name:'保存为本地参考资料'}).click();
+  await page.waitForFunction(()=>window.calls.length===2);
+  assert.equal(await page.evaluate(()=>window.calls[1].method),'getHsCode');
+}
+async function existingReference(page, status='ReferenceOnly') {
+  await page.evaluate(status=>window.calls[1].resolve({id:7,code:'5208',name:'本地名称',elements:'人工申报要素',notes:'本地核验备注',sourceName:'本地来源',effectiveYear:2026,rowVersion:'native:4',status}),status);
+}
 try{
+  await scenario('remote',async page=>{
+    await startReferenceSave(page);
+    await page.evaluate(()=>window.calls[1].reject(new window.ApiError(404,'不存在','')));
+    await page.waitForFunction(()=>window.calls.length===3);
+    const created=await page.evaluate(()=>({method:window.calls[2].method,body:window.calls[2].request.body}));
+    assert.equal(created.method,'createHsCode');assert.equal(created.body.id,0);assert.equal(created.body.rowVersion,'');
+    await page.evaluate(()=>window.calls[2].resolve({...window.calls[2].request.body,id:7,rowVersion:'native:1'}));
+    await page.getByText(/已保存为本地参考资料，导入年度税则后/).waitFor();
+  });
+  for(const status of [403,503]) await scenario('remote',async page=>{
+    await startReferenceSave(page);
+    await page.evaluate(status=>window.calls[1].reject(new window.ApiError(status,'Failed',JSON.stringify({message:'本地查询失败'}))),status);
+    await page.getByText('本地查询失败',{exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>window.calls.length),2,'Only a confirmed 404 allows creation');
+  });
+  for(const conflict of [false,true]) await scenario('remote',async page=>{
+    await startReferenceSave(page);await existingReference(page);
+    await page.getByRole('dialog',{name:'更新本地参考资料'}).waitFor();
+    assert.equal(await page.evaluate(()=>window.calls.length),2);
+    await page.getByRole('button',{name:'确认更新',exact:true}).click();
+    await page.waitForFunction(()=>window.calls.length===3);
+    const update=await page.evaluate(()=>({method:window.calls[2].method,body:window.calls[2].request.body}));
+    assert.equal(update.method,'updateHsCode');
+    assert.deepEqual([update.body.id,update.body.rowVersion,update.body.notes,update.body.sourceName,update.body.effectiveYear,update.body.elements,update.body.name],
+      [7,'native:4','本地核验备注','本地来源',2026,'人工申报要素','远程棉布名称']);
+    await page.evaluate(conflict=>conflict?window.calls[2].reject(new window.ApiError(409,'Conflict',JSON.stringify({message:'记录版本已变化',code:'ConcurrencyConflict'}))):window.calls[2].resolve({...window.calls[2].request.body,rowVersion:'native:5'}),conflict);
+    await page.getByText(conflict?'记录版本已变化':/已更新本地参考资料/,{exact:conflict}).waitFor();
+    assert.equal(await page.evaluate(()=>window.calls.length),3,'A conflicting write is never replayed');
+    assert.equal(await page.evaluate(()=>window.cache.getMutationCache().getAll().length),0);
+  });
+  for(const departure of ['cancel','owner','revoke']) await scenario('remote',async page=>{
+    await startReferenceSave(page);await existingReference(page);
+    await page.getByRole('dialog',{name:'更新本地参考资料'}).waitFor();
+    if(departure!=='cancel')await page.evaluate(departure=>window.render(departure==='owner'?1:0,departure!=='revoke'),departure);
+    await page.getByRole('button',{name:departure==='cancel'?'取消':'确认更新',exact:true}).click();
+    await page.getByRole('dialog').waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(()=>window.calls.length),2,'An obsolete or rejected confirmation must not write');
+  });
+  await scenario('remote',async page=>{
+    await startReferenceSave(page);await existingReference(page,'Active');
+    await page.getByText('此编码已有税则记录，请在本地 HS 编码中查看或编辑。',{exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>window.calls.length),2);
+  });
   for(const [mode,method] of [['read-only','searchRemoteHsCodes'],['capture','captureRemoteHsCodes']]) await scenario(mode,async page=>{
     await page.getByLabel('联网查询 HS 编码').fill('棉布');
     await page.getByRole('button',{name:'查询',exact:true}).click();

@@ -21,6 +21,12 @@ pub const EXAMPLES: &str = "hs-examples";
 pub const FEEDBACK: &str = "hs-feedback";
 pub const REPLACEMENTS: &str = "hs-replacements";
 pub const CANDIDATES: &str = "hs-candidates";
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum SaveMode {
+    Create,
+    Edit,
+    Import,
+}
 pub(super) use export_doc_contracts::hs_maintenance::MAX_BATCH;
 pub const OPERATIONS: &[Operation] = &[
     LIST_HS_CODES,
@@ -133,7 +139,12 @@ pub fn handle(
                 .ok_or_else(|| error(404, "HS 编码不存在。"))
         }
         CREATE_HS_CODE | UPDATE_HS_CODE => {
-            let mut body = body.clone();
+            export_doc_contracts::validation::provided_fields(
+                contracts::request(operation.id),
+                body,
+            )
+            .map_err(invalid)?;
+            let mut body = contracts::dto(contracts::request(operation.id), body.clone());
             if operation == UPDATE_HS_CODE {
                 let code = hs::code(read(parameters, "code")).map_err(invalid)?;
                 if hs::code(&text(&body, "code")).map_err(invalid)? != code {
@@ -142,15 +153,23 @@ pub fn handle(
                 let previous = tx
                     .find_identity(CODES, &code)?
                     .ok_or_else(|| error(404, "HS 编码不存在。"))?;
-                if body["id"]
-                    .as_i64()
-                    .is_some_and(|id| id > 0 && Some(id) != previous["id"].as_i64())
+                if super::request_values::record_id(body.get("id"))?
+                    .is_some_and(|id| id != 0 && Some(id) != previous["id"].as_i64())
                 {
                     return Err(invalid("记录编号与编码不一致。"));
                 }
                 body["id"] = previous["id"].clone();
             }
-            save_code(tx, actor, &body, false)
+            save_code(
+                tx,
+                actor,
+                &body,
+                if operation == CREATE_HS_CODE {
+                    SaveMode::Create
+                } else {
+                    SaveMode::Edit
+                },
+            )
         }
         DELETE_HS_CODE | DELETE_HS_CODES_BATCH => {
             mutations::delete_codes(tx, actor, operation, parameters, query, body)
@@ -240,7 +259,13 @@ pub(super) fn annotate_year(row: &mut Value, year: i32) {
     row["requiresAnnualReview"] =
         json!(row["status"] == "Active" && row["effectiveYear"].as_i64() != Some(i64::from(year)));
 }
-pub fn save_code(tx: &Connection, actor: &Actor, body: &Value, managed: bool) -> Result<Value> {
+pub(super) fn save_code(
+    tx: &Connection,
+    actor: &Actor,
+    body: &Value,
+    mode: SaveMode,
+) -> Result<Value> {
+    let managed = mode == SaveMode::Import;
     let mut dto: ApiHsCodeDto = serde_json::from_value(contracts::project(
         contracts::schema("ApiHsCodeDto"),
         body.clone(),
@@ -255,6 +280,21 @@ pub fn save_code(tx: &Connection, actor: &Actor, body: &Value, managed: bool) ->
             .map_err(|_| invalid("HS 验证时间须为包含时区的有效时间。"))?;
     }
     let previous = tx.find_identity(CODES, &dto.code)?;
+    let record_id = previous
+        .as_ref()
+        .and_then(|r| r["id"].as_i64())
+        .unwrap_or(0);
+    match mode {
+        SaveMode::Create if dto.id != 0 => {
+            return Err(invalid("新建 HS 编码不能指定已有记录编号。"));
+        }
+        SaveMode::Create if previous.is_some() => {
+            return Err(conflict("此 HS 编码已存在，请读取最新记录后编辑。"));
+        }
+        SaveMode::Edit if previous.is_none() => return Err(error(404, "HS 编码记录不存在。")),
+        SaveMode::Edit if dto.id != record_id => return Err(invalid("记录编号与编码不一致。")),
+        _ => {}
+    }
     if !managed
         && dto.status == "Active"
         && previous.as_ref().is_some_and(|row| {
@@ -278,14 +318,6 @@ pub fn save_code(tx: &Connection, actor: &Actor, body: &Value, managed: bool) ->
         ));
     }
     if !managed
-        && dto.status == "ReferenceOnly"
-        && previous
-            .as_ref()
-            .is_some_and(|row| row["status"] == "Active")
-    {
-        return Ok(previous.unwrap());
-    }
-    if !managed
         && previous
             .as_ref()
             .is_some_and(|row| row["status"] != dto.status)
@@ -295,21 +327,6 @@ pub fn save_code(tx: &Connection, actor: &Actor, body: &Value, managed: bool) ->
     if !managed && previous.is_none() && dto.status != "ReferenceOnly" {
         return Err(invalid("手工新建编码只能作为参考资料。"));
     }
-    let record_id = previous
-        .as_ref()
-        .and_then(|r| r["id"].as_i64())
-        .unwrap_or(0);
-    if !managed && dto.id > 0 && dto.id != record_id {
-        return Err(error(404, "HS 编码记录不存在。"));
-    }
-    let expected = if managed || dto.id > 0 {
-        store::expected(body)
-    } else {
-        previous
-            .as_ref()
-            .and_then(|r| r["versionNumber"].as_i64())
-            .unwrap_or(0)
-    };
     dto.update_time = Some(store::timestamp());
     let mut value = serde_json::to_value(&dto)?;
     for field in ["obsoleteReason", "obsoletedAt"] {
@@ -321,7 +338,7 @@ pub fn save_code(tx: &Connection, actor: &Actor, body: &Value, managed: bool) ->
             value.as_object_mut().unwrap().remove(field);
         }
     }
-    value["expectedVersion"] = json!(expected);
+    value["expectedVersion"] = json!(store::expected(body));
     store::save(
         tx,
         CODES,

@@ -22,6 +22,9 @@ for (const status of [400, 401, 403, 404, 409, 422]) {
   assert(!shouldRetryQueryFailure(0, new ApiError(status, "Business", "")), `${status} must not retry`);
 }
 assert(shouldRetryQueryFailure(0, new TypeError("fetch failed")), "network TypeError should retry");
+assert(shouldRetryQueryFailure(0, new DOMException("deadline", "TimeoutError")), "transport deadlines should retry");
+assert(!shouldRetryQueryFailure(0, new DOMException("cancelled", "AbortError")), "caller cancellation must not retry");
+assert(!shouldRetryQueryFailure(2, new DOMException("deadline", "TimeoutError")), "deadline retries must remain bounded");
 assert(!shouldRetryQueryFailure(0, new Error("client model failed")), "ordinary client error must not retry");
 assert(!shouldRetryQueryFailure(2, new TypeError("fetch failed")), "retry count must be bounded");
 assert(queryRetryDelay(0) === 750 && queryRetryDelay(1) === 1500 && queryRetryDelay(5) === 3000, "retry delay should use bounded backoff");

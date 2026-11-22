@@ -77,8 +77,22 @@ export function normalizeHsCodeDtoForSave(item: ApiHsCodeDto): ApiHsCodeDto {
   return {
     ...normalizeHsCodeDtoForRequest(item),
     id: 0,
+    rowVersion: "",
     status: item.remoteRecordKind ? "ReferenceOnly" : item.status,
   };
+}
+
+/** Remote references replace only supplied reference fields, preserving local governance and notes. */
+export function mergeHsCodeReference(local: ApiHsCodeDto, remote: ApiHsCodeDto): ApiHsCodeDto {
+  const normalized = normalizeHsCodeDtoForRequest(remote);
+  const fields = ["name", "unit", "description", "elements", "supervisionConditions", "inspectionCategory",
+    "rebateRate", "normalTariffRate", "preferentialTariffRate", "exportTariffRate", "consumptionTaxRate",
+    "valueAddedTaxRate", "detailUrl", "remoteRecordKind", "instanceCount", "summaryUrl", "evidenceUrl",
+    "observedAt", "recommendedKeywords", "personalPostalTaxCode", "ciqEntries", "classificationEntries",
+    "declarationExampleCount"] as const;
+  const supplied = fields.map(key => [key, normalized[key]] as const).filter(([, value]) =>
+    value !== undefined && value !== null && value !== "" && (!Array.isArray(value) || value.length > 0));
+  return { ...local, ...Object.fromEntries(supplied) };
 }
 
 export function replaceHsCodeResult(items: ApiHsCodeDto[], original: ApiHsCodeDto, next: ApiHsCodeDto) {

@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-22 审查回归：`test_hs_transfer_ui.mjs` 覆盖联网参考首次保存、已有记录确认更新、本地字段保留、版本冲突和身份/权限切换；`test:business-date-refresh` 同时执行模型与真实 React 时钟回归，登记在统一 `session` 组。资源终态保护及 HS 写入边界进入 Engine 双库共享合同，会议室重叠、时区、纳秒、状态和损坏时间进入 Storage 双库共享合同。实际验证与清理见[本批记录](../docs/archive/2026-11/2026-11-22项目审查修复与清理.md)。
+
 2026-11-21 工作区同步：`npm --prefix apps/export-doc-web run test:workspace-refresh-ui` 验证两类资源详情版本推进、中文草稿保留及旧版本冲突，模板来源跨页检索/选择/取消，折叠任务零请求及办公命令换客户端取消；登记到统一 `business` 组。发票保存回归另验证商品库确认期间撤权或换客户端不得写入。CRM 授权计数、提醒空值及偏移/纳秒边界由 Storage 双库共用合同验证，真实 PostgreSQL 使用 `test-native-postgres.ps1 -Scope Workflows`。范围与实际结果见[本批记录](../docs/archive/2026-11/2026-11-21工作区同步与查询精简.md)。
 
 `node scripts/test_credit_http.mjs <AppRoot>` 需要按当前源码构建的 `office_review` 和完整 OCR/PDFium 资源，在独立测试库验证仅发票权限的信用证上传、无权限拒绝、PDF/OCR 与登录并发、请求取消后的资源恢复。结果写入 `artifacts/credit-http`。

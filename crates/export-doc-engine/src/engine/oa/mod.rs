@@ -116,10 +116,8 @@ fn access(tx: &Connection, actor: &Actor, meta: &Value, row: &Value) -> Result<(
     Ok(())
 }
 pub(super) fn mutable(row: &Value) -> Result<()> {
-    if !["Draft", "Returned"].contains(&text(row, "status").as_str()) {
-        return Err(conflict(
-            "只有草稿或退回修改的申请可修改，请先撤回待审批申请。",
-        ));
+    if !export_doc_domain::oa::request_is_editable(&text(row, "kind"), &text(row, "status")) {
+        return Err(conflict("当前申请已提交或办结，不能修改草稿。"));
     }
     Ok(())
 }

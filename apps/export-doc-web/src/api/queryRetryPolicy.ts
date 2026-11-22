@@ -15,7 +15,7 @@ export function shouldRetryQueryFailure(failureCount: number, error: unknown) {
     return false;
   }
 
-  return error instanceof TypeError;
+  return error instanceof TypeError || error instanceof Error && error.name === "TimeoutError";
 }
 
 export function queryRetryDelay(attemptIndex: number) {

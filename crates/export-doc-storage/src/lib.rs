@@ -430,6 +430,7 @@ delegate! {
     unit_account_page(company:&str,date:&str,all:bool,before:Option<i64>,limit:i64)->Vec<Value>;
     workflow_notification_account_page(company:&str,date:&str,before:Option<i64>,limit:i64)->Vec<Value>;
     resource_has_open_requests(kind:&str,parent:i64,states:&[&str])->bool;
+    booking_overlaps(company:&str,room:i64,from:&str,to:&str,states:&[&str])->bool;
     supplier_overview(scope:&DataScope<'_>, filter:&str, offset:i64, limit:i64)->Value;
     query_workflow_summary(query:&WorkflowSummaryQuery<'_>)->(i64,Vec<Value>);
     query_workflow_tasks(query:&WorkflowTaskQuery<'_>)->(i64,Vec<Value>);

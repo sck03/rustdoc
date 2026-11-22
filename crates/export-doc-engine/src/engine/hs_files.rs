@@ -141,7 +141,7 @@ fn commit(
             if change=="Unchanged"{unchanged+=1;continue;}
             if change=="SuspectedObsolete"{item["status"]=json!("SuspectedObsolete");item["replacedByCodes"]=json!(row["replacementCandidates"].as_array().into_iter().flatten().filter_map(|v|v.as_str()).collect::<Vec<_>>().join(","));obsolete+=1;}
             else if current.is_none(){added+=1;}else{updated+=1;}
-            hs::save_code(tx,actor,&item,true)?;
+            hs::save_code(tx,actor,&item,hs::SaveMode::Import)?;
         }
         Ok(json!({"success":true,"addedCount":added,"updatedCount":updated,"unchangedCount":unchanged,"suspectedObsoleteCount":obsolete,"skippedCount":skipped,"message":format!("税则导入完成：新增 {added}，更新 {updated}，未变 {unchanged}，疑似作废 {obsolete}，跳过 {skipped}。") }))
     })

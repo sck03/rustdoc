@@ -27,6 +27,7 @@ macro_rules! unsupported_operations {
 pub(crate) trait Adapter: Send {
     semantic_operations! {
         crm_follow_up_counts(query: &CrmQuery<'_>, now: &str, until: &str) -> CrmFollowUpCounts => crm_query::follow_up_counts;
+        booking_overlaps(company: &str, room: i64, from: &str, to: &str, states: &[&str]) -> bool => office_query::booking_overlaps;
         scan_dashboard(scope: &DataScope<'_>, fields: &[(&str, &str)], before: Option<i64>) -> Vec<Value> => dashboard_query::scan;
         party_candidates(kind: &str, company: &str, keys: &[(&str, String)]) -> Vec<Value> => party_query::candidates;
         sole_exporter_name(scope: &DataScope<'_>) -> Option<String> => party_query::sole_exporter_name;
