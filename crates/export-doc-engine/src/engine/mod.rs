@@ -442,7 +442,14 @@ impl NativeService {
                 }
                 #[cfg(feature = "excel")]
                 if hs_files::OPERATIONS.contains(&operation) {
-                    respond_json!(hs_files::handle(self, &actor, operation, &body_value));
+                    respond_json!(hs_files::handle(
+                        self,
+                        &actor,
+                        operation,
+                        parameters,
+                        query,
+                        &body_value
+                    ));
                 }
                 if hs::OPERATIONS.contains(&operation) {
                     respond_json!(hs::handle(

@@ -168,3 +168,42 @@ fn resource_id_in_invoice_text_does_not_grant_image_access() {
         Some(403)
     );
 }
+
+#[test]
+fn owned_unused_images_require_the_recycle_action_in_catalog_and_command() {
+    let _scenario = report_scenario();
+    let fixture = Fixture::new();
+    let uploader = fixture.user_with_recycle("upload-without-recycle", false);
+    let image = uploader
+        .upload(
+            UPLOAD_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
+            &[],
+            json!({}),
+            "未使用图片.png",
+            &Fixture::png(),
+        )
+        .unwrap();
+    let catalog: Value = uploader
+        .json(QUERY_REPORT_TEMPLATE_V3_IMAGE_RESOURCES, &[], &[], None)
+        .unwrap();
+    let row = catalog["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row["id"] == image["id"])
+        .unwrap();
+    assert_eq!(row["ownsUpload"], true);
+    assert_eq!(row["isReferenced"], false);
+    assert_eq!(row["canRecycle"], false);
+    uploader.assert_rejected(
+        RECYCLE_REPORT_TEMPLATE_V3_IMAGE_RESOURCE,
+        &[("resourceId", image["id"].as_str().unwrap().into())],
+        None,
+        403,
+    );
+    let admin: Value = fixture
+        .client()
+        .json(QUERY_REPORT_TEMPLATE_V3_IMAGE_RESOURCES, &[], &[], None)
+        .unwrap();
+    assert_eq!(admin["items"][0]["canRecycle"], true);
+}

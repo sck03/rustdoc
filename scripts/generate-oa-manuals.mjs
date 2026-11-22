@@ -60,11 +60,19 @@ figure{margin:5mm 0}img{display:block;width:100%;max-height:207mm;object-fit:con
 `;
 const browser = await require("playwright").chromium.launch({ executablePath: locateChromeForTesting(root), headless: true });
 const manifest = [];
+const imageTitles = {
+  "form-designer.png": { title: "自定义申请表单", date: "2026-11-17" },
+  "project-duties.png": { title: "项目限定职责", date: "2026-11-20" },
+  "request-details.png": { title: "申请详情与办理结果", date: "2026-11-17" },
+  "packing-workspace.png": { title: "装柜工作区", date: "2026-11-20" },
+  "hs-import-preview.png": { title: "HS 导入差异核对", date: "2026-11-22" },
+  "attachment-category.png": { title: "业务资料分类筛选", date: "2026-11-22" },
+};
 try {
   const manuals = [
     ["OA管理员手册", "ADMIN", ["form-designer.png", "project-duties.png"]],
     ["OA用户手册", "USER", ["request-details.png"]],
-    ["项目程序操作说明", "OPERATIONS", ["packing-workspace.png", "project-duties.png"]],
+    ["项目程序操作说明", "OPERATIONS", ["hs-import-preview.png", "attachment-category.png", "packing-workspace.png", "project-duties.png"]],
   ];
   for (const [name, label, screenshots] of manuals) {
     const source = fs.readFileSync(path.join(sourceRoot, `${name}.md`), "utf8");
@@ -74,7 +82,9 @@ try {
     for (const screenshot of screenshots) {
       const screenshotPath = path.join(sourceRoot, "images", screenshot);
       if (!fs.existsSync(screenshotPath)) throw new Error(`Anonymous UI evidence is required: ${screenshotPath}`);
-      sections.push(`<section><h2>界面参考</h2><figure><img src="${pathToFileURL(screenshotPath).href}" alt="${name}匿名界面"><figcaption>匿名验收界面示例，来源见图片目录说明。显示的字段、操作和流程以当前产品版、身份权限及公司发布规则为准。</figcaption></figure></section>`);
+      const reference = imageTitles[screenshot];
+      if (!reference) throw new Error(`Screenshot caption is required: ${screenshot}`);
+      sections.push(`<section><h2>${escape(reference.title)}</h2><figure><img src="${pathToFileURL(screenshotPath).href}" alt="${escape(reference.title)}匿名界面"><figcaption>${reference.date} 匿名验收界面示例。显示的字段、操作和流程以当前产品版、身份权限及公司发布规则为准。</figcaption></figure></section>`);
     }
     const html = path.join(output, `${name}.html`);
     fs.writeFileSync(html, `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${name}</title><style>${style}</style></head><body>${sections.join("\n")}</body></html>`);

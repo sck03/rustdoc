@@ -32,8 +32,8 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["success","addedCount","updatedCount","unchangedCount","suspectedObsoleteCount","skippedCount","message"])),
     ("ApiHsCodeImportPreviewItemDto",o(vec![
         ("changeType",s()),("rowNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("item",r("ApiHsCodeDto")),
-        ("changedFields",a(s())),("replacementCandidates",a(s())),("message",s())
-    ]).required(vec!["changeType","rowNumber","item","changedFields","replacementCandidates","message"])),
+        ("changes",a(r("ApiHsCodeImportFieldChangeDto"))),("replacementCandidates",a(s())),("message",s())
+    ]).required(vec!["changeType","rowNumber","item","changes","replacementCandidates","message"])),
     ("ApiHsCodeImportPreviewPathRequest",o(vec![
         ("filePath",s()),("mode",s()),("sourceName",s()),
         ("effectiveYear",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))
@@ -42,10 +42,10 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("token",s()),("fileName",s()),("mode",s()),
         ("sourceName",s()),("effectiveYear",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("worksheetName",s()),
         ("headerRowNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("confidence",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("columns",a(r("ApiHsCodeImportColumnMappingDto"))),
-        ("items",a(r("ApiHsCodeImportPreviewItemDto"))),("addCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("updateCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
+        ("addCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("updateCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("unchangedCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("suspectedObsoleteCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("conflictCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("invalidCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("warnings",a(s())),("storagePolicy",s())
-    ]).required(vec!["token","fileName","mode","sourceName","worksheetName","headerRowNumber","confidence","columns","items","addCount","updateCount","unchangedCount","suspectedObsoleteCount","conflictCount","invalidCount","warnings","storagePolicy"])),
+    ]).required(vec!["token","fileName","mode","sourceName","worksheetName","headerRowNumber","confidence","columns","addCount","updateCount","unchangedCount","suspectedObsoleteCount","conflictCount","invalidCount","warnings","storagePolicy"])),
     ("ApiHsCodeKnowledgeExamplePage",o(vec![
         ("items",a(r("HsCodeDeclarationExample"))),("totalCount",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("pageNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),
         ("pageSize",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))

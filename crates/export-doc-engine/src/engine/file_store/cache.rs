@@ -100,6 +100,9 @@ impl Cache {
             .as_mut()
             .map(|file| super::verification::check(file, object))
             .transpose();
+        // Cancellation says nothing about the cached bytes. Keep the entry so
+        // a subsequent reader can verify it again without another S3 transfer.
+        crate::operation::check()?;
         let mut state = self
             .state
             .lock()
@@ -257,6 +260,36 @@ mod tests {
         assert!(cache.get(&object).is_err());
         assert!(cache.get(&object).unwrap().is_none());
         assert!(!path.exists(), "failed cache entries must be removed");
+    }
+
+    #[test]
+    fn cancellation_and_deadline_do_not_evict_verified_bytes() {
+        let root = crate::engine::test_support::ScratchDirectory::new();
+        let path = root.0.join("cached-object");
+        fs::write(&path, b"original").unwrap();
+        let object = FileObject {
+            digest: crate::engine::media::digest(b"original"),
+            size: 8,
+        };
+        let cache = Cache::default();
+        cache.state.lock().unwrap().insert(
+            object.digest.clone(),
+            Arc::new(Entry {
+                path: path.clone(),
+                size: 8,
+            }),
+        );
+        let cancelled = crate::operation::OperationScope::new(std::time::Duration::from_secs(1));
+        cancelled.cancel();
+        let expired = crate::operation::OperationScope::new(std::time::Duration::ZERO);
+        for scope in [cancelled, expired] {
+            assert_eq!(
+                scope.run(|| cache.get(&object)).unwrap_err().status,
+                Some(504)
+            );
+            assert!(path.exists());
+            assert!(cache.get(&object).unwrap().is_some());
+        }
     }
 
     fn entry(size: u64) -> Arc<Entry> {

@@ -37,11 +37,12 @@ pub(super) fn query(
         })?;
         let targets: Vec<_> = entries.iter().filter_map(|entry| entry["resourceId"].as_str()).collect();
         let references = References::query(tx, &actor, None, Some(&targets))?;
+        let can_recycle = auth::authorize(&actor, "document.report-resources", "recycle").is_ok();
         let items: Vec<_> = entries.iter().map(|entry| {
             let id = text(entry, "resourceId");
             let own = owns(&actor, entry);
             let referenced = references.all.contains(&id) || managed.contains_key(&id);
-            json!({"id":id,"mediaType":entry["mediaType"],"byteLength":entry["byteLength"],"sha256":entry["sha256"],"ownsUpload":own,"isReferenced":referenced,"canRecycle":(actor.admin || own) && !referenced})
+            json!({"id":id,"mediaType":entry["mediaType"],"byteLength":entry["byteLength"],"sha256":entry["sha256"],"ownsUpload":own,"isReferenced":referenced,"canRecycle":can_recycle && (actor.admin || own) && !referenced})
         }).collect();
         Ok(crate::contracts::page(items, total as usize, page, size))
     })

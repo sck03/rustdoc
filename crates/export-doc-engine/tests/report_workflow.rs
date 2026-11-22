@@ -204,24 +204,31 @@ impl Fixture {
         bytes.into_inner()
     }
     fn user(&self, name: &str) -> ApiClient {
-        let permissions = self.create(
-            CREATE_PERMISSION_TEMPLATE,
-            json!({"code":format!("ROLE-{name}"),"name":name,"isActive":true,"grants":[
-                {"resourceKey":"document.report-templates","action":"view","dataScope":"company"},
-                {"resourceKey":"document.report-templates","action":"design","dataScope":"own"},
-                {"resourceKey":"document.report-templates","action":"clone","dataScope":"own"},
-                {"resourceKey":"document.report-resources","action":"view","dataScope":"own"},
-                {"resourceKey":"document.report-resources","action":"upload","dataScope":"own"},
-                {"resourceKey":"document.report-resources","action":"recycle","dataScope":"own"},
-                {"resourceKey":"document.invoices","action":"view","dataScope":"own"},
-                {"resourceKey":"document.invoice-output","action":"preview","dataScope":"own"},
-                {"resourceKey":"document.invoice-output","action":"export-pdf","dataScope":"own"},
-                {"resourceKey":"document.jobs","action":"view","dataScope":"own"},
-                {"resourceKey":"document.jobs","action":"operate","dataScope":"own"},
-                {"resourceKey":"document.jobs","action":"manage","dataScope":"own"},
-                {"resourceKey":"document.invoices","action":"operate","dataScope":"own"}
-            ]}),
-        );
+        self.user_with_recycle(name, true)
+    }
+    fn user_with_recycle(&self, name: &str, recycle: bool) -> ApiClient {
+        let mut definition = json!({"code":format!("ROLE-{name}"),"name":name,"isActive":true,"grants":[
+            {"resourceKey":"document.report-templates","action":"view","dataScope":"company"},
+            {"resourceKey":"document.report-templates","action":"design","dataScope":"own"},
+            {"resourceKey":"document.report-templates","action":"clone","dataScope":"own"},
+            {"resourceKey":"document.report-resources","action":"view","dataScope":"own"},
+            {"resourceKey":"document.report-resources","action":"upload","dataScope":"own"},
+            {"resourceKey":"document.report-resources","action":"recycle","dataScope":"own"},
+            {"resourceKey":"document.invoices","action":"view","dataScope":"own"},
+            {"resourceKey":"document.invoice-output","action":"preview","dataScope":"own"},
+            {"resourceKey":"document.invoice-output","action":"export-pdf","dataScope":"own"},
+            {"resourceKey":"document.jobs","action":"view","dataScope":"own"},
+            {"resourceKey":"document.jobs","action":"operate","dataScope":"own"},
+            {"resourceKey":"document.jobs","action":"manage","dataScope":"own"},
+            {"resourceKey":"document.invoices","action":"operate","dataScope":"own"}
+        ]});
+        if !recycle {
+            definition["grants"]
+                .as_array_mut()
+                .unwrap()
+                .retain(|grant| grant["action"] != "recycle");
+        }
+        let permissions = self.create(CREATE_PERMISSION_TEMPLATE, definition);
         let permissions = self.client().publish_scheme(permissions);
         self.create(CREATE_USER_ACCOUNT, json!({"username":name,"fullName":name,"role":"User","permissionTemplateId":permissions["id"],"permissionSchemeVersion":permissions["publishedVersion"],"departmentId":"GENERAL","companyScope":"DEFAULT","isActive":true,"resetPassword":"Report-Test-2026"}));
         self.client()

@@ -1491,9 +1491,15 @@ export interface ApiHsCodeImportCommitResponse {
   updatedCount: number;
 }
 
+export interface ApiHsCodeImportFieldChangeDto {
+  after: string;
+  before: string;
+  field: string;
+}
+
 export interface ApiHsCodeImportPreviewItemDto {
   changeType: string;
-  changedFields: string[];
+  changes: ApiHsCodeImportFieldChangeDto[];
   item: ApiHsCodeDto;
   message: string;
   replacementCandidates: string[];
@@ -1516,7 +1522,6 @@ export interface ApiHsCodeImportPreviewResponse {
   fileName: string;
   headerRowNumber: number;
   invalidCount: number;
-  items: ApiHsCodeImportPreviewItemDto[];
   mode: string;
   sourceName: string;
   storagePolicy: string;
@@ -2295,6 +2300,16 @@ export interface ApiPagedResponseOfApiHsCodeDto {
   hasNextPage: boolean;
   hasPreviousPage: boolean;
   items: ApiHsCodeDto[];
+  pageNumber: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+}
+
+export interface ApiPagedResponseOfApiHsCodeImportPreviewItemDto {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  items: ApiHsCodeImportPreviewItemDto[];
   pageNumber: number;
   pageSize: number;
   totalCount: number;
@@ -4088,7 +4103,6 @@ export interface BusinessAttachmentMetadataUpdate {
 export interface BusinessAttachmentPage {
   canUpload: boolean;
   fileBytesLimit: number;
-  invoiceBytesLimit: number | null;
   page: PagedResultOfBusinessAttachmentRecord;
   usedBytes?: number | null;
 }
@@ -9398,6 +9412,7 @@ export interface ListBusinessAttachmentCategoriesRequest {
 }
 
 export interface ListBusinessAttachmentsRequest {
+  categoryId?: number;
   invoiceId?: number;
   keyword?: string;
   includeArchived?: boolean;
@@ -9604,6 +9619,13 @@ export interface ListHistoryOfPurchaseRequestRequest {
 
 export interface ListHistoryOfTravelRequestRequest {
   id: number;
+  pageNumber?: number;
+  pageSize?: number;
+}
+
+export interface ListHsCodeImportPreviewItemsRequest {
+  token: string;
+  changeType?: "Add" | "Update" | "Unchanged" | "SuspectedObsolete" | "Conflict" | "Invalid";
   pageNumber?: number;
   pageSize?: number;
 }

@@ -50,6 +50,7 @@ export default function createApi(transport: ApiTransport) {
     const path = "/api/business-attachments";
     return transport.request<BusinessAttachmentPage>("GET", path, {
       query: {
+        "categoryId": request.categoryId,
         "invoiceId": request.invoiceId,
         "keyword": request.keyword,
         "includeArchived": request.includeArchived,

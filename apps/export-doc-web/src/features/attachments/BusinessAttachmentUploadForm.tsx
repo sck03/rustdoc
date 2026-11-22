@@ -8,8 +8,8 @@ import { attachmentMetadata, fileSizeLabel, type AttachmentUploadInput } from ".
 import { BusinessAttachmentFields } from "./BusinessAttachmentFields.tsx";
 import { Drawer } from "../../ui/primitives/Dialog.tsx";
 
-export function BusinessAttachmentUploadForm({ invoiceId, attachment, categories, maximumBytes, remainingBytes, busy, onUpload, onSave, onClose }: {
-  invoiceId: number; attachment?: BusinessAttachmentRecord; maximumBytes: number; remainingBytes: number; busy: boolean;
+export function BusinessAttachmentUploadForm({ invoiceId, attachment, categories, maximumBytes, busy, onUpload, onSave, onClose }: {
+  invoiceId: number; attachment?: BusinessAttachmentRecord; maximumBytes: number; busy: boolean;
   categories: BusinessAttachmentCategoryRecord[];
   onUpload: (request: AttachmentUploadInput, signal: AbortSignal) => Promise<BusinessAttachmentRecord>;
   onSave: (work: (signal: AbortSignal) => Promise<BusinessAttachmentRecord[]>) => Promise<boolean>;
@@ -31,7 +31,6 @@ export function BusinessAttachmentUploadForm({ invoiceId, attachment, categories
     if (busy) return;
     if (!attachments.files.length) { setError("请选择文件。"); return; }
     if (!categories.some(item => item.id === metadata.categoryId)) { setError("请选择有效的资料分类。"); return; }
-    if (attachments.files.reduce((sum, entry) => sum + entry.file.size, 0) > remainingBytes) { setError("所选文件超过本单剩余附件容量。"); return; }
     setError("");
     await onSave(async signal => {
       const records = await attachments.save("attachments", signal, async current => current ?? [], async (current, entry, signal) => {
@@ -49,7 +48,7 @@ export function BusinessAttachmentUploadForm({ invoiceId, attachment, categories
     {attachments.failedKey && <p role="status">已上传文件会保留，再次提交只处理剩余文件。</p>}
     <AttachmentDraftFields draft={attachments} busy={busy} label="选择业务资料文件" onChange={() => setDirty(true)}
       selection={{ accept: ".pdf,.png,.jpg,.jpeg,.gif,.webp,.xls,.xlsx,.doc,.docx,.pptx,.txt,.csv", pattern: /\.(pdf|png|jpe?g|gif|webp|xlsx?|docx?|pptx|txt|csv)$/iu,
-        maxBytes: maximumBytes, maxFiles: attachment ? 1 : 20, maxTotalBytes: remainingBytes, multiple: !attachment,
+        maxBytes: maximumBytes, maxFiles: attachment ? 1 : 20, maxTotalBytes: maximumBytes * (attachment ? 1 : 20), multiple: !attachment,
         description: `每个最多 ${fileSizeLabel(maximumBytes)}；${attachment ? "选择一个新版本文件" : "一次最多 20 个文件，每个文件分别归档"}。` }}
       renderFileDetails={multiple ? entry => <label>资料名称 · {entry.file.name}<input required maxLength={200} disabled={busy} value={titles[entry.key] ?? fileTitle(entry.file)} onChange={event => setTitles(current => ({ ...current, [entry.key]: event.target.value }))} /></label> : undefined} />
     <BusinessAttachmentFields value={fields} categories={categories} hideTitle={multiple} disabled={busy || Boolean(attachment)} onChange={value => {

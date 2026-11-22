@@ -16,6 +16,8 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
   const { keywordInput: keyword, setKeywordInput: setKeyword, keyword: search, setKeyword: setSearch, pageNumber, setPageNumber, pageSize, setPageSize } = useDirectoryLocation();
   const { params, update: updateRoute } = useRouteQuery();
   const includeArchived = params.get("archived") === "true";
+  const categoryId = readRouteId(params.get("categoryId")) ?? undefined;
+  const setCategoryId = (id: number | undefined) => updateRoute({ categoryId: id ?? null, page: null });
   const setIncludeArchived = (value: boolean) => updateRoute({ archived: value, page: null });
   const selectedId = readRouteId(params.get("attachmentId"));
   const revisionBefore = readRouteId(params.get("revisionBefore")) ?? undefined;
@@ -34,8 +36,8 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
   const abortable = useAbortableOperation(selectedId);
   const queries = useQueryClient();
   const query = useQuery({
-    queryKey: ["business-attachments", userId, invoiceId, search, includeArchived, pageNumber, pageSize],
-    queryFn: ({ signal }) => client.listBusinessAttachments({ invoiceId, keyword: search || undefined, includeArchived, pageNumber, pageSize }, { signal }),
+    queryKey: ["business-attachments", userId, invoiceId, search, includeArchived, pageNumber, pageSize, categoryId],
+    queryFn: ({ signal }) => client.listBusinessAttachments({ invoiceId, categoryId, keyword: search || undefined, includeArchived, pageNumber, pageSize }, { signal }),
   });
   const details = useQuery({
     queryKey: ["business-attachments", userId, "detail", selectedId, revisionBefore, eventBefore],
@@ -101,7 +103,7 @@ export function useBusinessAttachments(client: ExportDocManagerApiClient, invoic
     });
   }
   const commitSearch = () => { setSearch(keyword.trim()); setPageNumber(1); };
-  return { query, details, invoice, categories, saveCategory, removeCategory, editMetadata, remove, keyword, search, includeArchived, pageNumber, pageSize, selectedId, busy, error, message,
+  return { query, details, invoice, categories, categoryId, setCategoryId, saveCategory, removeCategory, editMetadata, remove, keyword, search, includeArchived, pageNumber, pageSize, selectedId, busy, error, message,
     uploadMode, setUploadMode, preview: preview?.id === selectedId ? preview : null, setPreview, upload, saveUploads, update, read, setSelectedId, setPageNumber, commitSearch,
     changeKeyword: (value: string) => { setKeyword(value); if (!value) { setSearch(""); setPageNumber(1); } },
     changeArchived: setIncludeArchived,

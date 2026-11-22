@@ -28,6 +28,14 @@ CREATE TABLE records (
     CHECK(kind<>'attachments' OR COALESCE(CASE WHEN jsonb_typeof(body->'invoiceId')='number' AND (body->>'invoiceId') ~ '^[1-9][0-9]*$' THEN (body->>'invoiceId')::numeric<=9223372036854775807 ELSE false END,false)),
     CHECK(kind<>'people' OR (COALESCE(NULLIF(body->'profile','null'::jsonb),'{}'::jsonb)-ARRAY['fullName','workEmail','workPhone','workLocation'])='{}'::jsonb)
 );
+CREATE TABLE import_preview_rows (
+    preview_id BIGINT NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+    position BIGINT NOT NULL CHECK(position >= 0),
+    body TEXT NOT NULL CHECK(json_typeof(body::json)='object'),
+    change_type TEXT GENERATED ALWAYS AS (COALESCE(body::json->>'changeType','')) STORED,
+    PRIMARY KEY(preview_id,position)
+);
+CREATE INDEX import_preview_rows_change ON import_preview_rows(preview_id,change_type,position);
 CREATE TABLE personnel_private_profiles (
     person_id BIGINT PRIMARY KEY REFERENCES records(id) ON DELETE CASCADE,
     body JSONB NOT NULL CHECK(jsonb_typeof(body)='object')

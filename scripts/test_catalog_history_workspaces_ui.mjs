@@ -29,13 +29,13 @@ window.finish=index=>{const p=window.requests[index];if(p.kind==="obsolete")p.re
 else if(p.kind==="obsolete-preview")p.resolve({totalCount:5200,maxBatchCount:5000,policy:"核实后批量确认作废。",items:Array.from({length:5000},(_,i)=>({id:10000+i,code:"6109"+String(i).padStart(6,"0"),name:"疑似编码 "+i,status:"SuspectedObsolete",rowVersion:"native:1"}))});
 else if(p.kind==="history-preview"){const keep=p.request.body.retainLatest;p.resolve({token:"preview-token",templateVersion:27,retention:retention(keep),items:Array.from({length:Math.max(0,window.totalHistory-keep)},(_,i)=>({id:i+1,recordVersion:1,versionNumber:i+1,byteLength:1024}))});}
 else {window.totalHistory=20;p.resolve({success:true,message:"历史已清理，当前模板保留。"});}};
-const preview={token:"annual",confidence:100,addCount:5000,updateCount:0,suspectedObsoleteCount:5000,conflictCount:0,invalidCount:0,columns:[],warnings:[],worksheetName:"年度",headerRowNumber:1,sourceName:"官方资料",effectiveYear:2026,
-items:Array.from({length:10000},(_,i)=>({changeType:i%2?"SuspectedObsolete":"Add",rowNumber:i+2,item:{code:String(i).padStart(10,"0"),name:"编码 "+i},message:"年度核对",replacementCandidates:[]}))};
+const preview={token:"annual",confidence:100,addCount:5000,updateCount:0,suspectedObsoleteCount:5000,conflictCount:0,invalidCount:0,columns:[],warnings:[],worksheetName:"年度",headerRowNumber:1,sourceName:"官方资料",effectiveYear:2026};
+client.listHsCodeImportPreviewItems=async(r,init)=>{window.calls.push({kind:"preview-page",request:r});const filtered=Array.from({length:10000},(_,i)=>({changeType:i%2?"SuspectedObsolete":"Add",rowNumber:i+2,item:{code:String(i).padStart(10,"0"),name:"编码 "+i},message:"年度核对",changes:[{field:"rebateRate",before:"9%",after:"13%"},{field:"notes",before:"原备注",after:""}],replacementCandidates:[]})).filter(row=>!r.changeType||row.changeType===r.changeType);const items=filtered.slice((r.pageNumber-1)*r.pageSize,r.pageNumber*r.pageSize);return {items,totalCount:filtered.length,totalPages:Math.ceil(filtered.length/r.pageSize),pageNumber:r.pageNumber,pageSize:r.pageSize,hasPreviousPage:r.pageNumber>1,hasNextPage:r.pageNumber*r.pageSize<filtered.length};};
 function Harness(){const [shown,setShown]=useState(true),[recordVersion,setVersion]=useState(1),[templateId,setTemplateId]=useState(23);window.hide=()=>setShown(false);window.switchRecord=()=>setVersion(2);window.switchTemplate=()=>setTemplateId(24);window.dirty=useHasUnsavedChanges();
 return !shown?<div>已退出</div>:window.mode==="list"?<MasterDataListPage client={client} config={masterDataConfigs.find(c=>c.key==="hs-codes")} canManage canOperate canViewMasterData/>:
 window.mode==="obsolete"?<HsCodeObsoleteAction client={client} records={[{...window.catalog[0],rowVersion:"native:"+recordVersion}]} disabled={false} onChanged={async()=>{window.changed++;}}/>:
 window.mode==="review"?<HsCodeObsoleteReviewPanel client={client} disabled={false} businessYear={2026} onChanged={async()=>{window.changed++;}}/>:
-window.mode==="preview"?<HsCodeImportPreview preview={preview} busy={false} onBack={()=>{}} onCommit={()=>{window.changed++;}}/>:
+window.mode==="preview"?<HsCodeImportPreview client={client} preview={preview} busy={false} onBack={()=>{}} onCommit={()=>{window.changed++;}}/>:
 <ReportTemplateHistoryRetention client={client} template={{id:templateId,versionNumber:27,canManageHistory:true}} enabled isBusy={false}/>;}
 createRoot(document.getElementById("root")).render(<MemoryRouter><QueryClientProvider client={queries}><ConfirmationProvider><UnsavedChangesProvider><Harness/></UnsavedChangesProvider></ConfirmationProvider></QueryClientProvider></MemoryRouter>);
 ` }, outfile: bundle, bundle: true, platform: "browser", format: "iife", jsx: "automatic", logLevel: "silent" });
@@ -87,10 +87,12 @@ try {
   });
   await scenario("preview", "large-annual-preview-pages-and-filters", async page => {
     const rows=page.locator("table tbody tr");await rows.first().waitFor();assert.equal(await rows.count(),50);
-    await page.getByLabel("筛选导入变更").selectOption("SuspectedObsolete");assert.equal(await rows.count(),50);
+    await rows.first().locator("summary").click();await rows.first().getByText("出口退税率：9% → 13%",{exact:true}).waitFor();await rows.first().getByText("备注：原备注 → （空）",{exact:true}).waitFor();
+    await page.getByLabel("筛选导入变更").selectOption("SuspectedObsolete");await page.getByText("编码 1",{exact:true}).waitFor();assert.equal(await rows.count(),50);
     await page.getByRole("button",{name:"下一页",exact:true}).click();await page.getByText("编码 101",{exact:true}).waitFor();
     await page.getByLabel("筛选导入变更").selectOption("Add");await page.getByText("编码 0",{exact:true}).waitFor();
     assert.equal(await rows.count(),50);
+    assert.deepEqual(await page.evaluate(()=>window.calls.filter(call=>call.kind==="preview-page").map(call=>[call.request.changeType??"",call.request.pageNumber,call.request.pageSize])),[["",1,50],["SuspectedObsolete",1,50],["SuspectedObsolete",2,50],["Add",1,50]]);
   });
   await scenario("history", "history-preview-and-reason-confirmation-refresh-capacity", async page => {
     await page.getByText(/历史快照：27 版/).waitFor();await page.getByRole("button",{name:"预检旧快照清理",exact:true}).click();

@@ -1,4 +1,4 @@
-//! Temporary import data is accounted from BLOB metadata without loading payloads.
+//! Temporary import data is accounted without materializing its row payloads.
 use crate::{Error, QuerySql, Result, sql};
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -24,9 +24,9 @@ impl ImportPreviewUsage {
 pub(crate) fn usage_sql(pg: bool) -> String {
     let owner = if pg { "$1" } else { "?1" };
     let length = if pg {
-        "octet_length(f.content)"
+        "octet_length(f.body)"
     } else {
-        "length(f.content)"
+        "length(CAST(f.body AS BLOB))"
     };
     let active = if pg {
         "CASE WHEN r.body->'consumed'='false'::jsonb THEN 1 WHEN r.body->'consumed'='true'::jsonb THEN 0 ELSE ('invalid preview state: '||r.id::text)::bigint END"
@@ -35,8 +35,8 @@ pub(crate) fn usage_sql(pg: bool) -> String {
     };
     format!("SELECT CAST(COALESCE(SUM(active),0) AS BIGINT), CAST(COALESCE(SUM(CASE WHEN owner_id={owner} THEN active ELSE 0 END),0) AS BIGINT),
         CAST(COALESCE(SUM(bytes),0) AS BIGINT), CAST(COALESCE(SUM(CASE WHEN owner_id={owner} THEN bytes ELSE 0 END),0) AS BIGINT)
-        FROM (SELECT r.owner_id, {active} AS active, COALESCE((SELECT {length} FROM files f
-            WHERE f.record_id=r.id AND f.kind='import-previews'),0) AS bytes
+        FROM (SELECT r.owner_id, {active} AS active, COALESCE((SELECT SUM({length}) FROM import_preview_rows f
+            WHERE f.preview_id=r.id),0) AS bytes
             FROM record_rows r WHERE r.kind='import-previews') previews")
 }
 

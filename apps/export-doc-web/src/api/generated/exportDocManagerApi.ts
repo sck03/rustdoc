@@ -478,6 +478,7 @@ const operationDomains: Record<string, Domain> = {
   listHistoryOfPersonnelChangeRequest: "office",
   listHistoryOfPurchaseRequest: "office",
   listHistoryOfTravelRequest: "office",
+  listHsCodeImportPreviewItems: "masterData",
   listHsCodeKnowledgeExamples: "masterData",
   listHsCodeRemoteCandidates: "masterData",
   listHsCodes: "masterData",

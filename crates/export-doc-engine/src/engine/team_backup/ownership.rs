@@ -4,12 +4,13 @@
 use super::{
     NativeService, OWNERSHIP_STORAGE_POLICY, auth,
     error::{Result, error, invalid},
-    store::{Actor, Store},
+    store::Actor,
 };
 use crate::contracts;
 use crate::engine::store::Connection;
 use export_doc_storage::RecordWrite;
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 
 const INVOICE_KIND: &str = "invoices";
 const PAYMENT_KIND: &str = "payments";
@@ -111,15 +112,16 @@ fn owner_of(record: &Value) -> Option<i64> {
     record["ownerUserId"].as_i64()
 }
 
-fn counts(store: &Store, kinds: &[&str]) -> Result<(i64, i64, Vec<(i64, i64)>)> {
-    let connection = store.connection()?;
+fn counts(connection: &Connection, kinds: &[&str]) -> Result<(i64, i64, BTreeMap<i64, i64>)> {
     let mut total = 0i64;
     let mut unassigned = 0i64;
-    let mut per_owner: Vec<(i64, i64)> = Vec::new();
+    let mut per_owner = BTreeMap::new();
     for (owner, count) in connection.ownership_counts(kinds)? {
         total += count;
         match owner {
-            Some(owner) => per_owner.push((owner, count)),
+            Some(owner) => {
+                per_owner.insert(owner, count);
+            }
             None => unassigned += count,
         }
     }
@@ -128,50 +130,57 @@ fn counts(store: &Store, kinds: &[&str]) -> Result<(i64, i64, Vec<(i64, i64)>)> 
 
 pub(super) fn summary(service: &NativeService, actor: &Actor) -> Result<Value> {
     auth::authorize(actor, "system.disaster-recovery", "manage")?;
-    let users = service.store.all("users")?;
-    let (invoice_total, invoice_unassigned, invoice_owners) =
-        counts(&service.store, &[INVOICE_KIND])?;
-    let (payment_total, payment_unassigned, payment_owners) =
-        counts(&service.store, &[PAYMENT_KIND])?;
-    let (other_total, other_unassigned, other_owners) = counts(&service.store, OTHER_KINDS)?;
-    let owners = users
-        .iter()
-        .map(|user| {
-            let user_id = user["id"].as_i64().unwrap_or_default();
-            let count = |owners: &[(i64, i64)]| {
-                owners
-                    .iter()
-                    .find(|(key, _)| *key == user_id)
-                    .map(|(_, count)| *count)
-                    .unwrap_or_default()
-            };
-            let mut item =
-                contracts::initial(contracts::schema("ApiSharedDatabaseOwnerSummaryItemDto"));
-            item["userId"] = json!(user_id);
-            item["username"] = json!(super::records_text(user, "username"));
-            item["fullName"] = json!(super::records_text(user, "fullName"));
-            item["role"] = json!(super::records_text(user, "role"));
-            item["departmentId"] = json!(super::records_text(user, "departmentId"));
-            item["companyScope"] = json!(super::records_text(user, "companyScope"));
-            item["isActive"] = json!(user["isActive"].as_bool().unwrap_or(true));
-            item["invoiceCount"] = json!(count(&invoice_owners));
-            item["paymentCount"] = json!(count(&payment_owners));
-            item["otherBusinessDataCount"] = json!(count(&other_owners));
-            item
-        })
-        .collect::<Vec<_>>();
-    let mut response = contracts::initial(contracts::schema(
-        "ApiSharedDatabaseOwnershipSummaryResponse",
-    ));
-    response["totalInvoices"] = json!(invoice_total);
-    response["unassignedInvoices"] = json!(invoice_unassigned);
-    response["totalPayments"] = json!(payment_total);
-    response["unassignedPayments"] = json!(payment_unassigned);
-    response["totalOtherBusinessData"] = json!(other_total);
-    response["unassignedOtherBusinessData"] = json!(other_unassigned);
-    response["owners"] = json!(owners);
-    response["storagePolicy"] = json!(OWNERSHIP_STORAGE_POLICY);
-    Ok(response)
+    service.store.read(|tx| {
+        let actor = auth::refresh_actor_in(tx, actor)?;
+        auth::authorize(&actor, "system.disaster-recovery", "manage")?;
+        let fields = [
+            "id",
+            "username",
+            "fullName",
+            "role",
+            "departmentId",
+            "companyScope",
+            "isActive",
+        ]
+        .map(|key| (key, key));
+        let users = crate::engine::store::matching(tx, "users", &[], &fields)?;
+        let (invoice_total, invoice_unassigned, invoice_owners) = counts(tx, &[INVOICE_KIND])?;
+        let (payment_total, payment_unassigned, payment_owners) = counts(tx, &[PAYMENT_KIND])?;
+        let (other_total, other_unassigned, other_owners) = counts(tx, OTHER_KINDS)?;
+        let owners = users
+            .iter()
+            .map(|user| {
+                let user_id = user["id"].as_i64().unwrap_or_default();
+                let count =
+                    |owners: &BTreeMap<i64, i64>| owners.get(&user_id).copied().unwrap_or_default();
+                let mut item =
+                    contracts::initial(contracts::schema("ApiSharedDatabaseOwnerSummaryItemDto"));
+                item["userId"] = json!(user_id);
+                item["username"] = json!(super::records_text(user, "username"));
+                item["fullName"] = json!(super::records_text(user, "fullName"));
+                item["role"] = json!(super::records_text(user, "role"));
+                item["departmentId"] = json!(super::records_text(user, "departmentId"));
+                item["companyScope"] = json!(super::records_text(user, "companyScope"));
+                item["isActive"] = json!(user["isActive"].as_bool().unwrap_or(true));
+                item["invoiceCount"] = json!(count(&invoice_owners));
+                item["paymentCount"] = json!(count(&payment_owners));
+                item["otherBusinessDataCount"] = json!(count(&other_owners));
+                item
+            })
+            .collect::<Vec<_>>();
+        let mut response = contracts::initial(contracts::schema(
+            "ApiSharedDatabaseOwnershipSummaryResponse",
+        ));
+        response["totalInvoices"] = json!(invoice_total);
+        response["unassignedInvoices"] = json!(invoice_unassigned);
+        response["totalPayments"] = json!(payment_total);
+        response["unassignedPayments"] = json!(payment_unassigned);
+        response["totalOtherBusinessData"] = json!(other_total);
+        response["unassignedOtherBusinessData"] = json!(other_unassigned);
+        response["owners"] = json!(owners);
+        response["storagePolicy"] = json!(OWNERSHIP_STORAGE_POLICY);
+        Ok(response)
+    })
 }
 
 pub(super) fn transfer(service: &NativeService, actor: &Actor, body: &Value) -> Result<Value> {

@@ -179,7 +179,12 @@ pub fn exercise(service: &NativeService, admin: &str) {
 }
 
 #[cfg(feature = "excel")]
+#[path = "hs_import_contract.rs"]
+mod hs_import_contract;
+
+#[cfg(feature = "excel")]
 fn invoice_feedback(service: &NativeService, admin: &str, tag: &str, current: &Value) {
+    hs_import_contract::exercise(service, admin, current["businessDate"].as_str().unwrap());
     const CODE: &str = "9900987654";
     let year: i32 = current["businessDate"].as_str().unwrap()[..4]
         .parse()

@@ -79,7 +79,6 @@ pub fn exercise(c: &Connection) {
         category_id: None,
         archived: false,
         keyword: "改名后的分类",
-        status: "",
     };
     q.offset = 0;
     assert_eq!(c.query_business(&q).unwrap().0, 2);
@@ -88,7 +87,6 @@ pub fn exercise(c: &Connection) {
         category_id: None,
         archived: false,
         keyword: "旧分类名称",
-        status: "",
     };
     assert_eq!(c.query_business(&q).unwrap().0, 0);
     q.list = BusinessList::Attachments {
@@ -96,7 +94,6 @@ pub fn exercise(c: &Connection) {
         category_id: None,
         archived: false,
         keyword: "",
-        status: "",
     };
     assert_eq!(c.query_business(&q).unwrap().0, 0);
     for code in ["B", "A"] {

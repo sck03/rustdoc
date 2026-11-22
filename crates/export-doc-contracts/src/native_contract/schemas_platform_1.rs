@@ -445,8 +445,8 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["expectedVersion","title","categoryId","poNumber","styleNo","note"])),
     ("BusinessAttachmentPage",o(vec![
         ("page",r("PagedResultOfBusinessAttachmentRecord")),("canUpload",b()),("usedBytes",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int64").pattern("^-?(?:0|[1-9]\\d*)$")),
-        ("fileBytesLimit",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("invoiceBytesLimit",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int64").pattern("^-?(?:0|[1-9]\\d*)$"))
-    ]).required(vec!["page","canUpload","fileBytesLimit","invoiceBytesLimit"])),
+        ("fileBytesLimit",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))
+    ]).required(vec!["page","canUpload","fileBytesLimit"])),
     ("BusinessAttachmentRecord",o(vec![
         ("id",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("invoiceId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("invoiceNo",s()),
         ("invoiceType",s()),("customerName",s()),("title",s()),

@@ -7,7 +7,7 @@ use super::{
 use crate::engine::store::Connection;
 use crate::{clock::BusinessClock, paths::nonce};
 use chrono::{DateTime, Duration};
-use export_doc_storage::{BlobWrite, RecordWrite};
+use export_doc_storage::RecordWrite;
 use serde_json::{Value, json};
 const KIND: &str = "import-previews";
 const GLOBAL_BYTES: u64 = 256 * 1024 * 1024;
@@ -43,6 +43,9 @@ pub struct PreparedPreview<'a> {
 /// Expensive bounded serialization can finish before acquiring the write transaction.
 pub fn prepare<'a>(kind: &'a str, rows: &[Value]) -> Result<PreparedPreview<'a>> {
     let (max_rows, max_payload) = limits(kind);
+    if rows.iter().any(|row| !row.is_object()) {
+        return Err(invalid("导入预检行必须是记录对象。"));
+    }
     if rows.len() > max_rows {
         return Err(invalid(format!(
             "预检内容超过 {max_rows} 行或 {} MiB，请缩小范围。",
@@ -92,7 +95,6 @@ pub fn save_prepared(
             let id = value["id"]
                 .as_i64()
                 .ok_or_else(|| unavailable("导入预检缺少编号。"))?;
-            tx.delete_blobs(id)?;
             if !tx.delete(KIND, id, store::expected(&value))? {
                 return Err(conflict("导入预检已变化，请重试。"));
             }
@@ -120,28 +122,23 @@ pub fn save_prepared(
     })?;
     value["id"] = json!(id);
     tx.set_body(id, &value)?;
-    tx.insert_blob(&BlobWrite {
-        kind: KIND,
-        record_id: id,
-        file_name: "preview.json",
-        media_type: "application/json",
-        digest: value["payloadSha256"].as_str().unwrap(),
-        content: bytes,
-        created_at: &now.to_rfc3339(),
-    })?;
+    tx.insert_import_preview_rows(
+        id,
+        std::str::from_utf8(bytes).map_err(|_| unavailable("导入预检编码无效。"))?,
+    )?;
     Ok(identity)
 }
-pub fn consume(
+fn authorized(
     tx: &Connection,
     actor: &Actor,
     clock: &BusinessClock,
     kind: &str,
     identity: &str,
-) -> Result<Vec<Value>> {
+) -> Result<Value> {
     if identity.len() != 32 || !identity.bytes().all(|ch| ch.is_ascii_hexdigit()) {
         return Err(invalid("导入预检编号无效，请重新选择文件。"));
     }
-    let mut preview = tx
+    let preview = tx
         .find_identity(KIND, identity)?
         .filter(|value| {
             value["kind"] == kind
@@ -160,31 +157,75 @@ pub fn consume(
     if expires <= clock.now().map_err(unavailable)?.utc_now {
         return Err(conflict("导入预检已过期，请重新选择文件。"));
     }
+    Ok(preview)
+}
+
+pub fn page(
+    tx: &Connection,
+    actor: &Actor,
+    clock: &BusinessClock,
+    kind: &str,
+    identity: &str,
+    change: &str,
+    query: &[(&str, String)],
+) -> Result<Value> {
+    let preview = authorized(tx, actor, clock, kind, identity)?;
     let id = preview["id"]
         .as_i64()
         .ok_or_else(|| unavailable("导入预检缺少编号。"))?;
-    let info = tx
-        .blob_info(id, KIND)?
-        .ok_or_else(|| unavailable("导入预检内容缺失。"))?;
-    if info.size == 0 || info.size > limits(kind).1 as u64 {
-        return Err(unavailable("导入预检容量无效。"));
+    for (key, max) in [("pageNumber", i32::MAX as u64), ("pageSize", 200)] {
+        if let Some(value) = super::request_values::find(query, key)
+            && value
+                .parse::<u64>()
+                .ok()
+                .filter(|value| (1..=max).contains(value))
+                .is_none()
+        {
+            return Err(invalid("预检页码或每页条数无效。"));
+        }
     }
-    let payload = tx
-        .blob(id, KIND)?
-        .ok_or_else(|| unavailable("导入预检内容缺失。"))?;
-    if payload.content.is_empty()
-        || payload.content.len() > limits(kind).1
-        || preview["payloadSha256"] != digest(&payload.content)
-    {
-        return Err(unavailable("导入预检完整性校验失败。"));
+    let (page, size, offset) = store::page_parameters(query);
+    let total = tx.import_preview_row_count(id, change)?;
+    let rows = tx.import_preview_rows(id, change, offset, size as i64)?;
+    Ok(crate::contracts::page(rows, total as usize, page, size))
+}
+
+pub fn consume(
+    tx: &Connection,
+    actor: &Actor,
+    clock: &BusinessClock,
+    kind: &str,
+    identity: &str,
+) -> Result<Vec<Value>> {
+    let mut preview = authorized(tx, actor, clock, kind, identity)?;
+    let id = preview["id"]
+        .as_i64()
+        .ok_or_else(|| unavailable("导入预检缺少编号。"))?;
+    let expected = preview["rowCount"]
+        .as_u64()
+        .filter(|n| *n <= limits(kind).0 as u64)
+        .ok_or_else(|| unavailable("导入预检行数无效。"))?;
+    let mut rows = Vec::new();
+    loop {
+        crate::operation::check()?;
+        let batch = tx.import_preview_rows(id, "", rows.len() as i64, 200)?;
+        if batch.is_empty() {
+            break;
+        }
+        if rows.len() + batch.len() > expected as usize {
+            return Err(unavailable("导入预检行数无效。"));
+        }
+        rows.extend(batch);
     }
-    let rows: Vec<Value> = serde_json::from_slice(&payload.content)
-        .map_err(|cause| unavailable(format!("导入预检内容无效：{cause}")))?;
-    if rows.len() > limits(kind).0 || preview["rowCount"] != json!(rows.len()) {
+    if rows.len() != expected as usize {
         return Err(unavailable("导入预检行数无效。"));
+    }
+    let checked = prepare(kind, &rows).map_err(|_| unavailable("导入预检内容无效。"))?;
+    if preview["payloadSha256"] != checked.digest {
+        return Err(unavailable("导入预检完整性校验失败。"));
     }
     preview["consumed"] = json!(true);
     tx.set_body(id, &preview)?;
-    tx.delete_blob(id, KIND)?;
+    tx.delete_import_preview_rows(id)?;
     Ok(rows)
 }

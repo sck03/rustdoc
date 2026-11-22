@@ -26,6 +26,10 @@ macro_rules! unsupported_operations {
 /// All business operations use this semantic storage boundary, never provider SQL.
 pub(crate) trait Adapter: Send {
     semantic_operations! {
+        insert_import_preview_rows(preview: i64, payload: &str) -> () => import_preview_rows::insert;
+        import_preview_row_count(preview: i64, change: &str) -> i64 => import_preview_rows::count;
+        import_preview_rows(preview: i64, change: &str, offset: i64, limit: i64) -> Vec<Value> => import_preview_rows::page;
+        delete_import_preview_rows(preview: i64) -> () => import_preview_rows::remove;
         crm_follow_up_counts(query: &CrmQuery<'_>, now: &str, until: &str) -> CrmFollowUpCounts => crm_query::follow_up_counts;
         booking_overlaps(company: &str, room: i64, from: &str, to: &str, states: &[&str]) -> bool => office_query::booking_overlaps;
         scan_dashboard(scope: &DataScope<'_>, fields: &[(&str, &str)], before: Option<i64>) -> Vec<Value> => dashboard_query::scan;

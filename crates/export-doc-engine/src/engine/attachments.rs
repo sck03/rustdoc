@@ -143,15 +143,20 @@ pub fn handle(
         let archived = query
             .iter()
             .any(|(key, value)| *key == "includeArchived" && value == "true");
-        let category_id = query
-            .iter()
-            .find(|(key, _)| *key == "categoryId")
-            .and_then(|(_, value)| value.parse::<i64>().ok());
+        let category_id = super::request_values::find(query, "categoryId")
+            .map(|value| {
+                value
+                    .parse::<i64>()
+                    .ok()
+                    .filter(|id| *id > 0)
+                    .ok_or_else(|| invalid("资料分类编号无效。"))
+            })
+            .transpose()?;
         store.read_for(actor, operation, query, |tx, actor| {
             let (page, size, offset) = store::page_parameters(query);
             let keyword = store::normalize(super::hs::read(query,"keyword"));
             let (total, mut items) = tx.query_business(&export_doc_storage::BusinessQuery {
-                list: export_doc_storage::BusinessList::Attachments { invoice_id, category_id, archived, keyword: &keyword, status: super::hs::read(query,"status") },
+                list: export_doc_storage::BusinessList::Attachments { invoice_id, category_id, archived, keyword: &keyword },
                 scope: auth::data_scope(actor,"document.invoices","view"),
                 fields: &[], offset, limit: size as i64,
             })?;
@@ -174,7 +179,7 @@ pub fn handle(
                 if !auth::visible(actor, "document.invoices", "view", invoice) { return Err(error(403, "没有访问此发票资料的权限。")); }
                 (Some(tx.attachment_bytes(id)?), auth::visible(actor, "document.invoices", "operate", invoice))
             } else { (None, auth::authorize(actor,"document.invoices","operate").is_ok()) };
-            Ok(json!({"page":contracts::page(items,total as usize,page,size),"canUpload":can_upload,"usedBytes":used,"fileBytesLimit":store.files.configuration()?.policy.file_bytes,"invoiceBytesLimit":Value::Null}))
+            Ok(json!({"page":contracts::page(items,total as usize,page,size),"canUpload":can_upload,"usedBytes":used,"fileBytesLimit":store.files.configuration()?.policy.file_bytes}))
         })?
     } else if operation == GET_BUSINESS_ATTACHMENT {
         let id = super::records::id(parameters)?;

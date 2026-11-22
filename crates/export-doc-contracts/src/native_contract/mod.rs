@@ -41,6 +41,7 @@ mod endpoints_tools;
 mod endpoints_users;
 mod endpoints_worklist;
 mod file_storage;
+mod hs_import;
 mod metadata;
 mod metadata_configuration;
 mod metadata_permissions;
@@ -68,6 +69,7 @@ use std::collections::BTreeMap;
 pub(super) fn document() -> Value {
     let mut schemas = Vec::new();
     schemas.extend(file_storage::schemas());
+    schemas.extend(hs_import::schemas());
     schemas.extend(schemas_platform_1::entries());
     schemas.extend(schemas_platform_2::entries());
     schemas.extend(schemas_invoices_1::entries());
@@ -83,6 +85,7 @@ pub(super) fn document() -> Value {
     let schemas: BTreeMap<_, _> = schemas.into_iter().collect();
     let mut endpoints = Vec::new();
     endpoints.extend(file_storage::endpoints());
+    endpoints.extend(hs_import::endpoints());
     endpoints.extend(endpoints_session::entries());
     endpoints.extend(endpoints_system::entries());
     endpoints.extend(endpoints_business_attachments::entries());

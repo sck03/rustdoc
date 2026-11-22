@@ -66,7 +66,7 @@ await require("esbuild").build({ stdin: { loader: "tsx", resolveDir: web, conten
     deleteBusinessAttachmentCategory:input=>{categories=categories.filter(item=>item.id!==input.id);return record('deleteCategory',input,{success:true});},
     getInvoice:async input=>({...createEmptyInvoice('2026-09-08'),...invoices.find(item=>item.id===input.id)}),
     listInvoices:input=>record('listInvoices',input,page(invoices.filter(item=>!input.keyword||item.invoiceNo.includes(input.keyword)),input)),
-    listBusinessAttachments:input=>record('listAttachments',input,{page:page(!deleted&&(!input.invoiceId||input.invoiceId===attachment.invoiceId)&&(!attachment.isArchived||input.includeArchived)?[{...attachment}]:[],input),canUpload:!readonly&&!(params.get('role')==='limited'&&input.invoiceId===1),usedBytes:deleted?0:4096,fileBytesLimit:16777216,invoiceBytesLimit:268435456}),
+    listBusinessAttachments:input=>record('listAttachments',input,{page:page(!deleted&&(!input.invoiceId||input.invoiceId===attachment.invoiceId)&&(!attachment.isArchived||input.includeArchived)&&(!input.categoryId||input.categoryId===attachment.categoryId)?[{...attachment}]:[],input),canUpload:!readonly&&!(params.get('role')==='limited'&&input.invoiceId===1),usedBytes:deleted?0:4096,fileBytesLimit:16777216}),
     getBusinessAttachment:input=>record('getAttachment',input,{attachment:{...attachment},revisions:[...versions],events:[...events],eventCount:events.length}),
     uploadBusinessAttachment:async input=>{
       const fields=Object.fromEntries(input.body.entries()); window.__calls.push({name:'upload',input:{invoiceId:input.invoiceId,fields:{...fields,file:fields.file.name}}});
@@ -164,6 +164,14 @@ try {
     await click(page, "查看版本"); await waitFor(page, "document.querySelectorAll('.attachment-version').length===2");
     await audit(page, `versions-${width}`);
   }
+  await open("attachments");
+  await input(page, 'select[aria-label="筛选资料分类"]', '2');
+  await waitFor(page, "window.__calls.some(c=>c.name==='listAttachments'&&c.input.categoryId===2)");
+  await waitFor(page, "document.querySelectorAll('.responsive-data-table tbody tr').length===0");
+  await input(page, 'select[aria-label="筛选资料分类"]', '1');
+  await waitFor(page, "document.querySelectorAll('.responsive-data-table tbody tr').length===1");
+  assert(await read(page, "window.__calls.some(c=>c.name==='listAttachments'&&c.input.categoryId===1&&c.input.pageNumber===1)"));
+  results.push('attachment-category-filter');
   await open("worklist");
   await input(page, ".list-workspace-filters label:nth-child(2) select", "Overdue");
   await waitFor(page, "document.querySelectorAll('.business-records-card').length===1");

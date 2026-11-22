@@ -20,6 +20,14 @@ CREATE TABLE records (
     CHECK(kind<>'attachments' OR COALESCE(json_type(body,'$.invoiceId')='integer' AND typeof(json_extract(body,'$.invoiceId'))='integer' AND json_extract(body,'$.invoiceId')>0,0)),
     CHECK(kind<>'people' OR json_remove(COALESCE(body->>'profile','{}'),'$.fullName','$.workEmail','$.workPhone','$.workLocation')='{}')
 );
+CREATE TABLE import_preview_rows (
+    preview_id INTEGER NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL CHECK(position >= 0),
+    body TEXT NOT NULL CHECK(json_valid(body) AND json_type(body)='object'),
+    change_type TEXT GENERATED ALWAYS AS (COALESCE(json_extract(body,'$.changeType'),'')) STORED,
+    PRIMARY KEY(preview_id,position)
+);
+CREATE INDEX import_preview_rows_change ON import_preview_rows(preview_id,change_type,position);
 CREATE TABLE personnel_private_profiles (
     person_id INTEGER PRIMARY KEY REFERENCES records(id) ON DELETE CASCADE,
     body TEXT NOT NULL CHECK(json_valid(body) AND json_type(body)='object')

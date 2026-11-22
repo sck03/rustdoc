@@ -13,3 +13,10 @@
 - `packing-workspace.png`：本批 `scripts/test_packing_credit_workspace_ui.mjs` 装柜工作区 1366 宽度截图，来源 `artifacts/packing-credit-workspace-ui/1795172973904/packing-layout-1366.png`。
 
 既有 2026-11-17 的 OA 表单/完成详情截图保留原来源日期，作为未变更界面的操作示例，不冒充本批重新执行的截图。
+
+2026-11-22 新增匿名界面：
+
+- `hs-import-preview.png`：本批真实 React/Rust HTTP 的 301 行 XLSX 导入预检，来源 `artifacts/review-consistency-http-ui/1795341256567/hs-import-changes.png`；裁去导航和重复抬头，保留摘要、字段前后值、分页与确认操作。
+- `attachment-category.png`：同次实际 HTTP 验证中的资料分类筛选，来源 `artifacts/review-consistency-http-ui/1795341256567/attachment-category.png`；裁取目录抬头、筛选及记录行。示例发票、资料及编码均为合成测试数据。
+
+本次只裁剪截图，不替换显示内容。OA 表单、详情及项目职责图片继续按原来源日期标注；其中没有已退役的 OA 附件分级控件。

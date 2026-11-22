@@ -21,6 +21,7 @@ pub const OPERATIONS: &[Operation] = &[
     PREVIEW_HS_CODES_IMPORT_UPLOAD,
     PREVIEW_HS_CODES_IMPORT_FROM_PATH,
     COMMIT_HS_CODES_IMPORT,
+    LIST_HS_CODE_IMPORT_PREVIEW_ITEMS,
 ];
 pub const LOCAL: &[Operation] = &[PREVIEW_HS_CODES_IMPORT_FROM_PATH];
 pub fn upload(
@@ -89,19 +90,49 @@ pub fn upload(
         })?;
     drop(prepared);
     let counts = |kind: &str| items.iter().filter(|row| row["changeType"] == kind).count();
-    let mut response = json!({"token":token,"fileName":name,"mode":mode,"sourceName":source,"effectiveYear":year,"worksheetName":table.sheet_name,"headerRowNumber":header+table.first_row,"confidence":100,
+    let response = json!({"token":token,"fileName":name,"mode":mode,"sourceName":source,"effectiveYear":year,"worksheetName":table.sheet_name,"headerRowNumber":header+table.first_row,"confidence":100,
             "columns":mapping.iter().map(|(field,column)|json!({"field":field,"header":table.rows[header][*column],"columnNumber":column+1,"confidence":100})).collect::<Vec<_>>(),
             "addCount":counts("Add"),"updateCount":counts("Update"),"unchangedCount":counts("Unchanged"),"suspectedObsoleteCount":counts("SuspectedObsolete"),"conflictCount":counts("Conflict"),"invalidCount":counts("Invalid"),
             "warnings":if mode=="CompleteSnapshot"{vec!["完整年度库会标记缺失编码为疑似作废，请核对全部预检结果。"]}else{vec![]},"storagePolicy":"预检尚未写入税则；30 分钟内确认有效，只能提交一次。"});
-    response["items"] = Value::Array(items);
     Ok(response)
 }
 pub fn handle(
     service: &NativeService,
     actor: &Actor,
     operation: Operation,
+    parameters: &[(&str, String)],
+    query: &[(&str, String)],
     body: &Value,
 ) -> Result<Value> {
+    if operation == LIST_HS_CODE_IMPORT_PREVIEW_ITEMS {
+        let change = hs::read(query, "changeType");
+        if ![
+            "",
+            "Add",
+            "Update",
+            "Unchanged",
+            "SuspectedObsolete",
+            "Conflict",
+            "Invalid",
+        ]
+        .contains(&change)
+        {
+            return Err(invalid("预检变更类别无效。"));
+        }
+        return service
+            .store
+            .read_for(actor, operation, query, |tx, actor| {
+                import_previews::page(
+                    tx,
+                    actor,
+                    &service.clock,
+                    "hs-tariffs",
+                    hs::read(parameters, "token"),
+                    change,
+                    query,
+                )
+            });
+    }
     if operation == COMMIT_HS_CODES_IMPORT {
         return commit(service, actor, operation, body);
     }

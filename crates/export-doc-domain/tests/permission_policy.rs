@@ -35,6 +35,13 @@ fn prior_policy(id: &str) -> &'static Value {
         ))
         .unwrap();
         policies.extend(additions.as_object().unwrap().clone());
+        // Reading a private import preview keeps the importer's management right.
+        policies.insert(
+            LIST_HS_CODE_IMPORT_PREVIEW_ITEMS.id.into(),
+            serde_json::json!({
+                "requirements":[{"resourceKey":"document.hs-knowledge","action":"manage"}]
+            }),
+        );
         Value::Object(policies)
     })[id]
 }

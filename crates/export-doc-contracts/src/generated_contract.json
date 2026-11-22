@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "4c531b9c676a6c46c9379fa6b54fd4ddae94bac0225a31de1bec696bf847129c",
+  "digest": "1ee7301f90026a8259e4940d4cf6eb51094727345935e11d3303b34373d86b70",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -47715,6 +47715,15 @@
       "office": null,
       "parameters": [
         {
+          "name": "categoryId",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          }
+        },
+        {
           "name": "invoiceId",
           "in": "query",
           "schema": {
@@ -52172,6 +52181,172 @@
       "request": null,
       "response": {
         "$ref": "#/components/schemas/OaEventPage"
+      },
+      "timeoutSeconds": 30,
+      "maxJsonResponseBytes": 67108864,
+      "requiresProcessingSlot": false,
+      "validatesDecimalInput": false
+    },
+    "ListHsCodeImportPreviewItems": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": true,
+        "access": {
+          "match": "All",
+          "resources": [
+            {
+              "resourceKey": "document.hs-knowledge",
+              "actions": [
+                "manage"
+              ],
+              "administratorOnly": false
+            }
+          ]
+        }
+      },
+      "office": null,
+      "parameters": [
+        {
+          "name": "token",
+          "in": "path",
+          "schema": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "required": true
+        },
+        {
+          "name": "changeType",
+          "in": "query",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "Add",
+              "Update",
+              "Unchanged",
+              "SuspectedObsolete",
+              "Conflict",
+              "Invalid"
+            ]
+          }
+        },
+        {
+          "name": "pageNumber",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1
+          }
+        },
+        {
+          "name": "pageSize",
+          "in": "query",
+          "schema": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 200
+          }
+        }
+      ],
+      "requestBody": null,
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiPagedResponseOfApiHsCodeImportPreviewItemDto"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "401": {
+          "description": "Unauthorized",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "403": {
+          "description": "Forbidden",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "404": {
+          "description": "Not Found",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "504": {
+          "description": "Gateway Timeout",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": null,
+      "response": {
+        "$ref": "#/components/schemas/ApiPagedResponseOfApiHsCodeImportPreviewItemDto"
       },
       "timeoutSeconds": 30,
       "maxJsonResponseBytes": 67108864,
@@ -96573,16 +96748,35 @@
         "message"
       ]
     },
+    "ApiHsCodeImportFieldChangeDto": {
+      "type": "object",
+      "properties": {
+        "after": {
+          "type": "string"
+        },
+        "before": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "before",
+        "after"
+      ]
+    },
     "ApiHsCodeImportPreviewItemDto": {
       "type": "object",
       "properties": {
         "changeType": {
           "type": "string"
         },
-        "changedFields": {
+        "changes": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/components/schemas/ApiHsCodeImportFieldChangeDto"
           }
         },
         "item": {
@@ -96610,7 +96804,7 @@
         "changeType",
         "rowNumber",
         "item",
-        "changedFields",
+        "changes",
         "replacementCandidates",
         "message"
       ]
@@ -96704,12 +96898,6 @@
           "format": "int32",
           "pattern": "^-?(?:0|[1-9]\\d*)$"
         },
-        "items": {
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/ApiHsCodeImportPreviewItemDto"
-          }
-        },
         "mode": {
           "type": "string"
         },
@@ -96765,7 +96953,6 @@
         "headerRowNumber",
         "confidence",
         "columns",
-        "items",
         "addCount",
         "updateCount",
         "unchangedCount",
@@ -100205,6 +100392,64 @@
           "type": "array",
           "items": {
             "$ref": "#/components/schemas/ApiHsCodeDto"
+          }
+        },
+        "pageNumber": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        },
+        "pageSize": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        },
+        "totalCount": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        },
+        "totalPages": {
+          "type": [
+            "integer",
+            "string"
+          ],
+          "format": "int32",
+          "pattern": "^-?(?:0|[1-9]\\d*)$"
+        }
+      },
+      "required": [
+        "items",
+        "totalCount",
+        "pageNumber",
+        "pageSize",
+        "totalPages",
+        "hasPreviousPage",
+        "hasNextPage"
+      ]
+    },
+    "ApiPagedResponseOfApiHsCodeImportPreviewItemDto": {
+      "type": "object",
+      "properties": {
+        "hasNextPage": {
+          "type": "boolean"
+        },
+        "hasPreviousPage": {
+          "type": "boolean"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/ApiHsCodeImportPreviewItemDto"
           }
         },
         "pageNumber": {
@@ -108423,15 +108668,6 @@
           "format": "int32",
           "pattern": "^-?(?:0|[1-9]\\d*)$"
         },
-        "invoiceBytesLimit": {
-          "type": [
-            "null",
-            "integer",
-            "string"
-          ],
-          "format": "int64",
-          "pattern": "^-?(?:0|[1-9]\\d*)$"
-        },
         "page": {
           "$ref": "#/components/schemas/PagedResultOfBusinessAttachmentRecord"
         },
@@ -108448,8 +108684,7 @@
       "required": [
         "page",
         "canUpload",
-        "fileBytesLimit",
-        "invoiceBytesLimit"
+        "fileBytesLimit"
       ]
     },
     "BusinessAttachmentRecord": {

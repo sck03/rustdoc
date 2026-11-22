@@ -25,6 +25,7 @@ pub use business_query::{BusinessList, BusinessQuery};
 pub use file_catalog::{FileInfo, FileObject, FileWrite};
 mod hs_query;
 mod import_preview_query;
+mod import_preview_rows;
 pub use import_preview_query::ImportPreviewUsage;
 mod job_query;
 pub use hs_query::HsQuery;
@@ -468,6 +469,10 @@ delegate! {
     appointment_references(people:&[i64])->Vec<Value>;
     attachment_category_counts(company:&str)->std::collections::BTreeMap<i64,i64>;
     import_preview_usage(owner:i64)->ImportPreviewUsage;
+    insert_import_preview_rows(preview:i64,payload:&str)->();
+    import_preview_row_count(preview:i64,change:&str)->i64;
+    import_preview_rows(preview:i64,change:&str,offset:i64,limit:i64)->Vec<Value>;
+    delete_import_preview_rows(preview:i64)->();
     expired_import_previews(before:&str)->Vec<Value>;
     query_hs(query:&HsQuery<'_>)->Vec<Value>;
     page_hs(query:&HsQuery<'_>)->(i64,Vec<Value>);

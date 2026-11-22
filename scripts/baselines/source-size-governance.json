@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
   "updatedAt": "2026-11-22",
-  "reviewNotes": "2026-11-22 audit fixes against 07687fa0: centralize request editability by business kind, use declared HS write DTOs and explicit create/edit/import modes, move booking conflicts to a bounded Storage query, and isolate remote reference confirmation from the view. Reuse the React UI fixture and shared transient retry policy. Reviewed measured totals: web production 88913, Rust native production 116091, Rust tests/examples 35536, automation 31560. Advance only the two regression aggregates for returned-resource immutability, HS identity/version conflicts, exact overlap instants and session recovery. Retain every per-file cap, growth allowance and production baseline. No dependency or database schema change. Evidence: docs/archive/2026-11/2026-11-22项目审查修复与清理.md; preceding evidence remains in docs/archive/2026-11/2026-11-21OA附件简化与审查修订.md.",
+  "reviewNotes": "2026-11-22 import/resource review against e706412e: introduce shared indexed preview-row storage and a scoped paged React preview; preserve absent incremental columns and expose before/after values. Align image recycling permissions, cache cancellation and attachment category queries; aggregate ownership in one read snapshot with projected accounts. Remove obsolete preview BLOB storage, status filtering and the null invoice limit. Measured totals: web 88942, native Rust 116581 (including inline tests and independent contract comparison code), tests/examples 35679, automation 31570. Advance only the two Rust aggregate baselines for these reviewed responsibilities and regressions; retain every per-file cap and the existing 75/120-line growth allowances. No dependency upgrade. Evidence: docs/archive/2026-11/2026-11-22导入预检与资源一致性修复.md; preceding evidence: docs/archive/2026-11/2026-11-22项目审查修复与清理.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 116031,
+      "baselineAggregateLines": 116581,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 116106,
+      "maximumAggregateLines": 116656,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 35536,
+      "baselineAggregateLines": 35679,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 35656,
+      "maximumAggregateLines": 35799,
       "reportFiles": false
     },
     {

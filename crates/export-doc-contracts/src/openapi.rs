@@ -17,6 +17,9 @@ pub fn document() -> Value {
 #[path = "contract_business_consistency.rs"]
 mod business_consistency;
 #[cfg(test)]
+#[path = "contract_import_preview.rs"]
+mod contract_import_preview;
+#[cfg(test)]
 #[path = "contract_custom_oa.rs"]
 mod custom_oa;
 #[cfg(test)]
@@ -254,6 +257,7 @@ mod tests {
                 .push(serde_json::json!(name));
         }
         audit_fixes::apply(&mut baseline);
+        contract_import_preview::apply(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

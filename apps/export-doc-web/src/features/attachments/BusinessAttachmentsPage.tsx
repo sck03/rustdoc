@@ -57,12 +57,16 @@ function BusinessAttachmentWorkspace({ client, user, invoiceId }: { client: Expo
         !data.canUpload ? <PageState tone="permission" title="不能上传到这张发票" description="当前账号没有本单的资料上传权限。"
           action={<button className="command-button secondary" type="button" onClick={() => model.setUploadMode(null)}>关闭上传</button>} /> :
           <BusinessAttachmentUploadForm key={uploadMode} invoiceId={uploadInvoiceId} attachment={uploadAttachment} categories={categories}
-            maximumBytes={data.fileBytesLimit} remainingBytes={data.invoiceBytesLimit == null ? Number.MAX_SAFE_INTEGER : Math.max(0, data.invoiceBytesLimit - (data.usedBytes ?? 0))} busy={model.busy} onUpload={model.upload} onSave={model.saveUploads} onClose={() => model.setUploadMode(null)} /> : null}
+            maximumBytes={data.fileBytesLimit} busy={model.busy} onUpload={model.upload} onSave={model.saveUploads} onClose={() => model.setUploadMode(null)} /> : null}
     <div className="business-records-content" hidden={model.selectedId !== null}>
     <form className="toolbar business-records-toolbar" role="search" onSubmit={(event) => { event.preventDefault(); model.commitSearch(); }}>
       <div className="search-form"><Search size={17} aria-hidden="true" />
         <input aria-label="搜索业务资料" placeholder="客户、单据号、PO、款号、资料名或文件名" value={model.keyword} maxLength={100} onChange={(event) => model.changeKeyword(event.target.value)} /></div>
       <div className="toolbar-actions">
+        <label className="inline-check">资料分类<select aria-label="筛选资料分类" value={model.categoryId ?? ""} onChange={event => model.setCategoryId(event.target.value ? Number(event.target.value) : undefined)}>
+          <option value="">全部分类</option>{model.categoryId && !categories.some(category => category.id === model.categoryId) && <option value={model.categoryId}>已选分类</option>}
+          {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+        </select></label>
         <button className="command-button secondary" type="submit">搜索</button>
         <label className="inline-check"><input type="checkbox" checked={model.includeArchived} onChange={(event) => model.changeArchived(event.target.checked)} />含停用资料</label>
         <button className="icon-button" type="button" aria-label="刷新业务资料" title="刷新业务资料" disabled={model.query.isFetching} onClick={model.refresh}><RefreshCw size={16} aria-hidden="true" /></button>

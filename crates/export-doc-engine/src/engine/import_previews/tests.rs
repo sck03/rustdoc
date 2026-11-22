@@ -19,6 +19,26 @@ fn previews_are_bounded_single_use_and_release_payloads_transactionally() {
     tx.begin().unwrap();
     let token = save(&tx, &actor, &clock, "suppliers", &rows).unwrap();
     tx.commit().unwrap();
+    let mut wrong_actor = actor.clone();
+    wrong_actor.id += 1;
+    assert_eq!(
+        page(&tx, &wrong_actor, &clock, "suppliers", &token, "", &[])
+            .unwrap_err()
+            .status,
+        Some(404)
+    );
+    let mut wrong_company = actor.clone();
+    wrong_company.company = "OTHER".into();
+    assert_eq!(
+        page(&tx, &wrong_company, &clock, "suppliers", &token, "", &[])
+            .unwrap_err()
+            .status,
+        Some(404)
+    );
+    assert_eq!(
+        page(&tx, &actor, &clock, "suppliers", &token, "", &[]).unwrap()["items"],
+        json!(rows)
+    );
     tx.begin().unwrap();
     assert_eq!(
         consume(&tx, &actor, &clock, "suppliers", &token).unwrap(),

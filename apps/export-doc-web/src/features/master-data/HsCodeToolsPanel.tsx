@@ -405,7 +405,7 @@ export function HsCodeToolsPanel({
                         : <button className="command-button" type="button" disabled={isBusy} onClick={chooseUploadFile}><Upload size={17} /><span>选择 Excel 文件</span></button>}
                     </div>
                   </>
-                ) : <HsCodeImportPreview key={importPreview.token} preview={importPreview} busy={isBusy} onBack={() => setImportPreview(null)} onCommit={commitImport} />}
+                ) : <HsCodeImportPreview key={importPreview.token} client={client} preview={importPreview} busy={isBusy} onBack={() => setImportPreview(null)} onCommit={commitImport} />}
               </div>
             ) : (
               <div className="hs-code-remote-workspace">

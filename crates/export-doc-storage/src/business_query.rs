@@ -18,7 +18,6 @@ pub enum BusinessList<'a> {
         category_id: Option<i64>,
         archived: bool,
         keyword: &'a str,
-        status: &'a str,
     },
     Invoices {
         filter: &'a Value,
@@ -125,7 +124,6 @@ pub(crate) fn build(q: &BusinessQuery<'_>, pg: bool) -> Result<(QuerySql, String
             category_id,
             archived,
             keyword,
-            status,
         } => {
             clauses.push("r.kind='attachments'".into());
             // Apply invoice scope inside the correlated lookup, before count/page.
@@ -149,13 +147,6 @@ pub(crate) fn build(q: &BusinessQuery<'_>, pg: bool) -> Result<(QuerySql, String
                     }
                     .into(),
                 );
-            }
-            if !status.is_empty() {
-                clauses.push(format!(
-                    "{}={}",
-                    field("status", pg),
-                    bind(&mut values, status, pg)
-                ));
             }
             if !keyword.is_empty() {
                 let category_id = field("categoryId", pg);

@@ -1,8 +1,10 @@
 # 账号、组织与 OA 新基线数据字典
 
-核对日期：2026-11-18。本文描述源码中的 schema 18；永久文件与引用见[文件存储与容量管理](./文件存储与容量管理.md)；自定义事项和独立设置版本见[本批记录](./archive/2026-11/2026-11-10自定义OA重构与验收.md)。独立申报资料及 `sourceId` 新基线见[联调记录](./archive/2026-11/2026-11-09独立申报与联调记录.md)，schema 14/13/12 的历史结果见[重构实施记录](./archive/2026-11/2026-11-06重构实施与验收记录.md)、[二期记录](./archive/2026-11/二期重构验收与清理记录.md)和[OA 执行记录](./archive/2026-11/OA重构验收与功能保留台账.md)。SQLite 桌面与 PostgreSQL 18 团队服务使用同一用例和规则，各自的物理 DDL、模型指纹分别计算。
+核对日期：2026-11-22。本文描述源码中的 schema 18；永久文件与引用见[文件存储与容量管理](./文件存储与容量管理.md)；自定义事项和独立设置版本见[本批记录](./archive/2026-11/2026-11-10自定义OA重构与验收.md)。独立申报资料及 `sourceId` 新基线见[联调记录](./archive/2026-11/2026-11-09独立申报与联调记录.md)，schema 14/13/12 的历史结果见[重构实施记录](./archive/2026-11/2026-11-06重构实施与验收记录.md)、[二期记录](./archive/2026-11/二期重构验收与清理记录.md)和[OA 执行记录](./archive/2026-11/OA重构验收与功能保留台账.md)。SQLite 桌面与 PostgreSQL 18 团队服务使用同一用例和规则，各自的物理 DDL、模型指纹分别计算。
 
 ## 基线与唯一来源
+
+2026-11-22：临时导入改用 `import_preview_rows`，以 `(preview_id, position)` 为主键、外键级联关联 `records` 中的预检元数据；正文为经过 JSON 校验的文本，保留序列化数字和键序。`change_type` 由正文生成，`import_preview_rows_change(preview_id, change_type, position)` 支持筛选后分页。提交核对原始行摘要，并在同一事务内删除行内容和标记已消费；不继续保存第二份 BLOB。该表及索引进入 schema 18 完整基线并改变模型指纹，旧实验库不自动转换。
 
 2026-11-18：两库新增 `records_opportunity_history_page` 部分索引，按 `kind`、`opportunityId` 文本表达式和倒序记录编号定位商机历史，不扫描其它商机的历史正文。历史分页继续使用现有 Storage 游标接口。完整 schema 18 的模型指纹随 DDL 更新，旧实验数据库和备份拒绝打开，使用新 DataRoot 或新 PostgreSQL 数据库。
 
@@ -49,6 +51,7 @@ schema 13 定稿同时统一两库的规范化检索键序与 PostgreSQL 结构�
 | `file_migrations` / `file_migration_queue` | 活动迁移及待复制对象；并发新增对象自动入队，核验后出队，空队列时短锁切换 |
 | `attachment_history.record_id/kind/sequence` | 资料修订和操作历史，按独立序号游标分页；不随主记录 JSON 重写全部历史 |
 | `files` | 临时任务输入/输出等既有生命周期 BLOB，永久业务附件不再使用此表 |
+| `import_preview_rows` | 临时导入的唯一行内容；按预检及序号分页，变更类别由正文生成，随预检删除级联回收 |
 | `organization_units.id/parent_id` | 稳定经营单位 ID 及层级；已有代码不改写，名称可编辑 |
 | `organization_departments.id/unit_id` | 部门属于一个单位；编辑/删除使用稳定 ID |
 | `persons.id` | 自然人公开事实；姓名不作身份键，不含联系方式等私密档案正文 |
