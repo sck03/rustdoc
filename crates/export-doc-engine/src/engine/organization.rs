@@ -10,6 +10,8 @@ use serde_json::{Value, json};
 use std::collections::{HashMap, hash_map::Entry};
 mod projection;
 pub(super) use projection::project;
+mod ordering;
+pub(super) use ordering::reorder;
 
 pub(super) fn leaders(
     value: &Value,

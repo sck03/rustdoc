@@ -28,7 +28,7 @@ export function officeReviewInvoke(url, spec, operations) {
     const query = new URLSearchParams(Object.entries(parameters).filter(([key]) => !op.route.includes(`{${key}}`)).map(([key, value]) => [key, String(value)]));
     const response = await fetch(url + route + (query.size ? '?' + query : ''), { method: op.method.toUpperCase(), signal: AbortSignal.timeout(60000), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
     if (!response.ok) throw new Error(`${id} (${response.status}): ${await response.text()}`);
-    return response.json();
+    return response.status === 204 ? undefined : response.json();
   };
 }
 

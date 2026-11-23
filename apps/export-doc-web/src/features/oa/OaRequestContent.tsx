@@ -16,7 +16,7 @@ export function OaRequestContent({row,user}:{row:OaSubmittedRequest|OaRequest;us
       <div><dt>变动类型</dt><dd>{row.personnelChange.action ? personnelChangeLabels[row.personnelChange.action] : "受限字段"}</dd></div>
       <div><dt>生效日期</dt><dd>{row.personnelChange.registration?.hireDate ?? row.personnelChange.effectiveDate}</dd></div>
       {(row.personnelChange.registration || ["Transfer", "Rehire"].includes(row.personnelChange.action ?? "")) && <>
-        <div><dt>任职部门</dt><dd>{row.personnelChange.registration?.departmentId ?? row.personnelChange.departmentId}</dd></div>
+        <div><dt>任职部门</dt><dd>{row.personnelChange.departmentName || row.personnelChange.registration?.departmentId || row.personnelChange.departmentId}</dd></div>
         <div><dt>职位</dt><dd>{row.personnelChange.registration?.jobTitle ?? row.personnelChange.jobTitle}</dd></div>
       </>}
       <div><dt>提交账号</dt><dd>#{row.ownerUserId}（见审批与办理记录）</dd></div>

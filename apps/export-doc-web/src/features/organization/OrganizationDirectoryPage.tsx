@@ -8,6 +8,7 @@ import { readApiError } from "../../ui/formUtils.ts";
 import { useOrganizationDirectory, useOrganizationOperation } from "./useOrganizationDirectory.ts";
 import { OrganizationCompanyForm, OrganizationDepartmentForm } from "./OrganizationForms.tsx";
 import { OrganizationTree } from "./OrganizationTree.tsx";
+import { DepartmentOrderDialog } from "./DepartmentOrderDialog.tsx";
 import { OrganizationCompanyList } from "./OrganizationCompanyList.tsx";
 import { RecordDeleteDialog } from "../office/RecordDeleteDialog.tsx";
 import { OrganizationUnitWorkspace } from "./OrganizationUnitWorkspace.tsx";
@@ -28,6 +29,7 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
   const [revealDepartmentCode, setRevealDepartmentCode] = useState<string | null>(null);
   const [companyEditor, setCompanyEditor] = useState<{ record?: ApiOrganizationCompanyDto } | null>(null);
   const [departmentEditor, setDepartmentEditor] = useState<{ record?: ApiOrganizationDepartmentDto; parentCode?: string } | null>(null);
+  const [ordering, setOrdering] = useState<ApiOrganizationDepartmentDto | null>(null);
   const companies = query.data?.companies ?? [];
   const company = companies.find((item) => item.code === companyCode) ?? companies.find((item) => item.isActive) ?? companies[0];
   const departments = (query.data?.departments ?? []).filter((item) => item.companyCode === company?.code);
@@ -58,6 +60,7 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
         <OrganizationTree key={company.code} departments={departments} keyword={search} companyName={company.name} canAdd={company.isActive && company.unitKind !== "Group"}
           revealDepartmentCode={revealDepartmentCode} onRevealed={() => setRevealDepartmentCode(null)}
           onEdit={(record) => setDepartmentEditor({ record })} onAdd={(parentCode) => setDepartmentEditor({ parentCode })}
+          onOrder={setOrdering}
           onDelete={(record) => setDeleting({ kind: "department", record })} />
         </div>} />
       </section>
@@ -72,5 +75,6 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
       onDelete={(body, signal) => deleting.kind === "company" ? client.deleteOrganizationCompany({ id: deleting.record.id, body }, { signal })
         : client.deleteOrganizationDepartment({ id: deleting.record.id, body }, { signal })}
       onClose={() => setDeleting(null)} onDeleted={() => setDeleting(null)} />}
+    {ordering && <DepartmentOrderDialog client={client} department={ordering} departments={departments} onClose={() => setOrdering(null)} />}
   </ListWorkspace>;
 }

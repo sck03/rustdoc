@@ -414,6 +414,7 @@ delegate! {
     access_restrictions(kind:&str,id:i64,resolved:bool)->Vec<Value>;
     save_access_restriction(kind:&str,id:i64,body:&Value)->Value;
     permission_scheme_versions(scheme:i64,offset:i64,limit:i64)->Value;
+    unit_permission_publications(unit:i64,scheme:Option<i64>)->Vec<Value>;
     permission_scheme_usage(ids:&[i64])->std::collections::BTreeMap<i64,PermissionSchemeUsage>;
     permission_scheme_version(scheme:i64,version:i64)->Option<Value>;
     publish_permission_scheme(scheme:i64,body:&Value,actor:i64,time:&str)->i64;

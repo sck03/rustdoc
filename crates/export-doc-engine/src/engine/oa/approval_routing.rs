@@ -124,10 +124,11 @@ pub(super) fn build_plan(
         .routed_exclusions_in(context, &compiled.contexts)
         .map_err(invalid)?;
     let mut notes = vec![];
+    let mut self_skipped = vec![];
     for (index, node) in rule.stages.iter().enumerate() {
         let context = compiled.contexts.get(&node.key).unwrap_or(context);
         super::materials::validate_policy(&node.material_policy)?;
-        let included =
+        let mut included =
             !excluded.contains(&node.key) && rule.includes(index, &context).map_err(invalid)?;
         let mut routing_row = row.clone();
         routing_row["routingDepartment"] = json!(context.department);
@@ -140,6 +141,23 @@ pub(super) fn build_plan(
         } else {
             vec![]
         };
+        if included
+            && node.skips_department_self(
+                employee["id"].as_i64().unwrap_or(0),
+                &bindings
+                    .iter()
+                    .filter_map(|b| b.person_id)
+                    .collect::<Vec<_>>(),
+            )
+        {
+            included = false;
+            bindings.clear();
+            self_skipped.push(node.key.clone());
+            notes.push(format!(
+                "{}：申请人为本部门有效负责人，跳过部门审批，转公司领导审批。",
+                node.name
+            ));
+        }
         let ids = if included && node.kind == NodeKind::Approval {
             let (ids, routed) = rule
                 .route_group(
@@ -166,7 +184,7 @@ pub(super) fn build_plan(
             }
             ids
         } else {
-            if !included {
+            if !included && !self_skipped.contains(&node.key) {
                 notes.push(format!("{}：条件或排他分支未命中，跳过节点。", node.name));
             }
             vec![]
@@ -241,6 +259,33 @@ pub(super) fn build_plan(
                 delegation_key: String::new(),
                 source_generation: None,
             });
+        }
+    }
+    for skipped in self_skipped {
+        let mut descendants = HashSet::from([skipped]);
+        loop {
+            let size = descendants.len();
+            for node in &rule.stages {
+                if node.depends_on.iter().any(|key| descendants.contains(key)) {
+                    descendants.insert(node.key.clone());
+                }
+            }
+            if size == descendants.len() {
+                break;
+            }
+        }
+        if !rule.stages.iter().zip(&plan.nodes).any(|(stage, node)| {
+            descendants.contains(&stage.key)
+                && !node.skipped
+                && stage.kind == NodeKind::Approval
+                && matches!(
+                    stage.source,
+                    export_doc_domain::approval_policy::ApproverSource::CompanyExecutive
+                        | export_doc_domain::approval_policy::ApproverSource::CompanyLeaders
+                )
+                && stage.self_approval == export_doc_domain::approval_policy::SelfApproval::Reject
+        }) {
+            return Err(invalid("部门负责人本人申请须进入独立的公司领导审批节点。"));
         }
     }
     super::business_nodes::validate_plan(rule, &plan, context)?;

@@ -43,6 +43,7 @@ pub(in crate::engine) fn dispatch(
         GET_OA_ROUTING_UNITS => oa::routing_units(store, actor),
         SAVE_UNIT_ACCESS => save(store, actor, body.clone()),
         GET_ORGANIZATION_DIRECTORY => organization::directory(store, actor),
+        REORDER_ORGANIZATION_DEPARTMENTS => organization::reorder(store, actor, body),
         PREVIEW_ORGANIZATION_COMPANY_CHANGE => {
             preview_company_change(store, actor, parameters, body)
         }

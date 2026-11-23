@@ -68,7 +68,9 @@ input[aria-invalid="true"], select[aria-invalid="true"], textarea[aria-invalid="
 [data-ui="button"][data-variant="secondary"][aria-busy="true"] { color: var(--edm-ink-800); background: var(--edm-bg-surface); border-color: var(--edm-line-strong); }
 [data-ui="button"][data-variant="danger"][aria-busy="true"] { background: var(--edm-danger-600); border-color: var(--edm-danger-600); }
 [data-ui="button"][data-variant="text"][aria-busy="true"] { color: var(--edm-primary-700); background: transparent; border-color: transparent; }
-[data-ui="button-indicator"] { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex: 0 0 18px; }
+[data-ui="button"] { position: relative; }
+[data-ui="button"][data-loading="true"] > :not([data-ui="button-indicator"]) { opacity: 0; }
+[data-ui="button-indicator"] { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 [aria-busy="true"] > [data-ui="button-indicator"] > svg { animation: edm-control-spin 1s linear infinite; }
 @keyframes edm-control-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { [aria-busy="true"] > [data-ui="button-indicator"] > svg { animation: none; } }

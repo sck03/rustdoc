@@ -181,11 +181,14 @@ pub fn list(
                 .filter(|t| t["ownerUnitId"].is_null())
                 .collect::<Vec<_>>()
         );
+        let templates_by_id: std::collections::HashMap<_, _> = templates
+            .iter()
+            .filter_map(|template| template["id"].as_i64().map(|id| (id, template)))
+            .collect();
         for user in result["users"].as_array_mut().into_iter().flatten() {
             let template = user["permissionTemplateId"]
                 .as_i64()
-                .map(|id| templates.iter().find(|template| template["id"] == id))
-                .flatten();
+                .and_then(|id| templates_by_id.get(&id));
             user["permissionTemplateCode"] = template
                 .map(|value| value["code"].clone())
                 .unwrap_or(json!(""));

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-11-22",
-  "reviewNotes": "2026-11-22 account/download review against b2691645: share account handover and administrator-retention rules, replace full catalog/count checks with bounded storage queries, and scan HS deletion IDs by cursor. Reuse the existing browser ticket pool with typed targets for jobs, backups and attachment streams; remove per-kind ticket wrappers and repeated download dispatch, and reuse file authorization capture. Add independent contract comparison, SQLite/PostgreSQL account regressions and HTTP streaming/Range/session tests. Measured native Rust 116744 (including inline tests and contract comparison), tests/examples 36098. Advance only these two aggregate baselines; preserve every per-file cap and the existing 75/120-line growth allowances. No dependency or schema upgrade. Evidence: docs/archive/2026-11/2026-11-22账号生命周期与下载优化.md; preceding evidence: docs/archive/2026-11/2026-11-22导入预检与资源一致性修复.md.",
+  "updatedAt": "2026-11-23",
+  "reviewNotes": "2026-11-23 organization/OA review against c1de8d52: split draft deletion, sibling ordering, public personnel labels and unit publication reads into bounded responsibility modules. Storage batches publication/name reads; remove repeated full personnel and per-template queries. Domain retains self/repeated/protected review constraints. Add independent contract/permission audits, shared SQLite/PostgreSQL regressions and material label privacy test. New endpoints require explicit generated projections, excluded from hand-maintained web counts. Preserve all per-file limits and existing aggregate growth allowances; advance web, organization, native Rust and native test aggregates after reviewed functional additions. The automation aggregate adds 155 lines for the real HTTP/React organization/OA regression and its explicit gate registration; retain the 150-line future growth allowance. Evidence: docs/archive/2026-11/2026-11-23组织与OA重构修复.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -10,9 +10,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 88821,
+      "baselineAggregateLines": 89033,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 89021,
+      "maximumAggregateLines": 89233,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 116744,
+      "baselineAggregateLines": 117378,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 116819,
+      "maximumAggregateLines": 117453,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 36098,
+      "baselineAggregateLines": 36347,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 36218,
+      "maximumAggregateLines": 36467,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 31560,
+      "baselineAggregateLines": 31715,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 31710,
+      "maximumAggregateLines": 31865,
       "reportFiles": false
     },
     {
@@ -355,8 +355,8 @@
       "directory": "apps/export-doc-web/src/features/organization",
       "filePattern": "^.+\\.(?:ts|tsx)$",
       "maximumLines": 200,
-      "maximumAggregateLines": 859,
-      "baselineAggregateLines": 809,
+      "maximumAggregateLines": 918,
+      "baselineAggregateLines": 868,
       "maximumAggregateGrowthLines": 50
     },
     {

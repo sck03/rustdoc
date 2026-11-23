@@ -51,12 +51,12 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("personnelChange",r("OaMaterialOaPersonnelChangeProjection")),("leave",r("OaMaterialOaLeave")),("travel",r("OaMaterialOaTravel")),
         ("overtime",r("OaMaterialOaOvertime")),("category",s().enumeration(Enumeration::Values(vec![serde_json::json!("Seal"),serde_json::json!("Certificate"),serde_json::json!("IT"),serde_json::json!("Repair"),serde_json::json!("Other")]))),("currency",s().enumeration(Enumeration::Values(vec![serde_json::json!("CNY"),serde_json::json!("USD"),serde_json::json!("EUR"),serde_json::json!("HKD"),serde_json::json!("JPY"),serde_json::json!("GBP")]))),
         ("lines",a(r("OaMaterialOaExpenseLine")).max_items(100)),("purchaseLines",a(r("OaMaterialOaPurchaseLine")).max_items(100)),("id",i().format("int64")),
-        ("versionNumber",i().format("int64")),("employeeName",s()),("departmentId",s()),
+        ("versionNumber",i().format("int64")),("employeeName",s()),("departmentId",s()),("departmentName",s().read_only(true)),
         ("ownerUserId",i().format("int64")),("status",s().enumeration(Enumeration::Values(vec![serde_json::json!("Draft"),serde_json::json!("Pending"),serde_json::json!("Approved"),serde_json::json!("Rejected"),serde_json::json!("Cancelled"),serde_json::json!("Completed"),serde_json::json!("HandedOff"),serde_json::json!("Returned"),serde_json::json!("Suspended"),serde_json::json!("Terminated")]))),("kind",s().enumeration(Enumeration::Values(vec![serde_json::json!("leave"),serde_json::json!("expense"),serde_json::json!("travel"),serde_json::json!("overtime"),serde_json::json!("purchase"),serde_json::json!("general"),serde_json::json!("personnel")]))),
         ("totalAmount",s()),("durationDays",s()),("durationHours",s()),
         ("createdAt",s()),("updatedAt",s()),("attachments",a(r("OaAttachment"))),
         ("applicantAppointmentId",s().read_only(true)),("applicantJobTitle",s().read_only(true)),("approvalPlan",r("OaApprovalPlan")),
-        ("canReview",b()),("reviewTaskKeys",a(s())),("approvalRoutingNotes",a(s())),
+        ("canReview",b()),("canDeleteDraft",b().read_only(true)),("reviewTaskKeys",a(s())),("approvalRoutingNotes",a(s())),
         ("lastRemindedAt",s()),("handlingKey",s()),("handlingName",s()),
         ("handlerNames",s()),("canHandle",b()),("submissionId",i().format("int64")),
         ("submissionNumber",i().format("int64")),("approvalDocument",r("OaSubmission")),("personnelExecution",Schema::default().any_of(vec![r("OaPersonnelExecution"),ty(Primitive::Null)])),
@@ -365,12 +365,12 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["requestKey","employeeNumber","departmentId","jobTitle","employmentType","hireDate","onProbation","probationEndsOn","contractEndsOn","profile"])),
     ("OaPersonnelChangeProjection",o(vec![
         ("action",s().enumeration(Enumeration::Values(vec![serde_json::json!("Hire"),serde_json::json!("Confirm"),serde_json::json!("Transfer"),serde_json::json!("Depart"),serde_json::json!("Rehire")]))),("expectedPersonnelVersion",i().format("int64")),("effectiveDate",s().format("date")),
-        ("departmentId",s()),("jobTitle",s()),("onProbation",b()),
+        ("departmentId",s()),("departmentName",s().read_only(true)),("jobTitle",s()),("onProbation",b()),
         ("registration",r("OaPersonnelRegistrationProjection")),("organization",r("PersonnelOrganization")),("primaryAppointmentId",s().description("Existing appointment to promote through an approved Transfer; empty keeps the current primary appointment.").max_length(64))
     ]).required(vec!["action"])),
     ("OaMaterialOaPersonnelChangeProjection",o(vec![
         ("action",s().enumeration(Enumeration::Values(vec![serde_json::json!("Hire"),serde_json::json!("Confirm"),serde_json::json!("Transfer"),serde_json::json!("Depart"),serde_json::json!("Rehire")]))),("expectedPersonnelVersion",i().format("int64")),("effectiveDate",s().format("date")),
-        ("departmentId",s()),("jobTitle",s()),("onProbation",b()),
+        ("departmentId",s()),("departmentName",s().read_only(true)),("jobTitle",s()),("onProbation",b()),
         ("registration",r("OaMaterialOaPersonnelRegistrationProjection")),("organization",r("OaMaterialPersonnelOrganization")),("primaryAppointmentId",s().description("Existing appointment to promote through an approved Transfer; empty keeps the current primary appointment.").max_length(64))
     ]).required(vec![])),
     ("OaMaterialOaPersonnelRegistrationProjection",o(vec![
@@ -393,6 +393,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("primaryStartsOn",s().read_only(true))
     ]).required(vec![])),
     ("OaMaterialPersonnelAssignment",o(vec![
+        ("companyName",s().read_only(true)),
         ("departmentId",s().max_length(50)),("jobTitle",s().max_length(120)),("managerEmployeeId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::Null])).minimum(num("1")).format("int64")),
         ("functionalManagerEmployeeIds",a(i().minimum(num("1")).format("int64")).max_items(10).unique_items(true)),("managerAssignmentId",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).max_length(64)),("functionalManagerAssignmentIds",a(s().max_length(64)).max_items(10)),
         ("managerName",s().read_only(true)),("functionalManagerNames",a(s()).read_only(true)),("id",s().description("Stable appointment identifier; omitted only for a new appointment.").max_length(64)),
@@ -414,6 +415,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("unit",s()),("unitPrice",s().pattern("^[0-9]+(\\.[0-9]{1,2})?$"))
     ]).required(vec![])),
     ("OaMaterialOaPersonnelChange",o(vec![
+        ("departmentName",s().read_only(true)),
         ("action",s().enumeration(Enumeration::Values(vec![serde_json::json!("Hire"),serde_json::json!("Confirm"),serde_json::json!("Transfer"),serde_json::json!("Depart"),serde_json::json!("Rehire")]))),("expectedPersonnelVersion",i().format("int64")),("effectiveDate",s().format("date")),
         ("departmentId",s()),("jobTitle",s()),("onProbation",b()),
         ("registration",r("OaMaterialPersonnelCreateRequest")),("organization",r("OaMaterialPersonnelOrganization")),("primaryAppointmentId",s().description("Existing appointment to promote through an approved Transfer; empty keeps the current primary appointment.").max_length(64))

@@ -1,4 +1,9 @@
-export type DepartmentNode = { code: string; name: string; parentCode?: string | null; isActive: boolean };
+export type DepartmentNode = { code: string; name: string; parentCode?: string | null; isActive: boolean; sortOrder?: number };
+
+export function compareDepartments(left: DepartmentNode, right: DepartmentNode) {
+  return (left.sortOrder ?? Number.MAX_SAFE_INTEGER) - (right.sortOrder ?? Number.MAX_SAFE_INTEGER)
+    || left.name.localeCompare(right.name, "zh-CN", { numeric: true }) || left.code.localeCompare(right.code);
+}
 type DepartmentManager = { managerName: string; managerEmployeeNumber?: string };
 
 export function departmentManagerLabel(manager: DepartmentManager) {
@@ -22,7 +27,14 @@ export function departmentOptions<T extends DepartmentNode>(departments: T[]) {
       parent = node.parentCode;
     }
     return { ...item, label: names.join(" / "), depth: ancestors.length, ancestors };
-  }).sort((left, right) => left.label.localeCompare(right.label, "zh-CN", { numeric: true }) || left.code.localeCompare(right.code));
+  }).sort((left, right) => {
+    const leftPath = [...left.ancestors, left.code];
+    const rightPath = [...right.ancestors, right.code];
+    for (let i = 0; i < Math.min(leftPath.length, rightPath.length); i++) {
+      if (leftPath[i] !== rightPath[i]) return compareDepartments(directory.get(leftPath[i])!, directory.get(rightPath[i])!);
+    }
+    return leftPath.length - rightPath.length;
+  });
 }
 
 export function parentDepartmentOptions<T extends DepartmentNode>(departments: T[], code?: string) {

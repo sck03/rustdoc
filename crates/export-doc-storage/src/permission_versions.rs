@@ -2,6 +2,38 @@
 use crate::sql::{Statement, object};
 use crate::{Adapter, Error, ErrorKind, Result};
 use serde_json::{Value, json};
+/// Latest unit-assignable publications, or one scheme's immutable history.
+pub(crate) fn unit_publications(
+    db: &(impl Adapter + ?Sized),
+    unit: i64,
+    scheme: Option<i64>,
+) -> Result<Vec<Value>> {
+    let mut s = Statement::new(db);
+    let owner = crate::sql::field("ownerUnitId", s.pg);
+    let active = crate::sql::field("isActive", s.pg);
+    let unit = s.number(unit);
+    let selected = if let Some(id) = scheme {
+        format!("v.scheme_id={}", s.number(id))
+    } else {
+        "v.version=(SELECT MAX(latest.version) FROM permission_scheme_versions latest WHERE latest.scheme_id=v.scheme_id)".into()
+    };
+    let body = if s.pg {
+        "v.body || jsonb_build_object('versionNumber',v.version,'publishedVersion',v.version,'publishedAt',v.published_at)"
+    } else {
+        "json_set(v.body,'$.versionNumber',v.version,'$.publishedVersion',v.version,'$.publishedAt',v.published_at)"
+    };
+    let aggregate = if s.pg {
+        "COALESCE(jsonb_agg(body),'[]'::jsonb)::text"
+    } else {
+        "json_group_array(json(body))"
+    };
+    let truth = if s.pg { "'true'" } else { "1" };
+    let query = format!(
+        "SELECT {aggregate} FROM (SELECT {body} AS body FROM permission_scheme_versions v JOIN records r ON r.kind='permission-templates' AND r.id=v.scheme_id WHERE {active}={truth} AND ({owner} IS NULL OR CAST({owner} AS BIGINT)={unit}) AND {selected} ORDER BY v.scheme_id,v.version DESC) publications"
+    );
+    serde_json::from_value(s.query(db, query)?).map_err(Into::into)
+}
+
 pub(crate) fn publication(
     db: &(impl Adapter + ?Sized),
     scheme: i64,

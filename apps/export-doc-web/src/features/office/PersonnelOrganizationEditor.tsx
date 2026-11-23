@@ -17,7 +17,7 @@ export function PersonnelOrganizationEditor({ client, company, departments, prim
     <p className="office-muted">主职与兼职共同构成部门权限范围；直属、职能汇报可用于审批路由。调整任职不会自动增加账号的操作权限。</p>
     <ReportingEditor client={client} company={company} label="主职汇报" value={value} onChange={next => onChange({ ...value, ...next })} />
     {value.additionalAssignments.map((assignment, index) => assignment.companyCode && assignment.companyCode !== company && !options.data?.companies?.some(unit => unit.code === assignment.companyCode) ? <section className="office-resource-card" key={assignment.id ?? index}>
-      <h4>其他单位任职（只读）</h4><p>{assignment.companyCode} · {assignment.departmentName || assignment.departmentId} · {assignment.jobTitle}</p>
+      <h4>其他单位任职（只读）</h4><p>{assignment.companyName || assignment.companyCode} · {assignment.departmentName || assignment.departmentId} · {assignment.jobTitle}</p>
       <p>任职日期：{assignment.startsOn || "长期"} 至 {assignment.endsOn || "长期"}；直属负责人：{assignment.managerName || "未设置"}</p><p className="office-muted">由对应单位的任职管理员维护。保存本页会保留此任职。</p>
     </section> : <fieldset className="office-resource-card" key={assignment.id ?? index}><legend>兼职 {index + 1}</legend><div className="office-form-grid">
       <PersonnelAssignmentFields client={client} assignment={assignment} company={company} companies={options.data?.companies ?? []} departments={departments} primaryDepartment={primaryDepartment} patch={update => patch(index, update)} />
@@ -49,7 +49,7 @@ export function PersonnelOrganizationFacts({ value }: { value?: OaMaterialPerson
   if (!value) return null;
   const reporting = (item: Partial<Reporting>) => <p>直属负责人：{item.managerName || (item.managerEmployeeId ? `人员 #${item.managerEmployeeId}` : "未设置")}；职能负责人：{item.functionalManagerNames?.join("、") || item.functionalManagerEmployeeIds?.map(id => `人员 #${id}`).join("、") || "未设置"}</p>;
   return <section className="personnel-fact-section" aria-label="任职与汇报关系"><h3>任职与汇报关系</h3>{reporting(value)}
-    {value.additionalAssignments?.length ? value.additionalAssignments.map(assignment => <div key={`${assignment.companyCode}:${assignment.departmentId}`}><strong>{assignment.companyCode} · {assignment.departmentName || assignment.departmentId} · {assignment.jobTitle}</strong><p>任职日期：{assignment.startsOn || "长期"} 至 {assignment.endsOn || "长期"}</p>{reporting(assignment)}</div>) : <p>兼职部门：未登记</p>}
+    {value.additionalAssignments?.length ? value.additionalAssignments.map(assignment => <div key={`${assignment.companyCode}:${assignment.departmentId}`}><strong>{assignment.companyName || assignment.companyCode} · {assignment.departmentName || assignment.departmentId} · {assignment.jobTitle}</strong><p>任职日期：{assignment.startsOn || "长期"} 至 {assignment.endsOn || "长期"}</p>{reporting(assignment)}</div>) : <p>兼职部门：未登记</p>}
     <AssignmentHistory items={value.assignmentHistory??[]}/>
   </section>;
 }

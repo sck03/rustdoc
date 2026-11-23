@@ -353,6 +353,104 @@ fn exercise_inner(service: &NativeService, root: &str, nodes: bool) {
             )
             .unwrap();
 
+        // The department head's own application bypasses exactly the department node.
+        let mut self_route = serial(
+            "general",
+            json!([{"source":"DepartmentManager","approverUserIds":[]},{"source":"CompanyExecutive","approverUserIds":[]}]),
+        );
+        self_route["stages"][1]["selfApproval"] = json!("Reject");
+        policy(service, admin, "general", self_route);
+        let own_draft = call(service,tokens[2],CREATE_GENERAL_REQUEST,0,Some(json!({"requestKey":nonce().unwrap(),"departmentId":b,"title":"负责人自动分流","reason":"负责人本人直达公司领导","category":"Other"}))).unwrap();
+        let preview = get(
+            service,
+            tokens[2],
+            PREVIEW_APPROVAL_OF_GENERAL_REQUEST,
+            own_draft["id"].as_i64().unwrap(),
+        );
+        assert_eq!(preview["approvalPlan"]["nodes"][0]["skipped"], true);
+        assert_eq!(
+            preview["approvalPlan"]["steps"].as_array().unwrap().len(),
+            1
+        );
+        assert_eq!(
+            preview["approvalPlan"]["steps"][0]["approverUserId"],
+            users[4]["id"]
+        );
+        let submitted = act(service, tokens[2], "general", "submit", &own_draft);
+        assert_eq!(
+            submitted["approvalPlan"]["steps"],
+            preview["approvalPlan"]["steps"]
+        );
+        assert!(
+            !submitted["approvalRoutingNotes"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        act(service, tokens[4], "general", "approve", &submitted);
+        let draft = create("general", json!({}));
+        let id = draft["id"].as_i64().unwrap();
+        let draft = service
+            .upload(
+                operation("general", "upload"),
+                &[("id", id.to_string())],
+                json!({"expectedVersion":draft["versionNumber"]}),
+                "draft.pdf",
+                b"%PDF-1.7\n%%EOF",
+                tokens[1],
+            )
+            .unwrap();
+        let deletion = json!({"expectedVersion":draft["versionNumber"],"note":"删除匿名草稿","commandKey":nonce().unwrap()});
+        assert_eq!(
+            call(
+                service,
+                tokens[2],
+                DELETE_GENERAL_REQUEST_DRAFT,
+                id,
+                Some(deletion.clone())
+            )
+            .unwrap_err()
+            .status,
+            Some(403)
+        );
+        let mut stale = deletion.clone();
+        stale["expectedVersion"] = json!(1);
+        assert_eq!(
+            call(
+                service,
+                tokens[1],
+                DELETE_GENERAL_REQUEST_DRAFT,
+                id,
+                Some(stale)
+            )
+            .unwrap_err()
+            .status,
+            Some(409)
+        );
+        call(
+            service,
+            tokens[1],
+            DELETE_GENERAL_REQUEST_DRAFT,
+            id,
+            Some(deletion.clone()),
+        )
+        .unwrap();
+        call(
+            service,
+            tokens[1],
+            DELETE_GENERAL_REQUEST_DRAFT,
+            id,
+            Some(deletion),
+        )
+        .unwrap();
+        assert_eq!(
+            call(service, tokens[1], GET_GENERAL_REQUEST, id, None)
+                .unwrap_err()
+                .status,
+            Some(404)
+        );
+        assert_eq!(call(service,tokens[2],DELETE_GENERAL_REQUEST_DRAFT,submitted["id"].as_i64().unwrap(),Some(json!({"expectedVersion":submitted["versionNumber"],"note":"历史不能删除","commandKey":nonce().unwrap()}))).unwrap_err().status,Some(409));
+
         // The submitter and applicant coincide; the leader's own signature is omitted.
         policy(
             service,

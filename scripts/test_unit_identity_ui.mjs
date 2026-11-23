@@ -36,7 +36,7 @@ await withOfficeUi('unit-identity-ui', async ({ output, url, operations, invoke,
   await editor.getByLabel('模块分类').selectOption({ label: '工作台' });
   await editor.getByLabel('通用申请快捷设置').selectOption('operate');
   const savedResponse = manager.waitForResponse(r=>r.url().endsWith('/api/organization/unit-schemes') && r.request().method()==='POST');
-  await editor.getByRole('button',{ name:'保存单位方案',exact:true }).click();
+  await editor.getByRole('button',{ name:'保存方案草稿',exact:true }).click();
   const response = await savedResponse; assert.equal(response.status(),200);
   const scheme = await response.json(); assert.equal(scheme.ownerUnitId,sub.id);
   await editor.waitFor({ state:'hidden' });

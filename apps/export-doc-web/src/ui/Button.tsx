@@ -21,8 +21,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLBut
       : variant === "text" ? "text-button"
         : "command-button secondary";
   return <button ref={ref} data-ui="button" data-variant={variant} className={`${variantClass} ${className}`.trim()} type="button" {...props}
-    disabled={disabled || busy} aria-busy={busy || props["aria-busy"] || undefined}>
-    {busy === undefined ? icon : <span data-ui="button-indicator" aria-hidden="true">{busy ? <LoaderCircle size={16} /> : icon}</span>}
+    disabled={disabled || busy} data-loading={busy || undefined} aria-busy={busy || props["aria-busy"] || undefined}>
+    {icon}
+    {busy && <span data-ui="button-indicator" aria-hidden="true"><LoaderCircle size={16} /></span>}
     {children === undefined || children === null ? null : <span>{children}</span>}
   </button>;
 });

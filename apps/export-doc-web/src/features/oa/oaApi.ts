@@ -8,6 +8,7 @@ export function oaApi(client: ExportDocManagerApiClient, kind: OaKind) {
   const name = names[kind];
   const execute = acknowledgedCommands(client, `${name}Request`);
   return {
+    deleteDraft: (id: number, input: OfficeActionInput, init?: ApiRequestInit) => client[`delete${name}RequestDraft`]({ id, body: officeCommand(client,kind+":"+id+":delete-draft",input) }, init),
     list: (request: { pageNumber: number; pageSize: number; mineOnly: boolean; status?: string; financeOnly?: boolean; approvalsOnly?: boolean; handlingOnly?: boolean; definitionKey?:string }, init?: ApiRequestInit) => client[`list${name}Request`](request, init),
     get: (id: number, init?: ApiRequestInit) => client[`get${name}Request`]({ id }, init),
     previewApproval: (id: number, init?: ApiRequestInit) => client[`previewApprovalOf${name}Request`]({ id }, init),

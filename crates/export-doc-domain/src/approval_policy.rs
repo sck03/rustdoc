@@ -629,6 +629,18 @@ impl ApprovalRule {
     }
 }
 impl ApprovalStage {
+    /// Missing assignees and independent/protected reviews must still fail closed.
+    pub fn skips_department_self(&self, applicant: i64, people: &[i64]) -> bool {
+        self.kind == NodeKind::Approval
+            && self.source == ApproverSource::DepartmentManager
+            && self.self_approval == SelfApproval::Skip
+            && self.repeated_approver == RepeatedApprover::Allow
+            && self.revision_policy.protected_user_ids.is_empty()
+            && applicant > 0
+            && !people.is_empty()
+            && people.iter().all(|id| *id == applicant)
+    }
+
     pub fn expression(&self) -> ConditionGroup {
         ConditionGroup {
             logic: self.condition_logic,

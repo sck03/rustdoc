@@ -31,7 +31,7 @@ pub fn exercise(service: &NativeService, root: &str) {
             root,
             CREATE_ORGANIZATION_COMPANY,
             0,
-            Some(json!({"code":code,"name":code,"isActive":true})),
+            Some(json!({"code":code,"name":format!("单位名称-{code}"),"isActive":true})),
         )
         .unwrap();
         for department in ["A", "B"] {
@@ -61,6 +61,14 @@ pub fn exercise(service: &NativeService, root: &str) {
     let number = format!("PERM-P-{suffix}");
     let person = call(service, admin, CREATE_PERSONNEL, 0, Some(json!({"requestKey":nonce().unwrap(),"employeeNumber":number,"departmentId":"A","jobTitle":"普通员工","employmentType":"FullTime","hireDate":"2026-01-01","profile":{"fullName":"权限成员0"}}))).unwrap();
     call(service, admin, LINK_PERSONNEL_ACCOUNT, person["employee"]["id"].as_i64().unwrap(), Some(json!({"expectedVersion":person["versionNumber"],"userId":users[0]["id"],"expectedAccountVersion":users[0]["versionNumber"]}))).unwrap();
+    let accounts = read(service, admin, LIST_USERS, &[]);
+    let employee_label = &accounts["users"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|user| user["id"] == users[0]["id"])
+        .unwrap()["employee"];
+    assert_eq!(employee_label["companyName"], format!("单位名称-{unit}"));
     let members = read(
         service,
         admin,
@@ -166,6 +174,152 @@ pub fn exercise(service: &NativeService, root: &str) {
         .status,
         Some(403 | 404)
     ));
+    // Non-record grants use all inside the current unit, on both database adapters.
+    let direct = json!([{"resourceKey":"office.general","action":"view","dataScope":"own"},{"resourceKey":"office.announcements","action":"view","dataScope":"all"},{"resourceKey":"office.notifications","action":"view","dataScope":"all"},{"resourceKey":"system.about","action":"view","dataScope":"all"}]);
+    let independent = call(service,admin,SAVE_UNIT_ACCESS,0,Some(json!({"userId":users[0]["id"],"companyCode":unit,"name":"功能授权","mode":"Business","appointmentId":appointment["id"],"permissionGrants":direct,"management":{},"disabledModules":[],"oaAssignedOnly":false,"includeDescendants":false,"startsAt":"","endsAt":"","isActive":true,"expectedVersion":0}))).unwrap();
+    assert_eq!(independent["permissionGrants"].as_array().unwrap().len(), 4);
+    let published = call(service,admin,CREATE_PERMISSION_TEMPLATE,0,Some(json!({"code":format!("read-unit-{suffix}"),"name":"单位可读发布版本","grants":direct,"disabledModules":[],"oaAssignedOnly":false,"isActive":true,"expectedVersion":0}))).unwrap();
+    let published = workflow::publish_scheme(service, admin, published);
+    let manager = call(service,admin,SAVE_UNIT_ACCESS,0,Some(json!({"userId":users[0]["id"],"companyCode":unit,"name":"单位授权管理","mode":"Administration","appointmentId":"","permissionGrants":direct,"management":{"roles":true},"disabledModules":[],"oaAssignedOnly":false,"includeDescendants":false,"startsAt":"","endsAt":"","isActive":true,"expectedVersion":0}))).unwrap();
+    let session = login(service, &users[0]);
+    let session = call(
+        service,
+        token(&session),
+        SWITCH_UNIT_CONTEXT,
+        0,
+        Some(json!({"contextId":format!("unit:{}:{unit}",manager["id"])})),
+    )
+    .unwrap();
+    let directory = read(
+        service,
+        token(&session),
+        GET_UNIT_ACCESS_DIRECTORY,
+        &[("companyCode", unit.clone())],
+    );
+    assert_eq!(directory["grantCeiling"].as_array().unwrap().len(), 4);
+    assert!(
+        !directory["permissionTemplates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p["id"] == scheme["id"])
+    );
+    assert!(
+        directory["permissionTemplates"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p["id"] == published["id"])
+    );
+    assert_eq!(
+        workflow::dispatch(
+            service,
+            token(&session),
+            GET_PERMISSION_SCHEME_VERSION,
+            &[],
+            &[
+                ("schemeId", scheme["id"].to_string()),
+                ("version", scheme["publishedVersion"].to_string())
+            ],
+            None
+        )
+        .unwrap_err()
+        .status,
+        Some(403)
+    );
+    let reviewer_option = directory["users"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|user| user["id"] == reviewer)
+        .unwrap();
+    let mut delegated = json!({"userId":reviewer,"companyCode":unit,"name":"独立配置上限内授权","mode":"Business","appointmentId":reviewer_option["appointments"][0]["id"],"permissionGrants":direct,"management":{},"disabledModules":[],"oaAssignedOnly":false,"includeDescendants":false,"startsAt":"","endsAt":"","isActive":true,"expectedVersion":0});
+    call(
+        service,
+        token(&session),
+        SAVE_UNIT_ACCESS,
+        0,
+        Some(delegated.clone()),
+    )
+    .unwrap();
+    delegated["name"] = json!("拒绝超过独立配置上限");
+    delegated["permissionGrants"] =
+        json!([{"resourceKey":"office.general","action":"view","dataScope":"company"}]);
+    assert_eq!(
+        call(
+            service,
+            token(&session),
+            SAVE_UNIT_ACCESS,
+            0,
+            Some(delegated)
+        )
+        .unwrap_err()
+        .status,
+        Some(403)
+    );
+    let scheme_query = [
+        ("schemeId", published["id"].to_string()),
+        ("version", published["publishedVersion"].to_string()),
+    ];
+    let version = read(
+        service,
+        token(&session),
+        GET_PERMISSION_SCHEME_VERSION,
+        &scheme_query,
+    );
+    assert_eq!(version["grants"], published["grants"]);
+    assert_eq!(
+        read(
+            service,
+            token(&session),
+            GET_PERMISSION_SCHEME_VERSIONS,
+            &scheme_query[..1]
+        )["totalCount"],
+        1
+    );
+    assert_eq!(call(service,token(&session),PUBLISH_PERMISSION_SCHEME,0,Some(json!({"schemeId":published["id"].to_string(),"expectedVersion":published["versionNumber"],"note":"不能修改平台方案","commandKey":nonce().unwrap()}))).unwrap_err().status,Some(403));
+    let departments = read(service, admin, GET_ORGANIZATION_DIRECTORY, &[])["departments"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|row| row["companyCode"] == unit)
+        .rev()
+        .cloned()
+        .collect::<Vec<_>>();
+    let order = json!({"companyCode":unit,"items":departments.iter().map(|row|json!({"id":row["id"],"expectedVersion":row["versionNumber"]})).collect::<Vec<_>>()});
+    call(
+        service,
+        admin,
+        REORDER_ORGANIZATION_DEPARTMENTS,
+        0,
+        Some(order.clone()),
+    )
+    .unwrap();
+    assert_eq!(
+        call(
+            service,
+            admin,
+            REORDER_ORGANIZATION_DEPARTMENTS,
+            0,
+            Some(order)
+        )
+        .unwrap_err()
+        .status,
+        Some(409)
+    );
+    let reordered = read(service, admin, GET_ORGANIZATION_DIRECTORY, &[]);
+    for (index, department) in departments.iter().enumerate() {
+        assert_eq!(
+            reordered["departments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["id"] == department["id"])
+                .unwrap()["sortOrder"],
+            json!(index)
+        );
+    }
+
     for management in [json!({"workflows":true}), json!({"appointments":true})] {
         let managed = call(service, admin, SAVE_UNIT_ACCESS, 0, Some(json!({"userId":users[0]["id"],"companyCode":unit,"name":format!("仅管理{management}"),"mode":"Administration","appointmentId":"","permissionGrants":[],"management":management,"disabledModules":[],"oaAssignedOnly":false,"includeDescendants":false,"startsAt":"","endsAt":"","isActive":true,"expectedVersion":0}))).unwrap();
         let session = login(service, &users[0]);

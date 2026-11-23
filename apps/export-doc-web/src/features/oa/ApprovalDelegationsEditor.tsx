@@ -14,7 +14,7 @@ export function ApprovalDelegationsEditor({ value, accounts, timeZone, onChange 
   const change = (index: number, patch: Partial<Delegations[number]>) =>
     onChange(value.map((item, i) => i === index ? { ...item, ...patch } : item));
   const accountOptions = <><option value={0}>请选择账号</option>{accounts.map(account =>
-    <option key={account.id} value={account.id}>{account.fullName} · {account.username} · {account.departmentId}</option>)}</>;
+    <option key={account.id} value={account.id}>{account.fullName} · {account.username} · {account.departmentName || account.departmentId}</option>)}</>;
   return <section className="oa-settings-section">
     <p className="office-muted">代理仅在有效期内生效；每个节点分别签署并记录实际办理人。</p>
     <div className="office-resource-grid">

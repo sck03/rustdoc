@@ -278,7 +278,7 @@ CREATE TABLE unit_access_grants (
     role_id INTEGER NOT NULL REFERENCES unit_access_roles(id) ON DELETE CASCADE,
     resource_key TEXT NOT NULL,
     action TEXT NOT NULL,
-    data_scope TEXT NOT NULL CHECK(data_scope IN ('own','department','company')),
+    data_scope TEXT NOT NULL CHECK(data_scope IN ('own','department','company','all')),
     PRIMARY KEY(role_id,resource_key,action)
 );
 

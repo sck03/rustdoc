@@ -32,7 +32,8 @@ export type ApprovalAccount = {
   fullName: string;
   username: string;
   departmentId: string;
-  contexts?: { id: string; name: string; departmentId: string }[];
+  departmentName?: string;
+  contexts?: { id: string; name: string; departmentId: string; departmentName?: string }[];
 };
 export function useApprovalSettings(client: ExportDocManagerApiClient, user: ApiUserDto) {
   return useQuery({

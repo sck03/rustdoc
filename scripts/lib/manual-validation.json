@@ -1,6 +1,10 @@
 {
   "schemaVersion": 1,
   "tests": {
+    "test_organization_oa_quality_ui.mjs": {
+      "environment": "当前源码 locked build 的 office_review、React dist 与 Chromium；使用自动创建的隔离 SQLite 验证组织排序、人员标签、审批分流、草稿编辑删除及单位权限版本。",
+      "commands": ["node scripts/test_organization_oa_quality_ui.mjs"]
+    },
     "test_credit_http.mjs": {
       "environment": "已按当前源码 locked build 的 office_review 与含 OCR/PDFium 的受管 AppRoot；隔离 SQLite，验证真实 HTTP 权限、并发登录、取消和恢复。",
       "commands": ["node scripts/test_credit_http.mjs <AppRoot>"]

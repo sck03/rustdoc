@@ -35,27 +35,12 @@ pub(in crate::engine) fn directory(
         let mut resources = crate::contracts::contract()["permissions"]["resources"].as_array().ok_or_else(|| unavailable("权限目录缺失。"))?.clone();
         resources.retain(|r| r["unitAssignable"] == true);
         for resource in &mut resources { for action in resource["actions"].as_array_mut().into_iter().flatten() { action["presetLevel"] = action["navigationAccessLevel"].clone(); } }
-        let ceiling = if actor.admin { Value::Null } else {
-            let id = actor.context.strip_prefix("unit:").and_then(|v| v.split_once(':')).and_then(|(id,_)| id.parse::<i64>().ok()).ok_or_else(|| error(403,"单位管理身份无效。"))?;
-            store::get(tx,KIND,id)?["permissionGrants"].clone()
-        };
+        let ceiling = super::super::permission_templates::unit_publications::ceiling(tx,&actor)?;
         let mut schemes = vec![];
-        let ceiling_grants=ceiling.as_array().map(|grants|serde_json::from_value::<Vec<Grant>>(json!(grants))).transpose()?;
-        for template in store::all(tx,"permission-templates")? {
-            if template["isActive"] != true { continue; }
-            if super::super::permission_templates::validate_owner(&template,&unit_record).is_err() { continue; }
-            let scheme_id=template["id"].as_i64().ok_or_else(||unavailable("方案编号缺失。"))?;
-            let versions=tx.permission_scheme_versions(scheme_id,0,1)?;
-            let Some(version)=versions["items"].as_array().and_then(|items|items.first()).and_then(|v|v["version"].as_i64()) else{continue;};
-            let published=tx.permission_scheme_version(scheme_id,version)?.ok_or_else(||unavailable("发布版本缺失。"))?;
-            let grants = super::super::permission_templates::direct_grants(&published)?;
-            if export_doc_domain::units::validate_grants(&grants).is_err() { continue; }
-            if let Some(ceiling) = &ceiling_grants {
-                if !export_doc_domain::units::within_ceiling(&grants,ceiling) { continue; }
-            }
-            let mut published=super::super::permission_templates::project(published)?;
-            published["publishedVersion"]=json!(version);
-            schemes.push(published);
+        for published in tx.unit_permission_publications(unit_record["id"].as_i64().ok_or_else(||unavailable("单位编号缺失。"))?,None)? {
+            if super::super::permission_templates::validate_owner(&published,&unit_record).is_err() { continue; }
+            if !super::super::permission_templates::unit_publications::eligible(&published,&ceiling)? { continue; }
+            schemes.push(super::super::permission_templates::project(published)?);
         }
         Ok(json!({"items":items,"users":users,"companies":companies(tx,&actor)?,"resources":resources,"grantCeiling":ceiling,"permissionTemplates":schemes}))
     })
@@ -63,30 +48,58 @@ pub(in crate::engine) fn directory(
 
 pub(in crate::engine) fn approvers(store: &Store, actor: &Actor) -> Result<Value> {
     store.read(|tx| {
-        let actor = auth::refresh_actor_in(tx,actor)?;
-        demand(&actor,&actor.company,"organization.workflows")?;
+        let actor = auth::refresh_actor_in(tx, actor)?;
+        demand(&actor, &actor.company, "organization.workflows")?;
         let mut users = vec![];
         let mut handlers = vec![];
-        for mut user in store::matching(tx,"users",&[("isActive","true".into())],&[("id","id"),("fullName","fullName"),("username","username"),("departmentId","departmentId")])? {
-            let id = user["id"].as_i64().ok_or_else(|| unavailable("账号编号损坏。"))?;
-            let candidates = match business_actors(tx,id,actor.edition,&actor.company) {
+        let mut names = super::super::organization::DepartmentNames::default();
+        for mut user in store::matching(
+            tx,
+            "users",
+            &[("isActive", "true".into())],
+            &[
+                ("id", "id"),
+                ("fullName", "fullName"),
+                ("username", "username"),
+                ("departmentId", "departmentId"),
+            ],
+        )? {
+            let id = user["id"]
+                .as_i64()
+                .ok_or_else(|| unavailable("账号编号损坏。"))?;
+            let candidates = match business_actors(tx, id, actor.edition, &actor.company) {
                 Ok(candidates) => candidates,
-                Err(e) if matches!(e.status,Some(400|403|404)) => continue,
+                Err(e) if matches!(e.status, Some(400 | 403 | 404)) => continue,
                 Err(e) => return Err(e),
             };
-            if candidates.iter().any(|candidate| [("office.general","complete"),("office.supplies","issue"),("office.rooms","issue")].iter().any(|(resource,action)| auth::authorize(candidate,resource,"view").is_ok() && auth::authorize(candidate,resource,action).is_ok())) {
-                let options = contexts(tx,&candidates[0])?.into_iter().filter(|c| c["companyCode"] == actor.company && c["mode"] != "Administration").map(|c| json!({"id":c["id"],"name":c["name"],"departmentId":c["departmentId"]})).collect::<Vec<_>>();
+            if candidates.iter().any(|candidate| {
+                [
+                    ("office.general", "complete"),
+                    ("office.supplies", "issue"),
+                    ("office.rooms", "issue"),
+                ]
+                .iter()
+                .any(|(resource, action)| {
+                    auth::authorize(candidate, resource, "view").is_ok()
+                        && auth::authorize(candidate, resource, action).is_ok()
+                })
+            }) {
+                let options = approver_contexts(tx, &candidates[0], &mut names)?;
                 let mut handler = user.clone();
+                handler["departmentName"] =
+                    json!(names.get(tx, &actor.company, &candidates[0].department)?);
                 handler["contexts"] = json!(options);
                 handlers.push(handler);
             }
-            match approval_actor(tx,id,actor.edition,&actor.company) {
+            match approval_actor(tx, id, actor.edition, &actor.company) {
                 Ok(candidate) => {
-                    let options = contexts(tx,&candidate)?.into_iter().filter(|c| c["companyCode"] == actor.company && c["mode"] != "Administration").map(|c| json!({"id":c["id"],"name":c["name"],"departmentId":c["departmentId"]})).collect::<Vec<_>>();
+                    let options = approver_contexts(tx, &candidate, &mut names)?;
+                    user["departmentName"] =
+                        json!(names.get(tx, &actor.company, &candidate.department)?);
                     user["contexts"] = json!(options);
                     users.push(user);
-                },
-                Err(e) if matches!(e.status,Some(400|403|404)) => {},
+                }
+                Err(e) if matches!(e.status, Some(400 | 403 | 404)) => {}
                 Err(e) => return Err(e),
             }
         }
@@ -261,9 +274,9 @@ pub(in crate::engine) fn save(store: &Store, actor: &Actor, input: Value) -> Res
                     .and_then(|v| v.split_once(':'))
                     .and_then(|(v, _)| v.parse::<i64>().ok())
                     .ok_or_else(|| error(403, "单位管理身份无效。"))?;
-                let scope = store::get(tx, KIND, role_id)?;
-                let ceiling: Vec<Grant> =
-                    serde_json::from_value(scope["permissionGrants"].clone())?;
+                let ceiling: Vec<Grant> = serde_json::from_value(
+                    super::super::permission_templates::unit_publications::ceiling(tx, actor)?,
+                )?;
                 if !export_doc_domain::units::within_ceiling(&grants, &ceiling) {
                     return Err(error(403, "请求权限超过本单位可下放的授权上限。"));
                 }
@@ -308,4 +321,13 @@ pub(in crate::engine) fn save(store: &Store, actor: &Actor, input: Value) -> Res
         saved["userName"] = json!(text(&user, "fullName"));
         Ok(saved)
     })
+}
+
+fn approver_contexts(
+    tx: &Connection,
+    actor: &Actor,
+    names: &mut super::super::organization::DepartmentNames,
+) -> Result<Vec<Value>> {
+    contexts(tx,actor)?.into_iter().filter(|c|c["companyCode"]==actor.company && c["mode"]!="Administration")
+        .map(|c| Ok(json!({"id":c["id"],"name":c["name"],"departmentId":c["departmentId"],"departmentName":names.get(tx,&actor.company,&text(&c,"departmentId"))?}))).collect()
 }

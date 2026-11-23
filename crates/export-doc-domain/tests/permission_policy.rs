@@ -35,6 +35,32 @@ fn prior_policy(id: &str) -> &'static Value {
         ))
         .unwrap();
         policies.extend(additions.as_object().unwrap().clone());
+        // Never-submitted draft deletion uses the existing edit right; ordering is directory management.
+        for (operation, resource, action) in [
+            (
+                DELETE_PERSONNEL_CHANGE_REQUEST_DRAFT,
+                "office.personnel-changes",
+                "edit",
+            ),
+            (DELETE_LEAVE_REQUEST_DRAFT, "office.leave", "edit"),
+            (DELETE_OVERTIME_REQUEST_DRAFT, "office.overtime", "edit"),
+            (DELETE_EXPENSE_REQUEST_DRAFT, "office.expenses", "edit"),
+            (DELETE_TRAVEL_REQUEST_DRAFT, "office.travel", "edit"),
+            (DELETE_PURCHASE_REQUEST_DRAFT, "office.purchase", "edit"),
+            (DELETE_GENERAL_REQUEST_DRAFT, "office.general", "edit"),
+            (
+                REORDER_ORGANIZATION_DEPARTMENTS,
+                "organization.directory",
+                "manage",
+            ),
+        ] {
+            policies.insert(
+                operation.id.into(),
+                serde_json::json!({
+                    "requirements":[{"resourceKey":resource,"action":action}]
+                }),
+            );
+        }
         // Issuing and consuming browser tickets preserve the original invoice-view right.
         for operation in [
             CREATE_BUSINESS_ATTACHMENT_DOWNLOAD_TICKET,

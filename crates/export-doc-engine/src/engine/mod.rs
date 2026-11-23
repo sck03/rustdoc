@@ -82,6 +82,7 @@ mod permission_templates;
 mod personnel;
 mod personnel_accounts;
 mod personnel_files;
+mod personnel_labels;
 mod personnel_organization;
 mod personnel_primary;
 mod personnel_privacy;

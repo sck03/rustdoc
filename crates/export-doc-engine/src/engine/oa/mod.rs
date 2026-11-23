@@ -20,6 +20,7 @@ mod definition_queries;
 mod definitions;
 mod document_schedule;
 mod documents;
+mod draft_deletion;
 mod escalations;
 mod exception_operations;
 mod handling_handover;
@@ -176,6 +177,13 @@ pub(super) fn project(
     };
     if detail {
         row["workflowTasks"] = fulfillment::tasks(tx, actor, &row)?;
+        row["canDeleteDraft"] = json!(
+            row["status"] == "Draft"
+                && row["ownerUserId"] == actor.id
+                && text(&row, "_requesterContext") == actor.context
+                && row["submissionNumber"].as_i64().unwrap_or(0) == 0
+                && row["submissionId"].as_i64().unwrap_or(0) == 0
+        );
         if let Some(plan) = review.as_ref().and_then(|r| r.plan.as_ref()) {
             row["fulfillmentState"] = json!(fulfillment::state(plan));
         }
@@ -237,10 +245,25 @@ pub(super) fn save(
     tx: &Connection,
     actor: &Actor,
     meta: &Value,
-    row: Value,
+    mut row: Value,
     action: &str,
     note: &str,
 ) -> Result<Value> {
+    if row["kind"] == "personnel" && matches!(row["status"].as_str(), Some("Draft" | "Returned")) {
+        let change = &mut row["personnelChange"];
+        let department = if change["action"] == "Hire" {
+            text(change, "registration.departmentId")
+        } else {
+            text(change, "departmentId")
+        };
+        if !department.is_empty() {
+            change["departmentName"] = json!(super::organization::DepartmentNames::default().get(
+                tx,
+                &actor.company,
+                &department
+            )?);
+        }
+    }
     if resource_requests::resource_kind(&row).is_some() {
         return resource_requests::save(tx, actor, row, action, note);
     }
@@ -330,6 +353,9 @@ pub(super) fn handle(
             return create(tx, &actor, meta, body, today);
         }
         let id = records::id(parameters)?;
+        if action == "delete-draft" {
+            return draft_deletion::delete(tx, &actor, meta, id, operation.id, body);
+        }
         let (_, mut row) = current(tx, &actor, meta, id)?;
         if action == "command-result" {
             return commands::result(tx, &actor, &row, parameters);
@@ -650,6 +676,11 @@ fn create(
     row["employeeName"] = employee["fullName"].clone();
     row["employeeNumber"] = employee["employeeNumber"].clone();
     row["departmentId"] = employee["departmentId"].clone();
+    row["departmentName"] = json!(super::organization::DepartmentNames::default().get(
+        tx,
+        &actor.company,
+        &text(&row, "departmentId")
+    )?);
     if let Some(id) = employee["applicantAppointmentId"].as_str() {
         row["applicantAppointmentId"] = json!(id);
         row["applicantJobTitle"] = employee["jobTitle"].clone();

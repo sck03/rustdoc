@@ -18,7 +18,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("unitKind",s().default_value(serde_json::json!("Company")).enumeration(Enumeration::Values(vec![serde_json::json!("Company"),serde_json::json!("Group")])))
     ]).required(vec!["code","name","isActive"])),
     ("ApiOrganizationDepartmentDto",o(vec![
-        ("code",s()),("companyCode",s()),("name",s()),
+        ("code",s()),("companyCode",s()),("name",s()),("sortOrder",i().minimum(num("0")).read_only(true)),
         ("isActive",b()),("versionNumber",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("parentCode",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::String]))),
         ("managerEmployeeId",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("managerName",s().default_value(serde_json::json!(""))),("additionalLeaders",a(r("OrganizationLeader")).max_items(10)),
         ("managerAppointmentId",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).max_length(64)),("additionalLeaderNames",ty(Primitive::Object).additional(Additional::Schema(Box::new(s()))).read_only(true)),("managerEmployeeNumber",s().description("Employee number for disambiguation; relationships and authorization use the stable employee ID. Request records retain the number captured when created.").read_only(true)),
@@ -30,6 +30,8 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("managerEmployeeId",Schema::default().kind(Types::Many(vec![Primitive::Null,Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$")),("additionalLeaders",a(r("OrganizationLeader")).max_items(10)),("managerAppointmentId",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).max_length(64))
     ]).required(vec!["code","companyCode","name","isActive"])),
     ("ApiOrganizationDirectoryResponse",o(vec![("companies",a(r("ApiOrganizationCompanyDto"))),("departments",a(r("ApiOrganizationDepartmentDto")))]).required(vec!["companies","departments"])),
+    ("OrganizationDepartmentOrderItem",o(vec![("id",i().format("int64").minimum(num("1"))),("expectedVersion",i().format("int64").minimum(num("1")))]).required(vec!["id","expectedVersion"])),
+    ("OrganizationDepartmentOrder",o(vec![("companyCode",s().min_length(1).max_length(50)),("parentId",i().format("int64").minimum(num("1"))),("items",a(r("OrganizationDepartmentOrderItem")).min_items(1).max_items(2000))]).required(vec!["companyCode","items"])),
     ("ApiPagedResponseOfApiUnitDto",super::schema_shapes::paged_response("ApiUnitDto")),
     ("ApiPersonnelImageForm",o(vec![("file",Schema::default().any_of(vec![ty(Primitive::Null),r("IFormFile")])),("expectedVersion",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::String])).format("int32").pattern("^-?(?:0|[1-9]\\d*)$"))])),
     ("ApiUnitDto",o(vec![
@@ -123,14 +125,14 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ("AccountPersonnelRecord",o(vec![
         ("id",i().format("int64")),("employeeNumber",s()),("fullName",s()),
         ("jobTitle",s()),("status",s().enumeration(Enumeration::Values(vec![serde_json::json!("Probation"),serde_json::json!("Active"),serde_json::json!("Departed")]))),("organization",r("PersonnelOrganization")),
-        ("departmentId",s()),("appointmentId",s().read_only(true))
+        ("departmentId",s()),("departmentName",s().read_only(true)),("companyScope",s().read_only(true)),("companyName",s().read_only(true)),("appointmentId",s().read_only(true))
     ]).required(vec!["id","employeeNumber","fullName","jobTitle","status"])),
     ("OrganizationLeader",o(vec![("employeeId",i().minimum(num("1")).format("int64")),("appointmentId",s().max_length(64)),("workflowKinds",a(s().enumeration(Enumeration::Values(vec![serde_json::json!("leave"),serde_json::json!("overtime"),serde_json::json!("expense"),serde_json::json!("travel"),serde_json::json!("purchase"),serde_json::json!("general"),serde_json::json!("personnel"),serde_json::json!("room"),serde_json::json!("supply")]))).min_items(1).max_items(9).unique_items(true))]).required(vec!["employeeId","workflowKinds"])),
     ("PersonnelAssignment",o(vec![
         ("departmentId",s().max_length(50)),("jobTitle",s().max_length(120)),("managerEmployeeId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::Null])).minimum(num("1")).format("int64")),
         ("functionalManagerEmployeeIds",a(i().minimum(num("1")).format("int64")).max_items(10).unique_items(true)),("managerAssignmentId",Schema::default().kind(Types::Many(vec![Primitive::String,Primitive::Null])).max_length(64)),("functionalManagerAssignmentIds",a(s().max_length(64)).max_items(10)),
         ("managerName",s().read_only(true)),("functionalManagerNames",a(s()).read_only(true)),("id",s().description("Stable appointment identifier; omitted only for a new appointment.").max_length(64)),
-        ("departmentName",s().read_only(true)),("canRemove",b().read_only(true)),("removalReason",s().read_only(true)),
+        ("departmentName",s().read_only(true)),("companyName",s().read_only(true)),("canRemove",b().read_only(true)),("removalReason",s().read_only(true)),
         ("companyCode",s().default_value(serde_json::json!("")).max_length(50)),("startsOn",s().default_value(serde_json::json!(""))),("endsOn",s().default_value(serde_json::json!("")))
     ]).required(vec!["departmentId","jobTitle","functionalManagerEmployeeIds"])),
     ("PersonnelOrganization",o(vec![
@@ -209,9 +211,9 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["items","users","companies","resources","permissionTemplates"])),
     ("UnitApproverOption",o(vec![
         ("id",i().format("int64")),("fullName",s()),("username",s()),
-        ("departmentId",s()),("contexts",a(r("UnitApproverContext")))
+        ("departmentId",s()),("departmentName",s().read_only(true)),("contexts",a(r("UnitApproverContext")))
     ]).required(vec!["id","fullName","username","departmentId","contexts"])),
-    ("UnitApproverContext",o(vec![("id",s()),("name",s()),("departmentId",s())]).required(vec!["id","name","departmentId"])),
+    ("UnitApproverContext",o(vec![("id",s()),("name",s()),("departmentId",s()),("departmentName",s().read_only(true))]).required(vec!["id","name","departmentId"])),
     ("UnitApproverOptions",o(vec![("users",a(r("UnitApproverOption"))),("handlers",a(r("UnitApproverOption")))]).required(vec!["users","handlers"])),
     ("UnitMemberAppointment",o(vec![
         ("departmentId",s().max_length(50)),("jobTitle",s().max_length(120)),("managerEmployeeId",Schema::default().kind(Types::Many(vec![Primitive::Integer,Primitive::Null])).minimum(num("1")).format("int64")),

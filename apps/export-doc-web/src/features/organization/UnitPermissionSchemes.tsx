@@ -37,7 +37,7 @@ function SchemeEditor({ client, unitId, directory, item, onClose, onSaved }: { c
         <label className="checkbox-field"><input type="checkbox" checked={draft.isActive} onChange={e => patch({ isActive: e.target.checked })} />启用方案</label>
         <label className="checkbox-field"><input type="checkbox" checked={draft.oaAssignedOnly ?? false} onChange={e => patch({ oaAssignedOnly: e.target.checked })} />仅查看本人及明确参与的申请</label>
         <div className="office-field-wide"><PermissionModuleGrid resources={model.resources} grants={Object.fromEntries(draft.grants.map(g => [grantKey(g.resourceKey,g.action),g.dataScope]))} dataScopes={model.recordScopes} actionDataScopes={model.actionDataScopes} disabled={operation.busy} onChange={value => patch({ grants: model.grants(value) })} disabledModules={draft.disabledModules ?? []} onModulesChange={disabledModules => patch({ disabledModules })} /></div>
-      </fieldset><p>修改会同时影响引用此方案的身份，并使相关账号的现有会话失效。无法满足未结职责时会拒绝保存并提示交接。</p><OfficeSubmit busy={operation.busy} label="保存单位方案" />
+      </fieldset><p>保存为草稿；发布并应用到指定身份后生效。</p><OfficeSubmit busy={operation.busy} label="保存方案草稿" />
     </form>
   </OfficeDialog>;
 }

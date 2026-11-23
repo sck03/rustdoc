@@ -72,7 +72,7 @@ pub(super) fn actor_summary(tx: &Connection, actor: &Actor) -> Result<Value> {
             &selected,
         )?)
     };
-    let mut result = summary(person);
+    let mut result = person;
     if let Some(appointment) = appointment {
         result["appointmentId"] = serde_json::json!(appointment.id);
         result["jobTitle"] = serde_json::json!(appointment.job_title);
@@ -81,7 +81,8 @@ pub(super) fn actor_summary(tx: &Connection, actor: &Actor) -> Result<Value> {
     } else {
         result["appointmentId"] = result["organization"]["primaryAssignmentId"].clone();
     }
-    Ok(result)
+    super::personnel_labels::enrich(tx, std::slice::from_mut(&mut result))?;
+    Ok(summary(result))
 }
 
 pub fn enrich_users(store: &Store, users: &mut [Value]) -> Result<()> {
@@ -89,7 +90,15 @@ pub fn enrich_users(store: &Store, users: &mut [Value]) -> Result<()> {
         .iter()
         .filter_map(|u| u["id"].as_i64())
         .collect::<Vec<_>>();
-    let mut links = store.read(|tx| links(tx, &ids))?;
+    let mut links = store.read(|tx| {
+        let links = links(tx, &ids)?;
+        let mut people: Vec<_> = links.into_values().collect();
+        super::personnel_labels::enrich(tx, &mut people)?;
+        Ok(people
+            .into_iter()
+            .map(|person| (person["accountId"].as_i64().unwrap_or(0), person))
+            .collect::<HashMap<_, _>>())
+    })?;
     for user in users {
         user["employee"] = user["id"]
             .as_i64()

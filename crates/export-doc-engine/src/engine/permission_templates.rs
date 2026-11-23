@@ -7,6 +7,7 @@ use super::{
 use export_doc_domain::permissions::{self, Grant};
 use serde_json::{Value, json};
 pub(super) mod publications;
+pub(super) mod unit_publications;
 
 pub(super) fn project_with_usage(tx: &Connection, value: Value) -> Result<Value> {
     project_many_with_usage(tx, vec![value])?

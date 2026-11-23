@@ -18,10 +18,10 @@ export function PermissionModuleGrid({
   readOnlyActions?: boolean;
   actionDataScopes?: Record<string, string[]>;
 }) {
-  const [selectedGroup, setGroup] = useState<string | null>(null);
+  const [selectedGroup, setGroup] = useState("");
   const [search, setSearch] = useState("");
   const groups = useMemo(() => [...new Set(resources.map((resource) => permissionResourceLocation(resource).group))], [resources]);
-  const group = selectedGroup === "" ? "" : groups.includes(selectedGroup ?? "") ? selectedGroup! : groups[0] ?? "";
+  const group = groups.includes(selectedGroup) ? selectedGroup : "";
   const visible = useMemo(() => filterPermissionResources(resources, group, search), [group, resources, search]);
 
   return (
@@ -35,7 +35,7 @@ export function PermissionModuleGrid({
           </select>
           <label className="permission-module-search">
             <Search size={15} aria-hidden="true" />
-            <input type="search" aria-label="搜索功能模块" placeholder="跨分类搜索模块或操作" maxLength={100} value={search} onChange={(event) => { setSearch(event.target.value); setGroup(event.target.value.trim() ? "" : null); }} />
+            <input type="search" aria-label="搜索功能模块" placeholder="跨分类搜索模块或操作" maxLength={100} value={search} onChange={(event) => { setSearch(event.target.value); setGroup(""); }} />
           </label>
         </div>
       </div>

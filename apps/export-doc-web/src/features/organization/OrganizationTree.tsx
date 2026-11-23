@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, ArrowUpDown } from "lucide-react";
 import type { ApiOrganizationDepartmentDto } from "../../api/index.ts";
 import { IconButton } from "../../ui/Button.tsx";
 import { PageState } from "../../ui/PageState.tsx";
@@ -13,12 +13,13 @@ type Props = {
   onEdit: (department: ApiOrganizationDepartmentDto) => void;
   onAdd: (parentCode: string) => void;
   onDelete: (department: ApiOrganizationDepartmentDto) => void;
+  onOrder: (department: ApiOrganizationDepartmentDto) => void;
   canAdd: boolean;
   revealDepartmentCode: string | null;
   onRevealed: () => void;
 };
 
-export function OrganizationTree({ departments, keyword, companyName, canAdd, onEdit, onAdd, onDelete, revealDepartmentCode, onRevealed }: Props) {
+export function OrganizationTree({ departments, keyword, companyName, canAdd, onEdit, onAdd, onDelete, onOrder, revealDepartmentCode, onRevealed }: Props) {
   const [expandedDepth, setExpandedDepth] = useState(1);
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [selectedCode, setSelectedCode] = useState("");
@@ -77,6 +78,7 @@ export function OrganizationTree({ departments, keyword, companyName, canAdd, on
             <td className="organization-manager-cell"><TablePrimaryText value={department.managerName || "未设置"} secondary={department.managerEmployeeNumber} /></td>
             <td><span className="organization-state" data-active={department.isActive}>{department.isActive ? "启用" : "停用"}</span></td>
             <td><div className="organization-row-actions">
+              <IconButton label={"调整" + department.name + "顺序"} onClick={() => onOrder(department)}><ArrowUpDown size={15} aria-hidden="true" /></IconButton>
               <IconButton label={"编辑" + department.name} onClick={() => onEdit(department)}><Pencil size={15} aria-hidden="true" /></IconButton>
               <IconButton label={"为" + department.name + "新增下级部门"} disabled={!canAdd || !department.isActive} onClick={() => onAdd(department.code)}><Plus size={16} aria-hidden="true" /></IconButton>
               <IconButton label={"删除" + department.name} onClick={() => onDelete(department)}><Trash2 size={15} aria-hidden="true" /></IconButton>

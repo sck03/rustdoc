@@ -422,7 +422,10 @@ pub fn exercise(service: &NativeService, admin: &str) {
     assert_eq!(
         summary_keys,
         [
+            "companyName",
+            "companyScope",
             "departmentId",
+            "departmentName",
             "employeeNumber",
             "fullName",
             "id",
@@ -430,7 +433,7 @@ pub fn exercise(service: &NativeService, admin: &str) {
             "organization",
             "status"
         ],
-        "Account summary exposes only the approved employment fields"
+        "Account summary exposes only approved employment fields and public organization labels"
     );
     for active in [false, true] {
         let saved = call(service, admin, UPDATE_USER_ACCOUNT, account["id"].as_i64().unwrap(), Some(json!({

@@ -44,10 +44,10 @@
   .organization-tree-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
   .organization-tree-toolbar .text-button { padding: 4px 4px; font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
   .organization-tree-scroll { min-width: 0; max-height: 65dvh; overflow: auto; border: 1px solid var(--edm-line); border-radius: var(--edm-radius-sm); }
-  .organization-tree-table { width: 100%; min-width: 0; table-layout: fixed; border-collapse: collapse; font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
+  .organization-tree-table { width: 100%; max-width: 58rem; min-width: 36rem; table-layout: fixed; border-collapse: collapse; font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
   .organization-manager-column { width: 7rem; }
   .organization-status-column { width: 3.7rem; }
-  .organization-actions-column { width: 7.2rem; }
+  .organization-actions-column { width: 12rem; }
   .organization-tree-table th { position: sticky; top: 0; z-index: var(--edm-z-sticky); padding: 8px 8px; text-align: start; background: var(--edm-bg-muted); color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
   .organization-tree-table td { padding: 4px 8px; border-bottom: 1px solid var(--edm-line); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .organization-tree-table tr:last-child td { border-bottom: 0; }
@@ -81,13 +81,13 @@
   }
   @media (max-width: 680px) {
     .organization-departments { padding: 12px; }
-    .organization-tree-table { min-width: 360px; }
+    .organization-tree-table { min-width: 36rem; }
     .organization-row-actions .icon-button, .organization-expand, .organization-node-name { min-width: 44px; min-height: 44px; }
     .organization-expand, .organization-leaf { flex-basis: 44px; }
     .organization-manager-column,
 .organization-manager-cell { display: none; }
     .organization-status-column { width: 3rem; }
-    .organization-actions-column { width: 6.5rem; }
+    .organization-actions-column { width: 15rem; }
     .organization-tree-table td,
 .organization-tree-table th { padding-inline: 4px; }
     .organization-tree-table .organization-node { padding-inline-start: calc(min(var(--organization-depth), 4) * 8px); }

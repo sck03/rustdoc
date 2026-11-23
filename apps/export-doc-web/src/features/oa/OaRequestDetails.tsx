@@ -27,11 +27,13 @@ import { WorkflowOperations } from "./WorkflowOperations.tsx";
 import { PersonnelExecutionNotice } from "./PersonnelExecutionNotice.tsx";
 import { WorkflowFulfillmentPanel } from "./WorkflowFulfillmentPanel.tsx";
 import { WorkflowDecisionHistory } from "./WorkflowDecisionHistory.tsx";
+import { OaDraftDeleteDialog } from "./OaDraftDeleteDialog.tsx";
 
-export function OaRequestDetails({ client, user, row, onEdit }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: OaRequest; onEdit: () => void }) {
+export function OaRequestDetails({ client, user, row, onEdit, onDeleted }: { client: ExportDocManagerApiClient; user: ApiUserDto; row: OaRequest; onEdit: () => void; onDeleted: () => void }) {
   const operation = useOaOperation(row.kind);
   const [reassigning, setReassigning] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [historyOpened, setHistoryOpened] = useState(false);
   const [purpose, setPurpose] = useState("Voucher");
   const [action, setAction] = useState<OaActionName | number | null>(null);
@@ -42,15 +44,17 @@ export function OaRequestDetails({ client, user, row, onEdit }: { client: Export
   return <article className="oa-detail">
     <header className="oa-detail-summary">
     <div className="office-card-heading"><h2>{row.title ?? `申请 #${row.id}`}</h2><span className="office-badge" data-state={row.status}>{oaStatus[row.status]}</span></div>
-    <dl className="oa-facts"><div><dt>申请编号</dt><dd>#{row.id}</dd></div><div><dt>{row.kind === "personnel" ? "变动人员" : "申请人"}</dt><dd>{requestPersonLabel(row.employeeName, row)}</dd></div><div><dt>所属部门</dt><dd>{row.departmentId}</dd></div><div><dt>更新时间</dt><dd>{formatBusinessDateTime(row.updatedAt, user.businessTimeZone)}</dd></div></dl>
+    <dl className="oa-facts"><div><dt>申请编号</dt><dd>#{row.id}</dd></div><div><dt>{row.kind === "personnel" ? "变动人员" : "申请人"}</dt><dd>{requestPersonLabel(row.employeeName, row)}</dd></div><div><dt>所属部门</dt><dd>{row.departmentName || row.departmentId}</dd></div><div><dt>更新时间</dt><dd>{formatBusinessDateTime(row.updatedAt, user.businessTimeZone)}</dd></div></dl>
     {row.kind === "personnel" && row.status === "Completed" && <InlineNotice tone="success" title="人员变动已生效">最终审批已更新人员档案和关联账号。
       {canViewPersonnelDetails(user) && <Link to={`/office/people/${row.employeeId}`}>查看人员档案</Link>}</InlineNotice>}
     {(editable || actions.length > 0) && <div className="office-card-actions">
       {editable && <button type="button" className="command-button secondary" disabled={operation.busy} onClick={onEdit}>编辑草稿</button>}
+      {editable && row.canDeleteDraft && <Button variant="danger" disabled={operation.busy} onClick={() => setDeleting(true)}>删除草稿</Button>}
       {editable && <button type="button" className="command-button secondary" disabled={operation.busy} onClick={() => setPreviewing(true)}>预览审批流程</button>}
       {actions.map((action) => <Button variant={action === primaryAction ? "primary" : "secondary"} key={action} disabled={operation.busy} onClick={() => setAction(action)}>{oaActionLabel(action, row.kind)}</Button>)}
     </div>}
     <PersonnelExecutionNotice client={client} user={user} row={row} />
+    {deleting && <OaDraftDeleteDialog client={client} row={row} onClose={() => setDeleting(false)} onDeleted={onDeleted} />}
     {row.status === "HandedOff" && <InlineNotice tone="success" title="财务交接已登记">此状态仅记录资料交接，不代表已记账或已付款；办理人、时间和说明见审批与办理记录。</InlineNotice>}
     </header>
     <div className="oa-detail-columns">

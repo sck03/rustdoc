@@ -39,7 +39,10 @@ export interface AccessRestrictionSave {
 
 export interface AccountPersonnelRecord {
   appointmentId?: string;
+  companyName?: string;
+  companyScope?: string;
   departmentId?: string;
+  departmentName?: string;
   employeeNumber: string;
   fullName: string;
   id: number;
@@ -2164,6 +2167,7 @@ export interface ApiOrganizationDepartmentDto {
   managerName: string;
   name: string;
   parentCode?: string | null;
+  sortOrder?: number;
   versionNumber: number;
 }
 
@@ -5205,6 +5209,7 @@ export interface OaMaterialOaOvertime {
 export interface OaMaterialOaPersonnelChange {
   action?: "Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire";
   departmentId?: string;
+  departmentName?: string;
   effectiveDate?: string;
   expectedPersonnelVersion?: number;
   jobTitle?: string;
@@ -5217,6 +5222,7 @@ export interface OaMaterialOaPersonnelChange {
 export interface OaMaterialOaPersonnelChangeProjection {
   action?: "Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire";
   departmentId?: string;
+  departmentName?: string;
   effectiveDate?: string;
   expectedPersonnelVersion?: number;
   jobTitle?: string;
@@ -5274,6 +5280,7 @@ export interface OaMaterialOaTravel {
 export interface OaMaterialPersonnelAssignment {
   canRemove?: boolean;
   companyCode?: string;
+  companyName?: string;
   departmentId?: string;
   departmentName?: string;
   endsOn?: string;
@@ -5375,6 +5382,7 @@ export interface OaPersonnelChange {
 export interface OaPersonnelChangeProjection {
   action: "Hire" | "Confirm" | "Transfer" | "Depart" | "Rehire";
   departmentId?: string;
+  departmentName?: string;
   effectiveDate?: string;
   expectedPersonnelVersion?: number;
   jobTitle?: string;
@@ -5452,6 +5460,7 @@ export interface OaRequest {
   approvalPlan?: OaApprovalPlan;
   approvalRoutingNotes?: string[];
   attachments: OaAttachment[];
+  canDeleteDraft?: boolean;
   canHandle?: boolean;
   canReview?: boolean;
   category?: "Seal" | "Certificate" | "IT" | "Repair" | "Other";
@@ -5461,6 +5470,7 @@ export interface OaRequest {
   definitionKey?: string;
   definitionVersion?: number;
   departmentId: string;
+  departmentName?: string;
   durationDays?: string;
   durationHours?: string;
   employeeId: number;
@@ -6003,6 +6013,17 @@ export interface OrganizationChangeImpact {
   versionNumber: number;
 }
 
+export interface OrganizationDepartmentOrder {
+  companyCode: string;
+  items: OrganizationDepartmentOrderItem[];
+  parentId?: number;
+}
+
+export interface OrganizationDepartmentOrderItem {
+  expectedVersion: number;
+  id: number;
+}
+
 export interface OrganizationGrantImpact {
   addedUnits: OrganizationImpactUnit[];
   removedUnits: OrganizationImpactUnit[];
@@ -6261,6 +6282,7 @@ export interface PersonnelAccountRequest {
 export interface PersonnelAssignment {
   canRemove?: boolean;
   companyCode?: string;
+  companyName?: string;
   departmentId: string;
   departmentName?: string;
   endsOn?: string;
@@ -6926,6 +6948,7 @@ export interface UnitAppointmentOption {
 
 export interface UnitApproverContext {
   departmentId: string;
+  departmentName?: string;
   id: string;
   name: string;
 }
@@ -6933,6 +6956,7 @@ export interface UnitApproverContext {
 export interface UnitApproverOption {
   contexts: UnitApproverContext[];
   departmentId: string;
+  departmentName?: string;
   fullName: string;
   id: number;
   username: string;
@@ -8347,9 +8371,19 @@ export interface DeleteCustomsCooProducerProfileRequest {
   expectedVersion: number;
 }
 
+export interface DeleteExpenseRequestDraftRequest {
+  id: number;
+  body: OaCommandAction;
+}
+
 export interface DeleteExporterRequest {
   id: number;
   rowVersion: string;
+}
+
+export interface DeleteGeneralRequestDraftRequest {
+  id: number;
+  body: OaCommandAction;
 }
 
 export interface DeleteHsCodeRequest {
@@ -8379,6 +8413,11 @@ export interface DeleteJobRequest {
   jobId: string;
 }
 
+export interface DeleteLeaveRequestDraftRequest {
+  id: number;
+  body: OaCommandAction;
+}
+
 export interface DeleteMeetingRoomRequest {
   id: number;
   body: DeleteRecordRequest;
@@ -8397,6 +8436,11 @@ export interface DeleteOrganizationCompanyRequest {
 export interface DeleteOrganizationDepartmentRequest {
   id: number;
   body: DeleteRecordRequest;
+}
+
+export interface DeleteOvertimeRequestDraftRequest {
+  id: number;
+  body: OaCommandAction;
 }
 
 export interface DeletePayeeRequest {
@@ -8425,6 +8469,11 @@ export interface DeletePersonnelAttachmentRequest {
   body: OaAction;
 }
 
+export interface DeletePersonnelChangeRequestDraftRequest {
+  id: number;
+  body: OaCommandAction;
+}
+
 export interface DeletePersonnelImageRequest {
   id: number;
   kind: PersonnelImageKind;
@@ -8439,6 +8488,11 @@ export interface DeletePortRequest {
 export interface DeleteProductRequest {
   id: number;
   rowVersion: string;
+}
+
+export interface DeletePurchaseRequestDraftRequest {
+  id: number;
+  body: OaCommandAction;
 }
 
 export interface DeleteReportTemplateRequest {
@@ -8468,6 +8522,11 @@ export interface DeleteSupplierProductLinkRequest {
   supplierId: number;
   id: number;
   expectedVersion?: number;
+}
+
+export interface DeleteTravelRequestDraftRequest {
+  id: number;
+  body: OaCommandAction;
 }
 
 export interface DeleteUnitRequest {
@@ -10413,6 +10472,10 @@ export interface RemindTravelRequestRequest {
 
 export interface RenameReportTemplateRequest {
   body: ApiReportTemplateRenameRequest;
+}
+
+export interface ReorderOrganizationDepartmentsRequest {
+  body: OrganizationDepartmentOrder;
 }
 
 export interface RepairSingleWindowExportReviewGroupsRequest {

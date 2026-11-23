@@ -48,7 +48,6 @@ pub(in crate::engine) fn handle(
         return store.read(|tx| {
             let actor = auth::refresh_actor_in(tx, actor)?;
             let draft = store::get(tx, "permission-templates", id)?;
-            demand(tx, &actor, &draft)?;
             if action == "version" {
                 let version = query
                     .iter()
@@ -56,6 +55,10 @@ pub(in crate::engine) fn handle(
                     .and_then(|(_, v)| v.parse::<i64>().ok())
                     .filter(|v| *v > 0)
                     .ok_or_else(|| invalid("发布版本无效。"))?;
+                if !actor.admin {
+                    return unit_publications::read(tx, &actor, id, Some(version), 1, 20);
+                }
+                demand(tx, &actor, &draft)?;
                 return project_with_usage(
                     tx,
                     tx.permission_scheme_version(id, version)?
@@ -79,6 +82,10 @@ pub(in crate::engine) fn handle(
                     .map_err(|_| invalid("页码无效。"))?
                     .unwrap_or(20)
                     .clamp(1, 100);
+                if !actor.admin {
+                    return unit_publications::read(tx, &actor, id, None, page, size);
+                }
+                demand(tx, &actor, &draft)?;
                 return Ok(tx.permission_scheme_versions(
                     id,
                     (page - 1).saturating_mul(size),

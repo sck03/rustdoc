@@ -8,7 +8,6 @@ use crate::engine::store::Connection;
 use export_doc_domain::personnel_organization::PersonnelOrganization;
 use export_doc_storage::{DataScope, GenericQuery};
 use serde_json::{Value, json};
-use std::collections::HashMap;
 
 pub fn reporting_options(
     store: &store::Store,
@@ -475,56 +474,20 @@ pub fn appointment_managers(
 }
 
 pub fn project(tx: &Connection, person: &Value) -> Result<Value> {
-    let organization = organization(person)?;
-    let mut value = serde_json::to_value(&organization)?;
-    let mut names = HashMap::new();
-    for id in organization.manager_ids() {
-        let manager = store::get(tx, "people", id)?;
-        names.insert(
-            id,
-            format!(
-                "{} · {}",
-                text(&manager, "profile.fullName"),
-                text(&manager, "employeeNumber")
-            ),
-        );
-    }
-    fn enrich(value: &mut Value, names: &HashMap<i64, String>) {
-        value["managerName"] = json!(
-            value["managerEmployeeId"]
-                .as_i64()
-                .and_then(|id| names.get(&id))
-                .cloned()
-                .unwrap_or_default()
-        );
-        value["functionalManagerNames"] = json!(
-            value["functionalManagerEmployeeIds"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(|id| id.as_i64().and_then(|id| names.get(&id)))
-                .collect::<Vec<_>>()
-        );
-    }
-    enrich(&mut value, &names);
-    let mut departments = super::organization::DepartmentNames::default();
+    let mut labeled = person.clone();
+    super::personnel_labels::enrich(tx, std::slice::from_mut(&mut labeled))?;
+    let mut value = labeled["organization"].take();
     let references = appointment_references(tx, person["id"].as_i64().unwrap_or(0))?;
     for assignment in value["additionalAssignments"]
         .as_array_mut()
         .into_iter()
         .flatten()
     {
-        enrich(assignment, &names);
         if let Some(reference) = references.iter().find(|r| r["id"] == assignment["id"]) {
             let reason = appointment_removal_reason(reference)?;
             assignment["canRemove"] = json!(reason.is_empty());
             assignment["removalReason"] = json!(reason);
         }
-        assignment["departmentName"] = json!(departments.get(
-            tx,
-            &text(assignment, "companyCode"),
-            &text(assignment, "departmentId")
-        )?);
     }
     Ok(value)
 }

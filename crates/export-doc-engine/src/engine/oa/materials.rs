@@ -14,6 +14,7 @@ const SYSTEM: &[&str] = &[
     "ownerUserId",
     "companyScope",
     "departmentId",
+    "departmentName",
     "employeeId",
     "employeeName",
     "employeeNumber",
@@ -30,6 +31,7 @@ const SYSTEM: &[&str] = &[
     "approvalPlan",
     "approvalDocument",
     "canReview",
+    "canDeleteDraft",
     "reviewTaskKeys",
     "workflowActions",
     "workflowTasks",
@@ -185,7 +187,21 @@ fn filter(
                 } else {
                     format!("{path}.{key}")
                 };
-                if !allowed(&next, policies) {
+                // Display labels disclose the same material as their source identifier.
+                let label_source = match key.as_str() {
+                    "departmentName"
+                        if fields.get("registration").is_some_and(Value::is_object) =>
+                    {
+                        Some("registration.departmentId")
+                    }
+                    "departmentName" => Some("departmentId"),
+                    "companyName" => Some("companyCode"),
+                    _ => None,
+                };
+                if !allowed(&next, policies)
+                    || label_source
+                        .is_some_and(|source| !allowed(&format!("{path}.{source}"), policies))
+                {
                     fields.remove(&key);
                     omitted.push(next);
                     continue;
@@ -498,4 +514,35 @@ pub(super) fn validate_policy(policy: &MaterialPolicy) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn material_labels_cannot_disclose_hidden_assignment_identifiers() {
+        for (mut value, hidden) in [
+            (
+                json!({"departmentId":"SECRET","departmentName":"隐藏部门"}),
+                "change.departmentId",
+            ),
+            (
+                json!({"registration":{"departmentId":"SECRET"},"departmentName":"隐藏部门"}),
+                "change.registration.departmentId",
+            ),
+            (
+                json!({"companyCode":"SECRET","companyName":"隐藏单位"}),
+                "change.companyCode",
+            ),
+        ] {
+            let policy = MaterialPolicy {
+                hidden_fields: vec![hidden.into()],
+                ..Default::default()
+            };
+            filter(&mut value, "change", &[policy], true, &mut vec![]);
+            assert!(value.get("departmentName").is_none());
+            assert!(value.get("companyName").is_none());
+        }
+    }
 }

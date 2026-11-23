@@ -140,7 +140,7 @@ CREATE TABLE command_receipts (
     context_id TEXT NOT NULL,
     command_key TEXT NOT NULL CHECK(length(command_key) BETWEEN 8 AND 128),
     command TEXT NOT NULL,
-    target_id INTEGER NOT NULL REFERENCES records(id) ON DELETE RESTRICT,
+    target_id INTEGER NOT NULL CHECK(target_id>0),
     request_digest TEXT NOT NULL CHECK(length(request_digest)=64),
     result TEXT NOT NULL,
     created_at TEXT NOT NULL,

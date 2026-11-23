@@ -17,7 +17,7 @@ export function OaDepartmentPicker({ client, user, employeeId, value, onChange }
   const organization = employeeId ? person.data?.organization : user.employee?.organization;
   if (person.isError) return <InlineNotice tone="error">{readApiError(person.error)}</InlineNotice>;
   if (!employee || !organization?.primaryAssignmentId) return null;
-  const primary = { id: organization.primaryAssignmentId, departmentId: employee.departmentId ?? "", jobTitle: employee.jobTitle, companyCode: employeeId ? person.data?.companyScope : user.primaryCompanyScope ?? user.companyScope };
+  const primary = { id: organization.primaryAssignmentId, departmentId: employee.departmentId ?? "", departmentName: employee.departmentName, jobTitle: employee.jobTitle, companyCode: employeeId ? person.data?.companyScope : user.primaryCompanyScope ?? user.companyScope };
   const currentId = user.employee?.appointmentId;
   const appointments = [primary, ...organization.additionalAssignments].filter(appointment =>
     appointment.companyCode === user.companyScope &&
@@ -29,6 +29,6 @@ export function OaDepartmentPicker({ client, user, employeeId, value, onChange }
     const appointment = appointments.find(item => item.id === event.target.value);
     if (appointment?.id) onChange({ id: appointment.id, departmentId: appointment.departmentId });
   }}>{appointments.map(appointment => <option key={appointment.id} value={appointment.id}>
-    {appointment.departmentId} · {appointment.jobTitle}{appointment.id === primary.id ? "（主职）" : "（兼职）"}
+    {appointment.departmentName || appointment.departmentId} · {appointment.jobTitle}{appointment.id === primary.id ? "（主职）" : "（兼职）"}
   </option>)}</select></OfficeField>;
 }

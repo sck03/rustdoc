@@ -93,6 +93,7 @@ export function OaRequestsPage({
                 user={user}
                 row={model.detail.data}
                 onEdit={() => setEditing(model.detail.data!)}
+                onDeleted={() => model.select(0)}
               />
             )
           )}
@@ -201,13 +202,16 @@ export function OaRequestsPage({
                   </span>
                 </div>
                 <p>
-                  {requestPersonLabel(row.employeeName, row)} · {row.departmentId}
+                  {requestPersonLabel(row.employeeName, row)} · {row.departmentName || row.departmentId}
                 </p>
                 <p className="office-muted">
                   #{row.id} {row.totalAmount && ` · ${row.currency} ${row.totalAmount}`}
                   {row.durationDays && ` · ${row.durationDays} 天`}
                   {row.durationHours && ` · ${row.durationHours} 小时`}
                 </p>
+                <div className="office-card-actions">
+                  <button type="button" className="command-button secondary" onClick={() => model.select(row.id)}>{model.approvalsOnly ? "去审批" : model.financeOnly || model.handlingOnly ? "去办理" : ["Draft","Returned"].includes(row.status) && oaAccess(user,kind,"edit",row) ? "编辑 / 提交" : "查看详情"}</button>
+                </div>
               </article>
             ))}
           </div>

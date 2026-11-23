@@ -9,6 +9,9 @@ mod audit_fixes;
 #[cfg(test)]
 #[path = "contract_browser_downloads.rs"]
 mod browser_downloads;
+#[cfg(test)]
+#[path = "contract_organization_quality.rs"]
+mod organization_quality;
 use std::sync::OnceLock;
 
 pub fn document() -> Value {
@@ -205,6 +208,7 @@ mod tests {
         supplier_resources::apply(&mut baseline);
         precision_stability::apply(&mut baseline);
         review_cleanup::apply(&mut baseline);
+        organization_quality::apply(&mut baseline);
         // Reviewed retirement: access is the sole authorization definition.
         // Keep every access rule, authentication flag, schema and error in the comparison.
         for path in baseline["paths"].as_object_mut().unwrap().values_mut() {
