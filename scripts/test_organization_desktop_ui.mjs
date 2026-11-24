@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { CdpClient, delay } from './lib/chromium-cdp.mjs';
 import { captureScreenshot, evaluate, getFreePort } from './lib/web-runtime-browser-session.mjs';
 import { spawnProcessTree, stopProcessTree } from './lib/child-process-tree.mjs';
+import { officeReviewInvoke, officeReviewOperations } from './lib/native-office-ui.mjs';
 
 // Targeted WebView2 regression; business workflow assertions live in the HTTP/React companion.
 const root = path.resolve(import.meta.dirname, '..');
@@ -38,16 +38,9 @@ try {
   await wait("!!document.querySelector('input[autocomplete=username]')");
   const context=await run("window.__TAURI_INTERNALS__.invoke('get_desktop_runtime_context')");
   const spec=JSON.parse(fs.readFileSync(path.join(root,'crates/export-doc-contracts/src/openapi.json'),'utf8'));
-  const operations=new Map(Object.entries(spec.paths).flatMap(([route,methods])=>Object.entries(methods).map(([method,op])=>[op.operationId,{route,method}])));
+  const request=officeReviewInvoke(context.apiBaseUrl,spec,officeReviewOperations(spec),{'X-ExportDocManager-Desktop-Token':context.desktopAccessToken});
   let token='';
-  async function invoke(id,body,parameters={}) {
-    const op=operations.get(id);assert(op,id);
-    const route=op.route.replace(/\{([^}]+)\}/gu,(_,key)=>encodeURIComponent(parameters[key]));
-    const response=await fetch(context.apiBaseUrl+route,{method:op.method.toUpperCase(),signal:AbortSignal.timeout(15000),
-      headers:{'content-type':'application/json','X-ExportDocManager-Desktop-Token':context.desktopAccessToken,...(token?{authorization:`Bearer ${token}`}:{})},...(body?{body:JSON.stringify(body)}:{})});
-    assert(response.ok,`${id}: ${response.status}`);
-    return response.status===204?undefined:response.json();
-  }
+  const invoke=(id,body,parameters={})=>request(id,body,parameters,token);
   token=(await invoke('Login',{username:'admin',password:''})).accessToken;
   await invoke('CreateOrganizationDepartment',{code:'UIA',name:'甲部门',companyCode:'DEFAULT',isActive:true});
   await invoke('CreateOrganizationDepartment',{code:'UIB',name:'乙部门',companyCode:'DEFAULT',isActive:true});

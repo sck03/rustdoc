@@ -29,14 +29,6 @@ pub(super) fn seed_missing(tx: &Connection, actor: &super::store::Actor) -> Resu
             super::contracts::initial(super::contracts::schema("ApiPermissionTemplateDto")),
             role,
         );
-        template["grants"] = json!(
-            permissions::catalog()
-                .roles
-                .iter()
-                .find(|item| item.code == code)
-                .ok_or_else(|| super::error::unavailable("权限预置目录缺失。"))?
-                .grants
-        );
         template["isActive"] = json!(true);
         template["isSystem"] = json!(true);
         super::store::save(

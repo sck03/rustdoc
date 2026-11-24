@@ -1,55 +1,10 @@
 //! Reviewed organization labels, sibling ordering and never-submitted draft deletion.
 use serde_json::{Value, json};
+#[path = "../tests/fixtures/approval_presets.rs"]
+mod approval_presets;
 
 pub(super) fn apply(baseline: &mut Value) {
-    // Preserve the eight existing profiles and independently state the two approval presets.
-    let roles = baseline["x-exportdoc-permissions"]["roles"]
-        .as_array_mut()
-        .unwrap();
-    assert_eq!(roles.len(), 8);
-    for (code, name, description, scope) in [
-        (
-            "DepartmentApprover",
-            "部门审批人员",
-            "查看和审批本部门 OA 事项，自助申请仅限本人；须关联有效任职并明确指定为流程责任人。",
-            "department",
-        ),
-        (
-            "CompanyApprover",
-            "公司审批人员",
-            "查看和审批本公司 OA 事项，自助申请仅限本人；不默认授予人事档案、资源办理或系统管理权限。",
-            "company",
-        ),
-    ] {
-        let mut grants = vec![
-            json!({"resourceKey":"office.people","action":"view","dataScope":"company"}),
-            json!({"resourceKey":"system.about","action":"view","dataScope":"own"}),
-            json!({"resourceKey":"office.announcements","action":"view","dataScope":"company"}),
-            json!({"resourceKey":"office.notifications","action":"view","dataScope":"company"}),
-        ];
-        let resources = [
-            "office.personnel-changes",
-            "office.leave",
-            "office.overtime",
-            "office.expenses",
-            "office.travel",
-            "office.purchase",
-            "office.general",
-            "office.rooms",
-            "office.supplies",
-        ];
-        for resource in resources {
-            for action in ["view", "approve"] {
-                grants.push(json!({"resourceKey":resource,"action":action,"dataScope":scope}));
-            }
-        }
-        for resource in resources.into_iter().skip(1) {
-            for action in ["create", "edit", "cancel"] {
-                grants.push(json!({"resourceKey":resource,"action":action,"dataScope":"own"}));
-            }
-        }
-        roles.push(json!({"code":code,"name":name,"description":description,"grants":grants}));
-    }
+    approval_presets::apply(baseline);
     let schemas = &mut baseline["components"]["schemas"];
     for (name, fields) in [
         (

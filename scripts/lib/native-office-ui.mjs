@@ -19,14 +19,14 @@ export function officeReviewExecutable(repo) {
 export function officeReviewOperations(spec) {
   return new Map(Object.entries(spec.paths).flatMap(([route, methods]) => Object.entries(methods).map(([method, op]) => [op.operationId, { route, method, request: op.requestBody?.content?.['application/json']?.schema }])));
 }
-export function officeReviewInvoke(url, spec, operations) {
+export function officeReviewInvoke(url, spec, operations, headers = {}) {
   return async (id, body, parameters = {}, token = '') => {
     const op = operations.get(id); assert(op, `Unknown operation ${id}`);
     const schema = op.request?.$ref ? spec.components.schemas[op.request.$ref.split('/').at(-1)] : op.request;
     if (body && schema?.required?.includes('commandKey') && !body.commandKey) body = { ...body, commandKey: randomUUID() };
     const route = op.route.replace(/\{([^}]+)\}/gu, (_, key) => encodeURIComponent(parameters[key]));
     const query = new URLSearchParams(Object.entries(parameters).filter(([key]) => !op.route.includes(`{${key}}`)).map(([key, value]) => [key, String(value)]));
-    const response = await fetch(url + route + (query.size ? '?' + query : ''), { method: op.method.toUpperCase(), signal: AbortSignal.timeout(60000), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+    const response = await fetch(url + route + (query.size ? '?' + query : ''), { method: op.method.toUpperCase(), signal: AbortSignal.timeout(60000), headers: { ...headers, ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
     if (!response.ok) throw new Error(`${id} (${response.status}): ${await response.text()}`);
     return response.status === 204 ? undefined : response.json();
   };
