@@ -69,6 +69,10 @@ mod tests {
 
     #[test]
     fn external_pages_cannot_replace_the_privileged_main_window() {
+        let nested =
+            tauri::Url::parse(&format!("{}https://example.com", "blob:".repeat(10_000))).unwrap();
+        assert!(matches!(nested.origin(), url::Origin::Opaque(_)));
+        assert!(!allow_main_navigation(&nested));
         for value in [
             "https://example.com",
             "http://127.0.0.1:5188",

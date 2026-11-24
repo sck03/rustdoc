@@ -48,7 +48,7 @@ aes-gcm = { version = "=0.11.1", default-features = false, features = ["aes", "a
 zeroize = "=1.9.1"
 chrono-tz.workspace = true
 ureq = { version = "=3.5.0", default-features = false, features = ["json", "native-tls"] }
-url = "=2.5.8"
+url = "=2.5.9"
 quick-xml = "=0.42.0"
 fs2 = "=0.4.3"
 pbkdf2 = { version = "=0.13.0", features = ["sha2"] }

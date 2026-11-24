@@ -11,7 +11,7 @@ lettre = { version = "=0.11.24", default-features = false, features = ["builder"
 tokio = { version = "=1.54.1", features = ["rt", "time", "net", "macros"] }
 scraper = { version = "=0.29.0", default-features = false }
 ego-tree = "=0.11.1"
-url = "=2.5.8"
+url = "=2.5.9"
 zip.workspace = true
 zeroize = "=1.9.1"
 

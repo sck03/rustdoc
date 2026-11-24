@@ -31,7 +31,7 @@ serde_json.workspace = true
 chrono.workspace = true
 fs2 = "=0.4.3"
 subtle = "=2.6.1"
-url = "=2.5.8"
+url = "=2.5.9"
 
 [dev-dependencies]
 tower = { version = "=0.5.3", features = ["util"] }

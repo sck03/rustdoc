@@ -236,7 +236,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | console_error_panic_hook | 0.1.7 | Apache-2.0 OR MIT | rust-workspace |
 | console_log | 1.1.0 | MIT OR Apache-2.0 | rust-workspace |
 | const-oid | 0.10.2 | Apache-2.0 OR MIT | rust-workspace |
-| cookie | 0.18.2 | MIT OR Apache-2.0 | rust-workspace |
+| cookie | 0.18.3 | MIT OR Apache-2.0 | rust-workspace |
 | cookie_store | 0.22.1 | MIT OR Apache-2.0 | rust-workspace |
 | core_detect | 1.0.0 | MIT OR Apache-2.0 | excel-analyzer, rust-workspace |
 | core_maths | 0.1.1 | MIT | rust-workspace |
@@ -326,7 +326,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | foreign-types-macros | 0.2.4 | MIT OR Apache-2.0 | rust-workspace |
 | foreign-types-shared | 0.1.1 | MIT OR Apache-2.0 | rust-workspace |
 | foreign-types-shared | 0.3.1 | MIT OR Apache-2.0 | rust-workspace |
-| form_urlencoded | 1.2.2 | MIT OR Apache-2.0 | rust-workspace |
+| form_urlencoded | 1.2.3 | MIT OR Apache-2.0 | rust-workspace |
 | fs2 | 0.4.3 | MIT OR Apache-2.0 | rust-workspace |
 | futures-channel | 0.3.34 | MIT OR Apache-2.0 | rust-workspace |
 | futures-core | 0.3.34 | MIT OR Apache-2.0 | rust-workspace |
@@ -738,7 +738,7 @@ The rust-workspace scope covers the complete locked desktop/server/build/test gr
 | untrusted | 0.9.0 | ISC | rust-workspace |
 | ureq | 3.5.0 | MIT OR Apache-2.0 | rust-workspace |
 | ureq-proto | 0.6.5 | MIT OR Apache-2.0 | rust-workspace |
-| url | 2.5.8 | MIT OR Apache-2.0 | rust-workspace |
+| url | 2.5.9 | MIT OR Apache-2.0 | rust-workspace |
 | urlpattern | 0.6.0 | MIT | rust-workspace |
 | usvg | 0.47.0 | Apache-2.0 OR MIT | rust-workspace |
 | utf16string | 0.2.0 | MIT OR Apache-2.0 | rust-workspace |
