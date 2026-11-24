@@ -13,6 +13,7 @@ use std::{
 use tauri::{Emitter, Manager};
 
 mod desktop_commands;
+mod desktop_downloads;
 mod desktop_file_dialog_commands;
 mod desktop_open_commands;
 mod desktop_runtime;

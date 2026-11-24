@@ -60,6 +60,15 @@ use serde_json::json;
 use std::fs;
 
 #[test]
+fn sqlite_communication_permissions() {
+    let root = test_workspace::create("communication-permissions");
+    let connection = Connection::sqlite(&root.join("store.db")).unwrap();
+    communication_query::exercise(&connection);
+    drop(connection);
+    test_workspace::remove(&root).unwrap();
+}
+
+#[test]
 fn sqlite_rejects_earlier_or_duplicate_schema_markers() {
     let root = test_workspace::create("storage-tests");
     for (name, versions) in [

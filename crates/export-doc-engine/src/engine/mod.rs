@@ -171,7 +171,10 @@ impl NativeService {
     /// Session management remains available after a unit grant expires. Business
     /// endpoints always resolve the selected context and never fall back to it.
     pub fn session_actor_for_operation(&self, token: &str, operation: Operation) -> Result<Actor> {
-        if matches!(operation, SWITCH_UNIT_CONTEXT | LOGOUT) {
+        if matches!(
+            operation,
+            SWITCH_UNIT_CONTEXT | LOGOUT | CHANGE_OWN_PASSWORD
+        ) {
             self.sessions.account_actor(&self.store, token)
         } else {
             self.session_actor(token)

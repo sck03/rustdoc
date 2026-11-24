@@ -232,6 +232,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
         ("expireDate",s().format("date")),("licenseStoragePath",s()),("storagePolicy",s())
     ]).required(vec!["isRegistered","isTrialExpired","trialDays","daysRemaining","machineId","message","expireDate","licenseStoragePath","storagePolicy"])),
     ("ApiLoginRequest",o(vec![("username",s()),("password",s())]).required(vec!["username","password"])),
+    ("ApiChangePasswordRequest",o(vec![("currentPassword",s().max_length(128)),("newPassword",s().min_length(8).max_length(128))]).required(vec!["currentPassword","newPassword"])),
     ("ApiLoginResponse",o(vec![
         ("tokenType",s()),("accessToken",s()),("expiresAt",s().format("date-time")),
         ("user",r("ApiUserDto"))

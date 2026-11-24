@@ -297,7 +297,17 @@ pub(super) fn rule(
                 continue;
             }
             let row = json!({"kind":rule.kind,"departmentId":department,"applicantAppointmentId":appointment});
-            let ids = super::actor_binding::resolve(tx, &scope, &row, &employee, stage)?
+            let ids = super::actor_binding::resolve(tx, &scope, &row, &employee, stage)
+                .map_err(|cause| {
+                    if matches!(cause.status, Some(400 | 403 | 404 | 409)) {
+                        error(
+                            cause.status.unwrap_or(400),
+                            format!("节点“{}”（部门 {}）：{}", stage.name, department, cause),
+                        )
+                    } else {
+                        cause
+                    }
+                })?
                 .into_iter()
                 .map(|b| b.user_id)
                 .collect::<Vec<_>>();

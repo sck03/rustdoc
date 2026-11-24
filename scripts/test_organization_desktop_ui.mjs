@@ -5,6 +5,7 @@ import { CdpClient, delay } from './lib/chromium-cdp.mjs';
 import { captureScreenshot, evaluate, getFreePort } from './lib/web-runtime-browser-session.mjs';
 import { spawnProcessTree, stopProcessTree } from './lib/child-process-tree.mjs';
 import { officeReviewInvoke, officeReviewOperations } from './lib/native-office-ui.mjs';
+import { createApprovedExpense } from './lib/approval-fixtures.mjs';
 
 // Targeted WebView2 regression; business workflow assertions live in the HTTP/React companion.
 const root = path.resolve(import.meta.dirname, '..');
@@ -46,6 +47,21 @@ try {
   await invoke('CreateOrganizationDepartment',{code:'UIB',name:'乙部门',companyCode:'DEFAULT',isActive:true});
   await run(`(()=>{const input=document.querySelector('input[autocomplete=username]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'admin');input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('.login-submit-button').click();})()`);
   await wait("!document.querySelector('.login-submit-button')&&!!document.querySelector('main')");
+  assert.equal(await run("document.querySelectorAll('.workspace-logout-button').length"),0);
+  for(const width of [1440,1180,390]) {
+    await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<=680});
+    await run("document.querySelector('.account-menu-trigger').click()");
+    await wait("!!document.querySelector('[role=menu]')");
+    assert.deepEqual(await run("[...document.querySelectorAll('[role=menuitem]')].map(e=>e.textContent)"),['修改密码','我的权限来源','退出登录']);
+    assert(await run("(()=>{const r=document.querySelector('[role=menu]').getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&document.documentElement.scrollWidth<=innerWidth+1;})()"));
+    await captureScreenshot(cdp,path.join(out,`account-menu-${width}.png`));
+    await run("[...document.querySelectorAll('[role=menuitem]')].find(e=>e.textContent==='修改密码').click()");
+    await wait("!!document.querySelector('[role=dialog] input[autocomplete=new-password]')");
+    assert.equal(await run("document.querySelectorAll('[role=dialog] input[type=password]').length"),3);
+    await run("[...document.querySelectorAll('[role=dialog] button')].find(e=>e.textContent==='取消').click()");
+    await wait("!document.querySelector('[role=dialog]')");
+  }
+  await cdp.send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
   await run("location.hash='/system/access-control'");
   await wait("!!document.querySelector('.user-management-section > .section-header .toolbar-actions')");
   assert(await run("(()=>{const rects=[...document.querySelector('.user-management-section > .section-header .toolbar-actions').children].map(e=>e.getBoundingClientRect());return Math.max(...rects.map(r=>r.top))-Math.min(...rects.map(r=>r.top))<5;})()"));
@@ -81,7 +97,28 @@ try {
   await run("[...document.querySelectorAll('button')].find(e=>e.textContent.trim().startsWith('商品明细')).click()");
   await wait("!!document.querySelector('.item-actions-heading')");
   assert.equal(await run("getComputedStyle(document.querySelector('.item-actions-heading')).textAlign"),'center');
-  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({edition:context.productEdition,layout:[1440,1920,600],toolbar:true,directOrdering:true,selfRouting:true},null,2));
+  const expense=await createApprovedExpense(request,token,context.apiBaseUrl,{'X-ExportDocManager-Desktop-Token':context.desktopAccessToken});
+  await cdp.send('Emulation.setDeviceMetricsOverride',{width:1440,height:900,deviceScaleFactor:1,mobile:false});
+  await run(`location.hash='/office/requests/expense?requestId=${expense}'`);
+  await wait("[...document.querySelectorAll('button')].some(e=>e.textContent==='预览／打印审批单')");
+  await run("[...document.querySelectorAll('button')].find(e=>e.textContent==='预览／打印审批单').click()");
+  await wait("!!document.querySelector('iframe[title=\"正式审批单 PDF\"]')");
+  await delay(1500);
+  const frame=await cdp.send('Page.getFrameTree');
+  assert(JSON.stringify(frame).includes('blob:'),'The actual PDF must navigate in the packaged WebView');
+  await captureScreenshot(cdp,path.join(out,'approval-pdf-preview.png'));
+  await run("document.querySelector('[role=dialog] [aria-label=\"关闭窗口\"]').click()");
+  if(process.argv.includes('--download')) {
+    await run("window.__TAURI_INTERNALS__.invoke('plugin:window|show',{label:'main'})");
+    const destination=path.join(out,'approval-downloaded.pdf');
+    console.log('SELECT_DOWNLOAD_PATH '+destination);
+    await run("[...document.querySelectorAll('button')].find(e=>e.textContent==='下载审批单 PDF').click()");
+    const deadline=Date.now()+120000;
+    while(Date.now()<deadline&&!fs.existsSync(destination))await delay(200);
+    assert(fs.existsSync(destination),'Select the printed isolated PDF destination in the native save dialog');
+    assert.equal(fs.readFileSync(destination).subarray(0,5).toString(),'%PDF-');
+  }
+  fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({edition:context.productEdition,layout:[1440,1920,600],accountMenu:[1440,1180,390],passwordDialog:true,toolbar:true,directOrdering:true,selfRouting:true,approvalPdf:true,nativeDownload:process.argv.includes('--download')},null,2));
   console.log('Targeted Tauri/WebView2 verification passed: '+out);
 } finally {
   if(cdp)cdp.close();

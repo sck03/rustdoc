@@ -30,7 +30,7 @@ fn node(
         due_hours: 48,
         handling_action: action,
         system_action: system,
-        allow_administration: kind == NodeKind::Handling,
+        allow_administration: false,
         pair_key: Default::default(),
         source_id: None,
         condition_logic: Default::default(),

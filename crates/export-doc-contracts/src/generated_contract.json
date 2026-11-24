@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "49dc11fa07cda7248bf62a10f78467f77a8467985393f4ce8d251ded4b60fcbb",
+  "digest": "87150534835f56daa136f20b89143c8b63c6c65c0ed348f7e25133f8e3da1ed1",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -5629,7 +5629,7 @@
       {
         "code": "Finance",
         "name": "财务人员",
-        "description": "维护本人付款报销，使用报表、汇率、邮件和 OCR。",
+        "description": "查看本公司费用报销并登记财务接收，维护本人付款和申请；审批决定另行授权。",
         "grants": [
           {
             "resourceKey": "office.people",
@@ -5804,7 +5804,7 @@
           {
             "resourceKey": "office.expenses",
             "action": "view",
-            "dataScope": "own"
+            "dataScope": "company"
           },
           {
             "resourceKey": "office.expenses",
@@ -12423,6 +12423,101 @@
       },
       "timeoutSeconds": 30,
       "maxJsonResponseBytes": 67108864,
+      "requiresProcessingSlot": false,
+      "validatesDecimalInput": false
+    },
+    "ChangeOwnPassword": {
+      "policy": {
+        "requiresAuthentication": true,
+        "requiresDesktopAccess": true,
+        "requiresLicense": false,
+        "access": {
+          "bypass": true
+        }
+      },
+      "office": null,
+      "parameters": [],
+      "requestBody": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiChangePasswordRequest"
+            }
+          }
+        },
+        "x-exportdoc-max-bytes": 4096
+      },
+      "responses": {
+        "200": {
+          "description": "OK",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiLogoutResponse"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Bad Request",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "409": {
+          "description": "Conflict",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "413": {
+          "description": "Payload Too Large",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "429": {
+          "description": "Too Many Requests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        },
+        "503": {
+          "description": "Service Unavailable",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiErrorResponse"
+              }
+            }
+          }
+        }
+      },
+      "request": {
+        "$ref": "#/components/schemas/ApiChangePasswordRequest"
+      },
+      "response": {
+        "$ref": "#/components/schemas/ApiLogoutResponse"
+      },
+      "timeoutSeconds": 30,
+      "maxJsonResponseBytes": 65536,
       "requiresProcessingSlot": false,
       "validatesDecimalInput": false
     },
@@ -93195,6 +93290,24 @@
       ],
       "additionalProperties": false
     },
+    "ApiChangePasswordRequest": {
+      "type": "object",
+      "properties": {
+        "currentPassword": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "newPassword": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "currentPassword",
+        "newPassword"
+      ]
+    },
     "ApiCommandResponse": {
       "type": "object",
       "properties": {
@@ -123177,6 +123290,10 @@
         "action": {
           "type": "string"
         },
+        "actionRequired": {
+          "type": "boolean",
+          "readOnly": true
+        },
         "createdAt": {
           "type": "string",
           "format": "date-time"
@@ -123194,6 +123311,10 @@
         },
         "requestKind": {
           "type": "string"
+        },
+        "requestStatus": {
+          "type": "string",
+          "readOnly": true
         },
         "status": {
           "type": "string",

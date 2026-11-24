@@ -271,17 +271,7 @@ pub(super) fn handle(
         }
         let resource = super::approval::resource(&kind).ok_or_else(|| invalid("申请类型无效。"))?;
         for stage in &typed.stages {
-            let mut requirements = stage
-                .approver_user_ids
-                .iter()
-                .map(|id| (*id, super::actor_binding::action(stage)))
-                .collect::<Vec<_>>();
-            for escalation in &stage.escalations {
-                if let Some(target) = &escalation.target {
-                    requirements.extend(target.user_ids.iter().map(|id|(*id,if escalation.action==export_doc_domain::approval_graph::EscalationAction::NotifySupervisor{"view"}else{super::actor_binding::action(stage)})));
-                }
-            }
-            for (id, action) in requirements {
+            for (id, action) in super::actor_binding::requirements(stage) {
                 let reviewer = super::super::units::for_operation(
                     tx,
                     id,

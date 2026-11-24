@@ -18,6 +18,7 @@ pub const OFFICE_ACTIONS: &[Operation] = &[
 pub const SPECIAL_OPERATIONS: &[Operation] = &[
     LOGIN,
     LOGOUT,
+    CHANGE_OWN_PASSWORD,
     GET_CURRENT_USER,
     RENEW_SESSION,
     SWITCH_UNIT_CONTEXT,

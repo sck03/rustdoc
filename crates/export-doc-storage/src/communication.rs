@@ -163,7 +163,7 @@ pub(super) fn sql(q: &CommunicationQuery<'_>, postgres: bool) -> QuerySql {
     };
     QuerySql {
         // Communications have no identity or workflow projection of their own.
-        source: crate::query_source::Source::Records,
+        source: crate::query_source::Source::Communications,
         filter,
         order: order.into(),
         values,

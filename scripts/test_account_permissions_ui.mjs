@@ -82,7 +82,10 @@ await withOfficeUi('account-permissions-ui', async ({ output, url, invoke, openP
   const deletedSession = await openPage('deleted-session-ui', 'Deleted-Session-2026');
   await invoke('deleteUserAccount', undefined, { id: temporary.user.id, expectedVersion: temporary.user.versionNumber }, token);
   // A background 401 may already have expired the workspace; otherwise exercise logout.
-  await deletedSession.evaluate(() => document.querySelector('.workspace-logout-button')?.click());
+  if (await deletedSession.getByRole('button', { name:/^账号菜单：/u }).count()) {
+    await deletedSession.getByRole('button', { name:/^账号菜单：/u }).click();
+    await deletedSession.getByRole('menuitem', { name:'退出登录', exact:true }).click();
+  }
   await deletedSession.locator('input[autocomplete=username]').waitFor({ state: 'visible' });
   assert.equal(await deletedSession.locator('.workspace-shell').count(), 0, 'deleted identities cannot remain in the authenticated workspace');
   await deletedSession.screenshot({ path: path.join(output, 'deleted-session-login.png') });

@@ -17,6 +17,7 @@ pub(crate) fn open_main_window(
 
     WebviewWindowBuilder::new(app, "main", url)
         .on_navigation(allow_main_navigation)
+        .on_download(crate::desktop_downloads::handle)
         .data_directory(webview_data_directory(&paths.data_root))
         .title(product_window_title())
         .inner_size(1440.0, 900.0)
@@ -48,6 +49,10 @@ fn webview_data_directory(data_root: &Path) -> PathBuf {
 }
 
 pub(crate) fn allow_main_navigation(url: &tauri::Url) -> bool {
+    if url.scheme() == "blob" {
+        return tauri::Url::parse(url.path())
+            .is_ok_and(|origin| origin.scheme() != "blob" && allow_main_navigation(&origin));
+    }
     if cfg!(feature = "custom-protocol") {
         matches!(
             (url.scheme(), url.host_str()),
@@ -71,6 +76,25 @@ mod tests {
         ] {
             assert!(!allow_main_navigation(&tauri::Url::parse(value).unwrap()));
         }
+        for value in [
+            "blob:https://example.com/test",
+            "blob:http://127.0.0.1:5188/test",
+            "blob:null/test",
+            "blob:blob:http://tauri.localhost/test",
+        ] {
+            assert!(!allow_main_navigation(&tauri::Url::parse(value).unwrap()));
+        }
+        let origin = if cfg!(feature = "custom-protocol") {
+            "http://tauri.localhost"
+        } else {
+            "http://127.0.0.1:5173"
+        };
+        assert!(allow_main_navigation(
+            &tauri::Url::parse(&format!(
+                "blob:{origin}/00000000-0000-0000-0000-000000000001"
+            ))
+            .unwrap()
+        ));
     }
 
     #[test]

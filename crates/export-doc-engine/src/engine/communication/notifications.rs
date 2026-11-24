@@ -121,10 +121,47 @@ fn project(tx: &Connection, actor: &Actor, mut notification: Value) -> Result<Va
         .filter(|v| v.is_string())
         .cloned()
         .unwrap_or_else(|| json!(format!("申请 #{}", parent["id"])));
+    notification["requestStatus"] = parent["status"].clone();
+    notification["actionRequired"] = json!(review_required(tx, actor, &parent, &notification)?);
     Ok(contracts::dto(
         contracts::schema("SiteNotification"),
         notification,
     ))
+}
+fn review_required(
+    tx: &Connection,
+    actor: &Actor,
+    parent: &Value,
+    notification: &Value,
+) -> Result<bool> {
+    if !matches!(
+        notification["action"].as_str(),
+        Some("submit" | "approve-step" | "approval-reassign" | "remind")
+    ) {
+        return Ok(false);
+    }
+    let review = super::super::oa::approval::ReviewSnapshot::read(tx, actor, parent)?;
+    let keys = review.task_keys();
+    if keys.is_empty() {
+        return Ok(false);
+    }
+    let notified = chrono::DateTime::parse_from_rfc3339(&text(notification, "createdAt"))
+        .map_err(|_| super::super::error::unavailable("通知时间损坏。"))?;
+    let Some(plan) = review.plan else {
+        return Ok(false);
+    };
+    for step in plan
+        .steps
+        .iter()
+        .filter(|step| keys.contains(&step.task_key))
+    {
+        let started = chrono::DateTime::parse_from_rfc3339(&plan.nodes[step.stage].started_at)
+            .map_err(|_| super::super::error::unavailable("审批任务开始时间损坏。"))?;
+        if started <= notified {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 fn mark(tx: &Connection, actor: &Actor, mut row: Value) -> Result<Value> {
     accessible(tx, actor, &row)?;

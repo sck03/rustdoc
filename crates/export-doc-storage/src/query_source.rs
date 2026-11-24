@@ -6,6 +6,7 @@ pub(crate) enum Source {
     Records,
     Projected,
     Workflow,
+    Communications,
 }
 impl Source {
     pub(crate) fn for_kind(kind: &str) -> Self {
@@ -17,7 +18,7 @@ impl Source {
     }
     fn table(self) -> &'static str {
         match self {
-            Self::Records => "records",
+            Self::Records | Self::Communications => "records",
             Self::Projected => "record_rows",
             Self::Workflow => "workflow_record_filters",
         }
@@ -39,12 +40,23 @@ pub(crate) fn slice(sql: &QuerySql, projection: &str, offset: i64, limit: i64) -
     )
 }
 pub(crate) fn page(sql: &QuerySql, projection: &str, offset: i64, limit: i64, pg: bool) -> String {
-    let selected = slice(sql, projection, offset, limit.clamp(1, 200));
     let aggregate = if pg {
         "COALESCE((SELECT jsonb_agg(page.body::jsonb) FROM page),'[]'::jsonb)::text"
     } else {
         "(SELECT json_group_array(json(page.body)) FROM page)"
     };
+    if matches!(sql.source, Source::Communications) {
+        // Resolve the reader's visible communications once. Repeating the
+        // workflow permission tree for count and page can exhaust SQL cursors.
+        let visible = self::aggregate(sql, "r.id");
+        return format!(
+            "WITH visible AS MATERIALIZED ({visible}), page(body) AS (SELECT {projection} FROM records r JOIN visible v ON v.id=r.id ORDER BY {order} LIMIT {limit} OFFSET {offset}) SELECT (SELECT COUNT(*) FROM visible), {aggregate}",
+            order = sql.order,
+            limit = limit.clamp(1, 200),
+            offset = offset.max(0)
+        );
+    }
+    let selected = slice(sql, projection, offset, limit.clamp(1, 200));
     format!(
         "WITH page(body) AS ({selected}) SELECT (SELECT COUNT(*) FROM {table} r WHERE {filter}), {aggregate}",
         table = sql.source.table(),

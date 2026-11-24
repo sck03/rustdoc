@@ -104,6 +104,7 @@ pub(super) fn entries() -> Vec<(&'static str,Schema)> { vec![
     ]).required(vec!["id","readerName","publishVersion","readAt"])),
     ("SiteNotification",o(vec![
         ("id",i().format("int64")),("title",s()),("action",s()),
+        ("actionRequired",b().read_only(true)),("requestStatus",s().read_only(true)),
         ("requestId",i().format("int64")),("requestKind",s()),("createdAt",s().format("date-time")),
         ("readAt",s()),("status",s().enumeration(Enumeration::Values(vec![serde_json::json!("Unread"),serde_json::json!("Read")])))
     ]).required(vec!["id","title","action","requestId","requestKind","createdAt","readAt","status"])),

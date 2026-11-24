@@ -490,19 +490,21 @@ pub(crate) fn participant_condition(
         "viewer.assignee_person_id",
         date,
     );
-    let mut choices = vec![
-        format!(
-            "(viewer.acted_by_id={user} AND viewer.acted_by_person_id=(SELECT person_id FROM personnel_accounts WHERE user_id={user}){signed_context})"
-        ),
-        format!(
-            "(viewer.assignee_id={user} AND viewer.assignee_person_id=(SELECT person_id FROM personnel_accounts WHERE user_id={user}){assigned_context} AND ({current_origin}))"
-        ),
-    ];
+    let signed = format!(
+        "(viewer.acted_by_id={user} AND viewer.acted_by_person_id=(SELECT person_id FROM personnel_accounts WHERE user_id={user}){signed_context})"
+    );
+    let mut assignees = vec![format!(
+        "(viewer.assignee_id={user} AND viewer.assignee_person_id=(SELECT person_id FROM personnel_accounts WHERE user_id={user}){assigned_context})"
+    )];
     for (principal, context, restriction) in principals {
-        choices.push(format!(
-            "(viewer.assignee_id={principal} AND viewer.assignee_person_id=(SELECT person_id FROM personnel_accounts WHERE user_id={principal}) AND viewer.context_id={context} AND ({restriction}) AND ({current_origin}))"
+        assignees.push(format!(
+            "(viewer.assignee_id={principal} AND viewer.assignee_person_id=(SELECT person_id FROM personnel_accounts WHERE user_id={principal}) AND viewer.context_id={context} AND ({restriction}))"
         ));
     }
+    let choices = format!(
+        "{signed} OR (({}) AND ({current_origin}))",
+        assignees.join(" OR ")
+    );
     let cc = if postgres {
         "workflow_instances notify CROSS JOIN LATERAL jsonb_array_elements_text(COALESCE(notify.definition->'notifyUserIds','[]'::jsonb)) cc(value)"
     } else {
@@ -534,6 +536,6 @@ pub(crate) fn participant_condition(
     );
     format!(
         "({record}.owner_id={user} OR EXISTS (SELECT 1 FROM workflow_current_tasks viewer WHERE viewer.request_id={record}.id AND viewer.submission=CAST({record}.body->>'submissionNumber' AS BIGINT) AND ({})) OR {node_actors} OR EXISTS (SELECT 1 FROM {cc} WHERE notify.request_id={record}.id AND notify.revision=CAST({record}.body->>'submissionNumber' AS BIGINT) AND CAST(cc.value AS BIGINT)={user}))",
-        choices.join(" OR ")
+        choices
     )
 }

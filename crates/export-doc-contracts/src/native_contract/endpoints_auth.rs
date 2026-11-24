@@ -8,5 +8,6 @@ pub(super) fn entries() -> Vec<Endpoint> { vec![
     route("get","/api/auth/me","getCurrentUser",super::responses::json(r("ApiUserDto"),&[],&[]),super::policies::rule((true,true,false),Access::Bypass{bypass:true}),None,None),
     route("post","/api/auth/renew","RenewSession",super::responses::json(r("ApiLoginResponse"),&[],&[]),super::policies::rule((true,true,false),Access::Bypass{bypass:true}),None,None),
     route("post","/api/auth/logout","Logout",super::responses::json(r("ApiLogoutResponse"),&[],&[]),super::policies::rule((true,true,false),Access::Bypass{bypass:true}),None,None),
+    route("post","/api/auth/password","ChangeOwnPassword",super::responses::json(r("ApiLogoutResponse"),&["400","409","413","429","503"],&[]),super::policies::rule((true,true,false),Access::Bypass{bypass:true}),None,Some(r("ApiChangePasswordRequest"))).body_limit(4096),
     route("post","/api/auth/unit-context","SwitchUnitContext",super::responses::json(r("ApiLoginResponse"),&[],&[]),super::policies::rule((true,true,false),Access::Bypass{bypass:true}),None,Some(r("UnitContextSelection"))),
 ] }

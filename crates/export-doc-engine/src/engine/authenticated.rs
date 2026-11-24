@@ -28,6 +28,9 @@ impl NativeService {
                 self.sessions.logout(token)?;
                 Ok(json!({"success":true}))
             }
+            CHANGE_OWN_PASSWORD => self
+                .sessions
+                .change_password(&self.store, token, &body_value),
             GET_CURRENT_USER => auth::user_dto_for(
                 &self.store,
                 &self.store.get("users", actor.id)?,

@@ -37,6 +37,7 @@ import { useUnitContextSwitch } from "./app/useUnitContextSwitch.ts";
 import { prefetchLandingDashboard } from "./app/loginPrefetch.ts";
 import { createSessionApiClient, sessionAuthorizationKey } from "./app/sessionApiClient.ts";
 import { useSessionLogout } from "./app/useSessionLogout.ts";
+import { useOwnPasswordChange } from "./app/useOwnPasswordChange.ts";
 import { isDashboardRoute, isLicenseRoute } from "./app/workspaceNavigation.ts";
 import {
   getDefaultWorkspaceRoute,
@@ -523,6 +524,10 @@ function App() {
     session: sessionRef, action: sessionActionRef, unitTransition: unitTransitionRef,
     desktopAccessToken, setBusy: setSessionActionBusy, endSession, setNotice: setWorkspaceNotice,
   });
+  const handleOwnPasswordChange = useOwnPasswordChange({
+    client, session: sessionRef, action: sessionActionRef, unitTransition: unitTransitionRef,
+    setBusy: setSessionActionBusy, endSession,
+  });
 
   async function handleRefreshSession(reauthenticate = false) {
     const previousSession = sessionRef.current;
@@ -646,7 +651,8 @@ function App() {
               catch (error) { setBackendStopped(readDesktopError(error)); }
             }
           } } : undefined,
-          isDesktopRuntime, user:session.user, onLogout:handleLogout, unitContext, notice:workspaceNotice,
+          isDesktopRuntime, user:session.user, onLogout:handleLogout, onChangePassword:handleOwnPasswordChange,
+          accountBusy:sessionActionBusy, unitContext, notice:workspaceNotice,
           onDismissNotice:()=>setWorkspaceNotice(null), sessionAttention }}
         routes={{ sessionToken:session.accessToken, activeProduct, canManageAuditLogs, client, routeAccessAllowed, user:session.user }} />
     </Suspense>

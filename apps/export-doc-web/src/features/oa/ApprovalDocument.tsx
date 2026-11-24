@@ -46,6 +46,6 @@ export function ApprovalDocument<T extends Document>({api,user,row,scope,submiss
       </>}
     </div>
     {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}
-    {preview && available && <OfficeDialog title="审批单预览与打印" onClose={()=>setPreview(null)}><p>使用 PDF 工具栏打印，或下载后使用本机 PDF 阅读器打印。</p>{url && <iframe title="正式审批单 PDF" src={url} style={{width:"100%",height:"70vh",border:0}} />}</OfficeDialog>}
+    {preview && available && <OfficeDialog title="审批单预览与打印" wide onClose={()=>setPreview(null)}><p>使用 PDF 工具栏打印，或下载后使用本机 PDF 阅读器打印。</p>{url && <iframe title="正式审批单 PDF" src={`${url}#view=FitH&navpanes=0&toolbar=1`} style={{width:"100%",height:"70vh",border:0}} />}</OfficeDialog>}
   </section>;
 }

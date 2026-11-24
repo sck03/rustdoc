@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import "../styles/workspaces.css";
 import "../styles/responsive.css";
-import { PermissionSourceSummary } from "./PermissionSourceSummary.tsx";
+import { AccountMenu, type ChangeOwnPassword } from "./AccountMenu.tsx";
 import { isComposingKey } from "../ui/keyboardEvent.ts";
 import {
   FileText,
-  LogOut,
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
@@ -67,6 +66,8 @@ type WorkspaceShellProps = {
   isDesktopRuntime: boolean;
   user: ApiUserDto;
   onLogout: () => void;
+  onChangePassword?: ChangeOwnPassword;
+  accountBusy?: boolean;
   unitContext?: { busy: boolean; error: string | null; switchContext: (id: string) => Promise<void> };
   children: ReactNode;
   connectivityOverride?: "online" | "offline";
@@ -83,6 +84,8 @@ export function WorkspaceShell({
   isDesktopRuntime,
   user,
   onLogout,
+  onChangePassword,
+  accountBusy,
   unitContext,
   children,
   connectivityOverride,
@@ -358,7 +361,6 @@ export function WorkspaceShell({
             </div>
           </div>
           <div className="session-strip">
-            <PermissionSourceSummary user={user} />
             {(user.unitContexts?.length ?? 0) > 1 && <label className="office-field"><span>单位身份</span><select aria-label="当前单位身份" value={user.contextId ?? ""} disabled={unitContext?.busy} onChange={event => void unitContext?.switchContext(event.target.value)}>
               {user.unitContexts?.map(context => <option key={context.id} value={context.id}>{context.companyName} · {context.name}</option>)}
             </select></label>}
@@ -378,19 +380,9 @@ export function WorkspaceShell({
               <Server size={15} aria-hidden="true" />
               <span className="api-base">{serviceStatusLabel}</span>
             </span>
-            <span className="session-user">
-              <span className="session-avatar" aria-hidden="true">
-                {displayName.trim().slice(0, 1).toUpperCase()}
-              </span>
-              <span className="session-user-copy">
-                <strong>{displayName}</strong>
-                <small>账号 · {renderUserWorkspaceLabel(user)}</small>
-              </span>
-            </span>
-            <button className="workspace-logout-button" type="button" title="退出登录" onClick={onLogout}>
-              <LogOut size={18} aria-hidden="true" />
-              <span>退出</span>
-            </button>
+            <AccountMenu user={user} displayName={displayName} identityLabel={renderUserWorkspaceLabel(user)}
+              isDesktopRuntime={isDesktopRuntime} onLogout={onLogout} onChangePassword={onChangePassword}
+              disabled={accountBusy || unitContext?.busy} passwordDisabled={Boolean(sessionAttention) || Boolean(backendStopped)} />
           </div>
         </header>
 

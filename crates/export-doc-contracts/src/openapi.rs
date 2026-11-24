@@ -4,6 +4,9 @@ mod native;
 pub use native::{DETAIL_FIELDS as OA_SHEET_DETAIL_FIELDS, SHEET_FIELDS as OA_SHEET_FIELDS};
 use serde_json::Value;
 #[cfg(test)]
+#[path = "../tests/fixtures/account_security.rs"]
+mod account_security;
+#[cfg(test)]
 #[path = "contract_audit_fixes.rs"]
 mod audit_fixes;
 #[cfg(test)]
@@ -266,6 +269,7 @@ mod tests {
         audit_fixes::apply(&mut baseline);
         contract_import_preview::apply(&mut baseline);
         browser_downloads::apply(&mut baseline);
+        account_security::apply(&mut baseline);
         if let Some(change) = difference("contract", &document(), &baseline) {
             panic!("undeclared contract change: {change}");
         }

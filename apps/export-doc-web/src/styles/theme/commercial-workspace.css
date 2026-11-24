@@ -185,31 +185,6 @@ html[data-interface-density="compact"] :where(th, td) {
   display: none;
 }
 
-.workspace-logout-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 38px;
-  padding: 0 12px;
-  color: var(--edm-text-secondary);
-  background: color-mix(in srgb, var(--edm-white) 84%, transparent);
-  border: 1px solid var(--edm-line);
-  border-radius: var(--edm-radius-full);
-  font-size: var(--edm-font-size-xs);
-  line-height: var(--edm-line-height-xs);
-  font-weight: var(--edm-font-weight-medium);
-}
-
-@media (hover: hover) and (pointer: fine) {
-
-.workspace-logout-button:hover:not(:disabled) {
-  color: var(--edm-danger-600);
-  background: var(--edm-danger-50);
-  border-color: var(--edm-danger-200);
-}
-}
-
 .editor-save-state {
   display: inline-flex;
   align-items: center;

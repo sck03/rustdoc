@@ -105,7 +105,7 @@ pub(super) fn value() -> serde_json::Value { serde_json::Value::Array(vec![
         (&["document.report-templates"],&["design","clone"],"own"),
         (&["document.report-resources"],&["upload"],"own"),
     ]),
-    role("Finance","财务人员","维护本人付款报销，使用报表、汇率、邮件和 OCR。", &[
+    role("Finance","财务人员","查看本公司费用报销并登记财务接收，维护本人付款和申请；审批决定另行授权。", &[
         (&["office.people"],&["view"],"company"),
         (&["office.rooms","office.supplies"],&["view","create","edit","cancel"],"own"),
         (&["document.payments"],&["view"],"company"),
@@ -119,7 +119,9 @@ pub(super) fn value() -> serde_json::Value { serde_json::Value::Array(vec![
         (&["sales.email-templates"],&["view"],"department"),
         (&["document.payment-output"],&["preview","print","export-pdf"],"company"),
         (&["common.email-delivery"],&["send","view-delivery"],"own"),
-        (&["office.leave","office.overtime","office.expenses"],&["view","create","edit","cancel"],"own"),
+        (&["office.leave","office.overtime"],&["view","create","edit","cancel"],"own"),
+        (&["office.expenses"],&["view"],"company"),
+        (&["office.expenses"],&["create","edit","cancel"],"own"),
         (&["office.expenses"],&["complete"],"company"),
         (&["office.travel","office.purchase","office.general"],&["view","create","edit","cancel"],"own"),
         (&["office.announcements","office.notifications"],&["view"],"company"),

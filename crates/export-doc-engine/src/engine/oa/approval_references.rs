@@ -91,8 +91,16 @@ pub(in crate::engine) fn validate_account_in(
         }
     }
     for rule in &rules {
-        let responsible = rule.account_ids().contains(&id);
-        if responsible || rule.notify_user_ids.contains(&id) {
+        let mut actions: std::collections::HashSet<_> = rule
+            .stages
+            .iter()
+            .flat_map(super::actor_binding::requirements)
+            .filter_map(|(user, action)| (user == id).then_some(action))
+            .collect();
+        if rule.notify_user_ids.contains(&id) {
+            actions.insert("view");
+        }
+        for action in actions {
             let resource =
                 approval::resource(&rule.kind).ok_or_else(|| invalid("未知审批类型。"))?;
             let reviewer = super::super::units::for_operation(
@@ -101,7 +109,7 @@ pub(in crate::engine) fn validate_account_in(
                 actor.edition,
                 company,
                 resource,
-                if responsible { "approve" } else { "view" },
+                action,
             )
             .map_err(|e| {
                 if matches!(e.status, Some(400 | 403 | 404)) {
@@ -112,7 +120,7 @@ pub(in crate::engine) fn validate_account_in(
             })?;
             if reviewer.company != company
                 || auth::authorize(&reviewer, resource, "view").is_err()
-                || (responsible && auth::authorize(&reviewer, resource, "approve").is_err())
+                || auth::authorize(&reviewer, resource, action).is_err()
             {
                 return Err(conflict(
                     "账号仍被流程草稿或启用版本引用，请先更新并发布流程或停用版本。",

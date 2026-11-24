@@ -14,6 +14,26 @@ pub(super) use escalations::targets as escalation_targets;
 pub(super) fn action(stage: &ApprovalStage) -> &'static str {
     node_action(stage.phase, stage.kind, stage.handling_action)
 }
+pub(super) fn requirements(stage: &ApprovalStage) -> Vec<(i64, &'static str)> {
+    let mut result: Vec<_> = stage
+        .approver_user_ids
+        .iter()
+        .map(|id| (*id, action(stage)))
+        .collect();
+    for escalation in &stage.escalations {
+        if let Some(target) = &escalation.target {
+            let action = if escalation.action
+                == export_doc_domain::approval_graph::EscalationAction::NotifySupervisor
+            {
+                "view"
+            } else {
+                action(stage)
+            };
+            result.extend(target.user_ids.iter().map(|id| (*id, action)));
+        }
+    }
+    result
+}
 pub(super) fn node_action(phase: Phase, kind: NodeKind, handling: HandlingAction) -> &'static str {
     if kind == NodeKind::Copy {
         return "view";
@@ -192,6 +212,11 @@ pub(super) fn resolve(
                         let id = records::positive(&user, "id", "办理候选")?;
                         match candidate(tx, actor, row, stage, id, AssignmentOrigin::default()) {
                             Ok(binding) => {
+                                // Maintenance takeover must be explicitly assigned; it
+                                // does not make administrators default business handlers.
+                                if binding.administration {
+                                    continue;
+                                }
                                 let candidate = super::super::units::resolve(
                                     tx,
                                     id,

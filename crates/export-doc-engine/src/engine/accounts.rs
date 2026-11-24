@@ -57,8 +57,8 @@ pub fn save(store: &Store, actor: &Actor, id: i64, mut body: Value) -> Result<Va
     {
         return Err(invalid("请选择有效角色。"));
     }
-    if (id == 0 || !password.is_empty()) && !(8..=128).contains(&password.chars().count()) {
-        return Err(invalid("新账号或重置密码须为 8–128 字。"));
+    if id == 0 || !password.is_empty() {
+        auth::validate_new_password(password)?;
     }
     let credential = if id == 0 || !password.is_empty() {
         Some(auth::password_hash(password)?)

@@ -77,9 +77,14 @@ pub(in crate::engine) fn reviewer_for(
         return Err(cause);
     }
     let account = store::get(tx, "users", id)?;
-    let resource_name = export_doc_domain::permissions::resource(resource)
+    let definition = export_doc_domain::permissions::resource(resource);
+    let resource_name = definition
         .map(|item| item.name.as_str())
         .unwrap_or(resource);
+    let action_name = definition
+        .and_then(|item| item.actions.iter().find(|item| item.key == action))
+        .map(|item| item.name.as_str())
+        .unwrap_or(action);
     Err(error(
         403,
         format!(
@@ -87,11 +92,7 @@ pub(in crate::engine) fn reviewer_for(
             text(&account, "fullName"),
             actor.company,
             resource_name,
-            if action == "approve" {
-                "审批"
-            } else {
-                action
-            }
+            action_name
         ),
     ))
 }
@@ -117,7 +118,7 @@ pub(in crate::engine) fn qualified_person_for(
             || !auth::restriction_allows(candidate, resource, "view", row, true)
             || !auth::restriction_allows(candidate, resource, action, row, true))
     {
-        return Err(error(403, "审批事项超出此身份的显式数据范围限制。"));
+        return Err(error(403, "事项超出此身份的显式数据范围限制。"));
     }
     let person = super::qualification::person_id(tx, candidate)?;
     if forbid_subject

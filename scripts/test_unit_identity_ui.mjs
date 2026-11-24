@@ -47,7 +47,8 @@ await withOfficeUi('unit-identity-ui', async ({ output, url, operations, invoke,
   const subContext = `unit:${workerRole.id}:UNITUI`;
   await switchIdentity(worker,subContext);
   await worker.goto(`${url}/#/office/requests/general`);
-  await worker.getByRole('button',{ name:'我的权限来源',exact:true }).click();
+  await worker.getByRole('button',{ name:/^账号菜单：/u }).click();
+  await worker.getByRole('menuitem',{ name:'我的权限来源',exact:true }).click();
   const source = worker.getByRole('dialog',{ name:'当前身份与权限来源',exact:true });
   await source.getByText(/子公司登记方案/u).waitFor();
   await source.getByRole('button',{ name:'关闭窗口',exact:true }).click();
@@ -89,12 +90,14 @@ await withOfficeUi('unit-identity-ui', async ({ output, url, operations, invoke,
   // A failed revocation keeps the workspace; a successful retry revokes the
   // exact bearer token before the UI discards the authenticated session.
   await manager.route('**/api/auth/logout', route => route.fulfill({ status:503,contentType:'application/json',body:JSON.stringify({ message:'注销服务暂时不可用' }) }));
-  await manager.getByTitle('退出登录',{ exact:true }).click();
+  await manager.getByRole('button',{ name:/^账号菜单：/u }).click();
+  await manager.getByRole('menuitem',{ name:'退出登录',exact:true }).click();
   await manager.getByText('退出登录未完成',{ exact:true }).waitFor();
   assert.equal(await manager.locator('input[autocomplete=username]').count(),0);
   await manager.unroute('**/api/auth/logout');
   const revoked = manager.waitForResponse(response => response.url().endsWith('/api/auth/logout'));
-  await manager.getByTitle('退出登录',{ exact:true }).click();
+  await manager.getByRole('button',{ name:/^账号菜单：/u }).click();
+  await manager.getByRole('menuitem',{ name:'退出登录',exact:true }).click();
   const logoutResponse = await revoked;
   assert(logoutResponse.ok());
   const authorization = logoutResponse.request().headers().authorization;

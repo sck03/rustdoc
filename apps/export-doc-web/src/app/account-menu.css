@@ -1,0 +1,16 @@
+.session-strip > .dropdown-menu { margin-inline-start: auto; }
+.account-menu-trigger {
+  min-inline-size: calc(var(--edm-space-12) * 4); max-inline-size: calc(var(--edm-space-12) * 5);
+  font-family: inherit; text-align: start; flex-shrink: 0;
+}
+.account-menu-trigger .session-user-copy { flex: 1; min-width: 0; }
+.account-menu-trigger .session-user-copy strong { max-width: 100%; }
+.account-menu-trigger > svg, .account-menu-trigger .session-avatar { flex-shrink: 0; }
+.account-menu-trigger .session-user-copy small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.account-menu-trigger[aria-expanded="true"] { border-color: var(--edm-primary-300); background: var(--edm-primary-50); }
+@media (hover: hover) and (pointer: fine) {
+  .account-menu-trigger:hover:not(:disabled) { border-color: var(--edm-primary-300); background: var(--edm-primary-50); }
+}
+@media (max-width: 680px) {
+  .account-menu-trigger { min-inline-size: 0; max-inline-size: calc(var(--edm-space-12) * 4); min-height: var(--edm-touch-target); }
+}

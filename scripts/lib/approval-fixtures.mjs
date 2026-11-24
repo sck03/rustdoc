@@ -75,6 +75,28 @@ export async function linkBusinessPerson(invoke, admin, user) {
   return invoke('LinkPersonnelAccount',{expectedVersion:person.versionNumber,userId:user.id,expectedAccountVersion:user.versionNumber},{id:person.employee.id},admin);
 }
 
+export async function createApprovedExpense(invoke, admin, url, headers = {}) {
+  const users = [], people = [];
+  for (const [name,role,grants] of [['applicant','OfficeEmployee',undefined],['reviewer','OfficeEmployee',['view','approve'].map(action=>({resourceKey:'office.expenses',action,dataScope:'company'}))],['finance','Finance',undefined]]) {
+    const user=(await invoke('createUserAccount',{username:`pdf-${name}`,fullName:`PDF验收${name}`,role,companyScope:'DEFAULT',departmentId:'GENERAL',isActive:true,resetPassword:'Pdf-Review-2026',...(grants?{permissionGrants:grants}:{})},{},admin)).user;
+    users.push(user);people.push(await linkBusinessPerson(invoke,admin,user));
+  }
+  const settings=await invoke('GetOaApprovalSettings',undefined,{},admin);
+  const definition=settings.rules.find(rule=>rule.key==='expense');
+  definition.stages=[approvalStage('review',[users[1].id]),...definition.stages.filter(node=>node.phase==='Fulfillment').map(node=>({...node,dependsOn:['review'],...(node.kind==='Handling'?{source:'Named',approverUserIds:[users[2].id]}:{})}))];
+  await publishDefinitions(invoke,admin,settings,['expense']);
+  const applicant=await invoke('Login',{username:users[0].username,password:'Pdf-Review-2026'});
+  const row=await invoke('CreateExpenseRequest',{requestKey:randomUUID(),title:'桌面正式审批单验收',reason:'预览、打印与保存',currency:'CNY',lines:[{category:'Other',spentOn:applicant.user.businessDate,description:'交通费',amount:'12.35'}]},{},applicant.accessToken);
+  const form=new FormData();form.set('file',new Blob(['%PDF-1.7\n%%EOF'],{type:'application/pdf'}),'proof.pdf');form.set('expectedVersion',String(row.versionNumber));
+  const uploaded=await fetch(`${url}/api/office/expense-requests/${row.id}/attachments`,{method:'POST',headers:{...headers,authorization:`Bearer ${applicant.accessToken}`},body:form,signal:AbortSignal.timeout(60000)});
+  assert(uploaded.ok,await uploaded.text());
+  const latest=await invoke('GetExpenseRequest',undefined,{id:row.id},applicant.accessToken);
+  await invoke('SubmitExpenseRequest',{expectedVersion:latest.versionNumber,note:'提交审批'},{id:row.id},applicant.accessToken);
+  const reviewer=(await invoke('Login',{username:users[1].username,password:'Pdf-Review-2026'})).accessToken;
+  await approveTask(invoke,reviewer,'Expense',row.id);
+  return row.id;
+}
+
 export async function publishPermissionScheme(invoke, token, scheme) {
   return invoke('PublishPermissionScheme',{schemeId:String(scheme.id),expectedVersion:scheme.versionNumber,note:'发布验收权限版本'}, {}, token);
 }

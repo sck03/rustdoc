@@ -5,7 +5,7 @@ import { formatBusinessDateTime } from "../../ui/businessTime.ts";
 import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { OfficeQueryState } from "../office/OfficeUi.tsx";
-import { communicationAccess, notificationActions, notificationLink } from "./communicationModel.ts";
+import { communicationAccess, notificationActionLabel, notificationLink } from "./communicationModel.ts";
 import { useCommunicationOperation, useNotifications, useNotificationCount } from "./useCommunication.ts";
 import { Pagination } from "../../ui/primitives/Pagination.tsx";
 import "../../styles/routes/office.css";
@@ -20,7 +20,7 @@ export function NotificationsPage({ client, user }: { client: ExportDocManagerAp
     description="查看申请与审批动态，进入关联申请继续办理。标记已读仅更新通知状态。">
     <div className="office-toolbar oa-toolbar"><label className="checkbox-field"><input type="checkbox" checked={m.unread} onChange={e => m.changeUnread(e.target.checked)} />仅未读</label><button type="button" className="command-button secondary" disabled={operation.busy || !count.data?.unreadCount} onClick={() => void operation.run(signal => client.readAllNotifications({ signal }), () => {})}>全部标记已读</button><button type="button" className="command-button secondary" onClick={() => { void m.query.refetch(); void count.refetch(); }}>刷新</button></div>
     {operation.error && <InlineNotice tone="error">{operation.error}</InlineNotice>}{count.isError && <InlineNotice tone="error">{readApiError(count.error)}</InlineNotice>}
-    <OfficeQueryState query={m.query} emptyTitle="当前没有通知" /><div className="office-resource-grid">{m.query.data?.items.map(row => { const link = notificationLink(row); return <article className="office-resource-card" key={row.id}><h3>{notificationActions[row.action] ?? row.action} · {row.title}</h3><p>{formatBusinessDateTime(row.createdAt, user.businessTimeZone)} · {row.status === "Read" ? "已读" : "未读"}</p><div className="office-card-actions">{link && <Link className="command-button secondary" to={link}>查看关联申请</Link>}{row.status === "Unread" && <button type="button" className="command-button" disabled={operation.busy} onClick={() => void operation.run(signal => client.readNotification({ id: row.id }, { signal }), () => {})}>标记已读</button>}</div></article>; })}</div>
+    <OfficeQueryState query={m.query} emptyTitle="当前没有通知" /><div className="office-resource-grid">{m.query.data?.items.map(row => { const link = notificationLink(row); return <article className="office-resource-card" key={row.id}><h3>{notificationActionLabel(row)} · {row.title}</h3><p>{formatBusinessDateTime(row.createdAt, user.businessTimeZone)} · {row.status === "Read" ? "已读" : "未读"}</p><div className="office-card-actions">{link && <Link className="command-button secondary" to={link}>查看关联申请</Link>}{row.status === "Unread" && <button type="button" className="command-button" disabled={operation.busy} onClick={() => void operation.run(signal => client.readNotification({ id: row.id }, { signal }), () => {})}>标记已读</button>}</div></article>; })}</div>
     <Pagination pageNumber={m.page} totalCount={m.query.data?.totalCount ?? 0} pageSize={20} isBusy={m.query.isFetching} onPageChange={m.setPage} />
   </ListWorkspace>;
 }

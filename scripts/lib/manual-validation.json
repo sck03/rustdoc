@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "tests": {
     "test_organization_desktop_ui.mjs": {
-      "environment": "Windows WebView2；已完成 locked build 的 Full SQLite 测试包，验证账号工具栏、组织表格、排序与审批图示；脚本自动创建隔离 DataRoot。",
-      "commands": ["node scripts/test_organization_desktop_ui.mjs <Full测试包目录>"]
+      "environment": "Windows WebView2；当前 locked build 的 Full SQLite 包，验证账号菜单、组织表格、排序、审批图及正式 PDF。脚本自动创建隔离 DataRoot；--download 需在原生保存对话框选择脚本打印的隔离路径。",
+      "commands": ["node scripts/test_organization_desktop_ui.mjs <Full测试包目录>", "node scripts/test_organization_desktop_ui.mjs <Full测试包目录> --download"]
     },
     "test_organization_oa_quality_ui.mjs": {
       "environment": "当前源码 locked build 的 office_review、React dist 与 Chromium；使用自动创建的隔离 SQLite 验证组织排序、人员标签、审批分流、草稿编辑删除及单位权限版本。",

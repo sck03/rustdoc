@@ -1,5 +1,6 @@
 use export_doc_storage::{
-    CommunicationQuery, CommunicationView, Connection, NotificationScope, RecordWrite,
+    CommunicationQuery, CommunicationView, Connection, NodeAccess, NotificationScope,
+    RecordApprover, RecordWrite,
 };
 use serde_json::{Value, json};
 
@@ -134,6 +135,15 @@ pub fn exercise(db: &Connection) {
     scopes.push(scope("oa-general", 2, vec![], None));
     for scope in &mut scopes {
         scope.workflow_date = Some(chrono::NaiveDate::from_ymd_opt(2026, 9, 30).unwrap());
+        scope.approval_principals = vec![RecordApprover {
+            user_id: 200,
+            context: String::new(),
+            restrictions: vec![],
+        }];
+        scope.node_access = vec![NodeAccess {
+            action: "complete",
+            restrictions: vec![],
+        }];
     }
     let combined = CommunicationQuery {
         view: CommunicationView::Notifications { scopes: &scopes },

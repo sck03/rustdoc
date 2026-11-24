@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "capturedAt": "2026-09-13",
-  "updatedAt": "2026-11-23",
-  "reviewNotes": "2026-11-23 organization/OA review against c1de8d52: split draft deletion, sibling ordering, public personnel labels and unit publication reads into bounded responsibility modules. Storage batches publication/name reads; remove repeated full personnel and per-template queries. Domain retains self/repeated/protected review constraints. Add independent contract/permission audits, shared SQLite/PostgreSQL regressions and material label privacy test. New endpoints require explicit generated projections, excluded from hand-maintained web counts. Preserve all per-file limits and existing aggregate growth allowances; advance web, organization, native Rust and native test aggregates after reviewed functional additions. The automation aggregate adds 155 lines for the real HTTP/React organization/OA regression and its explicit gate registration; retain the 150-line future growth allowance. Evidence: docs/archive/2026-11/2026-11-23组织与OA重构修复.md.",
+  "updatedAt": "2026-11-24",
+  "reviewNotes": "2026-11-24 reviewed account menu, self-service password and finance receipt scope: refresh the five affected aggregate baselines for bounded modules, independent API deltas, real HTTP/React regressions and Tauri checks; move auth tests into the test tree and remove retired logout styling. Preserve per-file limits and original future-growth allowances. Evidence: docs/archive/2026-11/2026-11-24账号菜单与财务接收.md. 2026-11-23 organization/OA review against c1de8d52: split draft deletion, sibling ordering, public personnel labels and unit publication reads into bounded responsibility modules. Storage batches publication/name reads; remove repeated full personnel and per-template queries. Domain retains self/repeated/protected review constraints. Add independent contract/permission audits, shared SQLite/PostgreSQL regressions and material label privacy test. New endpoints require explicit generated projections, excluded from hand-maintained web counts. Preserve all per-file limits and existing aggregate growth allowances; advance web, organization, native Rust and native test aggregates after reviewed functional additions. The automation aggregate adds 155 lines for the real HTTP/React organization/OA regression and its explicit gate registration; retain the 150-line future growth allowance. Evidence: docs/archive/2026-11/2026-11-23组织与OA重构修复.md.",
   "rules": [
     {
       "name": "repository web production default",
@@ -10,9 +10,9 @@
       "filePattern": "^.+\\.(?:ts|tsx|css)$",
       "excludePattern": "^apps/export-doc-web/src/api/generated/",
       "maximumLines": 900,
-      "baselineAggregateLines": 89033,
+      "baselineAggregateLines": 89249,
       "maximumAggregateGrowthLines": 200,
-      "maximumAggregateLines": 89233,
+      "maximumAggregateLines": 89449,
       "reportFiles": false
     },
     {
@@ -38,9 +38,9 @@
       "filePattern": "^.+\\.rs$",
       "excludePattern": "/(?:tests|examples)/|/generated_api\\.rs$",
       "maximumLines": 900,
-      "baselineAggregateLines": 117378,
+      "baselineAggregateLines": 117498,
       "maximumAggregateGrowthLines": 75,
-      "maximumAggregateLines": 117453,
+      "maximumAggregateLines": 117573,
       "reportFiles": false
     },
     {
@@ -52,9 +52,9 @@
       "filePattern": "^.+\\.rs$",
       "relativePathPattern": "/(?:tests|examples)/",
       "maximumLines": 1200,
-      "baselineAggregateLines": 36347,
+      "baselineAggregateLines": 36682,
       "maximumAggregateGrowthLines": 120,
-      "maximumAggregateLines": 36467,
+      "maximumAggregateLines": 36802,
       "reportFiles": false
     },
     {
@@ -67,9 +67,9 @@
       "filePattern": "^.+\\.(?:mjs|ps1|cmd|yml|yaml)$",
       "excludePattern": "^(?:scripts/[^/]*native[^/]*\\.(?:mjs|ps1|cmd)$|deploy/rust-native/|\\.github/workflows/rust-native-validation\\.yml$)",
       "maximumLines": 2300,
-      "baselineAggregateLines": 31715,
+      "baselineAggregateLines": 32007,
       "maximumAggregateGrowthLines": 150,
-      "maximumAggregateLines": 31865,
+      "maximumAggregateLines": 32157,
       "reportFiles": false
     },
     {
@@ -93,9 +93,9 @@
       "filePattern": "^.+\\.(?:yml|yaml)$",
       "excludePattern": "^\\.github/workflows/rust-native-validation\\.yml$",
       "maximumLines": 800,
-      "baselineAggregateLines": 1074,
+      "baselineAggregateLines": 1098,
       "maximumAggregateGrowthLines": 20,
-      "maximumAggregateLines": 1094,
+      "maximumAggregateLines": 1118,
       "reportFiles": false
     },
     {

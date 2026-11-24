@@ -355,6 +355,11 @@ export interface ApiBackupWebDavSettings {
   userName: string;
 }
 
+export interface ApiChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface ApiCommandResponse {
   message: string;
   success: boolean;
@@ -6828,11 +6833,13 @@ export interface SingleWindowSettings {
 
 export interface SiteNotification {
   action: string;
+  actionRequired?: boolean;
   createdAt: string;
   id: number;
   readAt: string;
   requestId: number;
   requestKind: string;
+  requestStatus?: string;
   status: "Unread" | "Read";
   title: string;
 }
@@ -7956,6 +7963,10 @@ export interface CancelTravelRequestRequest {
 
 export interface CaptureRemoteHsCodesRequest {
   body: ApiHsCodeRemoteSearchRequest;
+}
+
+export interface ChangeOwnPasswordRequest {
+  body: ApiChangePasswordRequest;
 }
 
 export interface CleanupAuditLogsRequest {
