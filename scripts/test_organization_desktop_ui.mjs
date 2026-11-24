@@ -10,6 +10,7 @@ import { createApprovedExpense } from './lib/approval-fixtures.mjs';
 // Targeted WebView2 regression; business workflow assertions live in the HTTP/React companion.
 const root = path.resolve(import.meta.dirname, '..');
 const app = path.resolve(process.argv[2]);
+const permissionSourceOnly = process.argv.includes('--permission-source-only');
 const out = path.join(root, 'artifacts/organization-desktop-ui', String(Date.now()));
 fs.mkdirSync(out, { recursive: true });
 const port = await getFreePort();
@@ -43,10 +44,30 @@ try {
   let token='';
   const invoke=(id,body,parameters={})=>request(id,body,parameters,token);
   token=(await invoke('Login',{username:'admin',password:''})).accessToken;
-  await invoke('CreateOrganizationDepartment',{code:'UIA',name:'甲部门',companyCode:'DEFAULT',isActive:true});
-  await invoke('CreateOrganizationDepartment',{code:'UIB',name:'乙部门',companyCode:'DEFAULT',isActive:true});
+  if (!permissionSourceOnly) {
+    await invoke('CreateOrganizationDepartment',{code:'UIA',name:'甲部门',companyCode:'DEFAULT',isActive:true});
+    await invoke('CreateOrganizationDepartment',{code:'UIB',name:'乙部门',companyCode:'DEFAULT',isActive:true});
+  }
   await run(`(()=>{const input=document.querySelector('input[autocomplete=username]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'admin');input.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('.login-submit-button').click();})()`);
   await wait("!document.querySelector('.login-submit-button')&&!!document.querySelector('main')");
+  if (permissionSourceOnly) {
+    for (const width of [1440,1180,390]) {
+      await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<=680});
+      await run("document.querySelector('.account-menu-trigger').click()");
+      await wait("!!document.querySelector('[role=menu]')");
+      await run("[...document.querySelectorAll('[role=menuitem]')].find(e=>e.textContent==='我的权限来源').click()");
+      await wait("!!document.querySelector('.permission-source-summary')");
+      assert(await run("(()=>{const d=document.querySelector('[role=dialog]');const r=d.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&d.scrollWidth<=d.clientWidth+1&&!/账号关闭|身份关闭|方案关闭|上级授权关闭|不会与其他单位身份合并/.test(d.textContent);})()"));
+      await captureScreenshot(cdp,path.join(out,`permission-source-${width}.png`));
+      await run("document.querySelector('[role=dialog] summary').click()");
+      await wait("document.querySelectorAll('.permission-source-operations li').length>0");
+      assert(await run("(()=>{const d=document.querySelector('[role=dialog]');return d.scrollWidth<=d.clientWidth+1;})()"));
+      await run("document.querySelector('[role=dialog] [aria-label=\"关闭窗口\"]').click()");
+      await wait("!document.querySelector('[role=dialog]')");
+    }
+    fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({edition:context.productEdition,permissionSource:[1440,1180,390],grantedOperations:true},null,2));
+    console.log('Targeted permission-source Tauri/WebView2 verification passed: '+out);
+  } else {
   assert.equal(await run("document.querySelectorAll('.workspace-logout-button').length"),0);
   for(const width of [1440,1180,390]) {
     await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width<=680});
@@ -120,6 +141,7 @@ try {
   }
   fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({edition:context.productEdition,layout:[1440,1920,600],accountMenu:[1440,1180,390],passwordDialog:true,toolbar:true,directOrdering:true,selfRouting:true,approvalPdf:true,nativeDownload:process.argv.includes('--download')},null,2));
   console.log('Targeted Tauri/WebView2 verification passed: '+out);
+  }
 } finally {
   if(cdp)cdp.close();
   await stopProcessTree(child);

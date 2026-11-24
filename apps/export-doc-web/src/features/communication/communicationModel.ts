@@ -11,6 +11,12 @@ export function notificationActionLabel(row: SiteNotification) {
   }
   return notificationActions[row.action] ?? row.action;
 }
+export function notificationFinanceReceiptStatus(row: SiteNotification) {
+  if (row.requestKind !== "oa-expense") return null;
+  if (row.requestStatus === "Approved") return { label: "待财务接收", tone: "warning" } as const;
+  if (row.requestStatus === "HandedOff") return { label: "已财务接收", tone: "positive" } as const;
+  return null;
+}
 export const communicationAccess = (user: ApiUserDto, resource: "announcements" | "notifications", action = "view") =>
   hasPermission(user.capabilities.permissions, `office.${resource}`, action);
 export function announcementActive(row: Announcement, now = Date.now()) {

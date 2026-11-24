@@ -23,7 +23,7 @@ export function AccountMenu({ user, displayName, identityLabel, isDesktopRuntime
         ...(user.permissionSource ? [{ key: "permissions", label: "我的权限来源", icon: <ShieldCheck size={18} aria-hidden="true" />, onSelect: () => setDialog("permissions") }] : []),
         { key: "logout", label: "退出登录", icon: <LogOut size={18} aria-hidden="true" />, onSelect: onLogout, danger: true, separator: true },
       ]} />
-    {dialog === "permissions" && <PermissionSourceSummary user={user} onClose={() => setDialog(null)} />}
+    {dialog === "permissions" && <PermissionSourceSummary user={user} isDesktopRuntime={isDesktopRuntime} onClose={() => setDialog(null)} />}
     {dialog === "password" && onChangePassword && <PasswordChangeDialog isDesktopRuntime={isDesktopRuntime}
       onChangePassword={onChangePassword} onClose={() => setDialog(null)} />}
   </>;

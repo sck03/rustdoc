@@ -31,7 +31,18 @@ await withOfficeUi('account-menu-ui', async ({ output, url, invoke, openPage, re
   const axe = require('axe-core'); await page.evaluate(axe.source);
   assert.deepEqual((await page.evaluate(() => window.axe.run(document.querySelector('.session-strip'), { runOnly:{ type:'tag', values:['wcag2a','wcag2aa'] } }))).violations, []);
   await page.getByRole('menuitem', { name:'我的权限来源', exact:true }).click();
-  await page.getByRole('dialog', { name:'当前身份与权限来源', exact:true }).getByRole('button', { name:'关闭窗口', exact:true }).click();
+  const sourceDialog = page.getByRole('dialog', { name:'当前身份与权限来源', exact:true });
+  assert(!/受限功能|账号关闭|身份关闭|方案关闭|上级授权关闭|不会与其他单位身份合并/u.test(await sourceDialog.innerText()));
+  for (const width of [1440, 680, 390]) {
+    await page.setViewportSize({width,height:900});
+    assert(await sourceDialog.evaluate(element => element.scrollWidth <= element.clientWidth + 1),`Permission dialog has no overflow at ${width}px`);
+    assert.deepEqual((await page.evaluate(() => window.axe.run(document.querySelector('[role="dialog"]'), {runOnly:{type:'tag',values:['wcag2a','wcag2aa']}}))).violations,[]);
+    await page.screenshot({path:path.join(output,`permission-source-${width}.png`)});
+  }
+  await sourceDialog.locator('summary').click();
+  await sourceDialog.getByText('当前没有已授权操作。',{exact:true}).waitFor();
+  await sourceDialog.getByRole('button', { name:'关闭窗口', exact:true }).click();
+  await page.setViewportSize({width:1440,height:1000});
   const requests = []; page.on('request', request => { if (request.url().endsWith('/api/auth/password')) requests.push(request); });
   const openPassword = async () => { await trigger.click(); await page.getByRole('menuitem', { name:'修改密码', exact:true }).click(); };
   await openPassword();
@@ -59,5 +70,19 @@ await withOfficeUi('account-menu-ui', async ({ output, url, invoke, openPage, re
   await relogged.getByRole('button', { name:/^账号菜单：/u }).click();
   await relogged.getByRole('menuitem', { name:'退出登录', exact:true }).click();
   await relogged.locator('input[autocomplete=username]').waitFor();
-  fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ keyboard:true, responsive:true, accessibility:true, selfPassword:true, otherSessionsRevoked:true, unrelatedAccountPreserved:true }, null, 2));
+  await invoke('createUserAccount', {username:'restricted-permission-ui',fullName:'权限范围测试',role:'OfficeEmployee',companyScope:'DEFAULT',departmentId:'GENERAL',
+    isActive:true,resetPassword:'Restricted-Pass-2026',disabledModules:['office.purchase'],oaAssignedOnly:true},{},admin);
+  const restricted = await openPage('restricted-permission-ui','Restricted-Pass-2026');
+  await restricted.getByRole('button',{name:/^账号菜单：/u}).click();
+  await restricted.getByRole('menuitem',{name:'我的权限来源',exact:true}).click();
+  const restrictedDialog = restricted.getByRole('dialog',{name:'当前身份与权限来源',exact:true});
+  await restrictedDialog.getByText('受限功能',{exact:true}).waitFor();
+  await restrictedDialog.getByText('账号限制',{exact:true}).waitFor();
+  assert.equal(await restrictedDialog.getByText('身份限制',{exact:true}).count(),0);
+  await restrictedDialog.getByText('仅本人及明确参与的事项',{exact:true}).waitFor();
+  await restrictedDialog.locator('summary').click();
+  assert(await restrictedDialog.locator('.permission-source-operations li').count()>0);
+  await restricted.screenshot({path:path.join(output,'permission-source-restricted.png')});
+  fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ keyboard:true, responsive:true, accessibility:true, selfPassword:true, otherSessionsRevoked:true, unrelatedAccountPreserved:true,
+    compactPermissionSource:true, realRestrictionsVisible:true }, null, 2));
 });

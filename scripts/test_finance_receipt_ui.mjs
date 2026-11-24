@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
 import { approvalStage, approveTask, fulfillNodeInUi, linkBusinessPerson, publishDefinitions } from './lib/approval-fixtures.mjs';
 
-await withOfficeUi('finance-receipt-ui', async ({ output, url, invoke, openPage }) => {
+await withOfficeUi('finance-receipt-ui', async ({ output, url, invoke, openPage, require }) => {
   const admin = (await invoke('Login', { username:'oa-review', password:'Review-2026-Test' })).accessToken;
   const users = [], people = [];
   for (const [username, fullName, role, grants] of [
@@ -51,21 +51,46 @@ await withOfficeUi('finance-receipt-ui', async ({ output, url, invoke, openPage 
   const account = (await invoke('ListUsers', undefined, {}, admin)).users.find(user => user.id === users[2].id);
   await invoke('updateUserAccount', { ...account, expectedVersion:account.versionNumber, resetPassword:'' }, { id:account.id }, admin);
   const applicant = (await invoke('Login', { username:'finance-applicant', password:'Finance-Receipt-2026' })).accessToken;
-  const request = await invoke('CreateExpenseRequest', { requestKey:randomUUID(), title:'财务接收范围回归', reason:'其他员工费用报销', currency:'CNY', lines:[{ category:'Other', spentOn:'2026-11-24', description:'交通费', amount:'12.35' }] }, {}, applicant);
+  const requestTitle = '业务部本月海外客户拜访交通与办公用品费用报销-' + 'ExpenseReference'.repeat(3);
+  const request = await invoke('CreateExpenseRequest', { requestKey:randomUUID(), title:requestTitle, reason:'其他员工费用报销', currency:'CNY', lines:[{ category:'Other', spentOn:'2026-11-24', description:'交通费', amount:'12.35' }] }, {}, applicant);
   const proof = new FormData(); proof.set('file', new Blob(['%PDF-1.7\n%%EOF'], { type:'application/pdf' }), 'proof.pdf'); proof.set('expectedVersion', String(request.versionNumber));
   const uploaded = await fetch(`${url}/api/office/expense-requests/${request.id}/attachments`, { method:'POST', headers:{ authorization:`Bearer ${applicant}` }, body:proof });
   assert(uploaded.ok, await uploaded.text());
   const latest = await invoke('GetExpenseRequest', undefined, { id:request.id }, applicant);
   await invoke('SubmitExpenseRequest', { expectedVersion:latest.versionNumber, note:'提交报销' }, { id:request.id }, applicant);
   const reviewer = (await invoke('Login', { username:'finance-reviewer', password:'Finance-Receipt-2026' })).accessToken;
+  const reviewerPage = await openPage('finance-reviewer','Finance-Receipt-2026');
+  await reviewerPage.goto(`${url}/#/office/notifications`);
+  await reviewerPage.getByRole('heading',{name:`待您审批 · ${requestTitle}`,exact:true}).waitFor();
+  assert.equal(await reviewerPage.locator('.notification-receipt-status').count(),0,'No finance receipt state before approval');
   await approveTask(invoke, reviewer, 'Expense', request.id);
   const notifications = await invoke('ListNotifications', undefined, {}, reviewer);
   const notices = notifications.items.filter(notification => notification.requestId === request.id && notification.action === 'submit');
   assert(notices.length > 0);
   assert(notices.every(notification => notification.actionRequired === false && notification.requestStatus === 'Approved'));
   const page = await openPage('finance-receiver', 'Finance-Receipt-2026');
+  await page.goto(`${url}/#/office/notifications`);
+  await page.getByLabel('财务接收状态：待财务接收',{exact:true}).waitFor();
+  await page.evaluate(require('axe-core').source);
+  assert.deepEqual((await page.evaluate(() => window.axe.run(document.querySelector('main'),{runOnly:{type:'tag',values:['wcag2a','wcag2aa']}}))).violations,[]);
+  for (const width of [1440,390]) {
+    await page.setViewportSize({width,height:900});
+    const layout=await page.locator('.notification-grid > article').first().evaluate(card=>{
+      const title=card.querySelector('h3'),badge=card.querySelector('.notification-receipt-status');
+      const titleBox=title.getBoundingClientRect(),badgeBox=badge.getBoundingClientRect();
+      return {noOverflow:document.documentElement.scrollWidth<=innerWidth+1&&card.scrollWidth<=card.clientWidth+1&&title.scrollWidth<=title.clientWidth+1,
+        compact:card.getBoundingClientRect().width<card.parentElement.getBoundingClientRect().width/2,
+        wrapped:titleBox.height>32,noOverlap:titleBox.right<=badgeBox.left+1||titleBox.bottom<=badgeBox.top+1,
+        badgeComplete:badge.scrollWidth<=badge.clientWidth+1,fullTitle:title.textContent};
+    });
+    assert(layout.noOverflow&&layout.wrapped&&layout.noOverlap&&layout.badgeComplete,JSON.stringify(layout));
+    if(width===1440)assert(layout.compact,'One notification stays a compact card');
+    assert(layout.fullTitle.endsWith(requestTitle),'The entire long title remains visible');
+    await page.screenshot({path:path.join(output,`finance-pending-${width}.png`)});
+  }
+  await page.setViewportSize({width:1440,height:1000});
   await page.goto(`${url}/#/office/requests/expense?view=finance&requestId=${request.id}`);
-  await page.getByText('财务接收范围回归', { exact:true }).first().waitFor();
+  await page.getByText(requestTitle, { exact:true }).first().waitFor();
   const liveFinance = (await invoke('Login', { username:'finance-receiver', password:'Finance-Receipt-2026' })).accessToken;
   const row = await invoke('GetExpenseRequest', undefined, { id:request.id }, liveFinance);
   const financeNotifications = await invoke('ListNotifications', undefined, {}, liveFinance);
@@ -76,14 +101,17 @@ await withOfficeUi('finance-receipt-ui', async ({ output, url, invoke, openPage 
   await fulfillNodeInUi(page, '财务接收回归');
   assert.equal((await invoke('GetExpenseRequest', undefined, { id:request.id }, liveFinance)).status, 'HandedOff');
   await page.goto(`${url}/#/office/notifications`);
-  await page.getByRole('heading', {name:/^站内通知/u}).waitFor();
   await page.getByRole('link',{name:'查看关联申请',exact:true}).first().waitFor();
+  await page.getByLabel('财务接收状态：已财务接收',{exact:true}).waitFor();
+  assert.equal(await page.getByLabel('财务接收状态：待财务接收',{exact:true}).count(),0);
   assert.equal(await page.getByText('加载失败',{exact:true}).count(),0);
   await page.getByRole('button',{name:'全部标记已读',exact:true}).click();
   await page.getByRole('heading',{name:'站内通知 · 0 条未读',exact:true}).waitFor();
   assert.equal((await invoke('GetNotificationUnreadCount', undefined, {}, liveFinance)).unreadCount,0);
   assert((await invoke('ListNotifications', undefined, {}, liveFinance)).items.every(notification => notification.status === 'Read'));
+  await page.getByLabel('财务接收状态：已财务接收',{exact:true}).waitFor();
   await page.screenshot({ path:path.join(output, 'finance-receipt.png'), fullPage:true });
   fs.writeFileSync(path.join(output, 'summary.json'), JSON.stringify({ defaultFinanceScope:true, noDefaultApproval:true, administratorExcluded:true, publication:true, crossEmployeeReceiptVisible:true,
-    combinedDepartmentApproval:true, financeNotifications:true, unreadCount:true, readAll:true }, null, 2));
+    combinedDepartmentApproval:true, financeNotifications:true, unreadCount:true, readAll:true, receiptOnlyAfterApproval:true, currentReceiptState:true,
+    longChineseAndUnbrokenEnglishTitle:true }, null, 2));
 });

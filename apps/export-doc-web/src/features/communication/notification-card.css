@@ -1,0 +1,4 @@
+.office-resource-grid.notification-grid { grid-template-columns: repeat(auto-fill,minmax(min(100%,300px),1fr)); }
+.notification-heading { display: flex; align-items: start; flex-wrap: wrap; gap: var(--edm-space-2) var(--edm-space-3); min-width: 0; }
+.notification-heading h3 { flex: 1; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.notification-receipt-status { flex-shrink: 0; white-space: nowrap; }
