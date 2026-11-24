@@ -134,7 +134,12 @@ pub(super) fn defaults(kind: &str, depends: &[String]) -> Result<Vec<ApprovalSta
         )?),
         "leave" | "overtime" | "travel" | "general" => result.push(node(
             "complete",
-            "实际办理登记",
+            match kind {
+                "leave" => "销假登记",
+                "overtime" => "加班完成确认",
+                "travel" => "出差归档",
+                _ => "实际办理登记",
+            },
             Handling,
             Complete,
             SystemCommand::None,

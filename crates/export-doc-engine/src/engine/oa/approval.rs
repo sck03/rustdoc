@@ -24,6 +24,21 @@ pub(in crate::engine) fn business_kind(kind: &str) -> &str {
         kind => kind.trim_start_matches("oa-"),
     }
 }
+pub(super) fn permission_requirement(resource: &str, action: &str) -> String {
+    let definition = export_doc_domain::permissions::resource(resource);
+    let resource_name = definition
+        .map(|item| item.name.as_str())
+        .unwrap_or(resource);
+    let action_name = definition
+        .and_then(|item| item.actions.iter().find(|item| item.key == action))
+        .map(|item| item.name.as_str())
+        .unwrap_or(action);
+    if action == "view" {
+        format!("“{resource_name}”查看")
+    } else {
+        format!("“{resource_name}”查看及 {action_name}")
+    }
+}
 pub(in crate::engine) fn resource_for_collaboration(resource: &str) -> bool {
     export_doc_domain::permissions::resource(resource)
         .is_some_and(|resource| resource.workflow_resource)
@@ -77,22 +92,13 @@ pub(in crate::engine) fn reviewer_for(
         return Err(cause);
     }
     let account = store::get(tx, "users", id)?;
-    let definition = export_doc_domain::permissions::resource(resource);
-    let resource_name = definition
-        .map(|item| item.name.as_str())
-        .unwrap_or(resource);
-    let action_name = definition
-        .and_then(|item| item.actions.iter().find(|item| item.key == action))
-        .map(|item| item.name.as_str())
-        .unwrap_or(action);
     Err(error(
         403,
         format!(
-            "{}：没有单位 {} 的“{}”查看及 {} 权限或有效业务任职。请在账号与权限中选择相应审批方案，并核对单位、部门和任职范围。",
+            "{}：没有单位 {} 的{}权限或有效业务任职。请在账号与权限中核对所选权限方案、单位、部门和人员任职。",
             text(&account, "fullName"),
             actor.company,
-            resource_name,
-            action_name
+            permission_requirement(resource, action)
         ),
     ))
 }

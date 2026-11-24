@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-24 OA 办理责任专项：构建当前 office_review 后运行 `node scripts/test_oa_responsibility_ui.mjs`。隔离 SQLite、真实 HTTP／React 核对全部 13 种内置定义；覆盖未关联办理账号排除、8 类办理节点的具体权限错误、补齐关联后仿真成功、无办理权限的具名审批人被拒绝，以及消耗品跳过归还。不会修改现有业务数据库，未运行 PDF 下载专项。
+
 2026-11-24 权限摘要／财务状态：`test_account_menu_ui.mjs` 增加空限制隐藏、实际限制提示、折叠授权明细及 1440／680／390 布局；`test_finance_receipt_ui.mjs` 验证审批前无接收标签、批准后待接收、办理后已接收及单卡片紧凑宽度。真实桌面仅检查权限弹窗时使用 `node scripts/test_organization_desktop_ui.mjs <Full测试包目录> --permission-source-only`，该模式不运行组织、发票或 PDF 专项。
 
 2026-11-24 账号／财务专项：构建当前 office_review 示例和 React 后运行 `node scripts/test_account_menu_ui.mjs`、`node scripts/test_finance_receipt_ui.mjs`。前者验证账号菜单、键盘、密码和会话；后者验证财务默认方案、部门审批组合、发布、财务接收与通知列表／未读数量。均使用隔离测试数据，不运行整轮门禁或 PDF 专项。Storage 通知查询可用 `cargo test --locked -p export-doc-storage --test contract sqlite_communication_permissions` 独立回归。

@@ -105,6 +105,26 @@ pub(super) fn resolve(
     employee: &Value,
     stage: &ApprovalStage,
 ) -> Result<Vec<ActorBinding>> {
+    resolve_in(tx, actor, row, employee, stage).map_err(|mut cause| {
+        if matches!(cause.status, Some(400 | 401 | 403 | 404 | 409)) {
+            let resource = approval::resource(&text(row, "kind")).unwrap_or("");
+            cause.message = format!(
+                "节点“{}”（{}）：{}",
+                stage.name,
+                approval::permission_requirement(resource, action(stage)),
+                cause.message
+            );
+        }
+        cause
+    })
+}
+fn resolve_in(
+    tx: &Connection,
+    actor: &Actor,
+    row: &Value,
+    employee: &Value,
+    stage: &ApprovalStage,
+) -> Result<Vec<ActorBinding>> {
     let mut origins = std::collections::HashMap::new();
     let ids = match stage.source {
         ApproverSource::Position
@@ -309,7 +329,7 @@ pub(super) fn resolve(
     }
     if result.is_empty() {
         return Err(conflict(
-            "节点没有有效的责任人员，请补齐任职、权限或办理分工。",
+            "未找到启用且关联有效人员任职的责任账号；请核对该节点的责任来源、权限范围或办理分工。",
         ));
     }
     Ok(result)

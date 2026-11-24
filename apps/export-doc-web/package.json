@@ -50,6 +50,7 @@
     "test:workspace-ui": "node ../../scripts/test_workspace_navigation_ui.mjs",
     "test:account-menu-ui": "node ../../scripts/test_account_menu_ui.mjs",
     "test:finance-receipt-ui": "node ../../scripts/test_finance_receipt_ui.mjs",
+    "test:oa-responsibility-ui": "node ../../scripts/test_oa_responsibility_ui.mjs",
     "test:navigation-reorganization-ui": "node ../../scripts/test_navigation_reorganization_ui.mjs",
     "test:email-template-model": "node ../../scripts/test_email_template_model.mjs",
     "test:email-template-workspace-ui": "node ../../scripts/test_email_template_workspace_ui.mjs",

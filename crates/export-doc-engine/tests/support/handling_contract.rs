@@ -50,6 +50,8 @@ pub fn exercise(service: &NativeService, root: &str) {
         ("seal", "OfficeEmployee"),
         ("supplies", "OfficeEmployee"),
         ("leader", "OfficeManager"),
+        ("personnel", "PersonnelManager"),
+        ("finance", "Finance"),
     ] {
         let mut body = json!({"username":format!("{name}-{suffix}"),"fullName":name,"role":role,"companyScope":company,"departmentId":department,"isActive":true,"resetPassword":"Handling-2026-Test"});
         if ["seal", "supplies"].contains(&name) {
@@ -86,7 +88,7 @@ pub fn exercise(service: &NativeService, root: &str) {
     let person = call(service,&admin,CREATE_PERSONNEL,0,Some(json!({"requestKey":nonce().unwrap(),"employeeNumber":format!("EMP-{suffix}"),"departmentId":department,"jobTitle":"业务员","employmentType":"FullTime","hireDate":"2026-09-01","profile":{"fullName":"applicant"}}))).unwrap();
     let person_id = person["employee"]["id"].as_i64().unwrap();
     call(service,&admin,LINK_PERSONNEL_ACCOUNT,person_id,Some(json!({"expectedVersion":person["versionNumber"],"userId":users[1]["id"],"expectedAccountVersion":users[1]["versionNumber"]}))).unwrap();
-    for index in 2..=4 {
+    for index in 2..users.len() {
         let person = call(
             service,
             &admin,
