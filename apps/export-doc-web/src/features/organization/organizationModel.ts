@@ -64,16 +64,26 @@ export function buildDepartmentTreeRows<T extends DepartmentNode & DepartmentMan
     siblings.push(entry);
     groups.set(parent, siblings);
   }
-  const rows: Array<typeof entries[number] & { childCount: number; expanded: boolean }> = [];
+  const rows: Array<typeof entries[number] & { childCount: number; expanded: boolean; siblingIndex: number; siblingCount: number }> = [];
   function visit(parentCode: string) {
-    for (const entry of groups.get(parentCode) ?? []) {
+    const siblings = groups.get(parentCode) ?? [];
+    for (const [siblingIndex, entry] of siblings.entries()) {
       if (!visible.has(entry.code)) continue;
       const children = groups.get(entry.code) ?? [];
       const expanded = keyword.trim() ? true : overrides[entry.code] ?? entry.depth < expandedDepth;
-      rows.push({ ...entry, childCount: children.length, expanded });
+      rows.push({ ...entry, childCount: children.length, expanded, siblingIndex, siblingCount: siblings.length });
       if (expanded) visit(entry.code);
     }
   }
   visit("");
   return rows;
+}
+
+export function moveDepartment<T extends DepartmentNode>(departments: T[], department: T, direction: -1 | 1) {
+  const siblings = departments.filter(row => (row.parentCode ?? "") === (department.parentCode ?? "")).sort(compareDepartments);
+  const index = siblings.findIndex(row => row.code === department.code);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= siblings.length) return null;
+  [siblings[index], siblings[target]] = [siblings[target], siblings[index]];
+  return siblings;
 }

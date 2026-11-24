@@ -24,7 +24,7 @@ export function UserManagementPanel({ client, canManageUsers }: { client: Export
       <div className="section-header">
         <div>
           <h2>账号管理</h2>
-          <p className="section-description">账号管理登录与操作权限；职位在人事档案维护。一份共享方案可组合人事、行政、财务等多种职责，在“权限方案”中选择“组合多个职责方案”创建。</p>
+          <p className="section-description">管理登录与操作权限；职位在人事档案维护。</p>
         </div>
         <div className="toolbar-actions">
           <button className="icon-button" type="button" title="刷新用户" aria-label="刷新用户" disabled={isBusy} onClick={() => void refreshUsers()}>

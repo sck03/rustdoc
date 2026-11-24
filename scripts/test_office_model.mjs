@@ -17,6 +17,7 @@ await require("esbuild").build({ stdin: { contents: `
   export { formReferenceLabels } from ${source("features/oa/oaFormModel.ts")};
   export * as personnel from ${source("features/office/personnelModel.ts")};
   export * as organization from ${source("features/organization/organizationModel.ts")};
+  export { departmentSelfRouting } from ${source("features/oa/workflowSelfApprovalModel.ts")};
   export * as communication from ${source("features/communication/communicationModel.ts")};
   export * as navigation from ${source("app/workspaceNavigation.ts")};
   export { getDefaultWorkspaceRoute } from ${source("app/productEdition.ts")};
@@ -27,7 +28,7 @@ await require("esbuild").build({ stdin: { contents: `
   export { oaApi } from ${source("features/oa/oaApi.ts")};
   export { officeRequestApi } from ${source("features/office/officeRequestApi.ts")};
 `, loader: "ts", resolveDir: web }, bundle: true, platform: "node", format: "esm", outfile: bundle, logLevel: "silent" });
-const { office, oa, personnel, organization, communication, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey, formReferenceLabels } = await import(pathToFileURL(bundle).href);
+const { office, oa, personnel, organization, communication, navigation, getDefaultWorkspaceRoute, isRouteAccessAllowed, createRequestKey, formReferenceLabels, departmentSelfRouting } = await import(pathToFileURL(bundle).href);
 const { ApiError, acknowledgedCommands, oaApi, officeRequestApi } = await import(pathToFileURL(bundle).href);
 for (const kind of ["rooms", "supplies"]) {
   const statuses = office.officeRequestStatuses(kind);
@@ -151,6 +152,17 @@ assert.deepEqual(organization.buildDepartmentTreeRows(departments,"",0,{}).map(i
 assert.deepEqual(organization.buildDepartmentTreeRows(departments,"",Infinity,{}).map(item=>item.code),["ROOT","SALES","TEAM"]);
 assert.deepEqual(organization.buildDepartmentTreeRows(departments,"",Infinity,{ROOT:false}).map(item=>item.code),["ROOT"]);
 assert.deepEqual(organization.buildDepartmentTreeRows(departments,"一组",0,{ROOT:false}).map(item=>item.code),["ROOT","SALES","TEAM"]);
+const siblingDepartments=[...departments,{code:"ADMIN",name:"行政部",parentCode:"ROOT",isActive:true,managerName:"",sortOrder:0}];
+assert.deepEqual(organization.moveDepartment(siblingDepartments,siblingDepartments[3],1).map(item=>item.code),["SALES","ADMIN"]);
+assert.equal(organization.moveDepartment(siblingDepartments,siblingDepartments[3],-1),null);
+const filteredSibling=organization.buildDepartmentTreeRows(siblingDepartments,"张宁",1,{}).find(item=>item.code==="SALES");
+assert.equal(filteredSibling.siblingIndex,1);assert.equal(filteredSibling.siblingCount,2,"filtered rows still move within the complete sibling set");
+const selfStage={source:"DepartmentManager",selfApproval:"Skip",repeatedApprover:"Allow"};
+assert.equal(departmentSelfRouting(selfStage).skips,true);
+assert.equal(departmentSelfRouting({...selfStage,repeatedApprover:"Reject"}).skips,false);
+assert.equal(departmentSelfRouting({...selfStage,revisionPolicy:{protectedUserIds:[7]}}).skips,false);
+assert.equal(departmentSelfRouting({...selfStage,selfApproval:"Reject"}).skips,false);
+assert.equal(departmentSelfRouting({...selfStage,source:"CompanyExecutive"}),null);
 const deepDepartments=Array.from({length:32},(_,index)=>({code:`D${index}`,name:`部门${index}`,parentCode:index?`D${index-1}`:null,isActive:true,managerName:""}));
 const deepMatch=organization.buildDepartmentTreeRows(deepDepartments,"部门31",1,{});
 assert.equal(deepMatch.length,32);assert.equal(deepMatch.at(-1).depth,31);assert.equal(deepMatch.at(-1).ancestors.length,31);

@@ -75,13 +75,7 @@ fn seed_admin(store: &Store, password: &str) -> Result<()> {
         transaction.set_credential(saved["id"].as_i64().unwrap_or(0),&salt,&hash,ITERATIONS)?;
         store::save(transaction,"companies",0,json!({"code":"DEFAULT","name":"本公司","isActive":true}),Some("DEFAULT".into()),&admin,"create")?;
         store::save(transaction,"departments",0,json!({"code":"GENERAL","name":"综合部","companyCode":"DEFAULT","parentCode":null,"managerEmployeeId":null,"isActive":true}),Some("GENERAL".into()),&admin,"create")?;
-        for role in contracts::contract()["permissions"]["roles"].as_array().ok_or_else(|| unavailable("权限角色目录缺失。"))? {
-            let mut template = contracts::overlay(contracts::initial(contracts::schema("ApiPermissionTemplateDto")), role);
-            template["grants"] = json!(permissions::catalog().roles.iter().find(|r| role["code"] == r.code).ok_or_else(|| unavailable("权限预置目录缺失。"))?.grants);
-            template["isActive"] = json!(true);
-            template["isSystem"] = json!(true);
-            store::save(transaction, "permission-templates", 0, template, Some(role["code"].as_str().unwrap_or("").into()), &admin, "create")?;
-        }
+        super::permission_templates::seed_missing(transaction, &admin)?;
         Ok(())
     })
 }
@@ -160,6 +154,12 @@ impl Sessions {
             let current = store::get(tx, "users", record["id"].as_i64().unwrap_or(0))?;
             if current["isActive"] != true || current["versionNumber"] != record["versionNumber"] {
                 return Err(error(401, "账号在登录期间发生变化，请重新登录。"));
+            }
+            if current["role"] == "Admin" {
+                super::permission_templates::seed_missing(
+                    tx,
+                    &actor_from_connection(tx, &current, store.edition)?,
+                )?;
             }
             session_version_in(tx, &current)
         })?;

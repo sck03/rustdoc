@@ -9,6 +9,49 @@ use serde_json::{Value, json};
 pub(super) mod publications;
 pub(super) mod unit_publications;
 
+/// Install absent presets under an authenticated administrator; never revise a saved scheme.
+pub(super) fn seed_missing(tx: &Connection, actor: &super::store::Actor) -> Result<()> {
+    if !actor.admin {
+        return Err(super::error::error(403, "只有系统管理员可初始化权限方案。"));
+    }
+    for role in super::contracts::contract()["permissions"]["roles"]
+        .as_array()
+        .ok_or_else(|| super::error::unavailable("权限角色目录缺失。"))?
+    {
+        let code = text(role, "code");
+        if tx
+            .find_identity("permission-templates", &super::store::normalize(&code))?
+            .is_some()
+        {
+            continue;
+        }
+        let mut template = super::contracts::overlay(
+            super::contracts::initial(super::contracts::schema("ApiPermissionTemplateDto")),
+            role,
+        );
+        template["grants"] = json!(
+            permissions::catalog()
+                .roles
+                .iter()
+                .find(|item| item.code == code)
+                .ok_or_else(|| super::error::unavailable("权限预置目录缺失。"))?
+                .grants
+        );
+        template["isActive"] = json!(true);
+        template["isSystem"] = json!(true);
+        super::store::save(
+            tx,
+            "permission-templates",
+            0,
+            template,
+            Some(code),
+            actor,
+            "create",
+        )?;
+    }
+    Ok(())
+}
+
 pub(super) fn project_with_usage(tx: &Connection, value: Value) -> Result<Value> {
     project_many_with_usage(tx, vec![value])?
         .pop()

@@ -49,7 +49,7 @@ await withOfficeUi('approval-permissions-ui', async ({ output, url, invoke, open
   const newSchemeDialog = admin.getByRole('dialog', { name: '新建权限方案', exact: true });
   await newSchemeDialog.getByLabel('新建方案起点').selectOption('company');
   await newSchemeDialog.getByRole('button', { name: '建立方案草稿', exact: true }).click();
-  assert.equal(await schemes.getByLabel('方案名称', { exact: true }).inputValue(), '公司审批负责人');
+  assert.equal(await schemes.getByLabel('方案名称', { exact: true }).inputValue(), '公司审批人员');
   await schemes.getByLabel('模块分类').selectOption({ label: '工作台' });
   assert.equal(await schemes.getByLabel('员工请假查看数据范围', { exact: true }).inputValue(), 'company');
   assert.equal(await schemes.getByLabel('员工请假任务审批数据范围', { exact: true }).inputValue(), 'company');

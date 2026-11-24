@@ -342,7 +342,8 @@ const schemeResources = new Map(editionPermissions.resources.map(resource => [re
   actions: resource.actions.map(action => ({ ...action, presetLevel: action.navigationAccessLevel })) }]));
 const employeeScheme = { id: 1, code: 'OfficeEmployee', isSystem: true, grants: employeeGrants, disabledModules: ['office.purchase'] };
 for (const scope of ['department', 'company']) {
-  const starting = scheme.createSchemeFromEmployee(employeeScheme, schemeResources, scope);
+  const preset = editionPermissions.roles.find(role => role.code === (scope === 'department' ? 'DepartmentApprover' : 'CompanyApprover'));
+  const starting = scheme.copyPermissionScheme({...preset,disabledModules:employeeScheme.disabledModules}, schemeResources);
   const grants = scheme.toPermissionGrants(starting.grants);
   assert(starting.disabledModules.includes('office.purchase'), 'Starting from an employee scheme preserves its disabled modules');
   for (const resource of schemeResources.values()) {
@@ -367,6 +368,12 @@ for (const [resource, action] of [['office.people', 'view-details'], ['office.ge
   assert(combined.grants[scheme.grantKey(resource, action)] === 'company', 'One scheme can contain HR, administration and finance duties');
 }
 assert(!scheme.toPermissionGrants(combined.grants).some(grant => ['system.users', 'system.settings'].includes(grant.resourceKey) || schemeResources.get(grant.resourceKey)?.isTechnical), 'Combining duties excludes administrator and technical permissions');
+const salesLead = scheme.combinePermissionSchemes(editionPermissions.roles.filter(role => ['Sales', 'DepartmentApprover'].includes(role.code)), schemeResources);
+assert(salesLead.grants[scheme.grantKey('sales.customers','edit')]==='own','Sales editing remains own');
+assert(salesLead.grants[scheme.grantKey('office.general','approve')]==='department','Department review remains departmental');
+const officeLead = scheme.combinePermissionSchemes(editionPermissions.roles.filter(role => ['PersonnelManager','OfficeManager','DepartmentApprover'].includes(role.code)), schemeResources);
+assert(officeLead.grants[scheme.grantKey('office.people','edit')]==='company','HR management remains company');
+assert(officeLead.grants[scheme.grantKey('office.general','approve')]==='company','a company administration approval already present must be visible for explicit review');
 const narrowed = scheme.combinePermissionSchemes([{ grants: [{ resourceKey: 'office.leave', action: 'view', dataScope: 'department' }], disabledModules: ['office.leave'] },
   { grants: [{ resourceKey: 'office.leave', action: 'view', dataScope: 'company' }], disabledModules: [] }], schemeResources);
 assert(narrowed.grants[scheme.grantKey('office.leave', 'view')] === 'company' && narrowed.disabledModules.includes('office.leave'), 'Scope union retains explicit module restrictions');

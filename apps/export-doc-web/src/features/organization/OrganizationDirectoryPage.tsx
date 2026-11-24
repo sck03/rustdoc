@@ -3,12 +3,12 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Building2, Plus, RefreshCw, Search } from "lucide-react";
 import type { ApiOrganizationCompanyDto, ApiOrganizationDepartmentDto, ApiUserDto, ExportDocManagerApiClient } from "../../api/index.ts";
-import { PageState } from "../../ui/PageState.tsx";
+import { InlineNotice, PageState } from "../../ui/PageState.tsx";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useOrganizationDirectory, useOrganizationOperation } from "./useOrganizationDirectory.ts";
 import { OrganizationCompanyForm, OrganizationDepartmentForm } from "./OrganizationForms.tsx";
 import { OrganizationTree } from "./OrganizationTree.tsx";
-import { DepartmentOrderDialog } from "./DepartmentOrderDialog.tsx";
+import { useDepartmentOrdering } from "./useDepartmentOrdering.ts";
 import { OrganizationCompanyList } from "./OrganizationCompanyList.tsx";
 import { RecordDeleteDialog } from "../office/RecordDeleteDialog.tsx";
 import { OrganizationUnitWorkspace } from "./OrganizationUnitWorkspace.tsx";
@@ -29,10 +29,10 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
   const [revealDepartmentCode, setRevealDepartmentCode] = useState<string | null>(null);
   const [companyEditor, setCompanyEditor] = useState<{ record?: ApiOrganizationCompanyDto } | null>(null);
   const [departmentEditor, setDepartmentEditor] = useState<{ record?: ApiOrganizationDepartmentDto; parentCode?: string } | null>(null);
-  const [ordering, setOrdering] = useState<ApiOrganizationDepartmentDto | null>(null);
   const companies = query.data?.companies ?? [];
   const company = companies.find((item) => item.code === companyCode) ?? companies.find((item) => item.isActive) ?? companies[0];
   const departments = (query.data?.departments ?? []).filter((item) => item.companyCode === company?.code);
+  const ordering = useDepartmentOrdering(client, company?.code ?? "", departments);
   return <ListWorkspace className="office-workspace organization-workspace" aria-label="组织架构管理" title="组织与任职" description="先选择单位，再维护部门、任职或授权。"
     actions={<>{user.capabilities.enabledModules?.includes("office.people") && <Link className="command-button secondary" to="/office/people">人员档案</Link>}
         {user.capabilities.canManageUsers && <Link className="command-button secondary" to="/system/access-control">账号与权限</Link>}
@@ -58,10 +58,12 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
         <div className="organization-search"><Search size={17} aria-hidden="true" /><input aria-label="查找部门或负责人" type="search" maxLength={100} value={search} onChange={(event) => setSearch(event.target.value)} placeholder="查找部门名称、代码或负责人" />
           <button type="button" className="icon-button" aria-label="刷新组织架构" disabled={query.isFetching} onClick={() => void query.refetch()}><RefreshCw size={17} aria-hidden="true" /></button></div>
         <OrganizationTree key={company.code} departments={departments} keyword={search} companyName={company.name} canAdd={company.isActive && company.unitKind !== "Group"}
+          orderingBusy={ordering.busy || query.isFetching}
           revealDepartmentCode={revealDepartmentCode} onRevealed={() => setRevealDepartmentCode(null)}
           onEdit={(record) => setDepartmentEditor({ record })} onAdd={(parentCode) => setDepartmentEditor({ parentCode })}
-          onOrder={setOrdering}
+          onMove={(department, direction) => void ordering.move(department, direction)}
           onDelete={(record) => setDeleting({ kind: "department", record })} />
+        {ordering.error && <InlineNotice tone="error">{ordering.error}</InlineNotice>}
         </div>} />
       </section>
       </div>
@@ -75,6 +77,5 @@ function DirectoryWorkspace({ client, user }: { client: ExportDocManagerApiClien
       onDelete={(body, signal) => deleting.kind === "company" ? client.deleteOrganizationCompany({ id: deleting.record.id, body }, { signal })
         : client.deleteOrganizationDepartment({ id: deleting.record.id, body }, { signal })}
       onClose={() => setDeleting(null)} onDeleted={() => setDeleting(null)} />}
-    {ordering && <DepartmentOrderDialog client={client} department={ordering} departments={departments} onClose={() => setOrdering(null)} />}
   </ListWorkspace>;
 }

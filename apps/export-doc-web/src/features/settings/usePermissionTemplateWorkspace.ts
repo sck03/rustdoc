@@ -4,7 +4,7 @@ import type { ApiPermissionTemplateDto, ApiPermissionTemplateSaveRequest, ApiPer
 import { identityQueryRoots, queryKeys } from "../../api/queryKeys.ts";
 import { readApiError } from "../../ui/formUtils.ts";
 import { useConfirmation } from "../../ui/ConfirmationProvider.tsx";
-import { combinePermissionSchemes, createSchemeFromEmployee, schemeStartingPoints, toPermissionGrants, type SchemeStartingPoint } from "./permissionSchemeModel.ts";
+import { combinePermissionSchemes, copyPermissionScheme, schemeStartingPoints, toPermissionGrants, type SchemeStartingPoint } from "./permissionSchemeModel.ts";
 import { useUnsavedChangesGuard } from "../../ui/unsavedChangesGuard.tsx";
 import { useScopedMutation } from "../../ui/useScopedMutation.ts";
 import { useAbortableOperationController, isAbortError } from "../../ui/useAbortableOperation.ts";
@@ -149,14 +149,15 @@ export function usePermissionTemplateWorkspace(client: ExportDocManagerApiClient
         description: "组合选定方案的当前配置；同一操作取较大范围，任一来源关闭的模块继续关闭。保存后独立维护。",
       });
     } else if (startingPoint !== "blank") {
-      const source = templates.find(template => template.isSystem && template.code === "OfficeEmployee");
+      const code = { employee: "OfficeEmployee", department: "DepartmentApprover", company: "CompanyApprover" }[startingPoint];
+      const source = templates.find(template => template.isSystem && template.code === code);
       if (!source?.isActive) {
-        setMessage("请先确认普通员工方案存在且已启用，再从该方案创建。");
+        setMessage("内置方案尚未就绪，请由系统管理员重新登录后刷新方案目录。");
         return;
       }
-      Object.assign(emptyDraft, createSchemeFromEmployee(source, resourceByKey, startingPoint), {
+      Object.assign(emptyDraft, copyPermissionScheme(source, resourceByKey), {
         name: schemeStartingPoints[startingPoint],
-        description: "以普通员工方案为起点；按实际职责核对模块、查看与审批范围，审批步骤另行配置。",
+        description: "复制所选内置方案；按实际职责核对操作及范围，负责人任职和审批步骤另行配置。",
       });
     }
     setSelectedId(0);

@@ -35,7 +35,7 @@ export function InvoiceItemsTable(props:Props){
           </colgroup>
           <thead>
             <tr>
-              <th>操作</th>
+              <th className="item-actions-heading">操作</th>
               {visibleColumns.map((column) => <th key={column.field}>{column.header}</th>)}
             </tr>
           </thead>

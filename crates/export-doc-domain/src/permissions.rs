@@ -403,6 +403,54 @@ mod tests {
     }
 
     #[test]
+    fn approval_presets_have_bounded_review_rights_without_management() {
+        for (role, scope) in [
+            ("DepartmentApprover", "department"),
+            ("CompanyApprover", "company"),
+        ] {
+            let grants = role_grants(role).unwrap();
+            for resource in [
+                "office.personnel-changes",
+                "office.leave",
+                "office.overtime",
+                "office.expenses",
+                "office.travel",
+                "office.purchase",
+                "office.general",
+                "office.rooms",
+                "office.supplies",
+            ] {
+                for action in ["view", "approve"] {
+                    assert!(
+                        grants.contains(&grant(resource, action, scope)),
+                        "{role}: {resource}/{action}"
+                    );
+                }
+            }
+            assert!(grants.contains(&grant("office.general", "create", "own")));
+            assert!(!grants.iter().any(|g| {
+                [
+                    "manage",
+                    "view-details",
+                    "complete",
+                    "issue",
+                    "return",
+                    "void",
+                ]
+                .contains(&g.action.as_str())
+            }));
+            assert!(!grants.iter().any(|g| g.data_scope == "all"
+                && resource(&g.resource_key).is_some_and(|r| r.supports_data_scope)));
+        }
+        assert!(
+            !role_grants("OfficeEmployee")
+                .unwrap()
+                .iter()
+                .any(|g| g.action == "approve")
+        );
+    }
+
+    #[test]
     fn voucher_output_follows_explicit_or_job_duties() {
         use crate::generated_api::*;
         let employee = role_grants("OfficeEmployee").unwrap();

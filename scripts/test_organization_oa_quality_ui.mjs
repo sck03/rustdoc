@@ -2,15 +2,15 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { withOfficeUi } from './lib/native-office-ui.mjs';
-import { publishDefinitions } from './lib/approval-fixtures.mjs';
+import { publishDefinitions, openDefinitionInUi, approveTask } from './lib/approval-fixtures.mjs';
 
 // One isolated backend verifies the same metadata that the real React clients consume.
 await withOfficeUi('organization-oa-quality-ui',async({invoke,output,openPage,url})=>{
 const report={}; const admin=(await invoke('Login',{username:'oa-review',password:'Review-2026-Test'})).accessToken;
 const allGeneral=['view','create','edit','cancel','approve','complete'].map(action=>({resourceKey:'office.general',action,dataScope:'company'}));
 await invoke('CreateOrganizationDepartment',{code:'REVIEWALT',name:'验证兼职部门',companyCode:'DEFAULT',isActive:true},{},admin);
-async function create(name,number,organization){const user=(await invoke('createUserAccount',{username:name,fullName:number,role:'OfficeEmployee',companyScope:'DEFAULT',departmentId:'GENERAL',isActive:true,resetPassword:'Review-Diag-2026',permissionGrants:allGeneral},{},admin)).user;const initial=await invoke('CreatePersonnel',{requestKey:randomUUID(),employeeNumber:number,departmentId:'GENERAL',jobTitle:'业务专员',employmentType:'FullTime',hireDate:'2026-01-01',onProbation:false,probationEndsOn:null,contractEndsOn:null,profile:{fullName:number},...(organization?{organization}:{})},{},admin);const person=await invoke('LinkPersonnelAccount',{expectedVersion:initial.versionNumber,userId:user.id,expectedAccountVersion:user.versionNumber},{id:initial.employee.id},admin);return {user,person};}
-const manager=await create('review-manager','验证部门负责人'); const executive=await create('review-executive','验证公司负责人'); const managerId=manager.person.employee.id,execId=executive.person.employee.id;
+async function create(name,number,organization,role='OfficeEmployee'){const user=(await invoke('createUserAccount',{username:name,fullName:number,role,companyScope:'DEFAULT',departmentId:'GENERAL',isActive:true,resetPassword:'Review-Diag-2026'},{},admin)).user;const initial=await invoke('CreatePersonnel',{requestKey:randomUUID(),employeeNumber:number,departmentId:'GENERAL',jobTitle:'业务专员',employmentType:'FullTime',hireDate:'2026-01-01',onProbation:false,probationEndsOn:null,contractEndsOn:null,profile:{fullName:number},...(organization?{organization}:{})},{},admin);const person=await invoke('LinkPersonnelAccount',{expectedVersion:initial.versionNumber,userId:user.id,expectedAccountVersion:user.versionNumber},{id:initial.employee.id},admin);return {user,person};}
+const manager=await create('review-manager','验证部门负责人',undefined,'DepartmentApprover'); const executive=await create('review-executive','验证公司负责人',undefined,'CompanyApprover'); const managerId=manager.person.employee.id,execId=executive.person.employee.id;
 const reports={managerEmployeeId:managerId,managerAssignmentId:manager.person.organization.primaryAssignmentId,functionalManagerEmployeeIds:[execId],functionalManagerAssignmentIds:[executive.person.organization.primaryAssignmentId]};
 const employee=await create('review-employee','验证普通员工',{...reports,additionalAssignments:[{companyCode:'DEFAULT',departmentId:'REVIEWALT',jobTitle:'业务专员',startsOn:'2026-01-01',endsOn:'',...reports}]});
 let directory=await invoke('GetOrganizationDirectory',undefined,{},admin);for(const department of directory.departments.filter(d=>d.companyCode==='DEFAULT'))await invoke('UpdateOrganizationDepartment',{...department,managerEmployeeId:managerId,managerAppointmentId:manager.person.organization.primaryAssignmentId,expectedVersion:department.versionNumber},{id:department.id},admin);let company=directory.companies.find(c=>c.code==='DEFAULT');await invoke('UpdateOrganizationCompany',{...company,executiveEmployeeId:execId,executiveAppointmentId:executive.person.organization.primaryAssignmentId,expectedVersion:company.versionNumber},{id:company.id},admin);
@@ -27,6 +27,8 @@ assert.equal(ordinary.approvalPlan.steps.length,2);
 assert.equal(leader.approvalPlan.steps.length,1);
 assert.equal(leader.approvalPlan.nodes.find(node=>node.key==='department').skipped,true);
 assert.equal(leader.approvalPlan.steps[0].approverUserId,executive.user.id);
+const unqualified=structuredClone(definition);unqualified.stages[0].source='Named';unqualified.stages[0].approverUserIds=[employee.user.id];
+await assert.rejects(()=>invoke('SimulateOaDefinition',{...sample(manager.person),definition:unqualified},{},admin),/验证普通员工.*查看及 审批/u);
 const saved = await invoke('SaveOaApprovalSettings',{section:'rules',definitionKey:'general',rule:definition,expectedRevision:settings.revisions?.['rule:general']??0},{},admin);
 await publishDefinitions(invoke,admin,saved,['general'],{general:[sample(employee.person),sample(manager.person)]});
 const employeeToken=(await invoke('Login',{username:'review-employee',password:'Review-Diag-2026'})).accessToken;
@@ -35,6 +37,9 @@ const managerDraft=await invoke('CreateGeneralRequest',{requestKey:randomUUID(),
 const managerSubmitted=await invoke('SubmitGeneralRequest',{expectedVersion:managerDraft.versionNumber,note:'验证分流'},{id:managerDraft.id},managerToken);
 assert.equal(managerSubmitted.approvalPlan.steps.length,1);
 assert.equal(managerSubmitted.approvalPlan.steps[0].approverUserId,executive.user.id);
+const executiveToken=(await invoke('Login',{username:'review-executive',password:'Review-Diag-2026'})).accessToken;
+const approved=await approveTask(invoke,executiveToken,'General',managerDraft.id);
+assert.equal(approved.status,'Approved');
 let draft=await invoke('CreateGeneralRequest',{requestKey:randomUUID(),title:'草稿往返编辑',reason:'隔离验证',category:'Other',currency:'CNY'},{},employeeToken);
 assert(draft.departmentName && draft.departmentName!=='GENERAL');
 const page=await openPage('review-employee','Review-Diag-2026');
@@ -59,19 +64,51 @@ assert.equal(await page.getByRole('button',{name:'中文草稿续编成功',exac
 await assert.rejects(()=>invoke('GetGeneralRequest',undefined,{id:draft.id},employeeToken),/404/);
 const adminPage=await openPage('oa-review','Review-2026-Test');
 await adminPage.goto(url+'/#/system/organization');
-await adminPage.getByRole('button',{name:'调整验证兼职部门顺序',exact:true}).click();
-const orderDialog=adminPage.getByRole('dialog',{name:'调整顺序 · 验证兼职部门',exact:true});
-await orderDialog.getByRole('button',{name:'置底',exact:true}).click();
-await orderDialog.getByRole('button',{name:'保存顺序',exact:true}).click();
-await orderDialog.waitFor({state:'hidden'});
+const moved=adminPage.waitForResponse(response=>response.url().endsWith('/api/organization-directory/departments/order')&&response.request().method()==='POST');
+await adminPage.getByRole('button',{name:'下移验证兼职部门',exact:true}).click();
+assert.equal((await moved).status(),204);
+assert.equal(await adminPage.getByRole('dialog').count(),0,'single-click ordering needs no dialog');
 await adminPage.reload();
 await adminPage.waitForFunction(()=>document.querySelector('.organization-tree-table tbody tr:last-child')?.getAttribute('data-department-code')==='REVIEWALT');
-for(const width of [1440,600]) {
+for(const width of [1440,1920,600]) {
   await adminPage.setViewportSize({width,height:900});
   const rows=await adminPage.locator('.organization-row-actions').evaluateAll(elements=>elements.map(element=>({available:element.getBoundingClientRect().width,needed:element.scrollWidth})));
   assert(rows.every(row=>row.needed<=row.available+1),JSON.stringify({width,rows}));
+  assert.equal(await adminPage.locator('.organization-actions-heading').evaluate(element=>getComputedStyle(element).textAlign),'center');
+  if(width>680){const bounds=await adminPage.locator('.organization-tree-table').evaluate(table=>({table:table.getBoundingClientRect().width,frame:table.parentElement.clientWidth}));assert(Math.abs(bounds.table-bounds.frame)<2,JSON.stringify(bounds));}
   await adminPage.screenshot({path:output+'/organization-'+width+'.png',fullPage:true});
 }
+await adminPage.setViewportSize({width:1440,height:900});
+await adminPage.goto(url+'/#/system/access-control');
+const header=adminPage.locator('.user-management-section > .section-header');
+await header.getByRole('button',{name:'保存',exact:true}).waitFor();
+const toolbar=await header.locator('.toolbar-actions').evaluate(element=>({height:element.getBoundingClientRect().height,buttons:[...element.children].map(button=>({top:button.getBoundingClientRect().top,height:button.getBoundingClientRect().height}))}));
+assert(Math.max(...toolbar.buttons.map(button=>button.top))-Math.min(...toolbar.buttons.map(button=>button.top))<5,JSON.stringify(toolbar));
+await adminPage.screenshot({path:output+'/account-toolbar.png',fullPage:true});
+await adminPage.goto(url+'/#/office/approval-settings');
+const editor=await openDefinitionInUi(adminPage,'general');
+await editor.locator('summary').filter({hasText:'负责人本人跳过，转公司领导审批'}).waitFor();
+await editor.getByRole('button',{name:'流程图',exact:true}).click();
+await editor.locator('svg').getByText('负责人本人跳过 → 公司领导',{exact:true}).waitFor();
+await adminPage.screenshot({path:output+'/self-routing-graph.png',fullPage:true});
+await adminPage.goto(url+'/#/system/access-control?view=templates');
+const schemes=adminPage.locator('.permission-template-section');
+await schemes.getByRole('button',{name:'新建方案',exact:true}).click();
+const combination=adminPage.getByRole('dialog',{name:'新建权限方案',exact:true});
+await combination.getByLabel('新建方案起点').selectOption('combined');
+await combination.getByRole('checkbox',{name:'业务人员',exact:true}).check();
+await combination.getByRole('checkbox',{name:'部门审批人员',exact:true}).check();
+await combination.getByRole('button',{name:'建立方案草稿',exact:true}).click();
+const combinedResponse=adminPage.waitForResponse(response=>response.url().endsWith('/api/permission-templates')&&response.request().method()==='POST');
+await schemes.getByRole('button',{name:'保存方案',exact:true}).click();
+const combinedScheme=await (await combinedResponse).json();
+assert(combinedScheme.grants.some(g=>g.resourceKey==='sales.customers'&&g.action==='edit'&&g.dataScope==='own'));
+assert(combinedScheme.grants.some(g=>g.resourceKey==='office.general'&&g.action==='approve'&&g.dataScope==='department'));
+const combinedPublication=await invoke('PublishPermissionScheme',{schemeId:String(combinedScheme.id),expectedVersion:combinedScheme.versionNumber,note:'兼任权限验证'},{},admin);
+const currentManager=(await invoke('ListUsers',undefined,{},admin)).users.find(u=>u.id===manager.user.id);
+await invoke('updateUserAccount',{...currentManager,expectedVersion:currentManager.versionNumber,permissionGrants:null,permissionTemplateId:combinedScheme.id,permissionSchemeVersion:combinedPublication.version},{id:currentManager.id},admin);
+const combinedSample=await invoke('SimulateOaDefinition',sample(employee.person),{},admin);
+assert.equal(combinedSample.approvalPlan.steps[0].approverUserId,manager.user.id);
 const grants=[...allGeneral,{resourceKey:'office.announcements',action:'view',dataScope:'all'},{resourceKey:'office.notifications',action:'view',dataScope:'all'},{resourceKey:'system.about',action:'view',dataScope:'all'}];
 const unitUser=(await invoke('createUserAccount',{username:'review-unit-admin',fullName:'单位授权管理员',role:'OfficeEmployee',companyScope:'DEFAULT',departmentId:'GENERAL',isActive:true,resetPassword:'Review-Diag-2026'},{},admin)).user;
 const role=await invoke('SaveUnitAccess',{userId:unitUser.id,companyCode:'DEFAULT',name:'单位授权管理',mode:'Administration',appointmentId:'',permissionGrants:grants,disabledModules:[],oaAssignedOnly:false,management:{roles:true},includeDescendants:false,startsAt:'',endsAt:'',isActive:true,expectedVersion:0},{},admin);
@@ -86,5 +123,5 @@ const versions=await invoke('GetPermissionSchemeVersions',undefined,{schemeId:St
 assert.equal(versions.totalCount,1);
 const version=await invoke('GetPermissionSchemeVersion',undefined,{schemeId:String(scheme.id),version:publication.version},unitToken);
 assert.deepEqual(version.grants,scheme.grants);
-await writeFile(output+'/results.json',JSON.stringify({names:report.names,ordinarySteps:ordinary.approvalPlan.steps.length,managerSteps:leader.approvalPlan.steps.length,departmentName:draft.departmentName,draftEditDelete:true,unitPublishedVersion:publication.version,layout:[1440,600]},null,2));
+await writeFile(output+'/results.json',JSON.stringify({names:report.names,ordinarySteps:ordinary.approvalPlan.steps.length,managerSteps:leader.approvalPlan.steps.length,departmentName:draft.departmentName,draftEditDelete:true,unitPublishedVersion:publication.version,combinedScheme:combinedScheme.name,layout:[1440,1920,600],accountToolbar:true,selfRoutingGraph:true},null,2));
 });

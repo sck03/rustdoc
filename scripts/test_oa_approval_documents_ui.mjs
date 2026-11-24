@@ -39,7 +39,8 @@ await withOfficeUi('oa-approval-documents-ui', async ({ output, url, invoke, ope
   const page = await openPage('oa-review', 'Review-2026-Test');
   await page.goto(`${url}/#/office/approval-settings`);
   const rule = await openDefinitionInUi(page, 'expense');
-  await rule.getByLabel('遇到申请人本人').first().selectOption('Reject');
+  await rule.locator('summary').filter({hasText:'生效条件'}).first().click();
+  await rule.getByLabel('申请人为部门负责人').first().selectOption('Reject');
   await rule.getByLabel('独立复核').first().selectOption('Reject');
   await rule.getByLabel('通过方式').first().selectOption('Any');
   await rule.getByLabel('责任人来源').first().selectOption('LineManager');

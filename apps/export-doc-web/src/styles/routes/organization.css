@@ -44,12 +44,13 @@
   .organization-tree-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
   .organization-tree-toolbar .text-button { padding: 4px 4px; font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
   .organization-tree-scroll { min-width: 0; max-height: 65dvh; overflow: auto; border: 1px solid var(--edm-line); border-radius: var(--edm-radius-sm); }
-  .organization-tree-table { width: 100%; max-width: 58rem; min-width: 36rem; table-layout: fixed; border-collapse: collapse; font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
+  .organization-tree-table { width: 100%; min-width: 36rem; table-layout: fixed; border-collapse: collapse; font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); }
   .organization-manager-column { width: 7rem; }
   .organization-status-column { width: 3.7rem; }
-  .organization-actions-column { width: 12rem; }
+  .organization-actions-column { width: calc(5 * 32px + 4 * 4px + 16px); }
   .organization-tree-table th { position: sticky; top: 0; z-index: var(--edm-z-sticky); padding: 8px 8px; text-align: start; background: var(--edm-bg-muted); color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
   .organization-tree-table td { padding: 4px 8px; border-bottom: 1px solid var(--edm-line); vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .organization-tree-table .organization-actions-heading { text-align: center; }
   .organization-tree-table tr:last-child td { border-bottom: 0; }
   @media (hover: hover) and (pointer: fine) {
   .organization-tree-table tbody tr:hover { background: var(--edm-bg-muted); }
@@ -62,7 +63,7 @@
   .organization-node-name strong { font-size: var(--edm-font-size-sm); line-height: var(--edm-line-height-sm); font-weight: var(--edm-font-weight-medium); }
   .organization-node-name small,
 .organization-child-count { color: var(--edm-text-secondary); font-size: var(--edm-font-size-xs); line-height: var(--edm-line-height-xs); }
-  .organization-row-actions { display: flex; gap: 4px; }
+  .organization-row-actions { display: flex; justify-content: center; gap: 4px; }
   .organization-row-actions .icon-button,
 .organization-expand { width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 4px; }
   .organization-expand { flex: 0 0 32px; border-color: transparent; background: transparent; }
@@ -87,7 +88,7 @@
     .organization-manager-column,
 .organization-manager-cell { display: none; }
     .organization-status-column { width: 3rem; }
-    .organization-actions-column { width: 15rem; }
+    .organization-actions-column { width: calc(5 * 44px + 4 * 4px + 8px); }
     .organization-tree-table td,
 .organization-tree-table th { padding-inline: 4px; }
     .organization-tree-table .organization-node { padding-inline-start: calc(min(var(--organization-depth), 4) * 8px); }

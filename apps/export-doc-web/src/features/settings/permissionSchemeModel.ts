@@ -77,17 +77,11 @@ export function detectPreset(grants: Record<string, string>, resource: ApiPermis
   return "custom";
 }
 
-export const schemeStartingPoints = { blank: "空白方案", employee: "普通员工方案", department: "部门审批负责人", company: "公司审批负责人", combined: "组合多个职责方案" } as const;
+export const schemeStartingPoints = { blank: "空白方案", employee: "普通员工方案", department: "部门审批人员", company: "公司审批人员", combined: "组合多个职责方案" } as const;
 export type SchemeStartingPoint = keyof typeof schemeStartingPoints;
 
-export function createSchemeFromEmployee(source: ApiPermissionTemplateDto, resources: ReadonlyMap<string, ApiPermissionResourceDefinitionDto>, scope: "employee" | "department" | "company") {
+export function copyPermissionScheme(source: ApiPermissionTemplateDto, resources: ReadonlyMap<string, ApiPermissionResourceDefinitionDto>) {
   const grants = getEditableSchemeGrants(source.grants, resources);
-  if (scope !== "employee") {
-    for (const resource of resources.values()) {
-      if (resource.isTechnical || !resource.workflowResource) continue;
-      for (const action of presetActions(resource, "approve")) grants[grantKey(resource.key, action.key)] = scope;
-    }
-  }
   return { grants, disabledModules: [...(source.disabledModules ?? [])], oaAssignedOnly: source.oaAssignedOnly ?? false };
 }
 

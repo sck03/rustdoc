@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, ArrowUpDown } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 import type { ApiOrganizationDepartmentDto } from "../../api/index.ts";
 import { IconButton } from "../../ui/Button.tsx";
 import { PageState } from "../../ui/PageState.tsx";
@@ -13,13 +13,14 @@ type Props = {
   onEdit: (department: ApiOrganizationDepartmentDto) => void;
   onAdd: (parentCode: string) => void;
   onDelete: (department: ApiOrganizationDepartmentDto) => void;
-  onOrder: (department: ApiOrganizationDepartmentDto) => void;
+  onMove: (department: ApiOrganizationDepartmentDto, direction: -1 | 1) => void;
+  orderingBusy: boolean;
   canAdd: boolean;
   revealDepartmentCode: string | null;
   onRevealed: () => void;
 };
 
-export function OrganizationTree({ departments, keyword, companyName, canAdd, onEdit, onAdd, onDelete, onOrder, revealDepartmentCode, onRevealed }: Props) {
+export function OrganizationTree({ departments, keyword, companyName, canAdd, onEdit, onAdd, onDelete, onMove, orderingBusy, revealDepartmentCode, onRevealed }: Props) {
   const [expandedDepth, setExpandedDepth] = useState(1);
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [selectedCode, setSelectedCode] = useState("");
@@ -59,7 +60,7 @@ export function OrganizationTree({ departments, keyword, companyName, canAdd, on
         <table ref={tableRef} className="organization-tree-table">
           <caption className="visually-hidden">部门按层级排列；展开下级或选择名称查看完整路径。</caption>
           <colgroup><col /><col className="organization-manager-column" /><col className="organization-status-column" /><col className="organization-actions-column" /></colgroup>
-          <thead><tr><th scope="col">部门 / 代码</th><th scope="col" className="organization-manager-cell">负责人</th><th scope="col">状态</th><th scope="col">操作</th></tr></thead>
+          <thead><tr><th scope="col">部门 / 代码</th><th scope="col" className="organization-manager-cell">负责人</th><th scope="col">状态</th><th scope="col" className="organization-actions-heading">操作</th></tr></thead>
           <tbody>{rows.map((department) => <tr key={department.code} data-department-code={department.code} data-selected={department.code === selectedCode} data-depth={department.depth}>
             <td>
               <div className="organization-node" style={{ "--organization-depth": department.depth } as CSSProperties}>
@@ -78,7 +79,8 @@ export function OrganizationTree({ departments, keyword, companyName, canAdd, on
             <td className="organization-manager-cell"><TablePrimaryText value={department.managerName || "未设置"} secondary={department.managerEmployeeNumber} /></td>
             <td><span className="organization-state" data-active={department.isActive}>{department.isActive ? "启用" : "停用"}</span></td>
             <td><div className="organization-row-actions">
-              <IconButton label={"调整" + department.name + "顺序"} onClick={() => onOrder(department)}><ArrowUpDown size={15} aria-hidden="true" /></IconButton>
+              <IconButton label={"上移" + department.name} disabled={orderingBusy || department.siblingIndex === 0} onClick={() => onMove(department, -1)}><ArrowUp size={15} aria-hidden="true" /></IconButton>
+              <IconButton label={"下移" + department.name} disabled={orderingBusy || department.siblingIndex === department.siblingCount - 1} onClick={() => onMove(department, 1)}><ArrowDown size={15} aria-hidden="true" /></IconButton>
               <IconButton label={"编辑" + department.name} onClick={() => onEdit(department)}><Pencil size={15} aria-hidden="true" /></IconButton>
               <IconButton label={"为" + department.name + "新增下级部门"} disabled={!canAdd || !department.isActive} onClick={() => onAdd(department.code)}><Plus size={16} aria-hidden="true" /></IconButton>
               <IconButton label={"删除" + department.name} onClick={() => onDelete(department)}><Trash2 size={15} aria-hidden="true" /></IconButton>

@@ -162,4 +162,18 @@ pub(super) fn value() -> serde_json::Value { serde_json::Value::Array(vec![
         (&["document.report-templates"],&["design","clone"],"own"),
         (&["document.report-resources"],&["upload"],"own"),
     ]),
+    role("DepartmentApprover","部门审批人员","查看和审批本部门 OA 事项，自助申请仅限本人；须关联有效任职并明确指定为流程责任人。", &[
+        (&["office.people"],&["view"],"company"),
+        (&["system.about"],&["view"],"own"),
+        (&["office.announcements","office.notifications"],&["view"],"company"),
+        (&["office.personnel-changes","office.leave","office.overtime","office.expenses","office.travel","office.purchase","office.general","office.rooms","office.supplies"],&["view","approve"],"department"),
+        (&["office.leave","office.overtime","office.expenses","office.travel","office.purchase","office.general","office.rooms","office.supplies"],&["create","edit","cancel"],"own"),
+    ]),
+    role("CompanyApprover","公司审批人员","查看和审批本公司 OA 事项，自助申请仅限本人；不默认授予人事档案、资源办理或系统管理权限。", &[
+        (&["office.people"],&["view"],"company"),
+        (&["system.about"],&["view"],"own"),
+        (&["office.announcements","office.notifications"],&["view"],"company"),
+        (&["office.personnel-changes","office.leave","office.overtime","office.expenses","office.travel","office.purchase","office.general","office.rooms","office.supplies"],&["view","approve"],"company"),
+        (&["office.leave","office.overtime","office.expenses","office.travel","office.purchase","office.general","office.rooms","office.supplies"],&["create","edit","cancel"],"own"),
+    ]),
 ]) }

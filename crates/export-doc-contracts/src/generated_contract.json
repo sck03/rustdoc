@@ -1,6 +1,6 @@
 {
   "source": "official /openapi/v1.json",
-  "digest": "b95223a22531ca442a0bfb6794f5ef283c8bae9f60d318926982f92173ef3759",
+  "digest": "49dc11fa07cda7248bf62a10f78467f77a8467985393f4ce8d251ded4b60fcbb",
   "configuration": {
     "defaults": {
       "revision": 0,
@@ -6735,6 +6735,480 @@
           {
             "resourceKey": "document.report-resources",
             "action": "upload",
+            "dataScope": "own"
+          }
+        ]
+      },
+      {
+        "code": "DepartmentApprover",
+        "name": "部门审批人员",
+        "description": "查看和审批本部门 OA 事项，自助申请仅限本人；须关联有效任职并明确指定为流程责任人。",
+        "grants": [
+          {
+            "resourceKey": "office.people",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "system.about",
+            "action": "view",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.notifications",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.personnel-changes",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.personnel-changes",
+            "action": "approve",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.leave",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.leave",
+            "action": "approve",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.overtime",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.overtime",
+            "action": "approve",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.expenses",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.expenses",
+            "action": "approve",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.travel",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.travel",
+            "action": "approve",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.purchase",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.purchase",
+            "action": "approve",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.general",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.general",
+            "action": "approve",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.rooms",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.rooms",
+            "action": "approve",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.supplies",
+            "action": "view",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.supplies",
+            "action": "approve",
+            "dataScope": "department"
+          },
+          {
+            "resourceKey": "office.leave",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.leave",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.leave",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.overtime",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.overtime",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.overtime",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.expenses",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.expenses",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.expenses",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.travel",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.travel",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.travel",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.purchase",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.purchase",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.purchase",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.general",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.general",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.general",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.rooms",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.rooms",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.rooms",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.supplies",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.supplies",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.supplies",
+            "action": "cancel",
+            "dataScope": "own"
+          }
+        ]
+      },
+      {
+        "code": "CompanyApprover",
+        "name": "公司审批人员",
+        "description": "查看和审批本公司 OA 事项，自助申请仅限本人；不默认授予人事档案、资源办理或系统管理权限。",
+        "grants": [
+          {
+            "resourceKey": "office.people",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "system.about",
+            "action": "view",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.announcements",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.notifications",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.personnel-changes",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.personnel-changes",
+            "action": "approve",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.leave",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.leave",
+            "action": "approve",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.overtime",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.overtime",
+            "action": "approve",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.expenses",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.expenses",
+            "action": "approve",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.travel",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.travel",
+            "action": "approve",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.purchase",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.purchase",
+            "action": "approve",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.general",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.general",
+            "action": "approve",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.rooms",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.rooms",
+            "action": "approve",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.supplies",
+            "action": "view",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.supplies",
+            "action": "approve",
+            "dataScope": "company"
+          },
+          {
+            "resourceKey": "office.leave",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.leave",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.leave",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.overtime",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.overtime",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.overtime",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.expenses",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.expenses",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.expenses",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.travel",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.travel",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.travel",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.purchase",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.purchase",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.purchase",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.general",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.general",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.general",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.rooms",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.rooms",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.rooms",
+            "action": "cancel",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.supplies",
+            "action": "create",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.supplies",
+            "action": "edit",
+            "dataScope": "own"
+          },
+          {
+            "resourceKey": "office.supplies",
+            "action": "cancel",
             "dataScope": "own"
           }
         ]

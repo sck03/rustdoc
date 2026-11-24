@@ -7,6 +7,8 @@ const rolePresentation: Record<string, { label: string; description: string }> =
   PersonnelManager: { label: "人事管理员", description: "维护人员档案及人事业务" },
   SalesManager: { label: "销售主管", description: "管理团队客户与销售业务" },
   Finance: { label: "财务人员", description: "处理付款报销、单据查询、报表、汇率、邮件和 OCR" },
+  DepartmentApprover: { label: "部门审批人员", description: "查看和审批本部门 OA 事项，组织负责人及有效任职另行指定" },
+  CompanyApprover: { label: "公司审批人员", description: "查看和审批本公司 OA 事项，组织负责人及有效任职另行指定" },
 };
 
 export function getRolePresentation(role?: string) {

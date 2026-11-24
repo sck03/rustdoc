@@ -101,6 +101,10 @@
   text-align: left;
 }
 
+.item-editor-table .item-actions-heading {
+  text-align: center;
+}
+
 .item-row-actions {
   display: grid;
   grid-template-columns: repeat(4, 30px);
@@ -364,6 +368,16 @@
   border: 1px solid var(--edm-line-strong);
   border-radius: var(--edm-radius-xl);
   background: var(--edm-bg-canvas);
+}
+
+.user-management-section > .section-header > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-management-section > .section-header > .toolbar-actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
 }
 
 .backup-recovery-card .section-header {

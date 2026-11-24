@@ -37,6 +37,7 @@ export function PermissionTemplateManagementPanel({ client, canManageUsers }: {
             <input type="checkbox" checked={sourceIds.includes(template.id)} onChange={event => setSourceIds(current => event.target.checked ? [...current, template.id] : current.filter(id => id !== template.id))} />{template.name}
           </label>)}
           <p>组合当前配置，同一操作取较大范围，关闭模块保留；新方案独立维护。</p>
+          <details><summary>兼任配置示例</summary><p>业务部负责人：业务人员（或销售主管）＋部门审批人员。综合部负责人：行政管理员＋人事管理员＋部门审批人员。组合后分别核对业务管理和审批范围，再保存、发布并分配给账号。</p></details>
         </fieldset>}
         {message && <InlineNotice tone="error">{message}</InlineNotice>}
         <button className="command-button" type="button" disabled={isBusy} onClick={() => void beginNew()}>建立方案草稿</button>
@@ -77,7 +78,7 @@ export function PermissionTemplateManagementPanel({ client, canManageUsers }: {
           {selectedTemplate&&!isAdminTemplate&&<PermissionPublicationActions key={selectedTemplate.id} client={client} scheme={selectedTemplate} disabled={hasUnsavedTemplateChanges||saveMutation.isPending} accountTargets onBusy={setPublicationBusy} onPublished={onPublished} />}
           <details className="permission-effective-details">
             <summary>权限设置说明</summary>
-            <p>总经理等跨部门负责人可从“公司审批负责人”新建方案，部门主管可从“部门审批负责人”开始，再按职责增减。方案复制普通员工的操作和关闭模块，只增加人事、行政的查看与审批；查看范围内的草稿与历史也可见。审批步骤、财务接收、档案维护及系统管理分别配置。部门范围包含主职、兼职及本人负责的部门与启用子部门；可另启用仅本人和分派申请可见。</p>
+            <p>负责人可选内置“部门审批人员”或“公司审批人员”；兼任业务、行政或人事职责时，通过新建方案中的“组合多个职责方案”合并。审批、实际办理、档案维护及系统管理分别授权；同一动作取较大范围，发布前须核对。部门范围含主职、兼职及负责的部门与启用子部门，可选仅本人及分派申请可见。</p>
           </details>
           <EffectivePermissionSummary effectiveGrants={selectedTemplate?.effectiveGrants ?? []} resourceByKey={resourceByKey} />
           <TechnicalPermissionCatalog

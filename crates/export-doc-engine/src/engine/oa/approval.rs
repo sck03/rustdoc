@@ -65,16 +65,34 @@ pub(in crate::engine) fn reviewer_for(
         resource,
         action,
     )?;
+    let mut denial = None;
     for reviewer in reviewers {
         match qualified_person_for(tx, &reviewer, row, action, forbid_subject) {
             Ok(_) => return Ok(reviewer),
-            Err(cause) if cause.status == Some(403) => {}
+            Err(cause) if cause.status == Some(403) => denial = Some(cause),
             Err(cause) => return Err(cause),
         }
     }
+    if let Some(cause) = denial {
+        return Err(cause);
+    }
+    let account = store::get(tx, "users", id)?;
+    let resource_name = export_doc_domain::permissions::resource(resource)
+        .map(|item| item.name.as_str())
+        .unwrap_or(resource);
     Err(error(
         403,
-        "责任人在此单位没有符合申请范围的有效人员审批身份。",
+        format!(
+            "{}：没有单位 {} 的“{}”查看及 {} 权限或有效业务任职。请在账号与权限中选择相应审批方案，并核对单位、部门和任职范围。",
+            text(&account, "fullName"),
+            actor.company,
+            resource_name,
+            if action == "approve" {
+                "审批"
+            } else {
+                action
+            }
+        ),
     ))
 }
 pub(in crate::engine) fn qualified_person(

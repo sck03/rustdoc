@@ -1,5 +1,7 @@
 # 脚本使用说明
 
+2026-11-24 组织/审批配置回归：`node scripts/test_organization_oa_quality_ui.mjs` 验证真实 HTTP/React 的内置审批方案、普通员工/负责人分流、签署、组合职责、同级直接排序与 1440/1920/600 布局。`node scripts/test_organization_desktop_ui.mjs <Full测试包目录>` 只验证本批受影响的真实 Tauri/WebView2 页面、居中操作表头、排序与分流图示；使用独立数据目录，不执行整轮桌面门禁。先以同一仓库 CARGO_HOME 串行完成构建，运行中的 HTTP 夹具须复制到独立目录后才能与 Cargo 编译并行。
+
 2026-11-23 组织/OA 回归：先构建当前 office_review 示例和 React，再执行 `node scripts/test_organization_oa_quality_ui.mjs`。使用隔离 SQLite 和真实 React 验证负责人本人分流、人员名称、列表编辑/删除、部门排序、宽窄屏操作列、单位功能授权和平台发布版本读取。两库共用组织/身份合同，PostgreSQL 18 使用现有 `test-native-postgres.ps1 -Scope All` 入口。完整结果见[本批记录](../docs/archive/2026-11/2026-11-23组织与OA重构修复.md)。
 
 2026-11-22 账号与下载回归：`access_service` 和 PostgreSQL `team_service` 共用账号交接、管理员保留、删除及旧会话合同；HTTP `files` 验证资料票据的 Cookie/操作绑定、分块、Range 及账号删除后拒绝下载。`test_business_features_ui.mjs` 检查原件不经 Blob 和迟到票据取消，`test_batch_file_workflows_ui.mjs` 在真实 React/HTTP 中下载并逐字节核对原件。HS 清空回归覆盖超过两批编号的完整清理与知识实例保留。执行结果与定向清理见[本批记录](../docs/archive/2026-11/2026-11-22账号生命周期与下载优化.md)。
